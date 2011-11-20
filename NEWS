@@ -56,6 +56,7 @@ changes relative to sbcl-1.0.53:
        safe outside systems with getaddrinfo().
   * bug fix: on 64-bit systems setting the nursery size above 4Gb now works.
     (lp#870868)
+  * bug fix: SB-POSIX tests failed on OpenBSD 5.0. (lp#892707)
 
 changes in sbcl-1.0.53 relative to sbcl-1.0.52:
   * enhancement: on 64-bit targets, in src/compiler/generic/early-vm.lisp,
