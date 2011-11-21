@@ -116,7 +116,7 @@
   #!+gencgc
   (progn
     (def!constant dynamic-space-start #x4f000000)
-    (def!constant dynamic-space-end   (!configure-dynamic-space-end #x7efff000)))
+    (def!constant dynamic-space-end   (!configure-dynamic-space-end)))
   #!-gencgc
   (progn
     (def!constant dynamic-0-space-start #x4f000000)
@@ -129,7 +129,7 @@
   #!+gencgc
   (progn
     (def!constant dynamic-space-start #x4f000000)
-    (def!constant dynamic-space-end   (!configure-dynamic-space-end #x7efff000)))
+    (def!constant dynamic-space-end   (!configure-dynamic-space-end)))
   #!-gencgc
   (progn
     (def!constant dynamic-0-space-start #x4f000000)
@@ -149,7 +149,7 @@
   #!+gencgc
   (progn
     (def!constant dynamic-space-start #x4f000000)
-    (def!constant dynamic-space-end   (!configure-dynamic-space-end #x6afff000)))
+    (def!constant dynamic-space-end   (!configure-dynamic-space-end)))
   #!-gencgc
   (progn
     (def!constant dynamic-0-space-start #x4f000000)
@@ -162,7 +162,7 @@
   #!+gencgc
   (progn
     (def!constant dynamic-space-start #x10000000)
-    (def!constant dynamic-space-end   (!configure-dynamic-space-end #x6ffff000)))
+    (def!constant dynamic-space-end   (!configure-dynamic-space-end)))
   #!-gencgc
   (progn
     (def!constant dynamic-0-space-start #x10000000)

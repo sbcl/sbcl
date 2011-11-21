@@ -12,7 +12,7 @@
 
 (in-package "SB!VM")
 
-(def!macro !configure-dynamic-space-end (default)
+(def!macro !configure-dynamic-space-end (&optional default)
   (with-open-file (f "output/dynamic-space-size.txt")
     (let ((line (read-line f)))
       (multiple-value-bind (number end)
@@ -26,8 +26,12 @@
                                 (expt 2 30))
                                (t
                                 (error "Invalid --dynamic-space-size=~A" line)))))
-              `(+ dynamic-space-start ,(* number mult)))
-            default)))))
+              `(+ dynamic-space-start ,(* number mult))))
+        (or default
+            `(+ dynamic-space-start
+                (ecase n-word-bits
+                  (32 (expt 2 29))
+                  (64 (expt 2 30)))))))))
 
 (defparameter *c-callable-static-symbols*
   '(sub-gc

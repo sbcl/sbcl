@@ -27,6 +27,14 @@ changes relative to sbcl-1.0.53:
   * GC-related enhancements and bug fixes:
     ** --dynamic-space-size and --control-stack-size now understand Kb, Mb,
          and Gb suffixes. Default is megabytes as before.
+    ** Default dynamic space size on all GENCGC platforms is now 512Mb for
+       32-bit systems, and 1Gb for 64-bit systems. (OpenBSD/x86-64 is the only
+       exception, defaulting to mere 444Mb to fit under default ulimits.) The
+       new defaults are in place to prevent hitting swap on low-end systems.
+       Use build-time option --dynamic-space-size to build an SBCL with
+       another default, or the runtime option to adjust the size at startup: a
+       good size is at most equal to the amount of physical memory the system
+       has.
     ** on GENCGC systems nursery and generation sizes now default to 5% of
        dynamic-space size.
     ** on 64-bit systems setting the nursery size above 4Gb now

@@ -129,11 +129,13 @@ INSTALLING SBCL
   To configure SBCL with a non-standard default dynamic-space size,
   use the --dynamic-space-size option:
 
-    $ sh make.sh --dynamic-space-size=1Gb
-    $ sh make.sh --dynamic-space-size=500Mb
+    $ sh make.sh --dynamic-space-size=4Gb
+    $ sh make.sh --dynamic-space-size=800Mb
 
   If mega- or gigabytes are not specified, the number is taken to be
-  in megabytes. The standard default is platform specific.
+  in megabytes. The standard default is 512Mb for 32-bit systems, and
+  1Gb for 64-bit systems (with the exception of OpenBSD where 444Mb
+  are used to fit under default ulimits.)
 
   If you don't already have an SBCL binary installed as "sbcl" on your
   system, you'll need to tell make.sh what Lisp to use as the
