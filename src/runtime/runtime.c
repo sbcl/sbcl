@@ -17,6 +17,7 @@
 
 #include <stdio.h>
 #include <string.h>
+#include <ctype.h>
 #ifndef LISP_FEATURE_WIN32
 #include <libgen.h>
 #endif
@@ -291,6 +292,46 @@ search_for_executable(const char *argv0)
 }
 #endif /* LISP_FEATURE_WIN32 */
 
+long parse_size_arg(char *arg, char *arg_name)
+{
+  char *tail, *power_name;
+  long power, res;
+  res = strtol(arg, &tail, 0);
+  if (arg == tail) {
+    lose("%s argument is not a number: %s", arg_name, arg);
+  } else if (tail[0]) {
+    int i, size;
+    power_name = copied_string(tail);
+    size = strlen(power_name);
+    for (i=0; i<size; i++)
+      power_name[i] = toupper(power_name[i]);
+  } else {
+    power = 20;
+    power_name = NULL;
+  }
+  if (power_name) {
+    if ((0==strcmp("KB", power_name)) ||
+        (0==strcmp("KIB", power_name))) {
+      power = 10;
+    } else if ((0==strcmp("MB", power_name)) ||
+               (0==strcmp("MIB", power_name))) {
+      power = 20;
+    } else if ((0==strcmp("GB", power_name)) ||
+               (0==strcmp("GIB", power_name))) {
+      power = 30;
+    } else {
+      lose("%s argument has an unknown suffix: %s", arg_name, tail);
+    }
+    free(power_name);
+  }
+  if ((res <= 0) ||
+      (res >= (LONG_MAX >> power))) {
+    lose("%s argument is out of range: %s", arg_name, arg);
+  }
+  res <<= power;
+  return res;
+}
+
 char **posix_argv;
 char *core_string;
 
@@ -402,32 +443,21 @@ main(int argc, char *argv[], char *envp[])
                 ++argi;
                 if (argi >= argc)
                     lose("missing argument for --dynamic-space-size");
-                {
-                  char *tail;
-                  long tmp = strtol(argv[argi++], &tail, 0);
-                  if (tail[0])
-                    lose("--dynamic-space-size argument is not a number");
-                  if ((tmp <= 0) ||
-                      (tmp >= (LONG_MAX >> 20))) {
-                    lose("--dynamic-space-size argument is out of range");
-                  }
-                  dynamic_space_size = tmp << 20;
-                }
+                  dynamic_space_size = parse_size_arg(argv[argi++], "--dynamic-space-size");
 #               ifdef MAX_DYNAMIC_SPACE_END
                 if (!((DYNAMIC_SPACE_START <
                        DYNAMIC_SPACE_START+dynamic_space_size) &&
                       (DYNAMIC_SPACE_START+dynamic_space_size <=
                        MAX_DYNAMIC_SPACE_END)))
-                    lose("--dynamic-space-size argument is too large");
+                  lose("--dynamic-space-size argument %s is too large, max %ldMiB",
+                       argv[argi-1], MAX_DYNAMIC_SPACE_END-DYNAMIC_SPACE_START);
 #               endif
             } else if (0 == strcmp(arg, "--control-stack-size")) {
                 ++argi;
                 if (argi >= argc)
                     lose("missing argument for --control-stack-size");
                 errno = 0;
-                thread_control_stack_size = strtol(argv[argi++], 0, 0) << 20;
-                if (errno)
-                    lose("argument to --control-stack-size is not a number");
+                thread_control_stack_size = parse_size_arg(argv[argi++], "--control-stack-size");
             } else if (0 == strcmp(arg, "--debug-environment")) {
                 int n = 0;
                 printf("; Commandline arguments:\n");

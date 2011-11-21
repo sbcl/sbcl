@@ -24,10 +24,23 @@ changes relative to sbcl-1.0.53:
        STANDARD-INSTANCE-ACCESS, and FUNCALLABLE-STANDARD-INSTANCE-ACCESS.
     ** Users can now defined new places usable with SB-EXT:COMPARE-AND-SWAP
        using an API anologous to defining new SETFable places.
+  * GC-related enhancements and bug fixes:
+    ** --dynamic-space-size and --control-stack-size now understand Kb, Mb,
+         and Gb suffixes. Default is megabytes as before.
+    ** on GENCGC systems nursery and generation sizes now default to 5% of
+       dynamic-space size.
+    ** on 64-bit systems setting the nursery size above 4Gb now
+       works. (lp#870868)
+    ** SB-KERNEL:MAKE-LISP-OBJ on GENCGC no longer categorically refuses to
+       create SIMPLE-FUN objects.
+  * SB-BSD-SOCKETS bug fixes:
+    ** GET-PROTOCOL-BY-NAME had a significant memory leak.
+    ** GET-HOST-BY-NAME and GET-HOST-BY-ADDRESS small amounts of memory on
+       systems with getaddrinfo().
+    ** GET-HOST-BY-NAME and GET-HOST-BY-ADDRESS weren't thread or interrupt
+       safe outside systems with getaddrinfo().
   * enhancement: debug-names of anonymous and local function are more
     descriptive. Affects backtraces and SB-SPROF results. (lp#805100)
-  * enhancement: on GENCGC systems nursery and generation sizes now default to
-    5% of dynamic-space size.
   * enhancement: on CHENEYGC targets, SB-KERNEL:MAKE-LISP-OBJ now does
     the same validation of pointer objects as GENCGC does, instead of a
     comparatively weak bounds-check against the heap spaces.
@@ -42,20 +55,10 @@ changes relative to sbcl-1.0.53:
     correctly, even on wide-fixnum builds. (lp#887220)
   * bug fix: (directory "foo/*/*.*") did not follow symlinks in foo/ that
     resolved to directories.
-  * bug fix: SB-KERNEL:MAKE-LISP-OBJ on GENCGC no longer categorically
-    refuses to create SIMPLE-FUN objects.
   * bug fix: type mismatch when assigning to lexical variables no longer
     result in fasl-dumping internal type objects. (lp#890750)
   * bug fix: type mismatch on (setf aref) and function return values no
     longer result in fasl-dumping internal type objects.
-  * bug fix: SB-BSD-SOCKETS issues
-    ** GET-PROTOCOL-BY-NAME had a significant memory leak.
-    ** GET-HOST-BY-NAME and GET-HOST-BY-ADDRESS small amounts of memory on
-       systems with getaddrinfo().
-    ** GET-HOST-BY-NAME and GET-HOST-BY-ADDRESS weren't thread or interrupt
-       safe outside systems with getaddrinfo().
-  * bug fix: on 64-bit systems setting the nursery size above 4Gb now works.
-    (lp#870868)
   * bug fix: With several combinations of argument types, for example (EXPT
     <integer> <(complex double)>), EXPT now uses double-precision throughout
     instead of partially calculating only to single-precision.  (lp#741564;
