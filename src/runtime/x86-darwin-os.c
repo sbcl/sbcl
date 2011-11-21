@@ -274,7 +274,7 @@ void signal_emulation_wrapper(x86_thread_state32_t *thread_state,
 
     /* Trap to restore the signal context. */
     asm volatile (".long 0xffff0b0f"
-                  : : "a" (thread_state), "b" (float_state));
+                  : : "a" (thread_state), "c" (float_state));
 }
 
 /* Convenience wrapper for the above */
@@ -478,7 +478,7 @@ catch_exception_raise(mach_port_t exception_port,
                 lose("thread_set_state (x86_THREAD_STATE32) failed %d\n", ret);
             if ((ret = thread_set_state(thread,
                                         x86_FLOAT_STATE32,
-                                        (thread_state_t)thread_state.EBX,
+                                        (thread_state_t)thread_state.ECX,
                                         x86_FLOAT_STATE32_COUNT)) != KERN_SUCCESS)
                 lose("thread_set_state (x86_FLOAT_STATE32) failed %d\n", ret);
             break;
