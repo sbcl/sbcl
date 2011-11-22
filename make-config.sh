@@ -357,6 +357,9 @@ case "$sbcl_os" in
             x86 | x86-64)
 		printf ' :sb-thread :sb-futex :largefile' >> $ltf
 		;;
+            ppc)
+		printf ' :sb-futex' >> $ltf
+		;;
         esac
 
         if [ $sbcl_arch = "x86-64" ]; then
