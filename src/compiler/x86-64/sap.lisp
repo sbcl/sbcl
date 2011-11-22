@@ -233,7 +233,9 @@
   (def-system-ref-and-set signed-sap-ref-64 %set-signed-sap-ref-64 mov
     signed-reg signed-num :qword)
   (def-system-ref-and-set sap-ref-sap %set-sap-ref-sap mov
-    sap-reg system-area-pointer :qword))
+    sap-reg system-area-pointer :qword)
+  (def-system-ref-and-set sap-ref-lispobj %set-sap-ref-lispobj mov
+    descriptor-reg * :qword))
 
 ;;;; SAP-REF-DOUBLE
 

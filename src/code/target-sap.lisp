@@ -95,6 +95,12 @@
            (fixnum offset))
   (sap-ref-sap sap offset))
 
+;; Return the LISPOBJ at OFFSET bytes from SAP.
+(defun sap-ref-lispobj (sap offset)
+  (declare (type system-area-pointer sap)
+           (fixnum offset))
+  (sap-ref-lispobj sap offset))
+
 ;;; Return the 32-bit SINGLE-FLOAT at OFFSET bytes from SAP.
 (defun sap-ref-single (sap offset)
   (declare (type system-area-pointer sap)
@@ -208,6 +214,12 @@
   (declare (type system-area-pointer sap new-value)
            (fixnum offset))
   (setf (sap-ref-sap sap offset) new-value))
+
+(defun %set-sap-ref-lispobj (sap offset new-value)
+  (declare (type system-area-pointer sap)
+           (fixnum offset)
+           (t new-value))
+  (setf (sap-ref-lispobj sap offset) new-value))
 
 (defun %set-sap-ref-single (sap offset new-value)
   (declare (type system-area-pointer sap)

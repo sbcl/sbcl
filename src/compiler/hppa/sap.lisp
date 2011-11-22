@@ -235,6 +235,8 @@
     signed-reg signed-num :long t)
   (def-system-ref-and-set sap-ref-sap %set-sap-ref-sap
     sap-reg system-area-pointer :long)
+  (def-system-ref-and-set sap-ref-lispobj %set-sap-ref-lispobj
+    descriptor-reg * :long)
   (def-system-ref-and-set sap-ref-single %set-sap-ref-single
     single-reg single-float :float)
   (def-system-ref-and-set sap-ref-double %set-sap-ref-double

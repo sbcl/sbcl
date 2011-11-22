@@ -225,7 +225,9 @@
   (def-system-ref-and-set sb!c::signed-sap-ref-32-with-offset sb!c::%set-signed-sap-ref-32-with-offset
     signed-reg signed-num :dword t)
   (def-system-ref-and-set sb!c::sap-ref-sap-with-offset sb!c::%set-sap-ref-sap-with-offset
-    sap-reg system-area-pointer :dword))
+    sap-reg system-area-pointer :dword)
+  (def-system-ref-and-set sb!c::sap-ref-lispobj-with-offset sb!c::%set-sap-ref-lispobj-with-offset
+    descriptor-reg * :dword))
 
 ;;;; SAP-REF-DOUBLE
 
