@@ -1973,6 +1973,18 @@ register."
 ;;; (Such values can arise in registers on machines with conservative
 ;;; GC, and might also arise in debug variable locations when
 ;;; those variables are invalid.)
+;;;
+;;; NOTE: this function is not GC-safe in the slightest when creating
+;;; a pointer to an object in dynamic space.  If a GC occurs between
+;;; the start of the call to VALID-LISP-POINTER-P and the end of
+;;; %MAKE-LISP-OBJ then the object could move before the boxed pointer
+;;; is constructed.  This can happen on CHENEYGC if an asynchronous
+;;; interrupt occurs within the window.  This can happen on GENCGC
+;;; under the same circumstances, but is more likely due to all GENCGC
+;;; platforms supporting threaded operation.  This is somewhat
+;;; mitigated on x86oids due to the conservative stack and interrupt
+;;; context "scavenging" on such platforms, but there still may be a
+;;; vulnerable window.
 (defun make-lisp-obj (val &optional (errorp t))
   (if (or
        ;; fixnum
