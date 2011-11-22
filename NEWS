@@ -71,6 +71,8 @@ changes relative to sbcl-1.0.53:
     <integer> <(complex double)>), EXPT now uses double-precision throughout
     instead of partially calculating only to single-precision.  (lp#741564;
     thanks to Lutz Euler)
+  * bug fix: SYMBOL-VALUE-IN-THREAD is no longer able to construct bogus
+    objects when interrupted by GC on PPC.
 
 changes in sbcl-1.0.53 relative to sbcl-1.0.52:
   * enhancement: on 64-bit targets, in src/compiler/generic/early-vm.lisp,

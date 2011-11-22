@@ -1527,34 +1527,17 @@ assume that unknown code can safely be terminated using TERMINATE-THREAD."
     (with-all-threads-lock
       (loop
         (if (thread-alive-p thread)
-            (let* ((epoch sb!kernel::*gc-epoch*)
-                   (offset (sb!kernel:get-lisp-obj-address
+            (let* ((offset (sb!kernel:get-lisp-obj-address
                             (sb!vm::symbol-tls-index symbol)))
-                   (tl-val (sap-ref-word (%thread-sap thread) offset)))
+                   (obj (sap-ref-lispobj (%thread-sap thread) offset))
+                   (tl-val (sb!kernel:get-lisp-obj-address obj)))
               (cond ((zerop offset)
                      (return (values nil :no-tls-value)))
                     ((or (eql tl-val sb!vm:no-tls-value-marker-widetag)
                          (eql tl-val sb!vm:unbound-marker-widetag))
                      (return (values nil :unbound-in-thread)))
                     (t
-                     (multiple-value-bind (obj ok) (make-lisp-obj tl-val nil)
-                       ;; The value we constructed may be invalid if a GC has
-                       ;; occurred. That is harmless, though, since OBJ is
-                       ;; either in a register or on stack, and we are
-                       ;; conservative on both on GENCGC -- so a bogus object
-                       ;; is safe here as long as we don't return it. If we
-                       ;; ever port threads to a non-conservative GC we must
-                       ;; pin the TL-VAL address before constructing OBJ, or
-                       ;; make WITH-ALL-THREADS-LOCK imply WITHOUT-GCING.
-                       ;;
-                       ;; The reason we don't just rely on TL-VAL pinning the
-                       ;; object is that the call to MAKE-LISP-OBJ may cause
-                       ;; bignum allocation, at which point TL-VAL might not
-                       ;; be alive anymore -- hence the epoch check.
-                       (when (eq epoch sb!kernel::*gc-epoch*)
-                         (if ok
-                             (return (values obj :ok))
-                             (return (values obj :invalid-tls-value))))))))
+                     (return (values obj :ok)))))
             (return (values nil :thread-dead))))))
 
   (defun %set-symbol-value-in-thread (symbol thread value)
@@ -1568,8 +1551,8 @@ assume that unknown code can safely be terminated using TERMINATE-THREAD."
               (cond ((zerop offset)
                      (values nil :no-tls-value))
                     (t
-                     (setf (sap-ref-word (%thread-sap thread) offset)
-                           (get-lisp-obj-address value))
+                     (setf (sap-ref-lispobj (%thread-sap thread) offset)
+                           value)
                      (values value :ok))))
             (values nil :thread-dead)))))
 
