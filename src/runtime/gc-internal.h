@@ -130,7 +130,7 @@ lispobj *search_dynamic_space(void *pointer);
 
 lispobj *gc_search_space(lispobj *start, size_t words, lispobj *pointer);
 
-extern int looks_like_valid_lisp_pointer_p(lispobj *pointer, lispobj *start_addr);
+extern int looks_like_valid_lisp_pointer_p(lispobj pointer, lispobj *start_addr);
 
 extern void scrub_control_stack();
 

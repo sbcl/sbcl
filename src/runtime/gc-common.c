@@ -2415,30 +2415,29 @@ gc_search_space(lispobj *start, size_t words, lispobj *pointer)
  * of the enclosing object.
  */
 int
-looks_like_valid_lisp_pointer_p(lispobj *pointer, lispobj *start_addr)
+looks_like_valid_lisp_pointer_p(lispobj pointer, lispobj *start_addr)
 {
-    if (!is_lisp_pointer((lispobj)pointer)) {
+    if (!is_lisp_pointer(pointer)) {
         return 0;
     }
 
     /* Check that the object pointed to is consistent with the pointer
      * low tag. */
-    switch (lowtag_of((lispobj)pointer)) {
+    switch (lowtag_of(pointer)) {
     case FUN_POINTER_LOWTAG:
         /* Start_addr should be the enclosing code object, or a closure
          * header. */
         switch (widetag_of(*start_addr)) {
         case CODE_HEADER_WIDETAG:
-          /* Make sure we actually point to a function in the code object,
-           * as opposed to a random point there. */
-          if (SIMPLE_FUN_HEADER_WIDETAG==widetag_of(*((lispobj *)(((unsigned long)pointer)-FUN_POINTER_LOWTAG))))
-            return 1;
-          else
-            return 0;
+            /* Make sure we actually point to a function in the code object,
+             * as opposed to a random point there. */
+            if (SIMPLE_FUN_HEADER_WIDETAG==widetag_of(native_pointer(pointer)[0]))
+                return 1;
+            else
+                return 0;
         case CLOSURE_HEADER_WIDETAG:
         case FUNCALLABLE_INSTANCE_HEADER_WIDETAG:
-            if ((unsigned long)pointer !=
-                ((unsigned long)start_addr+FUN_POINTER_LOWTAG)) {
+            if (pointer != make_lispobj(start_addr, FUN_POINTER_LOWTAG)) {
                 return 0;
             }
             break;
@@ -2447,8 +2446,7 @@ looks_like_valid_lisp_pointer_p(lispobj *pointer, lispobj *start_addr)
         }
         break;
     case LIST_POINTER_LOWTAG:
-        if ((unsigned long)pointer !=
-            ((unsigned long)start_addr+LIST_POINTER_LOWTAG)) {
+        if (pointer != make_lispobj(start_addr, LIST_POINTER_LOWTAG)) {
             return 0;
         }
         /* Is it plausible cons? */
@@ -2461,8 +2459,7 @@ looks_like_valid_lisp_pointer_p(lispobj *pointer, lispobj *start_addr)
             return 0;
         }
     case INSTANCE_POINTER_LOWTAG:
-        if ((unsigned long)pointer !=
-            ((unsigned long)start_addr+INSTANCE_POINTER_LOWTAG)) {
+        if (pointer != make_lispobj(start_addr, INSTANCE_POINTER_LOWTAG)) {
             return 0;
         }
         if (widetag_of(start_addr[0]) != INSTANCE_HEADER_WIDETAG) {
@@ -2478,8 +2475,7 @@ looks_like_valid_lisp_pointer_p(lispobj *pointer, lispobj *start_addr)
          * cannot be found by simply walking the heap, therefore we
          * need to check for it. -- AB, 2010-Jun-04 */
         if ((widetag_of(start_addr[0]) == CODE_HEADER_WIDETAG)) {
-            lispobj *potential_lra =
-                (lispobj *)(((unsigned long)pointer) - OTHER_POINTER_LOWTAG);
+            lispobj *potential_lra = native_pointer(pointer);
             if ((widetag_of(potential_lra[0]) == RETURN_PC_HEADER_WIDETAG) &&
                 ((potential_lra - HeaderValue(potential_lra[0])) == start_addr)) {
                 return 1; /* It's as good as we can verify. */
@@ -2487,8 +2483,7 @@ looks_like_valid_lisp_pointer_p(lispobj *pointer, lispobj *start_addr)
         }
 #endif
 
-        if ((unsigned long)pointer !=
-            ((unsigned long)start_addr+OTHER_POINTER_LOWTAG)) {
+        if (pointer != make_lispobj(start_addr, OTHER_POINTER_LOWTAG)) {
             return 0;
         }
         /* Is it plausible?  Not a cons. XXX should check the headers. */
@@ -2633,7 +2628,7 @@ valid_lisp_pointer_p(lispobj *pointer)
     if (((start=search_dynamic_space(pointer))!=NULL) ||
         ((start=search_static_space(pointer))!=NULL) ||
         ((start=search_read_only_space(pointer))!=NULL))
-        return looks_like_valid_lisp_pointer_p(pointer, start);
+        return looks_like_valid_lisp_pointer_p((lispobj)pointer, start);
     else
         return 0;
 }
