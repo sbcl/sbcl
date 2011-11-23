@@ -8,7 +8,9 @@
 ;;;; DEFCAS, and #'(CAS ...) functions -- making things mostly isomorphic with
 ;;;; SETF.
 
-(defglobal **cas-expanders** (make-hash-table :test #'eq :synchronized t))
+(defglobal **cas-expanders** (make-hash-table :test #'eq
+                                              #-sb-xc-host #-sb-xc-host
+                                              :synchronized t))
 
 (define-function-name-syntax cas (list)
   (destructuring-bind (cas symbol) list
