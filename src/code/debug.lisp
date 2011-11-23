@@ -583,7 +583,7 @@ reset to ~S."
   ;; definitely preferred, because the FORMAT alternative was acting odd.
   (pprint-logical-block (stream nil)
     (format stream
-            "debugger invoked on a ~S~@[ in thread ~A~]: ~2I~_~A"
+            "debugger invoked on a ~S~@[ in thread ~_~A~]: ~2I~_~A"
             (type-of condition)
             #!+sb-thread sb!thread:*current-thread*
             #!-sb-thread nil
