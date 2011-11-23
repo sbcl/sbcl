@@ -739,6 +739,11 @@
        (eq (numeric-type-complexp x) :real)))
 
 ;;; Exactly the same as CONSTRAIN-INTEGER-TYPE, but for float numbers.
+;;;
+;;; In contrast to the integer version, here the input types can have
+;;; open bounds in addition to closed ones and we don't increment or
+;;; decrement a bound to honor OR-EQUAL being NIL but put an open bound
+;;; into the result instead, if appropriate.
 (defun constrain-float-type (x y greater or-equal)
   (declare (type numeric-type x y))
   (declare (ignorable x y greater or-equal)) ; for CROSS-FLOAT-INFINITY-KLUDGE
@@ -760,10 +765,9 @@
            (tighter-p (x ref)
              (cond ((null x) nil)
                    ((null ref) t)
-                   ((and or-equal
-                         (= (type-bound-number x) (type-bound-number ref)))
-                    ;; X is tighter if REF is not an open bound and X is
-                    (and (not (consp ref)) (consp x)))
+                   ((= (type-bound-number x) (type-bound-number ref))
+                    ;; X is tighter if X is an open bound and REF is not
+                    (and (consp x) (not (consp ref))))
                    (greater
                     (< (type-bound-number ref) (type-bound-number x)))
                    (t

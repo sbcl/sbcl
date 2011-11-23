@@ -2082,6 +2082,31 @@
       (compiler-note () (throw :note nil)))
     (error "Unreachable code undetected.")))
 
+(with-test (:name (:compiler :constraint-propagation :float-bounds-3
+                   :LP-894498))
+  (catch :note
+    (handler-case
+        (compile nil '(lambda (x)
+                        (declare (type (single-float 0.0) x))
+                        (when (> x 0.0)
+                          (when (zerop x)
+                            (error "This is unreachable.")))))
+      (compiler-note () (throw :note nil)))
+    (error "Unreachable code undetected.")))
+
+(with-test (:name (:compiler :constraint-propagation :float-bounds-4
+                   :LP-894498))
+  (catch :note
+    (handler-case
+        (compile nil '(lambda (x y)
+                        (declare (type (single-float 0.0) x)
+                                 (type (single-float (0.0)) y))
+                        (when (> x y)
+                          (when (zerop x)
+                            (error "This is unreachable.")))))
+      (compiler-note () (throw :note nil)))
+    (error "Unreachable code undetected.")))
+
 (with-test (:name (:compiler :constraint-propagation :var-eql-to-var-1))
   (catch :note
     (handler-case
