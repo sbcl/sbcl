@@ -515,6 +515,7 @@
                      (signal-semaphore sem))
                    ;; KLUDGE: Prevent interrupts after this point from
                    ;; unwinding us, so that we can reason about the counts.
+                   #+sb-thread
                    (sb-thread::block-deferrable-signals))))))
       (let* ((threads (loop for i from 1 upto 100
                             collect (make-thread #'critical :name (format nil "T~A" i))))
