@@ -264,13 +264,5 @@
   (assert (equal "foo" (documentation 'bug-643958-test 'function)))
   (setf (documentation 'bug-643958-test 'function) "bar")
   (assert (equal "bar" (documentation 'bug-643958-test 'function))))
-
-(with-test (:name :bug-881445
-            :skipped-on '(not :x86-64))
-  (let ((x (make-array (1- (expt 2 32)) :element-type '(unsigned-byte 8))))
-    (assert (> (sb-kernel:dynamic-usage) (length x)))
-    ;; prevent compiler from getting too smart...
-    (eval x)
-    t))
 
 ;;;; success

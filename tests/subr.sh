@@ -66,6 +66,11 @@ run_sbcl () (
     fi
 )
 
+run_sbcl_with_args () (
+    set -u
+    "$SBCL_RUNTIME" --core "$SBCL_CORE" "$@"
+)
+
 run_sbcl_with_core () (
     set -u
     core="$1"
