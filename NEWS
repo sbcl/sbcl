@@ -23,6 +23,7 @@ changes relative to sbcl-1.1.4:
        SB-DEBUG:BACKTRACE-AS-LIST.
     ** SB-DEBUG:*SHOW-ENTRY-POINT-DETAILS** has been deprecated, as the same
        information is available in less intrusive form as frame annotations.
+  * enhancement: SB-POSIX now supports provides MAP-ANON.
   * bug fix: no more unused variable style warnings from RESTART-CASE
     macroexpansion (lp#1113859)
   * bug fix: deleting a package removes it from implementation-package

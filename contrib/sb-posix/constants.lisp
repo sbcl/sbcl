@@ -255,6 +255,7 @@
  (:integer map-shared "MAP_SHARED" "mmap: shared memory" t)
  (:integer map-private "MAP_PRIVATE" "mmap: private mapping" t)
  (:integer map-fixed "MAP_FIXED" "mmap: map at given location" t)
+ (:integer map-anon "MAP_ANON" "mmap: anonymous mapping not associated with any file" t)
 
  ;; msync()
  (:integer ms-async "MS_ASYNC" "msync: return immediately" t)
