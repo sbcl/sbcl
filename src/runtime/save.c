@@ -311,7 +311,7 @@ save_to_filehandle(FILE *file, char *filename, lispobj init_function,
         if (data) {
             unsigned long word;
             long offset;
-            int i;
+            page_index_t i;
             for (i = 0; i < last_free_page; i++) {
                 /* Thanks to alignment requirements, the two low bits
                  * are always zero, so we can use them to store the

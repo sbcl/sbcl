@@ -399,7 +399,7 @@ handle_exception(EXCEPTION_RECORD *exception_record,
                  * exception handler if the gc doesn't take the wp violation?
                  */
                 if (exception_record->ExceptionInformation[0]) {
-                    int index = find_page_index(fault_address);
+                    page_index_t index = find_page_index(fault_address);
                     if ((index != -1) && (page_table[index].write_protected)) {
                         gencgc_handle_wp_violation(fault_address);
                     }

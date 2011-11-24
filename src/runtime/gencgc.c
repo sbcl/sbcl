@@ -57,7 +57,7 @@
 #endif
 
 /* forward declarations */
-page_index_t  gc_find_freeish_pages(long *restart_page_ptr, long nbytes,
+page_index_t  gc_find_freeish_pages(page_index_t *restart_page_ptr, long nbytes,
                                     int page_type_flag);
 
 
@@ -246,7 +246,7 @@ find_page_index(void *addr)
 }
 
 static size_t
-npage_bytes(long npages)
+npage_bytes(page_index_t npages)
 {
     gc_assert(npages>=0);
     return ((unsigned long)npages)*GENCGC_CARD_BYTES;
@@ -363,11 +363,10 @@ unsigned long gencgc_alloc_granularity = GENCGC_ALLOC_GRANULARITY;
 
 /* Count the number of pages which are write-protected within the
  * given generation. */
-static long
+static page_index_t
 count_write_protect_generation_pages(generation_index_t generation)
 {
-    page_index_t i;
-    unsigned long count = 0;
+    page_index_t i, count = 0;
 
     for (i = 0; i < last_free_page; i++)
         if (page_allocated_p(i)
@@ -378,11 +377,11 @@ count_write_protect_generation_pages(generation_index_t generation)
 }
 
 /* Count the number of pages within the given generation. */
-static long
+static page_index_t
 count_generation_pages(generation_index_t generation)
 {
     page_index_t i;
-    long count = 0;
+    page_index_t count = 0;
 
     for (i = 0; i < last_free_page; i++)
         if (page_allocated_p(i)
@@ -392,11 +391,11 @@ count_generation_pages(generation_index_t generation)
 }
 
 #if QSHOW
-static long
+static page_index_t
 count_dont_move_pages(void)
 {
     page_index_t i;
-    long count = 0;
+    page_index_t count = 0;
     for (i = 0; i < last_free_page; i++) {
         if (page_allocated_p(i)
             && (page_table[i].dont_move != 0)) {
@@ -457,11 +456,11 @@ write_generation_stats(FILE *file)
 
     for (i = 0; i < SCRATCH_GENERATION; i++) {
         page_index_t j;
-        long boxed_cnt = 0;
-        long unboxed_cnt = 0;
-        long large_boxed_cnt = 0;
-        long large_unboxed_cnt = 0;
-        long pinned_cnt=0;
+        page_index_t boxed_cnt = 0;
+        page_index_t unboxed_cnt = 0;
+        page_index_t large_boxed_cnt = 0;
+        page_index_t large_unboxed_cnt = 0;
+        page_index_t pinned_cnt=0;
 
         for (j = 0; j < last_free_page; j++)
             if (page_table[j].gen == i) {
@@ -488,17 +487,19 @@ write_generation_stats(FILE *file)
         gc_assert(generations[i].bytes_allocated
                   == count_generation_bytes_allocated(i));
         fprintf(file,
-                "   %1d: %5ld %5ld %5ld %5ld %5ld %5ld %5ld %5ld %5ld %8ld %5ld %8ld %4ld %3d %7.4f\n",
+                "   %1d: %5ld %5ld %5ld %5ld",
                 i,
                 generations[i].alloc_start_page,
                 generations[i].alloc_unboxed_start_page,
                 generations[i].alloc_large_start_page,
-                generations[i].alloc_large_unboxed_start_page,
-                boxed_cnt,
-                unboxed_cnt,
-                large_boxed_cnt,
-                large_unboxed_cnt,
-                pinned_cnt,
+                generations[i].alloc_large_unboxed_start_page);
+        fprintf(file,
+                " %5"PAGE_INDEX_FMT" %5"PAGE_INDEX_FMT" %5"PAGE_INDEX_FMT
+                " %5"PAGE_INDEX_FMT" %5"PAGE_INDEX_FMT,
+                boxed_cnt, unboxed_cnt, large_boxed_cnt,
+                large_unboxed_cnt, pinned_cnt);
+        fprintf(file
+                " %8ld %5ld %8ld %4ld %3d %7.4f\n",
                 generations[i].bytes_allocated,
                 (npage_bytes(count_generation_pages(i))
                  - generations[i].bytes_allocated),
@@ -587,7 +588,7 @@ void fast_bzero(void*, size_t); /* in <arch>-assem.S */
  * OS. Generally done after a large GC.
  */
 void zero_pages_with_mmap(page_index_t start, page_index_t end) {
-    int i;
+    page_index_t i;
     void *addr = page_address(start), *new_addr;
     size_t length = npage_bytes(1+end-start);
 
@@ -2536,7 +2537,7 @@ static void
 scavenge_generations(generation_index_t from, generation_index_t to)
 {
     page_index_t i;
-    int num_wp = 0;
+    page_index_t num_wp = 0;
 
 #define SC_GEN_CK 0
 #if SC_GEN_CK
@@ -2826,16 +2827,19 @@ scavenge_newspace_generation(generation_index_t generation)
     record_new_objects = 0;
 
 #if SC_NS_GEN_CK
-    /* Check that none of the write_protected pages in this generation
-     * have been written to. */
-    for (i = 0; i < page_table_pages; i++) {
-        if (page_allocated_p(i)
-            && (page_table[i].bytes_used != 0)
-            && (page_table[i].gen == generation)
-            && (page_table[i].write_protected_cleared != 0)
-            && (page_table[i].dont_move == 0)) {
-            lose("write protected page %d written to in scavenge_newspace_generation\ngeneration=%d dont_move=%d\n",
-                 i, generation, page_table[i].dont_move);
+    {
+        page_index_t i;
+        /* Check that none of the write_protected pages in this generation
+         * have been written to. */
+        for (i = 0; i < page_table_pages; i++) {
+            if (page_allocated_p(i)
+                && (page_table[i].bytes_used != 0)
+                && (page_table[i].gen == generation)
+                && (page_table[i].write_protected_cleared != 0)
+                && (page_table[i].dont_move == 0)) {
+                lose("write protected page %d written to in scavenge_newspace_generation\ngeneration=%d dont_move=%d\n",
+                     i, generation, page_table[i].dont_move);
+            }
         }
     }
 #endif
