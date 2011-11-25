@@ -79,11 +79,11 @@ boolean enable_page_protection = 1;
 
 /* the minimum size (in bytes) for a large object*/
 #if (GENCGC_ALLOC_GRANULARITY >= PAGE_BYTES) && (GENCGC_ALLOC_GRANULARITY >= GENCGC_CARD_BYTES)
-long large_object_size = 4 * GENCGC_ALLOC_GRANULARITY;
+os_vm_size_t large_object_size = 4 * GENCGC_ALLOC_GRANULARITY;
 #elif (GENCGC_CARD_BYTES >= PAGE_BYTES) && (GENCGC_CARD_BYTES >= GENCGC_ALLOC_GRANULARITY)
-long large_object_size = 4 * GENCGC_CARD_BYTES;
+os_vm_size_t large_object_size = 4 * GENCGC_CARD_BYTES;
 #else
-long large_object_size = 4 * PAGE_BYTES;
+os_vm_size_t large_object_size = 4 * PAGE_BYTES;
 #endif
 
 
