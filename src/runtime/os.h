@@ -189,4 +189,10 @@ extern char *os_get_runtime_executable_path(int external_path);
 # define OS_VM_SIZE_FMTX "lx"
 #endif
 
+/* FIXME: this is not the right place for this, but here we have
+ * a convenient base type to hand. If it turns out we can just use
+ * size_t everywhere, this can more to runtime.h. */
+typedef os_vm_size_t word_t;
+#define WORD_FMTX OS_VM_SIZE_FMTX
+
 #endif
