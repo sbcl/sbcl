@@ -789,7 +789,7 @@ gc_alloc_new_region(long nbytes, int page_type_flag, struct alloc_region *alloc_
 {
     page_index_t first_page;
     page_index_t last_page;
-    unsigned long bytes_found;
+    os_vm_size_t bytes_found;
     page_index_t i;
     int ret;
 
