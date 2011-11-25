@@ -30,6 +30,16 @@ inline void *page_address(page_index_t);
 int gencgc_handle_wp_violation(void *);
 
 
+#if GENCGC_CARD_BYTES > USHRT_MAX
+# if GENCGC_CARD_BYTES > UINT_MAX
+#   error "GENCGC_CARD_BYTES unexpectedly large."
+# else
+typedef unsigned int page_bytes_t;
+# endif
+#else
+typedef unsigned short page_bytes_t;
+#endif
+
 /* Note that this structure is also used from Lisp-side in
  * src/code/room.lisp, and the Lisp-side structure layout is currently
  * not groveled from C code but hardcoded. Any changes to the
@@ -42,18 +52,14 @@ struct page {
     /* This is the offset from the start of the page to the start of
      * the alloc_region which contains/contained it.
      */
-    unsigned long region_start_offset;
+    os_vm_size_t region_start_offset;
 
     /* the number of bytes of this page that are used. This may be less
      * than the actual bytes used for pages within the current
      * allocation regions. It should be 0 for all unallocated pages (not
      * hard to achieve).
      */
-#if GENCGC_CARD_BYTES > USHRT_MAX
-    unsigned int bytes_used;
-#else
-    unsigned short bytes_used;
-#endif
+    page_bytes_t bytes_used;
 
     unsigned
         /* This is set when the page is write-protected. This should
