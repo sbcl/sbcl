@@ -3956,7 +3956,7 @@ collect_garbage(generation_index_t last_gen)
 
     auto_gc_trigger = bytes_allocated + bytes_consed_between_gcs;
     if(gencgc_verbose)
-        fprintf(stderr,"Next gc when %ld bytes have been consed\n",
+        fprintf(stderr,"Next gc when %"OS_VM_SIZE_FMT" bytes have been consed\n",
                 auto_gc_trigger);
 
     /* If we did a big GC (arbitrarily defined as gen > 1), release memory
