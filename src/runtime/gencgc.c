@@ -350,11 +350,11 @@ static pthread_mutex_t free_pages_lock = PTHREAD_MUTEX_INITIALIZER;
 static pthread_mutex_t allocation_lock = PTHREAD_MUTEX_INITIALIZER;
 #endif
 
-extern unsigned long gencgc_release_granularity;
-unsigned long gencgc_release_granularity = GENCGC_RELEASE_GRANULARITY;
+extern os_vm_size_t gencgc_release_granularity;
+os_vm_size_t gencgc_release_granularity = GENCGC_RELEASE_GRANULARITY;
 
-extern unsigned long gencgc_alloc_granularity;
-unsigned long gencgc_alloc_granularity = GENCGC_ALLOC_GRANULARITY;
+extern os_vm_size_t gencgc_alloc_granularity;
+os_vm_size_t gencgc_alloc_granularity = GENCGC_ALLOC_GRANULARITY;
 
 
 /*
@@ -1266,27 +1266,29 @@ gc_heap_exhausted_error_or_lose (long available, long requested)
 }
 
 page_index_t
-gc_find_freeish_pages(page_index_t *restart_page_ptr, long nbytes,
+gc_find_freeish_pages(page_index_t *restart_page_ptr, long bytes,
                       int page_type_flag)
 {
-    page_index_t first_page, last_page;
-    page_index_t restart_page = *restart_page_ptr;
-    long nbytes_goal = nbytes;
-    long bytes_found = 0;
-    long most_bytes_found = 0;
-    page_index_t most_bytes_found_from, most_bytes_found_to;
-    int small_object = nbytes < GENCGC_CARD_BYTES;
+    page_index_t most_bytes_found_from = 0, most_bytes_found_to = 0;
+    page_index_t first_page, last_page, restart_page = *restart_page_ptr;
+    os_vm_size_t nbytes = bytes;
+    os_vm_size_t nbytes_goal = nbytes;
+    os_vm_size_t bytes_found = 0;
+    os_vm_size_t most_bytes_found = 0;
+    boolean small_object = nbytes < GENCGC_CARD_BYTES;
     /* FIXME: assert(free_pages_lock is held); */
 
     if (nbytes_goal < gencgc_alloc_granularity)
-            nbytes_goal = gencgc_alloc_granularity;
+        nbytes_goal = gencgc_alloc_granularity;
 
     /* Toggled by gc_and_save for heap compaction, normally -1. */
     if (gencgc_alloc_start_page != -1) {
         restart_page = gencgc_alloc_start_page;
     }
 
-    gc_assert(nbytes>=0);
+    /* FIXME: This is on bytes instead of nbytes pending cleanup of
+     * long from the interface. */
+    gc_assert(bytes>=0);
     /* Search for a page with at least nbytes of space. We prefer
      * not to split small objects on multiple pages, to reduce the
      * number of contiguous allocation regions spaning multiple
@@ -1350,6 +1352,7 @@ gc_find_freeish_pages(page_index_t *restart_page_ptr, long nbytes,
         gc_heap_exhausted_error_or_lose(most_bytes_found, nbytes);
     }
 
+    gc_assert(most_bytes_found_to);
     *restart_page_ptr = most_bytes_found_from;
     return most_bytes_found_to-1;
 }
