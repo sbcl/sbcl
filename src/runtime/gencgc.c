@@ -245,11 +245,11 @@ find_page_index(void *addr)
     return (-1);
 }
 
-static size_t
+static os_vm_size_t
 npage_bytes(page_index_t npages)
 {
     gc_assert(npages>=0);
-    return ((unsigned long)npages)*GENCGC_CARD_BYTES;
+    return ((os_vm_size_t)npages)*GENCGC_CARD_BYTES;
 }
 
 /* Check that X is a higher address than Y and return offset from Y to
@@ -590,7 +590,7 @@ void fast_bzero(void*, size_t); /* in <arch>-assem.S */
 void zero_pages_with_mmap(page_index_t start, page_index_t end) {
     page_index_t i;
     void *addr = page_address(start), *new_addr;
-    size_t length = npage_bytes(1+end-start);
+    os_vm_size_t length = npage_bytes(1+end-start);
 
     if (start > end)
       return;
