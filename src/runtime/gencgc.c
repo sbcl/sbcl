@@ -254,8 +254,8 @@ npage_bytes(page_index_t npages)
 
 /* Check that X is a higher address than Y and return offset from Y to
  * X in bytes. */
-static inline
-size_t void_diff(void *x, void *y)
+static inline os_vm_size_t
+void_diff(void *x, void *y)
 {
     gc_assert(x >= y);
     return (pointer_sized_uint_t)x - (pointer_sized_uint_t)y;
