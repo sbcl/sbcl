@@ -988,13 +988,13 @@ add_new_area(page_index_t first_page, size_t offset, size_t size)
 void
 gc_alloc_update_page_tables(int page_type_flag, struct alloc_region *alloc_region)
 {
-    int more;
+    boolean more;
     page_index_t first_page;
     page_index_t next_page;
-    unsigned long bytes_used;
-    unsigned long orig_first_page_bytes_used;
-    unsigned long region_size;
-    unsigned long byte_cnt;
+    os_vm_size_t bytes_used;
+    os_vm_size_t region_size;
+    os_vm_size_t byte_cnt;
+    page_bytes_t orig_first_page_bytes_used;
     int ret;
 
 
