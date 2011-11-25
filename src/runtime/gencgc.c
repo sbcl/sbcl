@@ -872,15 +872,11 @@ gc_alloc_new_region(long nbytes, int page_type_flag, struct alloc_region *alloc_
 
     /* we can do this after releasing free_pages_lock */
     if (gencgc_zero_check) {
-        long *p;
-        for (p = (long *)alloc_region->start_addr;
-             p < (long *)alloc_region->end_addr; p++) {
+        word_t *p;
+        for (p = (word_t *)alloc_region->start_addr;
+             p < (word_t *)alloc_region->end_addr; p++) {
             if (*p != 0) {
-                /* KLUDGE: It would be nice to use %lx and explicit casts
-                 * (long) in code like this, so that it is less likely to
-                 * break randomly when running on a machine with different
-                 * word sizes. -- WHN 19991129 */
-                lose("The new region at %x is not zero (start=%p, end=%p).\n",
+                lose("The new region is not zero at %p (start=%p, end=%p).\n",
                      p, alloc_region->start_addr, alloc_region->end_addr);
             }
         }
@@ -1120,13 +1116,11 @@ static inline void *gc_quick_alloc(long nbytes);
 void *
 gc_alloc_large(long nbytes, int page_type_flag, struct alloc_region *alloc_region)
 {
-    page_index_t first_page;
-    page_index_t last_page;
-    int orig_first_page_bytes_used;
-    long byte_cnt;
-    int more;
-    unsigned long bytes_used;
-    page_index_t next_page;
+    boolean more;
+    page_index_t first_page, next_page, last_page;
+    page_bytes_t orig_first_page_bytes_used;
+    os_vm_size_t byte_cnt;
+    os_vm_size_t bytes_used;
     int ret;
 
     ret = thread_mutex_lock(&free_pages_lock);
