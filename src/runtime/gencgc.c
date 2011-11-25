@@ -498,18 +498,20 @@ write_generation_stats(FILE *file)
                 " %5"PAGE_INDEX_FMT" %5"PAGE_INDEX_FMT,
                 boxed_cnt, unboxed_cnt, large_boxed_cnt,
                 large_unboxed_cnt, pinned_cnt);
-        fprintf(file
-                " %8ld %5ld %8ld %4ld %3d %7.4f\n",
+        fprintf(file,
+                " %8"OS_VM_SIZE_FMT
+                " %5"OS_VM_SIZE_FMT
+                " %8"OS_VM_SIZE_FMT
+                " %4"PAGE_INDEX_FMT" %3d %7.4f\n",
                 generations[i].bytes_allocated,
-                (npage_bytes(count_generation_pages(i))
-                 - generations[i].bytes_allocated),
+                (npage_bytes(count_generation_pages(i)) - generations[i].bytes_allocated),
                 generations[i].gc_trigger,
                 count_write_protect_generation_pages(i),
                 generations[i].num_gc,
                 generation_average_age(i));
     }
-    fprintf(file,"   Total bytes allocated    = %lu\n", (unsigned long)bytes_allocated);
-    fprintf(file,"   Dynamic-space-size bytes = %lu\n", (unsigned long)dynamic_space_size);
+    fprintf(file,"   Total bytes allocated    = %"OS_VM_SIZE_FMT"\n", bytes_allocated);
+    fprintf(file,"   Dynamic-space-size bytes = %"OS_VM_SIZE_FMT"\n", dynamic_space_size);
 
     fpu_restore(fpu_state);
 }

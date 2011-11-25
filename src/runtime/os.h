@@ -179,4 +179,14 @@ int os_get_errno(void);
  * returned, it must be 'free'd. */
 extern char *os_get_runtime_executable_path(int external_path);
 
+/* Write platforms specific ones when necessary. This is to get us off
+ * the ground. */
+#if N_WORD_BITS == 32
+# define OS_VM_SIZE_FMT "u"
+# define OS_VM_SIZE_FMTX "x"
+#else
+# define OS_VM_SIZE_FMT "lu"
+# define OS_VM_SIZE_FMTX "lx"
+#endif
+
 #endif
