@@ -408,11 +408,11 @@ count_dont_move_pages(void)
 
 /* Work through the pages and add up the number of bytes used for the
  * given generation. */
-static unsigned long
+static os_vm_size_t
 count_generation_bytes_allocated (generation_index_t gen)
 {
     page_index_t i;
-    unsigned long result = 0;
+    os_vm_size_t result = 0;
     for (i = 0; i < last_free_page; i++) {
         if (page_allocated_p(i)
             && (page_table[i].gen == gen))
