@@ -3996,7 +3996,7 @@ gc_free_heap(void)
     for (page = 0; page < page_table_pages; page++) {
         /* Skip free pages which should already be zero filled. */
         if (page_allocated_p(page)) {
-            void *page_start, *addr;
+            void *page_start;
             for (last_page = page;
                  (last_page < page_table_pages) && page_allocated_p(last_page);
                  last_page++) {
