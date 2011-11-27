@@ -161,6 +161,7 @@ with that condition (or with no condition) will be returned."
   (apply #'format *query-io*
          (if promptp prompt-control "~&Type a form to be evaluated: ")
          prompt-args)
+  (finish-output *query-io*)
   (list (eval (read *query-io*))))
 
 (defun check-type-error (place place-value type type-string)

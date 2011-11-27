@@ -38,12 +38,6 @@ one-past-the-end"
                                       (octets-encoding-error-position c)))
                      (octets-encoding-error-external-format c)))))
 
-(defun read-replacement-character ()
-  (format *query-io*
-          "Replacement byte, bytes, character, or string (evaluated): ")
-  (finish-output *query-io*)
-  (list (eval (read *query-io*))))
-
 (defun encoding-error (external-format string pos)
   (restart-case
       (error 'octets-encoding-error
@@ -52,7 +46,10 @@ one-past-the-end"
              :position pos)
     (use-value (replacement)
       :report "Supply a set of bytes to use in place of the invalid one."
-      :interactive read-replacement-character
+      :interactive
+      (lambda ()
+        (read-evaluated-form
+         "Replacement byte, bytes, character, or string (evaluated): "))
       (typecase replacement
         ((unsigned-byte 8)
          (make-array 1 :element-type '(unsigned-byte 8) :initial-element replacement))
@@ -103,11 +100,6 @@ one-past-the-end"
 
 (define-condition malformed-ascii (octet-decoding-error) ())
 
-(defun read-replacement-string ()
-  (format *query-io* "Enter a replacement string designator (evaluated): ")
-  (finish-output *query-io*)
-  (list (eval (read *query-io*))))
-
 (defun decoding-error (array start end external-format reason pos)
   (restart-case
       (error reason
@@ -118,7 +110,10 @@ one-past-the-end"
              :pos pos)
     (use-value (s)
       :report "Supply a replacement string designator."
-      :interactive read-replacement-string
+      :interactive
+      (lambda ()
+        (read-evaluated-form
+         "Enter a replacement string designator (evaluated): "))
       (string s))))
 
 ;;; Utilities used in both to-string and to-octet conversions
