@@ -4069,3 +4069,13 @@
                                            :initial-element 0)
                              1)
                     #(0 1 0 0)))))
+
+(with-test (:name :catch-interferes-with-debug-names)
+  (let ((fun (funcall
+              (compile nil
+                       `(lambda ()
+                          (catch 'out
+                              (flet ((foo ()
+                                       (throw 'out (lambda () t))))
+                                (foo))))))))
+    (assert (equal '(lambda () :in foo) (sb-kernel:%fun-name fun)))))

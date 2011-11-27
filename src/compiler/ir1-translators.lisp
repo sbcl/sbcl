@@ -480,7 +480,17 @@ Return VALUE without evaluating it."
   ;; Name of the outermost non-NIL BLOCK, or the source namestring
   ;; of the source file.
   (let ((context
-          (or (car (find-if #'car (lexenv-blocks *lexenv*) :from-end t))
+          (or (car (find-if (lambda (b)
+                              (let ((name (pop b)))
+                                (and name
+                                     ;; KLUDGE: High debug adds this block on
+                                     ;; some platforms.
+                                     #!-unwind-to-frame-and-call-vop
+                                     (neq 'return-value-tag name)
+                                     ;; KLUDGE: CATCH produces blocks whose
+                                     ;; cleanup is :CATCH.
+                                     (neq :catch (cleanup-kind (entry-cleanup (pop b)))))))
+                            (lexenv-blocks *lexenv*) :from-end t))
               *source-namestring*
               (let ((p (or *compile-file-truename* *load-truename*)))
                 (when p (namestring p))))))
