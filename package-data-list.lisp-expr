@@ -1034,6 +1034,7 @@ possibly temporariliy, because it might be used internally."
                "READ-EVALUATED-FORM"
                "MAKE-UNPRINTABLE-OBJECT"
                "POWER-OF-TWO-CEILING"
+               "PRINT-NOT-READABLE-ERROR"
 
                ;; ..and macros..
                "COLLECT"

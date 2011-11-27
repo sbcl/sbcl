@@ -42,15 +42,7 @@
 
 (def!method print-object ((state random-state) stream)
   (if (and *print-readably* (not *read-eval*))
-      (restart-case
-          (error 'print-not-readable :object state)
-        (print-unreadably ()
-          :report "Print unreadably."
-          (write state :stream stream :readably nil))
-        (use-value (object)
-          :report "Supply an object to be printed instead."
-          :interactive read-unreadable-replacement
-          (write object :stream stream)))
+      (print-not-readable-error state stream)
       (format stream "#S(~S ~S #.~S)"
               'random-state
               ':state

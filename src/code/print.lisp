@@ -308,51 +308,54 @@
 
 ;;;; support for the PRINT-UNREADABLE-OBJECT macro
 
-(defun read-unreadable-replacement ()
-  (format *query-io* "~@<Enter an object (evaluated): ~@:>")
-  (finish-output *query-io*)
-  (list (eval (read *query-io*))))
+(defun print-not-readable-error (object stream)
+  (restart-case
+      (error 'print-not-readable :object object)
+    (print-unreadably ()
+      :report "Print unreadably."
+      (let ((*print-readably* nil))
+        (output-object object stream)
+        object))
+    (use-value (o)
+      :report "Supply an object to be printed instead."
+      :interactive
+      (lambda ()
+        (read-evaluated-form "~@<Enter an object (evaluated): ~@:>"))
+      (output-object o stream)
+      o)))
 
 ;;; guts of PRINT-UNREADABLE-OBJECT
 (defun %print-unreadable-object (object stream type identity body)
   (declare (type (or null function) body))
-  (when *print-readably*
-    (restart-case
-        (error 'print-not-readable :object object)
-      (print-unreadably ()
-        :report "Print unreadably.")
-      (use-value (o)
-        :report "Supply an object to be printed instead."
-        :interactive read-unreadable-replacement
-        (write o :stream stream)
-        (return-from %print-unreadable-object nil))))
-  (flet ((print-description ()
-           (when type
-             (write (type-of object) :stream stream :circle nil
-                    :level nil :length nil)
-             (write-char #\space stream)
-             (pprint-newline :fill stream))
-           (when body
-             (funcall body))
-           (when identity
-             (when (or body (not type))
-               (write-char #\space stream))
-             (pprint-newline :fill stream)
-             (write-char #\{ stream)
-             (write (get-lisp-obj-address object) :stream stream
-                    :radix nil :base 16)
-             (write-char #\} stream))))
-    (cond ((print-pretty-on-stream-p stream)
-           ;; Since we're printing prettily on STREAM, format the
-           ;; object within a logical block. PPRINT-LOGICAL-BLOCK does
-           ;; not rebind the stream when it is already a pretty stream,
-           ;; so output from the body will go to the same stream.
-           (pprint-logical-block (stream nil :prefix "#<" :suffix ">")
-             (print-description)))
-          (t
-           (write-string "#<" stream)
-           (print-description)
-           (write-char #\> stream))))
+  (if *print-readably*
+      (print-not-readable-error object stream)
+      (flet ((print-description ()
+               (when type
+                 (write (type-of object) :stream stream :circle nil
+                                         :level nil :length nil)
+                 (write-char #\space stream)
+                 (pprint-newline :fill stream))
+               (when body
+                 (funcall body))
+               (when identity
+                 (when (or body (not type))
+                   (write-char #\space stream))
+                 (pprint-newline :fill stream)
+                 (write-char #\{ stream)
+                 (write (get-lisp-obj-address object) :stream stream
+                                                      :radix nil :base 16)
+                 (write-char #\} stream))))
+        (cond ((print-pretty-on-stream-p stream)
+               ;; Since we're printing prettily on STREAM, format the
+               ;; object within a logical block. PPRINT-LOGICAL-BLOCK does
+               ;; not rebind the stream when it is already a pretty stream,
+               ;; so output from the body will go to the same stream.
+               (pprint-logical-block (stream nil :prefix "#<" :suffix ">")
+                 (print-description)))
+              (t
+               (write-string "#<" stream)
+               (print-description)
+               (write-char #\> stream)))))
   nil)
 
 ;;;; OUTPUT-OBJECT -- the main entry point
@@ -954,16 +957,7 @@
                               (load-time-value
                                (array-element-type
                                 (make-array 0 :element-type 'character))))))
-                (restart-case
-                    (error 'print-not-readable :object vector)
-                  (print-unreadably ()
-                    :report "Print unreadably."
-                    (let ((*print-readably* nil))
-                      (output-vector vector stream)))
-                  (use-value (o)
-                    :report "Supply an object to be printed instead."
-                    :interactive read-unreadable-replacement
-                    (write o :stream stream))))
+                (print-not-readable-error vector stream))
                ((or *print-escape* *print-readably*)
                 (write-char #\" stream)
                 (quote-string vector stream)
@@ -981,14 +975,8 @@
         (t
          (when (and *print-readably*
                     (not (array-readably-printable-p vector)))
-           (restart-case
-               (error 'print-not-readable :object vector)
-             (print-unreadably ()
-               :report "Print unreadably.")
-             (use-value (o)
-               :report "Supply an object to be printed instead."
-               :interactive read-unreadable-replacement
-               (return-from output-vector (write o :stream stream)))))
+           (return-from output-vector
+             (print-not-readable-error vector stream)))
          (descend-into (stream)
                        (write-string "#(" stream)
                        (dotimes (i (length vector))
@@ -1040,14 +1028,8 @@
 (defun output-array-guts (array stream)
   (when (and *print-readably*
              (not (array-readably-printable-p array)))
-    (restart-case
-        (error 'print-not-readable :object array)
-      (print-unreadably ()
-        :report "Print unreadably.")
-      (use-value (o)
-        :report "Supply an object to be printed instead."
-        :interactive read-unreadable-replacement
-        (return-from output-array-guts (write o :stream stream)))))
+    (return-from output-array-guts
+      (print-not-readable-error array stream)))
   (write-char #\# stream)
   (let ((*print-base* 10)
         (*print-radix* nil))
@@ -1596,16 +1578,8 @@
   (cond (*read-eval*
          (write-string "#." stream))
         (*print-readably*
-         (restart-case
-             (error 'print-not-readable :object x)
-           (print-unreadably ()
-             :report "Print unreadably."
-             (let ((*print-readably* nil))
-               (output-float-infinity x stream)))
-           (use-value (o)
-             :report "Supply an object to be printed instead."
-             :interactive read-unreadable-replacement
-             (write o :stream stream))))
+         (return-from output-float-infinity
+           (print-not-readable-error x stream)))
         (t
          (write-string "#<" stream)))
   (write-string "SB-EXT:" stream)

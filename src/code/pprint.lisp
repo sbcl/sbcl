@@ -1007,16 +1007,7 @@ line break."
          (output-ugly-object array stream))
         ((and *print-readably*
               (not (array-readably-printable-p array)))
-         (restart-case
-             (error 'print-not-readable :object array)
-           (print-unreadably ()
-             :report "Print unreadably."
-             (let ((*print-readably* nil))
-               (pprint-array stream array)))
-           (use-value (o)
-             :report "Supply an object to be printed instead."
-             :interactive read-unreadable-replacement
-             (write o :stream stream))))
+         (print-not-readable-error array stream))
         ((vectorp array)
          (pprint-vector stream array))
         (t
