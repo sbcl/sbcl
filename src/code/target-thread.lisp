@@ -435,11 +435,11 @@ HOLDING-MUTEX-P."
     #!-sb-thread
     (when old
       (error "Strange deadlock on ~S in an unithreaded build?" mutex))
-    #!-sb-futex
+    #!-(and sb-thread sb-futex)
     (and (not old)
          ;; Don't even bother to try to CAS if it looks bad.
          (not (sb!ext:compare-and-swap (mutex-%owner mutex) nil new-owner)))
-    #!+sb-futex
+    #!+(and sb-thread sb-futex)
     ;; From the Mutex 2 algorithm from "Futexes are Tricky" by Ulrich Drepper.
     (when (eql +lock-free+ (sb!ext:compare-and-swap (mutex-state mutex)
                                                     +lock-free+
@@ -606,7 +606,7 @@ IF-NOT-OWNER is :FORCE)."
       ;; FIXME: Is a :memory barrier too strong here?  Can we use a :write
       ;; barrier instead?
       (barrier (:memory)))
-    #!+sb-futex
+    #!+(and sb-thread sb-futex)
     (when old-owner
       ;; FIXME: once ATOMIC-INCF supports struct slots with word sized
       ;; unsigned-byte type this can be used:
@@ -633,7 +633,7 @@ IF-NOT-OWNER is :FORCE)."
   #!+sb-doc
   "Waitqueue type."
   (name nil :type (or null thread-name))
-  #!+sb-futex
+  #!+(and sb-thread sb-futex)
   (token nil))
 
 #!+(and sb-thread (not sb-futex))
