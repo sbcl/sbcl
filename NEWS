@@ -62,6 +62,8 @@ changes relative to sbcl-1.0.53:
   * enhancement: convenience function SET-SBCL-SOURCE-LOCATION for informing
     the system where on the filesystem the SBCL sources themselves are
     located.  (Thanks to Zach Beane)
+  * enhancement: the compiler is now able to derive tighter bounds for
+    floating point numbers in some cases. (Thanks to Lutz Euler, lp#894498)
   * bug fix: on 64-bit targets, atomic-incf/aref does index computation
     correctly, even on wide-fixnum builds. (lp#887220)
   * bug fix: (directory "foo/*/*.*") did not follow symlinks in foo/ that
