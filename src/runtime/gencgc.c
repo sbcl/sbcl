@@ -1454,8 +1454,9 @@ general_copy_large_object(lispobj object, long nwords, boolean boxedp)
         page_index_t next_page;
         page_bytes_t old_bytes_used;
 
-        /* BOXED ONLY? */
-        /* Note: Any page write-protection must be removed, else a
+        /* FIXME: This comment is somewhat stale.
+         *
+         * Note: Any page write-protection must be removed, else a
          * later scavenge_newspace may incorrectly not scavenge these
          * pages. This would not be necessary if they are added to the
          * new areas, but let's do it for them all (they'll probably
@@ -1511,13 +1512,17 @@ general_copy_large_object(lispobj object, long nwords, boolean boxedp)
         next_page++;
         while ((old_bytes_used == GENCGC_CARD_BYTES) &&
                (page_table[next_page].gen == from_space) &&
+               /* FIXME: It is not obvious to me why this is necessary
+                * as a loop condition: it seems to me that the
+                * region_start_offset test should be sufficient, but
+                * experimentally that is not the case. --NS
+                * 2011-11-28 */
+               (boxedp ?
+                page_boxed_p(next_page) :
+                page_allocated_no_region_p(next_page)) &&
                page_table[next_page].large_object &&
                (page_table[next_page].region_start_offset ==
                 npage_bytes(next_page - first_page))) {
-            if (boxedp)
-                gc_assert(page_boxed_p(next_page));
-            else
-                gc_assert(page_allocated_no_region_p(next_page));
             /* Checks out OK, free the page. Don't need to both zeroing
              * pages as this should have been done before shrinking the
              * object. These pages shouldn't be write-protected, even if
