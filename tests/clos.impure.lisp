@@ -1901,4 +1901,14 @@
                    (sb-pcl::generic-function-pretty-arglist
                     #'generic-function-pretty-arglist-optional-and-key)))))
 
+(with-test (:name :bug-894202)
+  (assert (eq :good
+              (handler-case
+                  (let ((name (gensym "FOO"))
+                        (decl (gensym "BAR")))
+                    (eval `(defgeneric ,name ()
+                             (declare (,decl)))))
+                (warning ()
+                  :good)))))
+
 ;;;; success

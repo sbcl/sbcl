@@ -19,6 +19,8 @@ changes relative to sbcl-1.0.54:
   * bug fix: condition slot accessors no longer cause undefined function
     style-warnings when used in the :REPORT clause of the DEFINE-CONDITION
     form that defines them. (lp#896379)
+  * bug fix: DEFGENERIC warns about unsupported declarations, as specified
+    by ANSI. (lp#894202)
 
 changes in sbcl-1.0.54 relative to sbcl-1.0.53:
   * minor incompatible changes:

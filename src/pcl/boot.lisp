@@ -171,25 +171,33 @@ bootstrapping.
           (let ((car-option (car option)))
             (case car-option
               (declare
-               (when (and
-                      (consp (cadr option))
-                      (member (first (cadr option))
-                              ;; FIXME: this list is slightly weird.
-                              ;; ANSI (on the DEFGENERIC page) in one
-                              ;; place allows only OPTIMIZE; in
-                              ;; another place gives this list of
-                              ;; disallowed declaration specifiers.
-                              ;; This seems to be the only place where
-                              ;; the FUNCTION declaration is
-                              ;; mentioned; TYPE seems to be missing.
-                              ;; Very strange.  -- CSR, 2002-10-21
-                              '(declaration ftype function
-                                inline notinline special)))
-                 (error 'simple-program-error
-                        :format-control "The declaration specifier ~S ~
+               (dolist (spec (cdr option))
+                 (unless (consp spec)
+                   (error 'simple-program-error
+                          :format-control "~@<Invalid declaration specifier in ~
+                                           DEFGENERIC: ~S~:@>"
+                          :format-arguments (list spec)))
+                 (when (member (first spec)
+                               ;; FIXME: this list is slightly weird.
+                               ;; ANSI (on the DEFGENERIC page) in one
+                               ;; place allows only OPTIMIZE; in
+                               ;; another place gives this list of
+                               ;; disallowed declaration specifiers.
+                               ;; This seems to be the only place where
+                               ;; the FUNCTION declaration is
+                               ;; mentioned; TYPE seems to be missing.
+                               ;; Very strange.  -- CSR, 2002-10-21
+                               '(declaration ftype function
+                                 inline notinline special))
+                   (error 'simple-program-error
+                          :format-control "The declaration specifier ~S ~
                                          is not allowed inside DEFGENERIC."
-                        :format-arguments (list (cadr option))))
-               (push (cadr option) (initarg :declarations)))
+                          :format-arguments (list spec)))
+                 (if (or (eq 'optimize (first spec))
+                         (info :declaration :recognized (first spec)))
+                     (push spec (initarg :declarations))
+                     (warn "Ignoring unrecognized declaration in DEFGENERIC: ~S"
+                           spec))))
               (:method-combination
                (when (initarg car-option)
                  (duplicate-option car-option))
@@ -239,8 +247,8 @@ bootstrapping.
            (compile-or-load-defgeneric ',fun-name))
          (load-defgeneric ',fun-name ',lambda-list
                           (sb-c:source-location) ,@initargs)
-        ,@(mapcar #'expand-method-definition methods)
-        (fdefinition ',fun-name)))))
+         ,@(mapcar #'expand-method-definition methods)
+         (fdefinition ',fun-name)))))
 
 (defun compile-or-load-defgeneric (fun-name)
   (proclaim-as-fun-name fun-name)
