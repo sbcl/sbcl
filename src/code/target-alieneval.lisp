@@ -295,18 +295,28 @@ Examples:
         ;; undesirable, in most uses of MAKE-ALIEN the %SAP-ALIEN
         ;; cannot be optimized away.
         `(locally (declare (muffle-conditions compiler-note))
-           (%sap-alien (%make-alien (* ,(align-offset bits alignment)
-                                       ,size-expr))
+           ;; FIXME: Do we really need the ASH/+7 here after ALIGN-OFFSET?
+           (%sap-alien (%make-alien (* ,(ash (+ 7 (align-offset bits alignment)) -3)
+                                       (the index ,size-expr)))
                        ',(make-alien-pointer-type :to alien-type)))))))
+
+(defun malloc-error (bytes errno)
+  (error 'simple-storage-condition
+         :format-control "~A: malloc() of ~S bytes failed."
+         :format-arguments (list (strerror errno) bytes)))
 
 ;;; Allocate a block of memory at least BITS bits long and return a
 ;;; system area pointer to it.
 #!-sb-fluid (declaim (inline %make-alien))
-(defun %make-alien (bits)
-  (declare (type index bits))
-  (alien-funcall (extern-alien "malloc"
-                               (function system-area-pointer unsigned))
-                 (ash (the index (+ bits 7)) -3)))
+(defun %make-alien (bytes)
+  (declare (type index bytes)
+           (optimize (sb!c:alien-funcall-saves-fp-and-pc 0)))
+  (let ((sap (alien-funcall (extern-alien "malloc"
+                                          (function system-area-pointer size-t))
+                            bytes)))
+    (if (and (not (eql 0 bytes)) (eql 0 (sap-int sap)))
+        (malloc-error bytes (get-errno))
+        sap)))
 
 #!-sb-fluid (declaim (inline free-alien))
 (defun free-alien (alien)
@@ -329,7 +339,7 @@ allocated by MAKE-ALIEN, MAKE-ALIEN-STRING or malloc(3)."
                                    :external-format external-format
                                    :null-terminate null-terminate))
          (count (length octets))
-         (buf (%make-alien (* 8 count))))
+         (buf (%make-alien count)))
     (sb!kernel:copy-ub8-to-system-area octets 0 buf 0 count)
     buf))
 

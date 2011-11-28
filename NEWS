@@ -7,6 +7,8 @@ changes relative to sbcl-1.0.54:
     ** --arch option can be used to specify the architecture to build for.
        (Mainly useful for building 32-bit SBCL's on x86-64 hosts, not
        full-blows cross-compilation.)
+  * enhancement: MAKE-ALIEN signals a storage-condition instead of returning a
+    null alien when malloc() fails. (lp#891268)
   * optimization: the compiler is smarter about representation selection for
     floating point constants used in full calls.
   * bug fix: deadlock detection could report the same deadlock twice, for
