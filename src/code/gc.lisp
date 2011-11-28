@@ -304,13 +304,28 @@ statistics are appended to it."
           (call-hooks "after-GC" *after-gc-hooks* :on-error :warn))))))
 
 ;;; This is the user-advertised garbage collection function.
-(defun gc (&key (gen 0) (full nil) &allow-other-keys)
+(defun gc (&key (full nil) (gen 0) &allow-other-keys)
   #!+(and sb-doc gencgc)
-  "Initiate a garbage collection. GEN controls the number of generations
-  to garbage collect."
+  "Initiate a garbage collection.
+
+The default is to initiate a nursery collection, which may in turn
+trigger a collection of one or more older generations as well. If FULL
+is true, all generations are collected. If GEN is provided, it can be
+used to specify the oldest generation guaranteed to be collected.
+
+On CheneyGC platforms arguments FULL and GEN take no effect: a full
+collection is always preformed."
   #!+(and sb-doc (not gencgc))
-  "Initiate a garbage collection. GEN may be provided for compatibility with
-  generational garbage collectors, but is ignored in this implementation."
+  "Initiate a garbage collection.
+
+The collection is always a full collection.
+
+Arguments FULL and GEN can be used for compatibility with GENCGC
+platforms: there the default is to initiate a nursery collection,
+which may in turn trigger a collection of one or more older
+generations as well. If FULL is true, all generations are collected.
+If GEN is provided, it can be used to specify the oldest generation
+guaranteed to be collected."
   (when (sub-gc :gen (if full 6 gen))
     (post-gc)))
 
