@@ -50,6 +50,7 @@ changes relative to sbcl-1.0.53:
        systems with getaddrinfo().
     ** GET-HOST-BY-NAME and GET-HOST-BY-ADDRESS weren't thread or interrupt
        safe outside systems with getaddrinfo().
+  * enhancement: ASDF has been updated 2.019.
   * enhancement: special-case TCO prevention for functions which never return
     extended to untrusted types, keeping one more frame's worth of debug
     information around in many cases.
