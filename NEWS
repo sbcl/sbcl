@@ -1,20 +1,20 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 changes relative to sbcl-1.0.53:
   * minor incompatible changes:
-    ** RENAME-FILE on a symbolic links used to rename the linked-to file instead
-       of the link.
+    ** RENAME-FILE on a symbolic links used to rename the linked-to file
+       instead of the link.
     ** DELETE-DIRECTORY on symbolic link to a directory used to delete the
-       directory, but now signal an error instead. Use TRUENAME to resolve
-       the pathname if you wish to delete the linked directory, and DELETE-FILE
-       if you wish to delete the
+       directory, but now signal an error instead. Use TRUENAME to resolve the
+       pathname if you wish to delete the linked directory, and DELETE-FILE if
+       you wish to delete the
     ** The internal SB-THREAD::SPINLOCK API has been deprecated, and using
        symbols associated with it will trigger a compile-time warning.
   * thread-related enhancements:
     (This work has been funded by the SBCL Threading 2011 IndieGoGo campaign.
      Many thanks to generous donors!)
-    ** Threading is now more reliable on non-Linux platforms. We still
-       don't consider threads on non-Linux platforms good enough to
-       enable them by default, but they're in a clearly better shape now.
+    ** Threading is now more reliable on non-Linux platforms. We still don't
+       consider threads on non-Linux platforms good enough to enable them by
+       default, but they're in a clearly better shape now.
     ** Deadlines supported now on all platforms.
     ** All blocking functions in the threading API now have a :TIMEOUT
        argument.
@@ -27,7 +27,7 @@ changes relative to sbcl-1.0.53:
   * GC-related enhancements and bug fixes:
     ** --dynamic-space-size and --control-stack-size now understand Kb, Mb,
          and Gb suffixes. Default is megabytes as before.
-    ** Default dynamic space size on all GENCGC platforms is now 512Mb for
+    ** on GENCGC targets, the default dynamic space size is now 512Mb for
        32-bit systems, and 1Gb for 64-bit systems. (OpenBSD/x86-64 is the only
        exception, defaulting to mere 444Mb to fit under default ulimits.) The
        new defaults are in place to prevent hitting swap on low-end systems.
@@ -35,12 +35,15 @@ changes relative to sbcl-1.0.53:
        another default, or the runtime option to adjust the size at startup: a
        good size is at most equal to the amount of physical memory the system
        has.
-    ** on GENCGC systems nursery and generation sizes now default to 5% of
+    ** on GENCGC targets, nursery and generation sizes now default to 5% of
        dynamic-space size.
-    ** on 64-bit systems setting the nursery size above 4Gb now
-       works. (lp#870868)
-    ** SB-KERNEL:MAKE-LISP-OBJ on GENCGC no longer categorically refuses to
-       create SIMPLE-FUN objects.
+    ** on GENCGC targets, SB-KERNEL:MAKE-LISP-OBJ no longer categorically
+       refuses to create SIMPLE-FUN objects.
+    ** on 64-bit GENCGC targets, setting the nursery size above 4Gb now works.
+       (lp#870868)
+    ** on CHENEYGC targets, SB-KERNEL:MAKE-LISP-OBJ now does the same
+       validation of pointer objects as GENCGC does, instead of a
+       comparatively weak bounds-check against the heap spaces.
   * SB-BSD-SOCKETS bug fixes:
     ** GET-PROTOCOL-BY-NAME had a significant memory leak.
     ** GET-HOST-BY-NAME and GET-HOST-BY-ADDRESS small amounts of memory on
@@ -48,13 +51,10 @@ changes relative to sbcl-1.0.53:
     ** GET-HOST-BY-NAME and GET-HOST-BY-ADDRESS weren't thread or interrupt
        safe outside systems with getaddrinfo().
   * enhancement: special-case TCO prevention for functions which never return
-    extended to untrusted type, keeping one more frame's worth of debug
+    extended to untrusted types, keeping one more frame's worth of debug
     information around in many cases.
   * enhancement: debug-names of anonymous and local function are more
     descriptive. Affects backtraces and SB-SPROF results. (lp#805100)
-  * enhancement: on CHENEYGC targets, SB-KERNEL:MAKE-LISP-OBJ now does
-    the same validation of pointer objects as GENCGC does, instead of a
-    comparatively weak bounds-check against the heap spaces.
   * enhancement: on win32, ABS of complex floats guards better against
     overflows. (lp#888410)
   * enhancement: RUN-PROGRAM now distinguishes exec() failing from child
@@ -66,11 +66,11 @@ changes relative to sbcl-1.0.53:
     floating point numbers in some cases. (Thanks to Lutz Euler, lp#894498)
   * bug fix: on 64-bit targets, atomic-incf/aref does index computation
     correctly, even on wide-fixnum builds. (lp#887220)
-  * bug fix: (directory "foo/*/*.*") did not follow symlinks in foo/ that
+  * bug fix: (DIRECTORY "foo/*/*.*") did not follow symlinks in foo/ that
     resolved to directories.
   * bug fix: type mismatch when assigning to lexical variables no longer
     result in fasl-dumping internal type objects. (lp#890750)
-  * bug fix: type mismatch on (setf aref) and function return values no
+  * bug fix: type mismatch on (SETF AREF) and function return values no
     longer result in fasl-dumping internal type objects.
   * bug fix: With several combinations of argument types, for example (EXPT
     <integer> <(complex double)>), EXPT now uses double-precision throughout
