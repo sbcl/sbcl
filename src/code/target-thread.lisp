@@ -362,6 +362,8 @@ HOLDING-MUTEX-P."
   ;; Make sure to get the current value.
   (sb!ext:compare-and-swap (mutex-%owner mutex) nil nil))
 
+(sb!ext:defglobal **deadlock-lock** nil)
+
 ;;; Signals an error if owner of LOCK is waiting on a lock whose release
 ;;; depends on the current thread. Does not detect deadlocks from sempahores.
 (defun check-deadlock ()
@@ -373,16 +375,36 @@ HOLDING-MUTEX-P."
                (let ((other-thread (mutex-%owner lock)))
                  (cond ((not other-thread))
                        ((eq self other-thread)
-                        (let* ((chain (deadlock-chain self origin))
+                        (let* ((chain
+                                 (with-cas-lock ((symbol-value '**deadlock-lock**))
+                                   (prog1 (deadlock-chain self origin)
+                                     ;; We're now committed to signaling the
+                                     ;; error and breaking the deadlock, so
+                                     ;; mark us as no longer waiting on the
+                                     ;; lock. This ensures that a single
+                                     ;; deadlock is reported in only one
+                                     ;; thread, and that we don't look like
+                                     ;; we're waiting on the lock when print
+                                     ;; stuff -- because that may lead to
+                                     ;; further deadlock checking, in turn
+                                     ;; possibly leading to a bogus vicious
+                                     ;; metacycle on PRINT-OBJECT.
+                                     (setf (thread-waiting-for self) nil))))
                                (barf
-                                (format nil
-                                        "~%WARNING: DEADLOCK CYCLE DETECTED:~%~@<   ~@;~
-                                         ~{~:@_~S~:@_~}~:@>~
-                                         ~%END OF CYCLE~%"
-                                        (mapcar #'car chain))))
+                                 (with-output-to-string (s)
+                                   (funcall (formatter
+                                             "~%WARNING: DEADLOCK CYCLE DETECTED:~%~@<   ~@;~
+                                              ~{~:@_~S~:@_~}~:@>~
+                                              ~%END OF CYCLE~%")
+                                            s
+                                            (mapcar #'car chain)))))
                           ;; Barf to stderr in case the system is too tied up
-                          ;; to report the error properly -- to avoid cross-talk
+                          ;; to report the error properly -- and to avoid cross-talk
                           ;; build the whole string up first.
+                          ;;
+                          ;; ...would be even better if we had
+                          ;; sensible locks on streams, but what can
+                          ;; you do...
                           (write-string barf sb!sys:*stderr*)
                           (finish-output sb!sys:*stderr*)
                           (error 'thread-deadlock

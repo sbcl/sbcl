@@ -307,13 +307,10 @@
                 (t1 (sb-thread:make-thread (test m1 m2 s1 s2) :name "T1"))
                 (t2 (sb-thread:make-thread (test m2 m1 s2 s1) :name "T2")))
            ;; One will deadlock, and the other will then complete normally.
-           ;; ...except sometimes, when we get unlucky, and both will do
-           ;; the deadlock detection in parallel and both signal.
            (let ((res (list (sb-thread:join-thread t1)
                             (sb-thread:join-thread t2))))
              (assert (or (equal '(:deadlock :ok) res)
-                         (equal '(:ok :deadlock) res)
-                         (equal '(:deadlock :deadlock) res))))))))
+                         (equal '(:ok :deadlock) res))))))))
 
 (with-test (:name deadlock-detection.2 :skipped-on '(not :sb-thread))
   (let* ((m1 (sb-thread:make-mutex :name "M1"))
