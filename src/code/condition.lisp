@@ -398,8 +398,12 @@
 
 (defvar *define-condition-hooks* nil)
 
+(defun %set-condition-report (name report)
+  (setf (condition-classoid-report (find-classoid name))
+        report))
+
 (defun %define-condition (name parent-types layout slots documentation
-                          report default-initargs all-readers all-writers
+                          default-initargs all-readers all-writers
                           source-location)
   (with-single-package-locked-error
       (:symbol name "defining ~A as a condition")
@@ -409,7 +413,6 @@
             source-location))
     (let ((class (find-classoid name)))
       (setf (condition-classoid-slots class) slots)
-      (setf (condition-classoid-report class) report)
       (setf (condition-classoid-default-initargs class) default-initargs)
       (setf (fdocumentation name 'type) documentation)
 
@@ -548,10 +551,10 @@
              (setq report
                    (if (stringp arg)
                        `#'(lambda (condition stream)
-                          (declare (ignore condition))
-                          (write-string ,arg stream))
+                            (declare (ignore condition))
+                            (write-string ,arg stream))
                        `#'(lambda (condition stream)
-                          (funcall #',arg condition stream))))))
+                            (funcall #',arg condition stream))))))
           (:default-initargs
            (do ((initargs (rest option) (cddr initargs)))
                ((endp initargs))
@@ -575,11 +578,15 @@
                               ',layout
                               (list ,@(slots))
                               ,documentation
-                              ,report
                               (list ,@default-initargs)
                               ',(all-readers)
                               ',(all-writers)
-                              (sb!c:source-location)))))))
+                              (sb!c:source-location))
+           ;; This needs to be after %DEFINE-CONDITION in case :REPORT
+           ;; is a lambda referring to condition slot accessors:
+           ;; they're not proclaimed as functions before it has run if
+           ;; we're under EVAL or loaded as source.
+           (%set-condition-report ',name ,report))))))
 
 ;;;; various CONDITIONs specified by ANSI
 

@@ -11,6 +11,8 @@
 
 (cl:in-package :cl-user)
 
+(use-package :test-util)
+
 ;;; Bug from CLOCC.
 (defpackage :p1
   (:use :cl)
@@ -36,6 +38,8 @@
   (setf (code-msg code) 2)
   (assert (eql (code-msg code) 2))
   (assert (eql (%code-msg code) 1)))
+
+(in-package :cl-user)
 
 ;;; Check that initializing the condition class metaobject doesn't create
 ;;; any instances. Reported by Marco Baringer on sbcl-devel Mon, 05 Jul 2004.
@@ -121,3 +125,13 @@
     (when (find-restart 'bar)
       (invoke-restart 'bar))))
 (assert (not (restart-test-finds-restarts)))
+
+(with-test (:name :bug-896379)
+  (let ((*evaluator-mode* :compile))
+    (handler-bind ((style-warning #'error))
+      (let ((reader (gensym "READER"))
+            (name (gensym "FOO-ERROR")))
+        (eval `(define-condition ,name (error)
+                 ((slot :initarg :slot :reader ,reader))
+                 (:report (lambda (c stream)
+                            (format stream "Oops: ~S" (,reader c))))))))))

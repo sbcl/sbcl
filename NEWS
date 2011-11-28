@@ -16,6 +16,9 @@ changes relative to sbcl-1.0.54:
   * bug fix: compiler error when typechecking a call to a function with
     non-constant keyword arguments.
   * bug fix: misoptimization of TRUNCATE causing erratic behaviour.
+  * bug fix: condition slot accessors no longer cause undefined function
+    style-warnings when used in the :REPORT clause of the DEFINE-CONDITION
+    form that defines them. (lp#896379)
 
 changes in sbcl-1.0.54 relative to sbcl-1.0.53:
   * minor incompatible changes:
