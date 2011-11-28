@@ -3715,6 +3715,7 @@
   ;; compile-times this is bound to be a bit brittle, but at least
   ;; here we try to establish a decent baseline.
   (flet ((time-it (lambda want)
+           (gc :full t) ; let's keep GCs coming from other code out...
            (let* ((start (get-internal-run-time))
                   (fun (compile nil lambda))
                   (end (get-internal-run-time))
