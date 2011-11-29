@@ -212,6 +212,7 @@
 #!-sb-fluid (declaim (maybe-inline map-allocated-objects))
 (defun map-allocated-objects (fun space &optional careful)
   (declare (type function fun) (type spaces space))
+  (declare (optimize (sb!c:alien-funcall-saves-fp-and-pc 0)))
   (flet ((make-obj (tagged-address)
            (if careful
                (make-lisp-obj tagged-address nil)
