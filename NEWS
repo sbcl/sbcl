@@ -23,6 +23,8 @@ changes relative to sbcl-1.0.54:
     form that defines them. (lp#896379)
   * bug fix: DEFGENERIC warns about unsupported declarations, as specified
     by ANSI. (lp#894202)
+  * bug fix: SUBTYPEP tests involving forward-referenced classes no longer
+    bogusly report NIL, T.
 
 changes in sbcl-1.0.54 relative to sbcl-1.0.53:
   * minor incompatible changes:

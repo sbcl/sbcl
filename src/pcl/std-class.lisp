@@ -845,7 +845,8 @@
 
 
 (defun class-has-a-forward-referenced-superclass-p (class)
-  (or (forward-referenced-class-p class)
+  (or (when (forward-referenced-class-p class)
+        class)
       (some #'class-has-a-forward-referenced-superclass-p
             (class-direct-superclasses class))))
 

@@ -732,4 +732,32 @@
       (assert (not ok))
       (assert sure))))
 
+(defclass subtypep-fwd-test1 (subtypep-fwd-test-unknown1) ())
+(defclass subtypep-fwd-test2 (subtypep-fwd-test-unknown2) ())
+(defclass subtypep-fwd-testb1 (subtypep-fwd-testb-unknown1) ())
+(defclass subtypep-fwd-testb2 (subtypep-fwd-testb-unknown2 subtypep-fwd-testb1) ())
+(with-test (:name (:subtypep :forward-referenced-classes))
+  (flet ((test (c1 c2 b1 b2)
+           (multiple-value-bind (x1 x2) (subtypep c1 c2)
+             (unless (and (eq b1 x1) (eq b2 x2))
+               (error "(subtypep ~S ~S) => ~S, ~S but wanted ~S, ~S"
+                      c1 c2 x1 x2 b1 b2)))))
+    (test 'subtypep-fwd-test1 'subtypep-fwd-test1 t t)
+    (test 'subtypep-fwd-test2 'subtypep-fwd-test2 t t)
+    (test 'subtypep-fwd-test1 'subtypep-fwd-test2 nil nil)
+    (test 'subtypep-fwd-test2 'subtypep-fwd-test1 nil nil)
+
+    (test 'subtypep-fwd-test1 'subtypep-fwd-test-unknown1 t t)
+    (test 'subtypep-fwd-test2 'subtypep-fwd-test-unknown2 t t)
+    (test 'subtypep-fwd-test1 'subtypep-fwd-test-unknown2 nil nil)
+    (test 'subtypep-fwd-test2 'subtypep-fwd-test-unknown1 nil nil)
+
+    (test 'subtypep-fwd-test-unknown2 'subtypep-fwd-test-unknown2 t t)
+    (test 'subtypep-fwd-test-unknown1 'subtypep-fwd-test-unknown1 t t)
+    (test 'subtypep-fwd-test-unknown1 'subtypep-fwd-test-unknown2 nil nil)
+    (test 'subtypep-fwd-test-unknown2 'subtypep-fwd-test-unknown1 nil nil)
+
+    (test 'subtypep-fwd-testb1 'subtypep-fwd-testb2 nil nil)
+    (test 'subtypep-fwd-testb2 'subtypep-fwd-testb1 t t)))
+
 ;;; success

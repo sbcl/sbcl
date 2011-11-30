@@ -51,7 +51,7 @@
   ;;   :SEALED    = We can't even add subclasses.
   ;;   NIL        = Anything could happen.
   (state nil :type (member nil :read-only :sealed))
-  ;; direct superclasses of this class
+  ;; direct superclasses of this class. Always NIL for CLOS classes.
   (direct-superclasses () :type list)
   ;; representation of all of the subclasses (direct or indirect) of
   ;; this class. This is NIL if no subclasses or not initalized yet;
@@ -854,30 +854,40 @@
 ;;; We might be passed classoids with invalid layouts; in any pairwise
 ;;; class comparison, we must ensure that both are valid before
 ;;; proceeding.
-(defun %ensure-classoid-valid (classoid layout)
+(defun %ensure-classoid-valid (classoid layout error-context)
   (aver (eq classoid (layout-classoid layout)))
-  (when (layout-invalid layout)
-    (if (typep classoid 'standard-classoid)
-        (let ((class (classoid-pcl-class classoid)))
-          (cond
-            ((sb!pcl:class-finalized-p class)
-             (sb!pcl::%force-cache-flushes class))
-            ((sb!pcl::class-has-a-forward-referenced-superclass-p class)
-             (error "Invalid, unfinalizeable class ~S (classoid ~S)."
-                    class classoid))
-            (t
-             (sb!pcl:finalize-inheritance class))))
-        (error "Don't know how to ensure validity of ~S (not ~
-                a STANDARD-CLASSOID)." classoid))))
+  (or (not (layout-invalid layout))
+      (if (typep classoid 'standard-classoid)
+          (let ((class (classoid-pcl-class classoid)))
+            (cond
+              ((sb!pcl:class-finalized-p class)
+               (sb!pcl::%force-cache-flushes class)
+               t)
+              ((sb!pcl::class-has-a-forward-referenced-superclass-p class)
+               (when error-context
+                 (bug "~@<Invalid class ~S with forward-referenced superclass ~
+                       ~S in ~A.~%~:@>"
+                      class
+                      (sb!pcl::class-has-a-forward-referenced-superclass-p class)
+                      error-context))
+               nil)
+              (t
+               (sb!pcl:finalize-inheritance class)
+               t)))
+          (bug "~@<Don't know how to ensure validity of ~S (not a STANDARD-CLASSOID) ~
+                for ~A.~%~:@>"
+               classoid (or error-context 'subtypep)))))
 
-(defun %ensure-both-classoids-valid (class1 class2)
+(defun %ensure-both-classoids-valid (class1 class2 &optional errorp)
   (do ((layout1 (classoid-layout class1) (classoid-layout class1))
        (layout2 (classoid-layout class2) (classoid-layout class2))
        (i 0 (+ i 1)))
-      ((and (not (layout-invalid layout1)) (not (layout-invalid layout2))))
+      ((and (not (layout-invalid layout1)) (not (layout-invalid layout2)))
+       t)
     (aver (< i 2))
-    (%ensure-classoid-valid class1 layout1)
-    (%ensure-classoid-valid class2 layout2)))
+    (unless (and (%ensure-classoid-valid class1 layout1 errorp)
+                 (%ensure-classoid-valid class2 layout2 errorp))
+      (return-from %ensure-both-classoids-valid nil))))
 
 (defun update-object-layout-or-invalid (object layout)
   (if (layout-for-std-class-p (layout-of object))
@@ -894,11 +904,22 @@
 (!define-type-method (classoid :simple-subtypep) (class1 class2)
   (aver (not (eq class1 class2)))
   (with-world-lock ()
-    (%ensure-both-classoids-valid class1 class2)
-    (let ((subclasses (classoid-subclasses class2)))
-      (if (and subclasses (gethash class1 subclasses))
-          (values t t)
-          (values nil t)))))
+    (if (%ensure-both-classoids-valid class1 class2)
+        (let ((subclasses2 (classoid-subclasses class2)))
+          (if (and subclasses2 (gethash class1 subclasses2))
+              (values t t)
+              (if (and (typep class1 'standard-classoid)
+                       (typep class2 'standard-classoid)
+                       (or (sb!pcl::class-has-a-forward-referenced-superclass-p
+                            (classoid-pcl-class class1))
+                           (sb!pcl::class-has-a-forward-referenced-superclass-p
+                            (classoid-pcl-class class2))))
+                  ;; If there's a forward-referenced class involved we don't know for sure.
+                  ;; (There are cases which we /could/ figure out, but that doesn't seem
+                  ;; to be required or important, really.)
+                  (values nil nil)
+                  (values nil t))))
+        (values nil nil))))
 
 ;;; When finding the intersection of a sealed class and some other
 ;;; class (not hierarchically related) the intersection is the union
@@ -919,7 +940,7 @@
 (!define-type-method (classoid :simple-intersection2) (class1 class2)
   (declare (type classoid class1 class2))
   (with-world-lock ()
-    (%ensure-both-classoids-valid class1 class2)
+    (%ensure-both-classoids-valid class1 class2 "type intersection")
     (cond ((eq class1 class2)
            class1)
           ;; If one is a subclass of the other, then that is the

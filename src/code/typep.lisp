@@ -199,7 +199,7 @@
         (aver (< i 2))
         (when (layout-invalid obj-layout)
           (setq obj-layout (update-object-layout-or-invalid object layout)))
-        (%ensure-classoid-valid classoid layout))
+        (%ensure-classoid-valid classoid layout "typep"))
     (let ((obj-inherits (layout-inherits obj-layout)))
       (or (eq obj-layout layout)
           (dotimes (i (length obj-inherits) nil)
