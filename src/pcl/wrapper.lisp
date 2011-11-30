@@ -34,7 +34,7 @@
 ;;; This is called in BRAID when we are making wrappers for classes
 ;;; whose slots are not initialized yet, and which may be built-in
 ;;; classes. We pass in the class name in addition to the class.
-(defun boot-make-wrapper (length name &optional class)
+(defun !boot-make-wrapper (length name &optional class)
   (let ((found (find-classoid name nil)))
     (cond
      (found

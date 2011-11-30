@@ -1740,8 +1740,8 @@ bootstrapping.
           :format-arguments (list fun-name)))
 
 (defvar *sgf-wrapper*
-  (boot-make-wrapper (early-class-size 'standard-generic-function)
-                     'standard-generic-function))
+  (!boot-make-wrapper (early-class-size 'standard-generic-function)
+                      'standard-generic-function))
 
 (defvar *sgf-slots-init*
   (mapcar (lambda (canonical-slot)

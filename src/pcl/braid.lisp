@@ -118,7 +118,7 @@
                  (let ((wr (format-symbol *pcl-package* "~A-WRAPPER" class)))
                    `(setf ,wr ,(if (eq class 'standard-generic-function)
                                    '*sgf-wrapper*
-                                   `(boot-make-wrapper
+                                   `(!boot-make-wrapper
                                      (early-class-size ',class)
                                      ',class))
                           ,class (allocate-standard-instance
@@ -199,7 +199,7 @@
                                   ((eq class standard-generic-function)
                                    standard-generic-function-wrapper)
                                   (t
-                                   (boot-make-wrapper (length slots) name))))
+                                   (!boot-make-wrapper (length slots) name))))
                    (proto nil))
               (when (eq name t) (setq *the-wrapper-of-t* wrapper))
               (set (make-class-symbol name) class)
