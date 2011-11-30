@@ -53,6 +53,8 @@ changes relative to sbcl-1.0.54:
   * bug fix: non-toplevel DEFSTRUCT signaled a style warning for unknown type.
   * bug fix: redefining a function whose previous definition contained an
     unknown type no longer causes a style-warning. (lp#806243)
+  * bug fix: undefined functions now appear in backtraces as ("undefined
+    function") instead of ("bogus stack frame") on non-x86oids.
 
 changes in sbcl-1.0.54 relative to sbcl-1.0.53:
   * minor incompatible changes:
