@@ -676,7 +676,8 @@
            (setf fifo nil))))
      sb-impl::*external-formats*)))
 
-(with-test (:name :bug-657183)
+(with-test (:name :bug-657183 :skipped-on '(not :sb-unicode))
+  #+sb-unicode
   (let ((name (merge-pathnames "stream-impure.temp-test"))
         (text '(#\GREEK_SMALL_LETTER_LAMDA
                 #\JAPANESE_BANK_SYMBOL
