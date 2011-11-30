@@ -65,6 +65,9 @@ do
       --prefix=)
         $optarg_ok && SBCL_PREFIX=$optarg
         ;;
+      --arch=)
+        $oparg_ok && SBCL_ARCH=$optarg
+        ;;
       --xc-host=)
         $optarg_ok && SBCL_XC_HOST=$optarg
         ;;
@@ -127,6 +130,10 @@ Options:
       If not provided, the default is platform-specific. <size> is
       taken to be megabytes unless explicitly suffixed with Gb in
       order to specify the size in gigabytes.
+
+  --arch=<string>      Specify the architecture to build for.
+
+      Mainly for doing x86 builds on x86-64.
 
   --xc-host=<string>   Specify the Common Lisp compilation host.
 
@@ -318,7 +325,7 @@ echo //setting up CPU-architecture-dependent information
 sbcl_arch=${SBCL_ARCH:-$guessed_sbcl_arch}
 echo sbcl_arch=\"$sbcl_arch\"
 if [ "$sbcl_arch" = "" ] ; then
-    echo "can't guess target SBCL architecture, need SBCL_ARCH environment var"
+    echo "can't guess target SBCL architecture, please specify --arch=<name>"
     exit 1
 fi
 printf ":%s" "$sbcl_arch" >> $ltf

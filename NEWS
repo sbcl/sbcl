@@ -1,4 +1,10 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
+changes relative to sbcl-1.0.54:
+  * enhancements to building SBCL:
+    ** --arch option can be used to specify the architecture to build for.
+       (Mainly useful for building 32-bit SBCL's on x86-64 hosts, not
+       full-blows cross-compilation.)
+
 changes in sbcl-1.0.54 relative to sbcl-1.0.53:
   * minor incompatible changes:
     ** RENAME-FILE on a symbolic links used to rename the linked-to file
