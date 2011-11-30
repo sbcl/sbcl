@@ -9,6 +9,8 @@ changes relative to sbcl-1.0.54:
        full-blows cross-compilation.)
   * bug fix: deadlock detection could report the same deadlock twice, for
     two different threads. Now a single deadlock is reported exactly once.
+  * bug fix: interval-arithmetic division during type derivation did not
+    account for signed zeros.
 
 changes in sbcl-1.0.54 relative to sbcl-1.0.53:
   * minor incompatible changes:

@@ -4080,3 +4080,12 @@
                                        (throw 'out (lambda () t))))
                                 (foo))))))))
     (assert (equal '(lambda () :in foo) (sb-kernel:%fun-name fun)))))
+
+(with-test (:name :interval-div-signed-zero)
+  (let ((fun (compile nil
+                      `(Lambda (a)
+                         (declare (type (member 0 -272413371076) a))
+                         (ffloor (the number a) -63243.127451934015d0)))))
+    (multiple-value-bind (q r) (funcall fun 0)
+      (assert (eql -0d0 q))
+      (assert (eql 0d0 r)))))

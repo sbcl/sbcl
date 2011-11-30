@@ -853,9 +853,6 @@
                  ((zerop (type-bound-number y))
                   ;; Divide by zero means result is infinity
                   nil)
-                 ((and (numberp x) (zerop x))
-                  ;; Zero divided by anything is zero.
-                  x)
                  (t
                   (bound-binop / x y)))))
     (let ((top-range (interval-range-info top))
