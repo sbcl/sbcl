@@ -19,8 +19,6 @@ use_test_subdirectory
 
 tmpscript=$TEST_FILESTEM.lisp-script
 
-printenv
-
 # bug 881445
 case "$SBCL_MACHINE_TYPE" in
     X86-64)
