@@ -866,7 +866,15 @@
                          (component-from-component-ptr component-ptr))))
             (/noshow0 "got CODE")
             (when (null code)
-              (return (values code 0 context)))
+              ;; KLUDGE: Detect undefined functions by a range-check
+              ;; against the trampoline address and the following
+              ;; function in the runtime.
+              (if (< (foreign-symbol-address "undefined_tramp")
+                     (sap-int (sb!vm:context-pc context))
+                     (foreign-symbol-address #!+x86 "closure_tramp"
+                                             #!+x86-64 "alloc_tramp"))
+                  (return (values :undefined-function 0 context))
+                  (return (values code 0 context))))
             (let* ((code-header-len (* (get-header-data code)
                                        sb!vm:n-word-bytes))
                    (pc-offset

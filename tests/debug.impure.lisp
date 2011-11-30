@@ -134,8 +134,7 @@
 
 (defvar *undefined-function-frame*
   ;; bug 353
-  '(#+(or x86 x86-64) "bogus stack frame"
-    #-(or x86 x86-64) "undefined function"))
+  '("undefined function"))
 
 ;;; Test for "undefined function" (undefined_tramp) working properly.
 ;;; Try it with and without tail call elimination, since they can have

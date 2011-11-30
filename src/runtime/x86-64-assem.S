@@ -275,6 +275,9 @@ GNAME(undefined_tramp):
 	ret
 	SIZE(GNAME(undefined_tramp))
 
+/* KLUDGE: FIND-ESCAPED-FRAME (SYS:SRC;CODE;DEBUG-INT.LISP) needs
+ * to know the name of the function immediately following the
+ * undefined-function trampoline. */
 
 	.text
 	.align	align_16byte,0x90
