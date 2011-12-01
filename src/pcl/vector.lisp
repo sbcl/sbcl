@@ -663,7 +663,9 @@
                            ;; args when a next-method is involved, to
                            ;; prevent compiler warnings about ignored
                            ;; args being read.
-                           (unless (and (eq 'ignore name) (member var req-args :test #'eq) (or cnm-p (member var parameters-setqd)))
+                           (unless (and (eq 'ignore name)
+                                        (member var req-args :test #'eq)
+                                        (or cnm-p (member var parameters-setqd)))
                              (push var outers))
                            (push var inners)))
                      (when outers

@@ -25,6 +25,9 @@ changes relative to sbcl-1.0.54:
     by ANSI. (lp#894202)
   * bug fix: SUBTYPEP tests involving forward-referenced classes no longer
     bogusly report NIL, T.
+  * bug fix: bogus style-warnings for DEFMETHOD forms that both declared some
+    required arguments ignored and performed assignments to others.
+    (lp#898331)
 
 changes in sbcl-1.0.54 relative to sbcl-1.0.53:
   * minor incompatible changes:

@@ -1911,4 +1911,13 @@
                 (warning ()
                   :good)))))
 
+(with-test (:name :bug-898331)
+  (handler-bind ((warning #'error))
+    (eval `(defgeneric bug-898331 (request type remaining-segment-requests all-requests)))
+    (eval `(defmethod bug-898331 ((request cons) (type (eql :cancel))
+                                  remaining-segment-requests
+                                  all-segment-requests)
+             (declare (ignore all-segment-requests))
+             (check-type request t)))))
+
 ;;;; success

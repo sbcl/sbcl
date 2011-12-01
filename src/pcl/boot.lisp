@@ -1312,9 +1312,8 @@ bootstrapping.
                                       applyp))
      &body body
      &environment env)
-  (let* ((all-params (append args (when rest-arg (list rest-arg))))
-         (rebindings (when (or setq-p call-next-method-p)
-                       (mapcar (lambda (x) (list x x)) all-params))))
+  (let* ((rebindings (when (or setq-p call-next-method-p)
+                       (mapcar (lambda (x) (list x x)) parameters-setqd))))
     (if (not (or call-next-method-p setq-p closurep next-method-p-p applyp))
         `(locally
              ,@body)
@@ -1337,7 +1336,6 @@ bootstrapping.
                          (declare (optimize (sb-c:insert-step-conditions 0)))
                          (not (null ,next-method-call))))))
            (let ,rebindings
-             ,@(when rebindings `((declare (ignorable ,@all-params))))
              ,@body)))))
 
 ;;; CMUCL comment (Gerd Moellmann):
