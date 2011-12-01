@@ -851,8 +851,10 @@
       (let ((name (key-info-name key)))
         (do ((arg args (cddr arg)))
             ((null arg))
-          (when (eq (lvar-value (first arg)) name)
-            (funcall fun (second arg) (key-info-type key))))))))
+          (let ((keyname (first arg)))
+            (when (and (constant-lvar-p keyname)
+                       (eq (lvar-value keyname) name))
+              (funcall fun (second arg) (key-info-type key)))))))))
 
 ;;; Assert that CALL is to a function of the specified TYPE. It is
 ;;; assumed that the call is legal and has only constants in the

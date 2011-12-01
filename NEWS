@@ -11,6 +11,8 @@ changes relative to sbcl-1.0.54:
     two different threads. Now a single deadlock is reported exactly once.
   * bug fix: interval-arithmetic division during type derivation did not
     account for signed zeros.
+  * bug fix: compiler error when typechecking a call to a function with
+    non-constant keyword arguments.
 
 changes in sbcl-1.0.54 relative to sbcl-1.0.53:
   * minor incompatible changes:

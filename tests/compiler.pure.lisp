@@ -4089,3 +4089,10 @@
     (multiple-value-bind (q r) (funcall fun 0)
       (assert (eql -0d0 q))
       (assert (eql 0d0 r)))))
+
+(with-test (:name :non-constant-keyword-typecheck)
+  (let ((fun (compile nil
+                      `(lambda (p1 p3 p4)
+                         (declare (type keyword p3))
+                         (tree-equal p1 (cons 1 2) (the (member :test) p3) p4)))))
+    (assert (funcall fun (cons 1.0 2.0) :test '=))))
