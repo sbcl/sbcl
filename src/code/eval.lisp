@@ -275,10 +275,7 @@
                                       else)
                                   lexenv)))
                ((let let*)
-                (destructuring-bind (definitions &rest body) (rest exp)
-                  (if (null definitions)
-                      (simple-eval-locally `(locally ,@body) lexenv)
-                      (%simple-eval exp lexenv))))
+                (%simple-eval exp lexenv))
                (t
                 (if (and (symbolp name)
                          (eq (info :function :kind name) :function))

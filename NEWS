@@ -28,6 +28,8 @@ changes relative to sbcl-1.0.54:
   * bug fix: bogus style-warnings for DEFMETHOD forms that both declared some
     required arguments ignored and performed assignments to others.
     (lp#898331)
+  * bug fix: *EVALUATOR-MODE* :COMPILE treated (LET () ...) identically
+    to (LOCALLY ...) leading to internally inconsistent toplevel-formness.
 
 changes in sbcl-1.0.54 relative to sbcl-1.0.53:
   * minor incompatible changes:

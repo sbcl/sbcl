@@ -262,4 +262,23 @@
     (with-input-from-string (s noise)
       (assert (equal "; in: DEFUN SOURCE-CONTEXT-TEST" (read-line s))))))
 
+(with-test (:name (eval :empty-let-is-not-toplevel))
+  (let ((sb-ext:*evaluator-mode* :compile))
+    (eval `(let ()
+             (defmacro empty-let-is-not-toplevel-x () :macro)
+             (defun empty-let-is-not-toplevel-fun ()
+               (empty-let-is-not-toplevel-x))))
+    (eval `(defun empty-let-is-not-toplevel-x () :fun))
+    (assert (eq :fun (empty-let-is-not-toplevel-fun))))
+  ;; While at it, test that we get the late binding under
+  ;; interpreter mode.
+  (let ((sb-ext:*evaluator-mode* :interpret))
+    (eval `(let ()
+             (defmacro empty-let-is-not-toplevel-x () :macro)
+             (defun empty-let-is-not-toplevel-fun ()
+               (empty-let-is-not-toplevel-x))))
+    (assert (eq :macro (empty-let-is-not-toplevel-fun)))
+    (eval `(defun empty-let-is-not-toplevel-x () :fun))
+    (assert (eq :fun (empty-let-is-not-toplevel-fun)))))
+
 ;;; success
