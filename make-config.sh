@@ -42,6 +42,9 @@ bad_option() {
     exit 1
 }
 
+WITH_FEATURES=""
+WITHOUT_FEATURES=""
+
 some_options=false
 for option
 do
@@ -49,10 +52,15 @@ do
   # Split --foo=bar into --foo and bar.
   case $option in
       *=*)
-        # For ease of scripting treat skip valued options with empty
+        # For ease of scripting skip valued options with empty
         # values.
         optarg=`expr "X$option" : '[^=]*=\(.*\)'` || optarg_ok=false
         option=`expr "X$option" : 'X\([^=]*=\).*'`
+        ;;
+      --with*)
+        optarg=`expr "X$option" : 'X--[^-]*-\(.*\)'` \
+            || bad_option "Malformed feature toggle: $option"
+        option=`expr "X$option" : 'X\(--[^-]*\).*'`
         ;;
       *)
         optarg=""
@@ -74,6 +82,12 @@ do
       --dynamic-space-size=)
         $optarg_ok && SBCL_DYNAMIC_SPACE_SIZE=$optarg
 	;;
+      --with)
+        WITH_FEATURES="$WITH_FEATURES :$optarg"
+        ;;
+      --without)
+        WITHOUT_FEATURES="$WITHOUT_FEATURES :$optarg"
+	;;
       -*)
         bad_option "Unknown command-line option to $0: \"$option\""
         ;;
@@ -88,6 +102,16 @@ do
   esac
   some_options=true
 done
+
+if (test -f customize-target-features.lisp && \
+    (test -n "$WITH_FEATURES" || test -n "$WITHOUT_FEATURES"))
+then
+    # Actually there's no reason why it would not work, but it would
+    # be confusing to say --with-thread only to have it turned off by
+    # customize-target-features.lisp...
+    echo "ERROR: Both customize-target-features.lisp, and feature-options"
+    echo "to make.sh present -- cannot use both at the same time."
+fi
 
 # Previously XC host was provided as a positional argument. 
 if test -n "$legacy_xc_spec"
@@ -130,6 +154,9 @@ Options:
       If not provided, the default is platform-specific. <size> is
       taken to be megabytes unless explicitly suffixed with Gb in
       order to specify the size in gigabytes.
+
+  --with-<feature>     Build with specified feature.
+  --without-<feature>  Build wihout the specfied feature.
 
   --arch=<string>      Specify the architecture to build for.
 
@@ -286,7 +313,8 @@ echo //initializing $ltf
 echo ';;;; This is a machine-generated file.' > $ltf
 echo ';;;; Please do not edit it by hand.' >> $ltf
 echo ';;;; See make-config.sh.' >> $ltf
-printf '(' >> $ltf
+echo "((lambda (features) (set-difference features (list$WITHOUT_FEATURES)))" >> $ltf
+printf " (union (list$WITH_FEATURES) (list " >> $ltf
 
 echo //guessing default target CPU architecture from host architecture
 case `uname -m` in
@@ -571,7 +599,7 @@ export sbcl_os sbcl_arch
 sh tools-for-build/grovel-features.sh >> $ltf
 
 echo //finishing $ltf
-echo ')' >> $ltf
+echo ')))' >> $ltf
 
 # FIXME: The version system should probably be redone along these lines:
 #

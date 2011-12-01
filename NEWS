@@ -1,6 +1,8 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 changes relative to sbcl-1.0.54:
   * enhancements to building SBCL:
+    ** --with-<feature> and --without-<feature> can be used to specify
+       which features to build with.
     ** --arch option can be used to specify the architecture to build for.
        (Mainly useful for building 32-bit SBCL's on x86-64 hosts, not
        full-blows cross-compilation.)
