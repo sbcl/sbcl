@@ -134,7 +134,13 @@
             (:include args-type
                       (class-info (type-class-or-lose 'values)))
             (:constructor %make-values-type)
+            (:predicate %values-type-p)
             (:copier nil)))
+
+(declaim (inline value-type-p))
+(defun values-type-p (x)
+  (or (eq x *wild-type*)
+      (%values-type-p x)))
 
 (defun-cached (make-values-type-cached
                :hash-bits 8

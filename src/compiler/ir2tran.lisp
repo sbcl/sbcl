@@ -667,7 +667,7 @@
   (let* ((type (node-derived-type call))
          (types
           (mapcar #'primitive-type
-                  (if (values-type-p type)
+                  (if (args-type-p type)
                       (append (args-type-required type)
                               (args-type-optional type))
                       (list type))))

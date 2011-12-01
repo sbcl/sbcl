@@ -432,8 +432,9 @@
       1
       (values-type-max-value-count type)))
 
+;;; VALUES type with a single value.
 (defun type-single-value-p (type)
-  (and (values-type-p type)
+  (and (%values-type-p type)
        (not (values-type-rest type))
        (null (values-type-optional type))
        (singleton-p (values-type-required type))))
