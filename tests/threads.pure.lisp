@@ -496,7 +496,7 @@
                              :timeout 0.01
                              :default cookie)))))
 
-(with-test (:name :semaphore-notification
+(with-test (:name (:semaphore-notification :wait-on-semaphore)
             :skipped-on '(not :sb-thread))
   (let ((sem (make-semaphore))
         (ok nil)
@@ -542,3 +542,13 @@
                            unsafe)))
           (assert (= n (+ k (length safe))))
           (assert unsafe))))))
+
+(with-test (:name (:semaphore-notification :try-sempahore)
+            :skipped-on '(not :sb-thread))
+  (let* ((sem (make-semaphore))
+         (note (make-semaphore-notification)))
+    (try-semaphore sem 1 note)
+    (assert (not (semaphore-notification-status note)))
+    (signal-semaphore sem)
+    (try-semaphore sem 1 note)
+    (assert (semaphore-notification-status note))))

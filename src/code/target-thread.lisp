@@ -1023,7 +1023,7 @@ the status is set to T."
       (when (not (minusp new-count))
         (setf (semaphore-%count semaphore) new-count)
         (when notification
-          (setf (semaphore-notifiction-%status notification) t))
+          (setf (semaphore-notification-%status notification) t))
         ;; FIXME: We don't actually document this -- should we just
         ;; return T, or document new count as the return?
         new-count))))
