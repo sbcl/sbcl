@@ -356,10 +356,14 @@
 ;;; DOCUMENTATION's argument-precedence-order wasn't being faithfully
 ;;; preserved through the bootstrap process until sbcl-0.7.8.39.
 ;;; (thanks to Gerd Moellmann)
-(let ((answer (documentation '+ 'function)))
-  (assert (stringp answer))
-  (defmethod documentation ((x (eql '+)) y) "WRONG")
-  (assert (string= (documentation '+ 'function) answer)))
+(with-test (:name :documentation-argument-precedence-order)
+  (defun foo022 ()
+    "Documentation"
+    t)
+  (let ((answer (documentation 'foo022 'function)))
+    (assert (stringp answer))
+    (defmethod documentation ((x (eql 'foo022)) y) "WRONG")
+    (assert (string= (documentation 'foo022 'function) answer))))
 
 ;;; only certain declarations are permitted in DEFGENERIC
 (macrolet ((assert-program-error (form)
