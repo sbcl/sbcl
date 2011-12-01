@@ -605,10 +605,23 @@ CSYMBOL(undefined_tramp):
 	/* Point reg_CODE to the header and tag it as function, since
 	   the debugger regards a function pointer in reg_CODE which
 	   doesn't point to a code object as undefined function.  */
-	bcl 20,31,.+4                  /* get address of the next instruction */
-	mflr reg_CODE                  /* header 1 extra word back from here */
-	addi reg_CODE,reg_CODE,-(SIMPLE_FUN_CODE_OFFSET+4)
-	
+	/* We are given that reg_LIP points to undefined_tramp by
+	   virtue of the calling convention.  */
+	addi reg_CODE,reg_LIP,-SIMPLE_FUN_CODE_OFFSET
+
+	/* If we are called with stack arguments (or in a tail-call
+	   scenario), we end up with an allocated stack frame, but the
+	   frame link information is uninitialized.  Fix things by
+	   allocating and initializing our stack frame "properly". */
+	cmpwi cr0,reg_NARGS,16
+	bt gt,1f
+	addi reg_CSP,reg_CFP,16
+	b 2f
+1:	add reg_CSP,reg_CFP,reg_NARGS
+2:	stw reg_OCFP,0(reg_CFP)
+	stw reg_LRA,4(reg_CFP)
+
+	/* Now that the preliminaries are dealt with, actually trap. */
 	twllei reg_ZERO,trap_Cerror
 	.byte 4
 	.byte UNDEFINED_FUN_ERROR

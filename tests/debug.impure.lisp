@@ -151,7 +151,11 @@
          (funcall fun)))
 
   (with-test (:name (:undefined-function :bug-346)
-              :fails-on '(or :alpha :ppc :sparc :mips
+                    ;; Failures on ALPHA, SPARC, MIPS, and probably
+                    ;; HPPA are due to not having a full and valid
+                    ;; stack frame for the undefined function frame.
+                    ;; See PPC undefined_tramp for details.
+              :fails-on '(or :alpha :sparc :mips
                           (and :x86-64 :freebsd)))
     (assert (verify-backtrace
              (lambda () (test #'optimized))
