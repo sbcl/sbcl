@@ -31,20 +31,20 @@
     (and layout (typep (layout-info layout) 'defstruct-description))))
 
 (sb!xc:defmacro %make-structure-instance-macro (dd slot-specs &rest slot-vars)
-  `(truly-the ,(dd-name dd)
-              ,(if (compiler-layout-ready-p (dd-name dd))
-                   `(%make-structure-instance ,dd ,slot-specs ,@slot-vars)
-                   ;; Non-toplevel defstructs don't have a layout at compile time,
-                   ;; so we need to construct the actual function at runtime -- but
-                   ;; we cache it at the call site, so that we don't perform quite
-                   ;; so horribly.
-                   `(let* ((cell (load-time-value (list nil)))
-                           (fun (car cell)))
-                      (if (functionp fun)
-                          (funcall fun ,@slot-vars)
-                          (funcall (setf (car cell)
-                                         (%make-structure-instance-allocator ,dd ,slot-specs))
-                                   ,@slot-vars))))))
+  (if (compiler-layout-ready-p (dd-name dd))
+      `(truly-the ,(dd-name dd)
+                  (%make-structure-instance ,dd ,slot-specs ,@slot-vars))
+      ;; Non-toplevel defstructs don't have a layout at compile time,
+      ;; so we need to construct the actual function at runtime -- but
+      ;; we cache it at the call site, so that we don't perform quite
+      ;; so horribly.
+      `(let* ((cell (load-time-value (list nil)))
+              (fun (car cell)))
+         (if (functionp fun)
+             (funcall fun ,@slot-vars)
+             (funcall (setf (car cell)
+                            (%make-structure-instance-allocator ,dd ,slot-specs))
+                      ,@slot-vars)))))
 
 (declaim (ftype (sfunction (defstruct-description list) function)
                 %make-structure-instance-allocator))

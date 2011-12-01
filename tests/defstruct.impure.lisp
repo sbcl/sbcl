@@ -1121,3 +1121,9 @@ redefinition."
 (with-test (:name (:struct-predicate :obsolete-instance))
   (defclass class-to-be-redefined () ((a :initarg :a :initform 1)))
   (function-trampoline #'structure-with-predicate-p))
+
+(with-test (:name (:defstruct :not-toplevel-silent))
+  (let ((sb-ext:*evaluator-mode* :compile))
+    (handler-bind ((warning #'error))
+     (eval `(let ()
+              (defstruct destruct-no-warning-not-at-toplevel bar))))))
