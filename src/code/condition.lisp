@@ -1705,11 +1705,14 @@ the usual naming convention (names like *FOO*) for special variables"
   (define-nil-returning-restart continue ()
     "Transfer control to a restart named CONTINUE, or return NIL if none exists.")
   (define-nil-returning-restart store-value (value)
-    "Transfer control and VALUE to a restart named STORE-VALUE, or return NIL if
-   none exists.")
+    "Transfer control and VALUE to a restart named STORE-VALUE, or
+return NIL if none exists.")
   (define-nil-returning-restart use-value (value)
-    "Transfer control and VALUE to a restart named USE-VALUE, or return NIL if
-   none exists."))
+    "Transfer control and VALUE to a restart named USE-VALUE, or
+return NIL if none exists.")
+  (define-nil-returning-restart print-unreadably ()
+    "Transfer control to a restart named SB-EXT:PRINT-UNREADABLY, or
+return NIL if none exists."))
 
 ;;; single-stepping restarts
 

@@ -574,4 +574,9 @@
 (with-test (:name :bug-867684)
   (assert (equal "ab" (format nil "a~0&b"))))
 
+(with-test (:name :print-unreadably-function)
+  (assert (equal "\"foo\""
+                 (handler-bind ((print-not-readable #'sb-ext:print-unreadably))
+                   (write-to-string (coerce "foo" 'base-string) :readably t)))))
+
 ;;; success

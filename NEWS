@@ -9,6 +9,9 @@ changes relative to sbcl-1.0.54:
        full-blows cross-compilation.)
   * enhancement: MAKE-ALIEN signals a storage-condition instead of returning a
     null alien when malloc() fails. (lp#891268)
+  * enhancement: SB-EXT:PRINT-UNREADABLY restart for PRINT-NOT-READABLE
+    conditions can be conveniently accessed through function with the same
+    name, analogously to CONTINUE.
   * optimization: the compiler is smarter about representation selection for
     floating point constants used in full calls.
   * bug fix: deadlock detection could report the same deadlock twice, for
