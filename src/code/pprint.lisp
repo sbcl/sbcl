@@ -1007,7 +1007,11 @@ line break."
          (output-ugly-object array stream))
         ((and *print-readably*
               (not (array-readably-printable-p array)))
-         (print-not-readable-error array stream))
+         (if *read-eval*
+             (if (vectorp array)
+                 (sb!impl::output-unreadable-vector-readably array stream)
+                 (sb!impl::output-unreadable-array-readably array stream))
+             (print-not-readable-error array stream)))
         ((vectorp array)
          (pprint-vector stream array))
         (t

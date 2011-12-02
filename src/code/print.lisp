@@ -991,6 +991,13 @@ variable: an unreadable object representing the error is printed instead.")
         (incf length)))
     (write-char #\) stream)))
 
+(defun output-unreadable-vector-readably (vector stream)
+  (declare (vector vector))
+  (write-string "#." stream)
+  (write `(coerce ,(coerce vector '(vector t))
+                  '(simple-array ,(array-element-type vector) (*)))
+         :stream stream))
+
 (defun output-vector (vector stream)
   (declare (vector vector))
   (cond ((stringp vector)
@@ -1014,11 +1021,8 @@ variable: an unreadable object representing the error is printed instead.")
            ;; (Don't use OUTPUT-OBJECT here, since this code
            ;; has to work for all possible *PRINT-BASE* values.)
            (write-char (if (zerop bit) #\0 #\1) stream)))
-        (t
-         (when (and *print-readably*
-                    (not (array-readably-printable-p vector)))
-           (return-from output-vector
-             (print-not-readable-error vector stream)))
+        ((or (not *print-readably*)
+             (array-readably-printable-p vector))
          (descend-into (stream)
                        (write-string "#(" stream)
                        (dotimes (i (length vector))
@@ -1026,7 +1030,11 @@ variable: an unreadable object representing the error is printed instead.")
                            (write-char #\space stream))
                          (punt-print-if-too-long i stream)
                          (output-object (aref vector i) stream))
-                       (write-string ")" stream)))))
+                       (write-string ")" stream)))
+        (*read-eval*
+         (output-unreadable-vector-readably vector stream))
+        (t
+         (print-not-readable-error vector stream))))
 
 ;;; This function outputs a string quoting characters sufficiently
 ;;; so that someone can read it in again. Basically, put a slash in
@@ -1066,20 +1074,45 @@ variable: an unreadable object representing the error is printed instead.")
         (*print-length* nil))
     (print-unreadable-object (array stream :type t :identity t))))
 
-;;; Output the readable #A form of an array.
-(defun output-array-guts (array stream)
-  (when (and *print-readably*
-             (not (array-readably-printable-p array)))
-    (return-from output-array-guts
-      (print-not-readable-error array stream)))
-  (write-char #\# stream)
-  (let ((*print-base* 10)
-        (*print-radix* nil))
-    (output-integer (array-rank array) stream))
-  (write-char #\A stream)
+;;; Convert an array into a list that can be used with MAKE-ARRAY's
+;;; :INITIAL-CONTENTS keyword argument.
+(defun listify-array (array)
   (with-array-data ((data array) (start) (end))
     (declare (ignore end))
-    (sub-output-array-guts data (array-dimensions array) stream start)))
+    (labels ((listify (dimensions index)
+               (if (null dimensions)
+                   (aref data index)
+                   (let* ((dimension (car dimensions))
+                          (dimensions (cdr dimensions))
+                          (count (reduce #'* dimensions)))
+                     (loop for i below dimension
+                           collect (listify dimensions index)
+                           do (incf index count))))))
+      (listify (array-dimensions array) start))))
+
+(defun output-unreadable-array-readably (array stream)
+  (write-string "#." stream)
+  (write `(make-array ',(array-dimensions array)
+                      :element-type ',(array-element-type array)
+                      :initial-contents ',(listify-array array))
+         :stream stream))
+
+;;; Output the readable #A form of an array.
+(defun output-array-guts (array stream)
+  (cond ((or (not *print-readably*)
+             (array-readably-printable-p array))
+         (write-char #\# stream)
+         (let ((*print-base* 10)
+               (*print-radix* nil))
+           (output-integer (array-rank array) stream))
+         (write-char #\A stream)
+         (with-array-data ((data array) (start) (end))
+           (declare (ignore end))
+           (sub-output-array-guts data (array-dimensions array) stream start)))
+        (*read-eval*
+         (output-unreadable-array-readably array stream))
+        (t
+         (print-not-readable-error array stream))))
 
 (defun sub-output-array-guts (array dimensions stream index)
   (declare (type (simple-array * (*)) array) (fixnum index))

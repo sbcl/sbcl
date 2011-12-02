@@ -579,4 +579,56 @@
                  (handler-bind ((print-not-readable #'sb-ext:print-unreadably))
                    (write-to-string (coerce "foo" 'base-string) :readably t)))))
 
+(with-test (:name :printing-specialized-arrays-readably)
+  (let ((*read-eval* t)
+        (dimss (loop repeat 10
+                     collect (loop repeat (1+ (random 3))
+                                   collect (1+ (random 10)))))
+        (props sb-vm::*specialized-array-element-type-properties*))
+    (labels ((random-elt (type)
+               (case type
+                 (base-char
+                  (code-char (random 128)))
+                 (character
+                  (code-char (random char-code-limit)))
+                 (single-float
+                  (+ least-positive-normalized-single-float
+                     (random most-positive-single-float)))
+                 (double-float
+                  (+ least-positive-normalized-double-float
+                         (random most-positive-double-float)))
+                 (bit
+                  (random 2))
+                 (fixnum
+                  (random most-positive-fixnum))
+                 ((t)
+                  t)
+                 (otherwise
+                  (destructuring-bind (type x) type
+                    (ecase type
+                      (unsigned-byte
+                       (random (1- (expt 2 x))))
+                      (signed-byte
+                       (- (random (expt 2 (1- x)))))
+                      (complex
+                       (complex (random-elt x) (random-elt x)))))))))
+      (dotimes (i (length props))
+        (let ((et (sb-vm::saetp-specifier (aref props i))))
+          (when et
+            (when (eq 'base-char et)
+              ;; base-strings not included in the #. printing.
+              (go :next))
+            (dolist (dims dimss)
+              (let ((a (make-array dims :element-type et)))
+                (assert (equal et (array-element-type a)))
+                (dotimes (i (array-total-size a))
+                  (setf (row-major-aref a i) (random-elt et)))
+                (let ((copy (read-from-string (write-to-string a :readably t))))
+                  (assert (equal dims (array-dimensions copy)))
+                  (assert (equal et (array-element-type copy)))
+                  (assert (equal (array-total-size a) (array-total-size copy)))
+                  (dotimes (i (array-total-size a))
+                    (assert (equal (row-major-aref a i) (row-major-aref copy i)))))))))
+        :next))))
+
 ;;; success
