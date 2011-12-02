@@ -2783,12 +2783,47 @@ scrub_control_stack(void)
 void
 scavenge_control_stack(struct thread *th)
 {
-    lispobj *control_stack =
-        (lispobj *)(th->control_stack_start);
-    unsigned long control_stack_size =
-        access_control_stack_pointer(th) - control_stack;
+    lispobj *object_ptr;
 
-    scavenge(control_stack, control_stack_size);
+    /* In order to properly support dynamic-extent allocation of
+     * non-CONS objects, the control stack requires special handling.
+     * Rather than calling scavenge() directly, grovel over it fixing
+     * broken hearts, scavenging pointers to oldspace, and pitching a
+     * fit when encountering unboxed data.  This prevents stray object
+     * headers from causing the scavenger to blow past the end of the
+     * stack (an error case checked in scavenge()).  We don't worry
+     * about treating unboxed words as boxed or vice versa, because
+     * the compiler isn't allowed to store unboxed objects on the
+     * control stack.  -- AB, 2011-Dec-02 */
+
+    for (object_ptr = th->control_stack_start;
+         object_ptr < access_control_stack_pointer(th);
+         object_ptr++) {
+
+        lispobj object = *object_ptr;
+#ifdef LISP_FEATURE_GENCGC
+        if (forwarding_pointer_p(object_ptr))
+            lose("unexpected forwarding pointer in scavenge_control_stack: %p, start=%p, end=%p\n",
+                 object_ptr, th->control_stack_start, access_control_stack_pointer(th));
+#endif
+        if (is_lisp_pointer(object) && from_space_p(object)) {
+            /* It currently points to old space. Check for a
+             * forwarding pointer. */
+            lispobj *ptr = native_pointer(object);
+            if (forwarding_pointer_p(ptr)) {
+                /* Yes, there's a forwarding pointer. */
+                *object_ptr = LOW_WORD(forwarding_pointer_value(ptr));
+            } else {
+                /* Scavenge that pointer. */
+                long n_words_scavenged =
+                    (scavtab[widetag_of(object)])(object_ptr, object);
+                gc_assert(n_words_scavenged == 1);
+            }
+        } else if (scavtab[widetag_of(object)] == scav_lose) {
+            lose("unboxed object in scavenge_control_stack: %p->%x, start=%p, end=%p\n",
+                 object_ptr, object, th->control_stack_start, access_control_stack_pointer(th));
+        }
+    }
 }
 
 /* Scavenging Interrupt Contexts */
