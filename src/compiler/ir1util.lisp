@@ -598,7 +598,6 @@
                               dx arg recheck-component)))
                (ref
                 (let* ((other (trivial-lambda-var-ref-lvar use)))
-                  (print (list :ref use other))
                   (unless (eq other lvar)
                     (handle-nested-dynamic-extent-lvars
                      dx other recheck-component)))))))
