@@ -45,6 +45,7 @@ bad_option() {
 WITH_FEATURES=""
 WITHOUT_FEATURES=""
 
+fancy=false
 some_options=false
 for option
 do
@@ -88,6 +89,11 @@ do
       --without)
         WITHOUT_FEATURES="$WITHOUT_FEATURES :$optarg"
 	;;
+      --fancy)
+        WITH_FEATURES="$WITH_FEATURES :sb-core-compression :sb-xref-for-internals :sb-after-xc-core"
+        # Lower down we add :sb-thread for platforms where it can be built.
+        fancy=true
+        ;;
       -*)
         bad_option "Unknown command-line option to $0: \"$option\""
         ;;
@@ -308,14 +314,6 @@ echo //entering make-config.sh
 echo //ensuring the existence of output/ directory
 if [ ! -d output ] ; then mkdir output; fi
 
-ltf=`pwd`/local-target-features.lisp-expr
-echo //initializing $ltf
-echo ';;;; This is a machine-generated file.' > $ltf
-echo ';;;; Please do not edit it by hand.' >> $ltf
-echo ';;;; See make-config.sh.' >> $ltf
-echo "((lambda (features) (set-difference features (list$WITHOUT_FEATURES)))" >> $ltf
-printf " (union (list$WITH_FEATURES) (list " >> $ltf
-
 echo //guessing default target CPU architecture from host architecture
 case `uname -m` in
     *86) guessed_sbcl_arch=x86 ;;
@@ -350,16 +348,42 @@ if [ "$sbcl_os" = "darwin" ] && [ "`/usr/sbin/sysctl -n hw.optional.x86_64`" = "
 fi
 
 echo //setting up CPU-architecture-dependent information
+if test -n "$SBCL_ARCH"
+then
+    # Normalize it.
+    SBCL_ARCH=`echo $SBCL_ARCH | tr '[A-Z]' '[a-z]' | tr _ -`
+fi
 sbcl_arch=${SBCL_ARCH:-$guessed_sbcl_arch}
 echo sbcl_arch=\"$sbcl_arch\"
 if [ "$sbcl_arch" = "" ] ; then
     echo "can't guess target SBCL architecture, please specify --arch=<name>"
     exit 1
 fi
+if $fancy
+then
+    # If --fancy, enable threads on platforms where they can be built.
+    case $sbcl_arch in
+        x86|x86-64|ppc)
+            WITH_FEATURES="$WITH_FEATURES :sb-thread"
+            echo "Enabling threads due to --fancy."
+            ;;
+        *)
+            echo "No threads on this platform."
+            ;;
+    esac
+fi
+
+ltf=`pwd`/local-target-features.lisp-expr
+echo //initializing $ltf
+echo ';;;; This is a machine-generated file.' > $ltf
+echo ';;;; Please do not edit it by hand.' >> $ltf
+echo ';;;; See make-config.sh.' >> $ltf
+echo "((lambda (features) (set-difference features (list$WITHOUT_FEATURES)))" >> $ltf
+printf " (union (list$WITH_FEATURES) (list " >> $ltf
+
 printf ":%s" "$sbcl_arch" >> $ltf
 
 echo //setting up OS-dependent information
-
 # Under Darwin x86-64, guess whether Darwin 9+ or below.
 if [ "$sbcl_os" = "darwin" ] && [ "$sbcl_arch" = "x86-64" ]; then
     darwin_version=`uname -r`

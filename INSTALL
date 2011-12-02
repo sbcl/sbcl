@@ -172,21 +172,11 @@ INSTALLING SBCL
   enabling or disabling features like documentation strings, threads,
   or extra debugging code.
 
-  The preferred way to do this is by creating a file
-  "customize-target-features.lisp", containing a lambda expression
-  which is applied to the default *FEATURES* set and which returns the
-  new *FEATURES* set, e.g.
+  The preferred way to do this is using commandline arguments to make.sh:
 
-    (lambda (features)
-      (flet ((enable (x)
-               (pushnew x features))
-             (disable (x)
-               (setf features (remove x features))))
-        ;; Threading support.
-        (enable :sb-thread)))
-
-  This is the preferred way because it lets local changes interact
-  cleanly with CVS changes to the main, global source tree.
+    --fancy                    Enables all supported feature enhancements.
+    --with-<feature>           Enables a specific feature.
+    --without-<feature>        Disables a specific feature.
 
   Some features of interest:
 
@@ -195,16 +185,26 @@ INSTALLING SBCL
       available on x86[-64] Max OS X, x86[-64] FreeBSD, x86 Solaris,
       and PPC Linux.
 
-    :SB-UNICODE
-      Unicode support. Enabled by default. Disabling this feature
-      limits characters to the 8-bit ISO-8859-1 set.
+      NOTE: --fancy enables threads on all platforms where they can
+      be built, even if they aren't 100% stable on that platform.
+
+    :SB-CORE-COMPRESSION
+      Adds zlib as a build-dependency, and makes SBCL able to save
+      compressed cores. Not enabled by default.
 
     :SB-XREF-FOR-INTERNALS
       XREF data for SBCL internals. Not enabled by default, increases
       core size by 5-6mb.
 
+    :SB-UNICODE
+      Unicode support. Enabled by default. Disabling this feature
+      limits characters to the 8-bit ISO-8859-1 set.
+
   A catalog of available features and their meaning can be found in
   "base-target-features.lisp-expr".
+
+  Please do NOT edit base-target-features.lisp-expr in order to enable
+  or disable build features.
 
 2.3. Troubleshooting
 
