@@ -34,6 +34,8 @@ changes relative to sbcl-1.0.54:
   * bug fix: *EVALUATOR-MODE* :COMPILE treated (LET () ...) identically
     to (LOCALLY ...) leading to internally inconsistent toplevel-formness.
   * bug fix: non-toplevel DEFSTRUCT signaled a style warning for unknown type.
+  * bug fix: redefining a function whose previous definition contained an
+    unknown type no longer causes a style-warning. (lp#806243)
 
 changes in sbcl-1.0.54 relative to sbcl-1.0.53:
   * minor incompatible changes:
