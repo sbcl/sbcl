@@ -732,7 +732,11 @@
                       ;; CLHS 3.2.2.1.3 specifies that NOTINLINE
                       ;; suppresses compiler-macros.
                       (not (fun-lexically-notinline-p cmacro-fun-name)))
-                 (let ((res (careful-expand-macro cmacro-fun form t)))
+                 (let ((res (handler-case
+                                (careful-expand-macro cmacro-fun form t)
+                              (compiler-macro-keyword-problem (c)
+                                (print-compiler-message *error-output* "note: ~A" (list c))
+                                form))))
                    (cond ((eq res form)
                           (ir1-convert-common-functoid start next result form op))
                          (t
@@ -797,15 +801,16 @@
            (let (;; We rely on the printer to abbreviate FORM.
                  (*print-length* 3)
                  (*print-level* 3))
-             (format
-              nil
-              #-sb-xc-host "~@<~;during ~A of ~S. Use ~S to intercept:~%~:@>"
-              ;; longer message to avoid ambiguity "Was it the xc host
-              ;; or the cross-compiler which encountered the problem?"
-              #+sb-xc-host "~@<~;during cross-compiler ~A of ~S. Use ~S to intercept:~%~:@>"
-              (if cmacro "compiler-macroexpansion" "macroexpansion")
-              form
-              '*break-on-signals*))))
+             (format nil
+                     "~@<~A of ~S. Use ~S to intercept.~%~:@>"
+                     (cond (cmacro
+                            #-sb-xc-host "Error during compiler-macroexpansion"
+                            #+sb-xc-host "Error during XC compiler-macroexpansion")
+                           (t
+                            #-sb-xc-host "during macroexpansion"
+                            #+sb-xc-host "during XC macroexpansion"))
+                     form
+                     '*break-on-signals*))))
     (handler-bind (;; KLUDGE: CMU CL in its wisdom (version 2.4.6 for Debian
                    ;; Linux, anyway) raises a CL:WARNING condition (not a
                    ;; CL:STYLE-WARNING) for undefined symbols when converting
@@ -836,9 +841,18 @@
                                (wherestring)
                                c)
                               (muffle-warning-or-die)))
-                   (error (lambda (c)
-                            (compiler-error "~@<~A~@:_ ~A~:>"
-                                            (wherestring) c))))
+                   (error
+                     (lambda (c)
+                       (cond
+                         (cmacro
+                          ;; The spec is silent on what we should do. Signaling
+                          ;; a full warning but declining to expand seems like
+                          ;; a conservative and sane thing to do.
+                          (compiler-warn "~@<~A~@:_ ~A~:>" (wherestring) c)
+                          (return-from careful-expand-macro form))
+                         (t
+                          (compiler-error "~@<~A~@:_ ~A~:>"
+                                          (wherestring) c))))))
       (funcall sb!xc:*macroexpand-hook* fun form *lexenv*))))
 
 ;;;; conversion utilities

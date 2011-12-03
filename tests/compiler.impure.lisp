@@ -15,6 +15,8 @@
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
 
+(in-package :cl-user)
+
 (when (eq sb-ext:*evaluator-mode* :interpret)
   (sb-ext:exit :code 104))
 
@@ -1312,6 +1314,101 @@
     (assert (eq :failed (test "(defun no-pkg::foo ())")))
     (assert (eq :failed (test "(cl:no-such-sym)")))
     (assert (eq :failed (test "...")))))
+
+(defun cmacro-signals-error () :fun)
+(define-compiler-macro cmacro-signals-error () (error "oops"))
+
+(with-test (:name :cmacro-signals-error)
+  (multiple-value-bind (fun warn fail)
+      (compile nil `(lambda () (cmacro-signals-error)))
+    (assert (and fun warn fail))
+    (assert (eq :fun (funcall fun)))))
+
+(defun cmacro-with-simple-key (&key a)
+  (format nil "fun=~A" a))
+(define-compiler-macro cmacro-with-simple-key (&whole form &key a)
+  (if (constantp a)
+      (format nil "cmacro=~A" (eval a))
+      form))
+
+(with-test (:name (:cmacro-with-simple-key :no-key))
+  (multiple-value-bind (fun warn fail)
+      (compile nil `(lambda () (cmacro-with-simple-key)))
+    (assert (and (not warn) (not fail)))
+    (assert (string= "cmacro=NIL" (funcall fun)))))
+
+(with-test (:name (:cmacro-with-simple-key :constant-key))
+  (multiple-value-bind (fun warn fail)
+      (compile nil `(lambda () (cmacro-with-simple-key :a 42)))
+    (assert (and (not warn) (not fail)))
+    (assert (string= "cmacro=42" (funcall fun)))))
+
+(with-test (:name (:cmacro-with-simple-key :variable-key))
+  (multiple-value-bind (fun warn fail)
+      (compile nil `(lambda (x) (cmacro-with-simple-key x 42)))
+    (assert (and (not warn) (not fail)))
+    (assert (string= "fun=42" (funcall fun :a)))))
+
+(defun cmacro-with-nasty-key (&key ((nasty-key var)))
+  (format nil "fun=~A" var))
+(define-compiler-macro cmacro-with-nasty-key (&whole form &key ((nasty-key var)))
+  (if (constantp var)
+      (format nil "cmacro=~A" (eval var))
+      form))
+
+(with-test (:name (:cmacro-with-nasty-key :no-key))
+  (multiple-value-bind (fun warn fail)
+      (compile nil `(lambda () (cmacro-with-nasty-key)))
+    (assert (and (not warn) (not fail)))
+    (assert (string= "cmacro=NIL" (funcall fun)))))
+
+(with-test (:name (:cmacro-with-nasty-key :constant-key))
+  ;; This bogosity is thanks to cmacro lambda lists being /macro/ lambda
+  ;; lists.
+  (multiple-value-bind (fun warn fail)
+      (compile nil `(lambda () (cmacro-with-nasty-key 'nasty-key 42)))
+    (assert (and (not warn) (not fail)))
+    (assert (string= "fun=42" (funcall fun)))))
+
+(with-test (:name (:cmacro-with-nasty-key :variable-key))
+  (multiple-value-bind (fun warn fail)
+      (compile nil `(lambda (nasty-key) (cmacro-with-nasty-key nasty-key 42)))
+    (assert (and (not warn) (not fail)))
+    (assert (string= "fun=42" (funcall fun 'nasty-key)))))
+
+(defconstant tricky-key 'tricky-key)
+(defun cmacro-with-tricky-key (&key ((tricky-key var)))
+  (format nil "fun=~A" var))
+(define-compiler-macro cmacro-with-tricky-key (&whole form &key ((tricky-key var)))
+  (if (constantp var)
+      (format nil "cmacro=~A" (eval var))
+      form))
+
+(with-test (:name (:cmacro-with-tricky-key :no-key))
+  (multiple-value-bind (fun warn fail)
+      (compile nil `(lambda () (cmacro-with-tricky-key)))
+    (assert (and (not warn) (not fail)))
+    (assert (string= "cmacro=NIL" (funcall fun)))))
+
+(with-test (:name (:cmacro-with-tricky-key :constant-quoted-key))
+  ;; This bogosity is thanks to cmacro lambda lists being /macro/ lambda
+  ;; lists.
+  (multiple-value-bind (fun warn fail)
+      (compile nil `(lambda () (cmacro-with-tricky-key 'tricky-key 42)))
+    (assert (and (not warn) (not fail)))
+    (assert (string= "fun=42" (funcall fun)))))
+
+(with-test (:name (:cmacro-with-tricky-key :constant-unquoted-key))
+  (multiple-value-bind (fun warn fail)
+      (compile nil `(lambda () (cmacro-with-tricky-key tricky-key 42)))
+    (assert (and (not warn) (not fail)))
+    (assert (string= "cmacro=42" (funcall fun)))))
+
+(with-test (:name (:cmacro-with-tricky-key :variable-key))
+  (multiple-value-bind (fun warn fail)
+      (compile nil `(lambda (x) (cmacro-with-tricky-key x 42)))
+    (assert (and (not warn) (not fail)))
+    (assert (string= "fun=42" (funcall fun 'tricky-key)))))
 
 ;;;; tests not in the problem domain, but of the consistency of the
 ;;;; compiler machinery itself

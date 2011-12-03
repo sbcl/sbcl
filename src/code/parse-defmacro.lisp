@@ -328,7 +328,8 @@
           (push `(multiple-value-bind (,problem ,info)
                      (verify-keywords ,rest-name
                                       ',keys
-                                      ',allow-other-keys-p)
+                                      ',allow-other-keys-p
+                                      ,(eq 'define-compiler-macro context))
                    (when ,problem
                      (,error-fun
                       'defmacro-lambda-list-broken-key-list-error
@@ -407,7 +408,7 @@
 ;;; Determine whether KEY-LIST is a valid list of keyword/value pairs.
 ;;; Do not signal the error directly, 'cause we don't know how it
 ;;; should be signaled.
-(defun verify-keywords (key-list valid-keys allow-other-keys)
+(defun verify-keywords (key-list valid-keys allow-other-keys &optional compiler-macro)
   (do ((already-processed nil)
        (unknown-keyword nil)
        (remaining key-list (cddr remaining)))
@@ -417,15 +418,30 @@
                 (not (lookup-keyword :allow-other-keys key-list)))
            (values :unknown-keyword (list unknown-keyword valid-keys))
            (values nil nil)))
-    (cond ((not (and (consp remaining) (listp (cdr remaining))))
-           (return (values :dotted-list key-list)))
-          ((null (cdr remaining))
-           (return (values :odd-length key-list)))
-          ((or (eq (car remaining) :allow-other-keys)
-               (member (car remaining) valid-keys))
-           (push (car remaining) already-processed))
-          (t
-           (setq unknown-keyword (car remaining))))))
+    (let ((key (when (consp remaining)
+                 (car remaining))))
+      (cond ((not (and (consp remaining) (listp (cdr remaining))))
+             (return (values :dotted-list key-list)))
+            ((null (cdr remaining))
+             (return (values :odd-length key-list))))
+      ;; Compiler-macro lambda lists are macro lambda lists -- meaning that
+      ;; &key ((a a) t) should match a literal A, not a form evaluating to A
+      ;; as in an ordinary lambda list.
+      ;;
+      ;; That, however, breaks the evaluation model unless A is also a
+      ;; constant evaluating to itself. So, signal a condition telling the
+      ;; compiler to punt on the expansion.
+      (when (and compiler-macro
+                 (not (or (keywordp key)
+                          (and (symbolp key)
+                               (constantp key)
+                               (eq key (symbol-value key))))))
+        (signal 'compiler-macro-keyword-problem :argument key))
+      (cond ((or (eq key :allow-other-keys)
+                 (member key valid-keys))
+             (push key already-processed))
+            (t
+             (setq unknown-keyword key))))))
 
 (defun lookup-keyword (keyword key-list)
   (do ((remaining key-list (cddr remaining)))

@@ -281,9 +281,9 @@
 ;;;
 ;;; We suppress printing of messages identical to the previous, but
 ;;; record the number of times that the message is repeated.
-(defmacro print-compiler-message (stream format-string format-args)
-  `(with-compiler-io-syntax
-     (%print-compiler-message ,stream ,format-string ,format-args)))
+(defun print-compiler-message (stream format-string format-args)
+  (with-compiler-io-syntax
+    (%print-compiler-message stream format-string format-args)))
 
 (defun %print-compiler-message (stream format-string format-args)
   (declare (type simple-string format-string))

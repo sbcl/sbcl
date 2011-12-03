@@ -1738,5 +1738,14 @@ not exists.")
 condition, stepping into the current form. Signals a CONTROL-ERROR is
 the restart does not exist."))
 
-(/show0 "condition.lisp end of file")
+;;; Compiler macro magic
 
+(define-condition compiler-macro-keyword-problem ()
+  ((argument :initarg :argument :reader compiler-macro-keyword-argument))
+  (:report (lambda (condition stream)
+             (format stream "~@<Argument ~S in keyword position is not ~
+                             a self-evaluating symbol, preventing compiler-macro ~
+                             expansion.~@:>"
+                     (compiler-macro-keyword-argument condition)))))
+
+(/show0 "condition.lisp end of file")

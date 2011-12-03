@@ -6,10 +6,9 @@ changes relative to sbcl-1.0.57:
     updates of CAS-able places (similar to Clojure's swap!).
   * enhancement: run-program no longer decodes and re-encodes environment when
     :environment argument is not provided. (lp#985904)
-  * enhancement: On SPARC, a limitation on the number of code constants
-    emittable by the compiler has been lifted, allowing certain long functions
-    to compiled and assembled which had previously been unsupported; fixes
-    cl-bench on this ISA (lp#1008996).
+  * enhancement: errors during compiler-macro expansion no longer cause
+    runtime errors, only a compile-time warning, otherwise behaving as if
+    the compiler macro had declined to expand.
   * optimization: On x86-64, code alignment of block headers is done with
     multi-byte NOPs now instead of repetitions of the single-byte NOP.
   * optimization: MAP-INTO is substantially faster when the target sequence is
@@ -20,6 +19,10 @@ changes relative to sbcl-1.0.57:
     function cannot escape.
   * optimization: SB-SEQUENCE:DOSEQUENCE is faster on vectors of unknown
     element type, and vectors that aren't SIMPLE-ARRAYs.
+  * bug fix: On SPARC, a limitation on the number of code constants emittable
+    by the compiler has been lifted, allowing certain long functions to
+    compiled and assembled which had previously been unsupported; fixes
+    cl-bench on this ISA (lp#1008996).
   * bug fix: potential for infinite recursion during compilation of CLOS slot
     typechecks when dependency graph had loops. (lp#1001799)
   * bug fix: error forms reported with some program-errors were not escaped
@@ -34,6 +37,9 @@ changes relative to sbcl-1.0.57:
   * bug fix: restore build on solaris/sparc. (lp#1008506)
   * bug fix: an issue with LDB in the PowerPC backend has been resolved;
     this fixes an issue found with cl-postgres (thanks to Tomas Hlavaty).
+  * bug fix: compiler-macro lambda-lists specifying non-keyword symbols
+    as keyword arguments no longer accidentally match unevaluated symbols
+    against them.
 
 changes in sbcl-1.0.57 relative to sbcl-1.0.56:
   * RANDOM enhancements and bug fixes:
