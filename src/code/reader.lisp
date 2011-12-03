@@ -906,7 +906,8 @@ standard Lisp readtable when NIL."
 
 (defun read-token (stream firstchar)
   #!+sb-doc
-  "This function is just an fsm that recognizes numbers and symbols."
+  "Default readmacro function. Handles numbers, symbols, and SBCL's
+extended <package-name>::<form-in-package> syntax."
   ;; Check explicitly whether FIRSTCHAR has an entry for
   ;; NON-TERMINATING in CHARACTER-ATTRIBUTE-TABLE and
   ;; READ-DOT-NUMBER-SYMBOL in CMT. Report an error if these are
@@ -1260,9 +1261,12 @@ standard Lisp readtable when NIL."
       (case (char-class char attribute-array attribute-hash-table)
         (#.+char-attr-delimiter+
          (unread-char char stream)
-         (simple-reader-error stream
-                              "illegal terminating character after a colon: ~S"
-                              char))
+         (if package-designator
+             (let ((*package* (%find-package-or-lose package-designator)))
+               (return (read stream t nil t)))
+             (simple-reader-error stream
+                                  "illegal terminating character after a double-colon: ~S"
+                                  char)))
         (#.+char-attr-single-escape+ (go SINGLE-ESCAPE))
         (#.+char-attr-multiple-escape+ (go MULT-ESCAPE))
         (#.+char-attr-package-delimiter+
@@ -1273,13 +1277,8 @@ standard Lisp readtable when NIL."
       RETURN-SYMBOL
       (casify-read-buffer escapes)
       (let ((found (if package-designator
-                       (find-package package-designator)
+                       (%find-package-or-lose package-designator)
                        (sane-package))))
-        (unless found
-          (error 'simple-reader-package-error :stream stream
-                 :format-arguments (list package-designator)
-                 :format-control "package ~S not found"))
-
         (if (or (zerop colons) (= colons 2) (eq found *keyword-package*))
             (return (intern* *read-buffer* *ouch-ptr* found))
             (multiple-value-bind (symbol test)

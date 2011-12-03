@@ -263,7 +263,7 @@
                 (reader-error ()
                   :error)))))
 
-(with-test (:name set-syntax-from-char-dispatch-macro-char)
+(with-test (:name :set-syntax-from-char-dispatch-macro-char)
   (let ((rt (copy-readtable)))
     (make-dispatch-macro-character #\! nil rt)
     (set-dispatch-macro-character #\! #\! (constantly 'bang^2) rt)
@@ -273,3 +273,7 @@
       (assert (eq 'bang^2 (maybe-bang)))
       (set-syntax-from-char #\! #\! rt)
       (assert (eq '!! (maybe-bang))))))
+
+(with-test (:name :read-in-package-syntax)
+  (assert (equal '(sb-c::a (sb-kernel::x sb-kernel::y) sb-c::b)
+                 (read-from-string "sb-c::(a sb-kernel::(x y) b)"))))

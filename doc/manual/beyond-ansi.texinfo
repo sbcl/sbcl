@@ -7,6 +7,7 @@ ANSI standard. SBCL doesn't support as many extensions as CMUCL, but
 it still has quite a few.  @xref{Contributed Modules}.
 
 @menu
+* Reader Extensions::
 * Garbage Collection::
 * Metaobject Protocol::
 * Support For Unix::
@@ -18,6 +19,24 @@ it still has quite a few.  @xref{Contributed Modules}.
 * Stale Extensions::
 * Efficiency Hacks::
 @end menu
+
+@node Reader Extensions
+@comment  node-name,  next,  previous,  up
+@section Reader Extensions
+@cindex Reader Extensions
+
+SBCL supports extended package prefix syntax, which allows specifying
+the package to read an arbitrary form in:
+
+@lisp
+<package-name>::<form-in-package>
+@end lisp
+
+Example:
+
+@lisp
+  'foo::(bar quux zot) == '(foo::bar foo::quux foo::zot)
+@end lisp
 
 @node  Garbage Collection
 @comment  node-name,  next,  previous,  up
