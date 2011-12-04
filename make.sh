@@ -20,6 +20,10 @@ export LANG LC_ALL
 # provided with absolutely no warranty. See the COPYING and CREDITS
 # files for more information.
 
+# Running make.sh with different options without clean.sh in the middle
+# can break things.
+sh clean.sh
+
 # If you're cross-compiling, make-config.sh should "do the right
 # thing" when run on the target machine, with the minor caveat that
 # any --xc-host parameter should be suitable for the host machine
