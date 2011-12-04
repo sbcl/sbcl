@@ -15,6 +15,8 @@ changes relative to sbcl-1.0.54:
   * enhancement: SB-EXT:*SUPPRESS-PRINT-ERRORS* can be used to suppress errors
     from the printer by type, causing an error marker to be printed instead.
     (Thanks to Attila Lendvai)
+  * enhancement: BACKTRACE and DESCRIBE now bind *PRINT-CIRCLE* to T, and
+    generally behave better when errors occur during printing.
   * optimization: the compiler is smarter about representation selection for
     floating point constants used in full calls.
   * bug fix: deadlock detection could report the same deadlock twice, for

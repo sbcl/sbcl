@@ -191,9 +191,14 @@ Other commands:
 In the debugger, the current frame is indicated by the prompt. COUNT
 is how many frames to show."
   (fresh-line stream)
-  (map-backtrace (lambda (frame)
-                   (print-frame-call frame stream :number t))
-                 :count count)
+  (let ((*suppress-print-errors* (if (subtypep 'serious-condition *suppress-print-errors*)
+                                     *suppress-print-errors*
+                                     'serious-condition))
+        (*print-circle* t))
+    (handler-bind ((print-not-readable #'print-unreadably))
+        (map-backtrace (lambda (frame)
+                         (print-frame-call frame stream :number t))
+                       :count count)))
   (fresh-line stream)
   (values))
 
@@ -413,21 +418,20 @@ thread, NIL otherwise."
           ;; For the function arguments, we can just print normally.
           (let ((*print-length* nil)
                 (*print-level* nil))
-            (prin1 (ensure-printable-object name) stream))
-          ;; If we hit a &REST arg, then print as many of the values as
-          ;; possible, punting the loop over lambda-list variables since any
-          ;; other arguments will be in the &REST arg's list of values.
-          (let ((print-args (ensure-printable-object args))
-                ;; Special case *PRINT-PRETTY* for eval frames: if
-                ;; *PRINT-LINES* is 1, turn off pretty-printing.
-                (*print-pretty*
-                 (if (and (eql 1 *print-lines*)
-                          (member name '(eval simple-eval-in-lexenv)))
-                     nil
-                     *print-pretty*)))
-            (if (listp print-args)
-                (format stream "~{ ~_~S~}" print-args)
-                (format stream " ~S" print-args))))
+            (prin1 name stream))
+          ;; If we hit a &REST arg, then print as many of the values
+          ;; as possible, punting the loop over lambda-list variables
+          ;; since any other arguments will be in the &REST arg's list
+          ;; of values. Special case *PRINT-PRETTY* for eval frames:
+          ;; if *PRINT-LINES* is 1, turn off pretty-printing.
+          (let ((*print-pretty*
+                  (if (and (eql 1 *print-lines*)
+                           (member name '(eval simple-eval-in-lexenv)))
+                      nil
+                      *print-pretty*))))
+          (if (listp args)
+              (format stream "~{ ~_~S~}" args)
+              (format stream " ~S" args)))
         (when kind
           (format stream "[~S]" kind))))
   (when (>= verbosity 2)

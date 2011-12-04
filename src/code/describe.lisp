@@ -49,7 +49,12 @@
   #+sb-doc
   "Print a description of OBJECT to STREAM-DESIGNATOR."
   (let ((stream (out-synonym-of stream-designator))
-        (*print-right-margin* (or *print-right-margin* 72)))
+        (*print-right-margin* (or *print-right-margin* 72))
+        (*print-circle* t)
+        (*suppress-print-errors*
+          (if (subtypep 'serious-condition *suppress-print-errors*)
+              *suppress-print-errors*
+              'serious-condition)))
     ;; Until sbcl-0.8.0.x, we did
     ;;   (FRESH-LINE STREAM)
     ;;   (PPRINT-LOGICAL-BLOCK (STREAM NIL)
@@ -65,7 +70,8 @@
     ;; here. (The example method for DESCRIBE-OBJECT does its own
     ;; FRESH-LINEing, which is a physical directive which works poorly
     ;; inside a pretty-printer logical block.)
-    (describe-object object stream)
+    (handler-bind ((print-not-readable #'print-unreadably))
+      (describe-object object stream))
     ;; We don't TERPRI here either (any more since sbcl-0.8.0.x), because
     ;; again ANSI's specification of DESCRIBE doesn't mention it and
     ;; ANSI's example of DESCRIBE-OBJECT does its own final TERPRI.
