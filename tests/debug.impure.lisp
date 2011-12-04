@@ -181,7 +181,7 @@
                   ;; :TIMEOUT NIL to the frame we expect. If we leave it out,
                   ;; the backtrace is fine -- but the test fails. I can only
                   ;; boggle right now.
-            :fails-on :darwin)
+            :fails-on '(or (and :x86 :linux) :darwin))
   (let ((m (sb-thread:make-mutex))
         (q (sb-thread:make-waitqueue)))
     (assert (verify-backtrace
