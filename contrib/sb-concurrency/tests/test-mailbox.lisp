@@ -57,12 +57,12 @@
       (apply #'+ (mapcar #'join-thread readers)))
   1000)
 
-;;; FIXME: Several tests disabled on Darwin and SunOS due to hangs.
+;;; FIXME: Several tests disabled on SunOS due to hangs.
 ;;;
-;;; On Darwin at least the issues don't seem to have anything to do with
-;;; mailboxes per-se, but are rather related to our usage of signal-unsafe
+;;; The issues don't seem to have anything to do with mailboxes
+;;; per-se, but are rather related to our usage of signal-unsafe
 ;;; pthread functions inside signal handlers.
-#+(and sb-thread (not (or darwin sunos)))
+#+(and sb-thread (not sunos))
 (progn
 
 ;; Dummy struct for ATOMIC-INCF to work.

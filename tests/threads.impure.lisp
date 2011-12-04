@@ -528,8 +528,7 @@
 
 (defun alloc-stuff () (copy-list '(1 2 3 4 5)))
 
-(with-test (:name (:interrupt-thread :interrupt-consing-child)
-            :broken-on :darwin)
+(with-test (:name (:interrupt-thread :interrupt-consing-child))
   (let ((thread (sb-thread:make-thread (lambda () (loop (alloc-stuff))))))
     (let ((killers
            (loop repeat 4 collect
@@ -1173,7 +1172,7 @@
 
 (format t "infodb test done~%")
 
-(with-test (:name :backtrace :broken-on :darwin)
+(with-test (:name :backtrace)
   ;; Printing backtraces from several threads at once used to hang the
   ;; whole SBCL process (discovered by accident due to a timer.impure
   ;; test misbehaving). The cause was that packages weren't even
@@ -1192,9 +1191,7 @@
 
 (format t "~&starting gc deadlock test: WARNING: THIS TEST WILL HANG ON FAILURE!~%")
 
-(with-test (:name :gc-deadlock
-                  ;; Prone to hang on Darwin due to interrupt issues.
-            :broken-on :darwin)
+(with-test (:name :gc-deadlock)
   ;; Prior to 0.9.16.46 thread exit potentially deadlocked the
   ;; GC due to *all-threads-lock* and session lock. On earlier
   ;; versions and at least on one specific box this test is good enough

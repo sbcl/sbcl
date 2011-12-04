@@ -179,11 +179,9 @@
 
 ;;; Disabled on Darwin due to deadlocks caused by apparent OS specific deadlocks,
 ;;; wich _appear_ to be caused by malloc() and free() not being thread safe: an
-;;; interrupted malloc in one thread can apparently block a free in another. There
-;;; are also some indications that pthread_mutex_lock is not re-entrant.
+;;; interrupted malloc in one thread can apparently block a free in another.
 (with-test (:name symbol-value-in-thread.3
-            :skipped-on '(not :sb-thread)
-            :broken-on :darwin)
+            :skipped-on '(not :sb-thread))
   (let* ((parent *current-thread*)
          (semaphore (make-semaphore))
          (running t)

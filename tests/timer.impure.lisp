@@ -245,7 +245,9 @@
 ;;; Used to hang occasionally at least on x86. Two bugs caused it:
 ;;; running out of stack (due to repeating timers being rescheduled
 ;;; before they ran) and dying threads were open interrupts.
-(with-test (:name (:timer :parallel-unschedule) :fails-on :ppc :skipped-on '(not :sb-thread) :broken-on '(or :darwin :ppc))
+(with-test (:name (:timer :parallel-unschedule)
+            :skipped-on '(not :sb-thread)
+            :broken-on ':ppc)
   (let ((timer (sb-ext:make-timer (lambda () 42) :name "parallel schedulers"))
         (other nil))
     (flet ((flop ()
