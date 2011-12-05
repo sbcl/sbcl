@@ -4127,7 +4127,7 @@
                        `(lambda (x)
                           (unknown-fun ,big (+ ,big x))))))
     (assert (equal (list 0 (1+ most-positive-fixnum))
-                   (ctu:find-code-constants fun :type t)))))
+                   (ctu:find-code-constants fun :type 'integer)))))
 
 (with-test (:name :fixnum+float-coerces-fixnum
             :skipped-on :x86)
