@@ -117,6 +117,7 @@ then
     # customize-target-features.lisp...
     echo "ERROR: Both customize-target-features.lisp, and feature-options"
     echo "to make.sh present -- cannot use both at the same time."
+    exit 1
 fi
 
 # Previously XC host was provided as a positional argument. 
