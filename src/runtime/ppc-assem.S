@@ -10,7 +10,7 @@
 #include "genesis/funcallable-instance.h"
 #include "genesis/static-symbols.h"
 #ifdef LISP_FEATURE_SB_THREAD
-#include "thread.h"
+#include "genesis/thread.h"
 #endif
 
 #ifdef LISP_FEATURE_DARWIN

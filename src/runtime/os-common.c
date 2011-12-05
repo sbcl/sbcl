@@ -73,3 +73,41 @@ os_get_errno(void)
 {
     return errno;
 }
+
+
+#if defined(LISP_FEATURE_SB_THREAD) && !defined(CANNOT_USE_POSIX_SEM_T)
+
+void
+os_sem_init(os_sem_t *sem, unsigned int value)
+{
+    if (-1==sem_init(sem, 0, value))
+        lose("os_sem_init(%p, %u): %s", sem, value, strerror(errno));
+    FSHOW((stderr, "os_sem_init(%p, %u)\n", sem, value));
+}
+
+void
+os_sem_wait(os_sem_t *sem, char *what)
+{
+    FSHOW((stderr, "%s: os_sem_wait(%p) ...\n", what, sem));
+    while (-1 == sem_wait(sem))
+        if (EINTR!=errno)
+            lose("%s: os_sem_wait(%p): %s", what, sem, strerror(errno));
+    FSHOW((stderr, "%s: os_sem_wait(%p) => ok\n", what, sem));
+}
+
+void
+os_sem_post(sem_t *sem, char *what)
+{
+    if (-1 == sem_post(sem))
+        lose("%s: os_sem_post(%p): %s", what, sem, strerror(errno));
+    FSHOW((stderr, "%s: os_sem_post(%p)\n", what, sem));
+}
+
+void
+os_sem_destroy(os_sem_t *sem)
+{
+    if (-1==sem_destroy(sem))
+        lose("os_sem_destroy(%p): %s", sem, strerror(errno));
+}
+
+#endif

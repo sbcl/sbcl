@@ -21,6 +21,7 @@
 #include <signal.h>
 #include <limits.h>
 #include <mach-o/dyld.h>
+#include <stdio.h>
 #include <errno.h>
 #include <dlfcn.h>
 
@@ -171,3 +172,48 @@ void darwin_init(void)
 
 #endif
 
+#ifdef LISP_FEATURE_SB_THREAD
+
+inline void
+os_sem_init(os_sem_t *sem, unsigned int value)
+{
+    if (KERN_SUCCESS!=semaphore_create(current_mach_task, sem, SYNC_POLICY_FIFO, (int)value))
+        lose("os_sem_init(%p): %s", sem, strerror(errno));
+}
+
+inline void
+os_sem_wait(os_sem_t *sem, char *what)
+{
+    kern_return_t ret;
+  restart:
+    FSHOW((stderr, "%s: os_sem_wait(%p)\n", what, sem));
+    ret = semaphore_wait(*sem);
+    FSHOW((stderr, "%s: os_sem_wait(%p) => %s\n", what, sem,
+           KERN_SUCCESS==ret ? "ok" : strerror(errno)));
+    switch (ret) {
+    case KERN_SUCCESS:
+        return;
+    case KERN_OPERATION_TIMED_OUT:
+        fprintf(stderr, "%s: os_sem_wait(%p): %s", what, sem, strerror(errno));
+        goto restart;
+    default:
+        lose("%s: os_sem_wait(%p): %s", what, sem, strerror(errno));
+    }
+}
+
+void
+os_sem_post(os_sem_t *sem, char *what)
+{
+    if (KERN_SUCCESS!=semaphore_signal(*sem))
+        lose("%s: os_sem_post(%p): %s", what, sem, strerror(errno));
+    FSHOW((stderr, "%s: os_sem_post(%p) ok\n", what, sem));
+}
+
+void
+os_sem_destroy(os_sem_t *sem)
+{
+    if (-1==semaphore_destroy(current_mach_task, *sem))
+        lose("os_sem_destroy(%p): %s", sem, strerror(errno));
+}
+
+#endif

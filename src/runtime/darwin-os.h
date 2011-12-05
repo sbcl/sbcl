@@ -40,4 +40,10 @@ extern mach_port_t current_mach_task;
 
 void darwin_init(void);
 
+#ifdef LISP_FEATURE_SB_THREAD
+#define CANNOT_USE_POSIX_SEM_T
+#include <mach/semaphore.h>
+typedef semaphore_t os_sem_t;
+#endif
+
 #endif /* _DARWIN_OS_H */

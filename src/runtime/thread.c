@@ -119,6 +119,80 @@ unlink_thread(struct thread *th)
     if (th->next)
         th->next->prev = th->prev;
 }
+
+/* Only access thread state with blockables blocked. */
+lispobj
+thread_state(struct thread *thread)
+{
+    lispobj state;
+    sigset_t old;
+    block_blockable_signals(NULL, &old);
+    os_sem_wait(thread->state_sem, "thread_state");
+    state = thread->state;
+    os_sem_post(thread->state_sem, "thread_state");
+    thread_sigmask(SIG_SETMASK, &old, NULL);
+    return state;
+}
+
+void
+set_thread_state(struct thread *thread, lispobj state)
+{
+    int i, waitcount = 0;
+    sigset_t old;
+    block_blockable_signals(NULL, &old);
+    os_sem_wait(thread->state_sem, "set_thread_state");
+    if (thread->state != state) {
+        if ((STATE_STOPPED==state) ||
+            (STATE_DEAD==state)) {
+            waitcount = thread->state_not_running_waitcount;
+            thread->state_not_running_waitcount = 0;
+            for (i=0; i<waitcount; i++)
+                os_sem_post(thread->state_not_running_sem, "set_thread_state (not running)");
+        }
+        if ((STATE_RUNNING==state) ||
+            (STATE_DEAD==state)) {
+            waitcount = thread->state_not_stopped_waitcount;
+            thread->state_not_stopped_waitcount = 0;
+            for (i=0; i<waitcount; i++)
+                os_sem_post(thread->state_not_stopped_sem, "set_thread_state (not stopped)");
+        }
+        thread->state = state;
+    }
+    os_sem_post(thread->state_sem, "set_thread_state");
+    thread_sigmask(SIG_SETMASK, &old, NULL);
+}
+
+void
+wait_for_thread_state_change(struct thread *thread, lispobj state)
+{
+    sigset_t old;
+    os_sem_t *wait_sem;
+    block_blockable_signals(NULL, &old);
+  start:
+    os_sem_wait(thread->state_sem, "wait_for_thread_state_change");
+    if (thread->state == state) {
+        switch (state) {
+        case STATE_RUNNING:
+            wait_sem = thread->state_not_running_sem;
+            thread->state_not_running_waitcount++;
+            break;
+        case STATE_STOPPED:
+            wait_sem = thread->state_not_stopped_sem;
+            thread->state_not_stopped_waitcount++;
+            break;
+        default:
+            lose("Invalid state in wait_for_thread_state_change: "OBJ_FMTX"\n", state);
+        }
+    } else {
+        wait_sem = NULL;
+    }
+    os_sem_post(thread->state_sem, "wait_for_thread_state_change");
+    if (wait_sem) {
+        os_sem_wait(wait_sem, "wait_for_thread_state_change");
+        goto start;
+    }
+    thread_sigmask(SIG_SETMASK, &old, NULL);
+}
 #endif
 
 static int
