@@ -21,6 +21,9 @@ changes relative to sbcl-1.0.54:
     (Thanks to Attila Lendvai)
   * enhancement: BACKTRACE and DESCRIBE now bind *PRINT-CIRCLE* to T, and
     generally behave better when errors occur during printing.
+  * enhancement: the test runner now takes a --report-skipped-tests argument
+    to report the individual tests skipped as well as the number of skipped
+    tests.
   * optimization: the compiler is smarter about representation selection for
     floating point constants used in full calls.
   * optimization: the compiler no longer refuses to coerce large fixnums to

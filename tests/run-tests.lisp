@@ -17,6 +17,7 @@
 
 (defvar *all-failures* nil)
 (defvar *break-on-error* nil)
+(defvar *report-skipped-tests* nil)
 (defvar *accept-files* nil)
 
 (defun run-all ()
@@ -26,6 +27,8 @@
            (setf test-util:*break-on-failure* t))
           ((string= arg "--break-on-expected-failure")
            (setf test-util:*break-on-expected-failure* t))
+          ((string= arg "--report-skipped-tests")
+           (setf *report-skipped-tests* t))
           (t
            (push (truename (parse-namestring arg)) *accept-files*))))
   (pure-runner (pure-load-files) #'load-test)
@@ -54,6 +57,11 @@
                             "Invalid exit status:"
                             (enough-namestring (second fail))))
                    ((eq (car fail) :skipped-disabled)
+                    (when *report-skipped-tests*
+                      (format t " ~20a ~a / ~a~%"
+                              "Skipped (irrelevant):"
+                              (enough-namestring (second fail))
+                              (third fail)))
                     (incf skipcount))
                    (t
                     (format t " ~20a ~a / ~a~%"

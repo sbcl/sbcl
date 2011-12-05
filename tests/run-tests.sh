@@ -2,10 +2,15 @@
 
 # Run the regression tests in this directory.
 #
-# Usage: run-tests.sh [--break-on-failure] [--break-on-expected-failure] [files]
+# Usage: run-tests.sh [OPTIONS] [files]
+#
+# Valid options are as follows:
+#
 #  --break-on-failure            Break into the debugger when a test fails
 #                                unexpectedly
 #  --break-on-expected-failure   Break into the debugger when any test fails
+#  --report-skipped-tests        Include tests :skipped-on target SBCL in
+#                                the test report.
 #
 # If no test files are specified, runs all tests.
 
