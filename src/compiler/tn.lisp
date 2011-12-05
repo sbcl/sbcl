@@ -211,8 +211,10 @@
       ;; However, in the case of USE-IMMED-P we can have the same TN for both
       ;; uses. The first two legs here take care of that by cross-pollinating the
       ;; cached values.
-      ((and use-immed-p boxedp (leaf-info constant)))
-      ((and use-immed-p (not boxedp) (constant-boxed-tn constant)))
+      ;;
+      ;; Similarly, when there is no immediate SC.
+      ((and (or use-immed-p (not immed)) boxedp (leaf-info constant)))
+      ((and (or use-immed-p (not immed)) (not boxedp) (constant-boxed-tn constant)))
       (t
        (let* ((component (component-info *component-being-compiled*))
               (sc (svref *backend-sc-numbers*
