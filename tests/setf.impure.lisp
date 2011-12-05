@@ -107,4 +107,11 @@
               (error ()
                 :error)))))
 
+(with-test (:name :getf-unused-default-variable)
+  (handler-bind ((style-warning #'error))
+    (compile nil `(lambda (x y)
+                    (setf (gethash :x x 0) 4)
+                    (setf (getf y :y 0) 4)
+                    (setf (get 'z :z 0) 4)))))
+
 ;;; success

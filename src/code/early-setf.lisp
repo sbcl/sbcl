@@ -475,7 +475,7 @@
 (sb!xc:define-setf-expander get (symbol prop &optional default)
   (let ((symbol-temp (gensym))
         (prop-temp (gensym))
-        (def-temp (gensym))
+        (def-temp (if default (gensym)))
         (newval (gensym)))
     (values `(,symbol-temp ,prop-temp ,@(if default `(,def-temp)))
             `(,symbol ,prop ,@(if default `(,default)))
@@ -487,7 +487,7 @@
 (sb!xc:define-setf-expander gethash (key hashtable &optional default)
   (let ((key-temp (gensym))
         (hashtable-temp (gensym))
-        (default-temp (gensym))
+        (default-temp (if default (gensym)))
         (new-value-temp (gensym)))
     (values
      `(,key-temp ,hashtable-temp ,@(if default `(,default-temp)))
