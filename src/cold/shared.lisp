@@ -139,6 +139,39 @@
   (format t
           "target backend-subfeatures *SHEBANG-BACKEND-FEATURES*=~@<~S~:>~%"
           *shebang-backend-subfeatures*))
+
+;;; Some feature combinations simply don't work, and sometimes don't
+;;; fail until quite a ways into the build.  Pick off the more obvious
+;;; combinations now, and provide a description of what the actual
+;;; failure is (not always obvious from when the build fails).
+(let ((feature-compatability-tests
+       '(("(and sb-thread (not gencgc))"
+          ":SB-THREAD requires :GENCGC")
+         ("(and sb-thread (not (or ppc x86 x86-64)))"
+          ":SB-THREAD not supported on selected architecture")
+         ("(and gencgc cheneygc)"
+          ":GENCGC and :CHENEYGC are incompatible")
+         ("(and cheneygc (not (or alpha hppa mips ppc sparc)))"
+          ":CHENEYGC not supported on selected architecture")
+         ("(and gencgc (not (or ppc x86 x86-64)))"
+          ":GENCGC not supported on selected architecture")
+         ("(not (or gencgc cheneygc))"
+          "One of :GENCGC or :CHENEYGC must be enabled")
+         ("(or (and alpha (or hppa mips ppc sparc x86 x86-64))
+               (and hppa (or mips ppc sparc x86 x86-64))
+               (and mips (or ppc sparc x86 x86-64))
+               (and ppc (or sparc x86 x86-64))
+               (and sparc (or x86 x86-64))
+               (and x86 x86-64))"
+          "More than one architecture selected")))
+      (failed-test-descriptions nil))
+  (dolist (test feature-compatability-tests)
+    (let ((*features* *shebang-features*))
+      (when (read-from-string (concatenate 'string "#+" (first test) "T NIL"))
+        (push (second test) failed-test-descriptions))))
+  (when failed-test-descriptions
+    (error "Feature compatability check failed, ~S"
+           failed-test-descriptions)))
 
 ;;;; cold-init-related PACKAGE and SYMBOL tools
 
