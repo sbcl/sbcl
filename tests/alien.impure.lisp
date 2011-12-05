@@ -327,7 +327,8 @@
 (with-test (:name :malloc-failure)
   (assert (eq :enomem
               (handler-case
-                  (sb-alien:make-alien char (1- array-total-size-limit))
+                  (loop repeat 128
+                        collect (sb-alien:make-alien char (1- array-total-size-limit)))
                 (storage-condition ()
                   :enomem)))))
 
