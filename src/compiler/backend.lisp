@@ -168,6 +168,7 @@
     immediate-constant-sc
     location-print-name
     combination-implementation-style
+    boxed-immediate-sc-p
 
     ;; from primtype.lisp
     primitive-type-of

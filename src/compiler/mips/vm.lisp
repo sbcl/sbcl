@@ -313,6 +313,10 @@
     (character
      (sc-number-or-lose 'immediate))))
 
+(!def-vm-support-routine boxed-immediate-sc-p (sc)
+  (or (eql sc (sc-number-or-lose 'zero))
+      (eql sc (sc-number-or-lose 'null))
+      (eql sc (sc-number-or-lose 'immediate))))
 
 ;;;; Function Call Parameters
 

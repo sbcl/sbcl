@@ -408,6 +408,9 @@
                  (eql value (log 2l0 2.718281828459045235360287471352662L0)))
          (sc-number-or-lose 'fp-constant)))))
 
+(!def-vm-support-routine boxed-immediate-sc-p (sc)
+  (eql sc (sc-number-or-lose 'immediate)))
+
 ;; For an immediate TN, return its value encoded for use as a literal.
 ;; For any other TN, return the TN.  Only works for FIXNUMs,
 ;; STATIC-SYMBOLs, and CHARACTERS (FLOATs and SAPs are handled

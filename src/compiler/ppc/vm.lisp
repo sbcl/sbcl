@@ -287,6 +287,11 @@
          (sc-number-or-lose 'immediate)
          nil))))
 
+(!def-vm-support-routine boxed-immediate-sc-p (sc)
+  (or (eql sc (sc-number-or-lose 'zero))
+      (eql sc (sc-number-or-lose 'null))
+      (eql sc (sc-number-or-lose 'immediate))))
+
 ;;; A predicate to see if a character can be used as an inline
 ;;; constant (the immediate field in the instruction used is sixteen
 ;;; bits wide, which is not the same as any defined subtype of

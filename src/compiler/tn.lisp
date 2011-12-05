@@ -204,7 +204,7 @@
   (let* ((immed (immediate-constant-sc (constant-value constant)))
          (use-immed-p (and immed
                            (or (not boxedp)
-                               (eql immed (sc-number-or-lose 'sb!vm::immediate))))))
+                               (boxed-immediate-sc-p immed)))))
     (cond
       ;; CONSTANT-TN uses two caches, one for boxed and one for unboxed uses.
       ;;

@@ -305,6 +305,11 @@
      (if (eql value 0d0)
          (sc-number-or-lose 'fp-double-zero )
          nil))))
+
+(!def-vm-support-routine boxed-immediate-sc-p (sc)
+  (or (eql sc (sc-number-or-lose 'zero))
+      (eql sc (sc-number-or-lose 'null))
+      (eql sc (sc-number-or-lose 'immediate))))
 
 ;;;; function call parameters
 
