@@ -223,15 +223,24 @@
 (progn
   (defoptimizer (allocate-vector stack-allocate-result)
       ((type length words) node dx)
-    (or (eq dx :always-dynamic)
-        (zerop (policy node safety))
-        ;; a vector object should fit in one page -- otherwise it might go past
-        ;; stack guard pages.
-        (values-subtypep (lvar-derived-type words)
-                         (load-time-value
-                          (specifier-type `(integer 0 ,(- (/ sb!vm::*backend-page-bytes*
-                                                             sb!vm:n-word-bytes)
-                                                          sb!vm:vector-data-offset)))))))
+    (and
+     ;; Can't put unboxed data on the stack unless we scavenge it
+     ;; conservatively.
+     #!-c-stack-is-control-stack
+     (constant-lvar-p type)
+     #!-c-stack-is-control-stack
+     (member (lvar-value type)
+             '#.(list (sb!vm:saetp-typecode (find-saetp 't))
+                      (sb!vm:saetp-typecode (find-saetp 'fixnum))))
+     (or (eq dx :always-dynamic)
+         (zerop (policy node safety))
+         ;; a vector object should fit in one page -- otherwise it might go past
+         ;; stack guard pages.
+         (values-subtypep (lvar-derived-type words)
+                          (load-time-value
+                           (specifier-type `(integer 0 ,(- (/ sb!vm::*backend-page-bytes*
+                                                              sb!vm:n-word-bytes)
+                                                           sb!vm:vector-data-offset))))))))
 
   (defoptimizer (allocate-vector ltn-annotate) ((type length words) call ltn-policy)
     (let ((args (basic-combination-args call))
