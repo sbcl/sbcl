@@ -199,20 +199,34 @@
 ;;; Create a constant TN. The implementation dependent
 ;;; IMMEDIATE-CONSTANT-SC function is used to determine whether the
 ;;; constant has an immediate representation.
-(defun make-constant-tn (constant)
+(defun make-constant-tn (constant boxedp)
   (declare (type constant constant))
-  (let* ((component (component-info *component-being-compiled*))
-         (immed (immediate-constant-sc (constant-value constant)))
-         (sc (svref *backend-sc-numbers*
-                    (or immed (sc-number-or-lose 'constant))))
-         (res (make-tn 0 :constant (primitive-type (leaf-type constant)) sc)))
-    (unless immed
-      (let ((constants (ir2-component-constants component)))
-        (setf (tn-offset res) (fill-pointer constants))
-        (vector-push-extend constant constants)))
-    (push-in tn-next res (ir2-component-constant-tns component))
-    (setf (tn-leaf res) constant)
-    res))
+  (let* ((immed (immediate-constant-sc (constant-value constant)))
+         (use-immed-p (and immed
+                           (or (not boxedp)
+                               (eql immed (sc-number-or-lose 'sb!vm::immediate))))))
+    (cond
+      ;; CONSTANT-TN uses two caches, one for boxed and one for unboxed uses.
+      ;;
+      ;; However, in the case of USE-IMMED-P we can have the same TN for both
+      ;; uses. The first two legs here take care of that by cross-pollinating the
+      ;; cached values.
+      ((and use-immed-p boxedp (leaf-info constant)))
+      ((and use-immed-p (not boxedp) (constant-boxed-tn constant)))
+      (t
+       (let* ((component (component-info *component-being-compiled*))
+              (sc (svref *backend-sc-numbers*
+                         (if use-immed-p
+                             immed
+                             (sc-number-or-lose 'constant))))
+              (res (make-tn 0 :constant (primitive-type (leaf-type constant)) sc)))
+         (unless use-immed-p
+           (let ((constants (ir2-component-constants component)))
+             (setf (tn-offset res) (fill-pointer constants))
+             (vector-push-extend constant constants)))
+         (push-in tn-next res (ir2-component-constant-tns component))
+         (setf (tn-leaf res) constant)
+         res)))))
 
 (defun make-load-time-value-tn (handle type)
   (let* ((component (component-info *component-being-compiled*))

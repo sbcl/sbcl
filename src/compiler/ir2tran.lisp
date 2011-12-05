@@ -91,29 +91,41 @@
 
 ;;; If LEAF already has a constant TN, return that, otherwise make a
 ;;; TN for it.
-(defun constant-tn (leaf)
+(defun constant-tn (leaf boxedp)
   (declare (type constant leaf))
-  (or (leaf-info leaf)
-      (setf (leaf-info leaf)
-            (make-constant-tn leaf))))
+  ;; When convenient we can have both a boxed and unboxed TN for
+  ;; constant.
+  (if boxedp
+      (or (constant-boxed-tn leaf)
+          (setf (constant-boxed-tn leaf) (make-constant-tn leaf t)))
+      (or (leaf-info leaf)
+          (setf (leaf-info leaf) (make-constant-tn leaf nil)))))
 
 ;;; Return a TN that represents the value of LEAF, or NIL if LEAF
 ;;; isn't directly represented by a TN. ENV is the environment that
 ;;; the reference is done in.
-(defun leaf-tn (leaf env)
+(defun leaf-tn (leaf env boxedp)
   (declare (type leaf leaf) (type physenv env))
   (typecase leaf
     (lambda-var
      (unless (lambda-var-indirect leaf)
        (find-in-physenv leaf env)))
-    (constant (constant-tn leaf))
+    (constant (constant-tn leaf boxedp))
     (t nil)))
 
 ;;; This is used to conveniently get a handle on a constant TN during
 ;;; IR2 conversion. It returns a constant TN representing the Lisp
 ;;; object VALUE.
 (defun emit-constant (value)
-  (constant-tn (find-constant value)))
+  (constant-tn (find-constant value) t))
+
+(defun boxed-ref-p (ref)
+  (let ((dest (lvar-dest (ref-lvar ref))))
+    (cond ((and (basic-combination-p dest) (eq :full (basic-combination-kind dest)))
+           t)
+          ;; Other cases?
+          (t
+           nil))))
 
 ;;; Convert a REF node. The reference must not be delayed.
 (defun ir2-convert-ref (node block)
@@ -141,7 +153,7 @@
                  (vop ancestor-frame-ref node block tn (leaf-info leaf) res))))
           (t (emit-move node block tn res)))))
       (constant
-       (emit-move node block (constant-tn leaf) res))
+       (emit-move node block (constant-tn leaf (boxed-ref-p node)) res))
       (functional
        (ir2-convert-closure node block leaf res))
       (global-var
@@ -378,7 +390,7 @@
           (ecase (ir2-lvar-kind 2lvar)
             (:delayed
              (let ((ref (lvar-uses lvar)))
-               (leaf-tn (ref-leaf ref) (node-physenv ref))))
+               (leaf-tn (ref-leaf ref) (node-physenv ref) (boxed-ref-p ref))))
             (:fixed
              (aver (= (length (ir2-lvar-locs 2lvar)) 1))
              (first (ir2-lvar-locs 2lvar)))))
@@ -1491,7 +1503,7 @@
              for idx upfrom 0
              do (vop sb!vm::more-arg node block
                      (lvar-tn node block context)
-                     (make-constant-tn (find-constant idx))
+                     (emit-constant idx)
                      loc)))
       (:unknown
        (let ((locs (ir2-lvar-locs 2lvar)))

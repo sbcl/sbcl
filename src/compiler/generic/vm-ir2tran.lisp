@@ -194,7 +194,7 @@
                          ,@(nreverse clauses)))))
                (frob)))
            (tnify (index)
-             (constant-tn (find-constant index))))
+             (emit-constant index)))
       (let ((setter (compute-setter))
             (length (length initial-contents)))
         (dotimes (i length)

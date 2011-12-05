@@ -676,7 +676,9 @@
                                                    (where-from :defined)))
                       (:include leaf))
   ;; the value of the constant
-  (value (missing-arg) :type t))
+  (value (missing-arg) :type t)
+  ;; Boxed TN for this constant, if any.
+  (boxed-tn nil :type (or null tn)))
 (defprinter (constant :identity t)
   value)
 

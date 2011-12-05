@@ -4113,3 +4113,10 @@
                    2d0)))
     (assert (eql 2 q))
     (assert (eql 0d0 r))))
+
+(with-test (:name :boxed-fp-constant-for-full-call)
+  (let ((fun (compile nil
+                      `(lambda (x)
+                         (declare (double-float x))
+                         (unknown-fun 1.0d0 (+ 1.0d0 x))))))
+    (assert (equal '(1.0d0) (ctu:find-code-constants fun :type 'double-float)))))
