@@ -312,8 +312,11 @@
                                     (%fun-lambda-list fun)
                                     (info :type :lambda-list symbol))
                                 stream)
-          (when (eq (%fun-fun fun) (%fun-fun (constant-type-expander t)))
-            (format stream "~@:_Expansion: ~S" (funcall fun (list symbol))))))
+          (multiple-value-bind (expansion ok)
+              (handler-case (typexpand-1 symbol)
+                (error () (values nil nil)))
+            (when ok
+              (format stream "~@:_Expansion: ~S" expansion)))))
       (terpri stream)))
 
   (when (or (member symbol sb-c::*policy-qualities*)
@@ -501,7 +504,10 @@
         (format stream "~@:_~A:~@<~;~{ ~A~^,~:_~}~;~:>" label list))))
 
 (defun describe-lambda-list (lambda-list stream)
-  (format stream "~@:_Lambda-list: ~:A" lambda-list))
+  (let ((*print-circle* nil)
+        (*print-level* 24)
+        (*print-length* 24))
+    (format stream "~@:_Lambda-list: ~:A" lambda-list)))
 
 (defun describe-function-source (function stream)
   (if (compiled-function-p function)
