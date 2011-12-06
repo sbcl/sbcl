@@ -19,6 +19,7 @@ src/assembly/target
 src/compiler/assembly
 src/compiler/target
 src/runtime/Config
+src/runtime/TAGS
 src/runtime/genesis
 src/runtime/ldso-stubs.S
 src/runtime/openbsd-sigcontext.h
