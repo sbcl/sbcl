@@ -567,7 +567,7 @@ elif [ "$sbcl_arch" = "x86-64" ]; then
     printf ' :float-eql-vops :inline-constants :memory-barrier-vops' >> $ltf
     printf ' :multiply-high-vops' >> $ltf
 elif [ "$sbcl_arch" = "mips" ]; then
-    printf ' :linkage-table' >> $ltf
+    printf ' :cheneygc :linkage-table' >> $ltf
     printf ' :stack-allocatable-closures :stack-allocatable-vectors' >> $ltf
     printf ' :stack-allocatable-lists :stack-allocatable-fixed-objects' >> $ltf
     printf ' :alien-callbacks' >> $ltf
@@ -606,13 +606,16 @@ elif [ "$sbcl_arch" = "sparc" ]; then
     # FUNCDEF macro for assembler. No harm in running this on sparc-linux
     # as well.
     sh tools-for-build/sparc-funcdef.sh > src/runtime/sparc-funcdef.h
+    printf ' :cheneygc' >> $ltf
     if [ "$sbcl_os" = "sunos" ] || [ "$sbcl_os" = "linux" ]; then
         printf ' :linkage-table' >> $ltf
     fi
     printf ' :stack-allocatable-closures :stack-allocatable-lists' >> $ltf
 elif [ "$sbcl_arch" = "alpha" ]; then
+    printf ' :cheneygc' >> $ltf
     printf ' :stack-allocatable-closures :stack-allocatable-lists' >> $ltf
 elif [ "$sbcl_arch" = "hppa" ]; then
+    printf ' :cheneygc' >> $ltf
     printf ' :stack-allocatable-vectors :stack-allocatable-fixed-objects' >> $ltf
     printf ' :stack-allocatable-lists' >> $ltf
 else
