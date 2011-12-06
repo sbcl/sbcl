@@ -36,7 +36,7 @@ fi
 SBCL="$SBCLRUNTIME --noinform --no-sysinit --no-userinit --noprint --disable-debugger"
 
 # extract version and date
-VERSION=`$SBCL --eval '(write-line (lisp-implementation-version))' --eval '(sb-ext:quit)'`
+VERSION=`$SBCL --eval '(write-line (lisp-implementation-version))' --eval '(sb-ext:exit)'`
 MONTH=`date "+%Y-%m"`
 
 sed -e "s/@VERSION@/$VERSION/" \
@@ -62,11 +62,11 @@ $SBCL <<EOF
 (dolist (module (quote ($MODULES)))
   (require module))
 (sb-texinfo:generate-includes "$DOCSTRINGDIR" $PACKAGES)
-(sb-ext:quit))
+(sb-ext:exit))
 EOF
 
 echo /creating package-locks.texi-temp
-if $SBCL --eval "(let ((plp (find-symbol \"PACKAGE-LOCKED-P\" :sb-ext))) (quit :unix-status (if (and plp (fboundp plp)) 0 1)))";
+if $SBCL --eval "(let ((plp (find-symbol \"PACKAGE-LOCKED-P\" :sb-ext))) (exit :code (if (and plp (fboundp plp)) 0 1)))";
 then
     cp package-locks-extended.texinfo package-locks.texi-temp
 else

@@ -14,7 +14,7 @@
 (use-package :sb-alien)
 
 #-(or x86 x86-64)
-(sb-ext:quit :unix-status 104)
+(sb-ext:exit :code 104)
 
 (defun run (program &rest arguments)
   (let* ((proc nil)

@@ -14,4 +14,4 @@
 (write-line "/loading custom userinit")
 
 (defun userinit-quit (x)
-  (sb-ext:quit :unix-status x))
+  (sb-ext:exit :code x))

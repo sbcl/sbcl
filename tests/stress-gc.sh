@@ -18,7 +18,7 @@ run_sbcl <<EOF
     (load *)
     (time (stress-gc ${1:-100000} ${2:-3000}))
     (format t "~&test completed successfully~%")
-    (quit :unix-status $EXIT_LISP_WIN)
+    (exit :code $EXIT_LISP_WIN)
 EOF
 check_status_maybe_lose "stress-gc" $?
 exit $EXIT_TEST_WIN

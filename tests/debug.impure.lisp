@@ -17,7 +17,7 @@
 
 ;;; The debugger doesn't have any native knowledge of the interpreter
 (when (eq sb-ext:*evaluator-mode* :interpret)
-  (sb-ext:quit :unix-status 104))
+  (sb-ext:exit :code 104))
 
 
 ;;;; Check that we get debug arglists right.

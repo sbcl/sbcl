@@ -461,13 +461,13 @@
                   (progn
                     (multiple-value-bind (nope error)
                         (ignore-errors (sb-posix:fcntl f sb-posix:f-setlk flock))
-                      (sb-ext:quit
-                       :unix-status
+                      (sb-ext:exit
+                       :code
                        (cond ((not (null nope)) 1)
                              ((= (sb-posix:syscall-errno error) sb-posix:eagain)
                               42)
                              (t 86))
-                       :recklessly-p t #| don't delete the file |#)))
+                       :abort t #| don't delete the file |#)))
                   (progn
                     (setf kid-status
                           (sb-posix:wexitstatus
@@ -495,12 +495,12 @@
                   (pid (sb-posix:fork)))
               (if (zerop pid)
                   (let ((r (sb-posix:fcntl f sb-posix:f-getlk flock)))
-                    (sb-ext:quit
-                     :unix-status
+                    (sb-ext:exit
+                     :code
                      (cond ((not (zerop r)) 1)
                            ((= (sb-posix:flock-pid flock) ppid) 42)
                            (t 86))
-                     :recklessly-p t #| don't delete the file |#))
+                     :abort t #| don't delete the file |#))
                   (progn
                     (setf kid-status
                           (sb-posix:wexitstatus

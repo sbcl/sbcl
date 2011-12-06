@@ -75,29 +75,45 @@ been specified on the command-line.")
 ;;; by QUIT) is caught and any final processing and return codes are
 ;;; handled appropriately.
 (defmacro handling-end-of-the-world (&body body)
-  (with-unique-names (caught)
-    `(without-interrupts
-       (let ((,caught
-               (catch '%end-of-the-world
-                 (unwind-protect
-                      (with-local-interrupts ,@body (quit))
-                   (handler-case
-                       (with-local-interrupts
-                         (call-hooks "exit" *exit-hooks* :on-error :warn))
-                     (serious-condition ()
-                       1))))))
-         ;; If user called QUIT and exit hooks were OK, the status is what it
-         ;; is -- even eg. streams cannot be flushed anymore. Even if
-         ;; something goes wrong now, we still report what was asked. We still
-         ;; want to have %END-OF-THE-WORLD visible, though.
-         (catch '%end-of-the-world
-           (handler-case
-               (unwind-protect
-                    (progn
-                      (flush-standard-output-streams)
-                      (sb!thread::terminate-session))
-                 (sb!unix:unix-exit ,caught))
-             (serious-condition ())))))))
+  `(without-interrupts
+     (catch '%end-of-the-world
+       (unwind-protect
+            (with-local-interrupts
+              (unwind-protect
+                   (progn ,@body)
+                (call-exit-hooks)))
+         (%exit)))))
+
+(defvar *exit-lock*)
+(defvar *exit-in-process* nil)
+(declaim (type (or null real) *exit-timeout*))
+(defvar *exit-timeout* 60
+  "Default amount of seconds, if any, EXIT should wait for other
+threads to finish after terminating them. Default value is 60. NIL
+means to wait indefinitely.")
+
+(defun os-exit-handler (condition)
+  (declare (ignore condition))
+  (os-exit *exit-in-process* :abort t))
+
+(defvar *exit-error-handler* #'os-exit-handler)
+
+(defun call-exit-hooks ()
+  (unless *exit-in-process*
+    (setf *exit-in-process* 0))
+  (handler-bind ((serious-condition *exit-error-handler*))
+    (call-hooks "exit" *exit-hooks* :on-error :warn)))
+
+(defun %exit ()
+  ;; If anything goes wrong, we will exit immediately and forcibly.
+  (handler-bind ((serious-condition *exit-error-handler*))
+    (let (ok)
+      (unwind-protect
+           (progn
+             (flush-standard-output-streams)
+             (sb!thread::%exit-other-threads)
+             (setf ok t))
+        (os-exit *exit-in-process* :abort (not ok))))))
 
 ;;;; working with *CURRENT-ERROR-DEPTH* and *MAXIMUM-ERROR-DEPTH*
 
@@ -315,7 +331,7 @@ any non-negative real number."
                                                value)
                   (load (native-pathname value))))
                (:quit
-                (quit))))
+                (exit))))
            (flush-standard-output-streams)))
     (with-simple-restart (abort "Skip rest of --eval and --load options.")
       (dolist (option options)
@@ -330,7 +346,7 @@ any non-negative real number."
                                           ;; Shell-style.
                                           (when (member (stream-error-stream e)
                                                         (list *stdout* *stdin* *stderr*))
-                                            (quit)))))
+                                            (exit)))))
              ;; Let's not use the *TTY* for scripts, ok? Also, normally we use
              ;; synonym streams, but in order to have the broken pipe/eof error
              ;; handling right we want to bind them for scripts.
@@ -347,7 +363,7 @@ any non-negative real number."
             (sb!fasl::maybe-skip-shebang-line f)
             (load-script f))))))
 
-;; Errors while processing the command line cause the system to QUIT,
+;; Errors while processing the command line cause the system to EXIT,
 ;; instead of trying to go into the Lisp debugger, because trying to
 ;; go into the Lisp debugger would get into various annoying issues of
 ;; where we should go after the user tries to return from the
@@ -357,7 +373,7 @@ any non-negative real number."
           "fatal error before reaching READ-EVAL-PRINT loop: ~%  ~?~%"
           control-string
           args)
-  (quit :unix-status 1))
+  (exit :code 1))
 
 ;;; the default system top level function
 (defun toplevel-init ()
@@ -519,11 +535,11 @@ any non-negative real number."
                      s))
           (/show0 "CONTINUEing from pre-REPL RESTART-CASE")
           (values))                     ; (no-op, just fall through)
-        (quit ()
-          :report "Quit SBCL (calling #'QUIT, killing the process)."
+        (exit ()
+          :report "Exit SBCL (calling #'EXIT, killing the process)."
           :test (lambda (c) (declare (ignore c)) (not script))
-          (/show0 "falling through to QUIT from pre-REPL RESTART-CASE")
-          (quit :unix-status 1))))
+          (/show0 "falling through to EXIT from pre-REPL RESTART-CASE")
+          (exit :code 1))))
 
     ;; one more time for good measure, in case we fell out of the
     ;; RESTART-CASE above before one of the flushes in the ordinary
@@ -600,7 +616,7 @@ that provides the REPL for the system. Assumes that *STANDARD-INPUT* and
   (let* ((eof-marker (cons nil nil))
          (form (read in nil eof-marker)))
     (if (eq form eof-marker)
-        (quit)
+        (exit)
         form)))
 
 (defun repl-fun (noprint)

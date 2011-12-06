@@ -72,7 +72,7 @@
     (error (e)
       (note "~&Error in cache test in ~S:~%~A~%...aborting"
             sb-thread:*current-thread* e)
-      (sb-ext:quit :unix-status 1)))
+      (sb-ext:exit :code 1)))
   (note "/~S done" sb-thread:*current-thread*))
 
 #+sb-thread

@@ -39,7 +39,7 @@ run_sbcl <<EOF
   (save-lisp-and-die "$tmpcore")
 EOF
 run_sbcl_with_core "$tmpcore" --no-userinit --no-sysinit <<EOF
-  (quit :unix-status (foo 10))
+  (exit :code (foo 10))
 EOF
 check_status_maybe_lose "Basic SAVE-LISP-AND-DIE" $? 21 "(saved core ran)"
 
@@ -47,11 +47,11 @@ check_status_maybe_lose "Basic SAVE-LISP-AND-DIE" $? 21 "(saved core ran)"
 run_sbcl <<EOF
   (defun bar ()
     (format t "~&Callbacks not supported, skipping~%")
-    (quit :unix-status 42))
+    (exit :code 42))
   #+alien-callbacks
   (progn
     (sb-alien::define-alien-callback foo int () 42)
-    (defun bar () (quit :unix-status (alien-funcall foo))))
+    (defun bar () (exit :code (alien-funcall foo))))
   (save-lisp-and-die "$tmpcore")
 EOF
 run_sbcl_with_core "$tmpcore" --no-userinit --no-sysinit <<EOF
@@ -66,7 +66,7 @@ run_sbcl <<EOF
 EOF
 chmod u+x "$tmpcore"
 ./"$tmpcore" > "$tmpoutput" --no-userinit --no-sysinit --noprint <<EOF 
-  (quit :unix-status 71)
+  (exit :code 71)
 EOF
 status=$?
 if [ $status != 71 ]; then
@@ -94,9 +94,9 @@ chmod u+x "$tmpcore"
   (save-lisp-and-die "$tmpcore" :executable t :save-runtime-options t)
 EOF
 chmod u+x "$tmpcore"
-./"$tmpcore" --no-userinit --version --eval '(quit)' <<EOF
-  (when (equal *posix-argv* '("./$tmpcore" "--version" "--eval" "(quit)"))
-    (quit :unix-status 42))
+./"$tmpcore" --no-userinit --version --eval '(exit)' <<EOF
+  (when (equal *posix-argv* '("./$tmpcore" "--version" "--eval" "(exit)"))
+    (exit :code 42))
 EOF
 status=$?
 if [ $status != 42 ]; then

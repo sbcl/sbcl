@@ -672,9 +672,9 @@ reset to ~S."
   (declare (ignore me))
   ;; There is no one there to interact with, so report the
   ;; condition and terminate the program.
-  (flet ((failure-quit (&key recklessly-p)
+  (flet ((failure-quit (&key abort)
            (/show0 "in FAILURE-QUIT (in --disable-debugger debugger hook)")
-           (quit :unix-status 1 :recklessly-p recklessly-p)))
+           (exit :code 1 :abort abort)))
     ;; This HANDLER-CASE is here mostly to stop output immediately
     ;; (and fall through to QUIT) when there's an I/O error. Thus,
     ;; when we're run under a shell script or something, we can die
@@ -724,7 +724,7 @@ reset to ~S."
         (ignore-errors
          (%primitive print
                      "Argh! error within --disable-debugger error handling"))
-        (failure-quit :recklessly-p t)))))
+        (failure-quit :abort t)))))
 
 (defvar *old-debugger-hook* nil)
 

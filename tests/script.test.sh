@@ -21,9 +21,9 @@ tmpscript=$TEST_FILESTEM.lisp-script
 tmpout=$TEST_FILESTEM.lisp-out
 tmperr=$TEST_FILESTEM.lisp-err
 
-echo '(quit :unix-status 7)' > $tmpscript
+echo '(exit :code 7)' > $tmpscript
 run_sbcl --script $tmpscript
-check_status_maybe_lose "--script exit status from QUIT" $? 7 "(quit status good)"
+check_status_maybe_lose "--script exit status from EXIT" $? 7 "(status good)"
 
 echo '(error "oops")' > $tmpscript
 run_sbcl --script $tmpscript 1> $tmpout 2> $tmperr
@@ -40,7 +40,7 @@ check_status_maybe_lose "--script exit status from normal exit" $? 0 "(everythin
 cat > $tmpscript <<EOF
 (setf *standard-output* (make-broadcast-stream))
 (close *standard-output*)
-(sb-ext:quit :unix-status 3)
+(sb-ext:exit :code 3)
 EOF
 run_sbcl --script $tmpscript >/dev/null
 check_status_maybe_lose "--script exit status from QUIT when standard-output closed" $? 3 "(as given)"
@@ -61,9 +61,9 @@ cat > $tmpscript <<EOF
 (sb-ext:quit :unix-status 3)
 EOF
 run_sbcl --script $tmpscript >/dev/null
-check_status_maybe_lose "--script exit status from QUIT when stdout closed" $? 3 "(as given)"
+check_status_maybe_lose "--script exit status from EXIT when stdout closed" $? 3 "(as given)"
 run_sbcl --load $tmpscript >/dev/null
-check_status_maybe_lose "--load exit status from QUIT when stdout closed" $? 3 "(as given)"
+check_status_maybe_lose "--load exit status from EXIT when stdout closed" $? 3 "(as given)"
 
 cat > $tmpscript <<EOF
 (loop (write-line (read-line)))

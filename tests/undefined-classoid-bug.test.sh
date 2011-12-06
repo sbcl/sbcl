@@ -16,12 +16,12 @@ run_sbcl <<EOF
 (let ((files (list $FILES)))
   (mapc #'load files)
   (mapc #'compile-file files))
-(quit :unix-status 52)
+(exit :code 52)
 EOF
 
 run_sbcl <<EOF
 (mapc #'load (list $FASLS))
-(quit :unix-status $EXIT_LISP_WIN)
+(exit :code $EXIT_LISP_WIN)
 EOF
 check_status_maybe_lose undefined-classoid-bug $?
 

@@ -1,6 +1,6 @@
 ;; -*- coding: utf-8 -*-
 #-sb-unicode
-(sb-ext:quit :unix-status 104)
+(sb-ext:exit :code 104)
 
 ;; use "AｱＡあ漾燹釭" for tests
 (let ((str (coerce '(#\u0041 #\uff71 #\uff21 #\u3042 #\u6f3e #\u71f9 #\u91ed)

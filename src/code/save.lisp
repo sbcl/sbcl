@@ -57,6 +57,9 @@ The following &KEY arguments are defined:
      and runs the top level read-eval-print loop. This function returning
      is equivalent to (SB-EXT:QUIT :UNIX-STATUS 0) being called.
 
+     TOPLEVEL functions should always provide an ABORT restart: otherwise
+     code they call will run without one.
+
   :EXECUTABLE
      If true, arrange to combine the SBCL runtime and the core image
      to create a standalone executable.  If false (the default), the

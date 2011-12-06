@@ -276,17 +276,63 @@
 
 (defun quit (&key recklessly-p (unix-status 0))
   #!+sb-doc
-  "Terminate the current Lisp. *EXIT-HOOKS* and pending unwind-protect
-cleanup forms are run unless RECKLESSLY-P is true. On UNIX-like
-systems, UNIX-STATUS is used as the status code."
-  (declare (type (signed-byte 32) unix-status))
-  ;; FIXME: Windows is not "unix-like", but still has the same
-  ;; unix-status... maybe we should just revert to calling it :STATUS?
-  (/show0 "entering QUIT")
-  (if recklessly-p
-      (sb!unix:unix-exit unix-status)
-      (throw '%end-of-the-world unix-status))
+  "Deprecated. See: SB-EXT:EXIT, SB-THREAD:RETURN-FROM-THREAD,
+SB-THREAD:ABORT-THREAD."
+  (if (or recklessly-p (sb!thread:main-thread-p))
+      (exit :code unix-status :abort recklessly-p)
+      (sb!thread:abort-thread))
   (critically-unreachable "after trying to die in QUIT"))
+
+(declaim (ftype (sfunction (&key (:code (or null exit-code))
+                                (:timeout (or null real))
+                                 (:abort t))
+                           nil)
+                exit))
+(defun exit (&key code abort (timeout *exit-timeout*))
+  #!+sb-doc
+  "Terminates the process, causing SBCL to exit with CODE. CODE
+defaults to 0 when ABORT is false, and 1 when it is true.
+
+When ABORT is false (the default), current thread is first unwound,
+*EXIT-HOOKS* are run, other threads are terminated, and standard
+output streams are flushed before SBCL calls exit(2) -- at which point
+atexit(3) functions will run. If multiple threads call EXIT with ABORT
+being false, the first one to call it will complete the protocol.
+
+When ABORT is true, SBCL exits immediately by calling _exit(2) without
+unwinding stack, or calling exit hooks. Note that _exit(2) does not
+call atexit(3) functions unlike exit(2).
+
+Recursive calls to EXIT cause EXIT to behave as it ABORT was true.
+
+TIMEOUT controls waiting for other threads to terminate when ABORT is
+NIL. Once current thread has been unwound and *EXIT-HOOKS* have been
+run, spawning new threads is prevented and all other threads are
+terminated by calling TERMINATE-THREAD on them. The system then waits
+for them to finish using JOIN-THREAD with the specified TIMEOUT. If a
+thread does not finish in TIMEOUT seconds, it is left to its own
+devices while the exit protocol continues. TIMEOUT defaults to
+*EXIT-TIMEOUT*, which in turn defaults to 60.
+
+Note that TIMEOUT applies only to JOIN-THREAD, not *EXIT-HOOKS*. Since
+TERMINATE-THREAD is asynchronous, getting multithreaded application
+termination with complex cleanups right using it can be tricky. To
+perform an orderly synchronous shutdown use an exit hook instead of
+relying on implicit thread termination.
+
+Consequences are unspecified if serious conditions occur during EXIT
+excepting errors from *EXIT-HOOKS*, which cause warnings and stop
+execution of the hook that signaled, but otherwise allow the exit
+process to continue normally."
+  (if (or abort *exit-in-process*)
+      (os-exit (or code 1) :abort t)
+      (let ((code (or code 0)))
+        (with-deadline (:seconds nil :override t)
+          (sb!thread:grab-mutex *exit-lock*))
+        (setf *exit-in-process* code
+              *exit-timeout* timeout)
+        (throw '%end-of-the-world t)))
+  (critically-unreachable "After trying to die in EXIT."))
 
 ;;;; initialization functions
 

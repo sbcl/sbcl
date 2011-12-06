@@ -12,7 +12,7 @@
 ;;;; more information.
 
 #-sb-thread
-(sb-ext:quit :unix-status 104)
+(sb-ext:exit :code 104)
 
 (use-package :sb-alien)
 

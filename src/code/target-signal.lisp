@@ -197,8 +197,7 @@
 
 (defun sigterm-handler (signal code context)
   (declare (ignore signal code context))
-  (sb!thread::terminate-session)
-  (sb!ext:quit))
+  (sb!ext:exit))
 
 ;;; SIGPIPE is not used in SBCL for its original purpose, instead it's
 ;;; for signalling a thread that it should look at its interruption

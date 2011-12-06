@@ -59,7 +59,7 @@ run_sbcl <<EOF
   (assert (equal (truename "link-4")     #p"$testdir/link-4"))
   (assert (equal (truename "link-5")     #p"$testdir/link-5"))
   (assert (equal (truename "link-6")     #p"$testdir/link-6"))
-  (sb-ext:quit :unix-status $EXIT_LISP_WIN)
+  (sb-ext:exit :code $EXIT_LISP_WIN)
 EOF
 check_status_maybe_lose "DIRECTORY/TRUENAME part 1" $?
 
@@ -78,7 +78,7 @@ run_sbcl <<EOF
   (assert (equal (truename "$testdir/link-4")     #p"$testdir/link-4"))
   (assert (equal (truename "$testdir/link-5")     #p"$testdir/link-5"))
   (assert (equal (truename "$testdir/link-6")     #p"$testdir/link-6"))
-  (sb-ext:quit :unix-status $EXIT_LISP_WIN)
+  (sb-ext:exit :code $EXIT_LISP_WIN)
 EOF
 check_status_maybe_lose "DIRECTORY/TRUENAME part 2" $?
 cleanup_test_subdirectory
@@ -194,7 +194,7 @@ Lisp filename syntax idiosyncrasies)."
   #+nil
   (need-match "animal/vertebrate/mammal/robot/../**/../**/*.*" nil))
 (need-matches)
-(sb-ext:quit :unix-status $EXIT_LISP_WIN)
+(sb-ext:exit :code $EXIT_LISP_WIN)
 EOF
 check_status_maybe_lose "DIRECTORY/TRUENAME part 3" $?
 cleanup_test_subdirectory
@@ -258,19 +258,19 @@ run_sbcl <<EOF
 (test "foo:**;*.tmp" "foo/aa.tmp" "far/ab.tmp" "qar/ac.tmp")
 (test "foo:foo;*.tmp" "foo/aa.tmp")
 (test "c/*/*.bar" "a/z/foo.bar")
-(quit :unix-status $EXIT_LISP_WIN)
+(exit :code $EXIT_LISP_WIN)
 EOF
 check_status_maybe_lose "DIRECTORY/PATTERNS" $?
 
 # Test whether ENSURE-DIRECTORIES-EXIST can create a directory whose
 # name contains a wildcard character (it used to get itself confused
 # internally).
-run_sbcl --eval '(ensure-directories-exist "foo\\*bar/baz.txt")' --eval '(sb-ext:quit)'
+run_sbcl --eval '(ensure-directories-exist "foo\\*bar/baz.txt")' --eval '(sb-ext:exit)'
 test -d foo*bar
 check_status_maybe_lose "ENSURE-DIRECTORIES-EXIST part 1" $? \
     0 "(directory exists)"
 
-run_sbcl --eval '(ensure-directories-exist "foo\\?bar/baz.txt")' --eval '(sb-ext:quit)'
+run_sbcl --eval '(ensure-directories-exist "foo\\?bar/baz.txt")' --eval '(sb-ext:exit)'
 test -d foo?bar
 check_status_maybe_lose "ENSURE-DIRECTORIES-EXIST part 2" $? \
     0 "(directory exists)"
@@ -282,7 +282,7 @@ touch    deltest
 touch    sub/deltest
 run_sbcl --eval '(let ((*default-pathname-defaults* (truename "sub")))
                    (delete-file "deltest")
-                   (sb-ext:quit))'
+                   (sb-ext:exit))'
 test -f deltest && test ! -f sub/deltest
 check_status_maybe_lose "delete-file via d-p-d" $? \
   0 "ok"
@@ -335,8 +335,8 @@ run_sbcl --eval '(sb-ext:delete-directory "simple_test_subdir1")' \
                    (delete-directory "one" :recursive t))' \
          --eval '(handler-case (delete-directory "will_fail")
                    (file-error ())
-                   (:no-error (x) (sb-ext:quit :unix-status 1)))' \
-         --eval '(sb-ext:quit)'
+                   (:no-error (x) (sb-ext:exit :code 1)))' \
+         --eval '(sb-ext:exit)'
 check_status_maybe_lose "delete-directory symlink" $? \
   0 "ok"
 test -L will_fail && test -d dont_delete_me

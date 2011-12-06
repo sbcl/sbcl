@@ -547,3 +547,34 @@
     (signal-semaphore sem)
     (try-semaphore sem 1 note)
     (assert (semaphore-notification-status note))))
+
+(with-test (:name (:return-from-thread :normal-thread))
+  (let* ((thread (make-thread (lambda ()
+                                (return-from-thread (values 1 2 3))
+                                :foo)))
+         (values (multiple-value-list (join-thread thread))))
+    (unless (equal (list 1 2 3) values)
+      (error "got ~S, wanted (1 2 3)" values))))
+
+(with-test (:name (:return-from-thread :main-thread))
+  (assert (main-thread-p))
+  (assert (eq :oops
+              (handler-case
+                  (return-from-thread t)
+                (thread-error ()
+                  :oops)))))
+
+(with-test (:name (:abort-thread :normal-thread))
+  (let ((thread (make-thread (lambda ()
+                               (abort-thread)
+                               :foo))))
+    (assert (eq :aborted! (join-thread thread :default :aborted!)))))
+
+(with-test (:name (:abort-thread :main-thread))
+  (assert (main-thread-p))
+  (assert (eq :oops
+              (handler-case
+                  (abort-thread)
+                (thread-error ()
+                  :oops)))))
+

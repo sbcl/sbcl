@@ -12,7 +12,7 @@
 ;;;; more information.
 
 (when (eq sb-ext:*evaluator-mode* :interpret)
-  (sb-ext:quit :unix-status 104))
+  (sb-ext:exit :code 104))
 
 (load "compiler-test-util.lisp")
 (use-package :ctu)

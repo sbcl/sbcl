@@ -328,7 +328,7 @@
               (map nil #'sb-thread:destroy-thread threads)
               (sleep 0.2))
             (return-from exit-cmd)))))
-  (sb-ext:quit :unix-status status)
+  (sb-ext:exit :code status)
   (values))
 
 (defun package-cmd (&optional pkg)
@@ -783,7 +783,7 @@
   ;; command
   (cond ((eq user-cmd *eof-cmd*)
          (when *exit-on-eof*
-           (sb-ext:quit))
+           (sb-ext:exit))
          (format *output* "EOF~%")
          t)
         ((eq user-cmd *null-cmd*)

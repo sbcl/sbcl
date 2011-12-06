@@ -1,7 +1,7 @@
 ;;; -*- coding: utf-8 -*-
 ;;; enc-cn.impure.lisp: test case for enc-cn.lisp and enc-cn-tbl.lisp
 #-sb-unicode
-(sb-ext:quit :unix-status 104)
+(sb-ext:exit :code 104)
 
 ;; use "1AＡあ胡玥姮" for tests
 (let ((str (coerce '(#\u0031 #\u0041 #\uff21 #\u3042 #\u80e1 #\u73a5 #\u59ee)

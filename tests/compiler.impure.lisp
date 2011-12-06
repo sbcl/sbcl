@@ -16,7 +16,7 @@
 ;;;; more information.
 
 (when (eq sb-ext:*evaluator-mode* :interpret)
-  (sb-ext:quit :unix-status 104))
+  (sb-ext:exit :code 104))
 
 (load "test-util.lisp")
 (load "compiler-test-util.lisp")

@@ -74,6 +74,9 @@ WITH-CAS-LOCK can be entered recursively."
 The offending thread is initialized by the :THREAD initialization argument and
 read by the function THREAD-ERROR-THREAD."))
 
+(define-condition simple-thread-error (thread-error simple-condition)
+  ())
+
 (define-condition thread-deadlock (thread-error)
   ((cycle :initarg :cycle :reader thread-deadlock-cycle))
   (:report
@@ -248,16 +251,88 @@ created and old ones may exit at any time."
   #!-sb-thread
   0)
 
+(defvar *initial-thread* nil)
+(defvar *make-thread-lock*)
+
 (defun init-initial-thread ()
   (/show0 "Entering INIT-INITIAL-THREAD")
-  (let ((initial-thread (%make-thread :name "initial thread"
+  (setf sb!impl::*exit-lock* (make-mutex :name "Exit Lock")
+        *make-thread-lock* (make-mutex :name "Make-Thread Lock"))
+  (let ((initial-thread (%make-thread :name "main thread"
                                       :%alive-p t
                                       :os-thread (current-thread-os-thread))))
-    (setq *current-thread* initial-thread)
+    (setq *initial-thread* initial-thread
+          *current-thread* initial-thread)
+    (grab-mutex (thread-result-lock *initial-thread*))
     ;; Either *all-threads* is empty or it contains exactly one thread
     ;; in case we are in reinit since saving core with multiple
     ;; threads doesn't work.
     (setq *all-threads* (list initial-thread))))
+
+(defun main-thread ()
+  "Returns the main thread of the process."
+  *initial-thread*)
+
+(defun main-thread-p (&optional (thread *current-thread*))
+  "True if THREAD, defaulting to current thread, is the main thread of the process."
+  (eq thread *initial-thread*))
+
+(defmacro return-from-thread (values-form &key allow-exit)
+  "Unwinds from and terminates the current thread, with values from
+VALUES-FORM as the results visible to JOIN-THREAD.
+
+If current thread is the main thread of the process (see
+MAIN-THREAD-P), signals an error unless ALLOW-EXIT is true, as
+terminating the main thread would terminate the entire process. If
+ALLOW-EXIT is true, returning from the main thread is equivalent to
+calling SB-EXT:EXIT with :CODE 0 and :ABORT NIL.
+
+See also: ABORT-THREAD and SB-EXT:EXIT."
+  `(%return-from-thread (multiple-value-list ,values-form) ,allow-exit))
+
+(defun %return-from-thread (values allow-exit)
+  (let ((self *current-thread*))
+    (cond ((main-thread-p self)
+           (unless allow-exit
+             (error 'simple-thread-error
+                    :format-control "~@<Tried to return ~S as values from main thread, ~
+                                     but exit was not allowed.~:@>"
+                    :format-arguments (list values)
+                    :thread self))
+           (sb!ext:exit :code 0))
+          (t
+           (throw '%return-from-thread (values-list values))))))
+
+(defun abort-thread (&key allow-exit)
+  "Unwinds from and terminates the current thread abnormally, causing
+JOIN-THREAD on current thread to signal an error unless a
+default-value is provided.
+
+If current thread is the main thread of the process (see
+MAIN-THREAD-P), signals an error unless ALLOW-EXIT is true, as
+terminating the main thread would terminate the entire process. If
+ALLOW-EXIT is true, aborting the main thread is equivalent to calling
+SB-EXT:EXIT code 1 and :ABORT NIL.
+
+Invoking the initial ABORT restart estabilished by MAKE-THREAD is
+equivalent to calling ABORT-THREAD in other than main threads.
+However, whereas ABORT restart may be rebound, ABORT-THREAD always
+unwinds the entire thread. (Behaviour of the initial ABORT restart for
+main thread depends on the :TOPLEVEL argument to
+SB-EXT:SAVE-LISP-AND-DIE.)
+
+See also: RETURN-FROM-THREAD and SB-EXT:EXIT."
+  (let ((self *current-thread*))
+    (cond ((main-thread-p self)
+           (unless allow-exit
+             (error 'simple-thread-error
+                    :format-control "~@<Tried to abort initial thread, but ~
+                                     exit was not allowed.~:@>"))
+           (sb!ext:exit :code 1))
+          (t
+           ;; We /could/ use TOPLEVEL-CATCHER or %END-OF-THE-WORLD as well, but
+           ;; this seems tidier. Those to are a bit too overloaded already.
+           (throw '%abort-thread t)))))
 
 
 ;;;; Aliens, low level stuff
@@ -1110,6 +1185,13 @@ on this semaphore, then N of them is woken up."
 #!+sb-thread
 (defun handle-thread-exit (thread)
   (/show0 "HANDLING THREAD EXIT")
+  (when *exit-in-process*
+    (if (consp *exit-in-process*)
+        ;; This means we're the main thread, but someone else
+        ;; requested the exit and exiting with the right code is the
+        ;; only thing left to do.
+        (os-exit (car *exit-in-process*) :abort nil)
+        (%exit)))
   ;; Lisp-side cleanup
   (with-all-threads-lock
     (setf (thread-%alive-p thread) nil)
@@ -1117,6 +1199,44 @@ on this semaphore, then N of them is woken up."
     (setq *all-threads* (delete thread *all-threads*))
     (when *session*
       (%delete-thread-from-session thread *session*))))
+
+(defun %exit-other-threads ()
+  ;; Grabbing this lock prevents new threads from
+  ;; being spawned, and guarantees that *ALL-THREADS*
+  ;; is up to date.
+  (with-deadline (:seconds nil :override t)
+    (grab-mutex *make-thread-lock*)
+    (let ((timeout sb!ext:*exit-timeout*)
+          (code *exit-in-process*)
+          (joinees nil)
+          (main nil))
+      (dolist (thread (list-all-threads))
+        (cond ((eq thread *current-thread*))
+              ((main-thread-p thread)
+               (setf main thread))
+              (t
+               (handler-case
+                   (progn
+                     (terminate-thread thread)
+                     (push thread joinees))
+                 (interrupt-thread-error ())))))
+      (dolist (thread (nreverse joinees))
+        (join-thread thread :default t :timeout timeout))
+      ;; Need to defer till others have joined, because when main
+      ;; thread exits, we're gone. Can't use TERMINATE-THREAD -- would
+      ;; get the exit code wrong.
+      (when main
+        (handler-case
+            (interrupt-thread
+             main
+             (lambda ()
+               (setf *exit-in-process* (list code))
+               (throw 'sb!impl::%end-of-the-world t)))
+          (interrupt-thread-error ()))
+        ;; Normally this never finishes, as once the main-thread
+        ;; unwinds we exit with the right code, but if times out
+        ;; before that happens, we will exit after returning.
+        (join-thread main :default t :timeout timeout)))))
 
 (defun terminate-session ()
   #!+sb-doc
@@ -1223,9 +1343,14 @@ have the foreground next."
 (defun make-thread (function &key name arguments)
   #!+sb-doc
   "Create a new thread of NAME that runs FUNCTION with the argument
-list designator provided (defaults to no argument). When the function
-returns the thread exits. The return values of FUNCTION are kept
-around and can be retrieved by JOIN-THREAD."
+list designator provided (defaults to no argument). Thread exits when
+the function returns. The return values of FUNCTION are kept around
+and can be retrieved by JOIN-THREAD.
+
+Invoking the initial ABORT restart estabilished by MAKE-THREAD
+terminates the thread.
+
+See also: RETURN-FROM-THREAD, ABORT-THREAD."
   #!-sb-thread (declare (ignore function name arguments))
   #!-sb-thread (error "Not supported in unithread builds.")
   #!+sb-thread (assert (or (atom arguments)
@@ -1234,116 +1359,118 @@ around and can be retrieved by JOIN-THREAD."
                        "Argument passed to ~S, ~S, is an improper list."
                        'make-thread arguments)
   #!+sb-thread
-  (let* ((thread (%make-thread :name name))
-         (setup-sem (make-semaphore :name "Thread setup semaphore"))
-         (real-function (coerce function 'function))
-         (arguments     (if (listp arguments)
-                            arguments
-                            (list arguments)))
-         (initial-function
-          (named-lambda initial-thread-function ()
-            ;; In time we'll move some of the binding presently done in C
-            ;; here too.
-            ;;
-            ;; KLUDGE: Here we have a magic list of variables that are
-            ;; not thread-safe for one reason or another.  As people
-            ;; report problems with the thread safety of certain
-            ;; variables, (e.g. "*print-case* in multiple threads
-            ;; broken", sbcl-devel 2006-07-14), we add a few more
-            ;; bindings here.  The Right Thing is probably some variant
-            ;; of Allegro's *cl-default-special-bindings*, as that is at
-            ;; least accessible to users to secure their own libraries.
-            ;;   --njf, 2006-07-15
-            ;;
-            ;; As it is, this lambda must not cons until we are ready
-            ;; to run GC. Be very careful.
-            (let* ((*current-thread* thread)
-                   (*restart-clusters* nil)
-                   (*handler-clusters* (sb!kernel::initial-handler-clusters))
-                   (*condition-restarts* nil)
-                   (sb!impl::*deadline* nil)
-                   (sb!impl::*deadline-seconds* nil)
-                   (sb!impl::*step-out* nil)
-                   ;; internal printer variables
-                   (sb!impl::*previous-case* nil)
-                   (sb!impl::*previous-readtable-case* nil)
-                   (sb!impl::*internal-symbol-output-fun* nil)
-                   (sb!impl::*descriptor-handlers* nil)) ; serve-event
-              ;; Binding from C
-              (setf sb!vm:*alloc-signal* *default-alloc-signal*)
-              (setf (thread-os-thread thread) (current-thread-os-thread))
-              (with-mutex ((thread-result-lock thread))
-                (with-all-threads-lock
-                  (push thread *all-threads*))
-                (with-session-lock (*session*)
-                  (push thread (session-threads *session*)))
-                (setf (thread-%alive-p thread) t)
-                (signal-semaphore setup-sem)
-                ;; can't use handling-end-of-the-world, because that flushes
-                ;; output streams, and we don't necessarily have any (or we
-                ;; could be sharing them)
-                (catch 'sb!impl::toplevel-catcher
-                  (catch 'sb!impl::%end-of-the-world
-                    (with-simple-restart
-                        (terminate-thread
-                         (format nil
-                                 "~~@<Terminate this thread (~A)~~@:>"
-                                 *current-thread*))
-                      (without-interrupts
-                        (unwind-protect
-                             (with-local-interrupts
-                               ;; Now that most things have a chance
-                               ;; to work properly without messing up
-                               ;; other threads, it's time to enable
-                               ;; signals.
-                               (sb!unix::unblock-deferrable-signals)
-                               (setf (thread-result thread)
-                                     (cons t
-                                           (multiple-value-list
-                                            (apply real-function arguments))))
-                               ;; Try to block deferrables. An
-                               ;; interrupt may unwind it, but for a
-                               ;; normal exit it prevents interrupt
-                               ;; loss.
-                               (block-deferrable-signals))
-                          ;; We're going down, can't handle interrupts
-                          ;; sanely anymore. GC remains enabled.
-                          (block-deferrable-signals)
-                          ;; We don't want to run interrupts in a dead
-                          ;; thread when we leave WITHOUT-INTERRUPTS.
-                          ;; This potentially causes important
-                          ;; interupts to be lost: SIGINT comes to
-                          ;; mind.
-                          (setq *interrupt-pending* nil)
-                          (handle-thread-exit thread))))))))
-            (values))))
-    ;; If the starting thread is stopped for gc before it signals the
-    ;; semaphore then we'd be stuck.
-    (assert (not *gc-inhibit*))
-    ;; Keep INITIAL-FUNCTION pinned until the child thread is
-    ;; initialized properly. Wrap the whole thing in
-    ;; WITHOUT-INTERRUPTS because we pass INITIAL-FUNCTION to another
-    ;; thread.
-    (without-interrupts
-      (with-pinned-objects (initial-function)
-        (let ((os-thread
-               (%create-thread
-                (get-lisp-obj-address initial-function))))
-          (when (zerop os-thread)
-            (error "Can't create a new thread"))
-          (wait-on-semaphore setup-sem)
-          thread)))))
+  (tagbody
+     (with-mutex (*make-thread-lock*)
+       (let* ((thread (%make-thread :name name))
+              (setup-sem (make-semaphore :name "Thread setup semaphore"))
+              (real-function (coerce function 'function))
+              (arguments     (if (listp arguments)
+                                 arguments
+                                 (list arguments)))
+              (initial-function
+                (named-lambda initial-thread-function ()
+                  ;; In time we'll move some of the binding presently done in C
+                  ;; here too.
+                  ;;
+                  ;; KLUDGE: Here we have a magic list of variables that are
+                  ;; not thread-safe for one reason or another.  As people
+                  ;; report problems with the thread safety of certain
+                  ;; variables, (e.g. "*print-case* in multiple threads
+                  ;; broken", sbcl-devel 2006-07-14), we add a few more
+                  ;; bindings here.  The Right Thing is probably some variant
+                  ;; of Allegro's *cl-default-special-bindings*, as that is at
+                  ;; least accessible to users to secure their own libraries.
+                  ;;   --njf, 2006-07-15
+                  ;;
+                  ;; As it is, this lambda must not cons until we are ready
+                  ;; to run GC. Be very careful.
+                  (let* ((*current-thread* thread)
+                         (*restart-clusters* nil)
+                         (*handler-clusters* (sb!kernel::initial-handler-clusters))
+                         (*condition-restarts* nil)
+                         (*exit-in-process* nil)
+                         (sb!impl::*deadline* nil)
+                         (sb!impl::*deadline-seconds* nil)
+                         (sb!impl::*step-out* nil)
+                         ;; internal printer variables
+                         (sb!impl::*previous-case* nil)
+                         (sb!impl::*previous-readtable-case* nil)
+                         (sb!impl::*internal-symbol-output-fun* nil)
+                         (sb!impl::*descriptor-handlers* nil)) ; serve-event
+                    ;; Binding from C
+                    (setf sb!vm:*alloc-signal* *default-alloc-signal*)
+                    (setf (thread-os-thread thread) (current-thread-os-thread))
+                    (with-mutex ((thread-result-lock thread))
+                      (with-all-threads-lock
+                        (push thread *all-threads*))
+                      (with-session-lock (*session*)
+                        (push thread (session-threads *session*)))
+                      (setf (thread-%alive-p thread) t)
+                      (signal-semaphore setup-sem)
+                      ;; Using handling-end-of-the-world would be a bit tricky
+                      ;; due to other catches and interrupts, so we essentially
+                      ;; re-implement it here. Once and only once more.
+                      (catch 'sb!impl::toplevel-catcher
+                        (catch 'sb!impl::%end-of-the-world
+                          (catch '%abort-thread
+                            (with-simple-restart
+                                (abort "~@<Abort thread (~A)~@:>" *current-thread*)
+                              (without-interrupts
+                                (unwind-protect
+                                     (with-local-interrupts
+                                       (sb!unix::unblock-deferrable-signals)
+                                       (setf (thread-result thread)
+                                             (cons t
+                                                   (multiple-value-list
+                                                    (unwind-protect
+                                                         (catch '%return-from-thread
+                                                           (apply real-function arguments))
+                                                      (when *exit-in-process*
+                                                        (sb!impl::call-exit-hooks)))))))
+                                  ;; We're going down, can't handle interrupts
+                                  ;; sanely anymore. GC remains enabled.
+                                  (block-deferrable-signals)
+                                  ;; We don't want to run interrupts in a dead
+                                  ;; thread when we leave WITHOUT-INTERRUPTS.
+                                  ;; This potentially causes important
+                                  ;; interupts to be lost: SIGINT comes to
+                                  ;; mind.
+                                  (setq *interrupt-pending* nil)
+                                  (handle-thread-exit thread)))))))))
+                  (values))))
+         ;; If the starting thread is stopped for gc before it signals the
+         ;; semaphore then we'd be stuck.
+         (assert (not *gc-inhibit*))
+         ;; Keep INITIAL-FUNCTION pinned until the child thread is
+         ;; initialized properly. Wrap the whole thing in
+         ;; WITHOUT-INTERRUPTS because we pass INITIAL-FUNCTION to another
+         ;; thread.
+         (without-interrupts
+           (with-pinned-objects (initial-function)
+             (let ((os-thread
+                     (%create-thread
+                      (get-lisp-obj-address initial-function))))
+               (when (zerop os-thread)
+                 (go :cant-spawn))
+               (wait-on-semaphore setup-sem)
+               (return-from make-thread thread))))))
+   :cant-spawn
+     (error "Could not create a new thread.")))
 
 (defun join-thread (thread &key (default nil defaultp) timeout)
   #!+sb-doc
-  "Suspend current thread until THREAD exits. Return the result values of the
-thread function.
+  "Suspend current thread until THREAD exits. Return the result values
+of the thread function.
 
-If the thread does not exit normally within TIMEOUT seconds return DEFAULT if
-given, or else signal JOIN-THREAD-ERROR.
+If the thread does not exit normally within TIMEOUT seconds return
+DEFAULT if given, or else signal JOIN-THREAD-ERROR.
 
-NOTE: Return convention in case of a timeout is exprimental and subject to
-change."
+Trying to join the main thread will cause JOIN-THREAD to block until
+TIMEOUT occurs or the process exits: when main thread exits, the
+entire process exits.
+
+NOTE: Return convention in case of a timeout is exprimental and
+subject to change."
   (let ((lock (thread-result-lock thread))
         (got-it nil)
         (problem :timeout))
@@ -1468,11 +1595,11 @@ Short version: be careful out there."
 
 (defun terminate-thread (thread)
   #!+sb-doc
-  "Terminate the thread identified by THREAD, by interrupting it and causing
-it to call SB-EXT:QUIT.
+  "Terminate the thread identified by THREAD, by interrupting it and
+causing it to call SB-EXT:ABORT-THREAD with :ALLOW-EXIT T.
 
-The unwind caused by TERMINATE-THREAD is asynchronous, meaning that eg. thread
-executing
+The unwind caused by TERMINATE-THREAD is asynchronous, meaning that
+eg. thread executing
 
   (let (foo)
      (unwind-protect
@@ -1485,12 +1612,12 @@ executing
          ;; to be dropped.
          (release-foo foo))))
 
-might miss calling RELEASE-FOO despite GET-FOO having returned true if the
-interrupt occurs inside the cleanup clause, eg. during execution of
-RELEASE-FOO.
+might miss calling RELEASE-FOO despite GET-FOO having returned true if
+the interrupt occurs inside the cleanup clause, eg. during execution
+of RELEASE-FOO.
 
-Thus, in order to write an asynch unwind safe UNWIND-PROTECT you need to use
-WITHOUT-INTERRUPTS:
+Thus, in order to write an asynch unwind safe UNWIND-PROTECT you need
+to use WITHOUT-INTERRUPTS:
 
   (let (foo)
     (sb-sys:without-interrupts
@@ -1505,7 +1632,7 @@ WITHOUT-INTERRUPTS:
 
 Since most libraries using UNWIND-PROTECT do not do this, you should never
 assume that unknown code can safely be terminated using TERMINATE-THREAD."
-  (interrupt-thread thread 'sb!ext:quit))
+  (interrupt-thread thread (lambda () (abort-thread :allow-exit t))))
 
 (define-alien-routine "thread_yield" int)
 

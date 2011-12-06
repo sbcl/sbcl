@@ -23,8 +23,8 @@ cat > $tmpfilename <<EOF
                (with-output-to-string (s)
                  (loop for byte = (read-byte *standard-input* nil)
                        while byte do (write-char (code-char byte) s))))
-        (quit :unix-status $EXIT_LISP_WIN)
-        (quit :unix-status $EXIT_LOSE))
+        (exit :code $EXIT_LISP_WIN)
+        (exit :code $EXIT_LOSE))
 EOF
 run_sbcl --disable-debugger --load $tmpfilename <<EOF
 Bivalent *STANDARD-INPUT*
@@ -36,7 +36,7 @@ cat > $tmpfilename <<EOF
     (loop for char across "Bivalent *STANDARD-OUTPUT*"
           do (write-byte (char-code char) *standard-output*))
     (terpri *standard-output*)
-    (quit :unix-status $EXIT_LISP_WIN)
+    (exit :code $EXIT_LISP_WIN)
 EOF
 run_sbcl --disable-debugger --load $tmpfilename > $tmpfilename.out
 check_status_maybe_lose bivalent-standard-output $?
@@ -52,7 +52,7 @@ cat > $tmpfilename <<EOF
     (loop for char across "Bivalent *ERROR-OUTPUT*"
           do (write-byte (char-code char) *error-output*))
     (terpri *error-output*)
-    (quit :unix-status $EXIT_LISP_WIN)
+    (exit :code $EXIT_LISP_WIN)
 EOF
 run_sbcl --disable-debugger --load $tmpfilename 2> $tmpfilename.out
 check_status_maybe_lose bivalent-error-output $?

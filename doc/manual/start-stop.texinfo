@@ -41,7 +41,7 @@ distribution for more information.
 * (+ 2 2)
 
 4
-* (quit)
+* (exit)
 $
 @end smallexample
 
@@ -96,22 +96,21 @@ Hello, World!
 @section Stopping SBCL
 
 @menu
-* Quit::                        
+* Exit::
 * End of File::                 
 * Saving a Core Image::         
 * Exit on Errors::              
 @end menu
 
-@node Quit
+@node Exit
 @comment  node-name,  next,  previous,  up
-@subsection Quit
+@subsection Exit
 
-SBCL can be stopped at any time by calling @code{sb-ext:quit},
+SBCL can be stopped at any time by calling @code{sb-ext:exit},
 optionally returning a specified numeric value to the calling process.
-See notes in @ref{Threading} about the interaction between this
-feature and sessions.
+See @ref{Threading} for information about terminating individual threads.
 
-@include fun-sb-ext-quit.texinfo
+@include fun-sb-ext-exit.texinfo
 
 @node End of File
 @comment  node-name,  next,  previous,  up

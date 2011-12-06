@@ -1,5 +1,9 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 changes relative to sbcl-1.0.56:
+  * enhancement: redesigned protocol for quitting SBCL. SB-EXT:EXIT is the new
+    main entry point, SB-EXT:QUIT is deprecated.
+  * enhancement: additions to the SB-THREAD API: RETURN-FROM-THREAD,
+    ABORT-THREAD, MAIN-THREAD-P, and MAIN-THREAD.
   * enhancement: FASL loading no longer grabs the world-lock.
   * enhancement: GENCGC reclaims space more aggressively when objects being
     allocated are a large fraction of the total available heap space.
@@ -37,6 +41,8 @@ changes relative to sbcl-1.0.56:
   * bug fix: better input error reporting for COMPILE-FILE. (lp#493380)
   * bug fix: default size of non-nursery generations has been shrunk on GENCGC,
     allowing faster release of memory back to the OS. (lp#991293)
+  * bug fix: WITH-DEADLINE (:SECONDS NIL :OVERRIDE T) now drops any
+    existing deadline for the dynamic scope of its body.
   * documentation:
     ** improved docstrings: REPLACE (lp#965592)
 

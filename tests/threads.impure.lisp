@@ -68,7 +68,7 @@
                                   (throw 'xxx nil))))
   (check-deferrables-unblocked-or-lose 0))
 
-#-sb-thread (sb-ext:quit :unix-status 104)
+#-sb-thread (sb-ext:exit :code 104)
 
 ;;;; Now the real tests...
 
@@ -82,7 +82,7 @@
                                   (check-deferrables-blocked-or-lose 0)
                                   (sb-thread::grab-mutex lock)
                                   (check-deferrables-unblocked-or-lose 0)
-                                  (sb-ext:quit)))
+                                  (sb-thread:abort-thread)))
     (sleep 1)
     (sb-thread::release-mutex lock)))
 
@@ -152,11 +152,11 @@
 
 (with-test (:name (:join-thread :nlx :default))
   (let ((sym (gensym)))
-    (assert (eq sym (join-thread (make-thread (lambda () (sb-ext:quit)))
+    (assert (eq sym (join-thread (make-thread (lambda () (sb-thread:abort-thread)))
                                  :default sym)))))
 
 (with-test (:name (:join-thread :nlx :error))
-  (raises-error? (join-thread (make-thread (lambda () (sb-ext:quit))))
+  (raises-error? (join-thread (make-thread (lambda () (sb-thread:abort-thread))))
                  join-thread-error))
 
 (with-test (:name (:join-thread :multiple-values))
@@ -175,7 +175,7 @@
       (sb-thread:make-thread (lambda ()
                                (with-mutex (mutex)
                                  (sb-thread:condition-wait queue mutex))
-                               (sb-ext:quit))))
+                               (sb-thread:abort-thread))))
     (let ((start-time (get-internal-run-time)))
       (funcall function)
       (prog1 (- (get-internal-run-time) start-time)
@@ -487,7 +487,7 @@
     (interrupt-thread child
                       (lambda ()
                         (format t "child pid ~A~%" *current-thread*)
-                        (when quit-p (sb-ext:quit))))
+                        (when quit-p (abort-thread))))
     (sleep 1)
     child))
 
@@ -698,7 +698,7 @@
                       (sb-unix::strerror)
                       reference-errno)
               (force-output)
-              (sb-ext:quit :unix-status 1)))))))
+              (abort-thread)))))))
 
 ;; (nanosleep -1 0) does not fail on FreeBSD
 (with-test (:name (:exercising-concurrent-syscalls))
@@ -725,13 +725,13 @@
 
 (format t "~&errno test done~%")
 
-(with-test (:name (:terminate-thread-restart))
+(with-test (:name :all-threads-have-abort-restart)
   (loop repeat 100 do
         (let ((thread (sb-thread:make-thread (lambda () (sleep 0.1)))))
           (sb-thread:interrupt-thread
            thread
            (lambda ()
-             (assert (find-restart 'sb-thread:terminate-thread)))))))
+             (assert (find-restart 'abort)))))))
 
 (sb-ext:gc :full t)
 
@@ -1166,7 +1166,7 @@
                                        (unless (zerop n)
                                          (setf ok nil)
                                          (format t "N != 0 (~A)~%" n)
-                                         (sb-ext:quit)))))))))
+                                         (abort-thread)))))))))
     (wait-for-threads threads)
     (assert ok)))
 

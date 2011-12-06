@@ -12,7 +12,7 @@
 ;;;; more information.
 
 #-sb-eval
-(sb-ext:quit :unix-status 104)
+(sb-ext:exit :code 104)
 
 (setf sb-ext:*evaluator-mode* :interpret)
 

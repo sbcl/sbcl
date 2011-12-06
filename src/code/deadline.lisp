@@ -43,18 +43,22 @@ not extended. Deadlines are per thread: children are unaffected by
 their parent's deadlines.
 
 Experimental."
-  (with-unique-names (deadline-seconds deadline)
+  (with-unique-names (tmp deadline-seconds deadline)
     ;; We're operating on a millisecond precision, so a single-float
     ;; is enough, and is an immediate on 64bit platforms.
-    `(let* ((,deadline-seconds (coerce ,seconds 'single-float))
+    `(let* ((,tmp ,seconds)
+            (,deadline-seconds
+              (when ,tmp
+                (coerce ,tmp 'single-float)))
             (,deadline
-             (+ (seconds-to-internal-time ,deadline-seconds)
-                (get-internal-real-time))))
+              (when ,deadline-seconds
+                (+ (seconds-to-internal-time ,deadline-seconds)
+                   (get-internal-real-time)))))
        (multiple-value-bind (*deadline* *deadline-seconds*)
            (if ,override
                (values ,deadline ,deadline-seconds)
                (let ((old *deadline*))
-                 (if (and old (< old ,deadline))
+                 (if (and old (or (not ,deadline) (< old ,deadline)))
                      (values old *deadline-seconds*)
                      (values ,deadline ,deadline-seconds))))
          ,@body))))

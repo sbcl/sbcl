@@ -39,4 +39,4 @@
                            :name (pathname-name texi-file)
                            :type (pathname-type texi-file)))))))
 
-(sb-ext:quit)
+(sb-ext:exit)

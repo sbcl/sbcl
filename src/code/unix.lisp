@@ -427,9 +427,14 @@ corresponds to NAME, or NIL if there is none."
 ;;; Terminate the current process with an optional error code. If
 ;;; successful, the call doesn't return. If unsuccessful, the call
 ;;; returns NIL and an error number.
-(defun unix-exit (&optional (code 0))
-  (declare (type (signed-byte 32) code))
-  (void-syscall ("exit" int) code))
+(deftype exit-code ()
+  `(signed-byte 32))
+(defun os-exit (code &key abort)
+  (unless (typep code 'exit-code)
+    (setf code (if abort 1 0)))
+  (if abort
+      (void-syscall ("_exit" int) code)
+      (void-syscall ("exit" int) code)))
 
 ;;; Return the process id of the current process.
 (define-alien-routine ("getpid" unix-getpid) int)

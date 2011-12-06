@@ -44,12 +44,16 @@ directions.
 @include fun-sb-thread-list-all-threads.texinfo
 @include fun-sb-thread-thread-alive-p.texinfo
 @include fun-sb-thread-thread-name.texinfo
+@include fun-sb-thread-main-thread-p.texinfo
+@include fun-sb-thread-main-thread.texinfo
 
-@subsection Making, Joining, and Yielding Threads
+@subsection Making, Returning From, Joining, and Yielding Threads
 
 @include fun-sb-thread-make-thread.texinfo
-@include fun-sb-thread-thread-yield.texinfo
+@include macro-sb-thread-return-from-thread.texinfo
+@include fun-sb-thread-abort-thread.texinfo
 @include fun-sb-thread-join-thread.texinfo
+@include fun-sb-thread-thread-yield.texinfo
 
 @subsection Asynchronous Operations
 
@@ -317,9 +321,6 @@ background thread enters the debugger, selecting any restart will put
 it back into the background before it resumes.  Arbitration for the
 input stream is managed by calls to @code{sb-thread:get-foreground}
 (which may block) and @code{sb-thread:release-foreground}.
-
-@code{sb-ext:quit} terminates all threads in the current session, but
-leaves other sessions running.
 
 @node Foreign threads
 @comment  node-name,  next,  previous,  up

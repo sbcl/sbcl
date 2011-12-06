@@ -191,7 +191,8 @@ ldso_stub__ ## fct: ;                  \\
         .size   ldso_stub__ ## fct,.-ldso_stub__ ## fct ;"))
 
 (defvar *stubs* (append
-                 '("accept"
+                 '("_exit"
+                   "accept"
                    "access"
                    "acos"
                    "acosh"

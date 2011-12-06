@@ -35,4 +35,4 @@
 
 ;; sleep a bit so our runner can kill us
 (sleep 10)
-(quit)
+(exit)

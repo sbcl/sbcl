@@ -11,7 +11,7 @@
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
 
-#-win32 (quit :unix-status 104) ;; This is extremely win32-specific.
+#-win32 (exit :code 104) ;; This is extremely win32-specific.
 
 (use-package :sb-alien)
 

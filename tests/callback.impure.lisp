@@ -15,7 +15,7 @@
 
 ;;; callbacks only on a few platforms
 #-alien-callbacks
-(quit :unix-status 104)
+(exit :code 104)
 
 ;;; simple callback for a function
 

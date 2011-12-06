@@ -27,7 +27,7 @@ cd output
                                :direction :output
                                :if-exists :supersede)
              (write-line (lisp-implementation-version) f))
-            (quit))'
+            (exit))'
 
 "$WIX_PATH/candle" sbcl.wxs
 "$WIX_PATH/light" sbcl.wixobj "$WIX_PATH/wixui.wixlib" \

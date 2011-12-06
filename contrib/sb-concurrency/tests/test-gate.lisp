@@ -39,7 +39,7 @@
         (interrupt-thread (car threads) (lambda ()
                                           (unwind-protect
                                                (when (gate-open-p gate)
-                                                 (sb-ext:quit))
+                                                 (abort-thread))
                                             (open-gate int-gate))))
         (wait-on-gate int-gate)
         (assert (every #'null marks))
