@@ -1583,6 +1583,8 @@
   ())
 (defknown style-warn (t &rest t) null ())
 
+(defknown sc-number-or-lose (symbol) sc-number
+  (foldable))
 
 ;;;; memory barriers
 
