@@ -44,6 +44,7 @@ bad_option() {
 
 WITH_FEATURES=""
 WITHOUT_FEATURES=""
+FANCY_FEATURES=":sb-core-compression :sb-xref-for-internals :sb-after-xc-core"
 
 fancy=false
 some_options=false
@@ -90,7 +91,7 @@ do
         WITHOUT_FEATURES="$WITHOUT_FEATURES :$optarg"
 	;;
       --fancy)
-        WITH_FEATURES="$WITH_FEATURES :sb-core-compression :sb-xref-for-internals :sb-after-xc-core"
+        WITH_FEATURES="$WITH_FEATURES $FANCY_FEATURES"
         # Lower down we add :sb-thread for platforms where it can be built.
         fancy=true
         ;;
@@ -164,6 +165,12 @@ Options:
 
   --with-<feature>     Build with specified feature.
   --without-<feature>  Build wihout the specfied feature.
+
+  --fancy              Build with several optional features:
+
+                           $FANCY_FEATURES
+
+                       Plus threading on platforms which support it.
 
   --arch=<string>      Specify the architecture to build for.
 
@@ -365,8 +372,13 @@ then
     # If --fancy, enable threads on platforms where they can be built.
     case $sbcl_arch in
         x86|x86-64|ppc)
-            WITH_FEATURES="$WITH_FEATURES :sb-thread"
-            echo "Enabling threads due to --fancy."
+	    if [ "$sbcl_os" = "sunos" ] && [ "$sbcl_arch" = "x86-64" ]
+	    then
+		echo "No threads on this platform."
+	    else
+		WITH_FEATURES="$WITH_FEATURES :sb-thread"
+		echo "Enabling threads due to --fancy."
+	    fi
             ;;
         *)
             echo "No threads on this platform."
