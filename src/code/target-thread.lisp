@@ -78,10 +78,16 @@ read by the function THREAD-ERROR-THREAD."))
   ((cycle :initarg :cycle :reader thread-deadlock-cycle))
   (:report
    (lambda (condition stream)
-     (let ((*print-circle* t))
-       (format stream "Deadlock cycle detected:~%~@<   ~@;~
-                     ~{~:@_~S~:@_~}~:@>"
-               (mapcar #'car (thread-deadlock-cycle condition)))))))
+     (let* ((*print-circle* t)
+            (cycle (thread-deadlock-cycle condition))
+            (start (caar cycle)))
+       (format stream "Deadlock cycle detected:~%")
+       (loop for part = (pop cycle)
+             while part
+             do (format stream "    ~S~%  waited for:~%    ~S~%  owned by:~%"
+                        (car part)
+                        (cdr part)))
+       (format stream "    ~S~%" start)))))
 
 #!+sb-doc
 (setf
@@ -375,38 +381,21 @@ HOLDING-MUTEX-P."
                (let ((other-thread (mutex-%owner lock)))
                  (cond ((not other-thread))
                        ((eq self other-thread)
-                        (let* ((chain
-                                 (with-cas-lock ((symbol-value '**deadlock-lock**))
-                                   (prog1 (deadlock-chain self origin)
-                                     ;; We're now committed to signaling the
-                                     ;; error and breaking the deadlock, so
-                                     ;; mark us as no longer waiting on the
-                                     ;; lock. This ensures that a single
-                                     ;; deadlock is reported in only one
-                                     ;; thread, and that we don't look like
-                                     ;; we're waiting on the lock when print
-                                     ;; stuff -- because that may lead to
-                                     ;; further deadlock checking, in turn
-                                     ;; possibly leading to a bogus vicious
-                                     ;; metacycle on PRINT-OBJECT.
-                                     (setf (thread-waiting-for self) nil))))
-                               (barf
-                                 (with-output-to-string (s)
-                                   (funcall (formatter
-                                             "~%WARNING: DEADLOCK CYCLE DETECTED:~%~@<   ~@;~
-                                              ~{~:@_~S~:@_~}~:@>~
-                                              ~%END OF CYCLE~%")
-                                            s
-                                            (mapcar #'car chain)))))
-                          ;; Barf to stderr in case the system is too tied up
-                          ;; to report the error properly -- and to avoid cross-talk
-                          ;; build the whole string up first.
-                          ;;
-                          ;; ...would be even better if we had
-                          ;; sensible locks on streams, but what can
-                          ;; you do...
-                          (write-string barf sb!sys:*stderr*)
-                          (finish-output sb!sys:*stderr*)
+                        (let ((chain
+                                (with-cas-lock ((symbol-value '**deadlock-lock**))
+                                  (prog1 (deadlock-chain self origin)
+                                    ;; We're now committed to signaling the
+                                    ;; error and breaking the deadlock, so
+                                    ;; mark us as no longer waiting on the
+                                    ;; lock. This ensures that a single
+                                    ;; deadlock is reported in only one
+                                    ;; thread, and that we don't look like
+                                    ;; we're waiting on the lock when print
+                                    ;; stuff -- because that may lead to
+                                    ;; further deadlock checking, in turn
+                                    ;; possibly leading to a bogus vicious
+                                    ;; metacycle on PRINT-OBJECT.
+                                    (setf (thread-waiting-for self) nil)))))
                           (error 'thread-deadlock
                                  :thread *current-thread*
                                  :cycle chain)))
@@ -439,7 +428,7 @@ HOLDING-MUTEX-P."
                         (list (list thread lock)))
                        (t
                         (if other-lock
-                            (cons (list thread lock)
+                            (cons (cons thread lock)
                                   (deadlock-chain other-thread other-lock))
                             ;; Again, the deadlock is gone?
                             (return-from check-deadlock nil)))))))
