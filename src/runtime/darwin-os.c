@@ -193,11 +193,19 @@ os_sem_wait(os_sem_t *sem, char *what)
     switch (ret) {
     case KERN_SUCCESS:
         return;
+        /* It is unclear just when we can get this, but a sufficiently
+         * long wait seems to do that, at least sometimes.
+         *
+         * However, a wait that long is definitely abnormal for the
+         * GC, so we complain before retrying.
+         */
     case KERN_OPERATION_TIMED_OUT:
         fprintf(stderr, "%s: os_sem_wait(%p): %s", what, sem, strerror(errno));
+        /* This is analogous to POSIX EINTR. */
+    case KERN_ABORTED:
         goto restart;
     default:
-        lose("%s: os_sem_wait(%p): %s", what, sem, strerror(errno));
+        lose("%s: os_sem_wait(%p): %lu, %s", what, sem, ret, strerror(errno));
     }
 }
 
