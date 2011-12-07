@@ -139,7 +139,10 @@ if the symbol isn't found."
                                (symbol-address unsigned)))
                  (dladdr (function unsigned unsigned (* (struct dl-info)))
                          :extern "dladdr"))
-      (let ((err (alien-funcall dladdr addr (addr info))))
+      (let ((err (without-gcing
+                   ;; On eg. Darwin GC can could otherwise interrupt
+                   ;; the call while dladdr is holding a lock.
+                   (alien-funcall dladdr addr (addr info)))))
         (if (zerop err)
             nil
             (slot info 'symbol))))
