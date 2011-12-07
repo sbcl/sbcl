@@ -241,15 +241,40 @@ any non-negative real number."
 ;;; Flush anything waiting on one of the ANSI Common Lisp standard
 ;;; output streams before proceeding.
 (defun flush-standard-output-streams ()
-  (dolist (name '(*debug-io*
-                  *error-output*
-                  *query-io*
-                  *standard-output*
-                  *trace-output*
-                  *terminal-io*))
-    ;; FINISH-OUTPUT may block more easily than FORCE-OUTPUT
-    (force-output (symbol-value name)))
+  (let ((null (make-broadcast-stream)))
+    (dolist (name '(*debug-io*
+                    *error-output*
+                    *query-io*
+                    *standard-output*
+                    *trace-output*
+                    *terminal-io*))
+      ;; 0. Pull out the underlying stream, so we know what it is.
+      ;; 1. Handle errors on it. We're doing this on entry to
+      ;;    debugger, so we don't want recursive errors here.
+      ;; 2. Rebind the stream symbol in case some poor sod sees
+      ;;    a broken stream here while running with *BREAK-ON-ERRORS*.
+      (let ((stream (stream-output-stream (symbol-value name))))
+        (progv (list name) (list null)
+          (handler-bind ((stream-error
+                           (lambda (c)
+                             (when (eq stream (stream-error-stream c))
+                               (go :next)))))
+            (force-output stream))))
+      :next))
   (values))
+
+(defun stream-output-stream (stream)
+  (typecase stream
+    (fd-stream
+     stream)
+    (synonym-stream
+     (stream-output-stream
+      (symbol-value (synonym-stream-symbol stream))))
+    (two-way-stream
+     (stream-output-stream
+      (two-way-stream-output-stream stream)))
+    (t
+     stream)))
 
 (defun process-init-file (specified-pathname kind)
   (multiple-value-bind (context default-function)
