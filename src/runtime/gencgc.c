@@ -4247,7 +4247,17 @@ void unhandled_sigmemoryfault(void* addr);
  *
  * Return true if this signal is a normal generational GC thing that
  * we were able to handle, or false if it was abnormal and control
- * should fall through to the general SIGSEGV/SIGBUS/whatever logic. */
+ * should fall through to the general SIGSEGV/SIGBUS/whatever logic.
+ *
+ * We have two control flags for this: one causes us to ignore faults
+ * on unprotected pages completely, and the second complains to stderr
+ * but allows us to continue without losing.
+ */
+extern boolean ignore_memoryfaults_on_unprotected_pages;
+boolean ignore_memoryfaults_on_unprotected_pages = 0;
+
+extern boolean continue_after_memoryfault_on_unprotected_pages;
+boolean continue_after_memoryfault_on_unprotected_pages = 0;
 
 int
 gencgc_handle_wp_violation(void* fault_addr)
@@ -4278,17 +4288,39 @@ gencgc_handle_wp_violation(void* fault_addr)
             os_protect(page_address(page_index), GENCGC_CARD_BYTES, OS_VM_PROT_ALL);
             page_table[page_index].write_protected_cleared = 1;
             page_table[page_index].write_protected = 0;
-        } else {
+        } else if (!ignore_memoryfaults_on_unprotected_pages) {
             /* The only acceptable reason for this signal on a heap
              * access is that GENCGC write-protected the page.
              * However, if two CPUs hit a wp page near-simultaneously,
              * we had better not have the second one lose here if it
              * does this test after the first one has already set wp=0
              */
-            if(page_table[page_index].write_protected_cleared != 1)
-                lose("fault in heap page %d not marked as write-protected\nboxed_region.first_page: %d, boxed_region.last_page %d\n",
-                     page_index, boxed_region.first_page,
-                     boxed_region.last_page);
+            if(page_table[page_index].write_protected_cleared != 1) {
+                void lisp_backtrace(int frames);
+                lisp_backtrace(10);
+                fprintf(stderr,
+                        "Fault @ %p, page %"PAGE_INDEX_FMT" not marked as write-protected:\n"
+                        "  boxed_region.first_page: %"PAGE_INDEX_FMT","
+                        "  boxed_region.last_page %"PAGE_INDEX_FMT"\n"
+                        "  page.region_start_offset: %"OS_VM_SIZE_FMT"\n"
+                        "  page.bytes_used: %"PAGE_BYTES_FMT"\n"
+                        "  page.allocated: %d\n"
+                        "  page.write_protected: %d\n"
+                        "  page.write_protected_cleared: %d\n"
+                        "  page.generation: %d\n",
+                        fault_addr,
+                        page_index,
+                        boxed_region.first_page,
+                        boxed_region.last_page,
+                        page_table[page_index].region_start_offset,
+                        page_table[page_index].bytes_used,
+                        page_table[page_index].allocated,
+                        page_table[page_index].write_protected,
+                        page_table[page_index].write_protected_cleared,
+                        page_table[page_index].gen);
+                if (!continue_after_memoryfault_on_unprotected_pages)
+                    lose("Feh.\n");
+            }
         }
         ret = thread_mutex_unlock(&free_pages_lock);
         gc_assert(ret == 0);

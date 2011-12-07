@@ -34,10 +34,12 @@ int gencgc_handle_wp_violation(void *);
 # if GENCGC_CARD_BYTES > UINT_MAX
 #   error "GENCGC_CARD_BYTES unexpectedly large."
 # else
-typedef unsigned int page_bytes_t;
+#   define PAGE_BYTES_FMT "u"
+    typedef unsigned int page_bytes_t;
 # endif
 #else
-typedef unsigned short page_bytes_t;
+# define PAGE_BYTES_FMT "hu"
+  typedef unsigned short page_bytes_t;
 #endif
 
 /* Note that this structure is also used from Lisp-side in
