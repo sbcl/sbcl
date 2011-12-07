@@ -138,6 +138,7 @@ int spawn(char *program, char *argv[], int sin, int sout, int serr,
                     p += n;
                 }
             }
+            close(channel[0]);
             if (child_errno) {
                 waitpid(pid, NULL, 0);
                 /* Our convention to tell Lisp that it was the exec that
