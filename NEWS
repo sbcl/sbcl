@@ -30,6 +30,9 @@ changes relative to sbcl-1.0.54:
     deadlock errors are reported in an easier-to-decipher manner.
   * enhancement: DESCRIBE on type designators reports the expansion in more
     cases.
+  * enhancement: SBCL now provides either an explicit :BIG-ENDIAN or
+    :LITTLE-ENDIAN in *FEATURES*, instead of :BIG-ENDIAN being implied by lack
+    of the :LITTLE-ENDIAN feature. (Thanks to Luís Oliveira, lp#901661)
   * optimization: the compiler is smarter about representation selection for
     floating point constants used in full calls.
   * optimization: the compiler no longer refuses to coerce large fixnums to

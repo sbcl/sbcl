@@ -583,12 +583,6 @@ elif [ "$sbcl_arch" = "mips" ]; then
     printf ' :stack-allocatable-closures :stack-allocatable-vectors' >> $ltf
     printf ' :stack-allocatable-lists :stack-allocatable-fixed-objects' >> $ltf
     printf ' :alien-callbacks' >> $ltf
-    # Use a little C program to try to guess the endianness.  Ware
-    # cross-compilers!
-    #
-    # FIXME: integrate to grovel-features, mayhaps
-    $GNUMAKE -C tools-for-build determine-endianness -I ../src/runtime
-    tools-for-build/determine-endianness >> $ltf
 elif [ "$sbcl_arch" = "ppc" ]; then
     printf ' :gencgc :stack-allocatable-closures :stack-allocatable-lists' >> $ltf
     printf ' :linkage-table :raw-instance-init-vops :memory-barrier-vops' >> $ltf
@@ -634,6 +628,13 @@ else
     # Nothing need be done in this case, but sh syntax wants a placeholder.
     echo > /dev/null
 fi
+
+# Use a little C program to try to guess the endianness.  Ware
+# cross-compilers!
+#
+# FIXME: integrate to grovel-features, mayhaps
+$GNUMAKE -C tools-for-build determine-endianness -I ../src/runtime
+tools-for-build/determine-endianness >> $ltf
 
 export sbcl_os sbcl_arch
 sh tools-for-build/grovel-features.sh >> $ltf

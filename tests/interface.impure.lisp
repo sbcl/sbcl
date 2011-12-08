@@ -292,5 +292,10 @@
                    (sb-debug:backtrace 100 s))))
         (foo 100 (let ((list (list t)))
                    (nconc list list)))))))
+
+(with-test (:name :endianness-in-features)
+  (assert
+   (or (member :big-endian *features*)
+       (member :little-endian *features*))))
 
 ;;;; success

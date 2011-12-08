@@ -25,7 +25,7 @@ int main (int argc, char *argv[]) {
     char *bar = (char *) &foo;
     switch(*bar) {
     case ' ':
-        /* Do nothing */
+        printf(" :big-endian");
         break;
     case '#':
         printf(" :little-endian");
