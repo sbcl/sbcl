@@ -26,6 +26,10 @@ changes relative to sbcl-1.0.54:
     tests.
   * enhancement: undefined functions now appear in backtraces as ("undefined
     function") instead of ("bogus stack frame") on x86oids.
+  * enhancement: detected deadlocks no longer cause stderr to be spammed, and
+    deadlock errors are reported in an easier-to-decipher manner.
+  * enhancement: DESCRIBE on type designators reports the expansion in more
+    cases.
   * optimization: the compiler is smarter about representation selection for
     floating point constants used in full calls.
   * optimization: the compiler no longer refuses to coerce large fixnums to
@@ -58,6 +62,13 @@ changes relative to sbcl-1.0.54:
   * bug fix: backtraces are no longer cut off at ("undefined function") when
     called under certain circumstances (involving a caller-allocated stack
     frame) on PPC.
+  * bug fix: RUN-PROGRAM leaked a file-descriptor per call on non-Windows
+    systems. (regression since 1.0.53)
+  * bug fix: GC deadlocks from dladdr() on certain platforms.
+  * bug fix: broken standard streams no longer automatically cause recursive
+    errors on debugger entry.
+  * bug fix: build ignored --dynamic-space-size=<size> argument to make.sh
+    (regression since 1.0.53)
 
 changes in sbcl-1.0.54 relative to sbcl-1.0.53:
   * minor incompatible changes:
