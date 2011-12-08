@@ -290,4 +290,12 @@
                                        (search x #(t t t) :start2 1 :end2 0 :end1 0)))
                            #(t t t))
                 (sb-kernel:bounding-indices-bad-error ()
-                  :ok)))))
+                  :ok))))
+  (assert (eql 1
+               (funcall (lambda ()
+                          (declare (optimize speed))
+                          (search #() #(1 1) :start2 1 :end2 1)))))
+  (assert (eql 2
+               (funcall (lambda ()
+                          (declare (optimize speed))
+                          (search #(1) #(1 1) :start1 1 :start2 2))))))

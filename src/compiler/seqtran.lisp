@@ -1087,8 +1087,8 @@
                     (oops pattern start1 end1))
                   (unless (<= start2 end2 len2)
                     (oops pattern start2 end2))))
-            (when (= 0 end1)
-              (return-from search 0))
+            (when (= end1 start1)
+              (return-from search start2))
             (do (,(if from-end
                       '(index2 (- end2 (- end1 start1)) (1- index2))
                       '(index2 start2 (1+ index2))))
