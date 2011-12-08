@@ -2221,4 +2221,17 @@
     (assert (equal type1 (sb-kernel:%simple-fun-type g)))
     (assert (equal type0 (sb-kernel:%simple-fun-type h)))))
 
+(test-util:with-test (:name :bug-308921)
+  (let ((*check-consistency* t))
+    (ctu:file-compile
+     `((let ((exported-symbols-alist
+               (loop for symbol being the external-symbols of :cl
+                     collect (cons symbol
+                                   (concatenate 'string
+                                                "#"
+                                                (string-downcase symbol))))))
+         (defun hyperdoc-lookup (symbol)
+           (cdr (assoc symbol exported-symbols-alist)))))
+     :load nil)))
+
 ;;; success
