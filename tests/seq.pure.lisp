@@ -298,4 +298,8 @@
   (assert (eql 2
                (funcall (lambda ()
                           (declare (optimize speed))
-                          (search #(1) #(1 1) :start1 1 :start2 2))))))
+                          (search #(1) #(1 1) :start1 1 :start2 2)))))
+  (assert (eql 2
+               (funcall (lambda ()
+                          (declare (optimize speed))
+                          (search #() #(1 1) :from-end t))))))
