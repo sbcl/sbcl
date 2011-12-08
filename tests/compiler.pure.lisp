@@ -4126,7 +4126,7 @@
          (fun (compile nil
                        `(lambda (x)
                           (unknown-fun ,big (+ ,big x))))))
-    (assert (= 1 (length (ctu:find-code-constants fun :type '(eql ,big)))))))
+    (assert (= 1 (length (ctu:find-code-constants fun :type `(eql ,big)))))))
 
 (with-test (:name :fixnum+float-coerces-fixnum
             :skipped-on :x86)
