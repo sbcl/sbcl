@@ -54,6 +54,12 @@
     (setf *test-count* 0))
   (incf *test-count*))
 
+(defun really-invoke-debugger (condition)
+  (with-simple-restart (continue "Continue")
+    (let ((*invoke-debugger-hook* *invoke-debugger-hook*))
+      (enable-debugger)
+      (invoke-debugger condition))))
+
 (defun fail-test (type test-name condition)
   (if (stringp condition)
       (log-msg "~@<~A ~S ~:_~A~:>"
@@ -76,12 +82,6 @@
 
 (defun skipped-p (skipped-on)
   (sb-impl::featurep skipped-on))
-
-(defun really-invoke-debugger (condition)
-  (with-simple-restart (continue "Continue")
-    (let ((*invoke-debugger-hook* *invoke-debugger-hook*))
-      (enable-debugger)
-      (invoke-debugger condition))))
 
 (defun test-env ()
   (cons (format nil "SBCL_MACHINE_TYPE=~A" (machine-type))

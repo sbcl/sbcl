@@ -128,6 +128,7 @@
             ,test-util:*break-on-expected-failure*)
       (let ((file ,test-file)
             (*break-on-error* ,run-tests::*break-on-error*))
+        (declare (special *break-on-error*))
         (format t "// Running ~a~%" file)
         (restart-case
             (handler-bind
