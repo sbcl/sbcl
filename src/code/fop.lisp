@@ -192,7 +192,7 @@
 
 ;;;; fops for loading symbols
 
-(defun fop-intern (smallp package)
+(defun aux-fop-intern (smallp package)
   (let ((size (if smallp
                   (read-byte-arg)
                   (read-word-arg))))
@@ -214,7 +214,7 @@
 
 (macrolet ((def (name code smallp package-form)
              `(define-fop (,name ,code)
-                (fop-intern ,smallp ,package-form))))
+                (aux-fop-intern ,smallp ,package-form))))
 
   (def fop-lisp-symbol-save          75 nil *cl-package*)
   (def fop-lisp-small-symbol-save    76 t   *cl-package*)
