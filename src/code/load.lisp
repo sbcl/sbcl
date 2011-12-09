@@ -51,19 +51,17 @@
 
 #!-sb-fluid (declaim (inline read-byte))
 
-;;; FIXME: why do all of these reading functions and macros declare
-;;; (SPEED 0)?  was there some bug in the compiler which has since
-;;; been fixed?  --njf, 2004-09-08
-
 ;;; This expands into code to read an N-byte unsigned integer using
 ;;; FAST-READ-BYTE.
 (defmacro fast-read-u-integer (n)
-  (declare (optimize (speed 0)))
-  (do ((res '(fast-read-byte)
-            `(logior (fast-read-byte)
-                     (ash ,res 8)))
-       (cnt 1 (1+ cnt)))
-      ((>= cnt n) res)))
+  (let (bytes)
+    `(let ,(loop for i from 0 below n
+                 collect (let ((name (gensym "B")))
+                           (push name bytes)
+                           `(,name ,(if (zerop i)
+                                        `(fast-read-byte)
+                                        `(ash (fast-read-byte) ,(* i 8))))))
+       (logior ,@bytes))))
 
 ;;; like FAST-READ-U-INTEGER, but the size may be determined at run time
 (defmacro fast-read-var-u-integer (n)
