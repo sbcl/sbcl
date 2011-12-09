@@ -456,6 +456,14 @@
 
 ;;;; DYNAMIC-EXTENT related
 
+(defun lambda-var-original-name (leaf)
+  (let* ((home (lambda-var-home leaf)))
+    (if (eq :external (lambda-kind home))
+        (let ((p (1- (position leaf (lambda-vars home)))))
+          (leaf-debug-name
+           (elt (lambda-vars (lambda-entry-fun home)) p)))
+        (leaf-debug-name leaf))))
+
 (defun note-no-stack-allocation (lvar &key flush)
   (do-uses (use (principal-lvar lvar))
     (unless (or
@@ -464,8 +472,12 @@
              ;; If we're flushing, don't complain if we can flush the combination.
              (and flush (combination-p use) (flushable-combination-p use)))
       (let ((*compiler-error-context* use))
-        (compiler-notify "could not stack allocate the result of ~S"
-                         (find-original-source (node-source-path use)))))))
+        (if (and (ref-p use) (lambda-var-p (ref-leaf use)))
+            (compiler-notify "~@<could~2:I not stack allocate ~S in: ~S~:@>"
+                             (lambda-var-original-name (ref-leaf use))
+                             (find-original-source (node-source-path use)))
+            (compiler-notify "~@<could~2:I not stack allocate: ~S~:@>"
+                             (find-original-source (node-source-path use))))))))
 
 (defun use-good-for-dx-p (use dx &optional component)
   ;; FIXME: Can casts point to LVARs in other components?
