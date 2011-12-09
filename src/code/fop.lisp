@@ -77,31 +77,36 @@
 ;;; of like READ-SEQUENCE specialized for files of (UNSIGNED-BYTE 8),
 ;;; with an automatic conversion from (UNSIGNED-BYTE 8) into CHARACTER
 ;;; for each element read
-(declaim (ftype (function (stream simple-string &optional index) (values))
-                read-string-as-bytes
-                #!+sb-unicode read-string-as-unsigned-byte-32))
 (defun read-string-as-bytes (stream string &optional (length (length string)))
-  (dotimes (i length)
-    (setf (aref string i)
-          (sb!xc:code-char (read-byte stream))))
-  ;; FIXME: The classic CMU CL code to do this was
-  ;;   (READ-N-BYTES FILE STRING START END).
-  ;; It was changed for SBCL because we needed a portable version for
-  ;; bootstrapping. Benchmark the non-portable version and see whether it's
-  ;; significantly better than the portable version here. If it is, then use
-  ;; it as an alternate definition, protected with #-SB-XC-HOST.
-  (values))
+  (declare (type (simple-array character (*)) string)
+           (type index length)
+           (optimize speed))
+  (with-fast-read-byte ((unsigned-byte 8) stream)
+    (dotimes (i length)
+      (setf (aref string i)
+            (sb!xc:code-char (fast-read-byte)))))
+  string)
+(defun read-base-string-as-bytes (stream string &optional (length (length string)))
+  (declare (type (simple-array base-char (*)) string)
+           (type index length)
+           (optimize speed))
+  (with-fast-read-byte ((unsigned-byte 8) stream)
+    (dotimes (i length)
+      (setf (aref string i)
+            (sb!xc:code-char (fast-read-byte)))))
+  string)
 #!+sb-unicode
 (defun read-string-as-unsigned-byte-32
     (stream string &optional (length (length string)))
+  (declare (type (simple-array character (*)) string)
+           (type index length)
+           (optimize speed))
   #+sb-xc-host (bug "READ-STRING-AS-UNSIGNED-BYTE-32 called")
-  (dotimes (i length)
-    (setf (aref string i)
-          (let ((code 0))
-            (dotimes (k 4 (sb!xc:code-char code))
-              (setf code (logior code (ash (read-byte stream)
-                                           (* k sb!vm:n-byte-bits))))))))
-  (values))
+  (with-fast-read-byte ((unsigned-byte 8) stream)
+    (dotimes (i length)
+      (setf (aref string i)
+            (sb!xc:code-char (fast-read-u-integer 4)))))
+  string)
 
 ;;;; miscellaneous fops
 
@@ -250,9 +255,11 @@
     #+sb-xc-host
     (read-string-as-bytes *fasl-input-stream* package-name)
     #-sb-xc-host
-    (#!-sb-unicode read-string-as-bytes
-     #!+sb-unicode read-string-as-unsigned-byte-32
-     *fasl-input-stream* package-name)
+    (progn
+      #!-sb-unicode
+      (read-string-as-bytes *fasl-input-stream* package-name)
+      #!+sb-unicode
+      (read-string-as-unsigned-byte-32 *fasl-input-stream* package-name))
     (push-fop-table (find-undeleted-package-or-lose package-name))))
 
 ;;;; fops for loading numbers
@@ -356,7 +363,7 @@
 (define-cloned-fops (fop-base-string 37) (fop-small-base-string 38)
   (let* ((arg (clone-arg))
          (res (make-string arg :element-type 'base-char)))
-    (read-string-as-bytes *fasl-input-stream* res)
+    (read-base-string-as-bytes *fasl-input-stream* res)
     res))
 
 #!+sb-unicode
