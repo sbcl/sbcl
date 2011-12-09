@@ -4153,3 +4153,10 @@
                    (lambda (bar)
                      (declare (dynamic-extent bar))
                      (foo bar))))))
+
+(with-test (:name :bug-803508-c)
+  (compile nil `(lambda ()
+                  (list
+                   (lambda (bar &optional quux)
+                     (declare (dynamic-extent bar quux))
+                     (foo bar quux))))))

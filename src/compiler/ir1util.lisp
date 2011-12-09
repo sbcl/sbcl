@@ -457,11 +457,14 @@
 ;;;; DYNAMIC-EXTENT related
 
 (defun lambda-var-original-name (leaf)
-  (let* ((home (lambda-var-home leaf)))
-    (if (eq :external (lambda-kind home))
-        (let ((p (1- (position leaf (lambda-vars home)))))
+  (let ((home (lambda-var-home leaf)))
+    (if (eq :external (functional-kind home))
+        (let* ((entry (functional-entry-fun home))
+               (p (1- (position leaf (lambda-vars home)))))
           (leaf-debug-name
-           (elt (lambda-vars (lambda-entry-fun home)) p)))
+           (if (optional-dispatch-p entry)
+               (elt (optional-dispatch-arglist entry) p)
+               (elt (lambda-vars entry) p))))
         (leaf-debug-name leaf))))
 
 (defun note-no-stack-allocation (lvar &key flush)
@@ -470,7 +473,15 @@
              ;; Don't complain about not being able to stack allocate constants.
              (and (ref-p use) (constant-p (ref-leaf use)))
              ;; If we're flushing, don't complain if we can flush the combination.
-             (and flush (combination-p use) (flushable-combination-p use)))
+             (and flush (combination-p use) (flushable-combination-p use))
+             ;; Don't report those with homes in :OPTIONAL -- we'd get doubled
+             ;; reports that way.
+             (and (ref-p use) (lambda-var-p (ref-leaf use))
+                  (eq :optional (lambda-kind (lambda-var-home (ref-leaf use))))))
+      ;; FIXME: For the first leg (lambda-bind (lambda-var-home ...))
+      ;; would be a far better description, but since we use
+      ;; *COMPILER-ERROR-CONTEXT* for muffling we can't -- as that node
+      ;; can have different handled conditions.
       (let ((*compiler-error-context* use))
         (if (and (ref-p use) (lambda-var-p (ref-leaf use)))
             (compiler-notify "~@<could~2:I not stack allocate ~S in: ~S~:@>"
