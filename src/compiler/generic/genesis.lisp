@@ -2123,7 +2123,7 @@ core and return a descriptor to it."
                 (let ((index (read-arg ,package-len)))
                   (push-fop-table
                    (cold-load-symbol (read-arg ,pname-len)
-                                     (svref *current-fop-table* index)))))))
+                                     (ref-fop-table index)))))))
   (frob fop-symbol-in-package-save #.sb!vm:n-word-bytes #.sb!vm:n-word-bytes)
   (frob fop-small-symbol-in-package-save 1 #.sb!vm:n-word-bytes)
   (frob fop-symbol-in-byte-package-save #.sb!vm:n-word-bytes 1)
@@ -2390,17 +2390,17 @@ core and return a descriptor to it."
 ;;;; cold fops for fixing up circularities
 
 (define-cold-fop (fop-rplaca :pushp nil)
-  (let ((obj (svref *current-fop-table* (read-word-arg)))
+  (let ((obj (ref-fop-table (read-word-arg)))
         (idx (read-word-arg)))
     (write-memory (cold-nthcdr idx obj) (pop-stack))))
 
 (define-cold-fop (fop-rplacd :pushp nil)
-  (let ((obj (svref *current-fop-table* (read-word-arg)))
+  (let ((obj (ref-fop-table (read-word-arg)))
         (idx (read-word-arg)))
     (write-wordindexed (cold-nthcdr idx obj) 1 (pop-stack))))
 
 (define-cold-fop (fop-svset :pushp nil)
-  (let ((obj (svref *current-fop-table* (read-word-arg)))
+  (let ((obj (ref-fop-table (read-word-arg)))
         (idx (read-word-arg)))
     (write-wordindexed obj
                    (+ idx
@@ -2410,7 +2410,7 @@ core and return a descriptor to it."
                    (pop-stack))))
 
 (define-cold-fop (fop-structset :pushp nil)
-  (let ((obj (svref *current-fop-table* (read-word-arg)))
+  (let ((obj (ref-fop-table (read-word-arg)))
         (idx (read-word-arg)))
     (write-wordindexed obj (1+ idx) (pop-stack))))
 

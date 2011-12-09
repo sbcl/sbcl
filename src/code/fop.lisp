@@ -134,8 +134,8 @@
 
 (define-fop (fop-nop 0 :stackp nil))
 (define-fop (fop-pop 1 :pushp nil) (push-fop-table (pop-stack)))
-(define-fop (fop-push 2) (svref *current-fop-table* (read-word-arg)))
-(define-fop (fop-byte-push 3) (svref *current-fop-table* (read-byte-arg)))
+(define-fop (fop-push 2) (ref-fop-table (read-word-arg)))
+(define-fop (fop-byte-push 3) (ref-fop-table (read-byte-arg)))
 
 (define-fop (fop-empty-list 4) ())
 (define-fop (fop-truth 5) t)
@@ -184,10 +184,10 @@
 
 (define-fop (fop-verify-table-size 62 :stackp nil)
   (let ((expected-index (read-word-arg)))
-    (unless (= *current-fop-table-index* expected-index)
+    (unless (= (get-fop-table-index) expected-index)
       (bug "fasl table of improper size"))))
 (define-fop (fop-verify-empty-stack 63 :stackp nil)
-  (unless (zerop (length *fop-stack*))
+  (unless (fop-stack-empty-p)
     (bug "fasl stack not empty when it should be")))
 
 ;;;; fops for loading symbols
@@ -227,13 +227,13 @@
   ;; FOP-SYMBOL-IN-LAST-PACKAGE-SAVE/FOP-SMALL-SYMBOL-IN-LAST-PACKAGE-SAVE
   ;; cloned fop pair could undo some of this bloat.
   (def fop-symbol-in-package-save             8 nil
-    (svref *current-fop-table* (read-word-arg)))
+    (ref-fop-table (read-word-arg)))
   (def fop-small-symbol-in-package-save       9 t
-    (svref *current-fop-table* (read-word-arg)))
+    (ref-fop-table (read-word-arg)))
   (def fop-symbol-in-byte-package-save       10 nil
-    (svref *current-fop-table* (read-byte-arg)))
+    (ref-fop-table (read-byte-arg)))
   (def fop-small-symbol-in-byte-package-save 11 t
-    (svref *current-fop-table* (read-byte-arg))))
+    (ref-fop-table (read-byte-arg))))
 
 (define-cloned-fops (fop-uninterned-symbol-save 12)
                     (fop-uninterned-small-symbol-save 13)
@@ -546,20 +546,20 @@
 ;;;; fops for fixing up circularities
 
 (define-fop (fop-rplaca 200 :pushp nil)
-  (let ((obj (svref *current-fop-table* (read-word-arg)))
+  (let ((obj (ref-fop-table (read-word-arg)))
         (idx (read-word-arg))
         (val (pop-stack)))
     (setf (car (nthcdr idx obj)) val)))
 
 (define-fop (fop-rplacd 201 :pushp nil)
-  (let ((obj (svref *current-fop-table* (read-word-arg)))
+  (let ((obj (ref-fop-table (read-word-arg)))
         (idx (read-word-arg))
         (val (pop-stack)))
     (setf (cdr (nthcdr idx obj)) val)))
 
 (define-fop (fop-svset 202 :pushp nil)
   (let* ((obi (read-word-arg))
-         (obj (svref *current-fop-table* obi))
+         (obj (ref-fop-table obi))
          (idx (read-word-arg))
          (val (pop-stack)))
     (if (%instancep obj)
@@ -567,7 +567,7 @@
         (setf (svref obj idx) val))))
 
 (define-fop (fop-structset 204 :pushp nil)
-  (setf (%instance-ref (svref *current-fop-table* (read-word-arg))
+  (setf (%instance-ref (ref-fop-table (read-word-arg))
                        (read-word-arg))
         (pop-stack)))
 

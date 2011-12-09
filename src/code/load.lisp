@@ -118,84 +118,117 @@
 ;;;; the fop table
 
 ;;; The table is implemented as a simple-vector indexed by the table
-;;; offset. We may need to have several, since LOAD can be called
-;;; recursively.
-
-;;; a list of free fop tables for the fasloader
+;;; offset. The offset is kept in at index 0 of the vector.
 ;;;
-;;; FIXME: Is it really a win to have this permanently bound?
-;;; Couldn't we just bind it on entry to LOAD-AS-FASL?
-(defvar *free-fop-tables* (list (make-array 1000)))
+;;; FOPs use the table to save stuff, other FOPs refer to the table by
+;;; direct indexes via REF-FOP-TABLE.
 
-;;; the current fop table
-(defvar *current-fop-table*)
-(declaim (simple-vector *current-fop-table*))
+(defvar *fop-table*)
+(declaim (simple-vector *fop-table*))
 
-;;; the length of the current fop table
-(defvar *current-fop-table-size*)
-(declaim (type index *current-fop-table-size*))
+(declaim (inline ref-fop-table))
+(defun ref-fop-table (index)
+  (declare (index index))
+  (svref *fop-table* (the index (+ index 1))))
 
-;;; the index in the fop-table of the next entry to be used
-(defvar *current-fop-table-index*)
-(declaim (type index *current-fop-table-index*))
+(defun get-fop-table-index ()
+  (svref *fop-table* 0))
 
-(defun grow-fop-table ()
-  (let* ((new-size (* *current-fop-table-size* 2))
-         (new-table (make-array new-size)))
-    (declare (fixnum new-size) (simple-vector new-table))
-    (replace new-table (the simple-vector *current-fop-table*))
-    (setq *current-fop-table* new-table)
-    (setq *current-fop-table-size* new-size)))
+(defun reset-fop-table ()
+  (setf (svref *fop-table* 0) 0))
 
-(defmacro push-fop-table (thing)
-  (let ((n-index (gensym)))
-    `(let ((,n-index *current-fop-table-index*))
-       (declare (fixnum ,n-index))
-       (when (= ,n-index (the fixnum *current-fop-table-size*))
-         (grow-fop-table))
-       (setq *current-fop-table-index* (1+ ,n-index))
-       (setf (svref *current-fop-table* ,n-index) ,thing))))
+(defun push-fop-table (thing)
+  (let* ((table *fop-table*)
+         (index (+ (the index (aref table 0)) 1)))
+    (declare (fixnum index)
+             (simple-vector table))
+    (when (eql index (length table))
+      (setf table (grow-fop-vector table index)
+            *fop-table* table))
+    (setf (aref table 0) index
+          (aref table index) thing)))
+
+;;; These three routines are used for both the stack and the table.
+(defun make-fop-vector (size)
+  (declare (index size))
+  (let ((vector (make-array size)))
+    (setf (aref vector 0) 0)
+    vector))
+
+(defun grow-fop-vector (old-vector old-size)
+  (declare (simple-vector old-vector)
+           (index old-size))
+  (let* ((new-size (* old-size 2))
+         (new-vector (make-array new-size)))
+    (declare (fixnum new-size)
+             (simple-vector new-vector old-vector))
+    (replace new-vector old-vector)
+    (nuke-fop-vector old-vector)
+    new-vector))
+
+(defun nuke-fop-vector (vector)
+  (declare (simple-vector vector)
+           (optimize speed))
+  ;; Make sure we don't keep any garbage.
+  #!+gencgc
+  (fill vector 0))
+
 
 ;;;; the fop stack
 
-;;; (This is to be bound by LOAD to an adjustable (VECTOR T) with
-;;; FILL-POINTER, for use as a stack with VECTOR-PUSH-EXTEND.)
+;;; Much like the table, this is bound to a simple vector whose first
+;;; element is the current index.
 (defvar *fop-stack*)
-(declaim (type (vector t) *fop-stack*))
+(declaim (simple-vector *fop-stack*))
 
-;;; Cache information about the fop stack in local variables. Define a
-;;; local macro to pop from the stack. Push the result of evaluation
+(defun fop-stack-empty-p ()
+  (eql 0 (svref *fop-stack* 0)))
+
+(defun pop-fop-stack ()
+  (let* ((stack *fop-stack*)
+         (top (svref stack 0)))
+    (declare (index top))
+    (when (eql 0 top)
+      (error "FOP stack empty"))
+    (setf (svref stack 0) (1- top))
+    (svref stack top)))
+
+(defun push-fop-stack (value)
+  (let* ((stack *fop-stack*)
+         (next (1+ (the index (svref stack 0)))))
+    (declare (index next))
+    (when (eql (length stack) next)
+      (setf stack (grow-fop-vector stack next)
+            *fop-stack* stack))
+    (setf (svref stack 0) next
+          (svref stack next) value)))
+
+;;; Define a local macro to pop from the stack. Push the result of evaluation
 ;;; if PUSHP.
 (defmacro with-fop-stack (pushp &body forms)
   (aver (member pushp '(nil t :nope)))
-  (with-unique-names (fop-stack)
-    `(let ((,fop-stack *fop-stack*))
-       (declare (type (vector t) ,fop-stack)
-                (ignorable ,fop-stack))
-       (macrolet ((pop-stack ()
-                    `(vector-pop ,',fop-stack))
-                  (push-stack (value)
-                    `(vector-push-extend ,value ,',fop-stack))
-                  (call-with-popped-args (fun n)
-                    `(%call-with-popped-args ,fun ,n ,',fop-stack)))
-         ,(if pushp
-              `(vector-push-extend (progn ,@forms) ,fop-stack)
-              `(progn ,@forms))))))
+  `(macrolet ((pop-stack ()
+                `(pop-fop-stack))
+              (push-stack (value)
+                `(push-fop-stack ,value)))
+     ,(if pushp
+          `(push-fop-stack (progn ,@forms))
+          `(progn ,@forms))))
 
 ;;; Call FUN with N arguments popped from STACK.
-(defmacro %call-with-popped-args (fun n stack)
+(defmacro call-with-popped-args (fun n)
   ;; N's integer value must be known at macroexpansion time.
   (declare (type index n))
-  (with-unique-names (n-stack old-length new-length)
+  (with-unique-names (n-stack old-top new-top)
     (let ((argtmps (make-gensym-list n)))
-      `(let* ((,n-stack ,stack)
-              (,old-length (fill-pointer ,n-stack))
-              (,new-length (- ,old-length ,n))
-              ,@(loop for i from 0 below n collecting
-                      `(,(nth i argtmps)
-                        (aref ,n-stack (+ ,new-length ,i)))))
-        (declare (type (vector t) ,n-stack))
-        (setf (fill-pointer ,n-stack) ,new-length)
+      `(let* ((,n-stack *fop-stack*)
+              (,old-top (svref ,n-stack 0))
+              (,new-top (- ,old-top ,n))
+              ,@(loop for i from 1 upto n collecting
+                      `(,(nth (1- i) argtmps)
+                        (aref ,n-stack (+ ,new-top ,i)))))
+         (declare (simple-vector ,n-stack))
+         (setf (svref ,n-stack 0) ,new-top)
         ;; (For some applications it might be appropriate to FILL the
         ;; popped area with NIL here, to avoid holding onto garbage. For
         ;; sbcl-0.8.7.something, though, it shouldn't matter, because
@@ -397,8 +430,8 @@
 (defun load-fasl-group (stream)
   (when (check-fasl-header stream)
     (catch 'fasl-group-end
-      (let ((*current-fop-table-index* 0)
-            (*skip-until* nil))
+      (reset-fop-table)
+      (let ((*skip-until* nil))
         (declare (special *skip-until*))
         (loop
           (let ((byte (read-byte stream)))
@@ -406,12 +439,12 @@
             #!+sb-show
             (when *show-fops-p*
               (let* ((stack *fop-stack*)
-                     (ptr (1- (fill-pointer *fop-stack*))))
+                     (ptr (svref stack 0)))
                 (fresh-line *trace-output*)
                 ;; The FOP operations are stack based, so it's sorta
                 ;; logical to display the operand before the operator.
                 ;; ("reverse Polish notation")
-                (unless (= ptr -1)
+                (unless (= ptr 0)
                   (write-char #\space *trace-output*)
                   (prin1 (aref stack ptr) *trace-output*)
                   (terpri *trace-output*))
@@ -437,17 +470,14 @@
   (maybe-announce-load stream verbose)
   (with-world-lock ()
     (let* ((*fasl-input-stream* stream)
-           (*current-fop-table* (or (pop *free-fop-tables*) (make-array 1000)))
-           (*current-fop-table-size* (length *current-fop-table*))
-           (*fop-stack* (make-array 100 :fill-pointer 0 :adjustable t)))
+           (*fop-table* (make-fop-vector 1000))
+           (*fop-stack* (make-fop-vector 100)))
       (unwind-protect
            (loop while (load-fasl-group stream))
-        (push *current-fop-table* *free-fop-tables*)
-        ;; NIL out the table, so that we don't hold onto garbage.
-        ;;
-        ;; FIXME: Could we just get rid of the free fop table pool so
-        ;; that this would go away?
-        (fill *current-fop-table* nil))))
+        ;; Nuke the table and stack to avoid keeping garbage on
+        ;; conservatively collected platforms.
+        (nuke-fop-vector *fop-table*)
+        (nuke-fop-vector *fop-stack*))))
   t)
 
 (declaim (notinline read-byte)) ; Why is it even *declaimed* inline above?
