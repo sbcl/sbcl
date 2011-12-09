@@ -275,16 +275,12 @@
   (load-s-integer (clone-arg)))
 
 (define-fop (fop-word-integer 35)
-  (prepare-for-fast-read-byte *fasl-input-stream*
-    (prog1
-     (fast-read-s-integer #.sb!vm:n-word-bytes)
-     (done-with-fast-read-byte))))
+  (with-fast-read-byte ((unsigned-byte 8) *fasl-input-stream*)
+    (fast-read-s-integer #.sb!vm:n-word-bytes)))
 
 (define-fop (fop-byte-integer 36)
-  (prepare-for-fast-read-byte *fasl-input-stream*
-    (prog1
-     (fast-read-s-integer 1)
-     (done-with-fast-read-byte))))
+  (with-fast-read-byte ((unsigned-byte 8) *fasl-input-stream*)
+    (fast-read-s-integer 1)))
 
 (define-fop (fop-ratio 70)
   (let ((den (pop-stack)))
@@ -302,17 +298,13 @@
   (macrolet ((define-complex-fop (name fop-code type)
                (let ((reader (symbolicate "FAST-READ-" type)))
                  `(define-fop (,name ,fop-code)
-                      (prepare-for-fast-read-byte *fasl-input-stream*
-                        (prog1
-                            (complex (,reader) (,reader))
-                          (done-with-fast-read-byte))))))
+                      (with-fast-read-byte ((unsigned-byte 8) *fasl-input-stream*)
+                        (complex (,reader) (,reader))))))
              (define-float-fop (name fop-code type)
                (let ((reader (symbolicate "FAST-READ-" type)))
                  `(define-fop (,name ,fop-code)
-                      (prepare-for-fast-read-byte *fasl-input-stream*
-                        (prog1
-                            (,reader)
-                          (done-with-fast-read-byte)))))))
+                    (with-fast-read-byte ((unsigned-byte 8) *fasl-input-stream*)
+                      (,reader))))))
     (define-complex-fop fop-complex-single-float 72 single-float)
     (define-complex-fop fop-complex-double-float 73 double-float)
     #!+long-float
@@ -435,68 +427,64 @@
 ;;;   extra bits. This must be packed according to the local
 ;;;   byte-ordering, allowing us to directly read the bits.
 (define-fop (fop-int-vector 43)
-  (prepare-for-fast-read-byte *fasl-input-stream*
-    (let* ((len (fast-read-u-integer #.sb!vm:n-word-bytes))
-           (size (fast-read-byte))
-           (res (case size
-                  (0 (make-array len :element-type 'nil))
-                  (1 (make-array len :element-type 'bit))
-                  (2 (make-array len :element-type '(unsigned-byte 2)))
-                  (4 (make-array len :element-type '(unsigned-byte 4)))
-                  (7 (prog1 (make-array len :element-type '(unsigned-byte 7))
-                       (setf size 8)))
-                  (8 (make-array len :element-type '(unsigned-byte 8)))
-                  (15 (prog1 (make-array len :element-type '(unsigned-byte 15))
-                        (setf size 16)))
-                  (16 (make-array len :element-type '(unsigned-byte 16)))
-                  (31 (prog1 (make-array len :element-type '(unsigned-byte 31))
-                        (setf size 32)))
-                  (32 (make-array len :element-type '(unsigned-byte 32)))
-                  #!+#.(cl:if (cl:= 64 sb!vm:n-word-bits) '(and) '(or))
-                  (63 (prog1 (make-array len :element-type '(unsigned-byte 63))
-                        (setf size 64)))
-                  (64 (make-array len :element-type '(unsigned-byte 64)))
-                  (t (bug "losing i-vector element size: ~S" size)))))
-      (declare (type index len))
-      (done-with-fast-read-byte)
-      (read-n-bytes *fasl-input-stream*
-                    res
-                    0
-                    (ceiling (the index (* size len)) sb!vm:n-byte-bits))
-      res)))
+  (let* ((len (read-word-arg))
+         (size (read-byte-arg))
+         (res (case size
+                (0 (make-array len :element-type 'nil))
+                (1 (make-array len :element-type 'bit))
+                (2 (make-array len :element-type '(unsigned-byte 2)))
+                (4 (make-array len :element-type '(unsigned-byte 4)))
+                (7 (prog1 (make-array len :element-type '(unsigned-byte 7))
+                     (setf size 8)))
+                (8 (make-array len :element-type '(unsigned-byte 8)))
+                (15 (prog1 (make-array len :element-type '(unsigned-byte 15))
+                      (setf size 16)))
+                (16 (make-array len :element-type '(unsigned-byte 16)))
+                (31 (prog1 (make-array len :element-type '(unsigned-byte 31))
+                      (setf size 32)))
+                (32 (make-array len :element-type '(unsigned-byte 32)))
+                #!+#.(cl:if (cl:= 64 sb!vm:n-word-bits) '(and) '(or))
+                (63 (prog1 (make-array len :element-type '(unsigned-byte 63))
+                      (setf size 64)))
+                (64 (make-array len :element-type '(unsigned-byte 64)))
+                (t (bug "losing i-vector element size: ~S" size)))))
+    (declare (type index len))
+    (read-n-bytes *fasl-input-stream*
+                  res
+                  0
+                  (ceiling (the index (* size len)) sb!vm:n-byte-bits))
+    res))
 
 ;;; This is the same as FOP-INT-VECTOR, except this is for signed
 ;;; SIMPLE-ARRAYs.
 (define-fop (fop-signed-int-vector 50)
-  (prepare-for-fast-read-byte *fasl-input-stream*
-    (let* ((len (fast-read-u-integer #.sb!vm:n-word-bytes))
-           (size (fast-read-byte))
-           (res (case size
-                  (8 (make-array len :element-type '(signed-byte 8)))
-                  (16 (make-array len :element-type '(signed-byte 16)))
-                  #!+#.(cl:if (cl:= 32 sb!vm:n-word-bits) '(and) '(or))
-                  (29 (prog1 (make-array len :element-type '(unsigned-byte 29))
-                        (setf size 32)))
-                  #!+#.(cl:if (cl:= 32 sb!vm:n-word-bits) '(and) '(or))
-                  (30 (prog1 (make-array len :element-type '(signed-byte 30))
-                        (setf size 32)))
-                  (32 (make-array len :element-type '(signed-byte 32)))
-                  #!+#.(cl:if (cl:= 64 sb!vm:n-word-bits) '(and) '(or))
-                  (60 (prog1 (make-array len :element-type '(unsigned-byte 60))
-                        (setf size 64)))
-                  #!+#.(cl:if (cl:= 64 sb!vm:n-word-bits) '(and) '(or))
-                  (61 (prog1 (make-array len :element-type '(signed-byte 61))
-                        (setf size 64)))
-                  #!+#.(cl:if (cl:= 64 sb!vm:n-word-bits) '(and) '(or))
-                  (64 (make-array len :element-type '(signed-byte 64)))
-                  (t (bug "losing si-vector element size: ~S" size)))))
-      (declare (type index len))
-      (done-with-fast-read-byte)
-      (read-n-bytes *fasl-input-stream*
-                    res
-                    0
-                    (ceiling (the index (* size len)) sb!vm:n-byte-bits))
-      res)))
+  (let* ((len (read-word-arg))
+         (size (read-byte-arg))
+         (res (case size
+                (8 (make-array len :element-type '(signed-byte 8)))
+                (16 (make-array len :element-type '(signed-byte 16)))
+                #!+#.(cl:if (cl:= 32 sb!vm:n-word-bits) '(and) '(or))
+                (29 (prog1 (make-array len :element-type '(unsigned-byte 29))
+                      (setf size 32)))
+                #!+#.(cl:if (cl:= 32 sb!vm:n-word-bits) '(and) '(or))
+                (30 (prog1 (make-array len :element-type '(signed-byte 30))
+                      (setf size 32)))
+                (32 (make-array len :element-type '(signed-byte 32)))
+                #!+#.(cl:if (cl:= 64 sb!vm:n-word-bits) '(and) '(or))
+                (60 (prog1 (make-array len :element-type '(unsigned-byte 60))
+                      (setf size 64)))
+                #!+#.(cl:if (cl:= 64 sb!vm:n-word-bits) '(and) '(or))
+                (61 (prog1 (make-array len :element-type '(signed-byte 61))
+                      (setf size 64)))
+                #!+#.(cl:if (cl:= 64 sb!vm:n-word-bits) '(and) '(or))
+                (64 (make-array len :element-type '(signed-byte 64)))
+                (t (bug "losing si-vector element size: ~S" size)))))
+    (declare (type index len))
+    (read-n-bytes *fasl-input-stream*
+                  res
+                  0
+                  (ceiling (the index (* size len)) sb!vm:n-byte-bits))
+    res))
 
 (define-fop (fop-eval 53)
   (if *skip-until*

@@ -1207,7 +1207,6 @@ possibly temporariliy, because it might be used internally."
                "+EMPTY-HT-SLOT+"
 
                ;; low-level i/o stuff
-               "DONE-WITH-FAST-READ-BYTE"
                "DONE-WITH-FAST-READ-CHAR"
                "FAST-READ-BYTE"
                "FAST-READ-BYTE-REFILL"
@@ -1218,7 +1217,7 @@ possibly temporariliy, because it might be used internally."
                "FAST-READ-VAR-U-INTEGER"
                "FILE-NAME"
                "INTERN*"
-               "PREPARE-FOR-FAST-READ-BYTE"
+               "WITH-FAST-READ-BYTE"
                "PREPARE-FOR-FAST-READ-CHAR"
 
                ;; reflection of our backquote implementation that the

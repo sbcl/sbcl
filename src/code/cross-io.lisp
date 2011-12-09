@@ -18,13 +18,15 @@
 ;;;; implementations, and the ordinary fop implementations are defined in terms
 ;;;; of fast-read operations.)
 
-(defmacro prepare-for-fast-read-byte (stream &body forms)
-  `(let ((%frc-stream% ,stream))
-     ,@forms))
-
-(defmacro fast-read-byte (&optional (eof-error-p t) (eof-value nil) any-type)
-  (declare (ignore any-type))
-  `(read-byte %frc-stream% ,eof-error-p ,eof-value))
-
-(defmacro done-with-fast-read-byte ()
-  `(values))
+(defmacro with-fast-read-byte ((type stream &optional (eof-error-p t) eof-value)
+                               &body body)
+  (declare (ignore type))
+  (let ((f-stream (gensym "STREAM"))
+        (f-eof-error-p (gensym "EOF-ERROR-P"))
+        (f-eof-value (gensym "EOF-VALUE")))
+    `(let ((,f-stream ,stream)
+           (,f-eof-error-p ,eof-error-p)
+           (,f-eof-value ,eof-value))
+       (flet ((fast-read-byte ()
+                  (the ,type (read-byte ,f-stream ,f-eof-error-p ,f-eof-value))))
+         ,@body))))

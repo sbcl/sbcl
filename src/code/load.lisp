@@ -96,10 +96,8 @@
   (declare (optimize (speed 0)))
   (if (= n 1)
       `(the (unsigned-byte 8) (read-byte *fasl-input-stream*))
-      `(prepare-for-fast-read-byte *fasl-input-stream*
-         (prog1
-          (fast-read-u-integer ,n)
-          (done-with-fast-read-byte)))))
+      `(with-fast-read-byte ((unsigned-byte 8) *fasl-input-stream*)
+         (fast-read-u-integer ,n))))
 
 (declaim (inline read-byte-arg read-halfword-arg read-word-arg))
 (defun read-byte-arg ()

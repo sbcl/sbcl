@@ -441,10 +441,8 @@
   ;; a-s-read-sequence and needs a lambda list that's congruent with
   ;; that of a-s-read-char
   (declare (ignore recursive-p))
-  (prepare-for-fast-read-byte stream
-    (prog1
-        (fast-read-byte eof-error-p eof-value t)
-      (done-with-fast-read-byte))))
+  (with-fast-read-byte (t stream eof-error-p eof-value)
+    (fast-read-byte)))
 
 (defun read-byte (stream &optional (eof-error-p t) eof-value)
   (if (ansi-stream-p stream)

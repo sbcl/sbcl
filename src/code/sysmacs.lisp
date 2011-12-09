@@ -184,37 +184,39 @@ maintained."
 ;;; Just like PREPARE-FOR-FAST-READ-CHAR except that we get the BIN
 ;;; method. The stream is assumed to be a ANSI-STREAM.
 ;;;
-;;; KLUDGE: It seems weird to have to remember to explicitly call
-;;; DONE-WITH-FAST-READ-BYTE at the end of this, given that we're
-;;; already wrapping the stuff inside in a block. Why not rename this
-;;; macro to WITH-FAST-READ-BYTE, do the DONE-WITH-FAST-READ-BYTE stuff
-;;; automatically at the end of the block, and eliminate
-;;; DONE-WITH-FAST-READ-BYTE as a separate entity? (and similarly
-;;; for the FAST-READ-CHAR stuff) -- WHN 19990825
-(defmacro prepare-for-fast-read-byte (stream &body forms)
-  `(let* ((%frc-stream% ,stream)
-          (%frc-method% (ansi-stream-bin %frc-stream%))
-          (%frc-buffer% (ansi-stream-in-buffer %frc-stream%))
-          (%frc-index% (ansi-stream-in-index %frc-stream%)))
-     (declare (type index %frc-index%)
-              (type ansi-stream %frc-stream%))
-     ,@forms))
-
-;;; Similar to fast-read-char, but we use a different refill routine & don't
-;;; convert to characters. If ANY-TYPE is true, then this can be used on any
-;;; integer streams, and we don't assert the result type.
-(defmacro fast-read-byte (&optional (eof-error-p t) (eof-value ()) any-type)
-  ;; KLUDGE: should use ONCE-ONLY on EOF-ERROR-P and EOF-VALUE -- WHN 19990825
-  `(truly-the
-    ,(if (and (eq eof-error-p t) (not any-type)) '(unsigned-byte 8) t)
-    (cond
-     ((not %frc-buffer%)
-      (funcall %frc-method% %frc-stream% ,eof-error-p ,eof-value))
-     ((= %frc-index% +ansi-stream-in-buffer-length+)
-      (prog1 (fast-read-byte-refill %frc-stream% ,eof-error-p ,eof-value)
-        (setq %frc-index% (ansi-stream-in-index %frc-stream%))))
-     (t
-      (prog1 (aref %frc-buffer% %frc-index%)
-        (incf %frc-index%))))))
-(defmacro done-with-fast-read-byte ()
-  `(done-with-fast-read-char))
+;;; FIXME: Refactor PREPARE-FOR-FAST-READ-CHAR into similar shape.
+(defmacro with-fast-read-byte ((type stream &optional (eof-error-p t) eof-value)
+                               &body body)
+  (aver (or (eq t eof-error-p) (eq t type)))
+  (with-unique-names (f-stream f-method f-buffer f-index eof-p eof-val)
+    `(let* ((,f-stream ,stream)
+            (,eof-p ,eof-error-p)
+            (,eof-val ,eof-value)
+            (,f-method (ansi-stream-bin ,f-stream))
+            (,f-buffer (ansi-stream-in-buffer ,f-stream))
+            (,f-index (ansi-stream-in-index ,f-stream)))
+       (declare (type ansi-stream ,f-stream)
+                (type index ,f-index))
+       (declare (disable-package-locks fast-read-byte))
+       (flet ((fast-read-byte ()
+                  (,@(cond ((equal '(unsigned-byte 8) type)
+                            ;; KLUDGE: For some reason I haven't tracked down
+                            ;; this makes a difference even in given the TRULY-THE.
+                            `(logand #xff))
+                           (t
+                            `(identity)))
+                   (truly-the ,type
+                              (cond
+                                ((not ,f-buffer)
+                                 (funcall ,f-method ,f-stream ,eof-p ,eof-val))
+                                ((= ,f-index +ansi-stream-in-buffer-length+)
+                                 (prog1 (fast-read-byte-refill ,f-stream ,eof-p ,eof-val)
+                                   (setq ,f-index (ansi-stream-in-index ,f-stream))))
+                                (t
+                                 (prog1 (aref ,f-buffer ,f-index)
+                                   (incf ,f-index))))))))
+         (declare (inline fast-read-byte))
+         (declare (enable-package-locks read-byte))
+         (unwind-protect
+              (locally ,@body)
+           (setf (ansi-stream-in-index ,f-stream) ,f-index))))))
