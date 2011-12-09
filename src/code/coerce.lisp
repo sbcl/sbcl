@@ -122,7 +122,7 @@
          object)
         ((eq type *empty-type*)
          (coerce-error))
-        ((csubtypep type (specifier-type 'character))
+        ((type= type (specifier-type 'character))
          (character object))
         ((numberp object)
          (cond

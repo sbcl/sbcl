@@ -76,6 +76,8 @@ changes relative to sbcl-1.0.54:
     an external entry point caused compiler-errors.
   * bug fix: compiler notes for failed stack allocation for a function argument
     no longer claim to be unable to stack allocate the function.
+  * bug fix: COERCE now signals a type-error on several coercions to
+    subtypes of CHARACTER that are forbidden according to ANSI. (lp#841312)
 
 changes in sbcl-1.0.54 relative to sbcl-1.0.53:
   * minor incompatible changes:

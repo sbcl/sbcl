@@ -85,3 +85,36 @@
                        c8 c9 ca cb cc cd ce cf))
              (char< c0 c1 c2 c3 c4 c5 c6 c7
               c8 c9 ca cb cc cd ce cf))))
+
+;;; Characters could be coerced to subtypes of CHARACTER to which they
+;;; don't belong. Also, character designators that are not characters
+;;; could be coerced to proper subtypes of CHARACTER.
+(with-test (:name :bug-841312)
+  ;; First let's make sure that the conditions hold that make the test
+  ;; valid: #\Nak is a BASE-CHAR, which at the same time ensures that
+  ;; STANDARD-CHAR is a proper subtype of BASE-CHAR, and under
+  ;; #+SB-UNICODE the character with code 955 exists and is not a
+  ;; BASE-CHAR.
+  (assert (typep #\Nak 'base-char))
+  #+sb-unicode
+  (assert (let ((c (code-char 955)))
+            (and c (not (typep c 'base-char)))))
+  ;; Test the formerly buggy coercions:
+  (macrolet ((assert-coerce-type-error (object type)
+               `(assert (raises-error? (coerce ,object ',type)
+                                       type-error))))
+    (assert-coerce-type-error #\Nak standard-char)
+    (assert-coerce-type-error #\a extended-char)
+    #+sb-unicode
+    (assert-coerce-type-error (code-char 955) base-char)
+    (assert-coerce-type-error 'a standard-char)
+    (assert-coerce-type-error "a" standard-char))
+  ;; The following coercions still need to be possible:
+  (macrolet ((assert-coercion (object type)
+               `(assert (typep (coerce ,object ',type) ',type))))
+    (assert-coercion #\a standard-char)
+    (assert-coercion #\Nak base-char)
+    #+sb-unicode
+    (assert-coercion (code-char 955) character)
+    (assert-coercion 'a character)
+    (assert-coercion "a" character)))
