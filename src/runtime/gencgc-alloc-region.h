@@ -3,6 +3,10 @@
 
 #include "gc.h"
 
+#ifndef LISP_FEATURE_GENCGC
+#error "gencgc-alloc-region.h included, but LISP_FEATURE_GENCGC not defined"
+#endif
+
 /* Abstract out the data for an allocation region allowing a single
  * routine to be used for allocation and closing. */
 struct alloc_region {

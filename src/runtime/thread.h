@@ -10,8 +10,6 @@
 #include "os.h"
 #ifdef LISP_FEATURE_GENCGC
 #include "gencgc-alloc-region.h"
-#else
-struct alloc_region { };
 #endif
 #include "genesis/symbol.h"
 #include "genesis/static-symbols.h"

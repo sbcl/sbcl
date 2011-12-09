@@ -31,7 +31,9 @@
 #include "monitor.h"
 #include "vars.h"
 #include "os.h"
+#ifdef LISP_FEATURE_GENCGC
 #include "gencgc-alloc-region.h" /* genesis/thread.h needs this */
+#endif
 #include "genesis/static-symbols.h"
 #include "thread.h"              /* genesis/primitive-objects.h needs this */
 #include "genesis/primitive-objects.h"
