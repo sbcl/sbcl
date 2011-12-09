@@ -72,6 +72,8 @@ changes relative to sbcl-1.0.54:
     errors on debugger entry.
   * bug fix: build ignored --dynamic-space-size=<size> argument to make.sh
     (regression since 1.0.53)
+  * bug fix: attempts to stack allocate a required argument to a function with
+    an external entry point caused compiler-errors.
 
 changes in sbcl-1.0.54 relative to sbcl-1.0.53:
   * minor incompatible changes:

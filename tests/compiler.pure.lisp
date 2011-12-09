@@ -4139,3 +4139,17 @@
     (assert (not (search "GENERIC"
                          (with-output-to-string (s)
                            (disassemble fun :stream s)))))))
+
+(with-test (:name :bug-803508)
+  (compile nil `(lambda ()
+                  (print
+                   (lambda (bar)
+                     (declare (dynamic-extent bar))
+                     (foo bar))))))
+
+(with-test (:name :bug-803508-b)
+  (compile nil `(lambda ()
+                  (list
+                   (lambda (bar)
+                     (declare (dynamic-extent bar))
+                     (foo bar))))))

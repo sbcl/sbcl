@@ -550,8 +550,9 @@
                     (neq :indefinite (lambda-var-extent var)))
            (let ((home (lambda-var-home var))
                  (refs (lambda-var-refs var)))
-             ;; bound by a system lambda, no other REFS
+             ;; bound by a non-XEP system lambda, no other REFS
              (when (and (lambda-system-lambda-p home)
+                        (neq :external (lambda-kind home))
                         (eq use (car refs)) (not (cdr refs)))
                ;; the LAMBDA this var is bound by has only a single REF, going
                ;; to a combination
@@ -563,16 +564,15 @@
 
 (defun trivial-lambda-var-ref-lvar (use)
   (let* ((this (ref-leaf use))
-         (home (lambda-var-home this)))
-    (multiple-value-bind (fun vars)
-        (values home (lambda-vars home))
-      (let* ((combination (lvar-dest (ref-lvar (car (lambda-refs fun)))))
-             (args (combination-args combination)))
-        (assert (= (length vars) (length args)))
-        (loop for var in vars
-              for arg in args
-              when (eq var this)
-              return arg)))))
+         (fun (lambda-var-home this))
+         (vars (lambda-vars fun))
+         (combination (lvar-dest (ref-lvar (car (lambda-refs fun)))))
+         (args (combination-args combination)))
+    (aver (= (length vars) (length args)))
+    (loop for var in vars
+          for arg in args
+          when (eq var this)
+          return arg)))
 
 ;;; This needs to play nice with LVAR-GOOD-FOR-DX-P and friends.
 (defun handle-nested-dynamic-extent-lvars (dx lvar &optional recheck-component)
