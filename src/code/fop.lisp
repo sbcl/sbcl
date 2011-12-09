@@ -266,17 +266,18 @@
 
 ;;; Load a signed integer LENGTH bytes long from *FASL-INPUT-STREAM*.
 (defun load-s-integer (length)
-  (declare (fixnum length))
-  ;; #+cmu (declare (optimize (inhibit-warnings 2)))
-  (do* ((index length (1- index))
-        (byte 0 (read-byte *fasl-input-stream*))
-        (result 0 (+ result (ash byte bits)))
-        (bits 0 (+ bits 8)))
-       ((= index 0)
-        (if (logbitp 7 byte)    ; look at sign bit
-            (- result (ash 1 bits))
-            result))
-    (declare (fixnum index byte bits))))
+  (declare (fixnum length)
+           (optimize speed))
+  (with-fast-read-byte ((unsigned-byte 8) *fasl-input-stream*)
+    (do* ((index length (1- index))
+          (byte 0 (fast-read-byte))
+          (result 0 (+ result (ash byte bits)))
+          (bits 0 (+ bits 8)))
+         ((= index 0)
+          (if (logbitp 7 byte)          ; look at sign bit
+              (- result (ash 1 bits))
+              result))
+      (declare (fixnum index byte bits)))))
 
 (define-cloned-fops (fop-integer 33) (fop-small-integer 34)
   (load-s-integer (clone-arg)))
