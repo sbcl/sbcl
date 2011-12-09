@@ -233,6 +233,19 @@
       (throw 'no-such-tag t))
     (assert (verify-backtrace #'throw-test '((throw-test))))))
 
+(defun bug-308926 (x)
+  (let ((v "foo"))
+    (flet ((bar (z)
+             (oops v z)
+             (oops z v)))
+      (bar x)
+      (bar v))))
+
+(with-test (:name :bug-308926)
+  (assert (verify-backtrace (lambda () (bug-308926 13))
+                            '(((flet bar :in bug-308926) 13)
+                              (bug-308926 &rest t)))))
+
 ;;; test entry point handling in backtraces
 
 (defun oops ()
