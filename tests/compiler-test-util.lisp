@@ -108,3 +108,20 @@
              (values warn fail)))
       (ignore-errors (delete-file lisp))
       (ignore-errors (delete-file fasl)))))
+
+(defun file-compile (toplevel-forms &key load)
+  (let* ((lisp (merge-pathnames "file-compile-tmp.lisp"))
+         (fasl (compile-file-pathname lisp)))
+    (unwind-protect
+         (progn
+           (with-open-file (f lisp :direction :output)
+             (if (stringp toplevel-forms)
+                 (write-line toplevel-forms f)
+                 (dolist (form toplevel-forms)
+                   (prin1 form f))))
+           (multiple-value-bind (fasl warn fail) (compile-file lisp)
+             (when load
+               (load fasl))
+             (values warn fail)))
+      (ignore-errors (delete-file lisp))
+      (ignore-errors (delete-file fasl)))))
