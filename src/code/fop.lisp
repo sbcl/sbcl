@@ -17,7 +17,7 @@
 ;;;     The body might pop the fop stack. The result of the body is
 ;;;     discarded.
 ;;; STACKP describes whether or not the body interacts with the fop stack.
-(defmacro define-fop ((name fop-code &key (pushp t) (stackp t)) &rest forms)
+(defmacro define-fop ((name fop-code &key (pushp t) (stackp t)) &body forms)
   `(progn
      (defun ,name ()
        ,(if stackp
