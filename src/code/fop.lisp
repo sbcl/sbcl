@@ -187,74 +187,48 @@
 
 ;;;; fops for loading symbols
 
-(macrolet (;; FIXME: Should all this code really be duplicated inside
-           ;; each fop? Perhaps it would be better for this shared
-           ;; code to live in FLET FROB1 and FLET FROB4 (for the
-           ;; two different sizes of counts).
-           (frob (name code name-size package)
-             (let ((n-package (gensym))
-                   (n-size (gensym))
-                   (n-buffer (gensym)))
-               `(define-fop (,name ,code)
-                  (prepare-for-fast-read-byte *fasl-input-stream*
-                    (let ((,n-package ,package)
-                          (,n-size (fast-read-u-integer ,name-size)))
-                      (when (> ,n-size (length *fasl-symbol-buffer*))
-                        (setq *fasl-symbol-buffer*
-                              (make-string (* ,n-size 2))))
-                      (done-with-fast-read-byte)
-                      (let ((,n-buffer *fasl-symbol-buffer*))
-                        #+sb-xc-host
-                        (read-string-as-bytes *fasl-input-stream*
-                                              ,n-buffer
-                                              ,n-size)
-                        #-sb-xc-host
-                        (#!+sb-unicode read-string-as-unsigned-byte-32
-                         #!-sb-unicode read-string-as-bytes
-                         *fasl-input-stream*
-                         ,n-buffer
-                         ,n-size)
-                        (push-fop-table (without-package-locks
-                                         (intern* ,n-buffer
-                                                  ,n-size
-                                                  ,n-package))))))))))
+(defun fop-intern (smallp package)
+  (let ((size (if smallp
+                  (read-byte-arg)
+                  (read-word-arg))))
+    (when (> size (length *fasl-symbol-buffer*))
+      (setq *fasl-symbol-buffer* (make-string (* size 2))))
+    (let ((buffer *fasl-symbol-buffer*))
+      #+sb-xc-host
+      (read-string-as-bytes *fasl-input-stream* buffer size)
+      #-sb-xc-host
+      (progn
+        #!+sb-unicode
+        (read-string-as-unsigned-byte-32 *fasl-input-stream* buffer size)
+        #!-sb-unicode
+        (read-string-as-bytes *fasl-input-stream* buffer size))
+      (push-fop-table (without-package-locks
+                        (intern* buffer
+                                 size
+                                 package))))))
 
-  ;; Note: CMU CL had FOP-SYMBOL-SAVE and FOP-SMALL-SYMBOL-SAVE, but
-  ;; since they made the behavior of the fasloader depend on the
-  ;; *PACKAGE* variable, not only were they a pain to support (because
-  ;; they required various hacks to handle *PACKAGE*-manipulation
-  ;; forms) they were basically broken by design, because ANSI gives
-  ;; the user so much flexibility in manipulating *PACKAGE* at
-  ;; load-time that no reasonable hacks could possibly make things
-  ;; work right. The ones used in CMU CL certainly didn't, as shown by
-  ;; e.g.
-  ;;   (IN-PACKAGE :CL-USER)
-  ;;     (DEFVAR CL::*FOO* 'FOO-VALUE)
-  ;;     (EVAL-WHEN (:COMPILE-TOPLEVEL :LOAD-TOPLEVEL :EXECUTE)
-  ;;       (SETF *PACKAGE* (FIND-PACKAGE :CL)))
-  ;; which in CMU CL 2.4.9 defines a variable CL-USER::*FOO* instead of
-  ;; defining CL::*FOO*. Therefore, we don't use those fops in SBCL.
-  ;;(frob fop-symbol-save               6 4 *package*)
-  ;;(frob fop-small-symbol-save   7 1 *package*)
+(macrolet ((def (name code smallp package-form)
+             `(define-fop (,name ,code)
+                (fop-intern ,smallp ,package-form))))
 
-  (frob fop-lisp-symbol-save          75 #.sb!vm:n-word-bytes *cl-package*)
-  (frob fop-lisp-small-symbol-save    76 1 *cl-package*)
-  (frob fop-keyword-symbol-save       77 #.sb!vm:n-word-bytes *keyword-package*)
-  (frob fop-keyword-small-symbol-save 78 1 *keyword-package*)
+  (def fop-lisp-symbol-save          75 nil *cl-package*)
+  (def fop-lisp-small-symbol-save    76 t   *cl-package*)
+  (def fop-keyword-symbol-save       77 nil *keyword-package*)
+  (def fop-keyword-small-symbol-save 78 t   *keyword-package*)
 
-  ;; FIXME: Because we don't have FOP-SYMBOL-SAVE any more, an enormous number
-  ;; of symbols will fall through to this case, probably resulting in bloated
-  ;; fasl files. A new
+  ;; FIXME: Because we don't have FOP-SYMBOL-SAVE any more, an
+  ;; enormous number of symbols will fall through to this case,
+  ;; probably resulting in bloated fasl files. A new
   ;; FOP-SYMBOL-IN-LAST-PACKAGE-SAVE/FOP-SMALL-SYMBOL-IN-LAST-PACKAGE-SAVE
   ;; cloned fop pair could undo some of this bloat.
-  (frob fop-symbol-in-package-save 8 #.sb!vm:n-word-bytes
-    (svref *current-fop-table* (fast-read-u-integer #.sb!vm:n-word-bytes)))
-  (frob fop-small-symbol-in-package-save 9 1
-    (svref *current-fop-table* (fast-read-u-integer #.sb!vm:n-word-bytes)))
-  (frob fop-symbol-in-byte-package-save 10 #.sb!vm:n-word-bytes
-    (svref *current-fop-table* (fast-read-u-integer 1)))
-  (frob fop-small-symbol-in-byte-package-save 11 1
-    (svref *current-fop-table* (fast-read-u-integer 1))))
+  (def fop-symbol-in-package-save             8 nil
+    (svref *current-fop-table* (read-word-arg)))
+  (def fop-small-symbol-in-package-save       9 t
+    (svref *current-fop-table* (read-word-arg)))
+  (def fop-symbol-in-byte-package-save       10 nil
+    (svref *current-fop-table* (read-byte-arg)))
+  (def fop-small-symbol-in-byte-package-save 11 t
+    (svref *current-fop-table* (read-byte-arg))))
 
 (define-cloned-fops (fop-uninterned-symbol-save 12)
                     (fop-uninterned-small-symbol-save 13)
