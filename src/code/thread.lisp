@@ -95,7 +95,7 @@ stale value, use MUTEX-OWNER instead."
 
 (sb!xc:defmacro with-spinlock ((lock) &body body)
   (deprecation-warning :early "1.0.53.11" 'with-recursive-spinlock 'with-mutex)
-  `(with-lock (,lock)
+  `(with-mutex (,lock)
      ,@body))
 
 (sb!xc:defmacro without-thread-waiting-for ((&key already-without-interrupts) &body body)
