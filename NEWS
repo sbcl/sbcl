@@ -1,5 +1,6 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 changes relative to sbcl-1.0.56:
+  * enhancement: FASL loading no longer grabs the world-lock.
   * enhancement: GENCGC reclaims space more aggressively when objects being
     allocated are a large fraction of the total available heap space.
     (lp#936304)

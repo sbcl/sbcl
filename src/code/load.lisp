@@ -469,16 +469,15 @@
   (when (zerop (file-length stream))
     (error "attempt to load an empty FASL file:~%  ~S" (namestring stream)))
   (maybe-announce-load stream verbose)
-  (with-world-lock ()
-    (let* ((*fasl-input-stream* stream)
-           (*fop-table* (make-fop-vector 1000))
-           (*fop-stack* (make-fop-vector 100)))
-      (unwind-protect
-           (loop while (load-fasl-group stream))
-        ;; Nuke the table and stack to avoid keeping garbage on
-        ;; conservatively collected platforms.
-        (nuke-fop-vector *fop-table*)
-        (nuke-fop-vector *fop-stack*))))
+  (let* ((*fasl-input-stream* stream)
+         (*fop-table* (make-fop-vector 1000))
+         (*fop-stack* (make-fop-vector 100)))
+    (unwind-protect
+         (loop while (load-fasl-group stream))
+      ;; Nuke the table and stack to avoid keeping garbage on
+      ;; conservatively collected platforms.
+      (nuke-fop-vector *fop-table*)
+      (nuke-fop-vector *fop-stack*)))
   t)
 
 (declaim (notinline read-byte)) ; Why is it even *declaimed* inline above?

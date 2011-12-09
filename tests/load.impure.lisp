@@ -305,3 +305,49 @@
 
 (with-test (:name (load "empty.fasl"))
   (assert (not (load-empty-file "fasl"))))
+
+(with-test (:name :parallel-fasl-load)
+  #+sb-thread
+  (let ((lisp #p"parallel-fasl-load-test.lisp")
+        (fasl nil)
+        (ready nil))
+    (unwind-protect
+         (progn
+           (multiple-value-bind (compiled warned failed)
+               (compile-file lisp)
+             (setf fasl compiled)
+             (assert (not warned))
+             (assert (not failed))
+             (labels ((load-loop ()
+                        (let* ((*standard-output* (make-broadcast-stream))
+                               (*error-output* *standard-output*))
+                          (sb-ext:wait-for ready)
+                          (handler-case
+                              (progn
+                                (loop repeat 1000
+                                      do (load fasl)
+                                         (test-it))
+                                t)
+                            (error (e) e))))
+                      (test-it ()
+                        (assert (= 1 (one-fun)))
+                        (assert (= 2 (two-fun)))
+                        (assert (= 42 (symbol-value '*var*)))
+                        (assert (= 13 (symbol-value '*quux*)))))
+               (let ((t1 (sb-thread:make-thread #'load-loop))
+                     (t2 (sb-thread:make-thread #'load-loop))
+                     (t3 (sb-thread:make-thread #'load-loop)))
+                 (setf ready t)
+                 (let ((r1 (sb-thread:join-thread t1))
+                       (r2 (sb-thread:join-thread t2))
+                       (r3 (sb-thread:join-thread t3)))
+                   (unless (and (eq t r1) (eq t r2) (eq t r3))
+                     (error "R1: ~A~2%R2: ~A~2%R2: ~A" r1 r2 r3))
+                   ;; These ones cannot be tested while redefinitions are running:
+                   ;; adding a method implies REMOVE-METHOD, so a call would be racy.
+                   (assert (eq :ok (a-slot (make-instance 'a-class :slot :ok))))
+                   (assert (eq 'cons (gen-fun '(foo))))
+                   (assert (eq 'a-class (gen-fun (make-instance 'a-class)))))
+                 (test-it)))))
+      (when fasl
+        (ignore-errors (delete-file fasl))))))
