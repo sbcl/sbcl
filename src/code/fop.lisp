@@ -193,24 +193,24 @@
 ;;;; fops for loading symbols
 
 (defun aux-fop-intern (smallp package)
-  (let ((size (if smallp
-                  (read-byte-arg)
-                  (read-word-arg))))
-    (when (> size (length *fasl-symbol-buffer*))
-      (setq *fasl-symbol-buffer* (make-string (* size 2))))
-    (let ((buffer *fasl-symbol-buffer*))
-      #+sb-xc-host
-      (read-string-as-bytes *fasl-input-stream* buffer size)
-      #-sb-xc-host
-      (progn
-        #!+sb-unicode
-        (read-string-as-unsigned-byte-32 *fasl-input-stream* buffer size)
-        #!-sb-unicode
-        (read-string-as-bytes *fasl-input-stream* buffer size))
-      (push-fop-table (without-package-locks
-                        (intern* buffer
-                                 size
-                                 package))))))
+  (declare (optimize speed))
+  (let* ((size (if smallp
+                   (read-byte-arg)
+                   (read-word-arg)))
+         (buffer (make-string size)))
+    #+sb-xc-host
+    (read-string-as-bytes *fasl-input-stream* buffer size)
+    #-sb-xc-host
+    (progn
+      #!+sb-unicode
+      (read-string-as-unsigned-byte-32 *fasl-input-stream* buffer size)
+      #!-sb-unicode
+      (read-string-as-bytes *fasl-input-stream* buffer size))
+    (push-fop-table (without-package-locks
+                      (intern* buffer
+                               size
+                               package
+                               :no-copy t)))))
 
 (macrolet ((def (name code smallp package-form)
              `(define-fop (,name ,code)

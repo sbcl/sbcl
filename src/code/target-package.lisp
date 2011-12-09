@@ -776,7 +776,7 @@ implementation it is ~S." *default-package-use-list*)
 
 ;;; If the symbol named by the first LENGTH characters of NAME doesn't exist,
 ;;; then create it, special-casing the keyword package.
-(defun intern* (name length package)
+(defun intern* (name length package &key no-copy)
   (declare (simple-string name))
   (multiple-value-bind (symbol where) (find-symbol* name length package)
     (cond (where
@@ -790,7 +790,11 @@ implementation it is ~S." *default-package-use-list*)
              (setf (values symbol where) (find-symbol* name length package))
              (if where
                  (values symbol where)
-                 (let ((symbol-name (subseq name 0 length)))
+                 (let ((symbol-name (cond (no-copy
+                                           (aver (= (length name) length))
+                                           name)
+                                          (t
+                                           (subseq name 0 length)))))
                    (with-single-package-locked-error
                        (:package package "interning ~A" symbol-name)
                      (let ((symbol (make-symbol symbol-name)))

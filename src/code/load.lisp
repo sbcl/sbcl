@@ -388,10 +388,6 @@
 #!+sb-show
 (defvar *show-fops-p* nil)
 
-;; buffer for loading symbols
-(defvar *fasl-symbol-buffer*)
-(declaim (simple-string *fasl-symbol-buffer*))
-
 ;;;
 ;;; a helper function for LOAD-AS-FASL
 ;;;
@@ -441,7 +437,6 @@
   (maybe-announce-load stream verbose)
   (with-world-lock ()
     (let* ((*fasl-input-stream* stream)
-           (*fasl-symbol-buffer* (make-string 100))
            (*current-fop-table* (or (pop *free-fop-tables*) (make-array 1000)))
            (*current-fop-table-size* (length *current-fop-table*))
            (*fop-stack* (make-array 100 :fill-pointer 0 :adjustable t)))
