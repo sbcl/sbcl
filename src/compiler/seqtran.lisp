@@ -643,15 +643,28 @@
                                                            (logior res (ash bits (truly-the (integer 0 ,(- sb!vm:n-word-bits n-bits)) i))))))))
                            res)))))
              (values
-              `(with-array-data ((data seq)
-                                 (start start)
-                                 (end end)
-                                 :check-fill-pointer t)
-                 (declare (type (simple-array ,element-type 1) data))
-                 (declare (type index start end))
-                 (declare (optimize (safety 0) (speed 3)))
-                 (,basher ,bash-value data start (- end start))
-                 seq)
+              ;; KLUDGE: WITH-ARRAY data in its full glory is going to mess up
+              ;; dynamic-extent for MAKE-ARRAY :INITIAL-ELEMENT initialization.
+              (if (csubtypep (lvar-type seq) (specifier-type '(simple-array * (*))))
+                  `(let* ((len (length seq))
+                          (end (or end len))
+                          (bound (1+ end)))
+                     ;; Minor abuse %CHECK-BOUND for bounds checking.
+                     ;; (- END START) may still end up negative, but
+                     ;; the basher handle that.
+                     (,basher ,bash-value seq
+                              (%check-bound seq bound start)
+                              (- (if end (%check-bound seq bound end) len)
+                                 start)))
+               `(with-array-data ((data seq)
+                                  (start start)
+                                  (end end)
+                                  :check-fill-pointer t)
+                  (declare (type (simple-array ,element-type 1) data))
+                  (declare (type index start end))
+                  (declare (optimize (safety 0) (speed 3)))
+                  (,basher ,bash-value data start (- end start))
+                  seq))
               `((declare (type ,element-type item))))))
           ((policy node (> speed space))
            (values

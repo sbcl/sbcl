@@ -176,11 +176,13 @@
   (let ((v (make-array (min n 1))))
     (declare (sb-int:truly-dynamic-extent v))
     (true v)
+    (true v)
     nil))
 
 (defun-with-dx make-array-on-stack-1 ()
   (let ((v (make-array '(42) :element-type 'single-float)))
     (declare (dynamic-extent v))
+    (true v)
     (true v)
     nil))
 
@@ -188,6 +190,7 @@
   (declare (integer n))
   (let ((v (make-array n :initial-contents x)))
     (declare (sb-int:truly-dynamic-extent v))
+    (true v)
     (true v)
     nil))
 
@@ -197,11 +200,13 @@
                        :element-type t :initial-contents x)))
     (declare (sb-int:truly-dynamic-extent v))
     (true v)
+    (true v)
     nil))
 
 (defun-with-dx make-array-on-stack-4 ()
   (let ((v (make-array 3 :initial-contents '(1 2 3))))
     (declare (sb-int:truly-dynamic-extent v))
+    (true v)
     (true v)
     nil))
 
@@ -209,11 +214,13 @@
   (let ((v (make-array 3 :initial-element 12 :element-type t)))
     (declare (sb-int:truly-dynamic-extent v))
     (true v)
+    (true v)
     nil))
 
 (defun-with-dx make-array-on-stack-6 ()
   (let ((v (make-array 3 :initial-element 12 :element-type '(unsigned-byte 8))))
     (declare (sb-int:truly-dynamic-extent v))
+    (true v)
     (true v)
     nil))
 
@@ -221,11 +228,13 @@
   (let ((v (make-array 3 :initial-element 12 :element-type '(signed-byte 8))))
     (declare (sb-int:truly-dynamic-extent v))
     (true v)
+    (true v)
     nil))
 
 (defun-with-dx make-array-on-stack-8 ()
   (let ((v (make-array 3 :initial-element 12 :element-type 'word)))
     (declare (sb-int:truly-dynamic-extent v))
+    (true v)
     (true v)
     nil))
 
@@ -233,11 +242,13 @@
   (let ((v (make-array 3 :initial-element 12.0 :element-type 'single-float)))
     (declare (sb-int:truly-dynamic-extent v))
     (true v)
+    (true v)
     nil))
 
 (defun-with-dx make-array-on-stack-10 ()
   (let ((v (make-array 3 :initial-element 12.0d0 :element-type 'double-float)))
     (declare (sb-int:truly-dynamic-extent v))
+    (true v)
     (true v)
     nil))
 
