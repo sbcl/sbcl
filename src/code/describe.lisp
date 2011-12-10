@@ -548,8 +548,7 @@
                         from
                         (type-specifier (info :function :type name)))))))
         ;; Defined.
-        (multiple-value-bind (fun what lambda-list ftype from inline
-                                  methods)
+        (multiple-value-bind (fun what lambda-list ftype from inline methods)
             (cond ((and (not function) (symbolp name) (special-operator-p name))
                    (let ((fun (symbol-function name)))
                      (values fun "a special operator" (%fun-lambda-list fun))))
@@ -560,7 +559,7 @@
                    (let ((fun (or function (fdefinition name))))
                      (multiple-value-bind (ftype from)
                          (if function
-                             (values (%fun-type function) "Derived")
+                             (values (%fun-type function) :derived)
                              (let ((ctype (info :function :type name)))
                                (values (when ctype (type-specifier ctype))
                                        (when ctype
@@ -568,9 +567,9 @@
                                          ;; from methods.
                                          (sb-c::maybe-update-info-for-gf name)
                                          (ecase (info :function :where-from name)
-                                           (:declared "Declared")
+                                           (:declared :declared)
                                            ;; This is hopefully clearer to users
-                                           ((:defined-method :defined) "Derived"))))))
+                                           ((:defined-method :defined) :derived))))))
                        (if (typep fun 'generic-function)
                            (values fun
                                    "a generic function"
@@ -597,12 +596,19 @@
               (pprint-indent :block 2 stream))
             (describe-lambda-list lambda-list stream)
             (when (and ftype from)
-              (format stream "~@:_~A type: ~S" from ftype))
+              (format stream "~@:_~:(~A~) type: ~S" from ftype))
+            (when (eq :declared from)
+              (let ((derived-ftype (%fun-type fun)))
+                (unless (equal derived-ftype ftype)
+                  (format stream "~@:_Derived type: ~S" derived-ftype))))
             (describe-documentation name 'function stream)
             (when (car inline)
               (format stream "~@:_Inline proclamation: ~A (~:[no ~;~]inline expansion available)"
                       (car inline)
                       (cdr inline)))
+            (awhen (info :function :info name)
+              (awhen (sb-c::decode-ir1-attributes (sb-c::fun-info-attributes it))
+                  (format stream "~@:_Known attributes: ~(~{~A~^, ~}~)" it)))
             (when methods
               (format stream "~@:_Method-combination: ~S"
                       (sb-pcl::method-combination-type-name
