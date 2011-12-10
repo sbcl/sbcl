@@ -25,7 +25,7 @@
 (cl:in-package :ctu)
 
 (unless (fboundp 'compiler-derived-type)
-  (defknown compiler-derived-type (t) (values t t) (movable flushable unsafe))
+  (defknown compiler-derived-type (t) (values t t) (flushable))
   (deftransform compiler-derived-type ((x) * * :node node)
     (sb-c::delay-ir1-transform node :optimize)
     `(values ',(type-specifier (sb-c::lvar-type x)) t))

@@ -86,7 +86,7 @@
 (defknown classoid-of (t) classoid (flushable))
 (defknown layout-of (t) layout (flushable))
 (defknown copy-structure (structure-object) structure-object
-  (flushable unsafe))
+  (flushable))
 
 ;;;; from the "Control Structure" chapter:
 
@@ -106,14 +106,14 @@
 (defknown special-operator-p (symbol) t
   ;; The set of special operators never changes.
   (movable foldable flushable))
-(defknown set (symbol t) t (unsafe)
+(defknown set (symbol t) t ()
   :derive-type #'result-type-last-arg)
-(defknown fdefinition ((or symbol cons)) function (unsafe explicit-check))
+(defknown fdefinition ((or symbol cons)) function (explicit-check))
 (defknown %set-fdefinition ((or symbol cons) function) function
-  (unsafe explicit-check))
+  (explicit-check))
 (defknown makunbound (symbol) symbol)
 (defknown fmakunbound ((or symbol cons)) (or symbol cons)
-  (unsafe explicit-check))
+  (explicit-check))
 (defknown apply (callable t &rest t) *) ; ### Last arg must be List...
 (defknown funcall (callable &rest t) *)
 
@@ -130,7 +130,7 @@
 ;;; We let VALUES-LIST be foldable, since constant-folding will turn
 ;;; it into VALUES. VALUES is not foldable, since MV constants are
 ;;; represented by a call to VALUES.
-(defknown values (&rest t) * (movable flushable unsafe))
+(defknown values (&rest t) * (movable flushable))
 (defknown values-list (list) * (movable foldable unsafely-flushable))
 
 ;;;; from the "Macros" chapter:
@@ -437,7 +437,7 @@
 (defknown copy-seq (sequence) consed-sequence (flushable)
   :derive-type (sequence-result-nth-arg 1))
 
-(defknown length (sequence) index (foldable flushable))
+(defknown length (sequence) index (foldable flushable dx-safe))
 
 (defknown reverse (sequence) consed-sequence (flushable)
   :derive-type (sequence-result-nth-arg 1))
@@ -450,7 +450,7 @@
                                         &key
                                         (:initial-element t))
   consed-sequence
-  (movable unsafe)
+  (movable)
   :derive-type (creation-result-type-specifier-nth-arg 1))
 
 (defknown concatenate (type-specifier &rest sequence) consed-sequence
@@ -483,15 +483,14 @@
 (defknown (every notany notevery) (callable sequence &rest sequence) boolean
   (foldable unsafely-flushable call))
 
-;;; unsafe for :INITIAL-VALUE...
 (defknown reduce (callable sequence &rest t &key (:from-end t) (:start index)
                   (:end sequence-end) (:initial-value t) (:key callable))
   t
-  (foldable flushable call unsafe))
+  (foldable flushable call))
 
 (defknown fill (sequence t &rest t &key
                          (:start index) (:end sequence-end)) sequence
-  (unsafe)
+    ()
   :derive-type #'result-type-first-arg
   :destroyed-constant-args (nth-constant-nonempty-sequence-args 1)
   :result-arg 0)
@@ -680,7 +679,7 @@
   t
   (foldable unsafely-flushable))
 
-(defknown cons (t t) cons (movable flushable unsafe))
+(defknown cons (t t) cons (movable flushable))
 
 (defknown tree-equal (t t &key (:test callable) (:test-not callable)) boolean
   (foldable flushable call))
@@ -695,10 +694,10 @@
 (defknown %lastn/fixnum (list (and unsigned-byte fixnum)) t (foldable flushable))
 (defknown %lastn/bignum (list (and unsigned-byte bignum)) t (foldable flushable))
 
-(defknown list (&rest t) list (movable flushable unsafe))
-(defknown list* (t &rest t) t (movable flushable unsafe))
+(defknown list (&rest t) list (movable flushable))
+(defknown list* (t &rest t) t (movable flushable))
 (defknown make-list (index &key (:initial-element t)) list
-  (movable flushable unsafe))
+  (movable flushable))
 
 ;;; All but last must be of type LIST, but there seems to be no way to
 ;;; express that in this syntax.
@@ -724,31 +723,31 @@
   :destroyed-constant-args (nth-constant-nonempty-sequence-args 1))
 
 (defknown ldiff (list t) list (flushable))
-(defknown (rplaca rplacd) (cons t) list (unsafe)
+(defknown (rplaca rplacd) (cons t) list ()
   :destroyed-constant-args (nth-constant-args 1))
 
 (defknown subst (t t t &key (:key callable) (:test callable)
                    (:test-not callable))
-  t (flushable unsafe call))
+  t (flushable call))
 (defknown nsubst (t t t &key (:key callable) (:test callable)
                     (:test-not callable))
-  t (unsafe call)
+  t (call)
   :destroyed-constant-args (nth-constant-nonempty-sequence-args 3))
 
 (defknown (subst-if subst-if-not)
           (t callable t &key (:key callable))
-  t (flushable unsafe call))
+  t (flushable call))
 (defknown (nsubst-if nsubst-if-not)
           (t callable t &key (:key callable))
-  t (unsafe call)
+  t (call)
   :destroyed-constant-args (nth-constant-nonempty-sequence-args 3))
 
 (defknown sublis (list t &key (:key callable) (:test callable)
                        (:test-not callable))
-  t (flushable unsafe call))
+  t (flushable call))
 (defknown nsublis (list t &key (:key callable) (:test callable)
                         (:test-not callable))
-  t (flushable unsafe call)
+  t (flushable call)
   :destroyed-constant-args (nth-constant-nonempty-sequence-args 2))
 
 (defknown member (t list &key (:key callable) (:test callable)
@@ -761,7 +760,7 @@
 
 (defknown adjoin (t list &key (:key callable) (:test callable)
                     (:test-not callable))
-  list (foldable flushable unsafe call))
+  list (foldable flushable call))
 
 (defknown (union intersection set-difference set-exclusive-or)
   (list list &key (:key callable) (:test callable) (:test-not callable))
@@ -779,8 +778,8 @@
   boolean
   (foldable flushable call))
 
-(defknown acons (t t t) list (movable flushable unsafe))
-(defknown pairlis (t t &optional t) list (flushable unsafe))
+(defknown acons (t t t) list (movable flushable))
+(defknown pairlis (t t &optional t) list (flushable))
 
 (defknown (rassoc assoc)
           (t list &key (:key callable) (:test callable) (:test-not callable))
@@ -788,8 +787,8 @@
 (defknown (assoc-if-not assoc-if rassoc-if rassoc-if-not)
           (callable list &key (:key callable)) list (foldable flushable call))
 
-(defknown (memq assq) (t list) list (foldable flushable unsafe))
-(defknown delq (t list) list (flushable unsafe)
+(defknown (memq assq) (t list) list (foldable flushable))
+(defknown delq (t list) list (flushable)
   :destroyed-constant-args (nth-constant-nonempty-sequence-args 2))
 
 ;;;; from the "Hash Tables" chapter:
@@ -802,15 +801,15 @@
         (:weakness (member nil :key :value :key-and-value :key-or-value))
         (:synchronized t))
   hash-table
-  (flushable unsafe))
+  (flushable))
 (defknown hash-table-p (t) boolean (movable foldable flushable))
 (defknown gethash (t hash-table &optional t) (values t boolean)
-  (flushable unsafe)) ; not FOLDABLE, since hash table contents can change
+  (flushable)) ; not FOLDABLE, since hash table contents can change
 (defknown sb!impl::gethash2 (t hash-table) (values t boolean)
-  (flushable unsafe)) ; not FOLDABLE, since hash table contents can change
+  (flushable)) ; not FOLDABLE, since hash table contents can change
 (defknown sb!impl::gethash3 (t hash-table t) (values t boolean)
-  (flushable unsafe)) ; not FOLDABLE, since hash table contents can change
-(defknown %puthash (t hash-table t) t (unsafe)
+  (flushable)) ; not FOLDABLE, since hash table contents can change
+(defknown %puthash (t hash-table t) t ()
   :destroyed-constant-args (nth-constant-args 2))
 (defknown remhash (t hash-table) boolean ()
   :destroyed-constant-args (nth-constant-args 2))
@@ -838,9 +837,9 @@
                       (:fill-pointer t)
                       (:displaced-to (or array null))
                       (:displaced-index-offset index))
-  array (flushable unsafe))
+  array (flushable))
 
-(defknown vector (&rest t) simple-vector (flushable unsafe))
+(defknown vector (&rest t) simple-vector (flushable))
 
 (defknown aref (array &rest index) t (foldable))
 (defknown row-major-aref (array index) t (foldable))
@@ -899,7 +898,7 @@
          (:initial-element t) (:initial-contents t)
          (:fill-pointer t) (:displaced-to (or array null))
          (:displaced-index-offset index))
-  array (unsafe))
+  array ())
 ;  :derive-type 'result-type-arg1) Not even close...
 
 ;;;; from the "Strings" chapter:
@@ -967,7 +966,7 @@
 (defknown make-echo-stream (stream stream) stream (flushable))
 (defknown make-string-input-stream (string &optional index sequence-end)
   stream
-  (flushable unsafe))
+  (flushable))
 (defknown make-string-output-stream
     (&key (:element-type type-specifier))
     string-output-stream
@@ -997,7 +996,7 @@
 
 (defknown set-macro-character (character callable &optional t (or readtable null))
   (eql t)
-  (unsafe))
+  ())
 (defknown get-macro-character (character &optional (or readtable null))
   (values callable boolean) (flushable))
 
@@ -1005,7 +1004,7 @@
   (eql t) ())
 (defknown set-dispatch-macro-character
   (character character callable &optional (or readtable null)) (eql t)
-  (unsafe))
+  ())
 (defknown get-dispatch-macro-character
   (character character &optional (or readtable null)) (or callable null)
   ())
@@ -1379,7 +1378,7 @@
            short-site-name long-site-name)
   () (or simple-string null) (flushable))
 
-(defknown identity (t) t (movable foldable flushable unsafe)
+(defknown identity (t) t (movable foldable flushable)
   :derive-type #'result-type-first-arg)
 
 (defknown constantly (t) function (movable flushable))
@@ -1456,17 +1455,17 @@
 (defknown data-vector-ref-with-offset (simple-array index fixnum) t
   (foldable explicit-check always-translatable))
 (defknown data-vector-set (array index t) t
-  (unsafe explicit-check always-translatable))
+  (explicit-check always-translatable))
 (defknown data-vector-set-with-offset (array index fixnum t) t
-  (unsafe explicit-check always-translatable))
+  (explicit-check always-translatable))
 (defknown hairy-data-vector-ref (array index) t
   (foldable explicit-check))
-(defknown hairy-data-vector-set (array index t) t (unsafe explicit-check))
+(defknown hairy-data-vector-set (array index t) t (explicit-check))
 (defknown hairy-data-vector-ref/check-bounds (array index) t
   (foldable explicit-check))
 (defknown hairy-data-vector-set/check-bounds (array index t)
   t
-  (unsafe explicit-check))
+  (explicit-check))
 (defknown %caller-frame () t (flushable))
 (defknown %caller-pc () system-area-pointer (flushable))
 (defknown %with-array-data (array index (or index null))
@@ -1475,7 +1474,7 @@
 (defknown %with-array-data/fp (array index (or index null))
   (values (simple-array * (*)) index index index)
   (foldable flushable))
-(defknown %set-symbol-package (symbol t) t (unsafe))
+(defknown %set-symbol-package (symbol t) t ())
 (defknown %coerce-name-to-fun ((or symbol cons)) function (flushable))
 (defknown %coerce-callable-to-fun (callable) function (flushable))
 (defknown array-bounding-indices-bad-error (t t t) nil)
@@ -1516,36 +1515,36 @@
   nil) ; never returns
 
 
-(defknown arg-count-error (t t t t t t) nil (unsafe))
+(defknown arg-count-error (t t t t t t) nil ())
 
 ;;;; SETF inverses
 
-(defknown %aset (array &rest t) t (unsafe)
+(defknown %aset (array &rest t) t ()
   :destroyed-constant-args (nth-constant-args 1))
-(defknown %set-row-major-aref (array index t) t (unsafe)
+(defknown %set-row-major-aref (array index t) t ()
   :destroyed-constant-args (nth-constant-args 1))
-(defknown (%rplaca %rplacd) (cons t) t (unsafe)
+(defknown (%rplaca %rplacd) (cons t) t ()
   :destroyed-constant-args (nth-constant-args 1))
-(defknown %put (symbol t t) t (unsafe))
-(defknown %setelt (sequence index t) t (unsafe)
+(defknown %put (symbol t t) t ())
+(defknown %setelt (sequence index t) t ()
   :destroyed-constant-args (nth-constant-args 1))
-(defknown %svset (simple-vector index t) t (unsafe)
+(defknown %svset (simple-vector index t) t ()
   :destroyed-constant-args (nth-constant-args 1))
-(defknown %bitset ((array bit) &rest index) bit (unsafe)
+(defknown %bitset ((array bit) &rest index) bit ()
   :destroyed-constant-args (nth-constant-args 1))
-(defknown %sbitset ((simple-array bit) &rest index) bit (unsafe)
+(defknown %sbitset ((simple-array bit) &rest index) bit ()
   :destroyed-constant-args (nth-constant-args 1))
-(defknown %charset (string index character) character (unsafe)
+(defknown %charset (string index character) character ()
   :destroyed-constant-args (nth-constant-args 1))
-(defknown %scharset (simple-string index character) character (unsafe)
+(defknown %scharset (simple-string index character) character ()
   :destroyed-constant-args (nth-constant-args 1))
-(defknown %set-symbol-value (symbol t) t (unsafe))
-(defknown (setf symbol-function) (function symbol) function (unsafe))
-(defknown %set-symbol-plist (symbol list) list (unsafe))
-(defknown %setnth (unsigned-byte list t) t (unsafe)
+(defknown %set-symbol-value (symbol t) t ())
+(defknown (setf symbol-function) (function symbol) function ())
+(defknown %set-symbol-plist (symbol list) list ())
+(defknown %setnth (unsigned-byte list t) t ()
   :destroyed-constant-args (nth-constant-args 2))
 (defknown %set-fill-pointer (complex-vector index) index
-    (unsafe explicit-check)
+    (explicit-check)
   :destroyed-constant-args (nth-constant-args 1))
 
 ;;;; ALIEN and call-out-to-C stuff
@@ -1553,7 +1552,7 @@
 ;; Used by WITH-PINNED-OBJECTS
 #!+(or x86 x86-64)
 (defknown sb!vm::touch-object (t) (values)
-    (unsafe always-translatable))
+    (always-translatable))
 
 #!+linkage-table
 (defknown foreign-symbol-dataref-sap (simple-string)
@@ -1571,7 +1570,7 @@
 ;;;; miscellaneous internal utilities
 
 (defknown %fun-name (function) t (flushable))
-(defknown (setf %fun-name) (t function) t (unsafe))
+(defknown (setf %fun-name) (t function) t ())
 
 (defknown policy-quality (policy symbol) policy-quality
           (flushable))
@@ -1595,10 +1594,10 @@
 
 ;;;; atomic ops
 (defknown %compare-and-swap-svref (simple-vector index t t) t
-    (unsafe))
+    ())
 (defknown %compare-and-swap-instance-ref (instance index t t) t
-    (unsafe))
+    ())
 (defknown %compare-and-swap-symbol-value (symbol t t) t
-    (unsafe unwind))
+    (unwind))
 (defknown spin-loop-hint () (values)
     (always-translatable))

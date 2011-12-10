@@ -33,6 +33,8 @@ changes relative to sbcl-1.0.54:
   * enhancement: SBCL now provides either an explicit :BIG-ENDIAN or
     :LITTLE-ENDIAN in *FEATURES*, instead of :BIG-ENDIAN being implied by lack
     of the :LITTLE-ENDIAN feature. (Thanks to Luís Oliveira, lp#901661)
+  * optimization: specialized arrays with non-zero :INITIAL-ELEMENT can
+    be stack-allocated. (lp#902351) 
   * optimization: the compiler is smarter about representation selection for
     floating point constants used in full calls.
   * optimization: the compiler no longer refuses to coerce large fixnums to
@@ -78,6 +80,8 @@ changes relative to sbcl-1.0.54:
     no longer claim to be unable to stack allocate the function.
   * bug fix: COERCE now signals a type-error on several coercions to
     subtypes of CHARACTER that are forbidden according to ANSI. (lp#841312)
+  * bug fix: missing failure-to-stack-allocate compiler notes for some
+    forms of MAKE-ARRAY with dynamic-extent. (lp#902351)
 
 changes in sbcl-1.0.54 relative to sbcl-1.0.53:
   * minor incompatible changes:

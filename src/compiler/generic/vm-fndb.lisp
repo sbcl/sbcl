@@ -87,7 +87,7 @@
   (flushable movable))
 
 (defknown %set-symbol-hash (symbol hash)
-  t (unsafe))
+  t ())
 
 (defknown initialize-vector ((simple-array * (*)) &rest t)
   (simple-array * (*))
@@ -95,10 +95,10 @@
   :result-arg 0)
 
 (defknown vector-fill* (t t t t) vector
-  (unsafe)
+  ()
   :result-arg 0)
 
-(defknown vector-length (vector) index (flushable))
+(defknown vector-length (vector) index (flushable dx-safe))
 
 (defknown vector-sap ((simple-unboxed-array (*))) system-area-pointer
   (flushable))
@@ -111,7 +111,7 @@
 (defknown (get-header-data get-closure-length) (t) (unsigned-byte 24)
   (flushable))
 (defknown set-header-data (t (unsigned-byte 24)) t
-  (unsafe))
+  ())
 
 (defknown %array-dimension (t index) index
   (flushable))
@@ -127,54 +127,54 @@
 (defknown %instance-layout (instance) layout
   (foldable flushable))
 (defknown %set-instance-layout (instance layout) layout
-  (unsafe))
+  ())
 (defknown %instance-length (instance) index
   (foldable flushable))
 (defknown %instance-ref (instance index) t
   (flushable always-translatable))
 (defknown %instance-set (instance index t) t
-  (unsafe always-translatable))
+  (always-translatable))
 (defknown %layout-invalid-error (t layout) nil)
 
 (defknown %raw-instance-ref/word (instance index) sb!vm:word
   (flushable always-translatable))
 (defknown %raw-instance-set/word (instance index sb!vm:word) sb!vm:word
-  (unsafe always-translatable))
+  (always-translatable))
 (defknown %raw-instance-ref/single (instance index) single-float
   (flushable always-translatable))
 (defknown %raw-instance-set/single (instance index single-float) single-float
-  (unsafe always-translatable))
+  (always-translatable))
 (defknown %raw-instance-ref/double (instance index) double-float
   (flushable always-translatable))
 (defknown %raw-instance-set/double (instance index double-float) double-float
-  (unsafe always-translatable))
+  (always-translatable))
 (defknown %raw-instance-ref/complex-single (instance index)
   (complex single-float)
   (flushable always-translatable))
 (defknown %raw-instance-set/complex-single
     (instance index (complex single-float))
   (complex single-float)
-  (unsafe always-translatable))
+  (always-translatable))
 (defknown %raw-instance-ref/complex-double (instance index)
   (complex double-float)
   (flushable always-translatable))
 (defknown %raw-instance-set/complex-double
     (instance index (complex double-float))
   (complex double-float)
-  (unsafe always-translatable))
+  (always-translatable))
 
 #!+(or x86 x86-64 ppc)
 (defknown %raw-instance-atomic-incf/word (instance index sb!vm:word) sb!vm:word
-    (unsafe always-translatable))
+    (always-translatable))
 #!+(or x86 x86-64 ppc)
 (defknown %array-atomic-incf/word (t index sb!vm:word) sb!vm:word
-  (unsafe always-translatable))
+  (always-translatable))
 
 ;;; These two are mostly used for bit-bashing operations.
 (defknown %vector-raw-bits (t fixnum) sb!vm:word
   (flushable))
 (defknown (%set-vector-raw-bits) (t fixnum sb!vm:word) sb!vm:word
-  (unsafe))
+  ())
 
 
 (defknown allocate-vector ((unsigned-byte 8) index index) (simple-array * (*))
@@ -206,7 +206,7 @@
 (defknown current-sp () system-area-pointer (movable flushable))
 (defknown current-fp () system-area-pointer (movable flushable))
 (defknown stack-ref (system-area-pointer index) t (flushable))
-(defknown %set-stack-ref (system-area-pointer index t) t (unsafe))
+(defknown %set-stack-ref (system-area-pointer index t) t ())
 (defknown lra-code-header (t) t (movable flushable))
 (defknown fun-code-header (t) t (movable flushable))
 (defknown %make-lisp-obj (sb!vm:word) t (movable flushable))
@@ -239,7 +239,7 @@
   (foldable flushable movable))
 
 (defknown %bignum-set-length (bignum-type bignum-index) bignum-type
-  (unsafe))
+  ())
 
 (defknown %bignum-ref (bignum-type bignum-index) bignum-element-type
   (flushable))
@@ -249,11 +249,11 @@
 
 (defknown %bignum-set (bignum-type bignum-index bignum-element-type)
   bignum-element-type
-  (unsafe))
+  ())
 #!+(or x86 x86-64)
 (defknown %bignum-set-with-offset
   (bignum-type bignum-index (signed-byte 24) bignum-element-type)
-  bignum-element-type (unsafe always-translatable))
+  bignum-element-type (always-translatable))
 
 (defknown %digit-0-or-plusp (bignum-element-type) boolean
   (foldable flushable movable))
@@ -351,13 +351,13 @@
 (defknown fdefn-p (t) boolean (movable foldable flushable))
 (defknown fdefn-name (fdefn) t (foldable flushable))
 (defknown fdefn-fun (fdefn) (or function null) (flushable))
-(defknown (setf fdefn-fun) (function fdefn) t (unsafe))
+(defknown (setf fdefn-fun) (function fdefn) t ())
 (defknown fdefn-makunbound (fdefn) t ())
 
 (defknown %simple-fun-self (function) function
   (flushable))
 (defknown (setf %simple-fun-self) (function function) function
-  (unsafe))
+  ())
 
 (defknown %closure-fun (function) function
   (flushable))
@@ -366,10 +366,10 @@
   (flushable))
 
 (defknown %make-funcallable-instance (index) function
-  (unsafe))
+  ())
 
 (defknown %funcallable-instance-info (function index) t (flushable))
-(defknown %set-funcallable-instance-info (function index t) t (unsafe))
+(defknown %set-funcallable-instance-info (function index t) t ())
 
 ;;;; mutator accessors
 

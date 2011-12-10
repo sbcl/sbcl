@@ -25,22 +25,29 @@
 ;;; breakdown of side effects, since we do very little code motion on
 ;;; IR1. We are interested in some deeper semantic properties such as
 ;;; whether it is safe to pass stack closures to.
+;;;
+;;; FIXME: This whole notion of "bad" explicit attributes is bad for
+;;; maintenance. How confident are we that we have no defknowns for functions
+;;; with functional arguments that are missing the CALL attribute? Much better
+;;; to have NO-CALLS, as it is much less likely to break accidentally.
 (!def-boolean-attribute ir1
   ;; may call functions that are passed as arguments. In order to
   ;; determine what other effects are present, we must find the
   ;; effects of all arguments that may be functions.
   call
-  ;; may incorporate function or number arguments into the result or
-  ;; somehow pass them upward. Note that this applies to any argument
-  ;; that *might* be a function or number, not just the arguments that
-  ;; always are.
-  unsafe
   ;; may fail to return during correct execution. Errors are O.K.
+  ;; UNUSED, BEWARE OF BITROT.
   unwind
   ;; the (default) worst case. Includes all the other bad things, plus
   ;; any other possible bad thing. If this is present, the above bad
   ;; attributes will be explicitly present as well.
   any
+  ;; all arguments are safe for dynamic extent.
+  ;; (We used to have an UNSAFE attribute, which was basically the inverse
+  ;; of this, but it was unused and bitrotted, so when we started making
+  ;; use of the information we flipped the name and meaning the safe way
+  ;; around.)
+  dx-safe
   ;; may be constant-folded. The function has no side effects, but may
   ;; be affected by side effects on the arguments. e.g. SVREF, MAPC.
   ;; Functions that side-effect their arguments are not considered to
@@ -67,9 +74,7 @@
   important-result
   ;; may be moved with impunity. Has no side effects except possibly
   ;; consing, and is affected only by its arguments.
-  ;;
-  ;; Since it is not used now, its distribution in fndb.lisp is
-  ;; mere random; use with caution.
+  ;; UNUSED, BEWARE OF BITROT.
   movable
   ;; The function is a true predicate likely to be open-coded. Convert
   ;; any non-conditional uses into (IF <pred> T NIL). Not usually

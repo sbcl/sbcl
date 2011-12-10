@@ -103,37 +103,37 @@
                 :ref-trans %array-fill-pointer
                 :ref-known (flushable foldable)
                 :set-trans (setf %array-fill-pointer)
-                :set-known (unsafe))
+                :set-known ())
   (fill-pointer-p :type (member t nil)
                   :ref-trans %array-fill-pointer-p
                   :ref-known (flushable foldable)
                   :set-trans (setf %array-fill-pointer-p)
-                  :set-known (unsafe))
+                  :set-known ())
   (elements :type index
             :ref-trans %array-available-elements
             :ref-known (flushable foldable)
             :set-trans (setf %array-available-elements)
-            :set-known (unsafe))
+            :set-known ())
   (data :type array
         :ref-trans %array-data-vector
         :ref-known (flushable foldable)
         :set-trans (setf %array-data-vector)
-        :set-known (unsafe))
+        :set-known ())
   (displacement :type (or index null)
                 :ref-trans %array-displacement
                 :ref-known (flushable foldable)
                 :set-trans (setf %array-displacement)
-                :set-known (unsafe))
+                :set-known ())
   (displaced-p :type t
                :ref-trans %array-displaced-p
                :ref-known (flushable foldable)
                :set-trans (setf %array-displaced-p)
-               :set-known (unsafe))
+               :set-known ())
   (displaced-from :type list
                   :ref-trans %array-displaced-from
                   :ref-known (flushable)
                   :set-trans (setf %array-displaced-from)
-                  :set-known (unsafe))
+                  :set-known ())
   (dimensions :rest-p t))
 
 (define-primitive-object (vector :type vector
@@ -154,12 +154,12 @@
   (entry-points :type (or function null)
                 :ref-known (flushable)
                 :ref-trans %code-entry-points
-                :set-known (unsafe)
+                :set-known ()
                 :set-trans (setf %code-entry-points))
   (debug-info :type t
               :ref-known (flushable)
               :ref-trans %code-debug-info
-              :set-known (unsafe)
+              :set-known ()
               :set-trans (setf %code-debug-info))
   (trace-table-offset)
   (constants :rest-p t))
@@ -197,20 +197,20 @@
   (next :type (or function null)
         :ref-known (flushable)
         :ref-trans %simple-fun-next
-        :set-known (unsafe)
+        :set-known ()
         :set-trans (setf %simple-fun-next))
   (name :ref-known (flushable)
         :ref-trans %simple-fun-name
-        :set-known (unsafe)
+        :set-known ()
         :set-trans (setf %simple-fun-name))
   (arglist :type list
            :ref-known (flushable)
            :ref-trans %simple-fun-arglist
-           :set-known (unsafe)
+           :set-known ()
            :set-trans (setf %simple-fun-arglist))
   (type :ref-known (flushable)
         :ref-trans %simple-fun-type
-        :set-known (unsafe)
+        :set-known ()
         :set-trans (setf %simple-fun-type))
   ;; NIL for empty, STRING for a docstring, SIMPLE-VECTOR for XREFS, and (CONS
   ;; STRING SIMPLE-VECTOR) for both.
@@ -218,12 +218,12 @@
         :ref-trans %simple-fun-info
         :ref-known (flushable)
         :set-trans (setf %simple-fun-info)
-        :set-known (unsafe))
+        :set-known ())
   ;; the SB!C::DEBUG-FUN object corresponding to this object, or NIL for none
   #+nil ; FIXME: doesn't work (gotcha, lowly maintenoid!) See notes on bug 137.
   (debug-fun :ref-known (flushable)
              :ref-trans %simple-fun-debug-fun
-             :set-known (unsafe)
+             :set-known ()
              :set-trans (setf %simple-fun-debug-fun))
   (code :rest-p t :c-type "unsigned char"))
 
@@ -241,7 +241,7 @@
                           :alloc-trans %make-funcallable-instance)
   (trampoline :init :funcallable-instance-tramp)
   (function :ref-known (flushable) :ref-trans %funcallable-instance-function
-            :set-known (unsafe) :set-trans (setf %funcallable-instance-function))
+            :set-known () :set-trans (setf %funcallable-instance-function))
   (info :rest-p t))
 
 (define-primitive-object (value-cell :lowtag other-pointer-lowtag
@@ -250,7 +250,7 @@
                                      ;; for this. Is this needed as well?
                                      :alloc-trans make-value-cell)
   (value :set-trans value-cell-set
-         :set-known (unsafe)
+         :set-known ()
          :ref-trans value-cell-ref
          :ref-known (flushable)
          :init :arg))
@@ -325,7 +325,7 @@
   ;; also the CAR of NIL-as-end-of-list
   (value :init :unbound
          :set-trans %set-symbol-global-value
-         :set-known (unsafe))
+         :set-known ())
   ;; also the CDR of NIL-as-end-of-list.  Its reffer needs special
   ;; care for this reason, as hash values must be fixnums.
   (hash :set-trans %set-symbol-hash)

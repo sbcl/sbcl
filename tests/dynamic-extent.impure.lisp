@@ -211,6 +211,36 @@
     (true v)
     nil))
 
+(defun-with-dx make-array-on-stack-6 ()
+  (let ((v (make-array 3 :initial-element 12 :element-type '(unsigned-byte 8))))
+    (declare (sb-int:truly-dynamic-extent v))
+    (true v)
+    nil))
+
+(defun-with-dx make-array-on-stack-7 ()
+  (let ((v (make-array 3 :initial-element 12 :element-type '(signed-byte 8))))
+    (declare (sb-int:truly-dynamic-extent v))
+    (true v)
+    nil))
+
+(defun-with-dx make-array-on-stack-8 ()
+  (let ((v (make-array 3 :initial-element 12 :element-type 'word)))
+    (declare (sb-int:truly-dynamic-extent v))
+    (true v)
+    nil))
+
+(defun-with-dx make-array-on-stack-9 ()
+  (let ((v (make-array 3 :initial-element 12.0 :element-type 'single-float)))
+    (declare (sb-int:truly-dynamic-extent v))
+    (true v)
+    nil))
+
+(defun-with-dx make-array-on-stack-10 ()
+  (let ((v (make-array 3 :initial-element 12.0d0 :element-type 'double-float)))
+    (declare (sb-int:truly-dynamic-extent v))
+    (true v)
+    nil))
+
 (defun-with-dx vector-on-stack (x y)
   (let ((v (vector 1 x 2 y 3)))
     (declare (sb-int:truly-dynamic-extent v))
@@ -534,6 +564,15 @@
   (assert-no-consing (make-array-on-stack-4))
   (assert-no-consing (make-array-on-stack-5))
   (assert-no-consing (vector-on-stack :x :y)))
+
+(with-test (:name (:no-consing :specialized-dx-vectors)
+            :skipped-on `(not (and :stack-allocatable-vectors
+                                   :c-stack-is-control-stack)))
+  (assert-no-consing (make-array-on-stack-6))
+  (assert-no-consing (make-array-on-stack-7))
+  (assert-no-consing (make-array-on-stack-8))
+  (assert-no-consing (make-array-on-stack-9))
+  (assert-no-consing (make-array-on-stack-10)))
 
 (with-test (:name (:no-consing :dx-raw-instances) :fails-on :ppc :skipped-on '(not :raw-instance-init-vops))
   (let (a b)

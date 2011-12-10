@@ -469,12 +469,16 @@
 ;;; the function might have.
 (defmacro defknown (name arg-types result-type &optional (attributes '(any))
                     &body keys)
+  #-sb-xc-host
+  (when (member 'unsafe attributes)
+    (style-warn "Ignoring legacy attribute UNSAFE. Replaced by its inverse: DX-SAFE.")
+    (setf attributes (remove 'unsafe attributes)))
   (when (and (intersection attributes '(any call unwind))
              (intersection attributes '(movable)))
     (error "function cannot have both good and bad attributes: ~S" attributes))
 
   (when (member 'any attributes)
-    (setq attributes (union '(call unsafe unwind) attributes)))
+    (setq attributes (union '(call unwind) attributes)))
   (when (member 'flushable attributes)
     (pushnew 'unsafely-flushable attributes))
 

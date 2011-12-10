@@ -106,7 +106,7 @@
             (forms
              `(progn
                 (defknown ,cas-trans (,type ,slot-type ,slot-type)
-                    ,slot-type (unsafe))
+                    ,slot-type ())
                 #!+compare-and-swap-vops
                 (def-casser ,cas-trans ,offset ,lowtag))))
           (when init

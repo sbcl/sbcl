@@ -232,11 +232,16 @@
         (values))
 
       ;; common uses for constant-byte-bashing
+      (defknown ,array-fill-name (word simple-unboxed-array ,offset ,offset)
+          simple-unboxed-array
+          ()
+        :result-arg 1)
       (defun ,array-fill-name (value dst dst-offset length)
         (declare (type word value) (type ,offset dst-offset length))
         (declare (optimize (speed 3) (safety 1)))
         (,constant-bash-name dst dst-offset length value
-                             #'%vector-raw-bits #'%set-vector-raw-bits))
+                             #'%vector-raw-bits #'%set-vector-raw-bits)
+        dst)
       (defun ,system-area-fill-name (value dst dst-offset length)
         (declare (type word value) (type ,offset dst-offset length))
         (declare (optimize (speed 3) (safety 1)))

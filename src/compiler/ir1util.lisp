@@ -565,6 +565,17 @@
                                  (return-from combination-args-flow-cleanly-p nil)))))))))))
     (recurse combination1)))
 
+(defun ref-good-for-dx-p (ref)
+ (let* ((lvar (ref-lvar ref))
+        (dest (when lvar (lvar-dest lvar))))
+   (and (combination-p dest)
+        (eq :known (combination-kind dest))
+        (awhen (combination-fun-info dest)
+          (or (ir1-attributep (fun-info-attributes it) dx-safe)
+              (and (not (combination-lvar dest))
+                   (awhen (fun-info-result-arg it)
+                     (eql lvar (nth it (combination-args dest))))))))))
+
 (defun trivial-lambda-var-ref-p (use)
   (and (ref-p use)
        (let ((var (ref-leaf use)))
@@ -573,10 +584,13 @@
                     (neq :indefinite (lambda-var-extent var)))
            (let ((home (lambda-var-home var))
                  (refs (lambda-var-refs var)))
-             ;; bound by a non-XEP system lambda, no other REFS
+             ;; bound by a non-XEP system lambda, no other REFS that aren't
+             ;; DX-SAFE, or are result-args when the result is discarded.
              (when (and (lambda-system-lambda-p home)
                         (neq :external (lambda-kind home))
-                        (eq use (car refs)) (not (cdr refs)))
+                        (dolist (ref refs t)
+                          (unless (or (eq use ref) (ref-good-for-dx-p ref))
+                            (return nil))))
                ;; the LAMBDA this var is bound by has only a single REF, going
                ;; to a combination
                (let* ((lambda-refs (lambda-refs home))

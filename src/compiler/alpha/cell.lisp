@@ -368,7 +368,7 @@
                       (:variant ,offset))
                     ,@(when writable
                         `((defknown ((setf ,fn)) (,lisp-type) ,lisp-type
-                            (unsafe))
+                            ())
                           (define-vop (,set ,set-vop)
                             (:translate (setf ,fn))
                             (:variant ,offset)))))))))
