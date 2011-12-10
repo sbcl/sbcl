@@ -128,7 +128,7 @@
 
 (declaim (inline ref-fop-table))
 (defun ref-fop-table (index)
-  (declare (index index))
+  (declare (type index index))
   (svref *fop-table* (the index (+ index 1))))
 
 (defun get-fop-table-index ()
@@ -150,14 +150,14 @@
 
 ;;; These three routines are used for both the stack and the table.
 (defun make-fop-vector (size)
-  (declare (index size))
+  (declare (type index size))
   (let ((vector (make-array size)))
     (setf (aref vector 0) 0)
     vector))
 
 (defun grow-fop-vector (old-vector old-size)
   (declare (simple-vector old-vector)
-           (index old-size))
+           (type index old-size))
   (let* ((new-size (* old-size 2))
          (new-vector (make-array new-size)))
     (declare (fixnum new-size)
@@ -187,7 +187,7 @@
 (defun pop-fop-stack ()
   (let* ((stack *fop-stack*)
          (top (svref stack 0)))
-    (declare (index top))
+    (declare (type index top))
     (when (eql 0 top)
       (error "FOP stack empty"))
     (setf (svref stack 0) (1- top))
@@ -196,7 +196,7 @@
 (defun push-fop-stack (value)
   (let* ((stack *fop-stack*)
          (next (1+ (the index (svref stack 0)))))
-    (declare (index next))
+    (declare (type index next))
     (when (eql (length stack) next)
       (setf stack (grow-fop-vector stack next)
             *fop-stack* stack))

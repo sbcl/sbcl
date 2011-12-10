@@ -126,7 +126,8 @@
 ;;; the host Lisp, this is only used at cold load time, and we don't
 ;;; care as much about efficiency, so it's fine to treat the host
 ;;; Lisp's INTERN as primitive and implement INTERN* in terms of it.
-(defun intern* (nameoid length package)
+(defun intern* (nameoid length package &key no-copy)
+  (declare (ignore no-copy))
   (intern (replace (make-string length) nameoid :end2 length) package))
 
 ;;; In the target Lisp this is implemented by reading a fixed slot in
