@@ -377,38 +377,17 @@
 ;;;; so we worry about dealing with END being supplied or defaulting
 ;;;; to NIL at this level.
 
-(defun string-subseq* (sequence start end)
-  (with-array-data ((data sequence)
-                    (start start)
-                    (end end)
-                    :force-inline t
-                    :check-fill-pointer t)
-    (declare (optimize (speed 3) (safety 0)))
-    (string-dispatch ((simple-array character (*))
-                      (simple-array base-char (*))
-                      (vector nil))
-        data
-        (subseq data start end))))
-
 (defun vector-subseq* (sequence start end)
   (declare (type vector sequence))
   (declare (type index start)
-           (type (or null index) end))
+           (type (or null index) end)
+           (optimize speed))
   (with-array-data ((data sequence)
                     (start start)
                     (end end)
                     :check-fill-pointer t
                     :force-inline t)
-    (let* ((copy (%make-sequence-like sequence (- end start)))
-           (setter (!find-data-vector-setter copy))
-           (reffer (!find-data-vector-reffer data)))
-      (declare (optimize (speed 3) (safety 0)))
-      (do ((old-index start (1+ old-index))
-           (new-index 0 (1+ new-index)))
-          ((= old-index end) copy)
-        (declare (index old-index new-index))
-        (funcall setter copy new-index
-                 (funcall reffer data old-index))))))
+    (funcall (!find-vector-subseq-fun data) data start end)))
 
 (defun list-subseq* (sequence start end)
   (declare (type list sequence)

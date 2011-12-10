@@ -794,7 +794,14 @@ implementation it is ~S." *default-package-use-list*)
                                            (aver (= (length name) length))
                                            name)
                                           (t
-                                           (subseq name 0 length)))))
+                                           ;; This so that SUBSEQ is inlined,
+                                           ;; because we need it fixed for cold init.
+                                           (string-dispatch
+                                               ((simple-array base-char (*))
+                                                (simple-array character (*)))
+                                               name
+                                             (declare (optimize speed))
+                                             (subseq name 0 length))))))
                    (with-single-package-locked-error
                        (:package package "interning ~A" symbol-name)
                      (let ((symbol (make-symbol symbol-name)))

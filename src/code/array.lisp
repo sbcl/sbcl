@@ -317,7 +317,7 @@ of specialized arrays is supported."
   (coerce (the list objects) 'simple-vector))
 
 
-;;;; accessor/setter functions
+;;;; accessor/setter and subseq functions
 
 ;;; Dispatch to an optimized routine the data vector accessors for
 ;;; each different specialized vector type. Do dispatching by looking
@@ -328,6 +328,9 @@ of specialized arrays is supported."
 ;;; the type information is available. Finally, for each of these
 ;;; routines also provide a slow path, taken for arrays that are not
 ;;; vectors or not simple.
+;;;
+;;; Similarly for SUBSEQ, except we don't have the slow-path at all:
+;;; VECTOR-SUBEQ* takes care of that.
 (macrolet ((def (name table-name)
              `(progn
                 (defglobal ,table-name (make-array ,(1+ sb!vm:widetag-mask)))
@@ -340,7 +343,8 @@ of specialized arrays is supported."
   (def !find-data-vector-setter %%data-vector-setters%%)
   (def !find-data-vector-setter/check-bounds %%data-vector-setters/check-bounds%%)
   (def !find-data-vector-reffer %%data-vector-reffers%%)
-  (def !find-data-vector-reffer/check-bounds %%data-vector-reffers/check-bounds%%))
+  (def !find-data-vector-reffer/check-bounds %%data-vector-reffers/check-bounds%%)
+  (def !find-vector-subseq-fun %%vector-subseq-funs%%))
 
 (macrolet ((%ref (accessor-getter extra-params)
              `(funcall (,accessor-getter array) array index ,@extra-params))
@@ -395,7 +399,34 @@ of specialized arrays is supported."
          :datum array
          :expected-type 'vector))
 
+(defun hairy-subseq-error (array start end)
+  (declare (ignore start end))
+  (error 'type-error
+         :datum array
+         :expected-type '(simple-array * (*))))
+
 ;;; Populate the dispatch tables.
+(macrolet ((def-subseq-funs ()
+             `(progn
+                (set '%%vector-subseq-funs%%
+                     (make-array (1+ sb!vm:widetag-mask)
+                                 :initial-element #'hairy-subseq-error))
+                ,@(map 'list
+                       (lambda (saetp)
+                         (let ((name (symbolicate "SUBSEQ/"
+                                                  (sb!vm:saetp-primitive-type-name saetp))))
+                           `(progn
+                              (defun ,name (vector start end)
+                                (declare (type (simple-array ,(sb!vm:saetp-specifier saetp) (*))
+                                               vector)
+                                         (index start end)
+                                         (optimize speed (safety 0)))
+                                (subseq vector start end))
+                              (setf (svref %%vector-subseq-funs%%
+                                           ,(sb!vm:saetp-typecode saetp))
+                                    #',name))))
+                       sb!vm:*specialized-array-element-type-properties*))))
+  (def-subseq-funs))
 (macrolet ((define-reffer (saetp check-form)
              (let* ((type (sb!vm:saetp-specifier saetp))
                     (atype `(simple-array ,type (*))))

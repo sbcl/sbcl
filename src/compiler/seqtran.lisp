@@ -994,7 +994,8 @@
   (let ((type (lvar-type seq)))
     (cond
       ((and (array-type-p type)
-            (csubtypep type (specifier-type '(or (simple-unboxed-array (*)) simple-vector))))
+            (csubtypep type (specifier-type '(or (simple-unboxed-array (*)) simple-vector)))
+            (policy node (> speed space)))
        (let ((element-type (type-specifier (array-type-specialized-element-type type))))
          `(let* ((length (length seq))
                  (end (or end length)))
@@ -1009,8 +1010,6 @@
                                                        'start)
                                               'result 0 'size element-type)
               result))))
-      ((csubtypep type (specifier-type 'string))
-       '(string-subseq* seq start end))
       (t
        '(vector-subseq* seq start end)))))
 
@@ -1031,8 +1030,6 @@
                      (result (make-array length :element-type ',element-type)))
                 ,(maybe-expand-copy-loop-inline 'seq 0 'result 0 'length element-type)
                 result)))
-          ((csubtypep type (specifier-type 'string))
-           '(string-subseq* seq 0 nil))
           (t
            '(vector-subseq* seq 0 nil)))))
 
