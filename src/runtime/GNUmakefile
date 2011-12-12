@@ -68,8 +68,10 @@ sbcl.h: $(wildcard genesis/*.h)
 	echo '#include "genesis/config.h"' >sbcl.h
 	echo '#include "genesis/constants.h"' >>sbcl.h
 
+# || true because we don't want the build to break if etags isn't there.
+# ...but it's still nice to have it done by default.
 TAGS tags: $(SRCS)
-	etags $(SRCS)
+	etags $(SRCS) || true
 
 clean:
 	-rm -f *.[do] $(TARGET) sbcl.nm sbcl.h core *.tmp $(OS_CLEAN_FILES)
