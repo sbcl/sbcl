@@ -276,4 +276,10 @@
 
 (with-test (:name :read-in-package-syntax)
   (assert (equal '(sb-c::a (sb-kernel::x sb-kernel::y) sb-c::b)
-                 (read-from-string "sb-c::(a sb-kernel::(x y) b)"))))
+                 (read-from-string "sb-c::(a sb-kernel::(x y) b)")))
+  #+sb-package-locks
+  (assert (eq :violated!
+              (handler-case
+                  (read-from-string "cl::'foo")
+                (package-lock-violation ()
+                  :violated!)))))

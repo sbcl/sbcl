@@ -904,6 +904,8 @@ standard Lisp readtable when NIL."
                (cond (all-lower (raise-em))
                      (all-upper (lower-em))))))))))))
 
+(defvar *reader-package* nil)
+
 (defun read-token (stream firstchar)
   #!+sb-doc
   "Default readmacro function. Handles numbers, symbols, and SBCL's
@@ -1262,7 +1264,7 @@ extended <package-name>::<form-in-package> syntax."
         (#.+char-attr-delimiter+
          (unread-char char stream)
          (if package-designator
-             (let ((*package* (%find-package-or-lose package-designator)))
+             (let* ((*reader-package* (%find-package-or-lose package-designator)))
                (return (read stream t nil t)))
              (simple-reader-error stream
                                   "illegal terminating character after a double-colon: ~S"
@@ -1278,7 +1280,7 @@ extended <package-name>::<form-in-package> syntax."
       (casify-read-buffer escapes)
       (let ((found (if package-designator
                        (%find-package-or-lose package-designator)
-                       (sane-package))))
+                       (or *reader-package* (sane-package)))))
         (if (or (zerop colons) (= colons 2) (eq found *keyword-package*))
             (return (intern* *read-buffer* *ouch-ptr* found))
             (multiple-value-bind (symbol test)

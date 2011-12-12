@@ -8,7 +8,8 @@ changes relative to sbcl-1.0.54:
        (Mainly useful for building 32-bit SBCL's on x86-64 hosts, not
        full-blows cross-compilation.)
   * enhancement: extended package prefix syntax <pkgname>::<form-in-package>
-    which allows specifying the name of the package for a whole form.
+    which allows specifying name of the default interning package for the
+    whole form.
   * enhancement: when *READ-EVAL* is true, arrays with element type other than
     T can be printed readably using #.-based syntax. (Thanks to Robert Brown)
   * enhancement: MAKE-ALIEN signals a storage-condition instead of returning a

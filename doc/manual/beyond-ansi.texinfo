@@ -26,10 +26,11 @@ it still has quite a few.  @xref{Contributed Modules}.
 @cindex Reader Extensions
 
 SBCL supports extended package prefix syntax, which allows specifying
-the package to read an arbitrary form in:
+an alternate package instead of @code{*package*} for the reader to use
+as the default package for interning symbols:
 
 @lisp
-<package-name>::<form-in-package>
+<package-name>::<form-with-interning-into-package>
 @end lisp
 
 Example:
@@ -37,6 +38,9 @@ Example:
 @lisp
   'foo::(bar quux zot) == '(foo::bar foo::quux foo::zot)
 @end lisp
+
+Doesn't alter @code{*package*}: if @code{foo::bar} would cause a
+read-time package lock violation, so does @code{foo::(bar)}.
 
 @node  Garbage Collection
 @comment  node-name,  next,  previous,  up
