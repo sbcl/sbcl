@@ -577,7 +577,7 @@
   (assert-no-consing (vector-on-stack :x :y)))
 
 (with-test (:name (:no-consing :specialized-dx-vectors)
-	    :fails-on '(and :sunos :x86)
+            :fails-on '(and :sunos :x86)
             :skipped-on `(not (and :stack-allocatable-vectors
                                    :c-stack-is-control-stack)))
   (assert-no-consing (make-array-on-stack-6))

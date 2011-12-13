@@ -585,7 +585,7 @@
     (precise-add-test-constraint fun x y not-p constraints
                                 consequent-constraints)
     (precise-add-test-constraint fun x y (not not-p) constraints
-                         alternative-constraints))
+                                 alternative-constraints))
   (values))
 
 (defun quick-add-complement-constraints (fun x y not-p
@@ -669,10 +669,7 @@
                            (add 'eql var1 var2 nil))
                           ((constant-lvar-p arg2)
                            (add 'eql var1
-                                (let ((use (principal-lvar-use arg2)))
-                                  (if (ref-p use)
-                                      (ref-leaf use)
-                                      (find-constant (lvar-value arg2))))
+                                (find-constant (lvar-value arg2))
                                 nil))
                           (t
                            (add-test-constraint quick-p

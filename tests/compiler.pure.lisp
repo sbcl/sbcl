@@ -4160,3 +4160,10 @@
                    (lambda (bar &optional quux)
                      (declare (dynamic-extent bar quux))
                      (foo bar quux))))))
+
+(with-test (:name :cprop-with-constant-but-assigned-to-closure-variable)
+  (compile nil `(lambda (b c d)
+                  (declare (type (integer -20545789 207590862) c))
+                  (declare (type (integer -1 -1) d))
+                  (let ((i (unwind-protect 32 (shiftf d -1))))
+                    (or (if (= d c)  2 (= 3 b)) 4)))))
