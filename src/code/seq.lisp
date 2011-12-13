@@ -2162,7 +2162,7 @@
 (macrolet (;; shared logic for defining %FIND-POSITION and
            ;; %FIND-POSITION-IF in terms of various inlineable cases
            ;; of the expression defined in FROB and VECTOR*-FROB
-           (frobs ()
+           (frobs (&optional bit-frob)
              `(seq-dispatch sequence-arg
                (frob sequence-arg from-end)
                (with-array-data ((sequence sequence-arg :offset-var offset)
@@ -2170,14 +2170,27 @@
                                  (end end)
                                  :check-fill-pointer t)
                  (multiple-value-bind (f p)
-                     (macrolet ((frob2 () '(if from-end
-                                            (frob sequence t)
-                                            (frob sequence nil))))
+                     (macrolet ((frob2 () `(if from-end
+                                               (frob sequence t)
+                                               (frob sequence nil))))
                        (typecase sequence
                          #!+sb-unicode
                          ((simple-array character (*)) (frob2))
                          ((simple-array base-char (*)) (frob2))
-                         (t (vector*-frob sequence))))
+                         ,@(when bit-frob
+                             `((simple-bit-vector
+                                (if (and (eq #'identity key)
+                                         (or (eq #'eq test)
+                                             (eq #'eql test)
+                                             (eq #'equal test)))
+                                    (let ((p (%bit-position (the bit item) sequence
+                                                            from-end start end)))
+                                      (if p
+                                          (values item p)
+                                          (values nil nil)))
+                                    (vector*-frob sequence)))))
+                         (t
+                          (vector*-frob sequence))))
                    (declare (type (or index null) p))
                    (values f (and p (the index (- p offset)))))))))
   (defun %find-position (item sequence-arg from-end start end key test)
@@ -2187,7 +2200,7 @@
                (vector*-frob (sequence)
                  `(%find-position-vector-macro item ,sequence
                                                from-end start end key test)))
-      (frobs)))
+      (frobs t)))
   (defun %find-position-if (predicate sequence-arg from-end start end key)
     (macrolet ((frob (sequence from-end)
                  `(%find-position-if predicate ,sequence

@@ -594,3 +594,102 @@
   (declare (type system-area-pointer sap))
   (declare (type fixnum offset))
   (copy-ub8-to-system-area bv 0 sap offset (length bv)))
+
+
+;;;; Bashing-Style search for bits
+;;;;
+;;;; Similar search would work well for base-strings as well.
+;;;; (Technically for all unboxed sequences of sub-word size elements,
+;;;; but somehow I doubt other eg. octet vectors get POSIION or FIND
+;;;; used as much on them.)
+(defconstant +bit-position-base-mask+ (1- n-word-bits))
+(defconstant +bit-position-base-shift+ (integer-length +bit-position-base-mask+))
+(macrolet ((def (name frob)
+             `(defun ,name (vector from-end start end)
+                (declare (simple-bit-vector vector)
+                         (index start end)
+                         (optimize (speed 3) (safety 0)))
+                (unless (= start end)
+                  (let* ((last-word (ash end (- +bit-position-base-shift+)))
+                         (last-bits (logand end +bit-position-base-mask+))
+                         (first-word (ash start (- +bit-position-base-shift+)))
+                         (first-bits (logand start +bit-position-base-mask+))
+                         ;; These mask out everything but the interesting parts.
+                         (end-mask #!+little-endian (lognot (ash -1 last-bits))
+                                   #!+big-endian (ash -1 (- sb!vm:n-word-bits last-bits)))
+                         (start-mask #!+little-endian (ash -1 first-bits)
+                                     #!+big-endian (lognot (ash -1 (- sb!vm:n-word-bits first-bits)))))
+                    (declare (index last-word first-word))
+                    (flet ((#!+little-endian start-bit
+                            #!+big-endian end-bit (x)
+                             (declare (word x))
+                             (- #!+big-endian sb!vm:n-word-bits
+                                (integer-length (logand x (- x)))
+                                #!+little-endian 1))
+                           (#!+little-endian end-bit
+                            #!+big-endian start-bit (x)
+                             (declare (word x))
+                             (- #!+big-endian sb!vm:n-word-bits
+                                (integer-length x)
+                                #!+little-endian 1))
+                           (found (i word-offset)
+                             (declare (index i word-offset))
+                             (return-from ,name
+                               (logior i (truly-the
+                                          fixnum
+                                          (ash word-offset +bit-position-base-shift+)))))
+                           (get-word (sap offset)
+                             (,@frob (sap-ref-word sap (* n-word-bytes offset)))))
+                      (declare (inline start-bit end-bit get-word))
+                      (with-pinned-objects (vector)
+                        (if from-end
+                            ;; Back to front
+                            (let* ((sap (vector-sap vector))
+                                   (word-offset last-word)
+                                   (word (logand end-mask (get-word sap word-offset))))
+                              (declare (word word)
+                                       (index word-offset))
+                              (unless (zerop word)
+                                (when (= word-offset first-word)
+                                  (setf word (logand word start-mask)))
+                                (unless (zerop word)
+                                  (found (end-bit word) word-offset)))
+                              (decf word-offset)
+                              (loop
+                                (when (< word-offset first-word)
+                                  (return-from ,name nil))
+                                (setf word (get-word sap word-offset))
+                                (unless (zerop word)
+                                  (when (= word-offset first-word)
+                                    (setf word (logand word start-mask)))
+                                  (unless (zerop word)
+                                    (found (end-bit word) word-offset)))
+                                (decf word-offset)))
+                            ;; Front to back
+                            (let* ((sap (vector-sap vector))
+                                   (word-offset first-word)
+                                   (word (logand start-mask (get-word sap word-offset))))
+                              (declare (word word)
+                                       (index word-offset))
+                              (unless (zerop word)
+                                (when (= word-offset last-word)
+                                  (setf word (logand word end-mask)))
+                                (unless (zerop word)
+                                  (found (start-bit word) word-offset)))
+                              (incf word-offset)
+                              (loop
+                                (when (> word-offset last-word)
+                                  (return-from ,name nil))
+                                (setf word (get-word sap word-offset))
+                                (unless (zerop word)
+                                  (when (= word-offset last-word)
+                                    (setf word (logand word end-mask)))
+                                  (unless (zerop word)
+                                    (found (start-bit word) word-offset)))
+                                (incf word-offset)))))))))))
+  (def %bit-position/0 (logandc2 #.(1- (expt 2 n-word-bits))))
+  (def %bit-position/1 (identity)))
+(defun %bit-position (bit vector from-end start end)
+  (ecase bit
+    (0 (%bit-position/0 vector from-end start end))
+    (1 (%bit-position/1 vector from-end start end))))

@@ -1139,4 +1139,93 @@
     (assert (raises-error? (concatenate type "qu" '(#\u #\x))))
     (assert (raises-error? (make-sequence type 4 :initial-element #\u)))))
 
+(defun test-bit-position (size set start end from-end res)
+  (let ((v (make-array size :element-type 'bit :initial-element 0)))
+    (dolist (i set)
+      (setf (bit v i) 1))
+    (dolist (f (list (compile nil
+                              `(lambda (b v s e fe)
+                                 (position b (the bit-vector v) :start s :end e :from-end fe)))
+                     (compile nil
+                              `(lambda (b v s e fe)
+                                 (assert (eql b 1))
+                                 (position 1 (the bit-vector v) :start s :end e :from-end fe)))
+                     (compile nil
+                              `(lambda (b v s e fe)
+                                 (position b (the vector v) :start s :end e :from-end fe)))))
+      (let ((got (funcall f 1 v start end from-end)))
+        (unless (eql res got)
+          (cerror "Continue" "POSITION 1, Wanted ~S, got ~S.~%  size = ~S, set = ~S, from-end = ~S"
+                  res got
+                  size set from-end)))))
+  (let ((v (make-array size :element-type 'bit :initial-element 1)))
+    (dolist (i set)
+      (setf (bit v i) 0))
+    (dolist (f (list (compile nil
+                              `(lambda (b v s e fe)
+                                 (position b (the bit-vector v) :start s :end e :from-end fe)))
+                     (compile nil
+                              `(lambda (b v s e fe)
+                                 (assert (eql b 0))
+                                 (position 0 (the bit-vector v) :start s :end e :from-end fe)))
+                     (compile nil
+                              `(lambda (b v s e fe)
+                                 (position b (the vector v) :start s :end e :from-end fe)))))
+      (let ((got (funcall f 0 v start end from-end)))
+        (unless (eql res got)
+          (cerror "Continue" "POSITION 0, Wanted ~S, got ~S.~%  size = ~S, set = ~S, from-end = ~S"
+                  res got
+                  size set from-end))))))
+
+(defun random-test-bit-position (n)
+  (loop repeat n
+        do (let* ((vector (make-array (+ 2 (random 5000)) :element-type 'bit))
+                  (offset (random (1- (length vector))))
+                  (size (1+ (random (- (length vector) offset))))
+                  (disp (make-array size :element-type 'bit :displaced-to vector
+                                         :displaced-index-offset offset)))
+             (assert (plusp size))
+             (loop repeat 10
+                   do (setf (bit vector (random (length vector))) 1))
+             (flet ((test (orig)
+                      (declare (bit-vector orig))
+                      (let ((copy (coerce orig 'simple-vector))
+                            (p0 (random (length orig)))
+                            (p1 (1+ (random (length orig)))))
+                        (multiple-value-bind (s e)
+                            (if (> p1 p0)
+                                (values p0 p1)
+                                (values p1 p0))
+                          (assert (eql (position 1 copy :start s :end e)
+                                       (position 1 orig :start s :end e)))
+                          (assert (eql (position 1 copy :start s :end e :from-end t)
+                                       (position 1 orig :start s :end e :from-end t)))))))
+               (test vector)
+               (test disp)))))
+
+(with-test (:name :bit-position)
+  (test-bit-position 0 (list) 0 0 nil nil)
+  (test-bit-position 0 (list) 0 0 t nil)
+  (test-bit-position 1 (list 0) 0 0 nil nil)
+  (test-bit-position 1 (list 0) 0 0 t nil)
+  (test-bit-position 1 (list 0) 0 1 nil 0)
+  (test-bit-position 1 (list 0) 0 1 t 0)
+  (test-bit-position 10 (list 0 1) 0 1 nil 0)
+  (test-bit-position 10 (list 0 1) 1 1 nil nil)
+  (test-bit-position 10 (list 0 1) 0 1 t 0)
+  (test-bit-position 10 (list 0 1) 1 1 t nil)
+  (test-bit-position 10 (list 0 3) 1 4 nil 3)
+  (test-bit-position 10 (list 0 3) 1 4 t 3)
+  (test-bit-position 10 (list 0 3 6) 1 10 nil 3)
+  (test-bit-position 10 (list 0 3 6) 1 10 t 6)
+  (test-bit-position 1000 (list 128 700) 20 500 nil 128)
+  (test-bit-position 1000 (list 128 700) 20 500 t 128)
+  (test-bit-position 1000 (list 423 762) 200 800 nil 423)
+  (test-bit-position 1000 (list 423 762) 200 800 t 762)
+  (test-bit-position 1000 (list 298 299) 100 400 nil 298)
+  (test-bit-position 1000 (list 298 299) 100 400 t 299))
+
+(with-test (:name (:bit-position :random-test))
+  (random-test-bit-position 10000))
+
 ;;; success

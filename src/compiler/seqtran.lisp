@@ -1444,6 +1444,31 @@
     from-end start end key test))
 
 (deftransform %find-position ((item sequence from-end start end key test)
+                              (t bit-vector t t t t t)
+                              * :node node)
+  (when (and test (lvar-fun-is test '(eq eql equal)))
+    (setf test nil))
+  (when (and key (lvar-fun-is key '(identity)))
+    (setf key nil))
+  (when (or test key)
+    (delay-ir1-transform node :optimize)
+    (give-up-ir1-transform "non-trivial :KEY or :TEST"))
+  `(with-array-data ((bits sequence :offset-var offset)
+                     (start start)
+                     (end end)
+                     :check-fill-pointer t)
+     (let ((p ,(if (constant-lvar-p item)
+                   (case (lvar-value item)
+                     (0 `(%bit-position/0 bits from-end start end))
+                     (1 `(%bit-position/1 bits from-end start end))
+                     (otherwise
+                      (abort-ir1-transform)))
+                   `(%bit-position (the bit item) bits from-end start end))))
+       (if p
+           (values item (the index (- (truly-the index p) offset)))
+           (values nil nil)))))
+
+(deftransform %find-position ((item sequence from-end start end key test)
                               (character string t t t function function)
                               *
                               :policy (> speed space))
