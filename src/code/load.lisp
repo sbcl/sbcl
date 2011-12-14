@@ -168,6 +168,7 @@
 
 (defun nuke-fop-vector (vector)
   (declare (simple-vector vector)
+           #!-gencgc (ignore vector)
            (optimize speed))
   ;; Make sure we don't keep any garbage.
   #!+gencgc
