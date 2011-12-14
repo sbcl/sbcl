@@ -883,7 +883,9 @@
   (op      :field (byte 8 8))
   (reg/mem :fields (list (byte 2 22) (byte 3 16))
                                 :type 'reg/mem)
-  (reg     :field (byte 3 19)   :type 'reg))
+  (reg     :field (byte 3 19)   :type 'reg)
+  ;; optional fields
+  (imm))
 
 (sb!disassem:define-instruction-format (rex-ext-reg-reg/mem-no-width 32
                                         :default-printer
@@ -1989,7 +1991,7 @@
               (error "bogus args to XCHG: ~S ~S" operand1 operand2)))))))
 
 (define-instruction lea (segment dst src)
-  (:printer rex-reg-reg/mem ((op #b1000110)))
+  (:printer rex-reg-reg/mem ((op #b1000110) (width 1)))
   (:printer reg-reg/mem ((op #b1000110) (width 1)))
   (:emitter
    (aver (or (dword-reg-p dst) (qword-reg-p dst)))
@@ -2428,20 +2430,19 @@
 
 (eval-when (:compile-toplevel :execute)
   (defun double-shift-inst-printer-list (op)
-    `(#+nil
-      (ext-reg-reg/mem-imm ((op ,(logior op #b100))
-                            (imm nil :type signed-imm-byte)))
-      (ext-reg-reg/mem ((op ,(logior op #b101)))
+    `((ext-reg-reg/mem-no-width ((op ,(logior op #b100))
+                                 (imm nil :type imm-byte)))
+      (ext-reg-reg/mem-no-width ((op ,(logior op #b101)))
          (:name :tab reg/mem ", " reg ", " 'cl)))))
 
 (define-instruction shld (segment dst src amt)
-  (:declare (type (or (member :cl) (mod 32)) amt))
+  (:declare (type (or (member :cl) (mod 64)) amt))
   (:printer-list (double-shift-inst-printer-list #b10100000))
   (:emitter
    (emit-double-shift segment #b0 dst src amt)))
 
 (define-instruction shrd (segment dst src amt)
-  (:declare (type (or (member :cl) (mod 32)) amt))
+  (:declare (type (or (member :cl) (mod 64)) amt))
   (:printer-list (double-shift-inst-printer-list #b10101000))
   (:emitter
    (emit-double-shift segment #b1 dst src amt)))

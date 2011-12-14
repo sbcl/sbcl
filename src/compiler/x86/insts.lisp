@@ -1742,12 +1742,11 @@
 
 (eval-when (:compile-toplevel :execute)
   (defun double-shift-inst-printer-list (op)
-    `(#+nil
-      (ext-reg-reg/mem-imm ((op ,(logior op #b10))
-                            (imm nil :type signed-imm-byte)))
-      (ext-reg-reg/mem ((op ,(logior op #b10)))
+    `((ext-reg-reg/mem ((op ,(logior op #b10)) (width 0)
+                        (imm nil :type signed-imm-byte)))
+      (ext-reg-reg/mem ((op ,(logior op #b10)) (width 1))
          (:name :tab reg/mem ", " reg ", " 'cl))
-      (x66-ext-reg-reg/mem ((op ,(logior op #b10)))
+      (x66-ext-reg-reg/mem ((op ,(logior op #b10)) (width 1))
          (:name :tab reg/mem ", " reg ", " 'cl)))))
 
 (define-instruction shld (segment dst src amt)
