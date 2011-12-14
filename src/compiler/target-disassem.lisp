@@ -422,8 +422,8 @@
         (format stream "~A~Vt~W~%" '.align
                 (dstate-argument-column dstate)
                 alignment))
-      (incf(dstate-next-offs dstate)
-           (- (align location alignment) location)))
+      (incf (dstate-next-offs dstate)
+            (- (align location alignment) location)))
     nil))
 
 (defun rewind-current-segment (dstate segment)
@@ -478,9 +478,10 @@
 (defun pad-inst-column (stream n-bytes)
   (declare (type stream stream)
            (type text-width n-bytes))
-  (dotimes (i (- *disassem-inst-column-width* (* 2 n-bytes)))
-    (write-char #\space stream))
-  (write-char #\space stream))
+  (when (> *disassem-inst-column-width* 0)
+    (dotimes (i (- *disassem-inst-column-width* (* 2 n-bytes)))
+      (write-char #\space stream))
+    (write-char #\space stream)))
 
 (defun handle-bogus-instruction (stream dstate prefix-len)
   (let ((alignment (dstate-alignment dstate)))
@@ -786,12 +787,13 @@
 
 ;;; Print NUM instruction bytes to STREAM as hex values.
 (defun print-inst (num stream dstate &key (offset 0) (trailing-space t))
-  (let ((sap (dstate-segment-sap dstate))
-        (start-offs (+ offset (dstate-cur-offs dstate))))
-    (dotimes (offs num)
-      (format stream "~2,'0x" (sb!sys:sap-ref-8 sap (+ offs start-offs))))
-    (when trailing-space
-      (pad-inst-column stream num))))
+  (when (> *disassem-inst-column-width* 0)
+    (let ((sap (dstate-segment-sap dstate))
+          (start-offs (+ offset (dstate-cur-offs dstate))))
+      (dotimes (offs num)
+        (format stream "~2,'0x" (sb!sys:sap-ref-8 sap (+ offs start-offs))))
+      (when trailing-space
+        (pad-inst-column stream num)))))
 
 ;;; Disassemble NUM bytes to STREAM as simple `BYTE' instructions.
 (defun print-bytes (num stream dstate)
@@ -839,10 +841,13 @@
 (defun make-dstate (&optional (fun-hooks *default-dstate-hooks*))
   (let ((alignment *disassem-inst-alignment-bytes*)
         (arg-column
-         (+ (or *disassem-opcode-column-width* 0)
+         (+ 2
             *disassem-location-column-width*
             1
-            label-column-width)))
+            label-column-width
+            *disassem-inst-column-width*
+            (if (zerop *disassem-inst-column-width*) 0 1)
+            *disassem-opcode-column-width*)))
 
     (when (> alignment 1)
       (push #'alignment-hook fun-hooks))

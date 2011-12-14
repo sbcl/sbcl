@@ -46,7 +46,7 @@
 ;;; the width of the column in which instruction-names are printed. A
 ;;; value of zero gives the effect of not aligning the arguments at
 ;;; all.
-(defvar *disassem-opcode-column-width* 6)
+(defvar *disassem-opcode-column-width* 0)
 (declaim (type text-width *disassem-opcode-column-width*))
 
 ;;; the width of the column in which instruction-bytes are printed. A
