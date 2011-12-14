@@ -471,20 +471,41 @@
         (unless (= (dstate-next-offs dstate) cur-offs)
           (return prefix-p))))))
 
-(defun handle-bogus-instruction (stream dstate)
+;;; Print enough spaces to fill the column used for instruction bytes,
+;;; assuming that N-BYTES many instruction bytes have already been
+;;; printed in it, then print an additional space as separator to the
+;;; opcode column.
+(defun pad-inst-column (stream n-bytes)
+  (declare (type stream stream)
+           (type text-width n-bytes))
+  (dotimes (i (- *disassem-inst-column-width* (* 2 n-bytes)))
+    (write-char #\space stream))
+  (write-char #\space stream))
+
+(defun handle-bogus-instruction (stream dstate prefix-len)
   (let ((alignment (dstate-alignment dstate)))
     (unless (null stream)
       (multiple-value-bind (words bytes)
           (truncate alignment sb!vm:n-word-bytes)
         (when (> words 0)
-          (print-inst (* words sb!vm:n-word-bytes) stream dstate))
+          (print-inst (* words sb!vm:n-word-bytes) stream dstate
+                      :trailing-space nil))
         (when (> bytes 0)
-          (print-inst bytes stream dstate)))
-      (print-bytes alignment stream dstate))
+          (print-inst bytes stream dstate :trailing-space nil)))
+      (pad-inst-column stream (+ prefix-len alignment))
+      (decf (dstate-cur-offs dstate) prefix-len)
+      (print-bytes (+ prefix-len alignment) stream dstate))
     (incf (dstate-next-offs dstate) alignment)))
 
 ;;; Iterate through the instructions in SEGMENT, calling FUNCTION for
 ;;; each instruction, with arguments of CHUNK, STREAM, and DSTATE.
+;;; Additionally, unless STREAM is NIL, several items are output to it:
+;;; things printed from several hooks, for example labels, and instruction
+;;; bytes before FUNCTION is called, notes and a newline afterwards.
+;;; Instructions having an INST-PRINTER of NIL are treated as prefix
+;;; instructions which makes them print on the same line as the following
+;;; instruction, outputting their INST-PRINT-NAME (unless that is NIL)
+;;; before FUNCTION is called for the following instruction.
 (defun map-segment-instructions (function segment dstate &optional stream)
   (declare (type function function)
            (type segment segment)
@@ -493,7 +514,8 @@
 
   (let ((ispace (get-inst-space))
         (prefix-p nil) ; just processed a prefix inst
-        (prefix-len 0)) ; length of any prefix instruction(s)
+        (prefix-len 0) ; sum of lengths of any prefix instruction(s)
+        (prefix-print-names nil)) ; reverse list of prefixes seen
 
     (rewind-current-segment dstate segment)
 
@@ -501,6 +523,11 @@
       (when (>= (dstate-cur-offs dstate)
                 (seg-length (dstate-segment dstate)))
         ;; done!
+        (when (and stream (> prefix-len 0))
+          (pad-inst-column stream prefix-len)
+          (decf (dstate-cur-offs dstate) prefix-len)
+          (print-bytes prefix-len stream dstate)
+          (incf (dstate-cur-offs dstate) prefix-len))
         (return))
 
       (setf (dstate-next-offs dstate) (dstate-cur-offs dstate))
@@ -514,56 +541,73 @@
         (sb!sys:without-gcing
          (setf (dstate-segment-sap dstate) (funcall (seg-sap-maker segment)))
 
-         (let ((chunk
-                (sap-ref-dchunk (dstate-segment-sap dstate)
-                                (dstate-cur-offs dstate)
-                                (dstate-byte-order dstate))))
-           (let ((fun-prefix-p (call-fun-hooks chunk stream dstate)))
-             (if (> (dstate-next-offs dstate) (dstate-cur-offs dstate))
-                 (setf prefix-p fun-prefix-p)
+         (let* ((chunk
+                 (sap-ref-dchunk (dstate-segment-sap dstate)
+                                 (dstate-cur-offs dstate)
+                                 (dstate-byte-order dstate)))
+                (fun-prefix-p (call-fun-hooks chunk stream dstate)))
+           (if (> (dstate-next-offs dstate) (dstate-cur-offs dstate))
+               (setf prefix-p fun-prefix-p)
                (let ((inst (find-inst chunk ispace)))
                  (cond ((null inst)
-                        (handle-bogus-instruction stream dstate))
+                        (handle-bogus-instruction stream dstate prefix-len)
+                        (setf prefix-p nil))
                        (t
-                        (setf (dstate-inst-properties dstate) nil)
                         (setf (dstate-next-offs dstate)
                               (+ (dstate-cur-offs dstate)
                                  (inst-length inst)))
-                        (let ((orig-next (dstate-next-offs dstate)))
-                          (print-inst (inst-length inst) stream dstate :trailing-space nil)
-                          (let ((prefilter (inst-prefilter inst))
-                                (control (inst-control inst)))
-                            (when prefilter
-                              (funcall prefilter chunk dstate))
+                        (let ((orig-next (dstate-next-offs dstate))
+                              (prefilter (inst-prefilter inst))
+                              (control (inst-control inst)))
+                          (print-inst (inst-length inst) stream dstate
+                                      :trailing-space nil)
+                          (when prefilter
+                            (funcall prefilter chunk dstate))
 
-                            (setf prefix-p (null (inst-printer inst)))
+                          (setf prefix-p (null (inst-printer inst)))
 
-                            ;; print any instruction bytes recognized by the prefilter which calls read-suffix
-                            ;; and updates next-offs
-                            (when stream
-                              (let ((suffix-len (- (dstate-next-offs dstate) orig-next)))
-                                (when (plusp suffix-len)
-                                  (print-inst suffix-len stream dstate :offset (inst-length inst) :trailing-space nil))
-                                (unless prefix-p
-                                  (dotimes (i (- *disassem-inst-column-width* (* 2 (+ (inst-length inst) suffix-len prefix-len))))
-                                    (write-char #\space stream))
-                                  (write-char #\space stream))
+                          (when stream
+                            ;; Print any instruction bytes recognized by
+                            ;; the prefilter which calls read-suffix and
+                            ;; updates next-offs.
+                            (let ((suffix-len (- (dstate-next-offs dstate)
+                                                 orig-next)))
+                              (when (plusp suffix-len)
+                                (print-inst suffix-len stream dstate
+                                            :offset (inst-length inst)
+                                            :trailing-space nil))
+                              ;; Keep track of the number of bytes
+                              ;; printed so far.
+                              (incf prefix-len (+ (inst-length inst)
+                                                  suffix-len)))
+                            (if prefix-p
+                                (let ((name (inst-print-name inst)))
+                                  (when name
+                                    (push name prefix-print-names)))
+                                (progn
+                                  ;; PREFIX-LEN includes the length of the
+                                  ;; current (non-prefix) instruction here.
+                                  (pad-inst-column stream prefix-len)
+                                  (dolist (name (reverse prefix-print-names))
+                                    (princ name stream)
+                                    (write-char #\space stream)))))
 
-                                (setf prefix-len (+ (inst-length inst) suffix-len))))
+                          (funcall function chunk inst)
 
-                            (funcall function chunk inst)
-
-                            (when control
-                              (funcall control chunk inst stream dstate))
-                            ))))))))))
+                          (when control
+                            (funcall control chunk inst stream dstate))))))))))
 
       (setf (dstate-cur-offs dstate) (dstate-next-offs dstate))
 
-      (unless (null stream)
+      (when stream
         (unless prefix-p
-          (setf prefix-len 0)
+          (setf prefix-len 0
+                prefix-print-names nil)
           (print-notes-and-newline stream dstate))
-        (setf (dstate-output-state dstate) nil)))))
+        (setf (dstate-output-state dstate) nil))
+      (unless prefix-p
+        (setf (dstate-inst-properties dstate) nil)))))
+
 
 ;;; Make an initial non-printing disassembly pass through DSTATE,
 ;;; noting any addresses that are referenced by instructions in this
@@ -747,9 +791,7 @@
     (dotimes (offs num)
       (format stream "~2,'0x" (sb!sys:sap-ref-8 sap (+ offs start-offs))))
     (when trailing-space
-      (dotimes (i (- *disassem-inst-column-width* (* 2 num)))
-        (write-char #\space stream))
-      (write-char #\space stream))))
+      (pad-inst-column stream num))))
 
 ;;; Disassemble NUM bytes to STREAM as simple `BYTE' instructions.
 (defun print-bytes (num stream dstate)
