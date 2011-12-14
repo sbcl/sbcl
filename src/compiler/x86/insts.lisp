@@ -48,13 +48,11 @@
 ;;; correctly in all cases, so we copy the x86-64 version which at
 ;;; least can handle the code output by the compiler.
 ;;;
-;;; Width information for an instruction is stored as an inst-prop on
-;;; the dstate.  The inst-props are cleared automatically after each
-;;; instruction, must be set by prefilters, and contain a single bit
-;;; of data each (presence/absence).  As such, each instruction that
-;;; can emit an operand-size prefix (x66 prefix) needs to have a set
-;;; of printers declared for both the prefixed and non-prefixed
-;;; encodings.
+;;; Width information for an instruction and whether a segment
+;;; override prefix was seen is stored as an inst-prop on the dstate.
+;;; The inst-props are cleared automatically after each non-prefix
+;;; instruction, must be set by prefilters, and contain a single bit of
+;;; data each (presence/absence).
 
 ;;; Return the operand size based on the prefixes and width bit from
 ;;; the dstate.
@@ -154,6 +152,12 @@
   (declare (ignore dstate))
   (sb!disassem:princ16 value stream))
 
+(defun maybe-print-segment-override (stream dstate)
+  (cond ((sb!disassem:dstate-get-inst-prop dstate 'fs-segment-prefix)
+         (princ "FS:" stream))
+        ((sb!disassem:dstate-get-inst-prop dstate 'gs-segment-prefix)
+         (princ "GS:" stream))))
+
 ;;; Returns either an integer, meaning a register, or a list of
 ;;; (BASE-REG OFFSET INDEX-REG INDEX-SCALE), where any component
 ;;; may be missing or nil to indicate that it's not used or has the
@@ -217,6 +221,16 @@
            (ignore value)
            (type sb!disassem:disassem-state dstate))
   (sb!disassem:dstate-put-inst-prop dstate 'operand-size-16))
+
+;;; This prefilter is used solely for its side effect, namely to put
+;;; one of the properties [FG]S-SEGMENT-PREFIX into the DSTATE.
+;;; Unlike PREFILTER-X66, this prefilter only catches the low bit of
+;;; the prefix byte.
+(defun prefilter-seg (value dstate)
+  (declare (type bit value)
+           (type sb!disassem:disassem-state dstate))
+  (sb!disassem:dstate-put-inst-prop
+   dstate (elt '(fs-segment-prefix gs-segment-prefix) value)))
 
 (defun read-address (value dstate)
   (declare (ignore value))              ; always nil anyway
@@ -349,6 +363,11 @@
 (sb!disassem:define-arg-type x66
   :prefilter #'prefilter-x66)
 
+;;; Used to capture the effect of the #x64 and #x65 segment override
+;;; prefixes.
+(sb!disassem:define-arg-type seg
+  :prefilter #'prefilter-seg)
+
 (eval-when (:compile-toplevel :load-toplevel :execute)
 (defparameter *conditions*
   '((:o . 0)
@@ -404,6 +423,10 @@
 
 (sb!disassem:define-instruction-format (x66 8)
   (x66   :field (byte 8 0) :type 'x66 :value #x66))
+
+(sb!disassem:define-instruction-format (seg 8)
+  (seg   :field (byte 7 1) :value #x32)
+  (fsgs  :field (byte 1 0) :type 'seg))
 
 (sb!disassem:define-instruction-format (simple 8)
   (op    :field (byte 7 1))
@@ -965,6 +988,16 @@
     (:gs
      (emit-byte segment #x65))))
 
+(define-instruction fs (segment)
+  (:printer seg ((fsgs #b0)) nil :print-name nil)
+  (:emitter
+   (bug "FS prefix used as a standalone instruction")))
+
+(define-instruction gs (segment)
+  (:printer seg ((fsgs #b1)) nil :print-name nil)
+  (:emitter
+   (bug "GS prefix used as a standalone instruction")))
+
 (define-instruction lock (segment)
   (:printer byte ((op #b11110000)) nil)
   (:emitter
@@ -1186,16 +1219,6 @@
    (emit-byte segment #xf3)
    (emit-byte segment #x90)))
 
-(define-instruction fs-segment-prefix (segment)
-  (:printer byte ((op #b01100100)))
-  (:emitter
-   (bug "FS emitted as a separate instruction!")))
-
-(define-instruction gs-segment-prefix (segment)
-  (:printer byte ((op #b01100101)))
-  (:emitter
-   (bug "GS emitted as a separate instruction!")))
-
 ;;;; flag control instructions
 
 ;;; CLC -- Clear Carry Flag.

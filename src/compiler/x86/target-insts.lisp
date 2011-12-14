@@ -23,6 +23,7 @@
   (when print-size-p
     (princ (inst-operand-size dstate) stream)
     (princ '| PTR | stream))
+  (maybe-print-segment-override stream dstate)
   (write-char #\[ stream)
   (let ((firstp t))
     (macrolet ((pel ((var val) &body body)

@@ -34,10 +34,12 @@ changes relative to sbcl-1.0.54:
   * enhancement: SBCL now provides either an explicit :BIG-ENDIAN or
     :LITTLE-ENDIAN in *FEATURES*, instead of :BIG-ENDIAN being implied by lack
     of the :LITTLE-ENDIAN feature. (Thanks to Luís Oliveira, lp#901661)
+  * enhancement: better disassembly of segment-prefixes on x86 and other
+    instruction prefixes (e.g. LOCK) on x86 and x86-64.
   * optimization: SUBSEQ on vectors of unknown element type is substantially
     faster. (lp#902537)
   * optimization: specialized arrays with non-zero :INITIAL-ELEMENT can
-    be stack-allocated. (lp#902351) 
+    be stack-allocated. (lp#902351)
   * optimization: the compiler is smarter about representation selection for
     floating point constants used in full calls.
   * optimization: the compiler no longer refuses to coerce large fixnums to
