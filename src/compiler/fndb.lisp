@@ -1449,7 +1449,8 @@
 (defknown (%dpb %deposit-field) (integer bit-index bit-index integer) integer
   (movable foldable flushable explicit-check))
 (defknown %negate (number) number (movable foldable flushable explicit-check))
-(defknown %check-bound (array index fixnum) index (movable foldable flushable))
+(defknown %check-bound (array index fixnum) index
+  (movable foldable flushable dx-safe))
 (defknown data-vector-ref (simple-array index) t
   (foldable explicit-check always-translatable))
 (defknown data-vector-ref-with-offset (simple-array index fixnum) t

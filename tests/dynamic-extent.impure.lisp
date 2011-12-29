@@ -252,6 +252,13 @@
     (true v)
     nil))
 
+(defun-with-dx make-array-on-stack-11 ()
+  (let ((v (make-array (the integer (opaque-identity 3)) :initial-element 12.0d0 :element-type 'double-float)))
+    (declare (sb-int:truly-dynamic-extent v))
+    (true v)
+    (true v)
+    nil))
+
 (defun-with-dx vector-on-stack (x y)
   (let ((v (vector 1 x 2 y 3)))
     (declare (sb-int:truly-dynamic-extent v))
@@ -584,7 +591,8 @@
   (assert-no-consing (make-array-on-stack-7))
   (assert-no-consing (make-array-on-stack-8))
   (assert-no-consing (make-array-on-stack-9))
-  (assert-no-consing (make-array-on-stack-10)))
+  (assert-no-consing (make-array-on-stack-10))
+  (assert-no-consing (make-array-on-stack-11)))
 
 (with-test (:name (:no-consing :dx-raw-instances) :skipped-on '(or (not :raw-instance-init-vops)
                                                                    (not (and :gencgc :c-stack-is-control-stack))))

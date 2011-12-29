@@ -37,7 +37,7 @@ changes relative to sbcl-1.0.54:
   * enhancement: better disassembly of segment-prefixes on x86 and other
     instruction prefixes (e.g. LOCK) on x86 and x86-64.
   * optimization: FIND and POSITION on bit-vectors are orders of magnitude
-    faster (assuming KEY and TEST are not used, or are sufficiently trivial).
+    faster (assuming KEY and TEST are not used, or are sufficiently trivial.)
   * optimization: SUBSEQ on vectors of unknown element type is substantially
     faster. (lp#902537)
   * optimization: specialized arrays with non-zero :INITIAL-ELEMENT can
