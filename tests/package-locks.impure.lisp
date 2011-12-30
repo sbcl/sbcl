@@ -550,4 +550,21 @@
     (assert (equal inline-lambda
                    (function-lambda-expression #'fill-pointer)))))
 
+(with-test (:name :compile-time-defclass-package-locked)
+  ;; Compiling (DEFCLASS FTYPE ...) used to break SBCL, but the package
+  ;; locks didn't kick in till later.
+  (assert (eq :ok
+              (handler-case
+                  (ctu:file-compile `((defclass ftype () ())))
+                (sb-ext:symbol-package-locked-error (e)
+                  (when (eq 'ftype (sb-ext:package-locked-error-symbol e))
+                    :ok)))))
+  ;; Check for accessor violations as well.
+  (assert (eq :ok
+              (handler-case
+                  (ctu:file-compile `((defclass foo () ((ftype :reader ftype)))))
+                (sb-ext:symbol-package-locked-error (e)
+                  (when (eq 'ftype (sb-ext:package-locked-error-symbol e))
+                    :ok))))))
+
 ;;; WOOT! Done.

@@ -298,6 +298,7 @@
   ;; actual type as a compile-time side-effect would probably be a bad
   ;; idea and (2) anyway we don't need to modify it in order to make
   ;; NAME be recognized as a valid type name)
+  (with-single-package-locked-error (:symbol name "proclaiming ~S as a class"))
   (unless (info :type :kind name)
     ;; Tell the compiler to expect a class with the given NAME, by
     ;; writing a kind of minimal placeholder type information. This
@@ -311,11 +312,12 @@
            ;; that :WHERE-FROM is :DEFINED, not :DECLARED, and should
            ;; probably be factored into a common function -- eg.
            ;; (%proclaim-ftype name declared-or-defined).
-           (when (eq (info :function :where-from name) :assumed)
-             (proclaim-as-fun-name name)
-             (note-name-defined name :function)
-             (setf (info :function :where-from name) :defined
-                   (info :function :type name) type))))
+           (with-single-package-locked-error (:symbol name "proclaiming ~S as a function")
+             (when (eq (info :function :where-from name) :assumed)
+               (proclaim-as-fun-name name)
+               (note-name-defined name :function)
+               (setf (info :function :where-from name) :defined
+                     (info :function :type name) type)))))
     (let ((rtype (specifier-type '(function (t) t)))
           (wtype (specifier-type '(function (t t) t))))
       (dolist (reader readers)

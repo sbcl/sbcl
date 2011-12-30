@@ -89,6 +89,8 @@ changes relative to sbcl-1.0.54:
     subtypes of CHARACTER that are forbidden according to ANSI. (lp#841312)
   * bug fix: missing failure-to-stack-allocate compiler notes for some
     forms of MAKE-ARRAY with dynamic-extent. (lp#902351)
+  * bug fix: some of the compile-time side-effects of DEFCLASS were not caught
+    by package locks.
 
 changes in sbcl-1.0.54 relative to sbcl-1.0.53:
   * minor incompatible changes:
