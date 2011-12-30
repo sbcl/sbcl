@@ -312,12 +312,11 @@
            ;; that :WHERE-FROM is :DEFINED, not :DECLARED, and should
            ;; probably be factored into a common function -- eg.
            ;; (%proclaim-ftype name declared-or-defined).
-           (with-single-package-locked-error (:symbol name "proclaiming ~S as a function")
-             (when (eq (info :function :where-from name) :assumed)
-               (proclaim-as-fun-name name)
-               (note-name-defined name :function)
-               (setf (info :function :where-from name) :defined
-                     (info :function :type name) type)))))
+           (when (eq (info :function :where-from name) :assumed)
+             (proclaim-as-fun-name name)
+             (note-name-defined name :function)
+             (setf (info :function :where-from name) :defined
+                   (info :function :type name) type))))
     (let ((rtype (specifier-type '(function (t) t)))
           (wtype (specifier-type '(function (t t) t))))
       (dolist (reader readers)
