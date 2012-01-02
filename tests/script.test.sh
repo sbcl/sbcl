@@ -38,12 +38,26 @@ run_sbcl --script $tmpscript
 check_status_maybe_lose "--script exit status from normal exit" $? 0 "(everything ok)"
 
 cat > $tmpscript <<EOF
-#+(or darwin netbsd openbsd)
-(progn
-  (format t "silently skipping known failure in script.test.sh~%")
-  (sb-ext:quit :unix-status 3))
-(setf *standard-output* (open "/dev/stdout"))
+(setf *standard-output* (make-broadcast-stream))
 (close *standard-output*)
+(sb-ext:quit :unix-status 3)
+EOF
+run_sbcl --script $tmpscript >/dev/null
+check_status_maybe_lose "--script exit status from QUIT when standard-output closed" $? 3 "(as given)"
+run_sbcl --load $tmpscript >/dev/null
+check_status_maybe_lose "--load exit status from QUIT when standard-output closed" $? 3 "(as given)"
+
+cat > $tmpscript <<EOF
+(close *standard-output*)
+(sb-ext:quit :unix-status 3)
+EOF
+run_sbcl --script $tmpscript >/dev/null
+check_status_maybe_lose "--script exit status from QUIT when original standard-output closed" $? 3 "(as given)"
+run_sbcl --load $tmpscript >/dev/null
+check_status_maybe_lose "--load exit status from QUIT when original standard-output closed" $? 3 "(as given)"
+
+cat > $tmpscript <<EOF
+(close sb-sys:*stdout*)
 (sb-ext:quit :unix-status 3)
 EOF
 run_sbcl --script $tmpscript >/dev/null
