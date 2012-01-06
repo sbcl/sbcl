@@ -60,6 +60,22 @@
               (progn ,@body))
          ,(when delete-afterwards `(ignore-errors (delete-file ,file))))))
 
+(deftest non-existent-class
+  (handler-case
+      (with-test-file (s *test-file* :class 'non-existent-stream)
+        nil)
+    ;; find-class will raise a simple-error
+    (simple-error (c) (search "There is no class" (simple-condition-format-control c))))
+  0)
+
+(deftest non-stream-class
+  (handler-case
+      (with-test-file (s *test-file* :class 'standard-class)
+        nil)
+    ;; Will fall through sb-simple-streams:open as it is no stream class.
+    (simple-error (c) (search "Don't know how to handle" (simple-condition-format-control c))))
+  0)
+
 (deftest create-file-1
     ;; Create a file-simple-stream, write data.
     (prog1

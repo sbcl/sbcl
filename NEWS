@@ -1,5 +1,7 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 changes relative to sbcl-1.0.55:
+  * bug fix: SB-SIMPLE-STREAMS signals an error for bogus :CLASS arguments in
+    OPEN. (lp#969352, thanks to Kambiz Darabi)
   * documentation:
     ** improved docstrings: REPLACE (lp#965592)
 

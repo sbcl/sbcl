@@ -713,7 +713,11 @@
            (remf options :input-handle)
            (remf options :output-handle)
            (make-instance class :lisp-stream
-                          (apply #'open-fd-stream filespec options))))))
+                          (apply #'open-fd-stream filespec options)))
+          (t (error "Don't know how to handle the stream class ~A"
+                    (etypecase class
+                      (symbol (find-class class t))
+                      (class class)))))))
 
 
 (declaim (inline read-byte read-char read-char-no-hang unread-char))
