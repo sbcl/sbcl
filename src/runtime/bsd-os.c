@@ -22,6 +22,7 @@
 #include <sys/param.h>
 #include <sys/file.h>
 #include <unistd.h>
+#include <utime.h>
 #include <assert.h>
 #include <errno.h>
 #include "sbcl.h"
@@ -340,6 +341,12 @@ struct dirent *
 _readdir(DIR *dirp)
 {
     return readdir(dirp);
+}
+
+int
+_utime(const char *file, const struct utimbuf *timep)
+{
+    return utime(file, timep);
 }
 
 /* Used in sb-bsd-sockets. */

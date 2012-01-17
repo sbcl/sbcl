@@ -743,8 +743,9 @@ not supported."
           result)))
   (export 'utime :sb-posix)
   (defun utime (filename &optional access-time modification-time)
-    (let ((fun (extern-alien "utime" (function int (c-string :not-null t)
-                                               (* alien-utimbuf))))
+    (let ((fun (extern-alien #-netbsd "utime" #+netbsd "_utime"
+                             (function int (c-string :not-null t)
+                                       (* alien-utimbuf))))
           (name (filename filename)))
       (if (not (and access-time modification-time))
           (alien-funcall fun name nil)
