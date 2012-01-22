@@ -635,7 +635,7 @@
                                       (remove-duplicates
                                        (nconc
                                         (mapcan #'function-keywords methods)
-                                        (mapcar #'keywordicate gf.keys))))))
+                                        (mapcar #'keyword-spec-name gf.keys))))))
                                 (when all-keys
                                   (setq keysp t)
                                   `(&key ,@all-keys))))
