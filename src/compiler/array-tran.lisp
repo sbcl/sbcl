@@ -180,9 +180,11 @@
         (flet ((subscript-bounds (subscript)
                  (let* ((type1 (lvar-type subscript))
                         (type2 (if (csubtypep type1 (specifier-type 'integer))
-                                   (weaken-integer-type type1)
+                                   (weaken-integer-type type1 :range-only t)
                                    (give-up)))
-                        (low (numeric-type-low type2))
+                        (low (if (integer-type-p type2)
+                                 (numeric-type-low type2)
+                                 (give-up)))
                         (high (numeric-type-high type2)))
                    (cond
                      ((and (or (not (bound-known-p low)) (minusp low))

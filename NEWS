@@ -1,4 +1,7 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
+changes relative to sbcl-1.0.55:
+  * bug fix: compiler errors when weakening hairy integer types. (lp#913232)
+
 changes in sbcl-1.0.55 relative to sbcl-1.0.54:
   * enhancements to building SBCL using make.sh:
     ** --fancy can be specified to enable all supported feature enhancements.

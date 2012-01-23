@@ -77,27 +77,58 @@
         (t
          (fun-guessed-cost 'typep)))))
 
-(defun weaken-integer-type (type)
-  (cond ((union-type-p type)
-         (let* ((types (union-type-types type))
-                (one (pop types))
-                (low (numeric-type-low one))
-                (high (numeric-type-high one)))
-           (flet ((maximize (bound)
-                    (if (and bound high)
-                        (setf high (max high bound))
-                        (setf high nil)))
-                  (minimize (bound)
-                    (if (and bound low)
-                        (setf low (min low bound))
-                        (setf low nil))))
-             (dolist (a types)
-               (minimize (numeric-type-low a))
-               (maximize (numeric-type-high a))))
-           (specifier-type `(integer ,(or low '*) ,(or high '*)))))
-        (t
-         (aver (integer-type-p type))
-         type)))
+(defun weaken-integer-type (type &key range-only)
+  ;; FIXME: Our canonicalization isn't quite ideal for this. We get
+  ;; types such as:
+  ;;
+  ;;      (OR (AND (SATISFIES FOO) (INTEGER -100 -50))
+  ;;          (AND (SATISFIES FOO) (INTEGER 100 200)))
+  ;;
+  ;; here, and weakening that into
+  ;;
+  ;;     (AND (SATISFIES FOO) (INTEGER -100 200))
+  ;;
+  ;; is too much work to do here ... but if we canonicalized things
+  ;; differently, we could get it for free with trivial changes here.
+  (labels ((weaken-integer-type-part (type base)
+             (cond ((intersection-type-p type)
+                    (let ((new (specifier-type base)))
+                      (dolist (part (intersection-type-types type))
+                        (when (if range-only
+                                  (numeric-type-p part)
+                                  (not (unknown-type-p part)))
+                          (setf new (type-intersection
+                                     new (weaken-integer-type-part part t)))))
+                      new))
+                   ((union-type-p type)
+                    (let ((low t) (high t) (rest *empty-type*))
+                      (flet ((maximize (bound)
+                               (if (and bound high)
+                                   (setf high (if (eq t high)
+                                                  bound
+                                                  (max high bound)))
+                                   (setf high nil)))
+                             (minimize (bound)
+                               (if (and bound low)
+                                   (setf low (if (eq t low)
+                                                 bound
+                                                 (min low bound)))
+                                   (setf low nil))))
+                        (dolist (part (union-type-types type))
+                          (let ((weak (weaken-integer-type-part part t)))
+                            (cond ((numeric-type-p weak)
+                                   (minimize (numeric-type-low weak))
+                                   (maximize (numeric-type-high weak)))
+                                  ((not range-only)
+                                   (setf rest (type-union rest weak)))))))
+                      (if (eq t low)
+                          rest
+                          (type-union rest
+                                      (specifier-type
+                                       `(integer ,(or low '*) ,(or high '*)))))))
+                   (t
+                    type))))
+    (weaken-integer-type-part type 'integer)))
 
 (defun-cached
     (weaken-type :hash-bits 8
@@ -108,9 +139,10 @@
   (cond ((named-type-p type)
          type)
         ((csubtypep type (specifier-type 'integer))
-         ;; KLUDGE: Simple range checks are not that expensive, and we *don't*
-         ;; want to accidentally lose eg. array bounds checks due to weakening,
-         ;; so for integer types we simply collapse all ranges into one.
+         ;; Simple range checks are not that expensive, and we *don't*
+         ;; want to accidentally lose eg. array bounds checks due to
+         ;; weakening, so for integer types we simply collapse all
+         ;; ranges into one.
          (weaken-integer-type type))
         (t
          (let ((min-cost (type-test-cost type))
