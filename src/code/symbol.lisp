@@ -180,7 +180,7 @@ distinct from the global value. Can also be SETF."
 
 (defun getf (place indicator &optional (default ()))
   #!+sb-doc
-  "Search the property list stored in Place for an indicator EQ to INDICATOR.
+  "Search the property list stored in PLACE for an indicator EQ to INDICATOR.
   If one is found, return the corresponding value, else return DEFAULT."
   (do ((plist place (cddr plist)))
       ((null plist) default)
