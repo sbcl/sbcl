@@ -529,7 +529,7 @@ load_core_file(char *file, os_vm_offset_t file_offset)
         }
 
         ptr += remaining_len;
-        FSHOW((stderr, "/new ptr=0x%"WORD_FTMX"\n", ptr));
+        FSHOW((stderr, "/new ptr=0x%"WORD_FMTX"\n", ptr));
     }
     SHOW("about to free(header)");
     free(header);
