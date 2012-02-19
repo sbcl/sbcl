@@ -9,18 +9,14 @@
 # provided with absolutely no warranty. See the COPYING and CREDITS
 # files for more information.
 
-# XXX why do all the other Configs set LINKFLAGS instead of LDFLAGS?
-# LINKFLAGS is only used in src/runtime/GNUmakefile, this causes the
-# dladdr test in tools-for-build/ to fail.
-
 LINKFLAGS += -export-dynamic
-LDFLAGS += -export-dynamic
 
 ASSEM_SRC = ppc-assem.S ldso-stubs.S
 ARCH_SRC = ppc-arch.c
 
 OS_SRC = bsd-os.c ppc-bsd-os.c
 OS_LIBS = -lutil
+
 ifdef LISP_FEATURE_SB_CORE_COMPRESSION
   OS_LIBS += -lz
 endif

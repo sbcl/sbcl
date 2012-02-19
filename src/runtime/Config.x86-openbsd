@@ -18,11 +18,6 @@ OS_LIBS += -lutil
 # locations used. If you wish to link the runtime using -Z option then
 # please see the comments in src/compiler/x86/parms.lisp
 
-# XXX why do all the other Configs set LINKFLAGS instead of LDFLAGS?
-# LINKFLAGS is only used in src/runtime/GNUmakefile, this causes the
-# dladdr test in tools-for-build/ to fail.
-
 LINKFLAGS += -export-dynamic
-LDFLAGS += -export-dynamic
 
-CFLAGS = -g -Wall -O2 -fno-omit-frame-pointer
+CFLAGS += -fno-omit-frame-pointer
