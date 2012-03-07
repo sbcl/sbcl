@@ -153,7 +153,7 @@
           ":SB-THREAD not supported on selected architecture")
          ("(and gencgc cheneygc)"
           ":GENCGC and :CHENEYGC are incompatible")
-         ("(and cheneygc (not (or alpha hppa mips ppc sparc)))"
+         ("(and cheneygc (not (or alpha arm hppa mips ppc sparc)))"
           ":CHENEYGC not supported on selected architecture")
          ("(and gencgc (not (or sparc ppc x86 x86-64)))"
           ":GENCGC not supported on selected architecture")
@@ -169,7 +169,8 @@
           ;; updated to take the additional indirection into account.
           ;; Let's avoid this unusual combination.
           ":SB-DYNAMIC-CORE requires :LINKAGE-TABLE and :SB-THREAD")
-         ("(or (and alpha (or hppa mips ppc sparc x86 x86-64))
+         ("(or (and alpha (or arm hppa mips ppc sparc x86 x86-64))
+               (and arm (or hppa mips ppc sparc x86 x86-64))
                (and hppa (or mips ppc sparc x86 x86-64))
                (and mips (or ppc sparc x86 x86-64))
                (and ppc (or sparc x86 x86-64))
@@ -255,6 +256,7 @@
                    #!+mips "mips"
                    #!+alpha "alpha"
                    #!+hppa "hppa"
+                   #!+arm "arm"
                    (subseq stem (+ position 7)))
       stem)))
 (compile 'stem-remap-target)

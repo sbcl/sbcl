@@ -409,6 +409,8 @@
  ;;      any PA-RISC CPU
  ;;   :mips
  ;;      any MIPS CPU (in little-endian mode with :little-endian)
+ ;;   :arm
+ ;;      an ARM CPU (details yet to be determined)
  ;;
  ;; (CMU CL also had a :pentium feature, which affected the definition
  ;; of some floating point vops. It was present but not enabled or
