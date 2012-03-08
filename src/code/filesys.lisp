@@ -1118,6 +1118,12 @@ Experimental: interface subject to change."
                                            (car one) (car two)) x))
                         (intersect-directory-helper (cdr one) (cdr two)))))))))
 
+
+(defun directory-pathname-p (pathname)
+  (and (pathnamep pathname)
+       (null (pathname-name pathname))
+       (null (pathname-type pathname))))
+
 (defun ensure-directories-exist (pathspec &key verbose (mode #o777))
   #!+sb-doc
   "Test whether the directories containing the specified file
@@ -1132,35 +1138,42 @@ Experimental: interface subject to change."
              :pathname pathspec))
     (let ((dir (pathname-directory pathname)))
       (loop for i from 1 upto (length dir)
-            do (let ((newpath (make-pathname
-                               :host (pathname-host pathname)
-                               :device (pathname-device pathname)
-                               :directory (subseq dir 0 i))))
-                 (unless (probe-file newpath)
-                   (let ((namestring (coerce (native-namestring newpath)
-                                             'string)))
-                     (when verbose
-                       (format *standard-output*
-                               "~&creating directory: ~A~%"
-                               namestring))
-                     (sb!unix:unix-mkdir namestring mode)
-                     (unless (probe-file newpath)
-                       (restart-case (error
-                                      'simple-file-error
-                                      :pathname pathspec
-                                      :format-control
-                                      "can't create directory ~A"
-                                      :format-arguments (list namestring))
-                         (retry ()
-                           :report "Retry directory creation."
-                           (ensure-directories-exist
-                            pathspec
-                            :verbose verbose :mode mode))
-                         (continue ()
-                           :report
-                           "Continue as if directory creation was successful."
-                           nil)))
-                     (setf created-p t)))))
+            do
+            (let* ((newpath (make-pathname
+                             :host (pathname-host pathname)
+                             :device (pathname-device pathname)
+                             :directory (subseq dir 0 i)))
+                   (probed (probe-file newpath)))
+              (unless (directory-pathname-p probed)
+                (let ((namestring (coerce (native-namestring newpath)
+                                          'string)))
+                  (when verbose
+                    (format *standard-output*
+                            "~&creating directory: ~A~%"
+                            namestring))
+                  (sb!unix:unix-mkdir namestring mode)
+                  (unless (directory-pathname-p (probe-file newpath))
+                    (restart-case
+                        (error
+                         'simple-file-error
+                         :pathname pathspec
+                         :format-control
+                         (if (and probed
+                                  (not (directory-pathname-p probed)))
+                             "Can't create directory ~A,~
+                                 ~%a file with the same name already exists."
+                             "Can't create directory ~A")
+                         :format-arguments (list namestring))
+                      (retry ()
+                        :report "Retry directory creation."
+                        (ensure-directories-exist
+                         pathspec
+                         :verbose verbose :mode mode))
+                      (continue ()
+                        :report
+                        "Continue as if directory creation was successful."
+                        nil)))
+                  (setf created-p t)))))
       (values pathspec created-p))))
 
 (/show0 "filesys.lisp 1000")
