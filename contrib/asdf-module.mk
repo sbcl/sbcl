@@ -1,4 +1,4 @@
-CC=gcc
+CC?=gcc
 
 # We need to extend flags to the C compiler and the linker
 # here. sb-posix, sb-grovel, and sb-bsd-sockets depends upon these
