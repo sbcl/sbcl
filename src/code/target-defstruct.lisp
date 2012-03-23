@@ -361,9 +361,9 @@
   #!+sb-doc
   "Return a copy of STRUCTURE with the same (EQL) slot values."
   (declare (type structure-object structure))
-  (let* ((len (%instance-length structure))
-         (res (%make-instance len))
-         (layout (%instance-layout structure))
+  (let* ((layout (%instance-layout structure))
+         (res (%make-instance (%instance-length structure)))
+         (len (layout-length layout))
          (nuntagged (layout-n-untagged-slots layout)))
 
     (declare (type index len))
