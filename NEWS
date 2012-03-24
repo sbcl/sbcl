@@ -6,6 +6,8 @@ changes relative to sbcl-1.0.55:
   * enhancements
     ** SBCL can now be built using Clang.
   * bug fix: compiler errors when weakening hairy integer types. (lp#913232)
+  * bug fix: don't complain about a too-hairy lexical environment for inlining
+    when the function has never been requested for inlining.  (lp#963530)
 
 changes in sbcl-1.0.55 relative to sbcl-1.0.54:
   * enhancements to building SBCL using make.sh:

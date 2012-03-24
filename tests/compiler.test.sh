@@ -504,5 +504,14 @@ cat > $tmpfilename <<EOF
 EOF
 expect_clean_compile $tmpfilename
 
+cat > $tmpfilename <<EOF
+(in-package :cl-user)
+
+(declaim (notinline foo))
+(let ((i 0)) (defun foo (x) (incf i x)))
+(defun bar (x) (foo x))
+EOF
+fail_on_condition_during_compile sb-ext:compiler-note $tmpfilename
+
 # success
 exit $EXIT_TEST_WIN

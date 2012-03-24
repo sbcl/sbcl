@@ -152,7 +152,8 @@ evaluated as a PROGN."
 (defun inline-fun-name-p (name)
   (or
    ;; the normal reason for saving the inline expansion
-   (info :function :inlinep name)
+   (let ((inlinep (info :function :inlinep name)))
+     (member inlinep '(:inline :maybe-inline)))
    ;; another reason for saving the inline expansion: If the
    ;; ANSI-recommended idiom
    ;;   (DECLAIM (INLINE FOO))
@@ -181,10 +182,8 @@ evaluated as a PROGN."
            (lambda `(lambda ,@lambda-guts))
            #-sb-xc-host
            (named-lambda `(named-lambda ,name ,@lambda-guts))
-           (inline-type (inline-fun-name-p name))
            (inline-lambda
-            (when (and inline-type
-                       (neq inline-type :notinline))
+            (when (inline-fun-name-p name)
               ;; we want to attempt to inline, so complain if we can't
               (or (sb!c:maybe-inline-syntactic-closure lambda env)
                   (progn
