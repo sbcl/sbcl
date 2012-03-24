@@ -181,8 +181,10 @@ evaluated as a PROGN."
            (lambda `(lambda ,@lambda-guts))
            #-sb-xc-host
            (named-lambda `(named-lambda ,name ,@lambda-guts))
+           (inline-type (inline-fun-name-p name))
            (inline-lambda
-            (when (inline-fun-name-p name)
+            (when (and inline-type
+                       (neq inline-type :notinline))
               ;; we want to attempt to inline, so complain if we can't
               (or (sb!c:maybe-inline-syntactic-closure lambda env)
                   (progn
