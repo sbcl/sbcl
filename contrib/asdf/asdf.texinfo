@@ -895,7 +895,8 @@ For more details on what these methods do, @pxref{Operations} in
 @example
 system-definition := ( defsystem system-designator @var{system-option}* )
 
-system-option := :defsystem-depends-on system-list 
+system-option := :defsystem-depends-on system-list
+                 | :weakly-depends-on @var{system-list}
                  | :class class-name (see discussion below)
                  | module-option
                  | option
@@ -980,12 +981,29 @@ extension loaded by @code{:defsystem-depends-on}, causing a name
 conflict in the current package.
 
 @subsection Defsystem depends on
+@cindex :defsystem-depends-on
 
 The @code{:defsystem-depends-on} option to @code{defsystem} allows the
 programmer to specify another ASDF-defined system or set of systems that
 must be loaded @emph{before} the system definition is processed.
 Typically this is used to load an ASDF extension that is used in the
 system definition.
+
+@subsection Weakly depends on 
+@cindex :weakly-depends-on
+
+The @code{:weakly-depends-on} option to @code{defsystem} allows the
+programmer to specify another ASDF-defined system or set of systems that
+ASDF should @emph{try} to load, but need not load in order to be
+successful.  Typically this is used if there are a number of systems
+that, if present, could provide additional functionality, but which are
+not necessary for basic function.
+
+Currently, although it is specified to be an option only to
+@code{defsystem}, this option is accepted at any component, but it probably
+only makes sense at the @code{defsystem} level. Programmers are cautioned not
+to use this component option except at the @code{defsystem} level, as
+this anomalous behavior may be removed without warning.
 
 @subsection Pathname specifiers
 @cindex pathname specifiers

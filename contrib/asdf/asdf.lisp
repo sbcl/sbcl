@@ -1,5 +1,5 @@
 ;;; -*- mode: Common-Lisp; Base: 10 ; Syntax: ANSI-Common-Lisp -*-
-;;; This is ASDF 2.019: Another System Definition Facility.
+;;; This is ASDF 2.20: Another System Definition Facility.
 ;;;
 ;;; Feedback, bug reports, and patches are all welcome:
 ;;; please mail to <asdf-devel@common-lisp.net>.
@@ -61,7 +61,8 @@
   (setf excl::*autoload-package-name-alist*
         (remove "asdf" excl::*autoload-package-name-alist*
                 :test 'equalp :key 'car)) ; need that BEFORE any mention of package ASDF as below
-  #+ecl (unless (member :ecl-bytecmp *features*) (require :cmp))
+  #+ecl (defun use-ecl-byte-compiler-p () (and (member :ecl-bytecmp *features*) t))
+  #+ecl (unless (use-ecl-byte-compiler-p) (require :cmp))
   #+gcl ;; Debian's GCL 2.7 has bugs with compiling multiple-value stuff, but can run ASDF 2.011
   (when (or (< system::*gcl-major-version* 2) ;; GCL 2.6 fails to fully compile ASDF at all
             (and (= system::*gcl-major-version* 2)
@@ -107,7 +108,7 @@
          ;; "2.345.6" would be a development version in the official upstream
          ;; "2.345.0.7" would be your seventh local modification of official release 2.345
          ;; "2.345.6.7" would be your seventh local modification of development version 2.345.6
-         (asdf-version "2.019")
+         (asdf-version "2.20")
          (existing-asdf (find-class 'component nil))
          (existing-version *asdf-version*)
          (already-there (equal asdf-version existing-version)))
@@ -2793,7 +2794,7 @@ Returns the new tree (which probably shares structure with the old one)"
                          rest)))
            (ret (find-component parent name)))
       (when weakly-depends-on
-        (appendf depends-on (remove-if (complement #'find-system) weakly-depends-on)))
+        (appendf depends-on (remove-if (complement #'(lambda (x) (find-system x nil))) weakly-depends-on)))
       (when *serial-depends-on*
         (push *serial-depends-on* depends-on))
       (if ret ; preserve identity
@@ -3085,6 +3086,15 @@ located."
      ;; we may have to segregate the code still by architecture.
      (:java :java :java-1.4 :java-1.5 :java-1.6 :java-1.7))))
 
+#+clozure
+(defun* ccl-fasl-version ()
+  ;; the fasl version is target-dependent from CCL 1.8 on.
+  (or (and (fboundp 'ccl::target-fasl-version)
+           (funcall 'ccl::target-fasl-version))
+      (and (boundp 'ccl::fasl-version)
+           (symbol-value 'ccl::fasl-version))
+      (error "Can't determine fasl version.")))
+
 (defun lisp-version-string ()
   (let ((s (lisp-implementation-version)))
     (car ; as opposed to OR, this idiom prevents some unreachable code warning
@@ -3104,7 +3114,7 @@ located."
       (format nil "~d.~d-f~d" ; shorten for windows
               ccl::*openmcl-major-version*
               ccl::*openmcl-minor-version*
-              (logand ccl::fasl-version #xFF))
+              (logand (ccl-fasl-version) #xFF))
       #+cmu (substitute #\- #\/ s)
       #+scl (format nil "~A~A" s
                     ;; ANSI upper case vs lower case.
@@ -3141,21 +3151,36 @@ located."
     #+mcl (current-user-homedir-pathname)
     #-mcl (user-homedir-pathname))))
 
+(defun* ensure-absolute-pathname* (x fmt &rest args)
+  (and (plusp (length x))
+       (or (absolute-pathname-p x)
+           (cerror "ignore relative pathname"
+                   "Invalid relative pathname ~A~@[ ~?~]" x fmt args))
+       x))
+(defun* split-absolute-pathnames (x fmt &rest args)
+  (loop :for dir :in (split-string
+                      x :separator (string (inter-directory-separator)))
+    :do (apply 'ensure-absolute-pathname* dir fmt args)
+    :collect dir))
+(defun getenv-absolute-pathname (x &aux (s (getenv x)))
+  (ensure-absolute-pathname* s "from (getenv ~S)" x))
+(defun getenv-absolute-pathnames (x &aux (s (getenv x)))
+  (split-absolute-pathnames s "from (getenv ~S) = ~S" x s))
+
 (defun* user-configuration-directories ()
   (let ((dirs
          `(,@(when (os-unix-p)
                (cons
-                (subpathname* (getenv "XDG_CONFIG_HOME") "common-lisp/")
-                (loop :with dirs = (getenv "XDG_CONFIG_DIRS")
-                  :for dir :in (split-string dirs :separator ":")
+                (subpathname* (getenv-absolute-pathname "XDG_CONFIG_HOME") "common-lisp/")
+                (loop :for dir :in (getenv-absolute-pathnames "XDG_CONFIG_DIRS")
                   :collect (subpathname* dir "common-lisp/"))))
            ,@(when (os-windows-p)
                `(,(subpathname* (or #+lispworks (sys:get-folder-path :local-appdata)
-                                    (getenv "LOCALAPPDATA"))
+                                    (getenv-absolute-pathname "LOCALAPPDATA"))
                                "common-lisp/config/")
                  ;; read-windows-registry HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\User Shell Folders\AppData
                  ,(subpathname* (or #+lispworks (sys:get-folder-path :appdata)
-                                    (getenv "APPDATA"))
+                                    (getenv-absolute-pathname "APPDATA"))
                                 "common-lisp/config/")))
            ,(subpathname (user-homedir) ".config/common-lisp/"))))
     (remove-duplicates (remove-if-not #'absolute-pathname-p dirs)
@@ -3168,8 +3193,8 @@ located."
      (aif
       ;; read-windows-registry HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\User Shell Folders\Common AppData
       (subpathname* (or #+lispworks (sys:get-folder-path :common-appdata)
-                        (getenv "ALLUSERSAPPDATA")
-                        (subpathname* (getenv "ALLUSERSPROFILE") "Application Data/"))
+                        (getenv-absolute-pathname "ALLUSERSAPPDATA")
+                        (subpathname* (getenv-absolute-pathname "ALLUSERSPROFILE") "Application Data/"))
                     "common-lisp/config/")
       (list it)))))
 
@@ -3293,12 +3318,12 @@ and the order is by decreasing length of namestring of the source pathname.")
 (defvar *user-cache*
   (flet ((try (x &rest sub) (and x `(,x ,@sub))))
     (or
-     (try (getenv "XDG_CACHE_HOME") "common-lisp" :implementation)
+     (try (getenv-absolute-pathname "XDG_CACHE_HOME") "common-lisp" :implementation)
      (when (os-windows-p)
        (try (or #+lispworks (sys:get-folder-path :local-appdata)
-                (getenv "LOCALAPPDATA")
+                (getenv-absolute-pathname "LOCALAPPDATA")
                 #+lispworks (sys:get-folder-path :appdata)
-                (getenv "APPDATA"))
+                (getenv-absolute-pathname "APPDATA"))
             "common-lisp" "cache" :implementation))
      '(:home ".cache" "common-lisp" :implementation))))
 
@@ -3433,13 +3458,12 @@ Please remove it from your ASDF configuration"))
 
 (defun* location-function-p (x)
   (and
-   (consp x)
    (length=n-p x 2)
-   (or (and (equal (first x) :function)
-            (typep (second x) 'symbol))
-       (and (equal (first x) 'lambda)
-            (cddr x)
-            (length=n-p (second x) 2)))))
+   (eq (car x) :function)
+   (or (symbolp (cadr x))
+       (and (consp (cadr x))
+            (eq (caadr x) 'lambda)
+            (length=n-p (cadadr x) 2)))))
 
 (defun* validate-output-translations-directive (directive)
   (or (member directive '(:enable-user-cache :disable-cache nil))
@@ -4015,19 +4039,18 @@ with a different configuration, so the configuration would be re-read then."
     (:directory ,(default-directory))
       ,@(loop :for dir :in
           `(,@(when (os-unix-p)
-                `(,(or (getenv "XDG_DATA_HOME")
+                `(,(or (getenv-absolute-pathname "XDG_DATA_HOME")
                        (subpathname (user-homedir) ".local/share/"))
-                  ,@(split-string (or (getenv "XDG_DATA_DIRS")
-                                      "/usr/local/share:/usr/share")
-                                  :separator ":")))
+                  ,@(or (getenv-absolute-pathnames "XDG_DATA_DIRS")
+                        '("/usr/local/share" "/usr/share"))))
             ,@(when (os-windows-p)
                 `(,(or #+lispworks (sys:get-folder-path :local-appdata)
-                       (getenv "LOCALAPPDATA"))
+                       (getenv-absolute-pathname "LOCALAPPDATA"))
                   ,(or #+lispworks (sys:get-folder-path :appdata)
-                       (getenv "APPDATA"))
+                       (getenv-absolute-pathname "APPDATA"))
                   ,(or #+lispworks (sys:get-folder-path :common-appdata)
-                       (getenv "ALLUSERSAPPDATA")
-                       (subpathname* (getenv "ALLUSERSPROFILE") "Application Data/")))))
+                       (getenv-absolute-pathname "ALLUSERSAPPDATA")
+                       (subpathname* (getenv-absolute-pathname "ALLUSERSPROFILE") "Application Data/")))))
           :collect `(:directory ,(subpathname* dir "common-lisp/systems/"))
           :collect `(:tree ,(subpathname* dir "common-lisp/source/")))
       :inherit-configuration))
@@ -4113,8 +4136,8 @@ with a different configuration, so the configuration would be re-read then."
           ,parameter
           ,@*default-source-registries*)
         :register #'(lambda (directory &key recurse exclude)
-                      (collect (list directory :recurse recurse :exclude exclude)))))
-     :test 'equal :from-end t)))
+                      (collect (list directory :recurse recurse :exclude exclude))))))
+   :test 'equal :from-end t))
 
 ;; Will read the configuration and initialize all internal variables.
 (defun* compute-source-registry (&optional parameter (registry *source-registry*))
@@ -4189,9 +4212,6 @@ with a different configuration, so the configuration would be re-read then."
 #+ecl
 (progn
   (setf *compile-op-compile-file-function* 'ecl-compile-file)
-
-  (defun use-ecl-byte-compiler-p ()
-    (member :ecl-bytecmp *features*))
 
   (defun ecl-compile-file (input-file &rest keys &key &allow-other-keys)
     (if (use-ecl-byte-compiler-p)
