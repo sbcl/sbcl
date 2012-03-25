@@ -164,13 +164,15 @@ mach_fork() {
         return pid;
     }
 }
+#endif
 
 void darwin_init(void)
 {
+#ifdef LISP_FEATURE_MACH_EXCEPTION_HANDLER
     setup_mach_exception_handling_thread();
+#endif
 }
 
-#endif
 
 #ifdef LISP_FEATURE_SB_THREAD
 
