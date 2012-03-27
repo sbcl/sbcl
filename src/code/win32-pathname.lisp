@@ -85,7 +85,7 @@
                                        name)))
             (when position
               (error 'namestring-parse-error
-                     :complaint "can't embed #\\Nul or #\\/ in Unix namestring"
+                     :complaint "can't embed #\\Nul or #\\/ in Windows namestring"
                      :namestring namestring
                      :offset position))))
 
