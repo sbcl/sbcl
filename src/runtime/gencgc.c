@@ -910,15 +910,14 @@ struct new_area {
     size_t size;
 };
 static struct new_area (*new_areas)[];
-static long new_areas_index;
-long max_new_areas;
+static size_t new_areas_index;
+size_t max_new_areas;
 
 /* Add a new area to new_areas. */
 static void
 add_new_area(page_index_t first_page, size_t offset, size_t size)
 {
-    unsigned long new_area_start,c;
-    long i;
+    size_t new_area_start, c, i;
 
     /* Ignore if full. */
     if (new_areas_index >= NUM_NEW_AREAS)
@@ -942,7 +941,7 @@ add_new_area(page_index_t first_page, size_t offset, size_t size)
     /* Search backwards for a prior area that this follows from. If
        found this will save adding a new area. */
     for (i = new_areas_index-1, c = 0; (i >= 0) && (c < 8); i--, c++) {
-        unsigned long area_end =
+        size_t area_end =
             npage_bytes((*new_areas)[i].page)
             + (*new_areas)[i].offset
             + (*new_areas)[i].size;
@@ -2623,15 +2622,15 @@ scavenge_newspace_generation_one_scan(generation_index_t generation)
 static void
 scavenge_newspace_generation(generation_index_t generation)
 {
-    long i;
+    size_t i;
 
     /* the new_areas array currently being written to by gc_alloc() */
     struct new_area (*current_new_areas)[] = &new_areas_1;
-    long current_new_areas_index;
+    size_t current_new_areas_index;
 
     /* the new_areas created by the previous scavenge cycle */
     struct new_area (*previous_new_areas)[] = NULL;
-    long previous_new_areas_index;
+    size_t previous_new_areas_index;
 
     /* Flush the current regions updating the tables. */
     gc_alloc_update_all_page_tables();
