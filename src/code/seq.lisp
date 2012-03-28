@@ -659,8 +659,13 @@
 (define-sequence-traverser replace
     (sequence1 sequence2 &rest args &key start1 end1 start2 end2)
   #!+sb-doc
-  "The target sequence is destructively modified by copying successive
-   elements into it from the source sequence."
+  "Destructively modifies SEQUENCE1 by copying successive elements
+into it from the SEQUENCE2.
+
+Elements are copied to the subseqeuence bounded by START1 and END1,
+from the subsequence bounded by START2 and END2. If these subsequences
+are not of the same length, then the shorter length determines how
+many elements are copied."
   (declare (truly-dynamic-extent args))
   (let* (;; KLUDGE: absent either rewriting FOO-REPLACE-FROM-BAR, or
          ;; excessively polluting DEFINE-SEQUENCE-TRAVERSER, we rebind
