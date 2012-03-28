@@ -95,27 +95,8 @@ os_vm_size_t bytes_consed_between_gcs = 12*1024*1024;
 /*
  * copying objects
  */
-static
-lispobj
-gc_general_copy_object(lispobj object, long nwords, int page_type_flag)
-{
-    int tag;
-    lispobj *new;
 
-    gc_assert(is_lisp_pointer(object));
-    gc_assert(from_space_p(object));
-    gc_assert((nwords & 0x01) == 0);
-
-    /* Get tag of object. */
-    tag = lowtag_of(object);
-
-    /* Allocate space. */
-    new = gc_general_alloc(nwords*N_WORD_BYTES, page_type_flag, ALLOC_QUICK);
-
-    /* Copy the object. */
-    memcpy(new,native_pointer(object),nwords*N_WORD_BYTES);
-    return make_lispobj(new,tag);
-}
+/* gc_general_copy_object is inline from gc-internal.h */
 
 /* to copy a boxed object */
 lispobj

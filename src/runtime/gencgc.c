@@ -1588,23 +1588,7 @@ copy_large_unboxed_object(lispobj object, long nwords)
 lispobj
 copy_unboxed_object(lispobj object, long nwords)
 {
-    long tag;
-    lispobj *new;
-
-    gc_assert(is_lisp_pointer(object));
-    gc_assert(from_space_p(object));
-    gc_assert((nwords & 0x01) == 0);
-
-    /* Get tag of object. */
-    tag = lowtag_of(object);
-
-    /* Allocate space. */
-    new = gc_quick_alloc_unboxed(nwords*N_WORD_BYTES);
-
-    memcpy(new,native_pointer(object),nwords*N_WORD_BYTES);
-
-    /* Return Lisp pointer of new object. */
-    return ((lispobj) new) | tag;
+    return gc_general_copy_object(object, nwords, UNBOXED_PAGE_FLAG);
 }
 
 
