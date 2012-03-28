@@ -2847,8 +2847,8 @@ print_ptr(lispobj *addr)
     page_index_t pi1 = find_page_index((void*)addr);
 
     if (pi1 != -1)
-        fprintf(stderr,"  %x: page %d  alloc %d  gen %d  bytes_used %d  offset %lu  dont_move %d\n",
-                (unsigned long) addr,
+        fprintf(stderr,"  %p: page %d  alloc %d  gen %d  bytes_used %d  offset %lu  dont_move %d\n",
+                addr,
                 pi1,
                 page_table[pi1].allocated,
                 page_table[pi1].gen,
