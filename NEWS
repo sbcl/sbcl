@@ -2,6 +2,8 @@
 changes relative to sbcl-1.0.55:
   * bug fix: SB-SIMPLE-STREAMS signals an error for bogus :CLASS arguments in
     OPEN. (lp#969352, thanks to Kambiz Darabi)
+  * bug fix: CASE normal-clauses do not allow T and OTHERWISE as keys.
+    (lp#959687)
   * documentation:
     ** improved docstrings: REPLACE (lp#965592)
 

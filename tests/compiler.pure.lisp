@@ -4179,3 +4179,23 @@
                   (declare (optimize speed)
                            (type (and fixnum a) x))
                   x)))
+
+(with-test (:name :bug-959687)
+  (multiple-value-bind (fun warn fail)
+      (compile nil `(lambda (x)
+                      (case x
+                        (t
+                         :its-a-t)
+                        (otherwise
+                         :somethign-else))))
+    (assert (and warn fail))
+    (assert (not (ignore-errors (funcall fun t)))))
+  (multiple-value-bind (fun warn fail)
+      (compile nil `(lambda (x)
+                      (case x
+                        (otherwise
+                         :its-an-otherwise)
+                        (t
+                         :somethign-else))))
+    (assert (and warn fail))
+    (assert (not (ignore-errors (funcall fun t))))))

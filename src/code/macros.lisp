@@ -261,6 +261,17 @@ invoked. In that case it will store into PLACE and start over."
                          ,@forms)
                        clauses))
                 (t
+                 (when (and (eq name 'case)
+                            (cdr cases)
+                            (memq keyoid '(t otherwise)))
+                   (error 'simple-reference-error
+                          :format-control
+                          "~@<~IBad ~S clause:~:@_  ~S~:@_~S allowed as the key ~
+                           designator only in the final otherwise-clause, not in a ~
+                           normal-clause. Use (~S) instead, or move the clause the ~
+                           correct position.~:@>"
+                          :format-arguments (list 'case case keyoid keyoid)
+                          :references `((:ansi-cl :macro case))))
                  (push keyoid keys)
                  (check-clause (list keyoid))
                  (push `((,test ,keyform-value ',keyoid)
