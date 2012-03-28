@@ -1610,13 +1610,13 @@ static lispobj trans_boxed(lispobj object);
  * Currently only absolute fixups to the constant vector, or to the
  * code area are checked. */
 void
-sniff_code_object(struct code *code, unsigned long displacement)
+sniff_code_object(struct code *code, os_vm_size_t displacement)
 {
 #ifdef LISP_FEATURE_X86
     long nheader_words, ncode_words, nwords;
-    void *p;
-    void *constants_start_addr = NULL, *constants_end_addr;
-    void *code_start_addr, *code_end_addr;
+    os_vm_address_t constants_start_addr = NULL, constants_end_addr, p;
+    os_vm_address_t code_start_addr, code_end_addr;
+    os_vm_address_t code_addr = (os_vm_address_t)code;
     int fixup_found = 0;
 
     if (!check_code_fixups)
@@ -1628,10 +1628,10 @@ sniff_code_object(struct code *code, unsigned long displacement)
     nheader_words = HeaderValue(*(lispobj *)code);
     nwords = ncode_words + nheader_words;
 
-    constants_start_addr = (void *)code + 5*N_WORD_BYTES;
-    constants_end_addr = (void *)code + nheader_words*N_WORD_BYTES;
-    code_start_addr = (void *)code + nheader_words*N_WORD_BYTES;
-    code_end_addr = (void *)code + nwords*N_WORD_BYTES;
+    constants_start_addr = code_addr + 5*N_WORD_BYTES;
+    constants_end_addr = code_addr + nheader_words*N_WORD_BYTES;
+    code_start_addr = code_addr + nheader_words*N_WORD_BYTES;
+    code_end_addr = code_addr + nwords*N_WORD_BYTES;
 
     /* Work through the unboxed code. */
     for (p = code_start_addr; p < code_end_addr; p++) {
@@ -1648,8 +1648,8 @@ sniff_code_object(struct code *code, unsigned long displacement)
         /* Check for code references. */
         /* Check for a 32 bit word that looks like an absolute
            reference to within the code adea of the code object. */
-        if ((data >= (code_start_addr-displacement))
-            && (data < (code_end_addr-displacement))) {
+        if ((data >= (void*)(code_start_addr-displacement))
+            && (data < (void*)(code_end_addr-displacement))) {
             /* function header */
             if ((d4 == 0x5e)
                 && (((unsigned)p - 4 - 4*HeaderValue(*((unsigned *)p-1))) ==
@@ -1691,8 +1691,8 @@ sniff_code_object(struct code *code, unsigned long displacement)
         /* Check for a 32 bit word that looks like an absolute
            reference to within the constant vector. Constant references
            will be aligned. */
-        if ((data >= (constants_start_addr-displacement))
-            && (data < (constants_end_addr-displacement))
+        if ((data >= (void*)(constants_start_addr-displacement))
+            && (data < (void*)(constants_end_addr-displacement))
             && (((unsigned)data & 0x3) == 0)) {
             /*  Mov eax,m32 */
             if (d1 == 0xa1) {
@@ -1790,11 +1790,12 @@ gencgc_apply_code_fixups(struct code *old_code, struct code *new_code)
 /* x86-64 uses pc-relative addressing instead of this kludge */
 #ifndef LISP_FEATURE_X86_64
     long nheader_words, ncode_words, nwords;
-    void *constants_start_addr, *constants_end_addr;
-    void *code_start_addr, *code_end_addr;
+    os_vm_address_t constants_start_addr, constants_end_addr;
+    os_vm_address_t code_start_addr, code_end_addr;
+    os_vm_address_t code_addr = (os_vm_address_t)new_code;
+    os_vm_address_t old_addr = (os_vm_address_t)old_code;
+    os_vm_size_t displacement = code_addr - old_addr;
     lispobj fixups = NIL;
-    unsigned long displacement =
-        (unsigned long)new_code - (unsigned long)old_code;
     struct vector *fixups_vector;
 
     ncode_words = fixnum_value(new_code->code_size);
@@ -1803,10 +1804,10 @@ gencgc_apply_code_fixups(struct code *old_code, struct code *new_code)
     /* FSHOW((stderr,
              "/compiled code object at %x: header words = %d, code words = %d\n",
              new_code, nheader_words, ncode_words)); */
-    constants_start_addr = (void *)new_code + 5*N_WORD_BYTES;
-    constants_end_addr = (void *)new_code + nheader_words*N_WORD_BYTES;
-    code_start_addr = (void *)new_code + nheader_words*N_WORD_BYTES;
-    code_end_addr = (void *)new_code + nwords*N_WORD_BYTES;
+    constants_start_addr = code_addr + 5*N_WORD_BYTES;
+    constants_end_addr = code_addr + nheader_words*N_WORD_BYTES;
+    code_start_addr = code_addr + nheader_words*N_WORD_BYTES;
+    code_end_addr = code_addr + nwords*N_WORD_BYTES;
     /*
     FSHOW((stderr,
            "/const start = %x, end = %x\n",
@@ -1854,24 +1855,22 @@ gencgc_apply_code_fixups(struct code *old_code, struct code *new_code)
         long length = fixnum_value(fixups_vector->length);
         long i;
         for (i = 0; i < length; i++) {
-            unsigned long offset = fixups_vector->data[i];
+            long offset = fixups_vector->data[i];
             /* Now check the current value of offset. */
-            unsigned long old_value =
-                *(unsigned long *)((unsigned long)code_start_addr + offset);
+            os_vm_address_t old_value = *(os_vm_address_t *)(code_start_addr + offset);
 
             /* If it's within the old_code object then it must be an
              * absolute fixup (relative ones are not saved) */
-            if ((old_value >= (unsigned long)old_code)
-                && (old_value < ((unsigned long)old_code
-                                 + nwords*N_WORD_BYTES)))
+            if ((old_value >= old_addr)
+                && (old_value < (old_addr + nwords*N_WORD_BYTES)))
                 /* So add the dispacement. */
-                *(unsigned long *)((unsigned long)code_start_addr + offset) =
+                *(os_vm_address_t *)(code_start_addr + offset) =
                     old_value + displacement;
             else
                 /* It is outside the old code object so it must be a
                  * relative fixup (absolute fixups are not saved). So
                  * subtract the displacement. */
-                *(unsigned long *)((unsigned long)code_start_addr + offset) =
+                *(os_vm_address_t *)(code_start_addr + offset) =
                     old_value - displacement;
         }
     } else {
