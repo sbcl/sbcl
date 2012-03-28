@@ -10,6 +10,7 @@
 ;;;; more information.
 
 (load "assertoid.lisp")
+(load "compiler-test-util.lisp")
 (use-package "ASSERTOID")
 
 ;;;; examples from, or close to, the Common Lisp DEFSTRUCT spec
@@ -1127,3 +1128,14 @@ redefinition."
     (handler-bind ((warning #'error))
      (eval `(let ()
               (defstruct destruct-no-warning-not-at-toplevel bar))))))
+
+(with-test (:name :bug-941102)
+  (let ((test `((defstruct bug-941102)
+                 (setf (find-class 'bug-941102-alias) (find-class 'bug-941102))
+                 (setf (find-class 'bug-941102-alias) nil))))
+    (multiple-value-bind (warn fail) (ctu:file-compile test :load t)
+      (assert (not warn))
+      (assert (not fail)))
+    (multiple-value-bind (warn2 fail2) (ctu:file-compile test)
+      (assert (not warn2))
+      (assert (not fail2)))))

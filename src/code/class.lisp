@@ -808,8 +808,12 @@
          ;; getting a different cell for a classoid with the same name
          ;; just would not do.
 
-         ;; Remove the proper name of the classoid.
-         (setf (classoid-name (classoid-cell-classoid cell)) nil)
+         ;; Remove the proper name of the classoid, if this was it.
+         (let* ((classoid (classoid-cell-classoid cell))
+                (proper-name (classoid-name classoid)))
+           (when (eq proper-name name)
+             (setf (classoid-name classoid) nil)))
+
          ;; Clear the cell.
          (setf (classoid-cell-classoid cell) nil
                (classoid-cell-pcl-class cell) nil))

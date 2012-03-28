@@ -4,6 +4,8 @@ changes relative to sbcl-1.0.55:
     OPEN. (lp#969352, thanks to Kambiz Darabi)
   * bug fix: CASE normal-clauses do not allow T and OTHERWISE as keys.
     (lp#959687)
+  * bug fix: (SETF (FIND-CLASS X) NIL) removed proper name of the underlying
+    classoid even if X was not the proper name of the class. (lp#941102)
   * documentation:
     ** improved docstrings: REPLACE (lp#965592)
 
