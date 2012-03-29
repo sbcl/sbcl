@@ -4199,3 +4199,13 @@
                          :somethign-else))))
     (assert (and warn fail))
     (assert (not (ignore-errors (funcall fun t))))))
+
+(with-test (:name :bug-924276)
+  (assert (eq :style-warning
+              (handler-case
+                  (compile nil `(lambda (a)
+                                  (cons a (symbol-macrolet ((b 1))
+                                            (declare (ignorable a))
+                                            :c))))
+                (style-warning ()
+                  :style-warning)))))

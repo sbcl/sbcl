@@ -837,7 +837,7 @@
         (reoptimize-lvar prev)))
 
 ;;; Return a new LEXENV just like DEFAULT except for the specified
-;;; slot values. Values for the alist slots are NCONCed to the
+;;; slot values. Values for the alist slots are APPENDed to the
 ;;; beginning of the current value, rather than replacing it entirely.
 (defun make-lexenv (&key (default *lexenv*)
                          funs vars blocks tags
@@ -852,7 +852,7 @@
   (macrolet ((frob (var slot)
                `(let ((old (,slot default)))
                   (if ,var
-                      (nconc ,var old)
+                      (append ,var old)
                       old))))
     (internal-make-lexenv
      (frob funs lexenv-funs)

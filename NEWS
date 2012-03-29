@@ -6,6 +6,8 @@ changes relative to sbcl-1.0.55:
     (lp#959687)
   * bug fix: (SETF (FIND-CLASS X) NIL) removed proper name of the underlying
     classoid even if X was not the proper name of the class. (lp#941102)
+  * bug fix: declaration leakage between lexical environments due to careless
+    use of NCONC in MAKE-LEXENV. (lp#924276)
   * documentation:
     ** improved docstrings: REPLACE (lp#965592)
 
