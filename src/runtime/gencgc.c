@@ -86,6 +86,9 @@ os_vm_size_t large_object_size = 4 * GENCGC_CARD_BYTES;
 os_vm_size_t large_object_size = 4 * PAGE_BYTES;
 #endif
 
+/* Largest allocation seen since last GC. */
+os_vm_size_t large_allocation = 0;
+
 
 /*
  * debugging
@@ -3735,7 +3738,7 @@ void
 collect_garbage(generation_index_t last_gen)
 {
     generation_index_t gen = 0, i;
-    int raise;
+    int raise, more = 0;
     int gen_to_wp;
     /* The largest value of last_free_page seen since the time
      * remap_free_pages was called. */
@@ -3768,13 +3771,23 @@ collect_garbage(generation_index_t last_gen)
     do {
         /* Collect the generation. */
 
-        if (gen >= gencgc_oldest_gen_to_gc) {
-            /* Never raise the oldest generation. */
+        if (more || (gen >= gencgc_oldest_gen_to_gc)) {
+            /* Never raise the oldest generation. Never raise the extra generation
+             * collected due to more-flag. */
             raise = 0;
+            more = 0;
         } else {
             raise =
                 (gen < last_gen)
                 || (generations[gen].num_gc >= generations[gen].number_of_gcs_before_promotion);
+            /* If we would not normally raise this one, but we're
+             * running low on space in comparison to the object-sizes
+             * we've been seeing, raise it and collect the next one
+             * too. */
+            if (!raise && gen == last_gen) {
+                more = (2*large_allocation) >= (dynamic_space_size - bytes_allocated);
+                raise = more;
+            }
         }
 
         if (gencgc_verbose > 1) {
@@ -3807,8 +3820,8 @@ collect_garbage(generation_index_t last_gen)
         gen++;
     } while ((gen <= gencgc_oldest_gen_to_gc)
              && ((gen < last_gen)
-                 || ((gen <= gencgc_oldest_gen_to_gc)
-                     && raise
+                 || more
+                 || (raise
                      && (generations[gen].bytes_allocated
                          > generations[gen].gc_trigger)
                      && (generation_average_age(gen)
@@ -3850,7 +3863,13 @@ collect_garbage(generation_index_t last_gen)
 
     update_dynamic_space_free_pointer();
 
-    auto_gc_trigger = bytes_allocated + bytes_consed_between_gcs;
+    /* Update auto_gc_trigger. Make sure we trigger the next GC before
+     * running out of heap! */
+    if (bytes_consed_between_gcs >= dynamic_space_size - bytes_allocated)
+        auto_gc_trigger = bytes_allocated + bytes_consed_between_gcs;
+    else
+        auto_gc_trigger = bytes_allocated + (dynamic_space_size - bytes_allocated)/2;
+
     if(gencgc_verbose)
         fprintf(stderr,"Next gc when %"OS_VM_SIZE_FMT" bytes have been consed\n",
                 auto_gc_trigger);
@@ -3866,6 +3885,7 @@ collect_garbage(generation_index_t last_gen)
     }
 
     gc_active_p = 0;
+    large_allocation = 0;
 
     log_generation_stats(gc_logfile, "=== GC End ===");
     SHOW("returning from collect_garbage");
@@ -4133,6 +4153,9 @@ general_alloc_internal(long nbytes, int page_type_flag, struct alloc_region *reg
     /* Must be inside a PA section. */
     gc_assert(get_pseudo_atomic_atomic(thread));
 
+    if (nbytes > large_allocation)
+        large_allocation = nbytes;
+
     /* maybe we can do this quickly ... */
     new_free_pointer = region->free_pointer + nbytes;
     if (new_free_pointer <= region->end_addr) {
@@ -4144,7 +4167,7 @@ general_alloc_internal(long nbytes, int page_type_flag, struct alloc_region *reg
     /* we have to go the long way around, it seems. Check whether we
      * should GC in the near future
      */
-    if (auto_gc_trigger && bytes_allocated > auto_gc_trigger) {
+    if (auto_gc_trigger && bytes_allocated+nbytes > auto_gc_trigger) {
         /* Don't flood the system with interrupts if the need to gc is
          * already noted. This can happen for example when SUB-GC
          * allocates or after a gc triggered in a WITHOUT-GCING. */

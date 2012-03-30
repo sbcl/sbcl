@@ -62,3 +62,17 @@
         ;; OAOO-ify them (probably to src/compiler/generic/params.lisp).
         (assert (= (sb-ext:generation-minimum-age-before-gc i) 0.75))
         (assert (= (sb-ext:generation-number-of-gcs-before-promotion i) 1))))
+
+(defun stress-gc ()
+  (let* ((x (make-array (truncate (* 0.2 (dynamic-space-size))
+                                  sb-vm:n-word-bytes))))
+    (elt x 0)))
+
+(with-test (:name :bug-936304)
+  (gc :full t)
+  (assert (eq :ok (handler-case
+                      (progn
+                        (loop repeat 50 do (stress-gc))
+                        :ok)
+                    (storage-condition ()
+                      :oom)))))
