@@ -404,15 +404,27 @@
              (:make-load-form-fun sb!kernel:just-dump-it-normally))
   ;; The type of this alien.
   (type (missing-arg) :type alien-type)
-  ;; The form to evaluate to produce the SAP pointing to where in the heap
-  ;; it is.
-  (sap-form (missing-arg)))
+  ;; Its name.
+  (alien-name (missing-arg) :type simple-string)
+  ;; Data or code?
+  (datap (missing-arg) :type boolean))
 (def!method print-object ((info heap-alien-info) stream)
   (print-unreadable-object (info stream :type t)
-    (funcall (formatter "~S ~S")
+    (funcall (formatter "~S ~S~@[ (data)~]")
              stream
-             (heap-alien-info-sap-form info)
-             (unparse-alien-type (heap-alien-info-type info)))))
+             (heap-alien-info-alien-name info)
+             (unparse-alien-type (heap-alien-info-type info))
+             (heap-alien-info-datap info))))
+
+;;; The form to evaluate to produce the SAP pointing to where in the heap
+;;; it is.
+(defun heap-alien-info-sap-form (info)
+  `(foreign-symbol-sap ,(heap-alien-info-alien-name info)
+                       ,(heap-alien-info-datap info)))
+
+(defun heap-alien-info-sap (info)
+  (foreign-symbol-sap (heap-alien-info-alien-name info)
+                      (heap-alien-info-datap info)))
 
 ;;;; Interfaces to the different methods
 
@@ -484,7 +496,7 @@
 
 (defun compute-deposit-lambda (type)
   (declare (type alien-type type))
-  `(lambda (sap offset ignore value)
+  `(lambda (value sap offset ignore)
      (declare (type system-area-pointer sap)
               (type unsigned-byte offset)
               (ignore ignore))

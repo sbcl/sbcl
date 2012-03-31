@@ -270,7 +270,7 @@
                      (sb-alien-internals:unparse-alien-type
                       (sb-alien::heap-alien-info-type info)))
              (format stream "~@:_Address: #x~8,'0X"
-                     (sap-int (eval (sb-alien::heap-alien-info-sap-form info))))))
+                     (sap-int (sb-alien::heap-alien-info-sap info)))))
           ((eq kind :macro)
            (let ((expansion (info :variable :macro-expansion symbol)))
              (format stream "~@:_Expansion: ~S" expansion)))
