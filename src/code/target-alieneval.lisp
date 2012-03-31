@@ -70,6 +70,14 @@
           (make-heap-alien-info :type type
                                 :sap-form `(foreign-symbol-sap ',alien-name t)))))
 
+(defun alien-value (symbol)
+  #!+sb-doc
+  "Returns the value of the alien variable bound to SYMBOL. Signals an
+error if SYMBOL is not bound to an alien variable, or if the alien
+variable is undefined."
+  (%heap-alien (or (info :variable :alien-info symbol)
+                   (error 'unbound-variable :name symbol))))
+
 (defmacro extern-alien (name type &environment env)
   #!+sb-doc
   "Access the alien variable named NAME, assuming it is of type TYPE. This

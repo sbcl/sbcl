@@ -522,9 +522,7 @@
           (t (values (cdr binding) :variable)))
         (case (sb!int:info :variable :kind symbol)
           (:macro (values (macroexpand-1 symbol) :expansion))
-          (:alien (let ((type (sb!int:info :variable :alien-info symbol)))
-                    (values (sb!alien::%heap-alien type)
-                            :variable)))
+          (:alien (values (sb!alien-internals:alien-value symbol) :variable))
           (t (values (symbol-value symbol) :variable))))))
 
 ;;; Retrieve the function/macro binding of the symbol NAME in
