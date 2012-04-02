@@ -5,6 +5,7 @@ changes relative to sbcl-1.0.55:
     (Thanks to James Knight, lp#911027)
   * enhancements
     ** SBCL can now be built using Clang.
+    ** ASDF has been updated 2.20.
   * bug fix: compiler errors when weakening hairy integer types. (lp#913232)
   * bug fix: don't complain about a too-hairy lexical environment for inlining
     when the function has never been requested for inlining.  (lp#963530)
