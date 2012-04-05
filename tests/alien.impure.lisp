@@ -304,7 +304,7 @@
                                            "execv"))
                     (values (alien-funcall sys-execv1 program argv)))))
     (compiler-note (n)
-      (error n))))
+      (error "bad note: ~A" n))))
 
 (with-test (:name :bug-721087)
   (assert (typep nil '(alien c-string)))
