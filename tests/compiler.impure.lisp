@@ -2246,4 +2246,16 @@
     ;; ...but the compiler should not break.
     (assert (and warn fail))))
 
+(test-util:with-test (:name :bug-903821)
+  (let* ((fun (compile nil '(lambda (x n)
+                             (declare (sb-ext:word x)
+                              (type (integer 0 #.(1- sb-vm:n-word-bits)) n)
+                              (optimize speed))
+                             (logandc2 x (ash -1 n)))))
+         (trace-output
+          (with-output-to-string (*trace-output*)
+            (eval `(trace ,(intern (format nil "ASH-LEFT-MOD~D" sb-vm::n-word-bits) "SB-VM")))
+            (assert (= 7 (funcall fun 15 3))))))
+    (assert (string= "" trace-output))))
+
 ;;; success

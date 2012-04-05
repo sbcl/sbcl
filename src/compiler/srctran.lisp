@@ -3043,6 +3043,19 @@
                (reoptimize-component (node-component node) :maybe))
              (cut-node (node &aux did-something)
                (when (and (not (block-delete-p (node-block node)))
+                          (ref-p node)
+                          (constant-p (ref-leaf node)))
+                 (let* ((constant-value (constant-value (ref-leaf node)))
+                        (new-value (if signedp
+                                       (mask-signed-field width constant-value)
+                                       (ldb (byte width 0) constant-value))))
+                   (unless (= constant-value new-value)
+                     (change-ref-leaf node (make-constant new-value))
+                     (setf (lvar-%derived-type (node-lvar node)) (make-values-type :required (list (ctype-of new-value))))
+                     (setf (block-reoptimize (node-block node)) t)
+                     (reoptimize-component (node-component node) :maybe)
+                     (return-from cut-node t))))
+               (when (and (not (block-delete-p (node-block node)))
                           (combination-p node)
                           (eq (basic-combination-kind node) :known))
                  (let* ((fun-ref (lvar-use (combination-fun node)))
@@ -3117,9 +3130,23 @@
                 (best-modular-version width nil)
               (when w
                 ;; FIXME: This should be (CUT-TO-WIDTH NODE KIND WIDTH SIGNEDP).
-                (cut-to-width x kind width signedp)
-                (cut-to-width y kind width signedp)
-                nil ; After fixing above, replace with T.
+                ;;
+                ;; FIXME: I think the FIXME (which is from APD) above
+                ;; implies that CUT-TO-WIDTH should do /everything/
+                ;; that's required, including reoptimizing things
+                ;; itself that it knows are necessary.  At the moment,
+                ;; CUT-TO-WIDTH sets up some new calls with
+                ;; combination-type :FULL, which later get noticed as
+                ;; known functions and properly converted.
+                ;;
+                ;; We cut to W not WIDTH if SIGNEDP is true, because
+                ;; signed constant replacement needs to know which bit
+                ;; in the field is the signed bit.
+                (let ((xact (cut-to-width x kind (if signedp w width) signedp))
+                      (yact (cut-to-width y kind (if signedp w width) signedp)))
+                  (declare (ignore xact yact))
+                  nil) ; After fixing above, replace with T, meaning
+                       ; "don't reoptimize this (LOGAND) node any more".
                 ))))))))
 
 (defoptimizer (mask-signed-field optimizer) ((width x) node)
@@ -3132,8 +3159,9 @@
             (multiple-value-bind (w kind)
                 (best-modular-version width t)
               (when w
-                ;; FIXME: This should be (CUT-TO-WIDTH NODE KIND WIDTH T).
-                (cut-to-width x kind width t)
+                ;; FIXME: This should be (CUT-TO-WIDTH NODE KIND W T).
+                ;; [ see comment above in LOGAND optimizer ]
+                (cut-to-width x kind w t)
                 nil ; After fixing above, replace with T.
                 ))))))))
 
