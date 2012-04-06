@@ -180,23 +180,27 @@ INSTALLING SBCL
 
   Some features of interest:
 
-    :SB-THREAD
+    :SB-THREAD (--with-sb-thread, --without-sb-thread)
+
       Native threads. Enabled by default on x86[-64] Linux only, also
       available on x86[-64] Max OS X, x86[-64] FreeBSD, x86 Solaris,
       and PPC Linux.
 
-      NOTE: --fancy enables threads on all platforms where they can
-      be built, even if they aren't 100% stable on that platform.
+      NOTE: --fancy enables threads on all platforms where they can be
+      built, even if they aren't 100% stable on that platform.
 
-    :SB-CORE-COMPRESSION
+    :SB-CORE-COMPRESSION (--with-sb-core-compression)
+
       Adds zlib as a build-dependency, and makes SBCL able to save
       compressed cores. Not enabled by default.
 
-    :SB-XREF-FOR-INTERNALS
+    :SB-XREF-FOR-INTERNALS (--with-sb-xref-for-internals)
+
       XREF data for SBCL internals. Not enabled by default, increases
       core size by 5-6mb.
 
-    :SB-UNICODE
+    :SB-UNICODE (--without-sb-unicode)
+
       Unicode support. Enabled by default. Disabling this feature
       limits characters to the 8-bit ISO-8859-1 set.
 
