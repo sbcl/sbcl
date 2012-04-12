@@ -471,7 +471,7 @@
                    collect (make-thread
                             (lambda ()
                               (sleep (random 0.02))
-                              (wait-on-semaphore sem :timeout 0.01)))))))
+                              (wait-on-semaphore sem :timeout 0.5)))))))
     (loop repeat 5
           do (signal-semaphore sem 2))
     (let ((ok (count-if #'join-thread threads)))
