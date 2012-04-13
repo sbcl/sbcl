@@ -278,5 +278,18 @@
     (assert (eq orig (pprint-dispatch 'some-symbol)))
     (assert (not (eq alt orig)))))
 
+(with-test (:name :pprint-improper-list)
+  (let* ((max-length 10)
+         (stream (make-broadcast-stream))
+         (errors
+           (loop for symbol being the symbol in :cl
+                 nconc
+                 (loop for i from 1 below max-length
+                       for list = (cons symbol 10) then (cons symbol list)
+                       when (nth-value 1 (ignore-errors (pprint list stream)))
+                       collect (format nil "(~{~a ~}~a . 10)" (butlast list) symbol)))))
+    (when errors
+      (error "Can't PPRINT imporper lists: ~a" errors))))
+
 
 ;;; success

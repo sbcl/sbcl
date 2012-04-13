@@ -13,6 +13,8 @@ changes relative to sbcl-1.0.56:
     use of NCONC in MAKE-LEXENV. (lp#924276)
   * bug fix: ENSURE-DIRECTORIES-EXIST now works when *default-pathname-defaults*
     contains NAME or TYPE components.
+  * bug fix: PPRINT couldn't print improper lists with CARs being some symbols
+    from CL package, e.g. (loop . 10).
   * documentation:
     ** improved docstrings: REPLACE (lp#965592)
 
