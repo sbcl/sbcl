@@ -99,14 +99,14 @@
 (defmacro load-binding-stack-pointer (reg)
   #!+sb-thread
   `(inst mov ,reg (make-ea :qword :base thread-base-tn
-                   :disp (* 8 thread-binding-stack-pointer-slot)))
+                   :disp (* n-word-bytes thread-binding-stack-pointer-slot)))
   #!-sb-thread
   `(load-symbol-value ,reg *binding-stack-pointer*))
 
 (defmacro store-binding-stack-pointer (reg)
   #!+sb-thread
   `(inst mov (make-ea :qword :base thread-base-tn
-              :disp (* 8 thread-binding-stack-pointer-slot))
+              :disp (* n-word-bytes thread-binding-stack-pointer-slot))
     ,reg)
   #!-sb-thread
   `(store-symbol-value ,reg *binding-stack-pointer*))
@@ -294,7 +294,7 @@
 #!+sb-thread
 (defmacro %clear-pseudo-atomic ()
   '(inst mov (make-ea :qword :base thread-base-tn
-              :disp (* 8 thread-pseudo-atomic-bits-slot))
+              :disp (* n-word-bytes thread-pseudo-atomic-bits-slot))
     0))
 
 #!+sb-thread
@@ -303,12 +303,12 @@
     `(let ((,label (gen-label)))
        (inst mov (make-ea :qword
                           :base thread-base-tn
-                          :disp (* 8 thread-pseudo-atomic-bits-slot))
+                          :disp (* n-word-bytes thread-pseudo-atomic-bits-slot))
              rbp-tn)
        ,@forms
        (inst xor (make-ea :qword
                           :base thread-base-tn
-                          :disp (* 8 thread-pseudo-atomic-bits-slot))
+                          :disp (* n-word-bytes thread-pseudo-atomic-bits-slot))
              rbp-tn)
        (inst jmp :z ,label)
        ;; if PAI was set, interrupts were disabled at the same time
