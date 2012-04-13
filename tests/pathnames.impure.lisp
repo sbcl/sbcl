@@ -592,4 +592,8 @@
   ;; * / :WILD
   (assert (equal (pathname-directory #p"\\*/") '(:relative "*"))))
 
+(with-test (:name :ensure-directories-exist-with-odd-d-p-d)
+  (let ((*default-pathname-defaults* #p"/tmp/foo"))
+    (ensure-directories-exist "/")))
+
 ;;;; success

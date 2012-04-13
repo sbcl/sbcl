@@ -1,5 +1,5 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
-changes relative to sbcl-1.0.55:
+changes relative to sbcl-1.0.56:
   * enhancement: GENCGC reclaims space more aggressively when objects being
     allocated are a large fraction of the total available heap space.
     (lp#936304)
@@ -11,6 +11,8 @@ changes relative to sbcl-1.0.55:
     classoid even if X was not the proper name of the class. (lp#941102)
   * bug fix: declaration leakage between lexical environments due to careless
     use of NCONC in MAKE-LEXENV. (lp#924276)
+  * bug fix: ENSURE-DIRECTORIES-EXIST now works when *default-pathname-defaults*
+    contains NAME or TYPE components.
   * documentation:
     ** improved docstrings: REPLACE (lp#965592)
 
