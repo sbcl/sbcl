@@ -306,3 +306,10 @@
                       (progn (run-program "run-program.impure.lisp" '()) nil)
                     (error (e)
                       (princ-to-string e))))))
+
+(with-test (:name (:run-program :if-input-does-not-exist))
+  (let ((file (pathname (sb-posix:mktemp "rpXXXXXX"))))
+    (assert (null (sb-ext:run-program "/bin/cat" '() :input file)))
+    (assert (null (sb-ext:run-program "/bin/cat" '() :output #.(or *compile-file-truename*
+                                                                   *load-truename*)
+                                      :if-output-exists nil)))))

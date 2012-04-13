@@ -11,10 +11,13 @@ changes relative to sbcl-1.0.56:
     classoid even if X was not the proper name of the class. (lp#941102)
   * bug fix: declaration leakage between lexical environments due to careless
     use of NCONC in MAKE-LEXENV. (lp#924276)
-  * bug fix: ENSURE-DIRECTORIES-EXIST now works when *default-pathname-defaults*
-    contains NAME or TYPE components.
+  * bug fix: ENSURE-DIRECTORIES-EXIST now works when
+    *default-pathname-defaults* contains NAME or TYPE components.
   * bug fix: PPRINT couldn't print improper lists with CARs being some symbols
     from CL package, e.g. (loop . 10).
+  * bug fix: run-program with existent or non-existent files for :output or
+    :input when :if-output-exists or :if-input-does-not-exist are NIL properly
+    returns NIL instead of signalling an obscure error.
   * documentation:
     ** improved docstrings: REPLACE (lp#965592)
 

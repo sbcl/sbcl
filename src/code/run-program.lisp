@@ -729,6 +729,8 @@ Users Manual for details about the PROCESS structure."#-win32"
                                       ;; hard-coded symbols here.
                                       (values stdout output-stream)
                                       (get-descriptor-for ,@args))))
+                           (unless ,fd
+                             (return-from run-program))
                            ,@body))
                       (with-open-pty (((pty-name pty-stream) (pty cookie))
                                       &body body)
@@ -1010,15 +1012,16 @@ Users Manual for details about the PROCESS structure."#-win32"
            ;; validation there.
            (with-open-stream (file (apply #'open object :allow-other-keys t
                                           keys))
-             (multiple-value-bind
-                   (fd errno)
-                 (sb-unix:unix-dup (sb-sys:fd-stream-fd file))
-               (cond (fd
-                      (push fd *close-in-parent*)
-                      (values fd nil))
-                     (t
-                      (error "couldn't duplicate file descriptor: ~A"
-                             (strerror errno)))))))
+             (when file
+               (multiple-value-bind
+                     (fd errno)
+                   (sb-unix:unix-dup (sb-sys:fd-stream-fd file))
+                 (cond (fd
+                        (push fd *close-in-parent*)
+                        (values fd nil))
+                       (t
+                        (error "couldn't duplicate file descriptor: ~A"
+                               (strerror errno))))))))
           ((streamp object)
            (ecase direction
              (:input
