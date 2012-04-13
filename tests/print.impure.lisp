@@ -631,4 +631,8 @@
                     (assert (equal (row-major-aref a i) (row-major-aref copy i)))))))))
         :next))))
 
+(with-test (:name (:format :negative-colinc-and-mincol))
+  (assert (raises-error? (format nil "~-2a" 1)))
+  (assert (raises-error? (format nil "~,0a" 1))))
+
 ;;; success

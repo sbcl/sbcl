@@ -170,6 +170,14 @@
 ;;;; format interpreters and support functions for simple output
 
 (defun format-write-field (stream string mincol colinc minpad padchar padleft)
+  (when (and colinc (<= colinc 0))
+    (error 'format-error
+           :complaint "The value of colinc is ~a, should be a positive integer"
+           :args (list colinc)))
+  (when (and mincol (< mincol 0))
+    (error 'format-error
+           :complaint "The value of mincol is ~a, should be a non-negative integer"
+           :args (list mincol)))
   (unless padleft
     (write-string string stream))
   (dotimes (i minpad)
