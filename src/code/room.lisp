@@ -129,6 +129,10 @@
       (make-room-info :name 'instance
                       :kind :instance))
 
+(setf (svref *meta-room-info* funcallable-instance-header-widetag)
+      (make-room-info :name 'funcallable-instance
+                      :kind :closure))
+
 ) ; EVAL-WHEN
 
 (defparameter *room-info* '#.*meta-room-info*)
@@ -304,7 +308,7 @@
                                 list-pointer-lowtag
                                 (* cons-size n-word-bytes)
                                 ok)))
-                  ((eql header-widetag closure-header-widetag)
+                  ((eq (room-info-kind info) :closure)
                    (let* ((obj (%make-lisp-obj (logior (sap-int current)
                                                        fun-pointer-lowtag)))
                           (size (round-to-dualword

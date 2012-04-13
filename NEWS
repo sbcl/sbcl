@@ -22,6 +22,7 @@ changes relative to sbcl-1.0.56:
     returns NIL instead of signalling an obscure error.
   * bug fix: fix miscompilation of some logand forms with large constant
     arguments.  (lp#974406)
+  * bug fix: account for funcallable-instance objects properly in ROOM.
   * documentation:
     ** improved docstrings: REPLACE (lp#965592)
 
