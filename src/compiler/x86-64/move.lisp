@@ -290,9 +290,10 @@
   (:generator 1
     (cond ((and (sc-is x signed-reg unsigned-reg)
                 (not (location= x y)))
-           ;; Uses 7 bytes, but faster on the Pentium
-           (inst lea y (make-ea :qword :index x
-                                :scale (ash 1 n-fixnum-tag-bits))))
+           (if (= n-fixnum-tag-bits 1)
+               (inst lea y (make-ea :qword :base x :index x))
+               (inst lea y (make-ea :qword :index x
+                                    :scale (ash 1 n-fixnum-tag-bits)))))
           (t
            ;; Uses: If x is a reg 2 + 3; if x = y uses only 3 bytes
            (move y x)
@@ -353,10 +354,14 @@
       ;; you change stuff here, make sure the sign flag doesn't get
       ;; overwritten before the CALL!
       (inst test x y)
-      ;; Faster but bigger then SHL Y 4. The cost of doing this
-      ;; speculatively should be noise compared to bignum consing if
-      ;; that is needed and saves one branch.
-      (inst lea y (make-ea :qword :index x :scale (ash 1 n-fixnum-tag-bits)))
+      ;; Using LEA is faster but bigger than MOV+SHL; it also doesn't
+      ;; twiddle the sign flag.  The cost of doing this speculatively
+      ;; should be noise compared to bignum consing if that is needed
+      ;; and saves one branch.
+      (if (= n-fixnum-tag-bits 1)
+          (inst lea y (make-ea :qword :base x :index x))
+          (inst lea y (make-ea :qword :index x
+                               :scale (ash 1 n-fixnum-tag-bits))))
       (inst jmp :z done)
       (inst mov y x)
       (inst lea temp-reg-tn

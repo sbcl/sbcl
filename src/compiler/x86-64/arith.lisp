@@ -510,8 +510,10 @@
     (inst idiv eax y)
     (if (location= quo eax)
         (inst shl eax n-fixnum-tag-bits)
-        (inst lea quo (make-ea :qword :index eax
-                               :scale (ash 1 n-fixnum-tag-bits))))
+        (if (= n-fixnum-tag-bits 1)
+            (inst lea quo (make-ea :qword :base eax :index eax))
+            (inst lea quo (make-ea :qword :index eax
+                                   :scale (ash 1 n-fixnum-tag-bits)))))
     (move rem edx)))
 
 (define-vop (fast-truncate-c/fixnum=>fixnum fast-safe-arith-op)
@@ -539,8 +541,10 @@
     (inst idiv eax y-arg)
     (if (location= quo eax)
         (inst shl eax n-fixnum-tag-bits)
-        (inst lea quo (make-ea :qword :index eax
-                               :scale (ash 1 n-fixnum-tag-bits))))
+        (if (= n-fixnum-tag-bits 1)
+            (inst lea quo (make-ea :qword :base eax :index eax))
+            (inst lea quo (make-ea :qword :index eax
+                                   :scale (ash 1 n-fixnum-tag-bits)))))
     (move rem edx)))
 
 (define-vop (fast-truncate/unsigned=>unsigned fast-safe-arith-op)
