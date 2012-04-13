@@ -374,6 +374,13 @@
   ;; Kept here so that when the thread dies we can release the whole
   ;; memory we reserved.
   (os-address :c-type "void *" :length #!+alpha 2 #!-alpha 1)
+  ;; Keep these next four slots close to the beginning of the structure.
+  ;; Doing so reduces code size for x86-64 allocation sequences and
+  ;; special variable manipulations.
+  #!+gencgc (alloc-region :c-type "struct alloc_region" :length 5)
+  #!+(or x86 x86-64 sb-thread) (pseudo-atomic-bits)
+  (binding-stack-start :c-type "lispobj *" :length #!+alpha 2 #!-alpha 1)
+  (binding-stack-pointer :c-type "lispobj *" :length #!+alpha 2 #!-alpha 1)
   #!+sb-thread
   (os-attr :c-type "pthread_attr_t *" :length #!+alpha 2 #!-alpha 1)
   #!+sb-thread
@@ -386,21 +393,17 @@
   (state-not-stopped-sem :c-type "os_sem_t *" :length #!+alpha 2 #!-alpha 1)
   #!+sb-thread
   (state-not-stopped-waitcount :c-type "int" :length 1)
-  (binding-stack-start :c-type "lispobj *" :length #!+alpha 2 #!-alpha 1)
-  (binding-stack-pointer :c-type "lispobj *" :length #!+alpha 2 #!-alpha 1)
   (control-stack-start :c-type "lispobj *" :length #!+alpha 2 #!-alpha 1)
   (control-stack-end :c-type "lispobj *" :length #!+alpha 2 #!-alpha 1)
   (control-stack-guard-page-protected)
   (alien-stack-start :c-type "lispobj *" :length #!+alpha 2 #!-alpha 1)
   (alien-stack-pointer :c-type "lispobj *" :length #!+alpha 2 #!-alpha 1)
-  #!+gencgc (alloc-region :c-type "struct alloc_region" :length 5)
   (this :c-type "struct thread *" :length #!+alpha 2 #!-alpha 1)
   (prev :c-type "struct thread *" :length #!+alpha 2 #!-alpha 1)
   (next :c-type "struct thread *" :length #!+alpha 2 #!-alpha 1)
   ;; starting, running, suspended, dead
   (state :c-type "lispobj")
   (tls-cookie)                          ;  on x86, the LDT index
-  #!+(or x86 x86-64 sb-thread) (pseudo-atomic-bits)
   (interrupt-data :c-type "struct interrupt_data *"
                   :length #!+alpha 2 #!-alpha 1)
   (stepping)
