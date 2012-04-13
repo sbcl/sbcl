@@ -209,7 +209,7 @@
 (define-vop (fixnump/signed-byte-64 type-predicate)
   (:args (value :scs (signed-reg)))
   (:info)
-  (:conditional :z)
+  (:conditional #.(if (= sb!vm:n-fixnum-tag-bits 1) :ns :z))
   (:arg-types signed-num)
   (:translate fixnump)
   (:generator 5
@@ -219,8 +219,8 @@
     ;;    ((x-a) >> n) = 0
     (inst mov rax-tn #.(- sb!xc:most-negative-fixnum))
     (inst add rax-tn value)
-    (inst shr rax-tn #.(integer-length (- sb!xc:most-positive-fixnum
-                                          sb!xc:most-negative-fixnum)))))
+    (unless (= n-fixnum-tag-bits 1)
+      (inst shr rax-tn n-fixnum-bits))))
 
 ;;; A (SIGNED-BYTE 64) can be represented with either fixnum or a bignum with
 ;;; exactly one digit.
