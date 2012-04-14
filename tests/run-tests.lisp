@@ -1,11 +1,9 @@
 #+#.(cl:if (cl:find-package "ASDF") '(or) '(and))
-(load (merge-pathnames "../contrib/asdf/asdf.fasl"))
+(require :asdf)
 
 #+#.(cl:if (cl:find-package "SB-POSIX") '(or) '(and))
-(let ((asdf:*central-registry*
-       (cons "../contrib/systems/" asdf:*central-registry*)))
-  (handler-bind (#+win32 (warning #'muffle-warning))
-    (asdf:oos 'asdf:load-op 'sb-posix)))
+(handler-bind (#+win32 (warning #'muffle-warning))
+  (require :sb-posix))
 
 (load "test-util.lisp")
 

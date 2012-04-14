@@ -55,18 +55,17 @@
 
 ;;; As reported by David Tolpin *LOAD-PATHNAME* was not merged.
 (progn
-  (defvar *saved-load-pathname*)
+  (defparameter *saved-load-pathname* nil)
   (with-open-file (s *tmp-filename*
                      :direction :output
                      :if-exists :supersede
                      :if-does-not-exist :create)
     (print '(setq *saved-load-pathname* *load-pathname*) s))
-  (let (tmp-fasl)
-    (unwind-protect
-         (progn
-           (load *tmp-filename*)
-           (assert (equal (merge-pathnames *tmp-filename*) *saved-load-pathname*)))
-      (delete-file *tmp-filename*))))
+  (unwind-protect
+       (progn
+         (load *tmp-filename*)
+         (assert (equal (merge-pathnames *tmp-filename*) *saved-load-pathname*)))
+    (delete-file *tmp-filename*)))
 
 ;;; Test many, many variations on LOAD.
 (defparameter *counter* 0)
@@ -254,9 +253,9 @@
                                        :if-exists :append)
       (write-line ";;comment"))
     (handler-bind ((error (lambda (error)
-                                   (declare (ignore error))
-                                   (when (find-restart 'sb-fasl::source)
-                                     (invoke-restart 'sb-fasl::source)))))
+                            (declare (ignore error))
+                            (when (find-restart 'sb-fasl::source)
+                              (invoke-restart 'sb-fasl::source)))))
       (load-and-assert spec source source))))
 
 ;; Ensure that we can invoke the restart OBJECT in the above case.
@@ -269,14 +268,20 @@
                                        :if-exists :append)
       (write-line ";;comment"))
     (handler-bind ((error (lambda (error)
-                                   (declare (ignore error))
-                                   (when (find-restart 'sb-fasl::object)
-                                     (invoke-restart 'sb-fasl::object)))))
+                            (declare (ignore error))
+                            (when (find-restart 'sb-fasl::object)
+                              (invoke-restart 'sb-fasl::object)))))
       (load-and-assert spec fasl fasl))))
 
 (with-test (:name :bug-332 :fails-on :win32)
   (flet ((stimulate-sbcl ()
-           (let ((filename (format nil "/tmp/~A.lisp" (gensym))))
+           (let ((filename
+                  (format nil "~A/~A.lisp"
+                          (or (posix-getenv "TEST_DIRECTORY")
+                              (posix-getenv "TMPDIR")
+                              "/tmp")
+                          (gensym))))
+             (ensure-directories-exist filename)
              ;; create a file which redefines a structure incompatibly
              (with-open-file (f filename :direction :output :if-exists :supersede)
                (print '(defstruct bug-332 foo) f)

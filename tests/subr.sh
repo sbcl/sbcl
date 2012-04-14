@@ -26,16 +26,17 @@ set -u
 set -a # export all variables at assignment-time.
 # Note: any script that uses the variables that name files should
 # quote them (with double quotes), to contend with whitespace.
-SBCL_HOME="$SBCL_PWD/../contrib"
-SBCL_CORE="$SBCL_PWD/../output/sbcl.core"
-SBCL_RUNTIME="$SBCL_PWD/../src/runtime/sbcl"
-SBCL_ARGS="--noinform --no-sysinit --no-userinit --noprint --disable-debugger"
+SBCL_HOME="${TEST_SBCL_HOME:-$SBCL_PWD/../contrib}"
+SBCL_CORE="${TEST_SBCL_CORE:-$SBCL_PWD/../output/sbcl.core}"
+SBCL_RUNTIME="${TEST_SBCL_RUNTIME:-$SBCL_PWD/../src/runtime/sbcl}"
+SBCL_ARGS="${TEST_SBCL_ARGS:---noinform --no-sysinit --no-userinit --noprint --disable-debugger}"
 
 # Scripts that use these variables should quote them.
 TEST_BASENAME="`basename $0`"
-TEST_FILESTEM="`basename "${TEST_BASENAME}" | sed 's/\.sh$//'`"
-TEST_FILESTEM="`echo "${TEST_FILESTEM}" | sed 's/\./-/g'`"
-TEST_DIRECTORY="$SBCL_PWD/$TEST_FILESTEM-$$"
+TEST_FILESTEM="$(basename "${TEST_BASENAME}" | sed 's/\.sh$// ; s/\./-/g')"
+: ${TEST_BASEDIR:="$SBCL_PWD"}
+TEST_DIRECTORY="${TEST_BASEDIR}/${TEST_FILESTEM}-$$"
+export TEST_DIRECTORY
 
 # "Ten four" is the closest numerical slang I can find to "OK", so
 # it's the Unix status value that we expect from a successful test.
