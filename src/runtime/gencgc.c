@@ -3847,7 +3847,7 @@ collect_garbage(generation_index_t last_gen)
 
     /* Update auto_gc_trigger. Make sure we trigger the next GC before
      * running out of heap! */
-    if (bytes_consed_between_gcs >= dynamic_space_size - bytes_allocated)
+    if (bytes_consed_between_gcs <= (dynamic_space_size - bytes_allocated))
         auto_gc_trigger = bytes_allocated + bytes_consed_between_gcs;
     else
         auto_gc_trigger = bytes_allocated + (dynamic_space_size - bytes_allocated)/2;
@@ -4125,6 +4125,7 @@ general_alloc_internal(long nbytes, int page_type_flag, struct alloc_region *reg
 #endif
     void *new_obj;
     void *new_free_pointer;
+    os_vm_size_t trigger_bytes = 0;
 
     gc_assert(nbytes>0);
 
@@ -4146,10 +4147,19 @@ general_alloc_internal(long nbytes, int page_type_flag, struct alloc_region *reg
         return(new_obj);        /* yup */
     }
 
+    /* We don't want to count nbytes against auto_gc_trigger unless we
+     * have to: it speeds up the tenuring of objects and slows down
+     * allocation. However, unless we do so when allocating _very_
+     * large objects we are in danger of exhausting the heap without
+     * running sufficient GCs.
+     */
+    if (nbytes >= bytes_consed_between_gcs)
+        trigger_bytes = nbytes;
+
     /* we have to go the long way around, it seems. Check whether we
      * should GC in the near future
      */
-    if (auto_gc_trigger && bytes_allocated+nbytes > auto_gc_trigger) {
+    if (auto_gc_trigger && (bytes_allocated+trigger_bytes > auto_gc_trigger)) {
         /* Don't flood the system with interrupts if the need to gc is
          * already noted. This can happen for example when SUB-GC
          * allocates or after a gc triggered in a WITHOUT-GCING. */

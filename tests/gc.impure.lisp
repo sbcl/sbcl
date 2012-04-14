@@ -70,9 +70,24 @@
 
 (with-test (:name :bug-936304)
   (gc :full t)
-  (assert (eq :ok (handler-case
-                      (progn
-                        (loop repeat 50 do (stress-gc))
-                        :ok)
-                    (storage-condition ()
-                      :oom)))))
+  (time
+   (assert (eq :ok (handler-case
+                       (progn
+                         (loop repeat 50 do (stress-gc))
+                         :ok)
+                     (storage-condition ()
+                       :oom))))))
+
+(with-test (:name :bug-981106)
+  (gc :full t)
+  (time
+   (assert (eq :ok
+               (handler-case
+                   (dotimes (runs 100 :ok)
+                     (let ((len (length
+                                 (with-output-to-string (string)
+                                   (dotimes (i 1000000)
+                                     (write-sequence "hi there!" string))))))
+                       (assert (eql len (* 1000000 (length "hi there!"))))))
+                 (storage-condition ()
+                   :oom))))))
