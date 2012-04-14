@@ -221,16 +221,6 @@
       (print-xmmreg value stream dstate)
     (print-mem-access value nil stream dstate)))
 
-;; Same as print-xmmreg/mem, but prints an explicit size indicator for
-;; memory references.
-(defun print-sized-xmmreg/mem (value stream dstate)
-  (declare (type (or list xmmreg) value)
-           (type stream stream)
-           (type sb!disassem:disassem-state dstate))
-  (if (typep value 'xmmreg)
-      (print-xmmreg value stream dstate)
-    (print-mem-access value (inst-operand-size dstate) stream dstate)))
-
 ;;; This prefilter is used solely for its side effects, namely to put
 ;;; the bits found in the REX prefix into the DSTATE for use by other
 ;;; prefilters and by printers.
@@ -489,10 +479,6 @@
 (sb!disassem:define-arg-type xmmreg/mem
   :prefilter #'prefilter-reg/mem
   :printer #'print-xmmreg/mem)
-
-(sb!disassem:define-arg-type sized-xmmreg/mem
-  :prefilter #'prefilter-reg/mem
-  :printer #'print-sized-xmmreg/mem)
 
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
@@ -902,7 +888,7 @@
   (x0f     :field (byte 8 0)    :value #x0f)
   (op      :field (byte 8 8))
   (reg/mem :fields (list (byte 2 22) (byte 3 16))
-                                :type 'sized-xmmreg/mem)
+                                :type 'xmmreg/mem)
   (reg     :field (byte 3 19)   :type 'reg))
 
 (sb!disassem:define-instruction-format (ext-reg-xmm/mem 32
@@ -912,7 +898,7 @@
   (x0f     :field (byte 8 8)    :value #x0f)
   (op      :field (byte 8 16))
   (reg/mem :fields (list (byte 2 30) (byte 3 24))
-                                :type 'sized-xmmreg/mem)
+                                :type 'xmmreg/mem)
   (reg     :field (byte 3 27)   :type 'reg))
 
 (sb!disassem:define-instruction-format (ext-rex-reg-xmm/mem 40
@@ -924,7 +910,7 @@
   (x0f     :field (byte 8 16)   :value #x0f)
   (op      :field (byte 8 24))
   (reg/mem :fields (list (byte 2 38) (byte 3 32))
-                                :type 'sized-xmmreg/mem)
+                                :type 'xmmreg/mem)
   (reg     :field (byte 3 35)   :type 'reg))
 
 ;; XMM comparison instruction

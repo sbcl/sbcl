@@ -5,6 +5,7 @@ changes relative to sbcl-1.0.56:
     (lp#936304)
   * optimization: fewer uses of full calls to signed modular functions.
     (lp#903821)
+  * bug fix: fixed disassembly of some SSE instructions on x86-64.
   * bug fix: SB-SIMPLE-STREAMS signals an error for bogus :CLASS arguments in
     OPEN. (lp#969352, thanks to Kambiz Darabi)
   * bug fix: CASE normal-clauses do not allow T and OTHERWISE as keys.
