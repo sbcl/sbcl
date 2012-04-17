@@ -313,7 +313,7 @@
         ;; Get the second digit.
         (loadw rax-tn value (1+ bignum-digits-offset) other-pointer-lowtag)
         ;; All zeros, its an (unsigned-byte 64).
-        (inst or rax-tn rax-tn)
+        (inst test rax-tn rax-tn)
         (inst jmp :z yep)
         (inst jmp nope)
 
@@ -323,7 +323,7 @@
 
         ;; positive implies (unsigned-byte 64).
         (emit-label fixnum)
-        (inst or rax-tn rax-tn)
+        (inst test rax-tn rax-tn)
         (inst jmp (if not-p :s :ns) target)
 
         (emit-label not-target)))))
@@ -356,7 +356,7 @@
       ;; Get the second digit.
       (loadw rax-tn value (1+ bignum-digits-offset) other-pointer-lowtag)
       ;; All zeros, its an (unsigned-byte 64).
-      (inst or rax-tn rax-tn)
+      (inst test rax-tn rax-tn)
       (inst jmp :z yep)
       (inst jmp nope)
 
@@ -366,7 +366,7 @@
 
       ;; positive implies (unsigned-byte 64).
       (emit-label fixnum)
-      (inst or rax-tn rax-tn)
+      (inst test rax-tn rax-tn)
       (inst jmp :s nope)
 
       (emit-label yep)

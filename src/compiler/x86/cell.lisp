@@ -286,7 +286,7 @@
       (loadw tls-index symbol symbol-tls-index-slot other-pointer-lowtag)
       (inst add bsp (* binding-size n-word-bytes))
       (store-binding-stack-pointer bsp)
-      (inst or tls-index tls-index)
+      (inst test tls-index tls-index)
       (inst jmp :ne tls-index-valid)
       (inst mov tls-index symbol)
       (inst call (make-fixup
@@ -359,7 +359,7 @@
 
     LOOP
     (loadw symbol bsp (- binding-symbol-slot binding-size))
-    (inst or symbol symbol)
+    (inst test symbol symbol)
     (inst jmp :z skip)
     ;; Bind stack debug sentinels have the unbound marker in the symbol slot
     (inst cmp symbol unbound-marker-widetag)

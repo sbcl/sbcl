@@ -312,7 +312,7 @@
         ;; Get the second digit.
         (loadw eax-tn value (1+ bignum-digits-offset) other-pointer-lowtag)
         ;; All zeros, its an (unsigned-byte 32).
-        (inst or eax-tn eax-tn)
+        (inst test eax-tn eax-tn)
         (inst jmp :z yep)
         (inst jmp nope)
 
@@ -322,7 +322,7 @@
 
         ;; positive implies (unsigned-byte 32).
         (emit-label fixnum)
-        (inst or eax-tn eax-tn)
+        (inst test eax-tn eax-tn)
         (inst jmp (if not-p :s :ns) target)
 
         (emit-label not-target)))))
@@ -355,7 +355,7 @@
       ;; Get the second digit.
       (loadw eax-tn value (1+ bignum-digits-offset) other-pointer-lowtag)
       ;; All zeros, its an (unsigned-byte 32).
-      (inst or eax-tn eax-tn)
+      (inst test eax-tn eax-tn)
       (inst jmp :z yep)
       (inst jmp nope)
 
@@ -365,7 +365,7 @@
 
       ;; positive implies (unsigned-byte 32).
       (emit-label fixnum)
-      (inst or eax-tn eax-tn)
+      (inst test eax-tn eax-tn)
       (inst jmp :s nope)
 
       (emit-label yep)

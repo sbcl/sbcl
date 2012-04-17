@@ -103,7 +103,7 @@
                ;; Now with the lock held, see if the symbol's tls index has been
                ;; set in the meantime.
                (loadw target other symbol-tls-index-slot other-pointer-lowtag)
-               (inst or target target)
+               (inst test target target)
                (inst jmp :ne release-tls-index-lock)
                ;; Allocate a new tls-index.
                (load-symbol-value target *free-tls-index*)

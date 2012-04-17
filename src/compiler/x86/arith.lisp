@@ -764,7 +764,7 @@ constant shift greater than word length")))
   (:generator 5
     (move result number)
     (move ecx amount)
-    (inst or ecx ecx)
+    (inst test ecx ecx)
     (inst jmp :ns positive)
     (inst neg ecx)
     (inst cmp ecx 31)
@@ -793,7 +793,7 @@ constant shift greater than word length")))
   (:generator 5
     (move result number)
     (move ecx amount)
-    (inst or ecx ecx)
+    (inst test ecx ecx)
     (inst jmp :ns positive)
     (inst neg ecx)
     (inst cmp ecx 31)
@@ -905,7 +905,7 @@ constant shift greater than word length")))
   (:generator 4
     (move result number)
     (move ecx amount)
-    (inst or ecx ecx)
+    (inst test ecx ecx)
     (inst jmp :ns positive)
     (inst neg ecx)
     (inst xor zero zero)
@@ -1464,7 +1464,7 @@ constant shift greater than word length")))
   (:arg-types unsigned-num)
   (:conditional :ns)
   (:generator 3
-    (inst or digit digit)))
+    (inst test digit digit)))
 
 
 ;;; For add and sub with carry the sc of carry argument is any-reg so

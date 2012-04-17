@@ -236,7 +236,7 @@
       (emit-error-break nil error-trap
                         (error-number-or-lose 'unseen-throw-tag-error)
                         (list target)))
-    (inst or catch catch)               ; check for NULL pointer
+    (inst test catch catch)             ; check for NULL pointer
     (inst jmp :z error))
 
   (inst cmp target (make-ea-for-object-slot catch catch-block-tag-slot 0))
@@ -264,7 +264,7 @@
   (declare (ignore start count))
 
   (let ((error (generate-error-code nil 'invalid-unwind-error)))
-    (inst or block block)               ; check for NULL pointer
+    (inst test block block)             ; check for NULL pointer
     (inst jmp :z error))
 
   (load-tl-symbol-value uwp *current-unwind-protect-block*)
@@ -309,7 +309,7 @@
   (declare (ignore start count))
 
   (let ((error (generate-error-code nil 'invalid-unwind-error)))
-    (inst or block block)               ; check for NULL pointer
+    (inst test block block)             ; check for NULL pointer
     (inst jmp :z error))
 
   ;; Save all our registers, as we're about to clobber them.
