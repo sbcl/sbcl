@@ -1623,44 +1623,43 @@
            (t
             (error "bogus arguments to MOV: ~S ~S" dst src))))))
 
+;;; Emit a sign-extending (if SIGNED-P is true) or zero-extending move.
+;;; To achieve the shortest possible encoding zero extensions into a
+;;; 64-bit destination are assembled as a straight 32-bit MOV (if the
+;;; source size is 32 bits) or as MOVZX with a 32-bit destination (if
+;;; the source size is 8 or 16 bits). Due to the implicit zero extension
+;;; to 64 bits this has the same effect as a MOVZX with 64-bit
+;;; destination but often needs no REX prefix.
 (defun emit-move-with-extension (segment dst src signed-p)
   (aver (register-p dst))
   (let ((dst-size (operand-size dst))
         (src-size (operand-size src))
-        (opcode (if signed-p  #b10111110 #b10110110)))
-    (ecase dst-size
-      (:word
-       (aver (eq src-size :byte))
-       (maybe-emit-operand-size-prefix segment :word)
-       ;; REX prefix is needed if SRC is SIL, DIL, SPL or BPL.
-       (maybe-emit-rex-for-ea segment src dst :operand-size :word)
-       (emit-byte segment #b00001111)
-       (emit-byte segment opcode)
-       (emit-ea segment src (reg-tn-encoding dst)))
-      ((:dword :qword)
-       (ecase src-size
-         (:byte
-          (maybe-emit-rex-for-ea segment src dst :operand-size dst-size)
-          (emit-byte segment #b00001111)
-          (emit-byte segment opcode)
-          (emit-ea segment src (reg-tn-encoding dst)))
-         (:word
-          (maybe-emit-rex-for-ea segment src dst :operand-size dst-size)
-          (emit-byte segment #b00001111)
-          (emit-byte segment (logior opcode 1))
-          (emit-ea segment src (reg-tn-encoding dst)))
-         (:dword
-          (aver (eq dst-size :qword))
-          ;; dst is in reg, src is in modrm
-          (let ((ea-p (ea-p src)))
-            (maybe-emit-rex-prefix segment (if signed-p :qword :dword) dst
-                                   (and ea-p (ea-index src))
-                                   (cond (ea-p (ea-base src))
-                                         ((tn-p src) src)
-                                         (t nil)))
-            (emit-byte segment (if signed-p #x63 #x8b)) ;movsxd or straight mov
-            ;;(emit-byte segment opcode)
-            (emit-ea segment src (reg-tn-encoding dst)))))))))
+        (opcode (if signed-p #b10111110 #b10110110)))
+    (macrolet ((emitter (operand-size &rest bytes)
+                 `(progn
+                   (maybe-emit-rex-for-ea segment src dst
+                                          :operand-size ,operand-size)
+                   ,@(mapcar (lambda (byte)
+                               `(emit-byte segment ,byte))
+                             bytes)
+                   (emit-ea segment src (reg-tn-encoding dst)))))
+      (ecase dst-size
+        (:word
+         (aver (eq src-size :byte))
+         (maybe-emit-operand-size-prefix segment :word)
+         (emitter :word #b00001111 opcode))
+        ((:dword :qword)
+         (unless signed-p
+           (setf dst-size :dword))
+         (ecase src-size
+           (:byte
+            (emitter dst-size #b00001111 opcode))
+           (:word
+            (emitter dst-size #b00001111 (logior opcode 1)))
+           (:dword
+            (aver (or (not signed-p) (eq dst-size :qword)))
+            (emitter dst-size
+                     (if signed-p #x63 #x8b))))))))) ; movsxd or straight mov
 
 (define-instruction movsx (segment dst src)
   (:printer ext-reg-reg/mem-no-width
