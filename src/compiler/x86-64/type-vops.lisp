@@ -13,6 +13,14 @@
 
 ;;;; test generation utilities
 
+;;; Optimize the case of moving a 64-bit value into RAX when not caring
+;;; about the upper 32 bits: often the REX prefix can be spared.
+(defun move-qword-to-eax (value)
+  (if (and (sc-is value any-reg descriptor-reg)
+           (< (tn-offset value) r8-offset))
+      (move eax-tn (make-dword-tn value))
+      (move rax-tn value)))
+
 (defun generate-fixnum-test (value)
   "zero flag set if VALUE is fixnum"
   (inst test
@@ -72,10 +80,7 @@
   (%test-headers value target not-p nil headers drop-through))
 
 (defun %test-lowtag (value target not-p lowtag)
-  (if (and (sc-is value any-reg descriptor-reg)
-           (< (tn-offset value) r8-offset))
-      (move eax-tn (make-dword-tn value)) ; shorter encoding (no REX prefix)
-      (move rax-tn value))
+  (move-qword-to-eax value)
   (inst and al-tn lowtag-mask)
   (inst cmp al-tn lowtag)
   (inst jmp (if not-p :ne :e) target))
@@ -249,7 +254,7 @@
             (values target not-target))
       (generate-fixnum-test value)
       (inst jmp :e yep)
-      (move rax-tn value)
+      (move-qword-to-eax value)
       (inst and al-tn lowtag-mask)
       (inst cmp al-tn other-pointer-lowtag)
       (inst jmp :ne nope)
@@ -265,7 +270,7 @@
                                      value)))
       (generate-fixnum-test value)
       (inst jmp :e yep)
-      (move rax-tn value)
+      (move-qword-to-eax value)
       (inst and al-tn lowtag-mask)
       (inst cmp al-tn other-pointer-lowtag)
       (inst jmp :ne nope)
@@ -294,8 +299,8 @@
         (inst jmp :e fixnum)
 
         ;; If not, is it an other pointer?
-        (inst and rax-tn lowtag-mask)
-        (inst cmp rax-tn other-pointer-lowtag)
+        (inst and al-tn lowtag-mask)
+        (inst cmp al-tn other-pointer-lowtag)
         (inst jmp :ne nope)
         ;; Get the header.
         (loadw rax-tn value 0 other-pointer-lowtag)
@@ -337,8 +342,8 @@
       (inst jmp :e fixnum)
 
       ;; If not, is it an other pointer?
-      (inst and rax-tn lowtag-mask)
-      (inst cmp rax-tn other-pointer-lowtag)
+      (inst and al-tn lowtag-mask)
+      (inst cmp al-tn other-pointer-lowtag)
       (inst jmp :ne nope)
       ;; Get the header.
       (loadw rax-tn value 0 other-pointer-lowtag)
