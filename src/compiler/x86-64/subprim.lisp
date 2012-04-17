@@ -18,7 +18,7 @@
   (:translate length)
   (:args (object :scs (descriptor-reg control-stack) :target ptr))
   (:arg-types list)
-  (:temporary (:sc unsigned-reg :offset eax-offset) eax)
+  (:temporary (:sc dword-reg :offset eax-offset) eax)
   (:temporary (:sc descriptor-reg :from (:argument 0)) ptr)
   (:results (count :scs (any-reg)))
   (:result-types positive-fixnum)
@@ -43,7 +43,7 @@
     (inst jmp :e DONE)
     ;; Otherwise, check to see whether we hit the end of a dotted list. If
     ;; not, loop back for more.
-    (move eax ptr)
+    (move eax (make-dword-tn ptr))
     (inst and al-tn lowtag-mask)
     (inst cmp al-tn list-pointer-lowtag)
     (inst jmp :e LOOP)
