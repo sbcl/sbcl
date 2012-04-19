@@ -24,6 +24,8 @@ changes relative to sbcl-1.0.56:
   * bug fix: fix miscompilation of some logand forms with large constant
     arguments.  (lp#974406)
   * bug fix: account for funcallable-instance objects properly in ROOM.
+  * bug fix: incorrect octets reported for c-string decoding errors.
+    (lp#985505)
   * documentation:
     ** improved docstrings: REPLACE (lp#965592)
 

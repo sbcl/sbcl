@@ -332,4 +332,41 @@
                 (storage-condition ()
                   :enomem)))))
 
+(with-test (:name :bug-985505)
+  ;; Check that correct octets are reported for a c-string-decoding error.
+  (assert
+   (eq :unibyte
+       (handler-case
+           (let ((c-string (coerce #(70 111 195 182 0)
+                                   '(vector (unsigned-byte 8)))))
+             (sb-sys:with-pinned-objects (c-string)
+               (sb-alien::c-string-to-string (sb-sys:vector-sap c-string)
+                                             :ascii 'character)))
+         (sb-int:c-string-decoding-error (e)
+           (assert (equalp #(195) (sb-int:character-decoding-error-octets e)))
+           :unibyte))))
+  (assert
+   (eq :multibyte-4
+       (handler-case
+           (let ((c-string (coerce #(70 111 246 0)
+                                   '(vector (unsigned-byte 8)))))
+             (sb-sys:with-pinned-objects (c-string)
+               (sb-alien::c-string-to-string (sb-sys:vector-sap c-string)
+                                             :utf-8 'character)))
+         (sb-int:c-string-decoding-error (e)
+           (assert (equalp #(246 0 0 0)
+                           (sb-int:character-decoding-error-octets e)))
+           :multibyte-4))))
+  (assert
+   (eq :multibyte-2
+       (handler-case
+           (let ((c-string (coerce #(70 195 1 182 195 182 0) '(vector (unsigned-byte 8)))))
+             (sb-sys:with-pinned-objects (c-string)
+               (sb-alien::c-string-to-string (sb-sys:vector-sap c-string)
+                                             :utf-8 'character)))
+         (sb-int:c-string-decoding-error (e)
+           (assert (equalp #(195 1)
+                           (sb-int:character-decoding-error-octets e)))
+           :multibyte-2)))))
+
 ;;; success

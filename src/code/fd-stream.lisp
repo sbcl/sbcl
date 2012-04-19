@@ -443,11 +443,10 @@
   (error 'c-string-encoding-error
          :external-format external-format
          :code code))
-
-(defun c-string-decoding-error (external-format octets)
+(defun c-string-decoding-error (external-format sap offset count)
   (error 'c-string-decoding-error
          :external-format external-format
-         :octets octets))
+         :octets (sap-ref-octets sap offset count)))
 
 ;;; Returning true goes into end of file handling, false will enter another
 ;;; round of input buffer filling followed by re-entering character decode.
@@ -1594,7 +1593,8 @@
                                    (incf head size)
                                    nil))
                            (when decode-break-reason
-                             (c-string-decoding-error ,name decode-break-reason))
+                             (c-string-decoding-error
+                              ,name sap head decode-break-reason))
                            (when (zerop (char-code char))
                              (return count))))
                  (string (make-string length :element-type element-type)))
@@ -1613,7 +1613,8 @@
                       (incf head size)
                       nil))
               (when decode-break-reason
-                (c-string-decoding-error ,name decode-break-reason))
+                (c-string-decoding-error
+                 ,name sap head decode-break-reason))
               (setf (aref string index) char)))))
 
       (defun ,output-c-string-function (string)
