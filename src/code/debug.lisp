@@ -331,11 +331,18 @@ thread, NIL otherwise."
 (defun clean-xep (name args)
   (values (second name)
           (if (consp args)
-              (let ((count (first args))
-                    (real-args (rest args)))
+              (let* ((count (first args))
+                     (real-args (rest args)))
                 (if (fixnump count)
-                    (subseq real-args 0
-                            (min count (length real-args)))
+                    ;; So, this is a cheap trick -- but makes backtraces for
+                    ;; too-many-arguments-errors much, much easier to to
+                    ;; understand. FIXME: For :EXTERNAL frames at least we
+                    ;; should be able to get the actual arguments, really.
+                    (loop repeat count
+                          for arg = (if real-args
+                                        (pop real-args)
+                                        (make-unprintable-object "unknown"))
+                          collect arg)
                     real-args))
               args)))
 

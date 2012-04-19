@@ -3,6 +3,8 @@ changes relative to sbcl-1.0.56:
   * enhancement: GENCGC reclaims space more aggressively when objects being
     allocated are a large fraction of the total available heap space.
     (lp#936304)
+  * enhancement: backtraces show the correct number of arguments for frames
+    called with too many arguments.
   * optimization: fewer uses of full calls to signed modular functions.
     (lp#903821)
   * bug fix: fixed disassembly of some SSE instructions on x86-64.

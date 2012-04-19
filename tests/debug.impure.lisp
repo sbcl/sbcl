@@ -251,6 +251,10 @@
 (defun oops ()
   (error "oops"))
 
+(with-test (:name :xep-too-many-arguments)
+  (assert (verify-backtrace (lambda () (oops 1 2 3 4 5 6))
+                            '((oops ? ? ? ? ? ?)))))
+
 (defmacro defbt (n ll &body body)
   `(progn
      ;; normal debug info
