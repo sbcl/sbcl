@@ -348,7 +348,13 @@
   (assert
    (eq :multibyte-4
        (handler-case
-           (let ((c-string (coerce #(70 111 246 0)
+           ;; KLUDGE, sort of.
+           ;;
+           ;; C-STRING decoding doesn't know how long the string is, and since this
+           ;; looks like a 4-byte sequence, it will grab 4 octets off the end.
+           ;;
+           ;; So we pad the vector for safety's sake.
+           (let ((c-string (coerce #(70 111 246 0 0 0)
                                    '(vector (unsigned-byte 8)))))
              (sb-sys:with-pinned-objects (c-string)
                (sb-alien::c-string-to-string (sb-sys:vector-sap c-string)
