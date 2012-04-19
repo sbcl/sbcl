@@ -1079,7 +1079,9 @@
                      (catch 'eof-input-catcher
                        (setf decode-break-reason
                              (block decode-break-reason
-                               (input-at-least ,stream-var ,(if (consp bytes) (car bytes) `(setq size ,bytes)))
+                               (input-at-least ,stream-var ,(if (consp bytes)
+                                                                (car bytes)
+                                                                `(setq size ,bytes)))
                                (let* ((byte (sap-ref-8 (buffer-sap ibuf) (buffer-head ibuf))))
                                  (declare (ignorable byte))
                                  ,@(when (consp bytes)
@@ -1579,7 +1581,9 @@
                            (setf decode-break-reason
                                  (block decode-break-reason
                                    (setf byte (sap-ref-8 sap head)
-                                         size ,(if (consp in-size-expr) (cadr in-size-expr) in-size-expr)
+                                         size ,(if (consp in-size-expr)
+                                                   (cadr in-size-expr)
+                                                   in-size-expr)
                                          char ,in-expr)
                                    (incf head size)
                                    nil))
@@ -1599,7 +1603,9 @@
               (setf decode-break-reason
                     (block decode-break-reason
                       (setf byte (sap-ref-8 sap head)
-                            size ,(if (consp in-size-expr) (cadr in-size-expr) in-size-expr)
+                            size ,(if (consp in-size-expr)
+                                      (cadr in-size-expr)
+                                      in-size-expr)
                             char ,in-expr)
                       (incf head size)
                       nil))
