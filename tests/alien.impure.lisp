@@ -369,4 +369,39 @@
                            (sb-int:character-decoding-error-octets e)))
            :multibyte-2)))))
 
+(with-test (:name :stream-to-c-string-decoding-restart-leakage)
+  ;; Restarts for stream decoding errors didn't use to be associated with
+  ;; their conditions, so they could get confused with c-string decoding errors.
+  (assert (eq :nesting-ok
+              (catch 'out
+                (handler-bind ((sb-int:character-decoding-error
+                                 (lambda (stream-condition)
+                                   (handler-bind ((sb-int:character-decoding-error
+                                                    (lambda (c-string-condition)
+                                                      (throw 'out
+                                                        (if (find-restart
+                                                             'sb-impl::input-replacement
+                                                             c-string-condition)
+                                                            :bad-restart
+                                                            :nesting-ok)))))
+                                     (let ((c-string (coerce #(70 195 1 182 195 182 0)
+                                                             '(vector (unsigned-byte 8)))))
+                                       (sb-sys:with-pinned-objects (c-string)
+                                         (sb-alien::c-string-to-string
+                                          (sb-sys:vector-sap c-string)
+                                          :utf-8 'character)))))))
+                  (let ((namestring "alien.impure.tmp"))
+                    (unwind-protect
+                         (progn
+                           (with-open-file (f namestring
+                                              :element-type '(unsigned-byte 8)
+                                              :direction :output
+                                              :if-exists :supersede)
+                             (dolist (b '(70 195 1 182 195 182 0))
+                               (write-byte b f)))
+                           (with-open-file (f namestring
+                                              :external-format :utf-8)
+                             (read-line f)))
+                      (delete-file namestring))))))))
+
 ;;; success
