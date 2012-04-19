@@ -116,10 +116,10 @@
    (lambda (c s)
      (let ((stream (stream-error-stream c))
            (code (character-encoding-error-code c)))
-       (format s "~@<encoding error on stream ~S (~S ~S): ~2I~_~
+       (format s "~@<~S stream encoding error on ~S: ~2I~_~
                   the character with code ~D cannot be encoded.~@:>"
-               stream ':external-format
                (character-coding-error-external-format c)
+               stream
                code)))))
 (define-condition stream-decoding-error (stream-error character-decoding-error)
   ()
@@ -127,17 +127,17 @@
    (lambda (c s)
      (let ((stream (stream-error-stream c))
            (octets (character-decoding-error-octets c)))
-       (format s "~@<decoding error on stream ~S (~S ~S): ~2I~_~
+       (format s "~@<~S stream decoding error on ~S: ~2I~_~
                   the octet sequence ~S cannot be decoded.~@:>"
-               stream ':external-format
                (character-coding-error-external-format c)
+               stream
                octets)))))
 
 (define-condition c-string-encoding-error (character-encoding-error)
   ()
   (:report
    (lambda (c s)
-     (format s "~@<c-string encoding error (:external-format ~S): ~2I~_~
+     (format s "~@<~S c-string encoding error: ~2I~_~
                   the character with code ~D cannot be encoded.~@:>"
                (character-coding-error-external-format c)
                (character-encoding-error-code c)))))
@@ -146,7 +146,7 @@
   ()
   (:report
    (lambda (c s)
-     (format s "~@<c-string decoding error (:external-format ~S): ~2I~_~
+     (format s "~@<~S c-string decoding error: ~2I~_~
                   the octet sequence ~S cannot be decoded.~@:>"
              (character-coding-error-external-format c)
              (character-decoding-error-octets c)))))
