@@ -598,7 +598,7 @@
   (values))
 
 ;;; Load the TN from its save location, allocating one if necessary.
-;;; The load is inserted BEFORE the specifier VOP. CONTEXT is a VOP
+;;; The load is inserted BEFORE the specified VOP. CONTEXT is a VOP
 ;;; used to tell which node/block to use for the new VOP.
 (defun restore-tn (tn before context)
   (declare (type tn tn) (type (or vop null) before) (type vop context))
@@ -919,8 +919,8 @@
 ;;; aren't any TN-REFs to represent the implicit reading of results or
 ;;; writing of arguments.
 ;;;
-;;; The second bullet corresponds conflicts with temporaries or between
-;;; arguments and results.
+;;; The second bullet corresponds to conflicts with temporaries or
+;;; between arguments and results.
 ;;;
 ;;; We consider both the TN-REF-TN and the TN-REF-LOAD-TN (if any) to
 ;;; be referenced simultaneously and in the same way. This causes
@@ -1057,9 +1057,9 @@
 
 ;;; This is called by PACK-LOAD-TN where there isn't any location free
 ;;; that we can pack into. What we do is move some live TN in one of
-;;; the specified SCs to memory, then mark this block all blocks that
-;;; reference the TN as needing repacking. If we succeed, we throw to
-;;; UNPACKED-TN. If we fail, we return NIL.
+;;; the specified SCs to memory, then mark all blocks that reference
+;;; the TN as needing repacking. If we succeed, we throw to UNPACKED-TN.
+;;; If we fail, we return NIL.
 ;;;
 ;;; We can unpack any live TN that appears in the NORMAL-TNs list
 ;;; (isn't wired or restricted.) We prefer to unpack TNs that are not
@@ -1117,7 +1117,7 @@
 ;;; if that location is in a SC not allowed by the primitive type.
 ;;; (The SC must still be allowed by the operand restriction.) This
 ;;; makes move VOPs more efficient, since we won't do a move from the
-;;; stack into a non-descriptor any-reg though a descriptor argument
+;;; stack into a non-descriptor any-reg through a descriptor argument
 ;;; load-TN. This does give targeting some real semantics, making it
 ;;; not a pure advisory to pack. It allows pack to do some packing it
 ;;; wouldn't have done before.

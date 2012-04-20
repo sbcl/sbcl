@@ -109,7 +109,7 @@
 ;;; This and the corresponding -SET transform work equally well on non-simple
 ;;; arrays, but after benchmarking (on x86), Nikodemus didn't find any cases
 ;;; where it actually helped with non-simple arrays -- to the contrary, it
-;;; only made for bigger and up 1o 100% slower code.
+;;; only made for bigger and up to 100% slower code.
 (deftransform hairy-data-vector-ref ((array index) (simple-array t) *)
   "avoid runtime dispatch on array element type"
   (let* ((type (lvar-type array))

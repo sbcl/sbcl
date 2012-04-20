@@ -529,7 +529,7 @@
                  :high (copy-interval-limit (interval-high x))))
 
 ;;; Given a point P contained in the interval X, split X into two
-;;; interval at the point P. If CLOSE-LOWER is T, then the left
+;;; intervals at the point P. If CLOSE-LOWER is T, then the left
 ;;; interval contains P. If CLOSE-UPPER is T, the right interval
 ;;; contains P. You can specify both to be T or NIL.
 (defun interval-split (p x &optional close-lower close-upper)
@@ -976,7 +976,7 @@
 
 ;;; a utility for defining derive-type methods of integer operations. If
 ;;; the types of both X and Y are integer types, then we compute a new
-;;; integer type with bounds determined Fun when applied to X and Y.
+;;; integer type with bounds determined by FUN when applied to X and Y.
 ;;; Otherwise, we use NUMERIC-CONTAGION.
 (defun derive-integer-type-aux (x y fun)
   (declare (type function fun))
@@ -2326,7 +2326,7 @@
   (if (and divisor-low divisor-high)
       ;; We know the range of the divisor, and the remainder must be
       ;; smaller than the divisor. We can tell the sign of the
-      ;; remainer if we know the sign of the number.
+      ;; remainder if we know the sign of the number.
       (let ((divisor-max (1- (max (abs divisor-low) (abs divisor-high)))))
         `(integer ,(if (or (null number-low)
                            (minusp number-low))
@@ -2337,7 +2337,7 @@
                        divisor-max
                        0)))
       ;; The divisor is potentially either very positive or very
-      ;; negative. Therefore, the remainer is unbounded, but we might
+      ;; negative. Therefore, the remainder is unbounded, but we might
       ;; be able to tell something about the sign from the number.
       `(integer ,(if (and number-low (not (minusp number-low)))
                      ;; The number we are dividing is positive.
@@ -3872,7 +3872,7 @@
 (define-source-transform > (&rest args) (multi-compare '> args nil 'real))
 ;;; We cannot do the inversion for >= and <= here, since both
 ;;;   (< NaN X) and (> NaN X)
-;;; are false, and we don't have type-inforation available yet. The
+;;; are false, and we don't have type-information available yet. The
 ;;; deftransforms for two-argument versions of >= and <= takes care of
 ;;; the inversion to > and < when possible.
 (define-source-transform <= (&rest args) (multi-compare '<= args nil 'real))

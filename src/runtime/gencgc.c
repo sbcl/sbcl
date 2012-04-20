@@ -168,7 +168,7 @@ boolean gc_active_p = 0;
 static boolean conservative_stack = 1;
 
 /* An array of page structures is allocated on gc initialization.
- * This helps quickly map between an address its page structure.
+ * This helps to quickly map between an address and its page structure.
  * page_table_pages is set from the size of the dynamic space. */
 page_index_t page_table_pages;
 struct page *page_table;

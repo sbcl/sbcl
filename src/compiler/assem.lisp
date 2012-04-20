@@ -903,7 +903,7 @@
            (setf (segment-alignment segment) bits)
            (setf (segment-sync-posn segment) (segment-current-posn segment)))
           (t
-           ;; The last alignment was more restrictive then this one.
+           ;; The last alignment was more restrictive than this one.
            ;; So we can just figure out how much noise to emit
            ;; assuming the last alignment was met.
            (let* ((mask (1- (ash 1 bits)))

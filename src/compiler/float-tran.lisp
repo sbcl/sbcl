@@ -691,7 +691,7 @@
   ;; LONG-FLOAT doesn't actually buy us anything.  FIXME.
   (setf *read-default-float-format*
         #!+long-float 'long-float #!-long-float 'double-float))
-;;; Test whether the numeric-type ARG is within in domain specified by
+;;; Test whether the numeric-type ARG is within the domain specified by
 ;;; DOMAIN-LOW and DOMAIN-HIGH, consider negative and positive zero to
 ;;; be distinct.
 #-sb-xc-host  ; (See CROSS-FLOAT-INFINITY-KLUDGE.)

@@ -654,7 +654,7 @@
                          (var2 (ok-lvar-lambda-var arg2 constraints)))
                     ;; The code below assumes that the constant is the
                     ;; second argument in case of variable to constant
-                    ;; comparision which is sometimes true (see source
+                    ;; comparison which is sometimes true (see source
                     ;; transformations for EQ, EQL and CHAR=). Fixing
                     ;; that would result in more constant substitutions
                     ;; which is not a universally good thing, thus the
@@ -965,7 +965,7 @@
           (add-test-constraints use node gen))))))
 
 ;;; Starting from IN compute OUT and (consequent/alternative
-;;; constraints if the block ends with and IF). Return the list of
+;;; constraints if the block ends with an IF). Return the list of
 ;;; successors that may need to be recomputed.
 (defun find-block-type-constraints (block final-pass-p)
   (declare (type cblock block))

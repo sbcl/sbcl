@@ -1537,7 +1537,7 @@
 ;;;     :LOAD-IF EXPRESSION
 ;;;         Controls whether automatic operand loading is done.
 ;;;         EXPRESSION is evaluated with the fixed operand TNs bound.
-;;;         If EXPRESSION is true,then loading is done and the variable
+;;;         If EXPRESSION is true, then loading is done and the variable
 ;;;         is bound to the load TN in the generator body. Otherwise,
 ;;;         loading is not done, and the variable is bound to the actual
 ;;;         operand.

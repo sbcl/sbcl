@@ -434,7 +434,7 @@
 ;;; an lvar.
 ;;;
 ;;; If the lvar isn't annotated (meaning the values are discarded) or
-;;; is unknown-values, the then we make temporaries for each supplied
+;;; is unknown-values, then we make temporaries for each supplied
 ;;; value, providing a place to compute the result in until we decide
 ;;; what to do with it (if anything.)
 ;;;
@@ -483,7 +483,7 @@
 
 ;;; Return a list of TNs wired to the standard value passing
 ;;; conventions that can be used to receive values according to the
-;;; unknown-values convention. This is used with together
+;;; unknown-values convention. This is used together with
 ;;; MOVE-LVAR-RESULT for delivering unknown values to a fixed values
 ;;; lvar.
 ;;;
@@ -541,7 +541,7 @@
 ;;; If necessary, emit coercion code needed to deliver the RESULTS to
 ;;; the specified lvar. NODE and BLOCK provide context for emitting
 ;;; code. Although usually obtained from STANDARD-RESULT-TNs or
-;;; LVAR-RESULT-TNs, RESULTS my be a list of any type or
+;;; LVAR-RESULT-TNs, RESULTS may be a list of any type or
 ;;; number of TNs.
 ;;;
 ;;; If the lvar is fixed values, then move the results into the lvar
