@@ -71,32 +71,46 @@
 ;;; If the lvar OBJECT definitely is or isn't of the specified
 ;;; type, then return T or NIL as appropriate. Otherwise quietly
 ;;; GIVE-UP-IR1-TRANSFORM.
-(defun ir1-transform-type-predicate (object type)
+(defun ir1-transform-type-predicate (object type node)
   (declare (type lvar object) (type ctype type))
   (let ((otype (lvar-type object)))
-    (cond ((not (types-equal-or-intersect otype type))
-           nil)
-          ((csubtypep otype type)
-           t)
-          ((eq type *empty-type*)
-           nil)
-          (t
-           (let ((intersect (type-intersection2 type otype)))
-             (unless intersect
-               (give-up-ir1-transform))
-             (multiple-value-bind (constantp value)
-                 (type-singleton-p intersect)
-               (if constantp
-                   `(eql object ',value)
-                   (give-up-ir1-transform))))))))
+    (flet ((tricky ()
+             (cond ((typep type 'alien-type-type)
+                    ;; We don't transform alien type tests until here, because
+                    ;; once we do that the rest of the type system can no longer
+                    ;; reason about them properly -- so we'd miss out on type
+                    ;; derivation, etc.
+                    (delay-ir1-transform node :optimize)
+                    (let ((alien-type (alien-type-type-alien-type type)))
+                      ;; If it's a lisp-rep-type, the CTYPE should be one already.
+                      (aver (not (compute-lisp-rep-type alien-type)))
+                      `(sb!alien::alien-value-typep object ',alien-type)))
+                   (t
+                    (give-up-ir1-transform)))))
+      (cond ((not (types-equal-or-intersect otype type))
+            nil)
+           ((csubtypep otype type)
+            t)
+           ((eq type *empty-type*)
+            nil)
+           (t
+            (let ((intersect (type-intersection2 type otype)))
+              (unless intersect
+                (tricky))
+              (multiple-value-bind (constantp value)
+                  (type-singleton-p intersect)
+                (if constantp
+                    `(eql object ',value)
+                    (tricky)))))))))
 
 ;;; Flush %TYPEP tests whose result is known at compile time.
-(deftransform %typep ((object type))
+(deftransform %typep ((object type) * * :node node)
   (unless (constant-lvar-p type)
     (give-up-ir1-transform))
   (ir1-transform-type-predicate
    object
-   (ir1-transform-specifier-type (lvar-value type))))
+   (ir1-transform-specifier-type (lvar-value type))
+   node))
 
 ;;; This is the IR1 transform for simple type predicates. It checks
 ;;; whether the single argument is known to (not) be of the
@@ -108,7 +122,7 @@
                            (basic-combination-fun node))))
                         *backend-predicate-types*)))
     (aver ctype)
-    (ir1-transform-type-predicate object ctype)))
+    (ir1-transform-type-predicate object ctype node)))
 
 ;;; If FIND-CLASSOID is called on a constant class, locate the
 ;;; CLASSOID-CELL at load time.

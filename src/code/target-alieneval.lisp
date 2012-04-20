@@ -814,6 +814,10 @@ null byte.
         (and (alien-value-p object)
              (alien-subtype-p (alien-value-type object) type)))))
 
+(defun alien-value-typep (object type)
+  (when (alien-value-p object)
+    (alien-subtype-p (alien-value-type object) type)))
+
 ;;;; ALIEN CALLBACKS
 ;;;;
 ;;;; See "Foreign Linkage / Callbacks" in the SBCL Internals manual.
