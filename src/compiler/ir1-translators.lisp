@@ -198,11 +198,11 @@ extent of the block."
   #!+sb-doc
   "TAGBODY {tag | statement}*
 
-Define tags for use with GO. The STATEMENTS are evaluated in order ,skipping
+Define tags for use with GO. The STATEMENTS are evaluated in order, skipping
 TAGS, and NIL is returned. If a statement contains a GO to a defined TAG
 within the lexical scope of the form, then control is transferred to the next
-statement following that tag. A TAG must an integer or a symbol. A STATEMENT
-must be a list. Other objects are illegal within the body."
+statement following that tag. A TAG must be an integer or a symbol. A
+STATEMENT must be a list. Other objects are illegal within the body."
   (start-block start)
   (ctran-starts-block next)
   (let* ((dummy (make-ctran))
@@ -352,7 +352,7 @@ Evaluate the FORMS in the specified SITUATIONS (any of :COMPILE-TOPLEVEL,
   "MACROLET ({(name lambda-list form*)}*) body-form*
 
 Evaluate the BODY-FORMS in an environment with the specified local macros
-defined. Name is the local macro name, LAMBDA-LIST is a DEFMACRO style
+defined. NAME is the local macro name, LAMBDA-LIST is a DEFMACRO style
 destructuring lambda list, and the FORMS evaluate to the expansion."
   (funcall-in-macrolet-lexenv
    definitions
