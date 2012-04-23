@@ -11,6 +11,12 @@
 
 (in-package "SB!VM")
 
+
+;; A fixnum that can be represented in tagged form by a signed 32-bit
+;; value and that can therefore be used as an immediate argument of
+;; arithmetic machine instructions.
+(deftype short-tagged-num () '(signed-byte #.(- 32 n-fixnum-tag-bits)))
+
 ;;;; unary operations
 
 (define-vop (fast-safe-arith-op)
@@ -110,13 +116,13 @@
 
 (define-vop (fast-fixnum-binop-c fast-safe-arith-op)
   (:args (x :target r :scs (any-reg)
-            :load-if (or (not (typep y '(signed-byte 29)))
+            :load-if (or (not (typep y 'short-tagged-num))
                          (not (sc-is x any-reg control-stack)))))
   (:info y)
   (:arg-types tagged-num (:constant fixnum))
   (:results (r :scs (any-reg)
                :load-if (or (not (location= x r))
-                            (not (typep y '(signed-byte 29))))))
+                            (not (typep y 'short-tagged-num)))))
   (:result-types tagged-num)
   (:note "inline fixnum arithmetic"))
 
@@ -157,7 +163,7 @@
                   (:translate ,translate)
                   (:generator 1
                   (move r x)
-                  (inst ,op r (if (typep y '(signed-byte 29))
+                  (inst ,op r (if (typep y 'short-tagged-num)
                                   (fixnumize y)
                                   (register-inline-constant :qword (fixnumize y))))))
                 (define-vop (,(symbolicate "FAST-" translate "/SIGNED=>SIGNED")
@@ -228,20 +234,20 @@
 (define-vop (fast-+-c/fixnum=>fixnum fast-safe-arith-op)
   (:translate +)
   (:args (x :target r :scs (any-reg)
-            :load-if (or (not (typep y '(signed-byte 29)))
+            :load-if (or (not (typep y 'short-tagged-num))
                          (not (sc-is x any-reg control-stack)))))
   (:info y)
   (:arg-types tagged-num (:constant fixnum))
   (:results (r :scs (any-reg)
                :load-if (or (not (location= x r))
-                            (not (typep y '(signed-byte 29))))))
+                            (not (typep y 'short-tagged-num)))))
   (:result-types tagged-num)
   (:note "inline fixnum arithmetic")
   (:generator 1
     (cond ((and (sc-is x any-reg) (sc-is r any-reg) (not (location= x r))
-                (typep y '(signed-byte 29)))
+                (typep y 'short-tagged-num))
            (inst lea r (make-ea :qword :base x :disp (fixnumize y))))
-          ((typep y '(signed-byte 29))
+          ((typep y 'short-tagged-num)
            (move r x)
            (inst add r (fixnumize y)))
           (t
@@ -535,7 +541,7 @@
   (:generator 30
     (move eax x)
     (inst cqo)
-    (if (typep y '(signed-byte 29))
+    (if (typep y 'short-tagged-num)
         (inst mov y-arg (fixnumize y))
         (setf y-arg (register-inline-constant :qword (fixnumize y))))
     (inst idiv eax y-arg)
@@ -1114,7 +1120,7 @@ constant shift greater than word length")))
 
 (define-vop (fast-conditional-c/fixnum fast-conditional/fixnum)
   (:args (x :scs (any-reg)
-            :load-if (or (not (typep y '(signed-byte 29)))
+            :load-if (or (not (typep y 'short-tagged-num))
                          (not (sc-is x any-reg control-stack)))))
   (:arg-types tagged-num (:constant fixnum))
   (:info y))
@@ -1166,7 +1172,7 @@ constant shift greater than word length")))
                                     (inst cmp x
                                           ,(case suffix
                                              (-c/fixnum
-                                                `(if (typep y '(signed-byte 29))
+                                                `(if (typep y 'short-tagged-num)
                                                      (fixnumize y)
                                                      (register-inline-constant
                                                       :qword (fixnumize y))))
@@ -1249,7 +1255,7 @@ constant shift greater than word length")))
 
 (define-vop (fast-eql-c/fixnum fast-conditional/fixnum)
   (:args (x :scs (any-reg)
-            :load-if (or (not (typep y '(signed-byte 29)))
+            :load-if (or (not (typep y 'short-tagged-num))
                          (not (sc-is x any-reg descriptor-reg control-stack)))))
   (:arg-types tagged-num (:constant fixnum))
   (:info y)
@@ -1257,7 +1263,7 @@ constant shift greater than word length")))
   (:generator 2
     (cond ((and (sc-is x any-reg descriptor-reg) (zerop y))
            (inst test x x))  ; smaller instruction
-          ((typep y '(signed-byte 29))
+          ((typep y 'short-tagged-num)
            (inst cmp x (fixnumize y)))
           (t
            (inst cmp x (register-inline-constant :qword (fixnumize y)))))))
