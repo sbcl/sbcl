@@ -687,7 +687,7 @@
 (define-vop (ldb-c/signed)
   (:translate %%ldb)
   (:args (x :scs (signed-reg)))
-  (:arg-types signed-num (:constant (integer 1 29)) (:constant (integer 0 29)))
+  (:arg-types signed-num (:constant (integer 1 29)) (:constant (integer 0 31)))
   (:info size posn)
   (:results (res :scs (any-reg)))
   (:result-types tagged-num)
@@ -701,7 +701,7 @@
 (define-vop (ldb-c/unsigned)
   (:translate %%ldb)
   (:args (x :scs (unsigned-reg)))
-  (:arg-types unsigned-num (:constant (integer 1 29)) (:constant (integer 0 29)))
+  (:arg-types unsigned-num (:constant (integer 1 29)) (:constant (integer 0 31)))
   (:info size posn)
   (:results (res :scs (any-reg)))
   (:result-types tagged-num)
@@ -711,7 +711,6 @@
           (mod (- (+ 32 n-fixnum-tag-bits) posn) 32)
           (- 32 size n-fixnum-tag-bits)
           (- 31 n-fixnum-tag-bits))))
-
 
 ;;;; Modular functions:
 (define-modular-fun lognot-mod32 (x) lognot :untagged nil 32)

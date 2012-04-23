@@ -29,6 +29,8 @@ changes relative to sbcl-1.0.56:
   * bug fix: account for funcallable-instance objects properly in ROOM.
   * bug fix: incorrect octets reported for c-string decoding errors.
     (lp#985505)
+  * bug fix: miscompilation of LDB on the PowerPC platform.  (thanks to Bruce
+    O'Neel)
   * documentation:
     ** improved docstrings: REPLACE (lp#965592)
 

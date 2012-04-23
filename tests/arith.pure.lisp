@@ -540,3 +540,10 @@
             (test base power '(complex double-float)))))
       (when (> n-broken 0)
         (error "Number of broken combinations: ~a" n-broken)))))
+
+(with-test (:name (:ldb :rlwinm :ppc))
+  (let ((one (compile nil '(lambda (a) (ldb (byte 9 27) a))))
+        (two (compile nil '(lambda (a)
+                            (declare (type (integer -3 57216651) a))
+                            (ldb (byte 9 27) a)))))
+    (assert (= 0 (- (funcall one 10) (funcall two 10))))))
