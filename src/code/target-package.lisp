@@ -335,7 +335,8 @@ error if any of PACKAGES is not a valid package designator."
 ;;; most other operations, are unspecified for deleted packages. We
 ;;; just do the easy thing and signal errors in that case.
 (macrolet ((def (ext real)
-             `(defun ,ext (x) (,real (find-undeleted-package-or-lose x)))))
+             `(defun ,ext (package-designator)
+                (,real (find-undeleted-package-or-lose package-designator)))))
   (def package-nicknames package-%nicknames)
   (def package-use-list package-%use-list)
   (def package-used-by-list package-%used-by-list)
