@@ -134,7 +134,7 @@
 ;;; deeply confused, so we violate what'd otherwise be good compiler
 ;;; practice by not trying to recover from this error and bailing out
 ;;; instead.)
-(define-condition input-error-in-compile-file (fatal-compiler-error)
+(define-condition input-error-in-compile-file (reader-error encapsulated-condition)
   (;; the position where the bad READ began, or NIL if unavailable,
    ;; redundant, or irrelevant
    (position :reader input-error-in-compile-file-position
@@ -143,8 +143,14 @@
   (:report
    (lambda (condition stream)
      (format stream
-             "~@<~S failure in ~S~@[ at character ~W~]: ~2I~_~A~:>"
+             "~@<~S error during ~S:~
+                ~@:_ ~2I~_~A~
+                  ~@[~@:_~@:_(in form starting at ~:{~(~A~): ~S~:^, ~:_~})~]~
+              ~:>"
              'read
              'compile-file
-             (input-error-in-compile-file-position condition)
-             (encapsulated-condition condition)))))
+             (encapsulated-condition condition)
+             (when (input-error-in-compile-file-position condition)
+               (sb!kernel::stream-error-position-info
+                (stream-error-stream condition)
+                (input-error-in-compile-file-position condition)))))))

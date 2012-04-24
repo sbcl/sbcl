@@ -1298,6 +1298,31 @@
     (type-error (e)
       (and (eql 10 (type-error-datum e))
            (eql 'list (type-error-expected-type e))))))
+
+;;;; tests for compiler output
+(with-test (:name :unexpected-compiler-output)
+  (let* ((*error-output* (make-string-output-stream))
+         (output (with-output-to-string (*standard-output*)
+                   (compile-file "compiler-output-test.lisp"
+                                 :print nil :verbose nil))))
+    (unless (zerop (length output))
+      (error "Unexpected output: ~S" output))))
+
+(with-test (:name :bug-493380)
+  (flet ((test (forms)
+           (catch 'debug
+             (let ((*debugger-hook* (lambda (condition if)
+                                      (throw 'debug
+                                        (if (typep condition 'serious-condition)
+                                            :debug
+                                            :oops)))))
+               (multiple-value-bind (warned failed) (ctu:file-compile forms)
+                 (when (and warned failed)
+                   :failed))))))
+    (assert (eq :failed (test "(defun")))
+    (assert (eq :failed (test "(defun no-pkg::foo ())")))
+    (assert (eq :failed (test "(cl:no-such-sym)")))
+    (assert (eq :failed (test "...")))))
 
 ;;;; tests not in the problem domain, but of the consistency of the
 ;;;; compiler machinery itself
@@ -1365,14 +1390,6 @@
           (grovel-results name))))))
 (identify-suspect-vops)
 
-;;;; tests for compiler output
-(let* ((*error-output* (make-broadcast-stream))
-       (output (with-output-to-string (*standard-output*)
-                 (compile-file "compiler-output-test.lisp"
-                               :print nil :verbose nil))))
-  (print output)
-  (assert (zerop (length output))))
-
 ;;;; bug 305: INLINE/NOTINLINE causing local ftype to be lost
 
 (define-condition optimization-error (error) ())

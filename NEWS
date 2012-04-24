@@ -31,6 +31,7 @@ changes relative to sbcl-1.0.56:
     (lp#985505)
   * bug fix: miscompilation of LDB on the PowerPC platform.  (thanks to Bruce
     O'Neel)
+  * bug fix: better input error reporting for COMPILE-FILE. (lp#493380)
   * documentation:
     ** improved docstrings: REPLACE (lp#965592)
 

@@ -766,52 +766,44 @@
   (:report (lambda (condition stream)
              (%report-reader-error condition stream :simple t))))
 
+(defun stream-error-position-info (stream &optional position)
+  (unless (interactive-stream-p stream)
+    (let ((now (file-position-or-nil-for-error stream))
+          (pos position))
+      (when (and (not pos) now (plusp now))
+        ;; FILE-POSITION is the next character -- error is at the previous one.
+        (setf pos (1- now)))
+      (let (lineno colno)
+        (when (and pos
+                   (< pos sb!xc:array-dimension-limit)
+                   (file-position stream :start))
+          (let ((string
+                  (make-string pos :element-type (stream-element-type stream))))
+            (when (= pos (read-sequence string stream))
+              ;; Lines count from 1, columns from 0. It's stupid and traditional.
+              (setq lineno (1+ (count #\Newline string))
+                    colno (- pos (or (position #\Newline string :from-end t) 0)))))
+          (file-position-or-nil-for-error stream now))
+        (remove-if-not #'second
+                       (list (list :line lineno)
+                             (list :column colno)
+                             (list :file-position pos)))))))
+
 ;;; base REPORTing of a READER-ERROR
 ;;;
 ;;; When SIMPLE, we expect and use SIMPLE-CONDITION-ish FORMAT-CONTROL
 ;;; and FORMAT-ARGS slots.
-(defun %report-reader-error (condition stream &key simple)
-  (let* ((error-stream (stream-error-stream condition))
-         (pos (file-position-or-nil-for-error error-stream)))
-    (when (and pos (plusp pos))
-      ;; FILE-POSITION is the next character -- error is at the previous one.
-      (decf pos))
-    (let (lineno colno)
-      (when (and pos
-                 (< pos sb!xc:array-dimension-limit)
-                 ;; KLUDGE: lseek() (which is what FILE-POSITION
-                 ;; reduces to on file-streams) is undefined on
-                 ;; "some devices", which in practice means that it
-                 ;; can claim to succeed on /dev/stdin on Darwin
-                 ;; and Solaris.  This is obviously bad news,
-                 ;; because the READ-SEQUENCE below will then
-                 ;; block, not complete, and the report will never
-                 ;; be printed.  As a workaround, we exclude
-                 ;; interactive streams from this attempt to report
-                 ;; positions.  -- CSR, 2003-08-21
-                 (not (interactive-stream-p error-stream))
-                 (file-position error-stream :start))
-        (let ((string
-               (make-string pos
-                            :element-type (stream-element-type
-                                           error-stream))))
-          (when (= pos (read-sequence string error-stream))
-            ;; Lines count from 1, columns from 0. It's stupid and traditional.
-            (setq lineno (1+ (count #\Newline string))
-                  colno (- pos (or (position #\Newline string :from-end t) 0)))))
-        (file-position-or-nil-for-error error-stream pos))
-      (pprint-logical-block (stream nil)
-        (if simple
-            (apply #'format stream
-                   (simple-condition-format-control condition)
-                   (simple-condition-format-arguments condition))
-            (prin1 (class-name (class-of condition)) stream))
-        (format stream "~2I~@[~_~_~:{~:(~A~): ~S~:^, ~:_~}~]~_~_Stream: ~S"
-                (remove-if-not #'second
-                               (list (list :line lineno)
-                                     (list :column colno)
-                                     (list :file-position pos)))
-                error-stream)))))
+(defun %report-reader-error (condition stream &key simple position)
+  (let ((error-stream (stream-error-stream condition)))
+    (pprint-logical-block (stream nil)
+      (if simple
+          (apply #'format stream
+                 (simple-condition-format-control condition)
+                 (simple-condition-format-arguments condition))
+          (prin1 (class-name (class-of condition)) stream))
+      (format stream "~2I~@[~_~_~:{~:(~A~): ~S~:^, ~:_~}~]~_~_Stream: ~S"
+              (stream-error-position-info error-stream position)
+              error-stream))))
 
 ;;;; special SBCL extension conditions
 
@@ -1214,7 +1206,7 @@ SB-EXT:PACKAGE-LOCKED-ERROR-SYMBOL."))
 
 (define-condition simple-package-error (simple-condition package-error) ())
 
-(define-condition simple-reader-package-error (simple-reader-error) ())
+(define-condition simple-reader-package-error (simple-reader-error package-error) ())
 
 (define-condition reader-eof-error (end-of-file)
   ((context :reader reader-eof-error-context :initarg :context))

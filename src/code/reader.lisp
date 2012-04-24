@@ -1279,7 +1279,12 @@ extended <package-name>::<form-in-package> syntax."
       RETURN-SYMBOL
       (casify-read-buffer escapes)
       (let ((found (if package-designator
-                       (%find-package-or-lose package-designator)
+                       (or (find-package package-designator)
+                           (error 'simple-reader-package-error
+                                  :package package-designator
+                                  :stream stream
+                                  :format-control "Package ~A does not exist."
+                                  :format-arguments (list package-designator)))
                        (or *reader-package* (sane-package)))))
         (if (or (zerop colons) (= colons 2) (eq found *keyword-package*))
             (return (intern* *read-buffer* *ouch-ptr* found))
@@ -1288,7 +1293,9 @@ extended <package-name>::<form-in-package> syntax."
               (when (eq test :external) (return symbol))
               (let ((name (read-buffer-to-string)))
                 (with-simple-restart (continue "Use symbol anyway.")
-                  (error 'simple-reader-package-error :stream stream
+                  (error 'simple-reader-package-error
+                         :package found
+                         :stream stream
                          :format-arguments (list name (package-name found))
                          :format-control
                          (if test

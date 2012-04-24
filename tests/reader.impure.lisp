@@ -155,6 +155,16 @@
          (test (make-dispatch-macro-character #\! t srt))
          (test (set-dispatch-macro-character #\# #\a (constantly t) srt) 'set-dispatch-macro-character))))))
 
+(with-test (:name :reader-package-errors)
+  (flet ((test (string)
+           (handler-case
+               (progn (read-from-string string) :feh)
+             (error (e)
+               (when (and (typep e 'reader-error) (typep e 'package-error))
+                 (package-error-package e))))))
+    (assert (equal "NO-SUCH-PKG" (test "no-such-pkg::foo")))
+    (assert (eq (find-package :cl) (test "cl:no-such-sym")))))
+
 ;;; THIS SHOULD BE LAST as it frobs the standard readtable
 (with-test (:name set-macro-character-nil)
   (handler-bind ((sb-int:standard-readtable-modified-error #'continue))

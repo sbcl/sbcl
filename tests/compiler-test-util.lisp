@@ -100,8 +100,10 @@
     (unwind-protect
          (progn
            (with-open-file (f lisp :direction :output)
-             (dolist (form toplevel-forms)
-               (prin1 form f)))
+             (if (stringp toplevel-forms)
+                 (write-line toplevel-forms f)
+                 (dolist (form toplevel-forms)
+                   (prin1 form f))))
            (multiple-value-bind (fasl warn fail) (compile-file lisp)
              (when load
                (load fasl))

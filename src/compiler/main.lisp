@@ -901,21 +901,26 @@ Examples:
   (handler-case
       (read-preserving-whitespace stream nil stream)
     (reader-error (condition)
-     (error 'input-error-in-compile-file
-            :condition condition
-            ;; We don't need to supply :POSITION here because
-            ;; READER-ERRORs already know their position in the file.
-            ))
+      (compiler-error 'input-error-in-compile-file
+                      ;; We don't need to supply :POSITION here because
+                      ;; READER-ERRORs already know their position in the file.
+                      :condition condition))
     ;; ANSI, in its wisdom, says that READ should return END-OF-FILE
     ;; (and that this is not a READER-ERROR) when it encounters end of
     ;; file in the middle of something it's trying to read.
     (end-of-file (condition)
-     (error 'input-error-in-compile-file
-            :condition condition
-            ;; We need to supply :POSITION here because the END-OF-FILE
-            ;; condition doesn't carry the position that the user
-            ;; probably cares about, where the failed READ began.
-            :position position))))
+      (compiler-error 'input-error-in-compile-file
+                      :condition condition
+                      ;; We need to supply :POSITION here because the END-OF-FILE
+                      ;; condition doesn't carry the position that the user
+                      ;; probably cares about, where the failed READ began.
+                      :position position
+                      :stream stream))
+    (error (condition)
+      (compiler-error 'input-error-in-compile-file
+                      :condition condition
+                      :position position
+                      :stream stream))))
 
 ;;; If STREAM is present, return it, otherwise open a stream to the
 ;;; current file. There must be a current file.
@@ -1647,8 +1652,8 @@ Examples:
         (*fun-names-in-this-file* ())
         (*allow-instrumenting* nil)
         (*compiler-error-bailout*
-         (lambda ()
-           (compiler-mumble "~2&; fatal error, aborting compilation~%")
+         (lambda (&optional error)
+           (declare (ignore error))
            (return-from sub-compile-file (values t t t))))
         (*current-path* nil)
         (*last-source-context* nil)
