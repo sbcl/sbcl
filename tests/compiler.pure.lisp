@@ -4236,3 +4236,21 @@
           (unless (= (funcall fun 16) (logand 15 (1- (ash 1 width))))
             (push (cons width extra) result)))))
     (assert (null result))))
+
+;; On x86-64 MOVE-IMMEDIATE of fixnum values into memory either directly
+;; uses a MOV into memory or goes through a temporary register if the
+;; value is larger than a certain number of bits. Check that it respects
+;; the limits of immediate arguments to the MOV instruction (if not, the
+;; assembler will fail an assertion) and doesn't have sign-extension
+;; problems. (The test passes fixnum constants through the MOVE VOP
+;; which calls MOVE-IMMEDIATE.)
+(with-test (:name :constant-fixnum-move)
+  (let ((f (compile nil `(lambda (g)
+                           (funcall g
+                                    ;; The first three args are
+                                    ;; uninteresting as they are
+                                    ;; passed in registers.
+                                    1 2 3
+                                    ,@(loop for i from 27 to 32
+                                            collect (expt 2 i)))))))
+    (assert (every #'plusp (funcall f #'list)))))

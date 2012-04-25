@@ -129,7 +129,7 @@
           (sc-is target signed-reg unsigned-reg descriptor-reg any-reg))
      (inst mov target val))
     ;; Likewise if the value is small enough.
-    ((typep val '(signed-byte 31))
+    ((typep val '(signed-byte 32))
      (inst mov target val))
     ;; Otherwise go through the temporary register
     (tmp-tn
@@ -159,10 +159,8 @@
              (etypecase val
                ((integer 0 0)
                 (zeroize y))
-               ((or (signed-byte 29) (unsigned-byte 29))
-                (inst mov y (fixnumize val)))
                (integer
-                (move-immediate y (fixnumize val)))
+                (inst mov y (fixnumize val)))
                (symbol
                 (load-symbol y val))
                (character
