@@ -904,7 +904,8 @@ Examples:
       (compiler-error 'input-error-in-compile-file
                       ;; We don't need to supply :POSITION here because
                       ;; READER-ERRORs already know their position in the file.
-                      :condition condition))
+                      :condition condition
+                      :stream stream))
     ;; ANSI, in its wisdom, says that READ should return END-OF-FILE
     ;; (and that this is not a READER-ERROR) when it encounters end of
     ;; file in the middle of something it's trying to read.
