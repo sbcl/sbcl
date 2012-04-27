@@ -917,7 +917,8 @@ size_t max_new_areas;
 static void
 add_new_area(page_index_t first_page, size_t offset, size_t size)
 {
-    size_t new_area_start, c, i;
+    size_t new_area_start, c;
+    ssize_t i;
 
     /* Ignore if full. */
     if (new_areas_index >= NUM_NEW_AREAS)
