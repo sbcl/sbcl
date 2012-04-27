@@ -264,7 +264,8 @@
                   (condition-classoid type)
                   (class
                    ;; Punt to CLOS.
-                   (return-from make-condition (apply #'make-instance type args)))
+                   (return-from make-condition
+                     (apply #'make-instance type args)))
                   (classoid
                    (error 'simple-type-error
                           :datum type
@@ -275,7 +276,8 @@
                    (error 'simple-type-error
                           :datum type
                           :expected-type 'condition-class
-                          :format-control "Bad type argument:~%  ~S"
+                          :format-control
+                          "~s doesn't designate a condition class."
                           :format-arguments (list type)))))
          (res (make-condition-object args)))
     (setf (%instance-layout res) (classoid-layout class))

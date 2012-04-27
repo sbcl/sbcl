@@ -52,8 +52,9 @@
          (error 'simple-type-error
                 :datum datum
                 :expected-type '(or symbol string)
-                :format-control "bad argument to ~S: ~S"
-                :format-arguments (list fun-name datum)))))
+                :format-control "Condition designator ~s is not of type ~s."
+                :format-arguments (list datum
+                                        '(or symbol string))))))
 
 (define-condition layout-invalid (type-error)
   ()
