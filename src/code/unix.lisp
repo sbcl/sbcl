@@ -430,11 +430,17 @@ corresponds to NAME, or NIL if there is none."
 (deftype exit-code ()
   `(signed-byte 32))
 (defun os-exit (code &key abort)
+  #!+sb-doc
+  "Exit the process with CODE. If ABORT is true, exit is performed using _exit(2),
+avoiding atexit(3) hooks, etc. Otherwise exit(2) is called."
   (unless (typep code 'exit-code)
     (setf code (if abort 1 0)))
   (if abort
       (void-syscall ("_exit" int) code)
       (void-syscall ("exit" int) code)))
+
+(define-deprecated-function :early "1.0.56.55" unix-exit os-exit (code)
+  (os-exit code))
 
 ;;; Return the process id of the current process.
 (define-alien-routine ("getpid" unix-getpid) int)

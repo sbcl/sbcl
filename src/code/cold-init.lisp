@@ -274,10 +274,8 @@
     (toplevel-init)
     (critically-unreachable "after TOPLEVEL-INIT")))
 
-(defun quit (&key recklessly-p (unix-status 0))
-  #!+sb-doc
-  "Deprecated. See: SB-EXT:EXIT, SB-THREAD:RETURN-FROM-THREAD,
-SB-THREAD:ABORT-THREAD."
+(define-deprecated-function :early "1.0.56.55" quit (exit sb!thread:abort-thread)
+    (&key recklessly-p (unix-status 0))
   (if (or recklessly-p (sb!thread:main-thread-p))
       (exit :code unix-status :abort recklessly-p)
       (sb!thread:abort-thread))

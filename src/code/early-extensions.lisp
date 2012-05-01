@@ -1089,52 +1089,63 @@
 
 ;;;; Deprecating stuff
 
-(defun deprecation-error (since name replacement)
+(defun normalize-deprecation-replacements (replacements)
+  (if (or (not (listp replacements))
+          (eq 'setf (car replacements)))
+      (list replacements)
+      replacements))
+
+(defun deprecation-error (since name replacements)
   (error 'deprecation-error
           :name name
-          :replacement replacement
+          :replacements (normalize-deprecation-replacements replacements)
           :since since))
 
-(defun deprecation-warning (state since name replacement
+(defun deprecation-warning (state since name replacements
                             &key (runtime-error (neq :early state)))
   (warn (ecase state
           (:early 'early-deprecation-warning)
           (:late 'late-deprecation-warning)
           (:final 'final-deprecation-warning))
         :name name
-        :replacement replacement
+        :replacements (normalize-deprecation-replacements replacements)
         :since since
         :runtime-error runtime-error))
 
-(defun deprecated-function (since name replacement)
+(defun deprecated-function (since name replacements)
   (lambda (&rest deprecated-function-args)
     (declare (ignore deprecated-function-args))
-    (deprecation-error since name replacement)))
+    (deprecation-error since name replacements)))
 
-(defun deprecation-compiler-macro (state since name replacement)
+(defun deprecation-compiler-macro (state since name replacements)
   (lambda (form env)
     (declare (ignore env))
-    (deprecation-warning state since name replacement)
+    (deprecation-warning state since name replacements)
     form))
 
-(defmacro define-deprecated-function (state since name replacement lambda-list &body body)
-  (let ((doc (let ((*package* (find-package :keyword)))
-               (format nil "~@<~S has been deprecated as of SBCL ~A~@[, use ~S instead~].~:>"
-                       name since replacement))))
+(defmacro define-deprecated-function (state since name replacements lambda-list &body body)
+  (let* ((replacements (normalize-deprecation-replacements replacements))
+         (doc (let ((*package* (find-package :keyword)))
+                (apply #'format nil
+                       "~@<~S has been deprecated as of SBCL ~A.~
+                        ~#[~; Use ~S instead.~; ~
+                              Use ~S or ~S instead.~:; ~
+                              Use~@{~#[~; or~] ~S~^,~} instead.~]~@:>"
+                       name since replacements))))
     `(progn
        ,(ecase state
-               ((:early :late)
-                `(defun ,name ,lambda-list
-                   ,doc
-                   ,@body))
-               ((:final)
-                `(progn
-                   (declaim (ftype (function * nil) ,name))
-                   (setf (fdefinition ',name)
-                         (deprecated-function ',name ',replacement ,since))
-                   (setf (documentation ',name 'function) ,doc))))
+          ((:early :late)
+           `(defun ,name ,lambda-list
+              ,doc
+              ,@body))
+          ((:final)
+           `(progn
+              (declaim (ftype (function * nil) ,name))
+              (setf (fdefinition ',name)
+                    (deprecated-function ',name ',replacements ,since))
+              (setf (documentation ',name 'function) ,doc))))
        (setf (compiler-macro-function ',name)
-             (deprecation-compiler-macro ,state ,since ',name ',replacement)))))
+             (deprecation-compiler-macro ,state ,since ',name ',replacements)))))
 
 ;;; Anaphoric macros
 (defmacro awhen (test &body body)

@@ -1614,7 +1614,7 @@ the usual naming convention (names like *FOO*) for special variables"
 
 (define-condition deprecation-condition ()
   ((name :initarg :name :reader deprecated-name)
-   (replacement :initarg :replacement :reader deprecated-name-replacement)
+   (replacements :initarg :replacements :reader deprecated-name-replacements)
    (since :initarg :since :reader deprecated-since)
    (runtime-error :initarg :runtime-error :reader deprecated-name-runtime-error)))
 
@@ -1622,14 +1622,21 @@ the usual naming convention (names like *FOO*) for special variables"
   (let ((*package* (find-package :keyword)))
     (if *print-escape*
         (print-unreadable-object (condition stream :type t)
-          (format stream "~S is deprecated~@[, use ~S~]"
+          (apply #'format
+                 stream "~S is deprecated.~
+                         ~#[~; Use ~S instead.~; ~
+                               Use ~S or ~S instead.~:; ~
+                               Use~@{~#[~; or~] ~S~^,~} instead.~]"
                   (deprecated-name condition)
-                  (deprecated-name-replacement condition)))
-        (format stream "~@<~S has been deprecated as of SBCL ~A~
-                        ~@[, use ~S instead~].~:@>"
+                  (deprecated-name-replacements condition)))
+        (apply #'format
+               stream "~@<~S has been deprecated as of SBCL ~A.~
+                       ~#[~; Use ~S instead.~; ~
+                             Use ~S or ~S instead.~:; ~
+                             Use~@{~#[~; or~] ~S~^,~:_~} instead.~]~:@>"
                 (deprecated-name condition)
                 (deprecated-since condition)
-                (deprecated-name-replacement condition)))))
+                (deprecated-name-replacements condition)))))
 
 (define-condition early-deprecation-warning (style-warning deprecation-condition)
   ())
