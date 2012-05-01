@@ -25,7 +25,7 @@
 #include <fcntl.h>
 #include <sys/ioctl.h>
 #include <unistd.h>
-
+#include <sys/wait.h>
 #include <sys/ioctl.h>
 #include <termios.h>
 #include <errno.h>
