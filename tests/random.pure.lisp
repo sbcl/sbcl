@@ -60,3 +60,93 @@
     ;; with a probability of 1 minus approximately (expt 2 -194).
     (unless (= x (1- high))
       (error "bad RANDOM distribution: ~16,16,'0r" x))))
+
+;;; Some tests for basic integer RANDOM functionality.
+
+(with-test (:name (:random :integer :error-if-invalid-random-state))
+  (dolist (optimize '(((speed 0) (compilation-speed 3))
+                      ((speed 3) (compilation-speed 0) (space 0))))
+    (dolist (expr `((lambda (x state)
+                      (declare (optimize ,@optimize))
+                      (random x state))
+                    (lambda (x state)
+                      (declare (optimize ,@optimize))
+                      (declare (type integer x))
+                      (random x state))
+                    (lambda (x state)
+                      (declare (optimize ,@optimize))
+                      (declare (type (integer 100 200) x))
+                      (random x state))
+                    (lambda (x state)
+                      (declare (optimize ,@optimize))
+                      (random (if x 10 20) state))))
+      (let ((fun (compile nil expr)))
+        (assert (raises-error? (funcall fun 150 nil) type-error))))))
+
+(with-test (:name (:random :integer :distribution))
+  (let ((generic-random (compile nil '(lambda (x)
+                                        (random x)))))
+    ;; Check powers of two: Every bit in the output should be sometimes
+    ;; 0, sometimes 1.
+    (dotimes (e 200)
+      (let* ((number (expt 2 e))
+             (foo (lambda ()
+                    (funcall generic-random number)))
+             (bar (compile nil `(lambda ()
+                                  (declare (optimize speed))
+                                  (random ,number)))))
+        (flet ((test (fun)
+                 (let ((x-and (funcall fun))
+                       (x-ior (funcall fun)))
+                   (dotimes (i 199)
+                     (setf x-and (logand x-and (funcall fun))
+                           x-ior (logior x-ior (funcall fun))))
+                   (assert (= x-and 0))
+                   (assert (= x-ior (1- number))))))
+          (test foo)
+          (test bar))))
+    ;; Test a collection of fixnums and bignums, powers of two and
+    ;; numbers just below and above powers of two, numbers needing one,
+    ;; two or more random chunks etc.
+    (dolist (number (remove-duplicates
+                     `(,@(loop for i from 2 to 11 collect i)
+                       ,@(loop for i in '(29 30 31 32 33 60 61 62 63 64 65)
+                               nconc (list (1- (expt 2 i))
+                                           (expt 2 i)
+                                           (1+ (expt 2 i))))
+                       ,@(loop for i from (1- sb-kernel::random-chunk-length)
+                               to (* sb-kernel::random-chunk-length 4)
+                               collect (* 3 (expt 2 i)))
+                       ,@(loop for i from 2 to sb-vm:n-word-bits
+                               for n = (expt 16 i)
+                               for r = (+ n (random n))
+                               collect r))))
+      (let ((foo (lambda ()
+                   (funcall generic-random number)))
+            (bar (compile nil `(lambda ()
+                                 (declare (optimize speed))
+                                 (random ,number)))))
+        (flet ((test (fun)
+                 (let* ((min (funcall fun))
+                        (max min))
+                   (dotimes (i 9999)
+                     (let ((r (funcall fun)))
+                       (when (< r min)
+                         (setf min r))
+                       (when (> r max)
+                         (setf max r))))
+                   ;; With 10000 trials and an argument of RANDOM below
+                   ;; 70 the probability of the minimum not being 0 is
+                   ;; less than (expt 10 -60), so we can test for that;
+                   ;; correspondingly with the maximum. For larger
+                   ;; arguments we can only test that all results are
+                   ;; in range.
+                   (if (< number 70)
+                       (progn
+                         (assert (= min 0))
+                         (assert (= max (1- number))))
+                       (progn
+                         (assert (>= min 0))
+                         (assert (< max number)))))))
+          (test foo)
+          (test bar))))))
