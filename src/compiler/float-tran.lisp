@@ -97,7 +97,8 @@
         ;; KLUDGE: a relatively conservative treatment, but better
         ;; than a bug (reported by PFD sbcl-devel towards the end of
         ;; 2004-11.
-        '(rem (random-chunk (or state *random-state*)) num))))
+        (give-up-ir1-transform
+         "Argument type is too complex to optimize for."))))
 
 ;;;; float accessors
 
