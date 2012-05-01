@@ -46,59 +46,79 @@
   (frob %random-single-float single-float)
   (frob %random-double-float double-float))
 
-;;; Mersenne Twister RNG
-;;;
-;;; FIXME: It's unpleasant to have RANDOM functionality scattered
-;;; through the code this way. It would be nice to move this into the
-;;; same file as the other RANDOM definitions.
+;;; Return an expression to generate an integer of N-BITS many random
+;;; bits, using the minimal number of random chunks possible.
+(defun generate-random-expr-for-power-of-2 (n-bits state)
+  (declare (type (integer 1 #.sb!vm:n-word-bits) n-bits))
+  (multiple-value-bind (n-chunk-bits chunk-expr)
+      (cond ((<= n-bits n-random-chunk-bits)
+             (values n-random-chunk-bits `(random-chunk ,state)))
+            ((<= n-bits (* 2 n-random-chunk-bits))
+             (values (* 2 n-random-chunk-bits) `(big-random-chunk ,state)))
+            (t
+             (error "Unexpectedly small N-RANDOM-CHUNK-BITS")))
+    (if (< n-bits n-chunk-bits)
+        `(logand ,(1- (ash 1 n-bits)) ,chunk-expr)
+        chunk-expr)))
+
+;;; This transform for compile-time constant word-sized integers
+;;; generates an accept-reject loop to achieve equidistribution of the
+;;; returned values. Several optimizations are done: If NUM is a power
+;;; of two no loop is needed. If the random chunk size is half the word
+;;; size only one chunk is used where sufficient. For values of NUM
+;;; where it is possible and results in faster code, the rejection
+;;; probability is reduced by accepting all values below the largest
+;;; multiple of the limit that fits into one or two chunks and and doing
+;;; a division to get the random value into the desired range.
 (deftransform random ((num &optional state)
-                      ((integer 1 #.(expt 2 sb!vm::n-word-bits)) &optional *))
-  ;; FIXME: I almost conditionalized this as #!+sb-doc. Find some way
-  ;; of automatically finding #!+sb-doc in proximity to DEFTRANSFORM
-  ;; to let me scan for places that I made this mistake and didn't
-  ;; catch myself.
-  "use inline (UNSIGNED-BYTE 32) operations"
-  (let ((type (lvar-type num))
-        (limit (expt 2 sb!vm::n-word-bits))
-        (random-chunk (ecase sb!vm::n-word-bits
-                        (32 'random-chunk)
-                        (64 'sb!kernel::big-random-chunk))))
-    (if (numeric-type-p type)
-        (let ((num-high (numeric-type-high (lvar-type num))))
-          (aver num-high)
-          (cond ((constant-lvar-p num)
-                 ;; Check the worst case sum absolute error for the
-                 ;; random number expectations.
-                 (let ((rem (rem limit num-high)))
-                   (unless (< (/ (* 2 rem (- num-high rem))
-                                 num-high limit)
-                              (expt 2 (- sb!kernel::random-integer-extra-bits)))
-                     (give-up-ir1-transform
-                      "The random number expectations are inaccurate."))
-                   (if (= num-high limit)
-                       `(,random-chunk (or state *random-state*))
-                       #!-(or x86 x86-64)
-                       `(rem (,random-chunk (or state *random-state*)) num)
-                       #!+(or x86 x86-64)
-                       ;; Use multiplication, which is faster.
-                       `(values (sb!bignum::%multiply
-                                 (,random-chunk (or state *random-state*))
-                                 num)))))
-                ((> num-high random-fixnum-max)
-                 (give-up-ir1-transform
-                  "The range is too large to ensure an accurate result."))
-                #!+(or x86 x86-64)
-                ((< num-high limit)
-                 `(values (sb!bignum::%multiply
-                           (,random-chunk (or state *random-state*))
-                           num)))
-                (t
-                 `(rem (,random-chunk (or state *random-state*)) num))))
-        ;; KLUDGE: a relatively conservative treatment, but better
-        ;; than a bug (reported by PFD sbcl-devel towards the end of
-        ;; 2004-11.
-        (give-up-ir1-transform
-         "Argument type is too complex to optimize for."))))
+                      ((constant-arg (integer 1 #.(expt 2 sb!vm:n-word-bits)))
+                       &optional *)
+                      *
+                      :policy (and (> speed compilation-speed)
+                                   (> speed space)))
+  "optimize to inlined RANDOM-CHUNK operations"
+  (let ((num (lvar-value num)))
+    (if (= num 1)
+        0
+        (flet ((chunk-n-bits-and-expr (n-bits)
+                 (cond ((<= n-bits n-random-chunk-bits)
+                        (values n-random-chunk-bits
+                                '(random-chunk (or state *random-state*))))
+                       ((<= n-bits (* 2 n-random-chunk-bits))
+                        (values (* 2 n-random-chunk-bits)
+                                '(big-random-chunk (or state *random-state*))))
+                       (t
+                        (error "Unexpectedly small N-RANDOM-CHUNK-BITS")))))
+          (if (zerop (logand num (1- num)))
+              ;; NUM is a power of 2.
+              (let ((n-bits (integer-length (1- num))))
+                (multiple-value-bind (n-chunk-bits chunk-expr)
+                    (chunk-n-bits-and-expr n-bits)
+                  (if (< n-bits n-chunk-bits)
+                      `(logand ,(1- (ash 1 n-bits)) ,chunk-expr)
+                      chunk-expr)))
+              ;; Generate an accept-reject loop.
+              (let ((n-bits (integer-length num)))
+                (multiple-value-bind (n-chunk-bits chunk-expr)
+                    (chunk-n-bits-and-expr n-bits)
+                  (if (or (> (* num 3) (expt 2 n-chunk-bits))
+                          (logbitp (- n-bits 2) num))
+                      ;; Division can't help as the quotient is below 3,
+                      ;; or is too costly as the rejection probability
+                      ;; without it is already small (namely at most 1/4
+                      ;; with the given test, which is experimentally a
+                      ;; reasonable threshold and cheap to test for).
+                      `(loop
+                         (let ((bits ,(generate-random-expr-for-power-of-2
+                                       n-bits '(or state *random-state*))))
+                           (when (< bits num)
+                             (return bits))))
+                      (let ((d (truncate (expt 2 n-chunk-bits) num)))
+                        `(loop
+                           (let ((bits ,chunk-expr))
+                             (when (< bits ,(* num d))
+                               (return (values (truncate bits ,d)))))))))))))))
+
 
 ;;;; float accessors
 

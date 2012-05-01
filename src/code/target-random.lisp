@@ -292,9 +292,8 @@
 #!-sb-fluid (declaim (inline big-random-chunk))
 (defun big-random-chunk (state)
   (declare (type random-state state))
-  (logand (1- (expt 2 64))
-          (logior (ash (random-chunk state) 32)
-                  (random-chunk state))))
+  (logior (ash (random-chunk state) 32)
+          (random-chunk state)))
 
 ;;; Handle the single or double float case of RANDOM. We generate a
 ;;; float between 0.0 and 1.0 by clobbering the significand of 1.0
@@ -310,7 +309,7 @@
   (* arg
      (- (make-single-float
          (dpb (ash (random-chunk state)
-                   (- sb!vm:single-float-digits random-chunk-length))
+                   (- sb!vm:single-float-digits n-random-chunk-bits))
               sb!vm:single-float-significand-byte
               (single-float-bits 1.0)))
         1.0)))
@@ -333,7 +332,7 @@
   (* arg
      (- (sb!impl::make-double-float
          (dpb (ash (random-chunk state)
-                   (- sb!vm:double-float-digits random-chunk-length 32))
+                   (- sb!vm:double-float-digits n-random-chunk-bits 32))
               sb!vm:double-float-significand-byte
               (sb!impl::double-float-high-bits 1d0))
          (random-chunk state))
@@ -348,7 +347,7 @@
     (* arg
        (- (sb!impl::make-double-float
            (dpb (ash (sb!vm::random-mt19937 state-vector)
-                     (- sb!vm:double-float-digits random-chunk-length
+                     (- sb!vm:double-float-digits n-random-chunk-bits
                         sb!vm:n-word-bits))
                 sb!vm:double-float-significand-byte
                 (sb!impl::double-float-high-bits 1d0))
@@ -356,26 +355,46 @@
           1d0))))
 
 
-;;;; random integers
+;;;; random fixnums
 
-(defun %random-integer (arg state)
-  (declare (type (integer 1) arg) (type random-state state))
-  (let ((shift (- random-chunk-length random-integer-overlap)))
-    (do ((bits (random-chunk state)
-               (logxor (ash bits shift) (random-chunk state)))
-         (count (+ (integer-length arg)
-                   (- random-integer-extra-bits shift))
-                (- count shift)))
-        ((minusp count)
-         (rem bits arg))
-      (declare (fixnum count)))))
+;;; Generate and return a pseudo random fixnum less than ARG. To achieve
+;;; equidistribution an accept-reject loop is used.
+;;; No extra effort is made to detect the case of ARG being a power of
+;;; two where rejection is not possible, as the cost of checking for
+;;; this case is the same as doing the rejection test. When ARG is
+;;; larger than (expt 2 N-RANDOM-CHUNK-BITS), which can only happen if
+;;; the random chunk size is half the word size, two random chunks are
+;;; used in each loop iteration, otherwise only one. Finally, the
+;;; rejection probability could often be reduced by not masking the
+;;; chunk but rejecting only values as least as large as the largest
+;;; multiple of ARG that fits in a chunk (or two), but this is not done
+;;; as the speed gains due to needing fewer loop iterations are by far
+;;; outweighted by the cost of the two divisions required (one to find
+;;; the multiplier and one to bring the result into the correct range).
+#!-sb-fluid (declaim (inline %random-fixnum))
+(defun %random-fixnum (arg state)
+  (declare (type (integer 1 #.sb!xc:most-positive-fixnum) arg)
+           (type random-state state))
+  (if (= arg 1)
+      0
+      (let* ((n-bits (integer-length (1- arg)))
+             (mask (1- (ash 1 n-bits))))
+        (macrolet ((accept-reject-loop (generator)
+                     `(loop
+                        (let ((bits (logand mask (,generator state))))
+                          (when (< bits arg)
+                            (return bits))))))
+          (assert (<= n-bits (* 2 n-random-chunk-bits)))
+          (if (<= n-bits n-random-chunk-bits)
+              (accept-reject-loop random-chunk)
+              (accept-reject-loop big-random-chunk))))))
 
 (defun random (arg &optional (state *random-state*))
-  (declare (inline %random-single-float %random-double-float
+  (declare (inline %random-fixnum %random-single-float %random-double-float
                    #!+long-float %random-long-float))
   (cond
-    ((and (fixnump arg) (<= arg random-fixnum-max) (> arg 0))
-     (rem (random-chunk state) arg))
+    ((and (fixnump arg) (> arg 0))
+     (%random-fixnum arg state))
     ((and (typep arg 'single-float) (> arg 0.0f0))
      (%random-single-float arg state))
     ((and (typep arg 'double-float) (> arg 0.0d0))
@@ -383,8 +402,8 @@
     #!+long-float
     ((and (typep arg 'long-float) (> arg 0.0l0))
      (%random-long-float arg state))
-    ((and (integerp arg) (> arg 0))
-     (%random-integer arg state))
+    ((and (bignump arg) (> arg 0))
+     (%random-bignum arg state))
     (t
      (error 'simple-type-error
             :expected-type '(or (integer 1) (float (0))) :datum arg

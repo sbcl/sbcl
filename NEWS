@@ -1,5 +1,18 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 changes relative to sbcl-1.0.56:
+  * RANDOM enhancements and bug fixes:
+    ** bug fix: the range and distribution of random integers could be
+       catastrophically wrong when the compiler derived the type of its
+       argument as a disjoint set of small integers.
+    ** bug fix: the distribution of random integers is now completely
+       uniform even when the specified limit is not a power of two.
+       (Previously some values could be about 0.1 % more probable than
+       others in the worst case.)
+    ** RANDOM on large integer arguments is generally faster and conses
+       less than before; this is visible for fixnums above a length of
+       about 24 bits, but extremely so for bignums: the old implementation
+       used time and space quadratical in the size of the argument there,
+       the new one is linear.
   * enhancement: redesigned protocol for quitting SBCL. SB-EXT:EXIT is the new
     main entry point, SB-EXT:QUIT is deprecated.
   * enhancement: additions to the SB-THREAD API: RETURN-FROM-THREAD,

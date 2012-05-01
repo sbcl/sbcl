@@ -114,8 +114,8 @@
                                nconc (list (1- (expt 2 i))
                                            (expt 2 i)
                                            (1+ (expt 2 i))))
-                       ,@(loop for i from (1- sb-kernel::random-chunk-length)
-                               to (* sb-kernel::random-chunk-length 4)
+                       ,@(loop for i from (1- sb-kernel::n-random-chunk-bits)
+                               to (* sb-kernel::n-random-chunk-bits 4)
                                collect (* 3 (expt 2 i)))
                        ,@(loop for i from 2 to sb-vm:n-word-bits
                                for n = (expt 16 i)
