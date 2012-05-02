@@ -23,6 +23,8 @@ changes relative to sbcl-1.0.56:
     (lp#936304)
   * enhancement: backtraces show the correct number of arguments for frames
     called with too many arguments.
+  * enhancement: support for abort(3), exit(3), and _exit(2) has been added to
+    SB-POSIX.
   * optimization: fewer uses of full calls to signed modular functions.
     (lp#903821)
   * optimization: typechecking alien values is typically 5 x faster.

@@ -140,3 +140,13 @@ a FILE-STREAM designating the underlying file-descriptor."
       (declaim (inline ,lisp-name))
       (defun ,lisp-name ,arglist
         ,@body))))
+
+(defmacro define-simple-call (name return-type &rest arguments)
+  (multiple-value-bind (lisp-name c-name)
+      (values name (substitute #\_ #\- (string-downcase name)))
+    `(progn
+       (export ',lisp-name :sb-posix)
+       (defun ,lisp-name ,(mapcar #'first arguments)
+         (alien-funcall (extern-alien ,c-name (function ,return-type
+                                                        ,@(mapcar #'second arguments)))
+                        ,@(mapcar #'first arguments))))))

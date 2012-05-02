@@ -281,26 +281,35 @@
 
   ;; uid, gid
   (define-call "geteuid" uid-t never-fails) ; "always successful", it says
-#-sunos  (define-call "getresuid" uid-t never-fails)
+  #-sunos
+  (define-call "getresuid" uid-t never-fails)
   (define-call "getuid" uid-t never-fails)
   (define-call "seteuid" int minusp (uid uid-t))
-#-sunos  (define-call "setfsuid" int minusp (uid uid-t))
+  #-sunos
+  (define-call "setfsuid" int minusp (uid uid-t))
   (define-call "setreuid" int minusp (ruid uid-t) (euid uid-t))
-#-sunos  (define-call "setresuid" int minusp (ruid uid-t) (euid uid-t) (suid uid-t))
+  #-sunos
+  (define-call "setresuid" int minusp (ruid uid-t) (euid uid-t) (suid uid-t))
   (define-call "setuid" int minusp (uid uid-t))
   (define-call "getegid" gid-t never-fails)
   (define-call "getgid" gid-t never-fails)
-#-sunos  (define-call "getresgid" gid-t never-fails)
+  #-sunos
+  (define-call "getresgid" gid-t never-fails)
   (define-call "setegid" int minusp (gid gid-t))
-#-sunos  (define-call "setfsgid" int minusp (gid gid-t))
+  #-sunos
+  (define-call "setfsgid" int minusp (gid gid-t))
   (define-call "setgid" int minusp (gid gid-t))
   (define-call "setregid" int minusp (rgid gid-t) (egid gid-t))
-#-sunos  (define-call "setresgid" int minusp (rgid gid-t) (egid gid-t) (sgid gid-t))
+  #-sunos
+  (define-call "setresgid" int minusp (rgid gid-t) (egid gid-t) (sgid gid-t))
 
   ;; processes, signals
   (define-call "alarm" int never-fails (seconds unsigned))
 
-
+  ;; exit and abort, not much point inlining these
+  (define-simple-call abort void)
+  (define-simple-call exit void (status int))
+  (define-simple-call _exit void (status int))
 
   ;; FIXME this is a lie, of course this can fail, but there's no
   ;; error handling here yet!

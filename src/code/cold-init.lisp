@@ -293,13 +293,13 @@ defaults to 0 when ABORT is false, and 1 when it is true.
 
 When ABORT is false (the default), current thread is first unwound,
 *EXIT-HOOKS* are run, other threads are terminated, and standard
-output streams are flushed before SBCL calls exit(2) -- at which point
+output streams are flushed before SBCL calls exit(3) -- at which point
 atexit(3) functions will run. If multiple threads call EXIT with ABORT
 being false, the first one to call it will complete the protocol.
 
 When ABORT is true, SBCL exits immediately by calling _exit(2) without
 unwinding stack, or calling exit hooks. Note that _exit(2) does not
-call atexit(3) functions unlike exit(2).
+call atexit(3) functions unlike exit(3).
 
 Recursive calls to EXIT cause EXIT to behave as it ABORT was true.
 
