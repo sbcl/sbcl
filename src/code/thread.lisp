@@ -94,7 +94,7 @@ stale value, use MUTEX-OWNER instead."
      ,@body))
 
 (sb!xc:defmacro with-spinlock ((lock) &body body)
-  (deprecation-warning :early "1.0.53.11" 'with-recursive-spinlock 'with-mutex)
+  (deprecation-warning :early "1.0.53.11" 'with-spinlock 'with-mutex)
   `(with-mutex (,lock)
      ,@body))
 

@@ -91,6 +91,7 @@ provided with absolutely no warranty. See the @file{COPYING} and
 * Networking::
 * Profiling::                   
 * Contributed Modules::         
+* Deprecated Interfaces::         
 * Concept Index::               
 * Function Index::              
 * Variable Index::              
@@ -116,6 +117,7 @@ provided with absolutely no warranty. See the @file{COPYING} and
 @include sb-bsd-sockets/sb-bsd-sockets.texinfo
 @include profiling.texinfo
 @include contrib-modules.texinfo
+@include deprecated.texinfo
 @include backmatter.texinfo
 
 @bye

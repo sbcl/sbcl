@@ -1123,6 +1123,45 @@
     (deprecation-warning state since name replacements)
     form))
 
+;;; STATE is one of
+;;;
+;;;   :EARLY, for a compile-time style-warning.
+;;;   :LATE, for a compile-time full warning.
+;;;   :FINAL, for a compile-time full warning and runtime error.
+;;;
+;;; Suggested duration of each stage is one year, but some things can move faster,
+;;; and some widely used legacy APIs might need to move slower. Internals we don't
+;;; usually add deprecation notes for, but sometimes an internal API actually has
+;;; several external users, in which case we try to be nice about it.
+;;;
+;;; When you deprecate something, note it here till it is fully gone: makes it
+;;; easier to keep things progressing orderly. Also add the relevant section
+;;; (or update it when deprecation proceeds) in the manual, in
+;;; deprecated.texinfo.
+;;;
+;;; EARLY:
+;;; - SB-THREAD::SPINLOCK (type), since 1.0.53.11 (08/2011)         -> Late: 08/2012
+;;; - SB-THREAD::MAKE-SPINLOCK, since 1.0.53.11 (08/2011)           -> Late: 08/2012
+;;; - SB-THREAD::WITH-SPINLOCK, since 1.0.53.11 (08/2011)           -> Late: 08/2012
+;;; - SB-THREAD::WITH-RECURSIVE-SPINLOCK, since 1.0.53.11 (08/2011) -> Late: 08/2012
+;;; - SB-THREAD::GET-SPINLOCK, since 1.0.53.11 (08/2011)            -> Late: 08/2012
+;;; - SB-THREAD::RELEASE-SPINLOCK, since 1.0.53.11 (08/2011)        -> Late: 08/2012
+;;; - SB-THREAD::SPINLOCK-VALUE, since 1.0.53.11 (08/2011)          -> Late: 08/2012
+;;; - SB-THREAD::SPINLOCK-NAME, since 1.0.53.11 (08/2011)           -> Late: 08/2012
+;;; - SETF SB-THREAD::SPINLOCK-NAME, since 1.0.53.11 (08/2011)      -> Late: 08/2012
+;;; - SB-C::MERGE-TAIL-CALLS (policy), since 1.0.53.74 (11/2011)    -> Late: 11/2012
+;;; - SB-EXT:QUIT, since 1.0.56.55 (05/2012)                        -> Late: 05/2013
+;;; - SB-UNIX:UNIX-EXIT, since 1.0.56.55 (05/2012)                  -> Late: 05/2013
+;;;
+;;; LATE:
+;;; - SB-SYS:OUTPUT-RAW-BYTES, since 1.0.8.16 (06/2007)                 -> Final: anytime
+;;; - SB-C::STACK-ALLOCATE-DYNAMIC-EXTENT (policy), since 1.0.19.7      -> Final: anytime
+;;; - SB-C::STACK-ALLOCATE-VECTOR (policy), since 1.0.19.7              -> Final: anytime
+;;; - SB-C::STACK-ALLOCATE-VALUE-CELLS (policy), since 1.0.19.7         -> Final: anytime
+;;; - SB-INTROSPECT:FUNCTION-ARGLIST, since 1.0.24.5 (01/2009)          -> Final: anytime
+;;; - SB-THREAD:JOIN-THREAD-ERROR-THREAD, since 1.0.29.17 (06/2009)     -> Final: 09/2012
+;;; - SB-THREAD:INTERRUPT-THREAD-ERROR-THREAD since 1.0.29.17 (06/2009) -> Final: 06/2012
+
 (defmacro define-deprecated-function (state since name replacements lambda-list &body body)
   (let* ((replacements (normalize-deprecation-replacements replacements))
          (doc (let ((*package* (find-package :keyword)))

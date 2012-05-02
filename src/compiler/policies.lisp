@@ -61,10 +61,6 @@ more reliable bactracing across foreign calls.")
     (if (zerop safety) 0 3)
   ("no" "maybe" "yes" "yes"))
 
-(define-optimization-quality merge-tail-calls
-    3
-  "Deprecated: has no effect on compiled code. (Never really did.)")
-
 (define-optimization-quality insert-debug-catch
     (if (> debug (max speed space))
         3

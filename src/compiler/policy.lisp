@@ -76,11 +76,16 @@ EXPERIMENTAL INTERFACE: Subject to change."
 
 ;;; Is it deprecated?
 (defun policy-quality-deprecation-warning (quality)
-  (when (member quality '(stack-allocate-dynamic-extent stack-allocate-vector
-                          stack-allocate-value-cells))
-    (deprecation-warning :late "1.0.19.7" quality '*stack-allocate-dynamic-extent*
-                         :runtime-error nil)
-    t))
+  (case quality
+    ((stack-allocate-dynamic-extent stack-allocate-vector stack-allocate-value-cells)
+     (deprecation-warning :late "1.0.19.7" quality '*stack-allocate-dynamic-extent*
+                          :runtime-error nil)
+     t)
+    ((merge-tail-calls)
+     (deprecation-warning :early "1.0.53.74" quality nil :runtime-error nil)
+     t)
+    (otherwise
+     nil)))
 
 ;;; *POLICY* holds the current global compiler policy information, as
 ;;; an alist mapping from optimization quality name to quality value.
