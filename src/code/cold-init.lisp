@@ -282,7 +282,7 @@
   (critically-unreachable "after trying to die in QUIT"))
 
 (declaim (ftype (sfunction (&key (:code (or null exit-code))
-                                (:timeout (or null real))
+                                 (:timeout (or null real))
                                  (:abort t))
                            nil)
                 exit))
@@ -307,10 +307,11 @@ TIMEOUT controls waiting for other threads to terminate when ABORT is
 NIL. Once current thread has been unwound and *EXIT-HOOKS* have been
 run, spawning new threads is prevented and all other threads are
 terminated by calling TERMINATE-THREAD on them. The system then waits
-for them to finish using JOIN-THREAD with the specified TIMEOUT. If a
-thread does not finish in TIMEOUT seconds, it is left to its own
-devices while the exit protocol continues. TIMEOUT defaults to
-*EXIT-TIMEOUT*, which in turn defaults to 60.
+for them to finish using JOIN-THREAD, waiting at most a total TIMEOUT
+seconds for all threads to join. Those threads that do not finish
+in time are simply ignored while the exit protocol continues. TIMEOUT
+defaults to *EXIT-TIMEOUT*, which in turn defaults to 60. TIMEOUT NIL
+means to wait indefinitely.
 
 Note that TIMEOUT applies only to JOIN-THREAD, not *EXIT-HOOKS*. Since
 TERMINATE-THREAD is asynchronous, getting multithreaded application

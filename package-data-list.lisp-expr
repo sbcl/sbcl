@@ -1059,6 +1059,7 @@ possibly temporariliy, because it might be used internally."
                "!DEF-BOOLEAN-ATTRIBUTE"
                "WITH-REBOUND-IO-SYNTAX"
                "WITH-SANE-IO-SYNTAX"
+               "WITH-PROGRESSIVE-TIMEOUT"
 
                ;; ..and CONDITIONs..
                "BUG"

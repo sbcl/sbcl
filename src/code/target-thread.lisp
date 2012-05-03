@@ -1186,12 +1186,7 @@ on this semaphore, then N of them is woken up."
 (defun handle-thread-exit (thread)
   (/show0 "HANDLING THREAD EXIT")
   (when *exit-in-process*
-    (if (consp *exit-in-process*)
-        ;; This means we're the main thread, but someone else
-        ;; requested the exit and exiting with the right code is the
-        ;; only thing left to do.
-        (os-exit (car *exit-in-process*) :abort nil)
-        (%exit)))
+    (%exit))
   ;; Lisp-side cleanup
   (with-all-threads-lock
     (setf (thread-%alive-p thread) nil)
@@ -1208,10 +1203,11 @@ on this semaphore, then N of them is woken up."
     (grab-mutex *make-thread-lock*)
     (let ((timeout sb!ext:*exit-timeout*)
           (code *exit-in-process*)
+          (current *current-thread*)
           (joinees nil)
           (main nil))
       (dolist (thread (list-all-threads))
-        (cond ((eq thread *current-thread*))
+        (cond ((eq thread current))
               ((main-thread-p thread)
                (setf main thread))
               (t
@@ -1220,23 +1216,25 @@ on this semaphore, then N of them is woken up."
                      (terminate-thread thread)
                      (push thread joinees))
                  (interrupt-thread-error ())))))
-      (dolist (thread (nreverse joinees))
-        (join-thread thread :default t :timeout timeout))
-      ;; Need to defer till others have joined, because when main
-      ;; thread exits, we're gone. Can't use TERMINATE-THREAD -- would
-      ;; get the exit code wrong.
-      (when main
-        (handler-case
-            (interrupt-thread
-             main
-             (lambda ()
-               (setf *exit-in-process* (list code))
-               (throw 'sb!impl::%end-of-the-world t)))
-          (interrupt-thread-error ()))
-        ;; Normally this never finishes, as once the main-thread
-        ;; unwinds we exit with the right code, but if times out
-        ;; before that happens, we will exit after returning.
-        (join-thread main :default t :timeout timeout)))))
+      (with-progressive-timeout (time-left :seconds timeout)
+        (dolist (thread joinees)
+          (join-thread thread :default t :timeout (time-left)))
+        ;; Need to defer till others have joined, because when main
+        ;; thread exits, we're gone. Can't use TERMINATE-THREAD -- would
+        ;; get the exit code wrong.
+        (when main
+          (handler-case
+              (interrupt-thread
+               main
+               (lambda ()
+                 (setf *exit-in-process* (list code))
+                 (throw 'sb!impl::%end-of-the-world t)))
+            (interrupt-thread-error ()))
+          ;; Normally this never finishes, as once the main-thread unwinds we
+          ;; exit with the right code, but if times out before that happens,
+          ;; we will exit after returning -- or rathe racing the main thread
+          ;; to calling OS-EXIT.
+          (join-thread main :default t :timeout (time-left)))))))
 
 (defun terminate-session ()
   #!+sb-doc

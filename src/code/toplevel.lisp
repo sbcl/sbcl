@@ -107,13 +107,18 @@ means to wait indefinitely.")
 (defun %exit ()
   ;; If anything goes wrong, we will exit immediately and forcibly.
   (handler-bind ((serious-condition *exit-error-handler*))
-    (let (ok)
-      (unwind-protect
-           (progn
-             (flush-standard-output-streams)
-             (sb!thread::%exit-other-threads)
-             (setf ok t))
-        (os-exit *exit-in-process* :abort (not ok))))))
+    (let ((ok nil)
+          (code *exit-in-process*))
+      (if (consp code)
+          ;; Another thread called EXIT, and passed the buck to us -- only
+          ;; final call left to do.
+          (os-exit (car code) :abort nil)
+          (unwind-protect
+               (progn
+                 (flush-standard-output-streams)
+                 (sb!thread::%exit-other-threads)
+                 (setf ok t))
+            (os-exit code :abort (not ok)))))))
 
 ;;;; working with *CURRENT-ERROR-DEPTH* and *MAXIMUM-ERROR-DEPTH*
 

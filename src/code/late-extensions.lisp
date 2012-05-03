@@ -331,6 +331,7 @@ See also the declarations SB-EXT:GLOBAL and SB-EXT:ALWAYS-BOUND."
                (go :restart)))))))
 
 (defmacro wait-for (test-form &key timeout)
+  #!+sb-doc
   "Wait until TEST-FORM evaluates to true, then return its primary value.
 If TIMEOUT is provided, waits at most approximately TIMEOUT seconds before
 returning NIL.
@@ -342,3 +343,25 @@ deadline.
 Experimental: subject to change without prior notice."
   `(dx-flet ((wait-for-test () (progn ,test-form)))
      (%wait-for #'wait-for-test ,timeout)))
+
+(defmacro with-progressive-timeout ((name &key seconds)
+                                    &body body)
+  #!+sb-doc
+  "Binds NAME as a local function for BODY. Each time #'NAME is called, it
+returns SECONDS minus the time that has elapsed since BODY was entered, or
+zero if more time than SECONDS has elapsed. If SECONDS is NIL, #'NAME
+returns NIL each time."
+  (with-unique-names (deadline time-left sec)
+    `(let* ((,sec ,seconds)
+            (,deadline
+              (when ,sec
+                (+ (get-internal-real-time)
+                   (round (* ,seconds internal-time-units-per-second))))))
+       (flet ((,name ()
+                (when ,deadline
+                  (let ((,time-left (- ,deadline (get-internal-real-time))))
+                    (if (plusp ,time-left)
+                        (* (coerce ,time-left 'single-float)
+                           ,(/ 1.0 internal-time-units-per-second))
+                        0)))))
+         ,@body))))
