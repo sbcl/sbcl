@@ -3297,10 +3297,20 @@ used for a COMPLEX component.~:@>"
     ((type= type (specifier-type 'base-char)) 'base-char)
     ((type= type (specifier-type 'extended-char)) 'extended-char)
     ((type= type (specifier-type 'standard-char)) 'standard-char)
-    (t (let ((pairs (character-set-type-pairs type)))
-        `(member ,@(loop for (low . high) in pairs
+    (t
+     ;; Unparse into either MEMBER or CHARACTER-SET. We use MEMBER if there
+     ;; are at most as many characters than there are character code ranges.
+     (let* ((pairs (character-set-type-pairs type))
+            (count (length pairs))
+            (chars (loop named outer
+                         for (low . high) in pairs
                          nconc (loop for code from low upto high
-                                     collect (sb!xc:code-char code))))))))
+                                     collect (sb!xc:code-char code)
+                                     when (minusp (decf count))
+                                     do (return-from outer t)))))
+       (if (eq chars t)
+           `(character-set ,pairs)
+           `(member ,@chars))))))
 
 (!define-type-method (character-set :singleton-p) (type)
   (let* ((pairs (character-set-type-pairs type))

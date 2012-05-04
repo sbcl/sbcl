@@ -118,3 +118,10 @@
     (assert-coercion (code-char 955) character)
     (assert-coercion 'a character)
     (assert-coercion "a" character)))
+
+(with-test (:name :bug-994487)
+  (let ((f (compile nil `(lambda (char)
+                           (code-char (1+ (char-code char)))))))
+    (assert (equal `(function (t) (values (sb-kernel:character-set ((1 . 1114111)))
+                                          &optional))
+                   (sb-impl::%fun-type f)))))

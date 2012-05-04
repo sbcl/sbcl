@@ -30,6 +30,8 @@ changes relative to sbcl-1.0.56:
   * optimization: typechecking alien values is typically 5 x faster.
   * optimization: FDEFINITION, SYMBOL-FUNCTION, MACRO-FUNCTION, and FBOUNDP
     are 20% faster.
+  * bug fix: file compilation performance issues when dumping subtypes
+    of CHARACTER (lp#994487)
   * bug fix: fixed disassembly of some SSE instructions on x86-64.
   * bug fix: SB-SIMPLE-STREAMS signals an error for bogus :CLASS arguments in
     OPEN. (lp#969352, thanks to Kambiz Darabi)
