@@ -25,6 +25,7 @@ changes relative to sbcl-1.0.56:
     called with too many arguments.
   * enhancement: support for abort(3), exit(3), and _exit(2) has been added to
     SB-POSIX.
+  * enhancement: ASDF has been updated 2.21.
   * optimization: fewer uses of full calls to signed modular functions.
     (lp#903821)
   * optimization: typechecking alien values is typically 5 x faster.

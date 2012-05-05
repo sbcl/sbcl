@@ -35,11 +35,11 @@ for Common Lisp programs and libraries.
 You can find the latest version of this manual at
 @url{http://common-lisp.net/project/asdf/asdf.html}.
 
-ASDF Copyright @copyright{} 2001-2011 Daniel Barlow and contributors.
+ASDF Copyright @copyright{} 2001-2012 Daniel Barlow and contributors.
 
-This manual Copyright @copyright{} 2001-2011 Daniel Barlow and contributors.
+This manual Copyright @copyright{} 2001-2012 Daniel Barlow and contributors.
 
-This manual revised @copyright{} 2009-2011 Robert P. Goldman and Francois-Rene Rideau.
+This manual revised @copyright{} 2009-2012 Robert P. Goldman and Francois-Rene Rideau.
 
 Permission is hereby granted, free of charge, to any person obtaining
 a copy of this software and associated documentation files (the
@@ -197,6 +197,7 @@ so you may more easily modify it, we recommend clbuild.
 @vindex *central-registry*
 @cindex link farm
 @findex load-system
+@findex require-system
 @findex compile-system
 @findex test-system
 @cindex system directory designator
@@ -219,10 +220,11 @@ You can usually load this copy using Common Lisp's @code{require} function:
 
 As of the writing of this manual,
 the following implementations provide ASDF 2 this way:
-abcl allegro ccl clisp cmucl ecl sbcl xcl.
-The following implementations don't provide it yet but will in a future release:
-lispworks scl.
-The following implementations are obsolete and most probably will never bundle it:
+abcl allegro ccl clisp cmucl ecl lispworks sbcl xcl.
+The following implementation doesn't provide it yet but will in a future release:
+scl.
+The following implementations are obsolete, not actively maintained,
+and most probably will never bundle it:
 cormancl gcl genera mcl.
 
 If the implementation you are using doesn't provide ASDF 2,
@@ -667,6 +669,8 @@ which is reported not to work on some implementations
 
 ASDF provides three commands for the most common system operations:
 @code{load-system}, @code{compile-system} or @code{test-system}.
+It also provides @code{require-system}, a version of @code{load-system}
+that skips trying to update systems that are already loaded.
 
 Because ASDF is an extensible system
 for defining @emph{operations} on @emph{components},
@@ -2081,7 +2085,7 @@ RELATIVE-COMPONENT-DESIGNATOR :=
     STRING | ;; relative directory pathname as interpreted by coerce-pathname.
              ;; In output translations, if last component, **/*.*.* is added
     PATHNAME | ;; pathname; unless last component, directory is assumed.
-    :IMPLEMENTATION | ;; directory based on implementation, e.g. sbcl-1.0.49-linux-x64
+    :IMPLEMENTATION | ;; directory based on implementation, e.g. sbcl-1.0.45-linux-x64
     :IMPLEMENTATION-TYPE | ;; a directory based on lisp-implementation-type only, e.g. sbcl
     :DEFAULT-DIRECTORY | ;; a relativized version of the default directory
     :*/ | ;; any direct subdirectory (since ASDF 2.011.4)
@@ -2904,6 +2908,147 @@ overriding the source-location and/or timestamping systems,
 checking that some compile-time side-effects were properly balanced,
 etc.
 
+Note that there is no around-load hook. This is on purpose.
+Some implementations such as ECL or GCL link object files,
+which allows for no such hook.
+Other implementations allow for concatenating FASL files,
+which doesn't allow for such a hook either.
+We aim to discourage something that's not portable,
+and has some dubious impact on performance and semantics
+even when it is possible.
+Things you might want to do with an around-load hook
+are better done around-compile,
+though it may at times require some creativity
+(see e.g. the @code{package-renaming} system).
+
+
+@section Controlling source file character encoding
+
+Starting with ASDF 2.21, components accept a @code{:encoding} option.
+By default, only @code{:default}, @code{:utf-8}
+and @code{:autodetect} are accepted.
+@code{:autodetect} is the default, and calls
+@code{*encoding-detection-hook*} which by default always returns
+@code{*default-encoding*} which itself defaults to @code{:default}.
+In other words, there now are plenty of extension hooks, but
+by default ASDF follows the backwards compatible behavior
+of using whichever @code{:default} encoding your implementation uses,
+which itself may or may not vary based on environment variables
+and other locale settings.
+In practice this means that only source code that only uses ASCII
+is guaranteed to be read the same on all implementations
+independently from any user setting.
+
+Additionally, for backward-compatibility with older versions of ASDF
+and/or with implementations that do not support unicode and its many encodings,
+you may want to use
+the reader conditionals @code{#+asdf-unicode #+asdf-unicode}
+to protect any @code{:encoding @emph{encoding}} statement
+as @code{:asdf-unicode} will be present in @code{*features*}
+only if you're using a recent ASDF
+on an implementation that supports unicode.
+We recommend that you avoid using unprotected @code{:encoding} specifications
+until after ASDF 2.21 becomes widespread, hopefully by the end of 2012.
+
+While it offers plenty of hooks for extension,
+and one such extension is being developed (see below),
+ASDF itself only recognizes one encoding beside @code{:default},
+and that is @code{:utf-8}, which is the @emph{de facto} standard,
+already used by the vast majority of libraries that use more than ASCII.
+On implementations that do not support unicode,
+the feature @code{:asdf-unicode} is absent, and
+the @code{:default} external-format is used
+to read even source files declared as @code{:utf-8}.
+On these implementations, non-ASCII characters
+intended to be read as one CL character
+may thus end up being read as multiple CL characters.
+In most cases, this shouldn't affect the software's semantics:
+comments will be skipped just the same, strings with be read and printed
+with slightly different lengths, symbol names will be accordingly longer,
+but none of it should matter.
+But a few systems that actually depend on unicode characters
+may fail to work properly, or may work in a subtly different way.
+See for instance @code{lambda-reader}.
+
+We invite you to embrace UTF-8
+as the encoding for non-ASCII characters starting today,
+even without any explicit specification in your @code{.asd} files.
+Indeed, on some implementations and configurations,
+UTF-8 is already the @code{:default},
+and loading your code may cause errors if it is encoded in anything but UTF-8.
+Therefore, even with the legacy behavior,
+non-UTF-8 is guaranteed to break for some users,
+whereas UTF-8 is pretty much guaranteed not to break anywhere
+(provided you do @emph{not} use a BOM),
+although it might be read incorrectly on some implementations.
+In the future, we intend to make @code{:utf-8}
+the default value of @code{*default-encoding*},
+to be enforced everywhere, so at least the code is guaranteed
+to be read correctly everywhere it can be.
+
+If you need non-standard character encodings for your source code,
+use the extension system @code{asdf-encodings}, by specifying
+@code{:defsystem-depends-on (:asdf-encodings)} in your @code{defsystem}.
+This extension system will register support for more encodings using the
+@code{*encoding-external-format-hook*} facility,
+so you can explicitly specify @code{:encoding :latin1}
+in your @code{.asd} file.
+Using the @code{*encoding-detection-hook*} it will also
+eventually implement some autodetection of a file's encoding
+from an emacs-style @code{-*- mode: lisp ; coding: latin1 -*-} declaration,
+or otherwise based on an analysis of octet patterns in the file.
+At this point, asdf-encoding only supports the encodings
+that are supported as part of your implementation.
+Since the list varies depending on implementations,
+we once again recommend you use @code{:utf-8} everywhere,
+which is the most portable (next is @code{:latin1}).
+
+If you're not using a version of Quicklisp that has it,
+you may get the source for @code{asdf-encodings} using git:
+@kbd{git clone git://common-lisp.net/projects/asdf/asdf-encodings.git}
+or
+@kbd{git clone ssh://common-lisp.net/project/asdf/git/asdf-encodings.git}.
+You can also browse the repository on
+@url{http://common-lisp.net/gitweb?p=projects/asdf/asdf-encodings.git}.
+
+In the future, we intend to change the default @code{*default-encoding*}
+to @code{:utf-8}, which is already the de facto standard
+for most libraries that use non-ASCII characters:
+utf-8 works everywhere and was backhandedly enforced by
+a lot of people using SBCL and utf-8 and sending reports to authors
+so they make their packages compatible.
+A survey showed only about a handful few libraries
+are incompatible with non-UTF-8, and then, only in comments,
+and we believe that authors will adopt UTF-8 when prompted.
+See the April 2012 discussion on the asdf-devel mailing-list.
+For backwards compatibility with users who insist on a non-UTF-8 encoding,
+but cannot immediately transition to using @code{asdf-encodings}
+(maybe because it isn't ready), it will still be possible to use
+the @code{:encoding :default} option in your @code{defsystem} form
+to restore the behavior of ASDF 2.20 and earlier.
+This shouldn't be required in libraries,
+because user pressure as mentioned above will already have pushed
+library authors towards using UTF-8;
+but authors of end-user programs might care.
+
+When you use @code{asdf-encodings}, any further loaded @code{.asd} file
+will use the autodetection algorithm to determine its encoding;
+yet if you depend on this detection happening,
+you may want to explicitly load @code{asdf-encodings} early in your build,
+for by the time you can use @code{:defsystem-depends-on},
+it is already too late to load it.
+In practice, this means that the @code{*default-encoding*}
+is usually used for @code{.asd} files.
+Currently, this defaults to @code{:default} for backwards compatibility,
+and that means that you shouldn't rely on non-ASCII characters in a .asd file.
+Since component (path)names are the only real data in these files,
+and non-ASCII characters are not very portable for file names,
+this isn't too much of an issue.
+We still encourage you to use either plain ASCII or UTF-8
+in @code{.asd} files,
+as we intend to make @code{:utf-8} the default encoding in the future.
+This might matter, for instance, in meta-data about author's names.
+
 
 @section Miscellaneous Exported Functions
 
@@ -3005,10 +3150,10 @@ look at the beginning of @file{asdf.lisp} to see what it does.
 This function is obsolete and present only for the sake of backwards-compatibility:
 ``If it's not backwards, it's not compatible''. We strongly discourage its use.
 Its current behavior is only well-defined on Unix platforms
-(which includes MacOS X and cygwin). On Windows, anything goes.
+(which include MacOS X and cygwin). On Windows, anything goes.
 
 Instead we recommend the use of such a function as
-@code{xcvb-driver:run-program/process-output-stream}
+@code{xcvb-driver:run-program/}
 from the @code{xcvb-driver} system that is distributed with XCVB:
 @url{http://common-lisp.net/project/xcvb}.
 It's only alternative that supports
@@ -3017,7 +3162,7 @@ and provides well-defined behavior outside Unix (i.e. on Windows).
 (The only unsupported exception is Genera, since on it
 @code{run-shell-command} doesn't make sense anyway on that platform).
 
-This function takes as arguments a @code{format} control-string
+@code{run-shell-command} takes as arguments a @code{format} control-string
 and arguments to be passed to @code{format} after this control-string
 to produce a string.
 This string is a command that will be evaluated with a POSIX shell if possible;
