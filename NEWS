@@ -123,6 +123,8 @@ changes in sbcl-1.0.55 relative to sbcl-1.0.54:
   * optimization: the compiler no longer refuses to coerce large fixnums to
     single floats inline, except on x86 where this limitation is still
     necessary.
+  * optimization: truncation operations with constant divisor arguments
+    1 and -1 are optimized away.
   * bug fix: deadlock detection could report the same deadlock twice, for
     two different threads. Now a single deadlock is reported exactly once.
   * bug fix: interval-arithmetic division during type derivation did not

@@ -3587,6 +3587,24 @@
   (def round)
   (def floor)
   (def ceiling))
+
+(macrolet ((def (name &optional float)
+             (let ((x (if float '(float x) 'x)))
+               `(deftransform ,name ((x y) (integer (constant-arg (member 1 -1)))
+                                     *)
+                  "fold division by 1"
+                  `(values ,(if (minusp (lvar-value y))
+                                '(%negate ,x)
+                                ',x)  0)))))
+  (def truncate)
+  (def round)
+  (def floor)
+  (def ceiling)
+  (def ftruncate t)
+  (def fround t)
+  (def ffloor t)
+  (def fceiling t))
+
 
 ;;;; character operations
 
