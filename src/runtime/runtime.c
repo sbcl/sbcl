@@ -292,11 +292,13 @@ search_for_executable(const char *argv0)
 }
 #endif /* LISP_FEATURE_WIN32 */
 
-long parse_size_arg(char *arg, char *arg_name)
+unsigned long parse_size_arg(char *arg, char *arg_name)
 {
   char *tail, *power_name;
-  long power, res;
-  res = strtol(arg, &tail, 0);
+  unsigned long power, res;
+
+  res = strtoul(arg, &tail, 0);
+
   if (arg == tail) {
     lose("%s argument is not a number: %s", arg_name, arg);
   } else if (tail[0]) {
@@ -325,7 +327,7 @@ long parse_size_arg(char *arg, char *arg_name)
     free(power_name);
   }
   if ((res <= 0) ||
-      (res >= (LONG_MAX >> power))) {
+      (res > (ULONG_MAX >> power))) {
     lose("%s argument is out of range: %s", arg_name, arg);
   }
   res <<= power;
@@ -449,7 +451,7 @@ main(int argc, char *argv[], char *envp[])
                        DYNAMIC_SPACE_START+dynamic_space_size) &&
                       (DYNAMIC_SPACE_START+dynamic_space_size <=
                        MAX_DYNAMIC_SPACE_END)))
-                  lose("--dynamic-space-size argument %s is too large, max %ldMiB",
+                  lose("--dynamic-space-size argument %s is too large, max %lu",
                        argv[argi-1], MAX_DYNAMIC_SPACE_END-DYNAMIC_SPACE_START);
 #               endif
             } else if (0 == strcmp(arg, "--control-stack-size")) {
