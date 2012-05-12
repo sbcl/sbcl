@@ -345,9 +345,10 @@
 (defun set-bound (x open-p)
   (if (and x open-p) (list x) x))
 
-;;; Apply the function F to a bound X. If X is an open bound, then
-;;; the result will be open. IF X is NIL, the result is NIL.
-(defun bound-func (f x)
+;;; Apply the function F to a bound X. If X is an open bound and the
+;;; function is declared strictly monotonic, then the result will be
+;;; open. IF X is NIL, the result is NIL.
+(defun bound-func (f x strict)
   (declare (type function f))
   (and x
        (handler-case
@@ -359,7 +360,7 @@
              (if (and (floatp y)
                       (float-infinity-p y))
                  nil
-                 (set-bound y (consp x)))))
+                 (set-bound y (and strict (consp x))))))
          ;; Some numerical operations will signal SIMPLE-TYPE-ERROR, e.g.
          ;; in the course of converting a bignum to a float.  Default to
          ;; NIL in that case.
@@ -464,9 +465,19 @@
                                   `(and (not (fp-zero-p ,xb))
                                         (not (fp-zero-p ,yb))))))))))))
 
+(defun coercion-loses-precision-p (val type)
+  (typecase val
+    (single-float)
+    (double-float (subtypep type 'single-float))
+    (rational (subtypep type 'float))
+    (t (bug "Unexpected arguments to bounds coercion: ~S ~S" val type))))
+
 (defun coerce-for-bound (val type)
   (if (consp val)
-      (list (coerce-for-bound (car val) type))
+      (let ((xbound (coerce-for-bound (car val) type)))
+        (if (coercion-loses-precision-p (car val) type)
+            xbound
+            (list xbound)))
       (cond
         ((subtypep type 'double-float)
          (if (<= most-negative-double-float val most-positive-double-float)
@@ -480,7 +491,10 @@
 (defun coerce-and-truncate-floats (val type)
   (when val
     (if (consp val)
-        (list (coerce-and-truncate-floats (car val) type))
+        (let ((xbound (coerce-for-bound (car val) type)))
+          (if (coercion-loses-precision-p (car val) type)
+              xbound
+              (list xbound)))
         (cond
           ((subtypep type 'double-float)
            (if (<= most-negative-double-float val most-positive-double-float)
@@ -781,8 +795,8 @@
 ;;; the negative of an interval
 (defun interval-neg (x)
   (declare (type interval x))
-  (make-interval :low (bound-func #'- (interval-high x))
-                 :high (bound-func #'- (interval-low x))))
+  (make-interval :low (bound-func #'- (interval-high x) t)
+                 :high (bound-func #'- (interval-low x) t)))
 
 ;;; Add two intervals.
 (defun interval-add (x y)
@@ -891,13 +905,17 @@
 
 ;;; Apply the function F to the interval X. If X = [a, b], then the
 ;;; result is [f(a), f(b)]. It is up to the user to make sure the
-;;; result makes sense. It will if F is monotonic increasing (or
-;;; non-decreasing).
-(defun interval-func (f x)
+;;; result makes sense. It will if F is monotonic increasing (or, if
+;;; the interval is closed, non-decreasing).
+;;;
+;;; (Actually most uses of INTERVAL-FUNC are coercions to float types,
+;;; which are not monotonic increasing, so default to calling
+;;; BOUND-FUNC with a non-strict argument).
+(defun interval-func (f x &optional increasing)
   (declare (type function f)
            (type interval x))
-  (let ((lo (bound-func f (interval-low x)))
-        (hi (bound-func f (interval-high x))))
+  (let ((lo (bound-func f (interval-low x) increasing))
+        (hi (bound-func f (interval-high x) increasing)))
     (make-interval :low lo :high hi)))
 
 ;;; Return T if X < Y. That is every number in the interval X is
@@ -969,8 +987,7 @@
 ;;; Compute the square of an interval.
 (defun interval-sqr (x)
   (declare (type interval x))
-  (interval-func (lambda (x) (* x x))
-                 (interval-abs x)))
+  (interval-func (lambda (x) (* x x)) (interval-abs x)))
 
 ;;;; numeric DERIVE-TYPE methods
 

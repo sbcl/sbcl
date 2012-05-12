@@ -2275,4 +2275,14 @@
             (assert (= 7 (funcall fun 15 3))))))
     (assert (string= "" trace-output))))
 
+(test-util:with-test (:name :bug-997528)
+  (let ((fun (compile nil '(lambda (x)
+                            (declare (optimize (speed 0) (space 0))
+                             (type (integer -228645653448155482 -228645653447928749) x))
+                            (floor 1.0 (the (integer -228645653448151677 -228645653448150900) x))))))
+    (multiple-value-bind (quo rem)
+        (funcall fun -228645653448151381)
+      (assert (= quo -1))
+      (assert (= rem (float -228645653448151381))))))
+
 ;;; success

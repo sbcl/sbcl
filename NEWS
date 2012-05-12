@@ -61,6 +61,9 @@ changes relative to sbcl-1.0.56:
     allowing faster release of memory back to the OS. (lp#991293)
   * bug fix: WITH-DEADLINE (:SECONDS NIL :OVERRIDE T) now drops any
     existing deadline for the dynamic scope of its body.
+  * bug fix: compiler-internal interval arithmetic needed to be more
+    conservative about open intervals when operated on by monotonic but not
+    strictly-monotonic functions.  (lp#975528)
   * documentation:
     ** improved docstrings: REPLACE (lp#965592)
 

@@ -326,12 +326,14 @@
                                        (if (< x ,most-negative)
                                            ,most-negative
                                            (coerce x ',type)))
-                                     (numeric-type-low num)))
+                                     (numeric-type-low num)
+                                     nil))
                      (hi (bound-func (lambda (x)
                                        (if (< ,most-positive x )
                                            ,most-positive
                                            (coerce x ',type)))
-                                     (numeric-type-high num))))
+                                     (numeric-type-high num)
+                                     nil)))
                 (specifier-type `(,',type ,(or lo '*) ,(or hi '*)))))
 
             (defoptimizer (,fun derive-type) ((num))
@@ -791,9 +793,9 @@
                  ;; Process the intersection.
                  (let* ((low (interval-low intersection))
                         (high (interval-high intersection))
-                        (res-lo (or (bound-func fun (if increasingp low high))
+                        (res-lo (or (bound-func fun (if increasingp low high) nil)
                                     default-low))
-                        (res-hi (or (bound-func fun (if increasingp high low))
+                        (res-hi (or (bound-func fun (if increasingp high low) nil)
                                     default-high))
                         (format (case (numeric-type-class arg)
                                   ((integer rational) 'single-float)
@@ -972,9 +974,9 @@
                    (int-hi (if hi
                                (ceiling (type-bound-number hi))
                                '*))
-                   (f-lo (or (bound-func #'float lo)
+                   (f-lo (or (bound-func #'float lo nil)
                              '*))
-                   (f-hi (or (bound-func #'float hi)
+                   (f-hi (or (bound-func #'float hi nil)
                              '*)))
               (specifier-type `(or (rational ,int-lo ,int-hi)
                                 (single-float ,f-lo, f-hi)))))
@@ -1004,9 +1006,9 @@
                    (int-hi (if hi
                                (ceiling (type-bound-number hi))
                                '*))
-                   (f-lo (or (bound-func #'float lo)
+                   (f-lo (or (bound-func #'float lo nil)
                              '*))
-                   (f-hi (or (bound-func #'float hi)
+                   (f-hi (or (bound-func #'float hi nil)
                              '*)))
               (specifier-type `(or (rational ,int-lo ,int-hi)
                                 (single-float ,f-lo, f-hi)))))
@@ -1449,8 +1451,8 @@
               ;; exactly the same way as the functions themselves do
               ;; it.
               (if (csubtypep arg domain)
-                  (let ((res-lo (bound-func fun (numeric-type-low arg)))
-                        (res-hi (bound-func fun (numeric-type-high arg))))
+                  (let ((res-lo (bound-func fun (numeric-type-low arg) nil))
+                        (res-hi (bound-func fun (numeric-type-high arg) nil)))
                     (unless increasingp
                       (rotatef res-lo res-hi))
                     (make-numeric-type
