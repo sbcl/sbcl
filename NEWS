@@ -64,6 +64,8 @@ changes relative to sbcl-1.0.56:
   * bug fix: compiler-internal interval arithmetic needed to be more
     conservative about open intervals when operated on by monotonic but not
     strictly-monotonic functions.  (lp#975528)
+  * bug fix: copy-tree caused stack exhaustion on long linear lists, and now
+    it's also slightly faster. (lp#998926)
   * documentation:
     ** improved docstrings: REPLACE (lp#965592)
 

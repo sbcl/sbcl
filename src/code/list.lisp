@@ -445,8 +445,21 @@
   #!+sb-doc
   "Recursively copy trees of conses."
   (if (consp object)
-      (cons (copy-tree (car object)) (copy-tree (cdr object)))
+      (let ((result (list (if (consp (car object))
+                              (copy-tree (car object))
+                              (car object)))))
+        (loop for last-cons = result then new-cons
+              for cdr = (cdr object) then (cdr cdr)
+              for car = (if (consp cdr)
+                            (car cdr)
+                            (return (setf (cdr last-cons) cdr)))
+              for new-cons = (list (if (consp car)
+                                       (copy-tree car)
+                                       car))
+              do (setf (cdr last-cons) new-cons))
+        result)
       object))
+
 
 ;;;; more commonly-used list functions
 
