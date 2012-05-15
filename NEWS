@@ -1,5 +1,7 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 changes relative to sbcl-1.0.57:
+  * enhancement: SB-EXT:ATOMIC-UPDATE makes it easy to perform non-destructive
+    updates of CAS-able places (similar to Clojure's swap!).
   * bug fix: potential for infinite recursion during compilation of CLOS slot
     typechecks when dependency graph had loops. (lp#1001799)
 

@@ -610,6 +610,7 @@ like *STACK-TOP-HINT* and unsupported stuff like *TRACED-FUN-LIST*."
                ;; Other atomic operations and types related to them
                "ATOMIC-INCF"
                "ATOMIC-DECF"
+               "ATOMIC-UPDATE"
                "WORD"
                "MOST-POSITIVE-WORD"
 

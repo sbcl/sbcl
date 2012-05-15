@@ -14,11 +14,22 @@
 (in-package :cl-user)
 
 (defpackage :thread-test
-  (:use :cl :sb-thread))
+  (:use :cl :sb-thread :sb-ext))
 
 (in-package :thread-test)
 
 (use-package :test-util)
+
+(with-test (:name atomic-update)
+  (let ((x (cons :count 0)))
+    (mapc #'sb-thread:join-thread
+          (loop repeat 1000
+                collect (sb-thread:make-thread
+                         (lambda ()
+                           (loop repeat 1000
+                                 do (atomic-update (cdr x) #'1+)
+                                    (sleep 0.00001))))))
+    (assert (equal x '(:count . 1000000)))))
 
 (with-test (:name mutex-owner)
   ;; Make sure basics are sane on unithreaded ports as well

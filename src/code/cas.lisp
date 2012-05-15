@@ -207,7 +207,8 @@ EXPERIMENTAL: Interface subject to change."
 Two values are considered to match if they are EQ. Returns the previous value
 of PLACE: if the returned value is EQ to OLD, the swap was carried out.
 
-PLACE must be an accessor form whose CAR is one of the following:
+PLACE must be an CAS-able place. Built-in CAS-able places are accessor forms
+whose CAR is one of the following:
 
  CAR, CDR, FIRST, REST, SVREF, SYMBOL-PLIST, SYMBOL-VALUE, SVREF, SLOT-VALUE
  SB-MOP:STANDARD-INSTANCE-ACCESS, SB-MOP:FUNCALLABLE-STANDARD-INSTANCE-ACCESS,
@@ -218,13 +219,15 @@ other then FIXNUM or T.
 
 In case of SLOT-VALUE, if the slot is unbound, SLOT-UNBOUND is called unless
 OLD is EQ to SB-PCL:+SLOT-UNBOUND+ in which case SB-PCL:+SLOT-UNBOUND+ is
-returned and NEW is assigned to the slot.
-
-Additionally, the results are unspecified if there is an applicable method on
-either SB-MOP:SLOT-VALUE-USING-CLASS, (SETF SB-MOP:SLOT-VALUE-USING-CLASS), or
+returned and NEW is assigned to the slot. Additionally, the results are
+unspecified if there is an applicable method on either
+SB-MOP:SLOT-VALUE-USING-CLASS, (SETF SB-MOP:SLOT-VALUE-USING-CLASS), or
 SB-MOP:SLOT-BOUNDP-USING-CLASS.
 
-EXPERIMENTAL: Interface subject to change."
+Additionally, the PLACE can be a anything for which a CAS-expansion has been
+specified using DEFCAS, DEFINE-CAS-EXPANDER, or for which a CAS-function has
+been defined. (See SB-EXT:CAS for more information.)
+"
   `(cas ,place ,old ,new))
 
 ;;; Out-of-line definitions for various primitive cas functions.

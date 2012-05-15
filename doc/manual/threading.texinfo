@@ -104,17 +104,23 @@ prints @code{0} and not @code{1} as of 0.9.6.
 @comment  node-name,  next,  previous,  up
 @section Atomic Operations
 
-SBCL provides a few special purpose atomic operations, particularly
-useful for implementing lockless algorithms.
+Following atomic operations are particularly useful for implementing
+lockless algorithms.
 
 @include macro-sb-ext-atomic-decf.texinfo
 @include macro-sb-ext-atomic-incf.texinfo
+@include macro-sb-ext-atomic-update.texinfo
 @include macro-sb-ext-compare-and-swap.texinfo
 
 @unnumberedsubsec CAS Protocol
 
-Our @code{compare-and-swap} is user-extensible using a protocol similar
-to @code{setf}:
+Our @code{compare-and-swap} is user-extensible using a protocol
+similar to @code{setf}, allowing users to add CAS support to new
+places via eg. @code{defcas}.
+
+At the same time, new atomic operations can be built on top of CAS
+using @code{get-cas-expansion}. See @code{atomic-update} for an
+example.
 
 @include macro-sb-ext-cas.texinfo
 @include macro-sb-ext-define-cas-expander.texinfo
