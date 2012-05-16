@@ -79,8 +79,10 @@
               (format stream "between ~W and ~W expected"
                       (arg-count-error-minimum condition)
                       (arg-count-error-maximum condition))))
-       (format stream ", but ~W found"
-               (length (arg-count-error-args condition)))))))
+       (format stream ", but ~a found"
+               (if (null (cdr (last (arg-count-error-args condition))))
+                   (length (arg-count-error-args condition))
+                   "not a proper list"))))))
 
 (define-condition defmacro-lambda-list-broken-key-list-error
                   (defmacro-lambda-list-bind-error)

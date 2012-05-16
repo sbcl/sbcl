@@ -4271,3 +4271,6 @@
   (raises-error?
    (eval '(lambda () (declare (ignorable (a b)))))
    sb-int:compiled-program-error))
+
+(with-test (:name :malformed-type-declaraions)
+  (compile nil '(lambda (a) (declare (type (integer 1 2 . 3) a)))))
