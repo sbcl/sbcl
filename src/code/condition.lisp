@@ -588,7 +588,8 @@
            ;; is a lambda referring to condition slot accessors:
            ;; they're not proclaimed as functions before it has run if
            ;; we're under EVAL or loaded as source.
-           (%set-condition-report ',name ,report))))))
+           (%set-condition-report ',name ,report)
+           ',name)))))
 
 ;;;; various CONDITIONs specified by ANSI
 

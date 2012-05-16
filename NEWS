@@ -68,6 +68,7 @@ changes relative to sbcl-1.0.56:
     it's also slightly faster. (lp#998926)
   * bug fix: better error messages for malformed declarations.
     (lp#1000239)
+  * bug fix: define-condition didn't return the name of the defined condition.
   * documentation:
     ** improved docstrings: REPLACE (lp#965592)
 

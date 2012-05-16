@@ -135,3 +135,9 @@
                  ((slot :initarg :slot :reader ,reader))
                  (:report (lambda (c stream)
                             (format stream "Oops: ~S" (,reader c))))))))))
+
+(with-test (:name :define-condition-result)
+  (let ((name (gensym "CONDITION")))
+    (assert
+     (eq (eval `(define-condition ,name () ()))
+         name))))
