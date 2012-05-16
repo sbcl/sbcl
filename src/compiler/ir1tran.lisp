@@ -1329,13 +1329,13 @@
 ;;; like FIND-IN-BINDINGS, but looks for #'FOO in the FVARS
 (defun find-in-bindings-or-fbindings (name vars fvars)
   (declare (list vars fvars))
-  (if (consp name)
-      (destructuring-bind (wot fn-name) name
-        (unless (eq wot 'function)
-          (compiler-error "The function or variable name ~S is unrecognizable."
-                          name))
-        (find fn-name fvars :key #'leaf-source-name :test #'equal))
-      (find-in-bindings vars name)))
+  (typecase name
+    (atom
+     (find-in-bindings vars name))
+    ((cons (eql function) (cons * null))
+     (find (cadr name) fvars :key #'leaf-source-name :test #'equal))
+    (t
+     (compiler-error "Malformed function or variable name ~S." name))))
 
 ;;; Process an ignore/ignorable declaration, checking for various losing
 ;;; conditions.

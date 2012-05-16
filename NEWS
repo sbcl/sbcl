@@ -66,6 +66,8 @@ changes relative to sbcl-1.0.56:
     strictly-monotonic functions.  (lp#975528)
   * bug fix: copy-tree caused stack exhaustion on long linear lists, and now
     it's also slightly faster. (lp#998926)
+  * bug fix: better error messages for malformed IGNORE declarations.
+    (lp#1000239)
   * documentation:
     ** improved docstrings: REPLACE (lp#965592)
 

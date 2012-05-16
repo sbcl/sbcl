@@ -4254,3 +4254,20 @@
                                     ,@(loop for i from 27 to 32
                                             collect (expt 2 i)))))))
     (assert (every #'plusp (funcall f #'list)))))
+
+(with-test (:name (:malformed-ignore :lp-1000239))
+  (raises-error?
+   (eval '(lambda () (declare (ignore (function . a)))))
+   sb-int:compiled-program-error)
+  (raises-error?
+   (eval '(lambda () (declare (ignore (function a b)))))
+   sb-int:compiled-program-error)
+  (raises-error?
+   (eval '(lambda () (declare (ignore (function)))))
+   sb-int:compiled-program-error)
+  (raises-error?
+   (eval '(lambda () (declare (ignore (a)))))
+   sb-int:compiled-program-error)
+  (raises-error?
+   (eval '(lambda () (declare (ignorable (a b)))))
+   sb-int:compiled-program-error))
