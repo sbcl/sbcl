@@ -14,6 +14,8 @@
  * files for more information.
  */
 
+#include "sbcl.h"
+
 #ifndef LISP_FEATURE_WIN32
 #ifdef LISP_FEATURE_LINUX
 /* For madvise */
@@ -33,8 +35,6 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <unistd.h>
-
-#include "sbcl.h"
 
 #include "os.h"
 #include "runtime.h"

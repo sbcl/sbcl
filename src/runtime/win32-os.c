@@ -604,6 +604,7 @@ void scratch(void)
       SetCurrentDirectoryW(0);
       SetEnvironmentVariableW(0, 0);
     #endif
+    _exit(0);
 }
 
 char *
