@@ -268,10 +268,7 @@
 
      :form (let ((direct-file-info (source-info-file-info info)))
              (when (eq :lisp (file-info-name direct-file-info))
-               (let ((form (elt (file-info-forms direct-file-info) 0)))
-                 ;; The form COMPILE saves may include gunk
-                 ;; from %SIMPLE-EVAL -- this gets rid of that.
-                 (sb!impl::eval-lambda-source-lambda form))))
+               (elt (file-info-forms direct-file-info) 0)))
      :function function)))
 
 ;;; Given an arbitrary sequence, coerce it to an unsigned vector if

@@ -91,14 +91,13 @@
   (let ((condition (coerce-to-condition datum arguments
                                         'simple-program-error 'compiler-error)))
     (restart-case
-        (progn
-          (cerror "Replace form with call to ERROR."
-                  'compiler-error
-                  :condition condition)
-          (funcall *compiler-error-bailout* condition)
-          (bug "Control returned from *COMPILER-ERROR-BAILOUT*."))
+        (cerror "Replace form with call to ERROR."
+                'compiler-error
+                :condition condition)
       (signal-error ()
-        (error condition)))))
+        (error condition)))
+    (funcall *compiler-error-bailout* condition)
+    (bug "Control returned from *COMPILER-ERROR-BAILOUT*.")))
 
 (defun compiler-warn (datum &rest arguments)
   (apply #'warn datum arguments)

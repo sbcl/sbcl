@@ -256,18 +256,25 @@
                             '((oops ? ? ? ? ? ?)))))
 
 (defmacro defbt (n ll &body body)
-  `(progn
-     ;; normal debug info
-     (defun ,(intern (format nil "BT.~A.1" n)) ,ll
-       ,@body)
-     ;; no arguments saved
-     (defun ,(intern (format nil "BT.~A.2" n)) ,ll
-       (declare (optimize (debug 1) (speed 3)))
-       ,@body)
-     ;; no lambda-list saved
-     (defun ,(intern (format nil "BT.~A.3" n)) ,ll
-       (declare (optimize (debug 0)))
-       ,@body)))
+  ;; WTF is this? This is a way to make these tests not depend so much on the
+  ;; details of LOAD/EVAL. Around 1.0.57 we changed %SIMPLE-EVAL to be
+  ;; slightly smarter, which meant that things which used to have xeps
+  ;; suddently had tl-xeps, etc. This takes care of that.
+  `(funcall
+    (compile nil
+             '(lambda ()
+               (progn
+                 ;; normal debug info
+                 (defun ,(intern (format nil "BT.~A.1" n)) ,ll
+                   ,@body)
+                 ;; no arguments saved
+                 (defun ,(intern (format nil "BT.~A.2" n)) ,ll
+                   (declare (optimize (debug 1) (speed 3)))
+                   ,@body)
+                 ;; no lambda-list saved
+                 (defun ,(intern (format nil "BT.~A.3" n)) ,ll
+                   (declare (optimize (debug 0)))
+                   ,@body))))))
 
 (defbt 1 (&key key)
   (list key))
@@ -610,9 +617,130 @@
          (vector-data-address (sb-sys:sap-int (sb-kernel::vector-sap memory)))
          (object-base-address (logandc2 (+ vector-data-address sb-vm:lowtag-mask) sb-vm:lowtag-mask))
          (object-tagged-address (+ object-base-address sb-vm:list-pointer-lowtag)))
-    (multiple-value-bind
-          (object valid-p)
+    (multiple-value-bind (object valid-p)
         (sb-kernel:make-lisp-obj object-tagged-address nil)
+      (declare (ignore object))
       (assert (not valid-p)))))
+
+(defun test-debugger (control form &rest targets)
+  (let ((out (make-string-output-stream))
+        (oops t))
+    (unwind-protect
+         (progn
+           (with-simple-restart (debugger-test-done! "Debugger Test Done!")
+             (let* ((*debug-io* (make-two-way-stream
+                                 (make-string-input-stream control)
+                                 (make-broadcast-stream out #+nil *standard-output*)))
+                    ;; Initial announcement goes to *ERROR-OUTPUT*
+                    (*error-output* *debug-io*)
+                    (*invoke-debugger-hook* nil))
+               (handler-bind ((error #'invoke-debugger))
+                 (eval form))))
+           (setf oops nil))
+      (when oops
+        (error "Uncontrolled unwind from debugger test.")))
+    ;; For sanity's sake this is outside the *debug-io* rebinding -- otherwise
+    ;; it could swallow our asserts!
+    (with-input-from-string (s (get-output-stream-string out))
+      (loop for line = (read-line s nil)
+            while line
+            do (assert targets)
+               #+nil
+               (format *error-output* "Got: ~A~%" line)
+               (let ((match (pop targets)))
+                 (if (eq '* match)
+                     ;; Whatever, till the next line matches.
+                     (let ((text (pop targets)))
+                       (unless (search text line)
+                         (push text targets)
+                         (push match targets)))
+                     (unless (search match line)
+                       (format *error-output* "~&Wanted: ~S~%   Got: ~S~%" match line)
+                       (setf oops t))))))
+    ;; Check that we saw everything we wanted
+    (when targets
+      (error "Missed: ~S" targets))
+    (assert (not oops))))
+
+(with-test (:name (:debugger :source 1))
+  (test-debugger
+   "d
+    source 0
+    debugger-test-done!"
+   `(progn
+      (defun this-will-break (x)
+               (declare (optimize debug))
+               (let* ((y (- x x))
+                      (z (/ x y)))
+                 (+ x z)))
+      (this-will-break 1))
+   '*
+   "debugger invoked"
+   '*
+   "DIVISION-BY-ZERO"
+   "operands (1 0)"
+   '*
+   "INTEGER-/-INTEGER"
+   "(THIS-WILL-BREAK 1)"
+   "1]"
+   "(/ X Y)"
+   "1]"))
+
+(with-test (:name (:debugger :source 2))
+  (test-debugger
+   "d
+    source 0
+    debugger-test-done!"
+   `(locally (declare (optimize (speed 0) (safety 3) (debug 3)))
+      (let ((f #'(lambda (x cont)
+                   (print x (make-broadcast-stream))
+                   (if (zerop x)
+                       (error "foo")
+                       (funcall cont (1- x) cont)))))
+        (funcall f 10 f)))
+   '*
+   "debugger"
+   '*
+   "foo"
+   '*
+   "source: (ERROR \"foo\")"
+   '*
+   "(LAMBDA (X CONT)"
+   '*
+   "(FUNCALL CONT (1- X) CONT)"
+   "1]"))
+
+(with-test (:name (disassemble :high-debug-eval))
+  (eval `(defun this-will-be-disassembled (x)
+           (declare (optimize debug))
+           (+ x x)))
+  (let* ((oopses (make-string-output-stream))
+         (disassembly
+           (let ((*error-output* oopses))
+             (with-output-to-string (*standard-output*)
+               (disassemble 'this-will-be-disassembled)))))
+    (with-input-from-string (s disassembly)
+      (assert (search "; disassembly for THIS-WILL-BE-DISASSEMBLED"
+                      (read-line s))))
+    (let ((problems (get-output-stream-string oopses)))
+      (unless (zerop (length problems))
+        (error problems)))))
+
+(defun this-too-will-be-disasssembled (x)
+  (declare (optimize debug))
+  (+ x x))
+
+(with-test (:name (disassemble :high-debug-load))
+  (let* ((oopses (make-string-output-stream))
+         (disassembly
+           (let ((*error-output* oopses))
+             (with-output-to-string (*standard-output*)
+               (disassemble 'this-too-will-be-disasssembled)))))
+    (with-input-from-string (s disassembly)
+      (assert (equal "; disassembly for THIS-TOO-WILL-BE-DISASSSEMBLED"
+                     (read-line s))))
+    (let ((problems (get-output-stream-string oopses)))
+      (unless (zerop (length problems))
+        (error problems)))))
 
 (write-line "/debug.impure.lisp done")
