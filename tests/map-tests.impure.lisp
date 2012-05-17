@@ -11,15 +11,81 @@
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
 
+(load "test-util.lisp")
 (load "assertoid.lisp")
 (use-package "ASSERTOID")
 
 ;;; tests of MAP
 ;;; FIXME: Move these into their own file.
-(assertoid (map 'vector #'+ '(1 2 3) '(30 20))
-           :expected-equalp #(31 22))
-(assertoid (map 'list #'+ #(1 2) '(100) #(0) #(100 100))
-           :expected-equal '(201))
+(test-util:with-test (:name :map)
+  (assertoid (map 'vector #'+ '(1 2 3) '(30 20))
+             :expected-equalp #(31 22))
+  (assertoid (map 'list #'+ #(1 2) '(100) #(0) #(100 100))
+             :expected-equal '(201)))
+
+;;; tests of MAP-INTO
+
+(test-util:with-test (:name :map-into)
+  (assertoid (map-into (vector) #'+ '(1 2 3) '(30 20))
+             :expected-equalp #())
+  (assertoid (map-into (vector 99) #'+ '(1 2 3) '(30 20))
+             :expected-equalp #(31))
+  (assertoid (map-into (vector 99 88) #'+ '(1 2 3) '(30 20))
+             :expected-equalp #(31 22))
+  (assertoid (map-into (vector 99 88 77) #'+ '(1 2 3) '(30 20))
+             :expected-equalp #(31 22 77))
+
+  (assertoid (map-into (list) #'+ '(1 2 3) '(30 20))
+             :expected-equalp '())
+  (assertoid (map-into (list 99) #'+ '(1 2 3) '(30 20))
+             :expected-equalp '(31))
+  (assertoid (map-into (list 99 88) #'+ '(1 2 3) '(30 20))
+             :expected-equalp '(31 22))
+  (assertoid (map-into (list 99 88 77) #'+ '(1 2 3) '(30 20))
+             :expected-equalp '(31 22 77))
+
+  (assertoid (map-into (vector 99 99 99) (constantly 5))
+             :expected-equalp #(5 5 5))
+  (assertoid (map-into (vector 99 99 99) (let ((x 0)) (lambda () (incf x))))
+             :expected-equalp #(1 2 3))
+
+  (assertoid (map-into (list 99 99 99) (constantly 5))
+             :expected-equalp '(5 5 5))
+  (assertoid (map-into (list 99 99 99) (let ((x 0)) (lambda () (incf x))))
+             :expected-equalp '(1 2 3))
+
+  (assertoid (map-into (make-array 0 :element-type 'fixnum)
+                       #'+ '(1 2 3) '(30 20))
+             :expected-equalp #())
+  (assertoid (map-into (make-array 1 :element-type 'fixnum :initial-element 99)
+                       #'+ '(1 2 3) '(30 20))
+             :expected-equalp #(31))
+  (assertoid (map-into (make-array 2 :element-type 'fixnum :initial-element 99)
+                       #'+ '(1 2 3) '(30 20))
+             :expected-equalp #(31 22))
+  (assertoid (map-into (make-array 3 :element-type 'fixnum :initial-element 99)
+                       #'+ '(1 2 3) '(30 20))
+             :expected-equalp #(31 22 99))
+
+  (assertoid (map-into (make-array 0 :fill-pointer 0 :initial-element 99)
+                       #'+ '(1 2 3) '(30 20))
+             :expected-equalp #())
+  (assertoid (map-into (make-array 1 :fill-pointer 0 :initial-element 99)
+                       #'+ '(1 2 3) '(30 20))
+             :expected-equalp #(31))
+  (assertoid (map-into (make-array 2 :fill-pointer 0 :initial-element 99)
+                       #'+ '(1 2 3) '(30 20))
+             :expected-equalp #(31 22))
+  (assertoid (map-into (make-array 3 :fill-pointer 0 :initial-element 99)
+                       #'+ '(1 2 3) '(30 20))
+             :expected-equalp #(31 22))
+
+  (assertoid (map-into (make-array 9 :fill-pointer 9 :initial-element 99)
+                       #'+ '(1 2 3) '(30 20))
+             :expected-equalp #(31 22))
+  (assertoid (map-into (make-array 9 :fill-pointer 5 :initial-element 99)
+                       #'+ '(1 2 3) '(30 20))
+             :expected-equalp #(31 22)))
 
 (defmacro with-mapnil-test-fun (fun-name &body body)
   `(let ((reversed-result nil))
@@ -27,15 +93,17 @@
               (push rest reversed-result)))
        ,@body
        (nreverse reversed-result))))
-(assertoid (with-mapnil-test-fun fun
-             (map nil #'fun #(1)))
-           :expected-equal '((1)))
-(assertoid (with-mapnil-test-fun fun
-             (map nil #'fun #() '(1 2 3)))
-           :expected-equal '())
-(assertoid (with-mapnil-test-fun fun
-             (map nil #'fun #(a b c) '(alpha beta) '(aleph beth)))
-           :expected-equal '((a alpha aleph) (b beta beth)))
+
+(test-util:with-test (:name :map-nil)
+  (assertoid (with-mapnil-test-fun fun
+               (map nil #'fun #(1)))
+             :expected-equal '((1)))
+  (assertoid (with-mapnil-test-fun fun
+               (map nil #'fun #() '(1 2 3)))
+             :expected-equal '())
+  (assertoid (with-mapnil-test-fun fun
+               (map nil #'fun #(a b c) '(alpha beta) '(aleph beth)))
+             :expected-equal '((a alpha aleph) (b beta beth))))
 
 ;;; Exercise MAP repeatedly on the same dataset by providing various
 ;;; combinations of sequence type arguments, declarations, and so
@@ -82,7 +150,11 @@
             (arrange
              `(assertoid (map ',result-type ,fun ,@(args-with-type-decls))
                          :expected-equalp (coerce ,result-seq
-                                                  ',result-type)))))
+                                                  ',result-type))))
+          (arrange
+           `(assertoid (map-into (fill (copy-seq ,result-seq) 9999)
+                                 ,fun ,@(args-with-type-decls))
+                       :expected-equalp ,result-seq)))
         (arrange
          `(assertoid (mapcar (lambda (args) (apply #',fun-name args))
                              (with-mapnil-test-fun mtf
@@ -95,17 +167,19 @@
                                     ,@(args-with-type-decls))))
                      :expected-equal (coerce ,result-seq 'list)))))
     `(progn ,@(nreverse reversed-assertoids))))
-(maptest :result-seq '(2 3)
-         :fun-name 1+
-         :arg-seqs (*list-2*)
-         :arg-types (list))
-(maptest :result-seq '(nil nil nil)
-         :fun-name oddp
-         :arg-seqs (*vector-30*)
-         :arg-types (vector))
-(maptest :result-seq '(12 24)
-         :fun-name +
-         :arg-seqs (*list-2* *list-2* *vector-30*)
-         :arg-types (list list vector))
+
+(test-util:with-test (:name :maptest)
+  (maptest :result-seq '(2 3)
+           :fun-name 1+
+           :arg-seqs (*list-2*)
+           :arg-types (list))
+  (maptest :result-seq '(nil nil nil)
+           :fun-name oddp
+           :arg-seqs (*vector-30*)
+           :arg-types (vector))
+  (maptest :result-seq '(12 24)
+           :fun-name +
+           :arg-seqs (*list-2* *list-2* *vector-30*)
+           :arg-types (list list vector)))
 
 ;;; success

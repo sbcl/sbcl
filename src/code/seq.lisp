@@ -1045,34 +1045,74 @@ many elements are copied."
          first-sequence
          more-sequences))
 
-;;; KLUDGE: MAP has been rewritten substantially since the fork from
-;;; CMU CL in order to give reasonable performance, but this
-;;; implementation of MAP-INTO still has the same problems as the old
-;;; MAP code. Ideally, MAP-INTO should be rewritten to be efficient in
-;;; the same way that the corresponding cases of MAP have been
-;;; rewritten. Instead of doing it now, though, it's easier to wait
-;;; until we have DYNAMIC-EXTENT, at which time it should become
-;;; extremely easy to define a reasonably efficient MAP-INTO in terms
-;;; of (MAP NIL ..). -- WHN 20000920
+;;; Uses the machinery of (MAP NIL ...). For non-vectors we avoid
+;;; computing the length of the result sequence since we can detect
+;;; the end during mapping (if MAP even gets that far).
 (defun map-into (result-sequence function &rest sequences)
-  (let* ((fp-result
-          (and (arrayp result-sequence)
-               (array-has-fill-pointer-p result-sequence)))
-         (len (apply #'min
-                     (if fp-result
-                         (array-dimension result-sequence 0)
-                         (length result-sequence))
-                     (mapcar #'length sequences))))
-
-    (when fp-result
-      (setf (fill-pointer result-sequence) len))
-
-    (let ((really-fun (%coerce-callable-to-fun function)))
-      (dotimes (index len)
-        (setf (elt result-sequence index)
-              (apply really-fun
-                     (mapcar (lambda (seq) (elt seq index))
-                             sequences))))))
+  (declare (truly-dynamic-extent sequences))
+  (let ((really-fun (%coerce-callable-to-fun function)))
+    ;; For each result type, define a mapping function which is
+    ;; responsible for replacing RESULT-SEQUENCE elements and for
+    ;; terminating itself if the end of RESULT-SEQUENCE is reached.
+    ;;
+    ;; The mapping function is defined with the MAP-LAMBDA macrolet,
+    ;; whose syntax matches that of LAMBDA.
+    (macrolet ((map-lambda (params &body body)
+                 `(flet ((f ,params ,@body))
+                    (declare (truly-dynamic-extent #'f))
+                    ;; Note (MAP-INTO SEQ (LAMBDA () ...)) is a
+                    ;; different animal, hence the awkward flip
+                    ;; between MAP and LOOP.
+                    (if sequences
+                        (apply #'map nil #'f sequences)
+                        (loop (f))))))
+      ;; Optimize MAP-LAMBDAs since they are the inner loops. Because
+      ;; we are manually doing bounds checking with known types, turn
+      ;; off safety for vectors and lists but keep it for generic
+      ;; sequences.
+      (etypecase result-sequence
+        (vector
+         (locally (declare (optimize speed (safety 0)))
+           (with-array-data ((data result-sequence) (start) (end)
+                             ;; MAP-INTO ignores fill pointer when mapping
+                             :check-fill-pointer nil)
+             (let ((index start))
+               (declare (type index index))
+               (macrolet ((dispatch ()
+                            `(block mapping
+                               (map-lambda (&rest args)
+                                 (declare (truly-dynamic-extent args))
+                                 (when (eql index end)
+                                   (return-from mapping))
+                                 (setf (aref data index)
+                                       (apply really-fun args))
+                                 (incf index)))))
+                 (typecase data
+                   (simple-vector (dispatch))
+                   (otherwise (dispatch))))
+               (when (array-has-fill-pointer-p result-sequence)
+                 (setf (fill-pointer result-sequence) (- index start)))))))
+        (list
+         (let ((node result-sequence))
+           (declare (type list node))
+           (map-lambda (&rest args)
+             (declare (truly-dynamic-extent args) (optimize speed (safety 0)))
+             (when (null node)
+               (return-from map-into result-sequence))
+             (setf (car node) (apply really-fun args))
+             (setf node (cdr node)))))
+        (sequence
+         (multiple-value-bind (iter limit from-end)
+             (sb!sequence:make-sequence-iterator result-sequence)
+           (map-lambda (&rest args)
+             (declare (truly-dynamic-extent args) (optimize speed))
+             (when (sb!sequence:iterator-endp result-sequence
+                                              iter limit from-end)
+               (return-from map-into result-sequence))
+             (setf (sb!sequence:iterator-element result-sequence iter)
+                   (apply really-fun args))
+             (setf iter (sb!sequence:iterator-step result-sequence
+                                                   iter from-end))))))))
   result-sequence)
 
 ;;;; quantifiers
