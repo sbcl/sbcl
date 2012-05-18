@@ -108,10 +108,15 @@
   (apply #'style-warn datum arguments)
   (values))
 
+(defun source-to-string (source)
+  (write-to-string source
+                   :escape t :readably nil :pretty t
+                   :circle t :array nil))
+
 (defun make-compiler-error-form (condition source)
   `(error 'compiled-program-error
           :message ,(princ-to-string condition)
-          :source ,(princ-to-string source)))
+          :source ,(source-to-string source)))
 
 ;;; Fatal compiler errors. We export FATAL-COMPILER-ERROR as an
 ;;; interface for errors that kill the compiler dead

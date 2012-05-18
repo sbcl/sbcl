@@ -4,6 +4,8 @@ changes relative to sbcl-1.0.57:
     updates of CAS-able places (similar to Clojure's swap!).
   * bug fix: potential for infinite recursion during compilation of CLOS slot
     typechecks when dependency graph had loops. (lp#1001799)
+  * bug fix: error forms reported with some program-errors were not escaped
+    properly.
 
 changes in sbcl-1.0.57 relative to sbcl-1.0.56:
   * RANDOM enhancements and bug fixes:

@@ -4274,3 +4274,11 @@
 
 (with-test (:name :malformed-type-declaraions)
   (compile nil '(lambda (a) (declare (type (integer 1 2 . 3) a)))))
+
+(with-test (:name :compiled-program-error-escaped-source)
+  (assert
+   (handler-case
+       (funcall (compile nil `(lambda () (lambda ("foo")))))
+     (sb-int:compiled-program-error (e)
+       (let ((source (read-from-string (sb-kernel::program-error-source e))))
+         (equal source '#'(lambda ("foo"))))))))
