@@ -1346,124 +1346,25 @@ and LDB (the low-level debugger).  See also ENABLE-DEBUGGER."
 
 ;;;; source location printing
 
-;;; We cache a stream to the last valid file debug source so that we
-;;; won't have to repeatedly open the file.
-;;;
-;;; KLUDGE: This sounds like a bug, not a feature. Opening files is fast
-;;; in the 1990s, so the benefit is negligible, less important than the
-;;; potential of extra confusion if someone changes the source during
-;;; a debug session and the change doesn't show up. And removing this
-;;; would simplify the system, which I like. -- WHN 19990903
-(defvar *cached-debug-source* nil)
-(declaim (type (or sb!di:debug-source null) *cached-debug-source*))
-(defvar *cached-source-stream* nil)
-(declaim (type (or stream null) *cached-source-stream*))
-
-;;; To suppress the read-time evaluation #. macro during source read,
-;;; *READTABLE* is modified. *READTABLE* is cached to avoid
-;;; copying it each time, and invalidated when the
-;;; *CACHED-DEBUG-SOURCE* has changed.
-(defvar *cached-readtable* nil)
-(declaim (type (or readtable null) *cached-readtable*))
-
 ;;; Stuff to clean up before saving a core
 (defun debug-deinit ()
-  (setf *cached-debug-source* nil
-        *cached-source-stream* nil
-        *cached-readtable* nil))
+  ;; Nothing to do right now. Once there was, maybe once there
+  ;; will be again.
+  )
 
-;;; We also cache the last toplevel form that we printed a source for
-;;; so that we don't have to do repeated reads and calls to
-;;; FORM-NUMBER-TRANSLATIONS.
-(defvar *cached-toplevel-form-offset* nil)
-(declaim (type (or index null) *cached-toplevel-form-offset*))
-(defvar *cached-toplevel-form*)
-(defvar *cached-form-number-translations*)
-
-;;; Given a code location, return the associated form-number
-;;; translations and the actual top level form. We check our cache ---
-;;; if there is a miss, we dispatch on the kind of the debug source.
-(defun get-toplevel-form (location)
-  (let ((d-source (sb!di:code-location-debug-source location)))
-    (if (and (eq d-source *cached-debug-source*)
-             (eql (sb!di:code-location-toplevel-form-offset location)
-                  *cached-toplevel-form-offset*))
-        (values *cached-form-number-translations* *cached-toplevel-form*)
-        (let* ((offset (sb!di:code-location-toplevel-form-offset location))
-               (res
-                (cond ((sb!di:debug-source-namestring d-source)
-                       (get-file-toplevel-form location))
-                      ((sb!di:debug-source-form d-source)
-                       (sb!di:debug-source-form d-source))
-                      (t (bug "Don't know how to use a DEBUG-SOURCE without ~
-                               a namestring or a form.")))))
-          (setq *cached-toplevel-form-offset* offset)
-          (values (setq *cached-form-number-translations*
-                        (sb!di:form-number-translations res offset))
-                  (setq *cached-toplevel-form* res))))))
-
-;;; Locate the source file (if it still exists) and grab the top level
-;;; form. If the file is modified, we use the top level form offset
-;;; instead of the recorded character offset.
-(defun get-file-toplevel-form (location)
-  (let* ((d-source (sb!di:code-location-debug-source location))
-         (tlf-offset (sb!di:code-location-toplevel-form-offset location))
-         (local-tlf-offset (- tlf-offset
-                              (sb!di:debug-source-root-number d-source)))
-         (char-offset
-          (aref (or (sb!di:debug-source-start-positions d-source)
-                    (error "no start positions map"))
-                local-tlf-offset))
-         (name (sb!di:debug-source-namestring d-source)))
-    (unless (eq d-source *cached-debug-source*)
-      (unless (and *cached-source-stream*
-                   (equal (pathname *cached-source-stream*)
-                          (pathname name)))
-        (setq *cached-readtable* nil)
-        (when *cached-source-stream* (close *cached-source-stream*))
-        (setq *cached-source-stream* (open name :if-does-not-exist nil))
-        (unless *cached-source-stream*
-          (error "The source file no longer exists:~%  ~A" (namestring name)))
-        (format *debug-io* "~%; file: ~A~%" (namestring name)))
-
-        (setq *cached-debug-source*
-              (if (= (sb!di:debug-source-created d-source)
-                     (file-write-date name))
-                  d-source nil)))
-
-    (cond
-     ((eq *cached-debug-source* d-source)
-      (file-position *cached-source-stream* char-offset))
-     (t
-      (format *debug-io*
-              "~%; File has been modified since compilation:~%;   ~A~@
-                 ; Using form offset instead of character position.~%"
-              (namestring name))
-      (file-position *cached-source-stream* 0)
-      (let ((*read-suppress* t))
-        (dotimes (i local-tlf-offset)
-          (read *cached-source-stream*)))))
-    (unless *cached-readtable*
-      (setq *cached-readtable* (copy-readtable))
-      (set-dispatch-macro-character
-       #\# #\.
-       (lambda (stream sub-char &rest rest)
-         (declare (ignore rest sub-char))
-         (let ((token (read stream t nil t)))
-           (format nil "#.~S" token)))
-       *cached-readtable*))
-    (let ((*readtable* *cached-readtable*))
-      (read *cached-source-stream*))))
-
-(defun code-location-source-form (location context)
-  (let* ((location (maybe-block-start-location location))
-         (form-num (sb!di:code-location-form-number location)))
-    (multiple-value-bind (translations form) (get-toplevel-form location)
-      (unless (< form-num (length translations))
-        (error "The source path no longer exists."))
-      (sb!di:source-path-context form
-                                 (svref translations form-num)
-                                 context))))
+(defun code-location-source-form (location context &optional (errorp t))
+  (let* ((start-location (maybe-block-start-location location))
+         (form-num (sb!di:code-location-form-number start-location)))
+    (multiple-value-bind (translations form)
+        (sb!di:get-toplevel-form start-location)
+      (cond ((< form-num (length translations))
+             (sb!di:source-path-context form
+                                        (svref translations form-num)
+                                        context))
+            (t
+             (funcall (if errorp #'error #'warn)
+                      "~@<Bogus form-number: the source file has ~
+                          probably changed too much to cope with.~:@>"))))))
 
 
 ;;; start single-stepping

@@ -985,110 +985,30 @@
                               (:copier nil))
   (debug-source nil :type (or null sb!di:debug-source))
   (toplevel-form-index -1 :type fixnum)
-  (toplevel-form nil :type list)
-  (form-number-mapping-table nil :type (or null (vector list)))
   (last-location-retrieved nil :type (or null sb!di:code-location))
   (last-form-retrieved -1 :type fixnum))
 
-;;; OAOO note: this shares a lot of implementation with
-;;; SB-DEBUG::GET-FILE-TOPLEVEL-FORM.  Perhaps these should be merged
-;;; somehow.
-(defun get-toplevel-form (debug-source tlf-index)
-  (cond
-    ((sb!di:debug-source-namestring debug-source)
-     (let ((namestring (sb!di:debug-source-namestring debug-source)))
-       (cond ((not (probe-file namestring))
-              (warn "The source file ~S no longer seems to exist." namestring)
-              nil)
-             (t
-              (let ((start-positions
-                     (sb!di:debug-source-start-positions debug-source)))
-                (cond ((null start-positions)
-                       (warn "There is no start positions map.")
-                       nil)
-                      (t
-                       (let* ((local-tlf-index
-                               (- tlf-index
-                                  (sb!di:debug-source-root-number
-                                   debug-source)))
-                              (char-offset
-                               (aref start-positions local-tlf-index)))
-                         (with-open-file (f namestring)
-                           (cond ((= (sb!di:debug-source-created debug-source)
-                                     (file-write-date namestring))
-                                  (file-position f char-offset))
-                                 (t
-                                  (warn "Source file ~S has been modified; ~@
-                                         using form offset instead of ~
-                                         file index."
-                                        namestring)
-                                  (let ((*read-suppress* t))
-                                    (dotimes (i local-tlf-index) (read f)))))
-                           (let ((*readtable* (copy-readtable)))
-                             (set-dispatch-macro-character
-                              #\# #\.
-                              (lambda (stream sub-char &rest rest)
-                                (declare (ignore rest sub-char))
-                                (let ((token (read stream t nil t)))
-                                  (format nil "#.~S" token))))
-                             (read f)))))))))))
-    ((sb!di:debug-source-form debug-source)
-     (sb!di:debug-source-form debug-source))
-    (t (bug "Don't know how to use a DEBUG-SOURCE without ~
-             a namestring or a form."))))
-
-(defun cache-valid (loc cache)
-  (and cache
-       (and (eq (sb!di:code-location-debug-source loc)
-                (sfcache-debug-source cache))
-            (eq (sb!di:code-location-toplevel-form-offset loc)
-                (sfcache-toplevel-form-index cache)))))
-
-(defun get-source-form (loc context &optional cache)
-  (let* ((cache-valid (cache-valid loc cache))
-         (tlf-index (sb!di:code-location-toplevel-form-offset loc))
-         (form-number (sb!di:code-location-form-number loc))
-         (toplevel-form
-          (if cache-valid
-              (sfcache-toplevel-form cache)
-              (get-toplevel-form (sb!di:code-location-debug-source loc)
-                                  tlf-index)))
-         (mapping-table
-          (if cache-valid
-              (sfcache-form-number-mapping-table cache)
-              (sb!di:form-number-translations toplevel-form tlf-index))))
-    (when (and (not cache-valid) cache)
-      (setf (sfcache-debug-source cache) (sb!di:code-location-debug-source loc)
-            (sfcache-toplevel-form-index cache) tlf-index
-            (sfcache-toplevel-form cache) toplevel-form
-            (sfcache-form-number-mapping-table cache) mapping-table))
-    (cond ((null toplevel-form)
-           nil)
-          ((>= form-number (length mapping-table))
-           (warn "bogus form-number in form!  The source file has probably ~@
-                  been changed too much to cope with.")
-           (when cache
-             ;; Disable future warnings.
-             (setf (sfcache-toplevel-form cache) nil))
-           nil)
-          (t
-           (when cache
-             (setf (sfcache-last-location-retrieved cache) loc)
-             (setf (sfcache-last-form-retrieved cache) form-number))
-           (sb!di:source-path-context toplevel-form
-                                      (aref mapping-table form-number)
-                                      context)))))
-
 (defun get-different-source-form (loc context &optional cache)
-  (if (and (cache-valid loc cache)
-           (or (= (sb!di:code-location-form-number loc)
-                  (sfcache-last-form-retrieved cache))
-               (and (sfcache-last-location-retrieved cache)
-                    (sb!di:code-location=
-                     loc
-                     (sfcache-last-location-retrieved cache)))))
+  (if (and cache
+           (eq (sb!di:code-location-debug-source loc)
+               (sfcache-debug-source cache))
+           (eq (sb!di:code-location-toplevel-form-offset loc)
+               (sfcache-toplevel-form-index cache))
+           (or (eql (sb!di:code-location-form-number loc)
+                    (sfcache-last-form-retrieved cache))
+               (awhen (sfcache-last-location-retrieved cache)
+                 (sb!di:code-location= loc it))))
       (values nil nil)
-      (values (get-source-form loc context cache) t)))
+      (let ((form (sb!debug::code-location-source-form loc context nil)))
+        (when cache
+          (setf (sfcache-debug-source cache)
+                (sb!di:code-location-debug-source loc))
+          (setf (sfcache-toplevel-form-index cache)
+                (sb!di:code-location-toplevel-form-offset loc))
+          (setf (sfcache-last-form-retrieved cache)
+                (sb!di:code-location-form-number loc))
+          (setf (sfcache-last-location-retrieved cache)))
+        (values form t))))
 
 ;;;; stuff to use debugging info to augment the disassembly
 

@@ -2525,6 +2525,70 @@ register."
                        (nconc (subseq form 0 n)
                               (cons res (nthcdr (1+ n) form))))))))
       (frob form path context))))
+
+;;; Given a code location, return the associated form-number
+;;; translations and the actual top level form.
+(defun get-toplevel-form (location)
+  (let ((d-source (code-location-debug-source location)))
+    (let* ((offset (code-location-toplevel-form-offset location))
+           (res
+             (cond ((debug-source-form d-source)
+                    (debug-source-form d-source))
+                   ((debug-source-namestring d-source)
+                    (get-file-toplevel-form location))
+                   (t (bug "Don't know how to use a DEBUG-SOURCE without ~
+                               a namestring or a form.")))))
+      (values (form-number-translations res offset) res))))
+
+;;; To suppress the read-time evaluation #. macro during source read,
+;;; *READTABLE* is modified.
+;;;
+;;; FIXME: This breaks #+#.(cl:if ...) Maybe we need a SAFE-READ-EVAL, which
+;;; this code can use for side- effect free #. calls?
+;;;
+;;; FIXME: This also knows nothing of custom readtables. The assumption
+;;; is that the current readtable is a decent approximation for what
+;;; we want, but that's lossy.
+(defun safe-readtable ()
+  (let ((rt (copy-readtable)))
+    (set-dispatch-macro-character
+     #\# #\. (lambda (stream sub-char &rest rest)
+               (declare (ignore rest sub-char))
+               (let ((token (read stream t nil t)))
+                 (format nil "#.~S" token)))
+     rt)
+    rt))
+
+;;; Locate the source file (if it still exists) and grab the top level
+;;; form. If the file is modified, we use the top level form offset
+;;; instead of the recorded character offset.
+(defun get-file-toplevel-form (location)
+  (let* ((d-source (code-location-debug-source location))
+         (tlf-offset (code-location-toplevel-form-offset location))
+         (local-tlf-offset (- tlf-offset
+                              (debug-source-root-number d-source)))
+         (char-offset
+          (aref (or (sb!di:debug-source-start-positions d-source)
+                    (error "no start positions map"))
+                local-tlf-offset))
+         (namestring (debug-source-namestring d-source)))
+    ;; FIXME: External format?
+    (with-open-file (f namestring :if-does-not-exist nil)
+      (unless f
+        (error "The source file no longer exists:~%  ~A" namestring))
+      (format *debug-io* "~%; file: ~A~%" namestring)
+      (let ((*readtable* (safe-readtable)))
+        (cond ((eql (debug-source-created d-source) (file-write-date f))
+               (file-position f char-offset))
+              (t
+               (format *debug-io*
+                       "~%; File has been modified since compilation:~%;   ~A~@
+                          ; Using form offset instead of character position.~%"
+                       namestring)
+               (let ((*read-suppress* t))
+                 (loop repeat local-tlf-offset
+                       do (read f)))))
+        (read f)))))
 
 ;;;; PREPROCESS-FOR-EVAL
 
