@@ -62,12 +62,13 @@ provide bindings for printer control variables.")
 ;;; nestedness inside debugger command loops
 (defvar *debug-command-level* 0)
 
-;;; If this is bound before the debugger is invoked, it is used as the
-;;; stack top by the debugger.
+;;; If this is bound before the debugger is invoked, it is used as the stack
+;;; top by the debugger. It can either be the first interesting frame, or the
+;;; name of the last uninteresting frame.
 (defvar *stack-top-hint* nil)
 
-(defvar *stack-top* nil)
 (defvar *real-stack-top* nil)
+(defvar *stack-top* nil)
 
 (defvar *current-frame* nil)
 
@@ -555,35 +556,57 @@ thread, NIL otherwise."
       (progv (list variable) (list nil)
         (funcall old-hook condition old-hook)))))
 
+;;; We can bind *stack-top-hint* to a symbol, in which case this function will
+;;; resolve that hint lazily before we enter the debugger.
+(defun resolve-stack-top-hint ()
+  (let ((hint *stack-top-hint*)
+        (*stack-top-hint* nil))
+    (cond
+      ;; No hint, just keep the debugger guts out.
+      ((not hint)
+       (find-caller-name-and-frame))
+      ;; Interrupted. Look for the interrupted frame -- if we don't find one
+      ;; this falls back to the next case.
+      ((and (eq hint 'invoke-interruption)
+            (nth-value 1 (find-interrupted-name-and-frame))))
+      ;; Name of the first uninteresting frame.
+      ((symbolp hint)
+       (find-caller-of-named-frame hint))
+      ;; We already have a resolved hint.
+      (t
+       hint))))
+
 (defun invoke-debugger (condition)
   #!+sb-doc
   "Enter the debugger."
 
-  ;; call *INVOKE-DEBUGGER-HOOK* first, so that *DEBUGGER-HOOK* is not
-  ;; called when the debugger is disabled
-  (run-hook '*invoke-debugger-hook* condition)
-  (run-hook '*debugger-hook* condition)
+  (let ((*stack-top-hint* (resolve-stack-top-hint)))
 
-  ;; We definitely want *PACKAGE* to be of valid type.
-  ;;
-  ;; Elsewhere in the system, we use the SANE-PACKAGE function for
-  ;; this, but here causing an exception just as we're trying to handle
-  ;; an exception would be confusing, so instead we use a special hack.
-  (unless (and (packagep *package*)
-               (package-name *package*))
-    (setf *package* (find-package :cl-user))
-    (format *error-output*
-            "The value of ~S was not an undeleted PACKAGE. It has been
+    ;; call *INVOKE-DEBUGGER-HOOK* first, so that *DEBUGGER-HOOK* is not
+    ;; called when the debugger is disabled
+    (run-hook '*invoke-debugger-hook* condition)
+    (run-hook '*debugger-hook* condition)
+
+    ;; We definitely want *PACKAGE* to be of valid type.
+    ;;
+    ;; Elsewhere in the system, we use the SANE-PACKAGE function for
+    ;; this, but here causing an exception just as we're trying to handle
+    ;; an exception would be confusing, so instead we use a special hack.
+    (unless (and (packagep *package*)
+                 (package-name *package*))
+      (setf *package* (find-package :cl-user))
+      (format *error-output*
+              "The value of ~S was not an undeleted PACKAGE. It has been
 reset to ~S."
-            '*package* *package*))
+              '*package* *package*))
 
-  ;; Before we start our own output, finish any pending output.
-  ;; Otherwise, if the user tried to track the progress of his program
-  ;; using PRINT statements, he'd tend to lose the last line of output
-  ;; or so, which'd be confusing.
-  (flush-standard-output-streams)
+    ;; Before we start our own output, finish any pending output.
+    ;; Otherwise, if the user tried to track the progress of his program
+    ;; using PRINT statements, he'd tend to lose the last line of output
+    ;; or so, which'd be confusing.
+    (flush-standard-output-streams)
 
-  (funcall-with-debug-io-syntax #'%invoke-debugger condition))
+    (funcall-with-debug-io-syntax #'%invoke-debugger condition)))
 
 (defun %print-debugger-invocation-reason (condition stream)
   (format stream "~2&")

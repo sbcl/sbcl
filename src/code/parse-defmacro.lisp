@@ -342,7 +342,7 @@
 ;;; We save space in macro definitions by calling this function.
 (defun arg-count-error (context name args lambda-list minimum maximum)
   (let (#-sb-xc-host
-        (sb!debug:*stack-top-hint* (nth-value 1 (find-caller-name-and-frame))))
+        (sb!debug:*stack-top-hint* (or sb!debug:*stack-top-hint* 'arg-count-error)))
     (error 'arg-count-error
            :kind context
            :name name

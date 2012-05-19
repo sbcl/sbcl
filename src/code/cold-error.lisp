@@ -87,15 +87,6 @@
             (funcall (cdr handler) condition)))))
     nil))
 
-;;; a shared idiom in ERROR, CERROR, and BREAK: The user probably
-;;; doesn't want to hear that the error "occurred in" one of these
-;;; functions, so we try to point the top of the stack to our caller
-;;; instead.
-(eval-when (:compile-toplevel :execute)
-  (defmacro-mundanely maybe-find-stack-top-hint ()
-    `(or sb!debug:*stack-top-hint*
-         (nth-value 1 (find-caller-name-and-frame)))))
-
 (defun error (datum &rest arguments)
   #!+sb-doc
   "Invoke the signal facility on a condition formed from DATUM and ARGUMENTS.
@@ -110,16 +101,13 @@
 
   (infinite-error-protect
     (let ((condition (coerce-to-condition datum arguments
-                                          'simple-error 'error)))
+                                          'simple-error 'error))
+          (sb!debug:*stack-top-hint* (or sb!debug:*stack-top-hint* 'error)))
       (/show0 "done coercing DATUM to CONDITION")
       (/show0 "signalling CONDITION from within ERROR")
-      (let ((sb!debug:*stack-top-hint* nil))
-        (signal condition))
+      (signal condition)
       (/show0 "done signalling CONDITION within ERROR")
-      ;; Finding the stack top hint is pretty expensive, so don't do
-      ;; it until we know we need the debugger.
-      (let ((sb!debug:*stack-top-hint* (maybe-find-stack-top-hint)))
-        (invoke-debugger condition)))))
+      (invoke-debugger condition))))
 
 (defun cerror (continue-string datum &rest arguments)
   (infinite-error-protect
@@ -130,9 +118,8 @@
                                             'simple-error
                                             'cerror)))
         (with-condition-restarts condition (list (find-restart 'continue))
-          (let ((sb!debug:*stack-top-hint* nil))
-            (signal condition))
-          (let ((sb!debug:*stack-top-hint* (maybe-find-stack-top-hint)))
+          (let ((sb!debug:*stack-top-hint* (or sb!debug:*stack-top-hint* 'cerror)))
+            (signal condition)
             (invoke-debugger condition))))))
   nil)
 
@@ -144,7 +131,7 @@
 (defun %break (what &optional (datum "break") &rest arguments)
   (infinite-error-protect
     (with-simple-restart (continue "Return from ~S." what)
-      (let ((sb!debug:*stack-top-hint* (maybe-find-stack-top-hint)))
+      (let ((sb!debug:*stack-top-hint* (or sb!debug:*stack-top-hint* '%break)))
         (invoke-debugger
          (coerce-to-condition datum arguments 'simple-condition what)))))
   nil)
@@ -154,7 +141,8 @@
   "Print a message and invoke the debugger without allowing any possibility
 of condition handling occurring."
   (declare (optimize (sb!c::rest-conversion 0)))
-  (let ((*debugger-hook* nil)) ; as specifically required by ANSI
+  (let ((*debugger-hook* nil) ; as specifically required by ANSI
+        (sb!debug:*stack-top-hint* (or sb!debug:*stack-top-hint* 'break)))
     (apply #'%break 'break datum arguments)))
 
 (defun warn (datum &rest arguments)
