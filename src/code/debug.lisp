@@ -361,29 +361,28 @@ thread, NIL otherwise."
                       (make-unprintable-object "more unavailable arguments")))))
               args)))
 
+(defun clean-debug-fun-name (name &optional args)
+  ;; FIXME: do we need to deal with
+  ;; HAIRY-FUNCTION-ENTRY here? I can't make it or
+  ;; &AUX-BINDINGS appear in backtraces, so they are
+  ;; left alone for now. --NS 2005-02-28
+  (if (consp name)
+      (case (first name)
+        ((sb!c::xep sb!c::tl-xep)
+         (clean-xep name args))
+        ((sb!c::&more-processor)
+         (clean-&more-processor name args))
+        ((sb!c::hairy-arg-processor
+          sb!c::varargs-entry sb!c::&optional-processor)
+         (clean-debug-fun-name (second name) args))
+        (t
+         (values name args)))
+      (values name args)))
+
 (defun frame-call (frame)
   (labels ((clean-name-and-args (name args)
-             (if (and (consp name) (not *show-entry-point-details*))
-                 ;; FIXME: do we need to deal with
-                 ;; HAIRY-FUNCTION-ENTRY here? I can't make it or
-                 ;; &AUX-BINDINGS appear in backtraces, so they are
-                 ;; left alone for now. --NS 2005-02-28
-                 (case (first name)
-                   ((eval)
-                    ;; The name of an evaluator thunk contains
-                    ;; the source context -- but that makes for a
-                    ;; confusing frame name, since it can look like an
-                    ;; EVAL call with a bogus argument.
-                    (values '#:eval-thunk nil))
-                   ((sb!c::xep sb!c::tl-xep)
-                    (clean-xep name args))
-                   ((sb!c::&more-processor)
-                    (clean-&more-processor name args))
-                   ((sb!c::hairy-arg-processor
-                     sb!c::varargs-entry sb!c::&optional-processor)
-                    (clean-name-and-args (second name) args))
-                   (t
-                    (values name args)))
+             (if (not *show-entry-point-details*)
+                 (clean-debug-fun-name name args)
                  (values name args))))
     (let ((debug-fun (sb!di:frame-debug-fun frame)))
       (multiple-value-bind (name args)
