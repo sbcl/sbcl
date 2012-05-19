@@ -17,6 +17,7 @@
   (:export #:assert-consing
            #:assert-no-consing
            #:compiler-derived-type
+           #:count-full-calls
            #:find-value-cell-values
            #:find-code-constants
            #:find-named-callees
@@ -110,3 +111,16 @@
              (values warn fail)))
       (ignore-errors (delete-file lisp))
       (ignore-errors (delete-file fasl)))))
+
+;; Pretty horrible, but does the job
+(defun count-full-calls (name function)
+  (let ((code (with-output-to-string (s)
+                (disassemble function :stream s)))
+        (n 0))
+    (with-input-from-string (s code)
+      (loop for line = (read-line s nil nil)
+            while line
+            when (and (search name line)
+                      (search "#<FDEFINITION" line))
+            do (incf n)))
+    n))
