@@ -85,3 +85,11 @@
                (sb-mop:class-direct-superclasses (make-instance 'standard-class))))
 (assert (equal (list (find-class 'sb-mop:funcallable-standard-object))
                (sb-mop:class-direct-superclasses (make-instance 'sb-mop:funcallable-standard-class))))
+
+(with-test (:name :bug-936513)
+  ;; This used to fail as ENSURE-GENERIC-FUNCTION wanted a list specifying
+  ;; the method combination, and didn't accept the actual object
+  (let ((mc (sb-pcl:find-method-combination #'make-instance 'standard nil)))
+    (ensure-generic-function 'make-instance :method-combination mc))
+  ;; Let's make sure the list works too...
+  (ensure-generic-function 'make-instance :method-combination '(standard)))

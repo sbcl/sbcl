@@ -8,6 +8,9 @@ changes relative to sbcl-1.0.57:
     properly.
   * bug fix: functions from EVAL are now on more equal footing with functions
     from COMPILE. (lp#1000783, lp#851170, lp#922408)
+  * bug fix: ENSURE-GENERIC-METHOD-COMBINATION accepts method combination
+    objects as its :METHOD-COMBINATION argument, not just lists designating
+    method combinations. (lp#936513)
 
 changes in sbcl-1.0.57 relative to sbcl-1.0.56:
   * RANDOM enhancements and bug fixes:
