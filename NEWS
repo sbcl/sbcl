@@ -1,4 +1,8 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
+changes relative to sbcl-1.0.57:
+  * bug fix: potential for infinite recursion during compilation of CLOS slot
+    typechecks when dependency graph had loops. (lp#1001799)
+
 changes in sbcl-1.0.57 relative to sbcl-1.0.56:
   * RANDOM enhancements and bug fixes:
     ** bug fix: the range and distribution of random integers could be

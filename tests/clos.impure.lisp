@@ -1920,4 +1920,23 @@
              (declare (ignore all-segment-requests))
              (check-type request t)))))
 
+(with-test (:name :bug-1001799)
+  ;; compilation of the defmethod used to cause infinite recursion
+  (let ((pax (gensym "PAX"))
+        (pnr (gensym "PNR"))
+        (sup (gensym "SUP"))
+        (frob (gensym "FROB"))
+        (sb-ext:*evaluator-mode* :compile))
+    (eval
+     `(progn
+        (declaim (optimize (speed 1) (space 1) (safety 3) (debug 3) (compilation-speed 1)))
+        (defclass ,pax (,sup)
+          ((,pnr :type (or null ,pnr))))
+        (defclass ,pnr (,sup)
+          ((,pax :type (or null ,pax))))
+        (defclass ,sup ()
+          ())
+        (defmethod ,frob ((pnr ,pnr))
+          (slot-value pnr ',pax))))))
+
 ;;;; success
