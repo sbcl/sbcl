@@ -1,5 +1,5 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
-changes relative to sbcl-1.0.56:
+changes in sbcl-1.0.57 relative to sbcl-1.0.56:
   * RANDOM enhancements and bug fixes:
     ** bug fix: the range and distribution of random integers could be
        catastrophically wrong when the compiler derived the type of its
