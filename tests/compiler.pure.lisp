@@ -4282,3 +4282,45 @@
      (sb-int:compiled-program-error (e)
        (let ((source (read-from-string (sb-kernel::program-error-source e))))
          (equal source '#'(lambda ("foo"))))))))
+
+(with-test (:name :escape-analysis-for-nlxs)
+  (flet ((test (check lambda &rest args)
+           (let ((fun (compile nil lambda)))
+             (if check
+                 (assert
+                  (eq :ok
+                      (handler-case
+                          (dolist (arg args nil)
+                            (setf fun (funcall fun arg)))
+                        (sb-int:simple-control-error (e)
+                          (when (equal
+                                 (simple-condition-format-control e)
+                                 "attempt to RETURN-FROM a block or GO to a tag that no longer exists")
+                            :ok)))))
+                 (ctu:assert-no-consing (apply fun args))))))
+    (test nil `(lambda (x)
+                 (block out
+                   (flet ((ex () (return-from out 'out!)))
+                     (typecase x
+                       (cons (or (car x) (ex)))
+                       (t (ex)))))) :foo)
+    (test t   `(lambda (x)
+                 (funcall
+                  (block nasty
+                    (flet ((oops () (return-from nasty t)))
+                      #'oops)))) t)
+    (test t   `(lambda (r)
+                 (block out
+                   (flet ((ex () (return-from out r)))
+                     (lambda (x)
+                       (typecase x
+                         (cons (or (car x) (ex)))
+                         (t (ex))))))) t t)
+    (test t   `(lambda (x)
+                 (flet ((eh (x)
+                          (flet ((meh () (return-from eh 'meh)))
+                            (lambda ()
+                              (typecase x
+                                (cons (or (car x) (meh)))
+                                (t (meh)))))))
+                   (funcall (eh x)))) t t)))

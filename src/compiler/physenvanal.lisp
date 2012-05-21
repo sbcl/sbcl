@@ -248,10 +248,58 @@
 
 ;;;; non-local exit
 
-#!-sb-fluid (declaim (inline should-exit-check-tag-p))
+(defvar *functional-escape-info*)
+
+(defun functional-may-escape-p (functional)
+  (let ((table *functional-escape-info*))
+    (unless table
+      ;; Many components never need the table since they have no escapes -- so
+      ;; we allocate it lazily.
+      (setf table (make-hash-table)
+            *functional-escape-info* table))
+    (multiple-value-bind (bool ok) (gethash functional table)
+      (if ok
+          bool
+          (let ((entry (functional-entry-fun functional)))
+            ;; First stick a NIL in there: break cycles.
+            (setf (gethash functional table) nil)
+            ;; Then compute the real value.
+            (setf (gethash functional table)
+                  (or
+                   ;; If the functional has a XEP, it's kind is :EXTERNAL --
+                   ;; which means it may escape. ...but if it
+                   ;; HAS-EXTERNAL-REFERENCES-P, then that XEP is actually a
+                   ;; TL-XEP, which means it's a toplevel function -- which in
+                   ;; turn means our search has bottomed out without an escape
+                   ;; path. AVER just to make sure, though.
+                   (and (eq :external (functional-kind functional))
+                        (if (functional-has-external-references-p functional)
+                            (aver (eq 'tl-xep (car (functional-debug-name functional))))
+                            t))
+                   ;; If it has an entry point that may escape, that just as bad.
+                   (and entry (functional-may-escape-p entry))
+                   ;; If it has references to it in functions that may escape, that's bad
+                   ;; too.
+                   (dolist (ref (functional-refs functional) nil)
+                     (let* ((lvar (ref-lvar ref))
+                            (dest (when lvar (lvar-dest lvar))))
+                       (when (functional-may-escape-p (node-home-lambda dest))
+                         (return t)))))))))))
+
 (defun exit-should-check-tag-p (exit)
   (declare (type exit exit))
-  (not (zerop (policy exit check-tag-existence))))
+  (let ((exit-lambda (lexenv-lambda (node-lexenv exit))))
+    (not (or
+          ;; Unsafe but fast...
+          (policy exit (zerop check-tag-existence))
+          ;; Dynamic extent is a promise things won't escape --
+          ;; and an explicit request to avoid heap consing.
+          (member (lambda-extent exit-lambda) '(:always-dynamic :maybe-dynamic))
+          ;; If the exit lambda cannot escape, then we should be safe.
+          ;; ...since the escape analysis is kinda new, and not particularly
+          ;; exhaustively tested, let alone proven, disable it for SAFETY 3.
+          (and (policy exit (< safety 3))
+               (not (functional-may-escape-p exit-lambda)))))))
 
 ;;; Insert the entry stub before the original exit target, and add a
 ;;; new entry to the PHYSENV-NLX-INFO. The %NLX-ENTRY call in the
@@ -352,13 +400,14 @@
 ;;; for later phases.
 (defun find-non-local-exits (component)
   (declare (type component component))
-  (dolist (lambda (component-lambdas component))
-    (dolist (entry (lambda-entries lambda))
-      (dolist (exit (entry-exits entry))
-        (let ((target-physenv (node-physenv entry)))
-          (if (eq (node-physenv exit) target-physenv)
-              (maybe-delete-exit exit)
-              (note-non-local-exit target-physenv exit))))))
+  (let ((*functional-escape-info* nil))
+    (dolist (lambda (component-lambdas component))
+      (dolist (entry (lambda-entries lambda))
+        (dolist (exit (entry-exits entry))
+          (let ((target-physenv (node-physenv entry)))
+            (if (eq (node-physenv exit) target-physenv)
+                (maybe-delete-exit exit)
+                (note-non-local-exit target-physenv exit)))))))
   (values))
 
 ;;;; final decision on stack allocation of dynamic-extent structures
