@@ -16,18 +16,8 @@
   "When (TYPEP condition *BREAK-ON-SIGNALS*) is true, then calls to SIGNAL will
    enter the debugger prior to signalling that condition.")
 
-(defun signal (datum &rest arguments)
-  #!+sb-doc
-  "Invokes the signal facility on a condition formed from DATUM and
-   ARGUMENTS. If the condition is not handled, NIL is returned. If
-   (TYPEP condition *BREAK-ON-SIGNALS*) is true, the debugger is invoked
-   before any signalling is done."
-  (let ((condition (coerce-to-condition datum
-                                        arguments
-                                        'simple-condition
-                                        'signal))
-        (*handler-clusters* *handler-clusters*)
-        (old-bos *break-on-signals*)
+(defun maybe-break-on-signal (condition)
+  (let ((old-bos *break-on-signals*)
         (bos-actually-breaking nil))
     (restart-case
         (let ((break-on-signals *break-on-signals*)
@@ -54,30 +44,45 @@
         (lambda (stream)
           (format stream
                   (if bos-actually-breaking
-                    "Return from BREAK and assign a new value to ~
-                     *BREAK-ON-SIGNALS*."
-                    "Assign a new value to *BREAK-ON-SIGNALS* and ~
-                     continue with signal handling.")))
+                      "Return from BREAK and assign a new value to ~
+                       *BREAK-ON-SIGNALS*."
+                      "Assign a new value to *BREAK-ON-SIGNALS* and ~
+                       continue with signal handling.")))
         :interactive
         (lambda ()
           (let (new-value)
             (loop
-             (format *query-io*
-                     "Enter new value for *BREAK-ON-SIGNALS*. ~
-                      Current value is ~S.~%~
-                      > "
-                     old-bos)
-             (force-output *query-io*)
-             (let ((*break-on-signals* nil))
-               (setf new-value (eval (read *query-io*)))
-               (if (typep new-value 'type-specifier)
-                   (return)
-                   (format *query-io*
-                           "~S is not a valid value for *BREAK-ON-SIGNALS* ~
-                            (must be a type-specifier).~%"
-                           new-value))))
+              (format *query-io*
+                      "Enter new value for *BREAK-ON-SIGNALS*. ~
+                       Current value is ~S.~%~
+                       > "
+                      old-bos)
+              (force-output *query-io*)
+              (let ((*break-on-signals* nil))
+                (setf new-value (eval (read *query-io*)))
+                (if (typep new-value 'type-specifier)
+                    (return)
+                    (format *query-io*
+                            "~S is not a valid value for *BREAK-ON-SIGNALS* ~
+                             (must be a type-specifier).~%"
+                            new-value))))
             (list new-value)))
-        (setf *break-on-signals* new-value)))
+        (setf *break-on-signals* new-value)))))
+
+(defun signal (datum &rest arguments)
+  #!+sb-doc
+  "Invokes the signal facility on a condition formed from DATUM and
+   ARGUMENTS. If the condition is not handled, NIL is returned. If
+   (TYPEP condition *BREAK-ON-SIGNALS*) is true, the debugger is invoked
+   before any signalling is done."
+  (let ((condition (coerce-to-condition datum
+                                        arguments
+                                        'simple-condition
+                                        'signal))
+        (*handler-clusters* *handler-clusters*)
+        (sb!debug:*stack-top-hint* (or sb!debug:*stack-top-hint* 'signal)))
+    (when *break-on-signals*
+      (maybe-break-on-signal condition))
     (loop
       (unless *handler-clusters*
         (return))
