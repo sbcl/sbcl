@@ -1007,7 +1007,7 @@
                 (sb!di:code-location-toplevel-form-offset loc))
           (setf (sfcache-last-form-retrieved cache)
                 (sb!di:code-location-form-number loc))
-          (setf (sfcache-last-location-retrieved cache)))
+          (setf (sfcache-last-location-retrieved cache) loc))
         (values form t))))
 
 ;;;; stuff to use debugging info to augment the disassembly
