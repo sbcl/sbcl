@@ -1,9 +1,11 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 changes relative to sbcl-1.0.57:
-  * enchancement: implicit generic function warnings now specify the package
+  * enhancement: implicit generic function warnings now specify the package
     in which the new generic function is being created.
   * enhancement: SB-EXT:ATOMIC-UPDATE makes it easy to perform non-destructive
     updates of CAS-able places (similar to Clojure's swap!).
+  * enhancement: run-program no longer decodes and re-encodes environment when
+    :environment argument is not provided. (lp#985904)
   * bug fix: potential for infinite recursion during compilation of CLOS slot
     typechecks when dependency graph had loops. (lp#1001799)
   * bug fix: error forms reported with some program-errors were not escaped

@@ -507,14 +507,18 @@ status slot."
     (setf (sap-ref-sap vec-sap vec-index-offset) (int-sap 0))
     (values vec-sap (sap+ vec-sap bytes-per-word) total-bytes)))
 
-(defmacro with-c-strvec ((var str-list) &body body)
-  (with-unique-names (sap size)
-    `(multiple-value-bind (,sap ,var ,size)
-         (string-list-to-c-strvec ,str-list)
-       (unwind-protect
-            (progn
-              ,@body)
-         (sb-sys:deallocate-system-memory ,sap ,size)))))
+(defmacro with-c-strvec ((var str-list &key null) &body body)
+  (once-only ((null null))
+    (with-unique-names (sap size)
+      `(multiple-value-bind (,sap ,var ,size)
+           (if ,null
+               (values nil (sb-sys:int-sap 0))
+               (string-list-to-c-strvec ,str-list))
+         (unwind-protect
+              (progn
+                ,@body)
+           (unless ,null
+             (sb-sys:deallocate-system-memory ,sap ,size)))))))
 
 (sb-alien:define-alien-routine spawn
     #-win32 sb-alien:int
@@ -576,9 +580,8 @@ status slot."
                     &key
                     #-win32 (env nil env-p)
                     #-win32 (environment
-                             (if env-p
-                                 (unix-environment-sbcl-from-cmucl env)
-                                 (posix-environ))
+                             (when env-p
+                               (unix-environment-sbcl-from-cmucl env))
                              environment-p)
                     (wait t)
                     search
@@ -742,9 +745,13 @@ Users Manual for details about the PROCESS structure."#-win32"
                       (with-args-vec ((vec args) &body body)
                         `(with-c-strvec (,vec ,args)
                            ,@body))
-                      (with-environment-vec ((vec env) &body body)
+                      (with-environment-vec ((vec) &body body)
                         #+win32 `(let (,vec) ,@body)
-                        #-win32 `(with-c-strvec (,vec ,env) ,@body)))
+                        #-win32
+                        `(with-c-strvec
+                             (,vec environment
+                              :null (not (or environment environment-p)))
+                           ,@body)))
              (with-fd-and-stream-for ((stdin input-stream) :input
                                       input cookie
                                       :direction :input
@@ -768,30 +775,30 @@ Users Manual for details about the PROCESS structure."#-win32"
                      (let (child)
                        (with-active-processes-lock ()
                          (with-args-vec (args-vec simple-args)
-                           (with-environment-vec (environment-vec environment)
+                           (with-environment-vec (environment-vec)
                              (setq child (without-gcing
                                            (spawn progname args-vec
                                                   stdin stdout stderr
                                                   (if search 1 0)
                                                   environment-vec pty-name
-                                                  (if wait 1 0))))
-                             (unless (minusp child)
-                               (setf proc
-                                     (apply
-                                      #'make-process
-                                      :pid child
-                                      :input input-stream
-                                      :output output-stream
-                                      :error error-stream
-                                      :status-hook status-hook
-                                      :cookie cookie
-                                      #-win32 (list :pty pty-stream
-                                                    :%status :running)
-                                      #+win32 (if wait
-                                                  (list :%status :exited
-                                                        :exit-code child)
-                                                  (list :%status :running))))
-                               (push proc *active-processes*)))))
+                                                  (if wait 1 0))))))
+                         (unless (minusp child)
+                           (setf proc
+                                 (apply
+                                  #'make-process
+                                  :pid child
+                                  :input input-stream
+                                  :output output-stream
+                                  :error error-stream
+                                  :status-hook status-hook
+                                  :cookie cookie
+                                  #-win32 (list :pty pty-stream
+                                                :%status :running)
+                                  #+win32 (if wait
+                                              (list :%status :exited
+                                                    :exit-code child)
+                                              (list :%status :running))))
+                           (push proc *active-processes*)))
                        ;; Report the error outside the lock.
                        #+win32
                        (when (minusp child)

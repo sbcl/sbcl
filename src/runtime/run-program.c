@@ -193,7 +193,9 @@ int spawn(char *program, char *argv[], int sin, int sout, int serr,
         if (fd != channel[1]) close(fd);
 #endif
 
-    environ = envp;
+    if (envp) {
+      environ = envp;
+    }
     /* Exec the program. */
     if (search)
       execvp(program, argv);
