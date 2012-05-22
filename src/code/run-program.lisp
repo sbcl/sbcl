@@ -939,6 +939,12 @@ Users Manual for details about the PROCESS structure."#-win32"
         (get-stream-fd-and-external-format
          (two-way-stream-output-stream stream) direction))))))
 
+(defun get-temporary-directory ()
+  #-win32 (or (sb-ext:posix-getenv "TMPDIR")
+              "/tmp")
+  #+win32 (or (sb-ext:posix-getenv "TEMP")
+              "C:/Temp"))
+
 
 ;;; Find a file descriptor to use for object given the direction.
 ;;; Returns the descriptor. If object is :STREAM, returns the created
@@ -957,10 +963,14 @@ Users Manual for details about the PROCESS structure."#-win32"
   ;; run afoul of disk quotas or to choke on small /tmp file systems.
   (flet ((make-temp-fd ()
            (multiple-value-bind (fd name/errno)
-               (sb-unix:sb-mkstemp "/tmp/.run-program-XXXXXX" #o0600)
+               (sb-unix:sb-mkstemp (format nil "~a/.run-program-XXXXXX"
+                                           (get-temporary-directory))
+                                   #o0600)
              (unless fd
                (error "could not open a temporary file: ~A"
                       (strerror name/errno)))
+             ;; Can't unlink an opened file on Windows
+             #-win32
              (unless (sb-unix:unix-unlink name/errno)
                (sb-unix:unix-close fd)
                (error "failed to unlink ~A" name/errno))
