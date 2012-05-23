@@ -25,3 +25,6 @@
     (set-pprint-dispatch 'string
                          (lambda (stream obj) (write-string "BAR-" stream)))
     (assert (string= "FOO-" (gentemp "FOO-") :end2 4))))
+
+(with-test (:name (gensym-fixnum-restriction))
+  (gensym (1+ most-positive-fixnum)))

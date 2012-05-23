@@ -274,7 +274,7 @@ distinct from the global value. Can also be SETF."
     (multiple-value-bind (prefix int)
         (etypecase thing
           (simple-string (values thing old))
-          (fixnum (values "G" thing))
+          (unsigned-byte (values "G" thing))
           (string (values (coerce thing 'simple-string) old)))
       (declare (simple-string prefix))
       (make-symbol (%make-symbol-name prefix int)))))
