@@ -604,7 +604,7 @@ be a lambda expression."
         (cond (cname
                `(global-function ,cname))
               (give-up
-               (give-up-ir1-transform give-up))
+               (give-up-ir1-transform "not known to be a function"))
               (t
                `(%coerce-callable-to-fun ,lvar-name))))))
 
@@ -647,8 +647,9 @@ be a lambda expression."
 (define-source-transform funcall (function &rest args)
   `(%funcall ,(ensure-source-fun-form function) ,@args))
 
-(deftransform %coerce-callable-to-fun ((thing) * *)
-  (ensure-lvar-fun-form thing 'thing "optimize away possible call to FDEFINITION at runtime"))
+(deftransform %coerce-callable-to-fun ((thing) * * :node node)
+  "optimize away possible call to FDEFINITION at runtime"
+  (ensure-lvar-fun-form thing 'thing t))
 
 (define-source-transform %coerce-callable-to-fun (thing)
   (ensure-source-fun-form thing t))
