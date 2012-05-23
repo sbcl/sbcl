@@ -289,17 +289,25 @@
 (defun exit-should-check-tag-p (exit)
   (declare (type exit exit))
   (let ((exit-lambda (lexenv-lambda (node-lexenv exit))))
-    (not (or
-          ;; Unsafe but fast...
-          (policy exit (zerop check-tag-existence))
-          ;; Dynamic extent is a promise things won't escape --
-          ;; and an explicit request to avoid heap consing.
-          (member (lambda-extent exit-lambda) '(:always-dynamic :maybe-dynamic))
-          ;; If the exit lambda cannot escape, then we should be safe.
-          ;; ...since the escape analysis is kinda new, and not particularly
-          ;; exhaustively tested, let alone proven, disable it for SAFETY 3.
-          (and (policy exit (< safety 3))
-               (not (functional-may-escape-p exit-lambda)))))))
+    (unless (or
+             ;; Unsafe but fast...
+             (policy exit (zerop check-tag-existence))
+             ;; Dynamic extent is a promise things won't escape --
+             ;; and an explicit request to avoid heap consing.
+             (member (lambda-extent exit-lambda) '(:always-dynamic :maybe-dynamic))
+             ;; If the exit lambda cannot escape, then we should be safe.
+             ;; ...since the escape analysis is kinda new, and not particularly
+             ;; exhaustively tested, let alone proven, disable it for SAFETY 3.
+             (and (policy exit (< safety 3))
+                  (not (functional-may-escape-p exit-lambda))))
+      (when (policy exit (> speed safety))
+        (let ((*compiler-error-context* (exit-entry exit)))
+          (compiler-notify "~@<Allocating a value-cell at runtime for ~
+                            checking possibly out of extent exit via ~S. Use ~
+                            GO/RETURN-FROM with SAFETY 0, or declare the exit ~
+                            function DYNAMIC-EXTENT to avoid.~:@>"
+                           (node-source-form exit))))
+      t)))
 
 ;;; Insert the entry stub before the original exit target, and add a
 ;;; new entry to the PHYSENV-NLX-INFO. The %NLX-ENTRY call in the

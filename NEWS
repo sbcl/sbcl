@@ -11,6 +11,9 @@ changes relative to sbcl-1.0.57:
   * optimization: MAP-INTO is substantially faster when the target sequence is
     of unknown type; mapping into lists is no longer O(N^2). (thanks to James
     M. Lawrence)
+  * optimization: the compiler no longer heap-conses to check exits in cases
+    where the exit function is dynamic extent, or when it can prove the exit
+    function cannot escape.
   * optimization: SB-SEQUENCE:DOSEQUENCE is faster on vectors of unknown
     element type, and vectors that aren't SIMPLE-ARRAYs.
   * bug fix: potential for infinite recursion during compilation of CLOS slot

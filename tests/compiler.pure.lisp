@@ -4285,7 +4285,15 @@
 
 (with-test (:name :escape-analysis-for-nlxs)
   (flet ((test (check lambda &rest args)
-           (let ((fun (compile nil lambda)))
+           (let* ((cell-note nil)
+                  (fun (handler-bind ((compiler-note
+                                        (lambda (note)
+                                          (when (search
+                                                 "Allocating a value-cell at runtime for"
+                                                 (princ-to-string note))
+                                            (setf cell-note t)))))
+                          (compile nil lambda))))
+             (assert (eql check cell-note))
              (if check
                  (assert
                   (eq :ok
@@ -4299,17 +4307,20 @@
                             :ok)))))
                  (ctu:assert-no-consing (apply fun args))))))
     (test nil `(lambda (x)
+                 (declare (optimize speed))
                  (block out
                    (flet ((ex () (return-from out 'out!)))
                      (typecase x
                        (cons (or (car x) (ex)))
                        (t (ex)))))) :foo)
     (test t   `(lambda (x)
+                 (declare (optimize speed))
                  (funcall
                   (block nasty
                     (flet ((oops () (return-from nasty t)))
                       #'oops)))) t)
     (test t   `(lambda (r)
+                 (declare (optimize speed))
                  (block out
                    (flet ((ex () (return-from out r)))
                      (lambda (x)
@@ -4317,6 +4328,7 @@
                          (cons (or (car x) (ex)))
                          (t (ex))))))) t t)
     (test t   `(lambda (x)
+                 (declare (optimize speed))
                  (flet ((eh (x)
                           (flet ((meh () (return-from eh 'meh)))
                             (lambda ()
