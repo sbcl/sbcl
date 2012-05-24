@@ -373,6 +373,12 @@
 
 ;;;; SUBSEQ
 ;;;;
+
+(define-array-dispatch vector-subseq-dispatch (array start end)
+  (declare (optimize speed (safety 0)))
+  (declare (type index start end))
+  (subseq array start end))
+
 ;;;; The support routines for SUBSEQ are used by compiler transforms,
 ;;;; so we worry about dealing with END being supplied or defaulting
 ;;;; to NIL at this level.
@@ -387,7 +393,7 @@
                     (end end)
                     :check-fill-pointer t
                     :force-inline t)
-    (funcall (!find-vector-subseq-fun data) data start end)))
+    (vector-subseq-dispatch data start end)))
 
 (defun list-subseq* (sequence start end)
   (declare (type list sequence)

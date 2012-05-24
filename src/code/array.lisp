@@ -317,7 +317,7 @@ of specialized arrays is supported."
   (coerce (the list objects) 'simple-vector))
 
 
-;;;; accessor/setter and subseq functions
+;;;; accessor/setter functions
 
 ;;; Dispatch to an optimized routine the data vector accessors for
 ;;; each different specialized vector type. Do dispatching by looking
@@ -328,9 +328,6 @@ of specialized arrays is supported."
 ;;; the type information is available. Finally, for each of these
 ;;; routines also provide a slow path, taken for arrays that are not
 ;;; vectors or not simple.
-;;;
-;;; Similarly for SUBSEQ, except we don't have the slow-path at all:
-;;; VECTOR-SUBEQ* takes care of that.
 (macrolet ((def (name table-name)
              `(progn
                 (defglobal ,table-name (make-array ,(1+ sb!vm:widetag-mask)))
@@ -343,8 +340,7 @@ of specialized arrays is supported."
   (def !find-data-vector-setter %%data-vector-setters%%)
   (def !find-data-vector-setter/check-bounds %%data-vector-setters/check-bounds%%)
   (def !find-data-vector-reffer %%data-vector-reffers%%)
-  (def !find-data-vector-reffer/check-bounds %%data-vector-reffers/check-bounds%%)
-  (def !find-vector-subseq-fun %%vector-subseq-funs%%))
+  (def !find-data-vector-reffer/check-bounds %%data-vector-reffers/check-bounds%%))
 
 (macrolet ((%ref (accessor-getter extra-params)
              `(funcall (,accessor-getter array) array index ,@extra-params))
@@ -399,34 +395,6 @@ of specialized arrays is supported."
          :datum array
          :expected-type 'vector))
 
-(defun hairy-subseq-error (array start end)
-  (declare (ignore start end))
-  (error 'type-error
-         :datum array
-         :expected-type '(simple-array * (*))))
-
-;;; Populate the dispatch tables.
-(macrolet ((def-subseq-funs ()
-             `(progn
-                (set '%%vector-subseq-funs%%
-                     (make-array (1+ sb!vm:widetag-mask)
-                                 :initial-element #'hairy-subseq-error))
-                ,@(map 'list
-                       (lambda (saetp)
-                         (let ((name (symbolicate "SUBSEQ/"
-                                                  (sb!vm:saetp-primitive-type-name saetp))))
-                           `(progn
-                              (defun ,name (vector start end)
-                                (declare (type (simple-array ,(sb!vm:saetp-specifier saetp) (*))
-                                               vector)
-                                         (index start end)
-                                         (optimize speed (safety 0)))
-                                (subseq vector start end))
-                              (setf (svref %%vector-subseq-funs%%
-                                           ,(sb!vm:saetp-typecode saetp))
-                                    #',name))))
-                       sb!vm:*specialized-array-element-type-properties*))))
-  (def-subseq-funs))
 (macrolet ((define-reffer (saetp check-form)
              (let* ((type (sb!vm:saetp-specifier saetp))
                     (atype `(simple-array ,type (*))))
@@ -1375,3 +1343,70 @@ function to be removed without further warning."
               (declare (type index src-index dst-index))
               (setf (sbit dst dst-index)
                     (logxor (sbit src src-index) 1))))))))
+
+;;;; array type dispatching
+
+;;; Store some saetp fields for DEFINE-ARRAY-DISPATCH since
+;;; sb!vm:*specialized-array-element-type-properties* is not always
+;;; available.
+(macrolet
+    ((define-saetp-info ()
+       `(eval-when (:compile-toplevel :load-toplevel :execute)
+          (defglobal %%saetp-info%%
+              ',(loop for saetp
+                      across sb!vm:*specialized-array-element-type-properties*
+                      collect `(,(sb!vm:saetp-typecode saetp)
+                                ,(sb!vm:saetp-specifier saetp)
+                                ,(sb!vm:saetp-primitive-type-name saetp)))))))
+  (define-saetp-info))
+
+;;; Given DISPATCH-FOO as the DISPATCH-NAME argument (unevaluated),
+;;; defines the functions
+;;;
+;;; DISPATCH-FOO/SIMPLE-BASE-STRING
+;;; DISPATCH-FOO/SIMPLE-CHARACTER-STRING
+;;; DISPATCH-FOO/SIMPLE-ARRAY-SINGLE-FLOAT
+;;; ...
+;;;
+;;; PARAMS are the function parameters in the definition of each
+;;; specializer function. The array being specialized must be the
+;;; first parameter in PARAMS. A type declaration for this parameter
+;;; is automatically inserted into the body of each function.
+;;;
+;;; The dispatch table %%FOO-FUNS%% is defined and populated by these
+;;; functions. The table is padded by the function
+;;; HAIRY-FOO-DISPATCH-ERROR, also defined by DEFINE-ARRAY-DISPATCH.
+;;;
+;;; Finally, the DISPATCH-FOO macro is defined which does the actual
+;;; dispatching when called. It expects arguments that match PARAMS.
+;;;
+(defmacro define-array-dispatch (dispatch-name params &body body)
+  (let ((table-name (symbolicate "%%" dispatch-name "-FUNS%%"))
+        (error-name (symbolicate "HAIRY-" dispatch-name "-ERROR")))
+    `(progn
+       (eval-when (:compile-toplevel :load-toplevel :execute)
+         (defun ,error-name (&rest args)
+           (error 'type-error
+                  :datum (first args)
+                  :expected-type '(simple-array * (*)))))
+       (defglobal ,table-name (make-array ,(1+ sb!vm:widetag-mask)
+                                          :initial-element #',error-name))
+       ,@(loop for (typecode specifier primitive-type-name) in %%saetp-info%%
+               collect (let ((fun-name (symbolicate (string dispatch-name)
+                                                    "/" primitive-type-name)))
+                         `(progn
+                            (defun ,fun-name ,params
+                              (declare (type (simple-array ,specifier (*))
+                                             ,(first params)))
+                              ,@body)
+                            (setf (svref ,table-name ,typecode) #',fun-name))))
+       (defmacro ,dispatch-name (&rest args)
+         (check-type (first args) symbol)
+         (let ((tag (gensym "TAG")))
+           `(funcall
+             (the function
+               (let ((,tag 0))
+                 (when (sb!vm::%other-pointer-p ,(first args))
+                   (setf ,tag (%other-pointer-widetag ,(first args))))
+                 (svref ,',table-name ,tag)))
+             ,@args))))))
