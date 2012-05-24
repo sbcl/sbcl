@@ -887,7 +887,7 @@ many elements are copied."
   (def %concatenate-to-string character)
   (def %concatenate-to-base-string base-char))
 
-;;;; MAP and MAP-INTO
+;;;; MAP
 
 ;;; helper functions to handle arity-1 subcases of MAP
 (declaim (ftype (function (function sequence) list) %map-list-arity-1))
@@ -1051,74 +1051,90 @@ many elements are copied."
          first-sequence
          more-sequences))
 
+;;;; MAP-INTO
+
+(defmacro map-into-lambda (sequences params &body body)
+  (check-type sequences symbol)
+  `(flet ((f ,params ,@body))
+     (declare (truly-dynamic-extent #'f))
+     ;; Note (MAP-INTO SEQ (LAMBDA () ...)) is a different animal,
+     ;; hence the awkward flip between MAP and LOOP.
+     (if ,sequences
+         (apply #'map nil #'f ,sequences)
+         (loop (f)))))
+
+(define-array-dispatch vector-map-into (data start end fun sequences)
+  (declare (optimize speed (safety 0))
+           (type index start end)
+           (type function fun)
+           (type list sequences))
+  (let ((index start))
+    (declare (type index index))
+    (if (and sequences (null (rest sequences)))
+        ;; do it manually when there is 1 input sequence
+        (with-array-data ((src (first sequences)) (src-start) (src-end)
+                          :check-fill-pointer t)
+          (let ((src-index src-start))
+            (declare (type index src-index))
+            (loop until (or (eql src-index src-end)
+                            (eql index end))
+                  do (setf (aref data index) (funcall fun (aref src src-index)))
+                     (incf index)
+                     (incf src-index))))
+        (block mapping
+          (map-into-lambda sequences (&rest args)
+            (declare (truly-dynamic-extent args))
+            (when (eql index end)
+              (return-from mapping))
+            (setf (aref data index) (apply fun args))
+            (incf index))))
+    index))
+
 ;;; Uses the machinery of (MAP NIL ...). For non-vectors we avoid
 ;;; computing the length of the result sequence since we can detect
 ;;; the end during mapping (if MAP even gets that far).
+;;;
+;;; For each result type, define a mapping function which is
+;;; responsible for replacing RESULT-SEQUENCE elements and for
+;;; terminating itself if the end of RESULT-SEQUENCE is reached.
+;;; The mapping function is defined with MAP-INTO-LAMBDA.
+;;;
+;;; MAP-INTO-LAMBDAs are optimized since they are the inner loops.
+;;; Because we are manually doing bounds checking with known types,
+;;; safety is turned off for vectors and lists but kept for generic
+;;; sequences.
 (defun map-into (result-sequence function &rest sequences)
-  (declare (truly-dynamic-extent sequences))
   (let ((really-fun (%coerce-callable-to-fun function)))
-    ;; For each result type, define a mapping function which is
-    ;; responsible for replacing RESULT-SEQUENCE elements and for
-    ;; terminating itself if the end of RESULT-SEQUENCE is reached.
-    ;;
-    ;; The mapping function is defined with the MAP-LAMBDA macrolet,
-    ;; whose syntax matches that of LAMBDA.
-    (macrolet ((map-lambda (params &body body)
-                 `(flet ((f ,params ,@body))
-                    (declare (truly-dynamic-extent #'f))
-                    ;; Note (MAP-INTO SEQ (LAMBDA () ...)) is a
-                    ;; different animal, hence the awkward flip
-                    ;; between MAP and LOOP.
-                    (if sequences
-                        (apply #'map nil #'f sequences)
-                        (loop (f))))))
-      ;; Optimize MAP-LAMBDAs since they are the inner loops. Because
-      ;; we are manually doing bounds checking with known types, turn
-      ;; off safety for vectors and lists but keep it for generic
-      ;; sequences.
-      (etypecase result-sequence
-        (vector
-         (locally (declare (optimize speed (safety 0)))
-           (with-array-data ((data result-sequence) (start) (end)
-                             ;; MAP-INTO ignores fill pointer when mapping
-                             :check-fill-pointer nil)
-             (let ((index start))
-               (declare (type index index))
-               (macrolet ((dispatch ()
-                            `(block mapping
-                               (map-lambda (&rest args)
-                                 (declare (truly-dynamic-extent args))
-                                 (when (eql index end)
-                                   (return-from mapping))
-                                 (setf (aref data index)
-                                       (apply really-fun args))
-                                 (incf index)))))
-                 (typecase data
-                   (simple-vector (dispatch))
-                   (otherwise (dispatch))))
-               (when (array-has-fill-pointer-p result-sequence)
-                 (setf (fill-pointer result-sequence) (- index start)))))))
-        (list
-         (let ((node result-sequence))
-           (declare (type list node))
-           (map-lambda (&rest args)
-             (declare (truly-dynamic-extent args) (optimize speed (safety 0)))
-             (when (null node)
-               (return-from map-into result-sequence))
-             (setf (car node) (apply really-fun args))
-             (setf node (cdr node)))))
-        (sequence
-         (multiple-value-bind (iter limit from-end)
-             (sb!sequence:make-sequence-iterator result-sequence)
-           (map-lambda (&rest args)
-             (declare (truly-dynamic-extent args) (optimize speed))
-             (when (sb!sequence:iterator-endp result-sequence
-                                              iter limit from-end)
-               (return-from map-into result-sequence))
-             (setf (sb!sequence:iterator-element result-sequence iter)
-                   (apply really-fun args))
-             (setf iter (sb!sequence:iterator-step result-sequence
-                                                   iter from-end))))))))
+    (etypecase result-sequence
+      (vector
+       (with-array-data ((data result-sequence) (start) (end)
+                         ;; MAP-INTO ignores fill pointer when mapping
+                         :check-fill-pointer nil)
+         (let ((new-end (vector-map-into data start end really-fun sequences)))
+           (when (array-has-fill-pointer-p result-sequence)
+             (setf (fill-pointer result-sequence) (- new-end start))))))
+      (list
+       (let ((node result-sequence))
+         (declare (type list node))
+         (map-into-lambda sequences (&rest args)
+           (declare (truly-dynamic-extent args)
+                    (optimize speed (safety 0)))
+           (when (null node)
+             (return-from map-into result-sequence))
+           (setf (car node) (apply really-fun args))
+           (setf node (cdr node)))))
+      (sequence
+       (multiple-value-bind (iter limit from-end)
+           (sb!sequence:make-sequence-iterator result-sequence)
+         (map-into-lambda sequences (&rest args)
+           (declare (truly-dynamic-extent args) (optimize speed))
+           (when (sb!sequence:iterator-endp result-sequence
+                                            iter limit from-end)
+             (return-from map-into result-sequence))
+           (setf (sb!sequence:iterator-element result-sequence iter)
+                 (apply really-fun args))
+           (setf iter (sb!sequence:iterator-step result-sequence
+                                                           iter from-end)))))))
   result-sequence)
 
 ;;;; quantifiers
