@@ -15,8 +15,10 @@ changes relative to sbcl-1.0.57:
   * bug fix: ENSURE-GENERIC-METHOD-COMBINATION accepts method combination
     objects as its :METHOD-COMBINATION argument, not just lists designating
     method combinations. (lp#936513)
-  * bug fix: run-program no longer unconditionally uses /tmp/ for temporary files.
-    (lp#968837).
+  * bug fix: run-program no longer unconditionally uses /tmp/ for temporary
+    files. (lp#968837).
+  * optimization: On x86-64, code alignment of block headers is done with
+    multi-byte NOPs now instead of repetitions of the single-byte NOP.
 
 changes in sbcl-1.0.57 relative to sbcl-1.0.56:
   * RANDOM enhancements and bug fixes:

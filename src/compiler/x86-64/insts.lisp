@@ -2670,8 +2670,36 @@
 
 (define-instruction nop (segment)
   (:printer byte ((op #b10010000)))
+  ;; multi-byte NOP
+  (:printer ext-reg/mem-no-width ((op '(#x1f 0))) '(:name))
   (:emitter
    (emit-byte segment #b10010000)))
+
+;;; Emit a sequence of single- or multi-byte NOPs to fill AMOUNT many
+;;; bytes with the smallest possible number of such instructions.
+(defun emit-long-nop (segment amount)
+  (declare (type segment segment)
+           (type index amount))
+  ;; Pack all instructions into one byte vector to save space.
+  (let* ((bytes #.(coerce #(#x90
+                            #x66 #x90
+                            #x0f #x1f #x00
+                            #x0f #x1f #x40 #x00
+                            #x0f #x1f #x44 #x00 #x00
+                            #x66 #x0f #x1f #x44 #x00 #x00
+                            #x0f #x1f #x80 #x00 #x00 #x00 #x00
+                            #x0f #x1f #x84 #x00 #x00 #x00 #x00 #x00
+                            #x66 #x0f #x1f #x84 #x00 #x00 #x00 #x00 #x00)
+                          '(vector (unsigned-byte 8))))
+         (max-length (isqrt (* 2 (length bytes)))))
+    (loop
+      (let* ((count (min amount max-length))
+             (start (ash (* count (1- count)) -1)))
+        (dotimes (i count)
+          (emit-byte segment (aref bytes (+ start i)))))
+      (if (> amount max-length)
+          (decf amount max-length)
+          (return)))))
 
 (define-instruction wait (segment)
   (:printer byte ((op #b10011011)))

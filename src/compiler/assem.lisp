@@ -703,14 +703,16 @@
 (def!struct (alignment-note (:include annotation)
                             (:conc-name alignment-)
                             (:predicate alignment-p)
-                            (:constructor make-alignment (bits size fill-byte))
+                            (:constructor make-alignment (bits size pattern))
                             (:copier nil))
   ;; the minimum number of low-order bits that must be zero
   (bits 0 :type alignment)
   ;; the amount of filler we are assuming this alignment op will take
   (size 0 :type (integer 0 #.(1- (ash 1 max-alignment))))
-  ;; the byte used as filling
-  (fill-byte 0 :type (or assembly-unit (signed-byte #.assembly-unit-bits))))
+  ;; the byte used as filling or :LONG-NOP, indicating to call EMIT-LONG-NOP
+  ;; to emit a filling pattern
+  (pattern 0 :type (or possibly-signed-assembly-unit
+                       (member :long-nop))))
 
 ;;; a reference to someplace that needs to be back-patched when
 ;;; we actually know what label positions, etc. are
@@ -765,12 +767,18 @@
   (incf (segment-current-posn segment))
   (values))
 
-;;; interface: Output AMOUNT copies of FILL-BYTE to SEGMENT.
-(defun emit-skip (segment amount &optional (fill-byte 0))
+;;; interface: Output AMOUNT bytes to SEGMENT, either copies of
+;;; PATTERN (if that is an integer), or by calling EMIT-LONG-NOP
+;;; (if PATTERN is :LONG-NOP).
+(defun emit-skip (segment amount &optional (pattern 0))
   (declare (type segment segment)
            (type index amount))
-  (dotimes (i amount)
-    (emit-byte segment fill-byte))
+  (etypecase pattern
+    (integer
+     (dotimes (i amount)
+       (emit-byte segment pattern)))
+    ((eql :long-nop)
+     (sb!vm:emit-long-nop segment amount)))
   (values))
 
 ;;; This is used to handle the common parts of annotation emission. We
@@ -851,10 +859,23 @@
 
 ;;; This is used internally whenever a chooser or alignment decides it
 ;;; doesn't need as much space as it originally thought.
+;;; This function used to extend an existing filler instead of creating
+;;; a new one when the previous segment annotation was a filler. Now
+;;; this is only done if the previous filler is immediately adjacent
+;;; to the new one in the segment, too. To see why this restriction is
+;;; necessary, consider a jump followed by an alignment made of
+;;; multi-byte NOPs when both are shrunk: The shortened alignment is
+;;; reemitted at its original _start_ position but the joined filler
+;;; would extend over this position and instead leave a subsequence of
+;;; the segment up to the alignment's original _end_ position visible.
 (defun emit-filler (segment n-bytes)
   (declare (type index n-bytes))
   (let ((last (segment-last-annotation segment)))
-    (cond ((and last (filler-p (car last)))
+    (cond ((and last
+                (filler-p (car last))
+                (= (+ (filler-index (car last))
+                      (filler-bytes (car last)))
+                   (segment-current-index segment)))
            (incf (filler-bytes (car last)) n-bytes))
           (t
            (emit-annotation segment (make-filler n-bytes)))))
@@ -879,7 +900,7 @@
 ;;; see if we can guarantee the alignment restriction by just outputting a
 ;;; fixed number of bytes. If so, we do so. Otherwise, we create and emit an
 ;;; alignment note.
-(defun %emit-alignment (segment vop bits &optional (fill-byte 0))
+(defun %emit-alignment (segment vop bits &optional (pattern 0))
   (when (segment-run-scheduler segment)
     (schedule-pending-instructions segment))
   (let ((hook (segment-inst-hook segment)))
@@ -894,12 +915,12 @@
            ;; alignment note to cover the rest.
            (let ((slop (logand offset (1- (ash 1 alignment)))))
              (unless (zerop slop)
-               (emit-skip segment (- (ash 1 alignment) slop) fill-byte)))
+               (emit-skip segment (- (ash 1 alignment) slop) pattern)))
            (let ((size (logand (1- (ash 1 bits))
                                (lognot (1- (ash 1 alignment))))))
              (aver (> size 0))
-             (emit-annotation segment (make-alignment bits size fill-byte))
-             (emit-skip segment size fill-byte))
+             (emit-annotation segment (make-alignment bits size pattern))
+             (emit-skip segment size pattern))
            (setf (segment-alignment segment) bits)
            (setf (segment-sync-posn segment) (segment-current-posn segment)))
           (t
@@ -908,10 +929,10 @@
            ;; assuming the last alignment was met.
            (let* ((mask (1- (ash 1 bits)))
                   (new-offset (logand (+ offset mask) (lognot mask))))
-             (emit-skip segment (- new-offset offset) fill-byte))
+             (emit-skip segment (- new-offset offset) pattern))
            ;; But we emit an alignment with size=0 so we can verify
            ;; that everything works.
-           (emit-annotation segment (make-alignment bits 0 fill-byte)))))
+           (emit-annotation segment (make-alignment bits 0 pattern)))))
   (values))
 
 ;;; This is used to find how ``aligned'' different offsets are.
@@ -1000,7 +1021,7 @@
                 (with-modified-segment-index-and-posn (segment index posn)
                   (setf (segment-last-annotation segment) prev)
                   (%emit-alignment segment nil (alignment-bits note)
-                                   (alignment-fill-byte note))
+                                   (alignment-pattern note))
                   (let* ((new-index (segment-current-index segment))
                          (size (- new-index index))
                          (old-size (alignment-size note))
@@ -1049,6 +1070,11 @@
               (with-modified-segment-index-and-posn (segment
                                                      (alignment-index note)
                                                      posn)
+                (when (eql (alignment-pattern note) :long-nop)
+                  ;; We need to re-emit the alignment because a shorter
+                  ;; multi-byte NOP pattern is most of the time not a
+                  ;; prefix of a longer one.
+                  (emit-skip segment size (alignment-pattern note)))
                 (emit-filler segment additional-delta)
                 (setf prev (segment-last-annotation segment))
                 (if prev
@@ -1229,10 +1255,10 @@
 ;;; Note: The need to capture SYMBOL-MACROLET bindings of
 ;;; **CURRENT-SEGMENT* and (%%CURRENT-VOP%%) prevents this from being an
 ;;; ordinary function.
-(defmacro emit-alignment (bits &optional (fill-byte 0))
+(defmacro emit-alignment (bits &optional (pattern 0))
   #!+sb-doc
   "Emit an alignment restriction to the current segment."
-  `(%emit-alignment (%%current-segment%%) (%%current-vop%%) ,bits ,fill-byte))
+  `(%emit-alignment (%%current-segment%%) (%%current-vop%%) ,bits ,pattern))
 
 (defun label-position (label &optional if-after delta)
   #!+sb-doc
