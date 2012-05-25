@@ -28,7 +28,7 @@ changes in sbcl-1.0.57 relative to sbcl-1.0.56:
     ** bug fix: the distribution of random integers is now completely
        uniform even when the specified limit is not a power of two.
        (Previously some values could be about 0.1 % more probable than
-       others in the worst case.)
+       others in the worst case.) (lp#309467)
     ** RANDOM on large integer arguments is generally faster and conses
        less than before; this is visible for fixnums above a length of
        about 24 bits, but extremely so for bignums: the old implementation
