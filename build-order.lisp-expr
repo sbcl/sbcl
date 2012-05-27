@@ -204,6 +204,7 @@
  ;; This needs DEFINE-ALIEN-ROUTINE from target-alieneval.
  ("src/code/misc-aliens" :not-host)
 
+ ("src/compiler/generic/vm-array")
  ("src/code/array"         :not-host)
  ("src/code/early-float"   :not-host)
  ("src/code/target-sxhash" :not-host) ; needs most-fooative-foo-float constants
@@ -359,7 +360,6 @@
  ;; in class.lisp.
  ("src/code/condition" :not-host)
 
- ("src/compiler/generic/vm-array")
  ("src/compiler/generic/primtype")
 
  ;; the implementation of the compiler-affecting part of forms like

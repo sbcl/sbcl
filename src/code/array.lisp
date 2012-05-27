@@ -1346,20 +1346,6 @@ function to be removed without further warning."
 
 ;;;; array type dispatching
 
-;;; Store some saetp fields for DEFINE-ARRAY-DISPATCH since
-;;; sb!vm:*specialized-array-element-type-properties* is not always
-;;; available.
-(macrolet
-    ((define-saetp-info ()
-       `(eval-when (:compile-toplevel :load-toplevel :execute)
-          (defglobal %%saetp-info%%
-              ',(loop for saetp
-                      across sb!vm:*specialized-array-element-type-properties*
-                      collect `(,(sb!vm:saetp-typecode saetp)
-                                ,(sb!vm:saetp-specifier saetp)
-                                ,(sb!vm:saetp-primitive-type-name saetp)))))))
-  (define-saetp-info))
-
 ;;; Given DISPATCH-FOO as the DISPATCH-NAME argument (unevaluated),
 ;;; defines the functions
 ;;;
@@ -1391,7 +1377,10 @@ function to be removed without further warning."
                   :expected-type '(simple-array * (*)))))
        (defglobal ,table-name (make-array ,(1+ sb!vm:widetag-mask)
                                           :initial-element #',error-name))
-       ,@(loop for (typecode specifier primitive-type-name) in %%saetp-info%%
+       ,@(loop for info across sb!vm:*specialized-array-element-type-properties*
+               for typecode = (sb!vm:saetp-typecode info)
+               for specifier = (sb!vm:saetp-specifier info)
+               for primitive-type-name = (sb!vm:saetp-primitive-type-name info)
                collect (let ((fun-name (symbolicate (string dispatch-name)
                                                     "/" primitive-type-name)))
                          `(progn
