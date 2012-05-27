@@ -781,7 +781,7 @@ many elements are copied."
         (let ((,sequence ,s))
           (seq-dispatch ,sequence
             (dolist (,e ,sequence ,return) ,@body)
-            (dovector (,e ,sequence ,return) ,@body)
+            (do-vector-data (,e ,sequence ,return) ,@body)
             (multiple-value-bind (state limit from-end step endp elt)
                 (sb!sequence:make-sequence-iterator ,sequence)
               (do ((state state (funcall step ,sequence state from-end)))
@@ -1070,24 +1070,13 @@ many elements are copied."
            (type list sequences))
   (let ((index start))
     (declare (type index index))
-    (if (and sequences (null (rest sequences)))
-        ;; do it manually when there is 1 input sequence
-        (with-array-data ((src (first sequences)) (src-start) (src-end)
-                          :check-fill-pointer t)
-          (let ((src-index src-start))
-            (declare (type index src-index))
-            (loop until (or (eql src-index src-end)
-                            (eql index end))
-                  do (setf (aref data index) (funcall fun (aref src src-index)))
-                     (incf index)
-                     (incf src-index))))
-        (block mapping
-          (map-into-lambda sequences (&rest args)
-            (declare (truly-dynamic-extent args))
-            (when (eql index end)
-              (return-from mapping))
-            (setf (aref data index) (apply fun args))
-            (incf index))))
+    (block mapping
+      (map-into-lambda sequences (&rest args)
+        (declare (truly-dynamic-extent args))
+        (when (eql index end)
+          (return-from mapping))
+        (setf (aref data index) (apply fun args))
+        (incf index)))
     index))
 
 ;;; Uses the machinery of (MAP NIL ...). For non-vectors we avoid

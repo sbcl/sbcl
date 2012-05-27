@@ -182,4 +182,9 @@
            :arg-seqs (*list-2* *list-2* *vector-30*)
            :arg-types (list list vector)))
 
+(test-util:with-test (:name :map-into-vector-from-list)
+  (map-into (eval (make-array 10))
+            #'list
+            (make-list 10)))
+
 ;;; success

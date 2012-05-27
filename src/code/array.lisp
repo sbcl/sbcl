@@ -339,8 +339,29 @@ of specialized arrays is supported."
                        (svref ,',table-name tag)))))))
   (def !find-data-vector-setter %%data-vector-setters%%)
   (def !find-data-vector-setter/check-bounds %%data-vector-setters/check-bounds%%)
-  (def !find-data-vector-reffer %%data-vector-reffers%%)
+  ;; Used by DO-VECTOR-DATA -- which in turn appears in DOSEQUENCE expansion,
+  ;; meaning we can have post-build dependences on this.
+  (def %find-data-vector-reffer %%data-vector-reffers%%)
   (def !find-data-vector-reffer/check-bounds %%data-vector-reffers/check-bounds%%))
+
+;;; Like DOVECTOR, but more magical -- can't use this on host.
+(defmacro do-vector-data ((elt vector &optional result) &body body)
+  (multiple-value-bind (forms decls) (parse-body body :doc-string-allowed nil)
+    (with-unique-names (index vec start end ref)
+      `(with-array-data ((,vec ,vector)
+                         (,start)
+                         (,end)
+                         :check-fill-pointer t)
+         (let ((,ref (%find-data-vector-reffer ,vec)))
+           (do ((,index ,start (1+ ,index)))
+               ((>= ,index ,end)
+                (let ((,elt nil))
+                  ,@(filter-dolist-declarations decls)
+                  ,elt
+                  ,result))
+             (let ((,elt (funcall ,ref ,vec ,index)))
+               ,@decls
+               (tagbody ,@forms))))))))
 
 (macrolet ((%ref (accessor-getter extra-params)
              `(funcall (,accessor-getter array) array index ,@extra-params))
@@ -375,7 +396,7 @@ of specialized arrays is supported."
                         (declare (ignore end))
                         (,accessor-name vector index ,@extra-params)))))))
   (define hairy-data-vector-ref slow-hairy-data-vector-ref
-    !find-data-vector-reffer
+    %find-data-vector-reffer
     nil (progn))
   (define hairy-data-vector-set slow-hairy-data-vector-set
     !find-data-vector-setter
