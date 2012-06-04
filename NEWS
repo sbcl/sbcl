@@ -27,6 +27,7 @@ changes relative to sbcl-1.0.57:
     method combinations. (lp#936513)
   * bug fix: run-program no longer unconditionally uses /tmp/ for temporary
     files. (lp#968837).
+  * bug fix: restor build on solaris/sparc. (lp#1008506)
 
 changes in sbcl-1.0.57 relative to sbcl-1.0.56:
   * RANDOM enhancements and bug fixes:

@@ -18,6 +18,7 @@
 
 #include <genesis/simple-fun.h>
 #include "thread.h"
+#include "interr.h"
 
 #ifdef LISP_FEATURE_GENCGC
 #include "gencgc-internal.h"
