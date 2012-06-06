@@ -555,3 +555,28 @@
                             (declare (type (integer -3 57216651) a))
                             (ldb (byte 9 27) a)))))
     (assert (= 0 (- (funcall one 10) (funcall two 10))))))
+
+;; The ISQRT implementation is sufficiently complicated that it should
+;; be tested.
+(with-test (:name :isqrt)
+  (labels ((test (x)
+             (let* ((r (isqrt x))
+                    (r2 (expt r 2))
+                    (s2 (expt (1+ r) 2)))
+               (unless (and (<= r2 x)
+                            (> s2 x))
+                 (error "isqrt failure for ~a" x))))
+           (tests (x)
+             (test x)
+             (let ((x2 (expt x 2)))
+               (test x2)
+               (test (1+ x2))
+               (test (1- x2)))))
+    (loop for i from 1 to 200
+          for pow = (expt 2 (1- i))
+          for j = (+ pow (random pow))
+          do
+          (tests i)
+          (tests j))
+    (dotimes (i 10)
+      (tests (random (expt 2 (+ 1000 (random 10000))))))))

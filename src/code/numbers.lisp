@@ -1448,26 +1448,26 @@ the first."
            ((fixnum bignum)
             (bignum-gcd (make-small-bignum u) v))))))
 
-;;;; from Robert Smith
+;;;; from Robert Smith; slightly changed not to cons unnecessarily.
 (defun isqrt (n)
   #!+sb-doc
-  "Return the root of the nearest integer less than n which is a perfect
-   square."
+  "Return the greatest integer less than or equal to the square root of N."
   (declare (type unsigned-byte n))
   (cond
     ((> n 24)
      (let* ((n-fourth-size (ash (1- (integer-length n)) -2))
             (n-significant-half (ash n (- (ash n-fourth-size 1))))
             (n-significant-half-isqrt (isqrt n-significant-half))
-            (zeroth-iteration (ash n-significant-half-isqrt n-fourth-size))
-            (qr (multiple-value-list (floor n zeroth-iteration)))
-            (first-iteration (ash (+ zeroth-iteration (first qr)) -1)))
-       (cond ((oddp (first qr))
-              first-iteration)
-             ((> (expt (- first-iteration zeroth-iteration) 2) (second qr))
-              (1- first-iteration))
-             (t
-              first-iteration))))
+            (zeroth-iteration (ash n-significant-half-isqrt n-fourth-size)))
+       (multiple-value-bind (quot rem)
+           (floor n zeroth-iteration)
+         (let ((first-iteration (ash (+ zeroth-iteration quot) -1)))
+           (cond ((oddp quot)
+                  first-iteration)
+                 ((> (expt (- first-iteration zeroth-iteration) 2) rem)
+                  (1- first-iteration))
+                 (t
+                  first-iteration))))))
     ((> n 15) 4)
     ((> n  8) 3)
     ((> n  3) 2)
