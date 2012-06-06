@@ -41,7 +41,31 @@
 
 (define-move-fun (load-constant 5) (vop x y)
   ((constant) (descriptor-reg))
-  (loadw y code-tn (tn-offset x) other-pointer-lowtag))
+  ;; Does the (positive) offset fit into our signed 13 bit immediate?
+  ;; Else go through a temporary register.  Note that PPC (for example)
+  ;; does not try to support arbitrarily large constant offsets, but PPC
+  ;; supports 16 bit immediates, so the restriction is not as severe
+  ;; there.
+  (let ((nbits 12))
+    (cond
+      ((<= (- (ash (tn-offset x) word-shift) other-pointer-lowtag)
+           (1- (ash 1 nbits)))
+       (loadw y code-tn (tn-offset x) other-pointer-lowtag))
+      (t
+       ;; Use LIP as a temporary.  This should be OK, because LIP is only
+       ;; used within VOPs, whereas we get called to supply the VOP's
+       ;; parameters much earlier.  And LIP-TN is relative to CODE-TN, so
+       ;; the GC should be fine with this.
+       (move lip-tn code-tn)
+       ;; When ADDing the offset, we need multiple steps, because ADD's
+       ;; immediate has the same size restriction as LOADW's.  Take care
+       ;; to add in word-sized steps, so that the LIP remains valid.
+       (let ((stepsize (logandc2 (1- (ash 1 nbits)) (1- (ash 1 word-shift)))))
+         (multiple-value-bind (q r)
+             (truncate (ash (tn-offset x) word-shift) stepsize)
+           (dotimes (x q) (inst add lip-tn stepsize))
+           (when (plusp r) (inst add lip-tn r))))
+       (loadw y lip-tn 0 other-pointer-lowtag)))))
 
 (define-move-fun (load-stack 5) (vop x y)
   ((control-stack) (any-reg descriptor-reg))

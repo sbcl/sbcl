@@ -2274,4 +2274,15 @@
       (assert (= quo -1))
       (assert (= rem (float -228645653448151381))))))
 
+(defmacro def-many-code-constants ()
+  `(defun many-code-constants ()
+     ,@(loop for i from 0 below 1000
+          collect `(print ,(format nil "hi-~d" i)))))
+
+(test-util:with-test (:name :many-code-constants)
+  (def-many-code-constants)
+  (assert (search "hi-999"
+                  (with-output-to-string (*standard-output*)
+                    (many-code-constants)))))
+
 ;;; success

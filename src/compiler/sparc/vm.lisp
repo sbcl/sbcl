@@ -299,6 +299,7 @@
   (defregtn zero any-reg)
   (defregtn null descriptor-reg)
   (defregtn code descriptor-reg)
+  (defregtn lip descriptor-reg)
   (defregtn alloc any-reg)
 
   (defregtn nargs any-reg)
