@@ -44,7 +44,8 @@
 (defun report ()
   (terpri)
   (format t "Finished running tests.~%")
-  (let ((skipcount 0))
+  (let ((skipcount 0)
+        (*print-pretty* nil))
     (cond (*all-failures*
            (format t "Status:~%")
            (dolist (fail (reverse *all-failures*))
