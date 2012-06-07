@@ -152,3 +152,29 @@
 (assert (= (64-bit-logcount (1- (ash 1 48))) 48))
 (assert (= (64-bit-logcount (1- (ash 1 54))) 54))
 
+(declaim (inline ppc-ldb-2))
+
+(defun ppc-ldb-2 (fun value)
+  (declare (type stream socket)
+           (type (signed-byte 32) value)
+           (optimize (speed 3) (safety 0) (space 1) (debug 1)
+                     (compilation-speed 0)))
+  (funcall fun (ldb (byte 8 24) value))
+  (funcall fun (ldb (byte 8 16) value))
+  (funcall fun (ldb (byte 8 8) value))
+  (funcall fun (ldb (byte 8 0) value))
+  (values))
+
+(defun ppc-ldb-1 (fun)
+  (declare (optimize (speed 3) (safety 0) (space 1) (debug 1)
+                     (compilation-speed 0)))
+  (loop
+     for param :across (make-array 1 :initial-element nil)
+     for size :across (make-array 1 :element-type 'fixnum :initial-element 3)
+     do (ppc-ldb-2 fun (if param size -1))))
+
+(let ((acc '()))
+  (ppc-ldb-1 (lambda (x)
+         (push x acc)))
+  (assert (equal acc '(#xff #xff #xff #xff))))
+
