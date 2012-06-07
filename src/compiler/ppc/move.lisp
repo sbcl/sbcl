@@ -168,11 +168,7 @@
   (:generator 4
     (let ((done (gen-label)))
       (inst andi. temp x fixnum-tag-mask)
-      (sc-case y
-        (signed-reg
-         (inst srawi y x n-fixnum-tag-bits))
-        (unsigned-reg
-         (inst srwi y x n-fixnum-tag-bits)))
+      (inst srawi y x n-fixnum-tag-bits)
 
       (inst beq done)
       (loadw y x bignum-digits-offset other-pointer-lowtag)
