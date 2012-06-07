@@ -269,38 +269,6 @@
                                        (the (eql #c(1.0 2.0))
                                          x))))))))
 
-;; The x86 port used not to reduce the arguments of transcendentals
-;; correctly.
-;; This test is valid only for x86: The x86 port uses the builtin x87
-;; FPU instructions to implement the trigonometric functions; other
-;; ports rely on the system's math library. These two differ in the
-;; precision of pi used for the range reduction and so yield results
-;; that can differ by arbitrarily large amounts for large inputs.
-;; The test expects the x87 results.
-(with-test (:name (:range-reduction :x87)
-            :skipped-on '(not :x86))
-  (flet ((almost= (x y)
-           (< (abs (- x y)) 1d-5)))
-    (macrolet ((foo (op value)
-                 `(assert (almost= (,op (mod ,value (* 2 pi)))
-                                   (,op ,value)))))
-      (let ((big (* pi (expt 2d0 70)))
-            (mid (coerce most-positive-fixnum 'double-float))
-            (odd (* pi most-positive-fixnum)))
-        (foo sin big)
-        (foo sin mid)
-        (foo sin odd)
-        (foo sin (/ odd 2d0))
-
-        (foo cos big)
-        (foo cos mid)
-        (foo cos odd)
-        (foo cos (/ odd 2d0))
-
-        (foo tan big)
-        (foo tan mid)
-        (foo tan odd)))))
-
 ;; Leakage from the host could result in wrong values for truncation.
 (with-test (:name :truncate)
   (assert (plusp (sb-kernel:%unary-truncate/single-float (expt 2f0 33))))

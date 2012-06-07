@@ -234,3 +234,104 @@
                              (2 0) (2 1) (2 2) (2 3)
                              (3 0) (3 1) (3 2) (3 3))
                            value single double))))))))
+
+;; The x86 port used not to reduce the arguments of transcendentals
+;; correctly.
+;; This test is valid only for x86: The x86 port uses the builtin x87
+;; FPU instructions to implement the trigonometric functions; other
+;; ports rely on the system's math library. These two differ in the
+;; precision of pi used for the range reduction and so yield results
+;; that can differ by arbitrarily large amounts for large inputs.
+;; The test expects the x87 results.
+(with-test (:name (:range-reduction :x87)
+            :skipped-on '(not :x86))
+  (flet ((almost= (x y)
+           (< (abs (- x y)) 1d-5)))
+    (macrolet ((foo (op value)
+                 `(assert (almost= (,op (mod ,value (* 2 pi)))
+                                   (,op ,value)))))
+      (let ((big (* pi (expt 2d0 70)))
+            (mid (coerce most-positive-fixnum 'double-float))
+            (odd (* pi most-positive-fixnum)))
+        (foo sin big)
+        (foo sin mid)
+        (foo sin odd)
+        (foo sin (/ odd 2d0))
+
+        (foo cos big)
+        (foo cos mid)
+        (foo cos odd)
+        (foo cos (/ odd 2d0))
+
+        (foo tan big)
+        (foo tan mid)
+        (foo tan odd)))))
+
+;; To test the range reduction of trigonometric functions we need a much
+;; more accurate approximation of pi than CL:PI is. Calculating this is
+;; more fun than copy-pasting a constant and Gauss-Legendre converges
+;; extremely fast.
+(defun pi-gauss-legendre (n-bits)
+  "Return a rational approximation to pi using the Gauss-Legendre
+algorithm. The calculations are done with integers, representing
+multiples of (expt 2 (- N-BITS)), and the result is an integral multiple
+of this number. The result is accurate to a few less than N-BITS many
+fractional bits."
+  (let ((a (ash 1 n-bits))                     ; scaled 1
+        (b (isqrt (expt 2 (1- (* n-bits 2))))) ; scaled (sqrt 1/2)
+        (c (ash 1 (- n-bits 2)))               ; scaled 1/4
+        (d 0))
+    (loop
+      (when (<= (- a b) 1)
+        (return))
+      (let ((a1 (ash (+ a b) -1)))
+        (psetf a a1
+               b (isqrt (* a b))
+               c (- c (ash (expt (- a a1) 2) (- d n-bits)))
+               d (1+ d))))
+    (/ (round (expt (+ a b) 2) (* 4 c))
+       (ash 1 n-bits))))
+
+;; Test that the range reduction of trigonometric functions is done
+;; with a sufficiently accurate value of pi that the reduced argument
+;; is correct to nearly double-float precision even for arguments of
+;; very large absolute value.
+;; This test is skipped on x86; as to why see the comment at the test
+;; (:range-reduction :x87) above.
+(with-test (:name (:range-reduction :precise-pi)
+            :skipped-on :x86)
+  (let ((rational-2pi (* 2 (pi-gauss-legendre 2200))))
+    (labels ((mod-2pi (x)
+               "Return X modulo 2 pi, where pi is precise enough that the
+                result is exact to double-float precision for all possible
+                double-float arguments."
+               (declare (type double-float x))
+               (coerce (mod (rational x) rational-2pi)
+                       'double-float))
+             (test (op x)
+               (let ((actual (funcall op x))
+                     (expected (funcall op (mod-2pi x))))
+                 ;; Some of the test values are chosen to reduce modulo
+                 ;; 2 pi to small numbers (between 1d-10 and 1d-7),
+                 ;; making their sine and tangent this small, too.
+                 ;; For other test values the absolute value of the
+                 ;; tangent may be much larger than 1. Therefore we
+                 ;; measure relative instead of absolute error.
+                 (unless (or (= actual expected 0)
+                             (and (= (signum actual) (signum expected))
+                                  (< (abs (/ (- actual expected)
+                                             (+ actual expected)))
+                                     (/ 1d-12 2))))
+                   (error "Inaccurate result for ~a: expected ~a, got ~a"
+                          (list op x) expected actual)))))
+      (dolist (op '(sin cos tan))
+        (dolist (val `(,(coerce most-positive-fixnum 'double-float)
+                       ,@(loop for v = most-positive-double-float
+                               then (expt v 4/5)
+                               while (> v (expt 2 50))
+                               collect v)
+                       6.543554061677196d28
+                       1.5334254929660437d43
+                       1.837213298702053d93
+                       4.913896894631919d229))
+          (test op val))))))
