@@ -263,7 +263,7 @@
   (:args (function :scs (descriptor-reg) :target result)
          (fdefn :scs (descriptor-reg)))
   (:temporary (:sc unsigned-reg) raw)
-  (:temporary (:sc byte-reg) type)
+  (:temporary (:sc unsigned-reg) type)
   (:results (result :scs (descriptor-reg)))
   (:generator 38
     (load-type type function (- fun-pointer-lowtag))
@@ -271,7 +271,7 @@
           (make-ea :byte :base function
                    :disp (- (* simple-fun-code-offset n-word-bytes)
                             fun-pointer-lowtag)))
-    (inst cmp type simple-fun-header-widetag)
+    (inst cmp (reg-in-size type :byte) simple-fun-header-widetag)
     (inst jmp :e NORMAL-FUN)
     (inst lea raw (make-fixup "closure_tramp" :foreign))
     NORMAL-FUN

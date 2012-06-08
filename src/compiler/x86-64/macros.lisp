@@ -120,10 +120,10 @@
               (n-offset offset))
     (ecase *backend-byte-order*
       (:little-endian
-       `(inst mov ,n-target
+       `(inst movzx ,n-target
               (make-ea :byte :base ,n-source :disp ,n-offset)))
       (:big-endian
-       `(inst mov ,n-target
+       `(inst movzx ,n-target
               (make-ea :byte :base ,n-source
                              :disp (+ ,n-offset (1- n-word-bytes))))))))
 

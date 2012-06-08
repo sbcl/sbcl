@@ -28,11 +28,12 @@
   (:translate widetag-of)
   (:policy :fast-safe)
   (:args (object :scs (descriptor-reg)))
-  (:temporary (:sc unsigned-reg :offset eax-offset :to (:result 0)) rax)
+  (:temporary (:sc unsigned-reg :offset rax-offset :target result
+                   :to (:result 0)) rax)
   (:results (result :scs (unsigned-reg)))
   (:result-types positive-fixnum)
   (:generator 6
-    (inst mov rax object)
+    (inst movzx rax (reg-in-size object :byte))
     (inst and al-tn lowtag-mask)
     (inst cmp al-tn other-pointer-lowtag)
     (inst jmp :e OTHER-PTR)
@@ -48,29 +49,27 @@
     (inst jmp :ne DONE)
 
     ;; must be an other immediate
-    (inst mov rax object)
+    (inst movzx rax (reg-in-size object :byte))
     (inst jmp DONE)
 
     FUNCTION-PTR
-    (load-type al-tn object (- fun-pointer-lowtag))
+    (load-type rax object (- fun-pointer-lowtag))
     (inst jmp DONE)
 
     OTHER-PTR
-    (load-type al-tn object (- other-pointer-lowtag))
+    (load-type rax object (- other-pointer-lowtag))
 
     DONE
-    (inst movzx result al-tn)))
+    (move result rax)))
 
 (define-vop (fun-subtype)
   (:translate fun-subtype)
   (:policy :fast-safe)
   (:args (function :scs (descriptor-reg)))
-  (:temporary (:sc byte-reg :from (:eval 0) :to (:eval 1)) temp)
   (:results (result :scs (unsigned-reg)))
   (:result-types positive-fixnum)
   (:generator 6
-    (load-type temp function (- fun-pointer-lowtag))
-    (inst movzx result temp)))
+    (load-type result function (- fun-pointer-lowtag))))
 
 (define-vop (set-fun-subtype)
   (:translate (setf fun-subtype))
