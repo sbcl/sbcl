@@ -23,7 +23,7 @@ else
 fi
 
 # SunOS find does not support -path.  Try to find a binary which does.
-if   [ -n "$GNUFIND" ];        then ;
+if   [ -n "$GNUFIND" ];        then :
 elif which gfind >/dev/null;   then GNUFIND=gfind
 elif which gnufind >/dev/null; then GNUFIND=gnufind
 else                                GNUFIND=find; fi
