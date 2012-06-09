@@ -177,7 +177,7 @@
                   ;; stunted, ending at _sigtramp, when we add :TIMEOUT NIL to
                   ;; the frame we expect. If we leave it out, the backtrace is
                   ;; fine -- but the test fails. I can only boggle right now.
-            :fails-on '(and :x86 (or :linux :darwin)))
+            :fails-on '(and :x86 :linux))
   (let ((m (sb-thread:make-mutex))
         (q (sb-thread:make-waitqueue)))
     (assert (verify-backtrace
