@@ -635,4 +635,13 @@
   (assert (raises-error? (format nil "~-2a" 1)))
   (assert (raises-error? (format nil "~,0a" 1))))
 
+(with-test (:name :bug-905817)
+  ;; The bug manifests itself in an endless loop in FORMAT.
+  ;; Correct behaviour is to signal an error.
+  (handler-case
+      (with-timeout 5
+        (assert (raises-error? (format nil "e~8,0s" 12395))))
+    (timeout ()
+      (error "Endless loop in FORMAT"))))
+
 ;;; success

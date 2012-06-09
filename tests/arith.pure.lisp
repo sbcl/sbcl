@@ -371,8 +371,12 @@
 ;; GCD used to sometimes return negative values. The following did, on 32 bit
 ;; builds.
 (with-test (:name :gcd)
+  ;; from lp#413680
   (assert (plusp (gcd 20286123923750474264166990598656
-                      680564733841876926926749214863536422912))))
+                      680564733841876926926749214863536422912)))
+  ;; from lp#516750
+  (assert (plusp (gcd 2596102012663483082521318626691873
+                      2596148429267413814265248164610048))))
 
 (with-test (:name :expt-zero-zero)
   ;; Check that (expt 0.0 0.0) and (expt 0 0.0) signal error, but (expt 0.0 0)

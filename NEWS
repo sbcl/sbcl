@@ -40,6 +40,9 @@ changes relative to sbcl-1.0.57:
   * bug fix: compiler-macro lambda-lists specifying non-keyword symbols
     as keyword arguments no longer accidentally match unevaluated symbols
     against them.
+  * bug fix: FORMAT used to loop infinitely in some cases when a COLINC
+    parameter was zero, now it signals an error. (lp#905817, fixed since
+    1.0.56.19)
 
 changes in sbcl-1.0.57 relative to sbcl-1.0.56:
   * RANDOM enhancements and bug fixes:
