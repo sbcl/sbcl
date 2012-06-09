@@ -19,7 +19,6 @@
 #include "genesis/fdefn.h"
 #include "genesis/closure.h"
 #include "genesis/funcallable-instance.h"
-#include "genesis/return-pc.h"
 #include "genesis/simple-fun.h"
 #include "genesis/static-symbols.h"
 		
@@ -166,7 +165,7 @@ symbol:
 	lw	reg_A5, 20(reg_CFP)
 
 	/* Calculate LRA */
-	la	reg_LRA, lra - RETURN_PC_RETURN_POINT_OFFSET
+	la	reg_LRA, lra + OTHER_POINTER_LOWTAG
 
 	/* Indirect closure */
 	lw	reg_CODE, CLOSURE_FUN_OFFSET(reg_LEXENV)
