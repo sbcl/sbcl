@@ -20,7 +20,8 @@
 
 (use-package :test-util)
 
-(with-test (:name atomic-update)
+(with-test (:name atomic-update
+            :skipped-on '(not :sb-thread))
   (let ((x (cons :count 0)))
     (mapc #'sb-thread:join-thread
           (loop repeat 1000
@@ -559,7 +560,8 @@
     (try-semaphore sem 1 note)
     (assert (semaphore-notification-status note))))
 
-(with-test (:name (:return-from-thread :normal-thread))
+(with-test (:name (:return-from-thread :normal-thread)
+            :skipped-on '(not :sb-thread))
   (let* ((thread (make-thread (lambda ()
                                 (return-from-thread (values 1 2 3))
                                 :foo)))
@@ -575,7 +577,8 @@
                 (thread-error ()
                   :oops)))))
 
-(with-test (:name (:abort-thread :normal-thread))
+(with-test (:name (:abort-thread :normal-thread)
+            :skipped-on '(not :sb-thread))
   (let ((thread (make-thread (lambda ()
                                (abort-thread)
                                :foo))))
