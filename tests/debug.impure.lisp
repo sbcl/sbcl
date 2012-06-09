@@ -174,11 +174,10 @@
 (with-test (:name :backtrace-interrupted-condition-wait
             :skipped-on '(not :sb-thread)
                   ;; For some unfathomable reason the backtrace becomes
-                  ;; stunted on Darwin, ending at _sigtramp, when we add
-                  ;; :TIMEOUT NIL to the frame we expect. If we leave it out,
-                  ;; the backtrace is fine -- but the test fails. I can only
-                  ;; boggle right now.
-            :fails-on '(or (and :x86 :linux) :darwin))
+                  ;; stunted, ending at _sigtramp, when we add :TIMEOUT NIL to
+                  ;; the frame we expect. If we leave it out, the backtrace is
+                  ;; fine -- but the test fails. I can only boggle right now.
+            :fails-on '(and :x86 (or :linux :darwin)))
   (let ((m (sb-thread:make-mutex))
         (q (sb-thread:make-waitqueue)))
     (assert (verify-backtrace
