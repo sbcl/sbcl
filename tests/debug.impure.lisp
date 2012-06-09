@@ -650,6 +650,8 @@
                  (if (eq '* match)
                      ;; Whatever, till the next line matches.
                      (let ((text (pop targets)))
+                       #+nil
+                       (format *error-output* "Looking for: ~A~%" text)
                        (unless (search text line)
                          (push text targets)
                          (push match targets)))
@@ -694,7 +696,7 @@
       (let ((f #'(lambda (x cont)
                    (print x (make-broadcast-stream))
                    (if (zerop x)
-                       (error "foo")
+                       (error "~%foo")
                        (funcall cont (1- x) cont)))))
         (funcall f 10 f)))
    '*
@@ -702,7 +704,7 @@
    '*
    "foo"
    '*
-   "source: (ERROR \"foo\")"
+   "source: (ERROR \"~%foo\")"
    '*
    "(LAMBDA (X CONT)"
    '*
