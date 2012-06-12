@@ -253,7 +253,7 @@
 (defknown expt (number number) number
   (movable foldable flushable explicit-check recursive))
 (defknown log (number &optional real) irrational
-  (movable foldable flushable explicit-check))
+  (movable foldable flushable explicit-check recursive))
 (defknown sqrt (number) irrational
   (movable foldable flushable explicit-check))
 (defknown isqrt (unsigned-byte) unsigned-byte
@@ -311,9 +311,13 @@
 (defknown (numerator denominator) (rational) integer
   (movable foldable flushable))
 
-(defknown (floor ceiling truncate round)
+(defknown (floor ceiling round)
   (real &optional real) (values integer real)
   (movable foldable flushable explicit-check))
+
+(defknown truncate
+  (real &optional real) (values integer real)
+  (movable foldable flushable explicit-check recursive))
 
 (defknown %multiply-high (word word) word
     (movable foldable flushable))
@@ -1159,10 +1163,12 @@
                                    :directory :name
                                    :type :version))
   generalized-boolean
-  ())
+  (recursive))
+
 (defknown pathname-match-p (pathname-designator pathname-designator)
   generalized-boolean
   ())
+
 (defknown translate-pathname (pathname-designator
                               pathname-designator
                               pathname-designator &key)
@@ -1187,7 +1193,7 @@
                        (:end sequence-end)
                        (:junk-allowed t))
   (values (or pathname null) sequence-end)
-  ())
+  (recursive))
 
 (defknown merge-pathnames
   (pathname-designator &optional pathname-designator pathname-version)
@@ -1337,7 +1343,7 @@
 
 (defknown apropos      (string-designator &optional package-designator t) (values))
 (defknown apropos-list (string-designator &optional package-designator t) list
-  (flushable))
+  (flushable recursive))
 
 (defknown get-decoded-time ()
   (values (integer 0 59) (integer 0 59) (integer 0 23) (integer 1 31)

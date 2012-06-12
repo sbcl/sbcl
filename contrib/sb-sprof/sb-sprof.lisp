@@ -865,9 +865,7 @@ The following keyword args are recognized:
            (if (and (consp name)
                     (member (first name)
                             '(sb-c::xep sb-c::tl-xep sb-c::&more-processor
-                              sb-c::varargs-entry
                               sb-c::top-level-form
-                              sb-c::hairy-arg-processor
                               sb-c::&optional-processor)))
                (second name)
                name)))

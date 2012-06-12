@@ -346,14 +346,17 @@
     (assert (verify-backtrace #'bt.2.3
                               '((bt.2.3 &rest))))))
 
+;;; This test is somewhat deceptively named. Due to confusion in debug naming
+;;; these functions used to have sb-c::varargs-entry debug names for their
+;;; main lambda.
 (with-test (:name (:backtrace :varargs-entry))
   (with-details t
     (assert (verify-backtrace #'bt.3.1
-                              '(((sb-c::varargs-entry bt.3.1) :key nil))))
+                              '((bt.3.1 :key nil))))
     (assert (verify-backtrace #'bt.3.2
-                              '(((sb-c::varargs-entry bt.3.2) :key ?))))
+                              '((bt.3.2 :key ?))))
     (assert (verify-backtrace #'bt.3.3
-                              '(((sb-c::varargs-entry bt.3.3) &rest)))))
+                              '((bt.3.3 &rest)))))
   (with-details nil
     (assert (verify-backtrace #'bt.3.1
                               '((bt.3.1 :key nil))))
@@ -362,14 +365,17 @@
     (assert (verify-backtrace #'bt.3.3
                               '((bt.3.3 &rest))))))
 
+;;; This test is somewhat deceptively named. Due to confusion in debug naming
+;;; these functions used to have sb-c::hairy-args-processor debug names for
+;;; their main lambda.
 (with-test (:name (:backtrace :hairy-args-processor))
   (with-details t
     (assert (verify-backtrace #'bt.4.1
-                              '(((sb-c::hairy-arg-processor bt.4.1) ?))))
+                              '((bt.4.1 ?))))
     (assert (verify-backtrace #'bt.4.2
-                              '(((sb-c::hairy-arg-processor bt.4.2) ?))))
+                              '((bt.4.2 ?))))
     (assert (verify-backtrace #'bt.4.3
-                              '(((sb-c::hairy-arg-processor bt.4.3) &rest)))))
+                              '((bt.4.3 &rest)))))
   (with-details nil
     (assert (verify-backtrace #'bt.4.1
                               '((bt.4.1 ?))))

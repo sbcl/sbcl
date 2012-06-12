@@ -740,14 +740,15 @@
                (main-vals (arg-info-default info))
                (bind-vals n-val)))))
 
-    (let* ((name (or debug-name source-name))
-           (main-entry (ir1-convert-lambda-body
+    (let* ((main-entry (ir1-convert-lambda-body
                         body (main-vars)
                         :aux-vars (append (bind-vars) aux-vars)
                         :aux-vals (append (bind-vals) aux-vals)
                         :post-binding-lexenv post-binding-lexenv
-                        :debug-name (debug-name 'varargs-entry name)
+                        :source-name source-name
+                        :debug-name debug-name
                         :system-lambda system-lambda))
+           (name (or debug-name source-name))
            (last-entry (convert-optional-entry main-entry default-vars
                                                (main-vals) () name)))
       (setf (optional-dispatch-main-entry res)
@@ -821,7 +822,8 @@
                          :aux-vars aux-vars
                          :aux-vals aux-vals
                          :post-binding-lexenv post-binding-lexenv
-                         :debug-name (debug-name 'hairy-arg-processor name)
+                         :source-name source-name
+                         :debug-name debug-name
                          :system-lambda system-lambda)))
 
                (setf (optional-dispatch-main-entry res) fun)
