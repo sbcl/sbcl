@@ -60,6 +60,24 @@ please submit a bug report to the developers' mailing list, details of ~
 which can be found at <http://sbcl.sourceforge.net/>.~:@>"
              ()))))
 
+;;; OAOOM...
+(define-condition compiler-macro-keyword-problem ()
+  ((argument :initarg :argument :reader compiler-macro-keyword-argument))
+  (:report (lambda (condition stream)
+             (format stream "~@<Argument ~S in keyword position is not ~
+                             a self-evaluating symbol, preventing compiler-macro ~
+                             expansion.~@:>"
+                     (compiler-macro-keyword-argument condition)))))
+
+;;; OAOOM...
+(define-condition duplicate-definition (reference-condition warning)
+  ((name :initarg :name :reader duplicate-definition-name))
+  (:report (lambda (c s)
+             (format s "~@<Duplicate definition for ~S found in ~
+                        one file.~@:>"
+                     (duplicate-definition-name c))))
+  (:default-initargs :references (list '(:ansi-cl :section (3 2 2 3)))))
+
 ;;; These are should never be instantiated before the real definitions
 ;;; come in.
 (deftype package-lock-violation () nil)
