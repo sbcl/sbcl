@@ -19,6 +19,9 @@ changes relative to sbcl-1.0.57:
     function cannot escape.
   * optimization: SB-SEQUENCE:DOSEQUENCE is faster on vectors of unknown
     element type, and vectors that aren't SIMPLE-ARRAYs.
+  * optimization: CL:SORT and CL:STABLE-SORT are more efficient in execution
+    speed (around 1/3 the time in some cases), and a little better in terms of
+    comparison calls. (Thanks to Takeru Ohta)
   * bug fix: On SPARC, a limitation on the number of code constants emittable
     by the compiler has been lifted, allowing certain long functions to
     compiled and assembled which had previously been unsupported; fixes

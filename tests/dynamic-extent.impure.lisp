@@ -876,7 +876,9 @@
                          nil)))
     (assert-notes 0 `(lambda (list)
                        (declare (optimize (space 0)))
-                       (sort list #'<)))
+                       (sort list (lambda (x y) ; shut unrelated notes up
+                                    (< (truly-the fixnum x)
+                                       (truly-the fixnum y))))))
     (assert-notes 0 `(lambda (other)
                        #'(lambda (s c n)
                            (ignore-errors (funcall other s c n)))))))
