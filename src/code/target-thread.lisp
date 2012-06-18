@@ -1661,20 +1661,19 @@ assume that unknown code can safely be terminated using TERMINATE-THREAD."
     ;; Prevent the thread from dying completely while we look for the TLS
     ;; area...
     (with-all-threads-lock
-      (loop
-        (if (thread-alive-p thread)
-            (let* ((offset (sb!kernel:get-lisp-obj-address
-                            (sb!vm::symbol-tls-index symbol)))
-                   (obj (sap-ref-lispobj (%thread-sap thread) offset))
-                   (tl-val (sb!kernel:get-lisp-obj-address obj)))
-              (cond ((zerop offset)
-                     (return (values nil :no-tls-value)))
-                    ((or (eql tl-val sb!vm:no-tls-value-marker-widetag)
-                         (eql tl-val sb!vm:unbound-marker-widetag))
-                     (return (values nil :unbound-in-thread)))
-                    (t
-                     (return (values obj :ok)))))
-            (return (values nil :thread-dead))))))
+      (if (thread-alive-p thread)
+          (let* ((offset (sb!kernel:get-lisp-obj-address
+                          (sb!vm::symbol-tls-index symbol)))
+                 (obj (sap-ref-lispobj (%thread-sap thread) offset))
+                 (tl-val (sb!kernel:get-lisp-obj-address obj)))
+            (cond ((zerop offset)
+                   (values nil :no-tls-value))
+                  ((or (eql tl-val sb!vm:no-tls-value-marker-widetag)
+                       (eql tl-val sb!vm:unbound-marker-widetag))
+                   (values nil :unbound-in-thread))
+                  (t
+                   (values obj :ok))))
+          (values nil :thread-dead))))
 
   (defun %set-symbol-value-in-thread (symbol thread value)
     (with-pinned-objects (value)
