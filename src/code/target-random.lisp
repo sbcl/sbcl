@@ -85,17 +85,17 @@
 (defun make-random-state (&optional state)
   #!+sb-doc
   "Make a random state object. The optional STATE argument specifies a seed
-  for deterministic pseudo-random number generation.
+for deterministic pseudo-random number generation.
 
-  As per the Common Lisp standard,
-  - If STATE is NIL or not supplied or is NIL, return a copy of the default
+As per the Common Lisp standard,
+- If STATE is NIL or not supplied, return a copy of the default
   *RANDOM-STATE*.
-  - If STATE is a random state, return a copy of it.
-  - If STATE is T, return a randomly initialized state (using operating-system
-  provided randomness source where available, otherwise a poor substitute
-  based on internal time and pid)
+- If STATE is a random state, return a copy of it.
+- If STATE is T, return a randomly initialized state (using operating-system
+  provided randomness where available, otherwise a poor substitute based on
+  internal time and pid).
 
-  See SB-EXT:SEED-RANDOM-STATE for a SBCL extension to this functionality."
+See SB-EXT:SEED-RANDOM-STATE for a SBCL extension to this functionality."
   (/show0 "entering MAKE-RANDOM-STATE")
   (check-type state (or boolean random-state))
   (seed-random-state state))
@@ -103,30 +103,30 @@
 (defun seed-random-state (&optional state)
   #!+sb-doc
   "Make a random state object. The optional STATE argument specifies a seed
-  for deterministic pseudo-random number generation.
+for deterministic pseudo-random number generation.
 
-  As per the Common Lisp standard for MAKE-RANDOM-STATE,
-  - If STATE is NIL or not supplied or is NIL, return a copy of the default
+As per the Common Lisp standard for MAKE-RANDOM-STATE,
+- If STATE is NIL or not supplied, return a copy of the default
   *RANDOM-STATE*.
-  - If STATE is a random state, return a copy of it.
-  - If STATE is T, return a randomly initialized state (using operating-system
-  provided randomness source where available, otherwise a poor substitute
-  based on internal time and pid)
+- If STATE is a random state, return a copy of it.
+- If STATE is T, return a randomly initialized state (using operating-system
+  provided randomness where available, otherwise a poor substitute based on
+  internal time and pid).
 
-  As a supported SBCL extension, we also support receiving as a seed an object
-  of the following types:
-  - (SIMPLE-ARRAY (UNSIGNED-BYTE 8) (*))
-  - UNSIGNED-BYTE
-  While we support arguments of any size and will mix the provided bits into
-  the random state, it is probably overkill to provide more than 256 bits worth
-  of actual information.
+As a supported SBCL extension, we also support receiving as a seed an object
+of the following types:
+- (SIMPLE-ARRAY (UNSIGNED-BYTE 8) (*))
+- UNSIGNED-BYTE
+While we support arguments of any size and will mix the provided bits into
+the random state, it is probably overkill to provide more than 256 bits worth
+of actual information.
 
-  This particular SBCL version also accepts an argument of the following type:
-  - (SIMPLE-ARRAY (UNSIGNED-BYTE 32) (*))
+This particular SBCL version also accepts an argument of the following type:
+(SIMPLE-ARRAY (UNSIGNED-BYTE 32) (*))
 
-  This particular SBCL version uses the popular MT19937 PRNG algorithm, and its
-  internal state only effectively contains about 19937 bits of information.
-  http://www.math.sci.hiroshima-u.ac.jp/~m-mat/MT/emt.html
+This particular SBCL version uses the popular MT19937 PRNG algorithm, and its
+internal state only effectively contains about 19937 bits of information.
+http://www.math.sci.hiroshima-u.ac.jp/~m-mat/MT/emt.html
 "
   (etypecase state
     ;; Easy standard cases
