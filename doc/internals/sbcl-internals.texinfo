@@ -9,7 +9,7 @@
 @c for install-info
 @dircategory Software development
 @direntry
-* sbcl-internals: (sbcl internals).   SBCL internal documentation
+* sbcl-internals: (sbcl-internals).   SBCL internal documentation
 @end direntry
 
 @copying
