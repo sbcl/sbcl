@@ -51,10 +51,10 @@
         (t
          (error 'simple-type-error
                 :datum datum
-                :expected-type '(or symbol string)
+                :expected-type '(or symbol string function)
                 :format-control "Condition designator ~s is not of type ~s."
                 :format-arguments (list datum
-                                        '(or symbol string))))))
+                                        '(or symbol string function))))))
 
 (define-condition layout-invalid (type-error)
   ()

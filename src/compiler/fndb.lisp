@@ -1589,6 +1589,11 @@
   ())
 (defknown style-warn (t &rest t) null ())
 
+(defknown coerce-to-condition ((or condition symbol string function)
+                               list type-specifier symbol)
+    condition
+    (explicit-check))
+
 (defknown sc-number-or-lose (symbol) sc-number
   (foldable))
 
