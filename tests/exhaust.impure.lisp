@@ -47,7 +47,9 @@
 ;;; Check that non-local control transfers restore the stack
 ;;; exhaustion checking after unwinding -- and that previous test
 ;;; didn't break it.
-(with-test (:name (:exhaust :non-local-control) :broken-on '(and :sunos :x86-64))
+(with-test (:name (:exhaust :non-local-control)
+                  :broken-on '(and :sunos :x86-64)
+                  :skipped-on :win32)
   (let ((exhaust-count 0)
         (recurse-count 0))
     (tagbody
@@ -64,7 +66,9 @@
 
 ;;; Check that we can safely use user-provided restarts to
 ;;; unwind.
-(with-test (:name (:exhaust :restarts) :broken-on '(and :sunos :x86-64))
+(with-test (:name (:exhaust :restarts)
+                  :broken-on '(and :sunos :x86-64)
+                  :skipped-on :win32)
   (let ((exhaust-count 0)
         (recurse-count 0))
     (block nil
@@ -79,7 +83,7 @@
              (recurse)))))
     (assert (= exhaust-count recurse-count *count*))))
 
-(with-test (:name (:exhaust :binding-stack))
+(with-test (:name (:exhaust :binding-stack) :skipped-on :win32)
   (let ((ok nil)
         (symbols (loop repeat 1024 collect (gensym)))
         (values (loop repeat 1024 collect nil)))
