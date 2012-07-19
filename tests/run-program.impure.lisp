@@ -160,8 +160,8 @@
 ;;; buffering of stdin and stdout depends on their TTYness, and ed isn't sufficiently
 ;;; agressive about flushing them. So, here's another test using :PTY.
 
-#-win32 ( ;; kludge: It would be nicer to disable individual test cases,
-          ;; but we are not using WITH-TEST yet here.
+#-win32 (progn ;; kludge: It would be nicer to disable individual test cases,
+               ;; but we are not using WITH-TEST yet here.
 
 (defparameter *tmpfile* "run-program-ed-test.tmp")
 
