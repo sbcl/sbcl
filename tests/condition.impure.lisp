@@ -96,22 +96,23 @@
 (define-condition my-stream-error-1-0-9 (stream-error) ())
 (define-condition parse-foo-error-1-0-9 (parse-error) ())
 (define-condition read-bar-error-1-0-9 (reader-error) ())
-(let (;; instances created initializing all the slots specified in
-      ;; ANSI CL
-      (parse-foo-error-1-0-9 (make-condition 'parse-foo-error-1-0-9
-                                             :stream *standard-input*))
-      (read-foo-error-1-0-9 (make-condition 'read-bar-error-1-0-9
-                                            :stream *standard-input*))
-      (my-stream-error-1-0-9 (make-condition 'my-stream-error-1-0-9
-                                             :stream *standard-input*)))
-  ;; should be printable
-  (dolist (c (list
-              my-stream-error-1-0-9
-              parse-foo-error-1-0-9
-              read-foo-error-1-0-9))
-    ;; whether escaped or not
-    (dolist (*print-escape* '(nil t))
-      (write c :stream (make-string-output-stream)))))
+(with-test (:name :printable-conditions :fails-on :win32)
+  (let (;; instances created initializing all the slots specified in
+        ;; ANSI CL
+        (parse-foo-error-1-0-9 (make-condition 'parse-foo-error-1-0-9
+                                               :stream *standard-input*))
+        (read-foo-error-1-0-9 (make-condition 'read-bar-error-1-0-9
+                                              :stream *standard-input*))
+        (my-stream-error-1-0-9 (make-condition 'my-stream-error-1-0-9
+                                               :stream *standard-input*)))
+    ;; should be printable
+    (dolist (c (list
+                my-stream-error-1-0-9
+                parse-foo-error-1-0-9
+                read-foo-error-1-0-9))
+      ;; whether escaped or not
+      (dolist (*print-escape* '(nil t))
+        (write c :stream (make-string-output-stream))))))
 
 ;;; Reported by Michael Weber: restart computation in :TEST-FUNCTION used to
 ;;; cause infinite recursion.

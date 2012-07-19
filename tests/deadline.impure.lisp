@@ -15,11 +15,11 @@
   (sb-ext:run-program "sleep" (list (format nil "~D" seconds))
                       :search t :wait t))
 
-(with-test (:name (:deadline :run-program :trivial))
+(with-test (:name (:deadline :run-program :trivial) :fails-on :win32)
   (assert-timeout (sb-sys:with-deadline (:seconds 1)
                     (run-sleep 3))))
 
-(with-test (:name (:deadline :defer-deadline-1))
+(with-test (:name (:deadline :defer-deadline-1) :fails-on :win32)
   (let ((n 0)
         (final nil))
     (handler-case
@@ -35,7 +35,7 @@
     (assert (= n 2))
     (assert final)))
 
-(with-test (:name (:deadline :defer-deadline-2))
+(with-test (:name (:deadline :defer-deadline-2) :fails-on :win32)
   (let ((n 0)
         (final nil))
     (handler-case
@@ -50,7 +50,7 @@
     (assert (plusp n))
     (assert (not final))))
 
-(with-test (:name (:deadline :cancel-deadline))
+(with-test (:name (:deadline :cancel-deadline) :fails-on :win32)
   (let ((n 0)
         (final nil))
     (handler-case

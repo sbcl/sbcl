@@ -43,34 +43,37 @@
 ;;;; fork/exec, so that no lisp is on the stack. This is our known-good
 ;;;; number.
 
-(run "/bin/sh" "run-compiler.sh" "-sbcl-pic"
-     "stack-alignment-offset.c" "-o" "stack-alignment-offset")
+#-win32
+(progn
+  (run "/bin/sh" "run-compiler.sh" "-sbcl-pic"
+       "stack-alignment-offset.c" "-o" "stack-alignment-offset")
 
-(defparameter *good-offset*
-  (parse-integer (run "./stack-alignment-offset"
-                      (princ-to-string *required-alignment*))))
+  (defparameter *good-offset*
+    (parse-integer (run "./stack-alignment-offset"
+                        (princ-to-string *required-alignment*))))
 
-;;;; Build the tool again, this time as a shared object, and load it
+  ;; Build the tool again, this time as a shared object, and load it
 
-(run "/bin/sh" "run-compiler.sh" "-sbcl-pic" "-sbcl-shared"
-     "stack-alignment-offset.c" "-o" "stack-alignment-offset.so")
+  (run "/bin/sh" "run-compiler.sh" "-sbcl-pic" "-sbcl-shared"
+       "stack-alignment-offset.c" "-o" "stack-alignment-offset.so")
 
-(load-shared-object (truename "stack-alignment-offset.so"))
+  (load-shared-object (truename "stack-alignment-offset.so"))
 
-(define-alien-routine stack-alignment-offset int (alignment int))
-(define-alien-routine trampoline int (callback (function int)))
+  (define-alien-routine stack-alignment-offset int (alignment int))
+  (define-alien-routine trampoline int (callback (function int))))
 
 ;;;; Now get the offset by calling from lisp, first with a regular foreign function
 ;;;; call, then with an intervening callback.
 
-(with-test (:name :regular)
+(with-test (:name :regular :fails-on :win32)
   (assert (= *good-offset* (stack-alignment-offset *required-alignment*))))
 
-(with-test (:name :callback)
+(with-test (:name :callback :fails-on :win32)
   (assert (= *good-offset* (trampoline (alien-lambda int ()
                                        (stack-alignment-offset *required-alignment*))))))
 
-(delete-file "stack-alignment-offset")
-(delete-file "stack-alignment-offset.so")
+(when (probe-file "stack-alignment-offset.so")
+  (delete-file "stack-alignment-offset")
+  (delete-file "stack-alignment-offset.so"))
 
 ;;;; success!

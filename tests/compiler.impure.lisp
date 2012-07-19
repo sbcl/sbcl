@@ -1190,7 +1190,7 @@
 (defun bug-308914-storage (x)
   (the (simple-array flt (*)) (bug-308914-unknown x)))
 
-(with-test (:name :bug-308914-workaround)
+(with-test (:name :bug-308914-workaround :fails-on :win32)
   ;; This used to hang in ORDER-UVL-SETS.
   (handler-case
       (with-timeout 10

@@ -3710,7 +3710,7 @@
                             (declare (ignore x y k1))
                             t))))))
 
-(with-test (:name :bug-309448)
+(with-test (:name :bug-309448 :fails-on :win32)
   ;; Like all tests trying to verify that something doesn't blow up
   ;; compile-times this is bound to be a bit brittle, but at least
   ;; here we try to establish a decent baseline.

@@ -88,13 +88,13 @@
     ;; Check that the binding stack was correctly unwound.
     (assert (eql *foo* 'x))))
 
-(with-test (:name (:restart-frame :special))
+(with-test (:name (:restart-frame :special) :fails-on :win32)
   (test-restart 'restart/special))
 
-(with-test (:name (:restart-frame :optional-special))
+(with-test (:name (:restart-frame :optional-special) :fails-on :win32)
   (test-restart 'restart/optional-special))
 
-(with-test (:name (:restart-frame :normal))
+(with-test (:name (:restart-frame :normal) :fails-on :win32)
   (test-restart 'restart/normal))
 
 
@@ -140,22 +140,23 @@
     ;; Check that the binding stack was correctly unwound.
     (assert (eql *foo* 'x))))
 
-(with-test (:name (:return-from-frame :special))
+(with-test (:name (:return-from-frame :special) :fails-on :win32)
   (test-return 'return/special))
 
-(with-test (:name (:return-from-frame :optional-special))
+(with-test (:name (:return-from-frame :optional-special) :fails-on :win32)
   (test-return 'return/optional-special))
 
-(with-test (:name (:return-from-frame :normal))
+(with-test (:name (:return-from-frame :normal) :fails-on :win32)
   (test-return 'return/normal))
 
 (defun throw-y () (throw 'y 'y))
 
 ;; Check that *CURRENT-CATCH-BLOCK* was correctly restored.
-(assert (eql (catch 'y
-               (test-return 'return/catch)
-               (throw-y))
-             'y))
+(with-test (:name :current-catch-block-restored :fails-on :win32)
+  (assert (eql (catch 'y
+                 (test-return 'return/catch)
+                 (throw-y))
+               'y)))
 
 
 ;;;; Test RETURN-FROM-FRAME with local functions
@@ -211,10 +212,10 @@
       (assert (equal *b* '(z))))
     (assert (eql *foo* 'x))))
 
-(with-test (:name (:return-from-frame :local-function))
+(with-test (:name (:return-from-frame :local-function) :fails-on :win32)
   (test-locals 'locals))
 
-(with-test (:name (:return-from-frame :hairy-local-function))
+(with-test (:name (:return-from-frame :hairy-local-function) :fails-on :win32)
   (test-locals 'hairy-locals))
 
 
@@ -262,16 +263,17 @@
         (assert (eql *foo* 'y)))
       (assert (eql *foo* 'x)))))
 
-(with-test (:name (:return-from-frame :anonymous :toplevel))
+(with-test (:name (:return-from-frame :anonymous :toplevel) :fails-on :win32)
   (test-anon *anon-1* 'foo (namestring *load-truename*)))
 
-(with-test (:name (:return-from-frame :anonymous :toplevel-special))
+(with-test (:name (:return-from-frame :anonymous :toplevel-special)
+                  :fails-on :win32)
   (test-anon *anon-2* '*foo* (namestring *load-truename*)))
 
-(with-test (:name (:return-from-frame :anonymous))
+(with-test (:name (:return-from-frame :anonymous) :fails-on :win32)
   (test-anon *anon-3* 'foo 'make-anon-3))
 
-(with-test (:name (:return-from-frame :anonymous :special))
+(with-test (:name (:return-from-frame :anonymous :special) :fails-on :win32)
   (test-anon *anon-4* '*foo* 'make-anon-4))
 
 
@@ -308,8 +310,10 @@
           (assert (eql *foo* 'y)))
         (assert (eql *foo* 'x))))))
 
-(test-unwind 'unwind-1 '(:unwind-1))
-(test-unwind 'unwind-2 '(:unwind-2 :unwind-1))
+(with-test (:name :test-unwind-1 :fails-on :win32)
+  (test-unwind 'unwind-1 '(:unwind-1)))
+(with-test (:name :test-unwind-2 :fails-on :win32)
+  (test-unwind 'unwind-2 '(:unwind-2 :unwind-1)))
 
 ;;; Regression in 1.0.10.47 reported by James Knight
 

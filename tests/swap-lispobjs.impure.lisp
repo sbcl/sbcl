@@ -29,21 +29,23 @@
              output))
     output))
 
-(run "/bin/sh" "run-compiler.sh"
-     "-sbcl-pic" "-sbcl-shared"
-     "-O3" "-I" "../src/runtime/"
-     "swap-lispobjs.c" "-o" "swap-lispobjs.so")
+(with-test (:name :swap-lispobjs/prepare :broken-on :win32)
+  (run "/bin/sh" "run-compiler.sh"
+       "-sbcl-pic" "-sbcl-shared"
+       "-O3" "-I" "../src/runtime/"
+       "swap-lispobjs.c" "-o" "swap-lispobjs.so")
 
-(load-shared-object (truename "swap-lispobjs.so"))
+  (load-shared-object (truename "swap-lispobjs.so"))
 
-(define-alien-routine try-to-zero-with-swap-lispobjs int
-  (lispobj-adress unsigned-long))
+  (define-alien-routine try-to-zero-with-swap-lispobjs int
+    (lispobj-adress unsigned-long)))
 
-(with-test (:name :swap-lispobjs)
+(with-test (:name :swap-lispobjs :fails-on :win32)
   (let ((x (cons 13 27)))
     (try-to-zero-with-swap-lispobjs
      (logandc2 (sb-kernel:get-lisp-obj-address x)
                sb-vm:lowtag-mask))
     (assert (equal x (cons 0 27)))))
 
-(delete-file "swap-lispobjs.so")
+(when (probe-file "swap-lispobjs.so")
+  (delete-file "swap-lispobjs.so"))

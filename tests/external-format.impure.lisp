@@ -124,7 +124,8 @@
     (write-byte #xe0 s)
     (dotimes (i 40)
       (write-sequence a s))))
-(with-test (:name (:character-decode-large :attempt-resync))
+(with-test (:name (:character-decode-large :attempt-resync)
+                  :fails-on :win32)
   (with-open-file (s *test-path* :direction :input
                      :external-format :utf-8)
     (let ((count 0))
@@ -992,7 +993,7 @@
     (with-open-file (s *test-path* :external-format :utf-32be)
       (assert (string= " ???? " (read-line s))))))
 
-(with-test (:name :invalid-external-format)
+(with-test (:name :invalid-external-format :fails-on :win32)
   (labels ((test-error (e)
              (assert (typep e 'error))
              (unless (equal "Undefined external-format: :BAD-FORMAT"

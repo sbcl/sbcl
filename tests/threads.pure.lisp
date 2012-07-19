@@ -412,14 +412,14 @@
     (assert (and (null value)
                  error))))
 
-(with-test (:name (:wait-for :basics))
+(with-test (:name (:wait-for :basics) :fails-on :win32)
   (assert (not (sb-ext:wait-for nil :timeout 0.1)))
   (assert (eql 42 (sb-ext:wait-for 42)))
   (let ((n 0))
     (assert (eql 100 (sb-ext:wait-for (when (= 100 (incf n))
                                         n))))))
 
-(with-test (:name (:wait-for :deadline))
+(with-test (:name (:wait-for :deadline) :fails-on :win32)
   (assert (eq :ok
               (sb-sys:with-deadline (:seconds 10)
                 (assert (not (sb-ext:wait-for nil :timeout 0.1)))
@@ -431,7 +431,7 @@
                     (error "oops"))
                 (sb-sys:deadline-timeout () :deadline)))))
 
-(with-test (:name (:condition-wait :timeout :one-thread))
+(with-test (:name (:condition-wait :timeout :one-thread) :fails-on :win32)
   (let ((mutex (make-mutex))
         (waitqueue (make-waitqueue)))
     (assert (not (with-mutex (mutex)
@@ -464,7 +464,7 @@
       (unless (eql 50 ok)
         (error "Wanted 50, got ~S" ok)))))
 
-(with-test (:name (:wait-on-semaphore :timeout :one-thread))
+(with-test (:name (:wait-on-semaphore :timeout :one-thread) :fails-on :win32)
   (let ((sem (make-semaphore))
         (n 0))
     (signal-semaphore sem 10)

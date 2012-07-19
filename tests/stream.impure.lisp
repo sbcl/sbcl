@@ -80,7 +80,8 @@
                        type-error))
 (assert (raises-error? (with-open-file (s "/dev/zero")
                          (read-byte s))
-                       type-error))
+                       #-win32 type-error
+                       #+win32 sb-int:simple-file-error))
 ;;; bidirectional streams getting confused about their position
 (let ((p "bidirectional-stream-test"))
   (with-open-file (s p :direction :output :if-exists :supersede)
@@ -131,27 +132,28 @@
 
 ;;; CLOSING a non-new streams should not delete them, and superseded
 ;;; files should be restored.
-(let ((test "test-file-for-close-should-not-delete"))
-  (macrolet ((test-mode (mode)
-               `(progn
-                 (catch :close-test-exit
-                   (with-open-file (f test :direction :output :if-exists ,mode)
-                     (write-line "test" f)
-                     (throw :close-test-exit t)))
-                 (assert (and (probe-file test) ,mode)))))
-    (unwind-protect
-         (progn
-           (with-open-file (f test :direction :output)
-             (write-line "test" f))
-           (test-mode :append)
-           (test-mode :overwrite)
-           ;; FIXME: We really should recover supersede files as well, according to
-           ;; CLOSE in CLHS, but at the moment we don't.
-           ;; (test-mode :supersede)
-           (test-mode :rename)
-           (test-mode :rename-and-delete))
-      (when (probe-file test)
-        (delete-file test)))))
+(with-test (:name test-file-for-close-should-not-delete :fails-on :win32)
+  (let ((test "test-file-for-close-should-not-delete"))
+    (macrolet ((test-mode (mode)
+                          `(progn
+                             (catch :close-test-exit
+                               (with-open-file (f test :direction :output :if-exists ,mode)
+                                               (write-line "test" f)
+                                               (throw :close-test-exit t)))
+                             (assert (and (probe-file test) ,mode)))))
+      (unwind-protect
+          (progn
+            (with-open-file (f test :direction :output)
+                            (write-line "test" f))
+            (test-mode :append)
+            (test-mode :overwrite)
+            ;; FIXME: We really should recover supersede files as well, according to
+            ;; CLOSE in CLHS, but at the moment we don't.
+            ;; (test-mode :supersede)
+            (test-mode :rename)
+            (test-mode :rename-and-delete))
+        (when (probe-file test)
+          (delete-file test))))))
 
 ;;; test for read-write invariance of signed bytes, from Bruno Haible
 ;;; cmucl-imp 2004-09-06
@@ -592,7 +594,7 @@
 ;;; READ-CHAR-NO-HANG on bivalent streams (as returned by RUN-PROGRAM)
 ;;; was wrong.  CSR managed to promote the wrongness to all streams in
 ;;; the 1.0.32.x series, breaking slime instantly.
-(with-test (:name :read-char-no-hang-after-unread-char)
+(with-test (:name :read-char-no-hang-after-unread-char :skipped-on :win32)
   (let* ((process (run-program "/bin/sh" '("-c" "echo a && sleep 10")
                                :output :stream :wait nil))
          (stream (process-output process))
@@ -607,9 +609,8 @@
       (read-char-no-hang stream)
       (assert (< (- (get-universal-time) time) 2)))))
 
-#-win32
 (require :sb-posix)
-
+#-win32
 (with-test (:name :interrupt-open :skipped-on :win32)
   (let ((fifo nil)
         (to 0))
@@ -639,7 +640,6 @@
         (ignore-errors (delete-file fifo))))))
 
 #-win32
-(require :sb-posix)
 (with-test (:name :overeager-character-buffering :skipped-on :win32)
   (let ((fifo nil)
         (proc nil))

@@ -98,7 +98,7 @@
 ;;; given only safe characters in the namestring, NATIVE-PATHNAME will
 ;;; never error, and NATIVE-NAMESTRING on the result will return the
 ;;; original namestring.
-(with-test (:name :random-native-namestrings)
+(with-test (:name :random-native-namestrings :fails-on :win32)
   (let ((safe-chars
          (coerce
           (cons #\Newline

@@ -61,7 +61,7 @@
 (assert (not (special-operator-p 'declare)))
 
 ;;; WITH-TIMEOUT should accept more than one form in its body.
-(with-test (:name :with-timeout-forms)
+(with-test (:name :with-timeout-forms :fails-on :win32)
   (handler-bind ((sb-ext:timeout #'continue))
     (sb-ext:with-timeout 3
       (sleep 2)

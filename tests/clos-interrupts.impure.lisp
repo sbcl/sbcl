@@ -77,7 +77,8 @@
 (defmethod compute-test ((x symbol) (y symbol))
   'symbol)
 
-(compute-test 1 2)
+(test-util:with-test (:name :compute-test :fails-on :win32)
+  (compute-test 1 2)
 
-;;; Check that we actually interrupted something.
-(assert (equal (list #'compute-test) *interrupted-gfs*))
+  ;; Check that we actually interrupted something.
+  (assert (equal (list #'compute-test) *interrupted-gfs*)))

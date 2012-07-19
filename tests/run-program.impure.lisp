@@ -19,7 +19,7 @@
 ;; (sometimes the handler will manage to WAIT3 a process before
 ;; run-tests WAITPIDs it).
 
-(with-test (:name :run-program-cat-1)
+(with-test (:name :run-program-cat-1 :skipped-on :win32)
   (let* ((process (sb-ext:run-program "/bin/cat" '() :wait nil
                                       :output :stream :input :stream))
          (out (process-input process))
@@ -31,7 +31,7 @@
               (assert (= (read-byte in) i)))
       (process-close process))))
 
-(with-test (:name :run-program-cat-2 :skipped-on '(not :sb-thread))
+(with-test (:name :run-program-cat-2 :skipped-on '(or (not :sb-thread) :win32))
   ;; Tests that reading from a FIFO is interruptible.
   (let* ((process (sb-ext:run-program "/bin/cat" '()
                                       :wait nil
@@ -97,7 +97,7 @@
              :start2 start :end2 end)
     seq))
 
-(with-test (:name :run-program-cat-3)
+(with-test (:name :run-program-cat-3 :skipped-on :win32)
   ;; User-defined binary input and output streams.
   (let ((in (make-instance 'buffer-stream))
         (out (make-instance 'buffer-stream))
@@ -109,7 +109,7 @@
       (assert (= 0 (read-sequence (make-array 8) out)))
       (assert (equalp buf data)))))
 
-(with-test (:name :run-program-cat-4)
+(with-test (:name :run-program-cat-4 :skipped-on :win32)
   ;; Null broadcast stream as output
   (let* ((process (sb-ext:run-program "/bin/cat" '() :wait nil
                                       :output (make-broadcast-stream)
@@ -127,24 +127,26 @@
 
 (require :sb-posix)
 
-(defun make-pipe ()
-  (multiple-value-bind (in out) (sb-posix:pipe)
-    (let ((input (sb-sys:make-fd-stream in
-                                        :input t
-                                        :external-format :ascii
-                                        :buffering :none :name "in"))
-          (output (sb-sys:make-fd-stream out
-                                         :output t
-                                         :external-format :ascii
-                                         :buffering :none :name "out")))
-      (make-two-way-stream input output))))
+#-win32
+(progn
+  (defun make-pipe ()
+    (multiple-value-bind (in out) (sb-posix:pipe)
+      (let ((input (sb-sys:make-fd-stream in
+                                          :input t
+                                          :external-format :ascii
+                                          :buffering :none :name "in"))
+            (output (sb-sys:make-fd-stream out
+                                           :output t
+                                           :external-format :ascii
+                                           :buffering :none :name "out")))
+        (make-two-way-stream input output))))
 
-(defparameter *cat-in-pipe* (make-pipe))
-(defparameter *cat-in* (make-synonym-stream '*cat-in-pipe*))
-(defparameter *cat-out-pipe* (make-pipe))
-(defparameter *cat-out* (make-synonym-stream '*cat-out-pipe*))
+  (defparameter *cat-in-pipe* (make-pipe))
+  (defparameter *cat-in* (make-synonym-stream '*cat-in-pipe*))
+  (defparameter *cat-out-pipe* (make-pipe))
+  (defparameter *cat-out* (make-synonym-stream '*cat-out-pipe*)))
 
-(with-test (:name :run-program-cat-5)
+(with-test (:name :run-program-cat-5 :fails-on :win32)
   (let ((cat (run-program "/bin/cat" nil :input *cat-in* :output *cat-out*
                           :wait nil)))
     (dolist (test '("This is a test!"
@@ -157,6 +159,9 @@
 ;;; The above test used to use ed, but there were buffering issues: on some platforms
 ;;; buffering of stdin and stdout depends on their TTYness, and ed isn't sufficiently
 ;;; agressive about flushing them. So, here's another test using :PTY.
+
+#-win32 ( ;; kludge: It would be nicer to disable individual test cases,
+          ;; but we are not using WITH-TEST yet here.
 
 (defparameter *tmpfile* "run-program-ed-test.tmp")
 
@@ -201,6 +206,8 @@
          (assert (equal "baz" (read-line f)))))
   (delete-file *tmpfile*))
 
+) ;; #-win32
+
 ;; Around 1.0.12 there was a regression when :INPUT or :OUTPUT was a
 ;; pathname designator.  Since these use the same code, it should
 ;; suffice to test just :INPUT.
@@ -217,7 +224,7 @@
 
 ;;; This used to crash on Darwin and trigger recursive lock errors on
 ;;; every platform.
-(with-test (:name (:run-program :stress))
+(with-test (:name (:run-program :stress) :fails-on :win32)
   ;; Do it a hundred times in batches of 10 so that with a low limit
   ;; of the number of processes the test can have a chance to pass.
   (loop
@@ -230,7 +237,7 @@
                                   ("It would be nice if this didn't crash.")
                                   :wait nil :output nil)))))
 
-(with-test (:name (:run-program :pty-stream))
+(with-test (:name (:run-program :pty-stream) :fails-on :win32)
   (assert (equal "OK"
                  (subseq
                   (with-output-to-string (s)
@@ -247,7 +254,7 @@
 ;; We can't check for the signal itself since run-program.c resets the
 ;; forked process' signal mask to defaults. But the default is `stop'
 ;; of which we can be notified asynchronously by providing a status hook.
-(with-test (:name (:run-program :inherit-stdin))
+(with-test (:name (:run-program :inherit-stdin) :fails-on :win32)
   (let (stopped)
     (flet ((status-hook (proc)
              (case (sb-ext:process-status proc)
@@ -267,7 +274,8 @@
 
 ;; Check that in when you do run-program with :wait t that causes
 ;; encoding error, it does not affect the following run-program
-(with-test (:name (:run-program :clean-exit-after-encoding-error))
+(with-test (:name (:run-program :clean-exit-after-encoding-error)
+                  :fails-on :win32)
   (let ((had-error-p nil))
     (flet ((barf (&optional (format :default))
              (with-output-to-string (stream)
@@ -307,6 +315,7 @@
                     (error (e)
                       (princ-to-string e))))))
 
+#-win32
 (with-test (:name (:run-program :if-input-does-not-exist))
   (let ((file (pathname (sb-posix:mktemp "rpXXXXXX"))))
     (assert (null (sb-ext:run-program "/bin/cat" '() :input file)))

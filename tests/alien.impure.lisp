@@ -247,8 +247,11 @@
 
 ;;; void conflicted with derived type
 (declaim (inline bug-316075))
+#-win32 ;kludge: This reader conditional masks a bug, but allows the test
+        ;to fail cleanly.
 (sb-alien:define-alien-routine bug-316075 void (result char :out))
-(with-test (:name bug-316075)
+(with-test (:name bug-316075 :fails-on :win32)
+  #+win32 (error "fail")
   (handler-bind ((warning #'error))
     (compile nil '(lambda () (multiple-value-list (bug-316075))))))
 
@@ -293,7 +296,7 @@
     (verify (signed 16)   #x003f8042 #x-7fbe)
     (verify (signed 16)   #x003f7042 #x7042)))
 
-(with-test (:name :bug-654485)
+(with-test (:name :bug-654485 :fails-on :win32)
   ;; DEBUG 2 used to prevent let-conversion of the open-coded ALIEN-FUNCALL body,
   ;; which in turn led the dreaded %SAP-ALIEN note.
   (handler-case
@@ -306,7 +309,7 @@
     (compiler-note (n)
       (error "bad note: ~A" n))))
 
-(with-test (:name :bug-721087)
+(with-test (:name :bug-721087 :fails-on :win32)
   (assert (typep nil '(alien c-string)))
   (assert (not (typep nil '(alien (c-string :not-null t)))))
   (assert (eq :ok

@@ -32,7 +32,7 @@
 ;;; some things SBCL-0.6.9 used not to parse correctly:
 ;;;
 ;;; SBCL used to throw an error saying there's no translation.
-(with-test (:name (:logical-pathname 1))
+(with-test (:name (:logical-pathname 1) :fails-on :win32)
   (assert (equal (namestring (translate-logical-pathname "demo0:file.lisp"))
                  "/tmp/file.lisp")))
 
@@ -49,12 +49,12 @@
                     "/tmp/**/foo.lisp"))))
 
 ;;; That should be correct:
-(with-test (:name (:logical-pathname 4))
+(with-test (:name (:logical-pathname 4) :fails-on :win32)
   (assert (equal (namestring (translate-logical-pathname "demo1:foo.lisp"))
                  "/tmp/foo.lisp")))
 
 ;;; Check for absolute/relative path confusion:
-(with-test (:name (:logical-pathname 5))
+(with-test (:name (:logical-pathname 5) :fails-on :win32)
   (assert (not (equal (namestring (translate-logical-pathname "demo1:;foo.lisp"))
                       "tmp/rel/foo.lisp")))
   (assert (equal (namestring (translate-logical-pathname "demo1:;foo.lisp"))
@@ -153,7 +153,7 @@
 ;;; there's some code in this section which should be attributed
 ;;; to something in the ANSI spec, but I don't know what code it is
 ;;; or what section of the specification has the related code.
-(with-test (:name (:logical-pathname 14))
+(with-test (:name (:logical-pathname 14) :fails-on :win32)
   (setf (logical-pathname-translations "test0")
         '(("**;*.*.*"              "/library/foo/**/")))
   (assert (equal (namestring (translate-logical-pathname
@@ -179,7 +179,7 @@
 ;;; ANSI section 19.3.1.1.5 specifies that translation to a filesystem
 ;;; which doesn't have versions should ignore the version slot. CMU CL
 ;;; didn't ignore this as it should, but we do.
-(with-test (:name (:logical-pathname 15))
+(with-test (:name (:logical-pathname 15) :fails-on :win32)
   (assert (equal (namestring (translate-logical-pathname
                               "test0:foo;bar;baz;mum.quux.3"))
                  "/library/foo/foo/bar/baz/mum.quux")))
@@ -325,7 +325,7 @@
 
 ;;; ensure read/print consistency (or print-not-readable-error) on
 ;;; pathnames:
-(with-test (:name :print/read-consistency)
+(with-test (:name :print/read-consistency :fails-on :win32)
   (let ((pathnames (list
                     (make-pathname :name "foo" :type "txt" :version :newest)
                     (make-pathname :name "foo" :type "txt" :version 1)
@@ -398,7 +398,7 @@
 
 ;;; we got (truename "/") wrong for about 6 months.  Check that it's
 ;;; still right.
-(with-test (:name :root-truename)
+(with-test (:name :root-truename :fails-on :win32)
   (let ((pathname (truename "/")))
     (assert (equalp pathname #p"/"))
     (assert (equal (pathname-directory pathname) '(:absolute)))))
@@ -412,7 +412,7 @@
     (assert (string= (write-to-string pathname :readably t) "#P\"SYS:**;*\""))))
 
 ;;; reported by James Y Knight on sbcl-devel 2006-05-17
-(with-test (:name :merge-back)
+(with-test (:name :merge-back :fails-on :win32)
   (let ((p1 (make-pathname :directory '(:relative "bar")))
         (p2 (make-pathname :directory '(:relative :back "foo"))))
     (assert (equal (merge-pathnames p1 p2)
@@ -535,7 +535,7 @@
   (assert (equal (make-pathname :directory '(:absolute))
                  (read-from-string "#p\"\\\\\\\\\""))))
 
-(with-test (:name :load-logical-pathname-translations)
+(with-test (:name :load-logical-pathname-translations :fails-on :win32)
   (let* ((cwd (truename "."))
          (foo (merge-pathnames "llpnt-foo.translations" cwd))
          (bar (merge-pathnames "llpnt-bar.translations" cwd))
@@ -567,7 +567,7 @@
       (ignore-errors (delete-file bar))
       (setf (logical-pathname-translations "SYS") translations))))
 
-(with-test (:name :tilde-expansion)
+(with-test (:name :tilde-expansion :fails-on :win32)
   (assert (equal '(:absolute :home "foo") (pathname-directory "~/foo/bar.txt")))
   (assert (equal '(:absolute (:home "jdoe") "quux") (pathname-directory "~jdoe/quux/")))
   (assert (equal "~/foo/x" (namestring (make-pathname :directory '(:absolute :home "foo")
@@ -592,7 +592,8 @@
   ;; * / :WILD
   (assert (equal (pathname-directory #p"\\*/") '(:relative "*"))))
 
-(with-test (:name :ensure-directories-exist-with-odd-d-p-d)
+(with-test (:name :ensure-directories-exist-with-odd-d-p-d
+                  :fails-on :win32)
   (let ((*default-pathname-defaults* #p"/tmp/foo"))
     (ensure-directories-exist "/")))
 

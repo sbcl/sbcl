@@ -84,8 +84,10 @@
            *loaded-pathname* *loaded-truename*)
        (load ,load-argument :print t :verbose t)
        (assert (and (= (1+ ,before) *counter*)
+                    #-win32 ;kludge
                     (equal ,(if pathname `(merge-pathnames ,pathname))
                            *loaded-pathname*)
+                    #-win32 ;kludge
                     (equal ,(if pathname `(merge-pathnames ,truename))
                            *loaded-truename*))))))
 
@@ -272,7 +274,7 @@
                                      (invoke-restart 'sb-fasl::object)))))
       (load-and-assert spec fasl fasl))))
 
-(with-test (:name :bug-332)
+(with-test (:name :bug-332 :fails-on :win32)
   (flet ((stimulate-sbcl ()
            (let ((filename (format nil "/tmp/~A.lisp" (gensym))))
              ;; create a file which redefines a structure incompatibly
