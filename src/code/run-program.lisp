@@ -386,14 +386,16 @@ status slot."
     ;; First try to use the Unix98 pty api.
     (let* ((master-name (coerce (format nil "/dev/ptmx") 'base-string))
            (master-fd (sb-unix:unix-open master-name
-                                         sb-unix:o_rdwr
+                                         (logior sb-unix:o_rdwr
+                                                 sb-unix:o_noctty)
                                          #o666)))
       (when master-fd
         (grantpt master-fd)
         (unlockpt master-fd)
         (let* ((slave-name (ptsname master-fd))
                (slave-fd (sb-unix:unix-open slave-name
-                                            sb-unix:o_rdwr
+                                            (logior sb-unix:o_rdwr
+                                                    sb-unix:o_noctty)
                                             #o666)))
           (when slave-fd
             (return-from find-a-pty
@@ -408,13 +410,15 @@ status slot."
         (let* ((master-name (coerce (format nil "/dev/pty~C~X" char digit)
                                     'base-string))
                (master-fd (sb-unix:unix-open master-name
-                                             sb-unix:o_rdwr
+                                             (logior sb-unix:o_rdwr
+                                                     sb-unix:o_noctty)
                                              #o666)))
           (when master-fd
             (let* ((slave-name (coerce (format nil "/dev/tty~C~X" char digit)
                                        'base-string))
                    (slave-fd (sb-unix:unix-open slave-name
-                                                sb-unix:o_rdwr
+                                                (logior sb-unix:o_rdwr
+                                                        sb-unix:o_noctty)
                                                 #o666)))
               (when slave-fd
                 (return-from find-a-pty
