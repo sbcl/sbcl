@@ -1,5 +1,5 @@
 ;;; -*- mode: Common-Lisp; Base: 10 ; Syntax: ANSI-Common-Lisp ; coding: utf-8 -*-
-;;; This is ASDF 2.21: Another System Definition Facility.
+;;; This is ASDF 2.23: Another System Definition Facility.
 ;;;
 ;;; Feedback, bug reports, and patches are all welcome:
 ;;; please mail to <asdf-devel@common-lisp.net>.
@@ -116,7 +116,7 @@
          ;; "2.345.6" would be a development version in the official upstream
          ;; "2.345.0.7" would be your seventh local modification of official release 2.345
          ;; "2.345.6.7" would be your seventh local modification of development version 2.345.6
-         (asdf-version "2.21")
+         (asdf-version "2.23")
          (existing-asdf (find-class 'component nil))
          (existing-version *asdf-version*)
          (already-there (equal asdf-version existing-version)))
@@ -371,7 +371,8 @@
             #:coerce-name
             #:directory-pathname-p #:ensure-directory-pathname
             #:absolute-pathname-p #:ensure-pathname-absolute #:pathname-root
-            #:getenv
+            #:getenv #:getenv-pathname #:getenv-pathname
+            #:getenv-absolute-directory #:getenv-absolute-directories
             #:probe-file*
             #:find-symbol* #:strcat
             #:make-pathname-component-logical #:make-pathname-logical
@@ -1343,7 +1344,7 @@ processed in order by OPERATE."))
     :initarg :if-component-dep-fails
     :accessor module-if-component-dep-fails)
    (default-component-class
-    :initform *default-component-class*
+    :initform nil
     :initarg :default-component-class
     :accessor module-default-component-class)))
 
@@ -2464,11 +2465,11 @@ recursive calls to traverse.")
         (*compile-file-failure-behaviour* (operation-on-failure operation)))
     (multiple-value-bind (output warnings-p failure-p)
         (call-with-around-compile-hook
-         c #'(lambda ()
+         c #'(lambda (&rest flags)
                (apply *compile-op-compile-file-function* source-file
                       :output-file output-file
                       :external-format (component-external-format c)
-                      (compile-op-flags operation))))
+                      (append flags (compile-op-flags operation)))))
       (unless output
         (error 'compile-error :component c :operation operation))
       (when failure-p
@@ -2788,6 +2789,11 @@ details."
         directory-pathname
         (default-directory))))
 
+(defun* find-class* (x &optional (errorp t) environment)
+  (etypecase x
+    ((or standard-class built-in-class) x)
+    (symbol (find-class x errorp environment))))
+
 (defun* class-for-type (parent type)
   (or (loop :for symbol :in (list
                              type
@@ -2799,8 +2805,10 @@ details."
                                  class (find-class 'component)))
         :return class)
       (and (eq type :file)
-           (or (and parent (module-default-component-class parent))
-               (find-class *default-component-class*)))
+           (find-class*
+            (or (loop :for module = parent :then (component-parent module) :while module
+                  :thereis (module-default-component-class module))
+                *default-component-class*) nil))
       (sysdef-error "don't recognize component type ~A" type)))
 
 (defun* maybe-add-tree (tree op1 op2 c)
@@ -2886,7 +2894,7 @@ Returns the new tree (which probably shares structure with the old one)"
         (type name &rest rest &key
               ;; the following list of keywords is reproduced below in the
               ;; remove-keys form.  important to keep them in sync
-              components pathname default-component-class
+              components pathname
               perform explain output-files operation-done-p
               weakly-depends-on depends-on serial in-order-to
               do-first
@@ -2913,7 +2921,7 @@ Returns the new tree (which probably shares structure with the old one)"
                         :pathname pathname
                         :parent parent
                         (remove-keys
-                         '(components pathname default-component-class
+                         '(components pathname
                            perform explain output-files operation-done-p
                            weakly-depends-on depends-on serial in-order-to)
                          rest)))
@@ -2927,10 +2935,6 @@ Returns the new tree (which probably shares structure with the old one)"
           (setf ret (apply 'make-instance (class-for-type parent type) args)))
       (component-pathname ret) ; eagerly compute the absolute pathname
       (when (typep ret 'module)
-        (setf (module-default-component-class ret)
-              (or default-component-class
-                  (and (typep parent 'module)
-                       (module-default-component-class parent))))
         (let ((*serial-depends-on* nil))
           (setf (module-components ret)
                 (loop
@@ -3287,37 +3291,44 @@ located."
     #+mcl (current-user-homedir-pathname)
     #-mcl (user-homedir-pathname))))
 
-(defun* ensure-absolute-pathname* (x fmt &rest args)
-  (and (plusp (length x))
-       (or (absolute-pathname-p x)
-           (cerror "ignore relative pathname"
-                   "Invalid relative pathname ~A~@[ ~?~]" x fmt args))
-       x))
-(defun* split-absolute-pathnames (x fmt &rest args)
+(defun* ensure-pathname* (x want-absolute want-directory fmt &rest args)
+  (when (plusp (length x))
+    (let ((p (if want-directory (ensure-directory-pathname x) (pathname x))))
+      (when want-absolute
+        (unless (absolute-pathname-p p)
+          (cerror "ignore relative pathname"
+                  "Invalid relative pathname ~A~@[ ~?~]" x fmt args)
+          (return-from ensure-pathname* nil)))
+      p)))
+(defun* split-pathnames* (x want-absolute want-directory fmt &rest args)
   (loop :for dir :in (split-string
                       x :separator (string (inter-directory-separator)))
-    :do (apply 'ensure-absolute-pathname* dir fmt args)
-    :collect dir))
-(defun getenv-absolute-pathname (x &aux (s (getenv x)))
-  (ensure-absolute-pathname* s "from (getenv ~S)" x))
-(defun getenv-absolute-pathnames (x &aux (s (getenv x)))
+        :collect (apply 'ensure-pathname* dir want-absolute want-directory fmt args)))
+(defun getenv-pathname (x &key want-absolute want-directory &aux (s (getenv x)))
+  (ensure-pathname* s want-absolute want-directory "from (getenv ~S)" x))
+(defun getenv-pathnames (x &key want-absolute want-directory &aux (s (getenv x)))
   (and (plusp (length s))
-       (split-absolute-pathnames s "from (getenv ~S) = ~S" x s)))
+       (split-pathnames* s want-absolute want-directory "from (getenv ~S) = ~S" x s)))
+(defun getenv-absolute-directory (x)
+  (getenv-pathname x :want-absolute t :want-directory t))
+(defun getenv-absolute-directories (x)
+  (getenv-pathnames x :want-absolute t :want-directory t))
+
 
 (defun* user-configuration-directories ()
   (let ((dirs
          `(,@(when (os-unix-p)
                (cons
-                (subpathname* (getenv-absolute-pathname "XDG_CONFIG_HOME") "common-lisp/")
-                (loop :for dir :in (getenv-absolute-pathnames "XDG_CONFIG_DIRS")
+                (subpathname* (getenv-absolute-directory "XDG_CONFIG_HOME") "common-lisp/")
+                (loop :for dir :in (getenv-absolute-directories "XDG_CONFIG_DIRS")
                   :collect (subpathname* dir "common-lisp/"))))
            ,@(when (os-windows-p)
                `(,(subpathname* (or #+lispworks (sys:get-folder-path :local-appdata)
-                                    (getenv-absolute-pathname "LOCALAPPDATA"))
+                                    (getenv-absolute-directory "LOCALAPPDATA"))
                                "common-lisp/config/")
                  ;; read-windows-registry HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\User Shell Folders\AppData
                  ,(subpathname* (or #+lispworks (sys:get-folder-path :appdata)
-                                    (getenv-absolute-pathname "APPDATA"))
+                                    (getenv-absolute-directory "APPDATA"))
                                 "common-lisp/config/")))
            ,(subpathname (user-homedir) ".config/common-lisp/"))))
     (remove-duplicates (remove-if-not #'absolute-pathname-p dirs)
@@ -3330,8 +3341,8 @@ located."
      (aif
       ;; read-windows-registry HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\User Shell Folders\Common AppData
       (subpathname* (or #+lispworks (sys:get-folder-path :common-appdata)
-                        (getenv-absolute-pathname "ALLUSERSAPPDATA")
-                        (subpathname* (getenv-absolute-pathname "ALLUSERSPROFILE") "Application Data/"))
+                        (getenv-absolute-directory "ALLUSERSAPPDATA")
+                        (subpathname* (getenv-absolute-directory "ALLUSERSPROFILE") "Application Data/"))
                     "common-lisp/config/")
       (list it)))))
 
@@ -3455,12 +3466,12 @@ and the order is by decreasing length of namestring of the source pathname.")
 (defvar *user-cache*
   (flet ((try (x &rest sub) (and x `(,x ,@sub))))
     (or
-     (try (getenv-absolute-pathname "XDG_CACHE_HOME") "common-lisp" :implementation)
+     (try (getenv-absolute-directory "XDG_CACHE_HOME") "common-lisp" :implementation)
      (when (os-windows-p)
        (try (or #+lispworks (sys:get-folder-path :local-appdata)
-                (getenv-absolute-pathname "LOCALAPPDATA")
+                (getenv-absolute-directory "LOCALAPPDATA")
                 #+lispworks (sys:get-folder-path :appdata)
-                (getenv-absolute-pathname "APPDATA"))
+                (getenv-absolute-directory "APPDATA"))
             "common-lisp" "cache" :implementation))
      '(:home ".cache" "common-lisp" :implementation))))
 
@@ -3684,10 +3695,10 @@ Please remove it from your ASDF configuration"))
   `(:output-translations
     ;; Some implementations have precompiled ASDF systems,
     ;; so we must disable translations for implementation paths.
-    #+sbcl ,(let ((h (getenv "SBCL_HOME")))
-                 (when (plusp (length h)) `((,(truenamize h) ,*wild-inferiors*) ())))
+    #+sbcl ,(let ((h (getenv-pathname "SBCL_HOME" :want-directory t)))
+              (when h `((,(truenamize h) ,*wild-inferiors*) ())))
     ;; The below two are not needed: no precompiled ASDF system there
-    ;; #+ecl (,(translate-logical-pathname "SYS:**;*.*") ())
+    #+ecl (,(translate-logical-pathname "SYS:**;*.*") ())
     ;; #+clozure ,(ignore-errors (list (wilden (let ((*default-pathname-defaults* #p"")) (truename #p"ccl:"))) ()))
     ;; All-import, here is where we want user stuff to be:
     :inherit-configuration
@@ -3879,12 +3890,13 @@ effectively disabling the output translation facility."
   (when (and x (probe-file* x))
     (delete-file x)))
 
-(defun* compile-file* (input-file &rest keys &key output-file &allow-other-keys)
-  (let* ((output-file (apply 'compile-file-pathname* input-file :output-file output-file keys))
+(defun* compile-file* (input-file &rest keys &key compile-check output-file &allow-other-keys)
+  (let* ((keywords (remove-keyword :compile-check keys))
+         (output-file (apply 'compile-file-pathname* input-file :output-file output-file keywords))
          (tmp-file (tmpize-pathname output-file))
          (status :error))
     (multiple-value-bind (output-truename warnings-p failure-p)
-        (apply 'compile-file input-file :output-file tmp-file keys)
+        (apply 'compile-file input-file :output-file tmp-file keywords)
       (cond
         (failure-p
          (setf status *compile-file-failure-behaviour*))
@@ -3892,15 +3904,19 @@ effectively disabling the output translation facility."
          (setf status *compile-file-warnings-behaviour*))
         (t
          (setf status :success)))
-      (ecase status
-        ((:success :warn :ignore)
+      (cond
+        ((and (ecase status
+                ((:success :warn :ignore) t)
+                ((:error nil)))
+              (or (not compile-check)
+                  (apply compile-check input-file :output-file tmp-file keywords)))
          (delete-file-if-exists output-file)
          (when output-truename
            (rename-file output-truename output-file)
            (setf output-truename output-file)))
-        (:error
+        (t ;; error or failed check
          (delete-file-if-exists output-truename)
-         (setf output-truename nil)))
+         (setf output-truename nil failure-p t)))
       (values output-truename warnings-p failure-p))))
 
 #+abcl
@@ -4011,21 +4027,24 @@ with a different configuration, so the configuration would be re-read then."
       entries))
 
 (defun* directory-files (directory &optional (pattern *wild-file*))
-  (setf directory (pathname directory))
-  (when (wild-pathname-p directory)
-    (error "Invalid wild in ~S" directory))
-  (unless (member (pathname-directory pattern) '(() (:relative)) :test 'equal)
-    (error "Invalid file pattern ~S" pattern))
-  (when (typep directory 'logical-pathname)
-    (setf pattern (make-pathname-logical pattern (pathname-host directory))))
-  (let ((entries (ignore-errors (directory* (merge-pathnames* pattern directory)))))
-    (filter-logical-directory-results
-     directory entries
-     #'(lambda (f)
-         (make-pathname :defaults directory
-                        :name (pathname-name f)
-                        :type (make-pathname-component-logical (pathname-type f))
-                        :version (make-pathname-component-logical (pathname-version f)))))))
+  (let ((dir (pathname directory)))
+    (when (typep dir 'logical-pathname)
+      ;; Because of the filtering we do below,
+      ;; logical pathnames have restrictions on wild patterns.
+      ;; Not that the results are very portable when you use these patterns on physical pathnames.
+      (when (wild-pathname-p dir)
+        (error "Invalid wild pattern in logical directory ~S" directory))
+      (unless (member (pathname-directory pattern) '(() (:relative)) :test 'equal)
+        (error "Invalid file pattern ~S for logical directory ~S" pattern directory))
+      (setf pattern (make-pathname-logical pattern (pathname-host dir))))
+    (let ((entries (ignore-errors (directory* (merge-pathnames* pattern dir)))))
+      (filter-logical-directory-results
+       directory entries
+       #'(lambda (f)
+           (make-pathname :defaults dir
+                          :name (make-pathname-component-logical (pathname-name f))
+                          :type (make-pathname-component-logical (pathname-type f))
+                          :version (make-pathname-component-logical (pathname-version f))))))))
 
 (defun* directory-asd-files (directory)
   (directory-files directory *wild-asd*))
@@ -4173,7 +4192,7 @@ with a different configuration, so the configuration would be re-read then."
 
 (defun* wrapping-source-registry ()
   `(:source-registry
-    #+sbcl (:tree ,(truenamize (getenv "SBCL_HOME")))
+    #+sbcl (:tree ,(truenamize (getenv-pathname "SBCL_HOME" :want-directory t)))
     :inherit-configuration
     #+cmu (:tree #p"modules:")
     #+scl (:tree #p"file://modules/")))
@@ -4183,18 +4202,18 @@ with a different configuration, so the configuration would be re-read then."
     (:directory ,(default-directory))
       ,@(loop :for dir :in
           `(,@(when (os-unix-p)
-                `(,(or (getenv-absolute-pathname "XDG_DATA_HOME")
+                `(,(or (getenv-absolute-directory "XDG_DATA_HOME")
                        (subpathname (user-homedir) ".local/share/"))
-                  ,@(or (getenv-absolute-pathnames "XDG_DATA_DIRS")
+                  ,@(or (getenv-absolute-directories "XDG_DATA_DIRS")
                         '("/usr/local/share" "/usr/share"))))
             ,@(when (os-windows-p)
                 `(,(or #+lispworks (sys:get-folder-path :local-appdata)
-                       (getenv-absolute-pathname "LOCALAPPDATA"))
+                       (getenv-absolute-directory "LOCALAPPDATA"))
                   ,(or #+lispworks (sys:get-folder-path :appdata)
-                       (getenv-absolute-pathname "APPDATA"))
+                       (getenv-absolute-directory "APPDATA"))
                   ,(or #+lispworks (sys:get-folder-path :common-appdata)
-                       (getenv-absolute-pathname "ALLUSERSAPPDATA")
-                       (subpathname* (getenv-absolute-pathname "ALLUSERSPROFILE") "Application Data/")))))
+                       (getenv-absolute-directory "ALLUSERSAPPDATA")
+                       (subpathname* (getenv-absolute-directory "ALLUSERSPROFILE") "Application Data/")))))
           :collect `(:directory ,(subpathname* dir "common-lisp/systems/"))
           :collect `(:tree ,(subpathname* dir "common-lisp/source/")))
       :inherit-configuration))
@@ -4399,7 +4418,7 @@ with a different configuration, so the configuration would be re-read then."
     (let ((*verbose-out* (make-broadcast-stream))
           (system (find-system (string-downcase name) nil)))
       (when system
-        (operate *require-asdf-operator* system :verbose nil)
+        (operate *require-asdf-operator* system :verbose nil :force-not (loaded-systems))
         t))))
 
 #+(or abcl clisp clozure cmu ecl sbcl)
