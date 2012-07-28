@@ -18,7 +18,8 @@ echo //entering make-target-contrib.sh
 
 LANG=C
 LC_ALL=C
-export LANG LC_ALL
+CC=${CC:-gcc}
+export CC LANG LC_ALL
 
 # Load our build configuration
 . output/build-config
