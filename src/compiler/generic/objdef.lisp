@@ -419,8 +419,10 @@
   ;; Same as above for the location of the current control stack
   ;; pointer.  This is also used on threaded x86oids to allow LDB to
   ;; print an approximation of the CSP as needed.
-  #!+(and sb-thread)
+  #!+sb-thread
   (control-stack-pointer :c-type "lispobj *")
+  #!+mach-exception-handler
+  (mach-port-name :c-type "mach_port_name_t")
   ;; KLUDGE: On alpha, until STEPPING we have been lucky and the 32
   ;; bit slots came in pairs. However the C compiler will align
   ;; interrupt_contexts on a double word boundary. This logic should

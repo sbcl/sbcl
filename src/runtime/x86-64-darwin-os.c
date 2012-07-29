@@ -65,8 +65,6 @@ pthread_mutex_t mach_exception_lock = PTHREAD_MUTEX_INITIALIZER;
 
 #ifdef LISP_FEATURE_MACH_EXCEPTION_HANDLER
 
-kern_return_t mach_thread_init(mach_port_t thread_exception_port);
-
 void sigill_handler(int signal, siginfo_t *siginfo, os_context_t *context);
 void sigtrap_handler(int signal, siginfo_t *siginfo, os_context_t *context);
 void memory_fault_handler(int signal, siginfo_t *siginfo,

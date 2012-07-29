@@ -392,14 +392,7 @@ new_thread_trampoline(struct thread *th)
                   (sizeof (struct interrupt_data)));
 
 #ifdef LISP_FEATURE_MACH_EXCEPTION_HANDLER
-    FSHOW((stderr, "Deallocating mach port %x\n", THREAD_STRUCT_TO_EXCEPTION_PORT(th)));
-    mach_port_move_member(current_mach_task,
-                          THREAD_STRUCT_TO_EXCEPTION_PORT(th),
-                          MACH_PORT_NULL);
-    mach_port_deallocate(current_mach_task,
-                         THREAD_STRUCT_TO_EXCEPTION_PORT(th));
-    mach_port_destroy(current_mach_task,
-                      THREAD_STRUCT_TO_EXCEPTION_PORT(th));
+    mach_lisp_thread_destroy(th);
 #endif
 
     schedule_thread_post_mortem(th);
@@ -589,12 +582,6 @@ create_thread_struct(lispobj initial_function) {
     th->stepping = NIL;
     return th;
 }
-
-#ifdef LISP_FEATURE_MACH_EXCEPTION_HANDLER
-mach_port_t setup_mach_exception_handling_thread();
-kern_return_t mach_thread_init(mach_port_t thread_exception_port);
-
-#endif
 
 void create_initial_thread(lispobj initial_function) {
     struct thread *th=create_thread_struct(initial_function);

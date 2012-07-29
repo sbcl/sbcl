@@ -12,12 +12,6 @@
 #include <machine/fpu.h>
 #endif
 
-#ifdef LISP_FEATURE_MACH_EXCEPTION_HANDLER
-#include <mach/mach.h>
-
-kern_return_t mach_thread_init(mach_port_t thread_exception_port);
-#endif
-
 /* KLUDGE: There is strong family resemblance in the signal context
  * stuff in FreeBSD and OpenBSD, but in detail they're different in
  * almost every line of code. It would be nice to find some way to
@@ -155,7 +149,7 @@ int arch_os_thread_init(struct thread *thread) {
 #endif
 
 #ifdef LISP_FEATURE_MACH_EXCEPTION_HANDLER
-    mach_thread_init(THREAD_STRUCT_TO_EXCEPTION_PORT(thread));
+    mach_lisp_thread_init(thread);
 #endif
 
 #ifdef LISP_FEATURE_C_STACK_IS_CONTROL_STACK

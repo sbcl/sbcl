@@ -44,10 +44,6 @@ void set_data_desc_addr(data_desc_t* desc, void* addr)
 
 #endif
 
-#ifdef LISP_FEATURE_MACH_EXCEPTION_HANDLER
-kern_return_t mach_thread_init(mach_port_t thread_exception_port);
-#endif
-
 int arch_os_thread_init(struct thread *thread) {
 #ifdef LISP_FEATURE_SB_THREAD
     int n;
@@ -79,7 +75,7 @@ int arch_os_thread_init(struct thread *thread) {
     pthread_setspecific(specials,thread);
 #endif
 #ifdef LISP_FEATURE_MACH_EXCEPTION_HANDLER
-    mach_thread_init(THREAD_STRUCT_TO_EXCEPTION_PORT(thread));
+    mach_lisp_thread_init(thread);
 #endif
 
 #ifdef LISP_FEATURE_C_STACK_IS_CONTROL_STACK
@@ -386,7 +382,6 @@ catch_exception_raise(mach_port_t exception_port,
                       exception_data_t code_vector,
                       mach_msg_type_number_t code_count)
 {
-    struct thread *th = (struct thread*) exception_port;
     x86_thread_state32_t thread_state;
     mach_msg_type_number_t state_count;
     vm_address_t region_addr;
@@ -399,6 +394,10 @@ catch_exception_raise(mach_port_t exception_port,
     void (*handler)(int, siginfo_t *, void *) = NULL;
     siginfo_t siginfo;
     kern_return_t ret, dealloc_ret;
+
+    struct thread *th = (struct thread*) exception_port;
+
+    FSHOW((stderr,"/entering catch_exception_raise with exception: %d\n", exception));
 
     /* Get state and info */
     state_count = x86_THREAD_STATE32_COUNT;

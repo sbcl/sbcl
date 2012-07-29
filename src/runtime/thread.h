@@ -229,8 +229,8 @@ static inline struct thread *arch_os_get_current_thread(void)
 }
 
 #if defined(LISP_FEATURE_MACH_EXCEPTION_HANDLER)
-#define THREAD_STRUCT_TO_EXCEPTION_PORT(th) ((mach_port_t) th)
-#define EXCEPTION_PORT_TO_THREAD_STRUCT(th) ((struct thread *) th)
+extern kern_return_t mach_lisp_thread_init(struct thread *thread);
+extern kern_return_t mach_lisp_thread_destroy(struct thread *thread);
 #endif
 
 extern void create_initial_thread(lispobj);

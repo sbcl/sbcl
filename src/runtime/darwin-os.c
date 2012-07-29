@@ -148,10 +148,32 @@ mach_thread_init(mach_port_t thread_exception_port)
     return ret;
 }
 
+kern_return_t
+mach_lisp_thread_init(struct thread *thread) {
+    mach_port_t port = (mach_port_t) thread;
+    kern_return_t ret;
+    ret = mach_thread_init(port);
+    thread->mach_port_name = port;
+
+    return ret;
+}
+
+kern_return_t
+mach_lisp_thread_destroy(struct thread *thread) {
+    mach_port_t port = (mach_port_t) thread;
+
+    FSHOW((stderr, "Deallocating mach port %x\n", port));
+    mach_port_move_member(current_mach_task, port, MACH_PORT_NULL);
+    mach_port_deallocate(current_mach_task, port);
+
+    return mach_port_destroy(current_mach_task, port);
+}
+
 void
 setup_mach_exceptions() {
+    mach_port_t port = (mach_port_t) all_threads;
     setup_mach_exception_handling_thread();
-    mach_thread_init(THREAD_STRUCT_TO_EXCEPTION_PORT(all_threads));
+    mach_thread_init(port);
 }
 
 pid_t
