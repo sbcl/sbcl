@@ -27,6 +27,8 @@
 
 #ifdef LISP_FEATURE_MACH_EXCEPTION_HANDLER
 #include <mach/mach.h>
+#include <libkern/OSAtomic.h>
+#include <stdlib.h>
 #endif
 
 char *
@@ -96,23 +98,80 @@ setup_mach_exception_handling_thread()
     return mach_exception_handling_thread;
 }
 
+struct exception_port_record
+{
+    struct thread * thread;
+    struct exception_port_record * next;
+};
+
+static OSQueueHead free_records = OS_ATOMIC_QUEUE_INIT;
+
+/* We can't depend on arbitrary addresses to be accepted as mach port
+ * names, particularly not on 64-bit platforms.  Instead, we allocate
+ * records that point to the thread struct, and loop until one is accepted
+ * as a port name.
+ *
+ * Threads are mapped to exception ports with a slot in the thread struct,
+ * and exception ports are casted to records that point to the corresponding
+ * thread.
+ *
+ * The lock-free free-list above is used as a cheap fast path.
+ */
+static mach_port_t
+find_receive_port(struct thread * thread)
+{
+    mach_port_t ret;
+    struct exception_port_record * curr, * to_free = NULL;
+    unsigned long i;
+    for (i = 1;; i++) {
+        curr = OSAtomicDequeue(&free_records, offsetof(struct exception_port_record, next));
+        if (curr == NULL) {
+            curr = calloc(1, sizeof(struct exception_port_record));
+            if (curr == NULL)
+                lose("unable to allocate exception_port_record\n");
+        }
+#ifdef LISP_FEATURE_X86_64
+        if ((mach_port_t)curr != (unsigned long)curr)
+            goto skip;
+#endif
+
+        if (mach_port_allocate_name(current_mach_task,
+                                    MACH_PORT_RIGHT_RECEIVE,
+                                    (mach_port_t)curr))
+            goto skip;
+        curr->thread = thread;
+        ret = (mach_port_t)curr;
+        break;
+        skip:
+        curr->next = to_free;
+        to_free = curr;
+        if ((i % 1024) == 0)
+            FSHOW((stderr, "Looped %lu times trying to allocate an exception port\n"));
+    }
+    while (to_free != NULL) {
+        struct exception_port_record * current = to_free;
+        to_free = to_free->next;
+        free(current);
+    }
+
+    FSHOW((stderr, "Allocated exception port %x for thread %p\n", ret, thread));
+
+    return ret;
+}
+
 /* tell the kernel that we want EXC_BAD_ACCESS exceptions sent to the
    exception port (which is being listened to do by the mach
    exception handling thread). */
 kern_return_t
-mach_thread_init(mach_port_t thread_exception_port)
+mach_lisp_thread_init(struct thread * thread)
 {
     kern_return_t ret;
-    mach_port_t current_mach_thread;
+    mach_port_t current_mach_thread, thread_exception_port;
 
     /* allocate a named port for the thread */
-    FSHOW((stderr, "Allocating mach port %x\n", thread_exception_port));
-    ret = mach_port_allocate_name(current_mach_task,
-                                  MACH_PORT_RIGHT_RECEIVE,
-                                  thread_exception_port);
-    if (ret) {
-        lose("mach_port_allocate_name failed with return_code %d\n", ret);
-    }
+    thread_exception_port
+        = thread->mach_port_name
+        = find_receive_port(thread);
 
     /* establish the right for the thread_exception_port to send messages */
     ret = mach_port_insert_right(current_mach_task,
@@ -149,31 +208,24 @@ mach_thread_init(mach_port_t thread_exception_port)
 }
 
 kern_return_t
-mach_lisp_thread_init(struct thread *thread) {
-    mach_port_t port = (mach_port_t) thread;
-    kern_return_t ret;
-    ret = mach_thread_init(port);
-    thread->mach_port_name = port;
-
-    return ret;
-}
-
-kern_return_t
 mach_lisp_thread_destroy(struct thread *thread) {
-    mach_port_t port = (mach_port_t) thread;
-
+    kern_return_t ret;
+    mach_port_t port = thread->mach_port_name;
     FSHOW((stderr, "Deallocating mach port %x\n", port));
     mach_port_move_member(current_mach_task, port, MACH_PORT_NULL);
     mach_port_deallocate(current_mach_task, port);
 
-    return mach_port_destroy(current_mach_task, port);
+    ret = mach_port_destroy(current_mach_task, port);
+    ((struct exception_port_record*)port)->thread = NULL;
+    OSAtomicEnqueue(&free_records, (void*)port, offsetof(struct exception_port_record, next));
+
+    return ret;
 }
 
 void
 setup_mach_exceptions() {
-    mach_port_t port = (mach_port_t) all_threads;
     setup_mach_exception_handling_thread();
-    mach_thread_init(port);
+    mach_lisp_thread_init(all_threads);
 }
 
 pid_t

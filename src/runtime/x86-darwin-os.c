@@ -395,10 +395,10 @@ catch_exception_raise(mach_port_t exception_port,
     siginfo_t siginfo;
     kern_return_t ret, dealloc_ret;
 
-    struct thread *th = (struct thread*) exception_port;
+    struct thread *th;
 
     FSHOW((stderr,"/entering catch_exception_raise with exception: %d\n", exception));
-
+    th = *(struct thread**)exception_port;
     /* Get state and info */
     state_count = x86_THREAD_STATE32_COUNT;
     if ((ret = thread_get_state(thread,
