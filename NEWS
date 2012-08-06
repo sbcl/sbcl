@@ -1,5 +1,5 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
-changes in sbcl-sbcl-1.0.58 relative to sbcl-1.0.57:
+changes in sbcl-1.0.58 relative to sbcl-1.0.57:
   * enhancement: implicit generic function warnings now specify the package
     in which the new generic function is being created.
   * enhancement: SB-EXT:ATOMIC-UPDATE makes it easy to perform non-destructive
