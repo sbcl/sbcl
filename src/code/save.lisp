@@ -55,7 +55,7 @@ The following &KEY arguments are defined:
      The function to run when the created core file is resumed. The
      default function handles command line toplevel option processing
      and runs the top level read-eval-print loop. This function returning
-     is equivalent to (SB-EXT:QUIT :UNIX-STATUS 0) being called.
+     is equivalent to (SB-EXT:EXIT :CODE 0) being called.
 
      TOPLEVEL functions should always provide an ABORT restart: otherwise
      code they call will run without one.

@@ -681,7 +681,7 @@ reset to ~S."
                (when *debug-beginner-help-p*
                  (format *debug-io*
                          "~%~@<Type HELP for debugger help, or ~
-                               (SB-EXT:QUIT) to exit from SBCL.~:@>~2%"))
+                               (SB-EXT:EXIT) to exit from SBCL.~:@>~2%"))
                (show-restarts *debug-restarts* *debug-io*))
              (internal-debug))
         (when background-p

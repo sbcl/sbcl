@@ -39,7 +39,7 @@ applications.")
   #!+sb-doc
   "This is a list of functions which are called in an unspecified
 order when SBCL process exits. Unused by SBCL itself: reserved for
-user and applications. Using (QUIT :RECKLESSLY-P T), or calling
+user and applications. Using (SB-EXT:EXIT :ABORT T), or calling
 exit(3) directly will circumvent these hooks.")
 
 
