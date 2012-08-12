@@ -1,4 +1,8 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
+changes relative to sbcl-1.0.58:
+  * documentation: a section on random number generation has been added to the
+    manual. (lp#656839)
+
 changes in sbcl-1.0.58 relative to sbcl-1.0.57:
   * enhancement: implicit generic function warnings now specify the package
     in which the new generic function is being created.
