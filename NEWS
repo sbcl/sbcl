@@ -12,11 +12,11 @@ changes in sbcl-1.0.58 relative to sbcl-1.0.57:
   * optimization: On x86-64, code alignment of block headers is done with
     multi-byte NOPs now instead of repetitions of the single-byte NOP.
   * optimization: MAP-INTO is substantially faster when the target sequence is
-    of unknown type; mapping into lists is no longer O(N^2). (thanks to James
-    M. Lawrence)
+    of unknown type; mapping into lists is no longer O(N^2). (lp#1001043,
+    thanks to James M. Lawrence)
   * optimization: the compiler no longer heap-conses to check exits in cases
     where the exit function is dynamic extent, or when it can prove the exit
-    function cannot escape.
+    function cannot escape. (lp#1002534)
   * optimization: SB-SEQUENCE:DOSEQUENCE is faster on vectors of unknown
     element type, and vectors that aren't SIMPLE-ARRAYs.
   * optimization: CL:SORT and CL:STABLE-SORT are more efficient in execution
