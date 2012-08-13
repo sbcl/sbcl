@@ -164,6 +164,9 @@
            (type function test key)
            (dynamic-extent head))
   (labels ((merge* (size list1 tail1 list2 tail2 rest)
+             (declare (optimize speed)
+                      (type (and fixnum unsigned-byte) size)
+                      (type cons list1 tail1 list2 tail2))
              (when (>= size +stable-sort-fast-merge-limit+)
                (cond ((not (funcall test (funcall key (car list2))   ; stability
                                          (funcall key (car tail1)))) ; trickery
