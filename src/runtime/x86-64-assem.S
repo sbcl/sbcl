@@ -541,6 +541,6 @@ ascs_finished:
 	.data
         .align  align_page
 GNAME(gc_safepoint_page):
-        .fill 32768
+        .fill 32768,1,0
 
         END()

@@ -52,6 +52,8 @@ changes in sbcl-1.0.58 relative to sbcl-1.0.57:
     1.0.56.19)
   * bug fix: run-program with :pty t no longer makes the pty as the process's
     controling terminal.
+  * bug fix: spawning threads on OS X 10.8 no longer crashes the process 
+    (lp#1012811).
 
 changes in sbcl-1.0.57 relative to sbcl-1.0.56:
   * RANDOM enhancements and bug fixes:
