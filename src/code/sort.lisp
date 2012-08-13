@@ -81,21 +81,24 @@
   (declare (type cons head list1 list2)
            (type function test key)
            (optimize speed))
-  (macrolet ((merge-one (l1 l2)
-               `(progn
-                  (setf (cdr tail) ,l1
-                        tail       ,l1)
-                  (let ((rest (cdr ,l1)))
-                    (cond (rest
-                           (setf ,l1 rest))
-                          (t
-                           (setf (cdr ,l1) ,l2)
-                           (return (cdr head))))))))
-    (loop
-     (if (funcall test (funcall key (car list2))  ; this way, equivalent
-                       (funcall key (car list1))) ; values are first popped
-         (merge-one list2 list1)                  ; from list1
-         (merge-one list1 list2)))))
+  (let ((key1 (funcall key (car list1)))
+        (key2 (funcall key (car list2))))
+    (macrolet ((merge-one (l1 k1 l2)
+                 `(progn
+                    (setf (cdr tail) ,l1
+                          tail       ,l1)
+                    (let ((rest (cdr ,l1)))
+                      (cond (rest
+                             (setf ,l1 rest
+                                   ,k1 (funcall key (first rest))))
+                            (t
+                             (setf (cdr ,l1) ,l2)
+                             (return (cdr head))))))))
+      (loop
+       (if (funcall test key2           ; this way, equivalent
+                         key1)          ; values are first popped
+           (merge-one list2 key2 list1) ; from list1
+           (merge-one list1 key1 list2))))))
 
 ;;; Convenience wrapper for CL:MERGE
 (declaim (inline merge-lists))
@@ -109,29 +112,89 @@
            (declare (dynamic-extent head))
            (merge-lists* head list1 list2 test key)))))
 
+;;; Small specialised stable sorts
+(declaim (inline stable-sort-list-2 stable-sort-list-3))
+(defun stable-sort-list-2 (list test key)
+  (declare (type cons list)
+           (type function test key))
+  (let ((second (cdr list)))
+    (declare (type cons second))
+    (when (funcall test (funcall key (car second))
+                        (funcall key (car list)))
+      (rotatef (car list) (car second)))
+    (values list second (shiftf (cdr second) nil))))
+
+(defun stable-sort-list-3 (list test key)
+  (declare (type cons list)
+           (type function test key))
+  (let* ((second (cdr list))
+         (third  (cdr second))
+         (x (car list))
+         (y (car second))
+         (z (car third)))
+    (declare (type cons second third))
+    (when (funcall test (funcall key y)
+                        (funcall key x))
+      (rotatef x y))
+    (let ((key-z (funcall key z)))
+      (when (funcall test key-z
+                          (funcall key y))
+        (if (funcall test key-z
+                          (funcall key x))
+            (rotatef x z y)
+            (rotatef z y))))
+    (setf (car list)   x
+          (car second) y
+          (car third)  z)
+    (values list third (shiftf (cdr third) nil))))
+
 ;;; STABLE-SORT-LIST implements a top-down merge sort. See the closest
 ;;; intro to algorithms book.  Benchmarks have shown significantly
 ;;; improved performance over the previous (hairier) bottom-up
 ;;; implementation, particularly on non-power-of-two sizes: bottom-up
 ;;; recursed on power-of-two-sized subsequences, which can result in
 ;;; very unbalanced recursion trees.
+
+;;; The minimum length at which list merge sort will try and detect
+;;; it can merge disjoint ranges (e.g. sorted inputs) in constant time.
+(defconstant +stable-sort-fast-merge-limit+ 8)
+
 (defun stable-sort-list (list test key &aux (head (cons :head list)))
   (declare (type list list)
            (type function test key)
            (dynamic-extent head))
-  (labels ((recur (list size)
+  (labels ((merge* (size list1 tail1 list2 tail2 rest)
+             (when (>= size +stable-sort-fast-merge-limit+)
+               (cond ((not (funcall test (funcall key (car list2))   ; stability
+                                         (funcall key (car tail1)))) ; trickery
+                      (setf (cdr tail1) list2)
+                      (return-from merge* (values list1 tail2 rest)))
+                     ((funcall test (funcall key (car tail2))
+                                    (funcall key (car list1)))
+                      (setf (cdr tail2) list1)
+                      (return-from merge* (values list2 tail1 rest)))))
+               (values (merge-lists* head list1 list2 test key)
+                       (if (null (cdr tail1))
+                           tail1
+                           tail2)
+                       rest))
+           (recur (list size)
              (declare (optimize speed)
                       (type cons list)
                       (type (and fixnum unsigned-byte) size))
-             (if (= 1 size)
-                 (values list (shiftf (cdr list) nil))
-                 (let ((half (ash size -1)))
-                   (multiple-value-bind (list1 rest)
-                       (recur list half)
-                     (multiple-value-bind (list2 rest)
-                         (recur rest (- size half))
-                       (values (merge-lists* head list1 list2 test key)
-                               rest)))))))
+             (cond ((> size 3)
+                    (let ((half (ash size -1)))
+                      (multiple-value-bind (list1 tail1 rest)
+                          (recur list half)
+                        (multiple-value-bind (list2 tail2 rest)
+                            (recur rest (- size half))
+                          (merge* size list1 tail1 list2 tail2 rest)))))
+                   ((= size 3)
+                    (stable-sort-list-3 list test key))
+                   ((= size 2)
+                    (stable-sort-list-2 list test key))
+                   (t ; (= size 1)
+                    (values list list (shiftf (cdr list) nil))))))
     (when list
       (values (recur list (length list))))))
 

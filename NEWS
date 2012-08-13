@@ -1,5 +1,7 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 changes relative to sbcl-1.0.58:
+  * optimization: CL:SORT and CL:STABLE-SORT of lists are faster and use fewer
+    comparisons, particularly on almost-sorted inputs.
   * documentation: a section on random number generation has been added to the
     manual. (lp#656839)
 

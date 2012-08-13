@@ -336,3 +336,37 @@
                                     (t #'shuffle))
                                   size type)
                          #'<))))))))
+
+(with-test (:name :stable-sort-smoke-test)
+  (flet ((iota (n type &aux (i 0))
+           (map-into (make-sequence type n)
+                     (lambda ()
+                       (cons 0 (incf i)))))
+         (shuffle (n type)
+           (let ((max (truncate (expt n 1/4)))
+                 (i   0))
+             (map-into (make-sequence type n)
+                       (lambda ()
+                         (cons (random max) (incf i))))))
+         (sortedp (x)
+           (let* ((nonce (list nil))
+                  (prev nonce))
+             (every (lambda (x)
+                      (prog1 (or (eql prev nonce)
+                                 (< (car prev) (car x))
+                                 (and (= (car prev) (car x))
+                                      (< (cdr prev) (cdr x))))
+                        (setf prev x)))
+                    x))))
+    (dolist (type '(simple-vector list))
+      (dolist (size '(0  1  2  3  4  5  6  7  8
+                      9 10 11 12 13 14 15 16 17
+                      1023 1024 1025 1536))
+        (loop for repeat below 5 do
+          (assert
+           (sortedp
+            (stable-sort (funcall (case repeat
+                                    (0 #'iota)
+                                    (t #'shuffle))
+                                  size type)
+                         #'< :key #'car))))))))
