@@ -284,10 +284,10 @@
         (sem (gensym)))
     `(let ((,sem (sb-thread::make-semaphore))
            ,values)
-       (sb-thread:make-thread (lambda ()
-                                (setq ,values
-                                      (multiple-value-list (progn ,@body)))
-                                (sb-thread::signal-semaphore ,sem)))
+       (make-join-thread (lambda ()
+                           (setq ,values
+                                 (multiple-value-list (progn ,@body)))
+                           (sb-thread::signal-semaphore ,sem)))
        (sb-thread::wait-on-semaphore ,sem)
        (values-list ,values))))
 

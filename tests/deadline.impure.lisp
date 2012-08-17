@@ -69,10 +69,10 @@
   (assert-timeout
    (let ((lock (sb-thread:make-mutex))
          (waitp t))
-     (sb-thread:make-thread (lambda ()
-                              (sb-thread:grab-mutex lock)
-                              (setf waitp nil)
-                              (sleep 5)))
+     (make-join-thread (lambda ()
+                         (sb-thread:grab-mutex lock)
+                         (setf waitp nil)
+                         (sleep 5)))
      (loop while waitp do (sleep 0.01))
      (sb-sys:with-deadline (:seconds 1)
        (sb-thread:grab-mutex lock)))))
@@ -87,17 +87,17 @@
   (assert-timeout
    (sb-sys:with-deadline (:seconds 1)
      (sb-thread:join-thread
-      (sb-thread:make-thread (lambda () (loop (sleep 1))))))))
+      (make-kill-thread (lambda () (loop (sleep 1))))))))
 
 (with-test (:name (:deadline :futex-wait-eintr) :skipped-on '(not :sb-thread))
   (let ((lock (sb-thread:make-mutex))
         (waitp t))
-    (sb-thread:make-thread (lambda ()
-                             (sb-thread:grab-mutex lock)
-                             (setf waitp nil)
-                             (sleep 5)))
+    (make-join-thread (lambda ()
+                        (sb-thread:grab-mutex lock)
+                        (setf waitp nil)
+                        (sleep 5)))
     (loop while waitp do (sleep 0.01))
-    (let ((thread (sb-thread:make-thread
+    (let ((thread (make-join-thread
                    (lambda ()
                      (let ((start (get-internal-real-time)))
                        (handler-case

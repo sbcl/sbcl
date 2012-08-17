@@ -69,6 +69,7 @@
                             (ecase (first fail)
                               (:expected-failure "Expected failure:")
                               (:unexpected-failure "Failure:")
+                              (:leftover-thread "Leftover thread (broken):")
                               (:unexpected-success "Unexpected success:")
                               (:skipped-broken "Skipped (broken):")
                               (:skipped-disabled "Skipped (irrelevant):"))

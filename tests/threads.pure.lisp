@@ -495,12 +495,12 @@
             :skipped-on '(not :sb-thread))
   (assert (eq :error
               (handler-case
-                  (join-thread (make-thread (lambda () (sleep 10))) :timeout 0.01)
+                  (join-thread (make-join-thread (lambda () (sleep 10))) :timeout 0.01)
                 (join-thread-error ()
                   :error))))
   (let ((cookie (cons t t)))
     (assert (eq cookie
-                (join-thread (make-thread (lambda () (sleep 10)))
+                (join-thread (make-join-thread (lambda () (sleep 10)))
                              :timeout 0.01
                              :default cookie)))))
 
@@ -526,7 +526,7 @@
                    #+sb-thread
                    (sb-thread::block-deferrable-signals))))))
       (let* ((threads (loop for i from 1 upto 100
-                            collect (make-thread #'critical :name (format nil "T~A" i))))
+                            collect (make-join-thread #'critical :name (format nil "T~A" i))))
              (safe nil)
              (unsafe nil)
              (interruptor (make-thread (lambda ()

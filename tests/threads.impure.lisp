@@ -86,8 +86,8 @@
 
 (with-test (:name (:interrupt-thread :deferrables-unblocked-by-lock))
   (let ((lock (sb-thread::make-mutex))
-        (thread (sb-thread:make-thread (lambda ()
-                                         (loop (sleep 1))))))
+        (thread (make-kill-thread (lambda ()
+                                    (loop (sleep 1))))))
     (sb-thread::grab-mutex lock)
     (sb-thread:interrupt-thread thread
                                 (lambda ()
@@ -184,10 +184,10 @@
         (mutex (sb-thread:make-mutex)))
     ;; Start NTHREADS idle threads.
     (dotimes (i nthreads)
-      (sb-thread:make-thread (lambda ()
-                               (with-mutex (mutex)
-                                 (sb-thread:condition-wait queue mutex))
-                               (sb-thread:abort-thread))))
+      (make-join-thread (lambda ()
+                          (with-mutex (mutex)
+                            (sb-thread:condition-wait queue mutex))
+                          (sb-thread:abort-thread))))
     (let ((start-time (get-internal-run-time)))
       (funcall function)
       (prog1 (- (get-internal-run-time) start-time)
@@ -286,7 +286,7 @@
 ;; if interrupted by another thread exiting/a gc/anything
 (with-test (:name (:sleep :continue-sleeping-after-interrupt))
   (let ((start-time (get-universal-time)))
-    (make-thread (lambda () (sleep 1) (sb-ext:gc :full t)))
+    (make-join-thread (lambda () (sleep 1) (sb-ext:gc :full t)))
     (sleep 5)
     (assert (>= (get-universal-time) (+ 5 start-time)))))
 
@@ -305,7 +305,7 @@
                  (assert (eql (mutex-value lock) *current-thread*))
                  (assert (eql n 1))
                  (decf n))))
-      (make-thread #'in-new-thread)
+      (make-join-thread #'in-new-thread)
       (sleep 2)            ; give it  a chance to start
       ;; check the lock is free while it's asleep
       (format t "parent thread ~A~%" *current-thread*)
@@ -329,7 +329,7 @@
                  ;; after waking we should have the lock again
                  (format t "woken, ~A got mutex~%" (mutex-value lock))
                  (assert (ours-p (mutex-value lock))))))
-      (make-thread #'in-new-thread)
+      (make-join-thread #'in-new-thread)
       (sleep 2)            ; give it  a chance to start
       ;; check the lock is free while it's asleep
       (format t "parent thread ~A~%" *current-thread*)
@@ -430,19 +430,19 @@
 (with-test (:name (:semaphore :wait-then-signal))
   (let ((sem (make-semaphore))
         (signalled-p nil))
-    (make-thread (lambda ()
-                   (sleep 0.1)
-                   (setq signalled-p t)
-                   (signal-semaphore sem)))
+    (make-join-thread (lambda ()
+                        (sleep 0.1)
+                        (setq signalled-p t)
+                        (signal-semaphore sem)))
     (wait-on-semaphore sem)
     (assert signalled-p)))
 
 (with-test (:name (:semaphore :signal-then-wait))
   (let ((sem (make-semaphore))
         (signalled-p nil))
-    (make-thread (lambda ()
-                   (signal-semaphore sem)
-                   (setq signalled-p t)))
+    (make-join-thread (lambda ()
+                        (signal-semaphore sem)
+                        (setq signalled-p t)))
     (loop until signalled-p)
     (wait-on-semaphore sem)
     (assert signalled-p)))
@@ -450,8 +450,8 @@
 (defun test-semaphore-multiple-signals (wait-on-semaphore)
   (let* ((sem (make-semaphore :count 5))
          (threads (loop repeat 20 collecting
-                        (make-thread (lambda ()
-                                       (funcall wait-on-semaphore sem))))))
+                        (make-join-thread (lambda ()
+                                            (funcall wait-on-semaphore sem))))))
     (flet ((count-live-threads ()
              (count-if #'thread-alive-p threads)))
       (sleep 0.5)
@@ -532,7 +532,7 @@
 (format t "~&semaphore tests done~%")
 
 (defun test-interrupt (function-to-interrupt &optional quit-p)
-  (let ((child  (make-thread function-to-interrupt)))
+  (let ((child  (make-kill-thread function-to-interrupt)))
     ;;(format t "gdb ./src/runtime/sbcl ~A~%attach ~A~%" child child)
     (sleep 2)
     (format t "interrupting child ~A~%" child)
@@ -581,7 +581,7 @@
 (defun alloc-stuff () (copy-list '(1 2 3 4 5)))
 
 (with-test (:name (:interrupt-thread :interrupt-consing-child))
-  (let ((thread (sb-thread:make-thread (lambda () (loop (alloc-stuff))))))
+  (let ((thread (make-thread (lambda () (loop (alloc-stuff))))))
     (let ((killers
            (loop repeat 4 collect
                  (sb-thread:make-thread
@@ -688,15 +688,15 @@
 
 (with-test (:name (:two-threads-running-gc))
   (let (a-done b-done)
-    (make-thread (lambda ()
-                   (dotimes (i 100)
-                     (sb-ext:gc) (princ "\\") (force-output))
-                   (setf a-done t)))
-    (make-thread (lambda ()
-                   (dotimes (i 25)
-                     (sb-ext:gc :full t)
-                     (princ "/") (force-output))
-                   (setf b-done t)))
+    (make-join-thread (lambda ()
+                        (dotimes (i 100)
+                          (sb-ext:gc) (princ "\\") (force-output))
+                        (setf a-done t)))
+    (make-join-thread (lambda ()
+                        (dotimes (i 25)
+                          (sb-ext:gc :full t)
+                          (princ "/") (force-output))
+                        (setf b-done t)))
     (loop
       (when (and a-done b-done) (return))
       (sleep 1))))
@@ -710,7 +710,7 @@
   (loop for i below 100 do
         (princ "!")
         (force-output)
-        (sb-thread:make-thread
+        (make-join-thread
          #'(lambda ()
              (waste)))
         (waste)
@@ -723,7 +723,7 @@
   (loop for i below 100 do
         (princ "!")
         (force-output)
-        (sb-thread:make-thread
+        (make-join-thread
          #'(lambda ()
              (let ((*aaa* (waste)))
                (waste))))
@@ -735,10 +735,10 @@
 
 ;; this used to deadlock on session-lock
 (with-test (:name (:no-session-deadlock))
-  (sb-thread:make-thread (lambda () (sb-ext:gc))))
+  (make-join-thread (lambda () (sb-ext:gc))))
 
 (defun exercise-syscall (fn reference-errno)
-  (sb-thread:make-thread
+  (make-kill-thread
    (lambda ()
      (loop do
           (funcall fn)
@@ -769,7 +769,7 @@
            (exercise-syscall (lambda () (open "no-such-file"
                                               :if-does-not-exist nil))
                              open-errno)
-           (sb-thread:make-thread (lambda () (loop (sb-ext:gc) (sleep 1)))))))
+           (make-join-thread (lambda () (loop (sb-ext:gc) (sleep 1)))))))
     (sleep 10)
     (princ "terminating threads")
     (dolist (thread threads)
@@ -779,7 +779,7 @@
 
 (with-test (:name :all-threads-have-abort-restart)
   (loop repeat 100 do
-        (let ((thread (sb-thread:make-thread (lambda () (sleep 0.1)))))
+        (let ((thread (make-kill-thread (lambda () (sleep 0.1)))))
           (sb-thread:interrupt-thread
            thread
            (lambda ()
@@ -810,7 +810,7 @@
 
 ;; expose thread creation races by exiting quickly
 (with-test (:name (:no-thread-creation-race :light))
-  (sb-thread:make-thread (lambda ())))
+  (make-join-thread (lambda ())))
 
 (with-test (:name (:no-thread-creation-race :heavy))
   (loop repeat 20 do
@@ -823,7 +823,7 @@
 ;; interrupt handlers are per-thread with pthreads, make sure the
 ;; handler installed in one thread is global
 (with-test (:name (:global-interrupt-handler))
-  (sb-thread:make-thread
+  (make-join-thread
    (lambda ()
      (sb-ext:run-program "sleep" '("1") :search t :wait nil))))
 
@@ -876,11 +876,11 @@
   (let (threads)
     (unwind-protect
          (progn
-           (push (sb-thread:make-thread #'exercise-binding) threads)
-           (push (sb-thread:make-thread (lambda ()
-                                          (loop
-                                           (sleep 0.1)
-                                           (send-gc))))
+           (push (make-kill-thread #'exercise-binding) threads)
+           (push (make-kill-thread (lambda ()
+                                     (loop
+                                      (sleep 0.1)
+                                      (send-gc))))
                  threads)
            (sleep 4))
       (mapc #'sb-thread:terminate-thread threads))))
@@ -909,7 +909,7 @@
   ;; expect this to corrupt the image.
   (let* ((hash (make-hash-table))
          (*errors* nil)
-         (threads (list (sb-thread:make-thread
+         (threads (list (make-kill-thread
                          (lambda ()
                            (catch 'done
                              (handler-bind ((serious-condition 'oops))
@@ -917,7 +917,7 @@
                                  ;;(princ "1") (force-output)
                                  (setf (gethash (random 100) hash) 'h)))))
                          :name "writer")
-                        (sb-thread:make-thread
+                        (make-kill-thread
                          (lambda ()
                            (catch 'done
                              (handler-bind ((serious-condition 'oops))
@@ -925,7 +925,7 @@
                                  ;;(princ "2") (force-output)
                                  (remhash (random 100) hash)))))
                          :name "reader")
-                        (sb-thread:make-thread
+                        (make-kill-thread
                          (lambda ()
                            (catch 'done
                              (handler-bind ((serious-condition 'oops))
@@ -942,7 +942,7 @@
 (with-test (:name (:synchronized-hash-table))
   (let* ((hash (make-hash-table :synchronized t))
          (*errors* nil)
-         (threads (list (sb-thread:make-thread
+         (threads (list (make-kill-thread
                          (lambda ()
                            (catch 'done
                              (handler-bind ((serious-condition 'oops))
@@ -950,7 +950,7 @@
                                  ;;(princ "1") (force-output)
                                  (setf (gethash (random 100) hash) 'h)))))
                          :name "writer")
-                        (sb-thread:make-thread
+                        (make-kill-thread
                          (lambda ()
                            (catch 'done
                              (handler-bind ((serious-condition 'oops))
@@ -958,7 +958,7 @@
                                  ;;(princ "2") (force-output)
                                  (remhash (random 100) hash)))))
                          :name "reader")
-                        (sb-thread:make-thread
+                        (make-kill-thread
                          (lambda ()
                            (catch 'done
                              (handler-bind ((serious-condition 'oops))
@@ -978,28 +978,28 @@
         (*errors* nil))
     (loop repeat 50
           do (setf (gethash (random 100) hash) 'xxx))
-    (let ((threads (list (sb-thread:make-thread
+    (let ((threads (list (make-kill-thread
                           (lambda ()
                             (catch 'done
                               (handler-bind ((serious-condition 'oops))
                                 (loop
                                       until (eq t (gethash (random 100) hash))))))
                           :name "reader 1")
-                         (sb-thread:make-thread
+                         (make-kill-thread
                           (lambda ()
                             (catch 'done
                               (handler-bind ((serious-condition 'oops))
                                 (loop
                                       until (eq t (gethash (random 100) hash))))))
                           :name "reader 2")
-                         (sb-thread:make-thread
+                         (make-kill-thread
                           (lambda ()
                             (catch 'done
                               (handler-bind ((serious-condition 'oops))
                                 (loop
                                       until (eq t (gethash (random 100) hash))))))
                           :name "reader 3")
-                         (sb-thread:make-thread
+                         (make-kill-thread
                           (lambda ()
                             (catch 'done
                               (handler-bind ((serious-condition 'oops))
@@ -1017,7 +1017,7 @@
 (with-test (:name (:hash-table-single-accessor-parallel-gc))
   (let ((hash (make-hash-table))
         (*errors* nil))
-    (let ((threads (list (sb-thread:make-thread
+    (let ((threads (list (make-kill-thread
                           (lambda ()
                             (handler-bind ((serious-condition 'oops))
                               (loop
@@ -1026,7 +1026,7 @@
                                       (remhash n hash)
                                       (setf (gethash n hash) 'h))))))
                           :name "accessor")
-                         (sb-thread:make-thread
+                         (make-kill-thread
                           (lambda ()
                             (handler-bind ((serious-condition 'oops))
                               (loop
@@ -1070,8 +1070,8 @@
                (let ((threads (loop for x from 1 to 10
                                     collect
                                     (let ((x x))
-                                      (sb-thread:make-thread (lambda ()
-                                                               (test x)))))))
+                                      (make-kill-thread (lambda ()
+                                                          (test x)))))))
                  (sleep 5)
                  (with-mutex (lock)
                    (funcall notify-fun queue))
@@ -1259,11 +1259,11 @@
          (force-output))
        (handler-case
            (if (oddp i)
-               (sb-thread:make-thread
+               (make-join-thread
                 (lambda ()
                   (sleep (random 0.001)))
                 :name (format nil "SLEEP-~D" i))
-               (sb-thread:make-thread
+               (make-join-thread
                 (lambda ()
                   ;; KLUDGE: what we are doing here is explicit,
                   ;; but the same can happen because of a regular
@@ -1351,8 +1351,9 @@
   (force-output))
 
 (with-test (:name (:hash-cache :subtypep))
-  (dotimes (i 10)
-    (sb-thread:make-thread #'subtypep-hash-cache-test)))
+  (mapc #'join-thread
+        (loop repeat 10
+              collect (sb-thread:make-thread #'subtypep-hash-cache-test))))
 (format t "hash-cache tests done~%")
 
 ;;;; BLACK BOX TESTS

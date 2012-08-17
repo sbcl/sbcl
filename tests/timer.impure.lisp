@@ -114,7 +114,7 @@
     (assert (zerop (length (sb-impl::%pqueue-contents sb-impl::*schedule*))))))
 
 (with-test (:name (:timer :other-thread) :skipped-on '(not :sb-thread))
-  (let* ((thread (sb-thread:make-thread (lambda () (sleep 2))))
+  (let* ((thread (make-kill-thread (lambda () (sleep 2))))
          (timer (make-timer (lambda ()
                               (assert (eq thread sb-thread:*current-thread*)))
                             :thread thread)))
@@ -214,7 +214,7 @@
       (assert ok))))
 
 (with-test (:name (:with-timeout :dead-thread) :skipped-on '(not :sb-thread))
-  (sb-thread:make-thread
+  (make-join-thread
    (lambda ()
      (let ((timer (make-timer (lambda ()))))
        (schedule-timer timer 3)
