@@ -1228,11 +1228,15 @@
                   ))))
         (sb!di:no-debug-blocks () nil)))))
 
+(defvar *disassemble-annotate* t
+  "Annotate DISASSEMBLE output with source code.")
+
 (defun add-debugging-hooks (segment debug-fun &optional sfcache)
   (when debug-fun
     (setf (seg-storage-info segment)
           (storage-info-for-debug-fun debug-fun))
-    (add-source-tracking-hooks segment debug-fun sfcache)
+    (when *disassemble-annotate*
+      (add-source-tracking-hooks segment debug-fun sfcache))
     (let ((kind (sb!di:debug-fun-kind debug-fun)))
       (flet ((add-new-hook (n)
                (push (make-offs-hook
@@ -1450,17 +1454,6 @@
       (label-segments segments dstate))
     (disassemble-segments segments stream dstate)))
 
-;;; FIXME: We probably don't need this any more now that there are
-;;; no interpreted functions, only compiled ones.
-(defun compile-function-lambda-expr (function)
-  (declare (type function function))
-  (multiple-value-bind (lambda closurep name)
-      (function-lambda-expression function)
-    (declare (ignore name))
-    (when closurep
-      (error "can't compile a lexical closure"))
-    (compile nil lambda)))
-
 (defun valid-extended-function-designators-for-disassemble-p (thing)
   (cond ((legal-fun-name-p thing)
          (compiled-funs-or-lose (fdefinition thing) thing))
@@ -1485,7 +1478,7 @@
         (error 'simple-type-error
                :datum thing
                :expected-type '(satisfies valid-extended-function-designators-for-disassemble-p)
-               :format-control "can't make a compiled function from ~S"
+               :format-control "Can't make a compiled function from ~S"
                :format-arguments (list name)))))
 
 (defun disassemble (object &key

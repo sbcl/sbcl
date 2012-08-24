@@ -812,6 +812,7 @@ like *STACK-TOP-HINT* and unsupported stuff like *TRACED-FUN-LIST*."
                "DEFINED-TYPE-NAME-P" "VALID-TYPE-SPECIFIER-P"
                "DELETE-DIRECTORY"
                "SET-SBCL-SOURCE-LOCATION"
+               "*DISASSEMBLE-ANNOTATE*"
 
                ;; stepping interface
                "STEP-CONDITION" "STEP-FORM-CONDITION" "STEP-FINISHED-CONDITION"
