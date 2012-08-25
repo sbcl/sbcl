@@ -21,6 +21,9 @@ ifeq (CYGWIN,$(findstring CYGWIN,$(UNAME)))
   # paths, either.
   CC:=$(shell cygpath -m $(shell readlink -fn $(shell which $(CC))))
 endif
+ifeq (Linux,$(UNAME))
+  EXTRA_CFLAGS=-D_GNU_SOURCE
+endif
 
 export CC SBCL EXTRA_CFLAGS EXTRA_LDFLAGS
 
