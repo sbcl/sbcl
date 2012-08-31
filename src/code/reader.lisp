@@ -1409,6 +1409,24 @@ extended <package-name>::<form-in-package> syntax."
                                  (the index (* num base))))))))
        (setq number (+ num (* number base-power)))))))
 
+(defun truncate-exponent (exponent number divisor)
+  "Truncate exponent if it's too large for a float"
+  ;; Work with base-2 logarithms to avoid conversions to floats,
+  ;; and convert to base-10 conservatively at the end.
+  ;; Use the least positive float, because denormalized exponent
+  ;; can be larger than normalized.
+  (let* ((max-exponent (- (nth-value
+                           1
+                           (decode-float least-positive-long-float))))
+         (number-magnitude (integer-length number))
+         (divisor-magnitude (1- (integer-length divisor)))
+         (magnitude (- number-magnitude divisor-magnitude)))
+    (if (minusp exponent)
+        (max exponent (ceiling (- (+ max-exponent magnitude))
+                               (floor (log 10 2))))
+        (min exponent (floor (- max-exponent magnitude)
+                             (floor (log 10 2)))))))
+
 (defun make-float (stream)
   ;; Assume that the contents of *read-buffer* are a legal float, with nothing
   ;; else after it.
@@ -1469,6 +1487,7 @@ extended <package-name>::<form-in-package> syntax."
                                   (#\F 'single-float)
                                   (#\D 'double-float)
                                   (#\L 'long-float)))
+                  (exponent (truncate-exponent exponent number divisor))
                   (result (make-float-aux (* (expt 10 exponent) number)
                                           divisor float-format stream)))
              (return-from make-float
@@ -1481,7 +1500,8 @@ extended <package-name>::<form-in-package> syntax."
     (type-error (c)
       (error 'reader-impossible-number-error
              :error c :stream stream
-             :format-control "failed to build float"))))
+             :format-control "failed to build float from ~a"
+             :format-arguments (list (read-buffer-to-string))))))
 
 (defun make-ratio (stream)
   ;; Assume *READ-BUFFER* contains a legal ratio. Build the number from
