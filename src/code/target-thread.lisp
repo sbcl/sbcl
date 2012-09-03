@@ -1526,12 +1526,28 @@ subject to change."
 #!+sb-thruption
 (defun run-interruption ()
   (in-interruption () ;the non-thruption code does this in the signal handler
-    (loop
-       (let ((interruption (with-interruptions-lock (*current-thread*)
-                             (pop (thread-interruptions *current-thread*)))))
-         (unless interruption
-           (return))
-         (funcall interruption)))))
+    (let ((interruption (with-interruptions-lock (*current-thread*)
+                          (pop (thread-interruptions *current-thread*)))))
+      (when interruption
+        (funcall interruption)
+        ;; I tried implementing this function as an explicit LOOP, because
+        ;; if we are currently processing the thruption queue, why not do
+        ;; all of them in one go instead of one-by-one?
+        ;;
+        ;; I still think LOOPing would be basically the right thing
+        ;; here.  But suppose some interruption unblocked deferrables.
+        ;; Will the next one be happy with that?  The answer is "no", at
+        ;; least in the sense that there are tests which check that
+        ;; deferrables are blocked at the beginning of a thruption, and
+        ;; races that make those tests fail.  Whether the tests are
+        ;; misguided or not, it seems easier/cleaner to loop implicitly
+        ;; -- and it's also what AK had implemented in the first place.
+        ;;
+        ;; The implicit loop is achieved by returning to C, but having C
+        ;; call back to us immediately.  The runtime will reset the sigmask
+        ;; in the mean time.
+        ;; -- DFL
+        (setf *thruption-pending* t)))))
 
 (defun interrupt-thread (thread function)
   #!+sb-doc
