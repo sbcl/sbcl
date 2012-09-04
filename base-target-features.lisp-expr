@@ -317,6 +317,19 @@
  ;; on zlib.
  ; :sb-core-compression
 
+ ;; On certain thread-enabled platforms, synchronization between threads
+ ;; for the purpose of stopping and starting the world around GC can be
+ ;; performed using safepoints instead of signals.  Enable this feature
+ ;; to compile with safepoints and to use them for GC.
+ ; :sb-safepoint
+
+ ;; When compiling with safepoints, the INTERRUPT-THREAD mechanism can
+ ;; also use safepoints to roll the target thread to a point at which it
+ ;; can be interrupted safely, instead of using a signal for this
+ ;; purpose.  Enable this feature in addition to :SB-SAFEPOINT to enable
+ ;; such behaviour.
+ ; :sb-thruption
+
  ;;
  ;; miscellaneous notes on other things which could have special significance
  ;; in the *FEATURES* list
