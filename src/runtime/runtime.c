@@ -544,6 +544,7 @@ main(int argc, char *argv[], char *envp[])
      * systems (e.g. Alpha) arch_init() needs need os_vm_page_size, so
      * it must follow os_init(). -- WHN 2000-01-26 */
     os_init(argv, envp);
+    dyndebug_init(); /* after os_init: do not print output before execve */
     arch_init();
     gc_init();
     validate();

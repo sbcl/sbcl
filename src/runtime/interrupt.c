@@ -808,7 +808,7 @@ interrupt_internal_error(os_context_t *context, boolean continuable)
 #endif
 
     SHOW("in interrupt_internal_error");
-#if QSHOW
+#if QSHOW == 2
     /* Display some rudimentary debugging information about the
      * error, so that even if the Lisp error handler gets badly
      * confused, we have a chance to determine what's going on. */

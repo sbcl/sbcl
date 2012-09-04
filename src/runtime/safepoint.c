@@ -46,26 +46,6 @@
 #include "interrupt.h"
 #include "lispregs.h"
 
-/* Temporarily, this macro is a wrapper for FSHOW_SIGNAL.  Ultimately,
- * it will be restored to its full win32 branch functionality, where it
- * provides a very useful tracing mechanism that is configurable at
- * runtime. */
-#define odxprint_show(what, fmt, args...)                       \
-     do {                                                       \
-         struct thread *__self = arch_os_get_current_thread();  \
-         FSHOW_SIGNAL((stderr, "[%p/%p:%s] " fmt "\n",          \
-                       __self,                                  \
-                       __self->os_thread,                       \
-                       #what,                                   \
-                       ##args));                                \
-     } while (0)
-
-#if QSHOW_SIGNALS
-# define odxprint odxprint_show
-#else
-# define odxprint(what, fmt, args...) do {} while (0)
-#endif
-
 #if !defined(LISP_FEATURE_WIN32)
 /* win32-os.c covers these, but there is no unixlike-os.c, so the normal
  * definition goes here.  Fixme: (Why) don't these work for Windows?

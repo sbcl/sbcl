@@ -122,6 +122,12 @@
  ;; original CMU CL code.)
  ; :sb-show-assem
 
+ ;; Compile the C runtime with support for low-level debugging output
+ ;; through FSHOW and FSHOW_SIGNAL.  If enabled, this feature allows
+ ;; users to turn on such debugging output using environment variables at
+ ;; run-time.
+ ; :sb-qshow
+
  ;; Setting this makes SBCL more "fluid", i.e. more amenable to
  ;; modification at runtime, by suppressing various INLINE declarations,
  ;; compiler macro definitions, FREEZE-TYPE declarations; and by

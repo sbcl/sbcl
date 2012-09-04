@@ -96,7 +96,7 @@ os_vm_size_t large_allocation = 0;
 
 /* the verbosity level. All non-error messages are disabled at level 0;
  * and only a few rare messages are printed at level 1. */
-#if QSHOW
+#if QSHOW == 2
 boolean gencgc_verbose = 1;
 #else
 boolean gencgc_verbose = 0;
