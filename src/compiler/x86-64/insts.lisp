@@ -3494,9 +3494,9 @@
     (values label (make-ea size
                            :disp (make-fixup nil :code-object label)))))
 
-(defun emit-constant-segment-header (constants optimize)
+(defun emit-constant-segment-header (segment constants optimize)
   (declare (ignore constants))
-  (loop repeat (if optimize 64 16) do (inst byte #x90)))
+  (emit-long-nop segment (if optimize 64 16)))
 
 (defun size-nbyte (size)
   (ecase size

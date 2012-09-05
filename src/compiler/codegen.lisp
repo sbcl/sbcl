@@ -187,6 +187,7 @@
         (let ((constants (sb!vm:sort-inline-constants *constant-vector*)))
           (assemble (*constant-segment*)
             (sb!vm:emit-constant-segment-header
+             *constant-segment*
              constants
              (do-ir2-blocks (2block component nil)
                (when (policy (block-last (ir2-block-block 2block))
