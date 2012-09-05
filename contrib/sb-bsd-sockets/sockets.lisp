@@ -229,7 +229,7 @@ buffer was too small."))
                                 (list sockint::EAGAIN sockint::EINTR)))
                    nil)
                   ((= len -1) (socket-error "recvfrom"))
-                  (t (loop for i from 0 below len
+                  (t (loop for i from 0 below (min len length)
                            do (setf (elt buffer i)
                                     (cond
                                       ((or (eql element-type 'character) (eql element-type 'base-char))

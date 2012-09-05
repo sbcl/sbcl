@@ -6,6 +6,9 @@ changes relative to sbcl-1.0.58:
     comparisons, particularly on almost-sorted inputs.
   * bug fix: Reading floats with large exponents no longer takes too much time
     before reporting that the exponent is too large.
+  * bug fix: SB-BSD-SOCKETS:SOCKET-RECEIVE with a UDP socket now works
+    correctly when the received datagram is larger than the provided buffer.
+    (lp#1023438, thanks to Robert Uhl)
   * documentation: a section on random number generation has been added to the
     manual. (lp#656839)
 
