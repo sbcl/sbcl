@@ -2884,7 +2884,7 @@
                            :disp (make-fixup nil :code-object label)))))
 
 (defun emit-constant-segment-header (segment constants optimize)
-  (declare (ignore constants))
+  (declare (ignore segment constants))
   (loop repeat (if optimize 64 16) do (inst byte #x90)))
 
 (defun size-nbyte (size)
