@@ -613,6 +613,8 @@ like *STACK-TOP-HINT* and unsupported stuff like *TRACED-FUN-LIST*."
                "ATOMIC-INCF"
                "ATOMIC-DECF"
                "ATOMIC-UPDATE"
+               "ATOMIC-PUSH"
+               "ATOMIC-POP"
                "WORD"
                "MOST-POSITIVE-WORD"
 

@@ -412,6 +412,7 @@
       (assert (eq :bar
                   (eval `(let (,@(mapcar 'list vars vals))
                       ,read-form)))))))
+
 (let ((foo (cons :foo nil)))
   (defun cas-foo (old new)
     (cas (cdr foo) old new)))
@@ -425,3 +426,22 @@
     (assert (not (cas bar nil :ok)))
     (assert (eq :ok (cas bar :ok nil)))
     (assert (not (cas bar nil t)))))
+
+(with-test (:name atomic-push
+            :skipped-on '(not :sb-thread))
+  (let ((store (cons nil nil))
+        (n 100000))
+    (symbol-macrolet ((x (car store))
+                      (y (cdr store)))
+      (dotimes (i n)
+        (push i y))
+      (mapc #'sb-thread:join-thread
+            (loop repeat 1000
+                  collect (sb-thread:make-thread
+                           (lambda ()
+                             (loop for z = (atomic-pop y)
+                                   while z
+                                   do (atomic-push z x)
+                                      (sleep 0.00001))))))
+      (assert (not y))
+      (assert (eql n (length x))))))

@@ -405,3 +405,34 @@ Examples:
        (loop for ,new = (funcall ,update-fn ,@arguments ,old)
              until (eq ,old (setf ,old ,cas-form))
              finally (return ,new)))))
+
+(defmacro atomic-push (obj place &environment env)
+  #!+sb-doc
+  "Like PUSH, but atomic. PLACE may be read multiple times before
+the operation completes -- the write does not occur until such time
+that no other thread modified PLACE between the read and the write.
+
+Works on all CASable places."
+  (multiple-value-bind (vars vals old new cas-form read-form)
+      (get-cas-expansion place env)
+    `(let* (,@(mapcar 'list vars vals)
+            (,old ,read-form)
+            (,new (cons ,obj ,old)))
+       (loop until (eq ,old (setf ,old ,cas-form))
+             do (setf (cdr ,new) ,old)
+             finally (return ,new)))))
+
+(defmacro atomic-pop (place &environment env)
+  #!+sb-doc
+  "Like POP, but atomic. PLACE may be read multiple times before
+the operation completes -- the write does not occur until such time
+that no other thread modified PLACE between the read and the write.
+
+Works on all CASable places."
+  (multiple-value-bind (vars vals old new cas-form read-form)
+      (get-cas-expansion place env)
+    `(let* (,@(mapcar 'list vars vals))
+       (loop for ,old = ,read-form
+             for ,new = (cdr ,old)
+             until (eq ,old (setf ,old ,cas-form))
+             finally (return (car ,old))))))
