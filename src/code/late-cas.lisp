@@ -28,7 +28,7 @@
                           ',cname ,old (the ,(info :variable :type cname) ,new))
                         slow)
                     slow))
-              `(symbol-global-value ,tmp)))))
+              `(symbol-global-value ,(or tmp `',cname))))))
 
 (define-cas-expander svref (vector index)
   (with-unique-names (v i old new)
