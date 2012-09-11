@@ -1,6 +1,11 @@
-#! /bin/sh
+#!/bin/bash
 
-set -e
+# Sourceforge username
+SFUSER=${SFUSER:-$USER}
+
+set -ex
+
+## Parse command line arguments
 
 usage () {
     if ! [ -z "$1" ]
@@ -11,8 +16,17 @@ usage () {
 
 usage: $0 [-s] VERSION-NUMBER [REV]
 
-  This script frobs NEWS, makes a "release" commit, builds, runs tests
-  and creates an annotated tag for the release with VERSION-NUMBER.
+  This script frobs NEWS, makes a "release" commit + tag of the
+  repository in \$PWD/release.sbcl .
+
+  It then clones the repository to a new clean directory and does the
+  following:
+  - Builds source tarball
+  - Builds a SBCL for self-build
+  - Builds x86-64 and x86 binaries
+  - Uploads binaries
+  - Pushes the repository
+  - Builds and uploads the documentation
 
   If -s is given, then use the gpg-sign mechanism of "git tag". You
   will need to have your gpg secret key handy.
@@ -20,8 +34,11 @@ usage: $0 [-s] VERSION-NUMBER [REV]
   if REV is given, it is the git revision to build into a release.
   Default is origin/master.
 
-  No changes will be pushed upstream. This script will tell you how to
-  do this when it finishes.
+  ENVIRONMENT:
+
+  SFUSER: Sourceforge username. Defaults to \$USER
+  SBCL_RELEASE_DIR: Absolute path to directory containing all the build
+    artifacts. If not defined, a new build directory is created in \$PWD.
 
 EOF
     exit 1
@@ -34,11 +51,14 @@ else
     sign=""
 fi
 
+## Verify version number
+
 if [ -z "$1" ]
 then
     usage "No version number."
 else
-    version=$1; shift
+    VERSION=$1; shift
+    echo $VERSION | perl -pe 'die "Invalid version number: $_\n" if !/^\d+\.\d+\.\d+$/'
 fi
 
 if [ -z "$1" ]
@@ -58,144 +78,244 @@ then
     usage "Extra command-line arguments: $@"
 fi
 
-sbcl_directory="$(cd "$(dirname $0)"; pwd)"
-tmpfile=$(mktemp -t sbcl-build-$(date +%Y%m%d)-XXXXXXXXX)
-tmpdir="$(mktemp -d -t sbcl-build-tree-$(date +%Y%m%d)-XXXXXXXXX)"
+SBCL_RELEASE_DIR=${SBCL_RELEASE_DIR:-$(mktemp -d $PWD/sbcl-release-dir-$(date +%Y%m%d)-XXXXXXXXX)}
+SBCL_DIR=$SBCL_RELEASE_DIR/sbcl-$VERSION
+GIT_DIR=$PWD/release.sbcl
+LOGFILE=$SBCL_RELEASE_DIR/log.txt
 
-## Check for messy work dirs:
+## Frob the git repository, and clone the repo to a clean build directory.
 
-echo "Fetching updates."
-git fetch
+if [ ! -d $SBCL_DIR ]; then
+  cd $GIT_DIR
 
-branch_name="release-$(date '+%s')"
-original_branch="$(git describe --all --contains HEAD)"
-trap "cd \"$sbcl_directory\" ; git checkout $original_branch" EXIT
-git checkout -b $branch_name $rev
+  sbcl_directory="$(cd "$(dirname $0)"; pwd)"
 
-echo "Checking that the tree is clean."
-if ! [ $(git status --porcelain | wc -l) = 0 ]
-then
-    echo "There are uncommitted / unpushed changes in this checkout!"
-    git status
-    exit 1
+  branch_name="release-$(date '+%s')"
+  original_branch="$(git describe --all --contains HEAD)"
+
+  echo "Checking that the tree is clean."
+  if ! [ $(git status --porcelain | wc -l) = 0 ]
+  then
+      echo "There are uncommitted / unpushed changes in this checkout!"
+      git status
+      exit 1
+  fi
+
+  ## Perform the necessary changes to the NEWS file:
+
+  echo "Munging NEWS"
+  sed -i.orig "/^changes relative to sbcl-.*:/ s/changes/changes in sbcl-$VERSION/ " NEWS
+  rm -f NEWS.orig
+  if ! grep "^changes in sbcl-$VERSION relative to" NEWS > /dev/null
+  then
+      echo "NEWS munging failed!"
+      exit 1
+  fi
+
+  ## Commit
+
+  cd "$sbcl_directory"
+
+  echo "Committing release version."
+  git add NEWS
+  git commit -m "$VERSION: will be tagged as \"sbcl-$VERSION\""
+
+  ## Make release notes
+
+  if [ ! -f $SBCL_RELEASE_DIR/sbcl-$VERSION-release-notes.txt ]; then
+    awk "BEGIN { state = 0 }
+     /^changes in sbcl-/ { state = 0 } 
+     /^changes in sbcl-$VERSION/ { state = 1 }
+     { if(state == 1) print \$0 }" < $GIT_DIR/NEWS > $SBCL_RELEASE_DIR/sbcl-$VERSION-release-notes.txt
+  fi
+
+  ## Tag
+
+  tag="sbcl-$VERSION"
+  echo "Tagging as $tag"
+  git tag $sign -F $SBCL_RELEASE_DIR/sbcl-$VERSION-release-notes.txt "$tag"
+
+  git clone $GIT_DIR $SBCL_DIR
 fi
 
-## Perform the necessary changes to the NEWS file:
+## Make the source tarball.
 
-echo "Munging NEWS"
-sed -i.orig "/^changes relative to sbcl-.*:/ s/changes/changes in sbcl-$version/ " NEWS
-rm -f NEWS.orig
-if ! grep "^changes in sbcl-$version relative to" NEWS > /dev/null
-then
-    echo "NEWS munging failed!"
-    exit 1
+if [ ! \( -f $SBCL_RELEASE_DIR/sbcl-$VERSION-source.tar -o -f $SBCL_RELEASE_DIR/sbcl-$VERSION-source.tar.bz2 \) ]; then
+  cd $SBCL_DIR
+  (. $SBCL_DIR/generate-version.sh; generate_version)
+  mkdir -p CVS
+  sh ./distclean.sh
+  rm -rf .git
+
+  cd $SBCL_RELEASE_DIR
+  sh sbcl-$VERSION/source-distribution.sh sbcl-$VERSION
+
+  mv $SBCL_DIR $SBCL_DIR.git
+
+  tar xvf sbcl-$VERSION-source.tar
 fi
 
-cd "$sbcl_directory"
+## Build x86-64 binary for bootstrap.
 
-echo "Committing release version."
-git add NEWS
-git commit -m "$version: will be tagged as \"sbcl-$version\""
+if [ ! -d $SBCL_RELEASE_DIR/bin ]; then
+  cd $SBCL_DIR
+  nice -20 ./make.sh >$LOGFILE 2>&1
 
-relnotes=$tmpdir/sbcl-$version-release-notes.txt
-awk "BEGIN { state = 0 }
- /^changes in sbcl-/ { state = 0 }
- /^changes in sbcl-$version/ { state = 1 }
- { if(state == 1) print \$0 }" < NEWS > $relnotes
-
-tag="sbcl-$version"
-echo "Tagging as $tag"
-git tag $sign -F $relnotes "$tag"
-
-SBCL_BUILDING_RELEASE_FROM=HEAD
-export SBCL_BUILDING_RELEASE_FROM
-echo "Building SBCL, log: $tmpfile"
-./make.sh >$tmpfile 2>&1
-
-if [ "SBCL $version" != "$(./src/runtime/sbcl --version)" ]
-then
-    echo "Built version number doesn't match requested one:" &>2
-    echo &>2
-    echo "    $(./src/runtime/sbcl --version)" &>2
-    exit 1
+  cd tests
+  nice -20 sh ./run-tests.sh >>$LOGFILE 2>&1
+  mkdir -p $SBCL_RELEASE_DIR/bin
+  cp $SBCL_DIR/src/runtime/sbcl $SBCL_RELEASE_DIR/bin/sbcl
+  cp $SBCL_DIR/output/sbcl.core $SBCL_RELEASE_DIR/bin/sbcl.core
 fi
 
-built_version=$(./src/runtime/sbcl --version | awk '{print $2}')
+## Build x86-64 release binary.
 
-echo "Running tests, log: $tmpfile"
-cd tests
-sh ./run-tests.sh >>$tmpfile 2>&1
-cd ..
+if [ ! -d $SBCL_RELEASE_DIR/sbcl-$VERSION-x86-64-linux ]; then
+  cd $SBCL_DIR
+  sh clean.sh
+  nice -20 ./make.sh "$SBCL_RELEASE_DIR/bin/sbcl --core $SBCL_RELEASE_DIR/bin/sbcl.core --no-userinit" >> $LOGFILE 2>&1
+  cd doc && sh ./make-doc.sh
+  cd $SBCL_RELEASE_DIR
 
-cp ./src/runtime/sbcl "$tmpdir"/sbcl-$version-bin
-cp ./output/sbcl.core "$tmpdir"/sbcl-$version.core
+  ln -s $SBCL_DIR $SBCL_RELEASE_DIR/sbcl-$VERSION-x86-64-linux
+  sh $SBCL_DIR/binary-distribution.sh sbcl-$VERSION-x86-64-linux
+  sh $SBCL_DIR/html-distribution.sh sbcl-$VERSION
+fi
 
-echo "Self-building, log: $tmpfile"
-./make.sh --xc-host="$tmpdir/sbcl-$version-bin --core $tmpdir/sbcl-$version.core --no-userinit --no-sysinit --disable-debugger" >>$tmpfile 2>&1
+## Build x86 release binary.
 
-echo "Building docs, log: $tmpfile"
-cd doc && sh ./make-doc.sh >$tmpfile 2>&1
+if [ ! -d $SBCL_RELEASE_DIR/sbcl-$VERSION-x86-linux ]; then
+  cd $SBCL_DIR
+  sh clean.sh
+  export SBCL_ARCH=x86
+  export PATH=/scratch/src/release/x86-gcc-wrapper:$PATH
+  nice -20 ./make.sh "$SBCL_RELEASE_DIR/bin/sbcl --core $SBCL_RELEASE_DIR/bin/sbcl.core --no-userinit" >> $LOGFILE 2>&1
+  cd tests
+  nice -20 sh ./run-tests.sh >>$LOGFILE 2>&1
 
-cd ..
+  cd $SBCL_RELEASE_DIR
+  ln -s $SBCL_DIR $SBCL_RELEASE_DIR/sbcl-$VERSION-x86-linux
+  sh $SBCL_DIR/binary-distribution.sh sbcl-$VERSION-x86-linux
+fi
 
-rm -f "$tmpdir"/sbcl-$version-bin "$tmpdir"/sbcl-$version.core
+## Checksum
 
-cp -a "$sbcl_directory" "$tmpdir"/sbcl-$version
+if [ ! -f $SBCL_RELEASE_DIR/sbcl-$VERSION-$SFUSER ]; then
+  cd $SBCL_RELEASE_DIR
+  echo "The SHA256 checksums of the following distribution files are:" > sbcl-$VERSION-$SFUSER
+  echo >> sbcl-$VERSION-$SFUSER
+  sha256sum sbcl-$VERSION*.tar >> sbcl-$VERSION-$SFUSER
+  bzip2 sbcl-$VERSION*.tar
+fi
 
-echo "Building tarballs, log $tmpfile"
-ln -s "$tmpdir"/sbcl-$version "$tmpdir"/sbcl-$version-x86-linux
-cd "$tmpdir"/
-sh sbcl-$version/binary-distribution.sh sbcl-$version-x86-linux >$tmpfile 2>&1
-sh sbcl-$version/html-distribution.sh sbcl-$version >$tmpfile 2>&1
-cd sbcl-$version
-sh ./distclean.sh >$tmpfile 2>&1
-cd ..
-sh sbcl-$version/source-distribution.sh sbcl-$version >$tmpfile 2>&1
+## Bug closing email
 
-echo "The SHA256 checksums of the following distribution files are:" > sbcl-$version-crhodes
-echo >> sbcl-$version-crhodes
-sha256sum sbcl-$version*.tar >> sbcl-$version-crhodes
-bzip2 "$tmpdir"/sbcl-$version*.tar
+if [ ! -f $SBCL_RELEASE_DIR/sbcl-$VERSION-bugmail.txt ]; then
+  cd $SBCL_RELEASE_DIR
+  echo Bugs fixed by sbcl-$VERSION release > sbcl-$VERSION-bugmail.txt
+ for bugnum in $(egrep -o "#[1-9][0-9][0-9][0-9][0-9][0-9]+" sbcl-$VERSION-release-notes.txt | sed s/#// | sort -n); do 
+    printf "\n bug %s\n status fixreleased" $bugnum >> sbcl-$VERSION-bugmail.txt
+  done
+  echo >> sbcl-$VERSION-bugmail.txt
+fi
 
-echo "Building bugmail."
-bugmail=sbcl-$version-bugmail.txt
-echo Bugs fixed by sbcl-$version release > $bugmail
-for bugnum in $(egrep -o "#[1-9][0-9][0-9][0-9][0-9][0-9]+" $relnotes | sed s/#// | sort -n)
-do 
-  printf "\n bug %s\n status fixreleased" $bugnum >> $bugmail
-done
-echo >> $bugmail
+## Sign
 
-echo SBCL distribution has been prepared in "$tmpdir"
+if [ ! -f $SBCL_RELEASE_DIR/sbcl-$VERSION-$SFUSER.asc ]; then
+  cd $SBCL_RELEASE_DIR
+  gpg -sta $SBCL_RELEASE_DIR/sbcl-$VERSION-$SFUSER
+fi
+
+## Upload to sf.net
+
+if [ ! -f $SBCL_RELEASE_DIR/uploaded ]; then
+
+  read -n 1 -p "Ok to upload? " A; echo  
+  if [ $A \!= "y" ]; then
+    exit 1
+  fi
+
+  cd $SBCL_RELEASE_DIR
+cat > $SBCL_RELEASE_DIR/sftp-batch <<EOF
+cd /home/frs/project/s/sb/sbcl/sbcl
+mkdir $VERSION
+chmod 775 $VERSION
+cd $VERSION
+put sbcl-$VERSION-$SFUSER.asc
+put sbcl-$VERSION-x86-linux-binary.tar.bz2
+put sbcl-$VERSION-x86-64-linux-binary.tar.bz2
+put sbcl-$VERSION-source.tar.bz2
+put sbcl-$VERSION-documentation-html.tar.bz2
+put sbcl-$VERSION-release-notes.txt
+put sbcl-$VERSION-release-notes.txt README
+EOF
+  sftp -b $SBCL_RELEASE_DIR/sftp-batch $SFUSER,sbcl@frs.sourceforge.net 
+  touch uploaded
+fi
+
+## Push
+
+if [ ! -f $SBCL_RELEASE_DIR/sbcl-git-pushed ]; then
+  cd $GIT_DIR
+  git diff origin || true
+  
+  read -n 1 -p "Ok? " A; echo  
+
+  if [ $A = "y" ]; then
+    git push
+    git push --tags
+    touch $SBCL_RELEASE_DIR/sbcl-git-pushed
+  else
+    exit 1
+  fi
+fi
+
+## Build + push documentation
+
+if [ ! -f $SBCL_RELEASE_DIR/sbcl-page-uploaded ]; then
+  cp -af $GIT_DIR/../sbcl-page $SBCL_RELEASE_DIR
+  cd $SBCL_RELEASE_DIR/sbcl-page/sbcl
+  git fetch
+  cd $SBCL_RELEASE_DIR/sbcl-page
+  git pull
+  git submodule update
+  cp $SBCL_DIR/NEWS .
+  perl -i -pe "s/(:x86(?:-64)? :linux :available) \".*\"/\$1 \"$VERSION\"/" \
+    platform-support-platforms.lisp
+
+  export LC_CTYPE=en_US.utf8
+
+  nice -20 make manual generate-pages SBCL_TAG=sbcl-$VERSION >>$LOGFILE 2>&1
+
+  COMMIT=false
+
+  git diff || COMMIT=true
+  links -dump platform-table.html
+
+  read -n 1 -p "Ok? " A; echo  
+
+  if [ $A = "y" ]; then
+    if [ $COMMIT ]; then
+      git commit -a -m "Update for $VERSION"
+      git push
+    fi
+    make upload-pages upload-manual SBCL_TAG=sbcl-$VERSION
+    touch $SBCL_RELEASE_DIR/sbcl-page-uploaded
+  else
+    exit 1
+  fi
+fi
+
+set +x
+
 echo TODO:
-echo
-echo "Sanity check: git show $tag"
-echo
-echo "git merge $branch_name && git push && git push --tags"
-echo "git branch -d $branch_name"
-echo "cd \"$tmpdir\""
-echo gpg -sta sbcl-$version-crhodes
-echo sftp crhodes,sbcl@frs.sourceforge.net
-echo \* cd /home/frs/project/s/sb/sbcl/sbcl
-echo \* mkdir $version
-echo \* chmod 775 $version
-echo \* cd $version
-echo \* put sbcl-$version-crhodes.asc
-echo \* put sbcl-$version-x86-linux-binary.tar.bz2
-echo \* put sbcl-$version-source.tar.bz2
-echo \* put sbcl-$version-documentation-html.tar.bz2
-echo \* put sbcl-$version-release-notes.txt
 echo 
 echo perform administrative tasks:
 echo 
 echo \* https://sourceforge.net/project/admin/?group_id=1373
-echo \* In the File Manager interface, click on the release notes file
-echo \ \ and tick the release notes box.
 echo \* In the File Manager interface, click on the source tarball and
 echo \ \ select as default download for all OSes.
 echo \* mail sbcl-announce
-echo \* check and send sbcl-$version-bugmail.txt to edit@bugs.launchpad.net
+echo \* check and send sbcl-$VERSION-bugmail.txt to edit@bugs.launchpad.net
 echo \ \ '(sign: C-c RET s p)'
-echo \* update \#lisp IRC topic
-echo \* update sbcl website
-
+echo "* update #lisp IRC topic (requires channel ops)"
