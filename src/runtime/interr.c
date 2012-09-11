@@ -39,9 +39,44 @@ default_lossage_handler(void)
 }
 static void (*lossage_handler)(void) = default_lossage_handler;
 
+#if QSHOW
+static void
+configurable_lossage_handler()
+{
+    void lisp_backtrace(int frames);
+
+    if (dyndebug_config.dyndebug_backtrace_when_lost) {
+        fprintf(stderr, "lose: backtrace follows as requested\n");
+        lisp_backtrace(100);
+    }
+
+    if (dyndebug_config.dyndebug_sleep_when_lost) {
+        fprintf(stderr,
+"The system is too badly corrupted or confused to continue at the Lisp.\n"
+"level.  The monitor was enabled, but you requested `sleep_when_lost'\n"
+"behaviour though dyndebug.  To help with your debugging effort, this\n"
+"thread will not enter the monitor, and instead proceed immediately to an\n"
+"infinite sleep call, maximizing your chances that the thread's current\n"
+"state can be preserved until you attach an external debugger. Good luck!\n");
+        for (;;)
+#         ifdef LISP_FEATURE_WIN32
+            Sleep(10000);
+#         else
+            sleep(10);
+#         endif
+    }
+
+    monitor_or_something();
+}
+#endif
+
 void enable_lossage_handler(void)
 {
+#if QSHOW
+    lossage_handler = configurable_lossage_handler;
+#else
     lossage_handler = monitor_or_something;
+#endif
 }
 void disable_lossage_handler(void)
 {

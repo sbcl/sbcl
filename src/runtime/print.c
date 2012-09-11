@@ -69,6 +69,10 @@ dyndebug_init()
     dyndebug_init1(misc,           "MISC");
     dyndebug_init1(pagefaults,     "PAGEFAULTS");
 
+    int n_output_flags = n;
+    dyndebug_init1(backtrace_when_lost, "BACKTRACE_WHEN_LOST");
+    dyndebug_init1(sleep_when_lost,     "SLEEP_WHEN_LOST");
+
     if (n != DYNDEBUG_NFLAGS)
         fprintf(stderr, "Bug in dyndebug_init\n");
 
@@ -84,7 +88,7 @@ dyndebug_init()
             if (!token) break;
             unsigned i;
             if (!strcmp(token, "all"))
-                for (i = 0; i < DYNDEBUG_NFLAGS; i++)
+                for (i = 0; i < n_output_flags; i++)
                     *ptrs[i] = 1;
             else {
                 for (i = 0; i < DYNDEBUG_NFLAGS; i++)
@@ -104,8 +108,11 @@ dyndebug_init()
             fprintf(stderr, "Valid flags are:\n");
             fprintf(stderr, "  all  ;enables all of the following:\n");
             unsigned i;
-            for (i = 0; i < DYNDEBUG_NFLAGS; i++)
+            for (i = 0; i < DYNDEBUG_NFLAGS; i++) {
+                if (i == n_output_flags)
+                    fprintf(stderr, "Additional options:\n");
                 fprintf(stderr, "  %s\n", names[i]);
+            }
         }
     }
 
