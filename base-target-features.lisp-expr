@@ -327,6 +327,7 @@
  ;; for the purpose of stopping and starting the world around GC can be
  ;; performed using safepoints instead of signals.  Enable this feature
  ;; to compile with safepoints and to use them for GC.
+ ;; (Replaces use of SIG_STOP_FOR_GC.)
  ; :sb-safepoint
 
  ;; When compiling with safepoints, the INTERRUPT-THREAD mechanism can
@@ -334,7 +335,13 @@
  ;; can be interrupted safely, instead of using a signal for this
  ;; purpose.  Enable this feature in addition to :SB-SAFEPOINT to enable
  ;; such behaviour.
+ ;; (Replaces use of SIGPIPE, except to wake up syscalls.)
  ; :sb-thruption
+
+ ;; When compiling with safepoints and thruptions, the TIMER facility
+ ;; can replace its use of setitimer with a background thread.
+ ;; (Replaces use of SIGALRM.)
+ ; :sb-wtimer
 
  ;;
  ;; miscellaneous notes on other things which could have special significance
