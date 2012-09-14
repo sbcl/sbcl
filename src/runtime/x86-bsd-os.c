@@ -1,4 +1,5 @@
 #include <signal.h>
+#include <stdio.h>
 #include "sbcl.h"
 #include "runtime.h"
 #include "thread.h"
