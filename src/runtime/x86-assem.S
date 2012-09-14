@@ -131,7 +131,7 @@
 # define LoadCurrentThreadSlot(offset,reg);     \
 	movl	SBCL_THREAD_BASE_EA, reg ;      \
 	movl	offset(reg), reg ;
-#elif defined(LISP_FEATURE_LINUX) || defined(LISP_FEATURE_SUNOS)
+#elif defined(LISP_FEATURE_LINUX) || defined(LISP_FEATURE_SUNOS) || defined(LISP_FEATURE_FREEBSD)
   /* see comment in arch_os_thread_init */
 # define SBCL_THREAD_BASE_EA %fs:THREAD_SELFPTR_OFFSET
 # define MAYBE_FS(addr) addr
