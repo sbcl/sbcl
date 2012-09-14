@@ -264,8 +264,9 @@ EOF
 set +e
 
 test_compile() {
+    x="$1"
     run_sbcl <<EOF
-(progn (load (compile-file "$TEST_FILESTEM.$1.lisp"))
+(progn (load (compile-file "$TEST_FILESTEM.$x.lisp"))
 (sb-ext:exit :code $EXIT_LISP_WIN))
 EOF
     check_status_maybe_lose "compile $1" $?
@@ -284,8 +285,9 @@ test_use fast
 
 test_save() {
     echo testing save $1 
+    x="$1"
     run_sbcl --load $TEST_FILESTEM.$1.fasl <<EOF
-#+linkage-table (save-lisp-and-die "$TEST_FILESTEM.$1.core")
+#+linkage-table (save-lisp-and-die "$TEST_FILESTEM.$x.core")
 #-linkage-table nil
 (sb-ext:exit :code 22) ; catch this
 EOF
