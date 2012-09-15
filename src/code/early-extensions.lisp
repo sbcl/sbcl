@@ -1140,6 +1140,8 @@
 ;;; deprecated.texinfo.
 ;;;
 ;;; EARLY:
+;;; - SB-THREAD::GET-MUTEX, since 1.0.37.33 (04/2010)               -> Late: 01/2013
+;;;   ^- initially deprecated without compile-time warning, hence the schedule
 ;;; - SB-THREAD::SPINLOCK (type), since 1.0.53.11 (08/2011)         -> Late: 08/2012
 ;;; - SB-THREAD::MAKE-SPINLOCK, since 1.0.53.11 (08/2011)           -> Late: 08/2012
 ;;; - SB-THREAD::WITH-SPINLOCK, since 1.0.53.11 (08/2011)           -> Late: 08/2012

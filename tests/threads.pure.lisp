@@ -35,7 +35,7 @@
 (with-test (:name mutex-owner)
   ;; Make sure basics are sane on unithreaded ports as well
   (let ((mutex (make-mutex)))
-    (get-mutex mutex)
+    (grab-mutex mutex)
     (assert (eq *current-thread* (mutex-value mutex)))
     (handler-bind ((warning #'error))
       (release-mutex mutex))
@@ -71,11 +71,11 @@
     (sleep 1)
     (assert (not (thread-alive-p thread)))))
 
-;;; GET-MUTEX should not be interruptible under WITHOUT-INTERRUPTS
+;;; GRAB-MUTEX should not be interruptible under WITHOUT-INTERRUPTS
 
-(with-test (:name without-interrupts+get-mutex :skipped-on '(not :sb-thread))
+(with-test (:name without-interrupts+grab-mutex :skipped-on '(not :sb-thread))
   (let* ((lock (make-mutex))
-         (bar (progn (get-mutex lock) nil))
+         (bar (progn (grab-mutex lock) nil))
          (thread (make-thread (lambda ()
                                 (sb-sys:without-interrupts
                                     (with-mutex (lock)

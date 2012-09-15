@@ -615,9 +615,8 @@ HOLDING-MUTEX-P."
                      (decode-timeout timeout))
                (go :again)))))))
 
-(defun get-mutex (mutex &optional new-owner (waitp t) (timeout nil))
-  #!+sb-doc
-  "Deprecated in favor of GRAB-MUTEX."
+(define-deprecated-function :early "1.0.37.33" get-mutex (grab-mutex)
+    (mutex &optional new-owner (waitp t) (timeout nil))
   (declare (ignorable waitp timeout))
   (let ((new-owner (or new-owner *current-thread*)))
     (or (%try-mutex mutex new-owner)

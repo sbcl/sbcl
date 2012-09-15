@@ -125,18 +125,32 @@ stale value, use MUTEX-OWNER instead."
                     (barrier (:write)))))
                (exec)))))))
 
-(sb!xc:defmacro with-mutex ((mutex &key (value '*current-thread*) (wait-p t))
+(sb!xc:defmacro with-mutex ((mutex &key (wait-p t) timeout value)
                             &body body)
   #!+sb-doc
-  "Acquire MUTEX for the dynamic scope of BODY, setting it to VALUE or
-some suitable default value if NIL.  If WAIT-P is non-NIL and the mutex
-is in use, sleep until it is available"
+  "Acquire MUTEX for the dynamic scope of BODY. If WAIT-P is true (the default),
+and the MUTEX is not immediately available, sleep until it is available.
+
+If TIMEOUT is given, it specifies a relative timeout, in seconds, on how long
+the system should try to acquire the lock in the contested case.
+
+If the mutex isn't acquired succesfully due to either WAIT-P or TIMEOUT, the
+body is not executed, and WITH-MUTEX returns NIL.
+
+Otherwise body is executed with the mutex held by current thread, and
+WITH-MUTEX returns the values of BODY.
+
+Historically WITH-MUTEX also accepted a VALUE argument, which when provided
+was used as the new owner of the mutex instead of the current thread. This is
+no longer supported: if VALUE is provided, it must be either NIL or the
+current thread."
   `(dx-flet ((with-mutex-thunk () ,@body))
      (call-with-mutex
       #'with-mutex-thunk
       ,mutex
       ,value
-      ,wait-p)))
+      ,wait-p
+      ,timeout)))
 
 (sb!xc:defmacro with-system-mutex ((mutex
                                     &key without-gcing allow-with-interrupts)
@@ -151,16 +165,30 @@ is in use, sleep until it is available"
        #'with-system-mutex-thunk
        ,mutex)))
 
-(sb!xc:defmacro with-recursive-lock ((mutex) &body body)
+(sb!xc:defmacro with-recursive-lock ((mutex &key (wait-p t) timeout) &body body)
   #!+sb-doc
-  "Acquires MUTEX for the dynamic scope of BODY. Within that scope
-further recursive lock attempts for the same mutex succeed. It is
-allowed to mix WITH-MUTEX and WITH-RECURSIVE-LOCK for the same mutex
-provided the default value is used for the mutex."
+  "Acquire MUTEX for the dynamic scope of BODY.
+
+If WAIT-P is true (the default), and the MUTEX is not immediately available or
+held by the current thread, sleep until it is available.
+
+If TIMEOUT is given, it specifies a relative timeout, in seconds, on how long
+the system should try to acquire the lock in the contested case.
+
+If the mutex isn't acquired succesfully due to either WAIT-P or TIMEOUT, the
+body is not executed, and WITH-RECURSIVE-LOCK returns NIL.
+
+Otherwise body is executed with the mutex held by current thread, and
+WITH-RECURSIVE-LOCK returns the values of BODY.
+
+Unlike WITH-MUTEX, which signals an error on attempt to re-acquire an already
+held mutex, WITH-RECURSIVE-LOCK allows recursive lock attempts to succeed."
   `(dx-flet ((with-recursive-lock-thunk () ,@body))
      (call-with-recursive-lock
       #'with-recursive-lock-thunk
-      ,mutex)))
+      ,mutex
+      ,wait-p
+      ,timeout)))
 
 (sb!xc:defmacro with-recursive-system-lock ((lock
                                              &key without-gcing)
@@ -180,7 +208,7 @@ provided the default value is used for the mutex."
                 (flet ((%call-with-system-mutex ()
                          (dx-let (got-it)
                            (unwind-protect
-                                (when (setf got-it (get-mutex mutex))
+                                (when (setf got-it (grab-mutex mutex))
                                   (funcall function))
                              (when got-it
                                (release-mutex mutex))))))
@@ -199,13 +227,16 @@ provided the default value is used for the mutex."
 
 #!-sb-thread
 (progn
-  (defun call-with-mutex (function mutex value waitp)
-    (declare (ignore mutex value waitp)
+  (defun call-with-mutex (function mutex value waitp timeout)
+    (declare (ignore mutex value waitp timeout)
              (function function))
+    (unless (or (null value) (eq *current-thread* value))
+      (error "~S called with non-nil :VALUE that isn't the current thread."
+             'with-mutex))
     (funcall function))
 
-  (defun call-with-recursive-lock (function mutex)
-    (declare (ignore mutex) (function function))
+  (defun call-with-recursive-lock (function mutex waitp timeout)
+    (declare (ignore mutex) (function function waitp timeout))
     (funcall function))
 
   (defun call-with-recursive-system-lock (function lock)
@@ -223,25 +254,30 @@ provided the default value is used for the mutex."
 ;;; closes over GOT-IT causes a value-cell to be allocated for it --
 ;;; and we prefer that to go on the stack since it can.
 (progn
-  (defun call-with-mutex (function mutex value waitp)
+  (defun call-with-mutex (function mutex value waitp timeout)
     (declare (function function))
+    (unless (or (null value) (eq *current-thread* value))
+      (error "~S called with non-nil :VALUE that isn't the current thread."
+             'with-mutex))
     (dx-let ((got-it nil))
       (without-interrupts
         (unwind-protect
              (when (setq got-it (allow-with-interrupts
-                                 (get-mutex mutex value waitp)))
+                                  (grab-mutex mutex :waitp waitp
+                                                    :timeout timeout)))
                (with-local-interrupts (funcall function)))
           (when got-it
             (release-mutex mutex))))))
 
-  (defun call-with-recursive-lock (function mutex)
+  (defun call-with-recursive-lock (function mutex waitp timeout)
     (declare (function function))
     (dx-let ((inner-lock-p (eq (mutex-%owner mutex) *current-thread*))
              (got-it nil))
       (without-interrupts
         (unwind-protect
              (when (or inner-lock-p (setf got-it (allow-with-interrupts
-                                                  (get-mutex mutex))))
+                                                   (grab-mutex mutex :waitp waitp
+                                                                     :timeout timeout))))
                (with-local-interrupts (funcall function)))
           (when got-it
             (release-mutex mutex))))))

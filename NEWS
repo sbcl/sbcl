@@ -2,6 +2,8 @@
 changes relative to sbcl-1.0.58:
   * enhancement: New variable, sb-ext:*disassemble-annotate* for controlling
     source annotation of DISASSEMBLE output. Defaults to T.
+  * enhancement: TIMEOUT arguments added to WITH-MUTEX and WITH-RECURSIVE-LOCK, and
+    WAIT-P argument added to WITH-RECURSIVE-LOCK.
   * enhancement: SB-EXT:ATOMIC-PUSH and SB-EXT:ATOMIC-POP allow atomic operations
     on list heads.
   * optimization: CL:SORT and CL:STABLE-SORT of lists are faster and use fewer

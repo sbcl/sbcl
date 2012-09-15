@@ -139,10 +139,6 @@ thread is allowed to hold the mutex, others which attempt to take it
 will be made to wait until it's free. Threads are woken in the order
 that they go to sleep.
 
-There isn't a timeout on mutex acquisition, but the usual WITH-TIMEOUT
-macro (which throws a TIMEOUT condition after n seconds) can be used
-if you want a bounded wait.
-
 @lisp
 (defpackage :demo (:use "CL" "SB-THREAD" "SB-EXT"))
 
@@ -162,14 +158,16 @@ if you want a bounded wait.
 @end lisp
 
 @include struct-sb-thread-mutex.texinfo
+
+@include macro-sb-thread-with-mutex.texinfo
+@include macro-sb-thread-with-recursive-lock.texinfo
+
 @include fun-sb-thread-make-mutex.texinfo
 @include fun-sb-thread-mutex-name.texinfo
+@include fun-sb-thread-mutex-owner.texinfo
 @include fun-sb-thread-mutex-value.texinfo
 @include fun-sb-thread-grab-mutex.texinfo
 @include fun-sb-thread-release-mutex.texinfo
-@include macro-sb-thread-with-mutex.texinfo
-@include macro-sb-thread-with-recursive-lock.texinfo
-@include fun-sb-thread-get-mutex.texinfo
 
 @node Semaphores
 @comment  node-name,  next,  previous,  up
@@ -295,7 +293,7 @@ and @code{sb-ext:atomic-pop}.
 @item
 @code{sb-ext:compare-and-swap}.
 @item
-@code{sb-thread:get-mutex}, @code{sb-thread:release-mutex},
+@code{sb-thread:grab-mutex}, @code{sb-thread:release-mutex},
 @code{sb-thread:with-mutex} and @code{sb-thread:with-recursive-lock}.
 @item
 @code{sb-thread:signal-semaphore}, @code{sb-thread:try-semaphore} and

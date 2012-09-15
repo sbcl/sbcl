@@ -37,6 +37,18 @@
     (with-mutex (mutex)
       mutex)))
 
+(with-test (:name (:with-mutex :timeout))
+  (let ((m (make-mutex)))
+    (with-mutex (m)
+      (assert (null (join-thread (make-thread
+                                  (lambda ()
+                                    (with-mutex (m :timeout 0.1)
+                                      t)))))))
+    (assert (join-thread (make-thread
+                          (lambda ()
+                            (with-mutex (m :timeout 0.1)
+                              t)))))))
+
 (sb-alien:define-alien-routine "check_deferrables_blocked_or_lose"
     void
   (where sb-alien:unsigned-long))
@@ -208,7 +220,7 @@
   (let ((l (make-mutex :name "foo"))
         (p *current-thread*))
     (assert (eql (mutex-value l) nil) nil "1")
-    (sb-thread:get-mutex l)
+    (sb-thread:grab-mutex l)
     (assert (eql (mutex-value l) p) nil "3")
     (sb-thread:release-mutex l)
     (assert (eql (mutex-value l) nil) nil "5")))
@@ -224,6 +236,46 @@
           (assert (ours-p (mutex-value l)) nil "4"))
         (assert (ours-p (mutex-value l)) nil "5"))
       (assert (eql (mutex-value l) nil) nil "6"))))
+
+(with-test (:name (:with-recursive-lock :wait-p))
+  (let ((m (make-mutex)))
+    (with-mutex (m)
+      (assert (null (join-thread (make-thread
+                                  (lambda ()
+                                    (with-recursive-lock (m :wait-p nil)
+                                      t)))))))
+    (assert (join-thread (make-thread
+                          (lambda ()
+                            (with-recursive-lock (m :wait-p nil)
+                              t)))))))
+
+(with-test (:name (:with-recursive-lock :wait-p :recursive))
+  (let ((m (make-mutex)))
+    (assert (join-thread (make-thread
+                          (lambda ()
+                            (with-recursive-lock (m :wait-p nil)
+                              (with-recursive-lock (m :wait-p nil)
+                                t))))))))
+
+(with-test (:name (:with-recursive-lock :timeout))
+  (let ((m (make-mutex)))
+    (with-mutex (m)
+      (assert (null (join-thread (make-thread
+                                  (lambda ()
+                                    (with-recursive-lock (m :timeout 0.1)
+                                      t)))))))
+    (assert (join-thread (make-thread
+                          (lambda ()
+                            (with-recursive-lock (m :timeout 0.1)
+                              t)))))))
+
+(with-test (:name (:with-recursive-lock :timeout :recursive))
+  (let ((m (make-mutex)))
+    (assert (join-thread (make-thread
+                          (lambda ()
+                            (with-recursive-lock (m :timeout 0.1)
+                              (with-recursive-lock (m :timeout 0.1)
+                                t))))))))
 
 (with-test (:name (:mutex :nesting-mutex-and-recursive-lock))
   (let ((l (make-mutex :name "a mutex")))
@@ -1102,7 +1154,7 @@
                  (handler-bind
                      ((sb-sys:deadline-timeout
                        #'(lambda (c)
-                           ;; We came here through the call to GET-MUTEX
+                           ;; We came here through the call to DECODE-TIMEOUT
                            ;; in CONDITION-WAIT (contended case of
                            ;; reaquiring the mutex) - so the former will
                            ;; be NIL, but interrupts should still be enabled.
