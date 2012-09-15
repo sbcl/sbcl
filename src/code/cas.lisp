@@ -93,7 +93,7 @@ EXPERIMENTAL: Interface subject to change."
           (cond
             ;; CAS expander.
             (info
-             (funcall info place environment))
+             (funcall info expanded environment))
 
             ;; Structure accessor
             ((setf info (info :function :structure-accessor name))
