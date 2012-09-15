@@ -1415,17 +1415,17 @@ extended <package-name>::<form-in-package> syntax."
   ;; and convert to base-10 conservatively at the end.
   ;; Use the least positive float, because denormalized exponent
   ;; can be larger than normalized.
-  (let* ((max-exponent (- (nth-value
-                           1
-                           (decode-float least-positive-long-float))))
+  (let* ((max-exponent
+          #!-long-float
+          (+ sb!vm:double-float-digits sb!vm:double-float-bias))
          (number-magnitude (integer-length number))
          (divisor-magnitude (1- (integer-length divisor)))
          (magnitude (- number-magnitude divisor-magnitude)))
     (if (minusp exponent)
         (max exponent (ceiling (- (+ max-exponent magnitude))
-                               (floor (log 10 2))))
+                               #.(floor (log 10 2))))
         (min exponent (floor (- max-exponent magnitude)
-                             (floor (log 10 2)))))))
+                             #.(floor (log 10 2)))))))
 
 (defun make-float (stream)
   ;; Assume that the contents of *read-buffer* are a legal float, with nothing
