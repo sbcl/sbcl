@@ -228,7 +228,7 @@ held mutex, WITH-RECURSIVE-LOCK allows recursive lock attempts to succeed."
 #!-sb-thread
 (progn
   (defun call-with-mutex (function mutex value waitp timeout)
-    (declare (ignore mutex value waitp timeout)
+    (declare (ignore mutex waitp timeout)
              (function function))
     (unless (or (null value) (eq *current-thread* value))
       (error "~S called with non-nil :VALUE that isn't the current thread."
@@ -236,7 +236,8 @@ held mutex, WITH-RECURSIVE-LOCK allows recursive lock attempts to succeed."
     (funcall function))
 
   (defun call-with-recursive-lock (function mutex waitp timeout)
-    (declare (ignore mutex) (function function waitp timeout))
+    (declare (ignore mutex waitp timeout)
+             (function function))
     (funcall function))
 
   (defun call-with-recursive-system-lock (function lock)
