@@ -687,6 +687,7 @@
   (def %bit-position/0 (logandc2 #.(1- (expt 2 n-word-bits))))
   (def %bit-position/1 (identity)))
 (defun %bit-position (bit vector from-end start end)
-  (ecase bit
+  (case bit
     (0 (%bit-position/0 vector from-end start end))
-    (1 (%bit-position/1 vector from-end start end))))
+    (1 (%bit-position/1 vector from-end start end))
+    (otherwise nil)))

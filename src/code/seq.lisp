@@ -2235,11 +2235,12 @@ many elements are copied."
                          ((simple-array base-char (*)) (frob2))
                          ,@(when bit-frob
                              `((simple-bit-vector
-                                (if (and (eq #'identity key)
+                                (if (and (typep item 'bit)
+                                         (eq #'identity key)
                                          (or (eq #'eq test)
                                              (eq #'eql test)
                                              (eq #'equal test)))
-                                    (let ((p (%bit-position (the bit item) sequence
+                                    (let ((p (%bit-position item sequence
                                                             from-end start end)))
                                       (if p
                                           (values item p)

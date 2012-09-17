@@ -17,6 +17,8 @@ changes relative to sbcl-1.0.58:
     a SYMBOL-VALUE form with a constant symbol argument.
   * bug fix: SB-EXT:GET-CAS-EXPANSION signaled an error when a macro expanding
     into a DEFCAS defined place was used as the place.
+  * bug fix: FIND and POSITION signaled a type-error when non-bits where looked
+    for from bit-vectors.
   * documentation: a section on random number generation has been added to the
     manual. (lp#656839)
 
