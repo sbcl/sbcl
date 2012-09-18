@@ -9,4 +9,5 @@
 
 (in-package "SB!THREAD")
 
-(defvar *current-thread*)
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (defvar *current-thread* nil))

@@ -11,6 +11,9 @@
 
 (in-package "SB!THREAD")
 
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (sb!xc:proclaim '(sb!ext:always-bound *current-thread*)))
+
 (def!type thread-name ()
   'simple-string)
 
