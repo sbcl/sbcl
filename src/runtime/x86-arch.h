@@ -21,6 +21,17 @@
 #define COMPILER_BARRIER \
     do { __asm__ __volatile__ ( "" : : : "memory"); } while (0)
 
+#ifdef LISP_FEATURE_WIN32
+extern int os_number_of_processors;
+#define yield_on_uniprocessor()                 \
+    do { if (os_number_of_processors<=1) SwitchToThread(); } while(0)
+#else
+/* Stubs are better than ifdef EVERYWHERE. */
+#define yield_on_uniprocessor()                 \
+    do {} while(0)
+#endif
+
+
 static inline void
 get_spinlock(volatile lispobj *word, unsigned long value)
 {
@@ -36,13 +47,16 @@ get_spinlock(volatile lispobj *word, unsigned long value)
              : "r" (value), "m" (*word)
              : "memory", "cc");
 #else
+        if (eax!=0) {
+            asm volatile("rep; nop");
+        }
         asm volatile ("xor %0,%0\n\
               lock cmpxchg %1,%2"
              : "=a" (eax)
              : "r" (value), "m" (*word)
              : "memory", "cc");
 #endif
-
+        yield_on_uniprocessor();
     } while(eax!=0);
 #else
     *word=value;

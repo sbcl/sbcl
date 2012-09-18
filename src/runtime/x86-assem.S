@@ -87,10 +87,10 @@
  *                           |XXXXXXXX| e4e
  *     TLS ends here>     ,- |XXXXXXXX| e4f = TEB_STATIC_TLS_SLOTS_OFFSET+63
  *                       /   z        z
- *                       |   ----------
- *                       |
- *                       |   big blob of SBCL-specific thread-local data
- *                       |     |----------------------------------------|
+ *                       |   ----------                    "os_address" ----.
+ *                       |                                                   |
+ *                       |   big blob of SBCL-specific thread-local data     |
+ *                       |     |----------------------------------------| <--'
  *                       |     |   CONTROL, BINDING, ALIEN STACK        |
  *                       |     z                                        z
  * ==================    |     |----------------------------------------|
@@ -424,8 +424,13 @@ Ldone:
 #ifdef LISP_FEATURE_WIN32
 	/* Establish an SEH frame. */
 #ifdef LISP_FEATURE_SB_THREAD
-	/* FIXME: need to save BSP here. */
-#error "need to save BSP here, but don't know how yet."
+	/* Save binding stack pointer */
+	subl $4, %esp
+	pushl %eax
+        movl SBCL_THREAD_BASE_EA, %eax
+	movl THREAD_BINDING_STACK_POINTER_OFFSET(%eax), %eax
+	movl %eax, 4(%esp)
+	popl %eax
 #else
 	pushl	BINDING_STACK_POINTER + SYMBOL_VALUE_OFFSET
 #endif
@@ -451,6 +456,7 @@ LsingleValue:
 
 #ifdef LISP_FEATURE_WIN32
 	/* Remove our SEH frame. */
+	mov     %fs:0,%esp
 	popl	%fs:0
 	add	$8, %esp
 #endif

@@ -11,6 +11,9 @@
 #ifdef LISP_FEATURE_GENCGC
 #include "gencgc-alloc-region.h"
 #endif
+#ifdef LISP_FEATURE_WIN32
+#include "win32-thread-private-events.h"
+#endif
 #include "genesis/symbol.h"
 #include "genesis/static-symbols.h"
 
@@ -283,6 +286,14 @@ extern __thread struct thread *current_thread;
 # define THREAD_CSP_PAGE_SIZE 0
 #endif
 
+#ifdef LISP_FEATURE_WIN32
+/*
+ * Win32 doesn't have SIGSTKSZ, and we're not switching stacks anyway,
+ * so define it arbitrarily
+ */
+#define SIGSTKSZ 1024
+#endif
+
 #define THREAD_STRUCT_SIZE (thread_control_stack_size + BINDING_STACK_SIZE + \
                             ALIEN_STACK_SIZE +                          \
                             sizeof(struct nonpointer_thread_data) +     \
@@ -290,6 +301,11 @@ extern __thread struct thread *current_thread;
                             32 * SIGSTKSZ +                             \
                             THREAD_ALIGNMENT_BYTES +                    \
                             THREAD_CSP_PAGE_SIZE)
+
+#if defined(LISP_FEATURE_WIN32)
+static inline struct thread* arch_os_get_current_thread()
+    __attribute__((__const__));
+#endif
 
 /* This is clearly per-arch and possibly even per-OS code, but we can't
  * put it somewhere sensible like x86-linux-os.c because it needs too
@@ -301,6 +317,10 @@ static inline struct thread *arch_os_get_current_thread(void)
 #if defined(LISP_FEATURE_SB_THREAD)
 #if defined(LISP_FEATURE_X86)
     register struct thread *me=0;
+#if defined(LISP_FEATURE_WIN32) && defined(LISP_FEATURE_SB_THREAD)
+    __asm__ ("movl %%fs:0xE10+(4*63), %0" : "=r"(me) :);
+    return me;
+#endif
     if(all_threads) {
 #if defined(LISP_FEATURE_DARWIN) && defined(LISP_FEATURE_RESTORE_FS_SEGMENT_REGISTER_FROM_TLS)
         sel_t sel;
@@ -326,7 +346,7 @@ static inline struct thread *arch_os_get_current_thread(void)
 #endif
         return th;
 #endif
-        __asm__ __volatile__ ("movl %%fs:%c1,%0" : "=r" (me)
+        __asm__ ("movl %%fs:%c1,%0" : "=r" (me)
                  : "i" (offsetof (struct thread,this)));
     }
     return me;
@@ -356,7 +376,11 @@ extern void thread_register_gc_trigger();
 
 # ifdef LISP_FEATURE_SB_THRUPTION
 int wake_thread(os_thread_t os_thread);
+#  ifdef LISP_FEATURE_WIN32
+void wake_thread_win32(struct thread *thread);
+#  else
 int wake_thread_posix(os_thread_t os_thread);
+#  endif
 # endif
 
 #define thread_qrl(th) (&(th)->nonpointer_data->qrl_lock)
@@ -416,7 +440,6 @@ int check_pending_thruptions(os_context_t *ctx);
 
 #endif
 
-extern boolean is_some_thread_local_addr(os_vm_address_t addr);
 extern void create_initial_thread(lispobj);
 
 #ifdef LISP_FEATURE_SB_THREAD

@@ -28,11 +28,11 @@
 
 #include <malloc.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <sys/param.h>
 #include <sys/file.h>
 #include <io.h>
 #include "sbcl.h"
-#include "./signal.h"
 #include "os.h"
 #include "arch.h"
 #include "globals.h"
@@ -46,7 +46,6 @@
 #include "dynbind.h"
 
 #include <sys/types.h>
-#include <signal.h>
 #include <sys/time.h>
 #include <sys/stat.h>
 #include <unistd.h>
@@ -58,14 +57,178 @@
 
 #include "validate.h"
 #include "thread.h"
-size_t os_vm_page_size;
+#include "cpputil.h"
+
+#ifndef LISP_FEATURE_SB_THREAD
+/* dummy definition to reduce ifdef clutter */
+#define WITH_GC_AT_SAFEPOINTS_ONLY() if (0) ; else
+#endif
+
+os_vm_size_t os_vm_page_size;
 
 #include "gc.h"
 #include "gencgc-internal.h"
+#include <winsock2.h>
 
 #if 0
 int linux_sparc_siginfo_bug = 0;
 int linux_supports_futex=0;
+#endif
+
+#include <stdarg.h>
+#include <string.h>
+
+/* missing definitions for modern mingws */
+#ifndef EH_UNWINDING
+#define EH_UNWINDING 0x02
+#endif
+#ifndef EH_EXIT_UNWIND
+#define EH_EXIT_UNWIND 0x04
+#endif
+
+/* Tired of writing arch_os_get_current_thread each time. */
+#define this_thread (arch_os_get_current_thread())
+
+/* wrappers for winapi calls that must be successful (like SBCL's
+ * (aver ...) form). */
+
+/* win_aver function: basic building block for miscellaneous
+ * ..AVER.. macrology (below) */
+
+/* To do: These routines used to be "customizable" with dyndebug_init()
+ * and variables like dyndebug_survive_aver, dyndebug_skip_averlax based
+ * on environment variables.  Those features got lost on the way, but
+ * ought to be reintroduced. */
+
+static inline
+intptr_t win_aver(intptr_t value, char* comment, char* file, int line,
+                  int justwarn)
+{
+    if (!value) {
+        LPSTR errorMessage = "<FormatMessage failed>";
+        DWORD errorCode = GetLastError(), allocated=0;
+        int posixerrno = errno;
+        const char* posixstrerror = strerror(errno);
+        char* report_template =
+            "Expression unexpectedly false: %s:%d\n"
+            " ... %s\n"
+            "     ===> returned #X%p, \n"
+            "     (in thread %p)"
+            " ... Win32 thinks:\n"
+            "     ===> code %u, message => %s\n"
+            " ... CRT thinks:\n"
+            "     ===> code %u, message => %s\n";
+
+        allocated =
+            FormatMessageA(FORMAT_MESSAGE_ALLOCATE_BUFFER|
+                           FORMAT_MESSAGE_FROM_SYSTEM,
+                           NULL,
+                           errorCode,
+                           MAKELANGID(LANG_ENGLISH,SUBLANG_ENGLISH_US),
+                           (LPSTR)&errorMessage,
+                           1024u,
+                           NULL);
+
+        if (justwarn) {
+            fprintf(stderr, report_template,
+                    file, line,
+                    comment, value,
+                    this_thread,
+                    (unsigned)errorCode, errorMessage,
+                    posixerrno, posixstrerror);
+        } else {
+            lose(report_template,
+                    file, line,
+                    comment, value,
+                    this_thread,
+                    (unsigned)errorCode, errorMessage,
+                    posixerrno, posixstrerror);
+        }
+        if (allocated)
+            LocalFree(errorMessage);
+    }
+    return value;
+}
+
+/* sys_aver function: really tiny adaptor of win_aver for
+ * "POSIX-parody" CRT results ("lowio" and similar stuff):
+ * negative number means something... negative. */
+static inline
+intptr_t sys_aver(long value, char* comment, char* file, int line,
+              int justwarn)
+{
+    win_aver((intptr_t)(value>=0),comment,file,line,justwarn);
+    return value;
+}
+
+/* Check for (call) result being boolean true. (call) may be arbitrary
+ * expression now; massive attack of gccisms ensures transparent type
+ * conversion back and forth, so the type of AVER(expression) is the
+ * type of expression. Value is the same _if_ it can be losslessly
+ * converted to (void*) and back.
+ *
+ * Failed AVER() is normally fatal. Well, unless dyndebug_survive_aver
+ * flag is set. */
+
+#define AVER(call)                                                      \
+    ({ __typeof__(call) __attribute__((unused)) me =                    \
+            (__typeof__(call))                                          \
+            win_aver((intptr_t)(call), #call, __FILE__, __LINE__, 0);      \
+        me;})
+
+/* AVERLAX(call): do the same check as AVER did, but be mild on
+ * failure: print an annoying unrequested message to stderr, and
+ * continue. With dyndebug_skip_averlax flag, AVERLAX stop even to
+ * check and complain. */
+
+#define AVERLAX(call)                                                   \
+    ({ __typeof__(call) __attribute__((unused)) me =                    \
+            (__typeof__(call))                                          \
+            win_aver((intptr_t)(call), #call, __FILE__, __LINE__, 1);      \
+        me;})
+
+/* Now, when failed AVER... prints both errno and GetLastError(), two
+ * variants of "POSIX/lowio" style checks below are almost useless
+ * (they build on sys_aver like the two above do on win_aver). */
+
+#define CRT_AVER_NONNEGATIVE(call)                              \
+    ({ __typeof__(call) __attribute__((unused)) me =            \
+            (__typeof__(call))                                  \
+            sys_aver((call), #call, __FILE__, __LINE__, 0);     \
+        me;})
+
+#define CRT_AVERLAX_NONNEGATIVE(call)                           \
+    ({ __typeof__(call) __attribute__((unused)) me =            \
+            (__typeof__(call))                                  \
+            sys_aver((call), #call, __FILE__, __LINE__, 1);     \
+        me;})
+
+/* to be removed */
+#define CRT_AVER(booly)                                         \
+    ({ __typeof__(booly) __attribute__((unused)) me = (booly);  \
+        sys_aver((booly)?0:-1, #booly, __FILE__, __LINE__, 0);  \
+        me;})
+
+const char * t_nil_s(lispobj symbol);
+
+/*
+ * The following signal-mask-related alien routines are called from Lisp:
+ */
+
+/* As of win32, deferrables _do_ matter. gc_signal doesn't. */
+unsigned long block_deferrables_and_return_mask()
+{
+    sigset_t sset;
+    block_deferrable_signals(0, &sset);
+    return (unsigned long)sset;
+}
+
+#if defined(LISP_FEATURE_SB_THREAD)
+void apply_sigmask(unsigned long sigmask)
+{
+    sigset_t sset = (sigset_t)sigmask;
+    pthread_sigmask(SIG_SETMASK, &sset, 0);
+}
 #endif
 
 /* The exception handling function looks like this: */
@@ -73,50 +236,169 @@ EXCEPTION_DISPOSITION handle_exception(EXCEPTION_RECORD *,
                                        struct lisp_exception_frame *,
                                        CONTEXT *,
                                        void *);
+/* handle_exception is defined further in this file, but since SBCL
+ * 1.0.1.24, it doesn't get registered as SEH handler directly anymore,
+ * not even by wos_install_interrupt_handlers. Instead, x86-assem.S
+ * provides exception_handler_wrapper; we install it here, and each
+ * exception frame on nested funcall()s also points to it.
+ */
+
 
 void *base_seh_frame;
 
 static void *get_seh_frame(void)
 {
     void* retval;
-    asm volatile ("movl %%fs:0,%0": "=r" (retval));
+#ifdef LISP_FEATURE_X86
+    asm volatile ("mov %%fs:0,%0": "=r" (retval));
+#else
+    asm volatile ("mov %%gs:0,%0": "=r" (retval));
+#endif
     return retval;
 }
 
 static void set_seh_frame(void *frame)
 {
-    asm volatile ("movl %0,%%fs:0": : "r" (frame));
-}
-
-#if 0
-static struct lisp_exception_frame *find_our_seh_frame(void)
-{
-    struct lisp_exception_frame *frame = get_seh_frame();
-
-    while (frame->handler != handle_exception)
-        frame = frame->next_frame;
-
-    return frame;
-}
-
-inline static void *get_stack_frame(void)
-{
-    void* retval;
-    asm volatile ("movl %%ebp,%0": "=r" (retval));
-    return retval;
-}
+#ifdef LISP_FEATURE_X86
+    asm volatile ("mov %0,%%fs:0": : "r" (frame));
+#else
+    asm volatile ("mov %0,%%gs:0": : "r" (frame));
 #endif
+}
+
+#if defined(LISP_FEATURE_SB_THREAD)
+
+/* Permit loads from GC_SAFEPOINT_PAGE_ADDR (NB page state change is
+ * "synchronized" with the memory region content/availability --
+ * e.g. you won't see other CPU flushing buffered writes after WP --
+ * but there is some window when other thread _seem_ to trap AFTER
+ * access is granted. You may think of it something like "OS enters
+ * SEH handler too slowly" -- what's important is there's no implicit
+ * synchronization between VirtualProtect caller and other thread's
+ * SEH handler, hence no ordering of events. VirtualProtect is
+ * implicitly synchronized with protected memory contents (only).
+ *
+ * The last fact may be potentially used with many benefits e.g. for
+ * foreign call speed, but we don't use it for now: almost the only
+ * fact relevant to the current signalling protocol is "sooner or
+ * later everyone will trap [everyone will stop trapping]".
+ *
+ * An interesting source on page-protection-based inter-thread
+ * communication is a well-known paper by Dave Dice, Hui Huang,
+ * Mingyao Yang: ``Asymmetric Dekker Synchronization''. Last time
+ * I checked it was available at
+ * http://home.comcast.net/~pjbishop/Dave/Asymmetric-Dekker-Synchronization.txt
+ */
+void map_gc_page()
+{
+    DWORD oldProt;
+    AVER(VirtualProtect((void*) GC_SAFEPOINT_PAGE_ADDR, sizeof(lispobj),
+                        PAGE_READWRITE, &oldProt));
+}
+
+void unmap_gc_page()
+{
+    DWORD oldProt;
+    AVER(VirtualProtect((void*) GC_SAFEPOINT_PAGE_ADDR, sizeof(lispobj),
+                        PAGE_NOACCESS, &oldProt));
+}
+
+#endif
+
+#if defined(LISP_FEATURE_SB_THREAD)
+/* We want to get a slot in TIB that (1) is available at constant
+   offset, (2) is our private property, so libraries wouldn't legally
+   override it, (3) contains something predefined for threads created
+   out of our sight.
+
+   Low 64 TLS slots are adressable directly, starting with
+   FS:[#xE10]. When SBCL runtime is initialized, some of the low slots
+   may be already in use by its prerequisite DLLs, as DllMain()s and
+   TLS callbacks have been called already. But slot 63 is unlikely to
+   be reached at this point: one slot per DLL that needs it is the
+   common practice, and many system DLLs use predefined TIB-based
+   areas outside conventional TLS storage and don't need TLS slots.
+   With our current dependencies, even slot 2 is observed to be free
+   (as of WinXP and wine).
+
+   Now we'll call TlsAlloc() repeatedly until slot 63 is officially
+   assigned to us, then TlsFree() all other slots for normal use. TLS
+   slot 63, alias FS:[#.(+ #xE10 (* 4 63))], now belongs to us.
+
+   To summarize, let's list the assumptions we make:
+
+   - TIB, which is FS segment base, contains first 64 TLS slots at the
+   offset #xE10 (i.e. TIB layout compatibility);
+   - TLS slots are allocated from lower to higher ones;
+   - All libraries together with CRT startup have not requested 64
+   slots yet.
+
+   All these assumptions together don't seem to be less warranted than
+   the availability of TIB arbitrary data slot for our use. There are
+   some more reasons to prefer slot 63 over TIB arbitrary data: (1) if
+   our assumptions for slot 63 are violated, it will be detected at
+   startup instead of causing some system-specific unreproducible
+   problems afterwards, depending on OS and loaded foreign libraries;
+   (2) if getting slot 63 reliably with our current approach will
+   become impossible for some future Windows version, we can add TLS
+   callback directory to SBCL binary; main image TLS callback is
+   started before _any_ TLS slot is allocated by libraries, and
+   some C compiler vendors rely on this fact. */
+
+void os_preinit()
+{
+#ifdef LISP_FEATURE_X86
+    DWORD slots[TLS_MINIMUM_AVAILABLE];
+    DWORD key;
+    int n_slots = 0, i;
+    for (i=0; i<TLS_MINIMUM_AVAILABLE; ++i) {
+        key = TlsAlloc();
+        if (key == OUR_TLS_INDEX) {
+            if (TlsGetValue(key)!=NULL)
+                lose("TLS slot assertion failed: fresh slot value is not NULL");
+            TlsSetValue(OUR_TLS_INDEX, (void*)(intptr_t)0xFEEDBAC4);
+            if ((intptr_t)(void*)arch_os_get_current_thread()!=(intptr_t)0xFEEDBAC4)
+                lose("TLS slot assertion failed: TIB layout change detected");
+            TlsSetValue(OUR_TLS_INDEX, NULL);
+            break;
+        }
+        slots[n_slots++]=key;
+    }
+    for (i=0; i<n_slots; ++i) {
+        TlsFree(slots[i]);
+    }
+    if (key!=OUR_TLS_INDEX) {
+        lose("TLS slot assertion failed: slot 63 is unavailable "
+             "(last TlsAlloc() returned %u)",key);
+    }
+#endif
+}
+#endif  /* LISP_FEATURE_SB_THREAD */
+
+int os_number_of_processors = 1;
 
 void os_init(char *argv[], char *envp[])
 {
     SYSTEM_INFO system_info;
-
     GetSystemInfo(&system_info);
-    os_vm_page_size = system_info.dwPageSize;
+    os_vm_page_size = system_info.dwPageSize > BACKEND_PAGE_BYTES?
+        system_info.dwPageSize : BACKEND_PAGE_BYTES;
+#if defined(LISP_FEATURE_X86)
+    fast_bzero_pointer = fast_bzero_detect;
+#endif
+    os_number_of_processors = system_info.dwNumberOfProcessors;
 
     base_seh_frame = get_seh_frame();
 }
 
+static inline boolean local_thread_stack_address_p(os_vm_address_t address)
+{
+    return this_thread &&
+        (((((u64)address >= (u64)this_thread->os_address) &&
+           ((u64)address < ((u64)this_thread)-THREAD_CSP_PAGE_SIZE))||
+          (((u64)address >= (u64)this_thread->control_stack_start)&&
+           ((u64)address < (u64)this_thread->control_stack_end))));
+}
 
 /*
  * So we have three fun scenarios here.
@@ -147,19 +429,12 @@ os_validate(os_vm_address_t addr, os_vm_size_t len)
 
     if (!addr) {
         /* the simple case first */
-        os_vm_address_t real_addr;
-        if (!(real_addr = VirtualAlloc(addr, len, MEM_COMMIT, PAGE_EXECUTE_READWRITE))) {
-            fprintf(stderr, "VirtualAlloc: 0x%lx.\n", GetLastError());
-            return 0;
-        }
-
-        return real_addr;
+        return
+            AVERLAX(VirtualAlloc(addr, len, MEM_RESERVE|MEM_COMMIT, PAGE_EXECUTE_READWRITE));
     }
 
-    if (!VirtualQuery(addr, &mem_info, sizeof mem_info)) {
-        fprintf(stderr, "VirtualQuery: 0x%lx.\n", GetLastError());
+    if (!AVERLAX(VirtualQuery(addr, &mem_info, sizeof mem_info)))
         return 0;
-    }
 
     if ((mem_info.State == MEM_RESERVE) && (mem_info.RegionSize >=len)) {
       /* It would be correct to return here. However, support for Wine
@@ -181,12 +456,13 @@ os_validate(os_vm_address_t addr, os_vm_size_t len)
     if (mem_info.State == MEM_RESERVE) {
         fprintf(stderr, "validation of reserved space too short.\n");
         fflush(stderr);
+        /* Oddly, we do not treat this assertion as fatal; hence also the
+         * provision for MEM_RESERVE in the following code, I suppose: */
     }
 
-    if (!VirtualAlloc(addr, len, (mem_info.State == MEM_RESERVE)? MEM_COMMIT: MEM_RESERVE, PAGE_EXECUTE_READWRITE)) {
-        fprintf(stderr, "VirtualAlloc: 0x%lx.\n", GetLastError());
+    if (!AVERLAX(VirtualAlloc(addr, len, (mem_info.State == MEM_RESERVE)?
+                              MEM_COMMIT: MEM_RESERVE, PAGE_EXECUTE_READWRITE)))
         return 0;
-    }
 
     return addr;
 }
@@ -194,24 +470,57 @@ os_validate(os_vm_address_t addr, os_vm_size_t len)
 /*
  * For os_invalidate(), we merely decommit the memory rather than
  * freeing the address space. This loses when freeing per-thread
- * data and related memory since it leaks address space. It's not
- * too lossy, however, since the two scenarios I'm aware of are
- * fd-stream buffers, which are pooled rather than torched, and
- * thread information, which I hope to pool (since windows creates
- * threads at its own whim, and we probably want to be able to
- * have them callback without funky magic on the part of the user,
- * and full-on thread allocation is fairly heavyweight). Someone
- * will probably shoot me down on this with some pithy comment on
- * the use of (setf symbol-value) on a special variable. I'm happy
- * for them.
+ * data and related memory since it leaks address space.
+ *
+ * So far the original comment (author unknown).  It used to continue as
+ * follows:
+ *
+ *   It's not too lossy, however, since the two scenarios I'm aware of
+ *   are fd-stream buffers, which are pooled rather than torched, and
+ *   thread information, which I hope to pool (since windows creates
+ *   threads at its own whim, and we probably want to be able to have
+ *   them callback without funky magic on the part of the user, and
+ *   full-on thread allocation is fairly heavyweight).
+ *
+ * But: As it turns out, we are no longer content with decommitting
+ * without freeing, and have now grown a second function
+ * os_invalidate_free(), sort of a really_os_invalidate().
+ *
+ * As discussed on #lisp, this is not a satisfactory solution, and probably
+ * ought to be rectified in the following way:
+ *
+ *  - Any cases currently going through the non-freeing version of
+ *    os_invalidate() are ultimately meant for zero-filling applications.
+ *    Replace those use cases with an os_revalidate_bzero() or similarly
+ *    named function, which explicitly takes care of that aspect of
+ *    the semantics.
+ *
+ *  - The remaining uses of os_invalidate should actually free, and once
+ *    the above is implemented, we can rename os_invalidate_free back to
+ *    just os_invalidate().
+ *
+ * So far the new plan, as yet unimplemented. -- DFL
  */
 
 void
 os_invalidate(os_vm_address_t addr, os_vm_size_t len)
 {
-    if (!VirtualFree(addr, len, MEM_DECOMMIT)) {
-        fprintf(stderr, "VirtualFree: 0x%lx.\n", GetLastError());
-    }
+    AVERLAX(VirtualFree(addr, len, MEM_DECOMMIT));
+}
+
+void
+os_invalidate_free(os_vm_address_t addr, os_vm_size_t len)
+{
+    AVERLAX(VirtualFree(addr, 0, MEM_RELEASE));
+}
+
+void
+os_invalidate_free_by_any_address(os_vm_address_t addr, os_vm_size_t len)
+{
+    MEMORY_BASIC_INFORMATION minfo;
+    AVERLAX(VirtualQuery(addr, &minfo, sizeof minfo));
+    AVERLAX(minfo.AllocationBase);
+    AVERLAX(VirtualFree(minfo.AllocationBase, 0, MEM_RELEASE));
 }
 
 /*
@@ -230,25 +539,14 @@ os_map(int fd, int offset, os_vm_address_t addr, os_vm_size_t len)
 {
     os_vm_size_t count;
 
-#if 0
-    fprintf(stderr, "os_map: %d, 0x%x, %p, 0x%x.\n", fd, offset, addr, len);
-    fflush(stderr);
-#endif
+    AVER(VirtualAlloc(addr, len, MEM_COMMIT, PAGE_EXECUTE_READWRITE)||
+         VirtualAlloc(addr, len, MEM_RESERVE|MEM_COMMIT,
+                      PAGE_EXECUTE_READWRITE));
 
-    if (!VirtualAlloc(addr, len, MEM_COMMIT, PAGE_EXECUTE_READWRITE)) {
-        fprintf(stderr, "VirtualAlloc: 0x%lx.\n", GetLastError());
-        lose("os_map: VirtualAlloc failure");
-    }
-
-    if (lseek(fd, offset, SEEK_SET) == -1) {
-        lose("os_map: Seek failure.");
-    }
+    CRT_AVER_NONNEGATIVE(lseek(fd, offset, SEEK_SET));
 
     count = read(fd, addr, len);
-    if (count != len) {
-        fprintf(stderr, "expected 0x%x, read 0x%x.\n", len, count);
-        lose("os_map: Failed to read enough bytes.");
-    }
+    CRT_AVER( count == len );
 
     return addr;
 }
@@ -269,10 +567,13 @@ os_protect(os_vm_address_t address, os_vm_size_t length, os_vm_prot_t prot)
 {
     DWORD old_prot;
 
-    if (!VirtualProtect(address, length, os_protect_modes[prot], &old_prot)) {
-        fprintf(stderr, "VirtualProtect failed, code 0x%lx.\n", GetLastError());
-        fflush(stderr);
-    }
+    DWORD new_prot = os_protect_modes[prot];
+    AVER(VirtualProtect(address, length, new_prot, &old_prot)||
+         (VirtualAlloc(address, length, MEM_COMMIT, new_prot) &&
+          VirtualProtect(address, length, new_prot, &old_prot)));
+    odxprint(misc,"Protecting %p + %p vmaccess %d "
+             "newprot %08x oldprot %08x",
+             address,length,prot,new_prot,old_prot);
 }
 
 /* FIXME: Now that FOO_END, rather than FOO_SIZE, is the fundamental
@@ -281,8 +582,8 @@ os_protect(os_vm_address_t address, os_vm_size_t length, os_vm_prot_t prot)
 static boolean
 in_range_p(os_vm_address_t a, lispobj sbeg, size_t slen)
 {
-    char* beg = (char*)((long)sbeg);
-    char* end = (char*)((long)sbeg) + slen;
+    char* beg = (char*)((uword_t)sbeg);
+    char* end = (char*)((uword_t)sbeg) + slen;
     char* adr = (char*)a;
     return (adr >= beg && adr < end);
 }
@@ -293,25 +594,90 @@ is_linkage_table_addr(os_vm_address_t addr)
     return in_range_p(addr, LINKAGE_TABLE_SPACE_START, LINKAGE_TABLE_SPACE_END);
 }
 
+static boolean is_some_thread_local_addr(os_vm_address_t addr);
+
 boolean
 is_valid_lisp_addr(os_vm_address_t addr)
 {
-    struct thread *th;
     if(in_range_p(addr, READ_ONLY_SPACE_START, READ_ONLY_SPACE_SIZE) ||
        in_range_p(addr, STATIC_SPACE_START   , STATIC_SPACE_SIZE) ||
-       in_range_p(addr, DYNAMIC_SPACE_START  , dynamic_space_size))
+       in_range_p(addr, DYNAMIC_SPACE_START  , dynamic_space_size) ||
+       is_some_thread_local_addr(addr))
         return 1;
-    for_each_thread(th) {
-        if(((os_vm_address_t)th->control_stack_start <= addr) && (addr < (os_vm_address_t)th->control_stack_end))
-            return 1;
-        if(in_range_p(addr, (unsigned long)th->binding_stack_start, BINDING_STACK_SIZE))
-            return 1;
-    }
     return 0;
 }
 
+/* test if an address is within thread-local space */
+static boolean
+is_thread_local_addr(struct thread* th, os_vm_address_t addr)
+{
+    /* Assuming that this is correct, it would warrant further comment,
+     * I think.  Based on what our call site is doing, we have been
+     * tasked to check for the address of a lisp object; not merely any
+     * foreign address within the thread's area.  Indeed, this used to
+     * be a check for control and binding stack only, rather than the
+     * full thread "struct".  So shouldn't the THREAD_STRUCT_SIZE rather
+     * be (thread_control_stack_size+BINDING_STACK_SIZE) instead?  That
+     * would also do away with the LISP_FEATURE_SB_THREAD case.  Or does
+     * it simply not matter?  --DFL */
+    ptrdiff_t diff = ((char*)th->os_address)-(char*)addr;
+    return diff > (ptrdiff_t)0 && diff < (ptrdiff_t)THREAD_STRUCT_SIZE
+#ifdef LISP_FEATURE_SB_THREAD
+        && addr != (os_vm_address_t) th->csp_around_foreign_call
+#endif
+        ;
+}
+
+static boolean
+is_some_thread_local_addr(os_vm_address_t addr)
+{
+    boolean result = 0;
+#ifdef LISP_FEATURE_SB_THREAD
+    struct thread *th;
+    pthread_mutex_lock(&all_threads_lock);
+    for_each_thread(th) {
+        if(is_thread_local_addr(th,addr)) {
+            result = 1;
+            break;
+        }
+    }
+    pthread_mutex_unlock(&all_threads_lock);
+#endif
+    return result;
+}
+
+
 /* A tiny bit of interrupt.c state we want our paws on. */
 extern boolean internal_errors_enabled;
+
+extern void exception_handler_wrapper();
+
+void
+c_level_backtrace(const char* header, int depth)
+{
+    void* frame;
+    int n = 0;
+    void** lastseh;
+
+    for (lastseh = get_seh_frame(); lastseh && (lastseh!=(void*)-1);
+         lastseh = *lastseh);
+
+    fprintf(stderr, "Backtrace: %s (thread %p)\n", header, this_thread);
+    for (frame = __builtin_frame_address(0); frame; frame=*(void**)frame)
+    {
+        if ((n++)>depth)
+            return;
+        fprintf(stderr, "[#%02d]: ebp = 0x%p, ret = 0x%p\n",n,
+                frame, ((void**)frame)[1]);
+    }
+}
+
+#ifdef LISP_FEATURE_X86
+#define voidreg(ctxptr,name) ((void*)((ctxptr)->E##name))
+#else
+#define voidreg(ctxptr,name) ((void*)((ctxptr)->R##name))
+#endif
+
 
 #if defined(LISP_FEATURE_X86)
 static int
@@ -322,7 +688,8 @@ handle_single_step(os_context_t *ctx)
 
     /* We are doing a displaced instruction. At least function
      * end breakpoints use this. */
-    restore_breakpoint_from_single_step(ctx);
+    WITH_GC_AT_SAFEPOINTS_ONLY () /* Todo: Is it really gc-unsafe? */
+        restore_breakpoint_from_single_step(ctx);
 
     return 0;
 }
@@ -337,7 +704,7 @@ handle_single_step(os_context_t *ctx)
 #endif
 
 static int
-handle_breakpoint_trap(os_context_t *ctx)
+handle_breakpoint_trap(os_context_t *ctx, struct thread* self)
 {
 #ifdef LISP_FEATURE_UD2_BREAKPOINTS
     if (((unsigned short *)((ctx->win32_context)->Eip))[0] != 0x0b0f)
@@ -346,18 +713,39 @@ handle_breakpoint_trap(os_context_t *ctx)
 
     /* Unlike some other operating systems, Win32 leaves EIP
      * pointing to the breakpoint instruction. */
-    ctx->Eip += TRAP_CODE_WIDTH;
+    (*os_context_pc_addr(ctx)) += TRAP_CODE_WIDTH;
 
     /* Now EIP points just after the INT3 byte and aims at the
      * 'kind' value (eg trap_Cerror). */
-    unsigned char trap = *(unsigned char *)(*os_context_pc_addr(ctx));
+    unsigned trap = *(unsigned char *)(*os_context_pc_addr(ctx));
+
+#ifdef LISP_FEATURE_SB_THREAD
+    /* Before any other trap handler: gc_safepoint ensures that
+       inner alloc_sap for passing the context won't trap on
+       pseudo-atomic. */
+    if (trap == trap_PendingInterrupt) {
+        /* Done everything needed for this trap, except EIP
+           adjustment */
+        arch_skip_instruction(ctx);
+        thread_interrupted(ctx);
+        return 0;
+    }
+#endif
 
     /* This is just for info in case the monitor wants to print an
      * approximation. */
-    current_control_stack_pointer =
+    access_control_stack_pointer(self) =
         (lispobj *)*os_context_sp_addr(ctx);
 
-    handle_trap(ctx, trap);
+    WITH_GC_AT_SAFEPOINTS_ONLY() {
+#if defined(LISP_FEATURE_SB_THREAD)
+        block_blockable_signals(0,&ctx->sigmask);
+#endif
+        handle_trap(ctx, trap);
+#if defined(LISP_FEATURE_SB_THREAD)
+        thread_sigmask(SIG_SETMASK,&ctx->sigmask,NULL);
+#endif
+    }
 
     /* Done, we're good to go! */
     return 0;
@@ -366,50 +754,109 @@ handle_breakpoint_trap(os_context_t *ctx)
 static int
 handle_access_violation(os_context_t *ctx,
                         EXCEPTION_RECORD *exception_record,
-                        void *fault_address)
+                        void *fault_address,
+                        struct thread* self)
 {
-    if (!(is_valid_lisp_addr(fault_address)
-          || is_linkage_table_addr(fault_address)))
-        return -1;
+    CONTEXT *win32_context = ctx->win32_context;
 
-    /* Pick off GC-related memory fault next. */
-    MEMORY_BASIC_INFORMATION mem_info;
+#if defined(LISP_FEATURE_X86)
+    odxprint(pagefaults,
+             "SEGV. ThSap %p, Eip %p, Esp %p, Esi %p, Edi %p, "
+             "Addr %p Access %d\n",
+             self,
+             win32_context->Eip,
+             win32_context->Esp,
+             win32_context->Esi,
+             win32_context->Edi,
+             fault_address,
+             exception_record->ExceptionInformation[0]);
+#else
+    odxprint(pagefaults,
+             "SEGV. ThSap %p, Eip %p, Esp %p, Esi %p, Edi %p, "
+             "Addr %p Access %d\n",
+             self,
+             win32_context->Rip,
+             win32_context->Rsp,
+             win32_context->Rsi,
+             win32_context->Rdi,
+             fault_address,
+             exception_record->ExceptionInformation[0]);
+#endif
 
-    if (!VirtualQuery(fault_address, &mem_info, sizeof mem_info)) {
-        fprintf(stderr, "VirtualQuery: 0x%lx.\n", GetLastError());
-        lose("handle_exception: VirtualQuery failure");
+    /* Stack: This case takes care of our various stack exhaustion
+     * protect pages (with the notable exception of the control stack!). */
+    if (self && local_thread_stack_address_p(fault_address)) {
+        if (handle_guard_page_triggered(ctx, fault_address))
+            return 0; /* gc safety? */
+        goto try_recommit;
     }
 
-    if (mem_info.State == MEM_RESERVE) {
-        /* First use new page, lets get some memory for it. */
-        if (!VirtualAlloc(mem_info.BaseAddress, os_vm_page_size,
-                          MEM_COMMIT, PAGE_EXECUTE_READWRITE)) {
-            fprintf(stderr, "VirtualAlloc: 0x%lx.\n", GetLastError());
-            lose("handle_exception: VirtualAlloc failure");
-
-        } else {
-            /*
-             * Now, if the page is supposedly write-protected and this
-             * is a write, tell the gc that it's been hit.
-             *
-             * FIXME: Are we supposed to fall-through to the Lisp
-             * exception handler if the gc doesn't take the wp violation?
-             */
-            if (exception_record->ExceptionInformation[0]) {
-                page_index_t index = find_page_index(fault_address);
-                if ((index != -1) && (page_table[index].write_protected)) {
-                    gencgc_handle_wp_violation(fault_address);
-                }
-            }
-            return 0;
-        }
-
-    } else if (gencgc_handle_wp_violation(fault_address)) {
-        /* gc accepts the wp violation, so resume where we left off. */
+    /* Safepoint pages */
+#ifdef LISP_FEATURE_SB_THREAD
+    if (fault_address == (void *) GC_SAFEPOINT_PAGE_ADDR) {
+        thread_in_lisp_raised(ctx);
         return 0;
     }
 
+    if ((((u64)fault_address) == ((u64)self->csp_around_foreign_call))){
+        thread_in_safety_transition(ctx);
+        return 0;
+    }
+#endif
+
+    /* dynamic space */
+    page_index_t index = find_page_index(fault_address);
+    if (index != -1) {
+        /*
+         * Now, if the page is supposedly write-protected and this
+         * is a write, tell the gc that it's been hit.
+         */
+        if (page_table[index].write_protected) {
+            gencgc_handle_wp_violation(fault_address);
+        } else {
+            AVER(VirtualAlloc(PTR_ALIGN_DOWN(fault_address,os_vm_page_size),
+                              os_vm_page_size,
+                              MEM_COMMIT, PAGE_EXECUTE_READWRITE));
+        }
+        return 0;
+    }
+
+    if (fault_address == undefined_alien_address)
+        return -1;
+
+    /* linkage table or a "valid_lisp_addr" outside of dynamic space (?) */
+    if (is_linkage_table_addr(fault_address)
+        || is_valid_lisp_addr(fault_address))
+        goto try_recommit;
+
     return -1;
+
+try_recommit:
+    /* First use of a new page, lets get some memory for it. */
+
+#if defined(LISP_FEATURE_X86)
+    AVER(VirtualAlloc(PTR_ALIGN_DOWN(fault_address,os_vm_page_size),
+                      os_vm_page_size,
+                      MEM_COMMIT, PAGE_EXECUTE_READWRITE)
+         ||(fprintf(stderr,"Unable to recommit addr %p eip 0x%08lx\n",
+                    fault_address, win32_context->Eip) &&
+            (c_level_backtrace("BT",5),
+             fake_foreign_function_call(ctx),
+             lose("Lispy backtrace"),
+             0)));
+#else
+    AVER(VirtualAlloc(PTR_ALIGN_DOWN(fault_address,os_vm_page_size),
+                      os_vm_page_size,
+                      MEM_COMMIT, PAGE_EXECUTE_READWRITE)
+         ||(fprintf(stderr,"Unable to recommit addr %p eip 0x%p\n",
+                    fault_address, (void*)win32_context->Rip) &&
+            (c_level_backtrace("BT",5),
+             fake_foreign_function_call(ctx),
+             lose("Lispy backtrace"),
+             0)));
+#endif
+
+    return 0;
 }
 
 static void
@@ -427,37 +874,48 @@ signal_internal_error_or_lose(os_context_t *ctx,
         lispobj context_sap;
         lispobj exception_record_sap;
 
+        asm("fnclex");
         /* We're making the somewhat arbitrary decision that having
          * internal errors enabled means that lisp has sufficient
          * marbles to be able to handle exceptions, but exceptions
          * aren't supposed to happen during cold init or reinit
          * anyway. */
 
+#if defined(LISP_FEATURE_SB_THREAD)
+        block_blockable_signals(0,&ctx->sigmask);
+#endif
         fake_foreign_function_call(ctx);
 
-        /* Allocate the SAP objects while the "interrupts" are still
-         * disabled. */
-        context_sap = alloc_sap(ctx);
-        exception_record_sap = alloc_sap(exception_record);
+        WITH_GC_AT_SAFEPOINTS_ONLY() {
+            /* Allocate the SAP objects while the "interrupts" are still
+             * disabled. */
+            context_sap = alloc_sap(ctx);
+            exception_record_sap = alloc_sap(exception_record);
+#if defined(LISP_FEATURE_SB_THREAD)
+            thread_sigmask(SIG_SETMASK, &ctx->sigmask, NULL);
+#endif
 
-        /* The exception system doesn't automatically clear pending
-         * exceptions, so we lose as soon as we execute any FP
-         * instruction unless we do this first. */
-        _clearfp();
-
-        /* Call into lisp to handle things. */
-        funcall2(StaticSymbolFunction(HANDLE_WIN32_EXCEPTION), context_sap,
-                 exception_record_sap);
-
+            /* The exception system doesn't automatically clear pending
+             * exceptions, so we lose as soon as we execute any FP
+             * instruction unless we do this first. */
+            /* Call into lisp to handle things. */
+            funcall2(StaticSymbolFunction(HANDLE_WIN32_EXCEPTION),
+                     context_sap,
+                     exception_record_sap);
+        }
         /* If Lisp doesn't nlx, we need to put things back. */
         undo_fake_foreign_function_call(ctx);
-
+#if defined(LISP_FEATURE_SB_THREAD)
+        thread_sigmask(SIG_SETMASK, &ctx->sigmask, NULL);
+#endif
         /* FIXME: HANDLE-WIN32-EXCEPTION should be allowed to decline */
         return;
     }
 
-    fprintf(stderr, "Exception Code: 0x%lx.\n", exception_record->ExceptionCode);
-    fprintf(stderr, "Faulting IP: 0x%lx.\n", (DWORD)exception_record->ExceptionAddress);
+    fprintf(stderr, "Exception Code: 0x%p.\n",
+            (void*)(intptr_t)exception_record->ExceptionCode);
+    fprintf(stderr, "Faulting IP: 0x%p.\n",
+            (void*)(intptr_t)exception_record->ExceptionAddress);
     if (exception_record->ExceptionCode == EXCEPTION_ACCESS_VIOLATION) {
         MEMORY_BASIC_INFORMATION mem_info;
 
@@ -465,9 +923,9 @@ signal_internal_error_or_lose(os_context_t *ctx,
             fprintf(stderr, "page status: 0x%lx.\n", mem_info.State);
         }
 
-        fprintf(stderr, "Was writing: %ld, where: 0x%lx.\n",
-                exception_record->ExceptionInformation[0],
-                (DWORD)fault_address);
+        fprintf(stderr, "Was writing: %p, where: 0x%p.\n",
+                (void*)exception_record->ExceptionInformation[0],
+                fault_address);
     }
 
     fflush(stderr);
@@ -478,31 +936,56 @@ signal_internal_error_or_lose(os_context_t *ctx,
 
 /*
  * A good explanation of the exception handling semantics is
- * http://win32assembly.online.fr/Exceptionhandling.html .
+ *   http://win32assembly.online.fr/Exceptionhandling.html (possibly defunct)
+ * or:
+ *   http://www.microsoft.com/msj/0197/exception/exception.aspx
  */
 
 EXCEPTION_DISPOSITION
 handle_exception(EXCEPTION_RECORD *exception_record,
                  struct lisp_exception_frame *exception_frame,
-                 CONTEXT *ctx,
+                 CONTEXT *win32_context,
                  void *dispatcher_context)
 {
+    if (!win32_context)
+        /* Not certain why this should be possible, but let's be safe... */
+        return ExceptionContinueSearch;
+
     if (exception_record->ExceptionFlags & (EH_UNWINDING | EH_EXIT_UNWIND)) {
         /* If we're being unwound, be graceful about it. */
 
         /* Undo any dynamic bindings. */
         unbind_to_here(exception_frame->bindstack_pointer,
                        arch_os_get_current_thread());
-
         return ExceptionContinueSearch;
     }
 
+    DWORD lastError = GetLastError();
+    DWORD lastErrno = errno;
     DWORD code = exception_record->ExceptionCode;
+    struct thread* self = arch_os_get_current_thread();
+
+    os_context_t context, *ctx = &context;
+    context.win32_context = win32_context;
+#if defined(LISP_FEATURE_SB_THREAD)
+    context.sigmask = self ? self->os_thread->blocked_signal_set : 0;
+#endif
 
     /* For EXCEPTION_ACCESS_VIOLATION only. */
     void *fault_address = (void *)exception_record->ExceptionInformation[1];
 
-    /* This function will become unwieldy.  Let's cut it down into
+    odxprint(seh,
+             "SEH: rec %p, ctxptr %p, rip %p, fault %p\n"
+             "... code %p, rcx %p, fp-tags %p\n\n",
+             exception_record,
+             win32_context,
+             voidreg(win32_context,ip),
+             fault_address,
+             (void*)(intptr_t)code,
+             voidreg(win32_context,cx),
+             win32_context->FloatSave.TagWord);
+
+    /* This function had become unwieldy.  Let's cut it down into
      * pieces based on the different exception codes.  Each exception
      * code handler gets the chance to decline by returning non-zero if it
      * isn't happy: */
@@ -511,11 +994,11 @@ handle_exception(EXCEPTION_RECORD *exception_record,
     switch (code) {
     case EXCEPTION_ACCESS_VIOLATION:
         rc = handle_access_violation(
-            ctx, exception_record, fault_address);
+            ctx, exception_record, fault_address, self);
         break;
 
     case SBCL_EXCEPTION_BREAKPOINT:
-        rc = handle_breakpoint_trap(ctx);
+        rc = handle_breakpoint_trap(ctx, self);
         break;
 
 #if defined(LISP_FEATURE_X86)
@@ -532,20 +1015,23 @@ handle_exception(EXCEPTION_RECORD *exception_record,
         /* All else failed, drop through to the lisp-side exception handler. */
         signal_internal_error_or_lose(ctx, exception_record, fault_address);
 
+    errno = lastErrno;
+    SetLastError(lastError);
     return ExceptionContinueExecution;
 }
 
 void
 wos_install_interrupt_handlers(struct lisp_exception_frame *handler)
 {
+#ifdef LISP_FEATURE_X86
     handler->next_frame = get_seh_frame();
-    handler->handler = &handle_exception;
+    handler->handler = (void*)exception_handler_wrapper;
     set_seh_frame(handler);
-}
-
-void bcopy(const void *src, void *dest, size_t n)
-{
-    MoveMemory(dest, src, n);
+#else
+    static int once = 0;
+    if (!once++)
+        AddVectoredExceptionHandler(1,veh);
+#endif
 }
 
 /*
@@ -679,5 +1165,62 @@ os_get_runtime_executable_path(int external)
 
     return copied_string(path);
 }
+
+#ifdef LISP_FEATURE_SB_THREAD
+
+int
+win32_wait_object_or_signal(HANDLE waitFor)
+{
+    struct thread * self = arch_os_get_current_thread();
+    HANDLE handles[2];
+    handles[0] = waitFor;
+    handles[1] = self->private_events.events[1];
+    return
+        WaitForMultipleObjects(2,handles, FALSE,INFINITE);
+}
+
+/*
+ * Portability glue for win32 waitable timers.
+ *
+ * One may ask: Why is there a wrapper in C when the calls are so
+ * obvious that Lisp could do them directly (as it did on Windows)?
+ *
+ * But the answer is that on POSIX platforms, we now emulate the win32
+ * calls and hide that emulation behind this os_* abstraction.
+ */
+HANDLE
+os_create_wtimer()
+{
+    return CreateWaitableTimer(0, 0, 0);
+}
+
+int
+os_wait_for_wtimer(HANDLE handle)
+{
+    return win32_wait_object_or_signal(handle);
+}
+
+void
+os_close_wtimer(HANDLE handle)
+{
+    CloseHandle(handle);
+}
+
+void
+os_set_wtimer(HANDLE handle, int sec, int nsec)
+{
+    /* in units of 100ns, i.e. 0.1us. Negative for relative semantics. */
+    long long dueTime
+        = -(((long long) sec) * 10000000
+            + ((long long) nsec + 99) / 100);
+    SetWaitableTimer(handle, (LARGE_INTEGER*) &dueTime, 0, 0, 0, 0);
+}
+
+void
+os_cancel_wtimer(HANDLE handle)
+{
+    CancelWaitableTimer(handle);
+}
+#endif
 
 /* EOF */

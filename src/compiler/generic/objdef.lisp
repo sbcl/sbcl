@@ -398,6 +398,7 @@
   (control-stack-guard-page-protected)
   (alien-stack-start :c-type "lispobj *" :length #!+alpha 2 #!-alpha 1)
   (alien-stack-pointer :c-type "lispobj *" :length #!+alpha 2 #!-alpha 1)
+  #!+win32 (private-events :c-type "struct private_events" :length 2)
   (this :c-type "struct thread *" :length #!+alpha 2 #!-alpha 1)
   (prev :c-type "struct thread *" :length #!+alpha 2 #!-alpha 1)
   (next :c-type "struct thread *" :length #!+alpha 2 #!-alpha 1)

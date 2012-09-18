@@ -26,10 +26,14 @@
 
 #include <stdlib.h>
 #include <stdio.h>
-#include <signal.h>
 #include <errno.h>
 #include <string.h>
 #include "sbcl.h"
+#if defined(LISP_FEATURE_WIN32) && defined(LISP_FEATURE_SB_THREAD)
+#include "pthreads_win32.h"
+#else
+#include <signal.h>
+#endif
 #include "runtime.h"
 #include "os.h"
 #include "interr.h"
@@ -3321,7 +3325,7 @@ preserve_context_registers (os_context_t *c)
     /* On Darwin the signal context isn't a contiguous block of memory,
      * so just preserve_pointering its contents won't be sufficient.
      */
-#if defined(LISP_FEATURE_DARWIN)
+#if defined(LISP_FEATURE_DARWIN)||defined(LISP_FEATURE_WIN32)
 #if defined LISP_FEATURE_X86
     preserve_pointer((void*)*os_context_register_addr(c,reg_EAX));
     preserve_pointer((void*)*os_context_register_addr(c,reg_ECX));
@@ -3350,9 +3354,11 @@ preserve_context_registers (os_context_t *c)
     #error "preserve_context_registers needs to be tweaked for non-x86 Darwin"
 #endif
 #endif
+#if !defined(LISP_FEATURE_WIN32)
     for(ptr = ((void **)(c+1))-1; ptr>=(void **)c; ptr--) {
         preserve_pointer(*ptr);
     }
+#endif
 }
 #endif
 

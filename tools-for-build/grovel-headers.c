@@ -205,6 +205,39 @@ main(int argc, char *argv[])
     DEFTYPE("uint",    UINT);
     DEFTYPE("ulong",   ULONG);
 
+    printf(";;; File Desired Access\n");
+    defconstant ("FILE_GENERIC_READ", FILE_GENERIC_READ);
+    defconstant ("FILE_GENERIC_WRITE", FILE_GENERIC_WRITE);
+    defconstant ("FILE_GENERIC_EXECUTE", FILE_GENERIC_EXECUTE);
+    defconstant ("FILE_SHARE_READ", FILE_SHARE_READ);
+    defconstant ("FILE_SHARE_WRITE", FILE_SHARE_WRITE);
+    defconstant ("FILE_SHARE_DELETE", FILE_SHARE_DELETE);
+
+    printf(";;; File Creation Dispositions\n");
+    defconstant("CREATE_NEW", CREATE_NEW);
+    defconstant("CREATE_ALWAYS", CREATE_ALWAYS);
+    defconstant("OPEN_EXISTING", OPEN_EXISTING);
+    defconstant("OPEN_ALWAYS", OPEN_ALWAYS);
+    defconstant("TRUNCATE_EXISTING", TRUNCATE_EXISTING);
+
+    printf(";;; Desired Access\n");
+    defconstant("ACCESS_GENERIC_READ", GENERIC_READ);
+    defconstant("ACCESS_GENERIC_WRITE", GENERIC_WRITE);
+    defconstant("ACCESS_GENERIC_EXECUTE", GENERIC_EXECUTE);
+    defconstant("ACCESS_GENERIC_ALL", GENERIC_ALL);
+    defconstant("ACCESS_FILE_APPEND_DATA", FILE_APPEND_DATA);
+    defconstant("ACCESS_DELETE", DELETE);
+
+    printf(";;; Handle Information Flags\n");
+    defconstant("HANDLE_FLAG_INHERIT", HANDLE_FLAG_INHERIT);
+    defconstant("HANDLE_FLAG_PROTECT_FROM_CLOSE", HANDLE_FLAG_PROTECT_FROM_CLOSE);
+
+    printf(";;; Standard Handle Keys\n");
+    defconstant("STD_INPUT_HANDLE", STD_INPUT_HANDLE);
+    defconstant("STD_OUTPUT_HANDLE", STD_OUTPUT_HANDLE);
+    defconstant("STD_ERROR_HANDLE", STD_ERROR_HANDLE);
+
+
     /* FIXME: SB-UNIX and SB-WIN32 really need to be untangled. */
     printf("(in-package \"SB!UNIX\")\n\n");
     printf(";;; Unix-like constants and types on Windows\n");
@@ -216,11 +249,13 @@ main(int argc, char *argv[])
     defconstant("o_append", _O_APPEND);
     defconstant("o_excl",   _O_EXCL);
     defconstant("o_binary", _O_BINARY);
+    defconstant("o_noinherit", _O_NOINHERIT);
 
     defconstant("enoent", ENOENT);
     defconstant("eexist", EEXIST);
     defconstant("eintr", EINTR);
     defconstant("eagain", EAGAIN);
+    defconstant("ebadf", EBADF);
 
     defconstant("s-ifmt",  S_IFMT);
     defconstant("s-ifdir", S_IFDIR);

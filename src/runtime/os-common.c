@@ -75,7 +75,7 @@ os_get_errno(void)
 }
 
 
-#if defined(LISP_FEATURE_SB_THREAD) && !defined(CANNOT_USE_POSIX_SEM_T)
+#if defined(LISP_FEATURE_SB_THREAD) && (!defined(CANNOT_USE_POSIX_SEM_T) || defined(LISP_FEATURE_WIN32))
 
 void
 os_sem_init(os_sem_t *sem, unsigned int value)

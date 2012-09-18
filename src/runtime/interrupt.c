@@ -102,7 +102,7 @@ union interrupt_handler interrupt_handlers[NSIG];
  * work for SIGSEGV and similar. It is good enough for timers, and
  * maybe all deferrables. */
 
-#ifdef LISP_FEATURE_SB_THREAD
+#if defined(LISP_FEATURE_SB_THREAD) && !defined(LISP_FEATURE_WIN32)
 static void
 add_handled_signals(sigset_t *sigset)
 {
@@ -121,7 +121,7 @@ void block_signals(sigset_t *what, sigset_t *where, sigset_t *old);
 static boolean
 maybe_resignal_to_lisp_thread(int signal, os_context_t *context)
 {
-#ifdef LISP_FEATURE_SB_THREAD
+#if defined(LISP_FEATURE_SB_THREAD) && !defined(LISP_FEATURE_WIN32)
     if (!pthread_getspecific(lisp_thread)) {
         if (!(sigismember(&deferrable_sigset,signal))) {
             corruption_warning_and_maybe_lose
@@ -175,7 +175,7 @@ maybe_resignal_to_lisp_thread(int signal, os_context_t *context)
 
 static void run_deferred_handler(struct interrupt_data *data,
                                  os_context_t *context);
-#ifndef LISP_FEATURE_WIN32
+#if !defined(LISP_FEATURE_WIN32) || defined(LISP_FEATURE_SB_THREAD)
 static void store_signal_data_for_later (struct interrupt_data *data,
                                          void *handler, int signal,
                                          siginfo_t *info,
@@ -240,7 +240,7 @@ boolean
 all_signals_blocked_p(sigset_t *sigset, sigset_t *sigset2,
                                 const char *name)
 {
-#if !defined(LISP_FEATURE_WIN32)
+#if !defined(LISP_FEATURE_WIN32) || defined(LISP_FEATURE_SB_THREAD)
     int i;
     boolean has_blocked = 0, has_unblocked = 0;
     sigset_t current;
@@ -314,7 +314,7 @@ sigset_t gc_sigset;
 
 #endif
 
-#if !defined(LISP_FEATURE_WIN32)
+#if !defined(LISP_FEATURE_WIN32) || defined(LISP_FEATURE_SB_THREAD)
 boolean
 deferrables_blocked_p(sigset_t *sigset)
 {
@@ -325,7 +325,7 @@ deferrables_blocked_p(sigset_t *sigset)
 void
 check_deferrables_unblocked_or_lose(sigset_t *sigset)
 {
-#if !defined(LISP_FEATURE_WIN32)
+#if !defined(LISP_FEATURE_WIN32) || defined(LISP_FEATURE_SB_THREAD)
     if (deferrables_blocked_p(sigset))
         lose("deferrables blocked\n");
 #endif
@@ -334,13 +334,13 @@ check_deferrables_unblocked_or_lose(sigset_t *sigset)
 void
 check_deferrables_blocked_or_lose(sigset_t *sigset)
 {
-#if !defined(LISP_FEATURE_WIN32)
+#if !defined(LISP_FEATURE_WIN32) || defined(LISP_FEATURE_SB_THREAD)
     if (!deferrables_blocked_p(sigset))
         lose("deferrables unblocked\n");
 #endif
 }
 
-#if !defined(LISP_FEATURE_WIN32)
+#if !defined(LISP_FEATURE_WIN32) || defined(LISP_FEATURE_SB_THREAD)
 boolean
 blockables_blocked_p(sigset_t *sigset)
 {
@@ -351,7 +351,7 @@ blockables_blocked_p(sigset_t *sigset)
 void
 check_blockables_unblocked_or_lose(sigset_t *sigset)
 {
-#if !defined(LISP_FEATURE_WIN32)
+#if !defined(LISP_FEATURE_WIN32) || defined(LISP_FEATURE_SB_THREAD)
     if (blockables_blocked_p(sigset))
         lose("blockables blocked\n");
 #endif
@@ -361,6 +361,24 @@ void
 check_blockables_blocked_or_lose(sigset_t *sigset)
 {
 #if !defined(LISP_FEATURE_WIN32)
+    /* On Windows, there are no actual signals, but since the win32 port
+     * tracks the sigmask and checks it explicitly, some functions are
+     * still required to keep the mask set up properly.  (After all, the
+     * goal of the sigmask emulation is to not have to change all the
+     * call sites in the first place.)
+     *
+     * However, this does not hold for all signals equally: While
+     * deferrables matter ("is interrupt-thread okay?"), it is not worth
+     * having to set up blockables properly (which include the
+     * non-existing GC signals).
+     *
+     * Yet, as the original comment explains it:
+     *   Adjusting FREE-INTERRUPT-CONTEXT-INDEX* and other aspecs of
+     *   fake_foreign_function_call machinery are sometimes useful here[...].
+     *
+     * So we merely skip this assertion.
+     *   -- DFL, trying to expand on a comment by AK.
+     */
     if (!blockables_blocked_p(sigset))
         lose("blockables unblocked\n");
 #endif
@@ -397,7 +415,7 @@ check_gc_signals_blocked_or_lose(sigset_t *sigset)
 void
 block_deferrable_signals(sigset_t *where, sigset_t *old)
 {
-#ifndef LISP_FEATURE_WIN32
+#if !defined(LISP_FEATURE_WIN32) || defined(LISP_FEATURE_SB_THREAD)
     block_signals(&deferrable_sigset, where, old);
 #endif
 }
@@ -405,7 +423,7 @@ block_deferrable_signals(sigset_t *where, sigset_t *old)
 void
 block_blockable_signals(sigset_t *where, sigset_t *old)
 {
-#ifndef LISP_FEATURE_WIN32
+#if !defined(LISP_FEATURE_WIN32) || defined(LISP_FEATURE_SB_THREAD)
     block_signals(&blockable_sigset, where, old);
 #endif
 }
@@ -414,7 +432,7 @@ block_blockable_signals(sigset_t *where, sigset_t *old)
 void
 block_gc_signals(sigset_t *where, sigset_t *old)
 {
-#ifndef LISP_FEATURE_WIN32
+#if !defined(LISP_FEATURE_WIN32) || defined(LISP_FEATURE_SB_THREAD)
     block_signals(&gc_sigset, where, old);
 #endif
 }
@@ -423,7 +441,7 @@ block_gc_signals(sigset_t *where, sigset_t *old)
 void
 unblock_deferrable_signals(sigset_t *where, sigset_t *old)
 {
-#ifndef LISP_FEATURE_WIN32
+#if !defined(LISP_FEATURE_WIN32) || defined(LISP_FEATURE_SB_THREAD)
     if (interrupt_handler_pending_p())
         lose("unblock_deferrable_signals: losing proposition\n");
 #ifndef LISP_FEATURE_SB_SAFEPOINT
@@ -436,7 +454,7 @@ unblock_deferrable_signals(sigset_t *where, sigset_t *old)
 void
 unblock_blockable_signals(sigset_t *where, sigset_t *old)
 {
-#ifndef LISP_FEATURE_WIN32
+#if !defined(LISP_FEATURE_WIN32) || defined(LISP_FEATURE_SB_THREAD)
     unblock_signals(&blockable_sigset, where, old);
 #endif
 }
@@ -454,7 +472,7 @@ unblock_gc_signals(sigset_t *where, sigset_t *old)
 void
 unblock_signals_in_context_and_maybe_warn(os_context_t *context)
 {
-#ifndef LISP_FEATURE_WIN32
+#if !defined(LISP_FEATURE_WIN32) || defined(LISP_FEATURE_SB_THREAD)
     sigset_t *sigset = os_context_sigmask_addr(context);
 #ifndef LISP_FEATURE_SB_SAFEPOINT
     if (all_signals_blocked_p(sigset, &gc_sigset, "gc")) {
@@ -548,7 +566,7 @@ in_leaving_without_gcing_race_p(struct thread *thread)
 void
 check_interrupt_context_or_lose(os_context_t *context)
 {
-#ifndef LISP_FEATURE_WIN32
+#if !defined(LISP_FEATURE_WIN32) || defined(LISP_FEATURE_SB_THREAD)
     struct thread *thread = arch_os_get_current_thread();
     struct interrupt_data *data = thread->interrupt_data;
     int interrupt_deferred_p = (data->pending_handler != 0);
@@ -793,7 +811,7 @@ interrupt_internal_error(os_context_t *context, boolean continuable)
 #endif
     context_sap = alloc_sap(context);
 
-#ifndef LISP_FEATURE_WIN32
+#if !defined(LISP_FEATURE_WIN32) || defined(LISP_FEATURE_SB_THREAD)
     thread_sigmask(SIG_SETMASK, os_context_sigmask_addr(context), 0);
 #endif
 
@@ -1048,7 +1066,7 @@ interrupt_handle_now(int signal, siginfo_t *info, os_context_t *context)
 
     check_blockables_blocked_or_lose(0);
 
-#ifndef LISP_FEATURE_WIN32
+#if !defined(LISP_FEATURE_WIN32) || defined(LISP_FEATURE_SB_THREAD)
     if (sigismember(&deferrable_sigset,signal))
         check_interrupts_enabled_or_lose(context);
 #endif
@@ -1115,11 +1133,11 @@ interrupt_handle_now(int signal, siginfo_t *info, os_context_t *context)
 
         FSHOW_SIGNAL((stderr,"/calling C-level handler\n"));
 
-#ifndef LISP_FEATURE_WIN32
+#if !defined(LISP_FEATURE_WIN32) || defined(LISP_FEATURE_SB_THREAD)
         /* Allow signals again. */
         thread_sigmask(SIG_SETMASK, os_context_sigmask_addr(context), 0);
-#endif
         (*handler.c)(signal, info, context);
+#endif
     }
 
     if (were_in_lisp)
@@ -1928,17 +1946,21 @@ sigabrt_handler(int signal, siginfo_t *info, os_context_t *context)
 void
 interrupt_init(void)
 {
-#ifndef LISP_FEATURE_WIN32
+#if !defined(LISP_FEATURE_WIN32) || defined(LISP_FEATURE_SB_THREAD)
     int i;
     SHOW("entering interrupt_init()");
+#ifndef LISP_FEATURE_WIN32
     see_if_sigaction_nodefer_works();
+#endif
     sigemptyset(&deferrable_sigset);
     sigemptyset(&blockable_sigset);
     sigemptyset(&gc_sigset);
     sigaddset_deferrable(&deferrable_sigset);
     sigaddset_blockable(&blockable_sigset);
     sigaddset_gc(&gc_sigset);
+#endif
 
+#ifndef LISP_FEATURE_WIN32
     /* Set up high level handler information. */
     for (i = 0; i < NSIG; i++) {
         interrupt_handlers[i].c =
@@ -1950,8 +1972,8 @@ interrupt_init(void)
             (void (*)(int, siginfo_t*, os_context_t*))SIG_DFL;
     }
     undoably_install_low_level_interrupt_handler(SIGABRT, sigabrt_handler);
-    SHOW("returning from interrupt_init()");
 #endif
+    SHOW("returning from interrupt_init()");
 }
 
 #ifndef LISP_FEATURE_WIN32
@@ -2000,7 +2022,7 @@ unhandled_trap_error(os_context_t *context)
     unblock_gc_signals(0, 0);
 #endif
     context_sap = alloc_sap(context);
-#ifndef LISP_FEATURE_WIN32
+#if !defined(LISP_FEATURE_WIN32) || defined(LISP_FEATURE_SB_THREAD)
     thread_sigmask(SIG_SETMASK, os_context_sigmask_addr(context), 0);
 #endif
     funcall1(StaticSymbolFunction(UNHANDLED_TRAP_ERROR), context_sap);
@@ -2014,11 +2036,13 @@ void
 handle_trap(os_context_t *context, int trap)
 {
     switch(trap) {
+#if !(defined(LISP_FEATURE_WIN32) && defined(LISP_FEATURE_SB_THREAD))
     case trap_PendingInterrupt:
         FSHOW((stderr, "/<trap pending interrupt>\n"));
         arch_skip_instruction(context);
         interrupt_handle_pending(context);
         break;
+#endif
     case trap_Error:
     case trap_Cerror:
         FSHOW((stderr, "/<trap error/cerror %d>\n", trap));

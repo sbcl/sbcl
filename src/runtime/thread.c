@@ -17,7 +17,7 @@
 #ifndef LISP_FEATURE_WIN32
 #include <sched.h>
 #endif
-#include <signal.h>
+#include "runtime.h"
 #include <stddef.h>
 #include <errno.h>
 #include <sys/types.h>
@@ -49,12 +49,8 @@
 #include "interrupt.h"
 #include "lispregs.h"
 
-#ifdef LISP_FEATURE_WIN32
-/*
- * Win32 doesn't have SIGSTKSZ, and we're not switching stacks anyway,
- * so define it arbitrarily
- */
-#define SIGSTKSZ 1024
+#if defined(LISP_FEATURE_WIN32) && defined(LISP_FEATURE_SB_THREAD)
+# define IMMEDIATE_POST_MORTEM
 #endif
 
 #if defined(LISP_FEATURE_DARWIN) && defined(LISP_FEATURE_SB_THREAD)
@@ -223,12 +219,14 @@ initial_thread_trampoline(struct thread *th)
     th->os_thread=thread_self();
 #ifndef LISP_FEATURE_WIN32
     protect_control_stack_hard_guard_page(1, NULL);
+#endif
     protect_binding_stack_hard_guard_page(1, NULL);
     protect_alien_stack_hard_guard_page(1, NULL);
+#ifndef LISP_FEATURE_WIN32
     protect_control_stack_guard_page(1, NULL);
+#endif
     protect_binding_stack_guard_page(1, NULL);
     protect_alien_stack_guard_page(1, NULL);
-#endif
 
 #if defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64)
     return call_into_lisp_first_time(function,args,0);
@@ -238,6 +236,28 @@ initial_thread_trampoline(struct thread *th)
 }
 
 #ifdef LISP_FEATURE_SB_THREAD
+
+# if defined(IMMEDIATE_POST_MORTEM)
+
+/*
+ * If this feature is set, we are running on a stack managed by the OS,
+ * and no fancy delays are required for anything.  Just do it.
+ */
+static void
+schedule_thread_post_mortem(struct thread *corpse)
+{
+    pthread_detach(pthread_self());
+    gc_assert(!pthread_attr_destroy(corpse->os_attr));
+    free(corpse->os_attr);
+#if defined(LISP_FEATURE_WIN32)
+    os_invalidate_free(corpse->os_address, THREAD_STRUCT_SIZE);
+#else
+    os_invalidate(corpse->os_address, THREAD_STRUCT_SIZE);
+#endif
+}
+
+# else
+
 /* THREAD POST MORTEM CLEANUP
  *
  * Memory allocated for the thread stacks cannot be reclaimed while
@@ -324,6 +344,8 @@ schedule_thread_post_mortem(struct thread *corpse)
     }
 }
 
+# endif /* !IMMEDIATE_POST_MORTEM */
+
 /* this is the first thing that runs in the child (which is why the
  * silly calling convention).  Basically it calls the user's requested
  * lisp function after doing arch_os_thread_init and whatever other
@@ -405,11 +427,25 @@ new_thread_trampoline(struct thread *th)
     os_sem_destroy(th->state_not_running_sem);
     os_sem_destroy(th->state_not_stopped_sem);
 
+#if defined(LISP_FEATURE_WIN32)
+    free((os_vm_address_t)th->interrupt_data);
+#else
     os_invalidate((os_vm_address_t)th->interrupt_data,
                   (sizeof (struct interrupt_data)));
+#endif
 
 #ifdef LISP_FEATURE_MACH_EXCEPTION_HANDLER
     mach_lisp_thread_destroy(th);
+#endif
+
+#if defined(LISP_FEATURE_WIN32)
+    int i;
+    for (i = 0; i<
+             (int) (sizeof(th->private_events.events)/
+                    sizeof(th->private_events.events[0])); ++i) {
+      CloseHandle(th->private_events.events[i]);
+    }
+    TlsSetValue(OUR_TLS_INDEX,NULL);
 #endif
 
     schedule_thread_post_mortem(th);
@@ -422,11 +458,20 @@ new_thread_trampoline(struct thread *th)
 static void
 free_thread_struct(struct thread *th)
 {
+#if defined(LISP_FEATURE_WIN32)
+    if (th->interrupt_data) {
+        os_invalidate_free((os_vm_address_t) th->interrupt_data,
+                      (sizeof (struct interrupt_data)));
+    }
+    os_invalidate_free((os_vm_address_t) th->os_address,
+                  THREAD_STRUCT_SIZE);
+#else
     if (th->interrupt_data)
         os_invalidate((os_vm_address_t) th->interrupt_data,
                       (sizeof (struct interrupt_data)));
     os_invalidate((os_vm_address_t) th->os_address,
                   THREAD_STRUCT_SIZE);
+#endif
 }
 
 #ifdef LISP_FEATURE_SB_THREAD
@@ -446,7 +491,7 @@ create_thread_struct(lispobj initial_function) {
     struct thread *th=0;        /*  subdue gcc */
     void *spaces=0;
     void *aligned_spaces=0;
-#ifdef LISP_FEATURE_SB_THREAD
+#if defined(LISP_FEATURE_SB_THREAD) || defined(LISP_FEATURE_WIN32)
     unsigned int i;
 #endif
 
@@ -606,8 +651,13 @@ create_thread_struct(lispobj initial_function) {
     access_control_stack_pointer(th)=th->control_stack_start;
 #endif
 
+#if defined(LISP_FEATURE_WIN32)
+    th->interrupt_data = (struct interrupt_data *)
+        calloc((sizeof (struct interrupt_data)),1);
+#else
     th->interrupt_data = (struct interrupt_data *)
         os_validate(0,(sizeof (struct interrupt_data)));
+#endif
     if (!th->interrupt_data) {
         free_thread_struct(th);
         return 0;
@@ -619,6 +669,12 @@ create_thread_struct(lispobj initial_function) {
 #endif
     th->no_tls_value_marker=initial_function;
 
+#if defined(LISP_FEATURE_WIN32)
+    for (i = 0; i<sizeof(th->private_events.events)/
+           sizeof(th->private_events.events[0]); ++i) {
+      th->private_events.events[i] = CreateEvent(NULL,FALSE,FALSE,NULL);
+    }
+#endif
     th->stepping = NIL;
     return th;
 }
@@ -664,8 +720,12 @@ boolean create_os_thread(struct thread *th,os_thread_t *kid_tid)
     if((initcode = pthread_attr_init(th->os_attr)) ||
        /* call_into_lisp_first_time switches the stack for the initial
         * thread. For the others, we use this. */
+#if defined(LISP_FEATURE_WIN32)
+       (pthread_attr_setstacksize(th->os_attr, thread_control_stack_size)) ||
+#else
        (pthread_attr_setstack(th->os_attr,th->control_stack_start,
                               thread_control_stack_size)) ||
+#endif
        (retcode = pthread_create
         (kid_tid,th->os_attr,(void *(*)(void *))new_thread_trampoline,th))) {
         FSHOW_SIGNAL((stderr, "init = %d\n", initcode));
@@ -823,10 +883,9 @@ thread_yield()
 int
 wake_thread(os_thread_t os_thread)
 {
-#ifdef LISP_FEATURE_WIN32
-# define SIGPIPE 1
-#endif
-#if !defined(LISP_FEATURE_SB_THRUPTION) || defined(LISP_FEATURE_WIN32)
+#if defined(LISP_FEATURE_WIN32)
+    return kill_safely(os_thread, 1);
+#elif !defined(LISP_FEATURE_SB_THRUPTION)
     return kill_safely(os_thread, SIGPIPE);
 #else
     return wake_thread_posix(os_thread);
@@ -871,6 +930,9 @@ kill_safely(os_thread_t os_thread, int signal)
          * :SPECIALS), especially with s/10/100/ in both loops. */
         if (os_thread == pthread_self()) {
             pthread_kill(os_thread, signal);
+#ifdef LISP_FEATURE_WIN32
+            check_pending_thruptions(NULL);
+#endif
             return 0;
         }
 
@@ -883,6 +945,9 @@ kill_safely(os_thread_t os_thread, int signal)
                 int status = pthread_kill(os_thread, signal);
                 if (status)
                     lose("kill_safely: pthread_kill failed with %d\n", status);
+#if defined(LISP_FEATURE_WIN32) && defined(LISP_FEATURE_SB_THRUPTION)
+                wake_thread_win32(thread);
+#endif
                 break;
             }
         }
@@ -892,6 +957,8 @@ kill_safely(os_thread_t os_thread, int signal)
             return 0;
         else
             return -1;
+#elif defined(LISP_FEATURE_WIN32)
+        return 0;
 #else
         int status;
         if (os_thread != 0)

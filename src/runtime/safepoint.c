@@ -140,7 +140,16 @@ check_pending_thruptions(os_context_t *ctx)
 {
     struct thread *p = arch_os_get_current_thread();
 
-    gc_assert(!os_get_csp(p));
+#ifdef LISP_FEATURE_WIN32
+    pthread_t pself = p->os_thread;
+    sigset_t oldset;
+    /* On Windows, wake_thread/kill_safely does not set THRUPTION_PENDING
+     * in the self-kill case; instead we do it here while also clearing the
+     * "signal". */
+    if (pself->pending_signal_set)
+        if (__sync_fetch_and_and(&pself->pending_signal_set,0))
+            SetSymbolValue(THRUPTION_PENDING, T, p);
+#endif
 
     if (!thread_may_thrupt(ctx))
         return 0;
@@ -148,12 +157,24 @@ check_pending_thruptions(os_context_t *ctx)
         return 0;
     SetSymbolValue(THRUPTION_PENDING, NIL, p);
 
+#ifdef LISP_FEATURE_WIN32
+    oldset = pself->blocked_signal_set;
+    pself->blocked_signal_set = deferrable_sigset;
+    if (ctx) fake_foreign_function_call(ctx);
+#else
     sigset_t oldset;
     block_deferrable_signals(0, &oldset);
+#endif
 
     funcall0(StaticSymbolFunction(RUN_INTERRUPTION));
 
+#ifdef LISP_FEATURE_WIN32
+    if (ctx) undo_fake_foreign_function_call(ctx);
+    pself->blocked_signal_set = oldset;
+    if (ctx) ctx->sigmask = oldset;
+#else
     pthread_sigmask(SIG_SETMASK, &oldset, 0);
+#endif
     return 1;
 }
 #endif
@@ -640,6 +661,17 @@ static void
 set_csp_from_context(struct thread *self, os_context_t *ctx)
 {
     void **sp = (void **) *os_context_register_addr(ctx, reg_SP);
+    /* On POSIX platforms, it is sufficient to investigate only the part
+     * of the stack that was live before the interrupt, because in
+     * addition, we consider interrupt contexts explicitly.  On Windows,
+     * however, we do not keep an explicit stack of exception contexts,
+     * and instead arrange for the conservative stack scan to also cover
+     * the context implicitly.  The obvious way to do that is to start
+     * at the context itself: */
+#ifdef LISP_FEATURE_WIN32
+    gc_assert((void **) ctx < sp);
+    sp = (void**) ctx;
+#endif
     gc_assert((void **)self->control_stack_start
               <= sp && sp
               < (void **)self->control_stack_end);
@@ -793,6 +825,38 @@ thread_register_gc_trigger()
 /* wake_thread(thread) -- ensure a thruption delivery to
  * `thread'. */
 
+# ifdef LISP_FEATURE_WIN32
+
+void
+wake_thread_io(struct thread * thread)
+{
+    SetEvent(thread->private_events.events[1]);
+}
+
+void
+wake_thread_win32(struct thread *thread)
+{
+    wake_thread_io(thread);
+
+    if (SymbolTlValue(THRUPTION_PENDING,thread)==T)
+        return;
+
+    SetTlSymbolValue(THRUPTION_PENDING,T,thread);
+
+    if ((SymbolTlValue(GC_PENDING,thread)==T)||
+        (SymbolTlValue(STOP_FOR_GC_PENDING,thread)==T))
+        return;
+
+    pthread_mutex_unlock(&all_threads_lock);
+
+    if (maybe_become_stw_initiator(1) && !in_race_p()) {
+        gc_stop_the_world();
+        gc_start_the_world();
+    }
+    pthread_mutex_lock(&all_threads_lock);
+    return;
+}
+# else
 int
 wake_thread_posix(os_thread_t os_thread)
 {
@@ -859,6 +923,7 @@ cleanup:
     pthread_sigmask(SIG_SETMASK, &oldset, 0);
     return found ? 0 : -1;
 }
+#endif /* !LISP_FEATURE_WIN32 */
 #endif /* LISP_FEATURE_SB_THRUPTION */
 
 void

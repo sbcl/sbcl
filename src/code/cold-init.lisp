@@ -230,7 +230,8 @@
   (show-and-call stream-cold-init-or-reset)
   (show-and-call !loader-cold-init)
   (show-and-call !foreign-cold-init)
-  #!-win32 (show-and-call signal-cold-init-or-reinit)
+  #!-(and win32 (not sb-thread))
+  (show-and-call signal-cold-init-or-reinit)
   (/show0 "enabling internal errors")
   (setf (sb!alien:extern-alien "internal_errors_enabled" boolean) t)
 
@@ -351,7 +352,7 @@ process to continue normally."
     (os-cold-init-or-reinit)
     (thread-init-or-reinit)
     (stream-reinit t)
-    #!-win32
+    #!-(and win32 (not sb-thread))
     (signal-cold-init-or-reinit)
     (setf (sb!alien:extern-alien "internal_errors_enabled" boolean) t)
     (float-cold-init-or-reinit))

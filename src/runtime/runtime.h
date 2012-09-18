@@ -15,6 +15,17 @@
 #ifndef _SBCL_RUNTIME_H_
 #define _SBCL_RUNTIME_H_
 
+#if defined(LISP_FEATURE_WIN32) && defined(LISP_FEATURE_SB_THREAD)
+# include "pthreads_win32.h"
+#else
+# include <signal.h>
+# ifdef LISP_FEATURE_SB_THREAD
+#  include <pthread.h>
+# endif
+#endif
+
+#include <stdint.h>
+
 #if defined(LISP_FEATURE_SB_THREAD)
 #define thread_self() pthread_self()
 #define thread_kill pthread_kill
@@ -27,6 +38,10 @@
 #define thread_sigmask sigprocmask
 #define thread_mutex_lock(l) 0
 #define thread_mutex_unlock(l) 0
+#endif
+
+#if defined(LISP_FEATURE_WIN32) && defined(LISP_FEATURE_SB_THREAD)
+void os_preinit();
 #endif
 
 #if defined(LISP_FEATURE_SB_SAFEPOINT)
@@ -125,7 +140,6 @@ void dyndebug_init(void);
 
 #if QSHOW_SIGNAL_SAFE == 1 && !defined(LISP_FEATURE_WIN32)
 
-#include <signal.h>
 extern sigset_t blockable_sigset;
 
 #define QSHOW_BLOCK                                             \
@@ -178,7 +192,6 @@ typedef unsigned long pointer_sized_uint_t ;
 #include <sys/types.h>
 
 #if defined(LISP_FEATURE_SB_THREAD)
-#include <pthread.h>
 typedef pthread_t os_thread_t;
 #else
 typedef pid_t os_thread_t;

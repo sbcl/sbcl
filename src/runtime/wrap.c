@@ -118,7 +118,7 @@ char * sb_realpath (char *path)
 
     if ((ret = calloc(MAX_PATH, sizeof(char))) == NULL)
         return NULL;
-    if (GetFullPathName(path, MAX_PATH, ret, cp) == 0) {
+    if (GetFullPathName(path, MAX_PATH, ret, &cp) == 0) {
         errnum = errno;
         free(ret);
         errno = errnum;
@@ -423,10 +423,18 @@ int select(int top_fd, DWORD *read_set, DWORD *write_set, DWORD *except_set, tim
  * yet, however, and the closest we can easily get to a timeval is the
  * seconds part. So that's what we do.
  */
+#define UNIX_EPOCH_FILETIME 116444736000000000ULL
+
 int gettimeofday(long *timeval, long *timezone)
 {
-    timeval[0] = time(NULL);
-    timeval[1] = 0;
+    FILETIME ft;
+    ULARGE_INTEGER uft;
+    GetSystemTimeAsFileTime(&ft);
+    uft.LowPart = ft.dwLowDateTime;
+    uft.HighPart = ft.dwHighDateTime;
+    uft.QuadPart -= UNIX_EPOCH_FILETIME;
+    timeval[0] = uft.QuadPart / 10000000;
+    timeval[1] = (uft.QuadPart % 10000000)/10;
 
     return 0;
 }
