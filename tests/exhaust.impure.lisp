@@ -83,7 +83,7 @@
              (recurse)))))
     (assert (= exhaust-count recurse-count *count*))))
 
-(with-test (:name (:exhaust :binding-stack) :skipped-on :win32)
+(with-test (:name (:exhaust :binding-stack))
   (let ((ok nil)
         (symbols (loop repeat 1024 collect (gensym)))
         (values (loop repeat 1024 collect nil)))
@@ -98,8 +98,7 @@
       (assert ok))))
 
 (with-test (:name (:exhaust :alien-stack)
-                  :skipped-on '(not :c-stack-is-control-stack)
-                  :fails-on :win32)
+                  :skipped-on '(or (not :c-stack-is-control-stack)))
   (let ((ok nil))
     (labels ((exhaust-alien-stack (i)
                (with-alien ((integer-array (array int 500)))

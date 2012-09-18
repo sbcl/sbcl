@@ -3710,14 +3710,18 @@
                             (declare (ignore x y k1))
                             t))))))
 
-(with-test (:name :bug-309448 :fails-on :win32)
+(with-test (:name :bug-309448)
   ;; Like all tests trying to verify that something doesn't blow up
   ;; compile-times this is bound to be a bit brittle, but at least
   ;; here we try to establish a decent baseline.
   (flet ((time-it (lambda want)
            (gc :full t) ; let's keep GCs coming from other code out...
            (let* ((start (get-internal-run-time))
-                  (fun (compile nil lambda))
+                  (fun (dotimes (internal-time-resolution-too-low-workaround
+                                  #+win32 10
+                                  #-win32 0
+                                  (compile nil lambda))
+                         (compile nil lambda)))
                   (end (get-internal-run-time))
                   (got (funcall fun)))
              (unless (eql want got)

@@ -11,7 +11,7 @@
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
 
-#-sb-thread
+#+(or :win32 (not :sb-thread))
 (sb-ext:exit :code 104)
 
 (use-package :sb-alien)

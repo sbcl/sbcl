@@ -4,7 +4,8 @@
 #+#.(cl:if (cl:find-package "SB-POSIX") '(or) '(and))
 (let ((asdf:*central-registry*
        (cons "../contrib/systems/" asdf:*central-registry*)))
-  (asdf:oos 'asdf:load-op 'sb-posix))
+  (handler-bind (#+win32 (warning #'muffle-warning))
+    (asdf:oos 'asdf:load-op 'sb-posix)))
 
 (load "test-util.lisp")
 

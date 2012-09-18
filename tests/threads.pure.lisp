@@ -25,10 +25,10 @@
   (let ((x (cons :count 0))
         (nthreads (ecase sb-vm:n-word-bits (32 100) (64 1000))))
     (mapc #'sb-thread:join-thread
-          (loop repeat 1000
+          (loop repeat nthreads
                 collect (sb-thread:make-thread
                          (lambda ()
-                           (loop repeat nthreads
+                           (loop repeat 1000
                                  do (atomic-update (cdr x) #'1+)
                                     (sleep 0.00001))))))
     (assert (equal x `(:count ,@(* 1000 nthreads))))))
@@ -56,7 +56,8 @@
 ;;; Condition-wait should not be interruptible under WITHOUT-INTERRUPTS
 
 (with-test (:name without-interrupts+condition-wait
-            :skipped-on '(not :sb-thread))
+            :skipped-on '(not :sb-thread)
+            :fails-on '(and :win32 :sb-futex))
   (let* ((lock (make-mutex))
          (queue (make-waitqueue))
          (thread (make-thread (lambda ()
@@ -208,7 +209,7 @@
                                         (loop repeat (random 128)
                                               do (setf ** *)))))))
     (write-string "; ")
-    (dotimes (i 15000)
+    (dotimes (i #+win32 2000 #-win32 15000)
       (when (zerop (mod i 200))
         (write-char #\.)
         (force-output))
@@ -413,14 +414,14 @@
     (assert (and (null value)
                  error))))
 
-(with-test (:name (:wait-for :basics) :fails-on :win32)
+(with-test (:name (:wait-for :basics))
   (assert (not (sb-ext:wait-for nil :timeout 0.1)))
   (assert (eql 42 (sb-ext:wait-for 42)))
   (let ((n 0))
     (assert (eql 100 (sb-ext:wait-for (when (= 100 (incf n))
                                         n))))))
 
-(with-test (:name (:wait-for :deadline) :fails-on :win32)
+(with-test (:name (:wait-for :deadline))
   (assert (eq :ok
               (sb-sys:with-deadline (:seconds 10)
                 (assert (not (sb-ext:wait-for nil :timeout 0.1)))
@@ -432,7 +433,7 @@
                     (error "oops"))
                 (sb-sys:deadline-timeout () :deadline)))))
 
-(with-test (:name (:condition-wait :timeout :one-thread) :fails-on :win32)
+(with-test (:name (:condition-wait :timeout :one-thread))
   (let ((mutex (make-mutex))
         (waitqueue (make-waitqueue)))
     (assert (not (with-mutex (mutex)
@@ -465,7 +466,7 @@
       (unless (eql 50 ok)
         (error "Wanted 50, got ~S" ok)))))
 
-(with-test (:name (:wait-on-semaphore :timeout :one-thread) :fails-on :win32)
+(with-test (:name (:wait-on-semaphore :timeout :one-thread))
   (let ((sem (make-semaphore))
         (n 0))
     (signal-semaphore sem 10)

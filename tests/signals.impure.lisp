@@ -13,7 +13,7 @@
 
 (use-package :test-util)
 
-(with-test (:name (:async-unwind :specials) :fails-on :win32)
+(with-test (:name (:async-unwind :specials))
   (let ((*x0* nil) (*x1* nil) (*x2* nil) (*x3* nil) (*x4* nil))
     (declare (special *x0* *x1* *x2* *x3* *x4*))
     (loop repeat 10 do
@@ -38,7 +38,14 @@
 
 (require :sb-posix)
 
-(with-test (:name (:signal :errno) :fails-on :win32)
+(with-test (:name (:signal :errno)
+                  ;; This test asserts that nanosleep behaves correctly
+                  ;; for invalid values and sets EINVAL.  Well, we have
+                  ;; nanosleep on Windows, but it depends on the caller
+                  ;; (namely SLEEP) to produce known-good arguments, and
+                  ;; even if we wanted to check argument validity,
+                  ;; integration with `errno' is not to be expected.
+                  :skipped-on :win32)
   (let* (saved-errno
          (returning nil)
          (timer (make-timer (lambda ()
@@ -57,7 +64,10 @@
     (loop repeat 1000000000)
     (assert (= saved-errno (sb-unix::get-errno)))))
 
-(with-test (:name :handle-interactive-interrupt :fails-on :win32)
+(with-test (:name :handle-interactive-interrupt
+                  ;; It is desirable to support C-c on Windows, but SIGINT
+                  ;; is not the mechanism to use on this platform.
+                  :skipped-on :win32)
   (assert (eq :condition
               (handler-case
                   (sb-thread::kill-safely

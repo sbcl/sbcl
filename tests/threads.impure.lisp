@@ -195,25 +195,28 @@
 (defun fact (n)
   "A function that does work with the CPU."
   (if (zerop n) 1 (* n (fact (1- n)))))
-(let ((work (lambda () (fact 15000))))
-  (let ((zero (scaling-test work 0))
-        (four (scaling-test work 4)))
-    ;; a slightly weak assertion, but good enough for starters.
-    (assert (< four (* 1.5 zero)))))
+
+(with-test (:name :lurking-threads)
+  (let ((work (lambda () (fact 15000))))
+    (let ((zero (scaling-test work 0))
+          (four (scaling-test work 4)))
+      ;; a slightly weak assertion, but good enough for starters.
+      (assert (< four (* 1.5 zero))))))
 
 ;;; For one of the interupt-thread tests, we want a foreign function
 ;;; that does not make syscalls
 
-(with-open-file (o "threads-foreign.c" :direction :output :if-exists :supersede)
-  (format o "void loop_forever() { while(1) ; }~%"))
-(sb-ext:run-program "/bin/sh"
-                    '("run-compiler.sh" "-sbcl-pic" "-sbcl-shared"
-                      "-o" "threads-foreign.so" "threads-foreign.c")
-                    :environment (test-util::test-env))
-(sb-alien:load-shared-object (truename "threads-foreign.so"))
-(sb-alien:define-alien-routine loop-forever sb-alien:void)
-(delete-file "threads-foreign.c")
-
+#-win32
+(progn
+  (with-open-file (o "threads-foreign.c" :direction :output :if-exists :supersede)
+    (format o "void loop_forever() { while(1) ; }~%"))
+  (sb-ext:run-program "/bin/sh"
+                      '("run-compiler.sh" "-sbcl-pic" "-sbcl-shared"
+                        "-o" "threads-foreign.so" "threads-foreign.c")
+                      :environment (test-util::test-env))
+  (sb-alien:load-shared-object (truename "threads-foreign.so"))
+  (sb-alien:define-alien-routine loop-forever sb-alien:void)
+  (delete-file "threads-foreign.c"))
 
 ;;; elementary "can we get a lock and release it again"
 (with-test (:name (:mutex :basics))
@@ -551,7 +554,9 @@
   (let ((child (test-interrupt (lambda () (loop)))))
     (terminate-thread child)))
 
-(with-test (:name (:interrupt-thread :interrupt-foreign-loop))
+(with-test (:name (:interrupt-thread :interrupt-foreign-loop)
+                  ;; This feature is explicitly unsupported on Win32.
+                  :skipped-on :win32)
   (test-interrupt #'loop-forever :quit))
 
 (with-test (:name (:interrupt-thread :interrupt-sleep))
@@ -753,7 +758,7 @@
               (abort-thread)))))))
 
 ;; (nanosleep -1 0) does not fail on FreeBSD
-(with-test (:name (:exercising-concurrent-syscalls))
+(with-test (:name (:exercising-concurrent-syscalls) :fails-on :win32)
   (let* (#-freebsd
          (nanosleep-errno (progn
                             (sb-unix:nanosleep -1 0)
@@ -789,7 +794,9 @@
 
 (format t "~&thread startup sigmask test done~%")
 
-(with-test (:name (:debugger-no-hang-on-session-lock-if-interrupted))
+(with-test (:name (:debugger-no-hang-on-session-lock-if-interrupted)
+                  :fails-on :win32)
+  #+win32 (error "user would have to touch a key interactively to proceed")
   (sb-debug::enable-debugger)
   (let* ((main-thread *current-thread*)
          (interruptor-thread
@@ -1405,7 +1412,9 @@
           (list d1 d2 d3 i))))
 (format t "parallel defclass test done~%")
 
-(with-test (:name (:deadlock-detection :interrupts))
+(with-test (:name (:deadlock-detection :interrupts) :fails-on :win32)
+  #+win32                               ;be more explicit than just :skipped-on
+  (error "not attempting, because of deadlock error in background thread")
   (let* ((m1 (sb-thread:make-mutex :name "M1"))
          (m2 (sb-thread:make-mutex :name "M2"))
          (t1-can-go (sb-thread:make-semaphore :name "T1 can go"))

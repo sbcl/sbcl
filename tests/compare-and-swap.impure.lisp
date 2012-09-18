@@ -436,7 +436,7 @@
       (dotimes (i n)
         (push i y))
       (mapc #'sb-thread:join-thread
-            (loop repeat 1000
+            (loop repeat (ecase sb-vm:n-word-bits (32 100) (64 1000))
                   collect (sb-thread:make-thread
                            (lambda ()
                              (loop for z = (atomic-pop y)
