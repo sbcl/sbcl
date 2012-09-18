@@ -6,6 +6,13 @@ changes relative to sbcl-1.0.58:
     WAIT-P argument added to WITH-RECURSIVE-LOCK.
   * enhancement: SB-EXT:ATOMIC-PUSH and SB-EXT:ATOMIC-POP allow atomic operations
     on list heads.
+  * enhancement: Optional features (not enabled by default) allow the
+    use of signals for inter-thread synchronization to be reduced on certain
+    supported platforms (currently Linux, Solaris, and FreeBSD on x86 and
+    x86-64).  Set (and :sb-thread :sb-safepoint :sb-thruption :sb-wtimer)
+    to test these experimental features.  Known remaining bugs include minor
+    thread safety issues, less timely freeing of memory by GC, and certain
+    (not yet optimally low) runtime overhead.  Thanks to Anton Kovalenko.
   * optimization: CL:SORT and CL:STABLE-SORT of lists are faster and use fewer
     comparisons, particularly on almost-sorted inputs.
   * bug fix: Reading floats with large exponents no longer takes too much time
