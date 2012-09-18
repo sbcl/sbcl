@@ -27,6 +27,7 @@
 #include <stdarg.h>
 #include "thread.h"              /* genesis/primitive-objects.h needs this */
 #include <errno.h>
+#include <stdlib.h>
 
 /* FSHOW and odxprint provide debugging output for low-level information
  * (signal handling, exceptions, safepoints) which is hard to debug by
@@ -124,6 +125,8 @@ dyndebug_init()
  * FSHOW call, i.e. it merely formats to stderr.  Ultimately, it should
  * be restored to its full win32 branch functionality, where output to a
  * file or to the debugger can be selected at runtime. */
+
+void vodxprint_fun(const char *, va_list);
 
 void
 odxprint_fun(const char *fmt, ...)
