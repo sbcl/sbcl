@@ -22,15 +22,16 @@
 
 (with-test (:name atomic-update
             :skipped-on '(not :sb-thread))
-  (let ((x (cons :count 0)))
+  (let ((x (cons :count 0))
+        (nthreads (ecase sb-vm:n-word-bits (32 100) (64 1000))))
     (mapc #'sb-thread:join-thread
           (loop repeat 1000
                 collect (sb-thread:make-thread
                          (lambda ()
-                           (loop repeat 1000
+                           (loop repeat nthreads
                                  do (atomic-update (cdr x) #'1+)
                                     (sleep 0.00001))))))
-    (assert (equal x '(:count . 1000000)))))
+    (assert (equal x `(:count ,@(* 1000 nthreads))))))
 
 (with-test (:name mutex-owner)
   ;; Make sure basics are sane on unithreaded ports as well
