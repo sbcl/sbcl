@@ -628,10 +628,18 @@ Teemu Kalvas:
   character database, restoring the FAST-READ-CHAR optimization and
   developing external format support.
 
+Dmitry Kalyanov:
+  His work was crucial in bringing the Windows backend forward; he
+  implemented pthreads and ported SB-THREAD to this platform.
+
 Yaroslav Kavenchuk:
   He implemented several missing features and fixed many bugs in
   the win32 port. He also worked on external-format support for
   SB-ALIEN.
+
+Anton Kovalenko:
+  He introduced a safepoint-based stop-the-world protocol and greatly
+  contributed to features and bugfixes related to the Windows port.
 
 Richard M Kreyter:
   He added documentation support for CLOS slot readers and writers,
@@ -646,8 +654,7 @@ Arthur Lemmens:
   SBCL to bootstrap under Lispworks for Windows.
 
 David Lichteblau:
-  He came up with a more memory-efficient representation for
-  structures with raw slots.
+  He repeatedly failed to update his entry in this file.
 
 Robert MacLachlan:
   He has continued to answer questions about, and contribute fixes to,
