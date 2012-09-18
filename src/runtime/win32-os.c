@@ -523,6 +523,10 @@ os_invalidate_free_by_any_address(os_vm_address_t addr, os_vm_size_t len)
     AVERLAX(VirtualFree(minfo.AllocationBase, 0, MEM_RELEASE));
 }
 
+#define maybe_open_osfhandle _open_osfhandle
+#define maybe_get_osfhandle _get_osfhandle
+#define FDTYPE int
+
 /*
  * os_map() is called to map a chunk of the core file into memory.
  *
@@ -1080,13 +1084,191 @@ char *dirname(char *path)
     return buf;
 }
 
+/* Unofficial but widely used property of console handles: they have
+   #b11 in two minor bits, opposed to other handles, that are
+   machine-word-aligned. Properly emulated even on wine.
+
+   Console handles are special in many aspects, e.g. they aren't NTDLL
+   system handles: kernel32 redirects console operations to CSRSS
+   requests. Using the hack below to distinguish console handles is
+   justified, as it's the only method that won't hang during
+   outstanding reads, won't try to lock NT kernel object (if there is
+   one; console isn't), etc. */
+int
+console_handle_p(HANDLE handle)
+{
+    return (handle != NULL)&&
+        (handle != INVALID_HANDLE_VALUE)&&
+        ((((int)(intptr_t)handle)&3)==3);
+}
+
+static const LARGE_INTEGER zero_large_offset = {.QuadPart = 0LL};
+
+int
+win32_unix_write(FDTYPE fd, void * buf, int count)
+{
+    HANDLE handle;
+    DWORD written_bytes;
+    OVERLAPPED overlapped;
+    struct thread * self = arch_os_get_current_thread();
+    BOOL waitInGOR;
+    LARGE_INTEGER file_position;
+    BOOL seekable;
+    BOOL ok;
+
+    handle =(HANDLE)maybe_get_osfhandle(fd);
+    if (console_handle_p(handle))
+        return write(fd, buf, count);
+
+    overlapped.hEvent = self->private_events.events[0];
+    seekable = SetFilePointerEx(handle,
+                                zero_large_offset,
+                                &file_position,
+                                FILE_CURRENT);
+    if (seekable) {
+        overlapped.Offset = file_position.LowPart;
+        overlapped.OffsetHigh = file_position.HighPart;
+    } else {
+        overlapped.Offset = 0;
+        overlapped.OffsetHigh = 0;
+    }
+    ok = WriteFile(handle, buf, count, &written_bytes, &overlapped);
+
+    if (ok) {
+        goto done_something;
+    } else {
+        if (GetLastError()!=ERROR_IO_PENDING) {
+            errno = EIO;
+            return -1;
+        } else {
+            if(WaitForMultipleObjects(2,self->private_events.events,
+                                      FALSE,INFINITE) != WAIT_OBJECT_0) {
+                CancelIo(handle);
+                waitInGOR = TRUE;
+            } else {
+                waitInGOR = FALSE;
+            }
+            if (!GetOverlappedResult(handle,&overlapped,&written_bytes,waitInGOR)) {
+                if (GetLastError()==ERROR_OPERATION_ABORTED) {
+                    errno = EINTR;
+                } else {
+                    errno = EIO;
+                }
+                return -1;
+            } else {
+                goto done_something;
+            }
+        }
+    }
+  done_something:
+    if (seekable) {
+        file_position.QuadPart += written_bytes;
+        SetFilePointerEx(handle,file_position,NULL,FILE_BEGIN);
+    }
+    return written_bytes;
+}
+
+int
+win32_unix_read(FDTYPE fd, void * buf, int count)
+{
+    HANDLE handle;
+    OVERLAPPED overlapped = {.Internal=0};
+    DWORD read_bytes = 0;
+    struct thread * self = arch_os_get_current_thread();
+    DWORD errorCode = 0;
+    BOOL waitInGOR = FALSE;
+    BOOL ok = FALSE;
+    LARGE_INTEGER file_position;
+    BOOL seekable;
+
+    handle = (HANDLE)maybe_get_osfhandle(fd);
+
+    if (console_handle_p(handle)) {
+        /* 1. Console is a singleton.
+           2. The only way to cancel console handle I/O is to close it.
+        */
+    if (console_handle_p(handle))
+        return read(fd, buf, count);
+    }
+    overlapped.hEvent = self->private_events.events[0];
+    /* If it has a position, we won't try overlapped */
+    seekable = SetFilePointerEx(handle,
+                                zero_large_offset,
+                                &file_position,
+                                FILE_CURRENT);
+    if (seekable) {
+        overlapped.Offset = file_position.LowPart;
+        overlapped.OffsetHigh = file_position.HighPart;
+    } else {
+        overlapped.Offset = 0;
+        overlapped.OffsetHigh = 0;
+    }
+    ok = ReadFile(handle,buf,count,&read_bytes, &overlapped);
+    if (ok) {
+        /* immediately */
+        goto done_something;
+    } else {
+        errorCode = GetLastError();
+        if (errorCode == ERROR_HANDLE_EOF ||
+            errorCode == ERROR_BROKEN_PIPE ||
+            errorCode == ERROR_NETNAME_DELETED) {
+            read_bytes = 0;
+            goto done_something;
+        }
+        if (errorCode!=ERROR_IO_PENDING) {
+            /* is it some _real_ error? */
+            errno = EIO;
+            return -1;
+        } else {
+            int ret;
+            if( (ret = WaitForMultipleObjects(2,self->private_events.events,
+                                              FALSE,INFINITE)) != WAIT_OBJECT_0) {
+                CancelIo(handle);
+                waitInGOR = TRUE;
+                /* Waiting for IO only */
+            } else {
+                waitInGOR = FALSE;
+            }
+            ok = GetOverlappedResult(handle,&overlapped,&read_bytes,waitInGOR);
+            if (!ok) {
+                errorCode = GetLastError();
+                if (errorCode == ERROR_HANDLE_EOF ||
+                    errorCode == ERROR_BROKEN_PIPE ||
+                    errorCode == ERROR_NETNAME_DELETED) {
+                    read_bytes = 0;
+                    goto done_something;
+                } else {
+                    if (errorCode == ERROR_OPERATION_ABORTED)
+                        errno = EINTR;      /* that's it. */
+                    else
+                        errno = EIO;        /* something unspecific */
+                    return -1;
+                }
+            } else
+                goto done_something;
+        }
+    }
+  done_something:
+    if (seekable) {
+        file_position.QuadPart += read_bytes;
+        SetFilePointerEx(handle,file_position,NULL,FILE_BEGIN);
+    }
+    return read_bytes;
+}
+
 /* This is a manually-maintained version of ldso_stubs.S. */
 
 void __stdcall RtlUnwind(void *, void *, void *, void *); /* I don't have winternl.h */
 
 void scratch(void)
 {
+    LARGE_INTEGER la = {{0}};
+    closesocket(0);
     CloseHandle(0);
+    shutdown(0, 0);
+    SetHandleInformation(0, 0, 0);
+    GetHandleInformation(0, 0);
+    getsockopt(0, 0, 0, 0, 0);
     FlushConsoleInputBuffer(0);
     FormatMessageA(0, 0, 0, 0, 0, 0, 0);
     FreeLibrary(0);
@@ -1108,6 +1290,7 @@ void scratch(void)
     Sleep(0);
     WriteFile(0, 0, 0, 0, 0);
     _get_osfhandle(0);
+    _open_osfhandle(0, 0);
     _rmdir(0);
     _pipe(0,0,0);
     access(0,0);
@@ -1120,6 +1303,7 @@ void scratch(void)
     MapViewOfFile(0,0,0,0,0);
     UnmapViewOfFile(0);
     FlushViewOfFile(0,0);
+    SetFilePointerEx(0, la, 0, 0);
     #ifndef LISP_FEATURE_SB_UNICODE
       CreateDirectoryA(0,0);
       CreateFileMappingA(0,0,0,0,0,0);

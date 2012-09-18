@@ -290,6 +290,8 @@
                               ((eql errno sb!unix:ewouldblock)
                                ;; Blocking, queue or wair.
                                (queue-or-wait))
+                              ;; if interrupted on win32, just try again
+                              #!+win32 ((eql errno sb!unix:eintr))
                               (t
                                (simple-stream-perror "Couldn't write to ~s"
                                                      stream errno)))))))))))))
@@ -952,6 +954,9 @@
            (errno 0)
            (count 0))
     (tagbody
+       #!+win32
+       (go :main)
+
        ;; Check for blocking input before touching the stream if we are to
        ;; serve events: if the FD is blocking, we don't want to try an uninterruptible
        ;; read(). Regular files should never block, so we can elide the check.
@@ -984,7 +989,7 @@
        ((lambda (return-reason)
           (ecase return-reason
             ((nil))                     ; fast path normal cases
-            ((:wait-for-input) (go :wait-for-input))
+            ((:wait-for-input) (go #!-win32 :wait-for-input #!+win32 :main))
             ((:closed-flame)   (go :closed-flame))
             ((:read-error)     (go :read-error))))
         (without-interrupts
@@ -1020,10 +1025,9 @@
                 (setf (values count errno)
                       (sb!unix:unix-read fd (sap+ sap tail) (- length tail)))
                 (cond ((null count)
-                       #!+win32
-                       (return :read-error)
-                       #!-win32
-                       (if (eql errno sb!unix:ewouldblock)
+                       (if (eql errno
+                                #!+win32 sb!unix:eintr
+                                #!-win32 sb!unix:ewouldblock)
                            (return :wait-for-input)
                            (return :read-error)))
                       ((zerop count)

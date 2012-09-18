@@ -21,6 +21,9 @@
 ;;; but groveling HANDLE makes it unsigned, which currently breaks the
 ;;; build. --NS 2006-06-18
 (define-alien-type handle int-ptr)
+
+(define-alien-type lispbool (boolean 32))
+
 (define-alien-type system-string
                    #!-sb-unicode c-string
                    #!+sb-unicode (c-string :external-format :ucs-2))
@@ -649,6 +652,12 @@ UNIX epoch: January 1st 1970."
           (alien-funcall afunc aname (addr length))))
       (cast-and-free aname))))
 
+(define-alien-routine ("SetFilePointerEx" set-file-pointer-ex) lispbool
+  (handle handle)
+  (offset long-long)
+  (new-position long-long :out)
+  (whence dword))
+
 ;; File mapping support routines
 (define-alien-routine (#!+sb-unicode "CreateFileMappingW"
                        #!-sb-unicode "CreateFileMappingA"
@@ -724,6 +733,7 @@ UNIX epoch: January 1st 1970."
 (defconstant file-attribute-encrypted #x4000)
 
 (defconstant file-flag-overlapped #x40000000)
+(defconstant file-flag-sequential-scan #x8000000)
 
 ;; GetFileAttribute is like a tiny subset of fstat(),
 ;; enough to distinguish directories from anything else.
@@ -735,3 +745,158 @@ UNIX epoch: January 1st 1970."
 
 (define-alien-routine ("CloseHandle" close-handle) bool
   (handle handle))
+
+(define-alien-routine ("_open_osfhandle" open-osfhandle)
+    int
+  (handle handle)
+  (flags int))
+
+;; Intended to be an imitation of sb!unix:unix-open based on
+;; CreateFile, as complete as possibly.
+;; FILE_FLAG_OVERLAPPED is a must for decent I/O.
+
+(defun unixlike-open (path flags mode &optional revertable)
+  (declare (type sb!unix:unix-pathname path)
+           (type fixnum flags)
+           (type sb!unix:unix-file-mode mode)
+           (ignorable mode))
+  (let* ((disposition-flags
+          (logior
+           (if (zerop (logand sb!unix:o_creat flags)) 0 #b100)
+           (if (zerop (logand sb!unix:o_excl flags)) 0 #b010)
+           (if (zerop (logand sb!unix:o_trunc flags)) 0 #b001)))
+         (create-disposition
+          ;; there are 8 combinations of creat|excl|trunc, some of
+          ;; them are equivalent. Case stmt below maps them to 5
+          ;; dispositions (see CreateFile manual).
+          (case disposition-flags
+            ((#b110 #b111) file-create-new)
+            ((#b001 #b011) file-truncate-existing)
+            ((#b000 #b010) file-open-existing)
+            (#b100 file-open-always)
+            (#b101 file-create-always))))
+    (let ((handle
+           (create-file path
+                        (logior
+                         (if revertable #x10000 0)
+                         (if (plusp (logand sb!unix:o_append flags))
+                             access-file-append-data
+                             0)
+                         (ecase (logand 3 flags)
+                           (0 FILE_GENERIC_READ)
+                           (1 FILE_GENERIC_WRITE)
+                           ((2 3) (logior FILE_GENERIC_READ
+                                          FILE_GENERIC_WRITE))))
+                        (logior FILE_SHARE_READ
+                                FILE_SHARE_WRITE)
+                        nil
+                        create-disposition
+                        (logior
+                         file-attribute-normal
+                         file-flag-overlapped
+                         file-flag-sequential-scan)
+                        0)))
+      (if (eql handle invalid-handle)
+          (values nil
+                  (let ((error-code (get-last-error)))
+                    (case error-code
+                      (#.error_file_not_found
+                       sb!unix:enoent)
+                      ((#.error_already_exists #.error_file_exists)
+                       sb!unix:eexist)
+                      (otherwise (- error-code)))))
+          (progn
+            ;; FIXME: seeking to the end is not enough for real APPEND
+            ;; semantics, but it's better than nothing.
+            ;;   -- AK
+            ;;
+            ;; On the other hand, the CL spec implies the "better than
+            ;; nothing" seek-once semantics implemented here, and our
+            ;; POSIX backend is incorrect in implementing :APPEND as
+            ;; O_APPEND.  Other CL implementations get this right across
+            ;; platforms.
+            ;;
+            ;; Of course, it would be nice if we had :IF-EXISTS
+            ;; :ATOMICALLY-APPEND separately as an extension, and in
+            ;; that case, we will have to worry about supporting it
+            ;; here after all.
+            ;;
+            ;; I've tested this only very briefly (on XP and Windows 7),
+            ;; but my impression is that WriteFile (without documenting
+            ;; it?) is like ZwWriteFile, i.e. if we pass in -1 as the
+            ;; offset in our overlapped structure, WriteFile seeks to the
+            ;; end for us.  Should we depend on that?  How do we communicate
+            ;; our desire to do so to the runtime?
+            ;;   -- DFL
+            ;;
+            (set-file-pointer-ex handle 0 (if (plusp (logand sb!unix::o_append flags)) 2 0))
+            (let ((fd (open-osfhandle handle (logior sb!unix::o_binary flags))))
+              (if (minusp fd)
+                  (values nil (sb!unix::get-errno))
+                  (values fd 0))))))))
+
+(define-alien-routine ("closesocket" close-socket) int (handle handle))
+(define-alien-routine ("shutdown" shutdown-socket) int (handle handle)
+  (how int))
+
+(define-alien-routine ("DuplicateHandle" duplicate-handle) lispbool
+  (from-process handle)
+  (from-handle handle)
+  (to-process handle)
+  (to-handle handle :out)
+  (access dword)
+  (inheritp lispbool)
+  (options dword))
+
+(defconstant +handle-flag-inherit+ 1)
+(defconstant +handle-flag-protect-from-close+ 2)
+
+(define-alien-routine ("SetHandleInformation" set-handle-information) lispbool
+  (handle handle)
+  (mask dword)
+  (flags dword))
+
+(define-alien-routine ("GetHandleInformation" get-handle-information) lispbool
+  (handle handle)
+  (flags dword :out))
+
+(define-alien-routine getsockopt int
+  (handle handle)
+  (level int)
+  (opname int)
+  (dataword int-ptr :in-out)
+  (socklen int :in-out))
+
+(defconstant sol_socket #xFFFF)
+(defconstant so_type #x1008)
+
+(defun socket-handle-p (handle)
+  (zerop (getsockopt handle sol_socket so_type 0 (alien-size int :bytes))))
+
+(defconstant ebadf 9)
+
+;;; For sockets, CloseHandle first and closesocket() afterwards is
+;;; legal: winsock tracks its handles separately (that's why we have
+;;; the problem with simple _close in the first place).
+;;;
+;;; ...Seems to be the problem on some OSes, though. We could
+;;; duplicate a handle and attempt close-socket on a duplicated one,
+;;; but it also have some problems...
+;;;
+;;; For now, we protect socket handle from close with SetHandleInformation,
+;;; then call CRT _close() that fails to close a handle but _gets rid of fd_,
+;;; and then we close a handle ourserves.
+
+(defun unixlike-close (fd)
+  (let ((handle (get-osfhandle fd)))
+    (flet ((close-protection (enable)
+             (set-handle-information handle 2 (if enable 2 0))))
+      (if (= handle invalid-handle)
+          (values nil ebadf)
+          (progn
+            (when (and (socket-handle-p handle) (close-protection t))
+              (shutdown-socket handle 2)
+              (alien-funcall (extern-alien "_dup2" (function int int int)) 0 fd)
+              (close-protection nil)
+              (close-socket handle))
+            (sb!unix::void-syscall ("close" int) fd))))))

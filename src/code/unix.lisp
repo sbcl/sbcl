@@ -158,6 +158,8 @@ corresponds to NAME, or NIL if there is none."
   (declare (type unix-pathname path)
            (type fixnum flags)
            (type unix-file-mode mode))
+  #!+win32 (sb!win32:unixlike-open path flags mode)
+  #!-win32
   (with-restarted-syscall (value errno)
     (int-syscall ("open" c-string int int)
                  path
@@ -170,8 +172,9 @@ corresponds to NAME, or NIL if there is none."
 ;;; associated with it.
 (/show0 "unix.lisp 391")
 (defun unix-close (fd)
-  (declare (type unix-fd fd))
-  (void-syscall ("close" int) fd))
+  #!+win32 (sb!win32:unixlike-close fd)
+  #!-win32 (declare (type unix-fd fd))
+  #!-win32 (void-syscall ("close" int) fd))
 
 ;;;; stdlib.h
 
@@ -315,7 +318,8 @@ corresponds to NAME, or NIL if there is none."
 (defun unix-read (fd buf len)
   (declare (type unix-fd fd)
            (type (unsigned-byte 32) len))
-  (int-syscall ("read" int (* char) int) fd buf len))
+  (int-syscall (#!-win32 "read" #!+win32 "win32_unix_read"
+                int (* char) int) fd buf len))
 
 ;;; UNIX-WRITE accepts a file descriptor, a buffer, an offset, and the
 ;;; length to write. It attempts to write len bytes to the device
@@ -326,7 +330,8 @@ corresponds to NAME, or NIL if there is none."
            (type (unsigned-byte 32) offset len))
   (flet ((%write (sap)
            (declare (system-area-pointer sap))
-           (int-syscall ("write" int (* char) int)
+           (int-syscall (#!-win32 "write" #!+win32 "win32_unix_write"
+                         int (* char) int)
                         fd
                         (with-alien ((ptr (* char) sap))
                           (addr (deref ptr offset)))

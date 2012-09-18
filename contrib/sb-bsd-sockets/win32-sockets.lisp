@@ -15,8 +15,10 @@
 ;;;; package where we will redefine all of the above
 ;;;; functions, converting between HANDLES and fds
 
+(defconstant WSA_FLAG_OVERLAPPED 1)
+
 (defun socket (af type proto)
-  (let* ((handle (wsa-socket af type proto nil 0 0))
+  (let* ((handle (wsa-socket af type proto nil 0 WSA_FLAG_OVERLAPPED))
          (fd (handle->fd handle 0)))
     fd))
 

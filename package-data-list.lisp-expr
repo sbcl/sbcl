@@ -2912,6 +2912,8 @@ SBCL itself"
                "PEEK-CONSOLE-INPUT"
                "PEEK-NAMED-PIPE"
                "READ-FILE"
+               "UNIXLIKE-CLOSE"
+               "UNIXLIKE-OPEN"
                "UNMAP-VIEW-OF-FILE"
                "WRITE-FILE"
                "WITH-PROCESS-TIMES")))

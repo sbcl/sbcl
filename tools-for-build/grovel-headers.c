@@ -191,7 +191,13 @@ main(int argc, char *argv[])
 
     printf(";;; Errors\n");
 
-    defconstant ("ERROR_ENVVAR_NOT_FOUND", ERROR_ENVVAR_NOT_FOUND);
+    printf(";;; Errors\n");
+
+    defconstant("ERROR_ENVVAR_NOT_FOUND", ERROR_ENVVAR_NOT_FOUND);
+    defconstant("ERROR_ALREADY_EXISTS", ERROR_ALREADY_EXISTS);
+    defconstant("ERROR_FILE_EXISTS", ERROR_FILE_EXISTS);
+    defconstant("ERROR_FILE_NOT_FOUND", ERROR_FILE_NOT_FOUND);
+    defconstant("ERROR_ACCESS_DENIED", ERROR_ACCESS_DENIED);
 
     printf(";;; GetComputerName\n");
 

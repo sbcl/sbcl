@@ -130,6 +130,7 @@ extern struct dyndebug_config {
     int dyndebug_pagefaults;
     int dyndebug_backtrace_when_lost;
     int dyndebug_sleep_when_lost;
+    int dyndebug_io;
 } dyndebug_config;
 
 #ifdef LISP_FEATURE_GENCGC
