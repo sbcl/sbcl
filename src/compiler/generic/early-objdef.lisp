@@ -99,7 +99,7 @@
                        (string= name "-LOWTAG" :start1 (- len 7))
                        (zerop (logand (symbol-value sym) fixnum-tag-mask)))
               (push sym fixtags))))
-        `',fixtags)
+        `',(sort fixtags #'string< :key #'symbol-name))
   #'equal)
 
 ;;; the heap types, stored in 8 bits of the header of an object on the

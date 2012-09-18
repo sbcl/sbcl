@@ -154,7 +154,7 @@
                           (stem (if (every #'alpha-char-p symbol-name)
                                     symbol-name
                                     (concatenate 'string symbol-name "-"))))
-                     `(,symbol (gensym ,stem))))
+                     `(,symbol (sb!xc:gensym ,stem))))
                  symbols)
      ,@body))
 
@@ -166,8 +166,8 @@
   (when (eq t name)
     (break))
   (if name
-      (loop repeat n collect (gensym (string name)))
-      (loop repeat n collect (gensym))))
+      (loop repeat n collect (sb!xc:gensym (string name)))
+      (loop repeat n collect (sb!xc:gensym))))
 
 ;;;; miscellany
 

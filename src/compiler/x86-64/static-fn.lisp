@@ -39,7 +39,11 @@
     (error "either too many args (~W) or too many results (~W); max = ~W"
            num-args num-results register-arg-count))
   (let ((num-temps (max num-args num-results))
-        (node (gensym "NODE-")))
+        (node (sb!xc:gensym "NODE-"))
+        (new-rbp-ea
+         '(make-ea :qword
+           :disp (frame-byte-offset (+ sp->fp-offset -3 ocfp-save-offset))
+           :base rsp-tn)))
     (collect ((temp-names) (temps) (arg-names) (args) (result-names) (results))
       (dotimes (i num-results)
         (let ((result-name (intern (format nil "RESULT-~D" i))))
@@ -80,17 +84,8 @@
          ;; 3+4+4=11 bytes as opposed to 1+4=5 bytes.
          (cond ((policy ,node (>= speed space))
                 (inst sub rsp-tn (* 3 n-word-bytes))
-                (inst mov (make-ea :qword :base rsp-tn
-                                   :disp (frame-byte-offset
-                                          (+ sp->fp-offset
-                                             -3
-                                             ocfp-save-offset)))
-                      rbp-tn)
-                (inst lea rbp-tn (make-ea :qword :base rsp-tn
-                                          :disp (frame-byte-offset
-                                                 (+ sp->fp-offset
-                                                    -3
-                                                    ocfp-save-offset)))))
+                (inst mov ,new-rbp-ea rbp-tn)
+                (inst lea rbp-tn ,new-rbp-ea))
                (t
                 ;; Dummy for return address.
                 (inst push rbp-tn)
@@ -98,7 +93,7 @@
 
          ,(if (zerop num-args)
               '(inst xor ecx ecx)
-              `(inst mov ecx (fixnumize ,num-args)))
+              `(inst mov ecx ,(fixnumize num-args)))
 
          (note-this-location vop :call-site)
          ;; Old CMU CL comment:

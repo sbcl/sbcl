@@ -826,7 +826,7 @@
           (let* ((name (first spec))
                  (exp-temp (gensym "ONCE-ONLY")))
             `(let ((,exp-temp ,(second spec))
-                   (,name (gensym ,(symbol-name name))))
+                   (,name (sb!xc:gensym ,(symbol-name name))))
                `(let ((,,name ,,exp-temp))
                   ,,(frob (rest specs) body))))))))
 
@@ -1166,19 +1166,22 @@
 
 (defmacro define-deprecated-function (state since name replacements lambda-list &body body)
   (let* ((replacements (normalize-deprecation-replacements replacements))
-         (doc (let ((*package* (find-package :keyword)))
-                (apply #'format nil
-                       "~@<~S has been deprecated as of SBCL ~A.~
-                        ~#[~; Use ~S instead.~; ~
-                              Use ~S or ~S instead.~:; ~
-                              Use~@{~#[~; or~] ~S~^,~} instead.~]~@:>"
-                       name since replacements))))
+         (doc
+          (let ((*package* (find-package :keyword))
+                (*print-pretty* nil))
+            (apply #'format nil
+                   "~S has been deprecated as of SBCL ~A.~
+                    ~#[~;~2%Use ~S instead.~;~2%~
+                            Use ~S or ~S instead.~:;~2%~
+                            Use~@{~#[~; or~] ~S~^,~} instead.~]"
+                    name since replacements))))
     `(progn
        ,(ecase state
           ((:early :late)
-           `(defun ,name ,lambda-list
-              ,doc
-              ,@body))
+           `(progn
+              (defun ,name ,lambda-list
+                ,doc
+                ,@body)))
           ((:final)
            `(progn
               (declaim (ftype (function * nil) ,name))
