@@ -2019,6 +2019,7 @@ is a good idea, but see SB-SYS re. blurring of boundaries."
                "THREAD-ERROR"
                "THREAD-ERROR-THREAD"
                "THREAD-ALIVE-P"
+               "THREAD-EMPHEMERAL-P"
                "THREAD-NAME"
                "THREAD-YIELD"
                ;; Memory barrier

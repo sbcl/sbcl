@@ -20,6 +20,7 @@
 in future versions."
   (name          nil :type (or thread-name null))
   (%alive-p      nil :type boolean)
+  (%ephemeral-p  nil :type boolean)
   (os-thread     nil :type (or integer null))
   (interruptions nil :type list)
   (result        nil :type list)
