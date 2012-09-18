@@ -51,7 +51,13 @@ os_vm_address_t os_validate(os_vm_address_t addr, os_vm_size_t len)
 
     if (addr == MAP_FAILED) {
         perror("mmap");
-        lose ("Error in mmap(..)\n");
+        /* While it is generally hard to recover from out-of-memory
+         * situations, we require callers to decide on the right course
+         * of action here.  Consider thread creation: Failure to mmap
+         * here is common if users have started too many threads, and
+         * often we can recover from that and treat it as an ordinary
+         * error. */
+        return 0;
     }
 
     return addr;
