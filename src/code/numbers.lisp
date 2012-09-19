@@ -353,6 +353,7 @@
              #!-sb-doc (declare (ignore doc))
              `(defun ,op (&rest args)
                 #!+sb-doc ,doc
+                (declare (truly-dynamic-extent args))
                 (if (null args) ,init
                     (do ((args (cdr args) (cdr args))
                          (result (car args) (,op result (car args))))
@@ -368,6 +369,7 @@
   #!+sb-doc
   "Subtract the second and all subsequent arguments from the first;
   or with one argument, negate the first argument."
+  (declare (truly-dynamic-extent more-numbers))
   (if more-numbers
       (do ((nlist more-numbers (cdr nlist))
            (result number))
@@ -380,6 +382,7 @@
   #!+sb-doc
   "Divide the first argument by each of the following arguments, in turn.
   With one argument, return reciprocal."
+  (declare (truly-dynamic-extent more-numbers))
   (if more-numbers
       (do ((nlist more-numbers (cdr nlist))
            (result number))
@@ -1032,6 +1035,7 @@ the first."
   #!+sb-doc
   "Return the bit-wise or of its arguments. Args must be integers."
   (declare (list integers))
+  (declare (truly-dynamic-extent integers))
   (if integers
       (do ((result (pop integers) (logior result (pop integers))))
           ((null integers) result)
@@ -1042,6 +1046,7 @@ the first."
   #!+sb-doc
   "Return the bit-wise exclusive or of its arguments. Args must be integers."
   (declare (list integers))
+  (declare (truly-dynamic-extent integers))
   (if integers
       (do ((result (pop integers) (logxor result (pop integers))))
           ((null integers) result)
@@ -1052,6 +1057,7 @@ the first."
   #!+sb-doc
   "Return the bit-wise and of its arguments. Args must be integers."
   (declare (list integers))
+  (declare (truly-dynamic-extent integers))
   (if integers
       (do ((result (pop integers) (logand result (pop integers))))
           ((null integers) result)
@@ -1062,6 +1068,7 @@ the first."
   #!+sb-doc
   "Return the bit-wise equivalence of its arguments. Args must be integers."
   (declare (list integers))
+  (declare (truly-dynamic-extent integers))
   (if integers
       (do ((result (pop integers) (logeqv result (pop integers))))
           ((null integers) result)
@@ -1364,6 +1371,7 @@ the first."
   #!+sb-doc
   "Return the greatest common divisor of the arguments, which must be
   integers. Gcd with no arguments is defined to be 0."
+  (declare (truly-dynamic-extent integers))
   (cond ((null integers) 0)
         ((null (cdr integers)) (abs (the integer (car integers))))
         (t
@@ -1378,6 +1386,7 @@ the first."
   #!+sb-doc
   "Return the least common multiple of one or more integers. LCM of no
   arguments is defined to be 1."
+  (declare (truly-dynamic-extent integers))
   (cond ((null integers) 1)
         ((null (cdr integers)) (abs (the integer (car integers))))
         (t
