@@ -378,8 +378,8 @@
          (multiple-value-bind (output-truename warnings-p failure-p)
             (if trace-file
                 (funcall compile-file src :output-file tmp-obj
-                         :trace-file t)
-                (funcall compile-file src :output-file tmp-obj ))
+                         :trace-file t :allow-other-keys t)
+                (funcall compile-file src :output-file tmp-obj))
            (declare (ignore warnings-p))
            (cond ((not output-truename)
                   (error "couldn't compile ~S" src))
