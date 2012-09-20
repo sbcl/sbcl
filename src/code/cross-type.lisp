@@ -248,7 +248,7 @@
              (if (stringp host-object)
                  (warn-and-give-up)
                  (values nil t)))
-            ((target-type-is-in '(character base-char))
+            ((target-type-is-in '(character base-char standard-char))
              (cond ((typep host-object 'standard-char)
                     (values t t))
                    ((not (characterp host-object))

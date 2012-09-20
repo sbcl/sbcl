@@ -1415,7 +1415,7 @@
                               (rest type))))
            (:constant
             ``(:constant ,#'(lambda (x)
-                              (typep x ',(second type)))
+                              (sb!xc:typep x ',(second type)))
                          ,',(second type)))))))
 
 (defun specify-operand-types (types ops more-ops)
