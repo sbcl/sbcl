@@ -1183,7 +1183,7 @@ many elements are copied."
                 ;; from the old seq.lisp into target-seq.lisp.
                 (define-compiler-macro ,name (pred first-seq &rest more-seqs)
                   (let ((elements (make-gensym-list (1+ (length more-seqs))))
-                        (blockname (gensym "BLOCK")))
+                        (blockname (sb!xc:gensym "BLOCK")))
                     (once-only ((pred pred))
                       `(block ,blockname
                          (map nil
