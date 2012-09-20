@@ -136,7 +136,8 @@
 
 ;;; various environment inquiries
 
-(defvar *features* '#.sb-cold:*shebang-features*
+(defvar *features*
+  '#.(sort (copy-list sb-cold:*shebang-features*) #'string<)
   #!+sb-doc
   "a list of symbols that describe features provided by the
    implementation")
