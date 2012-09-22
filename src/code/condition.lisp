@@ -13,26 +13,6 @@
 
 (in-package "SB!KERNEL")
 
-;;;; miscellaneous support utilities
-
-;;; Signalling an error when trying to print an error condition is
-;;; generally a PITA, so whatever the failure encountered when
-;;; wondering about FILE-POSITION within a condition printer, 'tis
-;;; better silently to give up than to try to complain.
-(defun file-position-or-nil-for-error (stream &optional (pos nil posp))
-  ;; Arguably FILE-POSITION shouldn't be signalling errors at all; but
-  ;; "NIL if this cannot be determined" in the ANSI spec doesn't seem
-  ;; absolutely unambiguously to prohibit errors when, e.g., STREAM
-  ;; has been closed so that FILE-POSITION is a nonsense question. So
-  ;; my (WHN) impression is that the conservative approach is to
-  ;; IGNORE-ERRORS. (I encountered this failure from within a homebrew
-  ;; defsystemish operation where the ERROR-STREAM had been CL:CLOSEd,
-  ;; I think by nonlocally exiting through a WITH-OPEN-FILE, by the
-  ;; time an error was reported.)
-  (if posp
-      (ignore-errors (file-position stream pos))
-      (ignore-errors (file-position stream))))
-
 ;;;; the CONDITION class
 
 (/show0 "condition.lisp 20")
@@ -768,29 +748,6 @@
   ()
   (:report (lambda (condition stream)
              (%report-reader-error condition stream :simple t))))
-
-(defun stream-error-position-info (stream &optional position)
-  (unless (interactive-stream-p stream)
-    (let ((now (file-position-or-nil-for-error stream))
-          (pos position))
-      (when (and (not pos) now (plusp now))
-        ;; FILE-POSITION is the next character -- error is at the previous one.
-        (setf pos (1- now)))
-      (let (lineno colno)
-        (when (and pos
-                   (< pos sb!xc:array-dimension-limit)
-                   (file-position stream :start))
-          (let ((string
-                  (make-string pos :element-type (stream-element-type stream))))
-            (when (= pos (read-sequence string stream))
-              ;; Lines count from 1, columns from 0. It's stupid and traditional.
-              (setq lineno (1+ (count #\Newline string))
-                    colno (- pos (or (position #\Newline string :from-end t) 0)))))
-          (file-position-or-nil-for-error stream now))
-        (remove-if-not #'second
-                       (list (list :line lineno)
-                             (list :column colno)
-                             (list :file-position pos)))))))
 
 ;;; base REPORTing of a READER-ERROR
 ;;;
