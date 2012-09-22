@@ -351,44 +351,42 @@
 
 (macrolet ((define-arith (op init doc)
              #!-sb-doc (declare (ignore doc))
-             `(defun ,op (&rest args)
-                #!+sb-doc ,doc
-                (declare (truly-dynamic-extent args))
-                (if (null args) ,init
-                    (do ((args (cdr args) (cdr args))
-                         (result (car args) (,op result (car args))))
-                        ((null args) result)
+             `(define-more-fun ,op (&rest numbers)
+                #!+sb-doc
+                ,doc
+                (if (more-p)
+                    (let ((result (more-arg 0)))
                       ;; to signal TYPE-ERROR when exactly 1 arg of wrong type:
-                      (declare (type number result)))))))
+                      (declare (type number result))
+                      (do-more (arg 1)
+                        (setf result (,op result arg)))
+                      result)
+                    ,init))))
   (define-arith + 0
     "Return the sum of its arguments. With no args, returns 0.")
   (define-arith * 1
     "Return the product of its arguments. With no args, returns 1."))
 
-(defun - (number &rest more-numbers)
+(define-more-fun - (number &rest more-numbers)
   #!+sb-doc
   "Subtract the second and all subsequent arguments from the first;
   or with one argument, negate the first argument."
-  (declare (truly-dynamic-extent more-numbers))
-  (if more-numbers
-      (do ((nlist more-numbers (cdr nlist))
-           (result number))
-          ((atom nlist) result)
-         (declare (list nlist))
-         (setq result (- result (car nlist))))
+  (if (more-p)
+      (let ((result number))
+        (do-more (arg)
+          (setf result (- result arg)))
+        result)
       (- number)))
 
-(defun / (number &rest more-numbers)
+(define-more-fun / (number &rest more-numbers)
   #!+sb-doc
   "Divide the first argument by each of the following arguments, in turn.
   With one argument, return reciprocal."
-  (declare (truly-dynamic-extent more-numbers))
-  (if more-numbers
-      (do ((nlist more-numbers (cdr nlist))
-           (result number))
-          ((atom nlist) result)
-         (declare (list nlist))
-         (setq result (/ result (car nlist))))
+  (if (more-p)
+      (let ((result number))
+        (do-more (arg)
+          (setf result (/ result arg)))
+        result)
       (/ number)))
 
 (defun 1+ (number)
@@ -807,93 +805,66 @@
 
 ;;;; comparisons
 
-(defun = (number &rest more-numbers)
+(define-more-fun = (number &rest more-numbers)
   #!+sb-doc
   "Return T if all of its arguments are numerically equal, NIL otherwise."
-  (declare (truly-dynamic-extent more-numbers))
-  (the number number)
-  (do ((nlist more-numbers (cdr nlist)))
-      ((atom nlist) t)
-     (declare (list nlist))
-     (if (not (= (car nlist) number)) (return nil))))
+  (declare (number number))
+  (do-more (arg)
+    (unless (= number arg)
+      (return-from = nil)))
+  t)
 
-(defun /= (number &rest more-numbers)
+(define-more-fun /= (number &rest more-numbers)
   #!+sb-doc
   "Return T if no two of its arguments are numerically equal, NIL otherwise."
-  (declare (truly-dynamic-extent more-numbers))
-  (do* ((head (the number number) (car nlist))
-        (nlist more-numbers (cdr nlist)))
-       ((atom nlist) t)
-     (declare (list nlist))
-     (unless (do* ((nl nlist (cdr nl)))
-                  ((atom nl) t)
-               (declare (list nl))
-               (if (= head (car nl)) (return nil)))
-       (return nil))))
+  (declare (number number))
+  (do-more (arg)
+    (when (= number arg)
+      (return-from /= nil)))
+  (dotimes (start (1- (more-count)))
+    (let ((head (more-arg start)))
+      (do-more (arg (1+ start))
+        (when (= head arg)
+          (return-from /= nil)))))
+  t)
 
-(defun < (number &rest more-numbers)
-  #!+sb-doc
-  "Return T if its arguments are in strictly increasing order, NIL otherwise."
-  (declare (truly-dynamic-extent more-numbers))
-  (do* ((n (the number number) (car nlist))
-        (nlist more-numbers (cdr nlist)))
-       ((atom nlist) t)
-     (declare (list nlist))
-     (if (not (< n (car nlist))) (return nil))))
+(macrolet ((def (op doc)
+             #!-sb-doc (declare (ignore doc))
+             `(define-more-fun ,op (number &rest more-numbers)
+                #!+sb-doc ,doc
+                (let ((n number))
+                  (declare (number n))
+                  (do-more (arg)
+                    (if (,op n arg)
+                        (setf n arg)
+                        (return-from ,op nil)))
+                  t))))
+  (def <  "Return T if its arguments are in strictly increasing order, NIL otherwise.")
+  (def >  "Return T if its arguments are in strictly decreasing order, NIL otherwise.")
+  (def <= "Return T if arguments are in strictly non-decreasing order, NIL otherwise.")
+  (def >= "Return T if arguments are in strictly non-increasing order, NIL otherwise."))
 
-(defun > (number &rest more-numbers)
-  #!+sb-doc
-  "Return T if its arguments are in strictly decreasing order, NIL otherwise."
-  (declare (truly-dynamic-extent more-numbers))
-  (do* ((n (the number number) (car nlist))
-        (nlist more-numbers (cdr nlist)))
-       ((atom nlist) t)
-     (declare (list nlist))
-     (if (not (> n (car nlist))) (return nil))))
-
-(defun <= (number &rest more-numbers)
-  #!+sb-doc
-  "Return T if arguments are in strictly non-decreasing order, NIL otherwise."
-  (declare (truly-dynamic-extent more-numbers))
-  (do* ((n (the number number) (car nlist))
-        (nlist more-numbers (cdr nlist)))
-       ((atom nlist) t)
-     (declare (list nlist))
-     (if (not (<= n (car nlist))) (return nil))))
-
-(defun >= (number &rest more-numbers)
-  #!+sb-doc
-  "Return T if arguments are in strictly non-increasing order, NIL otherwise."
-  (declare (truly-dynamic-extent more-numbers))
-  (do* ((n (the number number) (car nlist))
-        (nlist more-numbers (cdr nlist)))
-       ((atom nlist) t)
-     (declare (list nlist))
-     (if (not (>= n (car nlist))) (return nil))))
-
-(defun max (number &rest more-numbers)
+(define-more-fun max (number &rest more-numbers)
   #!+sb-doc
   "Return the greatest of its arguments; among EQUALP greatest, return
 the first."
-  (declare (truly-dynamic-extent more-numbers))
-  (do ((nlist more-numbers (cdr nlist))
-       (result number))
-      ((null nlist) (return result))
-     (declare (list nlist))
-     (declare (type real number result))
-     (if (> (car nlist) result) (setq result (car nlist)))))
+  (let ((n number))
+    (declare (number n))
+    (do-more (arg)
+      (when (> arg n)
+        (setf n arg)))
+    n))
 
-(defun min (number &rest more-numbers)
+(define-more-fun min (number &rest more-numbers)
   #!+sb-doc
   "Return the least of its arguments; among EQUALP least, return
 the first."
-  (declare (truly-dynamic-extent more-numbers))
-  (do ((nlist more-numbers (cdr nlist))
-       (result number))
-      ((null nlist) (return result))
-     (declare (list nlist))
-     (declare (type real number result))
-     (if (< (car nlist) result) (setq result (car nlist)))))
+  (let ((n number))
+    (declare (number n))
+    (do-more (arg)
+      (when (< arg n)
+        (setf n arg)))
+    n))
 
 (eval-when (:compile-toplevel :execute)
 
@@ -1031,49 +1002,21 @@ the first."
 
 ;;;; logicals
 
-(defun logior (&rest integers)
-  #!+sb-doc
-  "Return the bit-wise or of its arguments. Args must be integers."
-  (declare (list integers))
-  (declare (truly-dynamic-extent integers))
-  (if integers
-      (do ((result (pop integers) (logior result (pop integers))))
-          ((null integers) result)
-        (declare (integer result)))
-      0))
-
-(defun logxor (&rest integers)
-  #!+sb-doc
-  "Return the bit-wise exclusive or of its arguments. Args must be integers."
-  (declare (list integers))
-  (declare (truly-dynamic-extent integers))
-  (if integers
-      (do ((result (pop integers) (logxor result (pop integers))))
-          ((null integers) result)
-        (declare (integer result)))
-      0))
-
-(defun logand (&rest integers)
-  #!+sb-doc
-  "Return the bit-wise and of its arguments. Args must be integers."
-  (declare (list integers))
-  (declare (truly-dynamic-extent integers))
-  (if integers
-      (do ((result (pop integers) (logand result (pop integers))))
-          ((null integers) result)
-        (declare (integer result)))
-      -1))
-
-(defun logeqv (&rest integers)
-  #!+sb-doc
-  "Return the bit-wise equivalence of its arguments. Args must be integers."
-  (declare (list integers))
-  (declare (truly-dynamic-extent integers))
-  (if integers
-      (do ((result (pop integers) (logeqv result (pop integers))))
-          ((null integers) result)
-        (declare (integer result)))
-      -1))
+(macrolet ((def (op init doc)
+             #!-sb-doc (declare (ignore doc))
+             `(define-more-fun ,op (&rest integers)
+                #!+sb-doc ,doc
+                (if (more-p)
+                    (let ((result (more-arg 0)))
+                      (declare (integer result))
+                      (do-more (arg 1)
+                        (setf result (,op result arg)))
+                      result)
+                    ,init))))
+  (def logior 0 "Return the bit-wise or of its arguments. Args must be integers.")
+  (def logxor 0 "Return the bit-wise exclusive or of its arguments. Args must be integers.")
+  (def logand -1 "Return the bit-wise and of its arguments. Args must be integers.")
+  (def logeqv -1 "Return the bit-wise equivalence of its arguments. Args must be integers."))
 
 (defun lognot (number)
   #!+sb-doc
@@ -1367,34 +1310,33 @@ the first."
 
 ;;;; GCD and LCM
 
-(defun gcd (&rest integers)
+(define-more-fun gcd (&rest integers)
   #!+sb-doc
   "Return the greatest common divisor of the arguments, which must be
   integers. Gcd with no arguments is defined to be 0."
-  (declare (truly-dynamic-extent integers))
-  (cond ((null integers) 0)
-        ((null (cdr integers)) (abs (the integer (car integers))))
-        (t
-         (do ((gcd (the integer (car integers))
-                   (gcd gcd (the integer (car rest))))
-              (rest (cdr integers) (cdr rest)))
-             ((null rest) gcd)
-           (declare (integer gcd)
-                    (list rest))))))
+  (case (more-count)
+    (0 0)
+    (1 (abs (the integer (more-arg 0))))
+    (otherwise
+     (let ((gcd (more-arg 0)))
+       (declare (integer gcd))
+       (do-more (arg 1)
+         (setf gcd (gcd gcd (the integer arg))))
+       gcd))))
 
-(defun lcm (&rest integers)
+(define-more-fun lcm (&rest integers)
   #!+sb-doc
   "Return the least common multiple of one or more integers. LCM of no
   arguments is defined to be 1."
-  (declare (truly-dynamic-extent integers))
-  (cond ((null integers) 1)
-        ((null (cdr integers)) (abs (the integer (car integers))))
-        (t
-         (do ((lcm (the integer (car integers))
-                   (lcm lcm (the integer (car rest))))
-              (rest (cdr integers) (cdr rest)))
-             ((null rest) lcm)
-           (declare (integer lcm) (list rest))))))
+  (case (more-count)
+    (0 1)
+    (1 (abs (the integer (more-arg 0))))
+    (otherwise
+     (let ((lcm (more-arg 0)))
+       (declare (integer lcm))
+       (do-more (arg 1)
+         (setf lcm (lcm lcm (the integer arg))))
+       lcm))))
 
 (defun two-arg-lcm (n m)
   (declare (integer n m))
