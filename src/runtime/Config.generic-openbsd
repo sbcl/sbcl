@@ -9,19 +9,13 @@
 # provided with absolutely no warranty. See the COPYING and CREDITS
 # files for more information.
 
-include Config.generic-openbsd
+LINKFLAGS += -export-dynamic
+OS_LIBS += -lutil
 
-ASSEM_SRC = ppc-assem.S ldso-stubs.S
-ARCH_SRC = ppc-arch.c
-
-OS_SRC = bsd-os.c ppc-bsd-os.c
-
-ifdef LISP_FEATURE_SB_CORE_COMPRESSION
-  OS_LIBS += -lz
+# If the compiler recognizes a -nopie flag then we're building on a
+# PIE-by-default system, so disable PIE.
+ifneq ($(shell $(CC) -dumpspecs 2>/dev/null | grep -e -nopie),)
+CFLAGS += -fno-pie
+LINKFLAGS += -nopie
+LDFLAGS += -nopie
 endif
-
-GC_SRC = gencgc.c
-
-# Nothing to do for after-grovel-headers.
-.PHONY: after-grovel-headers
-after-grovel-headers:
