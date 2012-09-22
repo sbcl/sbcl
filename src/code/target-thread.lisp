@@ -1360,7 +1360,7 @@ Invoking the initial ABORT restart estabilished by MAKE-THREAD
 terminates the thread.
 
 See also: RETURN-FROM-THREAD, ABORT-THREAD."
-  #!-sb-thread (declare (ignore function name arguments))
+  #!-sb-thread (declare (ignore function name arguments ephemeral))
   #!-sb-thread (error "Not supported in unithread builds.")
   #!+sb-thread (assert (or (atom arguments)
                            (null (cdr (last arguments))))
