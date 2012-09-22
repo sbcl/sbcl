@@ -13,22 +13,11 @@
 
 (in-package "SB!C")
 
-;;; Convert into an IF so that IF optimizations will eliminate redundant
-;;; negations.
-(define-source-transform not (x) `(if ,x nil t))
-(define-source-transform null (x) `(if ,x nil t))
-
-;;; ENDP is just NULL with a LIST assertion. The assertion will be
-;;; optimized away when SAFETY optimization is low; hopefully that
-;;; is consistent with ANSI's "should return an error".
-(define-source-transform endp (x) `(null (the list ,x)))
-
 ;;; We turn IDENTITY into PROG1 so that it is obvious that it just
 ;;; returns the first value of its argument. Ditto for VALUES with one
 ;;; arg.
 (define-source-transform identity (x) `(prog1 ,x))
 (define-source-transform values (x) `(prog1 ,x))
-
 
 ;;; CONSTANTLY is pretty much never worth transforming, but it's good to get the type.
 (defoptimizer (constantly derive-type) ((value))
@@ -120,7 +109,6 @@
 ;;; whatever is right for them is right for us. FIFTH..TENTH turn into
 ;;; Nth, which can be expanded into a CAR/CDR later on if policy
 ;;; favors it.
-(define-source-transform first (x) `(car ,x))
 (define-source-transform rest (x) `(cdr ,x))
 (define-source-transform second (x) `(cadr ,x))
 (define-source-transform third (x) `(caddr ,x))
@@ -162,8 +150,6 @@
     `(progn
        (setf (cdr ,n-x) ,y)
        ,n-x)))
-
-(define-source-transform nth (n l) `(car (nthcdr ,n ,l)))
 
 (deftransform last ((list &optional n) (t &optional t))
   (let ((c (constant-lvar-p n)))
@@ -4084,57 +4070,149 @@
        ,@(mapcar (lambda (x) `(values ,x)) (butlast args))
        (values-list ,(car (last args))))))
 
-;;; When &REST argument are at play, we also have extra context and count
-;;; arguments -- convert to %VALUES-LIST-OR-CONTEXT when possible, so that the
-;;; deftransform can decide what to do after everything has been converted.
-(define-source-transform values-list (list)
-  (if (symbolp list)
-      (let* ((var (lexenv-find list vars))
-             (info (when (lambda-var-p var)
-                     (lambda-var-arg-info var))))
-        (if (and info
+;;;; transforming references to &REST argument
+
+;;; We add magical &MORE arguments to all functions with &REST. If ARG names
+;;; the &REST argument, this returns the lambda-vars for the context and
+;;; count.
+(defun possible-rest-arg-context (arg)
+  (when (symbolp arg)
+    (let* ((var (lexenv-find arg vars))
+           (info (when (lambda-var-p var)
+                   (lambda-var-arg-info var))))
+      (when (and info
                  (eq :rest (arg-info-kind info))
                  (consp (arg-info-default info)))
-            (destructuring-bind (context count &optional used) (arg-info-default info)
-              (declare (ignore used))
-              `(%values-list-or-context ,list ,context ,count))
-            (values nil t)))
-      (values nil t)))
+        (values-list (arg-info-default info))))))
 
-(deftransform %values-list-or-context ((list context count) * * :node node)
-  (let* ((use (lvar-use list))
+(defun mark-more-context-used (rest-var)
+  (let ((info (lambda-var-arg-info rest-var)))
+    (aver (eq :rest (arg-info-kind info)))
+    (destructuring-bind (context count &optional used) (arg-info-default info)
+      (unless used
+        (setf (arg-info-default info) (list context count t))))))
+
+(defun mark-more-context-invalid (rest-var)
+  (let ((info (lambda-var-arg-info rest-var)))
+    (aver (eq :rest (arg-info-kind info)))
+    (setf (arg-info-default info) t)))
+
+;;; This determines of we the REF to a &REST variable is headed towards
+;;; parts unknown, or if we can really use the context.
+(defun rest-var-more-context-ok (lvar)
+  (let* ((use (lvar-use lvar))
          (var (when (ref-p use) (ref-leaf use)))
          (home (when (lambda-var-p var) (lambda-var-home var)))
-         (info (when (lambda-var-p var) (lambda-var-arg-info var))))
+         (info (when (lambda-var-p var) (lambda-var-arg-info var)))
+         (restp (when info (eq :rest (arg-info-kind info)))))
     (flet ((ref-good-for-more-context-p (ref)
              (let ((dest (principal-lvar-end (node-lvar ref))))
                (and (combination-p dest)
-                    ;; Uses outside VALUES-LIST will require a &REST list anyways,
-                    ;; to it's no use saving effort here -- plus they might modify
-                    ;; the list destructively.
-                    (eq '%values-list-or-context (lvar-fun-name (combination-fun dest)))
+                    ;; If the destination is to anything but these, we're going to
+                    ;; actually need the rest list -- and since other operations
+                    ;; might modify the list destructively, the using the context
+                    ;; isn't good anywhere else either.
+                    (lvar-fun-is (combination-fun dest)
+                                 '(%rest-values %rest-ref %rest-length
+                                   %rest-null %rest-true))
                     ;; If the home lambda is different and isn't DX, it might
                     ;; escape -- in which case using the more context isn't safe.
                     (let ((clambda (node-home-lambda dest)))
                       (or (eq home clambda)
                           (leaf-dynamic-extent clambda)))))))
-      (let ((context-ok
-              (and info
-                   (consp (arg-info-default info))
-                   (not (lambda-var-specvar var))
-                   (not (lambda-var-sets var))
-                   (every #'ref-good-for-more-context-p (lambda-var-refs var))
-                   (policy node (= 3 rest-conversion)))))
-        (cond (context-ok
-               (destructuring-bind (context count &optional used) (arg-info-default info)
-                 (declare (ignore used))
-                 (setf (arg-info-default info) (list context count t)))
-               `(%more-arg-values context 0 count))
-              (t
-               (when info
-                 (setf (arg-info-default info) t))
-               `(values-list list)))))))
+      (let ((ok (and restp
+                     (consp (arg-info-default info))
+                     (not (lambda-var-specvar var))
+                     (not (lambda-var-sets var))
+                     (every #'ref-good-for-more-context-p (lambda-var-refs var)))))
+        (if ok
+            (mark-more-context-used var)
+            (when restp
+              (mark-more-context-invalid var)))
+        ok))))
 
+;;; VALUES-LIST -> %REST-VALUES
+(define-source-transform values-list (list)
+  (multiple-value-bind (context count) (possible-rest-arg-context list)
+    (if context
+        `(%rest-values ,list ,context ,count)
+        (values nil t))))
+
+;;; NTH -> %REST-REF
+(define-source-transform nth (n list)
+  (multiple-value-bind (context count) (possible-rest-arg-context list)
+    (if context
+        `(%rest-ref ,n ,list ,context ,count)
+        `(car (nthcdr ,n ,list)))))
+
+(define-source-transform elt (seq n)
+  (multiple-value-bind (context count) (possible-rest-arg-context seq)
+    (if context
+        `(%rest-ref ,n ,seq ,context ,count)
+        (values nil t))))
+
+;;; CAR -> %REST-REF
+(defun source-transform-car (list)
+  (multiple-value-bind (context count) (possible-rest-arg-context list)
+    (if context
+        `(%rest-ref 0 ,list ,context ,count)
+        (values nil t))))
+(define-source-transform car (list) (source-transform-car list))
+(define-source-transform first (list) (source-transform-car list))
+
+;;; LENGTH -> %REST-LENGTH
+(defun source-transform-length (list)
+  (multiple-value-bind (context count) (possible-rest-arg-context list)
+    (if context
+        `(%rest-length ,list ,context ,count)
+        (values nil t))))
+(define-source-transform length (list) (source-transform-length list))
+(define-source-transform list-length (list) (source-transform-length list))
+
+;;; ENDP, NULL and NOT -> %REST-NULL
+;;;
+;;; Outside &REST convert into an IF so that IF optimizations will eliminate
+;;; redundant negations.
+(defun source-transform-null (x op)
+  (multiple-value-bind (context count) (possible-rest-arg-context x)
+    (cond (context
+           `(%rest-null ',op ,x ,context ,count))
+          ((eq 'endp op)
+           `(if (the list ,x) nil t))
+          (t
+           `(if ,x nil t)))))
+(define-source-transform not (x) (source-transform-null x 'not))
+(define-source-transform null (x) (source-transform-null x 'null))
+(define-source-transform endp (x) (source-transform-null x 'endp))
+
+(deftransform %rest-values ((list context count))
+  (if (rest-var-more-context-ok list)
+      `(%more-arg-values context 0 count)
+      `(values-list list)))
+
+(deftransform %rest-ref ((n list context count))
+  (cond ((rest-var-more-context-ok list)
+         `(%more-arg context n))
+        ((and (constant-lvar-p n) (zerop (lvar-value n)))
+         `(car list))
+        (t
+         `(nth n list))))
+
+(deftransform %rest-length ((list context count))
+  (if (rest-var-more-context-ok list)
+      'count
+      `(length list)))
+
+(deftransform %rest-null ((op list context count))
+  (aver (constant-lvar-p op))
+  (if (rest-var-more-context-ok list)
+      `(eql 0 count)
+      `(,(lvar-value op) list)))
+
+(deftransform %rest-true ((list context count))
+  (if (rest-var-more-context-ok list)
+      `(not (eql 0 count))
+      `list))
 
 ;;;; transforming FORMAT
 ;;;;

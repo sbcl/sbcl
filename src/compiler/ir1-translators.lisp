@@ -42,7 +42,10 @@ otherwise evaluate ELSE and return its values. ELSE defaults to NIL."
     ;; IR1-CONVERT-MAYBE-PREDICATE requires DEST to be CIF, so the
     ;; order of the following two forms is important
     (setf (lvar-dest pred-lvar) node)
-    (ir1-convert start pred-ctran pred-lvar test)
+    (multiple-value-bind (context count) (possible-rest-arg-context test)
+      (if context
+          (ir1-convert start pred-ctran pred-lvar `(%rest-true ,test ,context ,count))
+          (ir1-convert start pred-ctran pred-lvar test)))
     (link-node-to-previous-ctran node pred-ctran)
 
     (let ((start-block (ctran-block pred-ctran)))

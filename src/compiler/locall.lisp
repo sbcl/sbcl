@@ -681,7 +681,7 @@
                    (call-args `(list ,@more-temps))
                    ;; &REST arguments may be accompanied by extra
                    ;; context and count arguments. We know this by
-                   ;; the ARG-INFO-DEFAULT. Supply NIL and 0 or
+                   ;; the ARG-INFO-DEFAULT. Supply 0 and 0 or
                    ;; don't convert at all depending.
                    (let ((more (arg-info-default info)))
                      (when more
@@ -692,7 +692,7 @@
                              ;; We've already converted to use the more context
                              ;; instead of the rest list.
                              (return-from convert-more-call))))
-                       (call-args nil)
+                       (call-args 0)
                        (call-args 0)
                        (setf (arg-info-default info) t)))
                    (return))
