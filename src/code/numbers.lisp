@@ -348,45 +348,50 @@
   (denominator number))
 
 ;;;; arithmetic operations
+;;;;
+;;;; IMPORTANT NOTE: Accessing &REST arguments with NTH is actually extremely
+;;;; efficient in SBCL, as is taking their LENGTH -- so this code is very
+;;;; clever instead of being charmingly naive. Please check that "obvious"
+;;;; improvements don't actually ruin performance.
+;;;;
+;;;; (Granted that the difference between very clever and charmingly naivve
+;;;; can sometimes be sliced exceedingly thing...)
 
 (macrolet ((define-arith (op init doc)
              #!-sb-doc (declare (ignore doc))
-             `(define-more-fun ,op (&rest numbers)
+             `(defun ,op (&rest numbers)
                 #!+sb-doc
                 ,doc
-                (if (more-p)
-                    (let ((result (more-arg 0)))
-                      ;; to signal TYPE-ERROR when exactly 1 arg of wrong type:
-                      (declare (type number result))
-                      (do-more (arg 1)
-                        (setf result (,op result arg)))
-                      result)
+                (if numbers
+                    (do ((result (nth 0 numbers) (,op result (nth i numbers)))
+                         (i 1 (1+ i)))
+                        ((>= i (length numbers))
+                         result)
+                      (declare (number result)))
                     ,init))))
   (define-arith + 0
     "Return the sum of its arguments. With no args, returns 0.")
   (define-arith * 1
     "Return the product of its arguments. With no args, returns 1."))
 
-(define-more-fun - (number &rest more-numbers)
+(defun - (number &rest more-numbers)
   #!+sb-doc
   "Subtract the second and all subsequent arguments from the first;
   or with one argument, negate the first argument."
-  (if (more-p)
+  (if more-numbers
       (let ((result number))
-        (do-more (arg)
-          (setf result (- result arg)))
-        result)
+        (dotimes (i (length more-numbers) result)
+          (setf result (- result (nth i more-numbers)))))
       (- number)))
 
-(define-more-fun / (number &rest more-numbers)
+(defun / (number &rest more-numbers)
   #!+sb-doc
   "Divide the first argument by each of the following arguments, in turn.
   With one argument, return reciprocal."
-  (if (more-p)
+  (if more-numbers
       (let ((result number))
-        (do-more (arg)
-          (setf result (/ result arg)))
-        result)
+        (dotimes (i (length more-numbers) result)
+          (setf result (/ result (nth i more-numbers)))))
       (/ number)))
 
 (defun 1+ (number)
@@ -805,66 +810,66 @@
 
 ;;;; comparisons
 
-(define-more-fun = (number &rest more-numbers)
+(defun = (number &rest more-numbers)
   #!+sb-doc
   "Return T if all of its arguments are numerically equal, NIL otherwise."
   (declare (number number))
-  (do-more (arg)
-    (unless (= number arg)
-      (return-from = nil)))
-  t)
+  (dotimes (i (length more-numbers) t)
+    (unless (= number (nth i more-numbers))
+      (return nil))))
 
-(define-more-fun /= (number &rest more-numbers)
+(defun /= (number &rest more-numbers)
   #!+sb-doc
   "Return T if no two of its arguments are numerically equal, NIL otherwise."
   (declare (number number))
-  (do-more (arg)
-    (when (= number arg)
-      (return-from /= nil)))
-  (dotimes (start (1- (more-count)))
-    (let ((head (more-arg start)))
-      (do-more (arg (1+ start))
-        (when (= head arg)
-          (return-from /= nil)))))
-  t)
+  (if more-numbers
+      (do ((n number (nth i more-numbers))
+            (i 0 (1+ i)))
+          ((>= i (length more-numbers))
+           t)
+        (do ((j i (1+ j)))
+            ((>= j (length more-numbers)))
+          (when (= n (nth j more-numbers))
+            (return-from /= nil))))
+      t))
 
 (macrolet ((def (op doc)
              #!-sb-doc (declare (ignore doc))
-             `(define-more-fun ,op (number &rest more-numbers)
+             `(defun ,op (number &rest more-numbers)
                 #!+sb-doc ,doc
                 (let ((n number))
                   (declare (number n))
-                  (do-more (arg)
-                    (if (,op n arg)
+                  (dotimes (i (length more-numbers) t)
+                    (let ((arg (nth i more-numbers)))
+                      (if (,op n arg)
                         (setf n arg)
-                        (return-from ,op nil)))
-                  t))))
+                        (return-from ,op nil))))))))
   (def <  "Return T if its arguments are in strictly increasing order, NIL otherwise.")
   (def >  "Return T if its arguments are in strictly decreasing order, NIL otherwise.")
   (def <= "Return T if arguments are in strictly non-decreasing order, NIL otherwise.")
   (def >= "Return T if arguments are in strictly non-increasing order, NIL otherwise."))
 
-(define-more-fun max (number &rest more-numbers)
+(defun max (number &rest more-numbers)
   #!+sb-doc
   "Return the greatest of its arguments; among EQUALP greatest, return
 the first."
   (let ((n number))
     (declare (number n))
-    (do-more (arg)
-      (when (> arg n)
-        (setf n arg)))
-    n))
+    (dotimes (i (length more-numbers) n)
+      (let ((arg (nth i more-numbers)))
+        (when (> arg n)
+          (setf n arg))))))
 
-(define-more-fun min (number &rest more-numbers)
+(defun min (number &rest more-numbers)
   #!+sb-doc
   "Return the least of its arguments; among EQUALP least, return
 the first."
   (let ((n number))
     (declare (number n))
-    (do-more (arg)
-      (when (< arg n)
-        (setf n arg)))
-    n))
+    (dotimes (i (length more-numbers) n)
+      (let ((arg (nth i more-numbers)))
+        (when (< arg n)
+          (setf n arg))))))
 
 (eval-when (:compile-toplevel :execute)
 
@@ -1004,14 +1009,14 @@ the first."
 
 (macrolet ((def (op init doc)
              #!-sb-doc (declare (ignore doc))
-             `(define-more-fun ,op (&rest integers)
+             `(defun ,op (&rest integers)
                 #!+sb-doc ,doc
-                (if (more-p)
-                    (let ((result (more-arg 0)))
-                      (declare (integer result))
-                      (do-more (arg 1)
-                        (setf result (,op result arg)))
-                      result)
+                (if integers
+                    (do ((result (nth 0 integers) (,op result (nth i integers)))
+                         (i 1 (1+ i)))
+                        ((>= i (length integers))
+                         result)
+                      (declare (integer result)))
                     ,init))))
   (def logior 0 "Return the bit-wise or of its arguments. Args must be integers.")
   (def logxor 0 "Return the bit-wise exclusive or of its arguments. Args must be integers.")
@@ -1310,33 +1315,35 @@ the first."
 
 ;;;; GCD and LCM
 
-(define-more-fun gcd (&rest integers)
+(defun gcd (&rest integers)
   #!+sb-doc
   "Return the greatest common divisor of the arguments, which must be
   integers. Gcd with no arguments is defined to be 0."
-  (case (more-count)
+  (case (length integers)
     (0 0)
-    (1 (abs (the integer (more-arg 0))))
+    (1 (abs (the integer (nth 0 integers))))
     (otherwise
-     (let ((gcd (more-arg 0)))
-       (declare (integer gcd))
-       (do-more (arg 1)
-         (setf gcd (gcd gcd (the integer arg))))
-       gcd))))
+     (do ((result (nth 0 integers)
+                  (gcd result (the integer (nth i integers))))
+          (i 1 (1+ i)))
+         ((>= i (length integers))
+          result)
+       (declare (integer result))))))
 
-(define-more-fun lcm (&rest integers)
+(defun lcm (&rest integers)
   #!+sb-doc
   "Return the least common multiple of one or more integers. LCM of no
   arguments is defined to be 1."
-  (case (more-count)
+  (case (length integers)
     (0 1)
-    (1 (abs (the integer (more-arg 0))))
+    (1 (abs (the integer (nth 0 integers))))
     (otherwise
-     (let ((lcm (more-arg 0)))
-       (declare (integer lcm))
-       (do-more (arg 1)
-         (setf lcm (lcm lcm (the integer arg))))
-       lcm))))
+     (do ((result (nth 0 integers)
+                  (lcm result (the integer (nth i integers))))
+          (i 1 (1+ i)))
+         ((>= i (length integers))
+          result)
+       (declare (integer result))))))
 
 (defun two-arg-lcm (n m)
   (declare (integer n m))

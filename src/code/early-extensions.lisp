@@ -1355,33 +1355,6 @@ to :INTERPRET, an interpreter will be used.")
          (make-unportable-float :long-float-negative-zero)
          0.0l0))))
 
-;;; Like DEFUN, but replaces &REST with &MORE while hiding that from the
-;;; lambda-list.
-(defmacro define-more-fun (name lambda-list &body body)
-  (let* ((p (position '&rest lambda-list))
-         (head (subseq lambda-list 0 p))
-         (tail (subseq lambda-list p))
-         (more-context (gensym "MORE-CONTEXT"))
-         (more-count (gensym "MORE-COUNT")))
-    (aver (= 2 (length tail)))
-    `(progn
-       (macrolet ((more-count ()
-                    `(truly-the index ,',more-count))
-                  (more-p ()
-                    `(not (eql 0 ,',more-count)))
-                  (more-arg (n)
-                    `(sb!c:%more-arg ,',more-context ,n))
-                  (do-more ((arg &optional (start 0)) &body body)
-                    (let ((i (gensym "I")))
-                      `(do ((,i (the index ,start) (truly-the index (1+ ,i))))
-                           ((>= ,i (more-count)))
-                         (declare (index ,i))
-                         (let ((,arg (sb!c:%more-arg ,',more-context ,i)))
-                           ,@body)))))
-         (defun ,name (,@head &more ,more-context ,more-count)
-           ,@body))
-       (setf (%simple-fun-arglist #',name) ',lambda-list))))
-
 ;;; Signalling an error when trying to print an error condition is
 ;;; generally a PITA, so whatever the failure encountered when
 ;;; wondering about FILE-POSITION within a condition printer, 'tis
