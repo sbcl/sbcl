@@ -3,6 +3,12 @@
 
 (in-package :sb-bsd-sockets-test)
 
+(defmacro deftest* ((name &key fails-on) form &rest results)
+  `(progn
+     (when (sb-impl::featurep ',fails-on)
+       (pushnew ',name sb-rt::*expected-failures*))
+     (deftest ,name ,form ,@results)))
+
 ;;; a real address
 (deftest make-inet-address
   (equalp (make-inet-address "127.0.0.1")  #(127 0 0 1))

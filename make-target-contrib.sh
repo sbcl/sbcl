@@ -82,6 +82,24 @@ for i in $contribs_to_build; do
     fi | tee output/building-contrib.`basename $i` 
 done
 
+# Otherwise report expected failures:
+HEADER_HAS_BEEN_PRINTED=false
+for dir in contrib/*; do
+  f="$dir/test-passed"
+  if test -f "$f" && grep -i fail "$f" >/dev/null; then
+      if ! $HEADER_HAS_BEEN_PRINTED; then
+          cat <<EOF
+
+Note: Test suite failures which are expected for this combination of
+platform and features have been ignored:
+EOF
+          HEADER_HAS_BEEN_PRINTED=true
+      fi
+      echo "  $dir"
+      (unset IFS; while read line; do echo "    $line"; done <"$f")
+  fi
+done
+
 # Sometimes people used to see the "No tests failed." output from the last
 # DEFTEST in contrib self-tests and think that's all that is. So...
 HEADER_HAS_BEEN_PRINTED=false

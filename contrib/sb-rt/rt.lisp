@@ -248,7 +248,6 @@
                    ~:@(~{~<~%   ~1:;~S~>~
                          ~^, ~}~)."
                     (length new-failures)
-                    new-failures)))
-          ))
+                    new-failures)))))
       (finish-output s)
-      (null pending))))
+      (values (null new-failures) (null pending) pending))))
