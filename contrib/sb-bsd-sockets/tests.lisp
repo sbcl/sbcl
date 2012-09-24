@@ -311,4 +311,57 @@
        (format t "Received ~A bytes from ~A:~A - ~A ~%"
                len address port (subseq buf 0 (min 10 len)))))))
 
-
+#+sb-thread
+(deftest interrupt-io
+    (let (result)
+      (labels
+          ((client (port)
+             (setf result
+                   (let ((s (make-instance 'inet-socket
+                                           :type :stream
+                                           :protocol :tcp)))
+                     (socket-connect s #(127 0 0 1) port)
+                     (let ((stream (socket-make-stream s
+                                                       :input t
+                                                       :output t
+                                                       :buffering :none)))
+                       (handler-case
+                           (prog1
+                               (catch 'stop
+                                 (progn
+                                   (read-char stream)
+                                   (sleep 0.1)
+                                   (sleep 0.1)
+                                   (sleep 0.1)))
+                             (close stream))
+                         (error (c)
+                           c))))))
+           (server ()
+             (let ((s (make-instance 'inet-socket
+                                     :type :stream
+                                     :protocol :tcp)))
+               (setf (sockopt-reuse-address s) t)
+               (socket-bind s (make-inet-address "127.0.0.1") 0)
+               (socket-listen s 5)
+               (multiple-value-bind (* port)
+                   (socket-name s)
+                 (let* ((client (sb-thread:make-thread
+                                 (lambda () (client port))))
+                        (r (socket-accept s))
+                        (stream (socket-make-stream r
+                                                    :input t
+                                                    :output t
+                                                    :buffering :none))
+                        (ok :ok))
+                   (socket-close s)
+                   (sleep 5)
+                   (sb-thread:interrupt-thread client
+                                               (lambda () (throw 'stop ok)))
+                   (sleep 5)
+                   (setf ok :not-ok)
+                   (write-char #\x stream)
+                   (close stream)
+                   (socket-close r))))))
+        (server))
+      result)
+  :ok)
