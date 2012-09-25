@@ -93,19 +93,20 @@
                (*compile-verbose* nil)
                (*compile-print* nil)
                (oops nil))
-          (handler-bind (((satisfies handle-condition-p) #'handle-condition-handler))
-            (clear-stuff)
-            (unless source-paths
-              (find-source-paths form tlf))
-            (let ((*compiler-error-bailout*
-                    (lambda (e)
-                      (setf oops e)
-                      ;; Unwind the compiler frames: users want the know where
-                      ;; the error came from, not how the compiler got there.
-                      (go :error))))
-              (return (%compile form (make-core-object)
-                                :name name
-                                :path `(original-source-start 0 ,tlf)))))
+          (with-world-lock ()
+            (handler-bind (((satisfies handle-condition-p) #'handle-condition-handler))
+              (clear-stuff)
+              (unless source-paths
+                (find-source-paths form tlf))
+              (let ((*compiler-error-bailout*
+                      (lambda (e)
+                        (setf oops e)
+                        ;; Unwind the compiler frames: users want the know where
+                        ;; the error came from, not how the compiler got there.
+                        (go :error))))
+                (return (%compile form (make-core-object)
+                                  :name name
+                                  :path `(original-source-start 0 ,tlf))))))
         :error
           ;; Either signal the error right away, or return a function that
           ;; will signal the corresponding COMPILED-PROGRAM-ERROR. This is so

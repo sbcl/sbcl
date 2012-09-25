@@ -236,17 +236,16 @@ Examples:
                        (*compiler-note-count* 0)
                        (*undefined-warnings* nil)
                        (*in-compilation-unit* t))
-                   (with-world-lock ()
-                     (handler-bind ((parse-unknown-type
-                                     (lambda (c)
-                                       (note-undefined-reference
-                                        (parse-unknown-type-specifier c)
-                                        :type))))
-                       (unwind-protect
-                            (multiple-value-prog1 (funcall fn) (setf succeeded-p t))
-                         (unless succeeded-p
-                           (incf *aborted-compilation-unit-count*))
-                         (summarize-compilation-unit (not succeeded-p))))))))))
+                   (handler-bind ((parse-unknown-type
+                                    (lambda (c)
+                                      (note-undefined-reference
+                                       (parse-unknown-type-specifier c)
+                                       :type))))
+                     (unwind-protect
+                          (multiple-value-prog1 (funcall fn) (setf succeeded-p t))
+                       (unless succeeded-p
+                         (incf *aborted-compilation-unit-count*))
+                       (summarize-compilation-unit (not succeeded-p)))))))))
     (if policy
         (let ((*policy* (process-optimize-decl policy (unless override *policy*)))
               (*policy-restrictions* (unless override *policy-restrictions*)))
@@ -1674,31 +1673,29 @@ Examples:
     (handler-case
         (handler-bind (((satisfies handle-condition-p) #'handle-condition-handler))
           (with-compilation-values
-              (sb!xc:with-compilation-unit ()
+            (sb!xc:with-compilation-unit ()
+              (with-world-lock ()
                 (clear-stuff)
-
                 (sub-sub-compile-file info)
-
                 (unless (zerop (hash-table-count *code-coverage-records*))
                   ;; Dump the code coverage records into the fasl.
                   (fopcompile `(record-code-coverage
                                 ',(namestring *compile-file-pathname*)
                                 ',(let (list)
-                                       (maphash (lambda (k v)
-                                                  (declare (ignore k))
-                                                  (push v list))
-                                                *code-coverage-records*)
-                                       list))
+                                    (maphash (lambda (k v)
+                                               (declare (ignore k))
+                                               (push v list))
+                                             *code-coverage-records*)
+                                    list))
                               nil
                               nil))
-
                 (finish-block-compilation)
                 (let ((object *compile-object*))
                   (etypecase object
                     (fasl-output (fasl-dump-source-info info object))
                     (core-object (fix-core-source-info info object))
                     (null)))
-                nil)))
+                nil))))
       ;; Some errors are sufficiently bewildering that we just fail
       ;; immediately, without trying to recover and compile more of
       ;; the input file.
