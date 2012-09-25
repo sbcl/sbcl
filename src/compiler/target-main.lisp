@@ -95,7 +95,6 @@
                (oops nil))
           (with-world-lock ()
             (handler-bind (((satisfies handle-condition-p) #'handle-condition-handler))
-              (clear-stuff)
               (unless source-paths
                 (find-source-paths form tlf))
               (let ((*compiler-error-bailout*

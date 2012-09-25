@@ -877,15 +877,11 @@
 ;;;
 ;;; FIXME:
 ;;;   * Perhaps this machinery should be #!+SB-SHOW.
-;;;   * Probably the hash tables should either be weak hash tables,
-;;;     or only allocated within a single compilation unit. Otherwise
-;;;     there will be a tendency for them to grow without bound and
-;;;     keep garbage from being collected.
 (macrolet ((def (counter vto vfrom fto ffrom)
              `(progn
                 (declaim (type hash-table ,vto ,vfrom))
-                (defvar ,vto (make-hash-table :test 'eq))
-                (defvar ,vfrom (make-hash-table :test 'eql))
+                (defvar ,vto)
+                (defvar ,vfrom)
                 (declaim (type fixnum ,counter))
                 (defvar ,counter 0)
 
@@ -900,7 +896,7 @@
   (def *continuation-number* *continuation-numbers* *number-continuations*
        cont-num num-cont)
   (def *tn-id* *tn-ids* *id-tns* tn-id id-tn)
-  (def *label-id* *id-labels* *label-ids* label-id id-label))
+  (def *label-id* *label-ids* *id-labels* label-id id-label))
 
 ;;; Print a terse one-line description of LEAF.
 (defun print-leaf (leaf &optional (stream *standard-output*))

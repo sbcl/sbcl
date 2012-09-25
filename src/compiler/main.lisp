@@ -372,12 +372,28 @@ Examples:
 ;;; WARNINGS-P and FAILURE-P are as in CL:COMPILE or CL:COMPILE-FILE.
 ;;; This also wraps up WITH-IR1-NAMESPACE functionality.
 (defmacro with-compilation-values (&body body)
-  `(with-ir1-namespace
-    (let ((*warnings-p* nil)
-          (*failure-p* nil))
-      (values (progn ,@body)
-              *warnings-p*
-              *failure-p*))))
+  `(let ((*continuation-number* 0)
+         (*continuation-numbers* (make-hash-table :test 'eq))
+         (*number-continuations* (make-hash-table :test 'eql))
+         (*tn-id* 0)
+         (*tn-ids* (make-hash-table :test 'eq))
+         (*id-tns* (make-hash-table :test 'eql))
+         (*label-id* 0)
+         (*label-ids* (make-hash-table :test 'eq))
+         (*id-labels* (make-hash-table :test 'eql)))
+       (unwind-protect
+            (with-ir1-namespace
+              (let ((*warnings-p* nil)
+                    (*failure-p* nil))
+                (values (progn ,@body)
+                        *warnings-p*
+                        *failure-p*)))
+         (clrhash *tn-ids*)
+         (clrhash *id-tns*)
+         (clrhash *continuation-numbers*)
+         (clrhash *number-continuations*)
+         (clrhash *label-ids*)
+         (clrhash *id-labels*))))
 
 ;;;; component compilation
 
@@ -734,36 +750,6 @@ Examples:
     (blast *free-vars*)
     (blast *free-funs*)
     (blast *constants*))
-  (values))
-
-;;; Clear global variables used by the compiler.
-;;;
-;;; FIXME: It seems kinda nasty and unmaintainable to have to do this,
-;;; and it adds overhead even when people aren't using the compiler.
-;;; Perhaps we could make these global vars unbound except when
-;;; actually in use, so that this function could go away.
-(defun clear-stuff (&optional (debug-too t))
-
-  (when debug-too
-    (clrhash *continuation-numbers*)
-    (clrhash *number-continuations*)
-    (setq *continuation-number* 0)
-    (clrhash *tn-ids*)
-    (clrhash *id-tns*)
-    (setq *tn-id* 0)
-    (clrhash *label-ids*)
-    (clrhash *id-labels*)
-    (setq *label-id* 0))
-
-  ;; (Note: The CMU CL code used to set CL::*GENSYM-COUNTER* to zero here.
-  ;; Superficially, this seemed harmful -- the user could reasonably be
-  ;; surprised if *GENSYM-COUNTER* turned back to zero when something was
-  ;; compiled. A closer inspection showed that this actually turned out to be
-  ;; harmless in practice, because CLEAR-STUFF was only called from within
-  ;; forms which bound CL::*GENSYM-COUNTER* to zero. However, this means that
-  ;; even though zeroing CL::*GENSYM-COUNTER* here turned out to be harmless in
-  ;; practice, it was also useless in practice. So we don't do it any more.)
-
   (values))
 
 ;;;; trace output
@@ -1233,8 +1219,7 @@ Examples:
             (when (core-object-p *compile-object*)
               (fix-core-source-info *source-info* *compile-object* result))
 
-            (mapc #'clear-ir1-info components-from-dfo)
-            (clear-stuff)))))))
+            (mapc #'clear-ir1-info components-from-dfo)))))))
 
 (defun process-toplevel-cold-fset (name lambda-expression path)
   (unless (producing-fasl-file)
@@ -1566,8 +1551,7 @@ Examples:
           (compile-load-time-value-lambda lambdas)
           (compile-toplevel-lambdas lambdas))
 
-      (mapc #'clear-ir1-info components)
-      (clear-stuff)))
+      (mapc #'clear-ir1-info components)))
   (values))
 
 ;;; Actually compile any stuff that has been queued up for block
@@ -1663,7 +1647,6 @@ Examples:
           (with-compilation-values
             (sb!xc:with-compilation-unit ()
               (with-world-lock ()
-                (clear-stuff)
                 (sub-sub-compile-file info)
                 (unless (zerop (hash-table-count *code-coverage-records*))
                   ;; Dump the code coverage records into the fasl.
