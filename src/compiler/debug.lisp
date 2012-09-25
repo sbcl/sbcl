@@ -1198,7 +1198,6 @@
                (when k
                  (res k)))
              *list-conflicts-table*)
-    (clrhash *list-conflicts-table*)
     (res)))
 
 ;;; Return a list of a the TNs that conflict with TN. Sort of, kind
@@ -1207,24 +1206,26 @@
   (aver (member (tn-kind tn) '(:normal :environment :debug-environment)))
   (let ((confs (tn-global-conflicts tn)))
     (cond (confs
-           (clrhash *list-conflicts-table*)
-           (do ((conf confs (global-conflicts-next-tnwise conf)))
-               ((null conf))
-             (format t "~&#<block ~D kind ~S>~%"
-                     (block-number (ir2-block-block (global-conflicts-block
-                                                     conf)))
-                     (global-conflicts-kind conf))
-             (let ((block (global-conflicts-block conf)))
-               (add-always-live-tns block tn)
-               (if (eq (global-conflicts-kind conf) :live)
-                   (add-all-local-tns block)
-                   (let ((bconf (global-conflicts-conflicts conf))
-                         (ltns (ir2-block-local-tns block)))
-                     (dotimes (i (ir2-block-local-tn-count block))
-                       (when (/= (sbit bconf i) 0)
-                         (setf (gethash (svref ltns i) *list-conflicts-table*)
-                               t)))))))
-           (listify-conflicts-table))
+           (let ((*list-conflicts-table* (make-hash-table :test 'eq)))
+             (unwind-protect
+                  (do ((conf confs (global-conflicts-next-tnwise conf)))
+                      ((null conf)
+                       (listify-conflicts-table))
+                    (format t "~&#<block ~D kind ~S>~%"
+                            (block-number (ir2-block-block (global-conflicts-block
+                                                            conf)))
+                            (global-conflicts-kind conf))
+                    (let ((block (global-conflicts-block conf)))
+                      (add-always-live-tns block tn)
+                      (if (eq (global-conflicts-kind conf) :live)
+                          (add-all-local-tns block)
+                          (let ((bconf (global-conflicts-conflicts conf))
+                                (ltns (ir2-block-local-tns block)))
+                            (dotimes (i (ir2-block-local-tn-count block))
+                              (when (/= (sbit bconf i) 0)
+                                (setf (gethash (svref ltns i) *list-conflicts-table*)
+                                      t)))))))
+               (clrhash *list-conflicts-table*))))
           (t
            (let* ((block (tn-local tn))
                   (ltns (ir2-block-local-tns block))

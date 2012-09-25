@@ -17,7 +17,6 @@
 (declaim (special *constants* *free-vars* *component-being-compiled*
                   *code-vector* *next-location* *result-fixups*
                   *free-funs* *source-paths*
-                  *list-conflicts-table*
                   *continuation-number* *continuation-numbers*
                   *number-continuations* *tn-id* *tn-ids* *id-tns*
                   *label-ids* *label-id* *id-labels*
@@ -744,9 +743,6 @@ Examples:
 ;;; Perhaps we could make these global vars unbound except when
 ;;; actually in use, so that this function could go away.
 (defun clear-stuff (&optional (debug-too t))
-
-  ;; Clear debug counters and tables.
-  (clrhash *list-conflicts-table*)
 
   (when debug-too
     (clrhash *continuation-numbers*)
