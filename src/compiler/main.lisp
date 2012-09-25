@@ -17,7 +17,7 @@
 (declaim (special *constants* *free-vars* *component-being-compiled*
                   *code-vector* *next-location* *result-fixups*
                   *free-funs* *source-paths*
-                  *seen-blocks* *seen-funs* *list-conflicts-table*
+                  *list-conflicts-table*
                   *continuation-number* *continuation-numbers*
                   *number-continuations* *tn-id* *tn-ids* *id-tns*
                   *label-ids* *label-id* *id-labels*
@@ -746,8 +746,6 @@ Examples:
 (defun clear-stuff (&optional (debug-too t))
 
   ;; Clear debug counters and tables.
-  (clrhash *seen-blocks*)
-  (clrhash *seen-funs*)
   (clrhash *list-conflicts-table*)
 
   (when debug-too
