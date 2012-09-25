@@ -745,12 +745,6 @@ Examples:
 ;;; actually in use, so that this function could go away.
 (defun clear-stuff (&optional (debug-too t))
 
-  ;; Clear global tables.
-  (when (boundp '*free-funs*)
-    (clrhash *free-funs*)
-    (clrhash *free-vars*)
-    (clrhash *constants*))
-
   ;; Clear debug counters and tables.
   (clrhash *seen-blocks*)
   (clrhash *seen-funs*)

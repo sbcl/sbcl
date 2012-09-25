@@ -692,10 +692,15 @@
          (*free-funs* (make-hash-table :test 'equal))
          (*constants* (make-hash-table :test 'equal))
          (*source-paths* (make-hash-table :test 'eq)))
-     (handler-bind ((compiler-error #'compiler-error-handler)
-                    (style-warning #'compiler-style-warning-handler)
-                    (warning #'compiler-warning-handler))
-       ,@forms)))
+     (unwind-protect
+          (handler-bind ((compiler-error #'compiler-error-handler)
+                         (style-warning #'compiler-style-warning-handler)
+                         (warning #'compiler-warning-handler))
+            ,@forms)
+       (clrhash *free-funs*)
+       (clrhash *free-vars*)
+       (clrhash *constants*)
+       (clrhash *source-paths*))))
 
 ;;; Look up NAME in the lexical environment namespace designated by
 ;;; SLOT, returning the <value, T>, or <NIL, NIL> if no entry. The
