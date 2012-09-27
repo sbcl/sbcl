@@ -77,7 +77,9 @@ dyndebug_init()
     if (n != DYNDEBUG_NFLAGS)
         fprintf(stderr, "Bug in dyndebug_init\n");
 
+#if defined(LISP_FEATURE_GENCGC)
     gencgc_verbose = dyndebug_config.dyndebug_gencgc_verbose;
+#endif
 
     char *featurelist = getenv("SBCL_DYNDEBUG");
     if (featurelist) {
