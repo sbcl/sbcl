@@ -4,6 +4,8 @@ changes relative to sbcl-1.1.0:
     COMPILE-FILE still do.)
   * bug fix: SB-CLTL2:MACROEXPAND-ALL correctly handles shadowing of symbol-macros
     by lexical bindings.
+  * bug fix: stack allocation was prevented by high DEBUG declaration in several
+    cases.
 
 changes in sbcl-1.1.0 relative to sbcl-1.0.58:
   * enhancement: New variable, sb-ext:*disassemble-annotate* for controlling

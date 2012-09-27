@@ -21,8 +21,17 @@
       sb-ext:*stack-allocate-dynamic-extent* t)
 
 (defmacro defun-with-dx (name arglist &body body)
-  `(defun ,name ,arglist
-     ,@body))
+  (let ((debug-name (sb-int:symbolicate name "-HIGH-DEBUG"))
+        (default-name (sb-int:symbolicate name "-DEFAULT")))
+    `(progn
+       (defun ,debug-name ,arglist
+         (declare (optimize debug))
+         ,@body)
+       (defun ,default-name ,arglist
+        ,@body)
+       (defun ,name (&rest args)
+         (apply #',debug-name args)
+         (apply #',default-name args)))))
 
 (declaim (notinline opaque-identity))
 (defun opaque-identity (x)
@@ -682,7 +691,7 @@
   (bdowning-2005-iv-16))
 
 (declaim (inline my-nconc))
-(defun-with-dx my-nconc (&rest lists)
+(defun my-nconc (&rest lists)
   (declare (dynamic-extent lists))
   (apply #'nconc lists))
 (defun-with-dx my-nconc-caller (a b c)

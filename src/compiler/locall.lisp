@@ -712,7 +712,8 @@
         (convert-hairy-fun-entry ref call (optional-dispatch-main-entry fun)
                                  (append temps more-temps)
                                  (ignores) (call-args)
-                                 more-temps))))
+                                 (when (optional-rest-p fun)
+                                   more-temps)))))
 
   (values))
 
@@ -1028,7 +1029,13 @@
   ;; with anonymous things, and suppressing inlining
   ;; for such things can easily give Python acute indigestion, so
   ;; we don't.)
-  (when (leaf-has-source-name-p clambda)
+  ;;
+  ;; A functional that is already inline-expanded in this componsne definitely
+  ;; deserves let-conversion -- and in case of main entry points for inline
+  ;; expanded optional dispatch, the main-etry isn't explicitly marked :INLINE
+  ;; even if the function really is.
+  (when (and (leaf-has-source-name-p clambda)
+             (not (functional-inline-expanded clambda)))
     ;; ANSI requires that explicit NOTINLINE be respected.
     (or (eq (lambda-inlinep clambda) :notinline)
         ;; If (= LET-CONVERSION 0) we can guess that inlining

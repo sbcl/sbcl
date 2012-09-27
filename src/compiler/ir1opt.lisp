@@ -1304,7 +1304,7 @@
                               '(optimize
                                 (preserve-single-use-debug-variables 0))
                               (lexenv-policy
-                                   (combination-lexenv call)))))
+                               (combination-lexenv call)))))
   (with-ir1-environment-from-node call
     (with-component-last-block (*current-component*
                                 (block-next (node-block call)))
@@ -1715,9 +1715,7 @@
                            leaf var)))
                  t)))))
         ((and (null (rest (leaf-refs var)))
-              ;; Don't substitute single-ref variables on high-debug /
-              ;; low speed, to improve the debugging experience.
-              (policy call (< preserve-single-use-debug-variables 3))
+              (not (preserve-single-use-debug-var-p call var))
               (substitute-single-use-lvar arg var)))
         (t
          (propagate-to-refs var (lvar-type arg))))))

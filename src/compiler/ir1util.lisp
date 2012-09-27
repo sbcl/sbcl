@@ -80,6 +80,15 @@
                    use))))
     (plu lvar)))
 
+(defun principal-lvar-dest (lvar)
+  (labels ((pld (lvar)
+             (declare (type lvar lvar))
+             (let ((dest (lvar-dest lvar)))
+               (if (cast-p dest)
+                   (pld (cast-lvar dest))
+                   dest))))
+    (pld lvar)))
+
 ;;; Update lvar use information so that NODE is no longer a use of its
 ;;; LVAR.
 ;;;
@@ -560,7 +569,7 @@
                        (when (lambda-p clambda1)
                          (dolist (var (lambda-vars clambda1) t)
                            (dolist (var-ref (lambda-var-refs var))
-                             (let ((dest (lvar-dest (ref-lvar var-ref))))
+                             (let ((dest (principal-lvar-dest (ref-lvar var-ref))))
                                (unless (and (combination-p dest) (recurse dest))
                                  (return-from combination-args-flow-cleanly-p nil)))))))))))
     (recurse combination1)))
@@ -2296,3 +2305,21 @@ is :ANY, the function name is not checked."
                (and ok (member name fun-names :test #'eq))))
          (or (not arg-count)
              (= arg-count (length (combination-args use)))))))
+
+;;; True if the optional has a rest-argument.
+(defun optional-rest-p (opt)
+  (dolist (var (optional-dispatch-arglist opt) nil)
+    (let* ((info (when (lambda-var-p var)
+                   (lambda-var-arg-info var)))
+           (kind (when info
+                   (arg-info-kind info))))
+      (when (eq :rest kind)
+        (return t)))))
+
+;;; Don't substitute single-ref variables on high-debug / low speed, to
+;;; improve the debugging experience. ...but don't bother keeping those
+;;; from system lambdas.
+(defun preserve-single-use-debug-var-p (call var)
+  (and (policy call (eql preserve-single-use-debug-variables 3))
+       (or (not (lambda-var-p var))
+           (not (lambda-system-lambda-p (lambda-var-home var))))))

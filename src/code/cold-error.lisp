@@ -145,7 +145,6 @@
   #!+sb-doc
   "Print a message and invoke the debugger without allowing any possibility
 of condition handling occurring."
-  (declare (optimize (sb!c::rest-conversion 0)))
   (let ((*debugger-hook* nil) ; as specifically required by ANSI
         (sb!debug:*stack-top-hint* (or sb!debug:*stack-top-hint* 'break)))
     (apply #'%break 'break datum arguments)))
