@@ -251,6 +251,64 @@ arch_handle_single_step_trap(os_context_t *context, int trap)
     arch_skip_instruction(context);
 }
 
+#ifdef LISP_FEATURE_GENCGC
+void
+arch_handle_allocation_trap(os_context_t *context)
+{
+    unsigned int* pc;
+    unsigned int or_inst;
+    int rs1;
+    int size;
+    int immed;
+    int context_index;
+    boolean were_in_lisp;
+    char* memory;
+
+    pc = (unsigned int*) *os_context_pc_addr(context);
+    or_inst = pc[-1];
+
+    /*
+     * The instruction before this trap instruction had better be an OR
+     * instruction!
+     */
+    if (!(((or_inst >> 30) == 2) && (((or_inst >> 19) & 0x1f) == 2)))
+        lose(stderr, "Whoa!!! Got an allocation trap not preceeded by an OR inst: 0x%08x!\n",
+                or_inst);
+
+    /*
+     * An OR instruction.  RS1 is the register we want to allocate to.
+     * RS2 (or an immediate) is the size.
+     */
+    rs1 = (or_inst >> 14) & 0x1f;
+    immed = (or_inst >> 13) & 1;
+
+    if (immed == 1)
+        size = or_inst & 0x1fff;
+    else {
+        size = or_inst & 0x1f;
+        size = *os_context_register_addr(context, size);
+    }
+
+    if (foreign_function_call_active)
+        lose(stderr, "Whoa! allocation trap and we weren't in lisp!\n");
+    fake_foreign_function_call(context);
+
+    /*
+     * Allocate some memory, store the memory address in rs1.
+     */
+    {
+        struct interrupt_data *data =
+            arch_os_get_current_thread()->interrupt_data;
+        data->allocation_trap_context = context;
+        memory = alloc(size);
+        data->allocation_trap_context = 0;
+    }
+    *os_context_register_addr(context, rs1) = memory;
+
+    undo_fake_foreign_function_call(context);
+}
+#endif
+
 static void sigill_handler(int signal, siginfo_t *siginfo,
                            os_context_t *context)
 {

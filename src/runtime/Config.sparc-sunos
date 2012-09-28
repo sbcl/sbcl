@@ -11,7 +11,7 @@
 
 CC = gcc
 CFLAGS += -DSVR4 -D_REENTRANT
-ASFLAGS = -g -Wall -DSVR4
+ASFLAGS = -g -Wall -DSVR4 -Wa,-xarch=v8plus
 LINKFLAGS += -v
 NM = nm -t x -p 
 
@@ -24,7 +24,11 @@ ifdef LISP_FEATURE_SB_CORE_COMPRESSION
   OS_LIBS += -lz
 endif
 
-GC_SRC = cheneygc.c
+ifdef LISP_FEATURE_GENCGC
+  GC_SRC = gencgc.c
+else
+  GC_SRC = cheneygc.c
+endif
 
 # Nothing to do for after-grovel-headers.
 .PHONY: after-grovel-headers

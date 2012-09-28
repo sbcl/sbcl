@@ -612,6 +612,15 @@
 ;; This fails on threaded PPC because the hash-table implementation
 ;; uses recursive system locks, which cons (see below for test
 ;; (:no-consing :lock), which also fails on threaded PPC).
+;;
+;; -- That may have been the situation in 2010 when the above comment
+;; was written, but AFAICT now, hash tables use WITH-PINNED-OBJECTS,
+;; which conses on PPC and SPARC when GENCGC is enabled.  So neither is
+;; this actually about threading, nor about PPC.  Yet since we are
+;; failing most of this file on SPARC anyway (for some tests even on
+;; cheneygc), I won't bother to mark this particular test as failing.
+;; It would be nice if someone could go through this file and figure it
+;; all out... --DFL
 (with-test (:name (:no-consing :hash-tables) :fails-on '(and :ppc :sb-thread))
   (assert-no-consing (test-hash-table)))
 

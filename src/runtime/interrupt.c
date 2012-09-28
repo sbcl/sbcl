@@ -556,7 +556,7 @@ check_interrupt_context_or_lose(os_context_t *context)
     sigset_t *sigset = os_context_sigmask_addr(context);
     /* On PPC pseudo_atomic_interrupted is cleared when coming out of
      * handle_allocation_trap. */
-#if defined(LISP_FEATURE_GENCGC) && !defined(LISP_FEATURE_PPC)
+#if defined(LISP_FEATURE_GENCGC) && !defined(GENCGC_IS_PRECISE)
     int interrupts_enabled = (SymbolValue(INTERRUPTS_ENABLED,thread) != NIL);
     int gc_inhibit = (SymbolValue(GC_INHIBIT,thread) != NIL);
     int gc_pending = (SymbolValue(GC_PENDING,thread) == T);
@@ -2052,6 +2052,12 @@ handle_trap(os_context_t *context, int trap)
         fake_foreign_function_call(context);
         thread_in_safety_transition(context);
         undo_fake_foreign_function_call(context);
+        arch_skip_instruction(context);
+        break;
+#endif
+#if defined(LISP_FEATURE_SPARC) && defined(LISP_FEATURE_GENCGC)
+    case trap_Allocation:
+        arch_handle_allocation_trap(context);
         arch_skip_instruction(context);
         break;
 #endif

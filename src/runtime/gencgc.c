@@ -447,6 +447,15 @@ write_generation_stats(FILE *file)
 #elif defined(LISP_FEATURE_PPC)
 #define FPU_STATE_SIZE 32
     long long fpu_state[FPU_STATE_SIZE];
+#elif defined(LISP_FEATURE_SPARC)
+    /*
+     * 32 (single-precision) FP registers, and the FP state register.
+     * But Sparc V9 has 32 double-precision registers (equivalent to 64
+     * single-precision, but can't be accessed), so we leave enough room
+     * for that.
+     */
+#define FPU_STATE_SIZE (((32 + 32 + 1) + 1)/2)
+    long long fpu_state[FPU_STATE_SIZE];
 #endif
 
     /* This code uses the FP instructions which may be set up for Lisp
@@ -4211,7 +4220,7 @@ general_alloc_internal(long nbytes, int page_type_flag, struct alloc_region *reg
                 thread_register_gc_trigger();
 #else
                 set_pseudo_atomic_interrupted(thread);
-#ifdef LISP_FEATURE_PPC
+#ifdef GENCGC_IS_PRECISE
                 /* PPC calls alloc() from a trap or from pa_alloc(),
                  * look up the most context if it's from a trap. */
                 {

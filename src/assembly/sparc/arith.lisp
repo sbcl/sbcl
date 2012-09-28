@@ -171,31 +171,12 @@
   (inst srl lo n-fixnum-tag-bits)
   (inst or lo temp)
   (inst sra hi n-fixnum-tag-bits)
-  ;; Allocate a BIGNUM for the result.
-  #+nil
-  (pseudo-atomic (:extra (pad-data-block (1+ bignum-digits-offset)))
-                 (let ((one-word (gen-label)))
-                   (inst or res alloc-tn other-pointer-lowtag)
-                   ;; We start out assuming that we need one word.  Is that correct?
-                   (inst sra temp lo 31)
-                   (inst xorcc temp hi)
-                   (inst b :eq one-word)
-                   (inst li temp (logior (ash 1 n-widetag-bits) bignum-widetag))
-                   ;; Nope, we need two, so allocate the addition space.
-                   (inst add alloc-tn (- (pad-data-block (+ 2 bignum-digits-offset))
-                                         (pad-data-block (1+ bignum-digits-offset))))
-                   (inst li temp (logior (ash 2 n-widetag-bits) bignum-widetag))
-                   (storew hi res (1+ bignum-digits-offset) other-pointer-lowtag)
-                   (emit-label one-word)
-                   (storew temp res 0 other-pointer-lowtag)
-                   (storew lo res bignum-digits-offset other-pointer-lowtag)))
   ;; Always allocate 2 words for the bignum result, even if we only
   ;; need one.  The copying GC will take care of the extra word if it
   ;; isn't needed.
   (with-fixed-allocation
       (res temp bignum-widetag (+ 2 bignum-digits-offset))
     (let ((one-word (gen-label)))
-      (inst or res alloc-tn other-pointer-lowtag)
       ;; We start out assuming that we need one word.  Is that correct?
       (inst sra temp lo 31)
       (inst xorcc temp hi)

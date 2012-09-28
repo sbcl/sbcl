@@ -1136,8 +1136,7 @@ default-value-8
     (let* ((enter (gen-label))
            (loop (gen-label))
            (done (gen-label))
-           (dx-p (node-stack-allocate-p node))
-           (alloc-area-tn (if dx-p csp-tn alloc-tn)))
+           (dx-p (node-stack-allocate-p node)))
       (move context context-arg)
       (move count count-arg)
       ;; Check to see if there are any arguments.
@@ -1147,15 +1146,13 @@ default-value-8
 
       ;; We need to do this atomically.
       (pseudo-atomic ()
-        (when dx-p
-          (align-csp temp))
         ;; Allocate a cons (2 words) for each item.
-        (inst andn result alloc-area-tn lowtag-mask)
-        (inst or result list-pointer-lowtag)
-        (move dst result)
         (inst sll temp count 1)
+        (allocation result temp list-pointer-lowtag
+                    :stack-p dx-p
+                    :temp-tn dst)
         (inst b enter)
-        (inst add alloc-area-tn temp)
+        (move dst result)
 
         ;; Compute the next cons and store it in the current one.
         (emit-label loop)

@@ -22,6 +22,7 @@ extern void arch_init(void);
 
 /* FIXME: It would be good to document these too! */
 extern void arch_skip_instruction(os_context_t*);
+extern void arch_handle_allocation_trap(os_context_t*);
 extern boolean arch_pseudo_atomic_atomic(os_context_t*);
 extern void arch_set_pseudo_atomic_interrupted(os_context_t*);
 extern void arch_clear_pseudo_atomic_interrupted(os_context_t*);

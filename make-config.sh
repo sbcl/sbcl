@@ -622,7 +622,17 @@ elif [ "$sbcl_arch" = "sparc" ]; then
     # FUNCDEF macro for assembler. No harm in running this on sparc-linux
     # as well.
     sh tools-for-build/sparc-funcdef.sh > src/runtime/sparc-funcdef.h
-    printf ' :cheneygc' >> $ltf
+    if [ "$sbcl_os" = "sunos" ]; then
+        printf ' :gencgc' >> $ltf
+    else
+        echo '***'
+        echo '*** You are running SPARC on non-SunOS.  Since GENCGC is'
+        echo '*** untested on this combination, make-config.sh is falling'
+        echo '*** back to CHENEYGC.  Please consider adjusting parms.lisp'
+        echo '*** to build with GENCGC instead.'
+        echo '***'
+        printf ' :cheneygc' >> $ltf
+    fi
     if [ "$sbcl_os" = "sunos" ] || [ "$sbcl_os" = "linux" ]; then
         printf ' :linkage-table' >> $ltf
     fi
