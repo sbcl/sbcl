@@ -189,8 +189,11 @@
                (let ((new-state (layout-invalid (wrapper-of instance))))
                  (unless (neq t new-state)
                    (cerror "Nevermind and recurse." 'bug
-                           :format-control "~@<Problem forcing cache flushes. Please report ~
-                                               to sbcl-devel. Info:~% ~S~:@>"
+                           :format-control "~@<~4IProblem forcing cache flushes. Please report ~
+                                               to sbcl-devel.~
+                                            ~% Owrapper: ~S~
+                                            ~% Wrapper-of: ~S~
+                                            ~% Class-wrapper: ~S~%~:@>"
                            :format-arguments (mapcar (lambda (x)
                                                        (cons x (layout-invalid x)))
                                                      (list owrapper
