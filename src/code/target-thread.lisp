@@ -1368,10 +1368,9 @@ See also: RETURN-FROM-THREAD, ABORT-THREAD."
                        "Argument passed to ~S, ~S, is an improper list."
                        'make-thread arguments)
   #!+sb-thread
-  (tagbody
+  (let ((thread (%make-thread :name name :%ephemeral-p ephemeral)))
      (with-mutex (*make-thread-lock*)
-       (let* ((thread (%make-thread :name name :%ephemeral-p ephemeral))
-              (setup-sem (make-semaphore :name "Thread setup semaphore"))
+       (let* ((setup-sem (make-semaphore :name "Thread setup semaphore"))
               (real-function (coerce function 'function))
               (arguments     (if (listp arguments)
                                  arguments
@@ -1461,15 +1460,11 @@ See also: RETURN-FROM-THREAD, ABORT-THREAD."
          ;; thread.
          (without-interrupts
            (with-pinned-objects (initial-function)
-             (let ((os-thread
-                     (%create-thread
-                      (get-lisp-obj-address initial-function))))
-               (when (zerop os-thread)
-                 (go :cant-spawn))
-               (wait-on-semaphore setup-sem)
-               (return-from make-thread thread))))))
-   :cant-spawn
-     (error "Could not create a new thread.")))
+             (if (zerop
+                  (%create-thread (get-lisp-obj-address initial-function)))
+                 (setf thread nil)
+                 (wait-on-semaphore setup-sem))))))
+     (or thread (error "Could not create a new thread."))))
 
 (defun join-thread (thread &key (default nil defaultp) timeout)
   #!+sb-doc

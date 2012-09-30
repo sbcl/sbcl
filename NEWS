@@ -26,6 +26,8 @@ changes relative to sbcl-1.0.58:
     into a DEFCAS defined place was used as the place.
   * bug fix: FIND and POSITION signaled a type-error when non-bits where looked
     for from bit-vectors.
+  * bug fix: a race condition around thread creation could (in SBCL 1.0.57)
+    lead to internal errors or crashes (lp#1058799).
   * documentation: a section on random number generation has been added to the
     manual. (lp#656839)
 
