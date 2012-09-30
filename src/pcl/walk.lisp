@@ -149,13 +149,25 @@
   ;; FLET and LABELS, so we have no idea what to use for the
   ;; environment. So we just blow it off, 'cause anything real we do
   ;; would be wrong. But we still have to make an entry so we can tell
-  ;; functions from macros.
+  ;; functions from macros -- same for telling variables apart from
+  ;; symbol macros.
   (let ((lexenv (sb!kernel::coerce-to-lexenv env)))
     (sb!c::make-lexenv
      :default lexenv
      :vars (when (eql (caar macros) *key-to-walker-environment*)
-             (copy-tree (remove :lexical-var (fourth (cadar macros))
-                                :key #'cadr)))
+             (copy-tree (mapcar (lambda (b)
+                                  (let ((name (car b))
+                                        (info (cadr b)))
+                                    (if (member info '(:lexical-var :special-var))
+                                        (cons name
+                                              (if (eq :special-var info)
+                                                  (sb!c::make-global-var
+                                                   :kind :special
+                                                   :%source-name name)
+                                                  (sb!c::make-lambda-var
+                                                   :%source-name name)))
+                                        b)))
+                                (fourth (cadar macros)))))
      :funs (append (mapcar (lambda (f)
                              (cons (car f)
                                    (sb!c::make-functional :lexenv lexenv)))
@@ -268,8 +280,11 @@
 (defun note-declaration (declaration env)
   (push declaration (caddr (env-lock env))))
 
-(defun note-lexical-binding (thing env)
-  (push (list thing :lexical-var) (cadddr (env-lock env))))
+(defun note-var-binding (thing env)
+  (push (list thing (if (var-special-p thing env)
+                        :special-var
+                        :lexical-var))
+        (cadddr (env-lock env))))
 
 (defun var-lexical-p (var env)
   (let ((entry (member var (env-lexical-variables env) :key #'car :test #'eq)))
@@ -679,7 +694,7 @@
   (cond ((null arglist) ())
         ((symbolp (setq arg (car arglist)))
          (or (member arg sb!xc:lambda-list-keywords :test #'eq)
-             (note-lexical-binding arg env))
+             (note-var-binding arg env))
          (recons arglist
                  arg
                  (walk-arglist (cdr arglist)
@@ -697,11 +712,11 @@
                                      (cddr arg)))
                         (walk-arglist (cdr arglist) context env nil))
                 (if (symbolp (car arg))
-                    (note-lexical-binding (car arg) env)
-                    (note-lexical-binding (cadar arg) env))
+                    (note-var-binding (car arg) env)
+                    (note-var-binding (cadar arg) env))
                 (or (null (cddr arg))
                     (not (symbolp (caddr arg)))
-                    (note-lexical-binding (caddr arg) env))))
+                    (note-var-binding (caddr arg) env))))
           (t
            (error "can't understand something in the arglist ~S" arglist))))
 
@@ -716,14 +731,18 @@
     (let* ((let/let* (car form))
            (bindings (cadr form))
            (body (cddr form))
-           (walked-bindings
-             (walk-bindings-1 bindings
-                              old-env
-                              new-env
-                              context
-                              sequentialp))
+           (walked-bindings nil)
            (walked-body
-             (walk-declarations body #'walk-repeat-eval new-env)))
+             (walk-declarations body
+                                (lambda (form env)
+                                  (setf walked-bindings
+                                        (walk-bindings-1 bindings
+                                                         old-env
+                                                         new-env
+                                                         context
+                                                         sequentialp))
+                                  (walk-repeat-eval form env))
+                                new-env)))
       (relist*
         form let/let* walked-bindings walked-body))))
 
@@ -784,7 +803,7 @@
          (recons bindings
                  (if (symbolp binding)
                      (prog1 binding
-                            (note-lexical-binding binding new-env))
+                       (note-var-binding binding new-env))
                      (prog1 (relist* binding
                                      (car binding)
                                      (walk-form-internal (cadr binding)
@@ -796,7 +815,7 @@
                                      ;; the next value form. Don't
                                      ;; walk it now, though.
                                      (cddr binding))
-                            (note-lexical-binding (car binding) new-env)))
+                            (note-var-binding (car binding) new-env)))
                  (walk-bindings-1 (cdr bindings)
                                   old-env
                                   new-env

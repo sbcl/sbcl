@@ -694,3 +694,25 @@
                                   'robot
                                   lexenv))))))))
   (emotional-state . happy))
+
+(deftest macroexpand-all.special-binding
+    (let ((form '(macrolet ((v (x &environment env)
+                             (sb-cltl2:variable-information x env)))
+                  (let* ((x :foo)
+                         (y (v x)))
+                    (declare (special x))
+                    (list y (v x))))))
+      (list (eval form)
+            (eval (sb-cltl2:macroexpand-all form))))
+  ((:special :special) (:special :special)))
+
+(deftest macroexpand-all.symbol-macro-shadowed
+    (let ((form '(macrolet ((v (x &environment env)
+                             (macroexpand x env)))
+                  (symbol-macrolet ((x :bad))
+                    (let* ((x :good)
+                           (y (v x)))
+                      y)))))
+      (list (eval form)
+            (eval (sb-cltl2:macroexpand-all form))))
+  (:good :good))
