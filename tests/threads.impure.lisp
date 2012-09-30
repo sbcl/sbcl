@@ -86,7 +86,7 @@
 
 (with-test (:name (:interrupt-thread :deferrables-unblocked-by-lock))
   (let ((lock (sb-thread::make-mutex))
-        (thread (make-kill-thread (lambda ()
+        (thread (make-join-thread (lambda ()
                                     (loop (sleep 1))))))
     (sb-thread::grab-mutex lock)
     (sb-thread:interrupt-thread thread
@@ -95,7 +95,7 @@
                                   (sb-thread::grab-mutex lock)
                                   (check-deferrables-unblocked-or-lose 0)
                                   (sb-thread:abort-thread)))
-    (sleep 1)
+    (sleep 3)
     (sb-thread::release-mutex lock)))
 
 ;;; compare-and-swap
