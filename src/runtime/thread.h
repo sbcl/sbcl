@@ -69,7 +69,9 @@ extern struct threads_suspend_info suspend_info;
 
 struct gcing_safety {
     lispobj csp_around_foreign_call;
+#ifdef LISP_FEATURE_C_STACK_IS_CONTROL_STACK
     lispobj* pc_around_foreign_call;
+#endif
 };
 
 int handle_safepoint_violation(os_context_t *context, os_vm_address_t addr);
@@ -253,10 +255,15 @@ StaticSymbolFunction(lispobj sym)
 extern __thread struct thread *current_thread;
 #endif
 
-#ifdef LISP_FEATURE_SB_SAFEPOINT
-# define THREAD_CSP_PAGE_SIZE BACKEND_PAGE_BYTES
-#else
+#ifndef LISP_FEATURE_SB_SAFEPOINT
 # define THREAD_CSP_PAGE_SIZE 0
+#elif defined(LISP_FEATURE_PPC)
+  /* BACKEND_PAGE_BYTES is nice and large on this platform, but therefore
+   * does not fit into an immediate, making it awkward to access the page
+   * relative to the thread-tn... */
+# define THREAD_CSP_PAGE_SIZE 4096
+#else
+# define THREAD_CSP_PAGE_SIZE BACKEND_PAGE_BYTES
 #endif
 
 #ifdef LISP_FEATURE_WIN32
@@ -365,11 +372,15 @@ void push_gcing_safety(struct gcing_safety *into)
          *th->csp_around_foreign_call)) {
         *th->csp_around_foreign_call = 0;
         asm volatile ("");
+#ifdef LISP_FEATURE_C_STACK_IS_CONTROL_STACK
         into->pc_around_foreign_call = th->pc_around_foreign_call;
         th->pc_around_foreign_call = 0;
         asm volatile ("");
+#endif
     } else {
+#ifdef LISP_FEATURE_C_STACK_IS_CONTROL_STACK
         into->pc_around_foreign_call = 0;
+#endif
     }
 }
 
@@ -381,8 +392,10 @@ void pop_gcing_safety(struct gcing_safety *from)
         asm volatile ("");
         *th->csp_around_foreign_call = from->csp_around_foreign_call;
         asm volatile ("");
+#ifdef LISP_FEATURE_C_STACK_IS_CONTROL_STACK
         th->pc_around_foreign_call = from->pc_around_foreign_call;
         asm volatile ("");
+#endif
     }
 }
 

@@ -353,7 +353,13 @@
      #+debug
      (progn
        (inst andi. ,flag-tn alloc-tn lowtag-mask)
-       (inst twi :ne ,flag-tn 0))))
+       (inst twi :ne ,flag-tn 0))
+     #!+sb-safepoint
+     (emit-safepoint)))
+
+#!+sb-safepoint
+(defun emit-safepoint ()
+  (inst lwz zero-tn null-tn (- (+ 4096 4 other-pointer-lowtag))))
 
 (def!macro with-pinned-objects ((&rest objects) &body body)
   "Arrange with the garbage collector that the pages occupied by

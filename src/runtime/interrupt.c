@@ -916,39 +916,12 @@ interrupt_handle_pending(os_context_t *context)
         /* handles the STOP_FOR_GC_PENDING case, plus THRUPTIONS */
         if (SymbolValue(STOP_FOR_GC_PENDING,thread) != NIL
 # ifdef LISP_FEATURE_SB_THRUPTION
-            || SymbolValue(THRUPTION_PENDING,thread) != NIL
+             || (SymbolValue(THRUPTION_PENDING,thread) != NIL
+                 && SymbolValue(INTERRUPTS_ENABLED, thread) != NIL)
 # endif
             )
-        {
             /* We ought to take this chance to do a pitstop now. */
-
-            /* Now, it goes without saying that the context sigmask
-             * tweaking around this call is not pretty.  However, it
-             * currently seems to be "needed" for the following
-             * situation.  (So let's find a better solution and remove
-             * this comment afterwards.)
-             *
-             * Suppose we are in a signal handler (let's say SIGALRM).
-             * At the end of a WITHOUT-INTERRUPTS, the lisp code notices
-             * that a thruption is pending, and says to itself "let's
-             * receive pending interrupts then".  We trust that the
-             * caller is happy to run those sorts of things now,
-             * including thruptions, otherwise it wouldn't have called
-             * us.  But that's the problem: Even though we can guess the
-             * caller's intention, may_thrupt() would see that signals
-             * are blocked in the signal context (because that context
-             * itself points to a signal handler).  So we cheat and
-             * pretend that signals weren't blocked.
-             * --DFL */
-#ifndef LISP_FEATURE_WIN32
-            sigset_t old, *ctxset = os_context_sigmask_addr(context);
-            unblock_signals(&deferrable_sigset, ctxset, &old);
-#endif
             thread_in_lisp_raised(context);
-#ifndef LISP_FEATURE_WIN32
-            sigcopyset(&old, ctxset);
-#endif
-        }
 #elif defined(LISP_FEATURE_SB_THREAD)
         if (SymbolValue(STOP_FOR_GC_PENDING,thread) != NIL) {
             /* STOP_FOR_GC_PENDING and GC_PENDING are cleared by
@@ -2065,7 +2038,7 @@ handle_trap(os_context_t *context, int trap)
         arch_handle_single_step_trap(context, trap);
         break;
 #endif
-#ifdef LISP_FEATURE_SB_SAFEPOINT
+#ifdef trap_GlobalSafepoint
     case trap_GlobalSafepoint:
         fake_foreign_function_call(context);
         thread_in_lisp_raised(context);

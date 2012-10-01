@@ -188,6 +188,22 @@
                  (signal int)
                  ;; Then enter the debugger like BREAK.
                  (%break 'sigint int))))))
+    #!+sb-safepoint
+    (let ((target (sb!thread::foreground-thread)))
+      ;; Note that INTERRUPT-THREAD on *CURRENT-THREAD* doesn't actually
+      ;; interrupt right away, because deferrables are blocked.  Rather,
+      ;; the kernel would arrange for the SIGPIPE to hit when the SIGINT
+      ;; handler is done.  However, on safepoint builds, we don't use
+      ;; SIGPIPE and lack an appropriate mechanism to handle pending
+      ;; thruptions upon exit from signal handlers (and this situation is
+      ;; unlike WITHOUT-INTERRUPTS, which handles pending interrupts
+      ;; explicitly at the end).  Only as long as safepoint builds pretend
+      ;; to cooperate with signals -- that is, as long as SIGINT-HANDLER
+      ;; is used at all -- detect this situation and work around it.
+      (if (eq target sb!thread:*current-thread*)
+          (interrupt-it)
+          (sb!thread:interrupt-thread target #'interrupt-it)))
+    #!-sb-safepoint
     (sb!thread:interrupt-thread (sb!thread::foreground-thread)
                                 #'interrupt-it)))
 

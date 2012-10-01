@@ -158,7 +158,8 @@ lispobj *gc_search_space(lispobj *start, size_t words, lispobj *pointer);
 extern int looks_like_valid_lisp_pointer_p(lispobj pointer, lispobj *start_addr);
 
 extern void scavenge_control_stack(struct thread *th);
-extern void scrub_control_stack();
+extern void scrub_control_stack(void);
+extern void scrub_thread_control_stack(struct thread *);
 
 #include "fixnump.h"
 

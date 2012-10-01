@@ -187,6 +187,7 @@ gc_state_wait(gc_phase_t phase)
 static void
 set_csp_from_context(struct thread *self, os_context_t *ctx)
 {
+#ifdef LISP_FEATURE_C_STACK_IS_CONTROL_STACK
     void **sp = (void **) *os_context_register_addr(ctx, reg_SP);
     /* On POSIX platforms, it is sufficient to investigate only the part
      * of the stack that was live before the interrupt, because in
@@ -202,6 +203,12 @@ set_csp_from_context(struct thread *self, os_context_t *ctx)
     gc_assert((void **)self->control_stack_start
               <= sp && sp
               < (void **)self->control_stack_end);
+#else
+    /* Note that the exact value doesn't matter much here, since
+     * platforms with precise GC use get_csp() only as a boolean -- the
+     * precise GC already keeps track of the stack pointer itself. */
+    void **sp = (void **) 0xEEEEEEEE;
+#endif
     *self->csp_around_foreign_call = (lispobj) sp;
 }
 
@@ -476,6 +483,15 @@ check_pending_thruptions(os_context_t *ctx)
         return 0;
     SetSymbolValue(THRUPTION_PENDING, NIL, p);
 
+#ifndef LISP_FEATURE_C_STACK_IS_CONTROL_STACK
+    int was_in_lisp = !foreign_function_call_active_p(p);
+    if (was_in_lisp) {
+        if (!ctx)
+            lose("self-kill bug");
+        fake_foreign_function_call(ctx);
+    }
+#endif
+
 #ifdef LISP_FEATURE_WIN32
     oldset = pself->blocked_signal_set;
     pself->blocked_signal_set = deferrable_sigset;
@@ -494,6 +510,12 @@ check_pending_thruptions(os_context_t *ctx)
 #else
     pthread_sigmask(SIG_SETMASK, &oldset, 0);
 #endif
+
+#ifndef LISP_FEATURE_C_STACK_IS_CONTROL_STACK
+    if (was_in_lisp)
+        undo_fake_foreign_function_call(ctx);
+#endif
+
     return 1;
 }
 #endif
@@ -868,12 +890,19 @@ thruption_handler(int signal, siginfo_t *info, os_context_t *ctx)
          * next safepoint will take care of it. */
         return;
 
+#ifndef LISP_FEATURE_C_STACK_IS_CONTROL_STACK
+    if (!foreign_function_call_active_p(self))
+        lose("csp && !ffca");
+#endif
+
     /* In C code.  As a rule, we assume that running thruptions is OK. */
     *self->csp_around_foreign_call = 0;
     thread_in_lisp_raised(ctx);
     *self->csp_around_foreign_call = transition_sp;
 }
 # endif
+
+#ifdef LISP_FEATURE_C_STACK_IS_CONTROL_STACK
 
 /* Designed to be of the same type as call_into_lisp.  Ignores its
  * arguments. */
@@ -897,6 +926,8 @@ handle_csp_safepoint_violation(lispobj fun, lispobj *args, int nargs)
     return 0;
 }
 
+#endif /* C_STACK_IS_CONTROL_STACK */
+
 int
 handle_safepoint_violation(os_context_t *ctx, os_vm_address_t fault_address)
 {
@@ -908,13 +939,25 @@ handle_safepoint_violation(os_context_t *ctx, os_vm_address_t fault_address)
     struct thread *self = arch_os_get_current_thread();
 
     if (fault_address == (os_vm_address_t) GC_SAFEPOINT_PAGE_ADDR) {
+#ifdef LISP_FEATURE_C_STACK_IS_CONTROL_STACK
         /* We're on the altstack and don't want to run Lisp code. */
         arrange_return_to_c_function(ctx, handle_global_safepoint_violation, 0);
+#else
+        if (foreign_function_call_active_p(self)) lose("GSP trap in C?");
+        fake_foreign_function_call(ctx);
+        thread_in_lisp_raised(ctx);
+        undo_fake_foreign_function_call(ctx);
+#endif
         return 1;
     }
 
     if (fault_address == (os_vm_address_t) self->csp_around_foreign_call) {
+#ifdef LISP_FEATURE_C_STACK_IS_CONTROL_STACK
         arrange_return_to_c_function(ctx, handle_csp_safepoint_violation, 0);
+#else
+        if (!foreign_function_call_active_p(self)) lose("CSP trap in Lisp?");
+        thread_in_safety_transition(ctx);
+#endif
         return 1;
     }
 
@@ -924,7 +967,17 @@ handle_safepoint_violation(os_context_t *ctx, os_vm_address_t fault_address)
 #endif /* LISP_FEATURE_WIN32 */
 
 void
-callback_wrapper_trampoline(lispobj arg0, lispobj arg1, lispobj arg2)
+callback_wrapper_trampoline(
+#if !(defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64))
+    /* On the x86oid backends, the assembly wrapper happens to not pass
+     * in ENTER_ALIEN_CALLBACK explicitly for safepoints.  However, the
+     * platforms with precise GC are tricky enough already, and I want
+     * to minimize the read-time conditionals.  For those platforms, I'm
+     * only replacing funcall3 with callback_wrapper_trampoline while
+     * keeping the arguments unchanged. --DFL */
+    lispobj __attribute__((__unused__)) fun,
+#endif
+    lispobj arg0, lispobj arg1, lispobj arg2)
 {
     struct thread* th = arch_os_get_current_thread();
     if (!th)
