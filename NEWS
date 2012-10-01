@@ -1,5 +1,5 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
-changes relative to sbcl-1.0.58:
+changes in sbcl-1.1.0 relative to sbcl-1.0.58:
   * enhancement: New variable, sb-ext:*disassemble-annotate* for controlling
     source annotation of DISASSEMBLE output. Defaults to T.
   * enhancement: TIMEOUT arguments added to WITH-MUTEX and WITH-RECURSIVE-LOCK, and
