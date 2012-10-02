@@ -62,3 +62,12 @@
   ;; names and offsets for registers used to pass arguments
   (defregset *register-arg-offsets*  r0 r1 r2 r3)
   (defparameter *register-arg-names* '(r0 r1 r2 r3)))
+
+
+;;;; SB and SC definition:
+
+(define-storage-base registers :finite :size 16)
+(define-storage-base control-stack :unbounded :size 8)
+(define-storage-base non-descriptor-stack :unbounded :size 0)
+(define-storage-base constant :non-packed)
+(define-storage-base immediate-constant :non-packed)
