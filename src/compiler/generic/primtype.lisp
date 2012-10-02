@@ -85,15 +85,15 @@
 (!def-primitive-type ratio (descriptor-reg))
 (!def-primitive-type complex (descriptor-reg))
 (/show0 "about to !DEF-PRIMITIVE-TYPE SINGLE-FLOAT")
-(!def-primitive-type single-float (single-reg descriptor-reg))
+(!def-primitive-type single-float (#!-arm single-reg descriptor-reg))
 (/show0 "about to !DEF-PRIMITIVE-TYPE DOUBLE-FLOAT")
-(!def-primitive-type double-float (double-reg descriptor-reg))
+(!def-primitive-type double-float (#!-arm double-reg descriptor-reg))
 
 (/show0 "about to !DEF-PRIMITIVE-TYPE COMPLEX-SINGLE-FLOAT")
-(!def-primitive-type complex-single-float (complex-single-reg descriptor-reg)
+(!def-primitive-type complex-single-float (#!-arm complex-single-reg descriptor-reg)
   :type (complex single-float))
 (/show0 "about to !DEF-PRIMITIVE-TYPE COMPLEX-DOUBLE-FLOAT")
-(!def-primitive-type complex-double-float (complex-double-reg descriptor-reg)
+(!def-primitive-type complex-double-float (#!-arm complex-double-reg descriptor-reg)
   :type (complex double-float))
 #!+sb-simd-pack
 (progn
