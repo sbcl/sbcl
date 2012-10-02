@@ -25,6 +25,31 @@
 (def!constant n-byte-bits 8)
 
 
+;;;; Where to put the different spaces.
+
+;;; On non-gencgc we need large dynamic and static spaces for PURIFY
+#!-gencgc
+(progn
+  (def!constant read-only-space-start #x04000000)
+  (def!constant read-only-space-end   #x07ff8000)
+  (def!constant static-space-start    #x08000000)
+  (def!constant static-space-end      #x097fff00)
+
+  (def!constant linkage-table-space-start #x0a000000)
+  (def!constant linkage-table-space-end   #x0b000000))
+
+(def!constant linkage-table-entry-size 16)
+
+#!+linux
+(progn
+  #!-gencgc
+  (progn
+    (def!constant dynamic-0-space-start #x4f000000)
+    (def!constant dynamic-0-space-end   #x66fff000)
+    (def!constant dynamic-1-space-start #x67000000)
+    (def!constant dynamic-1-space-end   #x7efff000)))
+
+
 ;;;; Assembler parameters:
 
 ;;; The number of bits per element in the assemblers code vector.
