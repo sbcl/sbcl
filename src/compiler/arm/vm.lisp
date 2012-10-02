@@ -71,3 +71,110 @@
 (define-storage-base non-descriptor-stack :unbounded :size 0)
 (define-storage-base constant :non-packed)
 (define-storage-base immediate-constant :non-packed)
+
+;;;
+;;; Handy macro so we don't have to keep changing all the numbers whenever
+;;; we insert a new storage class.
+;;;
+(defmacro define-storage-classes (&rest classes)
+  (do ((forms (list 'progn)
+              (let* ((class (car classes))
+                     (sc-name (car class))
+                     (constant-name (intern (concatenate 'simple-string
+                                                         (string sc-name)
+                                                         "-SC-NUMBER"))))
+                (list* `(define-storage-class ,sc-name ,index
+                          ,@(cdr class))
+                       `(def!constant ,constant-name ,index)
+                       forms)))
+       (index 0 (1+ index))
+       (classes classes (cdr classes)))
+      ((null classes)
+       (nreverse forms))))
+
+(def!constant kludge-nondeterministic-catch-block-size 6)
+
+(define-storage-classes
+
+  ;; Non-immediate contstants in the constant pool
+  (constant constant)
+
+  ;; NULL is in a register.
+  (null immediate-constant)
+
+  ;; Anything else that can be an immediate.
+  (immediate immediate-constant)
+
+
+  ;; **** The stacks.
+
+  ;; The control stack.  (Scanned by GC)
+  (control-stack control-stack)
+
+  ;; We put ANY-REG and DESCRIPTOR-REG early so that their SC-NUMBER
+  ;; is small and therefore the error trap information is smaller.
+  ;; Moving them up here from their previous place down below saves
+  ;; ~250K in core file size.  --njf, 2006-01-27
+
+  ;; Immediate descriptor objects.  Don't have to be seen by GC, but nothing
+  ;; bad will happen if they are.  (fixnums, characters, header values, etc).
+  (any-reg
+   registers
+   :locations #.(append non-descriptor-regs descriptor-regs)
+   :constant-scs (immediate)
+   :save-p t
+   :alternate-scs (control-stack))
+
+  ;; Pointer descriptor objects.  Must be seen by GC.
+  (descriptor-reg registers
+   :locations #.descriptor-regs
+   :constant-scs (constant null immediate)
+   :save-p t
+   :alternate-scs (control-stack))
+
+  ;; The non-descriptor stacks.
+  (signed-stack non-descriptor-stack) ; (signed-byte 32)
+  (unsigned-stack non-descriptor-stack) ; (unsigned-byte 32)
+  (character-stack non-descriptor-stack) ; non-descriptor characters.
+  (sap-stack non-descriptor-stack) ; System area pointers.
+
+
+  ;; **** Things that can go in the integer registers.
+
+  ;; Non-Descriptor characters
+  (character-reg registers
+   :locations #.non-descriptor-regs
+   :constant-scs (immediate)
+   :save-p t
+   :alternate-scs (character-stack))
+
+  ;; Non-Descriptor SAP's (arbitrary pointers into address space)
+  (sap-reg registers
+   :locations #.non-descriptor-regs
+   :constant-scs (immediate)
+   :save-p t
+   :alternate-scs (sap-stack))
+
+  ;; Non-Descriptor (signed or unsigned) numbers.
+  (signed-reg registers
+   :locations #.non-descriptor-regs
+   :constant-scs (immediate)
+   :save-p t
+   :alternate-scs (signed-stack))
+  (unsigned-reg registers
+   :locations #.non-descriptor-regs
+   :constant-scs (immediate)
+   :save-p t
+   :alternate-scs (unsigned-stack))
+
+  ;; Random objects that must not be seen by GC.  Used only as temporaries.
+  (non-descriptor-reg registers
+   :locations #.non-descriptor-regs)
+
+  ;; Pointers to the interior of objects.  Used only as a temporary.
+  (interior-reg registers
+   :locations (#.lip-offset))
+
+  ;; A catch or unwind block.
+  (catch-block control-stack
+               :element-size kludge-nondeterministic-catch-block-size))
