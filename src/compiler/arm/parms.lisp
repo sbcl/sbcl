@@ -13,4 +13,20 @@
 
 (in-package "SB!VM")
 
-;;; Dummy placeholder file.
+;;; number of bits per word where a word holds one lisp descriptor
+(def!constant n-word-bits 32)
+
+;;; the natural width of a machine word (as seen in e.g. register width,
+;;; address space)
+(def!constant n-machine-word-bits 32)
+
+;;; number of bits per byte where a byte is the smallest addressable
+;;; object
+(def!constant n-byte-bits 8)
+
+
+;;;; Assembler parameters:
+
+;;; The number of bits per element in the assemblers code vector.
+;;;
+(defparameter *assembly-unit-length* 8)
