@@ -63,6 +63,11 @@ ldso_stub__~A: ;                                \\
 #endif
 #include \"sbcl.h\""
 
+#!+arm "
+/* KLUDGE: This is a dummy placeholder to get us through make-host-1.
+ * It needs to be replaced once we're at the point of trying to get
+ * make-target-1 to complete.  -- AJB, 2012-10-01 */"
+
 #!+sparc "
 #ifdef LISP_FEATURE_SPARC
 #include \"sparc-funcdef.h\"
