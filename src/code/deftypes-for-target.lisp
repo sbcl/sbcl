@@ -182,6 +182,7 @@
 (sb!xc:deftype callable () '(or function symbol))
 
 ;;; decomposing floats into integers
+#!-arm (progn
 (sb!xc:deftype single-float-exponent ()
   `(integer ,(- sb!vm:single-float-normal-exponent-min
                 sb!vm:single-float-bias
@@ -210,5 +211,6 @@
   `(integer 0 (,(ash 1 sb!vm:single-float-digits))))
 (sb!xc:deftype double-float-significand ()
   `(integer 0 (,(ash 1 sb!vm:double-float-digits))))
+) ;; End of #!-arm PROGN
 
 (/show0 "deftypes-for-target.lisp end of file")
