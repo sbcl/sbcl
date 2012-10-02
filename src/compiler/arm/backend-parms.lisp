@@ -1,3 +1,3 @@
 (in-package "SB!VM")
 
-;;; Dummy placeholder file.
+(def!constant +backend-fasl-file-implementation+ :arm)
