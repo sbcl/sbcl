@@ -50,6 +50,26 @@
     (def!constant dynamic-1-space-end   #x7efff000)))
 
 
+;;;; Static symbols.
+
+
+;;; These symbols are loaded into static space directly after NIL so
+;;; that the system can compute their address by adding a constant
+;;; amount to NIL.
+;;;
+;;; The fdefn objects for the static functions are loaded into static
+;;; space directly after the static symbols.  That way, the raw-addr
+;;; can be loaded directly out of them by indirecting relative to NIL.
+;;;
+(defparameter *static-symbols*
+  (append
+   *common-static-symbols*
+   *c-callable-static-symbols*))
+
+(defparameter *static-funs*
+  '())
+
+
 ;;;; Assembler parameters:
 
 ;;; The number of bits per element in the assemblers code vector.
