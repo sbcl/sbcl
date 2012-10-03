@@ -34,7 +34,7 @@
   (defreg r2 2)
   (defreg r3 3)
   (defreg r4 4)
-  (defreg r5 5)
+  (defreg code 5)
   (defreg lip 6)
   (defreg r7 7)
   (defreg r8 8)
@@ -47,10 +47,10 @@
   (defreg pc 15) ;; Yes, the program counter.
 
   (defregset system-regs
-      lip null fp sp lr pc)
+      lip null fp sp lr pc code)
 
   (defregset descriptor-regs
-      r0 r1 r2 r3 r4 r5)
+      r0 r1 r2 r3 r4)
 
   (defregset non-descriptor-regs
       r7 r8 r9 r12)
