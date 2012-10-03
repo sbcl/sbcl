@@ -6,6 +6,8 @@ changes relative to sbcl-1.1.0:
     by lexical bindings.
   * bug fix: stack allocation was prevented by high DEBUG declaration in several
     cases.
+  * bug fix: SB-EXT:GC-LOGFILE signaled an error when no logfile was set. (thanks
+    to SANO Masatoshi)
 
 changes in sbcl-1.1.0 relative to sbcl-1.0.58:
   * enhancement: New variable, sb-ext:*disassemble-annotate* for controlling

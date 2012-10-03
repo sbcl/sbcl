@@ -164,16 +164,17 @@ run in any thread.")
           (old %gc-logfile))
       (setf %gc-logfile new)
       (when old
-        (sb!alien:free-alien old))))
+        (sb!alien:free-alien old))
+      pathname))
   (defun gc-logfile ()
     #!+sb-doc
     "Return the pathname used to log garbage collections. Can be SETF.
 Default is NIL, meaning collections are not logged. If non-null, the
 designated file is opened before and after each collection, and generation
 statistics are appended to it."
-    (let ((val %gc-logfile))
+    (let ((val (cast %gc-logfile c-string)))
       (when val
-        (native-pathname (cast val c-string)))))
+        (native-pathname val))))
   (declaim (inline dynamic-space-size))
   (defun dynamic-space-size ()
     "Size of the dynamic space in bytes."
