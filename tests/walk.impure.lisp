@@ -36,8 +36,12 @@
                    (char= c #\newline)))
              s))
 (defun string=-modulo-tabspace (x y)
-  (string= (string-modulo-tabspace x)
-           (string-modulo-tabspace y)))
+  (if (string= (string-modulo-tabspace x)
+               (string-modulo-tabspace y))
+      t
+      (progn
+        (print (list :want y :got x))
+        nil)))
 
 ;;;; tests based on stuff at the end of the original CMU CL
 ;;;; pcl/walk.lisp file
@@ -344,7 +348,7 @@ Form: (TAGBODY)   Context: EVAL
         C)   Context: EVAL
 Form: (FOO A)   Context: EVAL
 Form: 'GLOBAL-FOO   Context: EVAL
-Form: B   Context: EVAL; lexically bound
+Form: B   Context: EVAL; lexically bound; declared special
 Form: C   Context: EVAL; lexically bound
 (LET (A B C)
   (DECLARE (SPECIAL A B))
@@ -471,7 +475,7 @@ Form: B   Context: EVAL; lexically bound
 Form: (FOO A B)   Context: EVAL
 Form: 'GLOBAL-FOO   Context: EVAL
 Form: (LIST A B)   Context: EVAL
-Form: A   Context: EVAL; lexically bound
+Form: A   Context: EVAL; lexically bound; declared special
 Form: B   Context: EVAL; lexically bound
 (MULTIPLE-VALUE-BIND (A B) (FOO A B) (DECLARE (SPECIAL A)) (LIST A B))"))
 
@@ -580,30 +584,34 @@ Form: A   Context: EVAL
 Form: B   Context: EVAL
 Form: (LIST A B C)   Context: EVAL
 Form: A   Context: EVAL; lexically bound; declared special
-Form: B   Context: EVAL; lexically bound
+Form: B   Context: EVAL; lexically bound; declared special
 Form: C   Context: EVAL; lexically bound
 (LET ((A A) (B A) (C B))
   (DECLARE (SPECIAL A B))
   (LIST A B C))"))
 
-(assert (string=-modulo-tabspace
+;;;; Bug in LET* walking!
+(test-util:with-test (:name (:walk-let* :hairy-specials)
+                      :fails-on :sbcl)
+  (assert
+   (string=-modulo-tabspace
          (with-output-to-string (*standard-output*)
            (take-it-out-for-a-test-walk (let* ((a a) (b a) (c b))
                                           (declare (special a b))
                                           (list a b c))))
          "Form: (LET* ((A A) (B A) (C B))
-        (DECLARE (SPECIAL A B))
-        (LIST A B C))   Context: EVAL
-Form: A   Context: EVAL
-Form: A   Context: EVAL; lexically bound
-Form: B   Context: EVAL; lexically bound
-Form: (LIST A B C)   Context: EVAL
-Form: A   Context: EVAL; lexically bound; declared special
-Form: B   Context: EVAL; lexically bound
-Form: C   Context: EVAL; lexically bound
-(LET* ((A A) (B A) (C B))
-  (DECLARE (SPECIAL A B))
-  (LIST A B C))"))
+                  (DECLARE (SPECIAL A B))
+                  (LIST A B C))   Context: EVAL
+          Form: A   Context: EVAL
+          Form: A   Context: EVAL; lexically bound; declared special
+          Form: B   Context: EVAL; lexically bound; declared special
+          Form: (LIST A B C)   Context: EVAL
+          Form: A   Context: EVAL; lexically bound; declared special
+          Form: B   Context: EVAL; lexically bound; declared special
+          Form: C   Context: EVAL; lexically bound
+          (LET* ((A A) (B A) (C B))
+            (DECLARE (SPECIAL A B))
+            (LIST A B C))")))
 
 (assert (string=-modulo-tabspace
          (with-output-to-string (*standard-output*)

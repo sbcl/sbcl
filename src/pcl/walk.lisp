@@ -158,9 +158,9 @@
              (copy-tree (mapcar (lambda (b)
                                   (let ((name (car b))
                                         (info (cadr b)))
-                                    (if (member info '(:lexical-var :special-var))
+                                    (if (eq info :lexical-var)
                                         (cons name
-                                              (if (eq :special-var info)
+                                              (if (var-special-p name env)
                                                   (sb!c::make-global-var
                                                    :kind :special
                                                    :%source-name name)
@@ -281,10 +281,7 @@
   (push declaration (caddr (env-lock env))))
 
 (defun note-var-binding (thing env)
-  (push (list thing (if (var-special-p thing env)
-                        :special-var
-                        :lexical-var))
-        (cadddr (env-lock env))))
+  (push (list thing :lexical-var) (cadddr (env-lock env))))
 
 (defun var-lexical-p (var env)
   (let ((entry (member var (env-lexical-variables env) :key #'car :test #'eq)))
@@ -301,10 +298,16 @@
 
 (defun %var-declaration (declaration var env)
   (let ((id (or (var-lexical-p var env) var)))
-    (dolist (decl (env-declarations env))
-      (when (and (eq (car decl) declaration)
-                 (eq (cadr decl) id))
-        (return decl)))))
+    (if (eq 'special declaration)
+        (dolist (decl (env-declarations env))
+          (when (and (eq (car decl) declaration)
+                     (or (member var (cdr decl))
+                         (and id (member id (cdr decl)))))
+            (return decl)))
+        (dolist (decl (env-declarations env))
+          (when (and (eq (car decl) declaration)
+                     (eq (cadr decl) id))
+            (return decl))))))
 
 (defun var-declaration (declaration var env)
   (if (walked-var-declaration-p declaration)
@@ -731,20 +734,21 @@
     (let* ((let/let* (car form))
            (bindings (cadr form))
            (body (cddr form))
-           (walked-bindings nil)
+           walked-bindings
            (walked-body
-             (walk-declarations body
-                                (lambda (form env)
-                                  (setf walked-bindings
-                                        (walk-bindings-1 bindings
-                                                         old-env
-                                                         new-env
-                                                         context
-                                                         sequentialp))
-                                  (walk-repeat-eval form env))
-                                new-env)))
+             (walk-declarations
+              body
+              (lambda (real-body real-env)
+                (setf walked-bindings
+                      (walk-bindings-1 bindings
+                                       old-env
+                                       new-env
+                                       context
+                                       sequentialp))
+                (walk-repeat-eval real-body real-env))
+              new-env)))
       (relist*
-        form let/let* walked-bindings walked-body))))
+       form let/let* walked-bindings walked-body))))
 
 (defun walk-locally (form context old-env)
   (declare (ignore context))
