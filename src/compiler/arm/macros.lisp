@@ -11,4 +11,11 @@
 
 (in-package "SB!VM")
 
-;;; Dummy placeholder file.
+;;; Instruction-like macros.
+
+(macrolet
+    ((def (op inst shift)
+       `(defmacro ,op (object base &optional (offset 0) (lowtag 0))
+          `(inst ,',inst ,object (@ ,base (- (ash ,offset ,,shift) ,lowtag))))))
+  (def loadw ldr word-shift)
+  (def storew str word-shift))
