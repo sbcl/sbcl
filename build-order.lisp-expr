@@ -516,7 +516,7 @@
  ("src/compiler/seqtran")
  ("src/compiler/typetran")
  ("src/compiler/generic/vm-typetran")
- ("src/compiler/float-tran")
+ #!-arm ("src/compiler/float-tran")
  ("src/compiler/saptran")
  ("src/compiler/srctran")
  ("src/compiler/bitops-derive-type")
