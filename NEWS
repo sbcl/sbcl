@@ -1,4 +1,10 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
+changes relative to sbcl-1.1.0:
+  * enhancement: WITH-COMPILATION-UNIT no longer grabs the world-lock. (COMPILE and
+    COMPILE-FILE still do.)
+  * bug fix: SB-CLTL2:MACROEXPAND-ALL correctly handles shadowing of symbol-macros
+    by lexical bindings.
+
 changes in sbcl-1.1.0 relative to sbcl-1.0.58:
   * enhancement: New variable, sb-ext:*disassemble-annotate* for controlling
     source annotation of DISASSEMBLE output. Defaults to T.
