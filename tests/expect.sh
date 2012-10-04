@@ -26,7 +26,7 @@ expect_load_error ()
             (assert (null value0))
             (format t "VALUE1=~S (~A)~%" value1 value1)
             (assert (typep value1 'error)))
-        (sb-ext:quit :unix-status $EXIT_LISP_WIN)
+        (sb-ext:exit :code $EXIT_LISP_WIN)
 EOF
     check_status_maybe_lose compile-and-load $?
 
@@ -37,7 +37,7 @@ EOF
             (assert (null value0))
             (format t "VALUE1=~S (~A)~%" value1 value1)
             (assert (typep value1 'error)))
-        (sb-ext:quit :unix-status $EXIT_LISP_WIN)
+        (sb-ext:exit :code $EXIT_LISP_WIN)
 EOF
     check_status_maybe_lose load-into-interpreter $?
 }
@@ -51,7 +51,7 @@ expect_clean_cload ()
             (ignore-errors (load (compile-file-pathname "$f")))
           (assert value0)
           (assert (null value1)))
-        (sb-ext:quit :unix-status $EXIT_LISP_WIN)
+        (sb-ext:exit :code $EXIT_LISP_WIN)
 EOF
     check_status_maybe_lose load-compiled $?
 }
@@ -67,7 +67,7 @@ expect_clean_compile ()
           (declare (ignore pathname))
           (assert (not warnings-p))
           (assert (not failure-p))
-          (sb-ext:quit :unix-status $EXIT_LISP_WIN))
+          (sb-ext:exit :code $EXIT_LISP_WIN))
 EOF
     check_status_maybe_lose clean-compile $?
 }
@@ -81,7 +81,7 @@ expect_warned_compile ()
           (declare (ignore pathname))
           (assert warnings-p)
           (assert (not failure-p))
-          (sb-ext:quit :unix-status $EXIT_LISP_WIN))
+          (sb-ext:exit :code $EXIT_LISP_WIN))
 EOF
     check_status_maybe_lose warn-compile $?
 }
@@ -94,7 +94,7 @@ expect_failed_compile ()
             (compile-file "$f")
           (declare (ignore pathname warnings-p))
           (assert failure-p)
-          (sb-ext:quit :unix-status $EXIT_LISP_WIN))
+          (sb-ext:exit :code $EXIT_LISP_WIN))
 EOF
     check_status_maybe_lose fail-compile $?
 }
@@ -111,7 +111,7 @@ expect_aborted_compile ()
             (assert failure-p)
             (assert warnings-p)
             (assert (not (probe-file fasl))))
-          (sb-ext:quit :unix-status $EXIT_LISP_WIN))
+          (sb-ext:exit :code $EXIT_LISP_WIN))
 EOF
     check_status_maybe_lose abort-compile $?
 }
@@ -123,7 +123,7 @@ fail_on_condition_during_compile ()
     run_sbcl <<EOF
         (handler-bind (($c #'error))
           (compile-file "$f")
-          (sb-ext:quit :unix-status $EXIT_LISP_WIN))
+          (sb-ext:exit :code $EXIT_LISP_WIN))
 EOF
     check_status_maybe_lose "fail-on-condition_$1" $?
 }
@@ -135,7 +135,7 @@ expect_condition_during_compile ()
     run_sbcl <<EOF
         (handler-bind (($c (lambda (c)
                              (declare (ignore c))
-                             (sb-ext:quit :unix-status $EXIT_LISP_WIN))))
+                             (sb-ext:exit :code $EXIT_LISP_WIN))))
           (compile-file "$f"))
 EOF
     check_status_maybe_lose "expect-condition_$1" $?
