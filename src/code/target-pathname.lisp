@@ -863,7 +863,7 @@ a host-structure or string."
   (cond
     (junk-allowed
      (handler-case
-         (%parse-namestring namestr host defaults start end nil)
+         (%parse-native-namestring namestr host defaults start end nil as-directory)
        (namestring-parse-error (condition)
          (values nil (namestring-parse-error-offset condition)))))
     (t

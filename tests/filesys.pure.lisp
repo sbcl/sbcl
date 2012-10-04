@@ -93,6 +93,15 @@
   (assert (equal "C:\\FOO\\BAR" (native-namestring "C:\\FOO\\BAR")))
   (assert (equal "C:\\FOO\\BAR" (native-namestring "C:\\FOO\\BAR\\" :as-file t))))
 
+(with-test (:name (:parse-native-pathname :as-directory :junk-allowed))
+  (assert
+   (equal
+    (parse-native-namestring "foo.lisp" nil *default-pathname-defaults*
+                             :as-directory t)
+    (parse-native-namestring "foo.lisp" nil *default-pathname-defaults*
+                             :as-directory t
+                             :junk-allowed t))))
+
 ;;; Test for NATIVE-PATHNAME / NATIVE-NAMESTRING stuff
 ;;;
 ;;; given only safe characters in the namestring, NATIVE-PATHNAME will
