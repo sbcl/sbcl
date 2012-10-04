@@ -64,7 +64,8 @@
 (defparameter *static-symbols*
   (append
    *common-static-symbols*
-   *c-callable-static-symbols*))
+   *c-callable-static-symbols*
+   '(*number-stack-pointer*)))
 
 (defparameter *static-funs*
   '())
