@@ -26,6 +26,18 @@
           `(inst ,',inst ,object (@ ,base (- (ash ,offset ,,shift) ,lowtag))))))
   (def loadw ldr word-shift)
   (def storew str word-shift))
+
+(defmacro load-symbol-value (reg symbol)
+  `(inst ldr ,reg (@ null-tn
+                     (+ (static-symbol-offset ',symbol)
+                        (ash symbol-value-slot word-shift)
+                        (- other-pointer-lowtag)))))
+
+(defmacro store-symbol-value (reg symbol)
+  `(inst str ,reg (@ null-tn
+                     (+ (static-symbol-offset ',symbol)
+                        (ash symbol-value-slot word-shift)
+                        (- other-pointer-lowtag)))))
 
 ;;;; Stack TN's
 
