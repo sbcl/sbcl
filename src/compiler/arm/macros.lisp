@@ -26,3 +26,33 @@
           `(inst ,',inst ,object (@ ,base (- (ash ,offset ,,shift) ,lowtag))))))
   (def loadw ldr word-shift)
   (def storew str word-shift))
+
+;;;; Stack TN's
+
+;;; Move a stack TN to a register and vice-versa.
+(defmacro load-stack-tn (reg stack)
+  `(let ((reg ,reg)
+         (stack ,stack))
+     (let ((offset (tn-offset stack)))
+       (sc-case stack
+         ((control-stack)
+          (loadw reg fp-tn offset))))))
+(defmacro store-stack-tn (stack reg)
+  `(let ((stack ,stack)
+         (reg ,reg))
+     (let ((offset (tn-offset stack)))
+       (sc-case stack
+         ((control-stack)
+          (storew reg fp-tn offset))))))
+
+(defmacro maybe-load-stack-tn (reg reg-or-stack)
+  "Move the TN Reg-Or-Stack into Reg if it isn't already there."
+  (once-only ((n-reg reg)
+              (n-stack reg-or-stack))
+    `(sc-case ,n-reg
+       ((any-reg descriptor-reg)
+        (sc-case ,n-stack
+          ((any-reg descriptor-reg)
+           (move ,n-reg ,n-stack))
+          ((control-stack)
+           (loadw ,n-reg fp-tn (tn-offset ,n-stack))))))))
