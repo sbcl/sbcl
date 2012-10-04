@@ -178,3 +178,21 @@
   ;; A catch or unwind block.
   (catch-block control-stack
                :element-size kludge-nondeterministic-catch-block-size))
+
+;;;; Make some random tns for important registers.
+
+(macrolet ((defregtn (name sc)
+               (let ((offset-sym (symbolicate name "-OFFSET"))
+                     (tn-sym (symbolicate name "-TN")))
+                 `(defparameter ,tn-sym
+                   (make-random-tn :kind :normal
+                    :sc (sc-or-lose ',sc)
+                    :offset ,offset-sym)))))
+
+  (defregtn lip interior-reg)
+  (defregtn null descriptor-reg)
+  (defregtn code descriptor-reg)
+
+  (defregtn sp any-reg)
+  (defregtn fp any-reg)
+  (defregtn pc any-reg))
