@@ -11,4 +11,22 @@
 
 (in-package "SB!VM")
 
-;;; Dummy placeholder file.
+(define-move-fun (load-immediate 1) (vop x y)
+  ((null immediate)
+   (any-reg descriptor-reg))
+  (let ((val (tn-value x)))
+    (etypecase val
+      (null
+       (move y null-tn)))))
+
+(define-move-fun (load-constant 5) (vop x y)
+  ((constant) (descriptor-reg))
+  (loadw y code-tn (tn-offset x) other-pointer-lowtag))
+
+(define-move-fun (load-stack 5) (vop x y)
+  ((control-stack) (any-reg descriptor-reg))
+  (load-stack-tn y x))
+
+(define-move-fun (store-stack 5) (vop x y)
+  ((any-reg descriptor-reg) (control-stack))
+  (store-stack-tn y x))
