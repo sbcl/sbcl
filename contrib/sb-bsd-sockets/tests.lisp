@@ -50,7 +50,7 @@
       (and (> (socket-file-descriptor s) 1) t))
   t)
 
-(deftest make-inet-socket-wrong
+(deftest* (make-inet-socket-wrong :fails-on :win32)
     ;; fail to make a socket: check correct error return.  There's no nice
     ;; way to check the condition stuff on its own, which is a shame
     (handler-case
@@ -66,7 +66,7 @@
       (:no-error nil))
   t)
 
-(deftest make-inet-socket-keyword-wrong
+(deftest* (make-inet-socket-keyword-wrong :fails-on :win32)
     ;; same again with keywords
     (handler-case
         (make-instance 'inet-socket :type :stream :protocol :udp)
@@ -83,7 +83,7 @@
   t)
 
 
-(deftest non-block-socket
+(deftest* (non-block-socket :fails-on :win32)
   (let ((s (make-instance 'inet-socket :type :stream :protocol :tcp)))
     (setf (non-blocking-mode s) t)
     (non-blocking-mode s))
@@ -112,7 +112,7 @@
       (address-in-use-error () t)))
   t)
 
-(deftest simple-sockopt-test
+(deftest* (simple-sockopt-test :fails-on :win32)
   ;; test we can set SO_REUSEADDR on a socket and retrieve it, and in
   ;; the process that all the weird macros in sockopt happened right.
   (let ((s (make-instance 'inet-socket :type :stream :protocol (get-protocol-by-name "tcp"))))
@@ -177,8 +177,8 @@
 ;;; to look at /etc/syslog.conf or local equivalent to find out where
 ;;; the message ended up
 
+#-win32
 (deftest simple-local-client
-    #-win32
     (progn
       ;; SunOS (Solaris) and Darwin systems don't have a socket at
       ;; /dev/log.  We might also be building in a chroot or
