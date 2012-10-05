@@ -1253,7 +1253,6 @@
                   (get-defined-fun name (fifth inline-lambda))
                   (get-defined-fun name))))
       (when (boundp '*lexenv*)
-        (remhash name *free-funs*)
         (aver (fasl-output-p *compile-object*))
         (if (member name *fun-names-in-this-file* :test #'equal)
             (warn 'duplicate-definition :name name)

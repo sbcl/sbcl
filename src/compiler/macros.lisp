@@ -685,22 +685,25 @@
     (aver-live-component *current-component*)
     (funcall fun)))
 
+(defmacro with-source-paths (&body forms)
+  (with-unique-names (source-paths)
+    `(let* ((,source-paths (make-hash-table :test 'eq))
+            (*source-paths* ,source-paths))
+      (unwind-protect
+           (progn ,@forms)
+        (clrhash ,source-paths)))))
+
 ;;; Bind the hashtables used for keeping track of global variables,
 ;;; functions, etc. Also establish condition handlers.
 (defmacro with-ir1-namespace (&body forms)
   `(let ((*free-vars* (make-hash-table :test 'eq))
          (*free-funs* (make-hash-table :test 'equal))
-         (*constants* (make-hash-table :test 'equal))
-         (*source-paths* (make-hash-table :test 'eq)))
+         (*constants* (make-hash-table :test 'equal)))
      (unwind-protect
-          (handler-bind ((compiler-error #'compiler-error-handler)
-                         (style-warning #'compiler-style-warning-handler)
-                         (warning #'compiler-warning-handler))
-            ,@forms)
+          (progn ,@forms)
        (clrhash *free-funs*)
        (clrhash *free-vars*)
-       (clrhash *constants*)
-       (clrhash *source-paths*))))
+       (clrhash *constants*))))
 
 ;;; Look up NAME in the lexical environment namespace designated by
 ;;; SLOT, returning the <value, T>, or <NIL, NIL> if no entry. The

@@ -47,17 +47,18 @@
         (if pathname
             (let* ((info (sb!c::make-file-source-info
                           pathname (stream-external-format stream)))
-                   (sb!c::*source-info* info)
-                   (sb!c::*source-paths* (make-hash-table :test 'eq)))
+                   (sb!c::*source-info* info))
               (setf (sb!c::source-info-stream info) stream)
               (sb!c::do-forms-from-info ((form current-index) info)
-                (sb!c::find-source-paths form current-index)
-                (eval-form form current-index)))
+                (sb!c::with-source-paths
+                  (sb!c::find-source-paths form current-index)
+                  (eval-form form current-index))))
             (let ((sb!c::*source-info* nil))
               (do ((form (read stream nil *eof-object*)
                          (read stream nil *eof-object*)))
                   ((eq form *eof-object*))
-                (eval-form form nil)))))))
+                (sb!c::with-source-paths
+                  (eval-form form nil))))))))
   t)
 
 ;;;; LOAD itself
