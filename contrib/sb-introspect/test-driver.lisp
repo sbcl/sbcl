@@ -12,6 +12,12 @@
 
 (in-package :sb-introspect-test)
 
+(defmacro deftest* ((name &key fails-on) form &rest results)
+  `(progn
+     (when (sb-impl::featurep ',fails-on)
+       (pushnew ',name sb-rt::*expected-failures*))
+     (deftest ,name ,form ,@results)))
+
 (deftest function-lambda-list.1
     (function-lambda-list 'cl-user::one)
   (cl-user::a cl-user::b cl-user::c))
@@ -294,15 +300,18 @@
 
 ;;; Skip the whole damn test on GENCGC PPC -- the combination is just
 ;;; to flaky for this to make too much sense.
-;; #-(and ppc gencgc)
-
-;;; It appears that this test can fail due to systematic issues (possibly
-;;; with the C compiler used) which we cannot detect based on *features*.
-;;; Until this issue has been fixed, I am disabling this test entirely to
-;;; to allow installation of the contrib on affected builds. C.f. lp1057631.
-;;; --DFL
-#-gencgc
-(deftest allocation-information.4
+;;;
+;;; -- It appears that this test can also fail due to systematic issues
+;;; (possibly with the C compiler used) which we cannot detect based on
+;;; *features*.  Until this issue has been fixed, I am marking this test
+;;; as failing on Windows to allow installation of the contrib on
+;;; affected builds, even if the underlying issue is (possibly?) not even
+;;; strictly related to windows.  C.f. lp1057631.  --DFL
+;;;
+(deftest* (allocation-information.4
+           ;; Ignored as per the comment above, even though it seems
+           ;; unlikely that this is the right condition.
+           :fails-on (or :win32 (and :ppc :gencgc)))
     #+gencgc
     (tai #'cons :heap
          ;; FIXME: This is the canonical GENCGC result. On PPC we sometimes get
