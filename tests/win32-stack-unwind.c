@@ -34,6 +34,7 @@
 #include <windows.h>
 #include <excpt.h>
 
+#include <setjmp.h>
 
 /* The "public" API */
 
@@ -83,7 +84,9 @@ EXCEPTION_DISPOSITION handle_exception(EXCEPTION_RECORD *exception_record,
     return ExceptionContinueSearch;
 }
 
-static void invoke_callback(callback_ptr callback, DWORD *unwind_token);
+static void
+  __attribute__((returns_twice))
+  invoke_callback(callback_ptr callback, DWORD *unwind_token);
 
 asm("_invoke_callback:"
     "pushl %ebp; movl %esp, %ebp;"
@@ -108,6 +111,22 @@ void establish_return_frame(callback_ptr callback)
     exception_frame[0] = get_seh_frame();
     exception_frame[1] = handle_exception;
     set_seh_frame(exception_frame);
+
+    /* Do a setjmp just to explicitly spill callee-saved registers, i.e.
+     * the portable equivalent of:
+     *   asm("" : : : "%esi", "%edi", "%ebx");
+     * which is needed because otherwise those registers would be trashed
+     * following the stack unwind, and leave us with a likely crash upon
+     * return to call_into_c.
+     *
+     * The returns_twice attribute on invoke_callback should take care
+     * of this already, but does not seem to take effect, at least with
+     * the version of gcc I am using.
+     *
+     * Note: __builtin_setjmp, not setjmp, because only the former has
+     * the desired effect on the immediate call site. */
+    jmp_buf env;
+    __builtin_setjmp(env);
 
     invoke_callback(callback, &saved_ebp);
 
