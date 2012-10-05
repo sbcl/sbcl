@@ -674,6 +674,7 @@ create_thread_struct(lispobj initial_function) {
            sizeof(th->private_events.events[0]); ++i) {
       th->private_events.events[i] = CreateEvent(NULL,FALSE,FALSE,NULL);
     }
+    th->synchronous_io_handle_and_flag = 0;
 #endif
     th->stepping = NIL;
     return th;

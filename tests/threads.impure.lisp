@@ -1492,3 +1492,49 @@
           (funcall get lock)
           (funcall release lock)
           (assert (eq t (funcall with lock))))))))
+
+(with-test (:name :interrupt-io-unnamed-pipe)
+  (let (result)
+    (labels
+        ((reader (fd)
+           (let ((stream (sb-sys:make-fd-stream fd
+                                                :element-type :default
+                                                :serve-events nil)))
+             (time
+              (let ((ok (handler-case
+                            (catch 'stop
+                              (progn
+                                (read-char stream)
+                                (sleep 0.1)
+                                (sleep 0.1)
+                                (sleep 0.1)))
+                          (error (c)
+                            c))))
+                (setf result ok)
+                (progn
+                  (format *trace-output* "~&=> ~A~%" ok)
+                  (force-output *trace-output*))))
+             (sleep 2)
+             (ignore-errors (close stream))))
+
+         (writer ()
+           (multiple-value-bind (read write)
+               (sb-unix:unix-pipe)
+             (let* ((reader (sb-thread:make-thread (lambda () (reader read))))
+                    (stream (sb-sys:make-fd-stream write
+                                                   :output t
+                                                   :element-type :default
+                                                   :serve-events nil))
+                    (ok :ok))
+               (sleep 1)
+               (sb-thread:interrupt-thread reader (lambda ()
+                                                    (print :throwing)
+                                                    (force-output)
+                                                    (throw 'stop ok)))
+               (sleep 1)
+               (setf ok :not-ok)
+               (write-char #\x stream)
+               (close stream)
+               (sb-thread:join-thread reader)))))
+      (writer))
+    (assert (eq result :ok))))

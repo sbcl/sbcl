@@ -145,9 +145,8 @@ vodxprint_fun(const char *fmt, va_list args)
 {
 #ifdef LISP_FEATURE_WIN32
     DWORD lastError = GetLastError();
-#else
-    int original_errno = errno;
 #endif
+    int original_errno = errno;
 
     QSHOW_BLOCK;
 
@@ -184,9 +183,8 @@ vodxprint_fun(const char *fmt, va_list args)
 
 #ifdef LISP_FEATURE_WIN32
     SetLastError(lastError);
-#else
-    errno = original_errno;
 #endif
+    errno = original_errno;
 }
 
 /* Translate the rather awkward syntax

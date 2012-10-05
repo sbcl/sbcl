@@ -83,6 +83,8 @@ char *dirname(char *path);
 
 void os_invalidate_free(os_vm_address_t addr, os_vm_size_t len);
 
+boolean win32_maybe_interrupt_io(void* thread);
+
 #define bcopy(src,dest,n) memmove(dest,src,n)
 
 struct thread;
