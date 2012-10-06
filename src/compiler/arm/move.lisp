@@ -19,6 +19,11 @@
       (null
        (move y null-tn)))))
 
+(define-move-fun (load-number 1) (vop x y)
+  ((immediate)
+   (signed-reg unsigned-reg))
+  (inst mov y (tn-value x)))
+
 (define-move-fun (load-constant 5) (vop x y)
   ((constant) (descriptor-reg))
   (loadw y code-tn (tn-offset x) other-pointer-lowtag))
@@ -27,6 +32,22 @@
   ((control-stack) (any-reg descriptor-reg))
   (load-stack-tn y x))
 
+(define-move-fun (load-number-stack 5) (vop x y)
+  ((character-stack) (character-reg)
+   (sap-stack) (sap-reg)
+   (signed-stack) (signed-reg)
+   (unsigned-stack) (unsigned-reg))
+  (let ((nfp (current-nfp-tn vop)))
+    (loadw y nfp (tn-offset x))))
+
 (define-move-fun (store-stack 5) (vop x y)
   ((any-reg descriptor-reg) (control-stack))
   (store-stack-tn y x))
+
+(define-move-fun (store-number-stack 5) (vop x y)
+  ((character-reg) (character-stack)
+   (sap-reg) (sap-stack)
+   (signed-reg) (signed-stack)
+   (unsigned-reg) (unsigned-stack))
+  (let ((nfp (current-nfp-tn vop)))
+    (storew x nfp (tn-offset y))))
