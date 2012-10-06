@@ -272,6 +272,7 @@
     (assert (eq :fun (empty-let-is-not-toplevel-fun))))
   ;; While at it, test that we get the late binding under
   ;; interpreter mode.
+  #+sb-eval
   (let ((sb-ext:*evaluator-mode* :interpret))
     (eval `(let ()
              (defmacro empty-let-is-not-toplevel-x () :macro)

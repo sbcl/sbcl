@@ -3831,7 +3831,8 @@
 (with-test (:name :multiple-args-to-function)
   (let ((form `(flet ((foo (&optional (x 13)) x))
                  (funcall (function foo 42))))
-        (*evaluator-mode* :interpret))
+        #+sb-eval (*evaluator-mode* :interpret))
+    #+sb-eval
     (assert (eq :error
                 (handler-case (eval form)
                   (error () :error))))
