@@ -617,7 +617,7 @@
 
  ("src/compiler/pseudo-vops")
 
- ("src/compiler/aliencomp")
+ #!-arm ("src/compiler/aliencomp")
 
  ("src/compiler/ltv")
  ("src/compiler/gtn")
