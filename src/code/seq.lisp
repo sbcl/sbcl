@@ -301,16 +301,17 @@
           (typecase expanded-type
             (atom (cond
                     ((eq expanded-type 'string) '(vector character))
-                    ((eq expanded-type 'simple-string) '(simple-array character (*)))
+                    ((eq expanded-type 'simple-string)
+                     '(simple-array character (*)))
                     (t type)))
             (cons (cond
-                    ((eq (car expanded-type) 'string) `(vector character ,@(cdr expanded-type)))
+                    ((eq (car expanded-type) 'string)
+                     `(vector character ,@(cdr expanded-type)))
                     ((eq (car expanded-type) 'simple-string)
                      `(simple-array character ,(if (cdr expanded-type)
                                                    (cdr expanded-type)
                                                    '(*))))
-                    (t type)))
-            (t type)))
+                    (t type)))))
          (type (specifier-type adjusted-type)))
     (cond ((csubtypep type (specifier-type 'list))
            (cond
