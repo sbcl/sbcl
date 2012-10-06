@@ -1799,7 +1799,7 @@
   (:emitter
    (aver (or (dword-reg-p dst) (qword-reg-p dst)))
    (maybe-emit-rex-for-ea segment src dst
-                          :operand-size :qword)
+                          :operand-size (if (dword-reg-p dst) :dword :qword))
    (emit-byte segment #b10001101)
    (emit-ea segment src (reg-tn-encoding dst))))
 
