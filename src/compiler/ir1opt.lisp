@@ -166,7 +166,14 @@
               :specialized-element-type (array-type-specialized-element-type type))
              ;; Simple arrays cannot change at all.
              type))
+        ((union-type-p type)
+         ;; Conservative union type is an union of conservative types.
+         (let ((res *empty-type*))
+           (dolist (part (union-type-types type) res)
+             (setf res (type-union res (conservative-type part))))))
         (t
+         ;; Catch-all.
+         ;;
          ;; If the type contains some CONS types, the conservative type contains all
          ;; of them.
          (when (types-equal-or-intersect type (specifier-type 'cons))

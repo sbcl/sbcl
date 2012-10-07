@@ -169,6 +169,11 @@
     (block nil
       (let ((dimensions (array-type-dimensions-or-give-up
                          (lvar-conservative-type array))))
+        ;; Might be *. (Note: currently this is never true, because the type
+        ;; derivation infers the rank from the call to ARRAY-IN-BOUNDS-P, but
+        ;; let's keep this future proof.)
+        (when (eq '* dimensions)
+          (give-up-ir1-transform "array bounds unknown"))
         ;; shortcut for zero dimensions
         (when (some (lambda (dim)
                       (and (bound-known-p dim) (zerop dim)))

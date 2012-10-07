@@ -10,6 +10,8 @@ changes relative to sbcl-1.1.0:
     (thanks to SANO Masatoshi)
   * bug fix: PARSE-NATIVE-NAMESTRING performed non-native parsing when
     :JUNK-ALLOWED was true.
+  * bug fix: type derivation inferred overly conservative types for
+    unions of array types. (lp#1050768)
 
 changes in sbcl-1.1.0 relative to sbcl-1.0.58:
   * enhancement: New variable, sb-ext:*disassemble-annotate* for controlling
