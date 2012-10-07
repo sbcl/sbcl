@@ -51,3 +51,61 @@
    (unsigned-reg) (unsigned-stack))
   (let ((nfp (current-nfp-tn vop)))
     (storew x nfp (tn-offset y))))
+
+
+;;;; The Move VOP:
+(define-vop (move)
+  (:args (x :target y
+            :scs (any-reg descriptor-reg null)
+            :load-if (not (location= x y))))
+  (:results (y :scs (any-reg descriptor-reg)
+               :load-if (not (location= x y))))
+  (:effects)
+  (:affected)
+  (:generator 0
+    (move y x)))
+
+(define-move-vop move :move
+  (any-reg descriptor-reg)
+  (any-reg descriptor-reg))
+
+;;; Make MOVE the check VOP for T so that type check generation
+;;; doesn't think it is a hairy type.  This also allows checking of a
+;;; few of the values in a continuation to fall out.
+(primitive-type-vop move (:check) t)
+
+;;; The MOVE-ARG VOP is used for moving descriptor values into another
+;;; frame for argument or known value passing.
+(define-vop (move-arg)
+  (:args (x :target y
+            :scs (any-reg descriptor-reg null))
+         (fp :scs (any-reg)
+             :load-if (not (sc-is y any-reg descriptor-reg))))
+  (:results (y))
+  (:generator 0
+    (sc-case y
+      ((any-reg descriptor-reg)
+       (move y x))
+      (control-stack
+       (storew x fp (tn-offset y))))))
+;;;
+(define-move-vop move-arg :move-arg
+  (any-reg descriptor-reg)
+  (any-reg descriptor-reg))
+
+
+
+;;;; ILLEGAL-MOVE
+
+;;; This VOP exists just to begin the lifetime of a TN that couldn't
+;;; be written legally due to a type error.  An error is signalled
+;;; before this VOP is so we don't need to do anything (not that there
+;;; would be anything sensible to do anyway.)
+(define-vop (illegal-move)
+  (:args (x) (type))
+  (:results (y))
+  (:ignore y)
+  (:vop-var vop)
+  (:save-p :compute-only)
+  (:generator 666
+    (error-call vop 'object-not-type-error x type)))
