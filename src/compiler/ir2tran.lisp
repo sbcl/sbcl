@@ -54,6 +54,7 @@
 
 ;;; Allocate an indirect value cell.
 (defevent make-value-cell-event "Allocate heap value cell for lexical var.")
+#!-arm
 (defun emit-make-value-cell (node block value res)
   (event make-value-cell-event node)
   (vop make-value-cell node block value nil res))
@@ -128,6 +129,7 @@
            nil))))
 
 ;;; Convert a REF node. The reference must not be delayed.
+#!-arm
 (defun ir2-convert-ref (node block)
   (declare (type ref node) (type ir2-block block))
   (let* ((lvar (node-lvar node))
@@ -304,6 +306,7 @@
       (setf (ir2-lvar-stack-pointer info)
             (make-stack-pointer-tn)))))
 
+#!-arm
 (defoptimizer (%allocate-closures ir2-convert) ((leaves) call 2block)
   (let ((dx-p (lvar-dynamic-extent leaves)))
     (collect ((delayed))
@@ -355,6 +358,7 @@
 ;;; deliver the value to that lvar. If the var is a lexical variable
 ;;; with no refs, then we don't actually set anything, since the
 ;;; variable has been deleted.
+#!-arm
 (defun ir2-convert-set (node block)
   (declare (type cset node) (type ir2-block block))
   (let* ((lvar (node-lvar node))
@@ -584,6 +588,9 @@
            (unless (eq locs results)
              (move-results-coerced node block results locs))))
         (:unknown
+         #!+arm
+         (error "Unable to MOVE-LVAR-RESULT for unknown-values LVAR due to not having VOP PUSH-VALUES.")
+         #!-arm
          (let* ((nvals (length results))
                 (locs (make-standard-value-tns nvals)))
            (move-results-coerced node block results locs)
@@ -655,6 +662,7 @@
 ;;; drop-through, but emit an unconditional branch afterward if we
 ;;; fail. NOT-P is true if the sense of the TEMPLATE's test should be
 ;;; negated.
+#!-arm
 (defun ir2-convert-conditional (node block template args info-args if not-p)
   (declare (type node node) (type ir2-block block)
            (type template template) (type (or tn-ref null) args)
@@ -758,9 +766,15 @@
             (aver (= (length info-args)
                      (template-info-arg-count template)))
             (when (and lvar (lvar-dynamic-extent lvar))
+              #!+arm
+              (error "Unable to support D-X result because VOP CURRENT-STACK-POINTER is undefined.")
+              #!-arm
               (vop current-stack-pointer call block
                    (ir2-lvar-stack-pointer (lvar-info lvar))))
             (when (emit-step-p call)
+              #!+arm
+              (error "Unable to emit stepping support because VOP STEP-INSTRUMENT-BEFORE-VOP is undefined.")
+              #!-arm
               (vop sb!vm::step-instrument-before-vop call block))
             (if info-args
                 (emit-template call block template args r-refs info-args)
@@ -879,6 +893,7 @@
 ;;; into the appropriate passing locations. After setting up the args
 ;;; and environment, we just move our return-pc into the called
 ;;; function's passing location.
+#!-arm
 (defun ir2-convert-tail-local-call (node block fun)
   (declare (type combination node) (type ir2-block block) (type clambda fun))
   (let ((this-env (physenv-info (node-physenv node)))
@@ -920,6 +935,7 @@
 ;;; (including implicit environment args.) We allocate a frame
 ;;; (returning the FP and NFP), and also compute the TN-REFS list for
 ;;; the values to pass and the list of passing location TNs.
+#!-arm
 (defun ir2-convert-local-call-args (node block fun)
   (declare (type combination node) (type ir2-block block) (type clambda fun))
   (let ((fp (make-stack-pointer-tn))
@@ -935,6 +951,7 @@
 
 ;;; Handle a non-TR known-values local call. We emit the call, then
 ;;; move the results to the lvar's destination.
+#!-arm
 (defun ir2-convert-local-known-call (node block fun returns lvar start)
   (declare (type node node) (type ir2-block block) (type clambda fun)
            (type return-info returns) (type (or lvar null) lvar)
@@ -959,6 +976,7 @@
 ;;; Otherwise, we use STANDARD-RESULT-TNS to get wired result TNs, and
 ;;; then call MOVE-LVAR-RESULT to do any necessary type checks or
 ;;; coercions.
+#!-arm
 (defun ir2-convert-local-unknown-call (node block fun lvar start)
   (declare (type node node) (type ir2-block block) (type clambda fun)
            (type (or lvar null) lvar) (type label start))
@@ -1052,6 +1070,7 @@
 
 ;;; Move the arguments into the passing locations and do a (possibly
 ;;; named) tail call.
+#!-arm
 (defun ir2-convert-tail-full-call (node block)
   (declare (type combination node) (type ir2-block block))
   (let* ((env (physenv-info (node-physenv node)))
@@ -1078,6 +1097,7 @@
   (values))
 
 ;;; like IR2-CONVERT-LOCAL-CALL-ARGS, only different
+#!-arm
 (defun ir2-convert-full-call-args (node block)
   (declare (type combination node) (type ir2-block block))
   (let* ((args (basic-combination-args node))
@@ -1101,6 +1121,7 @@
 ;;; Do full call when a fixed number of values are desired. We make
 ;;; STANDARD-RESULT-TNS for our lvar, then deliver the result using
 ;;; MOVE-LVAR-RESULT. We do named or normal call, as appropriate.
+#!-arm
 (defun ir2-convert-fixed-full-call (node block)
   (declare (type combination node) (type ir2-block block))
   (multiple-value-bind (fp args arg-locs nargs)
@@ -1120,6 +1141,7 @@
   (values))
 
 ;;; Do full call when unknown values are desired.
+#!-arm
 (defun ir2-convert-multiple-full-call (node block)
   (declare (type combination node) (type ir2-block block))
   (multiple-value-bind (fp args arg-locs nargs)
@@ -1224,11 +1246,17 @@
       (cond ((and (optional-dispatch-p ef) (optional-dispatch-more-entry ef))
              ;; Special case the xep-allocate-frame + copy-more-arg case.
              (vop xep-allocate-frame node block start-label t)
+             #!+arm
+             (error "Should VOP COPY-MORE-ARG here.")
+             #!-arm
              (vop copy-more-arg node block (optional-dispatch-max-args ef)))
             (t
              ;; No more args, so normal entry.
              (vop xep-allocate-frame node block start-label nil)))
       (if (ir2-physenv-closure env)
+          #!+arm
+          (error "Should set up a closure env, but can't do that on ARM yet.")
+          #!-arm
           (let ((closure (make-normal-tn *backend-t-primitive-type*)))
             (vop setup-closure-environment node block start-label closure)
             (let ((n -1))
@@ -1326,6 +1354,9 @@
     (cond
      ((and (eq (return-info-kind returns) :fixed)
            (not (xep-p fun)))
+      #!+arm
+      (error "Should VOP KNOWN-RETURN here.")
+      #!-arm
       (let ((locs (lvar-tns node block lvar
                                     (return-info-types returns))))
         (vop* known-return node block
@@ -1343,12 +1374,18 @@
               locs)
         (if (= nvals 1)
             (vop return-single node block old-fp return-pc (car locs))
+            #!+arm
+            (error "Should VOP RETURN here.")
+            #!-arm
             (vop* return node block
                   (old-fp return-pc (reference-tn-list locs nil))
                   (nil)
                   nvals))))
      (t
       (aver (eq lvar-kind :unknown))
+      #!+arm
+      (error "Should VOP RETURN-MULTIPLE here.")
+      #!-arm
       (vop* return-multiple node block
             (old-fp return-pc
                     (reference-tn-list (ir2-lvar-locs 2lvar) nil))
@@ -1405,6 +1442,7 @@
 ;;; the first argument: all the other argument lvar TNs are
 ;;; ignored. This is because we require all of the values globs to be
 ;;; contiguous and on stack top.
+#!-arm
 (defun ir2-convert-mv-call (node block)
   (declare (type mv-combination node) (type ir2-block block))
   (aver (basic-combination-args node))
@@ -1439,6 +1477,7 @@
 ;;; Reset the stack pointer to the start of the specified
 ;;; unknown-values lvar (discarding it and all values globs on top of
 ;;; it.)
+#!-arm
 (defoptimizer (%pop-values ir2-convert) ((%lvar) node block)
   (let* ((lvar (lvar-value %lvar))
          (2lvar (lvar-info lvar)))
@@ -1451,6 +1490,7 @@
           (t (bug "Trying to pop a not stack-allocated LVAR ~S."
                   lvar)))))
 
+#!-arm
 (defoptimizer (%nip-values ir2-convert) ((last-nipped last-preserved
                                                       &rest moved)
                                          node block)
@@ -1500,6 +1540,7 @@
 ;;; VALUES-LIST function. This gets the full call VOP to deal with
 ;;; defaulting any unsupplied values. It seems unworthwhile to
 ;;; optimize this case.
+#!-arm
 (defoptimizer (values-list ir2-convert) ((list) node block)
   (let* ((lvar (node-lvar node))
          (2lvar (and lvar (lvar-info lvar))))
@@ -1513,6 +1554,7 @@
                        (eq (ir2-lvar-kind 2lvar) :fixed)))
              (ir2-convert-full-call node block)))))
 
+#!-arm
 (defoptimizer (%more-arg-values ir2-convert) ((context start count) node block)
   (binding* ((lvar (node-lvar node) :exit-if-null)
              (2lvar (lvar-info lvar)))
@@ -1541,6 +1583,7 @@
 
 ;;; This is trivial, given our assumption of a shallow-binding
 ;;; implementation.
+#!-arm
 (defoptimizer (%special-bind ir2-convert) ((var value) node block)
   (let ((name (leaf-source-name (lvar-value var))))
     #!-(and sb-thread x86-64)
@@ -1552,6 +1595,7 @@
       (emit-constant name)
       (vop sb!vm::bind/let node block (lvar-tn node block value) name))))
 
+#!-arm
 (defoptimizer (%special-unbind ir2-convert) ((var) node block)
   (vop unbind node block))
 
@@ -1606,6 +1650,7 @@
 ;;; environment. Note that this is never called on the escape exits
 ;;; for CATCH and UNWIND-PROTECT, since the escape functions aren't
 ;;; IR2 converted.
+#!-arm
 (defun ir2-convert-exit (node block)
   (declare (type exit node) (type ir2-block block))
   (let* ((nlx (exit-nlx-info node))
@@ -1630,6 +1675,7 @@
 ;;; This function invalidates a lexical exit on exiting from the
 ;;; dynamic extent. This is done by storing 0 into the indirect value
 ;;; cell that holds the closed unwind block.
+#!-arm
 (defoptimizer (%lexical-exit-breakup ir2-convert) ((info) node block)
   (let ((nlx (lvar-value info)))
     (when (nlx-info-safe-p nlx)
@@ -1639,6 +1685,7 @@
 
 ;;; We have to do a spurious move of no values to the result lvar so
 ;;; that lifetime analysis won't get confused.
+#!-arm
 (defun ir2-convert-throw (node block)
   (declare (type mv-combination node) (type ir2-block block))
   (let ((args (basic-combination-args node)))
@@ -1656,6 +1703,7 @@
 ;;; exit, and TAG is the lvar for the catch tag (if any.) We get at
 ;;; the target PC by passing in the label to the vop. The vop is
 ;;; responsible for building a return-PC object.
+#!-arm
 (defun emit-nlx-start (node block info tag)
   (declare (type node node) (type ir2-block block) (type nlx-info info)
            (type (or lvar null) tag))
@@ -1732,6 +1780,7 @@
 ;;; UNWIND-PROTECT case, the values receiving restores the stack
 ;;; pointer. In an UNWIND-PROTECT cleanup, we want to leave the stack
 ;;; pointer alone, since the thrown values are still out there.
+#!-arm
 (defoptimizer (%nlx-entry ir2-convert) ((info-lvar) node block)
   (let* ((info (lvar-value info-lvar))
          (lvar (node-lvar node))
@@ -1777,6 +1826,7 @@
 
 ;;;; n-argument functions
 
+#!-arm
 (macrolet ((def (name)
              `(defoptimizer (,name ir2-convert) ((&rest args) node block)
                 (let* ((refs (move-tail-full-call-args node block))
@@ -1933,9 +1983,17 @@
                         (ftype (and (info :function :info name) ; only use the FTYPE if
                                     (info :function :type name)))) ; NAME was DEFKNOWN
                    (unless (or (node-tail-p last)
+<<<<<<< HEAD
                                (policy last (zerop safety))
                                (and (fun-type-p ftype)
                                     (eq *empty-type* (fun-type-returns ftype))))
+=======
+                               (info :function :info name)
+                               (policy last (zerop safety)))
+                     #!+arm
+                     (error "Should VOP NIL-FUN-RETURNED-ERROR here.")
+                     #!-arm
+>>>>>>> compiler/ir2tran: Disable most of the important bits on ARM.
                      (vop nil-fun-returned-error last 2block
                           (if name
                               (emit-constant name)
@@ -1944,6 +2002,9 @@
                                 (aver (not named))
                                 tn)))))))
               ((not (eq (ir2-block-next 2block) (block-info target)))
+               #!+arm
+               (error "Should VOP BRANCH here.")
+               #!-arm
                (vop branch last 2block (block-label target)))
               (t
                (register-drop-thru target))))))
