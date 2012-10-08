@@ -192,10 +192,12 @@ code:
     (unless (do-not-grovel component)
       (let* ((cc (or (and (string/= (sb-ext:posix-getenv "CC") "")
                           (sb-ext:posix-getenv "CC"))
-                     ;; It might be nice to include a CONTINUE or
-                     ;; USE-VALUE restart here, but ASDF seems to insist
-                     ;; on handling the errors itself.
-                     (error "The CC environment variable has not been set in SB-GROVEL. Since this variable should always be set during the SBCL build process, this might indicate an SBCL with a broken contrib installation.")))
+                     (if (member :sb-building-contrib *features*)
+                         (error "~@<The CC environment variable not set during ~
+                                 SB-GROVEL build.~:@>")
+                         (sb-int:style-warn
+                          "CC environment variable not set, SB-GROVEL falling back to \"cc\"."))
+                     "cc"))
              (code (sb-ext:process-exit-code
                     (sb-ext:run-program
                      cc
