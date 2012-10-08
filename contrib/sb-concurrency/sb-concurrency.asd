@@ -13,6 +13,7 @@
 
 (asdf:defsystem :sb-concurrency
   :components ((:file "package")
+               (:file "frlock"   :depends-on ("package"))
                (:file "queue"    :depends-on ("package"))
                (:file "mailbox"  :depends-on ("package" "queue"))
                (:file "gate"     :depends-on ("package"))))
@@ -24,6 +25,7 @@
     :components
     ((:file "package")
      (:file "test-utils"   :depends-on ("package"))
+     (:file "test-frlock"  :depends-on ("package" "test-utils"))
      (:file "test-queue"   :depends-on ("package" "test-utils"))
      (:file "test-mailbox" :depends-on ("package" "test-utils"))
      (:file "test-gate"    :depends-on ("package" "test-utils"))))))

@@ -74,3 +74,22 @@ multiple threads must wait for a single event before proceeding.
 @include fun-sb-concurrency-make-gate.texinfo
 @include fun-sb-concurrency-open-gate.texinfo
 @include fun-sb-concurrency-wait-on-gate.texinfo
+
+@page
+@anchor{Section sb-concurrency:frlock}
+@subsection Frlocks, aka Fast Read Locks
+@cindex Frlock
+@cindex Fast Read Lock
+
+@include struct-sb-concurrency-frlock.texinfo
+
+@include macro-sb-concurrency-frlock-read.texinfo
+@include macro-sb-concurrency-frlock-write.texinfo
+
+@include fun-sb-concurrency-make-frlock.texinfo
+@include fun-sb-concurrency-frlock-name.texinfo
+
+@include fun-sb-concurrency-frlock-read-begin.texinfo
+@include fun-sb-concurrency-frlock-read-end.texinfo
+@include fun-sb-concurrency-grab-frlock-write-lock.texinfo
+@include fun-sb-concurrency-release-frlock-write-lock.texinfo

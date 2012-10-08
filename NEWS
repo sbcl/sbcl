@@ -5,6 +5,7 @@ changes relative to sbcl-1.1.1:
     (NT 5.0) is no longer being maintained.
   * notice: Starting with this version, SBCL on Windows no longer supports
     building with disabled thread support.
+  * enhancement: frlocks have been added to SB-CONCURRENCY contrib module.
   * enhancement: New feature sb-dynamic-core allows the runtime to be
     rebuilt or relocated without requiring changes to the core file on
     all linkage table platforms.  Required on Windows.
