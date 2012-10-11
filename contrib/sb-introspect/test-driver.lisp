@@ -299,7 +299,9 @@
   t)
 
 ;;; Skip the whole damn test on GENCGC PPC -- the combination is just
-;;; to flaky for this to make too much sense.
+;;; to flaky for this to make too much sense.  GENCGC SPARC almost
+;;; certainly exhibits the same behavior patterns (or antipatterns) as
+;;; GENCGC PPC.
 ;;;
 ;;; -- It appears that this test can also fail due to systematic issues
 ;;; (possibly with the C compiler used) which we cannot detect based on
@@ -311,7 +313,7 @@
 (deftest* (allocation-information.4
            ;; Ignored as per the comment above, even though it seems
            ;; unlikely that this is the right condition.
-           :fails-on (or :win32 (and :ppc :gencgc)))
+           :fails-on (or :win32 (and (or :ppc :sparc) :gencgc)))
     #+gencgc
     (tai #'cons :heap
          ;; FIXME: This is the canonical GENCGC result. On PPC we sometimes get
