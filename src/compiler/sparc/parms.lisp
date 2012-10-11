@@ -96,7 +96,7 @@
 ;;;; Description of the target address space.
 
 ;;; Where to put the different spaces.  Must match the C code!
-#!+linux
+#!+(and linux cheneygc)
 (progn
   (def!constant linkage-table-space-start #x0f800000)
   (def!constant linkage-table-space-end   #x10000000)
@@ -112,6 +112,20 @@
 
   (def!constant dynamic-1-space-start #x40000000)
   (def!constant dynamic-1-space-end   #x48000000))
+
+#!+(and linux gencgc) ; sensibly small read-only and static spaces
+(progn
+  (def!constant linkage-table-space-start #x0f800000)
+  (def!constant linkage-table-space-end   #x10000000)
+
+  (def!constant read-only-space-start     #x11000000)
+  (def!constant read-only-space-end       #x110ff000)
+
+  (def!constant static-space-start        #x11100000)
+  (def!constant static-space-end          #x111ff000)
+
+  (def!constant dynamic-space-start       #x30000000)
+  (def!constant dynamic-space-end         (!configure-dynamic-space-end)))
 
 #!+(and sunos cheneygc) ; might as well start by trying the same numbers
 (progn

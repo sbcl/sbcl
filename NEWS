@@ -3,8 +3,8 @@ changes relative to sbcl-1.1.0:
   * enhancement: WITH-COMPILATION-UNIT no longer grabs the world-lock.
     (COMPILE and COMPILE-FILE still do.)
   * optimization: the SPARC backend now supports the precise generational
-    (GENCGC) garbage collection.  Enabled by default on Solaris/SPARC.
-    Thanks to Raymond Toy (via CMUCL).
+    (GENCGC) garbage collection.  Enabled by default on Solaris/SPARC and
+    Linux/SPARC.  Thanks to Raymond Toy (via CMUCL).
   * enhancement: add experimental support for the SB-THREAD feature and the
     timer facility on Windows.  Thanks to Dmitry Kalyanov and Anton Kovalenko.
     Threads are enabled by default, and this version of SBCL is considered
