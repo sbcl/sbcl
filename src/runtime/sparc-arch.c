@@ -35,6 +35,9 @@ void arch_init(void)
 
 os_vm_address_t arch_get_bad_addr(int sig, siginfo_t *code, os_context_t *context)
 {
+#if 1 /* New way. */
+    return (os_vm_address_t)code->si_addr;
+#else /* Old way, almost certainly predates sigaction(2)-style handlers */
     unsigned int badinst;
     unsigned int *pc;
     int rs1;
@@ -82,6 +85,7 @@ os_vm_address_t arch_get_bad_addr(int sig, siginfo_t *code, os_context_t *contex
             (*os_context_register_addr(context, rs1) +
              *os_context_register_addr(context, rs2));
     }
+#endif
 }
 
 void arch_skip_instruction(os_context_t *context)
