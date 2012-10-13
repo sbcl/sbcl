@@ -21,3 +21,28 @@
   (:generator 0
     ;; Don't bother doing anything.
     ))
+
+;;;; Unknown values return:
+
+;;; Return a single value using the unknown-values convention.
+(define-vop (return-single)
+  (:args (old-fp :scs (any-reg) :to :eval)
+         (return-pc :scs (descriptor-reg))
+         (value))
+  (:ignore value)
+  (:vop-var vop)
+  (:generator 6
+    (trace-table-entry trace-table-fun-epilogue)
+    ;; Clear the number stack.
+    (let ((cur-nfp (current-nfp-tn vop)))
+      (when cur-nfp
+        (error "Don't know how to clear number stack space in RETURN-SINGLE")))
+    ;; Clear the control stack, and restore the frame pointer.
+    (move sp-tn fp-tn)
+    (move fp-tn old-fp)
+    ;; Indicate a single-valued return by clearing all of the status
+    ;; flags.
+    (inst msr :f 0)
+    ;; Out of here.
+    (inst add pc-tn return-pc (- 4 other-pointer-lowtag))
+    (trace-table-entry trace-table-normal)))
