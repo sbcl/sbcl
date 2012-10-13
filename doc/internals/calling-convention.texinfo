@@ -81,7 +81,7 @@ The local (known-values) calling convention is implemented by the
 @code{known-call-local} and @code{known-return} VOPs.
 
 Local unknown-values calls are handled at the call site by the
-@code{call-local} and @code{mutiple-call-local} VOPs. The main
+@code{call-local} and @code{multiple-call-local} VOPs. The main
 difference between the full call and local call protocols here is that
 local calls use a different frame setup protocol, and will tend to not
 use the normal frame layout for the old frame-pointer and
@@ -191,7 +191,7 @@ EBX} instruction. When expecting more than one value, we need to
 arrange to set up default values when a single-value return happens,
 so we encode a jump around a stub of code which fakes up the register
 use convention of a multiple-value return. Again, in the old
-convention this was a two-byte unconditionl jump, and in the new
+convention this was a two-byte unconditional jump, and in the new
 convention this is a conditional jump based on the carry flag.
 
 

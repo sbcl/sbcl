@@ -177,7 +177,7 @@ this pseudovector of random hash values.  To look a value up from a
 cache from a single class, the hash corresponding to the cache's index
 is looked up and reduced to the size of the cache (by bitmasking, for
 cache sizes of a power of two); then the entry at that index is looked
-up and compared for indentity with the wrapper in question.  If it
+up and compared for identity with the wrapper in question.  If it
 matches, this is a hit; otherwise the cache is walked sequentially from
 this index, skipping the 0th entry.  If the original index is reached,
 the cache does not contain the value sought@footnote{Actually, there's

@@ -15,7 +15,7 @@
 Your primary source of SBCL support should probably be the mailing
 list @strong{sbcl-help}: in addition to other users SBCL developers
 monitor this list and are available for advice. As an anti-spam
-measure subcription is required for posting:
+measure subscription is required for posting:
 
 @urlline{https://lists.sourceforge.net/lists/listinfo/sbcl-help}
 
@@ -123,7 +123,7 @@ send a useful bug report then:
 
 @item
 @cindex ldb
-Compile sbcl with ldb support (feature @code{:sb-ldb}, see
+Compile SBCL with ldb support (feature @code{:sb-ldb}, see
 @file{base-target-features.lisp-expr}) and change @code{#define QSHOW_SIGNAL 0} to
 @code{#define QSHOW_SIGNAL 1} in @file{src/runtime/runtime.h}.
 

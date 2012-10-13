@@ -23,12 +23,12 @@ set of all 256 characters supported by the implementation.  With the
 encompasses the set of all 1114112 characters, while @code{base-char}
 represents the set of the first 128 characters.
 
-The effect of this on string types is that an sbcl configured with
+The effect of this on string types is that an SBCL configured with
 @code{:SB-UNICODE} has three disjoint @code{string} types: @code{(vector
 nil)}, @code{base-string} and @code{(vector character)}.  In a build
 without @code{:SB-UNICODE}, there are two such disjoint types:
 @code{(vector nil)} and @code{(vector character)}; @code{base-string} is
-identially equal to @code{(vector character)}.
+identically equal to @code{(vector character)}.
 
 The @code{SB-KERNEL:CHARACTER-SET-TYPE} represents possibly
 noncontiguous sets of characters as lists of range pairs: for example,

@@ -48,7 +48,7 @@ When a deferrable signal is delivered to a thread within a pseudo
 atomic section the pseudo-atomic-interrupted flag is set, the signal
 and its context are stored, and all deferrable signals blocked. This
 is to guarantee that there is at most one pending handler in
-SBCL. While the signals are blocked, the responsibilty of keeping
+SBCL. While the signals are blocked, the responsibility of keeping
 track of other pending signals lies with the OS.
 
 On leaving the pseudo atomic section, the pending handler is run and
@@ -135,7 +135,7 @@ safe functions to be more precise. Functions passed to
 @code{INTERRUPT-THREAD} have the same restrictions and considerations
 as signal handlers.
 
-Destructive modification, and holding mutexes to protect desctructive
+Destructive modification, and holding mutexes to protect destructive
 modifications from interfering with each other are often the cause of
 non-reentrancy. Recursive locks are not likely to help, and while
 @code{WITHOUT-INTERRUPTS} is, it is considered untrendy to litter the
@@ -177,7 +177,7 @@ It is not easy to debug signal problems. The best bet probably is to
 enable @code{QSHOW} and @code{QSHOW_SIGNALS} in runtime.h and once
 SBCL runs into problems attach gdb. A simple @code{thread apply all
 ba} is already tremendously useful. Another possibility is to send a
-SIGABORT to SBCL to provoke landing in LDB, if it's compiled with it
+SIGABRT to SBCL to provoke landing in LDB, if it's compiled with it
 and it has not yet done so on its own.
 
 Note, that fprintf used by QSHOW is not reentrant and at least on x86

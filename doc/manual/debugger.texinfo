@@ -333,7 +333,7 @@ function. This is a consequence of the way the compiler works: there
 is nothing odd with your program. You will also see @code{:CLEANUP}
 frames during the execution of @code{unwind-protect} cleanup code.
 The @code{:EXTERNAL} and @code{:CLEANUP} above are entry-point types,
-visible only if @code{sb-debug:*show-entry-point-details*} os true.
+visible only if @code{sb-debug:*show-entry-point-details*} is true.
 
 @node  Debug Tail Recursion
 @comment  node-name,  next,  previous,  up

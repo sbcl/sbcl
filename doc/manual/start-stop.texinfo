@@ -313,9 +313,9 @@ special syntax is intended to reduce quoting headaches when invoking
 SBCL from shell scripts.
 
 @item --noprint
-When ordinarily the toplevel "read-eval-print loop" would be exe-
-cuted, execute a "read-eval loop" instead, i.e. don't print a prompt
-and don't echo results. Combined with the @code{--noinform} runtime
+When ordinarily the toplevel "read-eval-print loop" would be executed,
+execute a "read-eval loop" instead, i.e. don't print a prompt and
+don't echo results. Combined with the @code{--noinform} runtime
 option, this makes it easier to write Lisp "scripts" which work
 cleanly in Unix pipelines.
 
@@ -341,9 +341,9 @@ can be omitted: this causes the script to be loaded from standard
 input instead. Shebang lines in standard input script are currently
 @emph{not} ignored.
 
-In either case, if there is an unhandled error (eg. end of file, or a
+In either case, if there is an unhandled error (e.g. end of file, or a
 broken pipe) on either standard input, standard output, or standard
-error, the script silently exits with code 0. This allows eg. safely
+error, the script silently exits with code 0. This allows e.g. safely
 piping output from SBCL to @code{head -n1} or similar.
 
 @end table

@@ -7,7 +7,7 @@ interfaces, and lists legacy interfaces in various stages of
 deprecation.
 
 This should not be confused with those things the ANSI Common Lisp
-standard calls ``deprecated'': the entirety of ANCL CL is supported by
+standard calls ``deprecated'': the entirety of ANSI CL is supported by
 SBCL, and none of those interfaces are subject to censure.
 
 @section Why Deprecate?
@@ -78,8 +78,8 @@ introspective tools such as @code{apropos} more useful.
 @section What Happens During Deprecation?
 
 Deprecation proceeds in three stages, each lasting approximately a
-year. In some cases it migh move slower or faster, but year per stage
-is what we aim at in general.
+year. In some cases it might move slower or faster, but one year per
+stage is what we aim at in general.
 
 During each stage warnings (and errors) of increasing severity are
 signaled, which note that the interface is deprecated, and point users
@@ -97,7 +97,7 @@ is re-implemented on top of its successor. While we try to keep things
 as backwards-compatible as feasible (taking maintenance costs into account),
 sometimes semantics change slightly.
 
-For example, when spinlock API was deprecated, spinlock objects ceased
+For example, when the spinlock API was deprecated, spinlock objects ceased
 to exist, and the whole spinlock API became a synonym for the mutex
 API -- so code using the spinlock API continued working, but silently
 switched to mutexes instead. However, if someone relied on
@@ -190,7 +190,7 @@ led to @code{sb-ext:quit} being deprecated, @code{sb-unix:unix-exit}
 ceased to be used internally. Since @code{SB-UNIX} is an internal package
 not intended for user code to use, and since we're slowly in the process
 of refactoring things to be less Unix-oriented, @code{sb-unix:unix-exit}
-was initially deleted as it was no longer used. Unfortuntely it became
+was initially deleted as it was no longer used. Unfortunately it became
 apparent that it was used by several external users, so it was re-instated
 in deprecated form.
 
@@ -204,7 +204,7 @@ exist in @code{SB-POSIX}.
 
 @strong{Remedy}
 
-For code needing to work with legacy SBCLs, use eg. @code{system-exit}
+For code needing to work with legacy SBCLs, use e.g. @code{system-exit}
 as show above in remedies for @code{sb-ext:quit}. In modern SBCLs
 simply call either @code{sb-posix:exit} or @code{sb-ext:exit} with
 appropriate arguments.
@@ -261,7 +261,7 @@ June 2012.
 
 @strong{Remedy}
 
-For code that needs to support legacy SBCLs, use eg.:
+For code that needs to support legacy SBCLs, use e.g.:
 
 @sp 1
 @lisp
@@ -291,7 +291,7 @@ not arglists.
 
 @strong{Remedy}
 
-For code that needs to support legacy SBCLs, use eg.:
+For code that needs to support legacy SBCLs, use e.g.:
 
 @sp 1
 @lisp

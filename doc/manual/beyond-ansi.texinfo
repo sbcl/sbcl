@@ -290,7 +290,7 @@ between classes and proper names and between lists of the form
 @vindex @sbpcl{+slot-unbound+}
 @findex @sbmop{standard-instance-access}
 @findex @sbmop{funcallable-standard-instance-access}
-distinguising unbound instance allocated slots from bound ones when
+distinguishing unbound instance allocated slots from bound ones when
 using @code{standard-instance-access} and
 @code{funcallable-standard-instance-access} is possible by comparison
 to the constant @code{+slot-unbound+}.

@@ -85,7 +85,7 @@ read and written with the usual input and output functions.
 @quotation
 Streams are @emph{not} created bivalent by default for performance
 reasons.  Bivalent streams are incompatible with
-@code{fast-read-char}, an internal optimization in sbcl's stream
+@code{fast-read-char}, an internal optimization in SBCL's stream
 machinery that bulk-converts octets to characters and implements a
 fast path through @code{read-char}.
 @end quotation

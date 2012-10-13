@@ -134,7 +134,7 @@ callback sequence has 4 parts / stages / bounces:
 
 saves the arguments from the C-call according to the alien-fun-type of
 the callback, and calls #'ENTER-ALIEN-CALLBACK with the index
-indentifying the callback, a pointer to the arguments copied on the
+identifying the callback, a pointer to the arguments copied on the
 stack and a pointer to return value storage. When control returns to
 the wrapper it returns the value to C. There is one assembler wrapper
 per callback.[1] The SAP to the wrapper code vector is what is passed

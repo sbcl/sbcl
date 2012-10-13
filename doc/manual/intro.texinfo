@@ -108,7 +108,7 @@ Hooks for Users}.
 @code{sb-aclrepl} provides an Allegro CL -style toplevel for SBCL,
 as an alternative to the classic CMUCL-style one. @xref{sb-aclrepl}.
 
-@item CLTL2 Compatility Layer
+@item CLTL2 Compatibility Layer
 @code{sb-cltl2} module provides @code{compiler-let} and environment
 access functionality described in @cite{Common Lisp The Language, 2nd
 Edition} which were removed from the language during the ANSI
@@ -122,7 +122,7 @@ runtime.
 
 @item Bitwise Rotation
 @code{sb-rotate-byte} provides an efficient primitive for bitwise
-rotation of integers, an operation required by eg. numerous
+rotation of integers, an operation required by e.g. numerous
 cryptographic algorithms, but not available as a primitive in ANSI
 Common Lisp. @xref{sb-rotate-byte}.
 
@@ -234,7 +234,7 @@ code can be rewritten in portable ANSI Common Lisp which has the
 desired behavior. E.g., the code above can be given an exactly defined
 meaning by replacing @code{defconstant} either with
 @code{defparameter} or with a customized macro which does the right
-thing, eg.
+thing, e.g.
 @lisp
 (defmacro define-constant (name value &optional doc)
   `(defconstant ,name (if (boundp ',name) (symbol-value ',name) ,value)
@@ -353,7 +353,7 @@ The SBCL website at @uref{http://www.sbcl.org/} has some general
 information, plus links to mailing lists devoted to SBCL, and to
 archives of these mailing lists. Subscribing to the mailing lists
 @cite{sbcl-help} and @cite{sbcl-announce} is recommended: both are
-fairly low-volume, and help you keep abrest with SBCL development.
+fairly low-volume, and help you keep abreast with SBCL development.
 
 @node Online Documentation
 @comment  node-name,  next,  previous,  up
@@ -375,7 +375,7 @@ case the documentation strings are only readable in the source code.
 
 Besides this user manual both SBCL source and binary distributions
 include some other SBCL-specific documentation files, which should be
-installed along with this manual in on your system, eg. in
+installed along with this manual on your system, e.g. in
 @file{/usr/local/share/doc/sbcl/}.
 
 @table @file
@@ -487,8 +487,8 @@ lesser differences as well. This book tends to help with the culture
 shock.
 
 @item Art Of Metaobject Programming, by Gregor Kiczales et al.
-Currently to prime source of information on the Common Lisp Metaobject
-Protocol, which is supported by SBCL. Section 2 (Chapers 5 and 6) are
+Currently the prime source of information on the Common Lisp Metaobject
+Protocol, which is supported by SBCL. Section 2 (Chapters 5 and 6) are
 freely available at @uref{http://www.lisp.org/mop/}.
 
 @end table
@@ -598,7 +598,7 @@ Other major changes since the fork from CMUCL include
 SBCL has removed many CMUCL extensions, (e.g. IP networking,
 remote procedure call, Unix system interface, and X11 interface) from
 the core system. Most of these are available as contributed modules
-(distributed with sbcl) or third-party modules instead.
+(distributed with SBCL) or third-party modules instead.
 
 @item
 SBCL has deleted or deprecated some nonstandard features and code

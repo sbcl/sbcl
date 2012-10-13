@@ -22,7 +22,7 @@ Structure slot accessors are efficient only if the compiler is able to
 open code them: compiling a call to a structure slot accessor before
 the structure is defined, declaring one @code{notinline}, or passing
 it as a functional argument to another function causes severe
-perfomance degradation.
+performance degradation.
 
 @subsection Standard object slot access
 
@@ -286,9 +286,10 @@ Syntax: @code{(sb-ext:always-bound symbol*)}
 
 Only valid as a global proclamation.
 
-Specifies that the named symbols is always bound. Inhibits @code{makunbound}
-of the named symbols. Proclaiming an unbound symbol as @code{always-bound} signals
-an error. Allows compiler to elide boundness checks from value lookups.
+Specifies that the named symbols are always bound. Inhibits
+@code{makunbound} of the named symbols. Proclaiming an unbound symbol
+as @code{always-bound} signals an error. Allows the compiler to elide
+boundness checks from value lookups.
 @end deffn
 
 @node  Miscellaneous Efficiency Issues

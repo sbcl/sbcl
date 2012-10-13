@@ -118,7 +118,7 @@ lockless algorithms.
 
 Our @code{compare-and-swap} is user-extensible using a protocol
 similar to @code{setf}, allowing users to add CAS support to new
-places via eg. @code{defcas}.
+places via e.g. @code{defcas}.
 
 At the same time, new atomic operations can be built on top of CAS
 using @code{get-cas-expansion}. See @code{atomic-update},
@@ -174,7 +174,7 @@ that they go to sleep.
 @section Semaphores
 
 Semaphores are among other things useful for keeping track of a
-countable resource, eg. messages in a queue, and sleep when the
+countable resource, e.g. messages in a queue, and sleep when the
 resource is exhausted.
 
 @include struct-sb-thread-semaphore.texinfo
@@ -209,7 +209,7 @@ There are three components:
 the condition itself (not represented in code)
 
 @item
-the condition variable (a.k.a waitqueue) which proxies for it
+the condition variable (a.k.a. waitqueue) which proxies for it
 
 @item
 a lock to hold while testing the condition
