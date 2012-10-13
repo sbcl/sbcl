@@ -11,6 +11,48 @@
 
 (in-package "SB!VM")
 
+;;;; Frame hackery:
+
+(define-vop (xep-allocate-frame)
+  (:info start-lab copy-more-arg-follows)
+  (:ignore copy-more-arg-follows)
+  (:vop-var vop)
+  (:temporary (:scs (any-reg)) temp)
+  (:generator 1
+    ;; Make sure the function is aligned, and drop a label pointing to this
+    ;; function header.
+    (emit-alignment n-lowtag-bits)
+    (trace-table-entry trace-table-fun-prologue)
+    (emit-label start-lab)
+    ;; Allocate function header.
+    (inst simple-fun-header-word)
+    (dotimes (i (1- simple-fun-code-offset))
+      (inst word 0))
+    ;; Calculate the address of the code component.  This is an
+    ;; exercise in excess cleverness.  First, we calculate (from our
+    ;; program counter only) the address of START-LAB plus
+    ;; OTHER-POINTER-LOWTAG.  The extra two words are to compensate
+    ;; for the offset applied by ARM CPUs when reading the program
+    ;; counter.
+    (inst sub lip-tn pc-tn (+ other-pointer-lowtag
+                              (- (* (+ 2 simple-fun-code-offset)
+                                    n-word-bytes))))
+    ;; Next, we read the function header.
+    (loadw temp lip-tn 0 other-pointer-lowtag)
+    ;; And finally we use the header value (a count in words), plus
+    ;; the fact that the top two bits of SIMPLE-FUN-HEADER-LOWTAG are
+    ;; clear (the value is #x2A) to compute the boxed address of the
+    ;; code component.
+    (inst sub code-tn lip-tn (lsr temp (- 8 word-shift)))
+    ;; Build our stack frames.
+    (inst add sp-tn fp-tn
+          (* n-word-bytes (sb-allocated-size 'control-stack)))
+    (let ((nfp-tn (current-nfp-tn vop)))
+      (when nfp-tn
+        (error "Don't know how to allocate number stack space")))
+    (trace-table-entry trace-table-normal)))
+
+
 ;;;; XEP hackery:
 
 ;;; We don't need to do anything special for regular functions.
