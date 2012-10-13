@@ -662,7 +662,6 @@
 ;;; drop-through, but emit an unconditional branch afterward if we
 ;;; fail. NOT-P is true if the sense of the TEMPLATE's test should be
 ;;; negated.
-#!-arm
 (defun ir2-convert-conditional (node block template args info-args if not-p)
   (declare (type node node) (type ir2-block block)
            (type template template) (type (or tn-ref null) args)
@@ -2002,9 +2001,6 @@
                                 (aver (not named))
                                 tn)))))))
               ((not (eq (ir2-block-next 2block) (block-info target)))
-               #!+arm
-               (error "Should VOP BRANCH here.")
-               #!-arm
                (vop branch last 2block (block-label target)))
               (t
                (register-drop-thru target))))))
