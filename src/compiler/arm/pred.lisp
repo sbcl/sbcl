@@ -11,4 +11,13 @@
 
 (in-package "SB!VM")
 
-;;; Dummy placeholder file.
+
+;;;; The Branch VOP.
+
+;;; The unconditional branch, emitted when we can't drop through to the desired
+;;; destination.  Dest is the continuation we transfer control to.
+;;;
+(define-vop (branch)
+  (:info dest)
+  (:generator 5
+    (inst b dest)))
