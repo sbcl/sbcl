@@ -2991,6 +2991,7 @@ core and return a descriptor to it."
   (format t "#define GC_SAFEPOINT_PAGE_ADDR ((void*)0x~XUL) /* ~:*~A */~%"
             sb!vm:gc-safepoint-page-addr)
 
+  #!-arm
   (dolist (symbol '(sb!vm::float-traps-byte
                     sb!vm::float-exceptions-byte
                     sb!vm::float-sticky-bits
