@@ -21,3 +21,22 @@
   (:info dest)
   (:generator 5
     (inst b dest)))
+
+
+;;;; Generic conditional VOPs
+
+;;; The generic conditional branch, emitted immediately after test
+;;; VOPs that only set flags.
+
+;;; FIXME: Unlike the PPC (from whence this was cribbed), ARM actually
+;;; has flags.  We should take advantage of them here.
+
+(define-vop (branch-if)
+  (:info dest flags not-p)
+  (:ignore dest flags not-p)
+  (:generator 0
+     (error "BRANCH-IF not yet implemented")))
+
+(defun convert-conditional-move-p (node dst-tn x-tn y-tn)
+  (declare (ignore node dst-tn x-tn y-tn))
+  nil)
