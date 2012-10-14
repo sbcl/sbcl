@@ -306,8 +306,10 @@
       (setf (ir2-lvar-stack-pointer info)
             (make-stack-pointer-tn)))))
 
-#!-arm
 (defoptimizer (%allocate-closures ir2-convert) ((leaves) call 2block)
+  #!+arm
+  (error "Don't know how to %ALLOCATE-CLOSURES")
+  #!-arm
   (let ((dx-p (lvar-dynamic-extent leaves)))
     (collect ((delayed))
       (when dx-p
@@ -1476,8 +1478,10 @@
 ;;; Reset the stack pointer to the start of the specified
 ;;; unknown-values lvar (discarding it and all values globs on top of
 ;;; it.)
-#!-arm
 (defoptimizer (%pop-values ir2-convert) ((%lvar) node block)
+  #!+arm
+  (error "Don't know how to %POP-VALUES")
+  #!-arm
   (let* ((lvar (lvar-value %lvar))
          (2lvar (lvar-info lvar)))
     (cond ((eq (ir2-lvar-kind 2lvar) :unknown)
@@ -1489,10 +1493,12 @@
           (t (bug "Trying to pop a not stack-allocated LVAR ~S."
                   lvar)))))
 
-#!-arm
 (defoptimizer (%nip-values ir2-convert) ((last-nipped last-preserved
                                                       &rest moved)
                                          node block)
+  #!+arm
+  (error "Don't know how to %NIP-VALUES")
+  #!-arm
   (let* ( ;; pointer immediately after the nipped block
          (after (lvar-value last-nipped))
          (2after (lvar-info after))
@@ -1539,8 +1545,10 @@
 ;;; VALUES-LIST function. This gets the full call VOP to deal with
 ;;; defaulting any unsupplied values. It seems unworthwhile to
 ;;; optimize this case.
-#!-arm
 (defoptimizer (values-list ir2-convert) ((list) node block)
+  #!+arm
+  (error "Don't know how to VALUES-LIST")
+  #!-arm
   (let* ((lvar (node-lvar node))
          (2lvar (and lvar (lvar-info lvar))))
     (cond ((and 2lvar
@@ -1553,8 +1561,10 @@
                        (eq (ir2-lvar-kind 2lvar) :fixed)))
              (ir2-convert-full-call node block)))))
 
-#!-arm
 (defoptimizer (%more-arg-values ir2-convert) ((context start count) node block)
+  #!+arm
+  (error "Don't know how to %MORE-ARG-VALUES")
+  #!-arm
   (binding* ((lvar (node-lvar node) :exit-if-null)
              (2lvar (lvar-info lvar)))
     (ecase (ir2-lvar-kind 2lvar)
@@ -1582,8 +1592,10 @@
 
 ;;; This is trivial, given our assumption of a shallow-binding
 ;;; implementation.
-#!-arm
 (defoptimizer (%special-bind ir2-convert) ((var value) node block)
+  #!+arm
+  (error "Don't know how to %SPECIAL-BIND")
+  #!-arm
   (let ((name (leaf-source-name (lvar-value var))))
     #!-(and sb-thread x86-64)
     (vop bind node block (lvar-tn node block value) (emit-constant name))
@@ -1594,8 +1606,10 @@
       (emit-constant name)
       (vop sb!vm::bind/let node block (lvar-tn node block value) name))))
 
-#!-arm
 (defoptimizer (%special-unbind ir2-convert) ((var) node block)
+  #!+arm
+  (error "Don't know how to %SPECIAL-UNBIND")
+  #!-arm
   (vop unbind node block))
 
 ;;; ### It's not clear that this really belongs in this file, or
@@ -1674,8 +1688,10 @@
 ;;; This function invalidates a lexical exit on exiting from the
 ;;; dynamic extent. This is done by storing 0 into the indirect value
 ;;; cell that holds the closed unwind block.
-#!-arm
 (defoptimizer (%lexical-exit-breakup ir2-convert) ((info) node block)
+  #!+arm
+  (error "Don't know how to %LEXICAL-EXIT-BREAKUP")
+  #!-arm
   (let ((nlx (lvar-value info)))
     (when (nlx-info-safe-p nlx)
       (vop value-cell-set node block
@@ -1779,8 +1795,10 @@
 ;;; UNWIND-PROTECT case, the values receiving restores the stack
 ;;; pointer. In an UNWIND-PROTECT cleanup, we want to leave the stack
 ;;; pointer alone, since the thrown values are still out there.
-#!-arm
 (defoptimizer (%nlx-entry ir2-convert) ((info-lvar) node block)
+  #!+arm
+  (error "Don't know how to %NLX-ENTRY")
+  #!-arm
   (let* ((info (lvar-value info-lvar))
          (lvar (node-lvar node))
          (2info (nlx-info-info info))
@@ -1982,17 +2000,12 @@
                         (ftype (and (info :function :info name) ; only use the FTYPE if
                                     (info :function :type name)))) ; NAME was DEFKNOWN
                    (unless (or (node-tail-p last)
-<<<<<<< HEAD
                                (policy last (zerop safety))
                                (and (fun-type-p ftype)
                                     (eq *empty-type* (fun-type-returns ftype))))
-=======
-                               (info :function :info name)
-                               (policy last (zerop safety)))
                      #!+arm
                      (error "Should VOP NIL-FUN-RETURNED-ERROR here.")
                      #!-arm
->>>>>>> compiler/ir2tran: Disable most of the important bits on ARM.
                      (vop nil-fun-returned-error last 2block
                           (if name
                               (emit-constant name)
