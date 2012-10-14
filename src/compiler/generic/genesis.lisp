@@ -1590,9 +1590,9 @@ core and return a descriptor to it."
                        (ecase type
                          (#.sb!vm:simple-fun-header-widetag
                           (/show0 "static-fset (simple-fun)")
-                          #!+sparc
+                          #!+(or sparc arm)
                           defn
-                          #!-sparc
+                          #!-(or sparc arm)
                           (make-random-descriptor
                            (+ (logandc2 (descriptor-bits defn)
                                         sb!vm:lowtag-mask)
