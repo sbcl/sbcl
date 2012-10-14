@@ -196,3 +196,7 @@
   (defregtn sp any-reg)
   (defregtn fp any-reg)
   (defregtn pc any-reg))
+
+(defun combination-implementation-style (node)
+  (declare (type sb!c::combination node) (ignore node))
+  (values :default nil))
