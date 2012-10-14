@@ -33,15 +33,15 @@
   (defreg r1 1)
   (defreg r2 2)
   (defreg r3 3)
-  (defreg r4 4)
+  (defreg lra 4)
   (defreg code 5)
   (defreg lip 6)
   (defreg r7 7)
-  (defreg r8 8)
-  (defreg r9 9)
+  (defreg ocfp 8)
+  (defreg nfp 9)
   (defreg null 10)
   (defreg fp 11)
-  (defreg r12 12)
+  (defreg nargs 12)
   (defreg sp 13)
   (defreg lr 14)
   (defreg pc 15) ;; Yes, the program counter.
@@ -50,10 +50,10 @@
       lip null fp sp lr pc code)
 
   (defregset descriptor-regs
-      r0 r1 r2 r3 r4)
+      r0 r1 r2 r3 lra)
 
   (defregset non-descriptor-regs
-      r7 r8 r9 r12)
+      r7 ocfp nfp nargs)
 
   ;; registers used to pass arguments
   ;;
