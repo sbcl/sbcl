@@ -196,6 +196,28 @@
   (defregtn sp any-reg)
   (defregtn fp any-reg)
   (defregtn pc any-reg))
+
+;;;; function call parameters
+
+;;; the SC numbers for register and stack arguments/return values
+(def!constant register-arg-scn (meta-sc-number-or-lose 'descriptor-reg))
+(def!constant immediate-arg-scn (meta-sc-number-or-lose 'any-reg))
+(def!constant control-stack-arg-scn (meta-sc-number-or-lose 'control-stack))
+
+;;; offsets of special stack frame locations
+(def!constant ocfp-save-offset 0)
+(def!constant lra-save-offset 1)
+(def!constant nfp-save-offset 2)
+
+
+;;; A list of TN's describing the register arguments.
+;;;
+(defparameter *register-arg-tns*
+  (mapcar #'(lambda (n)
+              (make-random-tn :kind :normal
+                              :sc (sc-or-lose 'descriptor-reg)
+                              :offset n))
+          *register-arg-offsets*))
 
 (defun combination-implementation-style (node)
   (declare (type sb!c::combination node) (ignore node))

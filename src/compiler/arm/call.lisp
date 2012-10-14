@@ -11,6 +11,90 @@
 
 (in-package "SB!VM")
 
+;;;; Interfaces to IR2 conversion:
+
+;;; Return a wired TN describing the N'th full call argument passing
+;;; location.
+(defun standard-arg-location (n)
+  (declare (type unsigned-byte n))
+  (if (< n register-arg-count)
+      (make-wired-tn *backend-t-primitive-type* register-arg-scn
+                     (elt *register-arg-offsets* n))
+      (make-wired-tn *backend-t-primitive-type* control-stack-arg-scn n)))
+
+
+;;; Make a passing location TN for a local call return PC.  If
+;;; standard is true, then use the standard (full call) location,
+;;; otherwise use any legal location.  Even in the non-standard case,
+;;; this may be restricted by a desire to use a subroutine call
+;;; instruction.
+(defun make-return-pc-passing-location (standard)
+  (if standard
+      (make-wired-tn *backend-t-primitive-type* register-arg-scn lra-offset)
+      (make-restricted-tn *backend-t-primitive-type* register-arg-scn)))
+
+;;; This is similar to MAKE-RETURN-PC-PASSING-LOCATION, but makes a
+;;; location to pass OLD-FP in. This is (obviously) wired in the
+;;; standard convention, but is totally unrestricted in non-standard
+;;; conventions, since we can always fetch it off of the stack using
+;;; the arg pointer.
+(defun make-old-fp-passing-location (standard)
+  (if standard
+      (make-wired-tn *fixnum-primitive-type* immediate-arg-scn ocfp-offset)
+      (make-normal-tn *fixnum-primitive-type*)))
+
+;;; Make the TNs used to hold OLD-FP and RETURN-PC within the current
+;;; function. We treat these specially so that the debugger can find
+;;; them at a known location.
+(defun make-old-fp-save-location (env)
+  (specify-save-tn
+   (physenv-debug-live-tn (make-normal-tn *fixnum-primitive-type*) env)
+   (make-wired-tn *fixnum-primitive-type*
+                  control-stack-arg-scn
+                  ocfp-save-offset)))
+(defun make-return-pc-save-location (env)
+  (specify-save-tn
+   (physenv-debug-live-tn (make-normal-tn *backend-t-primitive-type*) env)
+   (make-wired-tn *backend-t-primitive-type*
+                  control-stack-arg-scn
+                  lra-save-offset)))
+
+;;; Make a TN for the standard argument count passing location.  We
+;;; only need to make the standard location, since a count is never
+;;; passed when we are using non-standard conventions.
+(defun make-arg-count-location ()
+  (make-wired-tn *fixnum-primitive-type* immediate-arg-scn nargs-offset))
+
+
+;;; Make a TN to hold the number-stack frame pointer.  This is
+;;; allocated once per component, and is component-live.
+(defun make-nfp-tn ()
+  (component-live-tn
+   (make-wired-tn *fixnum-primitive-type* immediate-arg-scn nfp-offset)))
+
+(defun make-stack-pointer-tn ()
+  (make-normal-tn *fixnum-primitive-type*))
+
+(defun make-number-stack-pointer-tn ()
+  (make-normal-tn *fixnum-primitive-type*))
+
+;;; Return a list of TNs that can be used to represent an unknown-values
+;;; continuation within a function.
+(defun make-unknown-values-locations ()
+  (list (make-stack-pointer-tn)
+        (make-normal-tn *fixnum-primitive-type*)))
+
+;;; This function is called by the ENTRY-ANALYZE phase, allowing
+;;; VM-dependent initialization of the IR2-COMPONENT structure.  We push
+;;; placeholder entries in the Constants to leave room for additional
+;;; noise in the code object header.
+(defun select-component-format (component)
+  (declare (type component component))
+  (dotimes (i code-constants-offset)
+    (vector-push-extend nil
+                        (ir2-component-constants (component-info component))))
+  (values))
+
 ;;;; Frame hackery:
 
 (define-vop (xep-allocate-frame)
