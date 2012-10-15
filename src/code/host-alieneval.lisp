@@ -1003,7 +1003,7 @@
 
 ;;; FIXME: This is really pretty horrible: we avoid creating new
 ;;; ALIEN-RECORD-TYPE objects when a live one is flitting around the
-;;; system already. This way forwrd-references sans fields get get
+;;; system already. This way forward-references sans fields get
 ;;; "updated" for free to contain the field info. Maybe rename
 ;;; MAKE-ALIEN-RECORD-TYPE to %MAKE-ALIEN-RECORD-TYPE and use
 ;;; ENSURE-ALIEN-RECORD-TYPE instead. --NS 20040729
@@ -1052,7 +1052,8 @@
         (overall-alignment 1)
         (parsed-fields nil))
     (dolist (field fields)
-      (destructuring-bind (var type &key alignment) field
+      (destructuring-bind (var type &key alignment bits offset) field
+        (declare (ignore bits))
         (let* ((field-type (parse-alien-type type env))
                (bits (alien-type-bits field-type))
                (parsed-field
@@ -1068,7 +1069,7 @@
           (setf overall-alignment (max overall-alignment alignment))
           (ecase kind
             (:struct
-             (let ((offset (align-offset total-bits alignment)))
+             (let ((offset (or offset (align-offset total-bits alignment))))
                (setf (alien-record-field-offset parsed-field) offset)
                (setf total-bits (+ offset bits))))
             (:union
@@ -1095,7 +1096,9 @@
   `(,(alien-record-field-name field)
      ,(%unparse-alien-type (alien-record-field-type field))
      ,@(when (alien-record-field-bits field)
-             (list (alien-record-field-bits field)))))
+             (list :bits (alien-record-field-bits field)))
+     ,@(when (alien-record-field-offset field)
+             (list :offset (alien-record-field-offset field)))))
 
 ;;; Test the record fields. Keep a hashtable table of already compared
 ;;; types to detect cycles.
