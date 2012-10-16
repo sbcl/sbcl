@@ -197,6 +197,21 @@
   (defregtn fp any-reg)
   (defregtn pc any-reg))
 
+;;; If VALUE can be represented as an immediate constant, then return the
+;;; appropriate SC number, otherwise return NIL.
+(defun immediate-constant-sc (value)
+  (typecase value
+    (null
+     (sc-number-or-lose 'null))
+    ((unsigned-byte 8)
+     ;; FIXME: Shifter arguments allow more range than this under
+     ;; certain circumstances (mostly to do with trailing zeros).
+     (sc-number-or-lose 'immediate))
+    (symbol
+     (if (static-symbol-p value)
+         (sc-number-or-lose 'immediate)
+         nil))))
+
 ;;;; function call parameters
 
 ;;; the SC numbers for register and stack arguments/return values
