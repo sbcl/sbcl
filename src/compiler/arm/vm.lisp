@@ -211,6 +211,10 @@
      (if (static-symbol-p value)
          (sc-number-or-lose 'immediate)
          nil))))
+
+(defun boxed-immediate-sc-p (sc)
+  (or (eql sc (sc-number-or-lose 'null))
+      (eql sc (sc-number-or-lose 'immediate))))
 
 ;;;; function call parameters
 
