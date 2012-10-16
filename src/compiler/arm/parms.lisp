@@ -61,7 +61,6 @@
 
 ;;;; Static symbols.
 
-
 ;;; These symbols are loaded into static space directly after NIL so
 ;;; that the system can compute their address by adding a constant
 ;;; amount to NIL.
@@ -74,7 +73,14 @@
   (append
    *common-static-symbols*
    *c-callable-static-symbols*
-   '(*number-stack-pointer*)))
+   '(*allocation-pointer*
+
+     *binding-stack-pointer*
+     *number-stack-pointer*
+
+     ;; interrupt handling
+     *pseudo-atomic-atomic*
+     *pseudo-atomic-interrupted*)))
 
 (defparameter *static-funs*
   '())
