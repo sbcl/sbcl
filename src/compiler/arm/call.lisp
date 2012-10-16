@@ -142,6 +142,17 @@
         (error "Don't know how to allocate number stack space")))
     (trace-table-entry trace-table-normal)))
 
+;;; Allocate a partial frame for passing stack arguments in a full call.  Nargs
+;;; is the number of arguments passed.  If no stack arguments are passed, then
+;;; we don't have to do anything.
+(define-vop (allocate-full-call-frame)
+  (:info nargs)
+  (:results (res :scs (any-reg)))
+  (:generator 2
+    (when (> nargs register-arg-count)
+      (move res sp-tn)
+      (inst add sp-tn sp-tn (* nargs n-word-bytes)))))
+
 
 ;;; This hook in the codegen pass lets us insert code before fall-thru entry
 ;;; points, local-call entry points, and tail-call entry points.  The default
