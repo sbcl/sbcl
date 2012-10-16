@@ -494,8 +494,8 @@
     (labels ((frob (mask index)
                (let* ((field (aref fields index))
                       (field-mask (cdr (assoc field
-                                              '((#\c . #b0001) (#\x . #b0010)
-                                                (#\s . #b0100) (#\f . #b1000))
+                                              '((#\C . #b0001) (#\X . #b0010)
+                                                (#\S . #b0100) (#\F . #b1000))
                                               :test #'char=))))
                  (unless field-mask
                    (error "bad status register field desginator ~S" fields))
