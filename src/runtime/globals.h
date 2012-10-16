@@ -112,6 +112,12 @@ extern void globals_init(void);
 # if defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64)
 #  define EXTERN(name,bytes) .global name
 # endif
+/**/
+# ifdef LISP_FEATURE_ARM
+#  ifdef __linux__
+#   define EXTERN(name,bytes) .global name
+#  endif
+# endif
 
 # if defined(LISP_FEATURE_ALPHA) || defined(LISP_FEATURE_X86_64)
 #  define POINTERSIZE 8
