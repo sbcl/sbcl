@@ -168,7 +168,9 @@
     (move fp-tn old-fp)
     ;; Indicate a single-valued return by clearing all of the status
     ;; flags.
-    (inst msr :f 0)
+    (inst msr (cpsr :f) 0)
     ;; Out of here.
+    #+(or) ;; Doesn't work, can't have a negative immediate value.
     (inst add pc-tn return-pc (- 4 other-pointer-lowtag))
+    (inst sub pc-tn return-pc (- other-pointer-lowtag 4))
     (trace-table-entry trace-table-normal)))
