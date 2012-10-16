@@ -224,6 +224,9 @@
     ;; :NOT-HOST is also set, since the SBCL assembler doesn't exist
     ;; while the cross-compiler is being built in the host ANSI Lisp.)
     :assem
+    ;; meaning: This file is for bootstrapping the ARM backend, and
+    ;; only files with this flag will be built by the cross-compiler.
+    :arm-bootstrap
     ;; meaning: The #'COMPILE-STEM argument called :IGNORE-FAILURE-P
     ;; should be true. (This is a KLUDGE: I'd like to get rid of it.
     ;; For now, it exists so that compilation can proceed through the

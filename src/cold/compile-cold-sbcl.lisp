@@ -18,7 +18,8 @@
 
 (let ((reversed-target-object-file-names nil))
   (do-stems-and-flags (stem flags)
-    (unless (position :not-target flags)
+    (#!-arm unless #!-arm (position :not-target flags)
+            #!+arm when #!+arm (position :arm-bootstrap flags)
       (push (target-compile-stem stem flags)
             reversed-target-object-file-names)
       #!+sb-show (warn-when-cl-snapshot-diff *cl-snapshot*)))
