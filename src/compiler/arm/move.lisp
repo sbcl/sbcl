@@ -16,6 +16,8 @@
    (any-reg descriptor-reg))
   (let ((val (tn-value x)))
     (etypecase val
+      (integer
+       (inst mov y (fixnumize val)))
       (null
        (move y null-tn)))))
 
