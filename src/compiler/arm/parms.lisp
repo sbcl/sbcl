@@ -48,7 +48,16 @@
     (def!constant dynamic-0-space-end   #x66fff000)
     (def!constant dynamic-1-space-start #x67000000)
     (def!constant dynamic-1-space-end   #x7efff000)))
+
+;;;; other miscellaneous constants
 
+(defenum (:start 8)
+  halt-trap
+  pending-interrupt-trap
+  error-trap
+  cerror-trap
+  breakpoint-trap
+  fun-end-breakpoint-trap)
 
 ;;;; Static symbols.
 
