@@ -32,7 +32,7 @@
   (defreg r0 0)
   (defreg r1 1)
   (defreg r2 2)
-  (defreg r3 3)
+  (defreg lexenv 3)
   (defreg lra 4)
   (defreg code 5)
   (defreg lip 6)
@@ -50,18 +50,18 @@
       lip null fp sp lr pc code)
 
   (defregset descriptor-regs
-      r0 r1 r2 r3 lra)
+      r0 r1 r2 lexenv lra r7)
 
   (defregset non-descriptor-regs
-      r7 ocfp nfp nargs)
+      ocfp nfp nargs)
 
   ;; registers used to pass arguments
   ;;
   ;; the number of arguments/return values passed in registers
-  (def!constant  register-arg-count 4)
+  (def!constant  register-arg-count 3)
   ;; names and offsets for registers used to pass arguments
-  (defregset *register-arg-offsets*  r0 r1 r2 r3)
-  (defparameter *register-arg-names* '(r0 r1 r2 r3)))
+  (defregset *register-arg-offsets*  r0 r1 r2)
+  (defparameter *register-arg-names* '(r0 r1 r2)))
 
 
 ;;;; SB and SC definition:
