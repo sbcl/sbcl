@@ -129,7 +129,6 @@
            nil))))
 
 ;;; Convert a REF node. The reference must not be delayed.
-#!-arm
 (defun ir2-convert-ref (node block)
   (declare (type ref node) (type ir2-block block))
   (let* ((lvar (node-lvar node))
@@ -144,6 +143,9 @@
              (explicit (lambda-var-explicit-value-cell leaf)))
          (cond
           ((and indirect explicit)
+           #!+arm
+           (error "Don't know how to VALUE-CELL-REF")
+           #!-arm
            (vop value-cell-ref node block tn res))
           ((and indirect
                 (not (eq (node-physenv node)
@@ -152,6 +154,9 @@
                                  (primitive-type (leaf-type leaf))))))
              (if reffer
                  (funcall reffer node block tn (leaf-info leaf) res)
+                 #!+arm
+                 (error "Don't know how to ANCESTOR-FRAME-REF")
+                 #!-arm
                  (vop ancestor-frame-ref node block tn (leaf-info leaf) res))))
           (t (emit-move node block tn res)))))
       (constant
@@ -169,12 +174,18 @@
     (ecase (global-var-kind leaf)
       ((:special :unknown)
        (aver (symbolp name))
+       #!+arm
+       (error "Don't know how to {FAST-,}SYMBOL-VALUE")
+       #!-arm
        (let ((name-tn (emit-constant name)))
          (if (or unsafe (always-boundp name))
              (vop fast-symbol-value node block name-tn res)
              (vop symbol-value node block name-tn res))))
       (:global
        (aver (symbolp name))
+       #!+arm
+       (error "Don't know how to {FAST-,}SYMBOL-GLOBAL-VALUE")
+       #!-arm
        (let ((name-tn (emit-constant name)))
          (if (or unsafe (always-boundp name))
              (vop fast-symbol-global-value node block name-tn res)
@@ -188,6 +199,9 @@
               (emit-move node block (make-load-time-constant-tn :known-fun name)
                          res))
              (t
+              #!+arm
+              (error "Don't know how to {SAFE-,}FDEFN-FUN")
+              #!-arm
               (let ((fdefn-tn (make-load-time-constant-tn :fdefinition name)))
                 (if unsafe
                     (vop fdefn-fun node block fdefn-tn res)
