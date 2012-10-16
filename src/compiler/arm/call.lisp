@@ -118,9 +118,9 @@
     ;; OTHER-POINTER-LOWTAG.  The extra two words are to compensate
     ;; for the offset applied by ARM CPUs when reading the program
     ;; counter.
-    (inst sub lip-tn pc-tn (+ other-pointer-lowtag
-                              (- (* (+ 2 simple-fun-code-offset)
-                                    n-word-bytes))))
+    (inst sub lip-tn pc-tn (- (* (+ 2 simple-fun-code-offset)
+                                 n-word-bytes)
+                              other-pointer-lowtag))
     ;; Next, we read the function header.
     (loadw temp lip-tn 0 other-pointer-lowtag)
     ;; And finally we use the header value (a count in words), plus
