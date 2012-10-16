@@ -908,7 +908,6 @@
 ;;; into the appropriate passing locations. After setting up the args
 ;;; and environment, we just move our return-pc into the called
 ;;; function's passing location.
-#!-arm
 (defun ir2-convert-tail-local-call (node block fun)
   (declare (type combination node) (type ir2-block block) (type clambda fun))
   (let ((this-env (physenv-info (node-physenv node)))
@@ -1112,7 +1111,6 @@
   (values))
 
 ;;; like IR2-CONVERT-LOCAL-CALL-ARGS, only different
-#!-arm
 (defun ir2-convert-full-call-args (node block)
   (declare (type combination node) (type ir2-block block))
   (let* ((args (basic-combination-args node))
@@ -1136,7 +1134,6 @@
 ;;; Do full call when a fixed number of values are desired. We make
 ;;; STANDARD-RESULT-TNS for our lvar, then deliver the result using
 ;;; MOVE-LVAR-RESULT. We do named or normal call, as appropriate.
-#!-arm
 (defun ir2-convert-fixed-full-call (node block)
   (declare (type combination node) (type ir2-block block))
   (multiple-value-bind (fp args arg-locs nargs)
