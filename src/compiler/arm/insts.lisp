@@ -326,7 +326,7 @@
                                ,opcode
                                ,(if src-p '(tn-offset src) 0)
                                ,(if dest-p '(tn-offset dest) 0)
-                               shifter-operand))))))
+                               (ldb (byte 12 0) shifter-operand)))))))
 
 (define-data-processing-instruction and  #x00 t t)
 (define-data-processing-instruction ands #x01 t t)
@@ -519,7 +519,8 @@
        (emit-dp-instruction segment (conditional-opcode condition)
                             #b00 (ldb (byte 1 25) encoded-src)
                             (if (logbitp 4 field-mask) #b10110 #b10010)
-                            field-mask #b1111 encoded-src)))))
+                            field-mask #b1111
+                            (ldb (byte 12 0) encoded-src))))))
 
 ;;;; Multiply instructions
 
