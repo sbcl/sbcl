@@ -211,14 +211,15 @@
      (dpb 1 (byte 1 25) (encode-shifter-immediate operand)))
 
     (tn
-     (ecase (sb-name (sc-sb (tn-sc operand)))
-       (registers
+     (cond
+       ((eq 'registers (sb-name (sc-sb (tn-sc operand))))
         ;; For those wondering, this is LSL immediate for 0 bits.
         (tn-offset operand))
 
-       ;; FIXME: Do we actually need constant TNs for shifter operands?
-       #+(or)
-       (constant )))
+       ((eq 'null (sc-name (tn-sc operand)))
+        null-offset)
+
+       (t (error "Don't know how to encode TN ~A as a SHIFTER-OPERAND" operand))))
 
     (shifter-operand
      (let ((Rm (tn-offset (shifter-operand-register operand)))
