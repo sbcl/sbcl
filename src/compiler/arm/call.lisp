@@ -97,6 +97,12 @@
 
 ;;;; Frame hackery:
 
+;;; Used for setting up the Old-FP in local call.
+(define-vop (current-fp)
+  (:results (val :scs (any-reg)))
+  (:generator 1
+    (move val fp-tn)))
+
 (define-vop (xep-allocate-frame)
   (:info start-lab copy-more-arg-follows)
   (:ignore copy-more-arg-follows)
@@ -135,6 +141,16 @@
       (when nfp-tn
         (error "Don't know how to allocate number stack space")))
     (trace-table-entry trace-table-normal)))
+
+
+;;; This hook in the codegen pass lets us insert code before fall-thru entry
+;;; points, local-call entry points, and tail-call entry points.  The default
+;;; does nothing.
+(defun emit-block-header (start-label trampoline-label fall-thru-p alignp)
+  (declare (ignore fall-thru-p alignp))
+  (when trampoline-label
+    (emit-label trampoline-label))
+  (emit-label start-label))
 
 
 ;;;; XEP hackery:
