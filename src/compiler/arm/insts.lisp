@@ -749,3 +749,20 @@
   (define-misc-load/store-instruction ldrh 1 #b1011 nil)
   (define-misc-load/store-instruction ldrsb 1 #b1101 nil)
   (define-misc-load/store-instruction ldrsh 1 #b1111 nil))
+
+;;;; Boxed-object computation instructions (for LRA and CODE)
+
+;;; Compute the address of a nearby LRA object by dead reckoning from
+;;; the location of the current instruction.
+(define-instruction compute-lra (segment dest lra-label)
+  (:vop-var vop)
+  (:emitter
+   (emit-back-patch
+    segment 4
+    (lambda (segment position)
+      (assemble (segment vop)
+        (inst add dest pc-tn (- (+ (label-position lra-label)
+                                   other-pointer-lowtag)
+                                ;; The 8 below is the displacement
+                                ;; from reading the program counter.
+                                (+ position 8))))))))
