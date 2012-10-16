@@ -175,6 +175,256 @@
     ;; Don't bother doing anything.
     ))
 
+;;;; Full call:
+;;;
+;;; There is something of a cross-product effect with full calls.
+;;; Different versions are used depending on whether we know the
+;;; number of arguments or the name of the called function, and
+;;; whether we want fixed values, unknown values, or a tail call.
+;;;
+;;; In full call, the arguments are passed creating a partial frame on
+;;; the stack top and storing stack arguments into that frame.  On
+;;; entry to the callee, this partial frame is pointed to by FP.  If
+;;; there are no stack arguments, we don't bother allocating a partial
+;;; frame, and instead set FP to SP just before the call.
+
+;;; This macro helps in the definition of full call VOPs by avoiding code
+;;; replication in defining the cross-product VOPs.
+;;;
+;;; Name is the name of the VOP to define.
+;;;
+;;; Named is true if the first argument is a symbol whose global function
+;;; definition is to be called.
+;;;
+;;; Return is either :Fixed, :Unknown or :Tail:
+;;; -- If :Fixed, then the call is for a fixed number of values, returned in
+;;;    the standard passing locations (passed as result operands).
+;;; -- If :Unknown, then the result values are pushed on the stack, and the
+;;;    result values are specified by the Start and Count as in the
+;;;    unknown-values continuation representation.
+;;; -- If :Tail, then do a tail-recursive call.  No values are returned.
+;;;    The Old-Fp and Return-PC are passed as the second and third arguments.
+;;;
+;;; In non-tail calls, the pointer to the stack arguments is passed as the last
+;;; fixed argument.  If Variable is false, then the passing locations are
+;;; passed as a more arg.  Variable is true if there are a variable number of
+;;; arguments passed on the stack.  Variable cannot be specified with :Tail
+;;; return.  TR variable argument call is implemented separately.
+;;;
+;;; In tail call with fixed arguments, the passing locations are passed as a
+;;; more arg, but there is no new-FP, since the arguments have been set up in
+;;; the current frame.
+(defmacro define-full-call (name named return variable)
+  (aver (not (and variable (eq return :tail))))
+  `(define-vop (,name
+                ,@(when (eq return :unknown)
+                    '(unknown-values-receiver)))
+     (:args
+      ,@(unless (eq return :tail)
+          '((new-fp :scs (any-reg) :to :eval)))
+
+      ,(if named
+           '(name :target name-pass)
+           '(arg-fun :target lexenv))
+
+      ,@(when (eq return :tail)
+          '((old-fp :target old-fp-pass)
+            (return-pc :target return-pc-pass)))
+
+      ,@(unless variable '((args :more t :scs (descriptor-reg)))))
+
+     ,@(when (eq return :fixed)
+         '((:results (values :more t))))
+
+     (:save-p ,(if (eq return :tail) :compute-only t))
+
+     ,@(unless (or (eq return :tail) variable)
+         '((:move-args :full-call)))
+
+     (:vop-var vop)
+     (:info ,@(unless (or variable (eq return :tail)) '(arg-locs))
+            ,@(unless variable '(nargs))
+            ,@(when (eq return :fixed) '(nvals))
+            step-instrumenting)
+
+     (:ignore
+      ,@(unless (or variable (eq return :tail)) '(arg-locs))
+      ,@(unless variable '(args)))
+
+     (:temporary (:sc descriptor-reg
+                  :offset ocfp-offset
+                  :from (:argument 1)
+                  ,@(unless (eq return :fixed)
+                      '(:to :eval)))
+                 old-fp-pass)
+
+     (:temporary (:sc descriptor-reg
+                  :offset lra-offset
+                  :from (:argument ,(if (eq return :tail) 2 1))
+                  :to :eval)
+                 return-pc-pass)
+
+     (:temporary (:sc descriptor-reg :offset lexenv-offset
+                      :from (:argument ,(if (eq return :tail) 0 1))
+                      :to :eval)
+                 ,(if named 'name-pass 'lexenv))
+
+     (:temporary (:scs (descriptor-reg) :from (:argument 0) :to :eval)
+                 function)
+     (:temporary (:sc any-reg :offset nargs-offset :to :eval)
+                 nargs-pass)
+
+     ,@(when variable
+         (mapcar #'(lambda (name offset)
+                     `(:temporary (:sc descriptor-reg
+                                   :offset ,offset
+                                   :to :eval)
+                         ,name))
+                 *register-arg-names* *register-arg-offsets*))
+     ,@(when (eq return :fixed)
+         '((:temporary (:scs (descriptor-reg) :from :eval) move-temp)))
+
+     ,@(unless (eq return :tail)
+         '((:temporary (:scs (non-descriptor-reg)) temp)
+           (:temporary (:sc control-stack :offset nfp-save-offset) nfp-save)))
+
+     (:generator ,(+ (if named 5 0)
+                     (if variable 19 1)
+                     (if (eq return :tail) 0 10)
+                     15
+                     (if (eq return :unknown) 25 0))
+       (trace-table-entry trace-table-call-site)
+       (let* ((cur-nfp (current-nfp-tn vop))
+              ,@(unless (eq return :tail)
+                  '((lra-label (gen-label))))
+              (step-done-label (gen-label))
+              (filler
+               (remove nil
+                       (list :load-nargs
+                             ,@(if (eq return :tail)
+                                   '((unless (location= old-fp old-fp-pass)
+                                       :load-old-fp)
+                                     (unless (location= return-pc
+                                                        return-pc-pass)
+                                       :load-return-pc)
+                                     (when cur-nfp
+                                       :frob-nfp))
+                                   '(:comp-lra
+                                     (when cur-nfp
+                                       :frob-nfp)
+                                     :save-fp
+                                     :load-fp))))))
+         (flet ((do-next-filler ()
+                  (let* ((next (pop filler))
+                         (what (if (consp next) (car next) next)))
+                    (ecase what
+                      (:load-nargs
+                       ,@(if variable
+                             `((inst sub nargs-pass sp-tn new-fp)
+                               ,@(let ((index -1))
+                                   (mapcar #'(lambda (name)
+                                               `(loadw ,name new-fp
+                                                       ,(incf index)))
+                                           *register-arg-names*)))
+                             '((inst mov nargs-pass (fixnumize nargs)))))
+                      ,@(if (eq return :tail)
+                            '((:load-old-fp
+                               (sc-case old-fp
+                                 (any-reg
+                                  (inst mov old-fp-pass old-fp))
+                                 (control-stack
+                                  (loadw old-fp-pass fp-tn
+                                         (tn-offset old-fp)))))
+                              (:load-return-pc
+                               (sc-case return-pc
+                                 (descriptor-reg
+                                  (inst mov return-pc-pass return-pc))
+                                 (control-stack
+                                  (loadw return-pc-pass fp-tn
+                                         (tn-offset return-pc)))))
+                              (:frob-nfp
+                               (inst add nsp-tn cur-nfp
+                                     (- (bytes-needed-for-non-descriptor-stack-frame)
+                                        number-stack-displacement))))
+                            `((:comp-lra
+                               (inst compute-lra return-pc-pass lra-label))
+                              (:frob-nfp
+                               (store-stack-tn nfp-save cur-nfp))
+                              (:save-fp
+                               (inst mov old-fp-pass fp-tn))
+                              (:load-fp
+                               ,(if variable
+                                    '(move fp-tn new-fp)
+                                    '(if (> nargs register-arg-count)
+                                         (move fp-tn new-fp)
+                                         (move fp-tn sp-tn))))))
+                      ((nil)))))
+                (insert-step-instrumenting (callable-tn)
+                  ;; Conditionally insert a conditional trap:
+                  (when step-instrumenting
+                    ;; Get the symbol-value of SB!IMPL::*STEPPING*
+                    (load-symbol-value temp sb!impl::*stepping*)
+                    (error "Don't know how to STEP-INSTRUMENT a CALL"))))
+
+
+           ,@(if named
+                 `((sc-case name
+                     (descriptor-reg (move name-pass name))
+                     (control-stack
+                      (loadw name-pass fp-tn (tn-offset name))
+                      (do-next-filler))
+                     (constant
+                      (loadw name-pass code-tn (tn-offset name)
+                             other-pointer-lowtag)
+                      (do-next-filler)))
+                   (insert-step-instrumenting name-pass)
+                   (loadw function name-pass fdefn-raw-addr-slot
+                          other-pointer-lowtag)
+                   (do-next-filler))
+                 `((sc-case arg-fun
+                     (descriptor-reg (move lexenv arg-fun))
+                     (control-stack
+                      (loadw lexenv fp-tn (tn-offset arg-fun))
+                      (do-next-filler))
+                     (constant
+                      (loadw lexenv code-tn (tn-offset arg-fun)
+                             other-pointer-lowtag)
+                      (do-next-filler)))
+                   (loadw function lexenv closure-fun-slot
+                          fun-pointer-lowtag)
+                   (do-next-filler)
+                   (insert-step-instrumenting function)))
+           (loop
+             (if filler
+                 (do-next-filler)
+                 (return)))
+
+           (note-this-location vop :call-site)
+           (inst add pc-tn function
+                 (- (ash simple-fun-code-offset word-shift)
+                    fun-pointer-lowtag)))
+
+         ,@(ecase return
+             (:fixed
+              '((emit-return-pc lra-label)
+                (default-unknown-values vop values nvals move-temp
+                                        temp lra-label)
+                (when cur-nfp
+                  (load-stack-tn cur-nfp nfp-save))))
+             (:unknown
+              '((emit-return-pc lra-label)
+                (note-this-location vop :unknown-return)
+                (receive-unknown-values values-start nvals start count
+                                        lra-label temp)
+                (when cur-nfp
+                  (load-stack-tn cur-nfp nfp-save))))
+             (:tail)))
+       (trace-table-entry trace-table-normal))))
+
+
+(define-full-call call nil :fixed nil)
+(define-full-call call-named t :fixed nil)
+
 ;;;; Unknown values return:
 
 ;;; Return a single value using the unknown-values convention.
