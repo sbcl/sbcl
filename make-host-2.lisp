@@ -104,6 +104,7 @@
 ;;; Let's check that the type system was reasonably sane. (It's easy
 ;;; to spend a long time wandering around confused trying to debug
 ;;; cold init if it wasn't.)
+#!-arm
 (when (position :sb-test *shebang-features*)
   (load "tests/type.after-xc.lisp"))
 
