@@ -111,3 +111,33 @@
   (:save-p :compute-only)
   (:generator 666
     (error-call vop 'object-not-type-error x type)))
+
+;;;; Moves and coercions:
+
+;;; These MOVE-TO-WORD VOPs move a tagged integer to a raw full-word
+;;; representation.  Similarly, the MOVE-FROM-WORD VOPs converts a raw integer
+;;; to a tagged bignum or fixnum.
+
+;;; ARG is a fixnum, so just shift it.  We need a type restriction because some
+;;; possible arg SCs (control-stack) overlap with possible bignum arg SCs.
+(define-vop (move-to-word/fixnum)
+  (:args (x :scs (any-reg descriptor-reg)))
+  (:results (y :scs (signed-reg unsigned-reg)))
+  (:arg-types tagged-num)
+  (:note "fixnum untagging")
+  (:generator 1
+    (inst mov y (asr x n-fixnum-tag-bits))))
+(define-move-vop move-to-word/fixnum :move
+  (any-reg descriptor-reg) (signed-reg unsigned-reg))
+
+;;; RESULT is a fixnum, so we can just shift.  We need the result type
+;;; restriction because of the control-stack ambiguity noted above.
+(define-vop (move-from-word/fixnum)
+  (:args (x :scs (signed-reg unsigned-reg)))
+  (:results (y :scs (any-reg descriptor-reg)))
+  (:result-types tagged-num)
+  (:note "fixnum tagging")
+  (:generator 1
+    (inst mov y (lsl x n-fixnum-tag-bits))))
+(define-move-vop move-from-word/fixnum :move
+  (signed-reg unsigned-reg) (any-reg descriptor-reg))
