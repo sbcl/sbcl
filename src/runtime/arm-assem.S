@@ -23,9 +23,9 @@ call_into_lisp:
 /* Trampolines, like on SPARC, use Lisp calling conventions. */
 	.align	3
 	.global	undefined_tramp
-	.type	undefined_tramp, %function
+	.type	undefined_tramp, %object
 	.word	SIMPLE_FUN_HEADER_WIDETAG
-undefined_tramp = . + 1
+	.equ	undefined_tramp, .+1
 	.word	undefined_tramp
 	.word	NIL
 	.word	NIL
@@ -37,9 +37,9 @@ undefined_tramp = . + 1
 
 	.align	3
 	.global	closure_tramp
-	.type	closure_tramp, %function
+	.type	closure_tramp, %object
 	.word	SIMPLE_FUN_HEADER_WIDETAG
-closure_tramp = . + 1
+	.equ	closure_tramp, .+1
 	.word	closure_tramp
 	.word	NIL
 	.word	NIL
@@ -53,8 +53,10 @@ closure_tramp = . + 1
 
 	.align	3
 	.global	funcallable_instance_tramp
-	.type	funcallable_instance_tramp, %function
+	.type	funcallable_instance_tramp, %object
 	.word	SIMPLE_FUN_HEADER_WIDETAG
+	.equ	funcallable_instance_tramp, .+1
+	.word	funcallable_instance_tramp
 	.word	NIL
 	.word	NIL
 	.word	NIL
