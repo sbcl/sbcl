@@ -2,6 +2,8 @@
 changes relative to sbcl-1.1.0:
   * enhancement: WITH-COMPILATION-UNIT no longer grabs the world-lock.
     (COMPILE and COMPILE-FILE still do.)
+  * optimization: The compiler no longer rotates loops in some cases where
+    this transformation actually lead to worse code being generated.
   * bug fix: SB-CLTL2:MACROEXPAND-ALL correctly handles shadowing of
     symbol-macros by lexical bindings.
   * bug fix: stack allocation was prevented by high DEBUG declaration in
