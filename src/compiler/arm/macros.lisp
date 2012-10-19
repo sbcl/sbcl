@@ -38,6 +38,22 @@
                      (+ (static-symbol-offset ',symbol)
                         (ash symbol-value-slot word-shift)
                         (- other-pointer-lowtag)))))
+
+;;; Macros to handle the fact that we cannot use the machine native call and
+;;; return instructions.
+
+(defmacro lisp-jump (function)
+  "Jump to the lisp function FUNCTION."
+  `(inst add pc-tn ,function
+         (- (ash simple-fun-code-offset word-shift)
+            fun-pointer-lowtag)))
+
+(defmacro lisp-return (return-pc)
+  "Return to RETURN-PC."
+  #+(or) ;; Doesn't work, can't have a negative immediate value.
+  `(inst add pc-tn ,return-pc (- 4 other-pointer-lowtag))
+  `(inst sub pc-tn ,return-pc (- other-pointer-lowtag 4)))
+
 
 ;;;; Stack TN's
 

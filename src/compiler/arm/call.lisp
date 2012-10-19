@@ -381,9 +381,7 @@
                  (return)))
 
            (note-this-location vop :call-site)
-           (inst add pc-tn function
-                 (- (ash simple-fun-code-offset word-shift)
-                    fun-pointer-lowtag)))
+           (lisp-jump function))
 
          ,@(ecase return
              (:fixed
@@ -428,7 +426,5 @@
     ;; flags.
     (inst msr (cpsr :f) 0)
     ;; Out of here.
-    #+(or) ;; Doesn't work, can't have a negative immediate value.
-    (inst add pc-tn return-pc (- 4 other-pointer-lowtag))
-    (inst sub pc-tn return-pc (- other-pointer-lowtag 4))
+    (lisp-return return-pc)
     (trace-table-entry trace-table-normal)))
