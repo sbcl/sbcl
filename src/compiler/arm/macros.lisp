@@ -54,6 +54,13 @@
   `(inst add pc-tn ,return-pc (- 4 other-pointer-lowtag))
   `(inst sub pc-tn ,return-pc (- other-pointer-lowtag 4)))
 
+(defmacro emit-return-pc (label)
+  "Emit a return-pc header word.  LABEL is the label to use for this return-pc."
+  `(progn
+     (emit-alignment n-lowtag-bits)
+     (emit-label ,label)
+     (inst lra-header-word)))
+
 
 ;;;; Stack TN's
 
