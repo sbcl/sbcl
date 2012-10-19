@@ -38,6 +38,8 @@
 ;;; standard convention, but is totally unrestricted in non-standard
 ;;; conventions, since we can always fetch it off of the stack using
 ;;; the arg pointer.
+#!+(or) ;; We don't pass OLD-FP, we generate it in the save-location
+        ;; directly.
 (defun make-old-fp-passing-location (standard)
   (if standard
       (make-wired-tn *fixnum-primitive-type* immediate-arg-scn ocfp-offset)
@@ -149,9 +151,12 @@
   (:info nargs)
   (:results (res :scs (any-reg)))
   (:generator 2
-    (when (> nargs register-arg-count)
-      (move res sp-tn)
-      (inst add sp-tn sp-tn (* nargs n-word-bytes)))))
+    ;; Unlike most other backends, we store the "OCFP" at frame
+    ;; allocation time rather than at function-entry time, largely due
+    ;; to a lack of usable registers.
+    (move res sp-tn)
+    (inst add sp-tn sp-tn (* (min 1 nargs) n-word-bytes))
+    (storew fp-tn res ocfp-save-offset)))
 
 
 ;;; This hook in the codegen pass lets us insert code before fall-thru entry
@@ -228,8 +233,7 @@
            '(arg-fun :target lexenv))
 
       ,@(when (eq return :tail)
-          '((old-fp :target old-fp-pass)
-            (return-pc :target return-pc-pass)))
+          '((return-pc :target return-pc-pass)))
 
       ,@(unless variable '((args :more t :scs (descriptor-reg)))))
 
@@ -252,15 +256,8 @@
       ,@(unless variable '(args)))
 
      (:temporary (:sc descriptor-reg
-                  :offset ocfp-offset
-                  :from (:argument 1)
-                  ,@(unless (eq return :fixed)
-                      '(:to :eval)))
-                 old-fp-pass)
-
-     (:temporary (:sc descriptor-reg
                   :offset lra-offset
-                  :from (:argument ,(if (eq return :tail) 2 1))
+                  :from (:argument 1)
                   :to :eval)
                  return-pc-pass)
 
@@ -302,9 +299,7 @@
                (remove nil
                        (list :load-nargs
                              ,@(if (eq return :tail)
-                                   '((unless (location= old-fp old-fp-pass)
-                                       :load-old-fp)
-                                     (unless (location= return-pc
+                                   '((unless (location= return-pc
                                                         return-pc-pass)
                                        :load-return-pc)
                                      (when cur-nfp
@@ -312,7 +307,6 @@
                                    '(:comp-lra
                                      (when cur-nfp
                                        :frob-nfp)
-                                     :save-fp
                                      :load-fp))))))
          (flet ((do-next-filler ()
                   (let* ((next (pop filler))
@@ -328,14 +322,7 @@
                                            *register-arg-names*)))
                              '((inst mov nargs-pass (fixnumize nargs)))))
                       ,@(if (eq return :tail)
-                            '((:load-old-fp
-                               (sc-case old-fp
-                                 (any-reg
-                                  (inst mov old-fp-pass old-fp))
-                                 (control-stack
-                                  (loadw old-fp-pass fp-tn
-                                         (tn-offset old-fp)))))
-                              (:load-return-pc
+                            '((:load-return-pc
                                (sc-case return-pc
                                  (descriptor-reg
                                   (inst mov return-pc-pass return-pc))
@@ -350,14 +337,8 @@
                                (inst compute-lra return-pc-pass lra-label))
                               (:frob-nfp
                                (store-stack-tn nfp-save cur-nfp))
-                              (:save-fp
-                               (inst mov old-fp-pass fp-tn))
                               (:load-fp
-                               ,(if variable
-                                    '(move fp-tn new-fp)
-                                    '(if (> nargs register-arg-count)
-                                         (move fp-tn new-fp)
-                                         (move fp-tn sp-tn))))))
+                               (move fp-tn new-fp))))
                       ((nil)))))
                 (insert-step-instrumenting (callable-tn)
                   ;; Conditionally insert a conditional trap:

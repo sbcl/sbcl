@@ -65,6 +65,9 @@ call_into_lisp:
 	@@ Set up the Lisp stack pointer
 	mov	reg_CSP, reg_CFP
 
+	@@ Set up the "frame link"
+	stmea   reg_CSP!, {reg_OCFP}
+
 	@@ Set up the return address
 	ldr	reg_LRA, =.lra
 
