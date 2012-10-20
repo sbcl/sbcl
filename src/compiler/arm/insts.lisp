@@ -655,9 +655,14 @@
        `(define-instruction ,name (segment &rest args)
           (:emitter
            (with-condition-defaulted (args (condition reg address))
-             (aver (register-p reg))
+             (aver (or (register-p reg)
+                       ,@(when (eq :store kind)
+                               '((and (tn-p reg)
+                                  (eq 'null (sc-name (tn-sc reg))))))))
              (emit-load/store-instruction segment condition
-                                          ,kind ,width reg address))))))
+                                          ,kind ,width
+                                          (if (register-p reg) reg null-tn)
+                                          address))))))
   (define-load/store-instruction ldr :load :word)
   (define-load/store-instruction ldrb :load :byte)
   (define-load/store-instruction str :store :word)
