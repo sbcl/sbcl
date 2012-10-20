@@ -496,9 +496,6 @@
     ;; Clear the control stack, and restore the frame pointer.
     (move sp-tn fp-tn)
     (move fp-tn old-fp)
-    ;; Indicate a single-valued return by clearing all of the status
-    ;; flags.
-    (inst msr (cpsr :f) 0)
     ;; Out of here.
-    (lisp-return return-pc)
+    (lisp-return return-pc t)
     (trace-table-entry trace-table-normal)))

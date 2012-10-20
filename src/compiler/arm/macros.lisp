@@ -50,11 +50,16 @@
          (- (ash simple-fun-code-offset word-shift)
             fun-pointer-lowtag)))
 
-(defmacro lisp-return (return-pc)
+(defmacro lisp-return (return-pc single-valued-p)
   "Return to RETURN-PC."
-  #+(or) ;; Doesn't work, can't have a negative immediate value.
-  `(inst add pc-tn ,return-pc (- 4 other-pointer-lowtag))
-  `(inst sub pc-tn ,return-pc (- other-pointer-lowtag 4)))
+  `(progn
+     ;; Indicate a single-valued return by clearing all of the status
+     ;; flags, or a multiple-valued return by setting all of the status
+     ;; flags.
+     (inst msr (cpsr :f) ,(if single-valued-p 0 #xf0))
+     #+(or) ;; Doesn't work, can't have a negative immediate value.
+     (inst add pc-tn ,return-pc (- 4 other-pointer-lowtag))
+     (inst sub pc-tn ,return-pc (- other-pointer-lowtag 4))))
 
 (defmacro emit-return-pc (label)
   "Emit a return-pc header word.  LABEL is the label to use for this return-pc."
