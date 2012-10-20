@@ -143,6 +143,95 @@
     (inst add sp-tn sp-tn (* (min 1 nargs) n-word-bytes))
     (storew fp-tn res ocfp-save-offset)))
 
+;;; Emit code needed at the return-point from an unknown-values call
+;;; for a fixed number of values.  VALUES is the head of the TN-REF
+;;; list for the locations that the values are to be received into.
+;;; NVALS is the number of values that are to be received (should
+;;; equal the length of Values).
+;;;
+;;; MOVE-TEMP is a DESCRIPTOR-REG TN used as a temporary.
+;;;
+;;; This code exploits the fact that in the unknown-values convention,
+;;; a single value return returns with all of the condition flags
+;;; clear, whereas a return of other than one value returns with the
+;;; condition flags set.
+;;;
+;;; If 0 or 1 values are expected, then we just emit an instruction to
+;;; reset the SP (which will only be executed when other than 1 value
+;;; is returned.)
+;;;
+;;; In the general case, we have to do three things:
+;;;  -- Default unsupplied register values.  This need only be done when a
+;;;     single value is returned, since register values are defaulted by the
+;;;     callee in the non-single case.
+;;;  -- Default unsupplied stack values.  This needs to be done whenever there
+;;;     are stack values.
+;;;  -- Reset SP.  This must be done whenever other than 1 value is returned,
+;;;     regardless of the number of values desired.
+
+(defun default-unknown-values (vop values nvals move-temp temp lra-label)
+  (declare (type (or tn-ref null) values)
+           (type unsigned-byte nvals) (type tn move-temp temp))
+  (let ((expecting-values-on-stack (> nvals register-arg-count))
+        (values-on-stack temp))
+    ;; Pick off the single-value case first.
+    (sb!assem:without-scheduling ()
+      (note-this-location vop (if (<= nvals 1)
+                                  :single-value-return
+                                  :unknown-return))
+
+      ;; Default register values for single-value return case.
+      ;; The callee returns with condition bits CLEAR in the
+      ;; single-value case.
+      (when values
+        (do ((i 1 (1+ i))
+             (val (tn-ref-across values) (tn-ref-across val)))
+            ((= i (min nvals register-arg-count)))
+          (inst mov :ne (tn-ref-tn val) null-tn)))
+
+      ;; If we're not expecting values on the stack, all that
+      ;; remains is to clear the stack frame (for the multiple-
+      ;; value return case).
+      (unless expecting-values-on-stack
+        (inst mov :eq sp-tn ocfp-tn))
+
+      ;; If we ARE expecting values on the stack, we need to
+      ;; either move them to their result location or to set their
+      ;; result location to the default.
+      (when expecting-values-on-stack
+
+        ;; For the single-value return case, fake up NARGS and
+        ;; OCFP so that we don't screw ourselves with the
+        ;; defaulting and stack clearing logic.
+        (inst mov :ne ocfp-tn sp-tn)
+        (inst mov :ne nargs-tn n-word-bytes)
+
+        ;; Compute the number of stack values (may be negative if
+        ;; not all of the register values are populated).
+        (inst sub values-on-stack nargs-tn (fixnumize register-arg-count))
+
+        ;; For each expected stack value...
+        (do ((i register-arg-count (1+ i))
+             (val (do ((i 0 (1+ i))
+                       (val values (tn-ref-across val)))
+                      ((= i register-arg-count) val))
+                  (tn-ref-across val)))
+            ((null val))
+
+          ;; ... Load it if there is a stack value available, or
+          ;; default it if there isn't.
+          (inst subs values-on-stack values-on-stack 4)
+          (loadw move-temp ocfp-tn i 0 :ge)
+          (store-stack-tn (tn-ref-tn val) move-temp :ge)
+          (store-stack-tn (tn-ref-tn val) null-tn :lt))
+
+        ;; Deallocate the callee stack frame.
+        (move sp-tn ocfp-tn)))
+
+    ;; And, finally, recompute the correct value for CODE-TN.
+    (inst compute-code code-tn lip-tn lra-label temp))
+  (values))
+
 
 ;;; This hook in the codegen pass lets us insert code before fall-thru entry
 ;;; points, local-call entry points, and tail-call entry points.  The default
