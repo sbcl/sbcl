@@ -193,6 +193,8 @@
   (defregtn null descriptor-reg)
   (defregtn code descriptor-reg)
 
+  (defregtn nargs any-reg)
+  (defregtn ocfp any-reg)
   (defregtn sp any-reg)
   (defregtn fp any-reg)
   (defregtn pc any-reg))
