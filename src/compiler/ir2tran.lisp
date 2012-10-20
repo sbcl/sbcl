@@ -321,12 +321,12 @@
             (make-stack-pointer-tn)))))
 
 (defoptimizer (%allocate-closures ir2-convert) ((leaves) call 2block)
-  #!+arm
-  (error "Don't know how to %ALLOCATE-CLOSURES")
-  #!-arm
   (let ((dx-p (lvar-dynamic-extent leaves)))
     (collect ((delayed))
       (when dx-p
+        #!+arm
+        (error "Don't know how to VOP CURRENT-STACK-POINTER")
+        #!-arm
         (vop current-stack-pointer call 2block
              (ir2-lvar-stack-pointer (lvar-info leaves))))
       (dolist (leaf (lvar-value leaves))
@@ -342,6 +342,9 @@
                    (entry (make-load-time-constant-tn :entry xep)))
           (let ((this-env (node-physenv call))
                 (leaf-dx-p (and dx-p (leaf-dynamic-extent leaf))))
+            #!+arm
+            (error "Don't know how to VOP MAKE-CLOSURE")
+            #!-arm
             (vop make-closure call 2block entry (length closure)
                  leaf-dx-p tn)
             (loop for what in closure and n from 0 do
@@ -359,14 +362,21 @@
                       (let ((initial-value (closure-initial-value
                                             what this-env nil)))
                         (if initial-value
+                            #!+arm
+                            (error "Don't know how to VOP CLOSURE-INIT")
+                            #!-arm
                           (vop closure-init call 2block
                                tn initial-value n)
                           ;; An initial-value of NIL means to stash
                           ;; the frame pointer... which requires a
                           ;; different VOP.
+                          #!+arm
+                          (error "Don't know how to VOP CLOSURE-INIT-FROM-FP")
+                          #!-arm
                           (vop closure-init-from-fp call 2block tn n)))))))))
       (loop for (tn what n) in (delayed)
-            do (vop closure-init call 2block
+            do #!+arm (error "Don't know how to VOP CLOSURE-INIT")
+               #!-arm (vop closure-init call 2block
                     tn what n))))
   (values))
 
