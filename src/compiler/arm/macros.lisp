@@ -22,8 +22,10 @@
 
 (macrolet
     ((def (op inst shift)
-       `(defmacro ,op (object base &optional (offset 0) (lowtag 0))
-          `(inst ,',inst ,object (@ ,base (- (ash ,offset ,,shift) ,lowtag))))))
+       `(defmacro ,op (object base
+                       &optional (offset 0) (lowtag 0) (predicate :al))
+          `(inst ,',inst ,predicate ,object
+                 (@ ,base (- (ash ,offset ,,shift) ,lowtag))))))
   (def loadw ldr word-shift)
   (def storew str word-shift))
 
@@ -65,20 +67,20 @@
 ;;;; Stack TN's
 
 ;;; Move a stack TN to a register and vice-versa.
-(defmacro load-stack-tn (reg stack)
+(defmacro load-stack-tn (reg stack &optional (predicate :al))
   `(let ((reg ,reg)
          (stack ,stack))
      (let ((offset (tn-offset stack)))
        (sc-case stack
          ((control-stack)
-          (loadw reg fp-tn offset))))))
-(defmacro store-stack-tn (stack reg)
+          (loadw reg fp-tn offset 0 ,predicate))))))
+(defmacro store-stack-tn (stack reg &optional (predicate :al))
   `(let ((stack ,stack)
          (reg ,reg))
      (let ((offset (tn-offset stack)))
        (sc-case stack
          ((control-stack)
-          (storew reg fp-tn offset))))))
+          (storew reg fp-tn offset 0 ,predicate))))))
 
 (defmacro maybe-load-stack-tn (reg reg-or-stack)
   "Move the TN Reg-Or-Stack into Reg if it isn't already there."
