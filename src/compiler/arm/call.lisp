@@ -120,22 +120,7 @@
     (inst simple-fun-header-word)
     (dotimes (i (1- simple-fun-code-offset))
       (inst word 0))
-    ;; Calculate the address of the code component.  This is an
-    ;; exercise in excess cleverness.  First, we calculate (from our
-    ;; program counter only) the address of START-LAB plus
-    ;; OTHER-POINTER-LOWTAG.  The extra two words are to compensate
-    ;; for the offset applied by ARM CPUs when reading the program
-    ;; counter.
-    (inst sub lip-tn pc-tn (- (* (+ 2 simple-fun-code-offset)
-                                 n-word-bytes)
-                              other-pointer-lowtag))
-    ;; Next, we read the function header.
-    (loadw temp lip-tn 0 other-pointer-lowtag)
-    ;; And finally we use the header value (a count in words), plus
-    ;; the fact that the top two bits of SIMPLE-FUN-HEADER-LOWTAG are
-    ;; clear (the value is #x2A) to compute the boxed address of the
-    ;; code component.
-    (inst sub code-tn lip-tn (lsr temp (- 8 word-shift)))
+    (inst compute-code code-tn lip-tn start-lab temp)
     ;; Build our stack frames.
     (inst add sp-tn fp-tn
           (* n-word-bytes (sb-allocated-size 'control-stack)))
