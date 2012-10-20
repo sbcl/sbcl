@@ -499,3 +499,58 @@
     ;; Out of here.
     (lisp-return return-pc t)
     (trace-table-entry trace-table-normal)))
+
+;;; Do unknown-values return of a fixed number of values.  The Values are
+;;; required to be set up in the standard passing locations.  Nvals is the
+;;; number of values returned.
+;;;
+;;; If returning a single value, then deallocate the current frame, restore
+;;; FP and jump to the single-value entry at Return-PC + 8.
+;;;
+;;; If returning other than one value, then load the number of values returned,
+;;; NIL out unsupplied values registers, restore FP and return at Return-PC.
+;;; When there are stack values, we must initialize the argument pointer to
+;;; point to the beginning of the values block (which is the beginning of the
+;;; current frame.)
+(define-vop (return)
+  (:args
+   (old-fp :scs (any-reg))
+   (return-pc :scs (descriptor-reg) :to (:eval 1) :target lra)
+   (values :more t))
+  (:ignore values)
+  (:info nvals)
+  (:temporary (:sc descriptor-reg :offset r0-offset :from (:eval 0)) r0)
+  (:temporary (:sc descriptor-reg :offset r1-offset :from (:eval 0)) r1)
+  (:temporary (:sc descriptor-reg :offset r2-offset :from (:eval 0)) r2)
+  (:temporary (:sc descriptor-reg :offset lra-offset :from (:eval 1)) lra)
+  (:temporary (:sc any-reg :offset nargs-offset) nargs)
+  (:temporary (:sc any-reg :offset ocfp-offset) val-ptr)
+  (:vop-var vop)
+  (:generator 6
+    (trace-table-entry trace-table-fun-epilogue)
+    (move lra return-pc)
+    ;; Clear the number stack.
+    (let ((cur-nfp (current-nfp-tn vop)))
+      (when cur-nfp
+        (error "Don't know how to clear number stack in VOP RETURN")))
+    (cond ((= nvals 1)
+           ;; Clear the control stack, and restore the frame pointer.
+           (move sp-tn fp-tn)
+           (move fp-tn old-fp)
+           ;; Out of here.
+           (lisp-return lra t))
+          (t
+           ;; Establish the values pointer and values count.
+           (move val-ptr fp-tn)
+           (inst mov nargs (fixnumize nvals))
+           ;; restore the frame pointer and clear as much of the control
+           ;; stack as possible.
+           (move fp-tn old-fp)
+           (inst add sp-tn val-ptr (* nvals n-word-bytes))
+           ;; pre-default any argument register that need it.
+           (when (< nvals register-arg-count)
+             (dolist (reg (subseq (list r0 r1 r2) nvals))
+               (move reg null-tn)))
+           ;; And away we go.
+           (lisp-return lra nil)))
+    (trace-table-entry trace-table-normal)))
