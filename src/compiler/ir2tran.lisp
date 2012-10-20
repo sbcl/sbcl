@@ -1389,9 +1389,6 @@
               locs)
         (if (= nvals 1)
             (vop return-single node block old-fp return-pc (car locs))
-            #!+arm
-            (error "Should VOP RETURN here.")
-            #!-arm
             (vop* return node block
                   (old-fp return-pc (reference-tn-list locs nil))
                   (nil)
