@@ -33,27 +33,22 @@
       (make-wired-tn *backend-t-primitive-type* register-arg-scn lra-offset)
       (make-restricted-tn *backend-t-primitive-type* register-arg-scn)))
 
-;;; This is similar to MAKE-RETURN-PC-PASSING-LOCATION, but makes a
-;;; location to pass OLD-FP in. This is (obviously) wired in the
-;;; standard convention, but is totally unrestricted in non-standard
-;;; conventions, since we can always fetch it off of the stack using
-;;; the arg pointer.
-#!+(or) ;; We don't pass OLD-FP, we generate it in the save-location
-        ;; directly.
-(defun make-old-fp-passing-location (standard)
-  (if standard
-      (make-wired-tn *fixnum-primitive-type* immediate-arg-scn ocfp-offset)
-      (make-normal-tn *fixnum-primitive-type*)))
+;;; MAKE-OLD-FP-PASSING-LOCATION would be here, but the ARM backend
+;;; passes the OCFP in its save location.
 
 ;;; Make the TNs used to hold OLD-FP and RETURN-PC within the current
 ;;; function. We treat these specially so that the debugger can find
 ;;; them at a known location.
 (defun make-old-fp-save-location (env)
-  (specify-save-tn
-   (physenv-debug-live-tn (make-normal-tn *fixnum-primitive-type*) env)
-   (make-wired-tn *fixnum-primitive-type*
-                  control-stack-arg-scn
-                  ocfp-save-offset)))
+  ;; Unlike the other backends, ARM function calling is designed to
+  ;; pass OLD-FP within the stack frame rather than in a register.  As
+  ;; such, in order for lifetime analysis not to screw up, we need it
+  ;; to be a stack TN wired to the save offset, not a normal TN with a
+  ;; wired SAVE-TN.
+  (physenv-debug-live-tn (make-wired-tn *fixnum-primitive-type*
+                                        control-stack-arg-scn
+                                        ocfp-save-offset)
+                         env))
 (defun make-return-pc-save-location (env)
   (specify-save-tn
    (physenv-debug-live-tn (make-normal-tn *backend-t-primitive-type*) env)
