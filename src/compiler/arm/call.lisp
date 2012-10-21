@@ -404,9 +404,7 @@
                                   (loadw return-pc-pass fp-tn
                                          (tn-offset return-pc)))))
                               (:frob-nfp
-                               (inst add nsp-tn cur-nfp
-                                     (- (bytes-needed-for-non-descriptor-stack-frame)
-                                        number-stack-displacement))))
+                               (error "Don't know how to :FROB-NFP for TAIL call")))
                             `((:comp-lra
                                (inst compute-lra return-pc-pass lra-label))
                               (:frob-nfp
@@ -418,6 +416,7 @@
                   ;; Conditionally insert a conditional trap:
                   (when step-instrumenting
                     ;; Get the symbol-value of SB!IMPL::*STEPPING*
+                    #+(or) ;; Doesn't work for :TAIL case.
                     (load-symbol-value temp sb!impl::*stepping*)
                     (error "Don't know how to STEP-INSTRUMENT a CALL"))))
 
@@ -477,6 +476,8 @@
 
 (define-full-call call nil :fixed nil)
 (define-full-call call-named t :fixed nil)
+(define-full-call tail-call nil :tail nil)
+(define-full-call tail-call-named t :tail nil)
 
 ;;;; Unknown values return:
 
