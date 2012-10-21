@@ -1094,7 +1094,6 @@
 
 ;;; Move the arguments into the passing locations and do a (possibly
 ;;; named) tail call.
-#!-arm
 (defun ir2-convert-tail-full-call (node block)
   (declare (type combination node) (type ir2-block block))
   (let* ((env (physenv-info (node-physenv node)))
