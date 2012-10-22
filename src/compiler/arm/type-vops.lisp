@@ -11,6 +11,12 @@
 
 (in-package "SB!VM")
 
+(defun %test-lowtag (value target not-p lowtag &key temp)
+  (assemble ()
+    (inst and temp value lowtag-mask)
+    (inst cmp temp lowtag)
+    (inst b (if not-p :ne :eq) target)))
+
 ;;; Type checking and testing (see also the use of !DEFINE-TYPE-VOPS
 ;;; in src/compiler/generic/late-type-vops.lisp):
 ;;;
