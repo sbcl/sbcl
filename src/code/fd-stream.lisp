@@ -2488,9 +2488,16 @@
     (without-package-locks
         (makunbound '*available-buffers*))))
 
-(defun stdstream-external-format (outputp)
-  (declare (ignorable outputp))
-  (let* ((keyword #!+win32 (if outputp (sb!win32::console-output-codepage) (sb!win32::console-input-codepage))
+(defun stdstream-external-format (fd outputp)
+  #!-win32 (declare (ignore fd outputp))
+  (let* ((keyword #!+win32 (let ((handle (sb!win32:get-osfhandle fd)))
+                             (if (and (/= handle -1)
+                                      (logbitp 0 handle)
+                                      (logbitp 1 handle))
+                                 :ucs-2
+                                 (if outputp
+                                     (sb!win32::console-output-codepage)
+                                     (sb!win32::console-input-codepage))))
                   #!-win32 (default-external-format))
          (ef (get-external-format keyword))
          (replacement (ef-default-replacement-character ef)))
@@ -2507,23 +2514,24 @@
           (make-fd-stream 0 :name "standard input" :input t :buffering :line
                           :element-type :default
                           :serve-events t
-                          :external-format (stdstream-external-format nil)))
+                          :external-format (stdstream-external-format 0 nil)))
     (setf *stdout*
           (make-fd-stream 1 :name "standard output" :output t :buffering :line
                           :element-type :default
-                          :external-format (stdstream-external-format t)))
+                          :external-format (stdstream-external-format 1 t)))
     (setf *stderr*
           (make-fd-stream 2 :name "standard error" :output t :buffering :line
                           :element-type :default
-                          :external-format (stdstream-external-format t)))
+                          :external-format (stdstream-external-format 2 t)))
     (let* ((ttyname #.(coerce "/dev/tty" 'simple-base-string))
            (tty (sb!unix:unix-open ttyname sb!unix:o_rdwr #o666)))
       (if tty
           (setf *tty*
                 (make-fd-stream tty :name "the terminal"
                                 :input t :output t :buffering :line
-                                :external-format (stdstream-external-format t)
-                                :serve-events t
+                                :external-format (stdstream-external-format
+                                                  tty t)
+                                :serve-events (or #!-win32 t)
                                 :auto-close t))
           (setf *tty* (make-two-way-stream *stdin* *stdout*))))
     (princ (get-output-stream-string *error-output*) *stderr*))

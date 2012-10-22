@@ -1160,6 +1160,270 @@ io_end_interruptible(HANDLE handle)
                                  handle, 0);
 }
 
+/* Documented limit for ReadConsole/WriteConsole is 64K bytes.
+   Real limit observed on W2K-SP3 is somewhere in between 32KiB and 64Kib...
+*/
+#define MAX_CONSOLE_TCHARS 16384
+
+int
+win32_write_unicode_console(HANDLE handle, void * buf, int count)
+{
+    DWORD written = 0;
+    DWORD nchars;
+    BOOL result;
+    nchars = count>>1;
+    if (nchars>MAX_CONSOLE_TCHARS) nchars = MAX_CONSOLE_TCHARS;
+
+    if (!io_begin_interruptible(handle)) {
+        errno = EINTR;
+        return -1;
+    }
+    result = WriteConsoleW(handle,buf,nchars,&written,NULL);
+    io_end_interruptible(handle);
+
+    if (result) {
+        if (!written) {
+            errno = EINTR;
+            return -1;
+        } else {
+            return 2*written;
+        }
+    } else {
+        DWORD err = GetLastError();
+        odxprint(io,"WriteConsole fails => %u\n", err);
+        errno = (err==ERROR_OPERATION_ABORTED ? EINTR : EIO);
+        return -1;
+    }
+}
+
+/*
+ * (AK writes:)
+ *
+ * It may be unobvious, but (probably) the most straightforward way of
+ * providing some sane CL:LISTEN semantics for line-mode console
+ * channel requires _dedicated input thread_.
+ *
+ * LISTEN should return true iff the next (READ-CHAR) won't have to
+ * wait. As our console may be shared with another process, entirely
+ * out of our control, looking at the events in PeekConsoleEvent
+ * result (and searching for #\Return) doesn't cut it.
+ *
+ * We decided that console input thread must do something smarter than
+ * a bare loop of continuous ReadConsoleW(). On Unix, user experience
+ * with the terminal is entirely unaffected by the fact that some
+ * process does (or doesn't) call read(); the situation on MS Windows
+ * is different.
+ *
+ * Echo output and line editing present on MS Windows while some
+ * process is waiting in ReadConsole(); otherwise all input events are
+ * buffered. If our thread were calling ReadConsole() all the time, it
+ * would feel like Unix cooked mode.
+ *
+ * But we don't write a Unix emulator here, even if it sometimes feels
+ * like that; therefore preserving this aspect of console I/O seems a
+ * good thing to us.
+ *
+ * LISTEN itself becomes trivial with dedicated input thread, but the
+ * goal stated above -- provide `native' user experience with blocked
+ * console -- don't play well with this trivial implementation.
+ *
+ * What's currently implemented is a compromise, looking as something
+ * in between Unix cooked mode and Win32 line mode.
+ *
+ * 1. As long as no console I/O function is called (incl. CL:LISTEN),
+ * console looks `blocked': no echo, no line editing.
+ *
+ * 2. (READ-CHAR), (READ-SEQUENCE) and other functions doing real
+ * input result in the ReadConsole request (in a dedicated thread);
+ *
+ * 3. Once ReadConsole is called, it is not cancelled in the
+ * middle. In line mode, it returns when <Enter> key is hit (or
+ * something like that happens). Therefore, if line editing and echo
+ * output had a chance to happen, console won't look `blocked' until
+ * the line is entered (even if line input was triggered by
+ * (READ-CHAR)).
+ *
+ * 4. LISTEN may request ReadConsole too (if no other thread is
+ * reading the console and no data are queued). It's the only case
+ * when the console becomes `unblocked' without any actual input
+ * requested by Lisp code.  LISTEN check if there is at least one
+ * input event in PeekConsole queue; unless there is such an event,
+ * ReadConsole is not triggered by LISTEN.
+ *
+ * 5. Console-reading Lisp thread now may be interrupted immediately;
+ * ReadConsole call itself, however, continues until the line is
+ * entered.
+ */
+
+struct {
+    WCHAR buffer[MAX_CONSOLE_TCHARS];
+    DWORD head, tail;
+    pthread_mutex_t lock;
+    pthread_cond_t cond_has_data;
+    pthread_cond_t cond_has_client;
+    pthread_t thread;
+    boolean initialized;
+    HANDLE handle;
+    boolean in_progress;
+} ttyinput = {.lock = PTHREAD_MUTEX_INITIALIZER};
+
+static void*
+tty_read_line_server()
+{
+    pthread_mutex_lock(&ttyinput.lock);
+    while (ttyinput.handle) {
+        DWORD nchars;
+        BOOL ok;
+
+        while (!ttyinput.in_progress)
+            pthread_cond_wait(&ttyinput.cond_has_client,&ttyinput.lock);
+
+        pthread_mutex_unlock(&ttyinput.lock);
+
+        ok = ReadConsoleW(ttyinput.handle,
+                          &ttyinput.buffer[ttyinput.tail],
+                          MAX_CONSOLE_TCHARS-ttyinput.tail,
+                          &nchars,NULL);
+
+        pthread_mutex_lock(&ttyinput.lock);
+
+        if (ok) {
+            ttyinput.tail += nchars;
+            pthread_cond_broadcast(&ttyinput.cond_has_data);
+        }
+        ttyinput.in_progress = 0;
+    }
+    pthread_mutex_unlock(&ttyinput.lock);
+    return NULL;
+}
+
+static boolean
+tty_maybe_initialize_unlocked(HANDLE handle)
+{
+    if (!ttyinput.initialized) {
+        if (!DuplicateHandle(GetCurrentProcess(),handle,
+                             GetCurrentProcess(),&ttyinput.handle,
+                             0,FALSE,DUPLICATE_SAME_ACCESS)) {
+            return 0;
+        }
+        pthread_cond_init(&ttyinput.cond_has_data,NULL);
+        pthread_cond_init(&ttyinput.cond_has_client,NULL);
+        pthread_create(&ttyinput.thread,NULL,tty_read_line_server,NULL);
+        ttyinput.initialized = 1;
+    }
+    return 1;
+}
+
+boolean
+win32_tty_listen(HANDLE handle)
+{
+    boolean result = 0;
+    INPUT_RECORD ir;
+    DWORD nevents;
+    pthread_mutex_lock(&ttyinput.lock);
+    if (!tty_maybe_initialize_unlocked(handle))
+        result = 0;
+
+    if (ttyinput.in_progress) {
+        result = 0;
+    } else {
+        if (ttyinput.head != ttyinput.tail) {
+            result = 1;
+        } else {
+            if (PeekConsoleInput(ttyinput.handle,&ir,1,&nevents) && nevents) {
+                ttyinput.in_progress = 1;
+                pthread_cond_broadcast(&ttyinput.cond_has_client);
+            }
+        }
+    }
+    pthread_mutex_unlock(&ttyinput.lock);
+    return result;
+}
+
+static int
+tty_read_line_client(HANDLE handle, void* buf, int count)
+{
+    int result = 0;
+    int nchars = count / sizeof(WCHAR);
+    sigset_t pendset;
+
+    if (!nchars)
+        return 0;
+    if (nchars>MAX_CONSOLE_TCHARS)
+        nchars=MAX_CONSOLE_TCHARS;
+
+    count = nchars*sizeof(WCHAR);
+
+    pthread_mutex_lock(&ttyinput.lock);
+
+    if (!tty_maybe_initialize_unlocked(handle)) {
+        result = -1;
+        errno = EIO;
+        goto unlock;
+    }
+
+    while (!result) {
+        while (ttyinput.head == ttyinput.tail) {
+            if (!io_begin_interruptible(ttyinput.handle)) {
+                ttyinput.in_progress = 0;
+                result = -1;
+                errno = EINTR;
+                goto unlock;
+            } else {
+                if (!ttyinput.in_progress) {
+                    /* We are to wait */
+                    ttyinput.in_progress=1;
+                    /* wake console reader */
+                    pthread_cond_broadcast(&ttyinput.cond_has_client);
+                }
+                pthread_cond_wait(&ttyinput.cond_has_data, &ttyinput.lock);
+                io_end_interruptible(ttyinput.handle);
+            }
+        }
+        result = sizeof(WCHAR)*(ttyinput.tail-ttyinput.head);
+        if (result > count) {
+            result = count;
+        }
+        if (result) {
+            if (result > 0) {
+                DWORD nch,offset = 0;
+                LPWSTR ubuf = buf;
+
+                memcpy(buf,&ttyinput.buffer[ttyinput.head],count);
+                ttyinput.head += (result / sizeof(WCHAR));
+                if (ttyinput.head == ttyinput.tail)
+                    ttyinput.head = ttyinput.tail = 0;
+
+                for (nch=0;nch<result/sizeof(WCHAR);++nch) {
+                    if (ubuf[nch]==13) {
+                        ++offset;
+                    } else {
+                        ubuf[nch-offset]=ubuf[nch];
+                    }
+                }
+                result-=offset*sizeof(WCHAR);
+
+            }
+        } else {
+            result = -1;
+            ttyinput.head = ttyinput.tail = 0;
+            errno = EIO;
+        }
+    }
+unlock:
+    pthread_mutex_unlock(&ttyinput.lock);
+    return result;
+}
+
+int
+win32_read_unicode_console(HANDLE handle, void* buf, int count)
+{
+
+    int result;
+    result = tty_read_line_client(handle,buf,count);
+    return result;
+}
+
 boolean
 win32_maybe_interrupt_io(void* thread)
 {
@@ -1228,6 +1492,11 @@ win32_maybe_interrupt_io(void* thread)
                                        &th->synchronous_io_handle_and_flag,
                                        (LPVOID)INVALID_HANDLE_VALUE);
         if (h && (h!=INVALID_HANDLE_VALUE)) {
+            if (console_handle_p(h)) {
+                pthread_mutex_lock(&ttyinput.lock);
+                pthread_cond_broadcast(&ttyinput.cond_has_data);
+                pthread_mutex_unlock(&ttyinput.lock);
+            }
             if (ptr_CancelSynchronousIo) {
                 pthread_mutex_lock(&th->os_thread->fiber_lock);
                 done = ptr_CancelSynchronousIo(th->os_thread->fiber_group->handle);
@@ -1255,7 +1524,7 @@ win32_unix_write(FDTYPE fd, void * buf, int count)
 
     handle =(HANDLE)maybe_get_osfhandle(fd);
     if (console_handle_p(handle))
-        return write(fd, buf, count);
+        return win32_write_unicode_console(handle,buf,count);
 
     overlapped.hEvent = self->private_events.events[0];
     seekable = SetFilePointerEx(handle,
@@ -1332,7 +1601,8 @@ win32_unix_read(FDTYPE fd, void * buf, int count)
     handle = (HANDLE)maybe_get_osfhandle(fd);
 
     if (console_handle_p(handle))
-        return read(fd, buf, count);
+        return win32_read_unicode_console(handle,buf,count);
+
     overlapped.hEvent = self->private_events.events[0];
     /* If it has a position, we won't try overlapped */
     seekable = SetFilePointerEx(handle,
