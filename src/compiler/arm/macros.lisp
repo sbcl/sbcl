@@ -98,3 +98,21 @@
            (move ,n-reg ,n-stack))
           ((control-stack)
            (loadw ,n-reg fp-tn (tn-offset ,n-stack))))))))
+
+;;;; memory accessor vop generators
+
+(defmacro define-full-reffer (name type offset lowtag scs el-type
+                              &optional translate)
+  `(define-vop (,name)
+     ,@(when translate
+             `((:translate ,translate)))
+     (:policy :fast-safe)
+     (:args (object :scs (descriptor-reg))
+            (index :scs (any-reg)))
+     (:arg-types ,type tagged-num)
+     (:temporary (:scs (interior-reg)) lip)
+     (:results (value :scs ,scs))
+     (:result-types ,el-type)
+     (:generator 5
+       (inst add lip object index)
+       (loadw value lip ,offset ,lowtag))))
