@@ -40,3 +40,17 @@
 (defun convert-conditional-move-p (node dst-tn x-tn y-tn)
   (declare (ignore node dst-tn x-tn y-tn))
   nil)
+
+
+;;;; Conditional VOPs:
+
+(define-vop (if-eq)
+  (:args (x :scs (any-reg descriptor-reg null))
+         (y :scs (any-reg descriptor-reg null)))
+  (:conditional)
+  (:info target not-p)
+  (:policy :fast-safe)
+  (:translate eq)
+  (:generator 3
+    (inst cmp x y)
+    (inst b (if not-p :ne :eq) target)))
