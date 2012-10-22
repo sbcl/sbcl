@@ -36,7 +36,7 @@ endif
 
 GC_SRC = gencgc.c
 
-CFLAGS = -g -Wall -O3 -fno-omit-frame-pointer -mno-cygwin -march=i686 -DWINVER=0x0501
+CFLAGS = -g -Wall -O3 -fno-omit-frame-pointer -march=i686 -DWINVER=0x0501
 ASFLAGS = $(CFLAGS)
 
 CPP = cpp
