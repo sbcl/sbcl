@@ -12,4 +12,7 @@
 
 (in-package "SB!VM")
 
-;;; Dummy placeholder file.
+;;;; Instance hackery:
+
+(define-full-reffer instance-index-ref * instance-slots-offset
+  instance-pointer-lowtag (descriptor-reg any-reg) * %instance-ref)
