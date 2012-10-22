@@ -421,9 +421,6 @@
        (aver (symbolp (leaf-source-name leaf)))
        (ecase (global-var-kind leaf)
          ((:special)
-          #!+arm
-          (error "Don't know how to VOP SET")
-          #!-arm
           (vop set node block (emit-constant (leaf-source-name leaf)) val))
          ((:global)
           #!+arm

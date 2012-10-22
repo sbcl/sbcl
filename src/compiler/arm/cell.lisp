@@ -12,6 +12,13 @@
 
 (in-package "SB!VM")
 
+;;;; Symbol hacking VOPs:
+
+;;; The compiler likes to be able to directly SET symbols.
+;;;
+(define-vop (set cell-set)
+  (:variant symbol-value-slot other-pointer-lowtag))
+
 ;;;; Instance hackery:
 
 (define-full-reffer instance-index-ref * instance-slots-offset
