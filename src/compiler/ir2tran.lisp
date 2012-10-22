@@ -384,7 +384,6 @@
 ;;; deliver the value to that lvar. If the var is a lexical variable
 ;;; with no refs, then we don't actually set anything, since the
 ;;; variable has been deleted.
-#!-arm
 (defun ir2-convert-set (node block)
   (declare (type cset node) (type ir2-block block))
   (let* ((lvar (node-lvar node))
@@ -402,6 +401,9 @@
                (explicit (lambda-var-explicit-value-cell leaf)))
            (cond
             ((and indirect explicit)
+             #!+arm
+             (error "Don't know how to VOP VALUE-CELL-SET")
+             #!-arm
              (vop value-cell-set node block tn val))
             ((and indirect
                   (not (eq (node-physenv node)
@@ -410,14 +412,23 @@
                                     (primitive-type (leaf-type leaf))))))
              (if setter
                  (funcall setter node block tn val (leaf-info leaf))
+                 #!+arm
+                 (error "Don't know how to VOP ANCESTOR-FRAME-SET")
+                 #!-arm
                  (vop ancestor-frame-set node block tn val (leaf-info leaf)))))
             (t (emit-move node block val tn))))))
       (global-var
        (aver (symbolp (leaf-source-name leaf)))
        (ecase (global-var-kind leaf)
          ((:special)
+          #!+arm
+          (error "Don't know how to VOP SET")
+          #!-arm
           (vop set node block (emit-constant (leaf-source-name leaf)) val))
          ((:global)
+          #!+arm
+          (error "Don't know how to VOP %SET-SYMBOL-GLOBAL-VALUE")
+          #!-arm
           (vop %set-symbol-global-value node
                block (emit-constant (leaf-source-name leaf)) val)))))
     (when locs
