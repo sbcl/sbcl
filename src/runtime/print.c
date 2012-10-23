@@ -70,6 +70,7 @@ dyndebug_init()
     dyndebug_init1(misc,           "MISC");
     dyndebug_init1(pagefaults,     "PAGEFAULTS");
     dyndebug_init1(io,             "IO");
+    dyndebug_init1(runtime_link,   "RUNTIME_LINK");
 
     int n_output_flags = n;
     dyndebug_init1(backtrace_when_lost, "BACKTRACE_WHEN_LOST");

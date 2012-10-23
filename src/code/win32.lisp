@@ -38,7 +38,7 @@
 
 ;;; Retrieve the calling thread's last-error code value.  The
 ;;; last-error code is maintained on a per-thread basis.
-(define-alien-routine ("GetLastError@0" get-last-error) dword)
+(define-alien-routine ("GetLastError" get-last-error) dword)
 
 ;;; Flag constants for FORMAT-MESSAGE.
 (defconstant format-message-from-system #x1000)
@@ -46,7 +46,7 @@
 ;;; Format an error message based on a lookup table.  See MSDN for the
 ;;; full meaning of the all options---most are not used when getting
 ;;; system error codes.
-(define-alien-routine ("FormatMessageA@28" format-message) dword
+(define-alien-routine ("FormatMessageA" format-message) dword
   (flags dword)
   (source (* t))
   (message-id dword)
@@ -64,7 +64,7 @@
 
 ;;; Read data from a file handle into a buffer.  This may be used
 ;;; synchronously or with "overlapped" (asynchronous) I/O.
-(define-alien-routine ("ReadFile@20" read-file) bool
+(define-alien-routine ("ReadFile" read-file) bool
   (file handle)
   (buffer (* t))
   (bytes-to-read dword)
@@ -73,7 +73,7 @@
 
 ;;; Write data from a buffer to a file handle.  This may be used
 ;;; synchronously  or with "overlapped" (asynchronous) I/O.
-(define-alien-routine ("WriteFile@20" write-file) bool
+(define-alien-routine ("WriteFile" write-file) bool
   (file handle)
   (buffer (* t))
   (bytes-to-write dword)
@@ -84,7 +84,7 @@
 ;;; removing it from the pipe.  BUFFER, BYTES-READ, BYTES-AVAIL, and
 ;;; BYTES-LEFT-THIS-MESSAGE may be NULL if no data is to be read.
 ;;; Return TRUE on success, FALSE on failure.
-(define-alien-routine ("PeekNamedPipe@24" peek-named-pipe) bool
+(define-alien-routine ("PeekNamedPipe" peek-named-pipe) bool
   (pipe handle)
   (buffer (* t))
   (buffer-size dword)
@@ -95,13 +95,13 @@
 ;;; Flush the console input buffer if HANDLE is a console handle.
 ;;; Returns true on success, false if the handle does not refer to a
 ;;; console.
-(define-alien-routine ("FlushConsoleInputBuffer@4" flush-console-input-buffer) bool
+(define-alien-routine ("FlushConsoleInputBuffer" flush-console-input-buffer) bool
   (handle handle))
 
 ;;; Read data from the console input buffer without removing it,
 ;;; without blocking.  Buffer should be large enough for LENGTH *
 ;;; INPUT-RECORD-SIZE bytes.
-(define-alien-routine ("PeekConsoleInputA@16" peek-console-input) bool
+(define-alien-routine ("PeekConsoleInputA" peek-console-input) bool
   (handle handle)
   (buffer (* t))
   (length dword)
@@ -166,7 +166,7 @@
 ;;;; System Functions
 
 #!-sb-thread
-(define-alien-routine ("Sleep@4" millisleep) void
+(define-alien-routine ("Sleep" millisleep) void
   (milliseconds dword))
 
 #!+sb-thread
@@ -348,7 +348,7 @@
   (defun ansi-codepage ()
     (or *ansi-codepage*
         (setq *ansi-codepage*
-              (gethash (alien-funcall (extern-alien "GetACP@0" (function UINT)))
+              (gethash (alien-funcall (extern-alien "GetACP" (function UINT)))
                        *codepage-to-external-format*
                        :latin-1))))
 
@@ -356,7 +356,7 @@
   (defun oem-codepage ()
     (or *oem-codepage*
         (setq *oem-codepage*
-            (gethash (alien-funcall (extern-alien "GetOEMCP@0" (function UINT)))
+            (gethash (alien-funcall (extern-alien "GetOEMCP" (function UINT)))
                      *codepage-to-external-format*
                      :latin-1)))))
 
@@ -364,7 +364,7 @@
 (declaim (ftype (function () keyword) console-input-codepage))
 (defun console-input-codepage ()
   (or #!+sb-unicode
-      (gethash (alien-funcall (extern-alien "GetConsoleCP@0" (function UINT)))
+      (gethash (alien-funcall (extern-alien "GetConsoleCP" (function UINT)))
                *codepage-to-external-format*)
       :latin-1))
 
@@ -373,11 +373,11 @@
 (defun console-output-codepage ()
   (or #!+sb-unicode
       (gethash (alien-funcall
-                (extern-alien "GetConsoleOutputCP@0" (function UINT)))
+                (extern-alien "GetConsoleOutputCP" (function UINT)))
                *codepage-to-external-format*)
       :latin-1))
 
-(define-alien-routine ("LocalFree@4" local-free) void
+(define-alien-routine ("LocalFree" local-free) void
   (lptr (* t)))
 
 (defmacro cast-and-free (value &key (type 'system-string)
@@ -390,10 +390,9 @@
   `(let
      ((,name (etypecase ,description
                (string ,description)
-               (cons (destructuring-bind (s &optional (l 0) c) ,description
-                       (format nil "~A~A~A" s
-                               (if c #!-sb-unicode "A@" #!+sb-unicode "W@" "@")
-                               l))))))
+               (cons (destructuring-bind (s &optional c) ,description
+                       (format nil "~A~A" s
+                               (if c #!-sb-unicode "A" #!+sb-unicode "W" "")))))))
      ,@body)))
 
 (defmacro make-system-buffer (x)
@@ -440,7 +439,7 @@
 (defun get-last-error-message (err)
   "http://msdn.microsoft.com/library/default.asp?url=/library/en-us/debug/base/retrieving_the_last_error_code.asp"
   (with-alien ((amsg (* char)))
-    (syscall (("FormatMessage" 28 t)
+    (syscall (("FormatMessage" t)
               dword dword dword dword dword (* (* char)) dword dword)
              (cast-and-free amsg :free-function local-free)
              (logior FORMAT_MESSAGE_ALLOCATE_BUFFER FORMAT_MESSAGE_FROM_SYSTEM)
@@ -457,7 +456,7 @@
 (defun get-folder-namestring (csidl)
   "http://msdn.microsoft.com/library/en-us/shellcc/platform/shell/reference/functions/shgetfolderpath.asp"
   (with-alien ((apath (* char) (make-system-buffer (1+ max_path))))
-    (syscall (("SHGetFolderPath" 20 t) int handle int handle dword (* char))
+    (syscall (("SHGetFolderPath" t) int handle int handle dword (* char))
              (concatenate 'string (cast-and-free apath) "\\")
              0 csidl 0 0 apath)))
 
@@ -466,7 +465,7 @@
 
 (defun sb!unix:posix-getcwd ()
   (with-alien ((apath (* char) (make-system-buffer (1+ max_path))))
-    (with-sysfun (afunc ("GetCurrentDirectory" 8 t) dword dword (* char))
+    (with-sysfun (afunc ("GetCurrentDirectory" t) dword dword (* char))
       (let ((ret (alien-funcall afunc (1+ max_path) apath)))
         (when (zerop ret)
           (win32-error "GetCurrentDirectory"))
@@ -480,16 +479,16 @@
   (declare (type sb!unix:unix-pathname name)
            (type sb!unix:unix-file-mode mode)
            (ignore mode))
-  (void-syscall* (("CreateDirectory" 8 t) system-string dword) name 0))
+  (void-syscall* (("CreateDirectory" t) system-string dword) name 0))
 
 (defun sb!unix:unix-rename (name1 name2)
   (declare (type sb!unix:unix-pathname name1 name2))
-  (void-syscall* (("MoveFile" 8 t) system-string system-string) name1 name2))
+  (void-syscall* (("MoveFile" t) system-string system-string) name1 name2))
 
 (defun sb!unix::posix-getenv (name)
   (declare (type simple-string name))
   (with-alien ((aenv (* char) (make-system-buffer default-environment-length)))
-    (with-sysfun (afunc ("GetEnvironmentVariable" 12 t)
+    (with-sysfun (afunc ("GetEnvironmentVariable" t)
                         dword system-string (* char) dword)
       (let ((ret (alien-funcall afunc name aenv default-environment-length)))
         (when (> ret default-environment-length)
@@ -506,7 +505,7 @@
 ;;
 ;; http://msdn.microsoft.com/library/en-us/dllproc/base/getcurrentprocess.asp
 (declaim (inline get-current-process))
-(define-alien-routine ("GetCurrentProcess@0" get-current-process) handle)
+(define-alien-routine ("GetCurrentProcess" get-current-process) handle)
 
 ;;;; Process time information
 
@@ -526,7 +525,7 @@
                 (,exit-time filetime)
                 (,kernel-time filetime)
                 (,user-time filetime))
-     (syscall* (("GetProcessTimes" 20) handle (* filetime) (* filetime)
+     (syscall* (("GetProcessTimes") handle (* filetime) (* filetime)
                 (* filetime) (* filetime))
                (progn ,@forms)
                (get-current-process)
@@ -545,7 +544,7 @@
           epoch (get-internal-real-time)))
   (defun get-internal-real-time ()
     (- (with-alien ((system-time filetime))
-         (syscall (("GetSystemTimeAsFileTime" 4) void (* filetime))
+         (syscall (("GetSystemTimeAsFileTime") void (* filetime))
                   (values (floor system-time 100ns-per-internal-time-unit))
                   (addr system-time)))
        epoch)))
@@ -591,7 +590,7 @@
   "Return the number of seconds and microseconds since the beginning of the
 UNIX epoch: January 1st 1970."
   (with-alien ((system-time filetime))
-    (syscall (("GetSystemTimeAsFileTime" 4) void (* filetime))
+    (syscall (("GetSystemTimeAsFileTime") void (* filetime))
              (multiple-value-bind (sec 100ns)
                  (floor (- system-time +unix-epoch-filetime+)
                         (* 100ns-per-internal-time-unit
@@ -606,7 +605,7 @@ UNIX epoch: January 1st 1970."
 ;; http://msdn.microsoft.com/library/en-us/dllproc/base/setenvironmentvariable.asp
 (defun setenv (name value)
   (declare (type simple-string name value))
-  (void-syscall* (("SetEnvironmentVariable" 8 t) system-string system-string)
+  (void-syscall* (("SetEnvironmentVariable" t) system-string system-string)
                  name value))
 
 (defmacro c-sizeof (s)
@@ -632,7 +631,7 @@ UNIX epoch: January 1st 1970."
 (defun get-version-ex ()
   (with-alien ((info (struct OSVERSIONINFO)))
     (setf (slot info 'dwOSVersionInfoSize) (c-sizeof (struct OSVERSIONINFO)))
-    (syscall* (("GetVersionEx" 4 t) (* (struct OSVERSIONINFO)))
+    (syscall* (("GetVersionEx" t) (* (struct OSVERSIONINFO)))
               (values (slot info 'dwMajorVersion)
                       (slot info 'dwMinorVersion)
                       (slot info 'dwBuildNumber)
@@ -650,7 +649,7 @@ UNIX epoch: January 1st 1970."
 (defun get-computer-name ()
   (with-alien ((aname (* char) (make-system-buffer (1+ MAX_COMPUTERNAME_LENGTH)))
                (length dword (1+ MAX_COMPUTERNAME_LENGTH)))
-    (with-sysfun (afunc ("GetComputerName" 8 t) bool (* char) (* dword))
+    (with-sysfun (afunc ("GetComputerName" t) bool (* char) (* dword))
       (when (zerop (alien-funcall afunc aname (addr length)))
         (let ((err (get-last-error)))
           (unless (= err ERROR_BUFFER_OVERFLOW)
@@ -659,6 +658,12 @@ UNIX epoch: January 1st 1970."
           (setf aname (make-system-buffer length))
           (alien-funcall afunc aname (addr length))))
       (cast-and-free aname))))
+
+(define-alien-routine ("_lseeki64" lseeki64)
+    (signed 64)
+  (fd int)
+  (position (signed 64))
+  (whence int))
 
 (define-alien-routine ("SetFilePointerEx" set-file-pointer-ex) lispbool
   (handle handle)
@@ -907,4 +912,4 @@ UNIX epoch: January 1st 1970."
               (alien-funcall (extern-alien "_dup2" (function int int int)) 0 fd)
               (close-protection nil)
               (close-socket handle))
-            (sb!unix::void-syscall ("close" int) fd))))))
+            (sb!unix::void-syscall ("_close" int) fd))))))

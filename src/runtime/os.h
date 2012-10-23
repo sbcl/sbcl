@@ -75,6 +75,10 @@ extern void os_zero(os_vm_address_t addr, os_vm_size_t length);
  * "hp-ux.c" in the old CMU CL code. Perhaps move/merge it in here. */
 extern os_vm_address_t os_validate(os_vm_address_t addr, os_vm_size_t len);
 
+#ifdef LISP_FEATURE_WIN32
+void* os_validate_recommit(os_vm_address_t addr, os_vm_size_t len);
+#endif
+
 /* This function seems to undo the effect of os_validate(..). */
 extern void os_invalidate(os_vm_address_t addr, os_vm_size_t len);
 

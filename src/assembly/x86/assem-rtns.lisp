@@ -338,7 +338,7 @@
   (inst push 0)
   (inst push 0)
   (inst push ecx-tn)
-  (inst call (make-fixup "RtlUnwind@16" :foreign)))
+  (inst call (make-fixup "RtlUnwind" :foreign)))
 
 ;; We want no VOP for this one and for it to only happen on Win32
 ;; targets.  Hence the following disaster.

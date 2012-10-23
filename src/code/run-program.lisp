@@ -184,7 +184,7 @@
 (setf (documentation 'process-pid 'function) "The pid of the child process.")
 
 #+win32
-(define-alien-routine ("GetExitCodeProcess@8" get-exit-code-process)
+(define-alien-routine ("GetExitCodeProcess" get-exit-code-process)
     int
   (handle unsigned) (exit-code unsigned :out))
 

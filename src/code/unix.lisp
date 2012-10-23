@@ -62,6 +62,9 @@
 ;;; should live in SB-SYS or even SB-EXT?
 
 (defmacro syscall ((name &rest arg-types) success-form &rest args)
+  (when (eql 3 (mismatch "[_]" name))
+    (setf name
+          (concatenate 'string #!+win32 "_" (subseq name 3))))
   `(locally
     (declare (optimize (sb!c::float-accuracy 0)))
     (let ((result (alien-funcall (extern-alien ,name (function int ,@arg-types))
@@ -276,7 +279,7 @@ corresponds to NAME, or NIL if there is none."
 (defun unix-access (path mode)
   (declare (type unix-pathname path)
            (type (mod 8) mode))
-  (void-syscall ("access" c-string int) path mode))
+  (void-syscall ("[_]access" c-string int) path mode))
 
 ;;; values for the second argument to UNIX-LSEEK
 ;;; Note that nowadays these are called SEEK_SET, SEEK_CUR, and SEEK_END
@@ -287,7 +290,7 @@ corresponds to NAME, or NIL if there is none."
 ;;; Is a stream interactive?
 (defun unix-isatty (fd)
   (declare (type unix-fd fd))
-  (int-syscall ("isatty" int) fd))
+  (int-syscall ("[_]isatty" int) fd))
 
 (defun unix-lseek (fd offset whence)
   "Unix-lseek accepts a file descriptor and moves the file pointer by
@@ -299,10 +302,12 @@ corresponds to NAME, or NIL if there is none."
   "
   (declare (type unix-fd fd)
            (type (integer 0 2) whence))
-  (let ((result (alien-funcall (extern-alien #!-largefile "lseek"
+  (let ((result #!-win32
+                (alien-funcall (extern-alien #!-largefile "lseek"
                                              #!+largefile "lseek_largefile"
                                              (function off-t int off-t int))
-                 fd offset whence)))
+                 fd offset whence)
+                #!+win32 (sb!win32:lseeki64 fd offset whence)))
     (if (minusp result)
         (values nil (get-errno))
       (values result 0))))
@@ -427,7 +432,7 @@ corresponds to NAME, or NIL if there is none."
 ;;; number are returned.
 (defun unix-dup (fd)
   (declare (type unix-fd fd))
-  (int-syscall ("dup" int) fd))
+  (int-syscall ("[_]dup" int) fd))
 
 ;;; Terminate the current process with an optional error code. If
 ;;; successful, the call doesn't return. If unsuccessful, the call
@@ -448,7 +453,7 @@ avoiding atexit(3) hooks, etc. Otherwise exit(2) is called."
   (os-exit code))
 
 ;;; Return the process id of the current process.
-(define-alien-routine ("getpid" unix-getpid) int)
+(define-alien-routine (#!+win32 "_getpid" #!-win32 "getpid" unix-getpid) int)
 
 ;;; Return the real user id associated with the current process.
 #!-win32
@@ -520,7 +525,7 @@ avoiding atexit(3) hooks, etc. Otherwise exit(2) is called."
 ;;; name and the file if this is the last link.
 (defun unix-unlink (name)
   (declare (type unix-pathname name))
-  (void-syscall ("unlink" c-string) name))
+  (void-syscall ("[_]unlink" c-string) name))
 
 ;;; Return the name of the host machine as a string.
 #!-win32

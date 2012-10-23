@@ -159,6 +159,7 @@
                 "SRC;CODE;PROFILE"
                 "SRC;CODE;NTRACE"
                 "SRC;CODE;STEP"
+                "SRC;CODE;WARM-LIB"
                 "SRC;CODE;RUN-PROGRAM"))
 
   (let ((fullname (concatenate 'string "SYS:" stem ".LISP")))

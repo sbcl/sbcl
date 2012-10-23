@@ -58,7 +58,7 @@ arguments to fit Lisp style more closely."))
 ;;; gethostbyname and gethostbyaddr.
 ;;;
 ;;; CLH: getaddrinfo seems to be broken is broken on x86-64/darwin
-#-(and x86-64 darwin)
+#-(or win32 (and x86-64 darwin))
 (let ((addr (sb-alien::find-dynamic-foreign-symbol-address "getaddrinfo")))
   (when addr
     (pushnew :sb-bsd-sockets-addrinfo *features*)))

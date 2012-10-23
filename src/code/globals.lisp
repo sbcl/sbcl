@@ -25,6 +25,7 @@
                   *restart-clusters*
                   *in-without-gcing* *gc-inhibit* *gc-pending*
                   #!+sb-thread *stop-for-gc-pending*
+                  #!+sb-dynamic-core sb!vm::*required-runtime-c-symbols*
                   *software-interrupt-vector* *load-verbose*
                   *load-print-stuff* *in-compilation-unit*
                   *aborted-compilation-unit-count* *char-name-alist*

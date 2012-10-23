@@ -30,6 +30,11 @@ export LANG LC_ALL
 # order to produce the symbol table file that second genesis needs. It
 # could come either before or after running the cross compiler; that
 # doesn't matter.)
+#
+# Note that the latter requirement does not apply to sb-dynamic-core
+# builds, since the cross compiler does not depend on symbol tables in
+# that case.  Only because sbcl.nm is convenient for debugging purposes
+# is its generation left enabled even for those builds.
 echo //building runtime system and symbol table file
 
 # The clean is needed for Darwin's readonlyspace hack.

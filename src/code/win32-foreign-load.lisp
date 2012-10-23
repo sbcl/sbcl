@@ -11,30 +11,61 @@
 
 (in-package "SB!ALIEN")
 
-(define-alien-type hinstance long)
+(define-alien-type hinstance signed)
 
-(define-alien-routine ("LoadLibraryA@4" loadlibrary) hinstance
+(define-alien-routine ("LoadLibraryA" loadlibrary) hinstance
   (file c-string))
 
-(define-alien-routine ("FreeLibrary@4" freelibrary) int
+(define-alien-routine ("FreeLibrary" freelibrary) int
   (handle hinstance))
 
-(define-alien-routine ("GetProcAddress@8" getprocaddress) system-area-pointer
+(define-alien-routine ("GetProcAddress" getprocaddress) system-area-pointer
   (handle hinstance)
   (symbol c-string))
 
-(define-alien-routine ("GetLastError@0" getlasterror) unsigned-int)
+(define-alien-routine ("GetLastError" getlasterror) unsigned-int)
 
-(defun dlopen-or-lose (obj)
-  (let* ((namestring (shared-object-namestring obj))
-         (handle (loadlibrary namestring)))
-    (aver namestring)
-    (when (zerop handle)
-      (setf (shared-object-handle obj) nil)
-      (error "Error opening shared object ~S:~%  ~A."
-             namestring (getlasterror)))
-    (setf (shared-object-handle obj) handle)
-    handle))
+(define-alien-routine ("SetStdHandle" set-std-handle)
+   void
+ (id int)
+ (handle int))
+
+(sb!alien:define-alien-routine ("GetStdHandle" get-std-handle)
+   sb!alien:int
+ (id sb!alien:int))
+
+(define-alien-routine ("GetModuleHandleW" get-module-handle)
+    hinstance
+  (name (c-string :external-format :ucs-2)))
+
+(defvar *reset-stdio-on-dlopen* t)
+
+(defconstant +stdio-handle+ -10)
+
+(defun loadlibrary-without-stdio (namestring)
+  (flet ((loadlibrary (namestring)
+           (loadlibrary namestring)))
+   (if *reset-stdio-on-dlopen*
+       (let ((stdio (get-std-handle +stdio-handle+)))
+         (unwind-protect
+              (progn
+                (set-std-handle +stdio-handle+ -1)
+                (loadlibrary namestring))
+           (set-std-handle +stdio-handle+ stdio)))
+       (loadlibrary namestring))))
+
+(defun dlopen-or-lose (&optional obj)
+  (if obj
+      (let* ((namestring (shared-object-namestring obj))
+             (handle (loadlibrary-without-stdio namestring)))
+        (aver namestring)
+        (when (zerop handle)
+          (setf (shared-object-handle obj) nil)
+          (error "Error opening shared object ~S:~%  ~A."
+                 namestring (getlasterror)))
+        (setf (shared-object-handle obj) handle)
+        handle)
+      (extern-alien "runtime_module_handle" hinstance)))
 
 (defun dlclose-or-lose (&optional (obj nil objp))
   (when (and objp (shared-object-handle obj))
@@ -59,11 +90,27 @@
   ;; GetProcAddress() won't return NULL on success.
   (let* ((extern (coerce symbol 'base-string))
          (result nil))
-    (dolist (obj *shared-objects*)
-      (let ((handle (shared-object-handle obj)))
-        (when handle
-          (setf result (sap-int (getprocaddress handle extern)))
-          (when (not (zerop result))
-            (return result)))))))
+    (dolist (handle
+              (cons *runtime-dlhandle*
+                    (mapcar #'shared-object-handle *shared-objects*)))
+      (when handle
+        (setf result (sap-int (getprocaddress handle extern)))
+        (when (not (zerop result))
+          (return result))))))
 
-
+(defun runtime-exported-symbols ()
+  ;; TODO: reimplement for x86-64. Not so hard.
+  (let* ((image-base (extern-alien "runtime_module_handle" system-area-pointer))
+         (pe-base (sap+ image-base (sap-ref-32 image-base 60)))
+         (export-directory (sap+ pe-base (- #!+x86 248 #!+x86-64 264 (* 16 8))))
+         (export-data (sap+ image-base (sap-ref-32 export-directory 0)))
+         (n-functions (sap-ref-32 export-data 20))
+         (n-names (sap-ref-32 export-data 24))
+         (functions-sap (sap+ image-base (sap-ref-32 export-data 28)))
+         (names-sap (sap+ image-base (sap-ref-32 export-data 32))))
+    (loop repeat (min n-functions n-names)
+          for offset from 0 by #.sb!vm::n-word-bytes
+          collect
+       (cons
+         (sap-int (sap+ image-base (sap-ref-32 functions-sap offset)))
+         (sap-int (sap+ image-base (sap-ref-32 names-sap offset)))))))

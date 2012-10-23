@@ -615,6 +615,9 @@ main(int argc, char *argv[], char *envp[])
     if (initial_function == NIL) {
         lose("couldn't find initial function\n");
     }
+#ifdef LISP_FEATURE_SB_DYNAMIC_CORE
+    os_link_runtime();
+#endif
 #ifdef LISP_FEATURE_HPUX
     /* -1 = CLOSURE_FUN_OFFSET, 23 = SIMPLE_FUN_CODE_OFFSET, we are
      * not in LANGUAGE_ASSEMBLY so we cant reach them. */

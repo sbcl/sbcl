@@ -526,9 +526,21 @@ case "$sbcl_os" in
         ;;
     win32)
         printf ' :win32' >> $ltf
+        #
+        # Optional features -- We enable them by default, but the build
+        # ought to work perfectly without them:
+        #
         printf ' :sb-futex' >> $ltf
         printf ' :sb-qshow' >> $ltf
+        #
+        # Required features -- Some of these used to be optional, but
+        # building without them is no longer considered supported:
+        #
+        # (Of course it doesn't provide dlopen, but there is
+        # roughly-equivalent magic nevertheless:)
+        printf ' :sb-dynamic-core :os-provides-dlopen' >> $ltf
         printf ' :sb-thread :sb-safepoint :sb-thruption :sb-wtimer' >> $ltf
+        #
         link_or_copy Config.$sbcl_arch-win32 Config
         link_or_copy $sbcl_arch-win32-os.h target-arch-os.h
         link_or_copy win32-os.h target-os.h

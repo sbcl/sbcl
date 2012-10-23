@@ -131,6 +131,7 @@ extern struct dyndebug_config {
     int dyndebug_backtrace_when_lost;
     int dyndebug_sleep_when_lost;
     int dyndebug_io;
+    int dyndebug_runtime_link;
 } dyndebug_config;
 
 #ifdef LISP_FEATURE_GENCGC
@@ -358,5 +359,7 @@ extern char *copied_string (char *string);
 #if defined(LISP_FEATURE_GENCGC) && !defined(LISP_FEATURE_C_STACK_IS_CONTROL_STACK)
 # define GENCGC_IS_PRECISE 1
 #endif
+
+void *os_dlsym_default(char *name);
 
 #endif /* _SBCL_RUNTIME_H_ */

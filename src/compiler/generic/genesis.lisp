@@ -520,6 +520,9 @@
 ;;; the cold core starts up
 (defvar *current-debug-sources*)
 
+;;; foreign symbol references
+(defparameter *cold-foreign-undefined-symbols* nil)
+
 ;;; the name of the object file currently being cold loaded (as a string, not a
 ;;; pathname), or NIL if we're not currently cold loading any object file
 (defvar *cold-load-filename* nil)
@@ -1926,6 +1929,22 @@ core and return a descriptor to it."
       (when value
         (do-cold-fixup (second fixup) (third fixup) value (fourth fixup))))))
 
+#!+sb-dynamic-core
+(progn
+  (defparameter *dyncore-address* sb!vm::linkage-table-space-start)
+  (defparameter *dyncore-linkage-keys* nil)
+  (defparameter *dyncore-table* (make-hash-table :test 'equal))
+
+  (defun dyncore-note-symbol (symbol-name datap)
+    "Register a symbol and return its address in proto-linkage-table."
+    (let ((key (cons symbol-name datap)))
+      (symbol-macrolet ((entry (gethash key *dyncore-table*)))
+        (or entry
+            (setf entry
+                  (prog1 *dyncore-address*
+                    (push key *dyncore-linkage-keys*)
+                    (incf *dyncore-address* sb!vm::linkage-table-entry-size))))))))
+
 ;;; *COLD-FOREIGN-SYMBOL-TABLE* becomes *!INITIAL-FOREIGN-SYMBOLS* in
 ;;; the core. When the core is loaded, !LOADER-COLD-INIT uses this to
 ;;; create *STATIC-FOREIGN-SYMBOLS*, which the code in
@@ -1933,15 +1952,25 @@ core and return a descriptor to it."
 (defun foreign-symbols-to-core ()
   (let ((symbols nil)
         (result *nil-descriptor*))
-    (maphash (lambda (symbol value)
-               (push (cons symbol value) symbols))
-             *cold-foreign-symbol-table*)
-    (setq symbols (sort symbols #'string< :key #'car))
-    (dolist (symbol symbols)
-      (cold-push (cold-cons (base-string-to-core (car symbol))
-                            (number-to-core (cdr symbol)))
-                 result))
-    (cold-set (cold-intern 'sb!kernel:*!initial-foreign-symbols*) result))
+    #!-sb-dynamic-core
+    (progn
+      (maphash (lambda (symbol value)
+                 (push (cons symbol value) symbols))
+               *cold-foreign-symbol-table*)
+      (setq symbols (sort symbols #'string< :key #'car))
+      (dolist (symbol symbols)
+        (cold-push (cold-cons (base-string-to-core (car symbol))
+                              (number-to-core (cdr symbol)))
+                   result)))
+    (cold-set (cold-intern 'sb!kernel:*!initial-foreign-symbols*) result)
+    #!+sb-dynamic-core
+    (let ((runtime-linking-list *nil-descriptor*))
+      (dolist (symbol *dyncore-linkage-keys*)
+        (cold-push (cold-cons (base-string-to-core (car symbol))
+                              (cdr symbol))
+                   runtime-linking-list))
+      (cold-set (cold-intern 'sb!vm::*required-runtime-c-symbols*)
+                runtime-linking-list)))
   (let ((result *nil-descriptor*))
     (dolist (rtn (sort (copy-list *cold-assembler-routines*) #'string< :key #'car))
       (cold-push (cold-cons (cold-intern (car rtn))
@@ -2593,6 +2622,12 @@ core and return a descriptor to it."
          (len (read-byte-arg))
          (sym (make-string len)))
     (read-string-as-bytes *fasl-input-stream* sym)
+    #!+sb-dynamic-core
+    (let ((offset (read-word-arg))
+          (value (dyncore-note-symbol sym nil)))
+      (do-cold-fixup code-object offset value kind))
+    #!- (and) (format t "Bad non-plt fixup: ~S~S~%" sym code-object)
+    #!-sb-dynamic-core
     (let ((offset (read-word-arg))
           (value (cold-foreign-symbol-address sym)))
       (do-cold-fixup code-object offset value kind))
@@ -2605,10 +2640,17 @@ core and return a descriptor to it."
          (len (read-byte-arg))
          (sym (make-string len)))
     (read-string-as-bytes *fasl-input-stream* sym)
-    (maphash (lambda (k v)
-               (format *error-output* "~&~S = #X~8X~%" k v))
-             *cold-foreign-symbol-table*)
-    (error "shared foreign symbol in cold load: ~S (~S)" sym kind)))
+    #!+sb-dynamic-core
+    (let ((offset (read-word-arg))
+          (value (dyncore-note-symbol sym t)))
+      (do-cold-fixup code-object offset value kind)
+      code-object)
+    #!-sb-dynamic-core
+    (progn
+      (maphash (lambda (k v)
+                 (format *error-output* "~&~S = #X~8X~%" k v))
+               *cold-foreign-symbol-table*)
+      (error "shared foreign symbol in cold load: ~S (~S)" sym kind))))
 
 (define-cold-fop (fop-assembler-code)
   (let* ((length (read-word-arg))
@@ -3244,7 +3286,10 @@ initially undefined function references:~2%")
                       symbol-table-file-name
                       core-file-name
                       map-file-name
-                      c-header-dir-name)
+                      c-header-dir-name
+                      #+nil (list-objects t))
+  #!+sb-dynamic-core
+  (declare (ignorable symbol-table-file-name))
 
   (format t
           "~&beginning GENESIS, ~A~%"
@@ -3258,10 +3303,18 @@ initially undefined function references:~2%")
 
   (let ((*cold-foreign-symbol-table* (make-hash-table :test 'equal)))
 
+    #!-sb-dynamic-core
     (when core-file-name
       (if symbol-table-file-name
           (load-cold-foreign-symbol-table symbol-table-file-name)
           (error "can't output a core file without symbol table file input")))
+
+    #!+sb-dynamic-core
+    (progn
+      (setf (gethash (extern-alien-name "undefined_tramp")
+                     *cold-foreign-symbol-table*)
+            (dyncore-note-symbol "undefined_tramp" nil))
+      (dyncore-note-symbol "undefined_alien_function" nil))
 
     ;; Now that we've successfully read our only input file (by
     ;; loading the symbol table, if any), it's a good time to ensure
