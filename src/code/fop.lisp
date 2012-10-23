@@ -145,7 +145,7 @@
   #+sb-xc-host ; since xc host doesn't know how to compile %PRIMITIVE
   (error "FOP-MISC-TRAP can't be defined without %PRIMITIVE.")
   #-sb-xc-host
-  (%primitive sb!c:make-other-immediate-type 0 sb!vm:unbound-marker-widetag))
+  (%primitive sb!c:make-unbound-marker))
 
 (define-cloned-fops (fop-character 68) (fop-short-character 69)
   (code-char (clone-arg)))

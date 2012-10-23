@@ -1542,8 +1542,7 @@
              (progn
                (labels ((,unbind (vars)
                           (declare (optimize (speed 2) (debug 0)))
-                          (let ((unbound-marker (%primitive make-other-immediate-type
-                                                            0 sb!vm:unbound-marker-widetag)))
+                          (let ((unbound-marker (%primitive make-unbound-marker)))
                             (dolist (var vars)
                               ;; CLHS says "bound and then made to have no value" -- user
                               ;; should not be able to tell the difference between that and this.

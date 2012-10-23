@@ -18,7 +18,7 @@
     (eval form)))
 
 (defun unbound-marker ()
-  (sb-c::%primitive sb-c:make-other-immediate-type 0 sb-vm:unbound-marker-widetag))
+  (sb-c::%primitive sb-c:make-unbound-marker))
 
 (defun assert-foo-not-checked (fun)
   (let* ((marker (unbound-marker))

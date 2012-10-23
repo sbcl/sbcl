@@ -141,22 +141,6 @@
     (inst sll res ptr 3)
     (inst srl res res 1)))
 
-(define-vop (make-other-immediate-type)
-  (:args (val :scs (any-reg descriptor-reg))
-         (type :scs (any-reg descriptor-reg immediate)
-               :target temp))
-  (:results (res :scs (any-reg descriptor-reg)))
-  (:temporary (:scs (non-descriptor-reg)) temp)
-  (:generator 2
-    (sc-case type
-      ((immediate)
-       (inst sll temp val n-widetag-bits)
-       (inst or res temp (tn-value type)))
-      (t
-       (inst sra temp type n-fixnum-tag-bits)
-       (inst sll res val (- n-widetag-bits n-fixnum-tag-bits))
-       (inst or res res temp)))))
-
 
 ;;;; Allocation
 

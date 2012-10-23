@@ -131,22 +131,6 @@
     ;; and shift the result into a positive fixnum like on x86.
     (inst rlwinm res ptr n-fixnum-tag-bits 1 n-positive-fixnum-bits)))
 
-(define-vop (make-other-immediate-type)
-  (:args (val :scs (any-reg descriptor-reg))
-         (type :scs (any-reg descriptor-reg immediate)
-               :target temp))
-  (:results (res :scs (any-reg descriptor-reg)))
-  (:temporary (:scs (non-descriptor-reg)) temp)
-  (:generator 2
-    (sc-case type
-      (immediate
-       (inst slwi temp val n-widetag-bits)
-       (inst ori res temp (tn-value type)))
-      (t
-       (inst srawi temp type n-fixnum-tag-bits)
-       (inst slwi res val (- n-widetag-bits n-fixnum-tag-bits))
-       (inst or res res temp)))))
-
 
 ;;;; Allocation
 

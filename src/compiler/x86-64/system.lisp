@@ -136,17 +136,6 @@
     ;; fixnum.
     (inst and res (lognot lowtag-mask))
     (inst shr res 1)))
-
-(define-vop (make-other-immediate-type)
-  (:args (val :scs (any-reg descriptor-reg) :target res)
-         (type :scs (unsigned-reg immediate)))
-  (:results (res :scs (any-reg descriptor-reg) :from (:argument 0)))
-  (:generator 2
-    (move res val)
-    (inst shl res (- n-widetag-bits n-fixnum-tag-bits))
-    (inst or res (sc-case type
-                   (unsigned-reg type)
-                   (immediate (tn-value type))))))
 
 ;;;; allocation
 

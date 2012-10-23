@@ -130,23 +130,6 @@
   (:policy :fast-safe)
   (:generator 1
     (inst zdep ptr n-positive-fixnum-bits n-positive-fixnum-bits res)))
-
-(define-vop (make-other-immediate-type)
-  (:args (val :scs (any-reg descriptor-reg))
-         (type :scs (any-reg descriptor-reg immediate) :target temp))
-  (:results (res :scs (any-reg descriptor-reg)))
-  (:temporary (:scs (non-descriptor-reg)) temp)
-  (:temporary (:scs (non-descriptor-reg)) t2)
-  (:generator 2
-    (sc-case type
-      ((immediate)
-        (inst sll val n-widetag-bits temp)
-        (inst li (tn-value type) t2)
-        (inst or temp t2 res))
-      (t
-        (inst sra type 2 temp)
-        (inst sll val (- n-widetag-bits 2) res)
-        (inst or res temp res)))))
 
 ;;;; Allocation
 

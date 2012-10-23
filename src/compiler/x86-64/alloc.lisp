@@ -169,7 +169,7 @@
 
 (define-vop (make-unbound-marker)
   (:args)
-  (:results (result :scs (any-reg)))
+  (:results (result :scs (descriptor-reg any-reg)))
   (:generator 1
     (inst mov result unbound-marker-widetag)))
 

@@ -52,8 +52,7 @@ distinct from the global value. Can also be SETF."
 
 (declaim (inline %makunbound))
 (defun %makunbound (symbol)
-  (%set-symbol-value symbol (%primitive sb!c:make-other-immediate-type
-                                        0 sb!vm:unbound-marker-widetag)))
+  (%set-symbol-value symbol (%primitive sb!c:make-unbound-marker)))
 
 (defun makunbound (symbol)
   #!+sb-doc
