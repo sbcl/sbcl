@@ -19,6 +19,41 @@
 (define-vop (set cell-set)
   (:variant symbol-value-slot other-pointer-lowtag))
 
+;;;; Binding and Unbinding.
+
+;;; BIND -- Establish VAL as a binding for SYMBOL.  Save the old value and
+;;; the symbol on the binding stack and stuff the new value into the
+;;; symbol.
+
+(define-vop (bind)
+  (:args (val :scs (any-reg descriptor-reg))
+         (symbol :scs (descriptor-reg)))
+  (:temporary (:scs (descriptor-reg)) value-temp)
+  (:temporary (:scs (any-reg)) bsp-temp)
+  (:generator 5
+    (loadw value-temp symbol symbol-value-slot other-pointer-lowtag)
+    (load-symbol-value bsp-temp *binding-stack-pointer*)
+    (inst add bsp-temp bsp-temp (* 2 n-word-bytes))
+    (store-symbol-value bsp-temp *binding-stack-pointer*)
+    (storew value-temp bsp-temp (- binding-value-slot binding-size))
+    (storew symbol bsp-temp (- binding-symbol-slot binding-size))
+    (storew val symbol symbol-value-slot other-pointer-lowtag)))
+
+(define-vop (unbind)
+  (:temporary (:scs (descriptor-reg)) symbol value)
+  (:temporary (:scs (any-reg)) bsp-temp)
+  (:temporary (:scs (any-reg)) zero-temp)
+  (:generator 0
+    (inst mov zero-temp 0)
+    (load-symbol-value bsp-temp *binding-stack-pointer*)
+    (loadw symbol bsp-temp (- binding-symbol-slot binding-size))
+    (loadw value bsp-temp (- binding-value-slot binding-size))
+    (storew value symbol symbol-value-slot other-pointer-lowtag)
+    (storew zero-temp bsp-temp (- binding-symbol-slot binding-size))
+    (storew zero-temp bsp-temp (- binding-value-slot binding-size))
+    (inst sub bsp-temp bsp-temp (* 2 n-word-bytes))
+    (store-symbol-value bsp-temp *binding-stack-pointer*)))
+
 ;;;; Instance hackery:
 
 (define-full-reffer instance-index-ref * instance-slots-offset
