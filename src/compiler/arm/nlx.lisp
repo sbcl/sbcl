@@ -12,6 +12,17 @@
 
 (in-package "SB!VM")
 
+;;; Make an environment-live stack TN for saving the SP for NLX entry.
+(defun make-nlx-sp-tn (env)
+  (physenv-live-tn
+   (make-representation-tn *fixnum-primitive-type* immediate-arg-scn)
+   env))
+
+;;; Make a TN for the argument count passing location for a
+;;; non-local entry.
+(defun make-nlx-entry-arg-start-location ()
+  (make-wired-tn *fixnum-primitive-type* immediate-arg-scn ocfp-offset))
+
 ;;; Save and restore dynamic environment.
 ;;;
 ;;; These VOPs are used in the reentered function to restore the appropriate
@@ -44,6 +55,11 @@
       (when cur-nfp
         (move cur-nfp nfp)))
     (store-symbol-value nsp *number-stack-pointer*)))
+
+(define-vop (current-stack-pointer)
+  (:results (res :scs (any-reg descriptor-reg)))
+  (:generator 1
+    (move res sp-tn)))
 
 (define-vop (current-binding-pointer)
   (:results (res :scs (any-reg descriptor-reg)))
