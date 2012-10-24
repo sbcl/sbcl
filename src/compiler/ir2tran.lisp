@@ -1740,7 +1740,6 @@
 ;;; exit, and TAG is the lvar for the catch tag (if any.) We get at
 ;;; the target PC by passing in the label to the vop. The vop is
 ;;; responsible for building a return-PC object.
-#!-arm
 (defun emit-nlx-start (node block info tag)
   (declare (type node node) (type ir2-block block) (type nlx-info info)
            (type (or lvar null) tag))
@@ -1761,9 +1760,15 @@
 
     (ecase kind
       (:catch
+       #!+arm
+       (error "Don't know how to VOP MAKE-CATCH-BLOCK")
+       #!-arm
        (vop make-catch-block node block block-tn
             (lvar-tn node block tag) target-label res))
       ((:unwind-protect :block :tagbody)
+       #!+arm
+       (error "Don't know how to VOP MAKE-UNWIND-BLOCK")
+       #!-arm
        (vop make-unwind-block node block block-tn target-label res)))
 
     (ecase kind
@@ -1772,6 +1777,9 @@
            (emit-make-value-cell node block res (ir2-nlx-info-home 2info))
            (emit-move node block res (ir2-nlx-info-home 2info))))
       (:unwind-protect
+       #!+arm
+       (error "Don't know how to VOP SET-UNWIND-PROTECT")
+       #!-arm
        (vop set-unwind-protect node block block-tn))
       (:catch)))
 
