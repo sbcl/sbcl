@@ -135,7 +135,7 @@
     ;; allocation time rather than at function-entry time, largely due
     ;; to a lack of usable registers.
     (move res sp-tn)
-    (inst add sp-tn sp-tn (* (min 1 nargs) n-word-bytes))
+    (inst add sp-tn sp-tn (* (max 1 nargs) n-word-bytes))
     (storew fp-tn res ocfp-save-offset)))
 
 ;;; Emit code needed at the return-point from an unknown-values call
