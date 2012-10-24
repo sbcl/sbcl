@@ -1826,9 +1826,6 @@
 ;;; pointer. In an UNWIND-PROTECT cleanup, we want to leave the stack
 ;;; pointer alone, since the thrown values are still out there.
 (defoptimizer (%nlx-entry ir2-convert) ((info-lvar) node block)
-  #!+arm
-  (error "Don't know how to %NLX-ENTRY")
-  #!-arm
   (let* ((info (lvar-value info-lvar))
          (lvar (node-lvar node))
          (2info (nlx-info-info info))
@@ -1841,11 +1838,17 @@
       ((:catch :block :tagbody)
        (let ((2lvar (and lvar (lvar-info lvar))))
          (if (and 2lvar (eq (ir2-lvar-kind 2lvar) :unknown))
+             #!+arm
+             (error "Don't know how to VOP NLX-ENTRY-MULTIPLE")
+             #!-arm
              (vop* nlx-entry-multiple node block
                    (top-loc start-loc count-loc nil)
                    ((reference-tn-list (ir2-lvar-locs 2lvar) t))
                    target)
              (let ((locs (standard-result-tns lvar)))
+               #!+arm
+               (error "Don't know how to VOP NLX-ENTRY")
+               #!-arm
                (vop* nlx-entry node block
                      (top-loc start-loc count-loc nil)
                      ((reference-tn-list locs t))
@@ -1854,6 +1857,9 @@
                (move-lvar-result node block locs lvar)))))
       (:unwind-protect
        (let ((block-loc (standard-arg-location 0)))
+         #!+arm
+         (error "Don't know how to VOP UWP-ENTRY")
+         #!-arm
          (vop uwp-entry node block target block-loc start-loc count-loc)
          (move-lvar-result
           node block
