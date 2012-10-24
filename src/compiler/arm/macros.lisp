@@ -13,12 +13,12 @@
 
 ;;; Instruction-like macros.
 
-(defmacro move (dst src)
+(defmacro move (dst src &optional (predicate :al))
   "Move SRC into DST unless they are location=."
   (once-only ((n-dst dst)
               (n-src src))
     `(unless (location= ,n-dst ,n-src)
-       (inst mov ,n-dst ,n-src))))
+       (inst mov ,predicate ,n-dst ,n-src))))
 
 (macrolet
     ((def (op inst shift)
