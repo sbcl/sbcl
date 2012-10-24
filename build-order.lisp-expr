@@ -38,7 +38,7 @@
  ("src/code/cross-early" :not-target)
 
  ;; This is our arm bootstrapping hack.
- ("src/arm-bootstrap" :not-host :arm-bootstrap :trace-file)
+ #!+arm ("src/arm-bootstrap" :not-host :arm-bootstrap :trace-file)
 
  ;; This comes early because it's useful for debugging everywhere.
  ("src/code/show")
