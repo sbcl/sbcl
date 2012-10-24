@@ -44,3 +44,8 @@
       (when cur-nfp
         (move cur-nfp nfp)))
     (store-symbol-value nsp *number-stack-pointer*)))
+
+(define-vop (current-binding-pointer)
+  (:results (res :scs (any-reg descriptor-reg)))
+  (:generator 1
+    (load-symbol-value res *binding-stack-pointer*)))

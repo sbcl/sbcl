@@ -11,4 +11,10 @@
 
 (in-package "SB!VM")
 
-;;; Dummy placeholder file.
+;;;; Automatic allocators for primitive objects.
+
+(define-vop (make-unbound-marker)
+  (:args)
+  (:results (result :scs (descriptor-reg any-reg)))
+  (:generator 1
+    (inst mov result unbound-marker-widetag)))

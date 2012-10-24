@@ -53,6 +53,33 @@
     (storew zero-temp bsp-temp (- binding-value-slot binding-size))
     (inst sub bsp-temp bsp-temp (* 2 n-word-bytes))
     (store-symbol-value bsp-temp *binding-stack-pointer*)))
+
+(define-vop (unbind-to-here)
+  (:args (arg :scs (descriptor-reg any-reg) :target where))
+  (:temporary (:scs (any-reg) :from (:argument 0)) where)
+  (:temporary (:scs (descriptor-reg)) symbol value)
+  (:temporary (:scs (any-reg)) bsp-temp zero-temp)
+  (:generator 0
+    (load-symbol-value bsp-temp *binding-stack-pointer*)
+    (inst mov zero-temp 0)
+    (move where arg)
+    (inst cmp where bsp-temp)
+    (inst b :eq DONE)
+
+    LOOP
+    (loadw symbol bsp-temp (- binding-symbol-slot binding-size))
+    (inst cmp symbol 0)
+    (loadw value bsp-temp (- binding-value-slot binding-size) 0 :ne)
+    (storew value symbol symbol-value-slot other-pointer-lowtag :ne)
+    (storew zero-temp bsp-temp (- binding-symbol-slot binding-size) 0 :ne)
+
+    (storew zero-temp bsp-temp (- binding-value-slot binding-size))
+    (inst sub bsp-temp bsp-temp (* 2 n-word-bytes))
+    (inst cmp where bsp-temp)
+    (inst b :ne LOOP)
+
+    DONE
+    (store-symbol-value bsp-temp *binding-stack-pointer*)))
 
 ;;;; Instance hackery:
 
