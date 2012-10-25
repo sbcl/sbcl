@@ -92,6 +92,15 @@
     (store-symbol-value result *current-catch-block*)
 
     (move block result)))
+
+(define-vop (unlink-catch-block)
+  (:temporary (:scs (any-reg)) block)
+  (:policy :fast-safe)
+  (:translate %catch-breakup)
+  (:generator 17
+    (load-symbol-value block *current-catch-block*)
+    (loadw block block catch-block-previous-catch-slot)
+    (store-symbol-value block *current-catch-block*)))
 
 ;;;; NLX entry VOPs:
 
