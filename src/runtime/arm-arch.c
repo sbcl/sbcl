@@ -45,7 +45,7 @@ void arch_skip_instruction(os_context_t *context)
 
 unsigned char *arch_internal_error_arguments(os_context_t *context)
 {
-    return (unsigned char *)(*os_context_pc_addr(context) + 4);
+    return (unsigned char *)(*os_context_pc_addr(context) + 5);
 }
 
 boolean arch_pseudo_atomic_atomic(os_context_t *context)
@@ -287,10 +287,19 @@ static void sigemt_handler(int signal, siginfo_t *siginfo,
 }
 #endif
 
+static void
+sigtrap_handler(int signal, siginfo_t *siginfo, os_context_t *context)
+{
+    unsigned int code = *((unsigned char *)(4+*os_context_pc_addr(context)));
+
+    handle_trap(context, code);
+}
+
 void arch_install_interrupt_handlers()
 {
 #if 0
     undoably_install_low_level_interrupt_handler(SIGILL , sigill_handler);
     undoably_install_low_level_interrupt_handler(SIGEMT, sigemt_handler);
 #endif
+    undoably_install_low_level_interrupt_handler(SIGTRAP, sigtrap_handler);
 }
