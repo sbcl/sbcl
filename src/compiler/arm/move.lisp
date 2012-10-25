@@ -106,11 +106,12 @@
 (define-vop (illegal-move)
   (:args (x) (type))
   (:results (y))
+  (:temporary (:sc non-descriptor-reg :offset ocfp-offset) error-temp)
   (:ignore y)
   (:vop-var vop)
   (:save-p :compute-only)
   (:generator 666
-    (error-call vop 'object-not-type-error x type)))
+    (error-call vop error-temp 'object-not-type-error x type)))
 
 ;;;; Moves and coercions:
 

@@ -36,8 +36,8 @@
   (defreg lra 4)
   (defreg code 5)
   (defreg lip 6)
-  (defreg r7 7)
-  (defreg ocfp 8)
+  (defreg ocfp 7)
+  (defreg r8 8)
   (defreg nfp 9)
   (defreg null 10)
   (defreg fp 11)
@@ -50,7 +50,7 @@
       lip null fp sp lr pc code)
 
   (defregset descriptor-regs
-      r0 r1 r2 lexenv lra r7)
+      r0 r1 r2 lexenv lra r8)
 
   (defregset non-descriptor-regs
       ocfp nfp nargs)
