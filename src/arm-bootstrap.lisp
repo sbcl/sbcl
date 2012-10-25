@@ -16,10 +16,6 @@
       (progv '(p0 p1 p2)
           '(2 1 0)
         (mv-test-caller))
-      (let ((saved-bsp (%primitive sb!c:current-binding-pointer)))
-        (%primitive sb!c:bind 'bar nil)
-        (%primitive sb!c:bind 'baz nil)
-        ;(%primitive sb!c:bind 'quux (%primitive sb!c:make-unbound-marker))
-        (mv-test-caller)
-        (%primitive sb!c:unbind-to-here saved-bsp)))
+      (catch 'tag
+        (mv-test-caller)))
     nil))
