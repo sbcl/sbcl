@@ -1843,9 +1843,6 @@
                    ((reference-tn-list (ir2-lvar-locs 2lvar) t))
                    target)
              (let ((locs (standard-result-tns lvar)))
-               #!+arm
-               (error "Don't know how to VOP NLX-ENTRY")
-               #!-arm
                (vop* nlx-entry node block
                      (top-loc start-loc count-loc nil)
                      ((reference-tn-list locs t))
