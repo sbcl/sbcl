@@ -1760,9 +1760,6 @@
 
     (ecase kind
       (:catch
-       #!+arm
-       (error "Don't know how to VOP MAKE-CATCH-BLOCK")
-       #!-arm
        (vop make-catch-block node block block-tn
             (lvar-tn node block tag) target-label res))
       ((:unwind-protect :block :tagbody)
