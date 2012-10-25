@@ -65,3 +65,30 @@
   (:results (res :scs (any-reg descriptor-reg)))
   (:generator 1
     (load-symbol-value res *binding-stack-pointer*)))
+
+;;;; Unwind block hackery:
+
+;;; Like Make-Unwind-Block, except that we also store in the specified tag, and
+;;; link the block into the Current-Catch list.
+;;;
+(define-vop (make-catch-block)
+  (:args (tn) (tag :scs (any-reg descriptor-reg)))
+  (:info entry-label)
+  (:results (block :scs (any-reg)))
+  (:temporary (:scs (descriptor-reg)) temp)
+  (:temporary (:scs (descriptor-reg) :target block :to (:result 0)) result)
+  (:generator 44
+    (inst add result fp-tn (* (tn-offset tn) n-word-bytes))
+    (load-symbol-value temp *current-unwind-protect-block*)
+    (storew temp result catch-block-current-uwp-slot)
+    (storew fp-tn result catch-block-current-cont-slot)
+    (storew code-tn result catch-block-current-code-slot)
+    (inst compute-lra temp entry-label)
+    (storew temp result catch-block-entry-pc-slot)
+
+    (storew tag result catch-block-tag-slot)
+    (load-symbol-value temp *current-catch-block*)
+    (storew temp result catch-block-previous-catch-slot)
+    (store-symbol-value result *current-catch-block*)
+
+    (move block result)))
