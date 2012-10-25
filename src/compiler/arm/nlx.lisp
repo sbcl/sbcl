@@ -92,3 +92,39 @@
     (store-symbol-value result *current-catch-block*)
 
     (move block result)))
+
+;;;; NLX entry VOPs:
+
+(define-vop (nlx-entry)
+  (:args (sp) ; Note: we can't list an sc-restriction, 'cause any load vops
+              ; would be inserted before the LRA.
+         (start)
+         (count))
+  (:results (values :more t))
+  (:temporary (:scs (descriptor-reg)) move-temp)
+  (:info label nvals)
+  (:save-p :force-to-stack)
+  (:vop-var vop)
+  (:generator 30
+    (emit-return-pc label)
+    (note-this-location vop :non-local-entry)
+    (cond ((zerop nvals))
+          ((= nvals 1)
+           (inst cmp count 0)
+           (move (tn-ref-tn values) null-tn :eq)
+           (loadw (tn-ref-tn values) start 0 0 :ne))
+          (t
+           (do ((i 0 (1+ i))
+                (tn-ref values (tn-ref-across tn-ref)))
+               ((null tn-ref))
+             (let ((tn (tn-ref-tn tn-ref)))
+               (inst subs count count (fixnumize 1))
+               (sc-case tn
+                 ((descriptor-reg any-reg)
+                  (loadw tn start i 0 :ge)
+                  (move tn null-tn :lt))
+                 (control-stack
+                  (loadw move-temp start i 0 :ge)
+                  (store-stack-tn tn move-temp :ge)
+                  (store-stack-tn tn null-tn :lt)))))))
+    (load-stack-tn sp-tn sp)))
