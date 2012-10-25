@@ -110,7 +110,26 @@ call_into_lisp:
 	.word	NIL
 	.word	NIL
 
-	/* FIXME: Implement. */
+        @@ The BREAK_POINT syscall.
+        ldr     r7, =0x000f0001
+        swi     #0
+
+        @@ Error arguments for an undefined function.
+        .byte   trap_Error
+        .byte   .error_args_end - . - 1
+        .byte   UNDEFINED_FUN_ERROR
+        @@ Need to indicate reg_LEXENV here, which is R3.  Encoding
+        @@ rules are to produce an "sc-offset" with the SC number in
+        @@ the low five bits and the offset (3 in our case) in the
+        @@ high $n$ bits.  sc_DescriptorReg happens to be 5, but we
+        @@ should use the constant for it.  So long as the overall
+        @@ value of the sc-offset is less than 254, we can use a
+        @@ single byte.  Overflowing that will take having the SC
+        @@ number being 30 or 31, and as of this writing the highest
+        @@ SC number is sc_CatchBlock at 16.  It would also take an
+        @@ offset of 7, not the 3 that we use for LEXENV.
+        .byte   sc_DescriptorReg + (0x20 * 3)
+.error_args_end:
 
 	.align	3
 	.global	closure_tramp
