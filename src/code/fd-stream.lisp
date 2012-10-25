@@ -2026,8 +2026,8 @@
     (:external-format
      (fd-stream-external-format fd-stream))
     (:interactive-p
-     (= 1 (the (member 0 1)
-            (sb!unix:unix-isatty (fd-stream-fd fd-stream)))))
+     (plusp (the (integer 0)
+              (sb!unix:unix-isatty (fd-stream-fd fd-stream)))))
     (:line-length
      80)
     (:charpos
