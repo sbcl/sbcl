@@ -324,9 +324,6 @@
   (let ((dx-p (lvar-dynamic-extent leaves)))
     (collect ((delayed))
       (when dx-p
-        #!+arm
-        (error "Don't know how to VOP CURRENT-STACK-POINTER")
-        #!-arm
         (vop current-stack-pointer call 2block
              (ir2-lvar-stack-pointer (lvar-info leaves))))
       (dolist (leaf (lvar-value leaves))
@@ -799,9 +796,6 @@
             (aver (= (length info-args)
                      (template-info-arg-count template)))
             (when (and lvar (lvar-dynamic-extent lvar))
-              #!+arm
-              (error "Unable to support D-X result because VOP CURRENT-STACK-POINTER is undefined.")
-              #!-arm
               (vop current-stack-pointer call block
                    (ir2-lvar-stack-pointer (lvar-info lvar))))
             (when (emit-step-p call)
@@ -2033,9 +2027,6 @@
                                (policy last (zerop safety))
                                (and (fun-type-p ftype)
                                     (eq *empty-type* (fun-type-returns ftype))))
-                     #!+arm
-                     (error "Should VOP NIL-FUN-RETURNED-ERROR here.")
-                     #!-arm
                      (vop nil-fun-returned-error last 2block
                           (if name
                               (emit-constant name)
