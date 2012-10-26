@@ -248,6 +248,48 @@
   (:generator 0
     ;; Don't bother doing anything.
     ))
+
+(define-vop (verify-arg-count)
+  (:policy :fast-safe)
+  (:translate sb!c::%verify-arg-count)
+  (:args (nargs :scs (any-reg)))
+  (:arg-types positive-fixnum (:constant t))
+  (:temporary (:sc non-descriptor-reg :offset ocfp-offset) error-temp)
+  (:info count)
+  (:vop-var vop)
+  (:save-p :compute-only)
+  (:generator 3
+    (let ((err-lab
+           (generate-error-code vop error-temp
+                                'invalid-arg-count-error nargs)))
+      (inst cmp nargs (fixnumize count))
+      (inst b :ne err-lab))))
+
+;;; Signal various errors.
+(macrolet ((frob (name error translate &rest args)
+             `(define-vop (,name)
+                ,@(when translate
+                    `((:policy :fast-safe)
+                      (:translate ,translate)))
+                (:args ,@(mapcar #'(lambda (arg)
+                                     `(,arg :scs (any-reg descriptor-reg)))
+                                 args))
+                (:temporary (:sc non-descriptor-reg :offset ocfp-offset) error-temp)
+                (:vop-var vop)
+                (:save-p :compute-only)
+                (:generator 1000
+                  (error-call vop error-temp ',error ,@args)))))
+  (frob arg-count-error invalid-arg-count-error
+    sb!c::%arg-count-error nargs)
+  (frob type-check-error object-not-type-error sb!c::%type-check-error
+    object type)
+  (frob layout-invalid-error layout-invalid-error sb!c::%layout-invalid-error
+    object layout)
+  (frob odd-key-args-error odd-key-args-error
+        sb!c::%odd-key-args-error)
+  (frob unknown-key-arg-error unknown-key-arg-error
+        sb!c::%unknown-key-arg-error key)
+  (frob nil-fun-returned-error nil-fun-returned-error nil fun))
 
 ;;;; Full call:
 ;;;
