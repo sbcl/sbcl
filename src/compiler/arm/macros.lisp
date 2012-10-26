@@ -99,6 +99,49 @@
           ((control-stack)
            (loadw ,n-reg fp-tn (tn-offset ,n-stack))))))))
 
+;;;; Error Code
+(defun emit-error-break (vop error-temp kind code values)
+  (aver (and (sc-is error-temp non-descriptor-reg)
+             (= (tn-offset error-temp) 7)))
+  (assemble ()
+    (when vop
+      (note-this-location vop :internal-error))
+    ;; We need R7 to contain BREAK_POINT (#x000f0001) in order to
+    ;; cause a SIGTRAP.
+    (inst mov error-temp #x000f0000)
+    (inst add error-temp error-temp 1)
+    ;; SWI is the syscall instruction, and under EABI rules is to be
+    ;; used with an immediate constant of zero and the syscall number
+    ;; in "scno", which is R7.
+    (inst swi 0)
+    ;; The rest of this is "just" the encoded error details.
+    (inst byte kind)
+    (with-adjustable-vector (vector)
+      (write-var-integer code vector)
+      (dolist (tn values)
+        (write-var-integer (make-sc-offset (sc-number (tn-sc tn))
+                                           (or (tn-offset tn) 0))
+                           vector))
+      (inst byte (length vector))
+      (dotimes (i (length vector))
+        (inst byte (aref vector i)))
+      (emit-alignment word-shift))))
+
+(defun error-call (vop error-temp error-code &rest values)
+  #!+sb-doc
+  "Cause an error.  ERROR-CODE is the error to cause."
+  (emit-error-break vop error-temp error-trap (error-number-or-lose error-code) values))
+
+(defun generate-error-code (vop error-temp error-code &rest values)
+  #!+sb-doc
+  "Generate-Error-Code Error-code Value*
+  Emit code for an error with the specified Error-Code and context Values."
+  (assemble (*elsewhere*)
+    (let ((start-lab (gen-label)))
+      (emit-label start-lab)
+      (emit-error-break vop error-temp error-trap (error-number-or-lose error-code) values)
+      start-lab)))
+
 ;;;; memory accessor vop generators
 
 (defmacro define-full-reffer (name type offset lowtag scs el-type
