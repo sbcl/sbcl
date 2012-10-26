@@ -54,6 +54,7 @@
 #include <float.h>
 
 #include <excpt.h>
+#include <errno.h>
 
 #include "validate.h"
 #include "thread.h"
@@ -1304,6 +1305,7 @@ void scratch(void)
     UnmapViewOfFile(0);
     FlushViewOfFile(0,0);
     SetFilePointerEx(0, la, 0, 0);
+    DuplicateHandle(0, 0, 0, 0, 0, 0, 0);
     #ifndef LISP_FEATURE_SB_UNICODE
       CreateDirectoryA(0,0);
       CreateFileMappingA(0,0,0,0,0,0);
