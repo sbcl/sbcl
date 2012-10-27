@@ -25,7 +25,10 @@
 (define-vop (check-type)
   (:args (value :target result :scs (any-reg descriptor-reg)))
   (:results (result :scs (any-reg descriptor-reg)))
-  (:temporary (:scs (non-descriptor-reg) :to (:result 0)) temp)
+  (:temporary (:scs (non-descriptor-reg)
+                    :to (:result 0)
+                    :offset ocfp-offset)
+              temp)
   (:vop-var vop)
   (:save-p :compute-only))
 
@@ -55,7 +58,7 @@
            `((define-vop (,check-name check-type)
                (:generator ,cost
                  (let ((err-lab
-                        (generate-error-code vop ',error-code value)))
+                        (generate-error-code vop temp ',error-code value)))
                    (test-type value err-lab t (,@type-codes)
                               :temp temp)
                    (move result value))))))
