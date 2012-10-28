@@ -155,16 +155,16 @@
 ;;; of the normal :AL is a pseudo-atomic interrupted trap.
 (defmacro pseudo-atomic ((flag-tn) &body forms)
   `(progn
-     (aver (and (sc-is flag-tn non-descriptor-reg)
-                (= (tn-offset flag-tn) 7)))
+     (aver (and (sc-is ,flag-tn non-descriptor-reg)
+                (= (tn-offset ,flag-tn) 7)))
      (without-scheduling ()
        (store-symbol-value pc-tn *pseudo-atomic-atomic*))
      ,@forms
      (without-scheduling ()
        (store-symbol-value null-tn *pseudo-atomic-atomic*)
-       (load-symbol-value flag-tn *pseudo-atomic-interrupted*)
-       (inst cmp flag-tn null-tn)
-       (inst mov :lt flag-tn (lsr flag-tn n-fixnum-tag-bits))
+       (load-symbol-value ,flag-tn *pseudo-atomic-interrupted*)
+       (inst cmp ,flag-tn null-tn)
+       (inst mov :lt ,flag-tn (lsr ,flag-tn n-fixnum-tag-bits))
        (inst swi :lt 0))))
 
 ;;;; memory accessor vop generators

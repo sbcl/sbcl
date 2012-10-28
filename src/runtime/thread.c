@@ -712,6 +712,10 @@ create_thread_struct(lispobj initial_function) {
     SetSymbolValue(ALIEN_STACK_POINTER,(lispobj)th->alien_stack_pointer,th);
     SetSymbolValue(PSEUDO_ATOMIC_BITS,(lispobj)th->pseudo_atomic_bits,th);
 #endif
+#ifdef PSEUDO_ATOMIC_INTERRUPTED
+    SetSymbolValue(PSEUDO_ATOMIC_ATOMIC,NIL,th);
+    SetSymbolValue(PSEUDO_ATOMIC_INTERRUPTED,NIL,th);
+#endif
 #endif
     bind_variable(CURRENT_CATCH_BLOCK,make_fixnum(0),th);
     bind_variable(CURRENT_UNWIND_PROTECT_BLOCK,make_fixnum(0),th);
