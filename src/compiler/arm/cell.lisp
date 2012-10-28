@@ -95,6 +95,14 @@
   (:generator 4
     (storew fp-tn object (+ closure-info-offset offset) fun-pointer-lowtag)))
 
+;;;; Value Cell hackery.
+
+(define-vop (value-cell-ref cell-ref)
+  (:variant value-cell-value-slot other-pointer-lowtag))
+
+(define-vop (value-cell-set cell-set)
+  (:variant value-cell-value-slot other-pointer-lowtag))
+
 ;;;; Instance hackery:
 
 (define-full-reffer instance-index-ref * instance-slots-offset
