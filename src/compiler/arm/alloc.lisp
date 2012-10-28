@@ -39,6 +39,18 @@
               (inst orr pa-flag pa-flag closure-header-widetag)))
         (storew pa-flag result 0 fun-pointer-lowtag)
         (storew function result closure-fun-slot fun-pointer-lowtag)))))
+
+;;; The compiler likes to be able to directly make value cells.
+;;;
+(define-vop (make-value-cell)
+  (:args (value :to :save :scs (descriptor-reg any-reg)))
+  (:temporary (:sc non-descriptor-reg :offset ocfp-offset) pa-flag)
+  (:info stack-allocate-p)
+  (:ignore stack-allocate-p)
+  (:results (result :scs (descriptor-reg)))
+  (:generator 10
+    (with-fixed-allocation (result pa-flag value-cell-header-widetag value-cell-size)
+      (storew value result value-cell-value-slot other-pointer-lowtag))))
 
 ;;;; Automatic allocators for primitive objects.
 
