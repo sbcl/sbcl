@@ -249,6 +249,18 @@
     ;; Don't bother doing anything.
     ))
 
+;;; Get the lexical environment from its passing location.
+(define-vop (setup-closure-environment)
+  (:temporary (:sc descriptor-reg :offset lexenv-offset :target closure
+               :to (:result 0))
+              lexenv)
+  (:results (closure :scs (descriptor-reg)))
+  (:info label)
+  (:ignore label)
+  (:generator 6
+    ;; Get result.
+    (move closure lexenv)))
+
 (define-vop (verify-arg-count)
   (:policy :fast-safe)
   (:translate sb!c::%verify-arg-count)
