@@ -11,6 +11,35 @@
 
 (in-package "SB!VM")
 
+;;;; Special purpose inline allocators.
+
+(define-vop (make-closure)
+  (:args (function :to :save :scs (descriptor-reg)))
+  (:info length stack-allocate-p)
+  (:temporary (:sc non-descriptor-reg :offset ocfp-offset) pa-flag)
+  (:results (result :scs (descriptor-reg)))
+  (:generator 10
+    (let* ((size (+ length closure-info-offset))
+           (alloc-size (pad-data-block size)))
+      (pseudo-atomic (pa-flag)
+        (if stack-allocate-p
+            #!-(or)
+            (error "Stack allocation for MAKE-CLOSURE not yet implemented")
+            #!+(or)
+            (progn
+              (align-csp result)
+              (inst clrrwi. result csp-tn n-lowtag-bits)
+              (inst addi csp-tn csp-tn alloc-size)
+              (inst ori result result fun-pointer-lowtag)
+              (inst lr temp (logior (ash (1- size) n-widetag-bits) closure-header-widetag)))
+            (progn
+              (allocation result alloc-size
+                          fun-pointer-lowtag :flag-tn pa-flag)
+              (inst mov pa-flag (ash (1- size) n-widetag-bits))
+              (inst orr pa-flag pa-flag closure-header-widetag)))
+        (storew pa-flag result 0 fun-pointer-lowtag)
+        (storew function result closure-fun-slot fun-pointer-lowtag)))))
+
 ;;;; Automatic allocators for primitive objects.
 
 (define-vop (make-unbound-marker)
