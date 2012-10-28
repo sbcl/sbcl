@@ -38,7 +38,7 @@ call_into_lisp:
 
 	@@ Save off the C stack pointer (should probably set it as the
 	@@ number stack or something).
-	stmfa	reg_CFP!, {sp}
+	stmea	reg_CFP!, {sp}
 
 	@@ Move the function to its passing location.
 	mov	reg_LEXENV, r0
@@ -85,7 +85,7 @@ call_into_lisp:
 	@@ FIXME: Should enter PSEUDO-ATOMIC and set FFCA here.
 
 	@@ Restore the C stack pointer.
-	ldr	sp, [reg_CSP]
+	ldr	sp, [reg_CSP, #-4]
 
 	@@ FIXME: Save the various stack and frame pointers here.
 
