@@ -339,9 +339,6 @@
                    (entry (make-load-time-constant-tn :entry xep)))
           (let ((this-env (node-physenv call))
                 (leaf-dx-p (and dx-p (leaf-dynamic-extent leaf))))
-            #!+arm
-            (error "Don't know how to VOP MAKE-CLOSURE")
-            #!-arm
             (vop make-closure call 2block entry (length closure)
                  leaf-dx-p tn)
             (loop for what in closure and n from 0 do
@@ -359,21 +356,14 @@
                       (let ((initial-value (closure-initial-value
                                             what this-env nil)))
                         (if initial-value
-                            #!+arm
-                            (error "Don't know how to VOP CLOSURE-INIT")
-                            #!-arm
                           (vop closure-init call 2block
                                tn initial-value n)
                           ;; An initial-value of NIL means to stash
                           ;; the frame pointer... which requires a
                           ;; different VOP.
-                          #!+arm
-                          (error "Don't know how to VOP CLOSURE-INIT-FROM-FP")
-                          #!-arm
                           (vop closure-init-from-fp call 2block tn n)))))))))
       (loop for (tn what n) in (delayed)
-            do #!+arm (error "Don't know how to VOP CLOSURE-INIT")
-               #!-arm (vop closure-init call 2block
+            do (vop closure-init call 2block
                     tn what n))))
   (values))
 
@@ -1278,9 +1268,6 @@
              ;; No more args, so normal entry.
              (vop xep-allocate-frame node block start-label nil)))
       (if (ir2-physenv-closure env)
-          #!+arm
-          (error "Should set up a closure env, but can't do that on ARM yet.")
-          #!-arm
           (let ((closure (make-normal-tn *backend-t-primitive-type*)))
             (vop setup-closure-environment node block start-label closure)
             (let ((n -1))
