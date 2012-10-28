@@ -54,7 +54,6 @@
 
 ;;; Allocate an indirect value cell.
 (defevent make-value-cell-event "Allocate heap value cell for lexical var.")
-#!-arm
 (defun emit-make-value-cell (node block value res)
   (event make-value-cell-event node)
   (vop make-value-cell node block value nil res))
@@ -143,9 +142,6 @@
              (explicit (lambda-var-explicit-value-cell leaf)))
          (cond
           ((and indirect explicit)
-           #!+arm
-           (error "Don't know how to VALUE-CELL-REF")
-           #!-arm
            (vop value-cell-ref node block tn res))
           ((and indirect
                 (not (eq (node-physenv node)
@@ -388,9 +384,6 @@
                (explicit (lambda-var-explicit-value-cell leaf)))
            (cond
             ((and indirect explicit)
-             #!+arm
-             (error "Don't know how to VOP VALUE-CELL-SET")
-             #!-arm
              (vop value-cell-set node block tn val))
             ((and indirect
                   (not (eq (node-physenv node)
@@ -1692,9 +1685,6 @@
 ;;; dynamic extent. This is done by storing 0 into the indirect value
 ;;; cell that holds the closed unwind block.
 (defoptimizer (%lexical-exit-breakup ir2-convert) ((info) node block)
-  #!+arm
-  (error "Don't know how to %LEXICAL-EXIT-BREAKUP")
-  #!-arm
   (let ((nlx (lvar-value info)))
     (when (nlx-info-safe-p nlx)
       (vop value-cell-set node block
