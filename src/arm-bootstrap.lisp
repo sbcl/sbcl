@@ -1,21 +1,13 @@
 (in-package "SB!IMPL")
 
-(locally
-    (declare (optimize (speed 3)
-                       (safety 0)))
-  (defun mv-test-callee ()
-    (values 0 1 2 3 4 5))
-  (defun mv-test-caller ()
-    (multiple-value-bind (v0 v1 v2 v3 v4 v5)
-        (mv-test-callee)
-      (values v5 v4 v3 v2 v1 v0)))
-  (defun !cold-init ()
-    (let ((foo 47))
-      (declare (special foo))
-      #+(or)
-      (progv '(p0 p1 p2)
-          '(2 1 0)
-        (mv-test-caller))
-      (catch 'tag
-        (mv-test-caller)))
-    nil))
+(defun test-closures-receiver (fun)
+  (declare (type function fun))
+  (funcall fun))
+
+(defun test-closures (value)
+  (test-closures-receiver
+   (lambda ()
+     value)))
+
+(defun !cold-init ()
+  (test-closures 14))
