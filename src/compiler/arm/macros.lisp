@@ -99,6 +99,51 @@
           ((control-stack)
            (loadw ,n-reg fp-tn (tn-offset ,n-stack))))))))
 
+;;;; Storage allocation:
+
+
+;;; This is the main mechanism for allocating memory in the lisp heap.
+;;;
+;;; The allocated space is stored in RESULT-TN with the lowtag LOWTAG
+;;; applied.  The amount of space to be allocated is SIZE bytes (which
+;;; must be a multiple of the lisp object size).
+;;;
+;;; Each platform seems to have its own slightly different way to do
+;;; heap allocation, taking various different options as parameters.
+;;; For ARM, we take the bare minimum parameters, RESULT-TN, SIZE, and
+;;; LOWTAG, and we require a single temporary register called FLAG-TN
+;;; to emphasize the parallelism with PSEUDO-ATOMIC (which must
+;;; surround a call to ALLOCATION anyway), and to indicate that the
+;;; P-A FLAG-TN is also acceptable here.
+
+(defmacro allocation (result-tn size lowtag &key flag-tn)
+  ;; Normal allocation to the heap.
+  (let ((alloc-size (gensym)))
+    `(let ((,alloc-size ,size))
+       (load-symbol-value ,flag-tn *allocation-pointer*)
+       (inst add ,result-tn ,flag-tn ,lowtag)
+       (inst add ,flag-tn ,flag-tn ,alloc-size)
+       (store-symbol-value ,flag-tn *allocation-pointer*))))
+
+(defmacro with-fixed-allocation ((result-tn flag-tn type-code size
+                                            &key (lowtag other-pointer-lowtag))
+                                 &body body)
+  "Do stuff to allocate an other-pointer object of fixed Size with a single
+  word header having the specified Type-Code.  The result is placed in
+  Result-TN, and Temp-TN is a non-descriptor temp (which may be randomly used
+  by the body.)  The body is placed inside the PSEUDO-ATOMIC, and presumably
+  initializes the object."
+  (once-only ((result-tn result-tn) (flag-tn flag-tn)
+              (type-code type-code) (size size) (lowtag lowtag))
+    `(pseudo-atomic (,flag-tn)
+       (allocation ,result-tn (pad-data-block ,size) ,lowtag
+                   :flag-tn ,flag-tn)
+       (when ,type-code
+         (inst mov ,flag-tn (ash (1- ,size) n-widetag-bits))
+         (inst orr ,flag-tn ,flag-tn ,type-code)
+         (storew ,flag-tn ,result-tn 0 ,lowtag))
+       ,@body)))
+
 ;;;; Error Code
 (defun emit-error-break (vop error-temp kind code values)
   (aver (and (sc-is error-temp non-descriptor-reg)
