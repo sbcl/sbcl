@@ -81,6 +81,20 @@
     DONE
     (store-symbol-value bsp-temp *binding-stack-pointer*)))
 
+;;;; Closure indexing.
+
+(define-vop (closure-ref slot-ref)
+  (:variant closure-info-offset fun-pointer-lowtag))
+
+(define-vop (closure-init slot-set)
+  (:variant closure-info-offset fun-pointer-lowtag))
+
+(define-vop (closure-init-from-fp)
+  (:args (object :scs (descriptor-reg)))
+  (:info offset)
+  (:generator 4
+    (storew fp-tn object (+ closure-info-offset offset) fun-pointer-lowtag)))
+
 ;;;; Instance hackery:
 
 (define-full-reffer instance-index-ref * instance-slots-offset
