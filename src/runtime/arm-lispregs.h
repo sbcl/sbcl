@@ -25,8 +25,8 @@
 #define reg_LRA         REG(4)
 #define reg_CODE        REG(5)
 #define reg_LIP         REG(6)
-#define reg_R7          REG(7)
-#define reg_OCFP        REG(8)
+#define reg_OCFP        REG(7)
+#define reg_R8          REG(8)
 #define reg_NFP         REG(9)
 #define reg_NULL        REG(10)
 #define reg_CFP         REG(11)
@@ -37,10 +37,10 @@
 
 #define REGNAMES \
         "R0",           "R1",           "R2",           "LEXENV", \
-        "LRA",          "CODE",         "LIP",          "R7", \
-        "OCFP",         "NFP",          "NULL",         "CFP", \
+        "LRA",          "CODE",         "LIP",          "OCFP", \
+        "R8",           "NFP",          "NULL",         "CFP", \
         "NARGS",        "CSP",          "LR",           "PC"
 
 #define BOXED_REGISTERS { \
-    reg_R0, reg_R1, reg_R2, reg_LEXENV, reg_LRA, reg_R7, reg_CODE \
+    reg_R0, reg_R1, reg_R2, reg_LEXENV, reg_LRA, reg_R8, reg_CODE \
 }

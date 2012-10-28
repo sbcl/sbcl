@@ -47,7 +47,7 @@ call_into_lisp:
 	mov	reg_NARGS, r2, lsl #2
 
 	@@ Move args pointer out of the way of the args to be loaded.
-	mov	reg_R7, r1
+	mov	reg_R8, r1
 
 	@@ Clear boxed registers otherwise uninitialized.
 	mov	reg_CODE, #0
@@ -58,9 +58,9 @@ call_into_lisp:
 	@@ Load our function args.  Cleverness abounds!
 	rsb	reg_LIP, reg_NARGS, #8
 	add	pc, pc, reg_LIP
-	ldr	reg_R2, [reg_R7, #8]
-	ldr	reg_R1, [reg_R7, #4]
-	ldr	reg_R0, [reg_R7]
+	ldr	reg_R2, [reg_R8, #8]
+	ldr	reg_R1, [reg_R8, #4]
+	ldr	reg_R0, [reg_R8]
 
 	@@ Set up the Lisp stack pointer
 	mov	reg_CSP, reg_CFP
