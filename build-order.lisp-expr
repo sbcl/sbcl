@@ -613,10 +613,10 @@
  ("src/assembly/target/array")
  ("src/assembly/target/arith")
  ("src/assembly/target/alloc")
- ("src/assembly/target/assem-rtns" :assem :not-host)
- ("src/assembly/target/array"      :assem :not-host)
- ("src/assembly/target/arith"      :assem :not-host)
- ("src/assembly/target/alloc"      :assem :not-host)
+ ("src/assembly/target/assem-rtns" :assem :not-host :arm-bootstrap)
+ ("src/assembly/target/array"      :assem :not-host :arm-bootstrap)
+ ("src/assembly/target/arith"      :assem :not-host :arm-bootstrap)
+ ("src/assembly/target/alloc"      :assem :not-host :arm-bootstrap)
 
  ("src/compiler/pseudo-vops")
 
