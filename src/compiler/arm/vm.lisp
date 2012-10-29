@@ -197,6 +197,7 @@
   (defregtn ocfp any-reg)
   (defregtn sp any-reg)
   (defregtn fp any-reg)
+  (defregtn lr any-reg)
   (defregtn pc any-reg))
 
 ;;; If VALUE can be represented as an immediate constant, then return the
