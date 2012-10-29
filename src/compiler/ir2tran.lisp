@@ -602,9 +602,6 @@
            (unless (eq locs results)
              (move-results-coerced node block results locs))))
         (:unknown
-         #!+arm
-         (error "Unable to MOVE-LVAR-RESULT for unknown-values LVAR due to not having VOP PUSH-VALUES.")
-         #!-arm
          (let* ((nvals (length results))
                 (locs (make-standard-value-tns nvals)))
            (move-results-coerced node block results locs)
@@ -1659,7 +1656,6 @@
 ;;; environment. Note that this is never called on the escape exits
 ;;; for CATCH and UNWIND-PROTECT, since the escape functions aren't
 ;;; IR2 converted.
-#!-arm
 (defun ir2-convert-exit (node block)
   (declare (type exit node) (type ir2-block block))
   (let* ((nlx (exit-nlx-info node))
@@ -1734,9 +1730,6 @@
        (vop make-catch-block node block block-tn
             (lvar-tn node block tag) target-label res))
       ((:unwind-protect :block :tagbody)
-       #!+arm
-       (error "Don't know how to VOP MAKE-UNWIND-BLOCK")
-       #!-arm
        (vop make-unwind-block node block block-tn target-label res)))
 
     (ecase kind
