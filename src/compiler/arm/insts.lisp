@@ -630,7 +630,7 @@
                                                           :down
                                                           :up)
                                                       mode)
-                                      (tn-offset base) (tn-offset data)
+                                      pc-offset (tn-offset data)
                                       absolute-delta)))))
            ((integerp offset)
             (aver (typep offset '(unsigned-byte 12)))
