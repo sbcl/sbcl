@@ -1848,6 +1848,10 @@ core and return a descriptor to it."
                 (ldb (byte 8 0) value)
                 (bvref-8 gspace-bytes (1+ gspace-byte-offset))
                 (ldb (byte 8 8) value)))))
+      (:arm
+       (ecase kind
+         (:absolute
+          (setf (bvref-32 gspace-bytes gspace-byte-offset) value))))
       (:hppa
        (ecase kind
          (:load

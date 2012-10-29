@@ -109,7 +109,12 @@
 
 (define-instruction word (segment word)
   (:emitter
-   (emit-word segment word)))
+   (etypecase word
+     (fixup
+      (note-fixup segment :absolute word)
+      (emit-word segment 0))
+     (integer
+      (emit-word segment word)))))
 
 (defun emit-header-data (segment type)
   (emit-back-patch segment
