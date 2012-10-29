@@ -269,6 +269,12 @@ static void set_seh_frame(void *frame)
 
 #if defined(LISP_FEATURE_SB_THREAD)
 
+void alloc_gc_page()
+{
+    AVER(VirtualAlloc(GC_SAFEPOINT_PAGE_ADDR, sizeof(lispobj),
+                      MEM_RESERVE|MEM_COMMIT, PAGE_READWRITE));
+}
+
 /* Permit loads from GC_SAFEPOINT_PAGE_ADDR (NB page state change is
  * "synchronized" with the memory region content/availability --
  * e.g. you won't see other CPU flushing buffered writes after WP --

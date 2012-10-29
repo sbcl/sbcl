@@ -940,12 +940,6 @@ GNAME(fast_bzero_pointer):
          * to fast_bzero_detect if OS supports SSE.  */
         .long GNAME(fast_bzero_base)
 
-	.globl GNAME(gc_safepoint_page)
-	.data
-        .align  align_page
-GNAME(gc_safepoint_page):
-        .fill BACKEND_PAGE_BYTES,1,0
-
 	.text
 	.align	align_16byte,0x90
 	.globl GNAME(fast_bzero)

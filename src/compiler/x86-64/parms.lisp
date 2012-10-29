@@ -103,25 +103,12 @@
 ;;; would be possible, but probably not worth the time and code bloat
 ;;; it would cause. -- JES, 2005-12-11
 
-(progn
-  (def!constant read-only-space-start     #x20000000)
-  (def!constant read-only-space-end       #x200ff000)
+;;; The default dynamic space size is lower on OpenBSD to allow SBCL to
+;;; run under the default 512M data size limit.
 
-  (def!constant static-space-start        #x20100000)
-  (def!constant static-space-end          #x201ff000)
+(!gencgc-space-setup #x20000000 #x1000000000 #!+openbsd #x1bcf0000)
 
-  (def!constant dynamic-space-start       #x1000000000)
-  #!-openbsd
-  (def!constant dynamic-space-end         (!configure-dynamic-space-end))
-  #!+openbsd
-  ;; This is lower on OpenBSD to allow SBCL to run under the default
-  ;; 512M data size limit.
-  (def!constant dynamic-space-end         (!configure-dynamic-space-end #x101bcf0000))
-
-  (def!constant linkage-table-space-start #x20200000)
-  (def!constant linkage-table-space-end   #x202ff000)
-
-  (def!constant linkage-table-entry-size 16))
+(def!constant linkage-table-entry-size 16)
 
 
 ;;;; other miscellaneous constants

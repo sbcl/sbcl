@@ -77,11 +77,6 @@ extern lispobj *current_dynamic_space;
 
 extern void globals_init(void);
 
-#ifdef LISP_FEATURE_SB_SAFEPOINT
-# define GC_SAFEPOINT_PAGE_ADDR ((lispobj) gc_safepoint_page)
-extern char gc_safepoint_page[];
-#endif
-
 #else /* LANGUAGE_ASSEMBLY */
 
 # ifdef LISP_FEATURE_MIPS

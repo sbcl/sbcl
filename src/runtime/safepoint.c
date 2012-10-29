@@ -51,6 +51,12 @@
  * definition goes here.  Fixme: (Why) don't these work for Windows?
  */
 void
+alloc_gc_page()
+{
+    os_validate(GC_SAFEPOINT_PAGE_ADDR, 4);
+}
+
+void
 map_gc_page()
 {
     odxprint(misc, "map_gc_page");

@@ -2889,6 +2889,10 @@ core and return a descriptor to it."
   ;; pseudo-atomic-trap-number or pseudo-atomic-magic-constant
   ;; [possibly applicable to other platforms])
 
+  #!+sb-safepoint
+  (format t "#define GC_SAFEPOINT_PAGE_ADDR ((void*)0x~XUL) /* ~:*~A */~%"
+            sb!vm:gc-safepoint-page-addr)
+
   (dolist (symbol '(sb!vm::float-traps-byte
                     sb!vm::float-exceptions-byte
                     sb!vm::float-sticky-bits

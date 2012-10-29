@@ -184,105 +184,16 @@
 ;;;        starting at #x40000000. By only using 512 - 64 MB we can
 ;;;        run under the default 512 MB data size resource limit.
 
-#!+win32
-(progn
-  (def!constant read-only-space-start #x22000000)
-  (def!constant read-only-space-end   #x220ff000)
+;;; NetBSD configuration used to have this comment regarding the linkage
+;;; table: "In CMUCL: 0xB0000000->0xB1000000"
 
-  (def!constant static-space-start    #x22100000)
-  (def!constant static-space-end      #x221ff000)
-
-  (def!constant dynamic-space-start   #x22300000)
-  (def!constant dynamic-space-end     (!configure-dynamic-space-end))
-
-  (def!constant linkage-table-space-start #x22200000)
-  (def!constant linkage-table-space-end   #x222ff000))
-
-#!+linux
-(progn
-  (def!constant read-only-space-start     #x01000000)
-  (def!constant read-only-space-end       #x010ff000)
-
-  (def!constant static-space-start        #x01100000)
-  (def!constant static-space-end          #x011ff000)
-
-  (def!constant dynamic-space-start       #x09000000)
-  (def!constant dynamic-space-end         (!configure-dynamic-space-end))
-
-  (def!constant linkage-table-space-start #x01200000)
-  (def!constant linkage-table-space-end   #x012ff000))
-
-#!+sunos
-(progn
-  (def!constant read-only-space-start     #x20000000)
-  (def!constant read-only-space-end       #x200ff000)
-
-  (def!constant static-space-start        #x20100000)
-  (def!constant static-space-end          #x201ff000)
-
-  (def!constant dynamic-space-start       #x48000000)
-  (def!constant dynamic-space-end         (!configure-dynamic-space-end))
-
-  (def!constant linkage-table-space-start #x20200000)
-  (def!constant linkage-table-space-end   #x202ff000))
-
-#!+freebsd
-(progn
-  (def!constant read-only-space-start     #x01000000)
-  (def!constant read-only-space-end       #x010ff000)
-
-  (def!constant static-space-start        #x01100000)
-  (def!constant static-space-end          #x011ff000)
-
-  (def!constant dynamic-space-start       #x58000000)
-  (def!constant dynamic-space-end         (!configure-dynamic-space-end))
-
-  (def!constant linkage-table-space-start #x01200000)
-  (def!constant linkage-table-space-end   #x012ff000))
-
-#!+openbsd
-(progn
-  (def!constant read-only-space-start     #x1b000000)
-  (def!constant read-only-space-end       #x1b0ff000)
-
-  (def!constant static-space-start        #x1b100000)
-  (def!constant static-space-end          #x1b1ff000)
-
-  (def!constant dynamic-space-start       #x40000000)
-  (def!constant dynamic-space-end         (!configure-dynamic-space-end))
-
-  (def!constant linkage-table-space-start #x1b200000)
-  (def!constant linkage-table-space-end   #x1b2ff000))
-
-#!+netbsd
-(progn
-  (def!constant read-only-space-start     #x20000000)
-  (def!constant read-only-space-end       #x200ff000)
-
-  (def!constant static-space-start        #x20100000)
-  (def!constant static-space-end          #x201ff000)
-
-  (def!constant dynamic-space-start       #x60000000)
-  (def!constant dynamic-space-end         (!configure-dynamic-space-end))
-
-  ;; In CMUCL: 0xB0000000->0xB1000000
-  (def!constant linkage-table-space-start #x20200000)
-  (def!constant linkage-table-space-end   #x202ff000))
-
-
-#!+darwin
-(progn
-  (def!constant read-only-space-start #x04000000)
-  (def!constant read-only-space-end   #x040ff000)
-
-  (def!constant static-space-start    #x04100000)
-  (def!constant static-space-end      #x041ff000)
-
-  (def!constant dynamic-space-start #x10000000)
-  (def!constant dynamic-space-end   (!configure-dynamic-space-end))
-
-  (def!constant linkage-table-space-start #x04200000)
-  (def!constant linkage-table-space-end   #x042ff000))
+#!+win32   (!gencgc-space-setup #x22000000 nil nil #x10000)
+#!+linux   (!gencgc-space-setup #x01000000 #x09000000)
+#!+sunos   (!gencgc-space-setup #x20000000 #x48000000)
+#!+freebsd (!gencgc-space-setup #x01000000 #x58000000)
+#!+openbsd (!gencgc-space-setup #x1b000000 #x40000000)
+#!+netbsd  (!gencgc-space-setup #x20000000 #x60000000)
+#!+darwin  (!gencgc-space-setup #x04000000 #x10000000)
 
 ;;; Size of one linkage-table entry in bytes.
 (def!constant linkage-table-entry-size 8)
