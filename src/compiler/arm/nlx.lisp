@@ -68,6 +68,23 @@
 
 ;;;; Unwind block hackery:
 
+;;; Compute the address of the catch block from its TN, then store into the
+;;; block the current Fp, Env, Unwind-Protect, and the entry PC.
+;;;
+(define-vop (make-unwind-block)
+  (:args (tn))
+  (:info entry-label)
+  (:results (block :scs (any-reg)))
+  (:temporary (:scs (descriptor-reg)) temp)
+  (:generator 22
+    (inst add block fp-tn (* (tn-offset tn) n-word-bytes))
+    (load-symbol-value temp *current-unwind-protect-block*)
+    (storew temp block unwind-block-current-uwp-slot)
+    (storew fp-tn block unwind-block-current-cont-slot)
+    (storew code-tn block unwind-block-current-code-slot)
+    (inst compute-lra temp entry-label)
+    (storew temp block catch-block-entry-pc-slot)))
+
 ;;; Like Make-Unwind-Block, except that we also store in the specified tag, and
 ;;; link the block into the Current-Catch list.
 ;;;
