@@ -21,7 +21,7 @@
 ;;; Make a TN for the argument count passing location for a
 ;;; non-local entry.
 (defun make-nlx-entry-arg-start-location ()
-  (make-wired-tn *fixnum-primitive-type* immediate-arg-scn ocfp-offset))
+  (make-wired-tn *fixnum-primitive-type* immediate-arg-scn r8-offset))
 
 ;;; Save and restore dynamic environment.
 ;;;
