@@ -261,6 +261,107 @@
     ;; Get result.
     (move closure lexenv)))
 
+;;; Copy a more arg from the argument area to the end of the current frame.
+;;; Fixed is the number of non-more arguments.
+(define-vop (copy-more-arg)
+  ;; The environment here-and-now is not properly initialized.  The
+  ;; stack frame is not yet fully allocated, and even if it were most
+  ;; of the slots have live data in them that PACK does not know
+  ;; about, so we cannot afford a register spill.  As far as the boxed
+  ;; registers go, the arg-passing registers (R0, R1, and R2) are
+  ;; live, LEXENV is live, and LRA is live.  On the unboxed front,
+  ;; NARGS is live.  FP has been set up by the caller, SP is
+  ;; protecting our stack arguments, but is otherwise not set up.  NFP
+  ;; is not yet set up.  CODE and NULL are set up.  SP and NFP must be
+  ;; correctly set up by the time we're done, and OCFP and R8 are
+  ;; available for use as temporaries.  If we were any more register
+  ;; constrained, we'd be spilling registers manually (rather than
+  ;; allowing PACK to do it for us).  -- AJB, 2012-Oct-30
+  (:vop-var vop)
+  ;; Pack COUNT and DEST into the same register, being careful to tell
+  ;; PACK that their lifetimes do not overlap (we're lying to PACK, as
+  ;; COUNT is live both before and after DEST, but not while DEST is
+  ;; live).
+  (:temporary (:sc any-reg :offset ocfp-offset :to :eval) count)
+  (:temporary (:sc any-reg :offset ocfp-offset :from :eval) dest)
+  (:temporary (:sc descriptor-reg :offset r8-offset) temp)
+  (:info fixed)
+  (:generator 20
+    ;; We open up with a LET to obtain a TN for NFP.  We'll call it
+    ;; RESULT, to distinguish it from NFP-as-NFP and to roughly
+    ;; parallel the PPC implementation.  We can't use a :TEMPORARY
+    ;; here because it would conflict with the existing NFP if there
+    ;; is a number-stack frame in play, but we only use it prior to
+    ;; actually setting up the "real" NFP.
+    (let ((result (make-random-tn :kind :normal
+                                  :sc (sc-or-lose 'any-reg)
+                                  :offset nfp-offset)))
+      ;; And we use ASSEMBLE here so that we get "implcit labels"
+      ;; rather than having to use GEN-LABEL and EMIT-LABEL.
+      (assemble ()
+        ;; Compute the end of the fixed stack frame (start of the MORE
+        ;; arg area) into RESULT.
+        (inst add result fp-tn
+              (* n-word-bytes (sb-allocated-size 'control-stack)))
+        ;; Compute the end of the MORE arg area (and our overall frame
+        ;; allocation) into the stack pointer.
+        (cond ((zerop fixed)
+               (inst cmp nargs-tn 0)
+               (inst add sp-tn result nargs-tn)
+               (inst b :eq DONE))
+              (t
+               (inst subs count nargs-tn (fixnumize fixed))
+               (inst b :le DONE)
+               (inst add sp-tn result count)))
+
+        (when (< fixed register-arg-count)
+          ;; We must stop when we run out of stack args, not when we
+          ;; run out of more args.
+          (inst add result result (fixnumize (- register-arg-count fixed))))
+
+        ;; Initialize dest to be end of stack.
+        (move dest sp-tn)
+
+        ;; We are copying at most (- NARGS FIXED) values, from last to
+        ;; first, in order to shift them out of the allocated part of
+        ;; the stack frame.  The FIXED values remain where they are,
+        ;; as they are part of the allocated stack frame.  Any
+        ;; remaining values are being moved to just beyond the end of
+        ;; the allocated stack frame, for a distance of (-
+        ;; (sb-allocated-size 'control-stack) fixed) words.  There is
+        ;; a constant displacement of a single word in the loop below,
+        ;; because DEST points to the space AFTER the value being
+        ;; moved.
+
+        LOOP
+        (inst cmp result dest)
+        (let ((delta (- (sb-allocated-size 'control-stack) fixed)))
+          (inst ldr :gt temp (@ dest (- (* (1+ delta) n-word-bytes)))))
+        (inst str :gt temp (@ dest (- n-word-bytes) :pre-index))
+        (inst b :le LOOP)
+
+        DO-REGS
+        (when (< fixed register-arg-count)
+          ;; Now we have to deposit any more args that showed up in registers.
+          (inst subs count nargs-tn (fixnumize fixed))
+          (do ((i fixed (1+ i)))
+              ((>= i register-arg-count))
+            ;; Don't deposit any more than there are.
+            (inst b :eq DONE)
+            (inst subs count count (fixnumize 1))
+            ;; Store it into the space reserved to it, by displacement
+            ;; from the frame pointer.
+            (storew (nth i *register-arg-tns*)
+                    fp-tn (+ (sb-allocated-size 'control-stack)
+                             (- i fixed)))))
+        DONE
+
+        ;; Now that we're done with the &MORE args, we can set up the
+        ;; number stack frame.
+        (let ((nfp-tn (current-nfp-tn vop)))
+          (when nfp-tn
+            (error "Don't know how to allocate number stack space")))))))
+
 (define-vop (verify-arg-count)
   (:policy :fast-safe)
   (:translate sb!c::%verify-arg-count)
