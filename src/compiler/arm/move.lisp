@@ -19,7 +19,9 @@
       (integer
        (inst mov y (fixnumize val)))
       (null
-       (move y null-tn)))))
+       (move y null-tn))
+      (symbol
+       (load-symbol y val)))))
 
 (define-move-fun (load-number 1) (vop x y)
   ((immediate)
