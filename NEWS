@@ -1,4 +1,20 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
+changes relative to sbcl-1.1.1:
+  * notice: System requirements for SBCL on Microsoft Windows: Windows NT 5.1
+    or newer (Windows XP, Server 2003) is required.  Support for Windows 2000
+    (NT 5.0) is no longer being maintained.
+  * notice: Starting with this version, SBCL on Windows no longer supports
+    building with disabled thread support.
+  * enhancement: New feature sb-dynamic-core allows the runtime to be
+    rebuilt or relocated without requiring changes to the core file on
+    all linkage table platforms.  Required on Windows.
+  * enhancement: Console I/O streams use UCS-2.
+  * enhancement: I/O on Windows unnamed pipes is interruptible
+    asynchronously using interrupt-thread, timers when running on Windows NT
+    version 6.1 or newer (Windows 7, Server 2008 R2).
+  * bug fix: Non-blocking reads from the Windows console were not necessarily
+    non-blocking. (lp#308923)
+
 changes in sbcl-1.1.1 relative to sbcl-1.1.0:
   * enhancement: WITH-COMPILATION-UNIT no longer grabs the world-lock.
     (COMPILE and COMPILE-FILE still do.)

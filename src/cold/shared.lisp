@@ -157,6 +157,16 @@
           ":GENCGC not supported on selected architecture")
          ("(not (or gencgc cheneygc))"
           "One of :GENCGC or :CHENEYGC must be enabled")
+         ("(and win32 (not (and sb-thread
+                                sb-safepoint sb-thruption sb-wtimer
+                                sb-dynamic-core)))"
+          ":SB-WIN32 requires :SB-THREAD and related features")
+         ("(and sb-dynamic-core (not (and linkage-table sb-thread)))"
+          ;; Subtle memory corruption follows when sb-dynamic-core is
+          ;; active, and non-threaded allocation routines have not been
+          ;; updated to take the additional indirection into account.
+          ;; Let's avoid this unusual combination.
+          ":SB-DYNAMIC-CORE requires :LINKAGE-TABLE and :SB-THREAD")
          ("(or (and alpha (or hppa mips ppc sparc x86 x86-64))
                (and hppa (or mips ppc sparc x86 x86-64))
                (and mips (or ppc sparc x86 x86-64))
@@ -170,7 +180,7 @@
       (when (read-from-string (concatenate 'string "#+" (first test) "T NIL"))
         (push (second test) failed-test-descriptions))))
   (when failed-test-descriptions
-    (error "Feature compatability check failed, ~S"
+    (error "Feature compatibility check failed, ~S"
            failed-test-descriptions)))
 
 ;;;; cold-init-related PACKAGE and SYMBOL tools
