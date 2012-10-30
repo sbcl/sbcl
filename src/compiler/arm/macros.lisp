@@ -29,6 +29,10 @@
   (def loadw ldr word-shift)
   (def storew str word-shift))
 
+(defmacro load-symbol (reg symbol)
+  (once-only ((reg reg) (symbol symbol))
+    `(inst add ,reg null-tn (static-symbol-offset ,symbol))))
+
 (defmacro load-symbol-value (reg symbol &optional (predicate :al))
   `(inst ldr ,predicate ,reg
          (@ null-tn
