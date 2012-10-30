@@ -102,7 +102,6 @@
 
 (define-vop (xep-allocate-frame)
   (:info start-lab copy-more-arg-follows)
-  (:ignore copy-more-arg-follows)
   (:vop-var vop)
   (:temporary (:scs (any-reg)) temp)
   (:generator 1
@@ -117,11 +116,12 @@
       (inst word 0))
     (inst compute-code code-tn lip-tn start-lab temp)
     ;; Build our stack frames.
-    (inst add sp-tn fp-tn
-          (* n-word-bytes (sb-allocated-size 'control-stack)))
-    (let ((nfp-tn (current-nfp-tn vop)))
-      (when nfp-tn
-        (error "Don't know how to allocate number stack space")))
+    (unless copy-more-arg-follows
+      (inst add sp-tn fp-tn
+            (* n-word-bytes (sb-allocated-size 'control-stack)))
+      (let ((nfp-tn (current-nfp-tn vop)))
+        (when nfp-tn
+          (error "Don't know how to allocate number stack space"))))
     (trace-table-entry trace-table-normal)))
 
 ;;; Allocate a partial frame for passing stack arguments in a full call.  Nargs
