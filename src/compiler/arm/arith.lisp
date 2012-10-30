@@ -30,3 +30,40 @@
   (:args (x :scs (any-reg)))
   (:arg-types tagged-num (:constant (unsigned-byte 8)))
   (:info target not-p y))
+
+;;; EQL/FIXNUM is funny because the first arg can be of any type, not
+;;; just a known fixnum.
+
+;;; These versions specify a fixnum restriction on their first arg.
+;;; We have also generic-eql/fixnum VOPs which are the same, but have
+;;; no restriction on the first arg and a higher cost.  The reason for
+;;; doing this is to prevent fixnum specific operations from being
+;;; used on word integers, spuriously consing the argument.
+
+(define-vop (fast-eql/fixnum fast-conditional)
+  (:args (x :scs (any-reg))
+         (y :scs (any-reg)))
+  (:arg-types tagged-num tagged-num)
+  (:note "inline fixnum comparison")
+  (:translate eql)
+  (:generator 4
+    (inst cmp x y)
+    (inst b (if not-p :ne :eq) target)))
+(define-vop (generic-eql/fixnum fast-eql/fixnum)
+  (:args (x :scs (any-reg descriptor-reg))
+         (y :scs (any-reg)))
+  (:arg-types * tagged-num)
+  (:variant-cost 7))
+
+(define-vop (fast-eql-c/fixnum fast-conditional/fixnum)
+  (:args (x :scs (any-reg)))
+  (:arg-types tagged-num (:constant (unsigned-byte 8)))
+  (:info target not-p y)
+  (:translate eql)
+  (:generator 2
+    (inst cmp x (fixnumize y))
+    (inst b (if not-p :ne :eq) target)))
+(define-vop (generic-eql-c/fixnum fast-eql-c/fixnum)
+  (:args (x :scs (any-reg descriptor-reg)))
+  (:arg-types * (:constant (unsigned-byte 8)))
+  (:variant-cost 6))
