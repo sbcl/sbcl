@@ -11,4 +11,22 @@
 
 (in-package "SB!VM")
 
-;;; Dummy placeholder file.
+;;;; Binary conditional VOPs:
+
+(define-vop (fast-conditional)
+  (:conditional)
+  (:info target not-p)
+  (:effects)
+  (:affected)
+  (:policy :fast-safe))
+
+(define-vop (fast-conditional/fixnum fast-conditional)
+  (:args (x :scs (any-reg))
+         (y :scs (any-reg)))
+  (:arg-types tagged-num tagged-num)
+  (:note "inline fixnum comparison"))
+
+(define-vop (fast-conditional-c/fixnum fast-conditional/fixnum)
+  (:args (x :scs (any-reg)))
+  (:arg-types tagged-num (:constant (unsigned-byte 8)))
+  (:info target not-p y))
