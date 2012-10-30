@@ -1250,9 +1250,6 @@
       (cond ((and (optional-dispatch-p ef) (optional-dispatch-more-entry ef))
              ;; Special case the xep-allocate-frame + copy-more-arg case.
              (vop xep-allocate-frame node block start-label t)
-             #!+arm
-             (error "Should VOP COPY-MORE-ARG here.")
-             #!-arm
              (vop copy-more-arg node block (optional-dispatch-max-args ef)))
             (t
              ;; No more args, so normal entry.
