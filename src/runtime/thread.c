@@ -120,6 +120,7 @@ unlink_thread(struct thread *th)
         th->next->prev = th->prev;
 }
 
+#ifndef LISP_FEATURE_SB_SAFEPOINT
 /* Only access thread state with blockables blocked. */
 lispobj
 thread_state(struct thread *thread)
@@ -193,7 +194,8 @@ wait_for_thread_state_change(struct thread *thread, lispobj state)
     }
     thread_sigmask(SIG_SETMASK, &old, NULL);
 }
-#endif
+#endif /* sb-safepoint */
+#endif /* sb-thread */
 
 static int
 initial_thread_trampoline(struct thread *th)
@@ -212,9 +214,6 @@ initial_thread_trampoline(struct thread *th)
     function = th->no_tls_value_marker;
     th->no_tls_value_marker = NO_TLS_VALUE_MARKER_WIDETAG;
     if(arch_os_thread_init(th)==0) return 1;
-#ifdef LISP_FEATURE_SB_SAFEPOINT
-    pthread_mutex_lock(thread_qrl(th));
-#endif
     link_thread(th);
     th->os_thread=thread_self();
 #ifndef LISP_FEATURE_WIN32
@@ -380,7 +379,6 @@ new_thread_trampoline(struct thread *th)
      * it is not). */
 #ifdef LISP_FEATURE_SB_SAFEPOINT
     *th->csp_around_foreign_call = (lispobj)&function;
-    pthread_mutex_lock(thread_qrl(th));
 #endif
     lock_ret = pthread_mutex_lock(&all_threads_lock);
     gc_assert(lock_ret == 0);
@@ -392,6 +390,9 @@ new_thread_trampoline(struct thread *th)
      * non-safepoint versions of this code.  Can we unify this more?
      */
 #ifdef LISP_FEATURE_SB_SAFEPOINT
+    gc_state_lock();
+    gc_state_wait(GC_NONE);
+    gc_state_unlock();
     WITH_GC_AT_SAFEPOINTS_ONLY() {
         result = funcall0(function);
         block_blockable_signals(0, 0);
@@ -402,8 +403,6 @@ new_thread_trampoline(struct thread *th)
     unlink_thread(th);
     lock_ret = pthread_mutex_unlock(&all_threads_lock);
     gc_assert(lock_ret == 0);
-    pthread_mutex_unlock(thread_qrl(th));
-    set_thread_state(th,STATE_DEAD);
 #else
     result = funcall0(function);
 
@@ -423,9 +422,11 @@ new_thread_trampoline(struct thread *th)
 #endif
 
     if(th->tls_cookie>=0) arch_os_thread_cleanup(th);
+#ifndef LISP_FEATURE_SB_SAFEPOINT
     os_sem_destroy(th->state_sem);
     os_sem_destroy(th->state_not_running_sem);
     os_sem_destroy(th->state_not_stopped_sem);
+#endif
 
 #if defined(LISP_FEATURE_WIN32)
     free((os_vm_address_t)th->interrupt_data);
@@ -574,17 +575,16 @@ create_thread_struct(lispobj initial_function) {
      * separately */
     th->os_attr=malloc(sizeof(pthread_attr_t));
     th->nonpointer_data = nonpointer_data;
+# ifndef LISP_FEATURE_SB_SAFEPOINT
     th->state_sem=&nonpointer_data->state_sem;
     th->state_not_running_sem=&nonpointer_data->state_not_running_sem;
     th->state_not_stopped_sem=&nonpointer_data->state_not_stopped_sem;
-    th->state_not_running_waitcount = 0;
-    th->state_not_stopped_waitcount = 0;
     os_sem_init(th->state_sem, 1);
     os_sem_init(th->state_not_running_sem, 0);
     os_sem_init(th->state_not_stopped_sem, 0);
-# ifdef LISP_FEATURE_SB_SAFEPOINT
-    pthread_mutex_init(thread_qrl(th), NULL);
 # endif
+    th->state_not_running_waitcount = 0;
+    th->state_not_stopped_waitcount = 0;
 #endif
     th->state=STATE_RUNNING;
 #ifdef LISP_FEATURE_STACK_GROWS_DOWNWARD_NOT_UPWARD

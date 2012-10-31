@@ -102,41 +102,12 @@ union per_thread_data {
  */
 struct nonpointer_thread_data
 {
-#ifdef LISP_FEATURE_SB_THREAD
+#if defined(LISP_FEATURE_SB_THREAD) && !defined(LISP_FEATURE_SB_SAFEPOINT)
     os_sem_t state_sem;
     os_sem_t state_not_running_sem;
     os_sem_t state_not_stopped_sem;
-# ifdef LISP_FEATURE_SB_SAFEPOINT
-   /* For safepoint-based builds, together with thread's
-    * csp_around_foreign_call pointer target, thread_qrl(thread) makes
-    * `quickly revokable lock'. Unlike most mutexes, this one is
-    * normally locked; by convention, other thread may read and use the
-    * thread's FFI-CSP location _either_ when the former holds the
-    * lock(mutex) _or_ when page permissions for FFI-CSP location were
-    * set to read-only.
-    *
-    * Combined semantic of QRL is not the same as the semantic of mutex
-    * returned by this function; rather, the mutex, when released by the
-    * owning thread, provides an edge-triggered notification of QRL
-    * release, which is represented by writing non-null
-    * csp_around_foreign_call.
-    *
-    * When owner thread is `in Lisp' (i.e. a heap mutator), its FFI-CSP
-    * contains null, otherwise it points to the top of C stack that
-    * should be preserved by GENCGC. If another thread needs to wait for
-    * mutator state change with `in Lisp => in C' direction, it disables
-    * FFI-CSP overwrite using page protection, and takes the mutex
-    * returned by thread_qrl(). Page fault handler normally ends up in a
-    * routine releasing this mutex and waiting for some appropriate
-    * event to take it back.
-    *
-    * This way, each thread may modify its own FFI-CSP content freely
-    * without memory barriers (paying with exception handling overhead
-    * whenever a contention happens). */
-    pthread_mutex_t qrl_lock;
-# endif
 #else
-    /* An unused field follows, to ensure that the struct in non-empty
+    /* An unused field follows, to ensure that the struct is non-empty
      * for non-GCC compilers. */
     int unused;
 #endif
@@ -382,8 +353,6 @@ void wake_thread_win32(struct thread *thread);
 int wake_thread_posix(os_thread_t os_thread);
 #  endif
 # endif
-
-#define thread_qrl(th) (&(th)->nonpointer_data->qrl_lock)
 
 static inline
 void push_gcing_safety(struct gcing_safety *into)
