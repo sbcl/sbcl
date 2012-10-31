@@ -362,6 +362,35 @@
           (when nfp-tn
             (error "Don't know how to allocate number stack space")))))))
 
+;;; More args are stored consecutively on the stack, starting
+;;; immediately at the context pointer.  The context pointer is not
+;;; typed, so the lowtag is 0.
+(define-full-reffer more-arg * 0 0 (descriptor-reg any-reg) * %more-arg)
+
+;;; Return the location and size of the more arg glob created by
+;;; Copy-More-Arg.  Supplied is the total number of arguments supplied
+;;; (originally passed in NARGS.)  Fixed is the number of non-rest
+;;; arguments.
+;;;
+;;; We must duplicate some of the work done by Copy-More-Arg, since at
+;;; that time the environment is in a pretty brain-damaged state,
+;;; preventing this info from being returned as values.  What we do is
+;;; compute supplied - fixed, and return a pointer that many words
+;;; below the current stack top.
+(define-vop (more-arg-context)
+  (:policy :fast-safe)
+  (:translate sb!c::%more-arg-context)
+  (:args (supplied :scs (any-reg)))
+  (:arg-types tagged-num (:constant fixnum))
+  (:info fixed)
+  (:results (context :scs (descriptor-reg))
+            (count :scs (any-reg)))
+  (:result-types t tagged-num)
+  (:note "more-arg-context")
+  (:generator 5
+    (inst sub count supplied (fixnumize fixed))
+    (inst sub context sp-tn count)))
+
 (define-vop (verify-arg-count)
   (:policy :fast-safe)
   (:translate sb!c::%verify-arg-count)
