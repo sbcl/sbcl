@@ -31,6 +31,54 @@
   (:arg-types tagged-num (:constant (unsigned-byte 8)))
   (:info target not-p y))
 
+(define-vop (fast-conditional/signed fast-conditional)
+  (:args (x :scs (signed-reg))
+         (y :scs (signed-reg)))
+  (:arg-types signed-num signed-num)
+  (:note "inline (signed-byte 32) comparison"))
+
+(define-vop (fast-conditional-c/signed fast-conditional/signed)
+  (:args (x :scs (signed-reg)))
+  (:arg-types signed-num (:constant (unsigned-byte 8)))
+  (:info target not-p y))
+
+(define-vop (fast-conditional/unsigned fast-conditional)
+  (:args (x :scs (unsigned-reg))
+         (y :scs (unsigned-reg)))
+  (:arg-types unsigned-num unsigned-num)
+  (:note "inline (unsigned-byte 32) comparison"))
+
+(define-vop (fast-conditional-c/unsigned fast-conditional/unsigned)
+  (:args (x :scs (unsigned-reg)))
+  (:arg-types unsigned-num (:constant (unsigned-byte 8)))
+  (:info target not-p y))
+
+(defmacro define-conditional-vop (tran cond unsigned not-cond not-unsigned)
+  `(progn
+     ,@(mapcar (lambda (suffix cost signed)
+                 (unless (and (member suffix '(/fixnum -c/fixnum))
+                              (eq tran 'eql))
+                   `(define-vop (,(intern (format nil "~:@(FAST-IF-~A~A~)"
+                                                  tran suffix))
+                                 ,(intern
+                                   (format nil "~:@(FAST-CONDITIONAL~A~)"
+                                           suffix)))
+                     (:translate ,tran)
+                     (:generator ,cost
+                      (inst cmp x
+                       ,(if (eq suffix '-c/fixnum) '(fixnumize y) 'y))
+                      (inst b (if not-p
+                                  ,(if signed not-cond not-unsigned)
+                                  ,(if signed cond unsigned))
+                       target)))))
+               '(/fixnum -c/fixnum /signed -c/signed /unsigned -c/unsigned)
+               '(4 3 6 5 6 5)
+               '(t t t t nil nil))))
+
+(define-conditional-vop < :lt :lo :ge :hs)
+(define-conditional-vop > :gt :hi :le :ls)
+(define-conditional-vop eql :eq :eq :ne :ne)
+
 ;;; EQL/FIXNUM is funny because the first arg can be of any type, not
 ;;; just a known fixnum.
 
