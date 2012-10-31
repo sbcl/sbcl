@@ -11,6 +11,135 @@
 
 (in-package "SB!VM")
 
+;;;; unary operations.
+
+(define-vop (fast-safe-arith-op)
+  (:policy :fast-safe)
+  (:effects)
+  (:affected))
+
+;;;; Binary fixnum operations.
+
+;;; Assume that any constant operand is the second arg...
+
+(define-vop (fast-fixnum-binop fast-safe-arith-op)
+  (:args (x :target r :scs (any-reg))
+         (y :target r :scs (any-reg)))
+  (:arg-types tagged-num tagged-num)
+  (:results (r :scs (any-reg)))
+  (:result-types tagged-num)
+  (:note "inline fixnum arithmetic"))
+
+(define-vop (fast-unsigned-binop fast-safe-arith-op)
+  (:args (x :target r :scs (unsigned-reg))
+         (y :target r :scs (unsigned-reg)))
+  (:arg-types unsigned-num unsigned-num)
+  (:results (r :scs (unsigned-reg)))
+  (:result-types unsigned-num)
+  (:note "inline (unsigned-byte 32) arithmetic"))
+
+(define-vop (fast-signed-binop fast-safe-arith-op)
+  (:args (x :target r :scs (signed-reg))
+         (y :target r :scs (signed-reg)))
+  (:arg-types signed-num signed-num)
+  (:results (r :scs (signed-reg)))
+  (:result-types signed-num)
+  (:note "inline (signed-byte 32) arithmetic"))
+
+
+(define-vop (fast-fixnum-binop-c fast-safe-arith-op)
+  (:args (x :target r :scs (any-reg)))
+  (:info y)
+  (:arg-types tagged-num
+              (:constant (and (signed-byte 11) (not (integer 0 0)))))
+  (:results (r :scs (any-reg)))
+  (:result-types tagged-num)
+  (:note "inline fixnum arithmetic"))
+
+(define-vop (fast-unsigned-binop-c fast-safe-arith-op)
+  (:args (x :target r :scs (unsigned-reg)))
+  (:info y)
+  (:arg-types unsigned-num
+              (:constant (and (signed-byte 13) (not (integer 0 0)))))
+  (:results (r :scs (unsigned-reg)))
+  (:result-types unsigned-num)
+  (:note "inline (unsigned-byte 32) arithmetic"))
+
+(define-vop (fast-signed-binop-c fast-safe-arith-op)
+  (:args (x :target r :scs (signed-reg)))
+  (:info y)
+  (:arg-types signed-num
+              (:constant (and (signed-byte 13) (not (integer 0 0)))))
+  (:results (r :scs (signed-reg)))
+  (:result-types signed-num)
+  (:note "inline (signed-byte 32) arithmetic"))
+
+(defmacro define-binop (translate untagged-penalty op
+                        &optional arg-swap)
+  `(progn
+     (define-vop (,(symbolicate 'fast translate '/fixnum=>fixnum)
+                  fast-fixnum-binop)
+       (:translate ,translate)
+       (:generator 2
+         ,(if arg-swap
+              `(inst ,op r y x)
+              `(inst ,op r x y))))
+     ,@(unless arg-swap
+         `((define-vop (,(symbolicate 'fast- translate '-c/fixnum=>fixnum)
+                        fast-fixnum-binop-c)
+             (:translate ,translate)
+             (:generator 1
+               (inst ,op r x (fixnumize y))))))
+     (define-vop (,(symbolicate 'fast- translate '/signed=>signed)
+                  fast-signed-binop)
+       (:translate ,translate)
+       (:generator ,(1+ untagged-penalty)
+         ,(if arg-swap
+              `(inst ,op r y x)
+              `(inst ,op r x y))))
+     ,@(unless arg-swap
+         `((define-vop (,(symbolicate 'fast- translate '-c/signed=>signed)
+                        fast-signed-binop-c)
+             (:translate ,translate)
+             (:generator ,untagged-penalty
+               (inst ,op r x y)))))
+     (define-vop (,(symbolicate 'fast- translate '/unsigned=>unsigned)
+                  fast-unsigned-binop)
+       (:translate ,translate)
+       (:generator ,(1+ untagged-penalty)
+         ,(if arg-swap
+              `(inst ,op r y x)
+              `(inst ,op r x y))))
+     ,@(unless arg-swap
+         `((define-vop (,(symbolicate 'fast- translate '-c/unsigned=>unsigned)
+                        fast-unsigned-binop-c)
+             (:translate ,translate)
+             (:generator ,untagged-penalty
+               (inst ,op r x y)))))))
+
+(define-binop + 4 add)
+(define-binop - 4 sub)
+(define-binop logand 2 and)
+(define-binop logandc1 2 bic t)
+(define-binop logandc2 2 bic)
+(define-binop logior 2 orr)
+(define-binop logxor 2 eor)
+
+(define-vop (fast-logand/signed-unsigned=>unsigned fast-logand/unsigned=>unsigned)
+  (:args (x :scs (signed-reg) :target r)
+         (y :scs (unsigned-reg) :target r))
+  (:arg-types signed-num unsigned-num)
+  (:translate logand))
+
+(define-source-transform logeqv (&rest args)
+  (if (oddp (length args))
+      `(logxor ,@args)
+      `(lognot (logxor ,@args))))
+(define-source-transform logorc1 (x y)
+  `(logior (lognot ,x) ,y))
+(define-source-transform logorc2 (x y)
+  `(logior ,x (lognot ,y)))
+
 ;;;; Binary conditional VOPs:
 
 (define-vop (fast-conditional)
