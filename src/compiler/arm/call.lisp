@@ -367,6 +367,73 @@
 ;;; typed, so the lowtag is 0.
 (define-full-reffer more-arg * 0 0 (descriptor-reg any-reg) * %more-arg)
 
+;;; Turn more arg (context, count) into a list.
+(define-vop (listify-rest-args)
+  (:args (context-arg :target context :scs (descriptor-reg))
+         (count-arg :target count :scs (any-reg)))
+  (:arg-types * tagged-num)
+  (:temporary (:scs (any-reg) :from (:argument 0)) context)
+  (:temporary (:scs (any-reg) :from (:argument 1)) count)
+  (:temporary (:scs (descriptor-reg) :from :eval) temp)
+  (:temporary (:scs (any-reg) :from :eval) dst)
+  (:temporary (:sc non-descriptor-reg :offset ocfp-offset) pa-flag)
+  (:results (result :scs (descriptor-reg)))
+  (:translate %listify-rest-args)
+  (:policy :safe)
+  (:node-var node)
+  (:generator 20
+    (move context context-arg)
+    (move count count-arg)
+    ;; Check to see if there are any arguments.
+    (inst cmp count 0)
+    (move result null-tn)
+    (inst b :eq DONE)
+
+    ;; We need to do this atomically.
+    (pseudo-atomic (pa-flag)
+      ;; Allocate a cons (2 words) for each item.
+      (if (node-stack-allocate-p node)
+          #!-(or)
+          (error "Don't know how to stack-allocate an &REST list.")
+          #!+(or)
+          (progn
+            (align-csp temp)
+            (inst clrrwi result csp-tn n-lowtag-bits)
+            (inst ori result result list-pointer-lowtag)
+            (move dst result)
+            (inst slwi temp count 1)
+            (inst add csp-tn csp-tn temp))
+          (progn
+            (inst mov temp (lsl count 1))
+            (allocation result temp list-pointer-lowtag
+                        :flag-tn pa-flag)
+            (move dst result)))
+
+      ;; FIXME: This entire loop is based on the PPC version, which is
+      ;; a poor fit for the ARM instruction set.
+      (inst b ENTER)
+
+      ;; Compute the next cons and store it in the current one.
+      LOOP
+      (inst add dst dst (* 2 n-word-bytes))
+      (storew dst dst -1 list-pointer-lowtag)
+
+      ;; Grab one value.
+      ENTER
+      (loadw temp context)
+      (inst add context context n-word-bytes)
+
+      ;; Dec count, and if != zero, go back for more.
+      (inst subs count count (fixnumize 1))
+      ;; Store the value into the car of the current cons (in the delay
+      ;; slot).
+      (storew temp dst 0 list-pointer-lowtag)
+      (inst b :gt LOOP)
+
+      ;; NIL out the last cons.
+      (storew null-tn dst 1 list-pointer-lowtag))
+    DONE))
+
 ;;; Return the location and size of the more arg glob created by
 ;;; Copy-More-Arg.  Supplied is the total number of arguments supplied
 ;;; (originally passed in NARGS.)  Fixed is the number of non-rest
