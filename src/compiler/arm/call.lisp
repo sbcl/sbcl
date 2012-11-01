@@ -334,11 +334,11 @@
         ;; moved.
 
         LOOP
-        (inst cmp result dest)
+        (inst cmp dest result)
         (let ((delta (- (sb-allocated-size 'control-stack) fixed)))
           (inst ldr :gt temp (@ dest (- (* (1+ delta) n-word-bytes)))))
         (inst str :gt temp (@ dest (- n-word-bytes) :pre-index))
-        (inst b :le LOOP)
+        (inst b :gt LOOP)
 
         DO-REGS
         (when (< fixed register-arg-count)
