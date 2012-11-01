@@ -1686,7 +1686,6 @@
 
 ;;; We have to do a spurious move of no values to the result lvar so
 ;;; that lifetime analysis won't get confused.
-#!-arm
 (defun ir2-convert-throw (node block)
   (declare (type mv-combination node) (type ir2-block block))
   (let ((args (basic-combination-args node)))

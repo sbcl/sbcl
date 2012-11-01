@@ -2,6 +2,36 @@
 
 ;;;; Non-local exit noise.
 
+(define-assembly-routine (throw
+                          (:return-style :none))
+                         ((:arg target descriptor-reg r0-offset)
+                          (:arg start any-reg r8-offset)
+                          (:arg count any-reg nargs-offset)
+                          (:temp ocfp non-descriptor-reg ocfp-offset)
+                          (:temp catch any-reg r1-offset)
+                          (:temp tag descriptor-reg r2-offset))
+  (declare (ignore start count))
+
+  (load-symbol-value catch *current-catch-block*)
+
+  LOOP
+
+  (let ((error (generate-error-code nil ocfp 'unseen-throw-tag-error target)))
+    (inst cmp catch 0)
+    (inst b :eq error))
+
+  (loadw tag catch catch-block-tag-slot)
+  (inst cmp tag target)
+  (loadw catch catch catch-block-previous-catch-slot 0 :ne)
+  (inst b :ne LOOP)
+
+  ;; As a dreadful cleverness, make use of the fact that assembly
+  ;; routines are emitted in order, with no padding, and that the body
+  ;; of UNWIND follows to arrange for the stack to be unwound to our
+  ;; chosen destination.
+  (move target catch) ;; TARGET coincides with UNWIND's BLOCK argument
+  )
+
 (define-assembly-routine (unwind
                           (:return-style :none)
                           (:translate %continue-unwind)
