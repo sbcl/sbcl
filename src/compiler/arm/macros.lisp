@@ -210,7 +210,8 @@
                 (= (tn-offset ,flag-tn) 7)))
      (without-scheduling ()
        (store-symbol-value pc-tn *pseudo-atomic-atomic*))
-     ,@forms
+     (assemble ()
+       ,@forms)
      (without-scheduling ()
        (store-symbol-value null-tn *pseudo-atomic-atomic*)
        (load-symbol-value ,flag-tn *pseudo-atomic-interrupted*)
