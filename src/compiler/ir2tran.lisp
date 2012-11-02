@@ -1145,7 +1145,6 @@
   (values))
 
 ;;; Do full call when unknown values are desired.
-#!-arm
 (defun ir2-convert-multiple-full-call (node block)
   (declare (type combination node) (type ir2-block block))
   (multiple-value-bind (fp args arg-locs nargs)

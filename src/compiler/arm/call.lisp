@@ -226,7 +226,53 @@
     ;; And, finally, recompute the correct value for CODE-TN.
     (inst compute-code code-tn lip-tn lra-label temp))
   (values))
+
+;;;; Unknown values receiving:
 
+;;;    Emit code needed at the return point for an unknown-values call for an
+;;; arbitrary number of values.
+;;;
+;;;    We do the single and non-single cases with no shared code: there doesn't
+;;; seem to be any potential overlap, and receiving a single value is more
+;;; important efficiency-wise.
+;;;
+;;;    When there is a single value, we just push it on the stack, returning
+;;; the old SP and 1.
+;;;
+;;;    When there is a variable number of values, we move all of the argument
+;;; registers onto the stack, and return Args and Nargs.
+;;;
+;;;    Args and Nargs are TNs wired to the named locations.  We must
+;;; explicitly allocate these TNs, since their lifetimes overlap with the
+;;; results Start and Count (also, it's nice to be able to target them).
+(defun receive-unknown-values (args nargs start count lra-label temp)
+  (declare (type tn args nargs start count temp))
+  (inst compute-code code-tn lip-tn lra-label temp)
+  (inst str :eq (first *register-arg-tns*) (@ sp-tn n-word-bytes :post-index))
+  (inst sub :eq start sp-tn 4)
+  (inst mov :eq count (fixnumize 1))
+  (do ((arg *register-arg-tns* (rest arg))
+       (i 0 (1+ i)))
+      ((null arg))
+    (storew (first arg) args i 0 :ne))
+  (move start args :ne)
+  (move count nargs :ne)
+  (values))
+
+
+;;; VOP that can be inherited by unknown values receivers.  The main
+;;; thing this handles is allocation of the result temporaries.
+(define-vop (unknown-values-receiver)
+  (:results
+   (start :scs (any-reg))
+   (count :scs (any-reg)))
+  (:temporary (:sc descriptor-reg :offset ocfp-offset
+                   :from :eval :to (:result 0))
+              values-start)
+  (:temporary (:sc any-reg :offset nargs-offset
+               :from :eval :to (:result 1))
+              nvals)
+  (:temporary (:scs (non-descriptor-reg)) temp))
 
 ;;; This hook in the codegen pass lets us insert code before fall-thru entry
 ;;; points, local-call entry points, and tail-call entry points.  The default
@@ -722,6 +768,8 @@
 
 (define-full-call call nil :fixed nil)
 (define-full-call call-named t :fixed nil)
+(define-full-call multiple-call nil :unknown nil)
+(define-full-call multiple-call-named t :unknown nil)
 (define-full-call tail-call nil :tail nil)
 (define-full-call tail-call-named t :tail nil)
 
