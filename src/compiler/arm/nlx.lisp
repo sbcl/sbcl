@@ -154,3 +154,40 @@
                   (store-stack-tn tn move-temp :ge)
                   (store-stack-tn tn null-tn :lt)))))))
     (load-stack-tn sp-tn sp)))
+
+(define-vop (nlx-entry-multiple)
+  (:args (top :target result) (src) (count))
+  ;; Again, no SC restrictions for the args, 'cause the loading would
+  ;; happen before the entry label.
+  (:info label)
+  (:temporary (:scs (any-reg)) dst)
+  (:temporary (:scs (descriptor-reg)) temp)
+  (:results (result :scs (any-reg) :from (:argument 0))
+            (num :scs (any-reg) :from (:argument 0)))
+  (:save-p :force-to-stack)
+  (:vop-var vop)
+  (:generator 30
+    (emit-return-pc label)
+    (note-this-location vop :non-local-entry)
+
+    ;; Setup results, and test for the zero value case.
+    (load-stack-tn result top)
+    (inst cmp count 0)
+    (inst mov num 0)
+    (inst b :eq DONE)
+
+    ;; Compute dst as one slot down from result, because we inc the index
+    ;; before we use it.
+    (inst sub dst result 4)
+
+    ;; Copy stuff down the stack.
+    LOOP
+    (inst ldr temp (@ src num))
+    (inst add num num (fixnumize 1))
+    (inst cmp num count)
+    (inst str temp (@ dst num))
+    (inst b :ne LOOP)
+
+    ;; Reset the CSP.
+    DONE
+    (inst add sp-tn result num)))

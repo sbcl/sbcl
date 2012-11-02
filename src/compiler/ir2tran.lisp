@@ -1795,9 +1795,6 @@
       ((:catch :block :tagbody)
        (let ((2lvar (and lvar (lvar-info lvar))))
          (if (and 2lvar (eq (ir2-lvar-kind 2lvar) :unknown))
-             #!+arm
-             (error "Don't know how to VOP NLX-ENTRY-MULTIPLE")
-             #!-arm
              (vop* nlx-entry-multiple node block
                    (top-loc start-loc count-loc nil)
                    ((reference-tn-list (ir2-lvar-locs 2lvar) t))
