@@ -801,3 +801,53 @@
            ;; And away we go.
            (lisp-return lra nil)))
     (trace-table-entry trace-table-normal)))
+
+;;; Do unknown-values return of an arbitrary number of values (passed
+;;; on the stack.)  We check for the common case of a single return
+;;; value, and do that inline using the normal single value return
+;;; convention.  Otherwise, we branch off to code that calls an
+;;; assembly-routine.
+(define-vop (return-multiple)
+  (:args
+   (old-fp-arg :scs (any-reg) :to (:eval 1))
+   (lra-arg :scs (descriptor-reg) :to (:eval 1))
+   (vals-arg :scs (any-reg) :target vals)
+   (nvals-arg :scs (any-reg) :target nvals))
+  (:temporary (:sc any-reg :offset lexenv-offset :from (:argument 0)) old-fp)
+  (:temporary (:sc descriptor-reg :offset lra-offset :from (:argument 1)) lra)
+  (:temporary (:sc any-reg :offset ocfp-offset :from (:argument 2)) vals)
+  (:temporary (:sc any-reg :offset nargs-offset :from (:argument 3)) nvals)
+  (:temporary (:sc descriptor-reg :offset r0-offset) r0)
+  (:vop-var vop)
+  (:generator 13
+    (trace-table-entry trace-table-fun-epilogue)
+    (move lra lra-arg)
+    ;; Clear the number stack.
+    (let ((cur-nfp (current-nfp-tn vop)))
+      (when cur-nfp
+        (error "Don't know how to clear number stack.")
+        #!+(or)
+        (inst addi nsp-tn cur-nfp
+              (- (bytes-needed-for-non-descriptor-stack-frame)
+                 number-stack-displacement))))
+
+    ;; Check for the single case.
+    (inst cmp nvals-arg (fixnumize 1))
+    (inst b :ne NOT-SINGLE)
+
+    ;; Return with one value.
+    (inst ldr r0 (@ vals-arg))
+    (move sp-tn fp-tn)
+    (move fp-tn old-fp-arg)
+    (lisp-return lra-arg t)
+
+    ;; Nope, not the single case.
+    NOT-SINGLE
+    (move old-fp old-fp-arg)
+    (move vals vals-arg)
+    (move nvals nvals-arg)
+    (inst ldr pc-tn (@ fixup))
+    FIXUP
+    (inst word (make-fixup 'return-multiple :assembly-routine))
+
+    (trace-table-entry trace-table-normal)))

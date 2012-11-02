@@ -1380,9 +1380,6 @@
                   nvals))))
      (t
       (aver (eq lvar-kind :unknown))
-      #!+arm
-      (error "Should VOP RETURN-MULTIPLE here.")
-      #!-arm
       (vop* return-multiple node block
             (old-fp return-pc
                     (reference-tn-list (ir2-lvar-locs 2lvar) nil))
