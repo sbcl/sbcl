@@ -1,17 +1,17 @@
 (in-package "SB!IMPL")
 
-(defun test-closures-receiver (fun)
-  (declare (type function fun))
-  (funcall fun))
+(defun test-closure (closure)
+  (declare (function closure))
+  (funcall closure)
+  nil)
 
-(defun test-closures (value)
-  (flet ((closure-test ()
-           (setf value 27)
-           (return-from test-closures
-             13)))
-    (declare (dynamic-extent #'closure-test))
-    (test-closures-receiver #'closure-test)
+(defun test-uwp ()
+  (let ((value 3))
+    (unwind-protect
+         (test-closure (lambda ()
+                         (setf value 7)))
+      (setf value (logand value 4)))
     value))
 
 (defun !cold-init ()
-  (test-closures 14))
+  (test-uwp))
