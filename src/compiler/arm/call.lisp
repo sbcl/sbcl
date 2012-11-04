@@ -33,8 +33,17 @@
       (make-wired-tn *backend-t-primitive-type* register-arg-scn lra-offset)
       (make-restricted-tn *backend-t-primitive-type* register-arg-scn)))
 
-;;; MAKE-OLD-FP-PASSING-LOCATION would be here, but the ARM backend
-;;; passes the OCFP in its save location.
+;;; This is similar to MAKE-RETURN-PC-PASSING-LOCATION, but makes a
+;;; location to pass OLD-FP in.
+;;;
+;;; This is wired in both the standard and the local-call conventions,
+;;; because we want to be able to assume it's always there. Besides,
+;;; the ARM doesn't have enough registers to really make it profitable
+;;; to pass it in a register.
+(defun make-old-fp-passing-location (standard)
+  (declare (ignore standard))
+  (make-wired-tn *fixnum-primitive-type* control-stack-sc-number
+                 ocfp-save-offset))
 
 ;;; Make the TNs used to hold OLD-FP and RETURN-PC within the current
 ;;; function. We treat these specially so that the debugger can find

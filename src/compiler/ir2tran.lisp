@@ -1275,8 +1275,6 @@
                   (emit-move node block pass home))))
           (incf n))))
 
-    ;; ARM manages OLD-FP during frame allocation.
-    #!-arm
     (emit-move node block (make-old-fp-passing-location t)
                (ir2-physenv-old-fp env)))
 
