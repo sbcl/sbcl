@@ -649,6 +649,7 @@
 
      ,@(unless (eq return :tail)
          '((:temporary (:scs (non-descriptor-reg)) temp)
+           (:temporary (:scs (interior-reg)) lip)
            (:temporary (:sc control-stack :offset nfp-save-offset) nfp-save)))
 
      (:generator ,(+ (if named 5 0)
@@ -698,7 +699,7 @@
                               (:frob-nfp
                                (error "Don't know how to :FROB-NFP for TAIL call")))
                             `((:comp-lra
-                               (inst compute-lra return-pc-pass lra-label))
+                               (inst compute-lra return-pc-pass lip lra-label))
                               (:frob-nfp
                                (store-stack-tn nfp-save cur-nfp))
                               (:load-fp

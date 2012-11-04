@@ -793,15 +793,62 @@
 
 ;;; Compute the address of a nearby LRA object by dead reckoning from
 ;;; the location of the current instruction.
-(define-instruction compute-lra (segment dest lra-label)
+(define-instruction compute-lra (segment dest lip lra-label)
   (:vop-var vop)
   (:emitter
-   (emit-back-patch
-    segment 4
-    (lambda (segment position)
-      (assemble (segment vop)
-        (inst add dest pc-tn (- (+ (label-position lra-label)
-                                   other-pointer-lowtag)
-                                ;; The 8 below is the displacement
-                                ;; from reading the program counter.
-                                (+ position 8))))))))
+   ;; We can compute the LRA in a single instruction if the overall
+   ;; offset puts it to within an 8-bit displacement.  Otherwise, we
+   ;; need to load it by parts into LIP until we're down to an 8-bit
+   ;; displacement, and load the final 8 bits into DEST.  We may
+   ;; safely presume that an overall displacement may be up to 24 bits
+   ;; wide (the PPC backend has special provision for branches over 15
+   ;; bits, which implies that segments can become large, but a 16
+   ;; megabyte segment (24 bits of displacement) is ridiculous), so we
+   ;; need to cover a range of up to three octets of displacement.
+   (labels ((compute-delta (position &optional magic-value)
+              (- (+ (label-position lra-label
+                                    (when magic-value position)
+                                    magic-value)
+                    other-pointer-lowtag)
+                 ;; The 8 below is the displacement
+                 ;; from reading the program counter.
+                 (+ position 8)))
+
+            (three-instruction-emitter (segment position)
+              (let ((delta (compute-delta position)))
+                (assemble (segment vop)
+                  (inst add lip pc-tn (ldb (byte 8 16) delta))
+                  (inst add lip lip (ldb (byte 8 8) delta))
+                  (inst add dest lip (ldb (byte 8 0) delta)))))
+
+            (two-instruction-emitter (segment position)
+              (let ((delta (compute-delta position)))
+                (assemble (segment vop)
+                  (inst add lip pc-tn (ldb (byte 8 8) delta))
+                  (inst add dest lip (ldb (byte 8 0) delta)))))
+
+            (one-instruction-emitter (segment position)
+              (let ((delta (compute-delta position)))
+                (assemble (segment vop)
+                  (inst add dest pc-tn delta))))
+
+            (two-instruction-maybe-shrink (segment posn magic-value)
+              (let ((delta (compute-delta posn magic-value)))
+                (when (<= (integer-length delta) 8)
+                  (emit-back-patch segment 4
+                                   #'one-instruction-emitter)
+                  t)))
+
+            (three-instruction-maybe-shrink (segment posn magic-value)
+              (let ((delta (compute-delta posn magic-value)))
+                (when (<= (integer-length delta) 16)
+                  (emit-chooser segment 8 2
+                                #'two-instruction-maybe-shrink
+                                #'two-instruction-emitter)
+                  t))))
+     (emit-chooser
+      ;; We need to emit up to three instructions, which is 12 octets.
+      ;; This preserves a mere two bits of alignment.
+      segment 12 2
+      #'three-instruction-maybe-shrink
+      #'three-instruction-emitter))))
