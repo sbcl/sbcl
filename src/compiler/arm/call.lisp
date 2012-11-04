@@ -134,7 +134,6 @@
     (move res sp-tn)
     (inst add sp-tn sp-tn (* (max 1 (sb-allocated-size 'control-stack))
                              n-word-bytes))
-    (storew fp-tn res ocfp-save-offset)
     (when (ir2-physenv-number-stack-p callee)
       (error "Don't know how to allocate number stack space")
       #!+(or)
