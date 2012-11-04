@@ -1730,9 +1730,6 @@
            (emit-make-value-cell node block res (ir2-nlx-info-home 2info))
            (emit-move node block res (ir2-nlx-info-home 2info))))
       (:unwind-protect
-       #!+arm
-       (error "Don't know how to VOP SET-UNWIND-PROTECT")
-       #!-arm
        (vop set-unwind-protect node block block-tn))
       (:catch)))
 
@@ -1804,9 +1801,6 @@
                (move-lvar-result node block locs lvar)))))
       (:unwind-protect
        (let ((block-loc (standard-arg-location 0)))
-         #!+arm
-         (error "Don't know how to VOP UWP-ENTRY")
-         #!-arm
          (vop uwp-entry node block target block-loc start-loc count-loc)
          (move-lvar-result
           node block

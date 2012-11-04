@@ -112,6 +112,15 @@
 
     (move block result)))
 
+;;; Just set the current unwind-protect to TN's address.  This
+;;; instantiates an unwind block as an unwind-protect.
+(define-vop (set-unwind-protect)
+  (:args (tn))
+  (:temporary (:scs (descriptor-reg)) new-uwp)
+  (:generator 7
+    (inst add new-uwp fp-tn (* (tn-offset tn) n-word-bytes))
+    (store-symbol-value new-uwp *current-unwind-protect-block*)))
+
 (define-vop (unlink-catch-block)
   (:temporary (:scs (any-reg)) block)
   (:policy :fast-safe)
@@ -120,6 +129,15 @@
     (load-symbol-value block *current-catch-block*)
     (loadw block block catch-block-previous-catch-slot)
     (store-symbol-value block *current-catch-block*)))
+
+(define-vop (unlink-unwind-protect)
+  (:temporary (:scs (any-reg)) block)
+  (:policy :fast-safe)
+  (:translate %unwind-protect-breakup)
+  (:generator 17
+    (load-symbol-value block *current-unwind-protect-block*)
+    (loadw block block unwind-block-current-uwp-slot)
+    (store-symbol-value block *current-unwind-protect-block*)))
 
 ;;;; NLX entry VOPs:
 
@@ -193,3 +211,15 @@
     ;; Reset the CSP.
     DONE
     (inst add sp-tn result num)))
+
+;;; This VOP is just to force the TNs used in the cleanup onto the stack.
+;;;
+(define-vop (uwp-entry)
+  (:info label)
+  (:save-p :force-to-stack)
+  (:results (block) (start) (count))
+  (:ignore block start count)
+  (:vop-var vop)
+  (:generator 0
+    (emit-return-pc label)
+    (note-this-location vop :non-local-entry)))
