@@ -3086,7 +3086,9 @@ initially undefined function references:~2%")
 
       (setf undefs (sort undefs #'string< :key #'fun-name-block-name))
       (dolist (name undefs)
-        (format t "~S~%" name)))
+        (format t "~8,'0X: ~S~%"
+                (descriptor-bits (gethash name *cold-fdefn-objects*))
+                name)))
 
     (format t "~%~|~%layout names:~2%")
     (collect ((stuff))
