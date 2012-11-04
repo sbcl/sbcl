@@ -941,7 +941,6 @@
 ;;; (including implicit environment args.) We allocate a frame
 ;;; (returning the FP and NFP), and also compute the TN-REFS list for
 ;;; the values to pass and the list of passing location TNs.
-#!-arm
 (defun ir2-convert-local-call-args (node block fun)
   (declare (type combination node) (type ir2-block block) (type clambda fun))
   (let ((fp (make-stack-pointer-tn))
@@ -957,7 +956,6 @@
 
 ;;; Handle a non-TR known-values local call. We emit the call, then
 ;;; move the results to the lvar's destination.
-#!-arm
 (defun ir2-convert-local-known-call (node block fun returns lvar start)
   (declare (type node node) (type ir2-block block) (type clambda fun)
            (type return-info returns) (type (or lvar null) lvar)
@@ -1353,9 +1351,6 @@
     (cond
      ((and (eq (return-info-kind returns) :fixed)
            (not (xep-p fun)))
-      #!+arm
-      (error "Should VOP KNOWN-RETURN here.")
-      #!-arm
       (let ((locs (lvar-tns node block lvar
                                     (return-info-types returns))))
         (vop* known-return node block

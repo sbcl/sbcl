@@ -124,6 +124,26 @@
           (error "Don't know how to allocate number stack space"))))
     (trace-table-entry trace-table-normal)))
 
+(define-vop (allocate-frame)
+  (:results (res :scs (any-reg))
+            (nfp :scs (any-reg)))
+  (:info callee)
+  (:ignore nfp)
+  (:generator 2
+    (trace-table-entry trace-table-fun-prologue)
+    (move res sp-tn)
+    (inst add sp-tn sp-tn (* (max 1 (sb-allocated-size 'control-stack))
+                             n-word-bytes))
+    (storew fp-tn res ocfp-save-offset)
+    (when (ir2-physenv-number-stack-p callee)
+      (error "Don't know how to allocate number stack space")
+      #!+(or)
+      (let* ((nbytes (bytes-needed-for-non-descriptor-stack-frame)))
+        (when (> nbytes number-stack-displacement)
+          (inst stwu nsp-tn nsp-tn (- (bytes-needed-for-non-descriptor-stack-frame)))
+          (inst addi nfp nsp-tn number-stack-displacement))))
+    (trace-table-entry trace-table-normal)))
+
 ;;; Allocate a partial frame for passing stack arguments in a full call.  Nargs
 ;;; is the number of arguments passed.  If no stack arguments are passed, then
 ;;; we don't have to do anything.
@@ -545,6 +565,81 @@
   (frob unknown-key-arg-error unknown-key-arg-error
         sb!c::%unknown-key-arg-error key)
   (frob nil-fun-returned-error nil-fun-returned-error nil fun))
+
+;;;; Local call with known values return:
+
+;;; Non-TR local call with known return locations.  Known-value return works
+;;; just like argument passing in local call.
+;;;
+;;; Note: we can't use normal load-tn allocation for the fixed args, since all
+;;; registers may be tied up by the more operand.  Instead, we use
+;;; MAYBE-LOAD-STACK-TN.
+(define-vop (known-call-local)
+  (:args (fp)
+         (nfp)
+         (args :more t))
+  (:results (res :more t))
+  (:move-args :local-call)
+  (:save-p t)
+  (:info save callee target)
+  (:ignore args res save)
+  (:vop-var vop)
+  (:temporary (:sc control-stack :offset nfp-save-offset) nfp-save)
+  (:temporary (:scs (non-descriptor-reg)) temp)
+  (:temporary (:scs (interior-reg)) lip)
+  (:generator 5
+    (trace-table-entry trace-table-call-site)
+    (let ((label (gen-label))
+          (cur-nfp (current-nfp-tn vop)))
+      (when cur-nfp
+        (store-stack-tn nfp-save cur-nfp))
+      (let ((callee-nfp (callee-nfp-tn callee)))
+        (when callee-nfp
+          (maybe-load-stack-tn callee-nfp nfp)))
+      (maybe-load-stack-tn fp-tn fp)
+      (inst compute-lra (callee-return-pc-tn callee) lip label)
+      (note-this-location vop :call-site)
+      (inst b target)
+      (emit-return-pc label)
+      (note-this-location vop :known-return)
+      (when cur-nfp
+        (load-stack-tn cur-nfp nfp-save)))
+    (trace-table-entry trace-table-normal)))
+
+;;; Return from known values call.  We receive the return locations as
+;;; arguments to terminate their lifetimes in the returning function.  We
+;;; restore FP and CSP and jump to the Return-PC.
+;;;
+;;; Note: we can't use normal load-tn allocation for the fixed args, since all
+;;; registers may be tied up by the more operand.  Instead, we use
+;;; MAYBE-LOAD-STACK-TN.
+(define-vop (known-return)
+  (:args (old-fp :target old-fp-temp)
+         (return-pc :target return-pc-temp)
+         (vals :more t))
+  (:temporary (:sc any-reg :from (:argument 0)) old-fp-temp)
+  (:temporary (:sc descriptor-reg :from (:argument 1)) return-pc-temp)
+  (:move-args :known-return)
+  (:info val-locs)
+  (:ignore val-locs vals)
+  (:vop-var vop)
+  (:generator 6
+    (trace-table-entry trace-table-fun-epilogue)
+    (maybe-load-stack-tn old-fp-temp old-fp)
+    (maybe-load-stack-tn return-pc-temp return-pc)
+    (move sp-tn fp-tn)
+    (let ((cur-nfp (current-nfp-tn vop)))
+      (when cur-nfp
+        (error "Don't know how to release number stack allocation")
+        #!+(or)
+        (inst addi nsp-tn cur-nfp
+              (- (bytes-needed-for-non-descriptor-stack-frame)
+                 number-stack-displacement))))
+    (move fp-tn old-fp-temp)
+    ;; Shouldn't use LISP-RETURN here because we don't need to signal
+    ;; single / multiple values.
+    (inst sub pc-tn return-pc-temp (- other-pointer-lowtag 4))
+    (trace-table-entry trace-table-normal)))
 
 ;;;; Full call:
 ;;;
