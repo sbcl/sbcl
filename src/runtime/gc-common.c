@@ -726,7 +726,7 @@ size_tiny_boxed(lispobj *where)
 
 /* Note: on the sparc we don't have to do anything special for fdefns, */
 /* 'cause the raw-addr has a function lowtag. */
-#if !defined(LISP_FEATURE_SPARC)
+#if (!defined(LISP_FEATURE_SPARC)) && (!defined(LISP_FEATURE_ARM))
 static sword_t
 scav_fdefn(lispobj *where, lispobj object)
 {
@@ -2076,7 +2076,7 @@ gc_init_tables(void)
     scavtab[UNBOUND_MARKER_WIDETAG] = scav_immediate;
     scavtab[NO_TLS_VALUE_MARKER_WIDETAG] = scav_immediate;
     scavtab[INSTANCE_HEADER_WIDETAG] = scav_instance;
-#if defined(LISP_FEATURE_SPARC)
+#if defined(LISP_FEATURE_SPARC) || defined(LISP_FEATURE_ARM)
     scavtab[FDEFN_WIDETAG] = scav_boxed;
 #else
     scavtab[FDEFN_WIDETAG] = scav_fdefn;
