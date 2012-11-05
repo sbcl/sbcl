@@ -200,7 +200,8 @@ corresponds to NAME, or NIL if there is none."
                                mode)))
         (if (minusp fd)
             (values nil (get-errno))
-            (values fd (octets-to-string template-buffer)))))))
+            (values #!-win32 fd #!+win32 (sb!win32::duplicate-and-unwrap-fd fd)
+                    (octets-to-string template-buffer)))))))
 
 ;;;; timebits.h
 
@@ -287,10 +288,16 @@ corresponds to NAME, or NIL if there is none."
 (defconstant l_incr 1) ; to increment the file pointer
 (defconstant l_xtnd 2) ; to extend the file size
 
+;; off_t is 32 bit on Windows, yet our functions support 64 bit seeks.
+(define-alien-type unix-offset
+  #!-win32 off-t
+  #!+win32 (signed 64))
+
 ;;; Is a stream interactive?
 (defun unix-isatty (fd)
   (declare (type unix-fd fd))
-  (int-syscall ("[_]isatty" int) fd))
+  #!-win32 (int-syscall ("isatty" int) fd)
+  #!+win32 (sb!win32::windows-isatty fd))
 
 (defun unix-lseek (fd offset whence)
   "Unix-lseek accepts a file descriptor and moves the file pointer by
@@ -302,12 +309,13 @@ corresponds to NAME, or NIL if there is none."
   "
   (declare (type unix-fd fd)
            (type (integer 0 2) whence))
-  (let ((result #!-win32
-                (alien-funcall (extern-alien #!-largefile "lseek"
+  (let ((result
+         #!-win32
+          (alien-funcall (extern-alien #!-largefile "lseek"
                                              #!+largefile "lseek_largefile"
                                              (function off-t int off-t int))
-                 fd offset whence)
-                #!+win32 (sb!win32:lseeki64 fd offset whence)))
+                        fd offset whence)
+          #!+win32 (sb!win32:lseeki64 fd offset whence)))
     (if (minusp result)
         (values nil (get-errno))
       (values result 0))))
@@ -359,15 +367,10 @@ corresponds to NAME, or NIL if there is none."
     (syscall ("pipe" (* int))
              (values (deref fds 0) (deref fds 1))
              (cast fds (* int)))))
-#!+win32
-(defun msvcrt-raw-pipe (fds size mode)
-  (syscall ("_pipe" (* int) int int)
-           (values (deref fds 0) (deref fds 1))
-           (cast fds (* int)) size mode))
+
 #!+win32
 (defun unix-pipe ()
-  (with-alien ((fds (array int 2)))
-    (msvcrt-raw-pipe fds 256 o_binary)))
+  (sb!win32::windows-pipe))
 
 ;; Windows mkdir() doesn't take the mode argument. It's cdecl, so we could
 ;; actually call it passing the mode argument, but some sharp-eyed reader
@@ -430,9 +433,10 @@ corresponds to NAME, or NIL if there is none."
 ;;; Duplicate an existing file descriptor (given as the argument) and
 ;;; return it. If FD is not a valid file descriptor, NIL and an error
 ;;; number are returned.
+#!-win32
 (defun unix-dup (fd)
   (declare (type unix-fd fd))
-  (int-syscall ("[_]dup" int) fd))
+  (int-syscall ("dup" int) fd))
 
 ;;; Terminate the current process with an optional error code. If
 ;;; successful, the call doesn't return. If unsuccessful, the call
@@ -897,11 +901,15 @@ avoiding atexit(3) hooks, etc. Otherwise exit(2) is called."
              (%extract-stat-results (addr buf))
              name (addr buf))))
 (defun unix-fstat (fd)
+  #!-win32
   (declare (type unix-fd fd))
-  (with-alien ((buf (struct wrapped_stat)))
-    (syscall ("fstat_wrapper" int (* (struct wrapped_stat)))
-             (%extract-stat-results (addr buf))
-             fd (addr buf))))
+  (#!-win32 funcall #!+win32 sb!win32::call-with-crt-fd
+   (lambda (fd)
+     (with-alien ((buf (struct wrapped_stat)))
+       (syscall ("fstat_wrapper" int (* (struct wrapped_stat)))
+                (%extract-stat-results (addr buf))
+                fd (addr buf))))
+   fd))
 
 #!-win32
 (defun fd-type (fd)

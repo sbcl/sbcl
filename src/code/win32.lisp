@@ -57,9 +57,37 @@
 
 ;;;; File Handles
 
+;;; Historically, SBCL on Windows used CRT (lowio) file descriptors,
+;;; unlike other Lisps. They really help to minimize required effort
+;;; for porting Unix-specific software, at least to the level that it
+;;; mostly works most of the time.
+;;;
+;;; Alastair Bridgewater recommended to switch away from CRT
+;;; descriptors, and Anton Kovalenko thinks it's the time to heed his
+;;; advice. I see that SBCL for Windows needs much more effort in the
+;;; area of OS IO abstractions and the like; using or leaving lowio
+;;; FDs doesn't change the big picture so much.
+;;;
+;;; Lowio layer, in exchange for `semi-automatic almost-portability',
+;;; brings some significant problems, which a grown-up cross-platform
+;;; CL implementation shouldn't have. Therefore, as its benefits
+;;; become negligible, it's a good reason to throw it away.
+;;;
+;;;  -- comment from AK's branch
+
+;;; For a few more releases, let's preserve old functions (now
+;;; implemented as identity) for user code which might have had to peek
+;;; into our internals in past versions when we hadn't been using
+;;; handles yet. -- DFL, 2012
+(defun get-osfhandle (fd) fd)
+(defun open-osfhandle (handle flags) (declare (ignore flags)) handle)
+
 ;;; Get the operating system handle for a C file descriptor.  Returns
 ;;; INVALID-HANDLE on failure.
-(define-alien-routine ("_get_osfhandle" get-osfhandle) handle
+(define-alien-routine ("_get_osfhandle" real-get-osfhandle) handle
+  (fd int))
+
+(define-alien-routine ("_close" real-crt-close) int
   (fd int))
 
 ;;; Read data from a file handle into a buffer.  This may be used
@@ -107,6 +135,9 @@
   (length dword)
   (nevents (* dword)))
 
+(define-alien-routine ("socket_input_available" socket-input-available) int
+  (socket handle))
+
 ;;; Listen for input on a Windows file handle.  Unlike UNIX, there
 ;;; isn't a unified interface to do this---we have to know what sort
 ;;; of handle we have.  Of course, there's no way to actually
@@ -126,14 +157,9 @@
                        handle)))
     (unless (zerop (peek-named-pipe handle nil 0 nil (addr avail) nil))
       (return-from handle-listen (plusp avail)))
-
-    (unless (zerop (peek-console-input handle
-                                       (cast buf (* t))
-                                       1 (addr avail)))
-      (return-from handle-listen (plusp avail)))
-
-    ;; FIXME-SOCKETS: Try again here with WSAEventSelect in case
-    ;; HANDLE is a socket.
+    (let ((res (socket-input-available handle)))
+      (unless (zerop res)
+        (return-from handle-listen (= res 1))))
     t))
 
 ;;; Listen for input on a C runtime file handle.  Returns true if
@@ -179,6 +205,10 @@
              (do () ((with-local-interrupts
                        (zerop (sb!impl::os-wait-for-wtimer timer)))))
           (sb!impl::os-close-wtimer timer))))))
+
+(define-alien-routine ("win32_wait_object_or_signal" wait-object-or-signal)
+    (signed 16)
+  (handle handle))
 
 #!+sb-unicode
 (progn
@@ -397,6 +427,13 @@
 
 (defmacro make-system-buffer (x)
  `(make-alien char #!+sb-unicode (ash ,x 1) #!-sb-unicode ,x))
+
+(define-alien-type pathname-buffer
+    (array char #.(ash (1+ max_path) #!+sb-unicode 1 #!-sb-unicode 0)))
+
+(define-alien-type long-pathname-buffer
+    #!+sb-unicode (array char 65536)
+    #!-sb-unicode pathname-buffer)
 
 ;;; FIXME: The various FOO-SYSCALL-BAR macros, and perhaps some other
 ;;; macros in this file, are only used in this file, and could be
@@ -659,17 +696,18 @@ UNIX epoch: January 1st 1970."
           (alien-funcall afunc aname (addr length))))
       (cast-and-free aname))))
 
-(define-alien-routine ("_lseeki64" lseeki64)
-    (signed 64)
-  (fd int)
-  (position (signed 64))
-  (whence int))
-
 (define-alien-routine ("SetFilePointerEx" set-file-pointer-ex) lispbool
   (handle handle)
   (offset long-long)
   (new-position long-long :out)
   (whence dword))
+
+(defun lseeki64 (handle offset whence)
+  (multiple-value-bind (moved to-place)
+      (set-file-pointer-ex handle offset whence)
+    (if moved
+        (values to-place 0)
+        (values -1 (- (get-last-error))))))
 
 ;; File mapping support routines
 (define-alien-routine (#!+sb-unicode "CreateFileMappingW"
@@ -748,6 +786,19 @@ UNIX epoch: January 1st 1970."
 (defconstant file-flag-overlapped #x40000000)
 (defconstant file-flag-sequential-scan #x8000000)
 
+;; Possible results of GetFileType.
+(defconstant file-type-disk 1)
+(defconstant file-type-char 2)
+(defconstant file-type-pipe 3)
+(defconstant file-type-remote 4)
+(defconstant file-type-unknown 0)
+
+(defconstant invalid-file-attributes (mod -1 (ash 1 32)))
+
+;;;; File Type Introspection by handle
+(define-alien-routine ("GetFileType" get-file-type) dword
+  (handle handle))
+
 ;; GetFileAttribute is like a tiny subset of fstat(),
 ;; enough to distinguish directories from anything else.
 (define-alien-routine (#!+sb-unicode "GetFileAttributesW"
@@ -759,7 +810,7 @@ UNIX epoch: January 1st 1970."
 (define-alien-routine ("CloseHandle" close-handle) bool
   (handle handle))
 
-(define-alien-routine ("_open_osfhandle" open-osfhandle)
+(define-alien-routine ("_open_osfhandle" real-open-osfhandle)
     int
   (handle handle)
   (flags int))
@@ -843,10 +894,7 @@ UNIX epoch: January 1st 1970."
             ;;   -- DFL
             ;;
             (set-file-pointer-ex handle 0 (if (plusp (logand sb!unix::o_append flags)) 2 0))
-            (let ((fd (open-osfhandle handle (logior sb!unix::o_binary flags))))
-              (if (minusp fd)
-                  (values nil (sb!unix::get-errno))
-                  (values fd 0))))))))
+            (values handle 0))))))
 
 (define-alien-routine ("closesocket" close-socket) int (handle handle))
 (define-alien-routine ("shutdown" shutdown-socket) int (handle handle)
@@ -895,21 +943,82 @@ UNIX epoch: January 1st 1970."
 ;;; ...Seems to be the problem on some OSes, though. We could
 ;;; duplicate a handle and attempt close-socket on a duplicated one,
 ;;; but it also have some problems...
-;;;
-;;; For now, we protect socket handle from close with SetHandleInformation,
-;;; then call CRT _close() that fails to close a handle but _gets rid of fd_,
-;;; and then we close a handle ourserves.
 
 (defun unixlike-close (fd)
-  (let ((handle (get-osfhandle fd)))
-    (flet ((close-protection (enable)
-             (set-handle-information handle 2 (if enable 2 0))))
-      (if (= handle invalid-handle)
-          (values nil ebadf)
-          (progn
-            (when (and (socket-handle-p handle) (close-protection t))
-              (shutdown-socket handle 2)
-              (alien-funcall (extern-alien "_dup2" (function int int int)) 0 fd)
-              (close-protection nil)
-              (close-socket handle))
-            (sb!unix::void-syscall ("_close" int) fd))))))
+  (if (or (zerop (close-socket fd))
+          (close-handle fd))
+      t (values nil ebadf)))
+
+(defconstant +std-input-handle+ -10)
+(defconstant +std-output-handle+ -11)
+(defconstant +std-error-handle+ -12)
+
+(defun get-std-handle-or-null (identity)
+  (let ((handle (alien-funcall
+                 (extern-alien "GetStdHandle" (function handle dword))
+                 (logand (1- (ash 1 (alien-size dword))) identity))))
+    (and (/= handle invalid-handle)
+         (not (zerop handle))
+         handle)))
+
+(defun get-std-handles ()
+  (values (get-std-handle-or-null +std-input-handle+)
+          (get-std-handle-or-null +std-output-handle+)
+          (get-std-handle-or-null +std-error-handle+)))
+
+(defconstant +duplicate-same-access+ 2)
+
+(defun duplicate-and-unwrap-fd (fd &key inheritp)
+  (let ((me (get-current-process)))
+    (multiple-value-bind (duplicated handle)
+        (duplicate-handle me (real-get-osfhandle fd)
+                          me 0 inheritp +duplicate-same-access+)
+      (if duplicated
+          (prog1 handle (real-crt-close fd))
+          (win32-error 'duplicate-and-unwrap-fd)))))
+
+(define-alien-routine ("CreatePipe" create-pipe) lispbool
+  (read-pipe handle :out)
+  (write-pipe handle :out)
+  (security-attributes (* t))
+  (buffer-size dword))
+
+(defun windows-pipe ()
+  (multiple-value-bind (created read-handle write-handle)
+      (create-pipe nil 256)
+    (if created (values read-handle write-handle)
+        (win32-error 'create-pipe))))
+
+(defun windows-isatty (handle)
+  (if (= file-type-char (get-file-type handle))
+      1 0))
+
+(defun inheritable-handle-p (handle)
+  (multiple-value-bind (got flags)
+      (get-handle-information handle)
+    (if got (plusp (logand flags +handle-flag-inherit+))
+        (win32-error 'inheritable-handle-p))))
+
+(defun (setf inheritable-handle-p) (allow handle)
+  (if (set-handle-information handle
+                              +handle-flag-inherit+
+                              (if allow +handle-flag-inherit+ 0))
+      allow
+      (win32-error '(setf inheritable-handle-p))))
+
+(defun sb!unix:unix-dup (fd)
+  (let ((me (get-current-process)))
+    (multiple-value-bind (duplicated handle)
+        (duplicate-handle me fd me 0 t +duplicate-same-access+)
+      (if duplicated
+          (values handle 0)
+          (values nil (- (get-last-error)))))))
+
+(defun call-with-crt-fd (thunk handle &optional (flags 0))
+  (multiple-value-bind (duplicate errno)
+      (sb!unix:unix-dup handle)
+    (if duplicate
+        (let ((fd (real-open-osfhandle duplicate flags)))
+          (unwind-protect (funcall thunk fd)
+            (real-crt-close fd)))
+        (values nil errno))))

@@ -147,7 +147,7 @@
   ;; the type of element being transfered
   (element-type 'base-char)
   ;; the Unix file descriptor
-  (fd -1 :type fixnum)
+  (fd -1 :type #!-win32 fixnum #!+win32 sb!vm:signed-word)
   ;; What do we know about the FD?
   (fd-type :unknown :type keyword)
   ;; controls when the output buffer is flushed
@@ -2086,7 +2086,7 @@
   (declare (fd-stream stream))
   (without-interrupts
     (let ((posn (sb!unix:unix-lseek (fd-stream-fd stream) 0 sb!unix:l_incr)))
-      (declare (type (or (alien sb!unix:off-t) null) posn))
+      (declare (type (or (alien sb!unix:unix-offset) null) posn))
       ;; We used to return NIL for errno==ESPIPE, and signal an error
       ;; in other failure cases. However, CLHS says to return NIL if
       ;; the position cannot be determined -- so that's what we do.
@@ -2115,7 +2115,7 @@
 (defun fd-stream-set-file-position (stream position-spec)
   (declare (fd-stream stream))
   (check-type position-spec
-              (or (alien sb!unix:off-t) (member nil :start :end))
+              (or (alien sb!unix:unix-offset) (member nil :start :end))
               "valid file position designator")
   (tagbody
    :again
@@ -2147,7 +2147,7 @@
                (t
                 (values (* position-spec (fd-stream-element-size stream))
                         sb!unix:l_set)))
-           (declare (type (alien sb!unix:off-t) offset))
+           (declare (type (alien sb!unix:unix-offset) offset))
            (let ((posn (sb!unix:unix-lseek (fd-stream-fd stream)
                                            offset origin)))
              ;; CLHS says to return true if the file-position was set
@@ -2159,7 +2159,7 @@
              ;; FIXME: We are still liable to signal an error if flushing
              ;; output fails.
              (return-from fd-stream-set-file-position
-               (typep posn '(alien sb!unix:off-t))))))))
+               (typep posn '(alien sb!unix:unix-offset))))))))
 
 
 ;;;; creation routines (MAKE-FD-STREAM and OPEN)
@@ -2490,14 +2490,13 @@
 
 (defun stdstream-external-format (fd outputp)
   #!-win32 (declare (ignore fd outputp))
-  (let* ((keyword #!+win32 (let ((handle (sb!win32:get-osfhandle fd)))
-                             (if (and (/= handle -1)
-                                      (logbitp 0 handle)
-                                      (logbitp 1 handle))
-                                 :ucs-2
-                                 (if outputp
-                                     (sb!win32::console-output-codepage)
-                                     (sb!win32::console-input-codepage))))
+  (let* ((keyword #!+win32 (if (and (/= fd -1)
+                                    (logbitp 0 fd)
+                                    (logbitp 1 fd))
+                               :ucs-2
+                               (if outputp
+                                   (sb!win32::console-output-codepage)
+                                   (sb!win32::console-input-codepage)))
                   #!-win32 (default-external-format))
          (ef (get-external-format keyword))
          (replacement (ef-default-replacement-character ef)))
@@ -2510,19 +2509,25 @@
       (aver (not (boundp '*available-buffers*)))
       (setf *available-buffers* nil)))
   (with-output-to-string (*error-output*)
-    (setf *stdin*
-          (make-fd-stream 0 :name "standard input" :input t :buffering :line
-                          :element-type :default
-                          :serve-events t
-                          :external-format (stdstream-external-format 0 nil)))
-    (setf *stdout*
-          (make-fd-stream 1 :name "standard output" :output t :buffering :line
-                          :element-type :default
-                          :external-format (stdstream-external-format 1 t)))
-    (setf *stderr*
-          (make-fd-stream 2 :name "standard error" :output t :buffering :line
-                          :element-type :default
-                          :external-format (stdstream-external-format 2 t)))
+    (multiple-value-bind (in out err)
+        #!-win32 (values 0 1 2)
+        #!+win32 (sb!win32::get-std-handles)
+      (flet ((stdio-stream (handle name inputp outputp)
+               (make-fd-stream
+                handle
+                :name name
+                :input inputp
+                :output outputp
+                :buffering :line
+                :element-type :default
+                :serve-events inputp
+                :external-format (stdstream-external-format handle outputp))))
+        (setf *stdin*  (stdio-stream in  "standard input"    t nil))
+        (setf *stdout* (stdio-stream out "standard output" nil   t))
+        (setf *stderr* (stdio-stream err "standard error"  nil   t))))
+    #!+win32
+    (setf *tty* (make-two-way-stream *stdin* *stdout*))
+    #!-win32
     (let* ((ttyname #.(coerce "/dev/tty" 'simple-base-string))
            (tty (sb!unix:unix-open ttyname sb!unix:o_rdwr #o666)))
       (if tty

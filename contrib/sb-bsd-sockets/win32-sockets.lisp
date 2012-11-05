@@ -16,56 +16,38 @@
 ;;;; functions, converting between HANDLES and fds
 
 (defconstant WSA_FLAG_OVERLAPPED 1)
+(declaim (inline handle->fd fd->handle))
+
+;;; For a few more releases, let's preserve old functions (now
+;;; implemented as identity) for user code which might have had to peek
+;;; into our internals in past versions when we hadn't been using
+;;; handles yet. -- DFL, 2012
+(defun handle->fd (handle flags) (declare (ignore flags)) handle)
+(defun fd->handle (fd) fd)
 
 (defun socket (af type proto)
-  (let* ((handle (wsa-socket af type proto nil 0 WSA_FLAG_OVERLAPPED))
-         (fd (handle->fd handle 0)))
-    fd))
+  (wsa-socket af type proto nil 0 WSA_FLAG_OVERLAPPED))
 
-(defun bind (fd &rest options)
-  (let ((handle (fd->handle fd)))
-    (apply #'win32-bind handle options)))
+;;; For historical reasons, the FFI functions declared in win32-constants
+;;; prepend "win32-" to the symbol names.  Rather than break compatibility
+;;; for users depending on those names, wrap the misnamed functions in
+;;; correctly named ones...
+(macrolet ((define-socket-fd-arg-routines (&rest names)
+             `(progn
+                (declaim (inline ,@names))
+                ,@(loop for routine in names collect
+                       `(defun ,routine (handle &rest options)
+                          (apply #',(sb-int:symbolicate "WIN32-" routine)
+                                 handle options))))))
+  (define-socket-fd-arg-routines
+      bind getsockname listen recv recvfrom send sendto close connect
+      getpeername ioctl setsockopt getsockopt))
 
-(defun getsockname (fd &rest options)
-  (apply #'win32-getsockname (fd->handle fd) options))
-
-(defun listen (fd &rest options)
-  (apply #'win32-listen (fd->handle fd) options))
-
-(defun accept (fd &rest options)
-  (handle->fd
-   (apply #'win32-accept (fd->handle fd) options)
-   0))
-
-(defun recv (fd &rest options)
-  (apply #'win32-recv (fd->handle fd) options))
-
-(defun recvfrom (fd &rest options)
-  (apply #'win32-recvfrom (fd->handle fd) options))
-
-(defun send (fd &rest options)
-  (apply #'win32-send (fd->handle fd) options))
-
-(defun sendto (fd &rest options)
-  (apply #'win32-sendto (fd->handle fd) options))
-
-(defun close (fd &rest options)
-  (apply #'win32-close (fd->handle fd) options))
-
-(defun connect (fd &rest options)
-  (apply #'win32-connect (fd->handle fd) options))
-
-(defun getpeername (fd &rest options)
-  (apply #'win32-getpeername (fd->handle fd) options))
-
-(defun ioctl (fd &rest options)
-  (apply #'win32-ioctl (fd->handle fd) options))
-
-(defun setsockopt (fd &rest options)
-  (apply #'win32-setsockopt (fd->handle fd) options))
-
-(defun getsockopt (fd &rest options)
-  (apply #'win32-getsockopt (fd->handle fd) options))
+(defun accept (handle &rest options)
+  (let ((handle (apply #'win32-accept handle options)))
+    (if (= handle -1)
+        -1
+        handle)))
 
 (defun make-wsa-version (major minor)
   (dpb minor (byte 8 8) major))

@@ -2450,6 +2450,7 @@ no guarantees of interface stability."
                "USER-HOMEDIR"
                "WITH-RESTARTED-SYSCALL"
                "SB-MKSTEMP"
+               "UNIX-OFFSET"
                "FD-TYPE"
 
                ;; stuff with a one-to-one mapping to Unix constructs
@@ -2917,5 +2918,6 @@ SBCL itself"
                "UNIXLIKE-CLOSE"
                "UNIXLIKE-OPEN"
                "UNMAP-VIEW-OF-FILE"
+               "WAIT-OBJECT-OR-SIGNAL"
                "WRITE-FILE"
                "WITH-PROCESS-TIMES")))

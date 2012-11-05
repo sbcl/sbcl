@@ -880,10 +880,6 @@ os_validate_recommit(os_vm_address_t addr, os_vm_size_t len)
         AVERLAX(VirtualAlloc(addr, len, MEM_COMMIT, PAGE_EXECUTE_READWRITE));
 }
 
-#define maybe_open_osfhandle _open_osfhandle
-#define maybe_get_osfhandle _get_osfhandle
-#define FDTYPE int
-
 /*
  * os_map() is called to map a chunk of the core file into memory.
  *
@@ -1441,6 +1437,25 @@ char *dirname(char *path)
     return buf;
 }
 
+// 0 - not a socket or other error, 1 - has input, 2 - has no input
+int
+socket_input_available(HANDLE socket)
+{
+    unsigned long count = 0, count_size = 0;
+    int wsaErrno = GetLastError();
+    int err = WSAIoctl((SOCKET)socket, FIONREAD, NULL, 0,
+                       &count, sizeof(count), &count_size, NULL, NULL);
+
+    int ret;
+
+    if (err == 0) {
+        ret = (count > 0) ? 1 : 2;
+    } else
+        ret = 0;
+    SetLastError(wsaErrno);
+    return ret;
+}
+
 /* Unofficial but widely used property of console handles: they have
    #b11 in two minor bits, opposed to other handles, that are
    machine-word-aligned. Properly emulated even on wine.
@@ -1843,9 +1858,8 @@ win32_maybe_interrupt_io(void* thread)
 static const LARGE_INTEGER zero_large_offset = {.QuadPart = 0LL};
 
 int
-win32_unix_write(FDTYPE fd, void * buf, int count)
+win32_unix_write(HANDLE handle, void * buf, int count)
 {
-    HANDLE handle;
     DWORD written_bytes;
     OVERLAPPED overlapped;
     struct thread * self = arch_os_get_current_thread();
@@ -1854,7 +1868,6 @@ win32_unix_write(FDTYPE fd, void * buf, int count)
     BOOL seekable;
     BOOL ok;
 
-    handle =(HANDLE)maybe_get_osfhandle(fd);
     if (console_handle_p(handle))
         return win32_write_unicode_console(handle,buf,count);
 
@@ -1918,9 +1931,8 @@ win32_unix_write(FDTYPE fd, void * buf, int count)
 }
 
 int
-win32_unix_read(FDTYPE fd, void * buf, int count)
+win32_unix_read(HANDLE handle, void * buf, int count)
 {
-    HANDLE handle;
     OVERLAPPED overlapped = {.Internal=0};
     DWORD read_bytes = 0;
     struct thread * self = arch_os_get_current_thread();
@@ -1929,8 +1941,6 @@ win32_unix_read(FDTYPE fd, void * buf, int count)
     BOOL ok = FALSE;
     LARGE_INTEGER file_position;
     BOOL seekable;
-
-    handle = (HANDLE)maybe_get_osfhandle(fd);
 
     if (console_handle_p(handle))
         return win32_read_unicode_console(handle,buf,count);

@@ -158,7 +158,7 @@
 (defstruct (process (:copier nil))
   pid                 ; PID of child process
   %status             ; either :RUNNING, :STOPPED, :EXITED, or :SIGNALED
-  exit-code           ; either exit code or signal
+  %exit-code          ; either exit code or signal
   core-dumped         ; T if a core image was dumped
   #-win32 pty                 ; stream to child's pty, or NIL
   input               ; stream to child's input, or NIL
@@ -172,7 +172,7 @@
   (print-unreadable-object (process stream :type t)
     (let ((status (process-status process)))
      (if (eq :exited status)
-         (format stream "~S ~S" status (process-exit-code process))
+         (format stream "~S ~S" status (process-%exit-code process))
          (format stream "~S ~S" (process-pid process) status)))
     process))
 
@@ -187,6 +187,13 @@
 (define-alien-routine ("GetExitCodeProcess" get-exit-code-process)
     int
   (handle unsigned) (exit-code unsigned :out))
+
+(defun process-exit-code (process)
+  #+sb-doc
+  "Return the exit code of PROCESS."
+  (or (process-%exit-code process)
+      (progn (get-processes-status-changes)
+             (process-%exit-code process))))
 
 (defun process-status (process)
   #+sb-doc
@@ -233,6 +240,16 @@ The function is called with PROCESS as its only argument.")
   "Wait for PROCESS to quit running for some reason. When
 CHECK-FOR-STOPPED is T, also returns when PROCESS is stopped. Returns
 PROCESS."
+  (declare (ignorable check-for-stopped))
+  #+win32
+  (let ((pid (process-pid process)))
+    (when (and pid (plusp pid))
+      (without-interrupts
+        (do ()
+            ((= 0
+                (with-local-interrupts
+                  (sb-win32:wait-object-or-signal pid))))))))
+  #-win32
   (loop
       (case (process-status process)
         (:running)
@@ -283,7 +300,7 @@ PROCESS."
             ((and (eql pid (process-pid process))
                   (= signal sb-unix:sigcont))
              (setf (process-%status process) :running)
-             (setf (process-exit-code process) nil)
+             (setf (process-%exit-code process) nil)
              (when (process-status-hook process)
                (funcall (process-status-hook process) process))
              t)
@@ -314,6 +331,11 @@ status slot."
   ;; maybe it should be set to :CLOSED, or similar?
   (with-active-processes-lock ()
    (setf *active-processes* (delete process *active-processes*)))
+  #+win32
+  (let ((handle (shiftf (process-pid process) nil)))
+    (when (and handle (plusp handle))
+      (or (sb-win32:close-handle handle)
+          (sb-win32::win32-error 'process-close))))
   process)
 
 (defun get-processes-status-changes ()
@@ -331,21 +353,23 @@ status slot."
                              (waitpid (process-pid proc) t t)
                            (when pid
                              (setf (process-%status proc) what)
-                             (setf (process-exit-code proc) code)
+                             (setf (process-%exit-code proc) code)
                              (setf (process-core-dumped proc) core)
                              (when (process-status-hook proc)
                                (push proc exited))
                              t)))
                        #+win32
                        (lambda (proc)
-                         (multiple-value-bind (ok code)
-                             (get-exit-code-process (process-pid proc))
-                           (when (and (plusp ok) (/= code 259))
-                             (setf (process-%status proc) :exited
-                                   (process-exit-code proc) code)
-                             (when (process-status-hook proc)
-                               (push proc exited))
-                             t)))
+                         (let ((pid (process-pid proc)))
+                           (when pid
+                             (multiple-value-bind (ok code)
+                                 (sb-win32::get-exit-code-process pid)
+                               (when (and (plusp ok) (/= code 259))
+                                 (setf (process-%status proc) :exited
+                                       (process-%exit-code proc) code)
+                                 (when (process-status-hook proc)
+                                   (push proc exited))
+                                 t)))))
                        *active-processes*)))
     ;; Can't call the hooks before all the processes have been deal
     ;; with, as calling a hook may cause re-entry to
@@ -720,7 +744,15 @@ Users Manual for details about the PROCESS structure."#-win32"
            ;; expand into UNWIND-PROTECT forms.  They're just
            ;; syntactic sugar to make the rest of the routine slightly
            ;; easier to read.
-           (macrolet ((with-fd-and-stream-for (((fd stream) which &rest args)
+           (macrolet ((with-no-with
+                          ((&optional no)
+                           (&whole form with-something parameters &body body))
+                        (declare (ignore with-something parameters))
+                        (typecase no
+                          (keyword `(progn ,@body))
+                          (null form)
+                          (t `(let ,no (declare (ignorable ,@no)) ,@body))))
+                      (with-fd-and-stream-for (((fd stream) which &rest args)
                                                &body body)
                         `(multiple-value-bind (,fd ,stream)
                              ,(ecase which
@@ -737,11 +769,9 @@ Users Manual for details about the PROCESS structure."#-win32"
                            ,@body))
                       (with-open-pty (((pty-name pty-stream) (pty cookie))
                                       &body body)
-                        #+win32 `(declare (ignore ,pty ,cookie))
-                        #+win32 `(let (,pty-name ,pty-stream) ,@body)
-                        #-win32 `(multiple-value-bind (,pty-name ,pty-stream)
-                                     (open-pty ,pty ,cookie :external-format external-format)
-                                   ,@body))
+                        `(multiple-value-bind (,pty-name ,pty-stream)
+                             (open-pty ,pty ,cookie :external-format external-format)
+                           ,@body))
                       (with-args-vec ((vec args) &body body)
                         `(with-c-strvec (,vec ,args)
                            ,@body))
@@ -768,47 +798,58 @@ Users Manual for details about the PROCESS structure."#-win32"
                                           :direction :output
                                           :if-exists if-error-exists
                                           :external-format external-format)
-                   (with-open-pty ((pty-name pty-stream) (pty cookie))
-                     ;; Make sure we are not notified about the child
-                     ;; death before we have installed the PROCESS
-                     ;; structure in *ACTIVE-PROCESSES*.
-                     (let (child)
-                       (with-active-processes-lock ()
-                         (with-args-vec (args-vec simple-args)
-                           (with-environment-vec (environment-vec)
-                             (setq child (without-gcing
-                                           (spawn progname args-vec
-                                                  stdin stdout stderr
-                                                  (if search 1 0)
-                                                  environment-vec pty-name
-                                                  (if wait 1 0))))))
-                         (unless (minusp child)
-                           (setf proc
-                                 (apply
-                                  #'make-process
-                                  :pid child
-                                  :input input-stream
-                                  :output output-stream
-                                  :error error-stream
-                                  :status-hook status-hook
-                                  :cookie cookie
-                                  #-win32 (list :pty pty-stream
-                                                :%status :running)
-                                  #+win32 (if wait
-                                              (list :%status :exited
-                                                    :exit-code child)
-                                              (list :%status :running))))
-                           (push proc *active-processes*)))
-                       ;; Report the error outside the lock.
-                       #+win32
-                       (when (minusp child)
-                         (error "Couldn't execute ~S: ~A" progname (strerror)))
-                       #-win32
-                       (case child
-                         (-2
-                          (error "Couldn't execute ~S: ~A" progname (strerror)))
-                         (-1
-                          (error "Couldn't fork child process: ~A" (strerror))))))))))
+                   (with-no-with (#+win32 (pty-name pty-stream))
+                     (with-open-pty ((pty-name pty-stream) (pty cookie))
+                       ;; Make sure we are not notified about the child
+                       ;; death before we have installed the PROCESS
+                       ;; structure in *ACTIVE-PROCESSES*.
+                       (let (child)
+                         (with-active-processes-lock ()
+                           (with-no-with (#+win32 (args-vec))
+                             (with-args-vec (args-vec simple-args)
+                               (with-no-with (#+win32 (environment-vec))
+                                 (with-environment-vec (environment-vec)
+                                   (setq child
+                                         #+win32
+                                         (sb-win32::mswin-spawn
+                                          progname
+                                          (with-output-to-string (argv)
+                                            (dolist (arg simple-args)
+                                              (write-string arg argv)
+                                              (write-char #\Space argv)))
+                                          stdin stdout stderr
+                                          search nil wait)
+                                         #-win32
+                                         (without-gcing
+                                             (spawn progname args-vec
+                                                    stdin stdout stderr
+                                                    (if search 1 0)
+                                                    environment-vec pty-name
+                                                    (if wait 1 0))))
+                                   (unless (minusp child)
+                                     (setf proc
+                                           (apply
+                                            #'make-process
+                                            :input input-stream
+                                            :output output-stream
+                                            :error error-stream
+                                            :status-hook status-hook
+                                            :cookie cookie
+                                            #-win32 (list :pty pty-stream
+                                                          :%status :running
+                                                          :pid child)
+                                            #+win32 (if wait
+                                                        (list :%status :exited
+                                                              :%exit-code child)
+                                                        (list :%status :running
+                                                              :pid child))))
+                                     (push proc *active-processes*)))))))
+                         ;; Report the error outside the lock.
+                         (case child
+                           (-2
+                            (error "Couldn't execute ~S: ~A" progname (strerror)))
+                           (-1
+                            (error "Couldn't fork child process: ~A" (strerror)))))))))))
         (dolist (fd *close-in-parent*)
           (sb-unix:unix-close fd))
         (unless proc
@@ -975,70 +1016,76 @@ Users Manual for details about the PROCESS structure."#-win32"
                (sb-unix:unix-close fd)
                (error "failed to unlink ~A" name/errno))
              fd)))
-    (cond ((eq object t)
-           ;; No new descriptor is needed.
-           (values -1 nil))
-          ((or (eq object nil)
-               (and (typep object 'broadcast-stream)
-                    (not (broadcast-stream-streams object))))
-           ;; Use /dev/null.
-           (multiple-value-bind
-                 (fd errno)
-               (sb-unix:unix-open #-win32 #.(coerce "/dev/null" 'base-string)
-                                  #+win32 #.(coerce "nul" 'base-string)
-                                  (case direction
-                                    (:input sb-unix:o_rdonly)
-                                    (:output sb-unix:o_wronly)
-                                    (t sb-unix:o_rdwr))
-                                  #o666)
-             (unless fd
-               (error #-win32 "~@<couldn't open \"/dev/null\": ~2I~_~A~:>"
-                      #+win32 "~@<couldn't open \"nul\" device: ~2I~_~A~:>"
-                      (strerror errno)))
-             (push fd *close-in-parent*)
-             (values fd nil)))
-          ((eq object :stream)
-           (multiple-value-bind (read-fd write-fd) (sb-unix:unix-pipe)
-             (unless read-fd
-               (error "couldn't create pipe: ~A" (strerror write-fd)))
-             (case direction
-               (:input
-                (push read-fd *close-in-parent*)
-                (push write-fd *close-on-error*)
-                (let ((stream (sb-sys:make-fd-stream write-fd :output t
-                                                     :element-type :default
-                                                     :external-format
-                                                     external-format)))
-                  (values read-fd stream)))
-               (:output
-                (push read-fd *close-on-error*)
-                (push write-fd *close-in-parent*)
-                (let ((stream (sb-sys:make-fd-stream read-fd :input t
-                                                     :element-type :default
-                                                     :external-format
-                                                     external-format)))
-                  (values write-fd stream)))
-               (t
-                (sb-unix:unix-close read-fd)
-                (sb-unix:unix-close write-fd)
-                (error "Direction must be either :INPUT or :OUTPUT, not ~S."
-                       direction)))))
-          ((or (pathnamep object) (stringp object))
-           ;; GET-DESCRIPTOR-FOR uses &allow-other-keys, so rather
-           ;; than munge the &rest list for OPEN, just disable keyword
-           ;; validation there.
-           (with-open-stream (file (apply #'open object :allow-other-keys t
-                                          keys))
-             (when file
-               (multiple-value-bind
-                     (fd errno)
-                   (sb-unix:unix-dup (sb-sys:fd-stream-fd file))
-                 (cond (fd
-                        (push fd *close-in-parent*)
-                        (values fd nil))
-                       (t
-                        (error "couldn't duplicate file descriptor: ~A"
-                               (strerror errno))))))))
+    (let ((dev-null #.(coerce #-win32 "/dev/null" #+win32 "nul" 'base-string)))
+      (cond ((eq object t)
+             ;; No new descriptor is needed.
+             (values -1 nil))
+            ((or (eq object nil)
+                 (and (typep object 'broadcast-stream)
+                      (not (broadcast-stream-streams object))))
+             ;; Use /dev/null.
+             (multiple-value-bind
+                   (fd errno)
+                 (sb-unix:unix-open dev-null
+                                    (case direction
+                                      (:input sb-unix:o_rdonly)
+                                      (:output sb-unix:o_wronly)
+                                      (t sb-unix:o_rdwr))
+                                    #o666)
+               (unless fd
+                 (error "~@<couldn't open ~S: ~2I~_~A~:>"
+                        dev-null (strerror errno)))
+               #+win32
+               (setf (sb-win32::inheritable-handle-p fd) t)
+               (push fd *close-in-parent*)
+               (values fd nil)))
+            ((eq object :stream)
+             (multiple-value-bind (read-fd write-fd) (sb-unix:unix-pipe)
+               (unless read-fd
+                 (error "couldn't create pipe: ~A" (strerror write-fd)))
+               #+win32
+               (setf (sb-win32::inheritable-handle-p read-fd)
+                     (eq direction :input)
+                     (sb-win32::inheritable-handle-p write-fd)
+                     (eq direction :output))
+               (case direction
+                 (:input
+                    (push read-fd *close-in-parent*)
+                    (push write-fd *close-on-error*)
+                    (let ((stream (sb-sys:make-fd-stream write-fd :output t
+                                                         :element-type :default
+                                                         :external-format
+                                                         external-format)))
+                      (values read-fd stream)))
+                 (:output
+                    (push read-fd *close-on-error*)
+                    (push write-fd *close-in-parent*)
+                    (let ((stream (sb-sys:make-fd-stream read-fd :input t
+                                                         :element-type :default
+                                                         :external-format
+                                                         external-format)))
+                      (values write-fd stream)))
+                 (t
+                    (sb-unix:unix-close read-fd)
+                    (sb-unix:unix-close write-fd)
+                    (error "Direction must be either :INPUT or :OUTPUT, not ~S."
+                           direction)))))
+            ((or (pathnamep object) (stringp object))
+             ;; GET-DESCRIPTOR-FOR uses &allow-other-keys, so rather
+             ;; than munge the &rest list for OPEN, just disable keyword
+             ;; validation there.
+             (with-open-stream (file (apply #'open object :allow-other-keys t
+                                            keys))
+               (when file
+                 (multiple-value-bind
+                       (fd errno)
+                     (sb-unix:unix-dup (sb-sys:fd-stream-fd file))
+                   (cond (fd
+                          (push fd *close-in-parent*)
+                          (values fd nil))
+                         (t
+                          (error "couldn't duplicate file descriptor: ~A"
+                                 (strerror errno))))))))
           ((streamp object)
            (ecase direction
              (:input
@@ -1122,6 +1169,6 @@ Users Manual for details about the PROCESS structure."#-win32"
                                              external-format)
                   (push read-fd *close-on-error*)
                   (push write-fd *close-in-parent*)
-                  (return (values write-fd nil)))))))
-          (t
-           (error "invalid option to RUN-PROGRAM: ~S" object)))))
+                  (return (values write-fd nil)))))
+             (t
+              (error "invalid option to RUN-PROGRAM: ~S" object))))))))

@@ -160,6 +160,7 @@
                 "SRC;CODE;NTRACE"
                 "SRC;CODE;STEP"
                 "SRC;CODE;WARM-LIB"
+                #+win32 "SRC;CODE;WARM-MSWIN"
                 "SRC;CODE;RUN-PROGRAM"))
 
   (let ((fullname (concatenate 'string "SYS:" stem ".LISP")))

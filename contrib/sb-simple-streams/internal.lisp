@@ -354,7 +354,11 @@
                                                    ;; eagain into
                                                    ;; sb-unix
                                                    11)
-                                                (= errno sb-unix:ewouldblock)))
+                                                (= errno
+                                                   #-win32
+                                                   sb-unix:ewouldblock
+                                                   #+win32
+                                                   sb-unix:eintr)))
                                        (sb-sys:wait-until-fd-usable fd :input nil)
                                        (go again))
                                       (t (return (- -10 errno)))))
@@ -564,9 +568,12 @@
         (loop
           (multiple-value-bind (fd errno)
               (if name
+                  #+win32
+                  (sb-win32:unixlike-open name mask mode)
+                  #-win32
                   (sb-unix:unix-open name mask mode)
                   (values nil sb-unix:enoent))
-            (cond ((sb-int:fixnump fd)
+            (cond ((integerp fd)
                    (when (eql if-exists :append)
                      (sb-unix:unix-lseek fd 0 sb-unix:l_xtnd))
                    (return (values fd name original delete-original)))
