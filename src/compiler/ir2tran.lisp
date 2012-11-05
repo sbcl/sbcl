@@ -1080,7 +1080,6 @@
          (args (basic-combination-args node))
          (nargs (length args))
          (pass-refs (move-tail-full-call-args node block))
-         #!-arm ;; ARM manages OLD-FP differently.
          (old-fp (ir2-physenv-old-fp env))
          (return-pc (ir2-physenv-return-pc env)))
 
@@ -1088,12 +1087,12 @@
         (fun-lvar-tn node block (basic-combination-fun node))
       (if named
           (vop* tail-call-named node block
-                (fun-tn #!-arm old-fp return-pc pass-refs)
+                (fun-tn old-fp return-pc pass-refs)
                 (nil)
                 nargs
                 (emit-step-p node))
           (vop* tail-call node block
-                (fun-tn #!-arm old-fp return-pc pass-refs)
+                (fun-tn old-fp return-pc pass-refs)
                 (nil)
                 nargs
                 (emit-step-p node)))))

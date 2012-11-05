@@ -702,7 +702,8 @@
            '(arg-fun :target lexenv))
 
       ,@(when (eq return :tail)
-          '((return-pc :target return-pc-pass)))
+          '((old-fp)
+            (return-pc :target return-pc-pass)))
 
       ,@(unless variable '((args :more t :scs (descriptor-reg)))))
 
@@ -722,7 +723,8 @@
 
      (:ignore
       ,@(unless (or variable (eq return :tail)) '(arg-locs))
-      ,@(unless variable '(args)))
+      ,@(unless variable '(args))
+      ,@(when (eq return :tail) '(old-fp)))
 
      (:temporary (:sc descriptor-reg
                   :offset lra-offset
