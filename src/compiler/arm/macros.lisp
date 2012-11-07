@@ -236,3 +236,21 @@
      (:generator 5
        (inst add lip object index)
        (loadw value lip ,offset ,lowtag))))
+
+(defmacro define-full-setter (name type offset lowtag scs el-type
+                              &optional translate)
+  `(define-vop (,name)
+     ,@(when translate
+             `((:translate ,translate)))
+     (:policy :fast-safe)
+     (:args (object :scs (descriptor-reg))
+            (index :scs (any-reg))
+            (value :scs ,scs :target result))
+     (:arg-types ,type tagged-num ,el-type)
+     (:temporary (:scs (interior-reg)) lip)
+     (:results (result :scs ,scs))
+     (:result-types ,el-type)
+     (:generator 2
+       (inst add lip object index)
+       (storew value lip ,offset ,lowtag)
+       (move result value))))
