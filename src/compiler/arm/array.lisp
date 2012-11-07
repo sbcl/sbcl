@@ -24,7 +24,6 @@
        ,(remove-if #'(lambda (x) (member x '(null))) scs)
        ,element-type
        data-vector-ref)
-     #!+(or)
      (define-full-setter ,(symbolicate "DATA-VECTOR-SET/" type) ,type
        vector-data-offset other-pointer-lowtag ,scs ,element-type
        data-vector-set)))
