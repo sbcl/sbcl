@@ -12,6 +12,27 @@
 
 (in-package "SB!VM")
 
+;;;; Data object ref/set stuff.
+
+(define-vop (slot)
+  (:args (object :scs (descriptor-reg)))
+  (:info name offset lowtag)
+  (:ignore name)
+  (:results (result :scs (descriptor-reg any-reg)))
+  (:generator 1
+    (loadw result object offset lowtag)))
+
+(define-vop (set-slot)
+  (:args (object :scs (descriptor-reg))
+         (value :scs (descriptor-reg any-reg)))
+  (:info name offset lowtag)
+  (:ignore name)
+  (:results)
+  (:generator 1
+    (storew value object offset lowtag)))
+
+(define-vop (init-slot set-slot))
+
 ;;;; Symbol hacking VOPs:
 
 ;;; The compiler likes to be able to directly SET symbols.
