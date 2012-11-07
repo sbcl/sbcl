@@ -59,3 +59,35 @@
   (:results (result :scs (descriptor-reg any-reg)))
   (:generator 1
     (inst mov result unbound-marker-widetag)))
+
+(define-vop (fixed-alloc)
+  (:args)
+  (:info name words type lowtag stack-allocate-p)
+  (:ignore name stack-allocate-p)
+  (:results (result :scs (descriptor-reg)))
+  (:temporary (:sc non-descriptor-reg :offset ocfp-offset) pa-flag)
+  (:generator 4
+    (with-fixed-allocation (result pa-flag type words :lowtag lowtag)
+      )))
+
+(define-vop (var-alloc)
+  (:args (extra :scs (any-reg)))
+  (:arg-types positive-fixnum)
+  (:info name words type lowtag)
+  (:ignore name)
+  (:results (result :scs (descriptor-reg)))
+  (:temporary (:scs (any-reg)) bytes)
+  (:temporary (:scs (non-descriptor-reg)) header)
+  (:temporary (:sc non-descriptor-reg :offset ocfp-offset) pa-flag)
+  (:generator 6
+    ;; Build the object header.
+    (inst add bytes extra (* words n-word-bytes))
+    (inst mov header (lsl bytes (- n-widetag-bits n-fixnum-tag-bits)))
+    (inst add header header type)
+    ;; Round up to the actual allocation granularity.
+    (inst add bytes n-word-bytes)
+    (inst bic bytes lowtag-mask)
+    ;; Allocate the object and set its header.
+    (pseudo-atomic (pa-flag)
+      (allocation result bytes lowtag :flag-tn pa-flag)
+      (storew header result 0 lowtag))))
