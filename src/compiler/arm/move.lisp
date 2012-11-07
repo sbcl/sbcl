@@ -28,6 +28,10 @@
    (signed-reg unsigned-reg))
   (inst mov y (tn-value x)))
 
+(define-move-fun (load-character 1) (vop x y)
+  ((immediate) (character-reg))
+  (inst mov y (char-code (tn-value x))))
+
 (define-move-fun (load-constant 5) (vop x y)
   ((constant) (descriptor-reg))
   (loadw y code-tn (tn-offset x) other-pointer-lowtag))
