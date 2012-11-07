@@ -28,7 +28,6 @@
        vector-data-offset other-pointer-lowtag ,scs ,element-type
        data-vector-set)))
 
-           #!+(or)
            (def-partial-data-vector-frobs (type element-type size signed &rest scs)
   `(progn
      (define-partial-reffer ,(symbolicate "DATA-VECTOR-REF/" type) ,type
@@ -41,23 +40,18 @@
   (def-full-data-vector-frobs simple-vector *
     descriptor-reg any-reg null)
 
-  #!+(or)
   (def-partial-data-vector-frobs simple-base-string character
     :byte nil character-reg)
   #!+sb-unicode
   (def-full-data-vector-frobs simple-character-string character character-reg)
 
-  #!+(or)
   (def-partial-data-vector-frobs simple-array-unsigned-byte-7 positive-fixnum
     :byte nil unsigned-reg signed-reg)
-  #!+(or)
   (def-partial-data-vector-frobs simple-array-unsigned-byte-8 positive-fixnum
     :byte nil unsigned-reg signed-reg)
 
-  #!+(or)
   (def-partial-data-vector-frobs simple-array-unsigned-byte-15 positive-fixnum
     :short nil unsigned-reg signed-reg)
-  #!+(or)
   (def-partial-data-vector-frobs simple-array-unsigned-byte-16 positive-fixnum
     :short nil unsigned-reg signed-reg)
 
@@ -66,11 +60,9 @@
   (def-full-data-vector-frobs simple-array-unsigned-byte-32 unsigned-num
     unsigned-reg)
 
-  #!+(or)
   (def-partial-data-vector-frobs simple-array-signed-byte-8 tagged-num
     :byte t signed-reg)
 
-  #!+(or)
   (def-partial-data-vector-frobs simple-array-signed-byte-16 tagged-num
     :short t signed-reg)
 
