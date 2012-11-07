@@ -254,3 +254,47 @@
        (inst add lip object index)
        (storew value lip ,offset ,lowtag)
        (move result value))))
+
+(defmacro define-partial-reffer (name type size signed offset lowtag scs
+                                 el-type &optional translate)
+  (let ((scale (ecase size (:byte 1) (:short 2))))
+    `(define-vop (,name)
+       ,@(when translate
+               `((:translate ,translate)))
+       (:policy :fast-safe)
+       (:args (object :scs (descriptor-reg))
+              (index :scs (unsigned-reg)))
+       (:arg-types ,type positive-fixnum)
+       (:results (value :scs ,scs))
+       (:result-types ,el-type)
+       (:temporary (:scs (interior-reg)) lip)
+       (:generator 5
+         ,(if (eq size :byte)
+              '(inst add lip object index)
+              '(inst add lip object (lsl index 1)))
+         (inst ,(ecase size
+                       (:byte (if signed 'ldrsb 'ldrb))
+                       (:short (if signed 'ldrsh 'ldrh)))
+               value lip (- (* ,offset n-word-bytes) ,lowtag))))))
+
+(defmacro define-partial-setter (name type size offset lowtag scs el-type
+                                 &optional translate)
+  (let ((scale (ecase size (:byte 1) (:short 2))))
+    `(define-vop (,name)
+       ,@(when translate
+               `((:translate ,translate)))
+       (:policy :fast-safe)
+       (:args (object :scs (descriptor-reg))
+              (index :scs (unsigned-reg))
+              (value :scs ,scs :target result))
+       (:arg-types ,type positive-fixnum ,el-type)
+       (:temporary (:scs (interior-reg)) lip)
+       (:results (result :scs ,scs))
+       (:result-types ,el-type)
+       (:generator 5
+         ,(if (eq size :byte)
+              '(inst add lip object index)
+              '(inst add lip object (lsl index 1)))
+         (inst ,(ecase size (:byte 'strb) (:short 'strh))
+               value lip (- (* ,offset n-word-bytes) ,lowtag))
+         (move result value)))))
