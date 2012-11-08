@@ -573,7 +573,7 @@
   ;; x compilation, for now we blithely ignore them and press on to more
   ;; x pressing problems. Someday, though, it would be nice to figure out
   ;; x what the problem is and fix it.
-  #!+(or ppc sparc) :ignore-failure-p)
+  #!+(or ppc) :ignore-failure-p)
  ("src/code/cross-modular"  :not-target)
  ("src/compiler/target/subprim")
 
