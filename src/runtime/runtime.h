@@ -205,7 +205,7 @@ typedef unsigned int u32;
 typedef signed int s32;
 
 /* this is an integral type the same length as a machine pointer */
-typedef unsigned long pointer_sized_uint_t ;
+typedef uintptr_t pointer_sized_uint_t;
 
 #include <sys/types.h>
 
@@ -215,12 +215,15 @@ typedef pthread_t os_thread_t;
 typedef pid_t os_thread_t;
 #endif
 
+typedef uintptr_t uword_t;
+typedef intptr_t  sword_t;
+
 /* FIXME: we do things this way because of the alpha32 port.  once
    alpha64 has arrived, all this nastiness can go away */
 #if 64 == N_WORD_BITS
 #define LOW_WORD(c) ((pointer_sized_uint_t)c)
 #define OBJ_FMTX "lx"
-typedef unsigned long lispobj;
+typedef uintptr_t lispobj;
 #else
 #define OBJ_FMTX "x"
 #define LOW_WORD(c) ((long)(c) & 0xFFFFFFFFL)

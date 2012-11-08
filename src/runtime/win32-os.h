@@ -37,10 +37,6 @@ typedef sem_t os_sem_t;
 typedef void *siginfo_t;
 #endif
 
-/* Note: This typedef will moved to runtime.h when AMD64 changes are being
- * merged. */
-typedef unsigned long uword_t;
-
 typedef LPVOID os_vm_address_t;
 typedef uword_t os_vm_size_t;
 typedef intptr_t os_vm_offset_t;
