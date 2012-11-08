@@ -156,11 +156,11 @@ collect_garbage(generation_index_t ignore)
 
 
     binding_stack_size =
-        current_binding_stack_pointer -
+        (lispobj *)get_binding_stack_pointer(th) -
         (lispobj *)th->binding_stack_start;
 #ifdef PRINTNOISE
     printf("Scavenging the binding stack %x - %x (%d words) ...\n",
-           th->binding_stack_start,current_binding_stack_pointer,
+           th->binding_stack_start,get_binding_stack_pointer(th),
            (int)(binding_stack_size));
 #endif
     scavenge(((lispobj *)th->binding_stack_start), binding_stack_size);
