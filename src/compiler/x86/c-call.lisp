@@ -403,7 +403,8 @@
   `(deref (sap-alien (sap+ ,sp ,offset) (* ,type))))
 
 #-sb-xc-host
-(defun alien-callback-assembler-wrapper (index return-type arg-types)
+(defun alien-callback-assembler-wrapper
+    (index return-type arg-types &optional (stack-offset 0))
   "Cons up a piece of code which calls call-callback with INDEX and a
 pointer to the arguments."
   (declare (ignore arg-types))
@@ -461,7 +462,7 @@ pointer to the arguments."
                  (error "unrecognized alien type: ~A" return-type)))
               (inst mov esp ebp)                   ; discard frame
               (inst pop ebp)                       ; restore frame pointer
-              (inst ret))
+              (inst ret stack-offset))
     (finalize-segment segment)
     ;; Now that the segment is done, convert it to a static
     ;; vector we can point foreign code to.

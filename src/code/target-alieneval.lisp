@@ -867,8 +867,10 @@ we don't create new wrappers if one for the same specifier already exists.")
   "Lisp trampoline store: assembler wrappers contain indexes to this, and
 ENTER-ALIEN-CALLBACK pulls the corresponsing trampoline out and calls it.")
 
-(defun %alien-callback-sap (specifier result-type argument-types function wrapper)
-  (let ((key (cons specifier function)))
+(defun %alien-callback-sap (specifier result-type argument-types function wrapper
+                            &optional call-type)
+  (declare #!-x86 (ignore call-type))
+  (let ((key (list specifier function)))
     (or (gethash key *alien-callbacks*)
         (setf (gethash key *alien-callbacks*)
               (let* ((index (fill-pointer *alien-callback-trampolines*))
@@ -879,8 +881,17 @@ ENTER-ALIEN-CALLBACK pulls the corresponsing trampoline out and calls it.")
                      ;; per-function tramp would need assembler at
                      ;; runtime. Possibly we could even pregenerate
                      ;; the code and just patch the index in later.
-                     (assembler-wrapper (alien-callback-assembler-wrapper
-                                         index result-type argument-types)))
+                     (assembler-wrapper
+                      (alien-callback-assembler-wrapper
+                       index result-type argument-types
+                       #!+x86
+                       (if (eq call-type :stdcall)
+                           (ceiling
+                            (apply #'+
+                                   (mapcar 'alien-type-word-aligned-bits
+                                           argument-types))
+                            8)
+                           0))))
                 (vector-push-extend
                  (alien-callback-lisp-trampoline wrapper function)
                  *alien-callback-trampolines*)
@@ -959,11 +970,17 @@ ENTER-ALIEN-CALLBACK pulls the corresponsing trampoline out and calls it.")
   (destructuring-bind (function result-type &rest argument-types)
       specifier
     (aver (eq 'function function))
-    (values (let ((*values-type-okay* t))
-              (parse-alien-type result-type env))
-            (mapcar (lambda (spec)
-                      (parse-alien-type spec env))
-                    argument-types))))
+    (multiple-value-bind (bare-result-type calling-convention)
+        (typecase result-type
+          ((cons calling-convention *)
+             (values (second result-type) (first result-type)))
+          (t result-type))
+      (values (let ((*values-type-okay* t))
+                (parse-alien-type bare-result-type env))
+              (mapcar (lambda (spec)
+                        (parse-alien-type spec env))
+                      argument-types)
+              calling-convention))))
 
 (defun alien-void-type-p (type)
   (and (alien-values-type-p type) (not (alien-values-type-values type))))
@@ -999,7 +1016,8 @@ SPECIFIER and FUNCTION already exists, it is returned instead of consing a new
 one."
   ;; Pull out as much work as is convenient to macro-expansion time, specifically
   ;; everything that can be done given just the SPECIFIER and ENV.
-  (multiple-value-bind (result-type argument-types) (parse-alien-ftype specifier env)
+  (multiple-value-bind (result-type argument-types call-type)
+      (parse-alien-ftype specifier env)
     `(%sap-alien
       (%alien-callback-sap ',specifier ',result-type ',argument-types
                            ,function
@@ -1007,7 +1025,8 @@ one."
                                (setf (gethash ',specifier *alien-callback-wrappers*)
                                      (compile nil
                                               ',(alien-callback-lisp-wrapper-lambda
-                                                 specifier result-type argument-types env)))))
+                                                 specifier result-type argument-types env))))
+                           ,call-type)
       ',(parse-alien-type specifier env))))
 
 (defun alien-callback-p (alien)
