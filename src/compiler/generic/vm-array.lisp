@@ -86,8 +86,10 @@
                     :n-pad-elements 1
                     :complex-typecode #.complex-character-string-widetag
                     :importance 17)
+         #!-arm
          (single-float 0.0f0 32 simple-array-single-float
           :importance 6)
+         #!-arm
          (double-float 0.0d0 64 simple-array-double-float
           :importance 5)
          (bit 0 1 simple-bit-vector
@@ -155,9 +157,11 @@
          #!+#.(cl:if (cl:= 64 sb!vm:n-word-bits) '(and) '(or))
          ((signed-byte 64) 0 64 simple-array-signed-byte-64
           :importance 7)
+         #!-arm
          ((complex single-float) #C(0.0f0 0.0f0) 64
           simple-array-complex-single-float
           :importance 3)
+         #!-arm
          ((complex double-float) #C(0.0d0 0.0d0) 128
           simple-array-complex-double-float
           :importance 2)
