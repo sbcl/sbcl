@@ -192,7 +192,7 @@
 (progn
   (define-alien-type (struct page)
       (struct page
-              (start long)
+              (start signed)
               ;; On platforms with small enough GC pages, this field
               ;; will be a short. On platforms with larger ones, it'll
               ;; be an int.
@@ -204,7 +204,7 @@
               (flags (unsigned 8))
               (gen (signed 8))))
   (declaim (inline find-page-index))
-  (define-alien-routine "find_page_index" long (index long))
+  (define-alien-routine "find_page_index" long (index signed))
   (define-alien-variable "page_table" (* (struct page))))
 
 ;;; Iterate over all the objects allocated in SPACE, calling FUN with

@@ -347,12 +347,12 @@ See also: RETURN-FROM-THREAD and SB-EXT:EXIT."
 
 (define-alien-routine "kill_safely"
     integer
-  (os-thread #!-alpha unsigned-long #!+alpha unsigned-int)
+  (os-thread #!-alpha unsigned #!+alpha unsigned-int)
   (signal int))
 
 (define-alien-routine "wake_thread"
     integer
-  (os-thread #!-alpha unsigned-long #!+alpha unsigned-int))
+  (os-thread unsigned))
 
 #!+sb-thread
 (progn
@@ -361,13 +361,13 @@ See also: RETURN-FROM-THREAD and SB-EXT:EXIT."
   ;; that on Linux it's a pid, but it might not be on posix thread
   ;; implementations.
   (define-alien-routine ("create_thread" %create-thread)
-      unsigned-long (lisp-fun-address unsigned-long))
+      unsigned (lisp-fun-address unsigned))
 
   (declaim (inline %block-deferrable-signals))
   (define-alien-routine ("block_deferrable_signals" %block-deferrable-signals)
       void
-    (where sb!alien:unsigned-long)
-    (old sb!alien:unsigned-long))
+    (where unsigned)
+    (old   unsigned))
 
   (defun block-deferrable-signals ()
     (%block-deferrable-signals 0 0))
@@ -376,16 +376,16 @@ See also: RETURN-FROM-THREAD and SB-EXT:EXIT."
   (progn
     (declaim (inline futex-wait %futex-wait futex-wake))
 
-    (define-alien-routine ("futex_wait" %futex-wait)
-        int (word unsigned-long) (old-value unsigned-long)
-        (to-sec long) (to-usec unsigned-long))
+    (define-alien-routine ("futex_wait" %futex-wait) int
+      (word unsigned) (old-value unsigned)
+      (to-sec long) (to-usec unsigned-long))
 
     (defun futex-wait (word old to-sec to-usec)
       (with-interrupts
         (%futex-wait word old to-sec to-usec)))
 
     (define-alien-routine "futex_wake"
-        int (word unsigned-long) (n unsigned-long))))
+        int (word unsigned) (n unsigned-long))))
 
 ;;; used by debug-int.lisp to access interrupt contexts
 #!-(or sb-fluid sb-thread) (declaim (inline sb!vm::current-thread-offset-sap))

@@ -89,7 +89,7 @@
 ;;;;      negligible.
 
 (declaim (inline context-pc-addr))
-(define-alien-routine ("os_context_pc_addr" context-pc-addr) (* unsigned-long)
+(define-alien-routine ("os_context_pc_addr" context-pc-addr) (* unsigned)
   ;; (Note: Just as in CONTEXT-REGISTER-ADDR, we intentionally use an
   ;; 'unsigned *' interpretation for the 32-bit word passed to us by
   ;; the C code, even though the C code may think it's an 'int *'.)
@@ -99,12 +99,12 @@
 (defun context-pc (context)
   (declare (type (alien (* os-context-t)) context))
   (let ((addr (context-pc-addr context)))
-    (declare (type (alien (* unsigned-long)) addr))
+    (declare (type (alien (* unsigned)) addr))
     (int-sap (deref addr))))
 
 (declaim (inline context-register-addr))
 (define-alien-routine ("os_context_register_addr" context-register-addr)
-  (* unsigned-long)
+  (* unsigned)
   ;; (Note the mismatch here between the 'int *' value that the C code
   ;; may think it's giving us and the 'unsigned *' value that we
   ;; receive. It's intentional: the C header files may think of
@@ -118,13 +118,13 @@
 (defun context-register (context index)
   (declare (type (alien (* os-context-t)) context))
   (let ((addr (context-register-addr context index)))
-    (declare (type (alien (* unsigned-long)) addr))
+    (declare (type (alien (* unsigned)) addr))
     (deref addr)))
 
 (defun %set-context-register (context index new)
   (declare (type (alien (* os-context-t)) context))
   (let ((addr (context-register-addr context index)))
-    (declare (type (alien (* unsigned-long)) addr))
+    (declare (type (alien (* unsigned)) addr))
     (setf (deref addr) new)))
 
 ;;; This is like CONTEXT-REGISTER, but returns the value of a float

@@ -136,7 +136,7 @@ corresponds to NAME, or NIL if there is none."
 ;;; is not extreme enough, since it doesn't need to be blindingly
 ;;; fast: we can just implement those functions in C as a wrapper
 ;;; layer.
-(define-alien-type fd-mask unsigned-long)
+(define-alien-type fd-mask unsigned)
 
 (define-alien-type nil
   (struct fd-set
