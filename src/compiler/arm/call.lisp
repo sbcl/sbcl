@@ -113,6 +113,7 @@
   (:info start-lab copy-more-arg-follows)
   (:vop-var vop)
   (:temporary (:scs (any-reg)) temp)
+  (:temporary (:scs (interior-reg)) lip)
   (:generator 1
     ;; Make sure the function is aligned, and drop a label pointing to this
     ;; function header.
@@ -123,7 +124,7 @@
     (inst simple-fun-header-word)
     (dotimes (i (1- simple-fun-code-offset))
       (inst word 0))
-    (inst compute-code code-tn lip-tn start-lab temp)
+    (inst compute-code code-tn lip start-lab temp)
     ;; Build our stack frames.
     (unless copy-more-arg-follows
       (inst add csp-tn cfp-tn
@@ -192,7 +193,7 @@
 ;;;  -- Reset SP.  This must be done whenever other than 1 value is returned,
 ;;;     regardless of the number of values desired.
 
-(defun default-unknown-values (vop values nvals move-temp temp lra-label)
+(defun default-unknown-values (vop values nvals move-temp temp lip lra-label)
   (declare (type (or tn-ref null) values)
            (type unsigned-byte nvals) (type tn move-temp temp))
   (let ((expecting-values-on-stack (> nvals register-arg-count))
@@ -252,7 +253,7 @@
         (move csp-tn ocfp-tn)))
 
     ;; And, finally, recompute the correct value for CODE-TN.
-    (inst compute-code code-tn lip-tn lra-label temp))
+    (inst compute-code code-tn lip lra-label temp))
   (values))
 
 ;;;; Unknown values receiving:
@@ -273,9 +274,9 @@
 ;;;    Args and Nargs are TNs wired to the named locations.  We must
 ;;; explicitly allocate these TNs, since their lifetimes overlap with the
 ;;; results Start and Count (also, it's nice to be able to target them).
-(defun receive-unknown-values (args nargs start count lra-label temp)
+(defun receive-unknown-values (args nargs start count lra-label temp lip)
   (declare (type tn args nargs start count temp))
-  (inst compute-code code-tn lip-tn lra-label temp)
+  (inst compute-code code-tn lip lra-label temp)
   (inst str :eq (first *register-arg-tns*) (@ csp-tn n-word-bytes :post-index))
   (inst sub :eq start csp-tn 4)
   (inst mov :eq count (fixnumize 1))
@@ -858,14 +859,14 @@
              (:fixed
               '((emit-return-pc lra-label)
                 (default-unknown-values vop values nvals move-temp
-                                        temp lra-label)
+                                        temp lip lra-label)
                 (when cur-nfp
                   (load-stack-tn cur-nfp nfp-save))))
              (:unknown
               '((emit-return-pc lra-label)
                 (note-this-location vop :unknown-return)
                 (receive-unknown-values values-start nvals start count
-                                        lra-label temp)
+                                        lra-label temp lip)
                 (when cur-nfp
                   (load-stack-tn cur-nfp nfp-save))))
              (:tail)))
