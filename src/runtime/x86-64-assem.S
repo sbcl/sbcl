@@ -281,13 +281,36 @@ GNAME(undefined_tramp):
  * to know the name of the function immediately following the
  * undefined-function trampoline. */
 
+/* Our call-site does not take care of caller-saved xmm registers, so it
+ * falls to us spill them beforing hopping into C.
+ *
+ * We simply save all of them.
+ *
+ * (But for the sake of completeness, here is my understanding of the specs:)
+ *                     System V       Microsoft
+ * argument passing    xmm0-7         xmm0-3
+ * caller-saved        xmm8-15        xmm4-5
+ * callee-saved        -              xmm6-15
+ *
+ *  --DFL */
+
+#define stkxmmsave(n) movaps %xmm##n, n*16(%rsp)
+#define stkxmmload(n) movaps n*16(%rsp), %xmm##n
+#define map_all_xmm(op) \
+	op(0);op(1);op(2);op(3);op(4);op(5);op(6);op(7); \
+    op(8);op(9);op(10);op(11);op(12);op(13);op(14);op(15);
+
 	.text
 	.align	align_16byte,0x90
 	.globl  GNAME(alloc_tramp)
 	TYPE(GNAME(alloc_tramp))
 GNAME(alloc_tramp):
+	cld
 	push	%rbp		# Save old frame pointer.
 	mov	%rsp,%rbp	# Establish new frame.
+	and	$-32,%rsp
+	sub	$16*16,%rsp
+	map_all_xmm(stkxmmsave)
 	push	%rax
 	push	%rcx
 	push	%rdx
@@ -297,9 +320,11 @@ GNAME(alloc_tramp):
 	push	%r9
 	push	%r10
 	push	%r11
-	mov	16(%rbp),%rdi	
+	push	%r11
+	mov	16(%rbp),%rdi
 	call	GNAME(alloc)
 	mov	%rax,16(%rbp)
+	pop	%r11
 	pop	%r11
 	pop	%r10
 	pop	%r9
@@ -309,6 +334,8 @@ GNAME(alloc_tramp):
 	pop	%rdx
 	pop	%rcx
 	pop	%rax
+	map_all_xmm(stkxmmload)
+	mov	%rbp,%rsp
 	pop	%rbp
 	ret
 	SIZE(GNAME(alloc_tramp))
@@ -427,7 +454,17 @@ GNAME(post_signal_tramp):
 	.align	align_16byte,0x90
 	.globl  GNAME(fast_bzero)
 	TYPE(GNAME(fast_bzero))
-        
+
+	#ifdef LISP_FEATURE_WIN32
+	#define xmmreg xmm7
+	#define redsave(reg,off) movups reg,-off(%rsp)
+	#define redrestore(reg,off) movups -off(%rsp),reg
+	#else
+	#define xmmreg xmm0
+	#define redsave(reg,off)
+	#define redrestore(reg,off)
+	#endif
+
 GNAME(fast_bzero):
         /* A fast routine for zero-filling blocks of memory that are
          * guaranteed to start and end at a 4096-byte aligned address.
@@ -435,10 +472,10 @@ GNAME(fast_bzero):
         shr $6, %rsi              /* Amount of 64-byte blocks to copy */
         jz Lend                   /* If none, stop */
         mov %rsi, %rcx            /* Save start address */
-        movups %xmm7, -16(%rsp)   /* Save XMM register */
-        xorps  %xmm7, %xmm7       /* Zero the XMM register */
+	redsave(%xmmreg,16)
+        xorps  %xmmreg, %xmmreg       /* Zero the XMM register */
         jmp Lloop
-        .align align_16byte                 
+        .align align_16byte
 Lloop:
 
         /* Copy the 16 zeroes from xmm7 to memory, 4 times. MOVNTDQ is the
@@ -446,17 +483,17 @@ Lloop:
          * we're touching are not fetched into the L1 cache, since we're just
          * going to overwrite the memory soon anyway.
          */
-        movntdq %xmm7, 0(%rdi)
-        movntdq %xmm7, 16(%rdi)
-        movntdq %xmm7, 32(%rdi)
-        movntdq %xmm7, 48(%rdi)
+        movntdq %xmmreg, 0(%rdi)
+        movntdq %xmmreg, 16(%rdi)
+        movntdq %xmmreg, 32(%rdi)
+        movntdq %xmmreg, 48(%rdi)
 
         add $64, %rdi  /* Advance pointer */
         dec %rsi       /* Decrement 64-byte block count */
         jnz Lloop
         mfence         /* Ensure that the writes are globally visible, since
                         * MOVNTDQ is weakly ordered */
-        movups -16(%rsp), %xmm7 /* Restore the XMM register */
+	redrestore(%xmmreg,16)
         prefetcht0 0(%rcx)      /* Prefetch the start of the block into cache,
                                  * since it's likely to be used immediately. */
 Lend:        
