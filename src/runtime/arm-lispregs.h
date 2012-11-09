@@ -24,7 +24,7 @@
 #define reg_LEXENV      REG(3)
 #define reg_LRA         REG(4)
 #define reg_CODE        REG(5)
-#define reg_LIP         REG(6)
+#define reg_NL3         REG(6)
 #define reg_OCFP        REG(7)
 #define reg_R8          REG(8)
 #define reg_NFP         REG(9)
@@ -37,7 +37,7 @@
 
 #define REGNAMES \
         "R0",           "R1",           "R2",           "LEXENV", \
-        "LRA",          "CODE",         "LIP",          "OCFP", \
+        "LRA",          "CODE",         "NL3",          "OCFP", \
         "R8",           "NFP",          "NULL",         "CFP", \
         "NARGS",        "CSP",          "LR",           "PC"
 

@@ -56,8 +56,8 @@ call_into_lisp:
 	mov	reg_R0, #0
 
 	@@ Load our function args.  Cleverness abounds!
-	rsb	reg_LIP, reg_NARGS, #8
-	add	pc, pc, reg_LIP
+	rsb	reg_NL3, reg_NARGS, #8
+	add	pc, pc, reg_NL3
 	ldr	reg_R2, [reg_R8, #8]
 	ldr	reg_R1, [reg_R8, #4]
 	ldr	reg_R0, [reg_R8]
