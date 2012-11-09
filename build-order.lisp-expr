@@ -630,7 +630,7 @@
  ("src/compiler/entry")
  ("src/compiler/ir2tran")
 
- #!-arm ("src/compiler/generic/vm-ir2tran")
+ ("src/compiler/generic/vm-ir2tran")
 
  ("src/compiler/copyprop")
  ("src/compiler/represent")
