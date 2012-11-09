@@ -114,7 +114,7 @@
   (:args (object :scs (descriptor-reg)))
   (:info offset)
   (:generator 4
-    (storew fp-tn object (+ closure-info-offset offset) fun-pointer-lowtag)))
+    (storew cfp-tn object (+ closure-info-offset offset) fun-pointer-lowtag)))
 
 ;;;; Value Cell hackery.
 

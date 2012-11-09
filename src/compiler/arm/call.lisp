@@ -107,7 +107,7 @@
 (define-vop (current-fp)
   (:results (val :scs (any-reg)))
   (:generator 1
-    (move val fp-tn)))
+    (move val cfp-tn)))
 
 (define-vop (xep-allocate-frame)
   (:info start-lab copy-more-arg-follows)
@@ -126,7 +126,7 @@
     (inst compute-code code-tn lip-tn start-lab temp)
     ;; Build our stack frames.
     (unless copy-more-arg-follows
-      (inst add sp-tn fp-tn
+      (inst add csp-tn cfp-tn
             (* n-word-bytes (sb-allocated-size 'control-stack)))
       (let ((nfp-tn (current-nfp-tn vop)))
         (when nfp-tn
@@ -140,9 +140,9 @@
   (:ignore nfp)
   (:generator 2
     (trace-table-entry trace-table-fun-prologue)
-    (move res sp-tn)
-    (inst add sp-tn sp-tn (* (max 1 (sb-allocated-size 'control-stack))
-                             n-word-bytes))
+    (move res csp-tn)
+    (inst add csp-tn csp-tn (* (max 1 (sb-allocated-size 'control-stack))
+                               n-word-bytes))
     (when (ir2-physenv-number-stack-p callee)
       (error "Don't know how to allocate number stack space")
       #!+(or)
@@ -162,9 +162,9 @@
     ;; Unlike most other backends, we store the "OCFP" at frame
     ;; allocation time rather than at function-entry time, largely due
     ;; to a lack of usable registers.
-    (move res sp-tn)
-    (inst add sp-tn sp-tn (* (max 1 nargs) n-word-bytes))
-    (storew fp-tn res ocfp-save-offset)))
+    (move res csp-tn)
+    (inst add csp-tn csp-tn (* (max 1 nargs) n-word-bytes))
+    (storew cfp-tn res ocfp-save-offset)))
 
 ;;; Emit code needed at the return-point from an unknown-values call
 ;;; for a fixed number of values.  VALUES is the head of the TN-REF
@@ -216,7 +216,7 @@
       ;; remains is to clear the stack frame (for the multiple-
       ;; value return case).
       (unless expecting-values-on-stack
-        (inst mov :eq sp-tn ocfp-tn))
+        (inst mov :eq csp-tn ocfp-tn))
 
       ;; If we ARE expecting values on the stack, we need to
       ;; either move them to their result location or to set their
@@ -226,7 +226,7 @@
         ;; For the single-value return case, fake up NARGS and
         ;; OCFP so that we don't screw ourselves with the
         ;; defaulting and stack clearing logic.
-        (inst mov :ne ocfp-tn sp-tn)
+        (inst mov :ne ocfp-tn csp-tn)
         (inst mov :ne nargs-tn n-word-bytes)
 
         ;; Compute the number of stack values (may be negative if
@@ -249,7 +249,7 @@
           (store-stack-tn (tn-ref-tn val) null-tn :lt))
 
         ;; Deallocate the callee stack frame.
-        (move sp-tn ocfp-tn)))
+        (move csp-tn ocfp-tn)))
 
     ;; And, finally, recompute the correct value for CODE-TN.
     (inst compute-code code-tn lip-tn lra-label temp))
@@ -276,8 +276,8 @@
 (defun receive-unknown-values (args nargs start count lra-label temp)
   (declare (type tn args nargs start count temp))
   (inst compute-code code-tn lip-tn lra-label temp)
-  (inst str :eq (first *register-arg-tns*) (@ sp-tn n-word-bytes :post-index))
-  (inst sub :eq start sp-tn 4)
+  (inst str :eq (first *register-arg-tns*) (@ csp-tn n-word-bytes :post-index))
+  (inst sub :eq start csp-tn 4)
   (inst mov :eq count (fixnumize 1))
   (do ((arg *register-arg-tns* (rest arg))
        (i 0 (1+ i)))
@@ -375,18 +375,18 @@
       (assemble ()
         ;; Compute the end of the fixed stack frame (start of the MORE
         ;; arg area) into RESULT.
-        (inst add result fp-tn
+        (inst add result cfp-tn
               (* n-word-bytes (sb-allocated-size 'control-stack)))
         ;; Compute the end of the MORE arg area (and our overall frame
         ;; allocation) into the stack pointer.
         (cond ((zerop fixed)
                (inst cmp nargs-tn 0)
-               (inst add sp-tn result nargs-tn)
+               (inst add csp-tn result nargs-tn)
                (inst b :eq DONE))
               (t
                (inst subs count nargs-tn (fixnumize fixed))
                (inst b :le DONE)
-               (inst add sp-tn result count)))
+               (inst add csp-tn result count)))
 
         (when (< fixed register-arg-count)
           ;; We must stop when we run out of stack args, not when we
@@ -394,7 +394,7 @@
           (inst add result result (fixnumize (- register-arg-count fixed))))
 
         ;; Initialize dest to be end of stack.
-        (move dest sp-tn)
+        (move dest csp-tn)
 
         ;; We are copying at most (- NARGS FIXED) values, from last to
         ;; first, in order to shift them out of the allocated part of
@@ -426,8 +426,8 @@
             ;; Store it into the space reserved to it, by displacement
             ;; from the frame pointer.
             (storew (nth i *register-arg-tns*)
-                    fp-tn (+ (sb-allocated-size 'control-stack)
-                             (- i fixed)))))
+                    cfp-tn (+ (sb-allocated-size 'control-stack)
+                              (- i fixed)))))
         DONE
 
         ;; Now that we're done with the &MORE args, we can set up the
@@ -530,7 +530,7 @@
   (:note "more-arg-context")
   (:generator 5
     (inst sub count supplied (fixnumize fixed))
-    (inst sub context sp-tn count)))
+    (inst sub context csp-tn count)))
 
 (define-vop (verify-arg-count)
   (:policy :fast-safe)
@@ -604,7 +604,7 @@
       (let ((callee-nfp (callee-nfp-tn callee)))
         (when callee-nfp
           (maybe-load-stack-tn callee-nfp nfp)))
-      (maybe-load-stack-tn fp-tn fp)
+      (maybe-load-stack-tn cfp-tn fp)
       (inst compute-lra (callee-return-pc-tn callee) lip label)
       (note-this-location vop :call-site)
       (inst b target)
@@ -635,7 +635,7 @@
     (trace-table-entry trace-table-fun-epilogue)
     (maybe-load-stack-tn old-fp-temp old-fp)
     (maybe-load-stack-tn return-pc-temp return-pc)
-    (move sp-tn fp-tn)
+    (move csp-tn cfp-tn)
     (let ((cur-nfp (current-nfp-tn vop)))
       (when cur-nfp
         (error "Don't know how to release number stack allocation")
@@ -643,7 +643,7 @@
         (inst addi nsp-tn cur-nfp
               (- (bytes-needed-for-non-descriptor-stack-frame)
                  number-stack-displacement))))
-    (move fp-tn old-fp-temp)
+    (move cfp-tn old-fp-temp)
     ;; Shouldn't use LISP-RETURN here because we don't need to signal
     ;; single / multiple values.
     (inst sub pc-tn return-pc-temp (- other-pointer-lowtag 4))
@@ -786,7 +786,7 @@
                     (ecase what
                       (:load-nargs
                        ,@(if variable
-                             `((inst sub nargs-pass sp-tn new-fp)
+                             `((inst sub nargs-pass csp-tn new-fp)
                                ,@(let ((index -1))
                                    (mapcar #'(lambda (name)
                                                `(loadw ,name new-fp
@@ -799,7 +799,7 @@
                                  (descriptor-reg
                                   (inst mov return-pc-pass return-pc))
                                  (control-stack
-                                  (loadw return-pc-pass fp-tn
+                                  (loadw return-pc-pass cfp-tn
                                          (tn-offset return-pc)))))
                               (:frob-nfp
                                (error "Don't know how to :FROB-NFP for TAIL call")))
@@ -808,7 +808,7 @@
                               (:frob-nfp
                                (store-stack-tn nfp-save cur-nfp))
                               (:load-fp
-                               (move fp-tn new-fp))))
+                               (move cfp-tn new-fp))))
                       ((nil)))))
                 (insert-step-instrumenting (callable-tn)
                   ;; Conditionally insert a conditional trap:
@@ -823,7 +823,7 @@
                  `((sc-case name
                      (descriptor-reg (move name-pass name))
                      (control-stack
-                      (loadw name-pass fp-tn (tn-offset name))
+                      (loadw name-pass cfp-tn (tn-offset name))
                       (do-next-filler))
                      (constant
                       (loadw name-pass code-tn (tn-offset name)
@@ -836,7 +836,7 @@
                  `((sc-case arg-fun
                      (descriptor-reg (move lexenv arg-fun))
                      (control-stack
-                      (loadw lexenv fp-tn (tn-offset arg-fun))
+                      (loadw lexenv cfp-tn (tn-offset arg-fun))
                       (do-next-filler))
                      (constant
                       (loadw lexenv code-tn (tn-offset arg-fun)
@@ -895,8 +895,8 @@
       (when cur-nfp
         (error "Don't know how to clear number stack space in RETURN-SINGLE")))
     ;; Clear the control stack, and restore the frame pointer.
-    (move sp-tn fp-tn)
-    (move fp-tn old-fp)
+    (move csp-tn cfp-tn)
+    (move cfp-tn old-fp)
     ;; Out of here.
     (lisp-return return-pc t)
     (trace-table-entry trace-table-normal)))
@@ -936,18 +936,18 @@
         (error "Don't know how to clear number stack in VOP RETURN")))
     (cond ((= nvals 1)
            ;; Clear the control stack, and restore the frame pointer.
-           (move sp-tn fp-tn)
-           (move fp-tn old-fp)
+           (move csp-tn cfp-tn)
+           (move cfp-tn old-fp)
            ;; Out of here.
            (lisp-return lra t))
           (t
            ;; Establish the values pointer and values count.
-           (move val-ptr fp-tn)
+           (move val-ptr cfp-tn)
            (inst mov nargs (fixnumize nvals))
            ;; restore the frame pointer and clear as much of the control
            ;; stack as possible.
-           (move fp-tn old-fp)
-           (inst add sp-tn val-ptr (* nvals n-word-bytes))
+           (move cfp-tn old-fp)
+           (inst add csp-tn val-ptr (* nvals n-word-bytes))
            ;; pre-default any argument register that need it.
            (when (< nvals register-arg-count)
              (dolist (reg (subseq (list r0 r1 r2) nvals))
@@ -991,8 +991,8 @@
 
     ;; Return with one value.
     (inst ldr r0 (@ vals-arg))
-    (move sp-tn fp-tn)
-    (move fp-tn old-fp-arg)
+    (move csp-tn cfp-tn)
+    (move cfp-tn old-fp-arg)
     (lisp-return lra-arg t)
 
     ;; Nope, not the single case.

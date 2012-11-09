@@ -26,8 +26,8 @@
   (:info nvals)
   (:temporary (:scs (descriptor-reg)) temp)
   (:generator 20
-    (inst mov start sp-tn)
-    (inst add sp-tn sp-tn (* nvals n-word-bytes))
+    (inst mov start csp-tn)
+    (inst add csp-tn csp-tn (* nvals n-word-bytes))
     (do ((val vals (tn-ref-across val))
          (i 0 (1+ i)))
         ((null val))

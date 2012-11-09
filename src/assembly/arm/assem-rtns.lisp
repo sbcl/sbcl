@@ -72,7 +72,7 @@
   ;; Copy the remaining args (including the future R2 register value)
   ;; over the outbound stack frame.
   (inst add src vals (* 2 n-word-bytes))
-  (inst add dst fp-tn (* 2 n-word-bytes))
+  (inst add dst cfp-tn (* 2 n-word-bytes))
   (inst sub count nvals (fixnumize 2))
 
   LOOP
@@ -82,14 +82,14 @@
   (inst b :ge LOOP)
 
   ;; Load the last remaining register result.
-  (inst ldr r2 (@ fp-tn (* 2 n-word-bytes)))
+  (inst ldr r2 (@ cfp-tn (* 2 n-word-bytes)))
 
   DONE
 
   ;; Deallocate the unused stack space.
-  (move ocfp-tn fp-tn)
-  (move fp-tn old-fp)
-  (inst add sp-tn ocfp-tn nvals)
+  (move ocfp-tn cfp-tn)
+  (move cfp-tn old-fp)
+  (inst add csp-tn ocfp-tn nvals)
 
   ;; Return.
   (lisp-return lra nil))
@@ -151,7 +151,7 @@
 
   (move cur-uwp block :eq)
 
-  (loadw fp-tn cur-uwp unwind-block-current-cont-slot)
+  (loadw cfp-tn cur-uwp unwind-block-current-cont-slot)
   (loadw code-tn cur-uwp unwind-block-current-code-slot)
   (loadw lra cur-uwp unwind-block-entry-pc-slot)
   ;; Shouldn't use LISP-RETURN here because we don't need to signal

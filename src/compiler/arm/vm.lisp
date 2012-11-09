@@ -40,14 +40,14 @@
   (defreg r8 8)
   (defreg nfp 9)
   (defreg null 10)
-  (defreg fp 11)
+  (defreg cfp 11)
   (defreg nargs 12)
-  (defreg sp 13)
+  (defreg csp 13)
   (defreg lr 14)
   (defreg pc 15) ;; Yes, the program counter.
 
   (defregset system-regs
-      lip null fp sp lr pc code)
+      lip null cfp csp lr pc code)
 
   (defregset descriptor-regs
       r0 r1 r2 lexenv lra r8)
@@ -195,8 +195,8 @@
 
   (defregtn nargs any-reg)
   (defregtn ocfp any-reg)
-  (defregtn sp any-reg)
-  (defregtn fp any-reg)
+  (defregtn csp any-reg)
+  (defregtn cfp any-reg)
   (defregtn lr any-reg)
   (defregtn pc any-reg))
 

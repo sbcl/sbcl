@@ -84,14 +84,14 @@
      (let ((offset (tn-offset stack)))
        (sc-case stack
          ((control-stack)
-          (loadw reg fp-tn offset 0 ,predicate))))))
+          (loadw reg cfp-tn offset 0 ,predicate))))))
 (defmacro store-stack-tn (stack reg &optional (predicate :al))
   `(let ((stack ,stack)
          (reg ,reg))
      (let ((offset (tn-offset stack)))
        (sc-case stack
          ((control-stack)
-          (storew reg fp-tn offset 0 ,predicate))))))
+          (storew reg cfp-tn offset 0 ,predicate))))))
 
 (defmacro maybe-load-stack-tn (reg reg-or-stack)
   "Move the TN Reg-Or-Stack into Reg if it isn't already there."
@@ -103,7 +103,7 @@
           ((any-reg descriptor-reg)
            (move ,n-reg ,n-stack))
           ((control-stack)
-           (loadw ,n-reg fp-tn (tn-offset ,n-stack))))))))
+           (loadw ,n-reg cfp-tn (tn-offset ,n-stack))))))))
 
 ;;;; Storage allocation:
 

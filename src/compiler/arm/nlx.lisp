@@ -59,7 +59,7 @@
 (define-vop (current-stack-pointer)
   (:results (res :scs (any-reg descriptor-reg)))
   (:generator 1
-    (move res sp-tn)))
+    (move res csp-tn)))
 
 (define-vop (current-binding-pointer)
   (:results (res :scs (any-reg descriptor-reg)))
@@ -78,10 +78,10 @@
   (:temporary (:scs (descriptor-reg)) temp)
   (:temporary (:scs (interior-reg)) lip)
   (:generator 22
-    (inst add block fp-tn (* (tn-offset tn) n-word-bytes))
+    (inst add block cfp-tn (* (tn-offset tn) n-word-bytes))
     (load-symbol-value temp *current-unwind-protect-block*)
     (storew temp block unwind-block-current-uwp-slot)
-    (storew fp-tn block unwind-block-current-cont-slot)
+    (storew cfp-tn block unwind-block-current-cont-slot)
     (storew code-tn block unwind-block-current-code-slot)
     (inst compute-lra temp lip entry-label)
     (storew temp block catch-block-entry-pc-slot)))
@@ -97,10 +97,10 @@
   (:temporary (:scs (descriptor-reg) :target block :to (:result 0)) result)
   (:temporary (:scs (interior-reg)) lip)
   (:generator 44
-    (inst add result fp-tn (* (tn-offset tn) n-word-bytes))
+    (inst add result cfp-tn (* (tn-offset tn) n-word-bytes))
     (load-symbol-value temp *current-unwind-protect-block*)
     (storew temp result catch-block-current-uwp-slot)
-    (storew fp-tn result catch-block-current-cont-slot)
+    (storew cfp-tn result catch-block-current-cont-slot)
     (storew code-tn result catch-block-current-code-slot)
     (inst compute-lra temp lip entry-label)
     (storew temp result catch-block-entry-pc-slot)
@@ -118,7 +118,7 @@
   (:args (tn))
   (:temporary (:scs (descriptor-reg)) new-uwp)
   (:generator 7
-    (inst add new-uwp fp-tn (* (tn-offset tn) n-word-bytes))
+    (inst add new-uwp cfp-tn (* (tn-offset tn) n-word-bytes))
     (store-symbol-value new-uwp *current-unwind-protect-block*)))
 
 (define-vop (unlink-catch-block)
@@ -173,7 +173,7 @@
                   (loadw move-temp start i 0 :ge)
                   (store-stack-tn tn move-temp :ge)
                   (store-stack-tn tn null-tn :lt)))))))
-    (load-stack-tn sp-tn sp)))
+    (load-stack-tn csp-tn sp)))
 
 (define-vop (nlx-entry-multiple)
   (:args (top :target result) (src) (count))
@@ -210,7 +210,7 @@
 
     ;; Reset the CSP.
     DONE
-    (inst add sp-tn result num)))
+    (inst add csp-tn result num)))
 
 ;;; This VOP is just to force the TNs used in the cleanup onto the stack.
 ;;;
