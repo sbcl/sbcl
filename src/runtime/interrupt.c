@@ -1547,8 +1547,10 @@ arrange_return_to_c_function(os_context_t *context,
        non-x86 ports */
     *os_context_pc_addr(context) = (os_context_register_t)(unsigned long)code;
     *os_context_register_addr(context,reg_NARGS) = 0;
+#ifdef reg_LIP
     *os_context_register_addr(context,reg_LIP) =
         (os_context_register_t)(unsigned long)code;
+#endif
     *os_context_register_addr(context,reg_CFP) =
         (os_context_register_t)(unsigned long)access_control_frame_pointer(th);
 #endif
@@ -1556,7 +1558,7 @@ arrange_return_to_c_function(os_context_t *context,
     *os_context_npc_addr(context) =
         4 + *os_context_pc_addr(context);
 #endif
-#ifdef LISP_FEATURE_SPARC
+#if defined(LISP_FEATURE_SPARC) || defined(LISP_FEATURE_ARM)
     *os_context_register_addr(context,reg_CODE) =
         (os_context_register_t)(fun + FUN_POINTER_LOWTAG);
 #endif
