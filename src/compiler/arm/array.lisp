@@ -73,3 +73,94 @@
 
   (def-full-data-vector-frobs simple-array-signed-byte-32 signed-num
     signed-reg))
+
+;;; Integer vectors whose elements are smaller than a byte.  I.e. bit, 2-bit,
+;;; and 4-bit vectors.
+(macrolet ((def-small-data-vector-frobs (type bits)
+  (let* ((elements-per-word (floor n-word-bits bits))
+         (bit-shift (1- (integer-length elements-per-word))))
+    `(progn
+       (define-vop (,(symbolicate "DATA-VECTOR-REF/" type))
+         (:note "inline array access")
+         (:translate data-vector-ref)
+         (:policy :fast-safe)
+         (:args (object :scs (descriptor-reg))
+                (index :scs (unsigned-reg)))
+         (:arg-types ,type positive-fixnum)
+         (:results (value :scs (any-reg)))
+         (:result-types positive-fixnum)
+         (:temporary (:scs (interior-reg)) lip)
+         (:temporary (:scs (non-descriptor-reg) :to (:result 0)) temp result)
+         (:generator 20
+           ;; Compute the offset for the word we're interested in.
+           (inst mov temp (lsr index ,bit-shift))
+           ;; Load the word in question.
+           (inst add lip object (lsl temp word-shift))
+           (inst ldr result lip
+                 (- (* vector-data-offset n-word-bytes)
+                    other-pointer-lowtag))
+           ;; Compute the position of the bitfield we need.
+           (inst and temp index ,(1- elements-per-word))
+           ,@(when (eq *backend-byte-order* :big-endian)
+               `((inst eor temp temp ,(1- elements-per-word))))
+           ,@(unless (= bits 1)
+               `((inst mov temp (lsl temp ,(1- (integer-length bits))))))
+           ;; Shift the field we need to the low bits of RESULT.
+           (inst mov result (lsr result temp))
+           ;; Mask out the field we're interested in.
+           (inst and result result ,(1- (ash 1 bits)))
+           ;; And fixnum-tag the result.
+           (inst mov value (lsl result n-fixnum-tag-bits))))
+       (define-vop (,(symbolicate "DATA-VECTOR-SET/" type))
+         (:note "inline array store")
+         (:translate data-vector-set)
+         (:policy :fast-safe)
+         (:args (object :scs (descriptor-reg))
+                (index :scs (unsigned-reg) :target shift)
+                (value :scs (unsigned-reg immediate) :target result))
+         (:arg-types ,type positive-fixnum positive-fixnum)
+         (:results (result :scs (unsigned-reg)))
+         (:result-types positive-fixnum)
+         (:temporary (:scs (interior-reg)) lip)
+         (:temporary (:scs (non-descriptor-reg)) temp old)
+         (:temporary (:scs (non-descriptor-reg) :from (:argument 1)) shift)
+         (:generator 25
+           ;; Compute the offset for the word we're interested in.
+           (inst mov temp (lsr index ,bit-shift))
+           (inst mov temp (lsl temp n-fixnum-tag-bits))
+           ;; Load the word in question.
+           (inst add lip object temp)
+           (inst ldr old lip
+                 (- (* vector-data-offset n-word-bytes)
+                    other-pointer-lowtag))
+           ;; Compute the position of the bitfield we need.
+           (inst and shift index ,(1- elements-per-word))
+           ,@(when (eq *backend-byte-order* :big-endian)
+               `((inst eor shift ,(1- elements-per-word))))
+           ,@(unless (= bits 1)
+               `((inst mov shift  (lsl shift ,(1- (integer-length bits))))))
+           ;; Clear the target bitfield.
+           (unless (and (sc-is value immediate)
+                        (= (tn-value value) ,(1- (ash 1 bits))))
+             (inst mov temp ,(1- (ash 1 bits)))
+             (inst bic old old (lsl temp shift)))
+           ;; LOGIOR in the new value (shifted appropriatly).
+           (sc-case value
+             (immediate
+              (inst mov temp (logand (tn-value value) ,(1- (ash 1 bits)))))
+             (unsigned-reg
+              (inst and temp value ,(1- (ash 1 bits)))))
+           (inst orr old (lsl temp shift))
+           ;; Write the altered word back to the array.
+           (inst str old lip
+                 (- (* vector-data-offset n-word-bytes)
+                    other-pointer-lowtag))
+           ;; And present the result properly.
+           (sc-case value
+             (immediate
+              (inst mov result (tn-value value)))
+             (unsigned-reg
+              (move result value)))))))))
+  (def-small-data-vector-frobs simple-bit-vector 1)
+  (def-small-data-vector-frobs simple-array-unsigned-byte-2 2)
+  (def-small-data-vector-frobs simple-array-unsigned-byte-4 4))
