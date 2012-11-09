@@ -645,9 +645,7 @@
               (- (bytes-needed-for-non-descriptor-stack-frame)
                  number-stack-displacement))))
     (move cfp-tn old-fp-temp)
-    ;; Shouldn't use LISP-RETURN here because we don't need to signal
-    ;; single / multiple values.
-    (inst sub pc-tn return-pc-temp (- other-pointer-lowtag 4))
+    (lisp-return return-pc-temp :known)
     (trace-table-entry trace-table-normal)))
 
 ;;;; Full call:
@@ -899,7 +897,7 @@
     (move csp-tn cfp-tn)
     (move cfp-tn old-fp)
     ;; Out of here.
-    (lisp-return return-pc t)
+    (lisp-return return-pc :single-value)
     (trace-table-entry trace-table-normal)))
 
 ;;; Do unknown-values return of a fixed number of values.  The Values are
@@ -940,7 +938,7 @@
            (move csp-tn cfp-tn)
            (move cfp-tn old-fp)
            ;; Out of here.
-           (lisp-return lra t))
+           (lisp-return lra :single-value))
           (t
            ;; Establish the values pointer and values count.
            (move val-ptr cfp-tn)
@@ -954,7 +952,7 @@
              (dolist (reg (subseq (list r0 r1 r2) nvals))
                (move reg null-tn)))
            ;; And away we go.
-           (lisp-return lra nil)))
+           (lisp-return lra :multiple-values)))
     (trace-table-entry trace-table-normal)))
 
 ;;; Do unknown-values return of an arbitrary number of values (passed
@@ -994,7 +992,7 @@
     (inst ldr r0 (@ vals-arg))
     (move csp-tn cfp-tn)
     (move cfp-tn old-fp-arg)
-    (lisp-return lra-arg t)
+    (lisp-return lra-arg :single-value)
 
     ;; Nope, not the single case.
     NOT-SINGLE

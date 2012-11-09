@@ -92,7 +92,7 @@
   (inst add csp-tn ocfp-tn nvals)
 
   ;; Return.
-  (lisp-return lra nil))
+  (lisp-return lra :multiple-values))
 
 ;;;; Non-local exit noise.
 
@@ -154,6 +154,4 @@
   (loadw cfp-tn cur-uwp unwind-block-current-cont-slot)
   (loadw code-tn cur-uwp unwind-block-current-code-slot)
   (loadw lra cur-uwp unwind-block-entry-pc-slot)
-  ;; Shouldn't use LISP-RETURN here because we don't need to signal
-  ;; single / multiple values.
-  (inst sub pc-tn lra (- other-pointer-lowtag 4)))
+  (lisp-return lra :known))

@@ -56,13 +56,16 @@
          (- (ash simple-fun-code-offset word-shift)
             fun-pointer-lowtag)))
 
-(defmacro lisp-return (return-pc single-valued-p)
+(defmacro lisp-return (return-pc return-style)
   "Return to RETURN-PC."
   `(progn
      ;; Indicate a single-valued return by clearing all of the status
      ;; flags, or a multiple-valued return by setting all of the status
      ;; flags.
-     (inst msr (cpsr :f) ,(if single-valued-p 0 #xf0))
+     ,(ecase return-style
+             (:single-value '(inst msr (cpsr :f) 0))
+             (:multiple-values '(inst msr (cpsr :f) #xf0))
+             (:known))
      #+(or) ;; Doesn't work, can't have a negative immediate value.
      (inst add pc-tn ,return-pc (- 4 other-pointer-lowtag))
      (inst sub pc-tn ,return-pc (- other-pointer-lowtag 4))))
