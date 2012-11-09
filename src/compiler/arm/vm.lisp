@@ -35,7 +35,7 @@
   (defreg lexenv 3)
   (defreg lra 4)
   (defreg code 5)
-  (defreg lip 6)
+  (defreg nl3 6)
   (defreg ocfp 7)
   (defreg r8 8)
   (defreg nfp 9)
@@ -47,13 +47,13 @@
   (defreg pc 15) ;; Yes, the program counter.
 
   (defregset system-regs
-      lip null cfp csp lr pc code)
+      null cfp csp lr pc code)
 
   (defregset descriptor-regs
       r0 r1 r2 lexenv lra r8)
 
   (defregset non-descriptor-regs
-      ocfp nfp nargs)
+      ocfp nfp nargs nl3)
 
   ;; registers used to pass arguments
   ;;
@@ -173,7 +173,7 @@
 
   ;; Pointers to the interior of objects.  Used only as a temporary.
   (interior-reg registers
-   :locations (#.lip-offset))
+   :locations (#.lr-offset))
 
   ;; A catch or unwind block.
   (catch-block control-stack
@@ -189,7 +189,6 @@
                     :sc (sc-or-lose ',sc)
                     :offset ,offset-sym)))))
 
-  (defregtn lip interior-reg)
   (defregtn null descriptor-reg)
   (defregtn code descriptor-reg)
 
@@ -197,7 +196,7 @@
   (defregtn ocfp any-reg)
   (defregtn csp any-reg)
   (defregtn cfp any-reg)
-  (defregtn lr any-reg)
+  (defregtn lr interior-reg)
   (defregtn pc any-reg))
 
 ;;; If VALUE can be represented as an immediate constant, then return the
