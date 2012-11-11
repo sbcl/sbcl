@@ -29,9 +29,9 @@
 ;;; this may be restricted by a desire to use a subroutine call
 ;;; instruction.
 (defun make-return-pc-passing-location (standard)
-  (if standard
-      (make-wired-tn *backend-t-primitive-type* register-arg-scn lra-offset)
-      (make-restricted-tn *backend-t-primitive-type* register-arg-scn)))
+  (declare (ignore standard))
+  (make-wired-tn *backend-t-primitive-type* control-stack-sc-number
+                 lra-save-offset))
 
 ;;; This is similar to MAKE-RETURN-PC-PASSING-LOCATION, but makes a
 ;;; location to pass OLD-FP in.
@@ -58,12 +58,11 @@
                                         control-stack-arg-scn
                                         ocfp-save-offset)
                          env))
-(defun make-return-pc-save-location (env)
-  (specify-save-tn
-   (physenv-debug-live-tn (make-normal-tn *backend-t-primitive-type*) env)
-   (make-wired-tn *backend-t-primitive-type*
-                  control-stack-arg-scn
-                  lra-save-offset)))
+(defun make-return-pc-save-location (physenv)
+  (physenv-debug-live-tn
+   (make-wired-tn *backend-t-primitive-type* control-stack-sc-number
+                  lra-save-offset)
+   physenv))
 
 ;;; Make a TN for the standard argument count passing location.  We
 ;;; only need to make the standard location, since a count is never
@@ -606,7 +605,8 @@
         (when callee-nfp
           (maybe-load-stack-tn callee-nfp nfp)))
       (maybe-load-stack-tn cfp-tn fp)
-      (inst compute-lra (callee-return-pc-tn callee) lip label)
+      (inst compute-lra lip lip label)
+      (store-stack-tn (callee-return-pc-tn callee) lip)
       (note-this-location vop :call-site)
       (inst b target)
       (emit-return-pc label)
@@ -702,7 +702,7 @@
 
       ,@(when (eq return :tail)
           '((old-fp)
-            (return-pc :target return-pc-pass)))
+            (return-pc)))
 
       ,@(unless variable '((args :more t :scs (descriptor-reg)))))
 
@@ -724,12 +724,6 @@
       ,@(unless (or variable (eq return :tail)) '(arg-locs))
       ,@(unless variable '(args))
       ,@(when (eq return :tail) '(old-fp)))
-
-     (:temporary (:sc descriptor-reg
-                  :offset lra-offset
-                  :from (:argument 1)
-                  :to :eval)
-                 return-pc-pass)
 
      (:temporary (:sc descriptor-reg :offset lexenv-offset
                       :from (:argument ,(if (eq return :tail) 0 1))
@@ -771,7 +765,9 @@
                        (list :load-nargs
                              ,@(if (eq return :tail)
                                    '((unless (location= return-pc
-                                                        return-pc-pass)
+                                                        (make-random-tn :kind :normal
+                                                                        :sc (sc-or-lose 'control-stack)
+                                                                        :offset lra-save-offset))
                                        :load-return-pc)
                                      (when cur-nfp
                                        :frob-nfp))
@@ -794,16 +790,13 @@
                              '((inst mov nargs-pass (fixnumize nargs)))))
                       ,@(if (eq return :tail)
                             '((:load-return-pc
-                               (sc-case return-pc
-                                 (descriptor-reg
-                                  (inst mov return-pc-pass return-pc))
-                                 (control-stack
-                                  (loadw return-pc-pass cfp-tn
-                                         (tn-offset return-pc)))))
+                               (error "RETURN-PC not in its passing location"))
                               (:frob-nfp
                                (error "Don't know how to :FROB-NFP for TAIL call")))
                             `((:comp-lra
-                               (inst compute-lra return-pc-pass lip lra-label))
+                               (inst compute-lra lip lip lra-label)
+                               (inst str lip (@ new-fp (* lra-save-offset
+                                                          n-word-bytes))))
                               (:frob-nfp
                                (store-stack-tn nfp-save cur-nfp))
                               (:load-fp

@@ -69,7 +69,8 @@ call_into_lisp:
 	stmea   reg_CSP!, {reg_OCFP}
 
 	@@ Set up the return address
-	ldr	reg_LRA, =.lra
+	ldr	reg_NL3, =.lra
+        stmea   reg_CSP!, {reg_NL3}
 
 	@@ And, finally, call into Lisp!
 	add	reg_PC, reg_LEXENV, #SIMPLE_FUN_CODE_OFFSET

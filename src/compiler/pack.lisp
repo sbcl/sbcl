@@ -1511,7 +1511,7 @@
                                   #!-arm "STACK"
                                   #!+arm "CONTROL-STACK")
                          (or (= offset 0)
-                             #!-arm (= offset 1))))
+                             (= offset 1))))
                (conflicts-in-sc original sc offset))
       (error "~S is wired to location ~D in SC ~A of kind ~S that it conflicts with."
              tn offset sc (tn-kind tn)))
