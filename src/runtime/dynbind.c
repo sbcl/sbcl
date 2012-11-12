@@ -40,7 +40,7 @@ void bind_variable(lispobj symbol, lispobj value, void *th)
                 &((struct symbol *)native_pointer(TLS_INDEX_LOCK))->value;
             FSHOW_SIGNAL((stderr, "entering dynbind tls alloc\n"));
             set_pseudo_atomic_atomic(thread);
-            get_spinlock(tls_index_lock,(long)th);
+            get_spinlock(tls_index_lock,(uword_t)th);
             if(!sym->tls_index) {
                 sym->tls_index=SymbolValue(FREE_TLS_INDEX,0);
                 SetSymbolValue(FREE_TLS_INDEX, sym->tls_index+N_WORD_BYTES, 0);

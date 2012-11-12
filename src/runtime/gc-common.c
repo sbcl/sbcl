@@ -236,7 +236,7 @@ trans_code(struct code *code)
 {
     struct code *new_code;
     lispobj first, l_code, l_new_code;
-    long nheader_words, ncode_words, nwords;
+    uword_t nheader_words, ncode_words, nwords;
     unsigned long displacement;
     lispobj fheaderl, *prev_pointer;
 
