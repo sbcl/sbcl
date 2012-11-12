@@ -280,14 +280,15 @@ process_directory(int fd, lispobj *ptr, int count, os_vm_offset_t file_offset)
     FSHOW((stderr, "/process_directory(..), count=%d\n", count));
 
     for (entry = (struct ndir_entry *) ptr; --count>= 0; ++entry) {
+
         compressed = 0;
-        long id = entry->identifier;
+        sword_t id = entry->identifier;
         if (id <= (MAX_CORE_SPACE_ID | DEFLATED_CORE_SPACE_ID_FLAG)) {
             if (id & DEFLATED_CORE_SPACE_ID_FLAG)
                 compressed = 1;
             id &= ~(DEFLATED_CORE_SPACE_ID_FLAG);
         }
-        long offset = os_vm_page_size * (1 + entry->data_page);
+        sword_t offset = os_vm_page_size * (1 + entry->data_page);
         os_vm_address_t addr =
             (os_vm_address_t) (os_vm_page_size * entry->address);
         lispobj *free_pointer = (lispobj *) addr + entry->nwords;

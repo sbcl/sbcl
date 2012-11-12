@@ -22,5 +22,5 @@ extern struct var *define_dynamic_var(char *name,
 
 extern char *var_name(struct var *var);
 extern lispobj var_value(struct var *var);
-extern long var_clock(struct var *var);
-extern void var_setclock(struct var *var, long value);
+extern sword_t var_clock(struct var *var);
+extern void var_setclock(struct var *var, sword_t value);

@@ -93,10 +93,10 @@ NWORDS(uword_t x, uword_t n_bits)
 #ifdef LISP_FEATURE_GENCGC
 #include "gencgc-alloc-region.h"
 void *
-gc_alloc_with_region(long nbytes,int page_type_flag, struct alloc_region *my_region,
+gc_alloc_with_region(sword_t nbytes,int page_type_flag, struct alloc_region *my_region,
                      int quick_p);
 static inline void *
-gc_general_alloc(long nbytes, int page_type_flag, int quick_p)
+gc_general_alloc(sword_t nbytes, int page_type_flag, int quick_p)
 {
     struct alloc_region *my_region;
     if (UNBOXED_PAGE_FLAG == page_type_flag) {
@@ -109,7 +109,7 @@ gc_general_alloc(long nbytes, int page_type_flag, int quick_p)
     return gc_alloc_with_region(nbytes, page_type_flag, my_region, quick_p);
 }
 #else
-extern void *gc_general_alloc(long nbytes,int page_type_flag,int quick_p);
+extern void *gc_general_alloc(word_t nbytes,int page_type_flag,int quick_p);
 #endif
 
 static inline lispobj
@@ -130,24 +130,24 @@ gc_general_copy_object(lispobj object, long nwords, int page_type_flag)
     return make_lispobj(new, lowtag_of(object));
 }
 
-extern long (*scavtab[256])(lispobj *where, lispobj object);
+extern sword_t (*scavtab[256])(lispobj *where, lispobj object);
 extern lispobj (*transother[256])(lispobj object);
-extern long (*sizetab[256])(lispobj *where);
+extern sword_t (*sizetab[256])(lispobj *where);
 
 extern struct weak_pointer *weak_pointers; /* in gc-common.c */
 extern struct hash_table *weak_hash_tables; /* in gc-common.c */
 
-extern void scavenge(lispobj *start, long n_words);
+extern void scavenge(lispobj *start, sword_t n_words);
 extern void scavenge_interrupt_contexts(struct thread *thread);
 extern void scav_weak_hash_tables(void);
 extern void scan_weak_hash_tables(void);
 extern void scan_weak_pointers(void);
 
-lispobj  copy_large_unboxed_object(lispobj object, long nwords);
-lispobj  copy_unboxed_object(lispobj object, long nwords);
-lispobj  copy_large_object(lispobj object, long nwords);
-lispobj  copy_object(lispobj object, long nwords);
-lispobj  copy_code_object(lispobj object, long nwords);
+lispobj  copy_large_unboxed_object(lispobj object, sword_t nwords);
+lispobj  copy_unboxed_object(lispobj object, sword_t nwords);
+lispobj  copy_large_object(lispobj object, sword_t nwords);
+lispobj  copy_object(lispobj object, sword_t nwords);
+lispobj  copy_code_object(lispobj object, sword_t nwords);
 
 lispobj *search_read_only_space(void *pointer);
 lispobj *search_static_space(void *pointer);

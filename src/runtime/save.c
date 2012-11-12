@@ -79,7 +79,7 @@ write_bytes_to_file(FILE * file, char *addr, long bytes, int compression)
 {
     if (compression == COMPRESSION_LEVEL_NONE) {
         while (bytes > 0) {
-            long count = fwrite(addr, 1, bytes, file);
+            sword_t count = fwrite(addr, 1, bytes, file);
             if (count > 0) {
                 bytes -= count;
                 addr += count;
@@ -309,12 +309,12 @@ save_to_filehandle(FILE *file, char *filename, lispobj init_function,
 
 #ifdef LISP_FEATURE_GENCGC
     {
-        size_t size = (last_free_page*sizeof(long)+os_vm_page_size-1)
+        size_t size = (last_free_page*sizeof(sword_t)+os_vm_page_size-1)
             &~(os_vm_page_size-1);
         uword_t *data = calloc(size, 1);
         if (data) {
             uword_t word;
-            long offset;
+            sword_t offset;
             page_index_t i;
             for (i = 0; i < last_free_page; i++) {
                 /* Thanks to alignment requirements, the two low bits
