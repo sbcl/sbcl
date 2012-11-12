@@ -560,9 +560,9 @@ backtrace_from_fp(void *fp, int nframes)
                    (unsigned long) ra);
         } else
 #endif
-        printf("Foreign fp = 0x%lx, ra = 0x%lx",
-               (unsigned long) next_fp,
-               (unsigned long) ra);
+        printf("Foreign fp = 0x%p, ra = 0x%p",
+               (void*) next_fp,
+               (void*) ra);
     }
 
     putchar('\n');

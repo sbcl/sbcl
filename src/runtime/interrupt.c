@@ -989,7 +989,7 @@ interrupt_handle_pending(os_context_t *context)
          * an interrupt arrived during GC (POST-GC, really) it was
          * handled. */
         if (original_pending_handler != data->pending_handler)
-            lose("pending handler changed in gc: %x -> %d.",
+            lose("pending handler changed in gc: %x -> %x.",
                  original_pending_handler, data->pending_handler);
     }
 

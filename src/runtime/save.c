@@ -190,8 +190,8 @@ output_space(FILE *file, int id, lispobj *addr, lispobj *end,
 
     bytes = words * sizeof(lispobj);
 
-    printf("writing %lu bytes from the %s space at 0x%08lx\n",
-           (unsigned long)bytes, names[id], (unsigned long)addr);
+    printf("writing %lu bytes from the %s space at 0x%p\n",
+           bytes, names[id], addr);
 
     data = write_and_compress_bytes(file, (char *)addr, bytes, file_offset,
                                     core_compression_level);

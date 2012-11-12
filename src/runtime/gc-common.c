@@ -1716,7 +1716,7 @@ scav_vector (lispobj *where, lispobj object)
          * sets the header in %%PUTHASH.
          */
         fprintf(stderr,
-                "Warning: no pointer at %lx in hash table: this indicates "
+                "Warning: no pointer at %p in hash table: this indicates "
                 "non-fatal corruption caused by concurrent access to a "
                 "hash-table from multiple threads. Any accesses to "
                 "hash-tables shared between threads should be protected "
