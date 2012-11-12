@@ -509,9 +509,9 @@ create_thread_struct(lispobj initial_function) {
         return NULL;
     /* Aligning up is safe as THREAD_STRUCT_SIZE has
      * THREAD_ALIGNMENT_BYTES padding. */
-    aligned_spaces = (void *)((((unsigned long)(char *)spaces)
+    aligned_spaces = (void *)((((uword_t)(char *)spaces)
                                + THREAD_ALIGNMENT_BYTES-1)
-                              &~(unsigned long)(THREAD_ALIGNMENT_BYTES-1));
+                              &~(uword_t)(THREAD_ALIGNMENT_BYTES-1));
     void* csp_page=
         (aligned_spaces+
          thread_control_stack_size+

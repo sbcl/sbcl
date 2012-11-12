@@ -237,7 +237,7 @@ arch_handle_fun_end_breakpoint(os_context_t *context)
 {
     *os_context_pc_addr(context) -= BREAKPOINT_WIDTH;
     *os_context_pc_addr(context) =
-        (unsigned long)handle_fun_end_breakpoint(context);
+        (uword_t)handle_fun_end_breakpoint(context);
 }
 
 void
@@ -392,7 +392,7 @@ arch_install_interrupt_handlers()
 void
 arch_write_linkage_table_jmp(char * reloc, void * fun)
 {
-    unsigned long addr = (unsigned long) fun;
+    uword_t addr = (uword_t) fun;
     int i;
 
     *reloc++ = 0xFF; /* Opcode for near jump to absolute reg/mem64. */
@@ -414,7 +414,7 @@ arch_write_linkage_table_jmp(char * reloc, void * fun)
 void
 arch_write_linkage_table_ref(void * reloc, void * data)
 {
-    *(unsigned long *)reloc = (unsigned long)data;
+    *(uword_t *)reloc = (uword_t)data;
 }
 
 #endif

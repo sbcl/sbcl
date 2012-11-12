@@ -311,9 +311,9 @@ save_to_filehandle(FILE *file, char *filename, lispobj init_function,
     {
         size_t size = (last_free_page*sizeof(long)+os_vm_page_size-1)
             &~(os_vm_page_size-1);
-        unsigned long *data = calloc(size, 1);
+        uword_t *data = calloc(size, 1);
         if (data) {
-            unsigned long word;
+            uword_t word;
             long offset;
             page_index_t i;
             for (i = 0; i < last_free_page; i++) {

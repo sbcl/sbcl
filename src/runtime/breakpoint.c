@@ -102,20 +102,20 @@ static long compute_offset(os_context_t *context, lispobj code)
     if (code == NIL)
         return 0;
     else {
-        unsigned long code_start;
+        uword_t code_start;
         struct code *codeptr = (struct code *)native_pointer(code);
 #ifdef LISP_FEATURE_HPPA
-        unsigned long pc = *os_context_pc_addr(context) & ~3;
+        uword_t pc = *os_context_pc_addr(context) & ~3;
 #else
-        unsigned long pc = *os_context_pc_addr(context);
+        uword_t pc = *os_context_pc_addr(context);
 #endif
 
-        code_start = (unsigned long)codeptr
+        code_start = (uword_t)codeptr
             + HeaderValue(codeptr->header)*sizeof(lispobj);
         if (pc < code_start)
             return 0;
         else {
-            unsigned long offset = pc - code_start;
+            uword_t offset = pc - code_start;
             if (offset >= (N_WORD_BYTES * fixnum_value(codeptr->code_size)))
                 return 0;
             else

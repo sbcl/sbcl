@@ -38,7 +38,7 @@ struct var {
 
 static int hash_name(char *name)
 {
-    unsigned long value = 0;
+    uword_t value = 0;
 
     while (*name != '\0') {
         value = (value << 1) ^ *(unsigned char *)(name++);
@@ -50,7 +50,7 @@ static int hash_name(char *name)
 
 static int hash_obj(lispobj obj)
 {
-    return (unsigned long)obj % OBJ_BUCKETS;
+    return (uword_t)obj % OBJ_BUCKETS;
 }
 
 void flush_vars()

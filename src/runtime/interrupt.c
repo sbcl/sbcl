@@ -642,9 +642,9 @@ build_fake_control_stack_frames(struct thread *th,os_context_t *context)
     /* Build a fake stack frame or frames */
 
     access_control_frame_pointer(th) =
-        (lispobj *)(unsigned long)
+        (lispobj *)(uword_t)
             (*os_context_register_addr(context, reg_CSP));
-    if ((lispobj *)(unsigned long)
+    if ((lispobj *)(uword_t)
             (*os_context_register_addr(context, reg_CFP))
         == access_control_frame_pointer(th)) {
         /* There is a small window during call where the callee's
@@ -702,7 +702,7 @@ fake_foreign_function_call(os_context_t *context)
     thread->pseudo_atomic_bits =
 #else
     dynamic_space_free_pointer =
-        (lispobj *)(unsigned long)
+        (lispobj *)(uword_t)
 #endif
             (*os_context_register_addr(context, reg_ALLOC));
 /*     fprintf(stderr,"dynamic_space_free_pointer: %p\n", */
@@ -766,13 +766,13 @@ undo_fake_foreign_function_call(os_context_t *context)
 #if defined(reg_ALLOC) && !defined(LISP_FEATURE_SB_THREAD)
     /* Put the dynamic space free pointer back into the context. */
     *os_context_register_addr(context, reg_ALLOC) =
-        (unsigned long) dynamic_space_free_pointer
+        (uword_t) dynamic_space_free_pointer
         | (*os_context_register_addr(context, reg_ALLOC)
            & LOWTAG_MASK);
     /*
-      ((unsigned long)(*os_context_register_addr(context, reg_ALLOC))
+      ((uword_t)(*os_context_register_addr(context, reg_ALLOC))
       & ~LOWTAG_MASK)
-      | ((unsigned long) dynamic_space_free_pointer & LOWTAG_MASK);
+      | ((uword_t) dynamic_space_free_pointer & LOWTAG_MASK);
     */
 #endif
 #if defined(reg_ALLOC) && defined(LISP_FEATURE_SB_THREAD)
@@ -780,7 +780,7 @@ undo_fake_foreign_function_call(os_context_t *context)
      * into the context (p-a-bits for p-a, and dynamic space free
      * pointer for ROOM). */
     *os_context_register_addr(context, reg_ALLOC) =
-        (unsigned long) dynamic_space_free_pointer
+        (uword_t) dynamic_space_free_pointer
         | (thread->pseudo_atomic_bits & LOWTAG_MASK);
     /* And clear them so we don't get bit later by call-in/call-out
      * not updating them. */
@@ -1862,7 +1862,7 @@ undoably_install_low_level_interrupt_handler (int signal,
 #endif
 
 /* This is called from Lisp. */
-unsigned long
+uword_t
 install_handler(int signal, void handler(int, siginfo_t*, os_context_t*))
 {
 #ifndef LISP_FEATURE_WIN32
@@ -1901,7 +1901,7 @@ install_handler(int signal, void handler(int, siginfo_t*, os_context_t*))
 
     FSHOW((stderr, "/leaving POSIX install_handler(%d, ..)\n", signal));
 
-    return (unsigned long)oldhandler.lisp;
+    return (uword_t)oldhandler.lisp;
 #else
     /* Probably-wrong Win32 hack */
     return 0;

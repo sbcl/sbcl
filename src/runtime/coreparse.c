@@ -291,11 +291,11 @@ process_directory(int fd, lispobj *ptr, int count, os_vm_offset_t file_offset)
         os_vm_address_t addr =
             (os_vm_address_t) (os_vm_page_size * entry->address);
         lispobj *free_pointer = (lispobj *) addr + entry->nwords;
-        unsigned long len = os_vm_page_size * entry->page_count;
+        uword_t len = os_vm_page_size * entry->page_count;
         if (len != 0) {
             os_vm_address_t real_addr;
             FSHOW((stderr, "/mapping %ld(0x%lx) bytes at 0x%lx\n",
-                   len, len, (unsigned long)addr));
+                   len, len, (uword_t)addr));
             if (compressed) {
 #ifdef LISP_FEATURE_SB_CORE_COMPRESSION
                 real_addr = inflate_core_bytes(fd, offset + file_offset, addr, len);
@@ -323,9 +323,8 @@ process_directory(int fd, lispobj *ptr, int count, os_vm_offset_t file_offset)
                 madvise(addr, len, MADV_MERGEABLE);
         }
 #endif
-
-        FSHOW((stderr, "/space id = %ld, free pointer = 0x%lx\n",
-               id, (unsigned long)free_pointer));
+        FSHOW((stderr, "/space id = %ld, free pointer = 0x%p\n",
+               id, (uword_t)free_pointer));
 
         switch (id) {
         case DYNAMIC_CORE_SPACE_ID:

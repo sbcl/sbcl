@@ -54,13 +54,13 @@ do {                                                                   \
 
 #define CEILING(x,y) (((x) + ((y) - 1)) & (~((y) - 1)))
 
-static inline unsigned long
-NWORDS(unsigned long x, unsigned long n_bits)
+static inline uword_t
+NWORDS(uword_t x, uword_t n_bits)
 {
     /* A good compiler should be able to constant-fold this whole thing,
        even with the conditional. */
     if(n_bits <= N_WORD_BITS) {
-        unsigned long elements_per_word = N_WORD_BITS/n_bits;
+        uword_t elements_per_word = N_WORD_BITS/n_bits;
 
         return CEILING(x, elements_per_word)/elements_per_word;
     }

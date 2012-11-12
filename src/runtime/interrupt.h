@@ -157,7 +157,7 @@ typedef void (*interrupt_handler_t)(int, siginfo_t *, os_context_t *);
 extern void undoably_install_low_level_interrupt_handler (
                         int signal,
                         interrupt_handler_t handler);
-extern unsigned long install_handler(int signal,
+extern uword_t install_handler(int signal,
                                      interrupt_handler_t handler);
 
 extern union interrupt_handler interrupt_handlers[NSIG];

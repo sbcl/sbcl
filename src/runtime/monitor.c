@@ -266,10 +266,10 @@ search_cmd(char **ptr)
     start = end = addr;
     lastcount = count;
 
-    printf("searching for 0x%x at 0x%p\n", val, (void*)(unsigned long)end);
+    printf("searching for 0x%x at 0x%p\n", val, (void*)(uword_t)end);
 
     while (search_for_type(val, &end, &count)) {
-        printf("found 0x%x at 0x%p:\n", val, (void*)(unsigned long)end);
+        printf("found 0x%x at 0x%p:\n", val, (void*)(uword_t)end);
         obj = *end;
         addr = end;
         end += 2;
@@ -419,16 +419,16 @@ catchers_cmd(char **ptr)
         while (catch != NULL) {
             printf("0x%08lX:\n\tuwp: 0x%08lX\n\tfp: 0x%08lX\n\t"
                    "code: 0x%08lX\n\tentry: 0x%08lX\n\ttag: ",
-                   (unsigned long)catch,
-                   (unsigned long)(catch->current_uwp),
-                   (unsigned long)(catch->current_cont),
+                   (uword_t)catch,
+                   (uword_t)(catch->current_uwp),
+                   (uword_t)(catch->current_cont),
 #if defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64)
-                   (unsigned long)component_ptr_from_pc((void*)catch->entry_pc)
+                   (uword_t)component_ptr_from_pc((void*)catch->entry_pc)
                        + OTHER_POINTER_LOWTAG,
 #else
-                   (unsigned long)(catch->current_code),
+                   (uword_t)(catch->current_code),
 #endif
-                   (unsigned long)(catch->entry_pc));
+                   (uword_t)(catch->entry_pc));
             brief_print((lispobj)catch->tag);
             catch = catch->previous_catch;
         }

@@ -1908,7 +1908,7 @@ static lispobj
 trans_boxed_large(lispobj object)
 {
     lispobj header;
-    unsigned long length;
+    uword_t length;
 
     gc_assert(is_lisp_pointer(object));
 
@@ -1925,7 +1925,7 @@ static lispobj
 trans_unboxed_large(lispobj object)
 {
     lispobj header;
-    unsigned long length;
+    uword_t length;
 
     gc_assert(is_lisp_pointer(object));
 
@@ -2052,9 +2052,9 @@ maybe_adjust_large_object(lispobj *where)
     page_index_t next_page;
     long nwords;
 
-    unsigned long remaining_bytes;
-    unsigned long bytes_freed;
-    unsigned long old_bytes_used;
+    uword_t remaining_bytes;
+    uword_t bytes_freed;
+    uword_t old_bytes_used;
 
     int boxed;
 
@@ -2241,7 +2241,7 @@ preserve_pointer(void *addr)
     /* quick check 2: Check the offset within the page.
      *
      */
-    if (((unsigned long)addr & (GENCGC_CARD_BYTES - 1)) >
+    if (((uword_t)addr & (GENCGC_CARD_BYTES - 1)) >
         page_table[addr_page_index].bytes_used)
         return;
 
@@ -2293,7 +2293,7 @@ preserve_pointer(void *addr)
         if (page_free_p(addr_page_index)
             || (page_table[addr_page_index].bytes_used == 0)
             /* Check the offset within the page. */
-            || (((unsigned long)addr & (GENCGC_CARD_BYTES - 1))
+            || (((uword_t)addr & (GENCGC_CARD_BYTES - 1))
                 > page_table[addr_page_index].bytes_used)) {
             FSHOW((stderr,
                    "weird? ignore ptr 0x%x to freed area of large object\n",
@@ -2482,7 +2482,7 @@ scavenge_generations(generation_index_t from, generation_index_t to)
             }
             if (!write_protected) {
                 scavenge(page_address(i),
-                         ((unsigned long)(page_table[last_page].bytes_used
+                         ((uword_t)(page_table[last_page].bytes_used
                                           + npage_bytes(last_page-i)))
                          /N_WORD_BYTES);
 
@@ -2599,7 +2599,7 @@ scavenge_newspace_generation_one_scan(generation_index_t generation)
 
             /* Do a limited check for write-protected pages.  */
             if (!all_wp) {
-                long nwords = (((unsigned long)
+                long nwords = (((uword_t)
                                (page_table[last_page].bytes_used
                                 + npage_bytes(last_page-i)
                                 + page_table[i].region_start_offset))
@@ -2765,7 +2765,7 @@ unprotect_oldspace(void)
     page_index_t i;
     void *region_addr = 0;
     void *page_addr = 0;
-    unsigned long region_bytes = 0;
+    uword_t region_bytes = 0;
 
     for (i = 0; i < last_free_page; i++) {
         if (page_allocated_p(i)
@@ -2804,10 +2804,10 @@ unprotect_oldspace(void)
  * assumes that all objects have been copied or promoted to an older
  * generation. Bytes_allocated and the generation bytes_allocated
  * counter are updated. The number of bytes freed is returned. */
-static unsigned long
+static uword_t
 free_oldspace(void)
 {
-    unsigned long bytes_freed = 0;
+    uword_t bytes_freed = 0;
     page_index_t first_page, last_page;
 
     first_page = 0;
@@ -2906,8 +2906,8 @@ verify_space(lispobj *start, size_t words)
 {
     int is_in_dynamic_space = (find_page_index((void*)start) != -1);
     int is_in_readonly_space =
-        (READ_ONLY_SPACE_START <= (unsigned long)start &&
-         (unsigned long)start < SymbolValue(READ_ONLY_SPACE_FREE_POINTER,0));
+        (READ_ONLY_SPACE_START <= (uword_t)start &&
+         (uword_t)start < SymbolValue(READ_ONLY_SPACE_FREE_POINTER,0));
 
     while (words > 0) {
         size_t count = 1;
@@ -3211,7 +3211,7 @@ verify_generation(generation_index_t generation)
                     break;
 
             verify_space(page_address(i),
-                         ((unsigned long)
+                         ((uword_t)
                           (page_table[last_page].bytes_used
                            + npage_bytes(last_page-i)))
                          / N_WORD_BYTES);
@@ -3240,7 +3240,7 @@ verify_zero_fill(void)
         } else {
             long free_bytes = GENCGC_CARD_BYTES - page_table[page].bytes_used;
             if (free_bytes > 0) {
-                long *start_addr = (long *)((unsigned long)page_address(page)
+                long *start_addr = (long *)((uword_t)page_address(page)
                                           + page_table[page].bytes_used);
                 long size = free_bytes / N_WORD_BYTES;
                 long i;
@@ -3367,9 +3367,9 @@ preserve_context_registers (os_context_t *c)
 static void
 garbage_collect_generation(generation_index_t generation, int raise)
 {
-    unsigned long bytes_freed;
+    uword_t bytes_freed;
     page_index_t i;
-    unsigned long static_space_size;
+    uword_t static_space_size;
     struct thread *th;
 
     gc_assert(generation <= HIGHEST_NORMAL_GENERATION);
@@ -3592,7 +3592,7 @@ garbage_collect_generation(generation_index_t generation, int raise)
      * please submit a patch. */
 #if 0
     if (SymbolValue(SCAVENGE_READ_ONLY_SPACE) != NIL) {
-        unsigned long read_only_space_size =
+        uword_t read_only_space_size =
             (lispobj*)SymbolValue(READ_ONLY_SPACE_FREE_POINTER) -
             (lispobj*)READ_ONLY_SPACE_START;
         FSHOW((stderr,
@@ -4198,7 +4198,7 @@ general_alloc_internal(long nbytes, int page_type_flag, struct alloc_region *reg
     gc_assert(nbytes>0);
 
     /* Check for alignment allocation problems. */
-    gc_assert((((unsigned long)region->free_pointer & LOWTAG_MASK) == 0)
+    gc_assert((((uword_t)region->free_pointer & LOWTAG_MASK) == 0)
               && ((nbytes & LOWTAG_MASK) == 0));
 
 #if !(defined(LISP_FEATURE_WIN32) && defined(LISP_FEATURE_SB_THREAD))

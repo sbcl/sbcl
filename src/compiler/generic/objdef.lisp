@@ -143,7 +143,7 @@
   ;; VECTOR -- see SHRINK-VECTOR.
   (length :ref-trans sb!c::vector-length
           :type index)
-  (data :rest-p t :c-type #!-alpha "unsigned long" #!+alpha "u32"))
+  (data :rest-p t :c-type #!-alpha "uword_t" #!+alpha "u32"))
 
 (define-primitive-object (code :type code-component
                                :lowtag other-pointer-lowtag

@@ -88,7 +88,7 @@ void print_message(char *fmt, va_list ap)
 {
     fprintf(stderr, " in SBCL pid %d",getpid());
 #if defined(LISP_FEATURE_SB_THREAD)
-    fprintf(stderr, "(tid %lu)", (unsigned long) thread_self());
+    fprintf(stderr, "(tid %lu)", (uword_t) thread_self());
 #endif
     if (fmt) {
         fprintf(stderr, ":\n");
