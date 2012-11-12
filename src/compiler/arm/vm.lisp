@@ -33,7 +33,7 @@
   (defreg r1 1)
   (defreg r2 2)
   (defreg lexenv 3)
-  (defreg lra 4)
+  (defreg nl2 4)
   (defreg code 5)
   (defreg nl3 6)
   (defreg ocfp 7)
@@ -50,10 +50,10 @@
       null cfp csp lr pc code)
 
   (defregset descriptor-regs
-      r0 r1 r2 lexenv lra r8)
+      r0 r1 r2 lexenv r8)
 
   (defregset non-descriptor-regs
-      ocfp nfp nargs nl3)
+      ocfp nfp nargs nl2 nl3)
 
   ;; registers used to pass arguments
   ;;

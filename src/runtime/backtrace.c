@@ -130,6 +130,7 @@ call_info_from_context(struct call_info *info, os_context_t *context)
     uword_t pc;
 
     info->interrupted = 1;
+#if !defined(LISP_FEATURE_ARM)
     if (lowtag_of(*os_context_register_addr(context, reg_CODE))
         == FUN_POINTER_LOWTAG) {
         /* We tried to call a function, but crapped out before $CODE could
@@ -140,8 +141,9 @@ call_info_from_context(struct call_info *info, os_context_t *context)
         info->lra = (lispobj)(*os_context_register_addr(context, reg_LRA));
         info->code = code_pointer(info->lra);
         pc = (uword_t)native_pointer(info->lra);
-    }
-    else {
+    } else
+#endif
+    {
         info->frame =
             (struct call_frame *)(uword_t)
                 (*os_context_register_addr(context, reg_CFP));

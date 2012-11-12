@@ -644,6 +644,7 @@ build_fake_control_stack_frames(struct thread *th,os_context_t *context)
     access_control_frame_pointer(th) =
         (lispobj *)(uword_t)
             (*os_context_register_addr(context, reg_CSP));
+#if !defined(LISP_FEATURE_ARM)
     if ((lispobj *)(uword_t)
             (*os_context_register_addr(context, reg_CFP))
         == access_control_frame_pointer(th)) {
@@ -666,12 +667,13 @@ build_fake_control_stack_frames(struct thread *th,os_context_t *context)
              * partial frame wasn't there. */
             oldcont = (lispobj)(*os_context_register_addr(context, reg_OCFP));
         }
-    }
+    } else
+#endif
     /* We can't tell whether we are still in the caller if it had to
      * allocate a stack frame due to stack arguments. */
     /* This observation provoked some past CMUCL maintainer to ask
      * "Can anything strange happen during return?" */
-    else {
+    {
         /* normal case */
         oldcont = (lispobj)(*os_context_register_addr(context, reg_CFP));
     }
