@@ -199,13 +199,24 @@ extern sigset_t blockable_sigset;
 /* even on alpha, int happens to be 4 bytes.  long is longer. */
 /* FIXME: these names really shouldn't reflect their length and this
    is not quite right for some of the FFI stuff */
+#if defined(LISP_FEATURE_WIN32)&&defined(LISP_FEATURE_X86_64)
+typedef unsigned long long u64;
+typedef signed long long s64;
+#else
 typedef unsigned long u64;
 typedef signed long s64;
+#endif
 typedef unsigned int u32;
 typedef signed int s32;
 
 /* this is an integral type the same length as a machine pointer */
 typedef uintptr_t pointer_sized_uint_t;
+
+#ifdef _WIN64
+#define AMD64_SYSV_ABI __attribute__((sysv_abi))
+#else
+#define AMD64_SYSV_ABI
+#endif
 
 #include <sys/types.h>
 

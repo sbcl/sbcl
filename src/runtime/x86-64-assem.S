@@ -25,7 +25,7 @@
 #include "genesis/thread.h"
 	
 /* Minimize conditionalization for different OS naming schemes. */
-#if defined __linux__  || defined __FreeBSD__ || defined __OpenBSD__ || defined __NetBSD__ || defined __sun
+#if defined __linux__  || defined __FreeBSD__ || defined __OpenBSD__ || defined __NetBSD__ || defined __sun || defined _WIN64
 #define GNAME(var) var
 #else
 #define GNAME(var) _##var
@@ -33,7 +33,7 @@
 
 /* Get the right type of alignment. Linux, FreeBSD and OpenBSD
  * want alignment in bytes. */
-#if defined(__linux__) || defined(__FreeBSD__) || defined(__OpenBSD__) || defined __NetBSD__ || defined(__sun)
+#if defined(__linux__) || defined(__FreeBSD__) || defined(__OpenBSD__) || defined __NetBSD__ || defined(__sun) || defined _WIN64
 #define align_4byte	4
 #define align_8byte	8
 #define align_16byte	16
@@ -363,7 +363,7 @@ GNAME(closure_tramp):
 	.align	align_16byte,0x90
 	.globl  GNAME(funcallable_instance_tramp)
 #if !defined(LISP_FEATURE_DARWIN)
-        .type	GNAME(funcallable_instance_tramp),@function
+	TYPE(GNAME(funcallable_instance_tramp))
 #endif
         GNAME(funcallable_instance_tramp):
 	mov	FUNCALLABLE_INSTANCE_FUNCTION_OFFSET(%rax),%rax
@@ -371,7 +371,7 @@ GNAME(closure_tramp):
 	 * now, the first word of it contains the address to jump to. */
 	jmp	*CLOSURE_FUN_OFFSET(%rax)
 #if !defined(LISP_FEATURE_DARWIN)
-	.size	GNAME(funcallable_instance_tramp), .-GNAME(funcallable_instance_tramp)
+	SIZE(GNAME(funcallable_instance_tramp))
 #endif
 /*
  * fun-end breakpoint magic

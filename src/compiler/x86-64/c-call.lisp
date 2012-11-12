@@ -27,9 +27,13 @@
   (xmm-args 0)
   (stack-frame-size 0))
 
+(defconstant max-int-args #.(length *c-call-register-arg-offsets*))
+(defconstant max-xmm-args #!+win32 4 #!-win32 8)
+
 (defun int-arg (state prim-type reg-sc stack-sc)
-  (let ((reg-args (arg-state-register-args state)))
-    (cond ((< reg-args 6)
+  (let ((reg-args (max (arg-state-register-args state)
+                       #!+win32 (arg-state-xmm-args state))))
+    (cond ((< reg-args max-int-args)
            (setf (arg-state-register-args state) (1+ reg-args))
            (my-make-wired-tn prim-type reg-sc
                              (nth reg-args *c-call-register-arg-offsets*)))
@@ -48,8 +52,9 @@
   (int-arg state 'system-area-pointer 'sap-reg 'sap-stack))
 
 (defun float-arg (state prim-type reg-sc stack-sc)
-  (let ((xmm-args (arg-state-xmm-args state)))
-    (cond ((< xmm-args 8)
+  (let ((xmm-args (max (arg-state-xmm-args state)
+                        #!+win32 (arg-state-register-args state))))
+    (cond ((< xmm-args max-xmm-args)
            (setf (arg-state-xmm-args state) (1+ xmm-args))
            (my-make-wired-tn prim-type reg-sc
                              (nth xmm-args *float-regs*)))
@@ -274,6 +279,8 @@
   (:ignore results
            #!+(and sb-safepoint win32) rdi
            #!+(and sb-safepoint win32) rsi
+           #!+win32 args
+           #!+win32 rax
            #!+sb-safepoint r15
            #!+sb-safepoint r13)
   (:vop-var vop)
@@ -288,6 +295,7 @@
       (let ((label (gen-label)))
         (inst lea r14 (make-fixup nil :code-object label))
         (emit-label label)))
+    #!-win32
     ;; ABI: AL contains amount of arguments passed in XMM registers
     ;; for vararg calls.
     (move-immediate rax
@@ -295,11 +303,13 @@
                        while tn-ref
                        count (eq (sb-name (sc-sb (tn-sc (tn-ref-tn tn-ref))))
                                  'float-registers)))
+    #!+win32 (inst sub rsp-tn #x20)     ;MS_ABI: shadow zone
     #!+sb-safepoint
     (progn                              ;Store SP and PC in thread struct
       (storew rsp-tn thread-base-tn thread-saved-csp-offset)
       (storew r14 thread-base-tn thread-pc-around-foreign-call-slot))
     (inst call function)
+    #!+win32 (inst add rsp-tn #x20)     ;MS_ABI: remove shadow space
     #!+sb-safepoint
     (progn
       ;; Zeroing out
@@ -417,23 +427,24 @@
              (error "Too many arguments in callback")))
     (let* ((segment (make-segment))
            (rax rax-tn)
-           #!+(not sb-safepoint) (rcx rcx-tn)
-           (rdi rdi-tn)
-           (rsi rsi-tn)
+           #!+(or win32 (not sb-safepoint)) (rcx rcx-tn)
+           #!-win32 (rdi rdi-tn)
+           #!-win32 (rsi rsi-tn)
            (rdx rdx-tn)
            (rbp rbp-tn)
            (rsp rsp-tn)
+           #!+win32 (r8 r8-tn)
            (xmm0 float0-tn)
            ([rsp] (make-ea :qword :base rsp :disp 0))
            ;; How many arguments have been copied
            (arg-count 0)
            ;; How many arguments have been copied from the stack
-           (stack-argument-count 0)
+           (stack-argument-count #!-win32 0 #!+win32 4)
            (gprs (mapcar (make-tn-maker 'any-reg) *c-call-register-arg-offsets*))
            (fprs (mapcar (make-tn-maker 'double-reg)
                          ;; Only 8 first XMM registers are used for
                          ;; passing arguments
-                         (subseq *float-regs* 0 8))))
+                         (subseq *float-regs* 0 #!-win32 8 #!+win32 4))))
       (assemble (segment)
         ;; Make room on the stack for arguments.
         (inst sub rsp (* n-word-bytes (length argument-types)))
@@ -456,6 +467,7 @@
             (incf arg-count)
             (cond (integerp
                    (let ((gpr (pop gprs)))
+                     #!+win32 (pop fprs)
                      ;; Argument not in register, copy it from the old
                      ;; stack location to a temporary register.
                      (unless gpr
@@ -468,6 +480,7 @@
                   ((or (alien-single-float-type-p type)
                        (alien-double-float-type-p type))
                    (let ((fpr (pop fprs)))
+                     #!+win32 (pop gprs)
                      (cond (fpr
                             ;; Copy from float register to target location.
                             (inst movq target-tn fpr))
@@ -517,16 +530,18 @@
         #!+sb-safepoint
         (progn
           ;; arg0 to ENTER-ALIEN-CALLBACK (trampoline index)
-          (inst mov rdi (fixnumize index))
+          (inst mov #!-win32 rdi #!+win32 rcx (fixnumize index))
           ;; arg1 to ENTER-ALIEN-CALLBACK (pointer to argument vector)
-          (inst mov rsi rsp)
+          (inst mov #!-win32 rsi #!+win32 rdx rsp)
           ;; add room on stack for return value
           (inst sub rsp 8)
           ;; arg2 to ENTER-ALIEN-CALLBACK (pointer to return value)
-          (inst mov rdx rsp)
+          (inst mov #!-win32 rdx #!+win32 r8 rsp)
           ;; Make new frame
           (inst push rbp)
           (inst mov  rbp rsp)
+          #!+win32 (inst sub rsp #x20)
+          #!+win32 (inst and rsp #x-20)
           ;; Call
           (inst mov rax (foreign-symbol-address "callback_wrapper_trampoline"))
           (inst call rax)

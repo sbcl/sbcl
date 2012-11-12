@@ -44,11 +44,13 @@ unsigned long fast_random_state = 1;
 void arch_init(void)
 {}
 
+#ifndef _WIN64
 os_vm_address_t
 arch_get_bad_addr(int sig, siginfo_t *code, os_context_t *context)
 {
     return (os_vm_address_t)code->si_addr;
 }
+#endif
 
 
 /*
@@ -76,6 +78,8 @@ context_eflags_addr(os_context_t *context)
     return &context->sc_rflags;
 #elif defined __NetBSD__
     return CONTEXT_ADDR_FROM_STEM(RFLAGS);
+#elif defined _WIN64
+    return (os_context_register_t*)&context->win32_context->EFlags;
 #else
 #error unsupported OS
 #endif
@@ -251,30 +255,37 @@ arch_handle_single_step_trap(os_context_t *context, int trap)
 
 
 void
+restore_breakpoint_from_single_step(os_context_t * context)
+{
+#ifdef CANNOT_GET_TO_SINGLE_STEP_FLAG
+    /* Un-install single step helper instructions. */
+    *(single_stepping-3) = single_step_save1;
+    *(single_stepping-2) = single_step_save2;
+    *(single_stepping-1) = single_step_save3;
+#else
+    *context_eflags_addr(context) &= ~0x100;
+#endif
+    /* Re-install the breakpoint if possible. */
+    if (((char *)*os_context_pc_addr(context) >
+         (char *)single_stepping) &&
+        ((char *)*os_context_pc_addr(context) <=
+         (char *)single_stepping + BREAKPOINT_WIDTH)) {
+        fprintf(stderr, "warning: couldn't reinstall breakpoint\n");
+    } else {
+        arch_install_breakpoint(single_stepping);
+    }
+
+    single_stepping = NULL;
+    return;
+}
+
+void
 sigtrap_handler(int signal, siginfo_t *info, os_context_t *context)
 {
     unsigned int trap;
 
     if (single_stepping) {
-#ifdef CANNOT_GET_TO_SINGLE_STEP_FLAG
-        /* Un-install single step helper instructions. */
-        *(single_stepping-3) = single_step_save1;
-        *(single_stepping-2) = single_step_save2;
-        *(single_stepping-1) = single_step_save3;
-#else
-        *context_eflags_addr(context) ^= 0x100;
-#endif
-        /* Re-install the breakpoint if possible. */
-        if (((char *)*os_context_pc_addr(context) >
-             (char *)single_stepping) &&
-            ((char *)*os_context_pc_addr(context) <=
-             (char *)single_stepping + BREAKPOINT_WIDTH)) {
-            fprintf(stderr, "warning: couldn't reinstall breakpoint\n");
-        } else {
-            arch_install_breakpoint(single_stepping);
-        }
-
-        single_stepping = NULL;
+        restore_breakpoint_from_single_step(context);
         return;
     }
 
@@ -372,12 +383,12 @@ arch_install_interrupt_handlers()
      * OS I haven't tested on?) and we have to go back to the old CMU
      * CL way, I hope there will at least be a comment to explain
      * why.. -- WHN 2001-06-07 */
-#if !defined(LISP_FEATURE_MACH_EXCEPTION_HANDLER)
+#if !defined(LISP_FEATURE_MACH_EXCEPTION_HANDLER) && !defined(LISP_FEATURE_WIN32)
     undoably_install_low_level_interrupt_handler(SIGILL , sigill_handler);
     undoably_install_low_level_interrupt_handler(SIGTRAP, sigtrap_handler);
 #endif
 
-#ifdef X86_64_SIGFPE_FIXUP
+#if defined(X86_64_SIGFPE_FIXUP) && !defined(LISP_FEATURE_WIN32)
     undoably_install_low_level_interrupt_handler(SIGFPE, sigfpe_handler);
 #endif
 

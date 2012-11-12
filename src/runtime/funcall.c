@@ -22,7 +22,11 @@
 #include "interrupt.h"
 
 /* This is implemented in assembly language and called from C: */
-extern lispobj call_into_lisp(lispobj fun, lispobj *args, int nargs);
+extern lispobj call_into_lisp(lispobj fun, lispobj *args, int nargs)
+#ifdef LISP_FEATURE_X86_64
+    __attribute__((sysv_abi))
+#endif
+    ;
 
 static inline lispobj
 safe_call_into_lisp(lispobj fun, lispobj *args, int nargs)

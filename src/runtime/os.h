@@ -189,8 +189,13 @@ extern char *os_get_runtime_executable_path(int external_path);
 # define OS_VM_SIZE_FMT "u"
 # define OS_VM_SIZE_FMTX "x"
 #else
+#if defined(LISP_FEATURE_SB_WIN32)
+# define OS_VM_SIZE_FMT "Iu"
+# define OS_VM_SIZE_FMTX "Ix"
+#else
 # define OS_VM_SIZE_FMT "lu"
 # define OS_VM_SIZE_FMTX "lx"
+#endif
 #endif
 
 /* FIXME: this is not the right place for this, but here we have

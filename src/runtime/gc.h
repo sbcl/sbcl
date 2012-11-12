@@ -22,7 +22,11 @@
 #define PAGE_BYTES BACKEND_PAGE_BYTES
 
 typedef intptr_t page_index_t;
+#ifdef LISP_FEATURE_WIN32
+#define PAGE_INDEX_FMT "Id"
+#else
 #define PAGE_INDEX_FMT "ld"
+#endif
 
 typedef signed char generation_index_t;
 

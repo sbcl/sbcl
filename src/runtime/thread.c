@@ -96,7 +96,11 @@ pthread_key_t lisp_thread = 0;
 #endif
 
 #if defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64)
-extern lispobj call_into_lisp_first_time(lispobj fun, lispobj *args, int nargs);
+extern lispobj call_into_lisp_first_time(lispobj fun, lispobj *args, int nargs)
+# ifdef LISP_FEATURE_X86_64
+    __attribute__((sysv_abi))
+# endif
+    ;
 #endif
 
 static void

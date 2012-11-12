@@ -2832,7 +2832,11 @@ core and return a descriptor to it."
                                                   priority)))
                      ;; machinery for new-style SBCL Lisp-to-C naming
                      (record-with-translated-name (priority large)
-                       (record (c-name name) priority (if large "LU" "")))
+                       (record (c-name name) priority
+                               (if large
+                                   #!+(and win32 x86-64) "LLU"
+                                   #!-(and win32 x86-64) "LU"
+                                   "")))
                      (maybe-record-with-translated-name (suffixes priority &key large)
                        (when (some (lambda (suffix)
                                      (tailwise-equal name suffix))
@@ -2873,7 +2877,8 @@ core and return a descriptor to it."
       (push (list (c-symbol-name c)
                   9
                   (symbol-value c)
-                  "LU"
+                  #!+(and win32 x86-64) "LLU"
+                  #!-(and win32 x86-64) "LU"
                   nil)
             constants))
     (setf constants

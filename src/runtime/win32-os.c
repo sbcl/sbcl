@@ -680,6 +680,54 @@ void os_preinit()
 }
 #endif  /* LISP_FEATURE_SB_THREAD */
 
+
+#ifdef LISP_FEATURE_X86_64
+/* Windows has 32-bit 'longs', so printf...%lX (and other %l patterns) doesn't
+ * work well with address-sized values, like it's done all over the place in
+ * SBCL. And msvcrt uses I64, not LL, for printing long longs.
+ *
+ * I've already had enough search/replace with longs/words/intptr_t for today,
+ * so I prefer to solve this problem with a format string translator. */
+
+/* There is (will be) defines for printf and friends. */
+
+static int translating_vfprintf(FILE*stream, const char *fmt, va_list args)
+{
+    char translated[1024];
+    int i=0, delta = 0;
+
+    while (fmt[i-delta] && i<sizeof(translated)-1) {
+        if((fmt[i-delta]=='%')&&
+           (fmt[i-delta+1]=='l')) {
+            translated[i++]='%';
+            translated[i++]='I';
+            translated[i++]='6';
+            translated[i++]='4';
+            delta += 2;
+        } else {
+            translated[i]=fmt[i-delta];
+            ++i;
+        }
+    }
+    translated[i++]=0;
+    return vfprintf(stream,translated,args);
+}
+
+int printf(const char*fmt,...)
+{
+    va_list args;
+    va_start(args,fmt);
+    return translating_vfprintf(stdout,fmt,args);
+}
+int fprintf(FILE*stream,const char*fmt,...)
+{
+    va_list args;
+    va_start(args,fmt);
+    return translating_vfprintf(stream,fmt,args);
+}
+
+#endif
+
 int os_number_of_processors = 1;
 
 BOOL WINAPI CancelIoEx(HANDLE handle, LPOVERLAPPED overlapped);
@@ -1036,7 +1084,6 @@ c_level_backtrace(const char* header, int depth)
 #endif
 
 
-#if defined(LISP_FEATURE_X86)
 static int
 handle_single_step(os_context_t *ctx)
 {
@@ -1045,12 +1092,10 @@ handle_single_step(os_context_t *ctx)
 
     /* We are doing a displaced instruction. At least function
      * end breakpoints use this. */
-    WITH_GC_AT_SAFEPOINTS_ONLY () /* Todo: Is it really gc-unsafe? */
-        restore_breakpoint_from_single_step(ctx);
+    restore_breakpoint_from_single_step(ctx);
 
     return 0;
 }
-#endif
 
 #ifdef LISP_FEATURE_UD2_BREAKPOINTS
 #define SBCL_EXCEPTION_BREAKPOINT EXCEPTION_ILLEGAL_INSTRUCTION
@@ -1064,7 +1109,7 @@ static int
 handle_breakpoint_trap(os_context_t *ctx, struct thread* self)
 {
 #ifdef LISP_FEATURE_UD2_BREAKPOINTS
-    if (((unsigned short *)((ctx->win32_context)->Eip))[0] != 0x0b0f)
+    if (((unsigned short *)*os_context_pc_addr(ctx))[0] != 0x0b0f)
         return -1;
 #endif
 
@@ -1358,11 +1403,9 @@ handle_exception(EXCEPTION_RECORD *exception_record,
         rc = handle_breakpoint_trap(ctx, self);
         break;
 
-#if defined(LISP_FEATURE_X86)
     case EXCEPTION_SINGLE_STEP:
         rc = handle_single_step(ctx);
         break;
-#endif
 
     default:
         rc = -1;
@@ -1376,6 +1419,37 @@ handle_exception(EXCEPTION_RECORD *exception_record,
     SetLastError(lastError);
     return ExceptionContinueExecution;
 }
+
+#ifdef LISP_FEATURE_X86_64
+
+#define RESTORING_ERRNO()                                       \
+    int sbcl__lastErrno = errno;                                \
+    RUN_BODY_ONCE(restoring_errno, errno = sbcl__lastErrno)
+
+LONG
+veh(EXCEPTION_POINTERS *ep)
+{
+    EXCEPTION_DISPOSITION disp;
+
+    RESTORING_ERRNO() {
+        if (!pthread_self())
+            return EXCEPTION_CONTINUE_SEARCH;
+    }
+
+    disp = handle_exception(ep->ExceptionRecord,0,ep->ContextRecord,0);
+
+    switch (disp)
+    {
+    case ExceptionContinueExecution:
+        return EXCEPTION_CONTINUE_EXECUTION;
+    case ExceptionContinueSearch:
+        return EXCEPTION_CONTINUE_SEARCH;
+    default:
+        fprintf(stderr,"Exception handler is mad\n");
+        ExitProcess(0);
+    }
+}
+#endif
 
 void
 wos_install_interrupt_handlers(struct lisp_exception_frame *handler)
@@ -1969,8 +2043,6 @@ win32_unix_read(HANDLE handle, void * buf, int count)
     }
     return read_bytes;
 }
-
-void __stdcall RtlUnwind(void *, void *, void *, void *); /* I don't have winternl.h */
 
 /* We used to have a scratch() function listing all symbols needed by
  * Lisp.  Much rejoicing commenced upon its removal.  However, I would

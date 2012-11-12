@@ -106,7 +106,14 @@
 ;;; The default dynamic space size is lower on OpenBSD to allow SBCL to
 ;;; run under the default 512M data size limit.
 
-(!gencgc-space-setup #x20000000 #x1000000000 #!+openbsd #x1bcf0000)
+(!gencgc-space-setup #x20000000
+                     #x1000000000
+
+                     ;; :default-dynamic-space-size
+                     #!+openbsd #x1bcf0000
+
+                     ;; :alignment
+                     #!+win32 #!+win32 nil #x10000)
 
 (def!constant linkage-table-entry-size 16)
 

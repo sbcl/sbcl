@@ -597,7 +597,7 @@ report_heap_exhaustion(long available, long requested, struct thread *th)
 }
 
 
-#if defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64)
+#if defined(LISP_FEATURE_X86)
 void fast_bzero(void*, size_t); /* in <arch>-assem.S */
 #endif
 
@@ -4303,13 +4303,28 @@ general_alloc(sword_t nbytes, int page_type_flag)
     }
 }
 
-lispobj *
+lispobj AMD64_SYSV_ABI *
 alloc(long nbytes)
 {
-#if !(defined(LISP_FEATURE_WIN32) && defined(LISP_FEATURE_SB_THREAD))
+#ifdef LISP_FEATURE_WIN32
+    /* WIN32 is currently the only platform where inline allocation is
+     * not pseudo atomic. */
+    struct thread *self = arch_os_get_current_thread();
+    int was_pseudo_atomic = get_pseudo_atomic_atomic(self);
+    if (!was_pseudo_atomic)
+        set_pseudo_atomic_atomic(self);
+#else
     gc_assert(get_pseudo_atomic_atomic(arch_os_get_current_thread()));
 #endif
-    return general_alloc(nbytes, BOXED_PAGE_FLAG);
+
+    lispobj *result = general_alloc(nbytes, BOXED_PAGE_FLAG);
+
+#ifdef LISP_FEATURE_WIN32
+    if (!was_pseudo_atomic)
+        clear_pseudo_atomic_atomic(self);
+#endif
+
+    return result;
 }
 
 /*

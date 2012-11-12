@@ -303,6 +303,9 @@
 
 #!+sb-thread
 (defmacro pseudo-atomic (&rest forms)
+  #!+win32
+  `(progn ,@forms (emit-safepoint))
+  #!-win32
   (with-unique-names (label)
     `(let ((,label (gen-label)))
        (inst mov (make-ea :qword
