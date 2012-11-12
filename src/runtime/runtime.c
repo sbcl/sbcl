@@ -294,10 +294,11 @@ search_for_executable(const char *argv0)
 }
 #endif /* LISP_FEATURE_WIN32 */
 
-unsigned long parse_size_arg(char *arg, char *arg_name)
+size_t
+parse_size_arg(char *arg, char *arg_name)
 {
   char *tail, *power_name;
-  unsigned long power, res;
+  size_t power, res;
 
   res = strtoul(arg, &tail, 0);
 
@@ -329,7 +330,7 @@ unsigned long parse_size_arg(char *arg, char *arg_name)
     free(power_name);
   }
   if ((res <= 0) ||
-      (res > (ULONG_MAX >> power))) {
+      (res >= (SIZE_MAX >> power))) {
     lose("%s argument is out of range: %s", arg_name, arg);
   }
   res <<= power;
