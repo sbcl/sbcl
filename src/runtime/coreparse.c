@@ -477,7 +477,7 @@ load_core_file(char *file, os_vm_offset_t file_offset)
                               ptr,
 #ifndef LISP_FEATURE_ALPHA
                               remaining_len / (sizeof(struct ndir_entry) /
-                                               sizeof(long)),
+                                               sizeof(lispobj)),
 #else
                               remaining_len / (sizeof(struct ndir_entry) /
                                                sizeof(u32)),

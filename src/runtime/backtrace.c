@@ -304,7 +304,7 @@ stack_pointer_p (void *p)
   /* we are using sizeof(long) here, because that is the right value on both
    * x86 and x86-64.  (But note that false positives would not cause much harm
    * given the heuristical nature of x86_call_context.) */
-  unsigned long stack_alignment = sizeof(long);
+  unsigned long stack_alignment = sizeof(void*);
 
   return (altstack_pointer_p(p)
           || (p < (void *) arch_os_get_current_thread()->control_stack_end
