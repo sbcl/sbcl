@@ -983,6 +983,11 @@ callback_wrapper_trampoline(
     if (!th)
         lose("callback invoked in non-lisp thread.  Sorry, that is not supported yet.");
 
+#ifdef LISP_FEATURE_WIN32
+    /* arg2 is the pointer to a return value, which sits on the stack */
+    th->carried_base_pointer = (os_context_register_t) *(((void**)arg2)-1);
+#endif
+
     WITH_GC_AT_SAFEPOINTS_ONLY()
         funcall3(SymbolValue(ENTER_ALIEN_CALLBACK, 0), arg0, arg1, arg2);
 }

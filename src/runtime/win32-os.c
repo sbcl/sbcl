@@ -1373,6 +1373,13 @@ handle_exception(EXCEPTION_RECORD *exception_record,
     context.sigmask = self ? self->os_thread->blocked_signal_set : 0;
 #endif
 
+    os_context_register_t oldbp = NULL;
+    if (self) {
+        oldbp = self ? self->carried_base_pointer : 0;
+        self->carried_base_pointer
+            = (os_context_register_t) voidreg(win32_context, bp);
+    }
+
     /* For EXCEPTION_ACCESS_VIOLATION only. */
     void *fault_address = (void *)exception_record->ExceptionInformation[1];
 
@@ -1415,6 +1422,9 @@ handle_exception(EXCEPTION_RECORD *exception_record,
         /* All else failed, drop through to the lisp-side exception handler. */
         signal_internal_error_or_lose(ctx, exception_record, fault_address);
 
+    if (self)
+        self->carried_base_pointer = oldbp;
+
     errno = lastErrno;
     SetLastError(lastError);
     return ExceptionContinueExecution;
@@ -1450,6 +1460,14 @@ veh(EXCEPTION_POINTERS *ep)
     }
 }
 #endif
+
+os_context_register_t
+carry_frame_pointer(os_context_register_t default_value)
+{
+    struct thread* self = arch_os_get_current_thread();
+    os_context_register_t bp = self->carried_base_pointer;
+    return bp ? bp : default_value;
+}
 
 void
 wos_install_interrupt_handlers(struct lisp_exception_frame *handler)

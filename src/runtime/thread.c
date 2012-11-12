@@ -568,7 +568,12 @@ create_thread_struct(lispobj initial_function) {
     th->os_thread=0;
 
 #ifdef LISP_FEATURE_SB_SAFEPOINT
+# ifdef LISP_FEATURE_WIN32
+    th->carried_base_pointer = 0;
+# endif
+# ifdef LISP_FEATURE_C_STACK_IS_CONTROL_STACK
     th->pc_around_foreign_call = 0;
+# endif
     th->csp_around_foreign_call = csp_page;
 #endif
 
