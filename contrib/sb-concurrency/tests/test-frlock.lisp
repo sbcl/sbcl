@@ -11,6 +11,12 @@
 
 (in-package :sb-concurrency-test)
 
+(defmacro deftest* ((name &key fails-on) form &rest results)
+  `(progn
+     (when (sb-impl::featurep ',fails-on)
+       (pushnew ',name sb-rt::*expected-failures*))
+     (deftest ,name ,form ,@results)))
+
 (defun test-frlocks (&key (reader-count 100) (read-count 1000000)
                           (outer-read-pause 0) (inner-read-pause 0)
                           (writer-count 10) (write-count 10000)
@@ -73,7 +79,10 @@
                 nil))))
       (values (cdr w-e!) (cdr r-e!))))
 
-(deftest frlock.1
-    (test-frlocks)
+(deftest* (frlock.1 :fails-on :win32)
+    (handler-case
+        (sb-ext:with-timeout 60 (test-frlocks))
+      (sb-ext:timeout (c)
+        (error "~A" c)))
   nil
   nil)
