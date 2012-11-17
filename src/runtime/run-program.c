@@ -164,7 +164,7 @@ int spawn(char *program, char *argv[], int sin, int sout, int serr,
       setsid();
 #elif defined(LISP_FEATURE_DARWIN)
       setpgid(0, getpid());
-#elif defined(SVR4) || defined(__linux__) || defined(__osf__)
+#elif defined(SVR4) || defined(__linux__) || defined(__osf__) || defined(__GLIBC__)
       setpgrp();
 #else
       setpgrp(0, getpid());

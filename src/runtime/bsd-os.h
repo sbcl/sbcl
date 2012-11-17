@@ -9,7 +9,7 @@
  * files for more information.
  */
 
-#ifdef __FreeBSD__
+#if defined(LISP_FEATURE_FREEBSD)
 #include <osreldate.h>
 #endif
 
@@ -32,7 +32,7 @@ typedef vm_size_t os_vm_size_t;
 typedef off_t os_vm_offset_t;
 typedef int os_vm_prot_t;
 
-#if defined __FreeBSD__
+#if defined(LISP_FEATURE_FREEBSD)
 /* Note: The man page for sigaction(2) in FreeBSD 4.0 says that this
  * is an mcontext_t, but according to comments by Raymond Wiker in the
  * original FreeBSD port of SBCL, that's wrong, it's actually a

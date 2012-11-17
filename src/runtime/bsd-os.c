@@ -63,7 +63,7 @@ os_vm_size_t os_vm_page_size;
 static void netbsd_init();
 #endif /* __NetBSD__ */
 
-#ifdef __FreeBSD__
+#if defined LISP_FEATURE_FREEBSD
 #include <sys/sysctl.h>
 #if defined(LISP_FEATURE_SB_THREAD) && !defined(LISP_FEATURE_SB_PTHREAD_FUTEX)
 #include <sys/umtx.h>
@@ -92,7 +92,7 @@ os_init(char *argv[], char *envp[])
 
 #ifdef __NetBSD__
     netbsd_init();
-#elif defined(__FreeBSD__)
+#elif defined(LISP_FEATURE_FREEBSD)
     freebsd_init();
 #elif defined(__OpenBSD__)
     openbsd_init();
@@ -107,7 +107,7 @@ os_context_sigmask_addr(os_context_t *context)
     /* (Unlike most of the other context fields that we access, the
      * signal mask field is a field of the basic, outermost context
      * struct itself both in FreeBSD 4.0 and in OpenBSD 2.6.) */
-#if defined(__FreeBSD__)  || defined(__NetBSD__) || defined(LISP_FEATURE_DARWIN)
+#if defined(LISP_FEATURE_FREEBSD) || defined(__NetBSD__) || defined(LISP_FEATURE_DARWIN)
     return &context->uc_sigmask;
 #elif defined (__OpenBSD__)
     return &context->sc_mask;
@@ -244,7 +244,7 @@ os_install_interrupt_handlers(void)
                                                  mach_error_memory_fault_handler);
 #else
     undoably_install_low_level_interrupt_handler(SIG_MEMORY_FAULT,
-#ifdef LISP_FEATURE_FREEBSD
+#if defined(LISP_FEATURE_FREEBSD) && !defined(__GLIBC__)
                                                  (__siginfohandler_t *)
 #endif
                                                  memory_fault_handler);
@@ -372,8 +372,10 @@ _socket(int domain, int type, int protocol)
 }
 #endif /* __NetBSD__ */
 
-#ifdef __FreeBSD__
+#if defined(LISP_FEATURE_FREEBSD)
+#ifndef __GLIBC__
 extern int getosreldate(void);
+#endif
 
 int sig_memory_fault;
 
@@ -381,10 +383,14 @@ static void freebsd_init()
 {
     /* Memory fault signal on FreeBSD was changed from SIGBUS to
      * SIGSEGV. */
+#ifdef __GLIBC__
+        sig_memory_fault = SIGSEGV;
+#else
     if (getosreldate() < 700004)
         sig_memory_fault = SIGBUS;
     else
         sig_memory_fault = SIGSEGV;
+#endif
 
     /* Quote from sbcl-devel (NIIMI Satoshi): "Some OSes, like FreeBSD
      * 4.x with GENERIC kernel, does not enable SSE support even on
@@ -456,7 +462,9 @@ os_get_runtime_executable_path(int external)
 {
     char path[PATH_MAX + 1];
 
+#ifndef __GLIBC__
     if (getosreldate() >= 600024) {
+#endif
         /* KERN_PROC_PATHNAME is available */
         size_t len = PATH_MAX + 1;
         int mib[4];
@@ -467,6 +475,7 @@ os_get_runtime_executable_path(int external)
         mib[3] = -1;
         if (sysctl(mib, 4, &path, &len, NULL, 0) != 0)
             return NULL;
+#ifndef __GLIBC__
     } else {
         int size;
         size = readlink("/proc/curproc/file", path, sizeof(path) - 1);
@@ -474,6 +483,7 @@ os_get_runtime_executable_path(int external)
             return NULL;
         path[size] = '\0';
     }
+#endif
     if (strcmp(path, "unknown") == 0)
         return NULL;
     return copied_string(path);

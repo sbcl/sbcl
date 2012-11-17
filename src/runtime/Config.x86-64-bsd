@@ -14,7 +14,11 @@ ASSEM_SRC = x86-64-assem.S
 ARCH_SRC = x86-64-arch.c
 
 OS_SRC = bsd-os.c x86-64-bsd-os.c
+ifneq (, $(filter GNU%, $(shell uname -s)))
+OS_LIBS = -ldl
+else
 OS_LIBS = # -ldl
+endif
 ifdef LISP_FEATURE_SB_CORE_COMPRESSION
   OS_LIBS += -lz
 endif

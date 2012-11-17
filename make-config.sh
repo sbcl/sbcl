@@ -274,7 +274,7 @@ case `uname` in
         ;;
     *BSD)
         case `uname` in
-            FreeBSD)
+            *FreeBSD)
                 sbcl_os="freebsd"
                 ;;
             OpenBSD)

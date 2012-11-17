@@ -68,7 +68,7 @@ context_eflags_addr(os_context_t *context)
      * we need to do this nasty absolute index magic number thing
      * instead. */
     return &context->uc_mcontext.gregs[17];
-#elif defined __FreeBSD__
+#elif defined LISP_FEATURE_FREEBSD
     return &context->uc_mcontext.mc_rflags;
 #elif defined LISP_FEATURE_DARWIN
     return CONTEXT_ADDR_FROM_STEM(rflags);
