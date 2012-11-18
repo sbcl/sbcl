@@ -11,4 +11,15 @@
 
 (in-package "SB!VM")
 
-;;; Dummy placeholder file.
+;;;; other miscellaneous VOPs
+
+(define-vop (halt)
+  (:temporary (:sc non-descriptor-reg :offset ocfp-offset) error-temp)
+  (:generator 1
+    ;; See macros.lisp, EMIT-ERROR-BREAK, for an explanation.
+    (inst mov error-temp #x000f0000)
+    (inst add error-temp error-temp 1)
+    (inst swi 0)
+    (inst byte halt-trap)
+    ;; Re-align to the next instruction boundary.
+    (emit-alignment word-shift)))
