@@ -12,6 +12,7 @@
 ;;;; more information.
 
 #-win32 (exit :code 104) ;; This is extremely win32-specific.
+#-x86   (exit :code 104) ;; And our AMD64 backend does not aim to support it.
 
 (use-package :sb-alien)
 
