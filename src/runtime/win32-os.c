@@ -1495,6 +1495,8 @@ boolean io_begin_interruptible(HANDLE handle)
     return 1;
 }
 
+static pthread_mutex_t interrupt_io_lock = PTHREAD_MUTEX_INITIALIZER;
+
 /* Unmark current thread as (probably) doing synchronous I/O; if an
  * I/O cancellation was requested, postpone it until next
  * io_begin_interruptible */
@@ -1503,8 +1505,10 @@ io_end_interruptible(HANDLE handle)
 {
     if (!ptr_CancelIoEx)
         return;
+    pthread_mutex_lock(&interrupt_io_lock);
     __sync_bool_compare_and_swap(&this_thread->synchronous_io_handle_and_flag,
                                  handle, 0);
+    pthread_mutex_unlock(&interrupt_io_lock);
 }
 
 /* Documented limit for ReadConsole/WriteConsole is 64K bytes.
@@ -1776,64 +1780,8 @@ win32_maybe_interrupt_io(void* thread)
 {
     struct thread *th = thread;
     boolean done = 0;
-    /* Kludge. (?)
-     *
-     * ICBW about all of this.  But it seems to me that this procedure is
-     * a race condition.  In theory.  One that is hard produce (I can't
-     * come up with a test case that exploits it), and might only be a bug
-     * if users are doing weird things with I/O, possibly from FFI.  But a
-     * race is a race, so shouldn't this function and io_end_interruptible
-     * cooperate more?
-     *
-     * Here's my thinking:
-     *
-     * A.. <interruptee thread>
-     *     ... stuffs its handle into its structure.
-     * B.. <interrupter thread>
-     *     ... calls us to wake the thread, finds the handle.
-     *     But just before we actually call CancelSynchronousIo/CancelIoEx,
-     *     something weird happens in the scheduler and the system is
-     *     so extremely busy that the interrupter doesn't get scheduled
-     *     for a while, giving the interruptee lots of time to continue.
-     * A.. Didn't actually have to block, calls io_end_interruptible (in
-     *     which the handle flag already invalid, but it doesn't care
-     *     about that and still continues).
-     *     ... Proceeds to do unrelated I/O, e.g. goes into FFI code
-     *     (possible, because the CSP page hasn't been armed yet), which
-     *     does I/O from a C library, completely unrelated to SBCL's
-     *     routines.
-     * B.. The scheduler gives us time for the interrupter again.
-     *     We call CancelSynchronousIo/CancelIoEx.
-     * A.. Interruptee gets an expected error in unrelated I/O during FFI.
-     *     Interruptee's C code is unhappy and dies.
-     *
-     * Note that CancelSynchronousIo and CancelIoEx have a rather different
-     * effect here.  In the normal (CancelIoEx) case, we only ever kill
-     * I/O on the file handle in question.  I think we could ask users
-     * to please not both use Lisp streams (unix-read/write) _and_ FFI code
-     * on the same file handle in quick succession.
-     *
-     * CancelSynchronousIo seems more dangerous though.  Here we interrupt
-     * I/O on any other handle, even ones we're not actually responsible for,
-     * because this functions deals with the thread handle, not the file
-     * handle.
-     *
-     * Options:
-     *  - Use mutexes.  Somewhere, somehow.  Presumably one mutex per
-     *    target thread, acquired around win32_maybe_interrupt_io and
-     *    io_end_interruptible.  (That's one mutex use per I/O
-     *    operation, but I can't imagine that compared to our FFI overhead
-     *    that's much of a problem.)
-     *  - In io_end_interruptible, detect that the flag has been
-     *    invalidated, and in that case, do something clever (what?) to
-     *    wait for the imminent gc_stop_the_world, which implicitly tells
-     *    us that win32_maybe_interrupt_io must have exited.  Except if
-     *    some _third_ thread is also beginning to call interrupt-thread
-     *    and wake_thread at the same time...?
-     *  - Revert the whole CancelSynchronousIo business after all.
-     *  - I'm wrong and everything is OK already.
-     */
     if (ptr_CancelIoEx) {
+        pthread_mutex_lock(&interrupt_io_lock);
         HANDLE h = (HANDLE)
             InterlockedExchangePointer((volatile LPVOID *)
                                        &th->synchronous_io_handle_and_flag,
@@ -1846,13 +1794,14 @@ win32_maybe_interrupt_io(void* thread)
             }
             if (ptr_CancelSynchronousIo) {
                 pthread_mutex_lock(&th->os_thread->fiber_lock);
-                done = ptr_CancelSynchronousIo(th->os_thread->fiber_group->handle);
+                done = !!ptr_CancelSynchronousIo(th->os_thread->fiber_group->handle);
                 pthread_mutex_unlock(&th->os_thread->fiber_lock);
             }
-            return (!!done)|(!!ptr_CancelIoEx(h,NULL));
+            done |= !!ptr_CancelIoEx(h,NULL);
         }
+        pthread_mutex_unlock(&interrupt_io_lock);
     }
-    return 0;
+    return done;
 }
 
 static const LARGE_INTEGER zero_large_offset = {.QuadPart = 0LL};
