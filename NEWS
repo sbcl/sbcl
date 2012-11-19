@@ -8,13 +8,19 @@ changes relative to sbcl-1.1.1:
   * enhancement: frlocks have been added to SB-CONCURRENCY contrib module.
   * enhancement: New feature sb-dynamic-core allows the runtime to be
     rebuilt or relocated without requiring changes to the core file on
-    all linkage table platforms.  Required on Windows.
-  * enhancement: Console I/O streams use UCS-2.
+    all linkage table platforms.  Required on Windows.  (Thanks to Anton
+    Kovalenko.)
+  * enhancement: Console I/O streams use UCS-2. (Thanks to Anton Kovalenko.)
   * enhancement: I/O on Windows unnamed pipes is interruptible
     asynchronously using interrupt-thread, timers when running on Windows NT
-    version 6.1 or newer (Windows 7, Server 2008 R2).
+    version 6.1 or newer (Windows 7, Server 2008 R2).  (Thanks to Anton
+    Kovalenko.)
+  * enhancement: Support for the experimental safepoint-based stop-the-world
+    protocol on the PowerPC platform.
   * bug fix: Non-blocking reads from the Windows console were not necessarily
-    non-blocking. (lp#308923)
+    non-blocking. Thanks to Anton Kovalenko. (lp#308923)
+  * bug fix: stability of threads on Windows has been improved upon through
+    an updated stop-the-world protocol (thanks to Anton Kovalenko).
 
 changes in sbcl-1.1.1 relative to sbcl-1.1.0:
   * enhancement: WITH-COMPILATION-UNIT no longer grabs the world-lock.
