@@ -73,6 +73,7 @@
  (:integer ENETUNREACH "WSAENETUNREACH")
  (:integer ENOTCONN "WSAENOTCONN")
  (:integer inaddr-any "INADDR_ANY")
+ (:integer FIONBIO "FIONBIO")
 
 
  ;; for socket-receive

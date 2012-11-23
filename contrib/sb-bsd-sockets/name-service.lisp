@@ -164,8 +164,7 @@ GET-NAME-SERVICE-ERRNO")
   (let ((*name-service-errno* (get-name-service-errno errno)))
     ;; Comment next to NETDB_INTERNAL in netdb.h says "See errno.".
     ;; This special case treatment hasn't actually been tested yet.
-    #-win32
-    (if (= *name-service-errno* sockint::NETDB-INTERNAL)
+    (if (and #-win32 (= *name-service-errno* sockint::NETDB-INTERNAL))
         (socket-error where)
         (let ((condition
                (condition-for-name-service-errno *name-service-errno*)))

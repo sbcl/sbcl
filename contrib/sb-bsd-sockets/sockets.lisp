@@ -26,6 +26,8 @@ protocol. Other values are used as-is.")
    (type  :initarg :type
           :reader socket-type
           :documentation "Type of the socket: :STREAM or :DATAGRAM.")
+   #+win32
+   (non-blocking-p :type (member t nil) :initform nil)
    (stream))
   (:documentation "Common base class of all sockets, not meant to be
 directly instantiated.")))
@@ -433,7 +435,7 @@ request an input stream and get an output stream in response\)."
                     :external-format external-format
                     :timeout timeout
                     :auto-close auto-close
-                    :serve-events serve-events))
+                    :serve-events (and serve-events #+win32 nil)))
       (setf (slot-value socket 'stream) stream))
     (sb-ext:cancel-finalization socket)
     stream))
@@ -454,7 +456,9 @@ request an input stream and get an output stream in response\)."
                        (socket-error-syscall c)
                        (or (socket-error-symbol c) (socket-error-errno c))
                        #+cmu (sb-unix:get-unix-error-msg num)
-                       #+sbcl (sb-int:strerror num)))))
+                       #+sbcl
+                       #+win32 (sb-win32::get-last-error-message num)
+                       #-win32 (sb-int:strerror num)))))
   (:documentation "Common base class of socket related conditions."))
 
 ;;; watch out for slightly hacky symbol punning: we use both the value

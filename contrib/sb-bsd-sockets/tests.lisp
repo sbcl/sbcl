@@ -50,7 +50,7 @@
       (and (> (socket-file-descriptor s) 1) t))
   t)
 
-(deftest* (make-inet-socket-wrong :fails-on :win32)
+(deftest* (make-inet-socket-wrong)
     ;; fail to make a socket: check correct error return.  There's no nice
     ;; way to check the condition stuff on its own, which is a shame
     (handler-case
@@ -66,7 +66,7 @@
       (:no-error nil))
   t)
 
-(deftest* (make-inet-socket-keyword-wrong :fails-on :win32)
+(deftest* (make-inet-socket-keyword-wrong)
     ;; same again with keywords
     (handler-case
         (make-instance 'inet-socket :type :stream :protocol :udp)
@@ -83,7 +83,7 @@
   t)
 
 
-(deftest* (non-block-socket :fails-on :win32)
+(deftest* (non-block-socket)
   (let ((s (make-instance 'inet-socket :type :stream :protocol :tcp)))
     (setf (non-blocking-mode s) t)
     (non-blocking-mode s))
@@ -112,7 +112,7 @@
       (address-in-use-error () t)))
   t)
 
-(deftest* (simple-sockopt-test :fails-on :win32)
+(deftest* (simple-sockopt-test)
   ;; test we can set SO_REUSEADDR on a socket and retrieve it, and in
   ;; the process that all the weird macros in sockopt happened right.
   (let ((s (make-instance 'inet-socket :type :stream :protocol (get-protocol-by-name "tcp"))))

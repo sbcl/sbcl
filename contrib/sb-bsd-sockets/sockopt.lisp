@@ -55,7 +55,8 @@ Code for options that not every system has should be conditionalised:
                   (if (= -1 (sockint::getsockopt (socket-file-descriptor socket)
                                                  ,find-level ,number
                                                  (sb-alien:addr buffer)
-                                                 (sb-alien:addr size)))
+                                                 #+win32 size
+                                                 #-win32 (sb-alien:addr size)))
                       (socket-error "getsockopt")
                       (,mangle-return buffer size)))
              `(error 'unsupported-operator
