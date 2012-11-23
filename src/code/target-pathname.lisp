@@ -47,7 +47,7 @@
                        (unparse-enough #'unparse-win32-enough)
                        (unparse-directory-separator "\\")
                        (simplify-namestring #'simplify-win32-namestring)
-                       (customary-case :upper))))
+                       (customary-case :lower))))
 (defparameter *win32-host* (make-win32-host))
 (defun make-win32-host-load-form (host)
   (declare (ignore host))
