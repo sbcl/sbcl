@@ -96,7 +96,7 @@
 (define-condition my-stream-error-1-0-9 (stream-error) ())
 (define-condition parse-foo-error-1-0-9 (parse-error) ())
 (define-condition read-bar-error-1-0-9 (reader-error) ())
-(with-test (:name :printable-conditions :fails-on :win32)
+(with-test (:name :printable-conditions)
   (let (;; instances created initializing all the slots specified in
         ;; ANSI CL
         (parse-foo-error-1-0-9 (make-condition 'parse-foo-error-1-0-9

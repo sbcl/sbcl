@@ -296,7 +296,7 @@
     (verify (signed 16)   #x003f8042 #x-7fbe)
     (verify (signed 16)   #x003f7042 #x7042)))
 
-(with-test (:name :bug-654485 :fails-on :win32)
+(with-test (:name :bug-654485)
   ;; DEBUG 2 used to prevent let-conversion of the open-coded ALIEN-FUNCALL body,
   ;; which in turn led the dreaded %SAP-ALIEN note.
   (handler-case

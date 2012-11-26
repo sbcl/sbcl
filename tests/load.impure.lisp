@@ -273,7 +273,7 @@
                               (invoke-restart 'sb-fasl::object)))))
       (load-and-assert spec fasl fasl))))
 
-(with-test (:name :bug-332 :fails-on :win32)
+(with-test (:name :bug-332)
   (flet ((stimulate-sbcl ()
            (let ((filename
                   (format nil "~A/~A.lisp"
