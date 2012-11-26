@@ -9,7 +9,7 @@
 # provided with absolutely no warranty. See the COPYING and CREDITS
 # files for more information.
 
-WIX_PATH="${WIX_PATH:-$PROGRAMFILES\WiX}"
+WIX_PATH="${WIX_PATH:-$PROGRAMFILES\Windows Installer XML v3.5\bin}"
 
 . ./sbcl-pwd.sh
 sbcl_pwd
@@ -20,17 +20,16 @@ cd output
   --disable-debugger --no-sysinit --no-userinit \
   --load ../tools-for-build/rtf.lisp \
   --load ../tools-for-build/wxs.lisp \
-  --eval '(progn 
+  --eval '(progn
             (write-rtf (read-text "../COPYING") "License.rtf")
             (write-wxs "sbcl.wxs")
-            (with-open-file (f "version.txt" 
+            (with-open-file (f "version.txt"
                                :direction :output
                                :if-exists :supersede)
              (write-line (lisp-implementation-version) f))
             (exit))'
 
 "$WIX_PATH/candle" sbcl.wxs
-"$WIX_PATH/light" sbcl.wixobj "$WIX_PATH/wixui.wixlib" \
-   -loc "$WIX_PATH/WixUI_en-us.wxl" \
+"$WIX_PATH/light" sbcl.wixobj \
+   -ext "$WIX_PATH/WixUIExtension.dll" -cultures:en-us \
    -out sbcl-`cat version.txt`.msi
-
