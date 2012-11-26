@@ -117,7 +117,7 @@
 (defun file-id (pathname)
   (id (format nil "File_~A" (enough-namestring pathname *sbcl-source-root*))))
 
-(defparameter *ignored-directories* '("CVS" ".svn"))
+(defparameter *ignored-directories* '("CVS" ".svn" "test-output"))
 
 (defparameter *pathname-type-abbrevs*
   '(("lisp" . "lsp")
@@ -275,9 +275,10 @@
                   "ConfigurableDirectory" "INSTALLDIR"
                   "Level" 1)
        ("ComponentRef" ("Id" "SBCL_Base"))
-       ("ComponentRef" ("Id" "SBCL_Shortcut"))
        ("Feature" ("Id" "Contrib" "Level" 1 "Title" "Contributed Modules")
                   ,@(ref-all-components))
+       ("Feature" ("Id" "Shortcut" "Level" 1 "Title" "Add Start Menu Shortcut")
+                  ("ComponentRef" ("Id" "SBCL_Shortcut")))
        ("Feature" ("Id" "SetPath" "Level" 1 "Title" "Set Environment Variable: PATH")
                   ("ComponentRef" ("Id" "SBCL_SetPATH")))
        ;; SetHome is still enabled by default (level 1), because SBCL

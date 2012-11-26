@@ -9,7 +9,14 @@
 # provided with absolutely no warranty. See the COPYING and CREDITS
 # files for more information.
 
-WIX_PATH="${WIX_PATH:-$PROGRAMFILES\Windows Installer XML v3.5\bin}"
+if test -n "$WIX_PATH"; then
+    :
+elif test -d "$PROGRAMFILES/WiX Toolset v3.7"; then
+    WIX_PATH="$PROGRAMFILES/WiX Toolset v3.7/bin"
+elif test -d "$PROGRAMFILES/Windows Installer XML v3.5"; then
+    WIX_PATH="$PROGRAMFILES/Windows Installer XML v3.5/bin"
+fi
+echo "using $WIX_PATH"
 
 . ./sbcl-pwd.sh
 sbcl_pwd
