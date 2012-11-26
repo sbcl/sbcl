@@ -597,4 +597,25 @@
   (let ((*default-pathname-defaults* #p"/tmp/foo"))
     (ensure-directories-exist "/")))
 
+(with-test (:name :long-file-name :skipped-on '(not :win32))
+  (let* ((x '("hint--if-you-are-having-trouble-deleting-this-test-directory"
+              "use-the-7zip-file-manager"))
+         (base (truename
+                (directory-namestring (or *load-pathname* *compile-pathname*))))
+         (shallow (make-pathname :directory `(:relative ,(car x))))
+         (shallow (merge-pathnames shallow base))
+         (deep (make-pathname
+                :directory `(:relative ,@(loop repeat 10 appending x))))
+         (deep (merge-pathnames deep base))
+         (native (sb-ext:native-namestring deep)))
+    (assert (> (length native) 260))
+    (assert (eql 3 (mismatch "\\\\?" native)))
+    (assert (not (probe-file shallow)))
+    (unwind-protect
+         (progn
+           (ensure-directories-exist deep)
+           (assert (probe-file deep)))
+      (sb-ext:delete-directory shallow :recursive t))
+    (assert (not (probe-file shallow)))))
+
 ;;;; success

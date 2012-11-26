@@ -2043,6 +2043,7 @@
               :expected-type 'fd-stream
               :format-control "~S is not a stream associated with a file."
               :format-arguments (list fd-stream)))
+     #!-win32
      (multiple-value-bind (okay dev ino mode nlink uid gid rdev size
                                 atime mtime ctime blksize blocks)
          (sb!unix:unix-fstat (fd-stream-fd fd-stream))
@@ -2052,7 +2053,21 @@
          (simple-stream-perror "failed Unix fstat(2) on ~S" fd-stream dev))
        (if (zerop mode)
            nil
-           (truncate size (fd-stream-element-size fd-stream)))))
+           (truncate size (fd-stream-element-size fd-stream))))
+     #!+win32
+     (let* ((handle (fd-stream-fd fd-stream))
+            (element-size (fd-stream-element-size fd-stream)))
+       (multiple-value-bind (got native-size)
+           (sb!win32:get-file-size-ex handle 0)
+         (if (zerop got)
+             ;; Might be a block device, in which case we fall back to
+             ;; a non-atomic workaround:
+             (let* ((here (sb!unix:unix-lseek handle 0 sb!unix:l_incr))
+                    (there (sb!unix:unix-lseek handle 0 sb!unix:l_xtnd)))
+               (when (and here there)
+                 (sb!unix:unix-lseek handle here sb!unix:l_set)
+                 (truncate there element-size)))
+             (truncate native-size element-size)))))
     (:file-string-length
      (etypecase arg1
        (character (fd-stream-character-size fd-stream arg1))

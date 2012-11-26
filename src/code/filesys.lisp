@@ -291,27 +291,34 @@
                  (simple-file-perror note-format pathname errno)
                  (return-from query-file-system nil))))
       (let ((filename (native-namestring pathname :as-file t)))
+        #!+win32
+        (case query-for
+          ((:existence :truename)
+           (multiple-value-bind (file kind)
+               (sb!win32::native-probe-file-name filename)
+             (when (and (not file) kind)
+               (setf file filename))
+             ;; The following OR was an AND, but that breaks files like NUL,
+             ;; for which GetLongPathName succeeds yet GetFileAttributesEx
+             ;; fails to return the file kind. --DFL
+             (if (or file kind)
+                 (values
+                  (parse-native-namestring
+                   file
+                   (pathname-host pathname)
+                   (sane-default-pathname-defaults)
+                   :as-directory (eq :directory kind)))
+                 (fail "couldn't resolve ~A" filename
+                       (- (sb!win32:get-last-error))))))
+          (:write-date
+           (or (sb!win32::native-file-write-date filename)
+               (fail "couldn't query write date of ~A" filename
+                     (- (sb!win32:get-last-error))))))
+        #!-win32
         (multiple-value-bind (existsp errno ino mode nlink uid gid rdev size
                                       atime mtime)
             (sb!unix:unix-stat filename)
-          (declare (ignore ino nlink gid rdev size atime
-                           #!+win32 uid))
-          #!+win32
-          ;; On win32, stat regards UNC pathnames and device names as
-          ;; nonexisting, so we check once more with the native API.
-          (unless existsp
-            (setf existsp
-                  (let ((handle (sb!win32:create-file
-                                 filename 0 0 nil
-                                 sb!win32:file-open-existing
-                                 0 0)))
-                    (when (/= -1 handle)
-                      (setf mode
-                            (or mode
-                                (if (logbitp 4
-                                             (sb!win32:get-file-attributes filename))
-                                    sb!unix:s-ifdir 0)))
-                      (progn (sb!win32:close-handle handle) t)))))
+          (declare (ignore ino nlink gid rdev size atime))
           (if existsp
               (case query-for
                 (:existence (nth-value
@@ -339,9 +346,7 @@
                              ;; ... but without any trailing slash.
                              :as-directory (eql (logand  mode sb!unix:s-ifmt)
                                                 sb!unix:s-ifdir))))
-                (:author
-                 #!-win32
-                 (sb!unix:uid-username uid))
+                (:author (sb!unix:uid-username uid))
                 (:write-date (+ unix-to-universal-time mtime)))
               (progn
                 ;; SBCL has for many years had a policy that a pathname
@@ -351,7 +356,6 @@
                 ;; we must distinguish cases where the symlink exists
                 ;; from ones where there's a loop in the apparent
                 ;; containing directory.
-                #!-win32
                 (multiple-value-bind (linkp ignore ino mode nlink uid gid rdev
                                             size atime mtime)
                     (sb!unix:unix-lstat filename)
@@ -501,9 +505,12 @@ per standard Unix unlink() behaviour."
     #!+win32
     (when (streamp file)
       (close file))
-    (multiple-value-bind (res err) (sb!unix:unix-unlink namestring)
-      (unless res
-        (simple-file-perror "Couldn't delete file ~A" namestring err))))
+    (multiple-value-bind (res err)
+        #!-win32 (sb!unix:unix-unlink namestring)
+        #!+win32 (or (sb!win32::native-delete-file namestring)
+                     (values nil (- (sb!win32:get-last-error))))
+        (unless res
+          (simple-file-perror "couldn't delete ~A" namestring err))))
   t)
 
 (defun directorize-pathname (pathname)
@@ -556,18 +563,27 @@ exist or if is a file or a symbolic link."
                               :classify-symlinks nil)
                (delete-dir dir))
              (delete-dir (dir)
-               (let* ((namestring (native-namestring dir :as-file t))
-                      (res (alien-funcall (extern-alien #!-win32 "rmdir"
-                                                        #!+win32 "_rmdir"
-                                                        (function int c-string))
-                                          namestring)))
-                 (if (minusp res)
-                     (simple-file-perror "Couldn't delete directory ~A"
-                                         namestring (get-errno))
-                     dir))))
+               (let ((namestring (native-namestring dir :as-file t)))
+                 (multiple-value-bind (res errno)
+                     #!+win32
+                     (or (sb!win32::native-delete-directory namestring)
+                         (values nil (- (sb!win32:get-last-error))))
+                     #!-win32
+                     (values
+                      (not (minusp (alien-funcall
+                                    (extern-alien "rmdir"
+                                                  (function int c-string))
+                                    namestring)))
+                      (get-errno))
+                     (if res
+                         dir
+                         (simple-file-perror
+                          "Could not delete directory ~A"
+                          namestring errno))))))
       (if recursive
           (recurse physical)
           (delete-dir physical)))))
+
 
 (defun sbcl-homedir-pathname ()
   (let ((sbcl-home (posix-getenv "SBCL_HOME")))
@@ -686,7 +702,8 @@ matching filenames."
            (canonicalize-directory (directory)
              (let (pieces)
                (dolist (piece directory)
-                 (if (and pieces (member piece '(:back :up)))
+                 (cond
+                    ((and pieces (member piece '(:back :up)))
                      ;; FIXME: We should really canonicalize when we construct
                      ;; pathnames. This is just wrong.
                      (case (car pieces)
@@ -698,8 +715,17 @@ matching filenames."
                        ((:relative :up :back)
                         (push piece pieces))
                        (t
-                        (pop pieces)))
-                     (push piece pieces)))
+                        (pop pieces))))
+                    ((equal piece ".")
+                     ;; This case only really matters on Windows,
+                     ;; because on POSIX, our call site (TRUENAME via
+                     ;; QUERY-FILE-SYSTEM) only passes in pathnames from
+                     ;; realpath(3), in which /./ has been removed
+                     ;; already.  Windows, however, depends on us to
+                     ;; perform this fixup. -- DFL
+                     )
+                    (t
+                     (push piece pieces))))
                (nreverse pieces))))
     (let ((name (simplify (pathname-name pathname)))
           (type (simplify (pathname-type pathname)))
@@ -728,6 +754,10 @@ matching filenames."
             (macrolet ((,iterator ()
                          `(funcall ,',one-iter)))
               ,@body)))
+       #!+win32
+       (sb!win32::native-call-with-directory-iterator
+        #'iterate ,namestring ,errorp)
+       #!-win32
        (call-with-native-directory-iterator #'iterate ,namestring ,errorp))))
 
 (defun call-with-native-directory-iterator (function namestring errorp)
@@ -792,9 +822,7 @@ Experimental: interface subject to change."
   (let* ((fun (%coerce-callable-to-fun function))
          (as-files (eq :as-files directories))
          (physical (physicalize-pathname directory))
-         ;; Not QUERY-FILE-SYSTEM :EXISTENCE, since it doesn't work on Windows
-         ;; network shares.
-         (realname (sb!unix:unix-realpath (native-namestring physical :as-file t)))
+         (realname (query-file-system physical :existence nil))
          (canonical (if realname
                         (parse-native-namestring realname
                                                  (pathname-host physical)
@@ -809,34 +837,39 @@ Experimental: interface subject to change."
                                         :as-directory (and dirp (not as-files)))
                                        physical))))
       (with-native-directory-iterator (next dirname :errorp errorp)
-        (loop for name = (next)
-              while name
-              do (let* ((full (concatenate 'string dirname name))
-                        (kind (native-file-kind full)))
-                   (when kind
-                     (case kind
-                       (:directory
-                        (when directories
-                          (map-it name t)))
-                       (:symlink
-                        (if classify-symlinks
-                            (let* ((tmpname (merge-pathnames
-                                             (parse-native-namestring
-                                              name nil physical :as-directory nil)
-                                             physical))
-                                   (truename (query-file-system tmpname :truename nil)))
-                              (if (or (not truename)
-                                      (or (pathname-name truename) (pathname-type truename)))
-                                  (when files
-                                    (funcall fun tmpname))
-                                  (when directories
-                                    (map-it name t))))
-                            (when files
-                              (map-it name nil))))
-                       (t
-                        ;; Anything else parses as a file.
-                        (when files
-                          (map-it name nil)))))))))))
+        (loop
+          ;; provision for FindFirstFileExW-based iterator that should be used
+          ;; on Windows: file kind is known instantly there, so we'll have it
+          ;; returned by (next) soon.
+          (multiple-value-bind (name kind) (next)
+            (unless (or name kind) (return))
+            (unless kind
+              (setf kind (native-file-kind
+                          (concatenate 'string dirname name))))
+            (when kind
+              (case kind
+                (:directory
+                 (when directories
+                   (map-it name t)))
+                (:symlink
+                 (if classify-symlinks
+                     (let* ((tmpname (merge-pathnames
+                                      (parse-native-namestring
+                                       name nil physical :as-directory nil)
+                                      physical))
+                            (truename (query-file-system tmpname :truename nil)))
+                       (if (or (not truename)
+                               (or (pathname-name truename) (pathname-type truename)))
+                           (when files
+                             (funcall fun tmpname))
+                           (when directories
+                             (map-it name t))))
+                     (when files
+                       (map-it name nil))))
+                (t
+                 ;; Anything else parses as a file.
+                 (when files
+                   (map-it name nil)))))))))))
 
 ;;; Part of DIRECTORY: implements matching the directory spec. Calls FUNCTION
 ;;; with all DIRECTORIES that match the directory portion of PATHSPEC.
@@ -1137,15 +1170,15 @@ Experimental: interface subject to change."
              :format-control "bad place for a wild pathname"
              :pathname pathspec))
     (let* ((dir (pathname-directory pathname))
-           ;; *d-p-d* can have name and type components which would prevent
-           ;; PROBE-FILE below from working
            (*default-pathname-defaults*
-             (make-pathname :directory dir :device (pathname-device pathname))))
-      (loop for i from 1 upto (length dir)
+             (make-pathname :directory dir :device (pathname-device pathname)))
+          (dev (pathname-device pathname)))
+      (loop for i from (case dev (:unc 3) (otherwise 2))
+              upto (length dir)
             do
             (let* ((newpath (make-pathname
                              :host (pathname-host pathname)
-                             :device (pathname-device pathname)
+                             :device dev
                              :directory (subseq dir 0 i)))
                    (probed (probe-file newpath)))
               (unless (directory-pathname-p probed)

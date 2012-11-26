@@ -11,6 +11,9 @@
 
 (in-package "SB!IMPL")
 
+(define-symbol-macro +long-file-name-prefix+ (quote "\\\\?\\"))
+(define-symbol-macro +unc-file-name-prefix+ (quote "\\\\?\\UNC"))
+
 (defun extract-device (namestr start end)
   (declare (type simple-string namestr)
            (type index start end))
@@ -21,17 +24,9 @@
                ;; "X:" style, saved as X
                (values (string (char namestr start)) (+ start 2)))
               ((and (member c0 '(#\/ #\\)) (eql c0 c1) (>= end (+ start 3)))
-               ;; "//UNC" style, saved as UNC
-               ;; FIXME: at unparsing time we tell these apart by length,
-               ;; which seems a bit lossy -- presumably one-letter UNC
-               ;; hosts can exist as well. That seems a less troublesome
-               ;; restriction than disallowing UNC hosts whose names match
-               ;; logical pathname hosts... Time will tell -- both LispWorks
-               ;; and ACL use the host component for UNC hosts, so maybe
-               ;; we will end up there as well.
-               (let ((p (or (position c0 namestr :start (+ start 3) :end end)
-                            end)))
-                 (values (subseq namestr (+ start 2) p) p)))
+               ;; "//UNC" style, saved as :UNC device, with host and share
+               ;; becoming directory components.
+               (values :unc (+ start 1)))
               (t
                (values nil start))))
       (values nil start)))
@@ -141,7 +136,17 @@
            (type index start end))
   (setf namestring (coerce namestring 'simple-string))
   (multiple-value-bind (device new-start)
-      (extract-device namestring start end)
+      (cond ((= (length +unc-file-name-prefix+)
+                (mismatch +unc-file-name-prefix+ namestring
+                          :start2 start))
+             (values :unc (+ start (length +unc-file-name-prefix+))))
+            ((= (length +long-file-name-prefix+)
+                (mismatch +long-file-name-prefix+ namestring
+                          :start2 start))
+             (extract-device namestring
+                             (+ start (length +long-file-name-prefix+))
+                             end))
+            (t (extract-device namestring start end)))
     (multiple-value-bind (absolute ranges)
         (split-at-slashes-and-backslashes namestring new-start end)
       (let* ((components (loop for ((start . end) . rest) on ranges
@@ -188,6 +193,8 @@
         (directory (pathname-directory pathname)))
     (cond ((or (null device) (eq device :unspecific))
            "")
+          ((eq device :unc)
+           (if native "\\" "/"))
           ((and (= 1 (length device)) (alpha-char-p (char device 0)))
            (concatenate 'simple-string device ":"))
           ((and (consp directory) (eq :relative (car directory)))
@@ -242,12 +249,25 @@
          (name-string (if name-present-p name ""))
          (type (pathname-type pathname))
          (type-present-p (typep type '(not (member nil :unspecific))))
-         (type-string (if type-present-p type "")))
+         (type-string (if type-present-p type ""))
+         (absolutep (and device (eql :absolute (car directory)))))
     (when name-present-p
       (setf as-file nil))
+    (when (and absolutep (member :up directory))
+      ;; employ merge-pathnames to parse :BACKs into which we turn :UPs
+      (setf directory
+            (pathname-directory
+             (merge-pathnames
+              (make-pathname :defaults pathname :directory '(:relative))
+              (make-pathname :defaults pathname
+                             :directory (substitute :back :up directory))))))
     (coerce
      (with-output-to-string (s)
-       (when device
+       (when absolutep
+         (write-string (case device
+                         (:unc +unc-file-name-prefix+)
+                         (otherwise +long-file-name-prefix+)) s))
+       (when (or (not absolutep) (not (member device '(:unc nil))))
          (write-string (unparse-win32-device pathname t) s))
        (when directory
          (ecase (pop directory)
@@ -259,22 +279,23 @@
                      (let ((where (user-homedir-namestring (second next))))
                        (if where
                            (write-string where s)
-                           (error "User homedir unknown for: ~S" (second next)))))
+                           (error "User homedir unknown for: ~S"
+                                  (second next)))))
                     (next
                      (push next directory)))
               (write-char #\\ s)))
            (:relative)))
        (loop for (piece . subdirs) on directory
-          do (typecase piece
-               ((member :up) (write-string ".." s))
-               (string (write-string piece s))
-               (t (error "ungood directory segment in NATIVE-NAMESTRING: ~S"
-                         piece)))
-          if (or subdirs (stringp name))
-          do (write-char #\\ s)
-          else
-          do (unless as-file
-               (write-char #\\ s)))
+             do (typecase piece
+                  ((member :up) (write-string ".." s))
+                  (string (write-string piece s))
+                  (t (error "ungood directory segment in NATIVE-NAMESTRING: ~S"
+                            piece)))
+             if (or subdirs (stringp name))
+             do (write-char #\\ s)
+             else
+             do (unless as-file
+                  (write-char #\\ s)))
        (if name-present-p
            (progn
              (unless (stringp name-string) ;some kind of wild field
@@ -288,7 +309,19 @@
            (when type-present-p ;
              (error
               "type component without a name component in NATIVE-NAMESTRING: ~S"
-              type))))
+              type)))
+       (when absolutep
+         (let ((string (get-output-stream-string s)))
+           (return-from unparse-native-win32-namestring
+             (cond ((< (- 260 12) (length string))
+                    ;; KLUDGE: account for additional length of 8.3 name to make
+                    ;; directories always accessible
+                    (coerce string 'simple-string))
+                   ((eq :unc device)
+                    (replace
+                     (subseq string (1- (length +unc-file-name-prefix+)))
+                     "\\"))
+                   (t (subseq string (length +long-file-name-prefix+))))))))
      'simple-string)))
 
 ;;; FIXME.

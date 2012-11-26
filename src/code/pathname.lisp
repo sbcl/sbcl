@@ -75,7 +75,7 @@
 ;;; all pathname components
 (eval-when (#-sb-xc :compile-toplevel :load-toplevel :execute)
   (def!type pathname-component-tokens ()
-    '(member nil :unspecific :wild)))
+    '(member nil :unspecific :wild :unc)))
 
 (sb!xc:defstruct (pathname (:conc-name %pathname-)
                            (:constructor %make-pathname (host

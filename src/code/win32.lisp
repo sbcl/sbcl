@@ -28,11 +28,45 @@
                    #!-sb-unicode c-string
                    #!+sb-unicode (c-string :external-format :ucs-2))
 
+(define-alien-type tchar #!-sb-unicode char
+                         #!+sb-unicode (unsigned 16))
+
 (defconstant default-environment-length 1024)
 
 ;;; HANDLEs are actually pointers, but an invalid handle is -1 cast
 ;;; to a pointer.
 (defconstant invalid-handle -1)
+
+(defconstant file-attribute-readonly #x1)
+(defconstant file-attribute-hidden #x2)
+(defconstant file-attribute-system #x4)
+(defconstant file-attribute-directory #x10)
+(defconstant file-attribute-archive #x20)
+(defconstant file-attribute-device #x40)
+(defconstant file-attribute-normal #x80)
+(defconstant file-attribute-temporary #x100)
+(defconstant file-attribute-sparse #x200)
+(defconstant file-attribute-reparse-point #x400)
+(defconstant file-attribute-reparse-compressed #x800)
+(defconstant file-attribute-reparse-offline #x1000)
+(defconstant file-attribute-not-content-indexed #x2000)
+(defconstant file-attribute-encrypted #x4000)
+
+(defconstant file-flag-overlapped #x40000000)
+(defconstant file-flag-sequential-scan #x8000000)
+
+;; Possible results of GetFileType.
+(defconstant file-type-disk 1)
+(defconstant file-type-char 2)
+(defconstant file-type-pipe 3)
+(defconstant file-type-remote 4)
+(defconstant file-type-unknown 0)
+
+(defconstant invalid-file-attributes (mod -1 (ash 1 32)))
+
+;;;; File Type Introspection by handle
+(define-alien-routine ("GetFileType" get-file-type) dword
+  (handle handle))
 
 ;;;; Error Handling
 
@@ -428,12 +462,26 @@
 (defmacro make-system-buffer (x)
  `(make-alien char #!+sb-unicode (ash ,x 1) #!-sb-unicode ,x))
 
+(defmacro with-handle ((var initform
+                            &key (close-operator 'close-handle))
+                            &body body)
+  `(without-interrupts
+       (block nil
+         (let ((,var ,initform))
+           (unwind-protect
+                (with-local-interrupts
+                    ,@body)
+             (,close-operator ,var))))))
+
 (define-alien-type pathname-buffer
     (array char #.(ash (1+ max_path) #!+sb-unicode 1 #!-sb-unicode 0)))
 
 (define-alien-type long-pathname-buffer
     #!+sb-unicode (array char 65536)
     #!-sb-unicode pathname-buffer)
+
+(defmacro decode-system-string (alien)
+  `(cast (cast ,alien (* char)) system-string))
 
 ;;; FIXME: The various FOO-SYSCALL-BAR macros, and perhaps some other
 ;;; macros in this file, are only used in this file, and could be
@@ -475,12 +523,16 @@
 
 (defun get-last-error-message (err)
   "http://msdn.microsoft.com/library/default.asp?url=/library/en-us/debug/base/retrieving_the_last_error_code.asp"
-  (with-alien ((amsg (* char)))
-    (syscall (("FormatMessage" t)
-              dword dword dword dword dword (* (* char)) dword dword)
-             (cast-and-free amsg :free-function local-free)
-             (logior FORMAT_MESSAGE_ALLOCATE_BUFFER FORMAT_MESSAGE_FROM_SYSTEM)
-             0 err 0 (addr amsg) 0 0)))
+  (let ((message
+         (with-alien ((amsg (* char)))
+           (syscall (("FormatMessage" t)
+                     dword dword dword dword dword (* (* char)) dword dword)
+                    (cast-and-free amsg :free-function local-free)
+                    (logior FORMAT_MESSAGE_ALLOCATE_BUFFER
+                            FORMAT_MESSAGE_FROM_SYSTEM
+                            FORMAT_MESSAGE_MAX_WIDTH_MASK)
+                    0 err 0 (addr amsg) 0 0))))
+    (and message (string-right-trim '(#\Space) message))))
 
 (defmacro win32-error (func-name &optional err)
   `(let ((err-code ,(or err `(get-last-error))))
@@ -492,35 +544,39 @@
 
 (defun get-folder-namestring (csidl)
   "http://msdn.microsoft.com/library/en-us/shellcc/platform/shell/reference/functions/shgetfolderpath.asp"
-  (with-alien ((apath (* char) (make-system-buffer (1+ max_path))))
+  (with-alien ((apath pathname-buffer))
     (syscall (("SHGetFolderPath" t) int handle int handle dword (* char))
-             (concatenate 'string (cast-and-free apath) "\\")
-             0 csidl 0 0 apath)))
+             (concatenate 'string (decode-system-string apath) "\\")
+             0 csidl 0 0 (cast apath (* char)))))
 
 (defun get-folder-pathname (csidl)
   (parse-native-namestring (get-folder-namestring csidl)))
 
 (defun sb!unix:posix-getcwd ()
-  (with-alien ((apath (* char) (make-system-buffer (1+ max_path))))
+  (with-alien ((apath pathname-buffer))
     (with-sysfun (afunc ("GetCurrentDirectory" t) dword dword (* char))
-      (let ((ret (alien-funcall afunc (1+ max_path) apath)))
+      (let ((ret (alien-funcall afunc (1+ max_path) (cast apath (* char)))))
         (when (zerop ret)
           (win32-error "GetCurrentDirectory"))
-        (when (> ret (1+ max_path))
-          (free-alien apath)
-          (setf apath (make-system-buffer ret))
-          (alien-funcall afunc ret apath))
-        (cast-and-free apath)))))
+        (if (> ret (1+ max_path))
+            (with-alien ((apath (* char) (make-system-buffer ret)))
+              (alien-funcall afunc ret apath)
+              (cast-and-free apath))
+            (decode-system-string apath))))))
 
 (defun sb!unix:unix-mkdir (name mode)
   (declare (type sb!unix:unix-pathname name)
            (type sb!unix:unix-file-mode mode)
            (ignore mode))
-  (void-syscall* (("CreateDirectory" t) system-string dword) name 0))
+  (syscall (("CreateDirectory" t) lispbool system-string (* t))
+           (values result (if result 0 (- (get-last-error))))
+           name nil))
 
 (defun sb!unix:unix-rename (name1 name2)
   (declare (type sb!unix:unix-pathname name1 name2))
-  (void-syscall* (("MoveFile" t) system-string system-string) name1 name2))
+  (syscall (("MoveFile" t) lispbool system-string system-string)
+           (values result (if result 0 (- (get-last-error))))
+           name1 name2))
 
 (defun sb!unix::posix-getenv (name)
   (declare (type simple-string name))
@@ -555,6 +611,15 @@
 ;;
 ;; http://msdn.microsoft.com/library/en-us/sysinfo/base/filetime_str.asp?
 (define-alien-type FILETIME (sb!alien:unsigned 64))
+
+;; FILETIME definition above is almost correct (on little-endian systems),
+;; except for the wrong alignment if used in another structure: the real
+;; definition is a struct of two dwords.
+;; Let's define FILETIME-MEMBER for that purpose; it will be useful with
+;; GetFileAttributesEx and FindFirstFileExW.
+
+(define-alien-type FILETIME-MEMBER
+    (struct nil (low dword) (high dword)))
 
 (defmacro with-process-times ((creation-time exit-time kernel-time user-time)
                               &body forms)
@@ -620,6 +685,9 @@
 ;;            (addr epoch)
 ;;            (addr filetime)))
 (defconstant +unix-epoch-filetime+ 116444736000000000)
+(defconstant +filetime-unit+ (* 100ns-per-internal-time-unit
+                                internal-time-units-per-second))
+(defconstant +common-lisp-epoch-filetime-seconds+ 9435484800)
 
 #!-sb-fluid
 (declaim (inline get-time-of-day))
@@ -635,15 +703,134 @@ UNIX epoch: January 1st 1970."
                (values sec (floor 100ns 10)))
              (addr system-time))))
 
+;; Data for FindFirstFileExW and GetFileAttributesEx
+(define-alien-type find-data
+    (struct nil
+            (attributes dword)
+            (ctime filetime-member)
+            (atime filetime-member)
+            (mtime filetime-member)
+            (size-low dword)
+            (size-high dword)
+            (reserved0 dword)
+            (reserved1 dword)
+            (long-name (array tchar #.max_path))
+            (short-name (array tchar 14))))
+
+(define-alien-type file-attributes
+    (struct nil
+            (attributes dword)
+            (ctime filetime-member)
+            (atime filetime-member)
+            (mtime filetime-member)
+            (size-low dword)
+            (size-high dword)))
+
+(define-alien-routine ("FindClose" find-close) lispbool
+  (handle handle))
+
+(defun attribute-file-kind (dword)
+  (if (logtest file-attribute-directory dword)
+      :directory :file))
+
+(defun native-file-write-date (native-namestring)
+  "Return file write date, represented as CL universal time."
+  (with-alien ((file-attributes file-attributes))
+    (syscall (("GetFileAttributesEx" t) lispbool
+              system-string int file-attributes)
+             (and result
+                  (- (floor (deref (cast (slot file-attributes 'mtime)
+                                         (* filetime)))
+                            +filetime-unit+)
+                     +common-lisp-epoch-filetime-seconds+))
+             native-namestring 0 file-attributes)))
+
+(defun native-probe-file-name (native-namestring)
+  "Return truename \(using GetLongPathName\) as primary value,
+File kind as secondary.
+
+Unless kind is false, null truename shouldn't be interpreted as error or file
+absense."
+  (with-alien ((file-attributes file-attributes)
+               (buffer long-pathname-buffer))
+    (syscall (("GetFileAttributesEx" t) lispbool
+              system-string int file-attributes)
+             (values
+              (syscall (("GetLongPathName" t) dword
+                        system-string long-pathname-buffer dword)
+                       (and (plusp result) (decode-system-string buffer))
+                       native-namestring buffer 32768)
+              (and result
+                   (attribute-file-kind
+                    (slot file-attributes 'attributes))))
+             native-namestring 0 file-attributes)))
+
+(defun native-delete-file (native-namestring)
+  (syscall (("DeleteFile" t) lispbool system-string)
+           result native-namestring))
+
+(defun native-delete-directory (native-namestring)
+  (syscall (("RemoveDirectory" t) lispbool system-string)
+           result native-namestring))
+
+(defun native-call-with-directory-iterator (function namestring errorp)
+  (declare (type (or null string) namestring)
+           (function function))
+  (when namestring
+    (with-alien ((find-data find-data))
+      (with-handle (handle (syscall (("FindFirstFile" t) handle
+                                     system-string find-data)
+                                    (if (eql result invalid-handle)
+                                        (if errorp
+                                            (win32-error "FindFirstFile")
+                                            (return))
+                                        result)
+                                    (concatenate 'string
+                                                 namestring "*.*")
+                                    find-data)
+                    :close-operator find-close)
+        (let ((more t))
+          (dx-flet ((one-iter ()
+                      (tagbody
+                       :next
+                         (when more
+                           (let ((name (decode-system-string
+                                        (slot find-data 'long-name)))
+                                 (attributes (slot find-data 'attributes)))
+                             (setf more
+                                   (syscall (("FindNextFile" t) lispbool
+                                             handle find-data) result
+                                             handle find-data))
+                             (cond ((equal name ".") (go :next))
+                                   ((equal name "..") (go :next))
+                                   (t
+                                    (return-from one-iter
+                                      (values name
+                                              (attribute-file-kind
+                                               attributes))))))))))
+            (funcall function #'one-iter)))))))
+
 ;; SETENV
 ;; The SetEnvironmentVariable function sets the contents of the specified
 ;; environment variable for the current process.
 ;;
 ;; http://msdn.microsoft.com/library/en-us/dllproc/base/setenvironmentvariable.asp
 (defun setenv (name value)
-  (declare (type simple-string name value))
-  (void-syscall* (("SetEnvironmentVariable" t) system-string system-string)
-                 name value))
+  (declare (type (or null simple-string) value))
+  (if value
+      (void-syscall* (("SetEnvironmentVariable" t) system-string system-string)
+                     name value)
+      (void-syscall* (("SetEnvironmentVariable" t) system-string int-ptr)
+                     name 0)))
+
+;; Let SETENV be an accessor for POSIX-GETENV.
+;;
+;; DFL: Merged this function because it seems useful to me.  But
+;; shouldn't we then define it on actual POSIX, too?
+(defun (setf sb!unix::posix-getenv) (new-value name)
+  (if (setenv name new-value)
+      new-value
+      (posix-getenv name)))
 
 (defmacro c-sizeof (s)
   "translate alien size (in bits) to c-size (in bytes)"
@@ -719,7 +906,7 @@ UNIX epoch: January 1st 1970."
   (protection dword)
   (maximum-size-high dword)
   (maximum-size-low dword)
-  (name (c-string #!+sb-unicode #!+sb-unicode :external-format :ucs-2)))
+  (name system-string))
 
 (define-alien-routine ("MapViewOfFile" map-view-of-file)
     system-area-pointer
@@ -749,13 +936,14 @@ UNIX epoch: January 1st 1970."
 (defconstant access-generic-execute #x20000000)
 (defconstant access-generic-all #x10000000)
 (defconstant access-file-append-data #x4)
+(defconstant access-delete #x00010000)
 
 ;; share modes
 (defconstant file-share-delete #x04)
 (defconstant file-share-read #x01)
 (defconstant file-share-write #x02)
 
-;; CreateFile (the real file-opening workhorse)
+;; CreateFile (the real file-opening workhorse).
 (define-alien-routine (#!+sb-unicode "CreateFileW"
                        #!-sb-unicode "CreateFileA"
                        create-file)
@@ -768,36 +956,10 @@ UNIX epoch: January 1st 1970."
   (flags-and-attributes dword)
   (template-file handle))
 
-(defconstant file-attribute-readonly #x1)
-(defconstant file-attribute-hidden #x2)
-(defconstant file-attribute-system #x4)
-(defconstant file-attribute-directory #x10)
-(defconstant file-attribute-archive #x20)
-(defconstant file-attribute-device #x40)
-(defconstant file-attribute-normal #x80)
-(defconstant file-attribute-temporary #x100)
-(defconstant file-attribute-sparse #x200)
-(defconstant file-attribute-reparse-point #x400)
-(defconstant file-attribute-reparse-compressed #x800)
-(defconstant file-attribute-reparse-offline #x1000)
-(defconstant file-attribute-not-content-indexed #x2000)
-(defconstant file-attribute-encrypted #x4000)
-
-(defconstant file-flag-overlapped #x40000000)
-(defconstant file-flag-sequential-scan #x8000000)
-
-;; Possible results of GetFileType.
-(defconstant file-type-disk 1)
-(defconstant file-type-char 2)
-(defconstant file-type-pipe 3)
-(defconstant file-type-remote 4)
-(defconstant file-type-unknown 0)
-
-(defconstant invalid-file-attributes (mod -1 (ash 1 32)))
-
-;;;; File Type Introspection by handle
-(define-alien-routine ("GetFileType" get-file-type) dword
-  (handle handle))
+;; GetFileSizeEx doesn't work with block devices :[
+(define-alien-routine ("GetFileSizeEx" get-file-size-ex)
+    bool
+  (handle handle) (file-size (signed 64) :in-out))
 
 ;; GetFileAttribute is like a tiny subset of fstat(),
 ;; enough to distinguish directories from anything else.
