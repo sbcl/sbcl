@@ -1,5 +1,5 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
-changes relative to sbcl-1.1.1:
+changes in sbcl-1.1.2 relative to sbcl-1.1.1:
   * notice: System requirements for SBCL on Microsoft Windows: Windows NT 5.1
     or newer (Windows XP, Server 2003) is required.  Support for Windows 2000
     (NT 5.0) is no longer being maintained.
