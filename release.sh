@@ -23,7 +23,7 @@ usage: $0 [-s] VERSION-NUMBER [REV]
   following:
   - Builds source tarball
   - Builds a SBCL for self-build
-  - Builds x86-64 and x86 binaries
+  - Builds x86-64 binaries
   - Uploads binaries
   - Pushes the repository
   - Builds and uploads the documentation
@@ -184,19 +184,19 @@ fi
 
 ## Build x86 release binary.
 
-if [ ! -d $SBCL_RELEASE_DIR/sbcl-$VERSION-x86-linux ]; then
-  cd $SBCL_DIR
-  sh clean.sh
-  export SBCL_ARCH=x86
-  export PATH=/scratch/src/release/x86-gcc-wrapper:$PATH
-  nice -20 ./make.sh "$SBCL_RELEASE_DIR/bin/sbcl --core $SBCL_RELEASE_DIR/bin/sbcl.core --no-userinit" >> $LOGFILE 2>&1
-  cd tests
-  nice -20 sh ./run-tests.sh >>$LOGFILE 2>&1
+#if [ ! -d $SBCL_RELEASE_DIR/sbcl-$VERSION-x86-linux ]; then
+#  cd $SBCL_DIR
+#  sh clean.sh
+#  export SBCL_ARCH=x86
+#  export PATH=/scratch/src/release/x86-gcc-wrapper:$PATH
+#  nice -20 ./make.sh "$SBCL_RELEASE_DIR/bin/sbcl --core $SBCL_RELEASE_DIR/bin/s#bcl.core --no-userinit" >> $LOGFILE 2>&1
+#  cd tests
+#  nice -20 sh ./run-tests.sh >>$LOGFILE 2>&
 
-  cd $SBCL_RELEASE_DIR
-  ln -s $SBCL_DIR $SBCL_RELEASE_DIR/sbcl-$VERSION-x86-linux
-  sh $SBCL_DIR/binary-distribution.sh sbcl-$VERSION-x86-linux
-fi
+#  cd $SBCL_RELEASE_DIR
+#  ln -s $SBCL_DIR $SBCL_RELEASE_DIR/sbcl-$VERSION-x86-linux
+#  sh $SBCL_DIR/binary-distribution.sh sbcl-$VERSION-x86-linux
+#fi
 
 ## Checksum
 
@@ -242,7 +242,6 @@ mkdir $VERSION
 chmod 775 $VERSION
 cd $VERSION
 put sbcl-$VERSION-$SFUSER.asc
-put sbcl-$VERSION-x86-linux-binary.tar.bz2
 put sbcl-$VERSION-x86-64-linux-binary.tar.bz2
 put sbcl-$VERSION-source.tar.bz2
 put sbcl-$VERSION-documentation-html.tar.bz2
@@ -280,16 +279,20 @@ if [ ! -f $SBCL_RELEASE_DIR/sbcl-page-uploaded ]; then
   git pull
   git submodule update
   cp $SBCL_DIR/NEWS .
-  perl -i -pe "s/(:x86(?:-64)? :linux :available) \".*\"/\$1 \"$VERSION\"/" \
+  perl -i -pe "s/(:x86-64 :linux :available) \".*\"/\$1 \"$VERSION\"/" \
     platform-support-platforms.lisp
 
-  export LC_CTYPE=en_US.utf8
+  export LC_CTYPE=en_GB.utf8
 
+  ## FIXME: this depends on the sbcl-$VERSION tag being visible on sf
+  ## git, not just the local machine (because of the submodule), which
+  ## means that the release.sbcl should have as its origin sf not
+  ## another local copy.
   nice -20 make manual generate-pages SBCL_TAG=sbcl-$VERSION >>$LOGFILE 2>&1
 
   COMMIT=false
 
-  git diff || COMMIT=true
+  git diff || COMMIT=true  
   links -dump platform-table.html
 
   read -n 1 -p "Ok? " A; echo  
@@ -313,8 +316,8 @@ echo
 echo perform administrative tasks:
 echo 
 echo \* https://sourceforge.net/project/admin/?group_id=1373
-echo \* In the File Manager interface, click on the source tarball and
-echo \ \ select as default download for all OSes.
+echo \* In the File Manager interface, click on \"information\" for the
+echo \ \ source tarball and select as default download for all OSes.
 echo \* mail sbcl-announce
 echo \* check and send sbcl-$VERSION-bugmail.txt to edit@bugs.launchpad.net
 echo \ \ '(sign: C-c RET s p)'
