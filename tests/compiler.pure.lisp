@@ -4357,3 +4357,16 @@
       (destructuring-bind (orig conservative) pair
         (assert sb-c::(type= (specifier-type cl-user::conservative)
                              (conservative-type (specifier-type cl-user::orig))))))))
+
+(with-test (:name (:smodular64 :wrong-width))
+  (let ((fun (compile nil
+                      '(lambda (x)
+                         (declare (type (signed-byte 64) x))
+                         (sb-c::mask-signed-field 64 (- x 7033717698976965573))))))
+    (assert (= (funcall fun 10038) -7033717698976955535))))
+
+(with-test (:name (:smodular32 :wrong-width))
+  (let ((fun (compile nil '(lambda (x)
+                             (declare (type (signed-byte 31) x))
+                             (sb-c::mask-signed-field 31 (- x 1055131947))))))
+    (assert (= (funcall fun 10038) -1055121909))))

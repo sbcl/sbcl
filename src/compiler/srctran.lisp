@@ -3160,7 +3160,7 @@
         (when (and (numberp low) (numberp high))
           (let ((width (max (integer-length high) (integer-length low))))
             (multiple-value-bind (w kind)
-                (best-modular-version width t)
+                (best-modular-version (1+ width) t)
               (when w
                 ;; FIXME: This should be (CUT-TO-WIDTH NODE KIND W T).
                 ;; [ see comment above in LOGAND optimizer ]
