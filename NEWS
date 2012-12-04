@@ -1,4 +1,8 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
+changes relative to sbcl-1.1.2:
+  * bug fix: fasls are now once again directly executable (on platforms
+    supporting shebang lines, with a suitably-installed sbcl).
+
 changes in sbcl-1.1.2 relative to sbcl-1.1.1:
   * notice: System requirements for SBCL on Microsoft Windows: Windows NT 5.1
     or newer (Windows XP, Server 2003) is required.  Support for Windows 2000

@@ -315,7 +315,14 @@
 
 ;;; Returns T if the stream is a binary input stream with a FASL header.
 (defun fasl-header-p (stream &key errorp)
-  (unless (member (stream-element-type stream) '(character base-char))
+  (unless (and (member (stream-element-type stream) '(character base-char))
+               ;; give up if it's not a file stream, or it's an
+               ;; fd-stream but it's either not bivalent or not
+               ;; seekable (doesn't really have a file)
+               (or (not (typep stream 'file-stream))
+                   (and (typep stream 'fd-stream)
+                        (or (not (sb!impl::fd-stream-bivalent-p stream))
+                            (not (sb!impl::fd-stream-file stream))))))
     (let ((p (file-position stream)))
       (unwind-protect
            (let* ((header *fasl-header-string-start-string*)

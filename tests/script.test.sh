@@ -18,6 +18,7 @@
 use_test_subdirectory
 
 tmpscript=$TEST_FILESTEM.lisp-script
+tmpfasl=$TEST_FILESTEM.lisp-fasl
 tmpout=$TEST_FILESTEM.lisp-out
 tmperr=$TEST_FILESTEM.lisp-err
 
@@ -87,7 +88,7 @@ then
     exit $EXIT_LOSE
 fi
 echo '(write-line "Ok!")' | run_sbcl --script 1>$tmpout 2>$tmperr
-check_status_maybe_lose "--script exit status script from stdin" $? 0 "(ok)"
+check_status_maybe_lose "--script exit status from stdin" $? 0 "(ok)"
 if [ -s $tmperr ] || [ "Ok!" != `cat $tmpout` ]
 then
     echo "--script unexpected error output"
@@ -105,6 +106,22 @@ if [ "`grep -c :SCRIPT-OK $tmpout`" != 1 ] ; then
    exit $EXIT_LOSE
 fi
 
-rm -f $tmpscript $tmpout $tmperr
+# automatically executing fasls
+#
+# this test is fragile, with its SBCL_HOME hack to get the shebang
+# line in the fasl to find the right core, and also is unlikely to
+# work with that mechanism on Windows.
+echo '(format t "Hello, Fasl~%")' > $tmpscript
+run_sbcl --eval "(compile-file \"$tmpscript\" :output-file \"$tmpfasl\")"  </dev/null >/dev/null
+chmod +x $tmpfasl
+SBCL_HOME=$(dirname $SBCL_CORE) ./$tmpfasl >$tmpout 2>$tmperr
+check_status_maybe_lose "--script exit status from fasl" $? 0 "(ok)"
+if [ -s $tmperr ] || [ "Hello, Fasl" != "`cat $tmpout`" ]
+then
+    echo "--script from fasl unexpected output"
+    exit $EXIT_LOSE
+fi
+
+rm -f $tmpscript $tmpout $tmperr $tmpfasl
 
 exit $EXIT_TEST_WIN
