@@ -158,7 +158,8 @@ extern void undoably_install_low_level_interrupt_handler (
                         int signal,
                         interrupt_handler_t handler);
 extern uword_t install_handler(int signal,
-                                     interrupt_handler_t handler);
+                               interrupt_handler_t handler,
+                               int synchronous);
 
 extern union interrupt_handler interrupt_handlers[NSIG];
 

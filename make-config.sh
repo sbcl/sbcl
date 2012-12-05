@@ -544,6 +544,7 @@ case "$sbcl_os" in
         # roughly-equivalent magic nevertheless:)
         printf ' :sb-dynamic-core :os-provides-dlopen' >> $ltf
         printf ' :sb-thread :sb-safepoint :sb-thruption :sb-wtimer' >> $ltf
+        printf ' :sb-safepoint-strictly' >> $ltf
         #
         link_or_copy Config.$sbcl_arch-win32 Config
         link_or_copy $sbcl_arch-win32-os.h target-arch-os.h

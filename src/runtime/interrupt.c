@@ -1779,6 +1779,89 @@ see_if_sigaction_nodefer_works(void)
 #undef SA_NODEFER_TEST_BLOCK_SIGNAL
 #undef SA_NODEFER_TEST_KILL_SIGNAL
 
+#if defined(LISP_FEATURE_SB_SAFEPOINT_STRICTLY) && !defined(LISP_FEATURE_WIN32)
+
+static void *
+signal_thread_trampoline(void *pthread_arg)
+{
+    int signo = (int) pthread_arg;
+    os_context_t fake_context;
+    siginfo_t fake_info;
+#ifdef LISP_FEATURE_PPC
+    mcontext_t uc_regs;
+#endif
+
+    memset(&fake_info, 0, sizeof(fake_info));
+    memset(&fake_context, 0, sizeof(fake_context));
+#ifdef LISP_FEATURE_PPC
+    memset(&uc_regs, 0, sizeof(uc_regs));
+    fake_context.uc_mcontext.uc_regs = &uc_regs;
+#endif
+
+    *os_context_pc_addr(&fake_context) = &signal_thread_trampoline;
+#ifdef ARCH_HAS_STACK_POINTER /* aka x86(-64) */
+    *os_context_sp_addr(&fake_context) = __builtin_frame_address(0);
+#endif
+
+    signal_handler_callback(interrupt_handlers[signo].lisp,
+                            signo, &fake_info, &fake_context);
+    return 0;
+}
+
+static void
+sigprof_handler_trampoline(int signal, siginfo_t *info, void *void_context)
+{
+    SAVE_ERRNO(signal,context,void_context);
+    struct thread *self = arch_os_get_current_thread();
+
+    /* alloc() is not re-entrant and still uses pseudo atomic (even though
+     * inline allocation does not).  In this case, give up. */
+    if (get_pseudo_atomic_atomic(self))
+        goto cleanup;
+
+    struct alloc_region tmp = self->alloc_region;
+    self->alloc_region = self->sprof_alloc_region;
+    self->sprof_alloc_region = tmp;
+
+    interrupt_handle_now_handler(signal, info, void_context);
+
+    /* And we're back.  We know that the SIGPROF handler never unwinds
+     * non-locally, and can simply swap things back: */
+
+    tmp = self->alloc_region;
+    self->alloc_region = self->sprof_alloc_region;
+    self->sprof_alloc_region = tmp;
+
+cleanup:
+    ; /* Dear C compiler, it's OK to have a label here. */
+    RESTORE_ERRNO;
+}
+
+static void
+spawn_signal_thread_handler(int signal, siginfo_t *info, void *void_context)
+{
+    SAVE_ERRNO(signal,context,void_context);
+
+    pthread_attr_t attr;
+    pthread_t th;
+
+    if (pthread_attr_init(&attr))
+        goto lost;
+    if (pthread_attr_setstacksize(&attr, thread_control_stack_size))
+        goto lost;
+    if (pthread_create(&th, &attr, &signal_thread_trampoline, (void*) signal))
+        goto lost;
+    if (pthread_attr_destroy(&attr))
+        goto lost;
+
+    RESTORE_ERRNO;
+    return;
+
+lost:
+    lose("spawn_signal_thread_handler");
+}
+#endif
+
 static void
 unblock_me_trampoline(int signal, siginfo_t *info, void *void_context)
 {
@@ -1863,7 +1946,8 @@ undoably_install_low_level_interrupt_handler (int signal,
 
 /* This is called from Lisp. */
 uword_t
-install_handler(int signal, void handler(int, siginfo_t*, os_context_t*))
+install_handler(int signal, void handler(int, siginfo_t*, os_context_t*),
+                int synchronous)
 {
 #ifndef LISP_FEATURE_WIN32
     struct sigaction sa;
@@ -1880,6 +1964,12 @@ install_handler(int signal, void handler(int, siginfo_t*, os_context_t*))
         if (ARE_SAME_HANDLER(handler, SIG_DFL) ||
             ARE_SAME_HANDLER(handler, SIG_IGN))
             sa.sa_sigaction = (void (*)(int, siginfo_t*, void*))handler;
+#ifdef LISP_FEATURE_SB_SAFEPOINT_STRICTLY
+        else if (signal == SIGPROF)
+            sa.sa_sigaction = sigprof_handler_trampoline;
+        else if (!synchronous)
+            sa.sa_sigaction = spawn_signal_thread_handler;
+#endif
         else if (sigismember(&deferrable_sigset, signal))
             sa.sa_sigaction = maybe_now_maybe_later;
         else if (!sigaction_nodefer_works &&

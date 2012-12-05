@@ -124,7 +124,9 @@
     fdefinition-object
     #!+win32 sb!kernel::handle-win32-exception
     #!+sb-thruption sb!thread::run-interruption
-    #!+sb-safepoint sb!thread::enter-foreign-callback))
+    #!+sb-safepoint sb!thread::enter-foreign-callback
+    #!+(and sb-safepoint-strictly (not win32))
+    sb!unix::signal-handler-callback))
 
 (defparameter *common-static-symbols*
   '(t

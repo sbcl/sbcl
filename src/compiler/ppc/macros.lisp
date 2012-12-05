@@ -336,6 +336,9 @@
 ;;; trap if ALLOC-TN's negative (handling the deferred interrupt) and
 ;;; using FLAG-TN - minus the large constant - to correct ALLOC-TN.
 (defmacro pseudo-atomic ((flag-tn) &body forms)
+  #!+sb-safepoint-strictly
+  `(progn ,flag-tn ,@forms (emit-safepoint))
+  #!-sb-safepoint-strictly
   `(progn
      (without-scheduling ()
        ;; Extra debugging stuff:

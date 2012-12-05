@@ -117,11 +117,25 @@
 (sb!alien:define-alien-routine ("install_handler" install-handler)
                                sb!alien:unsigned-long
   (signal sb!alien:int)
-  (handler sb!alien:unsigned-long))
+  (handler sb!alien:unsigned-long)
+  (synchronous boolean))
 
 ;;;; interface to enabling and disabling signal handlers
 
-(defun enable-interrupt (signal handler)
+;;; Note on the SYNCHRONOUS argument: On builds without pseudo-atomic,
+;;; we have no way of knowing whether interrupted code was in an
+;;; allocation sequence, and cannot delay signals until after
+;;; allocation.  Any signal that can occur asynchronously must be
+;;; considered unsafe for immediate execution, and the invocation of its
+;;; lisp handler will get delayed into a newly spawned signal handler
+;;; thread.  However, there are signals which we must handle
+;;; immediately, because they occur synchonously (hence the boolean flag
+;;; SYNCHRONOUS to this function), luckily implying that the signal
+;;; happens only in specific places (illegal instructions, floating
+;;; point instructions, certain system calls), hopefully ruling out the
+;;; possibility that we would trigger it during allocation.
+
+(defun enable-interrupt (signal handler &key synchronous)
   (declare (type (or function fixnum (member :default :ignore)) handler))
   (/show0 "enable-interrupt")
   (flet ((run-handler (&rest args)
@@ -135,7 +149,8 @@
                                        (:ignore sig-ign)
                                        (t
                                         (sb!kernel:get-lisp-obj-address
-                                         #'run-handler))))))
+                                         #'run-handler)))
+                                     synchronous)))
         (cond ((= result sig-dfl) :default)
               ((= result sig-ign) :ignore)
               (t (the (or function fixnum)
@@ -146,6 +161,26 @@
 
 (defun ignore-interrupt (signal)
   (enable-interrupt signal :ignore))
+
+;;;; Support for signal handlers which aren't.
+;;;;
+;;;; On safepoint builds, user-defined Lisp signal handlers do not run
+;;;; in the handler for their signal, because we have no pseudo atomic
+;;;; mechanism to prevent handlers from hitting during allocation.
+;;;; Rather, the signal spawns off a fresh native thread, which calls
+;;;; into lisp with a fake context through this callback:
+
+#!+(and sb-safepoint-strictly (not win32))
+(defun signal-handler-callback (run-handler signal args)
+  (sb!thread::initial-thread-function-trampoline
+   (sb!thread::make-signal-handling-thread :name "signal handler"
+                                           :signal-number signal)
+   nil (lambda ()
+         (let* ((info (sb!sys:sap-ref-sap args 0))
+                (context (sb!sys:sap-ref-sap args sb!vm:n-word-bytes)))
+           (funcall run-handler signal info context)))
+   nil nil nil nil))
+
 
 ;;;; default LISP signal handlers
 ;;;;
@@ -237,13 +272,13 @@
   "Enable all the default signals that Lisp knows how to deal with."
   (enable-interrupt sigint #'sigint-handler)
   (enable-interrupt sigterm #'sigterm-handler)
-  (enable-interrupt sigill #'sigill-handler)
+  (enable-interrupt sigill #'sigill-handler :synchronous t)
   #!-linux
   (enable-interrupt sigemt #'sigemt-handler)
-  (enable-interrupt sigfpe #'sb!vm:sigfpe-handler)
-  (enable-interrupt sigbus #'sigbus-handler)
+  (enable-interrupt sigfpe #'sb!vm:sigfpe-handler :synchronous t)
+  (enable-interrupt sigbus #'sigbus-handler :synchronous t)
   #!-linux
-  (enable-interrupt sigsys #'sigsys-handler)
+  (enable-interrupt sigsys #'sigsys-handler :synchronous t)
   #!-sb-wtimer
   (enable-interrupt sigalrm #'sigalrm-handler)
   #!-sb-thruption

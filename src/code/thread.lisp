@@ -42,6 +42,14 @@ in future versions."
   "Type of native threads which are attached to the runtime as Lisp threads
 temporarily.")
 
+#!+(and sb-safepoint-strictly (not win32))
+(def!struct (signal-handling-thread
+             (:include foreign-thread)
+             (:conc-name "THREAD-"))
+  #!+sb-doc
+  "Asynchronous signal handling thread."
+  (signal-number nil :type integer))
+
 (def!struct mutex
   #!+sb-doc
   "Mutex type."

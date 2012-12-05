@@ -792,7 +792,9 @@ The following keyword args are recognized:
                                     :mode mode))
       (enable-call-counting)
       (setf *profiled-threads* threads)
-      (sb-sys:enable-interrupt sb-unix:sigprof #'sigprof-handler)
+      (sb-sys:enable-interrupt sb-unix:sigprof
+                               #'sigprof-handler
+                               :synchronous t)
       (ecase mode
         (:alloc
          (let ((alloc-signal (1- alloc-interval)))
@@ -1404,6 +1406,23 @@ functions during statistical profiling."
 (defun test ()
   (with-profiling (:reset t :max-samples 1000 :report :graph)
     (test-0 7)))
+
+(defun consalot ()
+  (let ((junk '()))
+    (loop repeat 10000 do
+         (push (make-array 10) junk))
+    junk))
+
+(defun consing-test ()
+  ;; 0.0001 chosen so that it breaks rather reliably when sprof does not
+  ;; respect pseudo atomic.
+  (with-profiling (:reset t :sample-interval 0.0001 :report :graph :loop nil)
+    (let ((target (+ (get-universal-time) 15)))
+      (princ #\.)
+      (force-output)
+      (loop
+         while (< (get-universal-time) target)
+         do (consalot)))))
 
 
 ;;; provision

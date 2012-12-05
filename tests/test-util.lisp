@@ -69,6 +69,10 @@
                     (setf ,threads (union (union *threads-to-kill*
                                                  *threads-to-join*)
                                           ,threads))
+                    #+(and sb-safepoint-strictly (not win32))
+                    (dolist (thread (sb-thread:list-all-threads))
+                      (when (typep thread 'sb-thread:signal-handling-thread)
+                        (ignore-errors (sb-thread:join-thread thread))))
                     (dolist (thread (sb-thread:list-all-threads))
                       (unless (or (not (sb-thread:thread-alive-p thread))
                                   (eql thread sb-thread:*current-thread*)

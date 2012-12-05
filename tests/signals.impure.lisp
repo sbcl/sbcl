@@ -70,9 +70,15 @@
                   :skipped-on :win32)
   (assert (eq :condition
               (handler-case
-                  (sb-thread::kill-safely
-                   (sb-thread::thread-os-thread sb-thread::*current-thread*)
-                   sb-unix:sigint)
+                  (progn
+                    (sb-thread::kill-safely
+                     (sb-thread::thread-os-thread sb-thread::*current-thread*)
+                     sb-unix:sigint)
+                    #+sb-safepoint-strictly
+                    ;; In this case, the signals handler gets invoked
+                    ;; indirectly through an INTERRUPT-THREAD.  Give it
+                    ;; enough time to hit.
+                    (sleep 1))
                 (sb-sys:interactive-interrupt ()
                   :condition)))))
 

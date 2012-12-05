@@ -4306,9 +4306,7 @@ general_alloc(sword_t nbytes, int page_type_flag)
 lispobj AMD64_SYSV_ABI *
 alloc(long nbytes)
 {
-#ifdef LISP_FEATURE_WIN32
-    /* WIN32 is currently the only platform where inline allocation is
-     * not pseudo atomic. */
+#ifdef LISP_FEATURE_SB_SAFEPOINT_STRICTLY
     struct thread *self = arch_os_get_current_thread();
     int was_pseudo_atomic = get_pseudo_atomic_atomic(self);
     if (!was_pseudo_atomic)
@@ -4319,7 +4317,7 @@ alloc(long nbytes)
 
     lispobj *result = general_alloc(nbytes, BOXED_PAGE_FLAG);
 
-#ifdef LISP_FEATURE_WIN32
+#ifdef LISP_FEATURE_SB_SAFEPOINT_STRICTLY
     if (!was_pseudo_atomic)
         clear_pseudo_atomic_atomic(self);
 #endif
@@ -4434,8 +4432,12 @@ void gc_alloc_update_all_page_tables(void)
 {
     /* Flush the alloc regions updating the tables. */
     struct thread *th;
-    for_each_thread(th)
+    for_each_thread(th) {
         gc_alloc_update_page_tables(BOXED_PAGE_FLAG, &th->alloc_region);
+#if defined(LISP_FEATURE_SB_SAFEPOINT_STRICTLY) && !defined(LISP_FEATURE_WIN32)
+        gc_alloc_update_page_tables(BOXED_PAGE_FLAG, &th->sprof_alloc_region);
+#endif
+    }
     gc_alloc_update_page_tables(UNBOXED_PAGE_FLAG, &unboxed_region);
     gc_alloc_update_page_tables(BOXED_PAGE_FLAG, &boxed_region);
 }

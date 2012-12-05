@@ -95,7 +95,7 @@ void
 sigint_init(void)
 {
     SHOW("entering sigint_init()");
-    install_handler(SIGINT, sigint_handler);
+    install_handler(SIGINT, sigint_handler, 1);
     SHOW("leaving sigint_init()");
 }
 

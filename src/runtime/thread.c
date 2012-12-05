@@ -401,6 +401,9 @@ undo_init_new_thread(struct thread *th, init_thread_data *scribble)
 #ifdef LISP_FEATURE_SB_SAFEPOINT
     block_blockable_signals(0, 0);
     gc_alloc_update_page_tables(BOXED_PAGE_FLAG, &th->alloc_region);
+#if defined(LISP_FEATURE_SB_SAFEPOINT_STRICTLY) && !defined(LISP_FEATURE_WIN32)
+    gc_alloc_update_page_tables(BOXED_PAGE_FLAG, &th->sprof_alloc_region);
+#endif
     pop_gcing_safety(&scribble->safety);
     lock_ret = pthread_mutex_lock(&all_threads_lock);
     gc_assert(lock_ret == 0);
@@ -418,6 +421,9 @@ undo_init_new_thread(struct thread *th, init_thread_data *scribble)
     gc_assert(lock_ret == 0);
 
     gc_alloc_update_page_tables(BOXED_PAGE_FLAG, &th->alloc_region);
+#if defined(LISP_FEATURE_SB_SAFEPOINT_STRICTLY) && !defined(LISP_FEATURE_WIN32)
+    gc_alloc_update_page_tables(BOXED_PAGE_FLAG, &th->sprof_alloc_region);
+#endif
     unlink_thread(th);
     pthread_mutex_unlock(&all_threads_lock);
     gc_assert(lock_ret == 0);
@@ -700,6 +706,9 @@ create_thread_struct(lispobj initial_function) {
 #endif
 #ifdef LISP_FEATURE_GENCGC
     gc_set_region_empty(&th->alloc_region);
+# if defined(LISP_FEATURE_SB_SAFEPOINT_STRICTLY) && !defined(LISP_FEATURE_WIN32)
+    gc_set_region_empty(&th->sprof_alloc_region);
+# endif
 #endif
 #ifdef LISP_FEATURE_SB_THREAD
     /* This parallels the same logic in globals.c for the

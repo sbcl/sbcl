@@ -422,6 +422,11 @@ int check_pending_thruptions(os_context_t *ctx);
 void attach_os_thread(init_thread_data *);
 void detach_os_thread(init_thread_data *);
 
+# if defined(LISP_FEATURE_SB_SAFEPOINT_STRICTLY) && !defined(LISP_FEATURE_WIN32)
+
+void signal_handler_callback(lispobj, int, void *, void *);
+# endif
+
 #endif
 
 extern void create_initial_thread(lispobj);

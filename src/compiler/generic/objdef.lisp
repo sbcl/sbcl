@@ -434,6 +434,8 @@
   #!+sb-safepoint (csp-around-foreign-call :c-type "lispobj *")
   #!+sb-safepoint (pc-around-foreign-call :c-type "lispobj *")
   #!+win32 (synchronous-io-handle-and-flag :c-type "HANDLE" :length 1)
+  #!+(and sb-safepoint-strictly (not win32))
+  (sprof-alloc-region :c-type "struct alloc_region" :length 5)
   ;; KLUDGE: On alpha, until STEPPING we have been lucky and the 32
   ;; bit slots came in pairs. However the C compiler will align
   ;; interrupt_contexts on a double word boundary. This logic should

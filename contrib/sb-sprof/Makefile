@@ -2,4 +2,4 @@ MODULE=sb-sprof
 include ../vanilla-module.mk
 
 test::
-	        true
+	$(SBCL) --eval '(load (format nil "SYS:CONTRIB;~:@(~A~);TEST.LISP" "$(MODULE)"))' </dev/null
