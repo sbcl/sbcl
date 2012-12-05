@@ -347,6 +347,13 @@ extern kern_return_t mach_lisp_thread_init(struct thread *thread);
 extern kern_return_t mach_lisp_thread_destroy(struct thread *thread);
 #endif
 
+typedef struct init_thread_data {
+#ifdef LISP_FEATURE_SB_SAFEPOINT
+    struct gcing_safety safety;
+#endif
+    void *dummy;
+} init_thread_data;
+
 #ifdef LISP_FEATURE_SB_SAFEPOINT
 void thread_in_safety_transition(os_context_t *ctx);
 void thread_in_lisp_raised(os_context_t *ctx);

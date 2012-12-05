@@ -349,25 +349,12 @@ schedule_thread_post_mortem(struct thread *corpse)
 
 # endif /* !IMMEDIATE_POST_MORTEM */
 
-/* this is the first thing that runs in the child (which is why the
- * silly calling convention).  Basically it calls the user's requested
- * lisp function after doing arch_os_thread_init and whatever other
- * bookkeeping needs to be done
- */
-int
-new_thread_trampoline(struct thread *th)
+static void
+init_new_thread(struct thread *th, init_thread_data *scribble)
 {
-    lispobj function;
-    int result, lock_ret;
+    int lock_ret;
 
-    FSHOW((stderr,"/creating thread %lu\n", thread_self()));
-    check_deferrables_blocked_or_lose(0);
-#ifndef LISP_FEATURE_SB_SAFEPOINT
-    check_gc_signals_unblocked_or_lose(0);
-#endif
     pthread_setspecific(lisp_thread, (void *)1);
-    function = th->no_tls_value_marker;
-    th->no_tls_value_marker = NO_TLS_VALUE_MARKER_WIDETAG;
     if(arch_os_thread_init(th)==0) {
         /* FIXME: handle error */
         lose("arch_os_thread_init failed\n");
@@ -382,7 +369,7 @@ new_thread_trampoline(struct thread *th)
      * danger of deadlocking even with SIG_STOP_FOR_GC blocked (which
      * it is not). */
 #ifdef LISP_FEATURE_SB_SAFEPOINT
-    *th->csp_around_foreign_call = (lispobj)&function;
+    *th->csp_around_foreign_call = (lispobj)&lock_ret;
 #endif
     lock_ret = pthread_mutex_lock(&all_threads_lock);
     gc_assert(lock_ret == 0);
@@ -397,19 +384,28 @@ new_thread_trampoline(struct thread *th)
     gc_state_lock();
     gc_state_wait(GC_NONE);
     gc_state_unlock();
-    WITH_GC_AT_SAFEPOINTS_ONLY() {
-        result = funcall0(function);
-        block_blockable_signals(0, 0);
-        gc_alloc_update_page_tables(BOXED_PAGE_FLAG, &th->alloc_region);
-    }
+    push_gcing_safety(&scribble->safety);
+#endif
+}
+
+static void
+undo_init_new_thread(struct thread *th, init_thread_data *scribble)
+{
+    int lock_ret;
+
+    /* Kludge: Changed the order of some steps between the safepoint/
+     * non-safepoint versions of this code.  Can we unify this more?
+     */
+#ifdef LISP_FEATURE_SB_SAFEPOINT
+    block_blockable_signals(0, 0);
+    gc_alloc_update_page_tables(BOXED_PAGE_FLAG, &th->alloc_region);
+    pop_gcing_safety(&scribble->safety);
     lock_ret = pthread_mutex_lock(&all_threads_lock);
     gc_assert(lock_ret == 0);
     unlink_thread(th);
     lock_ret = pthread_mutex_unlock(&all_threads_lock);
     gc_assert(lock_ret == 0);
 #else
-    result = funcall0(function);
-
     /* Block GC */
     block_blockable_signals(0, 0);
     set_thread_state(th, STATE_DEAD);
@@ -454,6 +450,31 @@ new_thread_trampoline(struct thread *th)
 #endif
 
     schedule_thread_post_mortem(th);
+}
+
+/* this is the first thing that runs in the child (which is why the
+ * silly calling convention).  Basically it calls the user's requested
+ * lisp function after doing arch_os_thread_init and whatever other
+ * bookkeeping needs to be done
+ */
+int
+new_thread_trampoline(struct thread *th)
+{
+    int result;
+    init_thread_data scribble;
+
+    FSHOW((stderr,"/creating thread %lu\n", thread_self()));
+    check_deferrables_blocked_or_lose(0);
+#ifndef LISP_FEATURE_SB_SAFEPOINT
+    check_gc_signals_unblocked_or_lose(0);
+#endif
+
+    lispobj function = th->no_tls_value_marker;
+    th->no_tls_value_marker = NO_TLS_VALUE_MARKER_WIDETAG;
+    init_new_thread(th, &scribble);
+    result = funcall0(function);
+    undo_init_new_thread(th, &scribble);
+
     FSHOW((stderr,"/exiting thread %lu\n", thread_self()));
     return result;
 }
