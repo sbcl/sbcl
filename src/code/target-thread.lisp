@@ -1349,6 +1349,83 @@ have the foreground next."
 
 ;;;; The beef
 
+#!+sb-thread
+(defun initial-thread-function-trampoline
+    (thread setup-sem real-function arguments)
+  ;; In time we'll move some of the binding presently done in C here
+  ;; too.
+  ;;
+  ;; KLUDGE: Here we have a magic list of variables that are not
+  ;; thread-safe for one reason or another.  As people report problems
+  ;; with the thread safety of certain variables, (e.g. "*print-case* in
+  ;; multiple threads broken", sbcl-devel 2006-07-14), we add a few more
+  ;; bindings here.  The Right Thing is probably some variant of
+  ;; Allegro's *cl-default-special-bindings*, as that is at least
+  ;; accessible to users to secure their own libraries.
+  ;;   --njf, 2006-07-15
+  ;;
+  ;; As it is, this lambda must not cons until we are ready to run
+  ;; GC. Be very careful.
+  (let* ((*current-thread* thread)
+         (*restart-clusters* nil)
+         (*handler-clusters* (sb!kernel::initial-handler-clusters))
+         (*condition-restarts* nil)
+         (*exit-in-process* nil)
+         (sb!impl::*deadline* nil)
+         (sb!impl::*deadline-seconds* nil)
+         (sb!impl::*step-out* nil)
+         ;; internal printer variables
+         (sb!impl::*previous-case* nil)
+         (sb!impl::*previous-readtable-case* nil)
+         (sb!impl::*internal-symbol-output-fun* nil)
+         (sb!impl::*descriptor-handlers* nil)) ; serve-event
+    ;; Binding from C
+    (setf sb!vm:*alloc-signal* *default-alloc-signal*)
+    (setf (thread-os-thread thread) (current-thread-os-thread))
+    (with-mutex ((thread-result-lock thread))
+      (with-all-threads-lock
+          (push thread *all-threads*))
+      (with-session-lock (*session*)
+        (push thread (session-threads *session*)))
+      (setf (thread-%alive-p thread) t)
+      (signal-semaphore setup-sem)
+      ;; Using handling-end-of-the-world would be a bit tricky
+      ;; due to other catches and interrupts, so we essentially
+      ;; re-implement it here. Once and only once more.
+      (catch 'sb!impl::toplevel-catcher
+        (catch 'sb!impl::%end-of-the-world
+          (catch '%abort-thread
+            (with-simple-restart
+                (abort "~@<Abort thread (~A)~@:>" *current-thread*)
+              (without-interrupts
+                  (unwind-protect
+                       (with-local-interrupts
+                           (sb!unix::unblock-deferrable-signals)
+                         (setf (thread-result thread)
+                               (prog1
+                                   (cons t
+                                         (multiple-value-list
+                                          (unwind-protect
+                                               (catch '%return-from-thread
+                                                 (apply real-function arguments))
+                                            (when *exit-in-process*
+                                              (sb!impl::call-exit-hooks)))))
+                                 #!+sb-safepoint
+                                 (sb!kernel::gc-safepoint))))
+                    ;; We're going down, can't handle interrupts
+                    ;; sanely anymore. GC remains enabled.
+                    (block-deferrable-signals)
+                    ;; We don't want to run interrupts in a dead
+                    ;; thread when we leave WITHOUT-INTERRUPTS.
+                    ;; This potentially causes important
+                    ;; interupts to be lost: SIGINT comes to
+                    ;; mind.
+                    (setq *interrupt-pending* nil)
+                    #!+sb-thruption
+                    (setq *thruption-pending* nil)
+                    (handle-thread-exit thread)))))))))
+  (values))
+
 (defun make-thread (function &key name arguments ephemeral)
   #!+sb-doc
   "Create a new thread of NAME that runs FUNCTION with the argument
@@ -1376,81 +1453,11 @@ See also: RETURN-FROM-THREAD, ABORT-THREAD."
                                  arguments
                                  (list arguments)))
               (initial-function
-                (named-lambda initial-thread-function ()
-                  ;; In time we'll move some of the binding presently done in C
-                  ;; here too.
-                  ;;
-                  ;; KLUDGE: Here we have a magic list of variables that are
-                  ;; not thread-safe for one reason or another.  As people
-                  ;; report problems with the thread safety of certain
-                  ;; variables, (e.g. "*print-case* in multiple threads
-                  ;; broken", sbcl-devel 2006-07-14), we add a few more
-                  ;; bindings here.  The Right Thing is probably some variant
-                  ;; of Allegro's *cl-default-special-bindings*, as that is at
-                  ;; least accessible to users to secure their own libraries.
-                  ;;   --njf, 2006-07-15
-                  ;;
-                  ;; As it is, this lambda must not cons until we are ready
-                  ;; to run GC. Be very careful.
-                  (let* ((*current-thread* thread)
-                         (*restart-clusters* nil)
-                         (*handler-clusters* (sb!kernel::initial-handler-clusters))
-                         (*condition-restarts* nil)
-                         (*exit-in-process* nil)
-                         (sb!impl::*deadline* nil)
-                         (sb!impl::*deadline-seconds* nil)
-                         (sb!impl::*step-out* nil)
-                         ;; internal printer variables
-                         (sb!impl::*previous-case* nil)
-                         (sb!impl::*previous-readtable-case* nil)
-                         (sb!impl::*internal-symbol-output-fun* nil)
-                         (sb!impl::*descriptor-handlers* nil)) ; serve-event
-                    ;; Binding from C
-                    (setf sb!vm:*alloc-signal* *default-alloc-signal*)
-                    (setf (thread-os-thread thread) (current-thread-os-thread))
-                    (with-mutex ((thread-result-lock thread))
-                      (with-all-threads-lock
-                        (push thread *all-threads*))
-                      (with-session-lock (*session*)
-                        (push thread (session-threads *session*)))
-                      (setf (thread-%alive-p thread) t)
-                      (signal-semaphore setup-sem)
-                      ;; Using handling-end-of-the-world would be a bit tricky
-                      ;; due to other catches and interrupts, so we essentially
-                      ;; re-implement it here. Once and only once more.
-                      (catch 'sb!impl::toplevel-catcher
-                        (catch 'sb!impl::%end-of-the-world
-                          (catch '%abort-thread
-                            (with-simple-restart
-                                (abort "~@<Abort thread (~A)~@:>" *current-thread*)
-                              (without-interrupts
-                                (unwind-protect
-                                     (with-local-interrupts
-                                       (sb!unix::unblock-deferrable-signals)
-                                       (setf (thread-result thread)
-                                             (prog1
-                                                 (cons t
-                                                       (multiple-value-list
-                                                        (unwind-protect
-                                                             (catch '%return-from-thread
-                                                               (apply real-function arguments))
-                                                          (when *exit-in-process*
-                                                            (sb!impl::call-exit-hooks)))))
-                                               #!+sb-safepoint
-                                               (sb!kernel::gc-safepoint))))
-                                  ;; We're going down, can't handle interrupts
-                                  ;; sanely anymore. GC remains enabled.
-                                  (block-deferrable-signals)
-                                  ;; We don't want to run interrupts in a dead
-                                  ;; thread when we leave WITHOUT-INTERRUPTS.
-                                  ;; This potentially causes important
-                                  ;; interupts to be lost: SIGINT comes to
-                                  ;; mind.
-                                  (setq *interrupt-pending* nil)
-                                  #!+sb-thruption
-                                  (setq *thruption-pending* nil)
-                                  (handle-thread-exit thread)))))))))
-                  (values))))
+               (named-lambda initial-thread-function ()
+                 ;; As it is, this lambda must not cons until we are ready
+                 ;; to run GC. Be very careful.
+                 (initial-thread-function-trampoline
+                  thread setup-sem real-function arguments))))
          ;; If the starting thread is stopped for gc before it signals the
          ;; semaphore then we'd be stuck.
          (assert (not *gc-inhibit*))
