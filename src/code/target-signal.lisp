@@ -214,6 +214,15 @@
   (declare (type system-area-pointer context))
   (/show "in Lisp-level SIGINT handler" (sap-int context))
   (flet ((interrupt-it ()
+           ;; This seems wrong to me on multi-threaded builds.  The
+           ;; closed-over signal context belongs to a SIGINT handler.
+           ;; But this function gets run through INTERRUPT-THREAD,
+           ;; i.e. in in a SIGPIPE handler, at a different point in time
+           ;; or even a different thread.  How do we know that the
+           ;; SIGINT's context structure from the other thread is still
+           ;; alive and meaningful?  Why do we care?  If we even need
+           ;; the context and PC, shouldn't they come from the SIGPIPE's
+           ;; context? --DFL
            (with-alien ((context (* os-context-t) context))
              (with-interrupts
                (let ((int (make-condition 'interactive-interrupt
