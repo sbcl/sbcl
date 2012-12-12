@@ -349,8 +349,9 @@ schedule_thread_post_mortem(struct thread *corpse)
 
 # endif /* !IMMEDIATE_POST_MORTEM */
 
+/* Note: scribble must be stack-allocated */
 static void
-init_new_thread(struct thread *th, init_thread_data *scribble)
+init_new_thread(struct thread *th, init_thread_data *scribble, int guardp)
 {
     int lock_ret;
 
@@ -361,7 +362,8 @@ init_new_thread(struct thread *th, init_thread_data *scribble)
     }
 
     th->os_thread=thread_self();
-    protect_control_stack_guard_page(1, NULL);
+    if (guardp)
+        protect_control_stack_guard_page(1, NULL);
     protect_binding_stack_guard_page(1, NULL);
     protect_alien_stack_guard_page(1, NULL);
     /* Since GC can only know about this thread from the all_threads
@@ -369,7 +371,7 @@ init_new_thread(struct thread *th, init_thread_data *scribble)
      * danger of deadlocking even with SIG_STOP_FOR_GC blocked (which
      * it is not). */
 #ifdef LISP_FEATURE_SB_SAFEPOINT
-    *th->csp_around_foreign_call = (lispobj)&lock_ret;
+    *th->csp_around_foreign_call = (lispobj)scribble;
 #endif
     lock_ret = pthread_mutex_lock(&all_threads_lock);
     gc_assert(lock_ret == 0);
@@ -449,6 +451,15 @@ undo_init_new_thread(struct thread *th, init_thread_data *scribble)
     TlsSetValue(OUR_TLS_INDEX,NULL);
 #endif
 
+    /* Undo the association of the current pthread to its `struct thread',
+     * such that we can call arch_os_get_current_thread() later in this
+     * thread and cleanly get back NULL. */
+#ifdef LISP_FEATURE_GCC_TLS
+    current_thread = NULL;
+#else
+    pthread_setspecific(specials, NULL);
+#endif
+
     schedule_thread_post_mortem(th);
 }
 
@@ -471,13 +482,74 @@ new_thread_trampoline(struct thread *th)
 
     lispobj function = th->no_tls_value_marker;
     th->no_tls_value_marker = NO_TLS_VALUE_MARKER_WIDETAG;
-    init_new_thread(th, &scribble);
+    init_new_thread(th, &scribble, 1);
     result = funcall0(function);
     undo_init_new_thread(th, &scribble);
 
     FSHOW((stderr,"/exiting thread %lu\n", thread_self()));
     return result;
 }
+
+# ifdef LISP_FEATURE_SB_SAFEPOINT
+static struct thread *create_thread_struct(lispobj);
+
+void
+attach_os_thread(init_thread_data *scribble)
+{
+    os_thread_t os = pthread_self();
+    odxprint(misc, "attach_os_thread: attaching to %p", os);
+
+    struct thread *th = create_thread_struct(NIL);
+    block_deferrable_signals(0, &scribble->oldset);
+    th->no_tls_value_marker = NO_TLS_VALUE_MARKER_WIDETAG;
+    /* We don't actually want a pthread_attr here, but rather than add
+     * `if's to the post-mostem, let's just keep that code happy by
+     * keeping it initialized: */
+    pthread_attr_init(th->os_attr);
+
+#ifndef LISP_FEATURE_WIN32
+    /* On windows, arch_os_thread_init will take care of finding the
+     * stack. */
+    pthread_attr_t attr;
+    int pthread_getattr_np(pthread_t, pthread_attr_t *);
+    pthread_getattr_np(os, &attr);
+    void *stack_addr;
+    size_t stack_size;
+    pthread_attr_getstack(&attr, &stack_addr, &stack_size);
+    th->control_stack_start = stack_addr;
+    th->control_stack_end = (void *) (((uintptr_t) stack_addr) + stack_size);
+#endif
+
+    init_new_thread(th, scribble, 0);
+
+    /* We will be calling into Lisp soon, and the functions being called
+     * recklessly ignore the comment in target-thread which says that we
+     * must be careful to not cause GC while initializing a new thread.
+     * Since we first need to create a fresh thread object, it's really
+     * tempting to just perform such unsafe allocation though.  So let's
+     * at least try to suppress GC before consing, and hope that it
+     * works: */
+    SetSymbolValue(GC_INHIBIT, T, th);
+
+    uword_t stacksize
+        = (uword_t) th->control_stack_end - (uword_t) th->control_stack_start;
+    odxprint(misc, "attach_os_thread: attached %p as %p (0x%lx bytes stack)",
+             os, th, (long) stacksize);
+}
+
+void
+detach_os_thread(init_thread_data *scribble)
+{
+    struct thread *th = arch_os_get_current_thread();
+    odxprint(misc, "detach_os_thread: detaching");
+
+    undo_init_new_thread(th, scribble);
+
+    odxprint(misc, "deattach_os_thread: detached");
+    pthread_setspecific(lisp_thread, (void *)0);
+    thread_sigmask(SIG_SETMASK, &scribble->oldset, 0);
+}
+# endif /* safepoint */
 
 #endif /* LISP_FEATURE_SB_THREAD */
 

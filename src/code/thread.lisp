@@ -35,6 +35,13 @@ in future versions."
    :type mutex)
   waiting-for)
 
+(def!struct (foreign-thread
+             (:include thread)
+             (:conc-name "THREAD-"))
+  #!+sb-doc
+  "Type of native threads which are attached to the runtime as Lisp threads
+temporarily.")
+
 (def!struct mutex
   #!+sb-doc
   "Mutex type."

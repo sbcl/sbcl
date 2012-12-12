@@ -338,10 +338,10 @@ extern kern_return_t mach_lisp_thread_destroy(struct thread *thread);
 #endif
 
 typedef struct init_thread_data {
+    sigset_t oldset;
 #ifdef LISP_FEATURE_SB_SAFEPOINT
     struct gcing_safety safety;
 #endif
-    void *dummy;
 } init_thread_data;
 
 #ifdef LISP_FEATURE_SB_SAFEPOINT
@@ -418,6 +418,9 @@ void pop_gcing_safety(struct gcing_safety *from)
     WITH_STATE_SEM_hygenic(sbcl__state_sem, thread)
 
 int check_pending_thruptions(os_context_t *ctx);
+
+void attach_os_thread(init_thread_data *);
+void detach_os_thread(init_thread_data *);
 
 #endif
 

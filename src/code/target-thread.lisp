@@ -1351,7 +1351,7 @@ have the foreground next."
 
 #!+sb-thread
 (defun initial-thread-function-trampoline
-    (thread setup-sem real-function arguments)
+    (thread setup-sem real-function arguments arg1 arg2 arg3)
   ;; In time we'll move some of the binding presently done in C here
   ;; too.
   ;;
@@ -1388,7 +1388,7 @@ have the foreground next."
       (with-session-lock (*session*)
         (push thread (session-threads *session*)))
       (setf (thread-%alive-p thread) t)
-      (signal-semaphore setup-sem)
+      (when setup-sem (signal-semaphore setup-sem))
       ;; Using handling-end-of-the-world would be a bit tricky
       ;; due to other catches and interrupts, so we essentially
       ;; re-implement it here. Once and only once more.
@@ -1400,14 +1400,17 @@ have the foreground next."
               (without-interrupts
                   (unwind-protect
                        (with-local-interrupts
-                           (sb!unix::unblock-deferrable-signals)
+                         (setf *gc-inhibit* nil) ;for foreign callbacks
+                         (sb!unix::unblock-deferrable-signals)
                          (setf (thread-result thread)
                                (prog1
                                    (cons t
                                          (multiple-value-list
                                           (unwind-protect
                                                (catch '%return-from-thread
-                                                 (apply real-function arguments))
+                                                 (if (listp arguments)
+                                                     (apply real-function arguments)
+                                                     (funcall real-function arg1 arg2 arg3)))
                                             (when *exit-in-process*
                                               (sb!impl::call-exit-hooks)))))
                                  #!+sb-safepoint
@@ -1457,7 +1460,7 @@ See also: RETURN-FROM-THREAD, ABORT-THREAD."
                  ;; As it is, this lambda must not cons until we are ready
                  ;; to run GC. Be very careful.
                  (initial-thread-function-trampoline
-                  thread setup-sem real-function arguments))))
+                  thread setup-sem real-function arguments nil nil nil))))
          ;; If the starting thread is stopped for gc before it signals the
          ;; semaphore then we'd be stuck.
          (assert (not *gc-inhibit*))
@@ -1513,6 +1516,12 @@ subject to change."
   #!+sb-doc
   "Deprecated. Same as TERMINATE-THREAD."
   (terminate-thread thread))
+
+#!+sb-safepoint
+(defun enter-foreign-callback (arg1 arg2 arg3)
+  (initial-thread-function-trampoline
+   (make-foreign-thread :name "foreign callback")
+   nil #'sb!alien::enter-alien-callback t arg1 arg2 arg3))
 
 (defmacro with-interruptions-lock ((thread) &body body)
   `(with-system-mutex ((thread-interruptions-lock ,thread))

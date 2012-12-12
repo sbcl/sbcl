@@ -2022,6 +2022,7 @@ is a good idea, but see SB-SYS re. blurring of boundaries."
                "THREAD-EMPHEMERAL-P"
                "THREAD-NAME"
                "THREAD-YIELD"
+               "FOREIGN-THREAD"
                ;; Memory barrier
                "BARRIER"
                ;; Mutexes

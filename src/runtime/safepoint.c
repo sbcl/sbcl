@@ -979,9 +979,17 @@ callback_wrapper_trampoline(
 #endif
     lispobj arg0, lispobj arg1, lispobj arg2)
 {
+#if defined(LISP_FEATURE_WIN32)
+    pthread_np_notice_thread();
+#endif
     struct thread* th = arch_os_get_current_thread();
-    if (!th)
-        lose("callback invoked in non-lisp thread.  Sorry, that is not supported yet.");
+    if (!th) {                  /* callback invoked in non-lisp thread */
+        init_thread_data scribble;
+        attach_os_thread(&scribble);
+        funcall3(StaticSymbolFunction(ENTER_FOREIGN_CALLBACK), arg0,arg1,arg2);
+        detach_os_thread(&scribble);
+        return;
+    }
 
 #ifdef LISP_FEATURE_WIN32
     /* arg2 is the pointer to a return value, which sits on the stack */

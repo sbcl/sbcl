@@ -123,7 +123,8 @@
     sb!di::handle-single-step-trap
     fdefinition-object
     #!+win32 sb!kernel::handle-win32-exception
-    #!+sb-thruption sb!thread::run-interruption))
+    #!+sb-thruption sb!thread::run-interruption
+    #!+sb-safepoint sb!thread::enter-foreign-callback))
 
 (defparameter *common-static-symbols*
   '(t
