@@ -44,10 +44,23 @@ void set_data_desc_addr(data_desc_t* desc, void* addr)
 
 #endif
 
+#ifdef LISP_FEATURE_SB_THREAD
+void
+arch_os_load_ldt(struct thread *thread)
+{
+    sel_t sel;
+
+    sel.index = thread->tls_cookie;
+    sel.rpl = USER_PRIV;
+    sel.ti = SEL_LDT;
+
+    __asm__ __volatile__ ("mov %0, %%fs" : : "r"(sel));
+}
+#endif
+
 int arch_os_thread_init(struct thread *thread) {
 #ifdef LISP_FEATURE_SB_THREAD
     int n;
-    sel_t sel;
 
     data_desc_t ldt_entry = { 0, 0, 0, DESC_DATA_WRITE,
                               3, 1, 0, DESC_DATA_32B, DESC_GRAN_BYTE, 0 };
@@ -65,13 +78,9 @@ int arch_os_thread_init(struct thread *thread) {
     thread_mutex_unlock(&modify_ldt_lock);
 
     FSHOW_SIGNAL((stderr, "/ TLS: Allocated LDT %x\n", n));
-    sel.index = n;
-    sel.rpl = USER_PRIV;
-    sel.ti = SEL_LDT;
-
-    __asm__ __volatile__ ("mov %0, %%fs" : : "r"(sel));
-
     thread->tls_cookie=n;
+    arch_os_load_ldt(thread);
+
     pthread_setspecific(specials,thread);
 #endif
 #ifdef LISP_FEATURE_MACH_EXCEPTION_HANDLER

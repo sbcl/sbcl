@@ -157,11 +157,24 @@ void set_data_desc_addr(struct segment_descriptor* desc, void* addr)
 
 #endif
 
+#ifdef LISP_FEATURE_SB_THREAD
+void
+arch_os_load_ldt(struct thread *thread)
+{
+    int sel = LSEL(thread->tls_cookie, SEL_UPL);
+    unsigned int fs = rfs();
+
+    /* Load FS only if it's necessary.  Modifying a selector
+     * causes privilege checking and it takes long time. */
+    if (fs != sel)
+        load_fs(sel);
+}
+#endif
+
 int arch_os_thread_init(struct thread *thread) {
 
 #ifdef LISP_FEATURE_SB_THREAD
     int n;
-    int sel;
 
     struct segment_descriptor ldt_entry = { 0, 0, SDT_MEMRW, SEL_UPL, 1,
                                             0, 0, 1, 0, 0 };
@@ -175,10 +188,9 @@ int arch_os_thread_init(struct thread *thread) {
         lose("unexpected i386_set_ldt(..) failure\n");
     }
     FSHOW_SIGNAL((stderr, "/ TLS: Allocated LDT %x\n", n));
-    sel =  LSEL(n, SEL_UPL);
-    load_fs(sel);
-
     thread->tls_cookie=n;
+    arch_os_load_ldt(thread);
+
 #ifdef LISP_FEATURE_GCC_TLS
     current_thread = thread;
 #else

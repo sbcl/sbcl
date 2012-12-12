@@ -35,6 +35,9 @@ extern void arch_do_displaced_inst(os_context_t *context,
                                    unsigned int orig_inst);
 
 extern int arch_os_thread_init(struct thread *thread);
+#if defined(LISP_FEATURE_X86) && defined(LISP_FEATURE_SB_THREAD)
+extern void arch_os_load_ldt(struct thread *thread);
+#endif
 extern int arch_os_thread_cleanup(struct thread *thread);
 
 extern lispobj funcall0(lispobj function);

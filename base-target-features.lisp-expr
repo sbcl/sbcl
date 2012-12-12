@@ -238,7 +238,7 @@
  ;; thread local storage) is not reliably preserved in signal
  ;; handlers, so we need to restore its value from the pthread thread
  ;; local storage.
- ; :restore-tls-segment-register-from-tls
+ ; :restore-fs-segment-register-from-tls
 
  ;; On some x86oid operating systems (darwin) SIGTRAP is not reliably
  ;; delivered for the INT3 instruction, so we use the UD2 instruction

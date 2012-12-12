@@ -478,7 +478,7 @@ case "$sbcl_os" in
                 printf ' :freebsd' >> $ltf
                 printf ' :gcc-tls' >> $ltf
                 if [ $sbcl_arch = "x86" ]; then
-                    printf ' :restore-tls-segment-register-from-context' >> $ltf
+                    printf ' :restore-fs-segment-register-from-tls' >> $ltf
                 fi
                 link_or_copy Config.$sbcl_arch-freebsd Config
                 ;;

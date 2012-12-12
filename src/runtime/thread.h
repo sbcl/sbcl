@@ -294,51 +294,40 @@ static inline struct thread* arch_os_get_current_thread()
 
 static inline struct thread *arch_os_get_current_thread(void)
 {
-#if defined(LISP_FEATURE_SB_THREAD)
-#if defined(LISP_FEATURE_X86)
+#if !defined(LISP_FEATURE_SB_THREAD)
+     return all_threads;
+
+#elif defined(LISP_FEATURE_X86) && defined(LISP_FEATURE_WIN32)
     register struct thread *me=0;
-#if defined(LISP_FEATURE_WIN32) && defined(LISP_FEATURE_SB_THREAD)
     __asm__ ("movl %%fs:0xE10+(4*63), %0" : "=r"(me) :);
     return me;
-#endif
-    if(all_threads) {
-#if defined(LISP_FEATURE_DARWIN) && defined(LISP_FEATURE_RESTORE_FS_SEGMENT_REGISTER_FROM_TLS)
-        sel_t sel;
-        struct thread *th = pthread_getspecific(specials);
-        sel.index = th->tls_cookie;
-        sel.rpl = USER_PRIV;
-        sel.ti = SEL_LDT;
-        __asm__ __volatile__ ("movw %w0, %%fs" : : "r"(sel));
-#elif defined(LISP_FEATURE_FREEBSD)
-#ifdef LISP_FEATURE_GCC_TLS
-        struct thread *th = current_thread;
-#else
-        struct thread *th = pthread_getspecific(specials);
-#endif
-#ifdef LISP_FEATURE_RESTORE_TLS_SEGMENT_REGISTER_FROM_TLS
-        unsigned int sel = LSEL(th->tls_cookie, SEL_UPL);
-        unsigned int fs = rfs();
 
-        /* Load FS only if it's necessary.  Modifying a selector
-         * causes privilege checking and it takes long time. */
-        if (fs != sel)
-            load_fs(sel);
-#endif
-        return th;
-#endif
-        __asm__ ("movl %%fs:%c1,%0" : "=r" (me)
-                 : "i" (offsetof (struct thread,this)));
-    }
-    return me;
 #else
-#ifdef LISP_FEATURE_GCC_TLS
-    return current_thread;
-#else
-    return pthread_getspecific(specials);
-#endif
-#endif /* x86 */
-#else
-     return all_threads;
+    if (!all_threads)
+        /* no need to bother */
+        return 0;
+
+    /* Otherwise, use pthreads to find the right value.  We do not load
+     * directly from %fs:this even on x86 platforms (like Linux and
+     * Solaris) with dependable %fs, because we want to return NULL if
+     * called by a non-Lisp thread, and %fs would not be initialized
+     * suitably in that case. */
+    struct thread *th;
+# ifdef LISP_FEATURE_GCC_TLS
+    th = current_thread;
+# else
+    th = pthread_getspecific(specials);
+# endif
+
+# if defined(LISP_FEATURE_RESTORE_FS_SEGMENT_REGISTER_FROM_TLS)
+    /* If enabled by make-config (currently Darwin and FreeBSD only),
+     * re-setup %fs.  This is an out-of-line call, and potentially
+     * expensive.*/
+    if (th)
+        arch_os_load_ldt(th);
+# endif
+
+    return th;
 #endif
 }
 
