@@ -1,5 +1,6 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 changes relative to sbcl-1.1.2:
+  * enhancement: warnings about bad locale settings, LANG, LC_CTYPE, etc.
   * bug fix: fasls are now once again directly executable (on platforms
     supporting shebang lines, with a suitably-installed sbcl).
 

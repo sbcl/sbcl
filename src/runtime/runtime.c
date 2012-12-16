@@ -347,6 +347,50 @@ char *saved_runtime_path = NULL;
 void pthreads_win32_init();
 #endif
 
+void print_locale_variable(const char *name)
+{
+  char *value = getenv(name);
+
+  if (value) {
+    fprintf(stderr, "\n  %s=%s", name, value);
+  }
+}
+
+void setup_locale()
+{
+  if(setlocale(LC_ALL, "") == NULL) {
+#ifndef LISP_FEATURE_WIN32
+
+    fprintf(stderr, "WARNING: Setting locale failed.\n");
+    fprintf(stderr, "  Check the following varaibles for correct values:");
+
+    if (setlocale(LC_CTYPE, "") == NULL) {
+      print_locale_variable("LC_ALL");
+      print_locale_variable("LC_CTYPE");
+      print_locale_variable("LANG");
+    }
+
+    if (setlocale(LC_MESSAGES, "") == NULL) {
+      print_locale_variable("LC_MESSAGES");
+    }
+    if (setlocale(LC_COLLATE, "") == NULL) {
+      print_locale_variable("LC_COLLATE");
+    }
+    if (setlocale(LC_MONETARY, "") == NULL) {
+      print_locale_variable("LC_MONETARY");
+    }
+    if (setlocale(LC_NUMERIC, "") == NULL) {
+      print_locale_variable("LC_NUMERIC");
+    }
+    if (setlocale(LC_TIME, "") == NULL) {
+      print_locale_variable("LC_TIME");
+    }
+    fprintf(stderr, "\n");
+
+#endif
+  }
+}
+
 
 int
 main(int argc, char *argv[], char *envp[])
@@ -378,8 +422,6 @@ main(int argc, char *argv[], char *envp[])
 
     interrupt_init();
     block_blockable_signals(0, 0);
-
-    setlocale(LC_ALL, "");
 
     runtime_options = NULL;
 
@@ -560,6 +602,8 @@ main(int argc, char *argv[], char *envp[])
     arch_init();
     gc_init();
     validate();
+
+    setup_locale();
 
     /* If no core file was specified, look for one. */
     if (!core) {
