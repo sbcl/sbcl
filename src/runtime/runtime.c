@@ -362,7 +362,7 @@ void setup_locale()
 #ifndef LISP_FEATURE_WIN32
 
     fprintf(stderr, "WARNING: Setting locale failed.\n");
-    fprintf(stderr, "  Check the following varaibles for correct values:");
+    fprintf(stderr, "  Check the following variables for correct values:");
 
     if (setlocale(LC_CTYPE, "") == NULL) {
       print_locale_variable("LC_ALL");
