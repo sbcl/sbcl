@@ -14,16 +14,15 @@
    (:module "vm"
             :depends-on ("compiler")
             :components
-            ((:file "x86-vm"
-                    :in-order-to ((compile-op (feature :x86))))
-             (:file "x86-64-vm"
-                    :in-order-to ((compile-op (feature :x86-64))))
-             (:file "ppc-vm"
-                    :in-order-to ((compile-op (feature :ppc)))))
+            (#+x86
+             (:file "x86-vm")
+             #+x86-64
+             (:file "x86-64-vm")
+             #+ppc
+             (:file "ppc-vm"))
             :pathname
             #+sb-building-contrib #p"SYS:CONTRIB;SB-ROTATE-BYTE;"
-            #-sb-building-contrib #.(make-pathname :directory '(:relative))
-            :if-component-dep-fails :ignore)
+            #-sb-building-contrib #.(make-pathname :directory '(:relative)))
    (:file "rotate-byte" :depends-on ("compiler"))))
 
 (defmethod perform :after ((o load-op) (c (eql (find-system :sb-rotate-byte))))
