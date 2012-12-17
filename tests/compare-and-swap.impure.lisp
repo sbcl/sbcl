@@ -120,6 +120,10 @@
 (defstruct box
   (word 0 :type sb-vm:word))
 
+;; Have the following tests check that CAS access to the superclass
+;; works in the presence of a subclass sharing the conc-name.
+(defstruct (subbox (:include box) (:conc-name "BOX-")))
+
 (defun inc-box (box n)
   (declare (fixnum n) (box box))
   (loop repeat n
