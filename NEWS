@@ -4,6 +4,7 @@ changes relative to sbcl-1.1.2:
     (lp#727625)
   * bug fix: fasls are now once again directly executable (on platforms
     supporting shebang lines, with a suitably-installed sbcl).
+  * bug fix: make.sh --help no longer runs clean.sh. (lp#937001)
 
 changes in sbcl-1.1.2 relative to sbcl-1.1.1:
   * notice: System requirements for SBCL on Microsoft Windows: Windows NT 5.1

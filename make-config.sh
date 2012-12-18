@@ -208,6 +208,10 @@ EOF
   exit 1
 fi
 
+# Running make.sh with different options without clean.sh in the middle
+# can break things.
+sh clean.sh
+
 mkdir -p output
 # Save prefix for make and install.sh.
 echo "SBCL_PREFIX='$SBCL_PREFIX'" > output/prefix.def
