@@ -198,7 +198,8 @@ any non-negative real number."
   (when (or (not (realp seconds))
             (minusp seconds))
     (error 'simple-type-error
-           :format-control "invalid argument to SLEEP: ~S"
+           :format-control "Invalid argument to SLEEP: -1, ~
+                            should be a non-negative real."
            :format-arguments (list seconds)
            :datum seconds
            :expected-type '(real 0)))

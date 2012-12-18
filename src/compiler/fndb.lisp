@@ -1367,7 +1367,7 @@
 (defknown (get-internal-run-time get-internal-real-time)
   () internal-time (flushable))
 
-(defknown sleep ((or (rational 0) (float 0.0))) null)
+(defknown sleep ((real 0)) null (explicit-check))
 
 ;;; Even though ANSI defines LISP-IMPLEMENTATION-TYPE and
 ;;; LISP-IMPLEMENTATION-VERSION to possibly punt and return NIL, we
