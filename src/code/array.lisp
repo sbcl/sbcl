@@ -871,7 +871,7 @@ of specialized arrays is supported."
 ;;;; ADJUST-ARRAY
 
 (defun adjust-array (array dimensions &key
-                           (element-type (array-element-type array))
+                           (element-type (array-element-type array) element-type-p)
                            (initial-element nil initial-element-p)
                            (initial-contents nil initial-contents-p)
                            fill-pointer
@@ -884,7 +884,8 @@ of specialized arrays is supported."
     (cond ((/= (the fixnum (length (the list dimensions)))
                (the fixnum (array-rank array)))
            (error "The number of dimensions not equal to rank of array."))
-          ((not (subtypep element-type (array-element-type array)))
+          ((and element-type-p
+                (not (subtypep element-type (array-element-type array))))
            (error "The new element type, ~S, is incompatible with old type."
                   element-type))
           ((and fill-pointer (not (array-has-fill-pointer-p array)))
