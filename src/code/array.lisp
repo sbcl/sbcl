@@ -960,7 +960,10 @@ of specialized arrays is supported."
                                dimensions new-length element-type
                                initial-contents initial-contents-p
                                initial-element initial-element-p))
+                        ;; Provide :END1 to avoid full call to LENGTH
+                        ;; inside REPLACE.
                         (replace new-data old-data
+                                 :end1 new-length
                                  :start2 old-start :end2 old-end))
                        (t (setf new-data
                                 (shrink-vector old-data new-length))))
