@@ -836,18 +836,17 @@ of specialized arrays is supported."
            (setf (%array-fill-pointer array) (1+ fill-pointer))
            fill-pointer))))
 
-(defun vector-push-extend (new-element
-                           vector
-                           &optional
-                           (min-extension
-                            (let ((length (length vector)))
-                              (min (1+ length)
-                                   (- array-dimension-limit length)))))
-  (declare (fixnum min-extension))
+(defun vector-push-extend (new-element vector &optional min-extension)
+  (declare (type (or null fixnum) min-extension))
   (let ((fill-pointer (fill-pointer vector)))
     (declare (fixnum fill-pointer))
     (when (= fill-pointer (%array-available-elements vector))
-      (adjust-array vector (+ fill-pointer (max 1 min-extension))))
+      (let ((min-extension
+             (or min-extension
+                 (let ((length (length vector)))
+                   (min (1+ length)
+                        (- array-dimension-limit length))))))
+        (adjust-array vector (+ fill-pointer (max 1 min-extension)))))
     ;; disable bounds checking
     (locally (declare (optimize (safety 0)))
       (setf (aref vector fill-pointer) new-element))
