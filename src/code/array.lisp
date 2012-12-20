@@ -133,20 +133,27 @@
        (bit #.sb!vm:complex-bit-vector-widetag)
        (t #.sb!vm:complex-vector-widetag)))))
 
-(defun allocate-vector-with-widetag (widetag length n-bits)
+(defglobal %%simple-array-n-bits%% (make-array (1+ sb!vm:widetag-mask)))
+#.(loop for info across sb!vm:*specialized-array-element-type-properties*
+        collect `(setf (aref %%simple-array-n-bits%% ,(sb!vm:saetp-typecode info))
+                       ,(sb!vm:saetp-n-bits info)) into forms
+        finally (return `(progn ,@forms)))
+
+(defun allocate-vector-with-widetag (widetag length &optional n-bits)
   (declare (type (unsigned-byte 8) widetag)
-           (type index length)
-           (type (integer 0 256) n-bits))
-  (allocate-vector widetag length
-                   (ceiling
-                    (* (if (or (= widetag sb!vm:simple-base-string-widetag)
-                               #!+sb-unicode
-                               (= widetag
-                                  sb!vm:simple-character-string-widetag))
-                           (1+ length)
-                           length)
-                       n-bits)
-                    sb!vm:n-word-bits)))
+           (type index length))
+  (let ((n-bits (or n-bits (aref %%simple-array-n-bits%% widetag))))
+    (declare (type (integer 0 256) n-bits))
+    (allocate-vector widetag length
+                     (ceiling
+                      (* (if (or (= widetag sb!vm:simple-base-string-widetag)
+                                 #!+sb-unicode
+                                 (= widetag
+                                    sb!vm:simple-character-string-widetag))
+                             (1+ length)
+                             length)
+                         n-bits)
+                      sb!vm:n-word-bits))))
 
 (defun make-array (dimensions &key
                               (element-type t)
@@ -193,7 +200,7 @@
         (let* ((total-size (reduce #'* dimensions))
                (data (or displaced-to
                          (data-vector-from-inits
-                          dimensions total-size element-type
+                          dimensions total-size element-type nil
                           initial-contents initial-contents-p
                           initial-element initial-element-p)))
                (array (make-array-header
@@ -293,18 +300,23 @@ of specialized arrays is supported."
 ;;; specified array characteristics. Dimensions is only used to pass
 ;;; to FILL-DATA-VECTOR for error checking on the structure of
 ;;; initial-contents.
-(defun data-vector-from-inits (dimensions total-size element-type
+(defun data-vector-from-inits (dimensions total-size
+                               element-type widetag
                                initial-contents initial-contents-p
                                initial-element initial-element-p)
   (when (and initial-contents-p initial-element-p)
     (error "cannot supply both :INITIAL-CONTENTS and :INITIAL-ELEMENT to
             either MAKE-ARRAY or ADJUST-ARRAY."))
-  (let ((data (if initial-element-p
-                  (make-array total-size
-                              :element-type element-type
-                              :initial-element initial-element)
-                  (make-array total-size
-                              :element-type element-type))))
+  (let ((data (cond
+                (widetag
+                 (allocate-vector-with-widetag widetag total-size))
+                (initial-element-p
+                 (make-array total-size
+                             :element-type element-type
+                             :initial-element initial-element))
+                (t
+                 (make-array total-size
+                             :element-type element-type)))))
     (cond (initial-element-p
            (unless (simple-vector-p data)
              (unless (typep initial-element element-type)
@@ -908,7 +920,7 @@ of specialized arrays is supported."
                          the :INITIAL-ELEMENT or :DISPLACED-TO option."))
              (let* ((array-size (apply #'* dimensions))
                     (array-data (data-vector-from-inits
-                                 dimensions array-size element-type
+                                 dimensions array-size element-type nil
                                  initial-contents initial-contents-p
                                  initial-element initial-element-p)))
                (if (adjustable-array-p array)
@@ -962,6 +974,7 @@ of specialized arrays is supported."
                         (setf new-data
                               (data-vector-from-inits
                                dimensions new-length element-type
+                               (widetag-of old-data)
                                initial-contents initial-contents-p
                                initial-element initial-element-p))
                         ;; Provide :END1 to avoid full call to LENGTH
@@ -989,7 +1002,8 @@ of specialized arrays is supported."
                                          (> new-length old-length))
                                      (data-vector-from-inits
                                       dimensions new-length
-                                      element-type () nil
+                                      element-type
+                                      (widetag-of old-data) () nil
                                       initial-element initial-element-p)
                                      old-data)))
                    (if (or (zerop old-length) (zerop new-length))
