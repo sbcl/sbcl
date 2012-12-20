@@ -133,6 +133,21 @@
        (bit #.sb!vm:complex-bit-vector-widetag)
        (t #.sb!vm:complex-vector-widetag)))))
 
+(defun allocate-vector-with-widetag (widetag length n-bits)
+  (declare (type (unsigned-byte 8) widetag)
+           (type index length)
+           (type (integer 0 256) n-bits))
+  (allocate-vector widetag length
+                   (ceiling
+                    (* (if (or (= widetag sb!vm:simple-base-string-widetag)
+                               #!+sb-unicode
+                               (= widetag
+                                  sb!vm:simple-character-string-widetag))
+                           (1+ length)
+                           length)
+                       n-bits)
+                    sb!vm:n-word-bits)))
+
 (defun make-array (dimensions &key
                               (element-type t)
                               (initial-element nil initial-element-p)
@@ -159,18 +174,7 @@
           (declare (type (unsigned-byte 8) type)
                    (type (integer 0 256) n-bits))
           (let* ((length (car dimensions))
-                 (array (allocate-vector
-                         type
-                         length
-                         (ceiling
-                          (* (if (or (= type sb!vm:simple-base-string-widetag)
-                                     #!+sb-unicode
-                                     (= type
-                                        sb!vm:simple-character-string-widetag))
-                                 (1+ length)
-                                 length)
-                             n-bits)
-                          sb!vm:n-word-bits))))
+                 (array (allocate-vector-with-widetag type length n-bits)))
             (declare (type index length))
             (when initial-element-p
               (fill array initial-element))
