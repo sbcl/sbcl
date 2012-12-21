@@ -2,9 +2,31 @@
 changes relative to sbcl-1.1.2:
   * enhancement: warnings about bad locale settings, LANG, LC_CTYPE, etc.
     (lp#727625)
+  * enhancement: support for C-c to interrupt the foreground thread
+    on Windows.  (Thanks to Anton Kovalenko.)
+  * enhancement: STDCALL alien callbacks. (Thanks to Anton Kovalenko.)
+  * enhancement: Safepoint builds on POSIX platforms can now optionally be
+    built without pseudo-atomic sequences and their run-time overhead.
+  * enhancement: Threads created outside of Lisp can enter Lisp through
+    alien callbacks and appear as Lisp threads for the duration of that
+    function invocation.  On safepoint builds only.
+  * enhancement: Miscellaneous improvements to namestrings and underlying
+    calls to OS functions for file system access on Windows.  (Thanks to
+    Anton Kovalenko.)
+  * enhancement: The MSI installer support for Windows now uses Windows
+    Installer XML at least version 3.5 and includes various usability
+    improvements.  (Thanks to Dmitry Kalyanov and Anton Kovalenko.)
+  * enhancement: The sb-bsd-sockets contrib now supports non-blocking-mode
+    on Windows.  (Thanks to Anton Kovalenko.)
+  * enhancement: The Windows backend now supports the x86-64 platform.
+    (Thanks to Anton Kovalenko.)
   * bug fix: fasls are now once again directly executable (on platforms
     supporting shebang lines, with a suitably-installed sbcl).
   * bug fix: make.sh --help no longer runs clean.sh. (lp#937001)
+  * bug fix: Fix CAS access to slots of direct instances of structure classes
+    in the presence of subclasses sharing the same conc-name.
+  * bug fix: Logical pathname namestrings on Windows have been changed to
+    be lower-case, to minimize differences between POSIX and Windows.
 
 changes in sbcl-1.1.2 relative to sbcl-1.1.1:
   * notice: System requirements for SBCL on Microsoft Windows: Windows NT 5.1
