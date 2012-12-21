@@ -303,9 +303,10 @@ static inline struct thread *arch_os_get_current_thread(void)
     return me;
 
 #else
-    if (!all_threads)
-        /* no need to bother */
-        return 0;
+
+# if defined(LISP_FEATURE_X86)
+    if (!all_threads) return 0;
+#endif
 
     /* Otherwise, use pthreads to find the right value.  We do not load
      * directly from %fs:this even on x86 platforms (like Linux and
