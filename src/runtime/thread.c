@@ -535,7 +535,7 @@ attach_os_thread(init_thread_data *scribble)
      * tempting to just perform such unsafe allocation though.  So let's
      * at least try to suppress GC before consing, and hope that it
      * works: */
-    SetSymbolValue(GC_INHIBIT, T, th);
+    bind_variable(GC_INHIBIT, T, th);
 
     uword_t stacksize
         = (uword_t) th->control_stack_end - (uword_t) th->control_stack_start;
