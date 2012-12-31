@@ -1,5 +1,5 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
-changes relative to sbcl-1.1.2:
+changes in sbcl-1.1.3 relative to sbcl-1.1.2:
   * enhancement: warnings about bad locale settings, LANG, LC_CTYPE, etc.
     (lp#727625)
   * enhancement: support for C-c to interrupt the foreground thread
