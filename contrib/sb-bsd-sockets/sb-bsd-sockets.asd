@@ -54,6 +54,7 @@
 (defmethod perform ((o test-op) (c (eql (find-system :sb-bsd-sockets-tests))))
   (multiple-value-bind (soft strict pending)
       (funcall (intern "DO-TESTS" (find-package "SB-RT")))
+    (declare (ignorable pending))
     (fresh-line)
     (unless strict
       #+sb-testing-contrib
