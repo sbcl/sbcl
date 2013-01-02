@@ -1,5 +1,9 @@
 (in-package "SB!IMPL")
 
+;; Cribbed from SYS:SRC;CODE;TOPLEVEL.
+(defun %halt ()
+  (%primitive sb!c:halt))
+
 (defun test-closure (closure)
   (declare (function closure))
   (funcall closure)
@@ -14,4 +18,5 @@
     value))
 
 (defun !cold-init ()
-  (test-uwp))
+  (test-uwp)
+  #+(or) (%halt))
