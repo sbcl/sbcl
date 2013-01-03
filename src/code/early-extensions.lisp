@@ -1300,12 +1300,16 @@
 ;;; Returns a list of members of LIST. Useful for dealing with circular lists.
 ;;; For a dotted list returns a secondary value of T -- in which case the
 ;;; primary return value does not include the dotted tail.
-(defun list-members (list)
+;;; If the maximum length is reached, return a secondary value of :MAYBE.
+(defun list-members (list &key max-length)
   (when list
     (do ((tail (cdr list) (cdr tail))
-         (members (list (car list)) (cons (car tail) members)))
-        ((or (not (consp tail)) (eq tail list))
-         (values members (not (listp tail)))))))
+         (members (list (car list)) (cons (car tail) members))
+         (count 0 (1+ count)))
+        ((or (not (consp tail)) (eq tail list)
+             (and max-length (>= count max-length)))
+         (values members (or (not (listp tail))
+                             (and (>= count max-length) :maybe)))))))
 
 ;;; Default evaluator mode (interpeter / compiler)
 

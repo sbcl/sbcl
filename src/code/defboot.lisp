@@ -360,17 +360,18 @@ evaluated as a PROGN."
   ;; var.
   (multiple-value-bind (forms decls) (parse-body body :doc-string-allowed nil)
     (let* ((n-list (gensym "N-LIST"))
-           (start (gensym "START"))
-           (tmp (gensym "TMP")))
+           (start (gensym "START")))
       (multiple-value-bind (clist members clist-ok)
           (cond ((sb!xc:constantp list env)
                  (let ((value (constant-form-value list env)))
-                   (multiple-value-bind (all dot) (list-members value)
-                     (when dot
+                   (multiple-value-bind (all dot) (list-members value :max-length 20)
+                     (when (eql dot t)
                        ;; Full warning is too much: the user may terminate the loop
                        ;; early enough. Contents are still right, though.
                        (style-warn "Dotted list ~S in DOLIST." value))
-                     (values value all t))))
+                     (if (eql dot :maybe)
+                         (values value nil nil)
+                         (values value all t)))))
                 ((and (consp list) (eq 'list (car list))
                       (every (lambda (arg) (sb!xc:constantp arg env)) (cdr list)))
                  (let ((values (mapcar (lambda (arg) (constant-form-value arg env)) (cdr list))))
@@ -382,10 +383,9 @@ evaluated as a PROGN."
              (tagbody
                 ,start
                 (unless (endp ,n-list)
-                  (let* (,@(if clist-ok
-                               `((,tmp (truly-the (member ,@members) (car ,n-list)))
-                                 (,var ,tmp))
-                               `((,var (car ,n-list)))))
+                  (let ((,var ,(if clist-ok
+                                   `(truly-the (member ,@members) (car ,n-list))
+                                   `(car ,n-list))))
                     ,@decls
                     (setq ,n-list (cdr ,n-list))
                     (tagbody ,@forms))
