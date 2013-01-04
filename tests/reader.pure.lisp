@@ -288,3 +288,6 @@
   (with-timeout 10
     (assert (raises-error? (read-from-string "10e10000000000000000000")
                            sb-kernel:reader-impossible-number-error))))
+
+(with-test (:name :bug-1095918)
+  (assert (= (length `#3(1)) 3)))

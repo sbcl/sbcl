@@ -21,32 +21,32 @@
 (defun sharp-left-paren (stream ignore length)
   (declare (ignore ignore) (special *backquote-count*))
   (let* ((list (read-list stream nil))
-         (listlength (handler-case (length list)
-                       (type-error
-                        (error)
-                        (declare (ignore error))
-                        (simple-reader-error stream
-                                             "improper list in #(): ~S"
-                                             list)))))
+         (list-length (handler-case (length list)
+                        (type-error ()
+                          (simple-reader-error stream
+                                               "Improper list in #(): ~S."
+                                               list)))))
     (declare (list list)
-             (fixnum listlength))
+             (fixnum list-length))
     (cond (*read-suppress* nil)
+          ((and length (> list-length length))
+           (simple-reader-error
+            stream
+            "Vector longer than the specified length: #~S~S."
+            length list))
           ((zerop *backquote-count*)
            (if length
-               (cond ((> listlength (the fixnum length))
-                      (simple-reader-error
-                       stream
-                       "vector longer than specified length: #~S~S"
-                       length list))
-                     (t
-                      (fill (the simple-vector
-                                 (replace (the simple-vector
-                                               (make-array length))
-                                          list))
-                            (car (last list))
-                            :start listlength)))
+               (fill (replace (make-array length) list)
+                     (car (last list))
+                     :start list-length)
                (coerce list 'vector)))
-          (t (cons *bq-vector-flag* list)))))
+          (t
+           (cons *bq-vector-flag*
+                 (if length
+                     (append list
+                             (make-list (- length list-length)
+                                        :initial-element (car (last list))))
+                     list))))))
 
 (defun sharp-star (stream ignore numarg)
   (declare (ignore ignore))
