@@ -506,7 +506,7 @@ profiling")
   ;; Ensure that only one thread at a time will be doing profiling stuff.
   (defvar *profiler-lock* (sb-thread:make-mutex :name "Statistical Profiler"))
   (defvar *distribution-lock* (sb-thread:make-mutex :name "Wallclock profiling lock"))
-  
+
   #+sb-thread
   (declaim (inline pthread-kill))
   #+sb-thread
