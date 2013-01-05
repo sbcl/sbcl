@@ -283,3 +283,8 @@
                   (compile nil '(lambda (m) (make-array m 1)))
                 (simple-warning () :good)))))
 
+
+(with-test (:name :bug-1096359)
+  (let ((a (make-array 1 :initial-element 5)))
+    (assert (equalp (adjust-array a 2 :initial-element 10)
+                    #(5 10)))))

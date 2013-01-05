@@ -304,25 +304,18 @@ of specialized arrays is supported."
                                element-type widetag
                                initial-contents initial-contents-p
                                initial-element initial-element-p)
-  (when (and initial-contents-p initial-element-p)
-    (error "cannot supply both :INITIAL-CONTENTS and :INITIAL-ELEMENT to
+  (when initial-element-p
+    (when initial-contents-p
+      (error "cannot supply both :INITIAL-CONTENTS and :INITIAL-ELEMENT to
             either MAKE-ARRAY or ADJUST-ARRAY."))
-  (let ((data (cond
-                (widetag
-                 (allocate-vector-with-widetag widetag total-size))
-                (initial-element-p
-                 (make-array total-size
-                             :element-type element-type
-                             :initial-element initial-element))
-                (t
-                 (make-array total-size
-                             :element-type element-type)))))
+    (unless (typep initial-element element-type)
+      (error "~S cannot be used to initialize an array of type ~S."
+             initial-element element-type)))
+  (let ((data (if widetag
+                  (allocate-vector-with-widetag widetag total-size)
+                  (make-array total-size :element-type element-type))))
     (cond (initial-element-p
-           (unless (simple-vector-p data)
-             (unless (typep initial-element element-type)
-               (error "~S cannot be used to initialize an array of type ~S."
-                      initial-element element-type))
-             (fill (the vector data) initial-element)))
+           (fill (the vector data) initial-element))
           (initial-contents-p
            (fill-data-vector data dimensions initial-contents)))
     data))
@@ -916,7 +909,7 @@ of specialized arrays is supported."
       (cond (initial-contents-p
              ;; array former contents replaced by INITIAL-CONTENTS
              (if (or initial-element-p displaced-to)
-                 (error "INITIAL-CONTENTS may not be specified with ~
+                 (error ":INITIAL-CONTENTS may not be specified with ~
                          the :INITIAL-ELEMENT or :DISPLACED-TO option."))
              (let* ((array-size (apply #'* dimensions))
                     (array-data (data-vector-from-inits

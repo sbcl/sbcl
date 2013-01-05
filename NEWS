@@ -3,6 +3,8 @@ changes relative to sbcl-1.1.3:
   * bug fix: very long (or infinite) constant lists in DOLIST do not result
     in very long compile times or heap exhaustion anymore. (lp#1095488)
   * bug fix: `#3(1) is read as #(1 1 1), not as #(1). (lp#1095918)
+  * bug fix: adjust-array ignored :initial-element for simple-vectors.
+    (lp#1096359)
 
 changes in sbcl-1.1.3 relative to sbcl-1.1.2:
   * enhancement: warnings about bad locale settings, LANG, LC_CTYPE, etc.
