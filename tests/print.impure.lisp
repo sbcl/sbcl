@@ -645,4 +645,8 @@
     (timeout ()
       (error "Endless loop in FORMAT"))))
 
+(with-test (:name :format-type-check)
+  (assert (raises-error? (format nil "~r" 1.32) sb-format:format-error))
+  (assert (raises-error? (format nil "~c" 1.32) sb-format:format-error)))
+
 ;;; success

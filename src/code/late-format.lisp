@@ -451,13 +451,22 @@
         (t
          `(prin1 ,(expand-next-arg) stream))))
 
-(def-format-directive #\C (colonp atsignp params)
+(def-format-directive #\C (colonp atsignp params string end)
   (expand-bind-defaults () params
-    (if colonp
-        `(format-print-named-character ,(expand-next-arg) stream)
-        (if atsignp
-            `(prin1 ,(expand-next-arg) stream)
-            `(write-char ,(expand-next-arg) stream)))))
+    (let ((n-arg (sb!xc:gensym "ARG")))
+      `(let ((,n-arg ,(expand-next-arg)))
+         (unless (typep ,n-arg 'character)
+           (error 'format-error
+                  :complaint "~s is not of type CHARACTER."
+                  :args (list ,n-arg)
+                  :control-string ,string
+                  :offset ,(1- end)))
+         ,(cond (colonp
+                 `(format-print-named-character ,n-arg stream))
+                (atsignp
+                 `(prin1 ,n-arg stream))
+                (t
+                 `(write-char ,n-arg stream)))))))
 
 (def-format-directive #\W (colonp atsignp params)
   (expand-bind-defaults () params
@@ -497,13 +506,19 @@
 (def-format-directive #\X (colonp atsignp params)
   (expand-format-integer 16 colonp atsignp params))
 
-(def-format-directive #\R (colonp atsignp params)
+(def-format-directive #\R (colonp atsignp params string end)
   (expand-bind-defaults
       ((base nil) (mincol 0) (padchar #\space) (commachar #\,)
        (commainterval 3))
       params
     (let ((n-arg (sb!xc:gensym "ARG")))
       `(let ((,n-arg ,(expand-next-arg)))
+         (unless (integerp ,n-arg)
+           (error 'format-error
+                  :complaint "~s is not of type INTEGER."
+                  :args (list ,n-arg)
+                  :control-string ,string
+                  :offset ,(1- end)))
          (if ,base
              (format-print-integer stream ,n-arg ,colonp ,atsignp
                                    ,base ,mincol

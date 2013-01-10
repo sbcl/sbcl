@@ -234,11 +234,17 @@
 
 (def-format-interpreter #\C (colonp atsignp params)
   (interpret-bind-defaults () params
-    (if colonp
-        (format-print-named-character (next-arg) stream)
-        (if atsignp
-            (prin1 (next-arg) stream)
-            (write-char (next-arg) stream)))))
+    (let ((arg (next-arg)))
+      (unless (typep arg 'character)
+        (error 'format-error
+               :complaint "~s is not of type CHARACTER."
+               :args (list arg)))
+      (cond (colonp
+             (format-print-named-character arg stream))
+            (atsignp
+             (prin1 arg stream))
+            (t
+             (write-char arg stream))))))
 
 ;;; "printing" as defined in the ANSI CL glossary, which is normative.
 (defun char-printing-p (char)
@@ -326,6 +332,10 @@
        (commainterval 3))
       params
     (let ((arg (next-arg)))
+      (unless (integerp arg)
+        (error 'format-error
+               :complaint "~s is not of type INTEGER."
+               :args (list arg)))
       (if base
           (format-print-integer stream arg colonp atsignp base mincol
                                 padchar commachar commainterval)
