@@ -646,7 +646,11 @@
       (error "Endless loop in FORMAT"))))
 
 (with-test (:name :format-type-check)
+  (assert (equal "1/10" (format nil "~2r" 1/2)))
   (assert (raises-error? (format nil "~r" 1.32) sb-format:format-error))
-  (assert (raises-error? (format nil "~c" 1.32) sb-format:format-error)))
+  (assert (raises-error? (format nil "~c" 1.32) sb-format:format-error))
+  (assert (equal "1/10" (eval '(format nil "~2r" 1/2))))
+  (assert (raises-error? (eval '(format nil "~r" 1.32)) sb-format:format-error))
+  (assert (raises-error? (eval '(format nil "~c" 1.32)) sb-format:format-error)))
 
 ;;; success

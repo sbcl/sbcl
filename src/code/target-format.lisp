@@ -332,7 +332,8 @@
        (commainterval 3))
       params
     (let ((arg (next-arg)))
-      (unless (integerp arg)
+      (unless (or base
+                  (integerp arg))
         (error 'format-error
                :complaint "~s is not of type INTEGER."
                :args (list arg)))

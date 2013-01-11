@@ -513,7 +513,8 @@
       params
     (let ((n-arg (sb!xc:gensym "ARG")))
       `(let ((,n-arg ,(expand-next-arg)))
-         (unless (integerp ,n-arg)
+         (unless (or ,base
+                     (integerp ,n-arg))
            (error 'format-error
                   :complaint "~s is not of type INTEGER."
                   :args (list ,n-arg)
