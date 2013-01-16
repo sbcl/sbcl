@@ -5,6 +5,9 @@ changes relative to sbcl-1.1.3:
   * bug fix: `#3(1) is read as #(1 1 1), not as #(1). (lp#1095918)
   * bug fix: adjust-array ignored :initial-element for simple-vectors.
     (lp#1096359)
+  * bug fix: optimizations to MAKE-INSTANCE with literal list initargs no
+    longer cause infinite loops (on circular data) or violate eqlity
+    constraints.  (lp#1099708)
 
 changes in sbcl-1.1.3 relative to sbcl-1.1.2:
   * enhancement: warnings about bad locale settings, LANG, LC_CTYPE, etc.

@@ -152,7 +152,21 @@
           (ctor-function-name ctor))))
 
 (defun make-ctor-function-name (class-name initargs safe-code-p)
-  (list* 'ctor class-name safe-code-p initargs))
+  (labels ((arg-name (x)
+             (typecase x
+               ;; this list of types might look arbitrary but it is
+               ;; exactly the set of types descended into by EQUAL,
+               ;; which is the predicate used by globaldb to test for
+               ;; name equality.
+               (list (gensym "LIST-INITARG-"))
+               (string (gensym "STRING-INITARG-"))
+               (bit-vector (gensym "BIT-VECTOR-INITARG-"))
+               (pathname (gensym "PATHNAME-INITARG-"))
+               (t x)))
+           (munge (list)
+             (let ((*gensym-counter* 0))
+               (mapcar #'arg-name list))))
+    (list* 'ctor class-name safe-code-p (munge initargs))))
 
 ;;; Keep this a separate function for testing.
 (defun ensure-ctor (function-name class-name initargs safe-code-p)

@@ -1939,4 +1939,97 @@
         (defmethod ,frob ((pnr ,pnr))
           (slot-value pnr ',pax))))))
 
+(with-test (:name :bug-1099708)
+  (defclass bug-1099708 ()
+    ((slot-1099708 :initarg :slot-1099708)))
+  ;; caused infinite equal testing in function name lookup
+  (eval
+   '(progn
+     (defun make-1099708-1 ()
+       (make-instance 'bug-1099708 :slot-1099708 '#1= (1 2 . #1#)))
+     (defun make-1099708-2 ()
+       (make-instance 'bug-1099708 :slot-1099708 '#2= (1 2 . #2#)))))
+  (assert (not (eql (slot-value (make-1099708-1) 'slot-1099708)
+                    (slot-value (make-1099708-2) 'slot-1099708)))))
+
+(with-test (:name :bug-1099708b-list)
+  (defclass bug-1099708b-list ()
+    ((slot-1099708b-list :initarg :slot-1099708b-list)))
+  (eval
+   '(progn
+     (defun make-1099708b-list-1 ()
+       (make-instance 'bug-1099708b-list :slot-1099708b-list '(some value)))
+     (defun make-1099708b-list-2 ()
+       (make-instance 'bug-1099708b-list :slot-1099708b-list '(some value)))))
+  (assert (eql (slot-value (make-1099708b-list-1) 'slot-1099708b-list)
+               (slot-value (make-1099708b-list-1) 'slot-1099708b-list)))
+  (assert (eql (slot-value (make-1099708b-list-2) 'slot-1099708b-list)
+               (slot-value (make-1099708b-list-2) 'slot-1099708b-list)))
+  (assert (not (eql (slot-value (make-1099708b-list-1) 'slot-1099708b-list)
+                    (slot-value (make-1099708b-list-2) 'slot-1099708b-list)))))
+
+(with-test (:name :bug-1099708b-string)
+  (defclass bug-1099708b-string ()
+    ((slot-1099708b-string :initarg :slot-1099708b-string)))
+  (eval
+   '(progn
+     (defun make-1099708b-string-1 ()
+       (make-instance 'bug-1099708b-string :slot-1099708b-string "string"))
+     (defun make-1099708b-string-2 ()
+       (make-instance 'bug-1099708b-string :slot-1099708b-string "string"))))
+  (assert (eql (slot-value (make-1099708b-string-1) 'slot-1099708b-string)
+               (slot-value (make-1099708b-string-1) 'slot-1099708b-string)))
+  (assert (eql (slot-value (make-1099708b-string-2) 'slot-1099708b-string)
+               (slot-value (make-1099708b-string-2) 'slot-1099708b-string)))
+  (assert (not (eql (slot-value (make-1099708b-string-1) 'slot-1099708b-string)
+                    (slot-value (make-1099708b-string-2) 'slot-1099708b-string)))))
+
+(with-test (:name :bug-1099708b-bitvector)
+  (defclass bug-1099708b-bitvector ()
+    ((slot-1099708b-bitvector :initarg :slot-1099708b-bitvector)))
+  (eval
+   '(progn
+     (defun make-1099708b-bitvector-1 ()
+       (make-instance 'bug-1099708b-bitvector :slot-1099708b-bitvector #*1011))
+     (defun make-1099708b-bitvector-2 ()
+       (make-instance 'bug-1099708b-bitvector :slot-1099708b-bitvector #*1011))))
+  (assert (eql (slot-value (make-1099708b-bitvector-1) 'slot-1099708b-bitvector)
+               (slot-value (make-1099708b-bitvector-1) 'slot-1099708b-bitvector)))
+  (assert (eql (slot-value (make-1099708b-bitvector-2) 'slot-1099708b-bitvector)
+               (slot-value (make-1099708b-bitvector-2) 'slot-1099708b-bitvector)))
+  (assert (not (eql (slot-value (make-1099708b-bitvector-1) 'slot-1099708b-bitvector)
+                    (slot-value (make-1099708b-bitvector-2) 'slot-1099708b-bitvector)))))
+
+(with-test (:name :bug-1099708b-pathname)
+  (defclass bug-1099708b-pathname ()
+    ((slot-1099708b-pathname :initarg :slot-1099708b-pathname)))
+  (eval
+   '(progn
+     (defun make-1099708b-pathname-1 ()
+       (make-instance 'bug-1099708b-pathname :slot-1099708b-pathname #p"pn"))
+     (defun make-1099708b-pathname-2 ()
+       (make-instance 'bug-1099708b-pathname :slot-1099708b-pathname #p"pn"))))
+  (assert (eql (slot-value (make-1099708b-pathname-1) 'slot-1099708b-pathname)
+               (slot-value (make-1099708b-pathname-1) 'slot-1099708b-pathname)))
+  (assert (eql (slot-value (make-1099708b-pathname-2) 'slot-1099708b-pathname)
+               (slot-value (make-1099708b-pathname-2) 'slot-1099708b-pathname)))
+  (assert (not (eql (slot-value (make-1099708b-pathname-1) 'slot-1099708b-pathname)
+                    (slot-value (make-1099708b-pathname-2) 'slot-1099708b-pathname)))))
+
+(with-test (:name :bug-1099708c-list)
+  (defclass bug-1099708c-list ()
+    ((slot-1099708c-list :initarg :slot-1099708c-list)))
+  (eval
+   '(progn
+     (defun make-1099708c-list-1 ()
+       (make-instance 'bug-1099708c-list :slot-1099708c-list #1='(some value)))
+     (defun make-1099708c-list-2 ()
+       (make-instance 'bug-1099708c-list :slot-1099708c-list #1#))))
+  (assert (eql (slot-value (make-1099708c-list-1) 'slot-1099708c-list)
+               (slot-value (make-1099708c-list-1) 'slot-1099708c-list)))
+  (assert (eql (slot-value (make-1099708c-list-2) 'slot-1099708c-list)
+               (slot-value (make-1099708c-list-2) 'slot-1099708c-list)))
+  (assert (eql (slot-value (make-1099708c-list-1) 'slot-1099708c-list)
+               (slot-value (make-1099708c-list-2) 'slot-1099708c-list))))
+
 ;;;; success
