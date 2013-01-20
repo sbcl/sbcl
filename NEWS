@@ -1,5 +1,7 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 changes relative to sbcl-1.1.3:
+  * optimization: LOOP expressions using "of-type character" have slightly
+    more efficient expansions.
   * bug fix: very long (or infinite) constant lists in DOLIST do not result
     in very long compile times or heap exhaustion anymore. (lp#1095488)
   * bug fix: `#3(1) is read as #(1 1 1), not as #(1). (lp#1095918)

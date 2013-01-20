@@ -925,6 +925,8 @@ code to be loaded.
              (let ((etype (sb!kernel:type-*-to-t
                            (sb!kernel:array-type-specialized-element-type ctype))))
                (make-array 0 :element-type (sb!kernel:type-specifier etype))))))
+        ((sb!xc:typep #\x data-type)
+         #\x)
         (t
          nil)))
 

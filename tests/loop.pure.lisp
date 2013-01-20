@@ -13,6 +13,8 @@
 
 (in-package "CL-USER")
 
+(load "compiler-test-util.lisp")
+
 ;;; The bug reported by Alexei Dejneka on sbcl-devel 2001-09-03
 ;;; is fixed now.
 (assert (equal (let ((hash (make-hash-table)))
@@ -273,3 +275,13 @@
   (assert (= 32640 (loop for i to 255
                          sum i into sum of-type fixnum
                          finally (return sum)))))
+
+(with-test (:name :of-type-character-init)
+  ;; The intention here is to if we initialize C to NIL before iteration start
+  ;; by looking for tell-tale types such as (OR NULL CHARACTER). ...not the
+  ;; most robust test ever, no.
+  (let* ((fun (compile nil `(lambda (x)
+                              (loop for c of-type character in x
+                                    collect (char-code c)))))
+         (consts (ctu:find-code-constants fun :type '(or symbol list))))
+    (assert (or (null consts) (equal 'character consts)))))
