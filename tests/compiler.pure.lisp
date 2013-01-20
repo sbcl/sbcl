@@ -4370,3 +4370,11 @@
                              (declare (type (signed-byte 31) x))
                              (sb-c::mask-signed-field 31 (- x 1055131947))))))
     (assert (= (funcall fun 10038) -1055121909))))
+
+(with-rest (:name :first-open-coded)
+  (let ((fun (compile nil `(lambda (x) (first x)))))
+    (assert (not (ctu:find-named-callees fun)))))
+
+(with-rest (:name :second-open-coded)
+  (let ((fun (compile nil `(lambda (x) (second x)))))
+    (assert (not (ctu:find-named-callees fun)))))

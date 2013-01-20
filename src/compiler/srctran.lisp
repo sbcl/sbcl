@@ -4151,14 +4151,17 @@
         `(%rest-ref ,n ,seq ,context ,count)
         (values nil t))))
 
-;;; CAR -> %REST-REF
+;;; CAR/FIRST -> %REST-REF
 (defun source-transform-car (list)
   (multiple-value-bind (context count) (possible-rest-arg-context list)
     (if context
         `(%rest-ref 0 ,list ,context ,count)
         (values nil t))))
-(define-source-transform car (list) (source-transform-car list))
-(define-source-transform first (list) (source-transform-car list))
+(define-source-transform car (list)
+  (source-transform-car list))
+(define-source-transform first (list)
+  (or (source-transform-car list)
+      `(car ,list)))
 
 ;;; LENGTH -> %REST-LENGTH
 (defun source-transform-length (list)
