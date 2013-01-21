@@ -1,7 +1,7 @@
 (in-package :cl-user)
 (require :sb-sprof)
 
-#-win32                                ;not yet
+#-(or win32 darwin)                    ;not yet
 (sb-sprof::test)
 #-win32                                ;not yet
 (sb-sprof::consing-test)
