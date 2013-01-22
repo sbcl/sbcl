@@ -491,3 +491,111 @@ if a restart was invoked."
            (assert (= 0 (length (package-implements-list p2)))))
       (when p1 (delete-package p1))
       (when p2 (delete-package p2)))))
+
+(with-test (:name :package-local-nicknames)
+  ;; Clear slate
+  (without-package-locks
+    (delete-package :package-local-nicknames-test-1)
+    (delete-package :package-local-nicknames-test-2))
+  (eval `(defpackage :package-local-nicknames-test-1
+           (:local-nicknames (:l :cl) (:sb :sb-ext))))
+  (eval `(defpackage :package-local-nicknames-test-2
+           (:export "CONS")))
+  ;; Introspection
+  (let ((alist (package-local-nicknames :package-local-nicknames-test-1)))
+    (assert (equal (cons "L" (find-package "CL")) (assoc "L" alist :test 'string=)))
+    (assert (equal (cons "SB" (find-package "SB-EXT")) (assoc "SB" alist :test 'string=)))
+    (assert (eql 2 (length alist))))
+  ;; Usage
+  (let ((*package* (find-package :package-local-nicknames-test-1)))
+    (let ((cons0 (read-from-string "L:CONS"))
+          (exit0 (read-from-string "SB:EXIT"))
+          (cons1 (find-symbol "CONS" :l))
+          (exit1 (find-symbol "EXIT" :sb))
+          (cl (find-package :l))
+          (sb (find-package :sb)))
+      (assert (eq 'cons cons0))
+      (assert (eq 'cons cons1))
+      (assert (equal "L:CONS" (prin1-to-string cons0)))
+      (assert (eq 'sb-ext:exit exit0))
+      (assert (eq 'sb-ext:exit exit1))
+      (assert (equal "SB:EXIT" (prin1-to-string exit0)))
+      (assert (eq cl (find-package :common-lisp)))
+      (assert (eq sb (find-package :sb-ext)))))
+  ;; Can't add same name twice for different global names.
+  (assert (eq :oopsie
+              (handler-case
+                  (add-package-local-nickname :l :package-local-nicknames-test-2
+                                              :package-local-nicknames-test-1)
+                (error ()
+                  :oopsie))))
+  ;; But same name twice is OK.
+  (add-package-local-nickname :l :cl :package-local-nicknames-test-1)
+  ;; Removal.
+  (assert (remove-package-local-nickname :l :package-local-nicknames-test-1))
+  (let ((*package* (find-package :package-local-nicknames-test-1)))
+    (let ((exit0 (read-from-string "SB:EXIT"))
+          (exit1 (find-symbol "EXIT" :sb))
+          (sb (find-package :sb)))
+      (assert (eq 'sb-ext:exit exit0))
+      (assert (eq 'sb-ext:exit exit1))
+      (assert (equal "SB:EXIT" (prin1-to-string exit0)))
+      (assert (eq sb (find-package :sb-ext)))
+      (assert (not (find-package :l)))))
+  ;; Adding back as another package.
+  (assert (eq (find-package :package-local-nicknames-test-1)
+              (add-package-local-nickname :l :package-local-nicknames-test-2
+                                          :package-local-nicknames-test-1)))
+  (let ((*package* (find-package :package-local-nicknames-test-1)))
+    (let ((cons0 (read-from-string "L:CONS"))
+          (exit0 (read-from-string "SB:EXIT"))
+          (cons1 (find-symbol "CONS" :l))
+          (exit1 (find-symbol "EXIT" :sb))
+          (cl (find-package :l))
+          (sb (find-package :sb)))
+      (assert (eq cons0 cons1))
+      (assert (not (eq 'cons cons0)))
+      (assert (eq (find-symbol "CONS" :package-local-nicknames-test-2)
+                  cons0))
+      (assert (equal "L:CONS" (prin1-to-string cons0)))
+      (assert (eq 'sb-ext:exit exit0))
+      (assert (eq 'sb-ext:exit exit1))
+      (assert (equal "SB:EXIT" (prin1-to-string exit0)))
+      (assert (eq cl (find-package :package-local-nicknames-test-2)))
+      (assert (eq sb (find-package :sb-ext)))))
+  ;; Interaction with package locks.
+  (lock-package :package-local-nicknames-test-1)
+  (assert (eq :package-oopsie
+              (handler-case
+                  (add-package-local-nickname :c :sb-c :package-local-nicknames-test-1)
+                (package-lock-violation ()
+                  :package-oopsie))))
+  (assert (eq :package-oopsie
+              (handler-case
+                  (remove-package-local-nickname :l :package-local-nicknames-test-1)
+                (package-lock-violation ()
+                  :package-oopsie))))
+  (unlock-package :package-local-nicknames-test-1)
+  (add-package-local-nickname :c :sb-c :package-local-nicknames-test-1)
+  (remove-package-local-nickname :l :package-local-nicknames-test-1))
+
+(with-test (:name (:delete-package :locally-nicknames-others))
+  (let (p1 p2)
+    (unwind-protect
+         (progn
+           (setf p1 (make-package "LOCALLY-NICKNAMES-OTHERS")
+                 p2 (make-package "LOCALLY-NICKNAMED-BY-OTHERS"))
+               (add-package-local-nickname :foo p2 p1)
+               (assert (package-locally-nicknamed-by p2))
+               (delete-package p1)
+               (assert (not (package-locally-nicknamed-by p2))))
+      (when p1 (delete-package p1))
+      (when p2 (delete-package p2)))))
+
+(with-test (:name (:delete-package :locally-nicknamed-by-others))
+  (let ((p1 (make-package "LOCALLY-NICKNAMES-OTHERS"))
+        (p2 (make-package "LOCALLY-NICKNAMED-BY-OTHERS")))
+    (add-package-local-nickname :foo p2 p1)
+    (assert (package-local-nicknames p1))
+    (delete-package p2)
+    (assert (not (package-local-nicknames p1)))))

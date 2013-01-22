@@ -184,6 +184,12 @@ Renaming a package.
 @item
 Deleting a package.
 
+@item
+Adding a new package local nickname to a package.
+
+@item
+Removing an existing package local nickname to a package.
+
 @end enumerate
 
 @subsubsection Operations on Symbols

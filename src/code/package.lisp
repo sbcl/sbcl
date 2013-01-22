@@ -106,7 +106,10 @@
   #!+sb-package-locks
   (%implementation-packages nil :type list)
   ;; Definition source location
-  (source-location nil :type (or null sb!c:definition-source-location)))
+  (source-location nil :type (or null sb!c:definition-source-location))
+  ;; Local package nicknames.
+  (%local-nicknames nil :type list)
+  (%locally-nicknamed-by nil :type list))
 
 ;;;; iteration macros
 

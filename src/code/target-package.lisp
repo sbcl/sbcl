@@ -342,6 +342,128 @@ error if any of PACKAGES is not a valid package designator."
   (def package-used-by-list package-%used-by-list)
   (def package-shadowing-symbols package-%shadowing-symbols))
 
+(defun package-local-nicknames (package-designator)
+  "Returns an alist of \(local-nickname . actual-package) describing the
+nicknames local to the designated package.
+
+When in the designated package, calls to FIND-PACKAGE with the any of the
+local-nicknames will return the corresponding actual-package instead. This
+also affects all implied calls to FIND-PACKAGE, including those performed by
+the reader.
+
+When printing a package prefix for a symbol with a package local nickname, the
+local nickname is used instead of the real name in order to preserve
+read/print consistency.
+
+See also: ADD-PACKAGE-LOCAL-NICKNAME, PACKAGE-LOCALLY-NICKNAMED-BY,
+REMOVE-PACKAGE-LOCAL-NICKNAME, and the DEFPACKAGE option :LOCAL-NICKNAMES.
+
+Experimental: interface subject to change."
+  (copy-tree
+   (package-%local-nicknames
+    (find-undeleted-package-or-lose package-designator))))
+
+(defun package-locally-nicknamed-by (package-designator)
+  "Returns a list of packages which have a local nickname for the designated
+package.
+
+See also: ADD-PACKAGE-LOCAL-NICKNAME, PACKAGE-LOCAL-NICKNAMES,
+REMOVE-PACKAGE-LOCAL-NICKNAME, and the DEFPACKAGE option :LOCAL-NICKNAMES.
+
+Experimental: interface subject to change."
+  (copy-list
+   (package-%locally-nicknamed-by
+    (find-undeleted-package-or-lose package-designator))))
+
+(defun add-package-local-nickname (local-nickname actual-package
+                                   &optional (package-designator (sane-package)))
+  "Adds LOCAL-NICKNAME for ACTUAL-PACKAGE in the designated package, defaulting
+to current package. LOCAL-NICKNAME must be a string designator, and
+ACTUAL-PACKAGE must be a package designator.
+
+Returns the designated package.
+
+Signals a continuable error if LOCAL-NICKNAME is already a package local
+nickname for a different package, or if LOCAL-NICKNAME is one of \"CL\",
+\"COMMON-LISP\", or, \"KEYWORD\".
+
+When in the designated package, calls to FIND-PACKAGE with the LOCAL-NICKNAME
+will return the package the designated ACTUAL-PACKAGE instead. This also
+affects all implied calls to FIND-PACKAGE, including those performed by the
+reader.
+
+When printing a package prefix for a symbol with a package local nickname,
+local nickname is used instead of the real name in order to preserve
+read/print consistency.
+
+See also: PACKAGE-LOCAL-NICKNAMES, PACKAGE-LOCALLY-NICKNAMED-BY,
+REMOVE-PACKAGE-LOCAL-NICKNAME, and the DEFPACKAGE option :LOCAL-NICKNAMES.
+
+Experimental: interface subject to change."
+  (let* ((nick (string local-nickname))
+         (actual (find-package-using-package actual-package nil))
+         (package (find-undeleted-package-or-lose package-designator))
+         (existing (package-%local-nicknames package))
+         (cell (assoc nick existing :test #'string=)))
+    (unless (package-name actual)
+      (error "Cannot add ~A as local nickname for a deleted package: ~S"
+             nick actual))
+    (with-single-package-locked-error
+        (:package package "adding ~A as a local nickname for ~A"
+                  nick actual))
+    (when (member nick '("CL" "COMMON-LISP" "KEYWORD") :test #'string=)
+      (cerror "Continue, use it as local nickname anyways."
+              "Attempt to use ~A as a package local nickname." nick))
+    (when (and cell (neq actual (cdr cell)))
+      (restart-case
+          (error "~@<Cannot add ~A as local nickname for ~A in ~S: already nickname for ~A.~:@>"
+                 nick actual package (cdr cell))
+        (keep-old ()
+          :report (lambda (s)
+                    (format s "Keep ~A as local nicname for ~A."
+                            nick (cdr cell))))
+        (change-nick ()
+          :report (lambda (s)
+                    (format s "Use ~A as local nickname for ~A instead."
+                            nick actual))
+          (let ((old (cdr cell)))
+            (with-package-graph ()
+              (setf (package-%locally-nicknamed-by old)
+                    (delete package (package-%locally-nicknamed-by old)))
+              (push package (package-%locally-nicknamed-by actual))
+              (setf (cdr cell) actual)))))
+      (return-from add-package-local-nickname package))
+    (unless cell
+      (with-package-graph ()
+        (push (cons nick actual) (package-%local-nicknames package))
+        (push package (package-%locally-nicknamed-by actual))))
+    package))
+
+(defun remove-package-local-nickname (old-nickname
+                                      &optional (package-designator (sane-package)))
+  "If the designated package had OLD-NICKNAME as a local nickname for
+another package, it is removed. Returns true if the nickname existed and was
+removed, and NIL otherwise.
+
+See also: ADD-PACKAGE-LOCAL-NICKNAME, PACKAGE-LOCAL-NICKNAMES,
+PACKAGE-LOCALLY-NICKNAMED-BY, and the DEFPACKAGE option :LOCAL-NICKNAMES.
+
+Experimental: interface subject to change."
+  (let* ((nick (string old-nickname))
+         (package (find-undeleted-package-or-lose package-designator))
+         (existing (package-%local-nicknames package))
+         (cell (assoc nick existing :test #'string=)))
+    (when cell
+      (with-single-package-locked-error
+          (:package package "removing local nickname ~A for ~A"
+                    nick (cdr cell)))
+      (with-package-graph ()
+        (let ((old (cdr cell)))
+          (setf (package-%local-nicknames package) (delete cell existing))
+          (setf (package-%locally-nicknamed-by old)
+                (delete package (package-%locally-nicknamed-by old)))))
+      t)))
+
 (defun %package-hashtable-symbol-count (table)
   (let ((size (the fixnum
                 (- (package-hashtable-size table)
@@ -383,9 +505,37 @@ error if any of PACKAGES is not a valid package designator."
    (find-restart-or-control-error 'debootstrap-package condition)))
 
 (defun find-package (package-designator)
+  "If PACKAGE-DESIGNATOR is a package, it is returned. Otherwise PACKAGE-DESIGNATOR
+must be a string designator, in which case the package it names is located and returned.
+
+As an SBCL extension, the current package may effect the way a package name is
+resolved: if the current package has local nicknames specified, package names
+matching those are resolved to the packages associated with them instead.
+
+Example:
+
+  (defpackage :a)
+  (defpackage :example (:use :cl) (:local-nicknames (:x :a)))
+  (let ((*package* (find-package :example)))
+    (find-package :x)) => #<PACKAGE A>
+
+See also: ADD-PACKAGE-LOCAL-NICKNAME, PACKAGE-LOCAL-NICKNAMES,
+REMOVE-PACKAGE-LOCAL-NICKNAME, and the DEFPACKAGE option :LOCAL-NICKNAMES."
+  (find-package-using-package package-designator
+                              (when (boundp '*package*)
+                                *package*)))
+
+;;; This is undocumented and unexported for now, but the idea is that by
+;;; making this a generic function then packages with custom package classes
+;;; could hook into this to provide their own resolution.
+(defun find-package-using-package (package-designator base)
   (flet ((find-package-from-string (string)
            (declare (type string string))
-           (let ((packageoid (gethash string *package-names*)))
+           (let* ((nicknames (when base
+                               (package-%local-nicknames base)))
+                  (nicknamed (when nicknames
+                               (cdr (assoc string nicknames :test #'string=))))
+                  (packageoid (or nicknamed (gethash string *package-names*))))
              (when (and (null packageoid)
                         (not *in-package-init*) ; KLUDGE
                         (let ((mismatch (mismatch "SB!" string)))
@@ -393,7 +543,7 @@ error if any of PACKAGES is not a valid package designator."
                (restart-case
                    (signal 'bootstrap-package-not-found :name string)
                  (debootstrap-package ()
-                   (return-from find-package
+                   (return-from find-package-using-package
                      (if (string= string "SB!XC")
                          (find-package "COMMON-LISP")
                          (find-package
@@ -715,6 +865,15 @@ implementation it is ~S." *default-package-use-list*)
                       (go :restart)))
                   (dolist (used (package-use-list package))
                     (unuse-package used package))
+                  (dolist (namer (package-%locally-nicknamed-by package))
+                    (setf (package-%local-nicknames namer)
+                          (delete package (package-%local-nicknames namer) :key #'cdr)))
+                  (setf (package-%locally-nicknamed-by package) nil)
+                  (dolist (cell (package-%local-nicknames package))
+                    (let ((actual (cdr cell)))
+                      (setf (package-%locally-nicknamed-by actual)
+                            (delete package (package-%locally-nicknamed-by actual)))))
+                  (setf (package-%local-nicknames package) nil)
                   (do-symbols (sym package)
                     (unintern sym package))
                   (with-package-names (names)

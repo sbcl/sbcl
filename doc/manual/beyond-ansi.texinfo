@@ -7,18 +7,19 @@ ANSI standard. SBCL doesn't support as many extensions as CMUCL, but
 it still has quite a few.  @xref{Contributed Modules}.
 
 @menu
-* Reader Extensions::
-* Garbage Collection::
-* Metaobject Protocol::
-* Support For Unix::
-* Customization Hooks for Users::
-* Tools To Help Developers::
-* Resolution of Name Conflicts::
-* Hash Table Extensions::
-* Random Number Generation::
-* Miscellaneous Extensions::
-* Stale Extensions::
-* Efficiency Hacks::
+* Reader Extensions::           
+* Package-Local Nicknames::     
+* Garbage Collection::          
+* Metaobject Protocol::         
+* Support For Unix::            
+* Customization Hooks for Users::  
+* Tools To Help Developers::    
+* Resolution of Name Conflicts::  
+* Hash Table Extensions::       
+* Random Number Generation::    
+* Miscellaneous Extensions::    
+* Stale Extensions::            
+* Efficiency Hacks::            
 @end menu
 
 @node Reader Extensions
@@ -42,6 +43,53 @@ Example:
 
 Doesn't alter @code{*package*}: if @code{foo::bar} would cause a
 read-time package lock violation, so does @code{foo::(bar)}.
+
+@node  Package-Local Nicknames
+@comment  node-name,  next,  previous,  up
+@section Package-Local Nicknames
+@cindex Package-Local Nicknames
+
+SBCL allows giving packages local nicknames: they allow short and
+easy-to-use names to be used without fear of name conflict associated
+with normal nicknames.
+
+A local nickname is valid only when inside the package for which it
+has been specified. Different packages can use same local nickname for
+different global names, or different local nickname for same global
+name.
+
+@findex @cl{defpackage}
+@defmac @cl{defpackage} name [[option]]* @result{} package
+
+Options are extended to include
+
+@itemize
+@item
+@code{:local-nicknames} @var{(local-nickname actual-package-name)}*
+
+The package has the specified local nicknames for the corresponding
+actual packages.
+@end itemize
+
+Example:
+
+@lisp
+(defpackage :bar (:intern "X"))
+(defpackage :foo (:intern "X"))
+(defpackage :quux (:use :cl) (:local-nicknames (:bar :foo) (:foo :bar)))
+(find-symbol "X" :foo) ; => FOO::X
+(find-symbol "X" :bar) ; => BAR::X
+(let ((*package* (find-package :quux)))
+  (find-symbol "X" :foo))               ; => BAR::X
+(let ((*package* (find-package :quux)))
+  (find-symbol "X" :bar))               ; => FOO::X
+@end lisp
+@end defmac
+
+@include fun-sb-ext-package-local-nicknames.texinfo
+@include fun-sb-ext-package-locally-nicknamed-by.texinfo
+@include fun-sb-ext-add-package-local-nickname.texinfo
+@include fun-sb-ext-remove-package-local-nickname.texinfo
 
 @node  Garbage Collection
 @comment  node-name,  next,  previous,  up
@@ -302,9 +350,9 @@ to the constant @code{+slot-unbound+}.
 @section Support For Unix
 
 @menu
-* Command-line arguments::
-* Querying the process environment::
-* Running external programs::
+* Command-line arguments::      
+* Querying the process environment::  
+* Running external programs::   
 @end menu
 
 @node Command-line arguments

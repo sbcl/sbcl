@@ -686,7 +686,9 @@ like *STACK-TOP-HINT* and unsupported stuff like *TRACED-FUN-LIST*."
                "DEFGLOBAL"
                "SYMBOL-GLOBAL-VALUE"
 
-               ;; package-locking stuff
+               ;; package extensions
+               ;;
+               ;; locks
                #!+sb-package-locks "PACKAGE-LOCKED-P"
                #!+sb-package-locks "LOCK-PACKAGE"
                #!+sb-package-locks "UNLOCK-PACKAGE"
@@ -702,6 +704,11 @@ like *STACK-TOP-HINT* and unsupported stuff like *TRACED-FUN-LIST*."
                "WITHOUT-PACKAGE-LOCKS"
                "DISABLE-PACKAGE-LOCKS"
                "ENABLE-PACKAGE-LOCKS"
+               ;; local nicknames
+               "ADD-PACKAGE-LOCAL-NICKNAME"
+               "REMOVE-PACKAGE-LOCAL-NICKNAME"
+               "PACKAGE-LOCAL-NICKNAMES"
+               "PACKAGE-LOCALLY-NICKNAMED-BY"
 
                ;; Custom conditions & condition accessors for users to handle.
                "CODE-DELETION-NOTE"

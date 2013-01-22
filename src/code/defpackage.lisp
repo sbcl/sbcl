@@ -34,19 +34,21 @@
    following: ~{~&~4T~A~}
    All options except ~{~A, ~}and :DOCUMENTATION can be used multiple
    times."
-  '((:nicknames "{package-name}*")
-    (:size "<integer>")
+  '((:use "{package-name}*")
+    (:export "{symbol-name}*")
+    (:import-from "<package-name> {symbol-name}*")
     (:shadow "{symbol-name}*")
     (:shadowing-import-from "<package-name> {symbol-name}*")
-    (:use "{package-name}*")
-    (:import-from "<package-name> {symbol-name}*")
-    (:intern "{symbol-name}*")
-    (:export "{symbol-name}*")
-    #!+sb-package-locks (:implement "{package-name}*")
+    (:local-nicknames "{local-nickname actual-package-name}*")
     #!+sb-package-locks (:lock "boolean")
-    (:documentation "doc-string"))
+    #!+sb-package-locks (:implement "{package-name}*")
+    (:documentation "doc-string")
+    (:intern "{symbol-name}*")
+    (:size "<integer>")
+    (:nicknames "{package-name}*"))
   '(:size #!+sb-package-locks :lock))
   (let ((nicknames nil)
+        (local-nicknames nil)
         (size nil)
         (shadows nil)
         (shadowing-imports nil)
@@ -69,6 +71,14 @@
       (case (car option)
         (:nicknames
          (setf nicknames (stringify-package-designators (cdr option))))
+        (:local-nicknames
+         (setf local-nicknames
+               (append local-nicknames
+                       (mapcar (lambda (spec)
+                                 (destructuring-bind (nick name) spec
+                                   (cons (stringify-package-designator nick)
+                                         (stringify-package-designator name))))
+                               (cdr option)))))
         (:size
          (cond (size
                 (error 'simple-program-error
@@ -142,7 +152,8 @@
     `(eval-when (:compile-toplevel :load-toplevel :execute)
        (%defpackage ,(stringify-string-designator package) ',nicknames ',size
                     ',shadows ',shadowing-imports ',(if use-p use :default)
-                    ',imports ',interns ',exports ',implement ',lock ',doc
+                    ',imports ',interns ',exports ',implement ',local-nicknames
+                    ',lock ',doc
                     (sb!c:source-location)))))
 
 (defun check-disjoint (&rest args)
@@ -208,8 +219,8 @@
                        shadows shadowing-imports
                        use
                        imports interns
-                       exports
-                       implement lock doc-string)
+                       exports implement local-nicknames
+                       lock doc-string)
   (declare #!-sb-package-locks
            (ignore implement lock))
   (%enter-new-nicknames package nicknames)
@@ -245,6 +256,10 @@
       (add-implementation-package package p))
     ;; Handle lock
     (setf (package-lock package) lock))
+  ;; Local nicknames. Throw out the old ones.
+  (setf (package-%local-nicknames package) nil)
+  (dolist (spec local-nicknames)
+    (add-package-local-nickname (car spec) (cdr spec) package))
   package)
 
 (defun update-package-with-variance (package name nicknames source-location
@@ -252,7 +267,8 @@
                                      use
                                      imports interns
                                      exports
-                                     implement lock doc-string)
+                                     implement local-nicknames
+                                     lock doc-string)
   (unless (string= (the string (package-name package)) name)
     (error 'simple-package-error
            :package name
@@ -320,10 +336,12 @@
   (update-package package nicknames source-location
                   shadows shadowing-imports
                   use imports interns exports
-                  implement lock doc-string))
+                  implement local-nicknames
+                  lock doc-string))
 
 (defun %defpackage (name nicknames size shadows shadowing-imports
-                    use imports interns exports implement lock doc-string
+                    use imports interns exports implement local-nicknames
+                    lock doc-string
                     source-location)
   (declare (type simple-string name)
            (type list nicknames shadows shadowing-imports
@@ -342,16 +360,19 @@
                                         nicknames source-location
                                         shadows shadowing-imports
                                         use imports interns exports
-                                        implement lock doc-string)
+                                        implement local-nicknames
+                                        lock doc-string)
           (let ((package (make-package name
                                        :use nil
                                        :internal-symbols (or size 10)
                                        :external-symbols (length exports))))
             (update-package package
-                            nicknames source-location
+                            nicknames
+                            source-location
                             shadows shadowing-imports
                             use imports interns exports
-                            implement lock doc-string))))))
+                            implement local-nicknames
+                            lock doc-string))))))
 
 (defun find-or-make-symbol (name package)
   (multiple-value-bind (symbol how) (find-symbol name package)
