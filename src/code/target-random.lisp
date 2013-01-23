@@ -158,7 +158,7 @@ http://www.math.sci.hiroshima-u.ac.jp/~m-mat/MT/emt.html
        (progn
          (/show0 "No /dev/urandom, using randomness from time and pid")
          (+ (get-internal-real-time)
-            #!+unix (ash (sb!unix:unix-getpid) 32))))))
+            (ash (sb!unix:unix-getpid) 32))))))
     ;; For convenience to users, we accept (simple-array (unsigned-byte 8) (*))
     ;; We just convert it to (simple-array (unsigned-byte 32) (*)) in a
     ;; completely straightforward way.
