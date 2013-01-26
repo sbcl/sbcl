@@ -3,7 +3,7 @@
 
 #-(or win32 darwin)                    ;not yet
 (sb-sprof::test)
-#-win32                                ;not yet
+#-(or win32 darwin)                    ;not yet
 (sb-sprof::consing-test)
 
 ;; For debugging purposes, print output for visual inspection to see if
