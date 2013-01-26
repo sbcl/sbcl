@@ -1414,7 +1414,7 @@
                         (make-dfun-lambda-list nargs applyp)
                         (make-fast-method-call-lambda-list nargs applyp))))
       (multiple-value-bind (cfunction constants)
-          (get-fun1 `(lambda
+          (get-fun1 `(named-lambda (gf-dispatch ,name)
                       ,arglist
                       ,@(unless function-p
                           `((declare (ignore .pv. .next-method-call.))))

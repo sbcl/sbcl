@@ -751,4 +751,17 @@
       (unless (zerop (length problems))
         (error problems)))))
 
+(defgeneric gf-dispatch-test/gf (x y)
+  (:method (x y)
+    (+ x y)))
+(defun gf-dispatch-test/f (z)
+  (gf-dispatch-test/gf z))
+
+(with-test (:name :gf-dispatch-backtrace)
+  ;; Fill the cache
+  (gf-dispatch-test/gf 1 1)
+  ;; Wrong argument count
+  (assert (verify-backtrace (lambda () (gf-dispatch-test/f 42))
+                            '(((sb-pcl::gf-dispatch gf-dispatch-test/gf) 42)))))
+
 (write-line "/debug.impure.lisp done")
