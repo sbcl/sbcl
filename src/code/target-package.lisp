@@ -894,56 +894,107 @@ implementation it is ~S." *default-package-use-list*)
              (name-conflict-symbols c)))))
 
 (defun name-conflict (package function datum &rest symbols)
-  (restart-case
-      (error 'name-conflict :package package :symbols symbols
-             :function function :datum datum)
-    (resolve-conflict (chosen-symbol)
-      :report "Resolve conflict."
-      :interactive
-      (lambda ()
-        (let* ((len (length symbols))
-               (nlen (length (write-to-string len :base 10)))
-               (*print-pretty* t))
-          (format *query-io* "~&~@<Select a symbol to be made accessible in ~
+  (flet ((importp (c)
+           (declare (ignore c))
+           (eq 'import function))
+         (use-or-export-p (c)
+           (declare (ignore c))
+           (or (eq 'use-package function)
+               (eq 'export function)))
+         (old-symbol ()
+           (car (remove datum symbols))))
+    (let ((pname (package-name package)))
+      (restart-case
+          (error 'name-conflict :package package :symbols symbols
+                                :function function :datum datum)
+        ;; USE-PACKAGE and EXPORT
+        (keep-old ()
+          :report (lambda (s)
+                    (ecase function
+                      (export
+                       (format s "Keep ~S accessible in ~A (shadowing ~S)."
+                               (old-symbol) pname datum))
+                      (use-package
+                       (format s "Keep symbols already accessible ~A (shadowing others)."
+                               pname))))
+          :test use-or-export-p
+          (dolist (s (remove-duplicates symbols :test #'string=))
+            (shadow (symbol-name s) package)))
+        (take-new ()
+          :report (lambda (s)
+                    (ecase function
+                      (export
+                       (format s "Make ~S accessible in ~A (uninterning ~S)."
+                               datum pname (old-symbol)))
+                      (use-package
+                       (format s "Make newly exposed symbols accessible in ~A, ~
+                                  uninterning old ones."
+                               pname))))
+          :test use-or-export-p
+          (dolist (s symbols)
+            (when (eq s (find-symbol (symbol-name s) package))
+              (unintern s package))))
+        ;; IMPORT
+        (shadowing-import-it ()
+          :report (lambda (s)
+                    (format s "Shadowing-import ~S, uninterning ~S."
+                            datum (old-symbol)))
+          :test importp
+          (shadowing-import datum package))
+        (dont-import-it ()
+          :report (lambda (s)
+                    (format s "Don't import ~S, keeping ~S."
+                            datum
+                            (car (remove datum symbols))))
+          :test importp)
+        ;; General case. This is exposed via SB-EXT.
+        (resolve-conflict (chosen-symbol)
+          :report "Resolve conflict."
+          :interactive
+          (lambda ()
+            (let* ((len (length symbols))
+                   (nlen (length (write-to-string len :base 10)))
+                   (*print-pretty* t))
+              (format *query-io* "~&~@<Select a symbol to be made accessible in ~
                               package ~A:~2I~@:_~{~{~V,' D. ~
                               ~/sb-impl::print-symbol-with-prefix/~}~@:_~}~
                               ~@:>"
-                (package-name package)
-                (loop for s in symbols
-                      for i upfrom 1
-                      collect (list nlen i s)))
-          (loop
-           (format *query-io* "~&Enter an integer (between 1 and ~D): " len)
-           (finish-output *query-io*)
-           (let ((i (parse-integer (read-line *query-io*) :junk-allowed t)))
-             (when (and i (<= 1 i len))
-               (return (list (nth (1- i) symbols))))))))
-      (multiple-value-bind (package-symbol status)
-          (find-symbol (symbol-name chosen-symbol) package)
-        (let* ((accessiblep status)     ; never NIL here
-               (presentp (and accessiblep
-                              (not (eq :inherited status)))))
-          (ecase function
-            ((unintern)
-             (if presentp
-                 (if (eq package-symbol chosen-symbol)
-                     (shadow (list package-symbol) package)
-                     (shadowing-import (list chosen-symbol) package))
-                 (shadowing-import (list chosen-symbol) package)))
-            ((use-package export)
-             (if presentp
-                 (if (eq package-symbol chosen-symbol)
-                     (shadow (list package-symbol) package) ; CLHS 11.1.1.2.5
-                     (if (eq (symbol-package package-symbol) package)
-                         (unintern package-symbol package) ; CLHS 11.1.1.2.5
-                         (shadowing-import (list chosen-symbol) package)))
-                 (shadowing-import (list chosen-symbol) package)))
-            ((import)
-             (if presentp
-                 (if (eq package-symbol chosen-symbol)
-                     nil                ; re-importing the same symbol
-                     (shadowing-import (list chosen-symbol) package))
-                 (shadowing-import (list chosen-symbol) package)))))))))
+                      (package-name package)
+                      (loop for s in symbols
+                            for i upfrom 1
+                            collect (list nlen i s)))
+              (loop
+                (format *query-io* "~&Enter an integer (between 1 and ~D): " len)
+                (finish-output *query-io*)
+                (let ((i (parse-integer (read-line *query-io*) :junk-allowed t)))
+                  (when (and i (<= 1 i len))
+                    (return (list (nth (1- i) symbols))))))))
+          (multiple-value-bind (package-symbol status)
+              (find-symbol (symbol-name chosen-symbol) package)
+            (let* ((accessiblep status)     ; never NIL here
+                   (presentp (and accessiblep
+                                  (not (eq :inherited status)))))
+              (ecase function
+                ((unintern)
+                 (if presentp
+                     (if (eq package-symbol chosen-symbol)
+                         (shadow (list package-symbol) package)
+                         (shadowing-import (list chosen-symbol) package))
+                     (shadowing-import (list chosen-symbol) package)))
+                ((use-package export)
+                 (if presentp
+                     (if (eq package-symbol chosen-symbol)
+                         (shadow (list package-symbol) package) ; CLHS 11.1.1.2.5
+                         (if (eq (symbol-package package-symbol) package)
+                             (unintern package-symbol package) ; CLHS 11.1.1.2.5
+                             (shadowing-import (list chosen-symbol) package)))
+                     (shadowing-import (list chosen-symbol) package)))
+                ((import)
+                 (if presentp
+                     (if (eq package-symbol chosen-symbol)
+                         nil                ; re-importing the same symbol
+                         (shadowing-import (list chosen-symbol) package))
+                     (shadowing-import (list chosen-symbol) package)))))))))))
 
 ;;; If we are uninterning a shadowing symbol, then a name conflict can
 ;;; result, otherwise just nuke the symbol.

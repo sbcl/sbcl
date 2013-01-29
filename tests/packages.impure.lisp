@@ -304,3 +304,87 @@ if a restart was invoked."
     (with-timeout 10
       (assert (eq 'cons (read-from-string "CL:CONS"))))
     (sb-thread:signal-semaphore sem2)))
+
+(with-test (:name :quick-name-conflict-resolution-import)
+  (let (p1 p2)
+    (unwind-protect
+         (progn
+           (setf p1 (make-package "QUICK-NAME-CONFLICT-RESOLUTION-IMPORT.1")
+                 p2 (make-package "QUICK-NAME-CONFLICT-RESOLUTION-IMPORT.2"))
+           (intern "FOO" p1)
+           (handler-bind ((name-conflict (lambda (c)
+                                           (invoke-restart 'sb-impl::dont-import-it))))
+             (import (intern "FOO" p2) p1))
+           (assert (not (eq (intern "FOO" p1) (intern "FOO" p2))))
+           (handler-bind ((name-conflict (lambda (c)
+                                           (invoke-restart 'sb-impl::shadowing-import-it))))
+             (import (intern "FOO" p2) p1))
+           (assert (eq (intern "FOO" p1) (intern "FOO" p2))))
+      (when p1 (delete-package p1))
+      (when p2 (delete-package p2)))))
+
+(with-test (:name :quick-name-conflict-resolution-export.1)
+  (let (p1 p2)
+    (unwind-protect
+         (progn
+           (setf p1 (make-package "QUICK-NAME-CONFLICT-RESOLUTION-EXPORT.1a")
+                 p2 (make-package "QUICK-NAME-CONFLICT-RESOLUTION-EXPORT.2a"))
+           (intern "FOO" p1)
+           (use-package p2 p1)
+           (handler-bind ((name-conflict (lambda (c)
+                                           (invoke-restart 'sb-impl::keep-old))))
+             (export (intern "FOO" p2) p2))
+           (assert (not (eq (intern "FOO" p1) (intern "FOO" p2)))))
+      (when p1 (delete-package p1))
+      (when p2 (delete-package p2)))))
+
+(with-test (:name :quick-name-conflict-resolution-export.2)
+  (let (p1 p2)
+    (unwind-protect
+         (progn
+           (setf p1 (make-package "QUICK-NAME-CONFLICT-RESOLUTION-EXPORT.1b")
+                 p2 (make-package "QUICK-NAME-CONFLICT-RESOLUTION-EXPORT.2b"))
+           (intern "FOO" p1)
+           (use-package p2 p1)
+           (handler-bind ((name-conflict (lambda (c)
+                                           (invoke-restart 'sb-impl::take-new))))
+             (export (intern "FOO" p2) p2))
+           (assert (eq (intern "FOO" p1) (intern "FOO" p2))))
+      (when p1 (delete-package p1))
+      (when p2 (delete-package p2)))))
+
+(with-test (:name :quick-name-conflict-resolution-use-package.1)
+  (let (p1 p2)
+    (unwind-protect
+         (progn
+           (setf p1 (make-package "QUICK-NAME-CONFLICT-RESOLUTION-USE-PACKAGE.1a")
+                 p2 (make-package "QUICK-NAME-CONFLICT-RESOLUTION-USE-PACKAGE.2a"))
+           (intern "FOO" p1)
+           (intern "BAR" p1)
+           (export (intern "FOO" p2) p2)
+           (export (intern "BAR" p2) p2)
+           (handler-bind ((name-conflict (lambda (c)
+                                           (invoke-restart 'sb-impl::keep-old))))
+             (use-package p2 p1))
+           (assert (not (eq (intern "FOO" p1) (intern "FOO" p2))))
+           (assert (not (eq (intern "BAR" p1) (intern "BAR" p2)))))
+      (when p1 (delete-package p1))
+      (when p2 (delete-package p2)))))
+
+(with-test (:name :quick-name-conflict-resolution-use-package.2)
+  (let (p1 p2)
+    (unwind-protect
+         (progn
+           (setf p1 (make-package "QUICK-NAME-CONFLICT-RESOLUTION-USE-PACKAGE.1b")
+                 p2 (make-package "QUICK-NAME-CONFLICT-RESOLUTION-USE-PACKAGE.2b"))
+           (intern "FOO" p1)
+           (intern "BAR" p1)
+           (export (intern "FOO" p2) p2)
+           (export (intern "BAR" p2) p2)
+           (handler-bind ((name-conflict (lambda (c)
+                                           (invoke-restart 'sb-impl::take-new))))
+             (use-package p2 p1))
+           (assert (eq (intern "FOO" p1) (intern "FOO" p2)))
+           (assert (eq (intern "BAR" p1) (intern "BAR" p2))))
+      (when p1 (delete-package p1))
+      (when p2 (delete-package p2)))))
