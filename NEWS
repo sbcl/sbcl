@@ -1,5 +1,5 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
-changes relative to sbcl-1.1.3:
+changes in sbcl-1.1.4 relative to sbcl-1.1.3:
   * optimization: LOOP expressions using "of-type character" have slightly
     more efficient expansions.
   * bug fix: very long (or infinite) constant lists in DOLIST do not result
