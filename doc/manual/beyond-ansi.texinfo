@@ -58,6 +58,9 @@ has been specified. Different packages can use same local nickname for
 different global names, or different local nickname for same global
 name.
 
+Symbol @code{:package-local-nicknames} in @code{*features*} denotes the
+support for this feature.
+
 @findex @cl{defpackage}
 @defmac @cl{defpackage} name [[option]]* @result{} package
 

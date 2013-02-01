@@ -275,7 +275,7 @@
  ;; We support package local nicknames. No :sb-prefix here as we vainly
  ;; believe our API is worth copying to other implementations as well.
  ;; This doesn't affect the build at all, merely declares how things are.
- :local-nicknames
+ :package-local-nicknames
 
  ;; This affects the definition of a lot of things in bignum.lisp. It
  ;; doesn't seem to be documented anywhere what systems it might apply
