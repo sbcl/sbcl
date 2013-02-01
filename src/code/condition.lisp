@@ -914,6 +914,11 @@
   ()
   (:default-initargs :references (list '(:ansi-cl :macro defpackage))))
 
+(define-condition package-at-variance-error (reference-condition simple-condition
+                                             package-error)
+  ()
+  (:default-initargs :references (list '(:ansi-cl :macro defpackage))))
+
 (define-condition defconstant-uneql (reference-condition error)
   ((name :initarg :name :reader defconstant-uneql-name)
    (old-value :initarg :old-value :reader defconstant-uneql-old-value)

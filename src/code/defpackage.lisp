@@ -253,41 +253,74 @@
                                      imports interns
                                      exports
                                      implement lock doc-string)
-  (let ((old-exports nil)
-        (old-shadows (package-%shadowing-symbols package))
-        (old-use (package-use-list package))
-        (no-longer-used nil))
-    (unless (string= (the string (package-name package)) name)
-      (error 'simple-package-error
-             :package name
-             :format-control "~A is a nickname for the package ~A"
-             :format-arguments (list name (package-name name))))
-    (do-external-symbols (symbol package)
-      (push symbol old-exports))
-    (setf old-shadows (set-difference old-shadows (append shadows
-                                                          shadowing-imports)
-                                      :test #'string=))
-    (setf no-longer-used (set-difference old-use use))
-    (setf use (set-difference use old-use))
-    (setf old-exports (set-difference old-exports exports :test #'string=))
-    (when old-shadows
-      (warn 'package-at-variance
-            :format-control "~A also shadows the following symbols:~%  ~S"
-            :format-arguments (list name old-shadows)))
+  (unless (string= (the string (package-name package)) name)
+    (error 'simple-package-error
+           :package name
+           :format-control "~A is a nickname for the package ~A"
+           :format-arguments (list name (package-name name))))
+  (let ((no-longer-shadowed
+          (set-difference (package-%shadowing-symbols package)
+                          (append shadows shadowing-imports)
+                          :test #'string=)))
+    (when no-longer-shadowed
+      (restart-case
+          (let ((*package* (find-package :keyword)))
+            (error 'sb!kernel::package-at-variance-error
+                   :format-control "~A also shadows the following symbols:~%  ~S"
+                   :format-arguments (list name no-longer-shadowed)
+                   :package package))
+        (drop-them ()
+          :report "Stop shadowing them by uninterning them."
+          (dolist (sym no-longer-shadowed)
+            (unintern sym package)))
+        (keep-them ()
+          :report "Keep shadowing them."))))
+  (let ((no-longer-used (set-difference (package-use-list package) use)))
     (when no-longer-used
-      (dolist (unused-package no-longer-used)
-        (unuse-package unused-package package))
-      (warn 'package-at-variance
-            :format-control "~A used to use the following packages:~%  ~S"
-            :format-arguments (list name no-longer-used)))
-    (when old-exports
-      (warn 'package-at-variance
-            :format-control "~A also exports the following symbols:~%  ~S"
-            :format-arguments (list name old-exports)))
-    (update-package package nicknames source-location
-                    shadows shadowing-imports
-                    use imports interns exports
-                    implement lock doc-string)))
+      (restart-case
+          (error 'sb!kernel::package-at-variance-error
+                 :format-control "~A also uses the following packages:~%  ~A"
+                 :format-arguments (list name (mapcar #'package-name no-longer-used))
+                 :package package)
+        (drop-them ()
+          :report "Stop using them."
+          (unuse-package no-longer-used package))
+        (keep-them ()
+          :report "Keep using them."))))
+  (let (old-exports)
+    (do-external-symbols (s package)
+      (push s old-exports))
+    (let ((no-longer-exported (set-difference old-exports exports :test #'string=)))
+     (when no-longer-exported
+       (restart-case
+           (error 'sb!kernel::package-at-variance-error
+                  :format-control "~A also exports the following symbols:~%  ~S"
+                  :format-arguments (list name no-longer-exported)
+                  :package package)
+         (drop-them ()
+           :report "Unexport them."
+           (unexport no-longer-exported package))
+         (keep-them ()
+           :report "Keep exporting them.")))))
+  (let ((old-implements
+          (set-difference (package-implements-list package)
+                          (mapcar #'find-undeleted-package-or-lose implement))))
+    (when old-implements
+      (restart-case
+          (error 'sb!kernel::package-at-variance-error
+                 :format-control "~A is also an implementation package for:~% ~{~S~^~%  ~}"
+                 :format-arguments (list name old-implements)
+                 :package package)
+        (drop-them ()
+          :report "Stop being an implementation package for them."
+          (dolist (p old-implements)
+            (remove-implementation-package package p)))
+        (keep-them ()
+          :report "Keep exporting them."))))
+  (update-package package nicknames source-location
+                  shadows shadowing-imports
+                  use imports interns exports
+                  implement lock doc-string))
 
 (defun %defpackage (name nicknames size shadows shadowing-imports
                     use imports interns exports implement lock doc-string

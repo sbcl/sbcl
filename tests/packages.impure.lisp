@@ -388,3 +388,80 @@ if a restart was invoked."
            (assert (eq (intern "BAR" p1) (intern "BAR" p2))))
       (when p1 (delete-package p1))
       (when p2 (delete-package p2)))))
+
+(with-test (:name (:package-at-variance-restarts :shadow))
+  (let (p)
+    (unwind-protect
+         (progn
+           (setf p (eval `(defpackage :package-at-variance-restarts.1
+                            (:use :cl)
+                            (:shadow "CONS"))))
+           (handler-bind ((sb-kernel::package-at-variance-error
+                            (lambda (c)
+                              (invoke-restart 'sb-impl::keep-them))))
+             (eval `(defpackage :package-at-variance-restarts.1
+                      (:use :cl))))
+           (assert (not (eq 'cl:cons (intern "CONS" p))))
+           (handler-bind ((sb-kernel::package-at-variance-error
+                            (lambda (c)
+                              (invoke-restart 'sb-impl::drop-them))))
+             (eval `(defpackage :package-at-variance-restarts.1
+                      (:use :cl))))
+           (assert (eq 'cl:cons (intern "CONS" p))))
+      (when p (delete-package p)))))
+
+(with-test (:name (:package-at-variance-restarts :use))
+  (let (p)
+    (unwind-protect
+         (progn
+           (setf p (eval `(defpackage :package-at-variance-restarts.2
+                            (:use :cl))))
+           (handler-bind ((sb-kernel::package-at-variance-error
+                            (lambda (c)
+                              (invoke-restart 'sb-impl::keep-them))))
+             (eval `(defpackage :package-at-variance-restarts.2
+                      (:use))))
+           (assert (eq 'cl:cons (intern "CONS" p)))
+           (handler-bind ((sb-kernel::package-at-variance-error
+                            (lambda (c)
+                              (invoke-restart 'sb-impl::drop-them))))
+             (eval `(defpackage :package-at-variance-restarts.2
+                      (:use))))
+           (assert (not (eq 'cl:cons (intern "CONS" p)))))
+      (when p (delete-package p)))))
+
+(with-test (:name (:package-at-variance-restarts :export))
+  (let (p)
+    (unwind-protect
+         (progn
+           (setf p (eval `(defpackage :package-at-variance-restarts.4
+                            (:export "FOO"))))
+           (handler-bind ((sb-kernel::package-at-variance-error
+                            (lambda (c)
+                              (invoke-restart 'sb-impl::keep-them))))
+             (eval `(defpackage :package-at-variance-restarts.4)))
+           (assert (eq :external (nth-value 1 (find-symbol "FOO" p))))
+           (handler-bind ((sb-kernel::package-at-variance-error
+                            (lambda (c)
+                              (invoke-restart 'sb-impl::drop-them))))
+             (eval `(defpackage :package-at-variance-restarts.4)))
+           (assert (eq :internal (nth-value 1 (find-symbol "FOO" p)))))
+      (when p (delete-package p)))))
+
+(with-test (:name (:package-at-variance-restarts :implement))
+  (let (p)
+    (unwind-protect
+         (progn
+           (setf p (eval `(defpackage :package-at-variance-restarts.5
+                            (:implement :sb-int))))
+           (handler-bind ((sb-kernel::package-at-variance-error
+                            (lambda (c)
+                              (invoke-restart 'sb-impl::keep-them))))
+             (eval `(defpackage :package-at-variance-restarts.5)))
+           (assert (member p (package-implemented-by-list :sb-int)))
+           (handler-bind ((sb-kernel::package-at-variance-error
+                            (lambda (c)
+                              (invoke-restart 'sb-impl::drop-them))))
+             (eval `(defpackage :package-at-variance-restarts.5)))
+           (assert (not (member p (package-implemented-by-list :sb-int)))))
+      (when p (delete-package p)))))
