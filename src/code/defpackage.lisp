@@ -262,6 +262,46 @@
     (add-package-local-nickname (car spec) (cdr spec) package))
   package)
 
+(declaim (type list *on-package-variance*))
+(defvar *on-package-variance* '(:warn t)
+  "Specifies behavior when redefining a package using DEFPACKAGE and the
+definition is in variance with the current state of the package.
+
+The value should be of the form:
+
+  (:WARN [T | packages-names] :ERROR [T | package-names])
+
+specifying which packages get which behaviour -- with T signifying the default unless
+otherwise specified. If default is not specified, :WARN is used.
+
+:WARN keeps as much state as possible and causes SBCL to signal a full warning.
+
+:ERROR causes SBCL to signal an error when the variant DEFPACKAGE form is executed,
+with restarts provided for user to specify what action should be taken.
+
+Example:
+
+  (setf *on-package-variance* '(:warn (:swank :swank-backend) :error t))
+
+specifies to signal a warning if SWANK package is in variance, and an error otherwise.")
+
+(defun note-package-variance (&rest args &key package &allow-other-keys)
+  (let ((pname (package-name package)))
+    (destructuring-bind (&key warn error) *on-package-variance*
+      (let ((what (cond ((and (listp error) (member pname error :test #'string=))
+                         :error)
+                        ((and (listp warn) (member pname warn :test #'string=))
+                         :warn)
+                        ((eq t error)
+                         :error)
+                        (t
+                         :warn))))
+        (ecase what
+          (:error
+           (apply #'error 'sb!kernel::package-at-variance-error args))
+          (:warn
+           (apply #'warn 'sb!kernel::package-at-variance args)))))))
+
 (defun update-package-with-variance (package name nicknames source-location
                                      shadows shadowing-imports
                                      use
@@ -281,10 +321,10 @@
     (when no-longer-shadowed
       (restart-case
           (let ((*package* (find-package :keyword)))
-            (error 'sb!kernel::package-at-variance-error
-                   :format-control "~A also shadows the following symbols:~%  ~S"
-                   :format-arguments (list name no-longer-shadowed)
-                   :package package))
+            (note-package-variance
+             :format-control "~A also shadows the following symbols:~%  ~S"
+             :format-arguments (list name no-longer-shadowed)
+             :package package))
         (drop-them ()
           :report "Stop shadowing them by uninterning them."
           (dolist (sym no-longer-shadowed)
@@ -294,10 +334,10 @@
   (let ((no-longer-used (set-difference (package-use-list package) use)))
     (when no-longer-used
       (restart-case
-          (error 'sb!kernel::package-at-variance-error
-                 :format-control "~A also uses the following packages:~%  ~A"
-                 :format-arguments (list name (mapcar #'package-name no-longer-used))
-                 :package package)
+          (note-package-variance
+           :format-control "~A also uses the following packages:~%  ~A"
+           :format-arguments (list name (mapcar #'package-name no-longer-used))
+           :package package)
         (drop-them ()
           :report "Stop using them."
           (unuse-package no-longer-used package))
@@ -309,10 +349,10 @@
     (let ((no-longer-exported (set-difference old-exports exports :test #'string=)))
      (when no-longer-exported
        (restart-case
-           (error 'sb!kernel::package-at-variance-error
-                  :format-control "~A also exports the following symbols:~%  ~S"
-                  :format-arguments (list name no-longer-exported)
-                  :package package)
+           (note-package-variance
+            :format-control "~A also exports the following symbols:~%  ~S"
+            :format-arguments (list name no-longer-exported)
+            :package package)
          (drop-them ()
            :report "Unexport them."
            (unexport no-longer-exported package))
@@ -323,10 +363,10 @@
                           (mapcar #'find-undeleted-package-or-lose implement))))
     (when old-implements
       (restart-case
-          (error 'sb!kernel::package-at-variance-error
-                 :format-control "~A is also an implementation package for:~% ~{~S~^~%  ~}"
-                 :format-arguments (list name old-implements)
-                 :package package)
+          (note-package-variance
+           :format-control "~A is also an implementation package for:~% ~{~S~^~%  ~}"
+           :format-arguments (list name old-implements)
+           :package package)
         (drop-them ()
           :report "Stop being an implementation package for them."
           (dolist (p old-implements)

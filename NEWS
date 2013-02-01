@@ -5,6 +5,13 @@ changes relative to sbcl-1.1.4:
     resulting from IMPORT, EXPORT, or USE-PACKAGE.
   * enhancement: variant DEFPACKAGE forms now signal a full error with
     restarts provided for resolving the situation. (lp#891351)
+  * enhancement: by setting SB-EXT:*ON-PACKAGE-VARIANCE* to :ERROR variant
+    DEFPACKAGE forms now signal a full error with restarts provided for
+    resolving the situation. Default is :WARN, which retains the previous
+    behaviour. (lp#891351)
+  * enhancement: easier to read method names in backtraces.
+  * bug fix: secondary CLOS dispatch functions have better debug names.
+    (lp#503081)
   * bug fix: deleting a package removes it from implementation-package
     lists of other packages.
 

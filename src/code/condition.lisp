@@ -912,7 +912,8 @@
 
 (define-condition package-at-variance (reference-condition simple-warning)
   ()
-  (:default-initargs :references (list '(:ansi-cl :macro defpackage))))
+  (:default-initargs :references (list '(:ansi-cl :macro defpackage)
+                                       '(:sbcl :variable *on-package-variance*))))
 
 (define-condition package-at-variance-error (reference-condition simple-condition
                                              package-error)

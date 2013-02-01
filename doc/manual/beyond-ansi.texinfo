@@ -94,6 +94,19 @@ Example:
 @include fun-sb-ext-add-package-local-nickname.texinfo
 @include fun-sb-ext-remove-package-local-nickname.texinfo
 
+@node  Package Variance
+@comment  node-name,  next,  previous,  up
+@section Package Variance
+
+Common Lisp standard specifies that ``If the new definition is at
+variance with the current state of that package, the consequences are
+undefined;'' SBCL by default signals a full warning and retains as
+much of the package state as possible.
+
+This can be adjusted using @code{sb-ext:*on-package-variance*}:
+
+@include var-sb-ext-star-on-package-variance-star.texinfo
+
 @node  Garbage Collection
 @comment  node-name,  next,  previous,  up
 @section Garbage Collection

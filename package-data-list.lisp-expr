@@ -709,6 +709,8 @@ like *STACK-TOP-HINT* and unsupported stuff like *TRACED-FUN-LIST*."
                "REMOVE-PACKAGE-LOCAL-NICKNAME"
                "PACKAGE-LOCAL-NICKNAMES"
                "PACKAGE-LOCALLY-NICKNAMED-BY"
+               ;; behaviour on DEFPACKAGE variance
+               "*ON-PACKAGE-VARIANCE*"
 
                ;; Custom conditions & condition accessors for users to handle.
                "CODE-DELETION-NOTE"

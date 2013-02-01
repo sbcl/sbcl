@@ -390,7 +390,8 @@ if a restart was invoked."
       (when p2 (delete-package p2)))))
 
 (with-test (:name (:package-at-variance-restarts :shadow))
-  (let (p)
+  (let ((p nil)
+        (*on-package-variance* '(:error t)))
     (unwind-protect
          (progn
            (setf p (eval `(defpackage :package-at-variance-restarts.1
@@ -411,7 +412,8 @@ if a restart was invoked."
       (when p (delete-package p)))))
 
 (with-test (:name (:package-at-variance-restarts :use))
-  (let (p)
+  (let ((p nil)
+        (*on-package-variance* '(:error t)))
     (unwind-protect
          (progn
            (setf p (eval `(defpackage :package-at-variance-restarts.2
@@ -431,7 +433,8 @@ if a restart was invoked."
       (when p (delete-package p)))))
 
 (with-test (:name (:package-at-variance-restarts :export))
-  (let (p)
+  (let ((p nil)
+        (*on-package-variance* '(:error t)))
     (unwind-protect
          (progn
            (setf p (eval `(defpackage :package-at-variance-restarts.4
@@ -449,7 +452,8 @@ if a restart was invoked."
       (when p (delete-package p)))))
 
 (with-test (:name (:package-at-variance-restarts :implement))
-  (let (p)
+  (let ((p nil)
+        (*on-package-variance* '(:error t)))
     (unwind-protect
          (progn
            (setf p (eval `(defpackage :package-at-variance-restarts.5
