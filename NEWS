@@ -1,6 +1,8 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 changes relative to sbcl-1.1.4:
   * new feature: package local nicknames. See manual for details.
+  * new feature: SB-EXT:MAP-DIRECTORY provides a powerful interface for
+    directory traversal: it is the backend used by SBCL for CL:DIRECTORY.
   * enhancement: easier to use restarts for resolving name-conflicts
     resulting from IMPORT, EXPORT, or USE-PACKAGE.
   * enhancement: variant DEFPACKAGE forms now signal a full error with
