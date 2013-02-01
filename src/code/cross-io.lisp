@@ -20,7 +20,6 @@
 
 (defmacro with-fast-read-byte ((type stream &optional (eof-error-p t) eof-value)
                                &body body)
-  (declare (ignore type))
   (let ((f-stream (gensym "STREAM"))
         (f-eof-error-p (gensym "EOF-ERROR-P"))
         (f-eof-value (gensym "EOF-VALUE")))
