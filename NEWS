@@ -1,4 +1,12 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
+changes relative to sbcl-1.1.4:
+  * enhancement: easier to use restarts for resolving name-conflicts
+    resulting from IMPORT, EXPORT, or USE-PACKAGE.
+  * enhancement: variant DEFPACKAGE forms now signal a full error with
+    restarts provided for resolving the situation. (lp#891351)
+  * bug fix: deleting a package removes it from implementation-package
+    lists of other packages.
+
 changes in sbcl-1.1.4 relative to sbcl-1.1.3:
   * optimization: LOOP expressions using "of-type character" have slightly
     more efficient expansions.
