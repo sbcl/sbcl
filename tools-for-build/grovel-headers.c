@@ -30,6 +30,7 @@
   #define WIN32_LEAN_AND_MEAN
   #include <windows.h>
   #include <shlobj.h>
+  #include <wincrypt.h>
   #undef boolean
 #else
   #include <poll.h>
@@ -244,6 +245,10 @@ main(int argc, char *argv[])
     defconstant("STD_OUTPUT_HANDLE", STD_OUTPUT_HANDLE);
     defconstant("STD_ERROR_HANDLE", STD_ERROR_HANDLE);
 
+    printf(";;; WinCrypt\n");
+    defconstant("crypt-verifycontext", CRYPT_VERIFYCONTEXT);
+    defconstant("crypt-silent", CRYPT_SILENT);
+    defconstant("prov-rsa-full", PROV_RSA_FULL);
 
     /* FIXME: SB-UNIX and SB-WIN32 really need to be untangled. */
     printf("(in-package \"SB!UNIX\")\n\n");

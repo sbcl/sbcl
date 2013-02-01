@@ -100,6 +100,35 @@ See SB-EXT:SEED-RANDOM-STATE for a SBCL extension to this functionality."
   (check-type state (or boolean random-state))
   (seed-random-state state))
 
+(defun fallback-random-seed ()
+  ;; When /dev/urandom is not available, we make do with time and pid
+  ;; Thread ID and/or address of a CONS cell would be even better, but...
+  (/show0 "No /dev/urandom, using randomness from time and pid")
+  (+ (get-internal-real-time)
+     (ash (sb!unix:unix-getpid) 32)))
+
+#!-win32
+(defun os-random-seed ()
+  (or
+   ;; On unices, we try to read from /dev/urandom and pass the results
+   ;; to our (simple-array (unsigned-byte 32) (*)) processor below.
+   ;; More than 256 bits would provide a false sense of security.
+   ;; If you need more bits than that, you probably also need
+   ;; a better algorithm too.
+   (ignore-errors
+    (with-open-file (r "/dev/urandom" :element-type '(unsigned-byte 32)
+                                      :direction :input :if-does-not-exist :error)
+      (let ((a (make-array '(8) :element-type '(unsigned-byte 32))))
+        (assert (= 8 (read-sequence a r)))
+        a)))
+   (fallback-random-seed)))
+
+#!+win32
+(defun os-random-seed ()
+  (/show0 "Getting randomness from CryptGenRandom")
+  (or (sb!win32:crypt-gen-random 32)
+      (fallback-random-seed)))
+
 (defun seed-random-state (&optional state)
   #!+sb-doc
   "Make a random state object. The optional STATE argument specifies a seed
@@ -139,26 +168,7 @@ http://www.math.sci.hiroshima-u.ac.jp/~m-mat/MT/emt.html
     ;; Standard case, less easy: try to randomly initialize a state.
     ((eql t)
      (/show0 "getting randomness from the operating system")
-     (seed-random-state
-      (or
-       ;; On unices, we try to read from /dev/urandom and pass the results
-       ;; to our (simple-array (unsigned-byte 32) (*)) processor below.
-       ;; More than 256 bits would provide a false sense of security.
-       ;; If you need more bits than that, you probably also need
-       ;; a better algorithm too.
-       #!-win32
-       (ignore-errors
-         (with-open-file (r "/dev/urandom" :element-type '(unsigned-byte 32)
-                            :direction :input :if-does-not-exist :error)
-           (let ((a (make-array '(8) :element-type '(unsigned-byte 32))))
-             (assert (= 8 (read-sequence a r)))
-             a)))
-       ;; When /dev/urandom is not available, we make do with time and pid
-       ;; Thread ID and/or address of a CONS cell would be even better, but...
-       (progn
-         (/show0 "No /dev/urandom, using randomness from time and pid")
-         (+ (get-internal-real-time)
-            (ash (sb!unix:unix-getpid) 32))))))
+     (seed-random-state (os-random-seed)))
     ;; For convenience to users, we accept (simple-array (unsigned-byte 8) (*))
     ;; We just convert it to (simple-array (unsigned-byte 32) (*)) in a
     ;; completely straightforward way.

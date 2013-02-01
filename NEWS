@@ -8,6 +8,8 @@ changes relative to sbcl-1.1.4:
   * enhancement: by setting SB-EXT:*ON-PACKAGE-VARIANCE* appropriately variant
     DEFPACKAGE forms can now signal a full error with restarts provided for
     resolving the situation. See manual for details. (lp#891351)
+  * enhancement: make-random-state now uses CryptGenRandom as a seed on Windows.
+    (Thanks to Anton Kovalenko.) (lp#1102748)
   * bug fix: secondary CLOS dispatch functions have better debug names.
     (lp#503081)
   * bug fix: deleting a package removes it from implementation-package

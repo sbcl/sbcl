@@ -1184,3 +1184,38 @@ absense."
           (unwind-protect (funcall thunk fd)
             (real-crt-close fd)))
         (values nil errno))))
+
+;;; random seeding
+
+(define-alien-routine ("CryptGenRandom" %crypt-gen-random) lispbool
+  (handle handle)
+  (length dword)
+  (buffer (* t)))
+
+(define-alien-routine (#!-sb-unicode "CryptAcquireContextA"
+                       #!+sb-unicode "CryptAcquireContextW"
+                       %crypt-acquire-context) lispbool
+  (handle handle :out)
+  (container system-string)
+  (provider system-string)
+  (provider-type dword)
+  (flags dword))
+
+(define-alien-routine ("CryptReleaseContext" %crypt-release-context) lispbool
+  (handle handle)
+  (flags dword))
+
+(defun crypt-gen-random (length)
+  (multiple-value-bind (ok context)
+      (%crypt-acquire-context nil nil prov-rsa-full
+                              (logior crypt-verifycontext crypt-silent))
+    (unless ok
+      (return-from crypt-gen-random (values nil (get-last-error))))
+    (unwind-protect
+         (let ((data (make-array length :element-type '(unsigned-byte 8))))
+           (with-pinned-objects (data)
+             (if (%crypt-gen-random context length (vector-sap data))
+                 data
+                 (values nil (get-last-error)))))
+      (unless (%crypt-release-context context 0)
+        (win32-error '%crypt-release-context)))))

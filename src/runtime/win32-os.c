@@ -70,6 +70,7 @@ os_vm_size_t os_vm_page_size;
 #include "gc.h"
 #include "gencgc-internal.h"
 #include <winsock2.h>
+#include <wincrypt.h>
 
 #if 0
 int linux_sparc_siginfo_bug = 0;
@@ -2080,6 +2081,9 @@ void scratch(void)
 
     /* a function from shell32.dll */
     SHGetFolderPathA(0, 0, 0, 0, 0);
+
+    /* from advapi32.dll */
+    CryptGenRandom(0, 0, 0);
 }
 
 char *

@@ -29,7 +29,7 @@ OS_SRC = win32-os.c x86-win32-os.c os-common.c pthreads_win32.c
 # interface, though.:-| As far as I (WHN 2002-05-19) know, no one is
 # working on one and it would be a nice thing to have.)
 LINKFLAGS = -Wl,-export-all-symbols -Wl,mswin.def
-OS_LIBS = -l ws2_32
+OS_LIBS = -l ws2_32 -ladvapi32
 ifdef LISP_FEATURE_SB_CORE_COMPRESSION
   OS_LIBS += -lz
 endif
