@@ -465,3 +465,29 @@ if a restart was invoked."
              (eval `(defpackage :package-at-variance-restarts.5)))
            (assert (not (member p (package-implemented-by-list :sb-int)))))
       (when p (delete-package p)))))
+
+(with-test (:name (:delete-package :implementation-package))
+  (let (p1 p2)
+    (unwind-protect
+         (progn
+           (setf p1 (make-package "DELETE-PACKAGE/IMPLEMENTATION-PACKAGE.1")
+                 p2 (make-package "DELETE-PACKAGE/IMPLEMENTATION-PACKAGE.2"))
+           (add-implementation-package p2 p1)
+           (assert (= 1 (length (package-implemented-by-list p1))))
+           (delete-package p2)
+           (assert (= 0 (length (package-implemented-by-list p1)))))
+      (when p1 (delete-package p1))
+      (when p2 (delete-package p2)))))
+
+(with-test (:name (:delete-package :implementated-package))
+  (let (p1 p2)
+    (unwind-protect
+         (progn
+           (setf p1 (make-package "DELETE-PACKAGE/IMPLEMENTED-PACKAGE.1")
+                 p2 (make-package "DELETE-PACKAGE/IMPLEMENTED-PACKAGE.2"))
+           (add-implementation-package p2 p1)
+           (assert (= 1 (length (package-implements-list p2))))
+           (delete-package p1)
+           (assert (= 0 (length (package-implements-list p2)))))
+      (when p1 (delete-package p1))
+      (when p2 (delete-package p2)))))

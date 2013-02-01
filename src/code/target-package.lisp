@@ -706,6 +706,8 @@ implementation it is ~S." *default-package-use-list*)
                                               (mapcar #'package-name use-list))))
                     (dolist (p use-list)
                       (unuse-package package p))))
+                (dolist (p (package-implements-list package))
+                  (remove-implementation-package package p))
                 (with-package-graph ()
                   ;; Check for races, restart if necessary.
                   (let ((package2 (find-package package-designator)))
