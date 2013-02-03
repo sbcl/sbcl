@@ -549,6 +549,7 @@ evaluated as a PROGN."
                    clauses))))
       `(block ,block-tag
          (let ((,temp-var nil))
+           (declare (ignorable ,temp-var))
            (tagbody
             (restart-bind
                 ,(mapcar (lambda (datum)
