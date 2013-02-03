@@ -98,7 +98,7 @@
 ;;; reliable?
 
 (defpackage #:sb-sprof
-  (:use #:cl #:sb-ext #:sb-unix #:sb-alien #:sb-sys)
+  (:use #:cl #:sb-ext #:sb-unix #:sb-alien #:sb-sys :sb-int)
   (:export #:*sample-interval* #:*max-samples* #:*alloc-interval*
            #:*report-sort-by* #:*report-sort-order*
            #:start-sampling #:stop-sampling #:with-sampling
@@ -336,6 +336,11 @@ on the depth of the call stack.")
   (max-samples (sb-int:missing-arg) :type sb-int:index)
   (sampled-threads nil :type list))
 
+(defmethod print-object ((samples samples) stream)
+  (print-unreadable-object (samples stream :type t :identity t)
+    (let ((*print-array* nil))
+      (call-next-method))))
+
 (defmethod print-object ((call-graph call-graph) stream)
   (print-unreadable-object (call-graph stream :type t :identity t)
     (format stream "~d samples" (call-graph-nsamples call-graph))))
@@ -517,22 +522,21 @@ profiling, and :TIME for wallclock profilgin.")
   ;;; interested using SIGPROF.
   (defun thread-distribution-handler ()
     (declare (optimize speed (space 0)))
-    (when *sampling*
-      #+sb-thread
-      (let ((lock *distribution-lock*))
-        ;; Don't flood the system with more interrupts if the last
-        ;; set is still being delivered.
-        (unless (sb-thread:mutex-value lock)
-          (sb-thread::with-system-mutex (lock)
-            (dolist (thread (profiled-threads))
-              ;; This may occasionally fail to deliver the signal, but that
-              ;; seems better then using kill_thread_safely with it's 1
-              ;; second backoff.
-              (let ((os-thread (sb-thread::thread-os-thread thread)))
-                (when os-thread
-                  (pthread-kill os-thread sb-unix:sigprof)))))))
-      #-sb-thread
-      (unix-kill 0 sb-unix:sigprof)))
+    #+sb-thread
+    (let ((lock *distribution-lock*))
+      ;; Don't flood the system with more interrupts if the last
+      ;; set is still being delivered.
+      (unless (sb-thread:mutex-value lock)
+        (sb-thread::with-system-mutex (lock)
+          (dolist (thread (profiled-threads))
+            ;; This may occasionally fail to deliver the signal, but that
+            ;; seems better then using kill_thread_safely with it's 1
+            ;; second backoff.
+            (let ((os-thread (sb-thread::thread-os-thread thread)))
+              (when os-thread
+                (pthread-kill os-thread sb-unix:sigprof)))))))
+    #-sb-thread
+    (unix-kill 0 sb-unix:sigprof))
 
   (defun sigprof-handler (signal code scp)
     (declare (ignore signal code) (optimize speed (space 0))
@@ -649,85 +653,97 @@ profiling, and :TIME for wallclock profilgin.")
                                 (threads '(list sb-thread:*current-thread*))
                                 (report nil report-p))
                           &body body)
-  "Repeatedly evaluate BODY with statistical profiling turned on.
-   In multi-threaded operation, only the thread in which WITH-PROFILING
-   was evaluated will be profiled by default. If you want to profile
-   multiple threads, invoke the profiler with START-PROFILING.
+  "Evaluate BODY with statistical profiling turned on. If LOOP is true,
+loop around the BODY until a sufficient number of samples has been collected.
+Returns the values from the last evaluation of BODY.
 
-   The following keyword args are recognized:
+In multi-threaded operation, only the thread in which WITH-PROFILING was
+evaluated will be profiled by default. If you want to profile multiple
+threads, invoke the profiler with START-PROFILING.
 
-   :SAMPLE-INTERVAL <n>
-     Take a sample every <n> seconds. Default is *SAMPLE-INTERVAL*.
+The following keyword args are recognized:
 
-   :ALLOC-INTERVAL <n>
-     Take a sample every time <n> allocation regions (approximately
-     8kB) have been allocated since the last sample. Default is
-     *ALLOC-INTERVAL*.
+ :SAMPLE-INTERVAL <n>
+   Take a sample every <n> seconds. Default is *SAMPLE-INTERVAL*.
 
-   :MODE <mode>
-     If :CPU, run the profiler in CPU profiling mode. If :ALLOC, run the
-     profiler in allocation profiling mode. If :TIME, run the profiler
-     in wallclock profiling mode.
+ :ALLOC-INTERVAL <n>
+   Take a sample every time <n> allocation regions (approximately
+   8kB) have been allocated since the last sample. Default is
+   *ALLOC-INTERVAL*.
 
-   :MAX-SAMPLES <max>
-     Repeat evaluating body until <max> samples are taken.
-     Default is *MAX-SAMPLES*.
+ :MODE <mode>
+   If :CPU, run the profiler in CPU profiling mode. If :ALLOC, run the
+   profiler in allocation profiling mode. If :TIME, run the profiler
+   in wallclock profiling mode.
 
-   :MAX-DEPTH <max>
-     Maximum call stack depth that the profiler should consider. Only
-     has an effect on x86 and x86-64.
+ :MAX-SAMPLES <max>
+   Repeat evaluating body until <max> samples are taken.
+   Default is *MAX-SAMPLES*.
 
-   :REPORT <type>
-     If specified, call REPORT with :TYPE <type> at the end.
+ :MAX-DEPTH <max>
+   Maximum call stack depth that the profiler should consider. Only
+   has an effect on x86 and x86-64.
 
-   :RESET <bool>
-     It true, call RESET at the beginning.
+ :REPORT <type>
+   If specified, call REPORT with :TYPE <type> at the end.
 
-   :THREADS <list-form>
-     Form that evaluates to the list threads to profile, or :ALL to indicate
-     that all threads should be profiled. Defaults to the current
-     thread. (Note: START-PROFILING defaults to all threads.)
+ :RESET <bool>
+   It true, call RESET at the beginning.
 
-     :THREADS has no effect on call-counting at the moment.
+ :THREADS <list-form>
+   Form that evaluates to the list threads to profile, or :ALL to indicate
+   that all threads should be profiled. Defaults to the current
+   thread. (Note: START-PROFILING defaults to all threads.)
 
-     On some platforms (eg. Darwin) the signals used by the profiler are
-     not properly delivered to threads in proportion to their CPU usage
-     when doing :CPU profiling. If you see empty call graphs, or are obviously
-     missing several samples from certain threads, you may be falling afoul
-     of this.
+   :THREADS has no effect on call-counting at the moment.
 
-   :LOOP <bool>
-     If true (the default) repeatedly evaluate BODY. If false, evaluate
-     if only once."
+   On some platforms (eg. Darwin) the signals used by the profiler are
+   not properly delivered to threads in proportion to their CPU usage
+   when doing :CPU profiling. If you see empty call graphs, or are obviously
+   missing several samples from certain threads, you may be falling afoul
+   of this. In this case using :MODE :TIME is likely to work better.
+
+ :LOOP <bool>
+   If false (the default), evaluete BODY only once. If true repeatedly
+   evaluate BODY."
   (declare (type report-type report))
   (check-type loop boolean)
-  `(let* ((*sample-interval* ,sample-interval)
-          (*alloc-interval* ,alloc-interval)
-          (*sampling* nil)
-          (*sampling-mode* ,mode)
-          (*max-samples* ,max-samples))
-     ,@(when reset '((reset)))
-     (unwind-protect
-          (progn
-            (start-profiling :max-depth ,max-depth :threads ,threads)
-            ,(if loop
-                 `(loop
-                     (when (>= (samples-trace-count *samples*)
-                               (samples-max-samples *samples*))
-                       (return))
-                     ,@(when show-progress
-                             `((format t "~&===> ~d of ~d samples taken.~%"
-                                       (samples-trace-count *samples*)
-                                       (samples-max-samples *samples*))))
-                     (let ((.last-index. (samples-index *samples*)))
-                       ,@body
-                       (when (= .last-index. (samples-index *samples*))
-                         (warn "No sampling progress; possibly a profiler bug.")
-                         (return))))
-                `(progn
-                   ,@body)))
-       (stop-profiling))
-     ,@(when report-p `((report :type ,report)))))
+  (with-unique-names (values last-index oops)
+    `(let* ((*sample-interval* ,sample-interval)
+            (*alloc-interval* ,alloc-interval)
+            (*sampling* nil)
+            (*sampling-mode* ,mode)
+            (*max-samples* ,max-samples))
+       ,@(when reset '((reset)))
+       (flet ((,oops ()
+                (warn "~@<No sampling progress; run too short, sampling interval ~
+                       too long, inappropriate set of sampled thread, or possibly ~
+                       a profiler bug.~:@>")))
+         (unwind-protect
+              (progn
+                (start-profiling :max-depth ,max-depth :threads ,threads)
+                ,(if loop
+                     `(let (,values)
+                        (loop
+                          (when (>= (samples-trace-count *samples*)
+                                    (samples-max-samples *samples*))
+                            (return))
+                          ,@(when show-progress
+                              `((format t "~&===> ~d of ~d samples taken.~%"
+                                        (samples-trace-count *samples*)
+                                        (samples-max-samples *samples*))))
+                          (let ((,last-index, (samples-index *samples*)))
+                            (setf ,values (multiple-value-list (progn ,@body)))
+                            (when (= ,last-index (samples-index *samples*))
+                              (,oops)
+                              (return))))
+                        (values-list ,values))
+                     `(let ((,last-index (samples-index *samples*)))
+                        (multiple-value-prog1 (progn ,@body)
+                          (when (= ,last-index (samples-index *samples*))
+                            (,oops))))))
+           (stop-profiling)))
+       ,@(when report-p `((report :type ,report))))))
 
 (defvar *timer* nil)
 

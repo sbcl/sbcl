@@ -1,5 +1,7 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 changes relative to sbcl-1.1.4:
+  * minor incompatible change: SB-SPROF:WITH-PROFILING no longer loops
+    by default.
   * new feature: package local nicknames. See manual for details.
   * new feature: SB-EXT:MAP-DIRECTORY provides a powerful interface for
     directory traversal: it is the backend used by SBCL for CL:DIRECTORY.
@@ -23,6 +25,8 @@ changes relative to sbcl-1.1.4:
        information is available in less intrusive form as frame annotations.
   * bug fix: deleting a package removes it from implementation-package
     lists of other packages.
+  * bug fix: SB-SPROF:WITH-PROFILING is now usable in the Slime REPL on Darwin.
+    This does not fix the occasional "interrupt already pending" issue, though.
 
 changes in sbcl-1.1.4 relative to sbcl-1.1.3:
   * optimization: LOOP expressions using "of-type character" have slightly
