@@ -359,7 +359,7 @@ on the depth of the call stack.")
 
 (defvar *sampling-mode* :cpu
   "Default sampling mode. :CPU for cpu profiling, :ALLOC for allocation
-profiling, and :TIME for wallclock profilgin.")
+profiling, and :TIME for wallclock profiling.")
 (declaim (type (member :cpu :alloc :time) *sampling-mode*))
 
 (defvar *alloc-region-size*
