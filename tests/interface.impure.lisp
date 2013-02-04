@@ -297,5 +297,20 @@
   (assert
    (or (member :big-endian *features*)
        (member :little-endian *features*))))
+
+(with-test (:name :function-documentation-mismatch)
+  (defun test ()
+    "X"
+    nil)
+  (setf (symbol-function 'test2) #'test)
+  (setf (documentation 'test 'function) "Y")
+  (assert (equal (documentation #'test t)
+                 (documentation 'test 'function)))
+  (setf (documentation 'test2 'function) "Z")
+  (assert (not
+           (equal (documentation 'test 'function)
+                  (documentation 'test2 'function)))))
+
+
 
 ;;;; success

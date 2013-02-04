@@ -23,13 +23,16 @@ changes relative to sbcl-1.1.4:
        SB-DEBUG:BACKTRACE-AS-LIST.
     ** SB-DEBUG:*SHOW-ENTRY-POINT-DETAILS** has been deprecated, as the same
        information is available in less intrusive form as frame annotations.
-  * enhancement: SB-POSIX now supports provides MAP-ANON.
+  * enhancement: SB-POSIX now provides MAP-ANON.
   * bug fix: no more unused variable style warnings from RESTART-CASE
     macroexpansion (lp#1113859)
   * bug fix: deleting a package removes it from implementation-package
     lists of other packages.
   * bug fix: SB-SPROF:WITH-PROFILING is now usable in the Slime REPL on Darwin.
     This does not fix the occasional "interrupt already pending" issue, though.
+  * bug fix: (setf (documentation 'x 'function)) and
+    (setf (documentation #'x t)) set documentation in different places.
+    (regression since 1.0.43.63)
 
 changes in sbcl-1.1.4 relative to sbcl-1.1.3:
   * optimization: LOOP expressions using "of-type character" have slightly

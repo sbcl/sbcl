@@ -18,6 +18,35 @@
       (setf (slot-value x '%documentation) new-value)
       (setf (%fun-doc x) new-value)))
 
+(defun real-function-name (name)
+  ;; Resolve the actual name of the function named by NAME
+  ;; e.g. (setf (name-function 'x) #'car)
+  ;; (real-function-name 'x) => CAR
+  (cond ((not (fboundp name))
+         nil)
+        ((and (symbolp name)
+              (special-operator-p name))
+         (%fun-name (fdefinition name)))
+        ((and (symbolp name)
+              (macro-function name))
+         (let ((name (%fun-name (macro-function name))))
+           (and (consp name)
+                (eq (car name) 'macro-function)
+                (cadr name))))
+        (t
+         (sb-impl::fun-name (fdefinition name)))))
+
+(defun set-function-name-documentation (name documentation)
+  (cond ((not (legal-fun-name-p name))
+         nil)
+        ((not (equal (real-function-name name) name))
+         (setf (random-documentation name 'function) documentation))
+        (t
+         (setf (fun-doc (or (and (symbolp name)
+                                 (macro-function name))
+                            (fdefinition name)))
+               documentation))))
+
 ;;; functions, macros, and special forms
 (defmethod documentation ((x function) (doc-type (eql 't)))
   (fun-doc x))
@@ -62,16 +91,14 @@
   (setf (fun-doc x) new-value))
 
 (defmethod (setf documentation) (new-value (x list) (doc-type (eql 'function)))
-  (when (legal-fun-name-p x)
-    (setf (random-documentation x 'function) new-value)))
+  (set-function-name-documentation x new-value))
 
 (defmethod (setf documentation) (new-value (x list) (doc-type (eql 'compiler-macro)))
   (awhen (compiler-macro-function x)
     (setf (documentation it t) new-value)))
 
 (defmethod (setf documentation) (new-value (x symbol) (doc-type (eql 'function)))
-  (when (legal-fun-name-p x)
-    (setf (random-documentation x 'function) new-value)))
+  (set-function-name-documentation x new-value))
 
 (defmethod (setf documentation) (new-value (x symbol) (doc-type (eql 'compiler-macro)))
   (awhen (compiler-macro-function x)
