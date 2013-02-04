@@ -8,7 +8,7 @@
  * provided with absolutely no warranty. See the COPYING and CREDITS
  * files for more information.
  */
-
+# define _GNU_SOURCE /* needed for RTLD_DEFAULT from dlfcn.h */
 #include <stdio.h>
 #include <errno.h>
 #include <string.h>
@@ -27,7 +27,6 @@
 #include "os.h"
 #include "interr.h"
 #if defined(LISP_FEATURE_OS_PROVIDES_DLOPEN) && !defined(LISP_FEATURE_WIN32)
-# define __USE_GNU /* needed for RTLD_DEFAULT */
 # include <dlfcn.h>
 #endif
 

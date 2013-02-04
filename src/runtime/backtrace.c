@@ -13,6 +13,9 @@
  * files for more information.
  */
 
+/* needed if we want dladdr() and Dl_Info from glibc's dlfcn.h */
+#define _GNU_SOURCE
+
 #include <stdio.h>
 #include <signal.h>
 #include "sbcl.h"
@@ -34,11 +37,7 @@
 #include "thread.h"
 
 #ifdef LISP_FEATURE_OS_PROVIDES_DLADDR
-# ifndef __USE_GNU
-/* __USE_GNU needed if we want dladdr() and Dl_Info from glibc. */
-# define __USE_GNU
-# endif
-# include "dlfcn.h"
+# include <dlfcn.h>
 #endif
 
 #if !(defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64))

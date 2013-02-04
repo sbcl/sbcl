@@ -14,6 +14,8 @@
  * files for more information.
  */
 
+#define _GNU_SOURCE /* for REG_RAX etc. from sys/ucontext */
+
 #include <stdio.h>
 #include <stddef.h>
 #include <sys/param.h>
@@ -22,10 +24,7 @@
 #include <unistd.h>
 #include <errno.h>
 
-#define __USE_GNU
 #include <sys/ucontext.h>
-#undef __USE_GNU
-
 
 #include "./signal.h"
 #include "os.h"
