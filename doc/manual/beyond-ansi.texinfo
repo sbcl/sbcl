@@ -9,6 +9,7 @@ it still has quite a few.  @xref{Contributed Modules}.
 @menu
 * Reader Extensions::           
 * Package-Local Nicknames::     
+* Package Variance::            
 * Garbage Collection::          
 * Metaobject Protocol::         
 * Support For Unix::            
