@@ -14,6 +14,8 @@
 
 (in-package run-tests)
 
+(load "colorize.lisp")
+
 (defvar *all-failures* nil)
 (defvar *break-on-error* nil)
 (defvar *report-skipped-tests* nil)
@@ -28,6 +30,7 @@
            (setf test-util:*break-on-expected-failure* t))
           ((string= arg "--report-skipped-tests")
            (setf *report-skipped-tests* t))
+          ((string= arg "--no-color"))
           (t
            (push (truename (parse-namestring arg)) *accept-files*))))
   (pure-runner (pure-load-files) #'load-test)
@@ -49,12 +52,14 @@
            (format t "Status:~%")
            (dolist (fail (reverse *all-failures*))
              (cond ((eq (car fail) :unhandled-error)
-                    (format t " ~20a ~a~%"
-                            "Unhandled error"
+                    (output-colored-text (car fail)
+                                          " Unhandled Error")
+                    (format t " ~a~%"
                             (enough-namestring (second fail))))
                    ((eq (car fail) :invalid-exit-status)
-                    (format t " ~20a ~a~%"
-                            "Invalid exit status:"
+                    (output-colored-text (car fail)
+                                          " Invalid exit status:")
+                    (format t " ~a~%"
                             (enough-namestring (second fail))))
                    ((eq (car fail) :skipped-disabled)
                     (when *report-skipped-tests*
@@ -64,14 +69,16 @@
                               (third fail)))
                     (incf skipcount))
                    (t
-                    (format t " ~20a ~a / ~a~%"
-                            (ecase (first fail)
-                              (:expected-failure "Expected failure:")
-                              (:unexpected-failure "Failure:")
-                              (:leftover-thread "Leftover thread (broken):")
-                              (:unexpected-success "Unexpected success:")
-                              (:skipped-broken "Skipped (broken):")
-                              (:skipped-disabled "Skipped (irrelevant):"))
+                    (output-colored-text
+                     (first fail)
+                     (ecase (first fail)
+                       (:expected-failure " Expected failure:")
+                       (:unexpected-failure " Failure:")
+                       (:leftover-thread " Leftover thread (broken):")
+                       (:unexpected-success " Unexpected success:")
+                       (:skipped-broken " Skipped (broken):")
+                       (:skipped-disabled " Skipped (irrelevant):")))
+                    (format t " ~a / ~a~%"
                             (enough-namestring (second fail))
                             (third fail)))))
            (when (> skipcount 0)

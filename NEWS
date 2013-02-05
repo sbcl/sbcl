@@ -24,6 +24,9 @@ changes relative to sbcl-1.1.4:
     ** SB-DEBUG:*SHOW-ENTRY-POINT-DETAILS** has been deprecated, as the same
        information is available in less intrusive form as frame annotations.
   * enhancement: SB-POSIX now provides MAP-ANON.
+  * enhancement: test-suite results are colorized, failures in red, unexpected
+    success in green. Works on Windows and on terminals with ANSI escape code
+    support. Can be disabled with --no-color.
   * bug fix: no more unused variable style warnings from RESTART-CASE
     macroexpansion (lp#1113859)
   * bug fix: no more unused variable style warnings when loading
