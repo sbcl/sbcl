@@ -630,7 +630,7 @@
   (frob %long-float long-float))
 
 ;;; Convert a ratio to a float. We avoid any rounding error by doing an
-;;; integer division. Accuracy is important to preserve read/print
+;;; integer division. Accuracy is important to preserve print-read
 ;;; consistency, since this is ultimately how the reader reads a float. We
 ;;; scale the numerator by a power of two until the division results in the
 ;;; desired number of fraction bits, then do round-to-nearest.

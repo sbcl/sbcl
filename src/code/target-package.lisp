@@ -353,7 +353,7 @@ the reader.
 
 When printing a package prefix for a symbol with a package local nickname, the
 local nickname is used instead of the real name in order to preserve
-read/print consistency.
+print-read consistency.
 
 See also: ADD-PACKAGE-LOCAL-NICKNAME, PACKAGE-LOCALLY-NICKNAMED-BY,
 REMOVE-PACKAGE-LOCAL-NICKNAME, and the DEFPACKAGE option :LOCAL-NICKNAMES.
@@ -394,7 +394,7 @@ reader.
 
 When printing a package prefix for a symbol with a package local nickname,
 local nickname is used instead of the real name in order to preserve
-read/print consistency.
+print-read consistency.
 
 See also: PACKAGE-LOCAL-NICKNAMES, PACKAGE-LOCALLY-NICKNAMED-BY,
 REMOVE-PACKAGE-LOCAL-NICKNAME, and the DEFPACKAGE option :LOCAL-NICKNAMES.

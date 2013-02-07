@@ -606,7 +606,7 @@ variable: an unreadable object representing the error is printed instead.")
             ;; be qualified. This can happen if the symbol has been
             ;; inherited from a package other than its home package.
             ;;
-            ;; To preserve read/print consistency, use the local nickname if
+            ;; To preserve print-read consistency, use the local nickname if
             ;; one exists.
             (unless (and accessible (eq symbol object))
               (let ((prefix (or (car (rassoc package (package-%local-nicknames current)))

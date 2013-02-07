@@ -323,7 +323,7 @@
   (assert (raises-error? (merge-pathnames (make-string-output-stream))
                          type-error)))
 
-;;; ensure read/print consistency (or print-not-readable-error) on
+;;; ensure print-read consistency (or print-not-readable-error) on
 ;;; pathnames:
 (with-test (:name :print/read-consistency :fails-on :win32)
   (let ((pathnames (list

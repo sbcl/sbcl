@@ -514,7 +514,7 @@
   (assert (string= (format nil "~E" 0.01) "1.e-2"))
   (assert (string= (format nil "~G" 0.01) "1.00e-2")))
 
-(with-test (:name (:fp-read/print-consistency single-float))
+(with-test (:name (:fp-print-read-consistency single-float))
   (let ((*random-state* (make-random-state t))
         (oops))
     (loop for f = most-positive-single-float then (/ f 2.0)
@@ -532,12 +532,12 @@
                         (push fr oops)
                         (return))))
     (when oops
-      (error "FP read/print inconsistencies:~%~:{  ~S => ~S~%~}"
+      (error "FP print-read inconsistencies:~%~:{  ~S => ~S~%~}"
              (mapcar (lambda (f)
                        (list f (read-from-string (prin1-to-string f))))
                      oops)))))
 
-(with-test (:name (:fp-read/print-consistency double-float))
+(with-test (:name (:fp-print-read-consistency double-float))
   (let ((*random-state* (make-random-state t))
         (oops))
     ;; FIXME skipping denormalized floats due to bug 793774.
@@ -558,7 +558,7 @@
                           (push fr oops)
                           (return)))))
     (when oops
-      (error "FP read/print inconsistencies:~%~:{  ~S => ~S~%~}"
+      (error "FP print-read inconsistencies:~%~:{  ~S => ~S~%~}"
              (mapcar (lambda (f)
                        (list f (read-from-string (prin1-to-string f))))
                      oops)))))
