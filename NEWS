@@ -27,6 +27,8 @@ changes relative to sbcl-1.1.4:
   * enhancement: test-suite results are colorized, failures in red, unexpected
     success in green. Works on Windows and on terminals with ANSI escape code
     support. Can be disabled with --no-color.
+  * optimization: SB-CONCURRENCY:QUEUE implementation is more efficient.
+    (thanks to James M. Lawrence)
   * bug fix: no more unused variable style warnings from RESTART-CASE
     macroexpansion (lp#1113859)
   * bug fix: no more unused variable style warnings when loading

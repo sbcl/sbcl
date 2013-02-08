@@ -92,6 +92,8 @@ and secondary value."
                       (return (values value t)))))))))
 
 (defun try-walk-queue (fun queue)
+  ;; This isn't /quite/ as bad as it looks. We're in danger of needing
+  ;; to restart only as long as we're close to the head of the queue.
   (let ((node (queue-head queue)))
     (loop
        (let ((value (car node)))
@@ -105,8 +107,9 @@ and secondary value."
 
 (defun list-queue-contents (queue)
   "Returns the contents of QUEUE as a list without removing them from the
-QUEUE. Mainly useful for manual examination of queue state, as the list
-may be out of date by the time it is returned."
+QUEUE. Mainly useful for manual examination of queue state, as the list may be
+out of date by the time it is returned, and concurrent dequeue operations may
+in the worse case force the queue-traversal to be restarted several times."
   (tagbody
    :retry
      (collect ((result))
