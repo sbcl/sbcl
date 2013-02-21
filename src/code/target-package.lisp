@@ -385,7 +385,8 @@ Returns the designated package.
 
 Signals a continuable error if LOCAL-NICKNAME is already a package local
 nickname for a different package, or if LOCAL-NICKNAME is one of \"CL\",
-\"COMMON-LISP\", or, \"KEYWORD\".
+\"COMMON-LISP\", or, \"KEYWORD\", or if LOCAL-NICKNAME is a global name or
+nickname for the package to which the nickname would be added.
 
 When in the designated package, calls to FIND-PACKAGE with the LOCAL-NICKNAME
 will return the package the designated ACTUAL-PACKAGE instead. This also
@@ -413,7 +414,18 @@ Experimental: interface subject to change."
                   nick actual))
     (when (member nick '("CL" "COMMON-LISP" "KEYWORD") :test #'string=)
       (cerror "Continue, use it as local nickname anyways."
-              "Attempt to use ~A as a package local nickname." nick))
+              "Attempt to use ~A as a package local nickname (for ~A)."
+              nick (package-name actual)))
+    (when (string= nick (package-name package))
+      (cerror "Continue, use it as a local nickname anyways."
+              "Attempt to use ~A as a package local nickname (for ~A) in ~
+               package named globally ~A."
+              nick (package-name actual) nick))
+    (when (member nick (package-nicknames package) :test #'string=)
+      (cerror "Continue, use it as a local nickname anyways."
+              "Attempt to use ~A as a package local nickname (for ~A) in ~
+               package nicknamed globally ~A."
+              nick (package-name actual) nick))
     (when (and cell (neq actual (cdr cell)))
       (restart-case
           (error "~@<Cannot add ~A as local nickname for ~A in ~S: already nickname for ~A.~:@>"

@@ -583,23 +583,58 @@ if a restart was invoked."
   (add-package-local-nickname :c :sb-c :package-local-nicknames-test-1)
   (remove-package-local-nickname :l :package-local-nicknames-test-1))
 
+(defmacro with-tmp-packages (bindings &body body)
+  `(let ,(mapcar #'car bindings)
+     (unwind-protect
+          (progn
+            (setf ,@(apply #'append bindings))
+            ,@body)
+       ,@(mapcar (lambda (p)
+                   `(when ,p (delete-package ,p)))
+                 (mapcar #'car bindings)))))
+
 (with-test (:name (:delete-package :locally-nicknames-others))
-  (let (p1 p2)
-    (unwind-protect
-         (progn
-           (setf p1 (make-package "LOCALLY-NICKNAMES-OTHERS")
-                 p2 (make-package "LOCALLY-NICKNAMED-BY-OTHERS"))
-               (add-package-local-nickname :foo p2 p1)
-               (assert (equal (list p1) (package-locally-nicknamed-by-list p2)))
-               (delete-package p1)
-               (assert (not (package-locally-nicknamed-by-list p2))))
-      (when p1 (delete-package p1))
-      (when p2 (delete-package p2)))))
+  (with-tmp-packages ((p1 (make-package "LOCALLY-NICKNAMES-OTHERS"))
+                      (p2 (make-package "LOCALLY-NICKNAMED-BY-OTHERS")))
+    (add-package-local-nickname :foo p2 p1)
+    (assert (equal (list p1) (package-locally-nicknamed-by-list p2)))
+    (delete-package p1)
+    (assert (not (package-locally-nicknamed-by-list p2)))))
 
 (with-test (:name (:delete-package :locally-nicknamed-by-others))
-  (let ((p1 (make-package "LOCALLY-NICKNAMES-OTHERS"))
-        (p2 (make-package "LOCALLY-NICKNAMED-BY-OTHERS")))
+  (with-tmp-packages ((p1 (make-package "LOCALLY-NICKNAMES-OTHERS"))
+                      (p2 (make-package "LOCALLY-NICKNAMED-BY-OTHERS")))
     (add-package-local-nickname :foo p2 p1)
     (assert (package-local-nicknames p1))
     (delete-package p2)
     (assert (not (package-local-nicknames p1)))))
+
+(with-test (:name :own-name-as-local-nickname)
+  (with-tmp-packages ((p1 (make-package "OWN-NAME-AS-NICKNAME1"))
+                      (p2 (make-package "OWN-NAME-AS-NICKNAME2")))
+    (assert (eq :oops
+                (handler-case
+                    (add-package-local-nickname :own-name-as-nickname1 p2 p1)
+                  (error ()
+                    :oops))))
+    (handler-bind ((error #'continue))
+      (add-package-local-nickname :own-name-as-nickname1 p2 p1))
+    (assert (eq (intern "FOO" p2)
+                (let ((*package* p1))
+                  (intern "FOO" :own-name-as-nickname1))))))
+
+(with-test (:name :own-nickname-as-local-nickname)
+  (with-tmp-packages ((p1 (make-package "OWN-NICKNAME-AS-NICKNAME1"
+                                        :nicknames '("OWN-NICKNAME")))
+                      (p2 (make-package "OWN-NICKNAME-AS-NICKNAME2")))
+    (assert (eq :oops
+                (handler-case
+                    (add-package-local-nickname :own-nickname p2 p1)
+                  (error ()
+                    :oops))))
+    (handler-bind ((error #'continue))
+      (add-package-local-nickname :own-nickname p2 p1))
+    (assert (eq (intern "FOO" p2)
+                (let ((*package* p1))
+                  (intern "FOO" :own-nickname))))))
+
