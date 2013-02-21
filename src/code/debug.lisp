@@ -152,6 +152,8 @@ Other commands:
     useful when the debugger was invoked to handle an error in
     deeply nested input syntax, and now the reader is confused.)")
 
+(defmacro with-debug-io-syntax (&body body)
+  `(funcall-with-debug-io-syntax (lambda () ,@body)))
 
 ;;; If LOC is an unknown location, then try to find the block start
 ;;; location. Used by source printing to some information instead of
@@ -328,15 +330,16 @@ METHOD-FRAME-STYLE (defaulting to *METHOD-FRAME-STYLE*), determines how frames
 corresponding to method functions are printed. Possible values
 are :MINIMAL, :NORMAL, and :FULL. See *METHOD-FRAME-STYLE* for more
 information."
-  (fresh-line stream)
-  (when print-thread
-    (format stream "Backtrace for: ~S~%" sb!thread:*current-thread*))
-  (let ((*suppress-print-errors* (if (subtypep 'serious-condition *suppress-print-errors*)
-                                     *suppress-print-errors*
-                                     'serious-condition))
-        (*print-circle* t)
-        (n start))
-    (handler-bind ((print-not-readable #'print-unreadably))
+  (with-debug-io-syntax
+    (fresh-line stream)
+    (when print-thread
+      (format stream "Backtrace for: ~S~%" sb!thread:*current-thread*))
+    (let ((*suppress-print-errors* (if (subtypep 'serious-condition *suppress-print-errors*)
+                                       *suppress-print-errors*
+                                       'serious-condition))
+          (*print-circle* t)
+          (n start))
+      (handler-bind ((print-not-readable #'print-unreadably))
         (map-backtrace (lambda (frame)
                          (print-frame-call frame stream
                                            :number n
@@ -346,8 +349,8 @@ information."
                        :from (backtrace-start-frame from)
                        :start start
                        :count count)))
-  (fresh-line stream)
-  (values))
+    (fresh-line stream)
+    (values)))
 
 (defun list-backtrace (&key
                        (count *backtrace-frame-count*)
@@ -818,8 +821,8 @@ the current thread are replaced with dummy objects which can safely escape."
                  (package-name *package*))
       (setf *package* (find-package :cl-user))
       (format *error-output*
-              "The value of ~S was not an undeleted PACKAGE. It has been
-reset to ~S."
+              "The value of ~S was not an undeleted PACKAGE. It has been ~
+               reset to ~S."
               '*package* *package*))
 
     ;; Before we start our own output, finish any pending output.
@@ -828,7 +831,8 @@ reset to ~S."
     ;; or so, which'd be confusing.
     (flush-standard-output-streams)
 
-    (funcall-with-debug-io-syntax #'%invoke-debugger condition)))
+  (with-debug-io-syntax
+    (%invoke-debugger condition))))
 
 (defun %print-debugger-invocation-reason (condition stream)
   (format stream "~2&")
@@ -912,64 +916,94 @@ reset to ~S."
 ;;; this function is for use in *INVOKE-DEBUGGER-HOOK* when ordinary
 ;;; ANSI behavior has been suppressed by the "--disable-debugger"
 ;;; command-line option
-(defun debugger-disabled-hook (condition me)
-  (declare (ignore me))
+(defun debugger-disabled-hook (condition previous-hook)
+  (declare (ignore previous-hook))
   ;; There is no one there to interact with, so report the
   ;; condition and terminate the program.
-  (flet ((failure-quit (&key abort)
+  (let ((*suppress-print-errors* t)
+        (condition-error-message
+         #.(format nil "A nested error within --disable-debugger error ~
+            handling prevents displaying the original error. We will try ~
+            to print a backtrace now."))
+        (backtrace-error-message
+         #.(format nil "A nested error within --disable-debugger error ~
+            handling prevents printing the backtrace. Sorry, exiting.")))
+    (labels
+        ((failure-quit (&key abort)
            (/show0 "in FAILURE-QUIT (in --disable-debugger debugger hook)")
-           (exit :code 1 :abort abort)))
-    ;; This HANDLER-CASE is here mostly to stop output immediately
-    ;; (and fall through to QUIT) when there's an I/O error. Thus,
-    ;; when we're run under a shell script or something, we can die
-    ;; cleanly when the script dies (and our pipes are cut), instead
-    ;; of falling into ldb or something messy like that. Similarly, we
-    ;; can terminate cleanly even if BACKTRACE dies because of bugs in
-    ;; user PRINT-OBJECT methods.
-    (handler-case
-        (progn
-          (format *error-output*
-                  "~&~@<unhandled ~S~@[ in thread ~S~]: ~2I~_~A~:>~2%"
-                  (type-of condition)
-                  #!+sb-thread sb!thread:*current-thread*
-                  #!-sb-thread nil
-                  condition)
-          ;; Flush *ERROR-OUTPUT* even before the BACKTRACE, so that
-          ;; even if we hit an error within BACKTRACE (e.g. a bug in
-          ;; the debugger's own frame-walking code, or a bug in a user
-          ;; PRINT-OBJECT method) we'll at least have the CONDITION
-          ;; printed out before we die.
-          (finish-output *error-output*)
-          ;; (Where to truncate the BACKTRACE is of course arbitrary, but
-          ;; it seems as though we should at least truncate it somewhere.)
-          (print-backtrace :count 128 :stream *error-output*
-                           :from :interrupted-frame)
-          (format
-           *error-output*
-           "~%unhandled condition in --disable-debugger mode, quitting~%")
-          (finish-output *error-output*)
-          (failure-quit))
-      (condition ()
-        ;; We IGNORE-ERRORS here because even %PRIMITIVE PRINT can
-        ;; fail when our output streams are blown away, as e.g. when
-        ;; we're running under a Unix shell script and it dies somehow
-        ;; (e.g. because of a SIGINT). In that case, we might as well
-        ;; just give it up for a bad job, and stop trying to notify
-        ;; the user of anything.
-        ;;
-        ;; Actually, the only way I've run across to exercise the
-        ;; problem is to have more than one layer of shell script.
-        ;; I have a shell script which does
-        ;;   time nice -10 sh make.sh "$1" 2>&1 | tee make.tmp
-        ;; and the problem occurs when I interrupt this with Ctrl-C
-        ;; under Linux 2.2.14-5.0 and GNU bash, version 1.14.7(1).
-        ;; I haven't figured out whether it's bash, time, tee, Linux, or
-        ;; what that is responsible, but that it's possible at all
-        ;; means that we should IGNORE-ERRORS here. -- WHN 2001-04-24
-        (ignore-errors
-         (%primitive print
-                     "Argh! error within --disable-debugger error handling"))
-        (failure-quit :abort t)))))
+           (exit :code 1 :abort abort))
+         (display-condition ()
+           (handler-case
+               (handler-case
+                   (print-condition)
+                 (t ()
+                   ;; printing failed, try to describe it
+                   (describe-condition)))
+             (t ()
+               ;; ok, give up trying to display the error and inform the user about it
+               (finish-output *error-output*)
+               (%primitive print condition-error-message))))
+         (print-condition ()
+           (format *error-output*
+                   "~&~@<Unhandled ~S~@[ in thread ~S~]: ~2I~_~A~:>~2%"
+                   (type-of condition)
+                   #!+sb-thread sb!thread:*current-thread*
+                   #!-sb-thread nil
+                   condition)
+           (finish-output *error-output*))
+         (describe-condition ()
+           (format *error-output*
+                   "~&Unhandled ~S~@[ in thread ~S~]:~%"
+                   (type-of condition)
+                   #!+sb-thread sb!thread:*current-thread*
+                   #!-sb-thread nil)
+           (sb-impl::describe condition *error-output*)
+           (finish-output *error-output*))
+         (display-backtrace ()
+           (handler-case
+               (print-backtrace :stream *error-output*
+                                :from :interrupted-frame
+                                :print-thread t)
+             (t ()
+               (values)))
+           (finish-output *error-output*)))
+      ;; This HANDLER-CASE is here mostly to stop output immediately
+      ;; (and fall through to QUIT) when there's an I/O error. Thus,
+      ;; when we're run under a shell script or something, we can die
+      ;; cleanly when the script dies (and our pipes are cut), instead
+      ;; of falling into ldb or something messy like that. Similarly, we
+      ;; can terminate cleanly even if BACKTRACE dies because of bugs in
+      ;; user PRINT-OBJECT methods. Separate the error handling of the
+      ;; two phases to maximize the chance of emitting some useful
+      ;; information.
+      (handler-case
+          (progn
+            (display-condition)
+            (display-backtrace)
+            (format *error-output*
+                    "~%unhandled condition in --disable-debugger mode, quitting~%")
+            (finish-output *error-output*)
+            (failure-quit))
+        (t ()
+          ;; We IGNORE-ERRORS here because even %PRIMITIVE PRINT can
+          ;; fail when our output streams are blown away, as e.g. when
+          ;; we're running under a Unix shell script and it dies somehow
+          ;; (e.g. because of a SIGINT). In that case, we might as well
+          ;; just give it up for a bad job, and stop trying to notify
+          ;; the user of anything.
+          ;;
+          ;; Actually, the only way I've run across to exercise the
+          ;; problem is to have more than one layer of shell script.
+          ;; I have a shell script which does
+          ;;   time nice -10 sh make.sh "$1" 2>&1 | tee make.tmp
+          ;; and the problem occurs when I interrupt this with Ctrl-C
+          ;; under Linux 2.2.14-5.0 and GNU bash, version 1.14.7(1).
+          ;; I haven't figured out whether it's bash, time, tee, Linux, or
+          ;; what that is responsible, but that it's possible at all
+          ;; means that we should IGNORE-ERRORS here. -- WHN 2001-04-24
+          (ignore-errors
+            (%primitive print backtrace-error-message))
+          (failure-quit :abort t))))))
 
 (defvar *old-debugger-hook* nil)
 
