@@ -714,7 +714,7 @@ like *STACK-TOP-HINT* and unsupported stuff like *TRACED-FUN-LIST*."
                "ADD-PACKAGE-LOCAL-NICKNAME"
                "REMOVE-PACKAGE-LOCAL-NICKNAME"
                "PACKAGE-LOCAL-NICKNAMES"
-               "PACKAGE-LOCALLY-NICKNAMED-BY"
+               "PACKAGE-LOCALLY-NICKNAMED-BY-LIST"
                ;; behaviour on DEFPACKAGE variance
                "*ON-PACKAGE-VARIANCE*"
 

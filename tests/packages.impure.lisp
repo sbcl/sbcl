@@ -590,9 +590,9 @@ if a restart was invoked."
            (setf p1 (make-package "LOCALLY-NICKNAMES-OTHERS")
                  p2 (make-package "LOCALLY-NICKNAMED-BY-OTHERS"))
                (add-package-local-nickname :foo p2 p1)
-               (assert (package-locally-nicknamed-by p2))
+               (assert (equal (list p1) (package-locally-nicknamed-by-list p2)))
                (delete-package p1)
-               (assert (not (package-locally-nicknamed-by p2))))
+               (assert (not (package-locally-nicknamed-by-list p2))))
       (when p1 (delete-package p1))
       (when p2 (delete-package p2)))))
 

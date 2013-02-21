@@ -91,7 +91,7 @@ Example:
 @end defmac
 
 @include fun-sb-ext-package-local-nicknames.texinfo
-@include fun-sb-ext-package-locally-nicknamed-by.texinfo
+@include fun-sb-ext-package-locally-nicknamed-by-list.texinfo
 @include fun-sb-ext-add-package-local-nickname.texinfo
 @include fun-sb-ext-remove-package-local-nickname.texinfo
 

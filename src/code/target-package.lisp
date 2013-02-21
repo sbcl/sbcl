@@ -355,7 +355,7 @@ When printing a package prefix for a symbol with a package local nickname, the
 local nickname is used instead of the real name in order to preserve
 print-read consistency.
 
-See also: ADD-PACKAGE-LOCAL-NICKNAME, PACKAGE-LOCALLY-NICKNAMED-BY,
+See also: ADD-PACKAGE-LOCAL-NICKNAME, PACKAGE-LOCALLY-NICKNAMED-BY-LIST,
 REMOVE-PACKAGE-LOCAL-NICKNAME, and the DEFPACKAGE option :LOCAL-NICKNAMES.
 
 Experimental: interface subject to change."
@@ -363,7 +363,7 @@ Experimental: interface subject to change."
    (package-%local-nicknames
     (find-undeleted-package-or-lose package-designator))))
 
-(defun package-locally-nicknamed-by (package-designator)
+(defun package-locally-nicknamed-by-list (package-designator)
   "Returns a list of packages which have a local nickname for the designated
 package.
 
@@ -396,7 +396,7 @@ When printing a package prefix for a symbol with a package local nickname,
 local nickname is used instead of the real name in order to preserve
 print-read consistency.
 
-See also: PACKAGE-LOCAL-NICKNAMES, PACKAGE-LOCALLY-NICKNAMED-BY,
+See also: PACKAGE-LOCAL-NICKNAMES, PACKAGE-LOCALLY-NICKNAMED-BY-LIST,
 REMOVE-PACKAGE-LOCAL-NICKNAME, and the DEFPACKAGE option :LOCAL-NICKNAMES.
 
 Experimental: interface subject to change."
@@ -446,7 +446,7 @@ another package, it is removed. Returns true if the nickname existed and was
 removed, and NIL otherwise.
 
 See also: ADD-PACKAGE-LOCAL-NICKNAME, PACKAGE-LOCAL-NICKNAMES,
-PACKAGE-LOCALLY-NICKNAMED-BY, and the DEFPACKAGE option :LOCAL-NICKNAMES.
+PACKAGE-LOCALLY-NICKNAMED-BY-LIST, and the DEFPACKAGE option :LOCAL-NICKNAMES.
 
 Experimental: interface subject to change."
   (let* ((nick (string old-nickname))
