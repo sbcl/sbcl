@@ -1,15 +1,19 @@
-(defpackage sb-cover-test
-  (:use "CL"))
+(defpackage sb-cover-test (:use :cl :asdf :uiop))
 
 (in-package sb-cover-test)
 
-(defparameter *path* #.(truename *compile-file-pathname*))
+(defparameter *source-directory*
+  (system-source-directory :sb-cover))
 (defparameter *output-directory*
-  (merge-pathnames (make-pathname :name nil
-                                  :type nil
-                                  :version nil
-                                  :directory '(:relative "test-output"))
-                   (make-pathname :directory (pathname-directory *path*))))
+  (apply-output-translations *source-directory*))
+
+(setf *default-pathname-defaults* (translate-logical-pathname *default-pathname-defaults*))
+
+(defun compile-load (x)
+  (flet ((in-dir (dir type)
+           (translate-logical-pathname (subpathname dir x :type type))))
+    (load (compile-file (in-dir *source-directory* "lisp")
+                        :output-file (in-dir *output-directory* "fasl")))))
 
 (defun report ()
   (handler-case
@@ -24,14 +28,15 @@
         (error "Should've raised a warning"))
     (warning ())))
 
+
 ;;; No instrumentation
-(load (compile-file (merge-pathnames #p"test-data-1.lisp" *path*)))
+(compile-load "test-data-1")
 (report-expect-failure)
 
 ;;; Instrument the file, try again -- first with a non-directory pathname
 
 (proclaim '(optimize sb-cover:store-coverage-data))
-(load (compile-file (merge-pathnames #p"test-data-1.lisp" *path*)))
+(compile-load "test-data-1")
 
 (catch 'ok
   (handler-case
@@ -42,8 +47,7 @@
 
 (report)
 
-(assert (probe-file (make-pathname :name "cover-index" :type "html"
-                                   :defaults *output-directory*)))
+(assert (probe-file (subpathname *output-directory* "cover-index.html")))
 
 ;;; None of the code was executed
 (assert (zerop (sb-cover::ok-of (getf sb-cover::*counts* :branch))))
@@ -78,7 +82,7 @@
 (report-expect-failure)
 
 ;;; Another file, with some branches
-(load (compile-file (merge-pathnames #p"test-data-2.lisp" *path*)))
+(compile-load "test-data-2")
 
 (test2 1)
 (report)
@@ -101,11 +105,9 @@
            (sb-cover::all-of (getf sb-cover::*counts* :branch))))
 
 ;; Check for presence of constant coalescing bugs
-
-(load (compile-file (merge-pathnames #p"test-data-3.lisp" *path*)))
+(compile-load "test-data-3")
 (test-2)
 
 ;; Clean up after the tests
-
 (map nil #'delete-file
      (directory (merge-pathnames #p"*.html" *output-directory*)))

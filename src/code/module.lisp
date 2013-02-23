@@ -83,7 +83,7 @@
   (let* ((filesys-name (string-downcase (string name)))
          (unadorned-path
           (merge-pathnames
-           (make-pathname :directory (list :relative filesys-name)
+           (make-pathname :directory (list :relative "contrib")
                           :name filesys-name)
            (truename (or (sbcl-homedir-pathname)
                          (return-from module-provide-contrib nil)))))
@@ -96,8 +96,11 @@
     ;; be removed by the time we get round to trying to load it.
     ;; Maybe factor out the logic in the LOAD guesser as to which file
     ;; was meant, so that we can use it here on open streams instead?
-    (when (or (probe-file unadorned-path)
-              (probe-file fasl-path)
-              (probe-file lisp-path))
-      (load unadorned-path)
-      t)))
+    (let ((file (or (probe-file fasl-path)
+                    (probe-file unadorned-path)
+                    (probe-file lisp-path))))
+      (when file
+        (handler-bind
+            (((or style-warning sb!int:package-at-variance) #'muffle-warning))
+          (load file))
+        t))))

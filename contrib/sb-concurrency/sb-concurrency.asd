@@ -43,6 +43,7 @@
                          (c (eql (asdf:find-system :sb-concurrency-tests))))
   (multiple-value-bind (soft strict pending)
       (funcall (intern "DO-TESTS" (find-package "SB-RT")))
+    (declare (ignorable pending))
     (fresh-line)
     (unless strict
       #+sb-testing-contrib

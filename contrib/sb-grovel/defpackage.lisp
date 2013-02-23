@@ -6,4 +6,4 @@
   ;; nasty things done with SB-ALIEN:STRUCT.
   #+sb-package-locks
   (:implement "SB-ALIEN")
-  (:use "COMMON-LISP" "SB-ALIEN" "ASDF" "SB-EXT"))
+  (:use "COMMON-LISP" "SB-ALIEN" "ASDF" "UIOP"))

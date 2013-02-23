@@ -9,20 +9,15 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-(defpackage :sb-introspect-system
-  (:use :asdf :cl))
-
-(in-package :sb-introspect-system)
+(defpackage #:sb-introspect-system (:use :cl :asdf :uiop))
+(in-package #:sb-introspect-system)
 
 (defsystem :sb-introspect
-  :components ((:file "introspect")))
-
-(defmethod perform :after ((o load-op) (c (eql (find-system :sb-introspect))))
-  (provide 'sb-introspect))
-
-(defmethod perform ((o test-op) (c (eql (find-system :sb-introspect))))
-  (operate 'load-op :sb-introspect-tests)
-  (operate 'test-op :sb-introspect-tests))
+  :components ((:file "introspect"))
+  #+sb-building-contrib :pathname
+  #+sb-building-contrib #p"SYS:CONTRIB;SB-INTROSPECT;"
+  :perform (load-op :after (o c) (provide 'sb-introspect))
+  :perform (test-op (o c) (test-system :sb-introspect/tests)))
 
 (defclass plist-file (cl-source-file)
   ((source-plist
@@ -42,41 +37,42 @@
   ())
 
 (defmethod perform ((op compile-op) (com source-only-file)))
-
+(defmethod perform ((op load-op) (com source-only-file)))
 (defmethod output-files ((op compile-op) (com source-only-file))
-  (list (component-pathname com)))
+  ())
+(defmethod component-depends-on ((op load-op) (com source-only-file))
+  `((load-source-op ,com) ,@(call-next-method)))
 
-(defsystem :sb-introspect-tests
+(defsystem :sb-introspect/tests
   :depends-on (:sb-introspect :sb-rt)
+  #+sb-building-contrib :pathname
+  #+sb-building-contrib #p"SYS:CONTRIB;SB-INTROSPECT;"
   :components ((:file "xref-test-data")
                (:file "xref-test" :depends-on ("xref-test-data"))
-               (:plist-file "test" :source-plist (:test-outer "OUT"))
+               (:plist-file "test" :source-plist (:test-outer "OUT") :operation-done-p (compile-op (o c) nil))
                (:source-only-file "load-test")
-               (:file "test-driver" :depends-on ("test" "load-test"))))
-
-(defmethod perform ((op test-op) (com (eql (find-system :sb-introspect-tests))))
-  ;; N.b. At least DEFINITION-SOURCE-PLIST.1 assumes that CWD is the
-  ;; contrib/sb-introspect directory which is true for when this is
-  ;; implicitly run via make-target-contribs.sh -- but not when this
-  ;; is executed manually.
-  (let ((*default-pathname-defaults*
-         (make-pathname :directory (pathname-directory
-                                    '#.(or *compile-file-pathname*
-                                           *load-pathname*)))))
-    (multiple-value-bind (soft strict #+sb-testing-contrib pending)
-        (funcall (find-symbol "DO-TESTS" "SB-RT"))
-      (fresh-line)
-      (unless strict
-        #+sb-testing-contrib
-        ;; We create TEST-PASSED from a shell script if tests passed.  But
-        ;; since the shell script only `touch'es it, we can actually create
-        ;; it ahead of time -- as long as we're certain that tests truly
-        ;; passed, hence the check for SOFT.
-        (when soft
-          (with-open-file (s #p"SYS:CONTRIB;SB-INTROSPECT;TEST-PASSED"
-                             :direction :output)
-            (dolist (pend pending)
-              (format s "Expected failure: ~A~%" pend))))
-        (warn "ignoring expected failures in test-op"))
-      (unless soft
-        (error "test-op failed with unexpected failures")))))
+               (:file "test-driver" :depends-on ("test" "load-test")))
+  :perform
+  (test-op (o c)
+    ;; N.b. At least DEFINITION-SOURCE-PLIST.1 assumes that CWD is the
+    ;; contrib/sb-introspect directory which is true for when this is
+    ;; implicitly run via make-target-contribs.sh -- but not when this
+    ;; is executed manually.
+    (let ((*default-pathname-defaults* (translate-logical-pathname (system-source-directory c))))
+      (multiple-value-bind (soft strict pending) (symbol-call :sb-rt :do-tests)
+        (declare (ignorable pending))
+        (fresh-line)
+        (unless strict
+          #+sb-testing-contrib
+          ;; We create TEST-PASSED from a shell script if tests passed.  But
+          ;; since the shell script only `touch'es it, we can actually create
+          ;; it ahead of time -- as long as we're certain that tests truly
+          ;; passed, hence the check for SOFT.
+          (when soft
+            (with-open-file (s #p"SYS:CONTRIB;SB-INTROSPECT;TEST-PASSED"
+                               :direction :output)
+              (dolist (pend pending)
+                (format s "Expected failure: ~A~%" pend))))
+          (warn "ignoring expected failures in test-op"))
+        (unless soft
+          (error "test-op failed with unexpected failures"))))))

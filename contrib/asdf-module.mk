@@ -1,4 +1,3 @@
-
 # We need to extend flags to the C compiler and the linker
 # here. sb-posix, sb-grovel, and sb-bsd-sockets depends upon these
 # being set on x86_64. Setting these in their Makefiles is not
@@ -7,6 +6,9 @@
 # ones as dependencies.
 
 UNAME:=$(shell uname -s)
+DEST=$(SBCL_PWD)/obj/sbcl-home/contrib/
+FASL=$(DEST)/$(SYSTEM).fasl
+ASD=$(DEST)/$(SYSTEM).asd
 
 ifeq (SunOS,$(UNAME))
   EXTRA_CFLAGS=-D_XOPEN_SOURCE=500 -D__EXTENSIONS__
@@ -27,18 +29,21 @@ endif
 
 export CC SBCL EXTRA_CFLAGS EXTRA_LDFLAGS
 
-all: $(EXTRA_ALL_TARGETS)
-	$(MAKE) -C ../asdf
-	$(SBCL) --eval '(defvar *system* "$(SYSTEM)")' --load ../asdf-stub.lisp --eval '(exit)'
+all: $(FASL) $(ASD) $(EXTRA_ALL_TARGETS)
 
-test: all
-	echo "(pushnew :sb-testing-contrib *features*)" \
-	     "(asdf:operate (quote asdf:load-op) :$(SYSTEM))" \
-	     "(asdf:operate (quote asdf:test-op) :$(SYSTEM))" | \
-	  $(SBCL) --eval '(load "../asdf/asdf")'
+$(FASL)::
+	$(MAKE) -C ../asdf
+	$(SBCL) --load ../asdf-stub.lisp \
+		--eval '(asdf::build-asdf-contrib "$(SYSTEM)")'
+
+$(ASD)::
+	echo "(defsystem :$(SYSTEM) :class require-system)" > $@
+
+test: $(FASL) $(ASD)
+	$(SBCL) --load ../asdf-stub.lisp \
+		--eval '(asdf::test-asdf-contrib "$(SYSTEM)")'
 
 # KLUDGE: There seems to be no portable way to tell tar to not to
 # preserve owner, so chown after installing for the current user.
 install: $(EXTRA_INSTALL_TARGETS)
-	tar cf - . | ( cd "$(BUILD_ROOT)$(INSTALL_DIR)" && tar xpvf - )
-	find "$(BUILD_ROOT)$(INSTALL_DIR)" -exec chown `id -u`:`id -g` {} \;
+	cp $(FASL) $(ASD) "$(BUILD_ROOT)$(INSTALL_DIR)"

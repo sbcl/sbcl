@@ -75,16 +75,16 @@ sbcl_pwd
 
 SBCL="$SBCL_PWD/src/runtime/sbcl --noinform --core $SBCL_PWD/output/sbcl.core --no-userinit --no-sysinit --disable-debugger"
 SBCL_BUILDING_CONTRIB=1
-export SBCL SBCL_BUILDING_CONTRIB
+export SBCL SBCL_BUILDING_CONTRIB SBCL_PWD
 
 . ./find-gnumake.sh
 find_gnumake
 
-for i in contrib/*; do
-    test -d $i && test -f $i/test-passed || continue;
-    INSTALL_DIR="$SBCL_HOME"/`basename $i `
+for i in `cd contrib ; echo *`; do
+    test -d contrib/$i && test -f obj/asdf-cache/$i/test-passed.test-report || continue;
+    INSTALL_DIR="$SBCL_HOME/contrib/"
     export INSTALL_DIR
-    ensure_dirs "$BUILD_ROOT$INSTALL_DIR" && $GNUMAKE -C $i install
+    ensure_dirs "$BUILD_ROOT$INSTALL_DIR" && $GNUMAKE -C contrib/$i install < /dev/null
 done
 
 echo

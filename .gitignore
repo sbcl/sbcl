@@ -44,9 +44,6 @@ tools-for-build/os-provides-putwc-test.exe
 tools-for-build/where-is-mcontext
 contrib/*/test-passed
 contrib/*/test-output
-contrib/*/foo.c
-contrib/*/a.out
-contrib/*/a.exe
 contrib/asdf/asdf-upstream
 contrib/sb-cover/test-output
 doc/manual/*.html

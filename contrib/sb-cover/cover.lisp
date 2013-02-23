@@ -89,7 +89,7 @@ result to RESTORE-COVERAGE."
             (make-pathname :directory (append (or (pathname-directory pathname)
                                                   (list :relative))
                                               (list (file-namestring pathname)))
-                           :name nil :type nil
+                           :name nil :type nil :version nil
                            :defaults pathname)))))
 
 (defun report (directory &key ((:form-mode *source-path-mode*) :whole)
@@ -104,17 +104,20 @@ the coverage report will be placed on the CARs of any cons-forms, while if
 it has the value :WHOLE the whole form will be annotated (the default).
 The former mode shows explicitly which forms were instrumented, while the
 latter mode is generally easier to read."
-  (let ((paths)
-        (*default-pathname-defaults* (pathname-as-directory directory)))
+  (let* ((paths)
+         (directory (pathname-as-directory directory))
+         (*default-pathname-defaults* (translate-logical-pathname directory)))
     (ensure-directories-exist *default-pathname-defaults*)
     (maphash (lambda (k v)
                (declare (ignore v))
-               (let* ((n (format nil "~(~{~2,'0X~}~)"
+               (let* ((pk (translate-logical-pathname k))
+                      (n (format nil "~(~{~2,'0X~}~)"
                                 (coerce (sb-md5:md5sum-string
-                                         (sb-ext:native-namestring k))
+                                         (sb-ext:native-namestring pk))
                                         'list)))
-                      (path (make-pathname :name n :type "html")))
+                      (path (make-pathname :name n :type "html" :defaults directory)))
                  (when (probe-file k)
+                   (ensure-directories-exist pk)
                    (with-open-file (stream path
                                            :direction :output
                                            :if-exists :supersede
@@ -122,7 +125,7 @@ latter mode is generally easier to read."
                      (push (list* k n (report-file k stream external-format))
                            paths)))))
              *code-coverage-info*)
-    (let ((report-file (make-pathname :name "cover-index" :type "html")))
+    (let ((report-file (make-pathname :name "cover-index" :type "html" :defaults directory)))
       (with-open-file (stream report-file
                               :direction :output :if-exists :supersede
                               :if-does-not-exist :create)

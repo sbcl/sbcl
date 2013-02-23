@@ -27,8 +27,8 @@ export CC LANG LC_ALL
 . ./sbcl-pwd.sh
 sbcl_pwd
 
-SBCL_HOME="$SBCL_PWD/contrib"
-export SBCL_HOME
+SBCL_HOME="$SBCL_PWD/obj/sbcl-home"
+export SBCL_HOME SBCL_PWD
 if [ "$OSTYPE" = "cygwin" ] ; then
     SBCL_PWD=`echo $SBCL_PWD | sed s/\ /\\\\\\\\\ /g`
 fi
@@ -43,39 +43,37 @@ export SBCL SBCL_BUILDING_CONTRIB
 # operation, because that causes multiple builds of base systems such
 # as SB-RT and SB-GROVEL, but FIXME: there's probably a better
 # solution.  -- CSR, 2003-05-30
-
-find contrib/ \( -name '*.fasl' -o \
-                 -name '*.FASL' -o \
-                 -name 'foo.c' -o \
-                 -name 'FOO.C' -o \
-                 -name 'a.out' -o \
-                 -name 'A.OUT' -o \
-                 -name 'alien.so' -o \
-                 -name 'ALIEN.SO' -o \
-                 -name '*.o' -o \
-                 -name '*.O' \) \
-  -print | xargs rm -f
+if [ -z "$DONT_CLEAN_SBCL_CONTRIB" ] ; then
+  find contrib/ obj/asdf-cache/ obj/sbcl-home/contrib/ \
+    \( -name '*.fasl' -o \
+       -name '*.FASL' -o \
+       -name 'foo.c' -o \
+       -name 'FOO.C' -o \
+       -name 'a.out' -o \
+       -name 'A.OUT' -o \
+       -name 'alien.so' -o \
+       -name 'ALIEN.SO' -o \
+       -name '*.o' -o \
+       -name '*.O' \) \
+    -print | xargs rm -f
+fi
 
 find output -name 'building-contrib.*' -print | xargs rm -f
 
 # Ignore all source registries.
-CL_SOURCE_REGISTRY='(:source-registry :ignore-inherited-configuration)'
-export CL_SOURCE_REGISTRY
-
 if [ -z "$*" ]; then
-    contribs_to_build=contrib/*
+    contribs_to_build="`cd contrib ; echo *`"
 else
-    for name in $*; do
-        contribs_to_build="contrib/$name $contribs_to_build"
-    done
+    contribs_to_build="$*"
 fi
 
 for i in $contribs_to_build; do
-    test -d $i && test -f $i/Makefile || continue;
-    # export INSTALL_DIR=$SBCL_HOME/`basename $i `
-    test -f $i/test-passed && rm $i/test-passed
+    test -d contrib/$i && test -f contrib/$i/Makefile || continue;
+    test -f contrib/$i/test-passed && rm contrib/$i/test-passed # remove old convention
+    test -f obj/asdf-cache/$i/test-passed.test-report && rm obj/asdf-cache/$i/test-passed.test-report
+    mkdir -p obj/asdf-cache/$i/
     # hack to get exit codes right.
-    if $GNUMAKE -C $i test 2>&1 && touch $i/test-passed ; then
+    if $GNUMAKE -C contrib/$i test < /dev/null 2>&1 && touch obj/asdf-cache/$i/test-passed.test-report ; then
 	:
     else
 	exit $?
@@ -84,8 +82,8 @@ done
 
 # Otherwise report expected failures:
 HEADER_HAS_BEEN_PRINTED=false
-for dir in contrib/*; do
-  f="$dir/test-passed"
+for dir in `cd obj/asdf-cache/ ; echo *`; do
+  f="obj/asdf-cache/$dir/test-passed.test-report"
   if test -f "$f" && grep -i fail "$f" >/dev/null; then
       if ! $HEADER_HAS_BEEN_PRINTED; then
           cat <<EOF
@@ -95,7 +93,7 @@ platform and features have been ignored:
 EOF
           HEADER_HAS_BEEN_PRINTED=true
       fi
-      echo "  $dir"
+      echo "  contrib/$dir"
       (unset IFS; while read line; do echo "    $line"; done <"$f")
   fi
 done
@@ -103,9 +101,9 @@ done
 # Sometimes people used to see the "No tests failed." output from the last
 # DEFTEST in contrib self-tests and think that's all that is. So...
 HEADER_HAS_BEEN_PRINTED=false
-for dir in contrib/*
+for dir in `cd contrib ; echo *`
 do
-  if [ -d "$dir" -a -f "$dir/Makefile" -a ! -f "$dir/test-passed" ]; then
+  if [ -d "contrib/$dir" -a -f "contrib/$dir/Makefile" -a ! -f "obj/asdf-cache/$dir/test-passed.test-report" ]; then
       if $HEADER_HAS_BEEN_PRINTED; then
           echo > /dev/null
       else
@@ -116,7 +114,7 @@ their self-tests. Failed contribs:"
 EOF
           HEADER_HAS_BEEN_PRINTED=true
       fi
-      echo "  `basename $dir`"
+      echo "  $dir"
   fi
 done
 

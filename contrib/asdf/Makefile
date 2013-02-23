@@ -1,13 +1,21 @@
-MODULE=asdf
-include ../vanilla-module.mk
+DEST=$(SBCL_PWD)/obj/sbcl-home/contrib/
+FASL=$(DEST)/asdf.fasl
 
+fasl:: $(FASL)
+$(FASL):: asdf.lisp ../../output/sbcl.core
+	if [ -d asdf-upstream ] ; then rm -rf asdf-upstream ; fi
+	mkdir -p $(DEST)
+	$(SBCL) --eval '(compile-file #p"SYS:CONTRIB;ASDF;ASDF.LISP" :output-file (parse-native-namestring "$@"))' </dev/null
 
-test::
+install::
+	cp $(FASL) "$(BUILD_ROOT)$(INSTALL_DIR)"
+
+test:: $(FASL)
 	true
 
-up:
+UPSTREAM=../../obj/asdf-upstream
+up::
 	sh pull-asdf.sh
-	(cd asdf-upstream; make build/asdf.lisp)
-	cp asdf-upstream/build/asdf.lisp asdf.lisp
-	cp asdf-upstream/doc/asdf.texinfo asdf.texinfo
-	cp asdf-upstream/README README
+	ln -f $(UPSTREAM)/build/asdf.lisp asdf.lisp
+	ln -f $(UPSTREAM)/doc/asdf.texinfo asdf.texinfo
+	ln -f $(UPSTREAM)/README README

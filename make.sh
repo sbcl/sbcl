@@ -71,7 +71,7 @@ time sh make-target-2.sh
 time sh make-target-contrib.sh
 
 NCONTRIBS=`find contrib -name Makefile -print | wc -l`
-NPASSED=`find contrib -name test-passed -print | wc -l`
+NPASSED=`find obj/asdf-cache -name test-passed.test-report -print | wc -l`
 echo
 echo "The build seems to have finished successfully, including $NPASSED (out of $NCONTRIBS)"
 echo "contributed modules. If you would like to run more extensive tests on"
