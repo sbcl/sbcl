@@ -1,4 +1,9 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
+changes relative to sbcl-1.1.5:
+  * bug fix: Prevent a make-array transform from modifying source forms
+    causing problems for inlined code. Thanks to Bart Botta.
+   (regression since 1.0.42.11-bis)
+
 changes in sbcl-1.1.5 relative to sbcl-1.1.4:
   * minor incompatible change: SB-SPROF:WITH-PROFILING no longer loops
     by default.
