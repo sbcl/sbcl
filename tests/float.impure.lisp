@@ -248,8 +248,11 @@
   (flet ((almost= (x y)
            (< (abs (- x y)) 1d-5)))
     (macrolet ((foo (op value)
-                 `(assert (almost= (,op (mod ,value (* 2 pi)))
-                                   (,op ,value)))))
+                 `(let ((actual (,op ,value))
+                        (expected (,op (mod ,value (* 2 pi)))))
+                    (unless (almost= actual expected)
+                      (error "Inaccurate result for ~a: expected ~a, got ~a"
+                             (list ',op ,value) expected actual)))))
       (let ((big (* pi (expt 2d0 70)))
             (mid (coerce most-positive-fixnum 'double-float))
             (odd (* pi most-positive-fixnum)))
