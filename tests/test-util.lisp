@@ -39,7 +39,7 @@
 (defmacro with-test ((&key fails-on broken-on skipped-on name)
                      &body body)
   (let ((block-name (gensym))
-        (threads    (gensym "THREADS")))
+        #+sb-thread (threads (gensym "THREADS")))
     `(progn
        (start-test)
        (cond
