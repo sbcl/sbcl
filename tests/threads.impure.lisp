@@ -37,18 +37,6 @@
     (with-mutex (mutex)
       mutex)))
 
-(with-test (:name (:with-mutex :timeout))
-  (let ((m (make-mutex)))
-    (with-mutex (m)
-      (assert (null (join-thread (make-thread
-                                  (lambda ()
-                                    (with-mutex (m :timeout 0.1)
-                                      t)))))))
-    (assert (join-thread (make-thread
-                          (lambda ()
-                            (with-mutex (m :timeout 0.1)
-                              t)))))))
-
 (sb-alien:define-alien-routine "check_deferrables_blocked_or_lose"
     void
   (where sb-alien:unsigned-long))
@@ -83,6 +71,18 @@
 #-sb-thread (sb-ext:exit :code 104)
 
 ;;;; Now the real tests...
+
+(with-test (:name (:with-mutex :timeout))
+  (let ((m (make-mutex)))
+    (with-mutex (m)
+      (assert (null (join-thread (make-thread
+                                  (lambda ()
+                                    (with-mutex (m :timeout 0.1)
+                                      t)))))))
+    (assert (join-thread (make-thread
+                          (lambda ()
+                            (with-mutex (m :timeout 0.1)
+                              t)))))))
 
 (with-test (:name (:interrupt-thread :deferrables-unblocked-by-lock))
   (let ((lock (sb-thread::make-mutex))
