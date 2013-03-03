@@ -6,6 +6,7 @@
 ;;; first, the headers necessary to find definitions of everything
 ("sys/types.h" "sys/socket.h" "sys/stat.h" "unistd.h" "sys/un.h"
  "netinet/in.h" "netinet/in_systm.h" "netinet/ip.h" "net/if.h"
+ "arpa/inet.h" ; inet_{ntop,pton}
  "netdb.h" "errno.h" "netinet/tcp.h" "fcntl.h" )
 
 ;;; then the stuff we're looking for
@@ -15,7 +16,7 @@
            #+(or sunos solaris hpux) "AF_UNIX"
            #-(or sunos solaris hpux) "AF_LOCAL"
            "Local to host (pipes and file-domain).")
- #+linux (:integer af-inet6 "AF_INET6"   "IP version 6")
+ (:integer af-inet6 "AF_INET6" "IP version 6")
  #+linux (:integer af-route "AF_NETLINK" "Alias to emulate 4.4BSD ")
 
  (:integer sock-stream "SOCK_STREAM"
@@ -171,12 +172,41 @@
                           ;; of the old sb-grovel scheme.
                           ((array (unsigned 8)) port "u_int16_t" "sin_port")
                           ((array (unsigned 8)) addr "struct in_addr" "sin_addr")))
+ (:structure in6-addr ("struct in6_addr"
+                       ((array (unsigned 8)) addr "unsigned char" "s6_addr[16]")))
+ (:structure sockaddr-in6 ("struct sockaddr_in6"
+                           #+darwin ((unsigned 8) len "__uint8_t" "sin_len")
+                           (integer family "sa_family_t" "sin6_family")
+                           ;; Like in IN-ADDR, port and addr could be
+                           ;; in-port-t and in6-addr-t, but then we'd
+                           ;; throw away the convenience (and
+                           ;; byte-order agnosticism) of the old
+                           ;; sb-grovel scheme.
+                           ((array (unsigned 8)) port "u_int16_t" "sin6_port")
+                           ((array (unsigned 8)) flowinfo "u_int32_t" "sin6_flowinfo")
+                           ((array (unsigned 8)) addr "struct in_addr6" "sin6_addr")
+                           ((array (unsigned 8)) scope-id "u_int32_t" "sin6_scope_id")))
  (:structure sockaddr-un ("struct sockaddr_un"
                           (integer family "sa_family_t" "sun_family")
                           (c-string path "char" "sun_path")))
  (:structure sockaddr-un-abstract ("struct sockaddr_un"
                               (integer family "sa_family_t" "sun_family")
                               ((array (unsigned 8)) path "char" "sun_path")))
+ (:integer INET-ADDRSTRLEN "INET_ADDRSTRLEN")
+ (:integer INET6-ADDRSTRLEN "INET6_ADDRSTRLEN")
+ (:function inet-ntop ("inet_ntop" c-string ; TODO external-format?
+                                   (af int)
+                                   (src (* t))
+                                   (dst c-string)
+                                   ;; size is of type socklen_t in
+                                   ;; recent Glibc's, butlast size-t
+                                   ;; seems to be the more portable
+                                   ;; variant.
+                                   (size size-t)))
+ (:function inet-pton ("inet_pton" int
+                                   (af int)
+                                   (src c-string) ; TODO external-format?
+                                   (dst (* t))))
  (:structure hostent ("struct hostent"
                       (c-string-pointer name "char *" "h_name")
                       ((* c-string) aliases "char **" "h_aliases")
@@ -286,7 +316,10 @@
                        ;; here.
                        #+darwin (integer addrlen "socklen_t" "ai_addrlen")
                        #-darwin (integer addrlen "size_t" "ai_addrlen")
-                       ((* sockaddr-in) addr "struct sockaddr*" "ai_addr")
+                       ;; This can be a void pointer since it has to
+                       ;; be cast to the respectively appropriate
+                       ;; address structure anyway.
+                       ((* t) addr "struct sockaddr*" "ai_addr")
                        (c-string-pointer canonname "char *" "ai_canonname")
                        ((* (struct addrinfo)) next "struct addrinfo*" "ai_next")))
 
@@ -311,7 +344,10 @@
  #+sb-bsd-sockets-addrinfo
  (:function getnameinfo ("getnameinfo"
                          int
-                         (address (* sockaddr-in))
+                         ;; This can be a void pointer since it has to
+                         ;; be cast to the respectively appropriate
+                         ;; address structure anyway.
+                         (address (* t))
                          (address-length size-t)
                          (host (* char))
                          (host-len size-t)

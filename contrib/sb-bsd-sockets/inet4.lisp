@@ -16,15 +16,21 @@ Examples:
 
 (defparameter *inet-address-any* (vector 0 0 0 0))
 
+(defun address-numbers/v4 (address)
+  (coerce address 'list))
+
+(defun endpoint-string/v4 (address port)
+  (format nil "~{~A~^.~}:~A" (address-numbers/v4 address) port))
+
 (defmethod socket-namestring ((socket inet-socket))
   (ignore-errors
-    (multiple-value-bind (addr port) (socket-name socket)
-      (format nil "~{~A~^.~}:~A" (coerce addr 'list) port))))
+    (multiple-value-bind (address port) (socket-name socket)
+      (endpoint-string/v4 address port))))
 
 (defmethod socket-peerstring ((socket inet-socket))
   (ignore-errors
-    (multiple-value-bind (addr port) (socket-peername socket)
-      (format nil "~{~A~^.~}:~A" (coerce addr 'list) port))))
+    (multiple-value-bind (address port) (socket-peername socket)
+      (endpoint-string/v4 address port))))
 
 ;;; binding a socket to an address and port.  Doubt that anyone's
 ;;; actually using this much, to be honest.

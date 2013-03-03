@@ -7,7 +7,6 @@
    ;; and the data isn't available when using getaddrinfo(). Unfortunately
    ;; it is exported.
    (aliases :initarg :aliases :reader host-ent-aliases)
-   ;; presently always AF_INET. Not exported.
    (address-type :initarg :type :reader host-ent-address-type)
    (addresses :initarg :addresses :reader host-ent-addresses
               :documentation "A list of addresses for this host."))
@@ -53,7 +52,7 @@
 
 (declaim (inline naturalize-unsigned-byte-8-array))
 (defun naturalize-unsigned-byte-8-array (array length)
-  (let ((addr (make-array 4 :element-type '(unsigned-byte 8))))
+  (let ((addr (make-array length :element-type '(unsigned-byte 8))))
     (dotimes (i length)
       (setf (elt addr i) (sb-alien:deref array i)))
     addr))
@@ -92,66 +91,101 @@ weird stuff - see gethostbyname(3) for the details."
 #+sb-bsd-sockets-addrinfo
 (progn
   (defun get-host-by-name (node)
-    "Returns a HOST-ENT instance for HOST-NAME or signals a NAME-SERVICE-ERROR.
-HOST-NAME may also be an IP address in dotted quad notation or some other
+    "Returns a HOST-ENT instance for NODE or signals a NAME-SERVICE-ERROR.
+
+Another HOST-ENT instance containing zero, one or more IPv6 addresses
+may be returned as a second return value.
+
+NODE may also be an IP address in dotted quad notation or some other
 weird stuff - see getaddrinfo(3) for the details."
     (declare (optimize speed))
     (sb-alien:with-alien ((info (* sockint::addrinfo)))
-      (let* ((to-free info))
-        (addrinfo-error-case ("getaddrinfo"
-                              (sockint::getaddrinfo node nil nil (sb-alien:addr info)))
-            (let ((host-ent (make-instance 'host-ent
-                                           :name node
-                                           :type sockint::af-inet
-                                           :aliases nil
-                                           :addresses nil)))
-              (loop until (sb-alien::null-alien info)
-                 ;; Only handle AF_INET currently.
-                 do
-                   (when (eq (sockint::addrinfo-family info) sockint::af-inet)
-                     (let* ((sockaddr (sockint::addrinfo-addr info))
-                            (address (sockint::sockaddr-in-addr sockaddr)))
-                       ;; The same effective result can be multiple time
-                       ;; in the list, with different socktypes. Only record
-                       ;; each address once.
-                       (setf (slot-value host-ent 'addresses)
-                             (adjoin (naturalize-unsigned-byte-8-array address
-                                                                       4)
-                                     (host-ent-addresses host-ent)
-                                     :test 'equalp))))
-                   (setf info (sockint::addrinfo-next info)))
-              (sockint::freeaddrinfo to-free)
-              host-ent)))))
+      (addrinfo-error-case ("getaddrinfo"
+                            (sockint::getaddrinfo
+                             node nil nil (sb-alien:addr info)))
+          (let ((host-ent4 (make-instance 'host-ent
+                                          :name node
+                                          :type sockint::af-inet
+                                          :aliases nil
+                                          :addresses nil))
+                (host-ent6 (make-instance 'host-ent
+                                          :name node
+                                          :type sockint::af-inet6
+                                          :aliases nil
+                                          :addresses nil)))
+            ;; The same effective result can be multiple time
+            ;; in the list, with different socktypes. Only record
+            ;; each address once.
+            (loop for info* = info then (sockint::addrinfo-next info*)
+               until (sb-alien::null-alien info*) do
+                 (cond
+                   ((= (sockint::addrinfo-family info*) sockint::af-inet)
+                    (let ((address (sockint::sockaddr-in-addr
+                                    (sb-alien:cast
+                                     (sockint::addrinfo-addr info*)
+                                     (* (sb-alien:struct sockint::sockaddr-in))))))
+                      (setf (slot-value host-ent4 'addresses)
+                            (adjoin (naturalize-unsigned-byte-8-array address 4)
+                                    (host-ent-addresses host-ent4)
+                                    :test 'equalp))))
+                   ((= (sockint::addrinfo-family info*) sockint::af-inet6)
+                    (let ((address (sockint::sockaddr-in6-addr
+                                    (sb-alien:cast
+                                     (sockint::addrinfo-addr info*)
+                                     (* (sb-alien:struct sockint::sockaddr-in6))))))
+                      (setf (slot-value host-ent6 'addresses)
+                            (adjoin (naturalize-unsigned-byte-8-array address 16)
+                                    (host-ent-addresses host-ent6)
+                                    :test 'equalp))))))
+            (sockint::freeaddrinfo info)
+            (values host-ent4 host-ent6)))))
 
   (defun get-host-by-address (address)
     "Returns a HOST-ENT instance for ADDRESS, which should be a vector of
- (integer 0 255), or signals a NAME-SERVICE-ERROR.
- See gethostbyaddr(3) for details."
+\(integer 0 255) with 4 elements in case of an IPv4 address and 16
+elements in case of an IPv6 address, or signals a NAME-SERVICE-ERROR.
+See gethostbyaddr(3) for details."
     (declare (optimize speed)
              (vector address))
-    (assert (= (length address) 4))
-    (sockint::with-sockaddr-in sockaddr ()
-      (sb-alien:with-alien ((host-buf (array char #.ni-max-host)))
-        #+darwin (setf (sockint::sockaddr-in-len sockaddr) 16)
-        (setf (sockint::sockaddr-in-family sockaddr) sockint::af-inet)
-        (dotimes (i 4)
-          (setf (sb-alien:deref (sockint::sockaddr-in-addr sockaddr) i)
-                (aref address i)))
-        (addrinfo-error-case ("getnameinfo"
-                              (sockint::getnameinfo
-                               sockaddr
-                               (sb-alien:alien-size sockint::sockaddr-in :bytes)
-                               (sb-alien:cast host-buf (* char)) ni-max-host
-                               nil 0
-                               sockint::ni-namereqd))
-            (make-instance 'host-ent
-                           :name (sb-alien::c-string-to-string
-                                  (sb-alien:alien-sap host-buf)
-                                  (sb-impl::default-external-format)
-                                  'character)
-                           :type sockint::af-inet
-                           :aliases nil
-                           :addresses (list address)))))))
+    (assert (member (length address) '(4 16) :test #'=))
+    (multiple-value-bind (sockaddr sockaddr-free sockaddr-size address-family)
+        (case (length address)
+          (4
+           (let ((sockaddr (sb-alien:make-alien sockint::sockaddr-in)))
+             #+darwin (setf (sockint::sockaddr-in-len sockaddr) 16)
+             (setf (sockint::sockaddr-in-family sockaddr) sockint::af-inet)
+             (dotimes (i (length address))
+               (setf (sb-alien:deref (sockint::sockaddr-in-addr sockaddr) i)
+                     (aref address i)))
+             (values sockaddr #'sockint::free-sockaddr-in
+                     (sb-alien:alien-size sockint::sockaddr-in :bytes)
+                     sockint::af-inet)))
+          (16
+           (let ((sockaddr (sb-alien:make-alien sockint::sockaddr-in6)))
+             (setf (sockint::sockaddr-in6-family sockaddr) sockint::af-inet6)
+             (dotimes (i (length address))
+               (setf (sb-alien:deref (sockint::sockaddr-in6-addr sockaddr) i)
+                     (aref address i)))
+             (values sockaddr #'sockint::free-sockaddr-in6
+                     (sb-alien:alien-size sockint::sockaddr-in6 :bytes)
+                     sockint::af-inet6))))
+      (unwind-protect
+           (sb-alien:with-alien ((host-buf (array char #.ni-max-host)))
+             (addrinfo-error-case ("getnameinfo"
+                                   (sockint::getnameinfo
+                                    (sb-alien:cast sockaddr (* t)) sockaddr-size
+                                    (sb-alien:cast host-buf (* char)) ni-max-host
+                                    nil 0
+                                    sockint::ni-namereqd))
+                 (make-instance 'host-ent
+                                :name (sb-alien::c-string-to-string
+                                       (sb-alien:alien-sap host-buf)
+                                       (sb-impl::default-external-format)
+                                       'character)
+                                :type address-family
+                                :aliases nil
+                                :addresses (list address))))
+        (funcall sockaddr-free sockaddr)))))
 
 ;;; Error handling
 

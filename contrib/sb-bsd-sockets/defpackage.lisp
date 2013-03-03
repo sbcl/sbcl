@@ -5,7 +5,7 @@
   (:use "COMMON-LISP" "SB-ALIEN" "SB-EXT"))
 
 (defpackage "SB-BSD-SOCKETS"
-  (:export socket local-socket local-abstract-socket inet-socket
+  (:export socket local-socket local-abstract-socket inet-socket inet6-socket
            make-inet-socket ; deprecated
            socket-bind socket-accept socket-connect
            socket-send socket-receive
@@ -16,7 +16,7 @@
 
            get-host-by-name get-host-by-address
            host-ent
-           host-ent-addresses host-ent-address
+           host-ent-address-type host-ent-addresses host-ent-address
            host-ent-aliases host-ent-name
            name-service-error
            ;; not sure if these are really good names or not
@@ -37,6 +37,7 @@
            ;; sockets.lisp
 
            make-inet-address
+           make-inet6-address
 
            non-blocking-mode)
   (:use "COMMON-LISP" "SB-BSD-SOCKETS-INTERNAL")

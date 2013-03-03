@@ -24,6 +24,8 @@
    (:file "sockopt" :depends-on ("util" "sockets"))
    (:file "inet" :depends-on ("protocol" "sockets"))
    (:file "inet4" :depends-on ("protocol" "sockets"))
+   (:file "inet6" :depends-on ("protocol" "sockets")
+    :if-feature (:not :win32))
    (:file "local" :depends-on ("protocol" "sockets"))
    (:file "name-service" :depends-on ("protocol" "sockets"))
    (:file "misc" :depends-on ("sockets"))

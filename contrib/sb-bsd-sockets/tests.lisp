@@ -18,6 +18,11 @@
   (equalp (make-inet-address "242.1.211.3")  #(242 1 211 3))
   t)
 
+(deftest make-inet6-address.1
+    (equalp (make-inet6-address "ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff")
+            #(255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255))
+  t)
+
 (deftest get-protocol-by-name/tcp
     (integerp (get-protocol-by-name "tcp"))
   t)
@@ -39,13 +44,13 @@
       nil))
   t)
 
-(deftest make-inet-socket
+(deftest make-inet-socket.smoke
   ;; make a socket
   (let ((s (make-instance 'inet-socket :type :stream :protocol (get-protocol-by-name "tcp"))))
     (and (> (socket-file-descriptor s) 1) t))
   t)
 
-(deftest make-inet-socket-keyword
+(deftest make-inet-socket.keyword
     ;; make a socket
     (let ((s (make-instance 'inet-socket :type :stream :protocol :tcp)))
       (and (> (socket-file-descriptor s) 1) t))
@@ -85,6 +90,15 @@
       (:no-error nil))
   t)
 
+(deftest make-inet6-socket.smoke
+  (let ((s (make-instance 'inet6-socket :type :stream :protocol (get-protocol-by-name "tcp"))))
+    (and (> (socket-file-descriptor s) 1) t))
+  t)
+
+(deftest make-inet6-socket.keyword
+  (let ((s (make-instance 'inet6-socket :type :stream :protocol :tcp)))
+    (and (> (socket-file-descriptor s) 1) t))
+  t)
 
 (deftest* (non-block-socket)
   (let ((s (make-instance 'inet-socket :type :stream :protocol :tcp)))
@@ -110,6 +124,26 @@
              (address-in-use-error () t)))
       (socket-close s1)
       (socket-close s2)))
+  t)
+
+(deftest inet6-socket-bind
+    (let* ((tcp (get-protocol-by-name "tcp"))
+           (address (make-inet6-address "::1"))
+           (s1 (make-instance 'inet6-socket :type :stream :protocol tcp))
+           (s2 (make-instance 'inet6-socket :type :stream :protocol tcp)))
+      (unwind-protect
+           ;; Given the functions we've got so far, if you can think of a
+           ;; better way to make sure the bind succeeded than trying it
+           ;; twice, let me know
+           (progn
+             (socket-bind s1 address 0)
+             (handler-case
+                 (let ((port (nth-value 1 (socket-name s1))))
+                   (socket-bind s2 address port)
+                   nil)
+               (address-in-use-error () t)))
+        (socket-close s1)
+        (socket-close s2)))
   t)
 
 (deftest* (simple-sockopt-test)
@@ -213,14 +247,25 @@
 ;;; these require that the internet (or bits of it, at least) is available
 
 #+internet-available
-(deftest get-host-by-name
+(deftest get-host-by-name.v4
   (equalp (car (host-ent-addresses (get-host-by-name "a.root-servers.net")))
           #(198 41 0 4))
   t)
 
 #+internet-available
-(deftest get-host-by-address
+(deftest get-host-by-name.v6
+  (equalp (car (host-ent-addresses (nth-value 1 (get-host-by-name "a.root-servers.net"))))
+          #(32 1 5 3 186 62 0 0 0 0 0 0 0 2 0 48))
+  t)
+
+#+internet-available
+(deftest get-host-by-address.v4
     (host-ent-name (get-host-by-address #(198 41 0 4)))
+  "a.root-servers.net")
+
+#+internet-available
+(deftest get-host-by-address.v6
+    (host-ent-name (get-host-by-address #(32 1 5 3 186 62 0 0 0 0 0 0 0 2 0 48)))
   "a.root-servers.net")
 
 ;;; These days lots of people seem to be using DNS servers that don't
