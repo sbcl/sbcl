@@ -64,33 +64,35 @@ TODO (rudi 2003-05-19): make the above work, make (defknown open) use it.
 ||#
 
 
-(handler-bind ((error #'continue))
-  (sb-c:defknown open (t &rest t
-                         &key (:direction (member :input :output :io :probe))
-                         (:element-type sb-kernel:type-specifier)
-                         (:if-exists (member :error :new-version :rename
-                                             :rename-and-delete :overwrite
-                                             :append :supersede nil))
-                         (:if-does-not-exist (member :error :create nil))
-                         (:external-format keyword)
-                         (:class (or symbol class))
-                         (:mapped (member t nil))
-                         (:input-handle (or null fixnum stream))
-                         (:output-handle (or null fixnum stream))
-                         &allow-other-keys)
+(sb-c:defknown open (t &rest t
+                       &key (:direction (member :input :output :io :probe))
+                       (:element-type sb-kernel:type-specifier)
+                       (:if-exists (member :error :new-version :rename
+                                                  :rename-and-delete :overwrite
+                                                  :append :supersede nil))
+                       (:if-does-not-exist (member :error :create nil))
+                       (:external-format keyword)
+                       (:class (or symbol class))
+                       (:mapped (member t nil))
+                       (:input-handle (or null fixnum stream))
+                       (:output-handle (or null fixnum stream))
+                       &allow-other-keys)
     (or stream null)
     ()
-    ;; :derive-type #'result-type-open-class
-    )
+  ;; :derive-type #'result-type-open-class
+  :overwrite-fndb-silently t)
 
-  (sb-c:defknown listen (&optional sb-kernel:stream-designator
-                                   (or null (integer 1 10) (member character)))
-    boolean (sb-c::unsafely-flushable sb-c::explicit-check))
+(sb-c:defknown listen (&optional sb-kernel:stream-designator
+                                 (or null (integer 1 10) (member character)))
+    boolean (sb-c::unsafely-flushable sb-c::explicit-check)
+  :overwrite-fndb-silently t)
 
-  (sb-c:defknown read-sequence (sequence stream &key (:start sb-int:index)
-                                         (:end sb-kernel:sequence-end)
-                                         (:partial-fill boolean))
-    (sb-int:index) ())
+(sb-c:defknown read-sequence (sequence stream &key (:start sb-int:index)
+                                       (:end sb-kernel:sequence-end)
+                                       (:partial-fill boolean))
+    (sb-int:index) ()
+  :overwrite-fndb-silently t)
 
-  (sb-c:defknown clear-input (&optional stream boolean) null
-                 (sb-c::explicit-check)))
+(sb-c:defknown clear-input (&optional stream boolean) null
+    (sb-c::explicit-check)
+  :overwrite-fndb-silently t)

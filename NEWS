@@ -1,5 +1,10 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 changes relative to sbcl-1.1.5:
+  * enhancement: the continuable error when defknown-ing over extant 
+    fndb entries can be ignored by passing :overwrite-fndb-silently t
+    as a keyword argument to sb-c:defknown (after attributes). Useful
+    to allow defknown to be re-loaded. Use with :allow-other-keys t
+    for backward compatibility.
   * bug fix: Prevent a make-array transform from modifying source forms
     causing problems for inlined code. Thanks to Bart Botta.
    (regression since 1.0.42.11-bis)

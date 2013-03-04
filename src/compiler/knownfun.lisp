@@ -206,10 +206,13 @@
                                 (:derive-type (or function null))
                                 (:optimizer (or function null))
                                 (:destroyed-constant-args (or function null))
-                                (:result-arg (or index null)))
+                                (:result-arg (or index null))
+                                (:overwrite-fndb-silently boolean))
                           *)
                 %defknown))
-(defun %defknown (names type attributes &key derive-type optimizer destroyed-constant-args result-arg)
+(defun %defknown (names type attributes
+                  &key derive-type optimizer destroyed-constant-args result-arg
+                    overwrite-fndb-silently)
   (let ((ctype (specifier-type type))
         (info (make-fun-info :attributes attributes
                              :derive-type derive-type
@@ -217,20 +220,21 @@
                              :destroyed-constant-args destroyed-constant-args
                              :result-arg result-arg)))
     (dolist (name names)
-      (let ((old-fun-info (info :function :info name)))
-        (when old-fun-info
-          ;; This is handled as an error because it's generally a bad
-          ;; thing to blow away all the old optimization stuff. It's
-          ;; also a potential source of sneaky bugs:
-          ;;    DEFKNOWN FOO
-          ;;    DEFTRANSFORM FOO
-          ;;    DEFKNOWN FOO ; possibly hidden inside some macroexpansion
-          ;;    ; Now the DEFTRANSFORM doesn't exist in the target Lisp.
-          ;; However, it's continuable because it might be useful to do
-          ;; it when testing new optimization stuff interactively.
-          (cerror "Go ahead, overwrite it."
-                  "~@<overwriting old FUN-INFO ~2I~_~S ~I~_for ~S~:>"
-                  old-fun-info name)))
+      (unless overwrite-fndb-silently
+        (let ((old-fun-info (info :function :info name)))
+          (when old-fun-info
+            ;; This is handled as an error because it's generally a bad
+            ;; thing to blow away all the old optimization stuff. It's
+            ;; also a potential source of sneaky bugs:
+            ;;    DEFKNOWN FOO
+            ;;    DEFTRANSFORM FOO
+            ;;    DEFKNOWN FOO ; possibly hidden inside some macroexpansion
+            ;;    ; Now the DEFTRANSFORM doesn't exist in the target Lisp.
+            ;; However, it's continuable because it might be useful to do
+            ;; it when testing new optimization stuff interactively.
+            (cerror "Go ahead, overwrite it."
+                    "~@<overwriting old FUN-INFO ~2I~_~S ~I~_for ~S~:>"
+                    old-fun-info name))))
       (setf (info :function :type name) ctype)
       (setf (info :function :where-from name) :declared)
       (setf (info :function :kind name) :function)

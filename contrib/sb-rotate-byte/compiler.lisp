@@ -1,16 +1,20 @@
 (in-package "SB-ROTATE-BYTE")
 
 (defknown rotate-byte (integer byte-specifier integer) integer
-  (foldable flushable))
+  (foldable flushable)
+  :overwrite-fndb-silently t)
 (defknown %rotate-byte (integer bit-index bit-index integer) integer
-  (foldable flushable))
+  (foldable flushable)
+  :overwrite-fndb-silently t)
 (defknown %unsigned-32-rotate-byte ((integer -31 31) (unsigned-byte 32))
     (unsigned-byte 32)
-  (foldable flushable))
+  (foldable flushable)
+  :overwrite-fndb-silently t)
 #+x86-64
 (defknown %unsigned-64-rotate-byte ((integer -63 63) (unsigned-byte 64))
     (unsigned-byte 64)
-  (foldable flushable))
+  (foldable flushable)
+  :overwrite-fndb-silently t)
 
 (macrolet (;; see src/compiler/srctran.lisp
            (with-byte-specifier ((size-var pos-var spec) &body body)
