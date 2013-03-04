@@ -1150,7 +1150,7 @@
 ;;; practice.
 ;;;
 ;;; Limit full open coding based on length of constant sequences. Default
-;;; value is chosen so that other parts of to compiler (constraint propagation
+;;; value is chosen so that other parts of the compiler (constraint propagation
 ;;; mainly) won't go nonlinear too badly. It's not an exact number -- but
 ;;; in the right ballpark.
 (defvar *concatenate-open-code-limit* 129)
@@ -1614,4 +1614,3 @@
   (define-trimmer-transform string-left-trim t nil)
   (define-trimmer-transform string-right-trim nil t)
   (define-trimmer-transform string-trim t t))
-
