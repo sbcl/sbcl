@@ -2082,11 +2082,10 @@ many elements are copied."
   (let ((end (or end length)))
     (seq-dispatch sequence
       (if from-end
-          (let ((length (length sequence)))
-            (nreverse (nlist-substitute*
-                       new old (nreverse (the list sequence))
-                       test test-not (- length end) (- length start)
-                       count key)))
+          (nreverse (nlist-substitute*
+                     new old (nreverse (the list sequence))
+                     test test-not (- length end) (- length start)
+                     count key))
           (nlist-substitute* new old sequence
                              test test-not start end count key))
       (if from-end
@@ -2136,10 +2135,9 @@ many elements are copied."
     (declare (fixnum end))
     (seq-dispatch sequence
       (if from-end
-          (let ((length (length sequence)))
-            (nreverse (nlist-substitute-if*
-                       new predicate (nreverse (the list sequence))
-                       (- length end) (- length start) count key)))
+          (nreverse (nlist-substitute-if*
+                     new predicate (nreverse (the list sequence))
+                     (- length end) (- length start) count key))
           (nlist-substitute-if* new predicate sequence
                                 start end count key))
       (if from-end
@@ -2178,10 +2176,9 @@ many elements are copied."
     (declare (fixnum end))
     (seq-dispatch sequence
       (if from-end
-          (let ((length (length sequence)))
-            (nreverse (nlist-substitute-if-not*
-                       new predicate (nreverse (the list sequence))
-                       (- length end) (- length start) count key)))
+          (nreverse (nlist-substitute-if-not*
+                     new predicate (nreverse (the list sequence))
+                     (- length end) (- length start) count key))
           (nlist-substitute-if-not* new predicate sequence
                                     start end count key))
       (if from-end
