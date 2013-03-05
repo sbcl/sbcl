@@ -39,29 +39,34 @@
                           0
                           (1- most-positive-fixnum))))
            (mod #.sb!xc:most-positive-fixnum))
+    ;; Entries for {start,end}{,1,2}
     ,@(mapcan (lambda (names)
                 (destructuring-bind (start end length sequence) names
                   (list
                    `(,start
                      0
                      nil
-                     (if (<= 0 ,start ,length)
+                     ;; Only evaluate LENGTH (which may be expensive)
+                     ;; if START is non-NIL.
+                     (if (or (zerop ,start) (<= 0 ,start ,length))
                          ,start
                          (sequence-bounding-indices-bad-error ,sequence ,start ,end))
                      index)
-                  `(,end
-                    nil
-                    nil
-                    (if (or (null ,end) (<= ,start ,end ,length))
-                        ;; Defaulting of NIL is done inside the
-                        ;; bodies, for ease of sharing with compiler
-                        ;; transforms.
-                        ;;
-                        ;; FIXME: defend against non-number non-NIL
-                        ;; stuff?
-                        ,end
-                        (sequence-bounding-indices-bad-error ,sequence ,start ,end))
-                    (or null index)))))
+                   `(,end
+                     nil
+                     nil
+                     ;; Only evaluate LENGTH (which may be expensive)
+                     ;; if END is non-NIL.
+                     (if (or (null ,end) (<= ,start ,end ,length))
+                         ;; Defaulting of NIL is done inside the
+                         ;; bodies, for ease of sharing with compiler
+                         ;; transforms.
+                         ;;
+                         ;; FIXME: defend against non-number non-NIL
+                         ;; stuff?
+                         ,end
+                         (sequence-bounding-indices-bad-error ,sequence ,start ,end))
+                     (or null index)))))
               '((start end length sequence)
                 (start1 end1 length1 sequence1)
                 (start2 end2 length2 sequence2)))
@@ -76,44 +81,52 @@
     (test-not nil
               nil
               (and test-not (%coerce-callable-to-fun test-not))
-              (or null function))
-    ))
+              (or null function))))
 
 (sb!xc:defmacro define-sequence-traverser (name args &body body)
   (multiple-value-bind (body declarations docstring)
       (parse-body body :doc-string-allowed t)
-    (collect ((new-args) (new-declarations) (adjustments))
+    (collect ((new-args)
+              (new-declarations)
+              ;; Things which are definitely used in any code path.
+              (rebindings/eager)
+              ;; Things which may be used/are only used in certain
+              ;; code paths (e.g. length).
+              (rebindings/lazy))
       (dolist (arg args)
         (case arg
           ;; FIXME: make this robust.  And clean.
-          ((sequence)
-           (new-args arg)
-           (adjustments '(length (length sequence)))
-           (new-declarations '(type index length)))
-          ((sequence1)
-           (new-args arg)
-           (adjustments '(length1 (length sequence1)))
-           (new-declarations '(type index length1)))
-          ((sequence2)
-           (new-args arg)
-           (adjustments '(length2 (length sequence2)))
-           (new-declarations '(type index length2)))
+          ((sequence sequence1 sequence2)
+           (let* ((length-var (ecase arg
+                                (sequence  'length)
+                                (sequence1 'length1)
+                                (sequence2 'length2)))
+                  (cache-var (symbolicate length-var '#:-cache)))
+             (new-args arg)
+             (rebindings/eager `(,cache-var nil))
+             (rebindings/lazy
+              `(,length-var (truly-the
+                             index
+                             (or ,cache-var (setf ,cache-var (length ,arg))))))))
           ((function predicate)
            (new-args arg)
-           (adjustments `(,arg (%coerce-callable-to-fun ,arg))))
-          (t (let ((info (cdr (assoc arg *sequence-keyword-info*))))
-               (cond (info
-                      (destructuring-bind (default supplied-p adjuster type) info
-                        (new-args `(,arg ,default ,@(when supplied-p (list supplied-p))))
-                        (adjustments `(,arg ,adjuster))
-                        (new-declarations `(type ,type ,arg))))
-                     (t (new-args arg)))))))
+           (rebindings/eager `(,arg (%coerce-callable-to-fun ,arg))))
+          (t
+           (let ((info (cdr (assoc arg *sequence-keyword-info*))))
+             (cond (info
+                    (destructuring-bind (default supplied-p adjuster type) info
+                      (new-args `(,arg ,default ,@(when supplied-p (list supplied-p))))
+                      (rebindings/eager `(,arg ,adjuster))
+                      (new-declarations `(type ,type ,arg))))
+                   (t (new-args arg)))))))
       `(defun ,name ,(new-args)
          ,@(when docstring (list docstring))
          ,@declarations
-         (let* (,@(adjustments))
-           (declare ,@(new-declarations))
-           ,@body)))))
+         (symbol-macrolet (,@(rebindings/lazy))
+           (let* (,@(rebindings/eager))
+             (declare ,@(new-declarations))
+             ,@body
+             ))))))
 
 ;;; SEQ-DISPATCH does an efficient type-dispatch on the given SEQUENCE.
 ;;;
@@ -202,6 +215,7 @@
              "Vector length (~W) doesn't match declared length (~W)."
              :format-arguments (list actual-length declared-length))))
   vector)
+
 (defun sequence-of-checked-length-given-type (sequence result-type)
   (let ((ctype (specifier-type result-type)))
     (if (not (array-type-p ctype))
@@ -1285,19 +1299,20 @@ many elements are copied."
 
 (define-sequence-traverser reduce (function sequence &rest args &key key
                                    from-end start end (initial-value nil ivp))
-  (declare (type index start))
-  (declare (truly-dynamic-extent args))
-  (let ((start start)
-        (end (or end length)))
-    (declare (type index start end))
-    (seq-dispatch sequence
+  (declare (type index start)
+           (truly-dynamic-extent args))
+  (seq-dispatch sequence
+    (let ((end (or end length)))
+      (declare (type index end))
       (if (= end start)
           (if ivp initial-value (funcall function))
           (if from-end
               (list-reduce-from-end function sequence key start end
                                     initial-value ivp)
               (list-reduce function sequence key start end
-                           initial-value ivp)))
+                           initial-value ivp))))
+    (let ((end (or end length)))
+      (declare (type index end))
       (if (= end start)
           (if ivp initial-value (funcall function))
           (if from-end
@@ -1312,8 +1327,8 @@ many elements are copied."
                   (setq initial-value (apply-key key (aref sequence start)))
                   (setq start (1+ start)))
                 (mumble-reduce function sequence key start end
-                               initial-value aref))))
-      (apply #'sb!sequence:reduce function sequence args))))
+                               initial-value aref)))))
+    (apply #'sb!sequence:reduce function sequence args)))
 
 ;;;; DELETE
 
@@ -1428,18 +1443,20 @@ many elements are copied."
   #!+sb-doc
   "Return a sequence formed by destructively removing the specified ITEM from
   the given SEQUENCE."
-  (declare (fixnum start))
-  (declare (truly-dynamic-extent args))
-  (let ((end (or end length)))
-    (declare (type index end))
-    (seq-dispatch sequence
+  (declare (type fixnum start)
+           (truly-dynamic-extent args))
+  (seq-dispatch sequence
+    (let ((end (or end length)))
+      (declare (type index end))
       (if from-end
           (normal-list-delete-from-end)
-          (normal-list-delete))
+          (normal-list-delete)))
+    (let ((end (or end length)))
+      (declare (type index end))
       (if from-end
           (normal-mumble-delete-from-end)
-          (normal-mumble-delete))
-      (apply #'sb!sequence:delete item sequence args))))
+          (normal-mumble-delete)))
+    (apply #'sb!sequence:delete item sequence args)))
 
 (eval-when (:compile-toplevel :execute)
 
@@ -1466,18 +1483,20 @@ many elements are copied."
   #!+sb-doc
   "Return a sequence formed by destructively removing the elements satisfying
   the specified PREDICATE from the given SEQUENCE."
-  (declare (fixnum start))
-  (declare (truly-dynamic-extent args))
-  (let ((end (or end length)))
-    (declare (type index end))
-    (seq-dispatch sequence
+  (declare (type fixnum start)
+           (truly-dynamic-extent args))
+  (seq-dispatch sequence
+    (let ((end (or end length)))
+      (declare (type index end))
       (if from-end
           (if-list-delete-from-end)
-          (if-list-delete))
+          (if-list-delete)))
+    (let ((end (or end length)))
+      (declare (type index end))
       (if from-end
           (if-mumble-delete-from-end)
-          (if-mumble-delete))
-      (apply #'sb!sequence:delete-if predicate sequence args))))
+          (if-mumble-delete)))
+    (apply #'sb!sequence:delete-if predicate sequence args)))
 
 (eval-when (:compile-toplevel :execute)
 
@@ -1504,18 +1523,20 @@ many elements are copied."
   #!+sb-doc
   "Return a sequence formed by destructively removing the elements not
   satisfying the specified PREDICATE from the given SEQUENCE."
-  (declare (fixnum start))
-  (declare (truly-dynamic-extent args))
-  (let ((end (or end length)))
-    (declare (type index end))
-    (seq-dispatch sequence
+  (declare (type fixnum start)
+           (truly-dynamic-extent args))
+  (seq-dispatch sequence
+    (let ((end (or end length)))
+      (declare (type index end))
       (if from-end
           (if-not-list-delete-from-end)
-          (if-not-list-delete))
+          (if-not-list-delete)))
+    (let ((end (or end length)))
+      (declare (type index end))
       (if from-end
           (if-not-mumble-delete-from-end)
-          (if-not-mumble-delete))
-      (apply #'sb!sequence:delete-if-not predicate sequence args))))
+          (if-not-mumble-delete)))
+    (apply #'sb!sequence:delete-if-not predicate sequence args)))
 
 ;;;; REMOVE
 
@@ -1653,52 +1674,58 @@ many elements are copied."
   #!+sb-doc
   "Return a copy of SEQUENCE with elements satisfying the test (default is
    EQL) with ITEM removed."
-  (declare (fixnum start))
-  (declare (truly-dynamic-extent args))
-  (let ((end (or end length)))
-    (declare (type index end))
-    (seq-dispatch sequence
+  (declare (type fixnum start)
+           (truly-dynamic-extent args))
+  (seq-dispatch sequence
+    (let ((end (or end length)))
+      (declare (type index end))
       (if from-end
           (normal-list-remove-from-end)
-          (normal-list-remove))
+          (normal-list-remove)))
+    (let ((end (or end length)))
+      (declare (type index end))
       (if from-end
           (normal-mumble-remove-from-end)
-          (normal-mumble-remove))
-      (apply #'sb!sequence:remove item sequence args))))
+          (normal-mumble-remove)))
+    (apply #'sb!sequence:remove item sequence args)))
 
 (define-sequence-traverser remove-if
     (predicate sequence &rest args &key from-end start end count key)
   #!+sb-doc
   "Return a copy of sequence with elements satisfying PREDICATE removed."
-  (declare (fixnum start))
-  (declare (truly-dynamic-extent args))
-  (let ((end (or end length)))
-    (declare (type index end))
-    (seq-dispatch sequence
+  (declare (type fixnum start)
+           (truly-dynamic-extent args))
+  (seq-dispatch sequence
+    (let ((end (or end length)))
+      (declare (type index end))
       (if from-end
           (if-list-remove-from-end)
-          (if-list-remove))
+          (if-list-remove)))
+    (let ((end (or end length)))
+      (declare (type index end))
       (if from-end
           (if-mumble-remove-from-end)
-          (if-mumble-remove))
-      (apply #'sb!sequence:remove-if predicate sequence args))))
+          (if-mumble-remove)))
+    (apply #'sb!sequence:remove-if predicate sequence args)))
 
 (define-sequence-traverser remove-if-not
     (predicate sequence &rest args &key from-end start end count key)
   #!+sb-doc
   "Return a copy of sequence with elements not satisfying PREDICATE removed."
-  (declare (fixnum start))
-  (declare (truly-dynamic-extent args))
-  (let ((end (or end length)))
-    (declare (type index end))
-    (seq-dispatch sequence
+  (declare (type fixnum start)
+           (truly-dynamic-extent args))
+  (seq-dispatch sequence
+    (let ((end (or end length)))
+      (declare (type index end))
       (if from-end
           (if-not-list-remove-from-end)
-          (if-not-list-remove))
+          (if-not-list-remove)))
+    (let ((end (or end length)))
+      (declare (type index end))
       (if from-end
           (if-not-mumble-remove-from-end)
-          (if-not-mumble-remove))
-      (apply #'sb!sequence:remove-if-not predicate sequence args))))
+          (if-not-mumble-remove)))
+    (apply #'sb!sequence:remove-if-not predicate sequence args)))
 
 ;;;; REMOVE-DUPLICATES
 
@@ -1839,8 +1866,8 @@ many elements are copied."
    sequence is returned.
 
    The :TEST-NOT argument is deprecated."
-  (declare (fixnum start))
-  (declare (truly-dynamic-extent args))
+  (declare (fixnum start)
+           (truly-dynamic-extent args))
   (seq-dispatch sequence
     (if sequence
         (list-remove-duplicates* sequence test test-not
@@ -1915,9 +1942,9 @@ many elements are copied."
    The :TEST-NOT argument is deprecated."
   (declare (truly-dynamic-extent args))
   (seq-dispatch sequence
-    (if sequence
-        (list-delete-duplicates* sequence test test-not
-                                 key from-end start end))
+    (when sequence
+      (list-delete-duplicates* sequence test test-not
+                               key from-end start end))
     (vector-delete-duplicates* sequence test test-not key from-end start end)
     (apply #'sb!sequence:delete-duplicates sequence args)))
 
@@ -1997,25 +2024,31 @@ many elements are copied."
 
 (sb!xc:defmacro subst-dispatch (pred)
   `(seq-dispatch sequence
-     (if from-end
-         (nreverse (list-substitute* ,pred
-                                     new
-                                     (reverse sequence)
-                                     (- (the fixnum length)
-                                        (the fixnum end))
-                                     (- (the fixnum length)
-                                        (the fixnum start))
-                                     count key test test-not old))
-         (list-substitute* ,pred
-                           new sequence start end count key test test-not
-                           old))
-    (if from-end
-        (vector-substitute* ,pred new sequence -1 (1- (the fixnum length))
-                            -1 length (1- (the fixnum end))
-                            (1- (the fixnum start))
-                            count key test test-not old)
-        (vector-substitute* ,pred new sequence 1 0 length length
-                            start end count key test test-not old))
+     (let ((end (or end length)))
+       (declare (type index end))
+       (if from-end
+           (nreverse (list-substitute* ,pred
+                                       new
+                                       (reverse sequence)
+                                       (- (the fixnum length)
+                                          (the fixnum end))
+                                       (- (the fixnum length)
+                                          (the fixnum start))
+                                       count key test test-not old))
+           (list-substitute* ,pred
+                             new sequence start end count key test test-not
+                             old)))
+
+     (let ((end (or end length)))
+       (declare (type index end))
+       (if from-end
+           (vector-substitute* ,pred new sequence -1 (1- (the fixnum length))
+                               -1 length (1- (the fixnum end))
+                               (1- (the fixnum start))
+                               count key test test-not old)
+           (vector-substitute* ,pred new sequence 1 0 length length
+                               start end count key test test-not old)))
+
     ;; FIXME: wow, this is an odd way to implement the dispatch.  PRED
     ;; here is (QUOTE [NORMAL|IF|IF-NOT]).  Not only is this pretty
     ;; pointless, but also LIST-SUBSTITUTE* and VECTOR-SUBSTITUTE*
@@ -2032,11 +2065,9 @@ many elements are copied."
   #!+sb-doc
   "Return a sequence of the same kind as SEQUENCE with the same elements,
   except that all elements equal to OLD are replaced with NEW."
-  (declare (fixnum start))
-  (declare (truly-dynamic-extent args))
-  (let ((end (or end length)))
-    (declare (type index end))
-    (subst-dispatch 'normal)))
+  (declare (type fixnum start)
+           (truly-dynamic-extent args))
+  (subst-dispatch 'normal))
 
 ;;;; SUBSTITUTE-IF, SUBSTITUTE-IF-NOT
 
@@ -2045,13 +2076,11 @@ many elements are copied."
   #!+sb-doc
   "Return a sequence of the same kind as SEQUENCE with the same elements
   except that all elements satisfying the PRED are replaced with NEW."
-  (declare (truly-dynamic-extent args))
-  (declare (fixnum start))
-  (let ((end (or end length))
-        (test predicate)
+  (declare (type fixnum start)
+           (truly-dynamic-extent args))
+  (let ((test predicate)
         (test-not nil)
         old)
-    (declare (type index length end))
     (subst-dispatch 'if)))
 
 (define-sequence-traverser substitute-if-not
@@ -2059,13 +2088,11 @@ many elements are copied."
   #!+sb-doc
   "Return a sequence of the same kind as SEQUENCE with the same elements
   except that all elements not satisfying the PRED are replaced with NEW."
-  (declare (truly-dynamic-extent args))
-  (declare (fixnum start))
-  (let ((end (or end length))
-        (test predicate)
+  (declare (type fixnum start)
+           (truly-dynamic-extent args))
+  (let ((test predicate)
         (test-not nil)
         old)
-    (declare (type index length end))
     (subst-dispatch 'if-not)))
 
 ;;;; NSUBSTITUTE
@@ -2077,23 +2104,26 @@ many elements are copied."
   "Return a sequence of the same kind as SEQUENCE with the same elements
   except that all elements equal to OLD are replaced with NEW. SEQUENCE
   may be destructively modified."
-  (declare (fixnum start))
-  (declare (truly-dynamic-extent args))
-  (let ((end (or end length)))
-    (seq-dispatch sequence
+  (declare (type fixnum start)
+           (truly-dynamic-extent args))
+  (seq-dispatch sequence
+    (let ((end (or end length)))
+      (declare (type index end))
       (if from-end
           (nreverse (nlist-substitute*
                      new old (nreverse (the list sequence))
                      test test-not (- length end) (- length start)
                      count key))
           (nlist-substitute* new old sequence
-                             test test-not start end count key))
+                             test test-not start end count key)))
+    (let ((end (or end length)))
+      (declare (type index end))
       (if from-end
           (nvector-substitute* new old sequence -1
                                test test-not (1- end) (1- start) count key)
           (nvector-substitute* new old sequence 1
-                               test test-not start end count key))
-      (apply #'sb!sequence:nsubstitute new old sequence args))))
+                               test test-not start end count key)))
+    (apply #'sb!sequence:nsubstitute new old sequence args)))
 
 (defun nlist-substitute* (new old sequence test test-not start end count key)
   (declare (fixnum start count end))
@@ -2129,23 +2159,25 @@ many elements are copied."
   "Return a sequence of the same kind as SEQUENCE with the same elements
    except that all elements satisfying PREDICATE are replaced with NEW.
    SEQUENCE may be destructively modified."
-  (declare (fixnum start))
-  (declare (truly-dynamic-extent args))
-  (let ((end (or end length)))
-    (declare (fixnum end))
-    (seq-dispatch sequence
+  (declare (type fixnum start)
+           (truly-dynamic-extent args))
+  (seq-dispatch sequence
+    (let ((end (or end length)))
+      (declare (type index end))
       (if from-end
           (nreverse (nlist-substitute-if*
                      new predicate (nreverse (the list sequence))
                      (- length end) (- length start) count key))
           (nlist-substitute-if* new predicate sequence
-                                start end count key))
+                                start end count key)))
+    (let ((end (or end length)))
+      (declare (type index end))
       (if from-end
           (nvector-substitute-if* new predicate sequence -1
                                   (1- end) (1- start) count key)
           (nvector-substitute-if* new predicate sequence 1
-                                  start end count key))
-      (apply #'sb!sequence:nsubstitute-if new predicate sequence args))))
+                                  start end count key)))
+    (apply #'sb!sequence:nsubstitute-if new predicate sequence args)))
 
 (defun nlist-substitute-if* (new test sequence start end count key)
   (declare (fixnum end))
@@ -2170,23 +2202,25 @@ many elements are copied."
   "Return a sequence of the same kind as SEQUENCE with the same elements
    except that all elements not satisfying PREDICATE are replaced with NEW.
    SEQUENCE may be destructively modified."
-  (declare (fixnum start))
-  (declare (truly-dynamic-extent args))
-  (let ((end (or end length)))
-    (declare (fixnum end))
-    (seq-dispatch sequence
+  (declare (type fixnum start)
+           (truly-dynamic-extent args))
+  (seq-dispatch sequence
+    (let ((end (or end length)))
+      (declare (fixnum end))
       (if from-end
           (nreverse (nlist-substitute-if-not*
                      new predicate (nreverse (the list sequence))
                      (- length end) (- length start) count key))
           (nlist-substitute-if-not* new predicate sequence
-                                    start end count key))
+                                    start end count key)))
+    (let ((end (or end length)))
+      (declare (fixnum end))
       (if from-end
           (nvector-substitute-if-not* new predicate sequence -1
                                       (1- end) (1- start) count key)
           (nvector-substitute-if-not* new predicate sequence 1
-                                      start end count key))
-      (apply #'sb!sequence:nsubstitute-if-not new predicate sequence args))))
+                                      start end count key)))
+    (apply #'sb!sequence:nsubstitute-if-not new predicate sequence args)))
 
 (defun nlist-substitute-if-not* (new test sequence start end count key)
   (declare (fixnum end))
@@ -2389,36 +2423,40 @@ many elements are copied."
     (pred sequence &rest args &key from-end start end key)
   #!+sb-doc
   "Return the number of elements in SEQUENCE satisfying PRED(el)."
-  (declare (fixnum start))
-  (declare (truly-dynamic-extent args))
-  (let ((end (or end length))
-        (pred (%coerce-callable-to-fun pred)))
-    (declare (type index end))
+  (declare (type fixnum start)
+           (truly-dynamic-extent args))
+  (let ((pred (%coerce-callable-to-fun pred)))
     (seq-dispatch sequence
-      (if from-end
-          (list-count-if nil t pred sequence)
-          (list-count-if nil nil pred sequence))
-      (if from-end
-          (vector-count-if nil t pred sequence)
-          (vector-count-if nil nil pred sequence))
+      (let ((end (or end length)))
+        (declare (type index end))
+        (if from-end
+            (list-count-if nil t pred sequence)
+            (list-count-if nil nil pred sequence)))
+      (let ((end (or end length)))
+        (declare (type index end))
+        (if from-end
+            (vector-count-if nil t pred sequence)
+            (vector-count-if nil nil pred sequence)))
       (apply #'sb!sequence:count-if pred sequence args))))
 
 (define-sequence-traverser count-if-not
     (pred sequence &rest args &key from-end start end key)
   #!+sb-doc
   "Return the number of elements in SEQUENCE not satisfying TEST(el)."
-  (declare (fixnum start))
-  (declare (truly-dynamic-extent args))
-  (let ((end (or end length))
-        (pred (%coerce-callable-to-fun pred)))
-    (declare (type index end))
+  (declare (type fixnum start)
+           (truly-dynamic-extent args))
+  (let ((pred (%coerce-callable-to-fun pred)))
     (seq-dispatch sequence
-      (if from-end
-          (list-count-if t t pred sequence)
-          (list-count-if t nil pred sequence))
-      (if from-end
-          (vector-count-if t t pred sequence)
-          (vector-count-if t nil pred sequence))
+      (let ((end (or end length)))
+        (declare (type index end))
+        (if from-end
+            (list-count-if t t pred sequence)
+            (list-count-if t nil pred sequence)))
+      (let ((end (or end length)))
+        (declare (type index end))
+        (if from-end
+            (vector-count-if t t pred sequence)
+            (vector-count-if t nil pred sequence)))
       (apply #'sb!sequence:count-if-not pred sequence args))))
 
 (define-sequence-traverser count
@@ -2427,27 +2465,29 @@ many elements are copied."
   #!+sb-doc
   "Return the number of elements in SEQUENCE satisfying a test with ITEM,
    which defaults to EQL."
-  (declare (fixnum start))
-  (declare (truly-dynamic-extent args))
+  (declare (type fixnum start)
+           (truly-dynamic-extent args))
   (when (and test-p test-not-p)
     ;; ANSI Common Lisp has left the behavior in this situation unspecified.
     ;; (CLHS 17.2.1)
     (error ":TEST and :TEST-NOT are both present."))
-  (let ((end (or end length)))
-    (declare (type index end))
-    (let ((%test (if test-not-p
-                     (lambda (x)
-                       (not (funcall test-not item x)))
-                     (lambda (x)
-                       (funcall test item x)))))
-      (seq-dispatch sequence
+  (let ((%test (if test-not-p
+                   (lambda (x)
+                     (not (funcall test-not item x)))
+                   (lambda (x)
+                     (funcall test item x)))))
+    (seq-dispatch sequence
+      (let ((end (or end length)))
+        (declare (type index end))
         (if from-end
             (list-count-if nil t %test sequence)
-            (list-count-if nil nil %test sequence))
+            (list-count-if nil nil %test sequence)))
+      (let ((end (or end length)))
+        (declare (type index end))
         (if from-end
             (vector-count-if nil t %test sequence)
-            (vector-count-if nil nil %test sequence))
-        (apply #'sb!sequence:count item sequence args)))))
+            (vector-count-if nil nil %test sequence)))
+      (apply #'sb!sequence:count item sequence args))))
 
 ;;;; MISMATCH
 
@@ -2535,26 +2575,39 @@ many elements are copied."
    SEQUENCE1 beyond the last position tested is returned. If a non-NIL
    :FROM-END argument is given, then one plus the index of the rightmost
    position in which the sequences differ is returned."
-  (declare (fixnum start1 start2))
+  (declare (type fixnum start1 start2))
   (declare (truly-dynamic-extent args))
-  (let* ((end1 (or end1 length1))
-         (end2 (or end2 length2)))
-    (declare (type index end1 end2))
-    (match-vars
-     (seq-dispatch sequence1
-       (seq-dispatch sequence2
+  (seq-dispatch sequence1
+    (seq-dispatch sequence2
+      (let ((end1 (or end1 length1))
+            (end2 (or end2 length2)))
+        (declare (type index end1 end2))
+        (match-vars
          (matchify-list (sequence1 start1 length1 end1)
            (matchify-list (sequence2 start2 length2 end2)
-             (list-list-mismatch)))
+             (list-list-mismatch)))))
+      (let ((end1 (or end1 length1))
+            (end2 (or end2 length2)))
+        (declare (type index end1 end2))
+        (match-vars
          (matchify-list (sequence1 start1 length1 end1)
-           (list-mumble-mismatch))
-         (apply #'sb!sequence:mismatch sequence1 sequence2 args))
-       (seq-dispatch sequence2
+           (list-mumble-mismatch))))
+      (apply #'sb!sequence:mismatch sequence1 sequence2 args))
+    (seq-dispatch sequence2
+      (let ((end1 (or end1 length1))
+            (end2 (or end2 length2)))
+        (declare (type index end1 end2))
+        (match-vars
          (matchify-list (sequence2 start2 length2 end2)
-           (mumble-list-mismatch))
-         (mumble-mumble-mismatch)
-         (apply #'sb!sequence:mismatch sequence1 sequence2 args))
-       (apply #'sb!sequence:mismatch sequence1 sequence2 args)))))
+           (mumble-list-mismatch))))
+      (let ((end1 (or end1 length1))
+            (end2 (or end2 length2)))
+        (declare (type index end1 end2))
+        (match-vars
+         (mumble-mumble-mismatch)))
+      (apply #'sb!sequence:mismatch sequence1 sequence2 args))
+    (apply #'sb!sequence:mismatch sequence1 sequence2 args)))
+
 
 ;;; search comparison functions
 
@@ -2645,14 +2698,18 @@ many elements are copied."
 (define-sequence-traverser search
     (sequence1 sequence2 &rest args &key
      from-end test test-not start1 end1 start2 end2 key)
-  (declare (fixnum start1 start2))
-  (declare (truly-dynamic-extent args))
-  (let ((end1 (or end1 length1))
-        (end2 (or end2 length2)))
-    (seq-dispatch sequence2
-      (list-search sequence2 sequence1)
-      (vector-search sequence2 sequence1)
-      (apply #'sb!sequence:search sequence1 sequence2 args))))
+  (declare (type fixnum start1 start2)
+           (truly-dynamic-extent args))
+  (seq-dispatch sequence2
+    (let ((end1 (or end1 length1))
+          (end2 (or end2 length2)))
+      (declare (type index end1 end2))
+      (list-search sequence2 sequence1))
+    (let ((end1 (or end1 length1))
+          (end2 (or end2 length2)))
+      (declare (type index end1 end2))
+      (vector-search sequence2 sequence1))
+    (apply #'sb!sequence:search sequence1 sequence2 args)))
 
 ;;; FIXME: this was originally in array.lisp; it might be better to
 ;;; put it back there, and make DOSEQUENCE and SEQ-DISPATCH be in
