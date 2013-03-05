@@ -2180,7 +2180,8 @@ many elements are copied."
     (apply #'sb!sequence:nsubstitute-if new predicate sequence args)))
 
 (defun nlist-substitute-if* (new test sequence start end count key)
-  (declare (fixnum end))
+  (declare (type fixnum end)
+           (type function test)) ; coercion is done by caller
   (do ((list (nthcdr start sequence) (cdr list))
        (index start (1+ index)))
       ((or (= index end) (null list) (= count 0)) sequence)
@@ -2190,6 +2191,8 @@ many elements are copied."
 
 (defun nvector-substitute-if* (new test sequence incrementer
                                start end count key)
+  (declare (type fixnum end)
+           (type function test)) ; coercion is done by caller
   (do ((index start (+ index incrementer)))
       ((or (= index end) (= count 0)) sequence)
     (when (funcall test (apply-key key (aref sequence index)))
@@ -2223,7 +2226,8 @@ many elements are copied."
     (apply #'sb!sequence:nsubstitute-if-not new predicate sequence args)))
 
 (defun nlist-substitute-if-not* (new test sequence start end count key)
-  (declare (fixnum end))
+  (declare (type fixnum end)
+           (type function test)) ; coercion is done by caller
   (do ((list (nthcdr start sequence) (cdr list))
        (index start (1+ index)))
       ((or (= index end) (null list) (= count 0)) sequence)
@@ -2233,6 +2237,8 @@ many elements are copied."
 
 (defun nvector-substitute-if-not* (new test sequence incrementer
                                    start end count key)
+  (declare (type fixnum end)
+           (type function test)) ; coercion is done by caller
   (do ((index start (+ index incrementer)))
       ((or (= index end) (= count 0)) sequence)
     (when (not (funcall test (apply-key key (aref sequence index))))
