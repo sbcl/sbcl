@@ -687,7 +687,7 @@
 
 (defun clear-output (&optional (stream *standard-output*))
   (with-out-stream stream (ansi-stream-misc :clear-output)
-                   (stream-force-output))
+                   (stream-clear-output))
   nil)
 
 (defun write-byte (integer stream)
