@@ -198,9 +198,16 @@
 (defmacro sequence:with-sequence-iterator
     ((&rest vars) (s &rest args &key from-end start end) &body body)
   (declare (ignore from-end start end))
-  `(multiple-value-bind (,@vars) (sequence:make-sequence-iterator ,s ,@args)
-    (declare (type function ,@(nthcdr 3 vars)))
-    ,@body))
+  (let* ((ignored '())
+         (vars (mapcar (lambda (x)
+                         (or x (let ((name (gensym)))
+                                 (push name ignored)
+                                 name)))
+                       vars)))
+   `(multiple-value-bind (,@vars) (sequence:make-sequence-iterator ,s ,@args)
+      (declare (type function ,@(nthcdr 3 vars))
+               (ignore ,@ignored))
+      ,@body)))
 
 (defmacro sequence:with-sequence-iterator-functions
     ((step endp elt setf index copy)
@@ -625,33 +632,40 @@
 (defmethod sequence:search
     ((sequence1 sequence) (sequence2 sequence) &key from-end (start1 0) end1
      (start2 0) end2 test test-not key)
-  (let ((test (sequence:canonize-test test test-not))
-        (key (sequence:canonize-key key))
-        (mainend2 (- (or end2 (length sequence2))
-                     (- (or end1 (length sequence1)) start1))))
-    (when (< mainend2 0)
+  (let* ((test (sequence:canonize-test test test-not))
+         (key (sequence:canonize-key key))
+         (range1 (- (or end1 (length sequence1)) start1))
+         (range2 (- (or end2 (length sequence2)) start2))
+         (count (1+ (- range2 range1))))
+    (when (minusp count)
       (return-from sequence:search nil))
-    (sequence:with-sequence-iterator (statem limitm from-endm stepm endpm)
-        (sequence2 :start start2 :end mainend2 :from-end from-end)
-      (do ((s2 (if from-end mainend2 0) (if from-end (1- s2) (1+ s2))))
-          (nil)
-        (sequence:with-sequence-iterator (state1 limit1 from-end1 step1 endp1 elt1)
-            (sequence1 :start start1 :end end1)
-          (sequence:with-sequence-iterator (state2 limit2 from-end2 step2 endp2 elt2)
-              (sequence2 :start s2)
-            (declare (ignore limit2 endp2))
-            (when (do ()
-                      ((funcall endp1 sequence1 state1 limit1 from-end1) t)
-                    (let ((o1 (funcall key (funcall elt1 sequence1 state1)))
-                          (o2 (funcall key (funcall elt2 sequence2 state2))))
-                      (unless (funcall test o1 o2)
-                        (return nil)))
-                    (setq state1 (funcall step1 sequence1 state1 from-end1))
-                    (setq state2 (funcall step2 sequence2 state2 from-end2)))
-              (return-from sequence:search s2))))
-        (when (funcall endpm sequence2 statem limitm from-endm)
-          (return nil))
-        (setq statem (funcall stepm sequence2 statem from-endm))))))
+    ;; Create an iteration state for SEQUENCE1 for the interesting
+    ;;range within SEQUENCE1. To compare this range against ranges in
+    ;;SEQUENCE2, we copy START-STATE1 and then mutate the copy.
+    (sequence:with-sequence-iterator (start-state1 nil from-end1 step1 nil elt1)
+        (sequence1 :start start1 :end end1 :from-end from-end)
+      ;; Create an iteration state for the interesting range within
+      ;; SEQUENCE2.
+      (sequence:with-sequence-iterator (start-state2 nil from-end2 step2 nil elt2 nil index2)
+          (sequence2 :start start2 :end end2 :from-end from-end)
+        ;; Copy both iterators at all COUNT possible match positions.
+        (dotimes (i count)
+          (let ((state1 (sequence:iterator-copy sequence1 start-state1))
+                (state2 (sequence:iterator-copy sequence2 start-state2)))
+            ;; Determine whether there is a match at the current
+            ;; position. Return immediately, if there is a match.
+            (dotimes
+                (j range1
+                   (return-from sequence:search
+                     (let ((position (funcall index2 sequence2 start-state2)))
+                       (if from-end (- position range1 -1) position))))
+              (unless (funcall test
+                               (funcall key (funcall elt1 sequence1 state1))
+                               (funcall key (funcall elt2 sequence2 state2)))
+                (return nil))
+              (setq state1 (funcall step1 sequence1 state1 from-end1))
+              (setq state2 (funcall step2 sequence2 state2 from-end2))))
+          (setq start-state2 (funcall step2 sequence2 start-state2 from-end2)))))))
 
 (defgeneric sequence:delete
     (item sequence &key from-end test test-not start end count key)

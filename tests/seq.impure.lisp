@@ -21,58 +21,82 @@
 
 (in-package :seq-test)
 
+(defclass list-backed-sequence (standard-object
+                                sequence)
+  ((elements :initarg :elements :type list :accessor %elements)))
+
+(defmethod sequence:make-sequence-like ((sequence list-backed-sequence) length
+                                        &rest args &key
+                                        initial-element initial-contents)
+  (declare (ignore initial-element initial-contents))
+  (make-instance 'list-backed-sequence
+                 :elements (apply #'sequence:make-sequence-like
+                                  '() length args)))
+
+(defmethod sequence:length ((sequence list-backed-sequence))
+  (length (%elements sequence)))
+
+(defmethod sequence:elt
+    ((sequence list-backed-sequence) index)
+  (nth index (%elements sequence)))
+
+(defmethod (setf sequence:elt)
+    (new-value (sequence list-backed-sequence) index)
+  (setf (nth index (%elements sequence)) new-value))
+
 ;;; helper functions for exercising SEQUENCE code on data of many
 ;;; specialized types, and in many different optimization scenarios
 (defun for-every-seq-1 (base-seq snippet)
-  (dolist (seq-type '(list
-                      (simple-array t 1)
-                      (vector t)
-                      (simple-array character 1)
-                      (vector character)
-                      (simple-array (signed-byte 4) 1)
-                      (vector (signed-byte 4))))
-    (flet ((entirely (eltype)
-             (every (lambda (el) (typep el eltype)) base-seq)))
+  (labels
+      ((entirely (eltype)
+         (every (lambda (el) (typep el eltype)) base-seq))
+       (make-sequence-for-type (type)
+         (etypecase type
+           ((member list list-backed-sequence)
+            (coerce base-seq type))
+           ((cons (eql simple-array) (cons * (cons (eql 1) null)))
+            (destructuring-bind (eltype one) (rest type)
+              (when (entirely eltype)
+                (coerce base-seq type))))
+           ((cons (eql vector))
+            (destructuring-bind (eltype) (rest type)
+              (when (entirely eltype)
+                (let ((initial-element
+                        (cond ((subtypep eltype 'character)
+                               #\!)
+                              ((subtypep eltype 'number)
+                               0)
+                                (t #'error))))
+                  (replace (make-array
+                            (+ (length base-seq)
+                               (random 3))
+                            :element-type eltype
+                            :fill-pointer
+                            (length base-seq)
+                            :initial-element
+                            initial-element)
+                           base-seq))))))))
+    (dolist (seq-type '(list
+                        (simple-array t 1)
+                        (vector t)
+                        (simple-array character 1)
+                        (vector character)
+                        (simple-array (signed-byte 4) 1)
+                        (vector (signed-byte 4))
+                        list-backed-sequence))
       (dolist (declaredness '(nil t))
         (dolist (optimization '(((speed 3) (space 0))
                                 ((speed 2) (space 2))
                                 ((speed 1) (space 2))
                                 ((speed 0) (space 1))))
-          (let* ((seq (if (eq seq-type 'list)
-                          (coerce base-seq 'list)
-                          (destructuring-bind (type-first &rest type-rest)
-                              seq-type
-                            (ecase type-first
-                              (simple-array
-                               (destructuring-bind (eltype one) type-rest
-                                 (assert (= one 1))
-                                 (if (entirely eltype)
-                                     (coerce base-seq seq-type)
-                                     (return))))
-                              (vector
-                               (destructuring-bind (eltype) type-rest
-                                 (if (entirely eltype)
-                                     (let ((initial-element
-                                            (cond ((subtypep eltype 'character)
-                                                   #\!)
-                                                  ((subtypep eltype 'number)
-                                                   0)
-                                                  (t #'error))))
-                                       (replace (make-array
-                                                 (+ (length base-seq)
-                                                    (random 3))
-                                                 :element-type eltype
-                                                 :fill-pointer
-                                                 (length base-seq)
-                                                 :initial-element
-                                                 initial-element)
-                                                base-seq))
-                                     (return))))))))
-                 (lambda-expr `(lambda (seq)
-                                 ,@(when declaredness
-                                     `((declare (type ,seq-type seq))))
-                                 (declare (optimize ,@optimization))
-                                 ,snippet)))
+          (let ((seq (make-sequence-for-type seq-type))
+                (lambda-expr `(lambda (seq)
+                                ,@(when declaredness
+                                    `((declare (type ,seq-type seq))))
+                                (declare (optimize ,@optimization))
+                                ,snippet)))
+            (when (not seq)
+              (return))
             (format t "~&~S~%" lambda-expr)
             (multiple-value-bind (fun warnings-p failure-p)
                 (compile nil lambda-expr)

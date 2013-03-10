@@ -22,6 +22,9 @@ changes relative to sbcl-1.1.5:
   * bug fix: compiling make-array no longer signals an error when the
     element-type is an uknown type, a warning is issued instead.
     Thanks to James Kalenius (lp#1156095)
+  * bug fix: SEARCH on generic (non-VECTOR non-LIST) sequence types no longer
+    produces wrong results for some inputs.  (Thanks to Jan Moringen.)
+    (lp#1153312)
 
 changes in sbcl-1.1.5 relative to sbcl-1.1.4:
   * minor incompatible change: SB-SPROF:WITH-PROFILING no longer loops
