@@ -10,6 +10,8 @@ changes relative to sbcl-1.1.5:
    (regression since 1.0.42.11-bis)
   * bug fix: clear-output calls the correct gray stream routine,
     sb-gray:stream-clear-output. (lp#1153257)
+  * bug fix: an error is signalled for an invalid format modifier: ~<~@>.
+    (lp#1153148)
 
 changes in sbcl-1.1.5 relative to sbcl-1.1.4:
   * minor incompatible change: SB-SPROF:WITH-PROFILING no longer loops

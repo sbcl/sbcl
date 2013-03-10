@@ -176,17 +176,17 @@
 
 (defmethod make-load-form ((object structure-object) &optional env)
   (declare (ignore env))
-  (error "~@<don't know how to dump ~S (default ~S method called).~@>"
+  (error "~@<don't know how to dump ~S (default ~S method called).~>"
          object 'make-load-form))
 
 (defmethod make-load-form ((object standard-object) &optional env)
   (declare (ignore env))
-  (error "~@<don't know how to dump ~S (default ~S method called).~@>"
+  (error "~@<don't know how to dump ~S (default ~S method called).~>"
          object 'make-load-form))
 
 (defmethod make-load-form ((object condition) &optional env)
   (declare (ignore env))
-  (error "~@<don't know how to dump ~S (default ~S method called).~@>"
+  (error "~@<don't know how to dump ~S (default ~S method called).~>"
          object 'make-load-form))
 
 (defun make-load-form-saving-slots (object &key (slot-names nil slot-names-p) environment)

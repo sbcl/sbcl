@@ -1049,7 +1049,7 @@
   (multiple-value-bind (segments first-semi close remaining)
       (parse-format-justification directives)
     (values
-     (if (format-directive-colonp close)
+     (if (format-directive-colonp close) ; logical block vs. justification
          (multiple-value-bind (prefix per-line-p insides suffix)
              (parse-format-logical-block segments colonp first-semi
                                          close params string end)
@@ -1063,6 +1063,16 @@
                     :complaint "~D illegal directive~:P found inside justification block"
                     :args (list count)
                     :references (list '(:ansi-cl :section (22 3 5 2)))))
+           ;; ANSI does not explicitly say that an error should be
+           ;; signalled, but the @ modifier is not explicitly allowed
+           ;; for ~> either.
+           (when (format-directive-atsignp close)
+             (error 'format-error
+                    :complaint "@ modifier not allowed in close ~
+                    directive of justification ~
+                    block (i.e. ~~<...~~@>."
+                    :offset (1- (format-directive-end close))
+                    :references (list '(:ansi-cl :section (22 3 6 2)))))
            (expand-format-justification segments colonp atsignp
                                         first-semi params)))
      remaining)))

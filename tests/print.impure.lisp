@@ -103,6 +103,10 @@
 (assert (raises-error? (format nil "~<~<~A~:>~>" '(foo))))
 (assert (string= (format nil "~<~<~A~>~>" 'foo) "FOO"))
 
+(with-test (:name (:format :justification-atsign-check))
+  (assert (raises-error? (format nil "~<~@>")))
+  (assert (raises-error? (eval '(format nil "~<~@>")))))
+
 ;;; Check that arrays that we print while *PRINT-READABLY* is true are
 ;;; in fact generating similar objects.
 (assert (equal (array-dimensions
