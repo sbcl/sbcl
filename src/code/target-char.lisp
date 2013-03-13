@@ -162,7 +162,7 @@
 
 ;;;; UCD accessor functions
 
-;;; The first (* 8 215) => 1720 entries in **CHARACTER-DATABASE**
+;;; The first (* 8 217) => 1736 entries in **CHARACTER-DATABASE**
 ;;; contain entries for the distinct character attributes:
 ;;; specifically, indexes into the GC kinds, Bidi kinds, CCC kinds,
 ;;; the decimal digit property, the digit property and the
@@ -189,12 +189,12 @@
 ;;;
 ;;; To look up information about a character, take the high 13 bits of
 ;;; its code point, and index the character database with that and a
-;;; base of 1720 (going past the miscellaneous information[*], so
+;;; base of 1736 (going past the miscellaneous information[*], so
 ;;; treating (a) as the start of the array).  This, labelled A, gives
 ;;; us another index into the detailed pages[-], which we can use to
 ;;; look up the details for the character in question: we add the low
 ;;; 8 bits of the character, shifted twice (because we have four-byte
-;;; table entries) to 1024 times the `page' index, with a base of 6072
+;;; table entries) to 1024 times the `page' index, with a base of 6088
 ;;; to skip over everything else.  This gets us to point B.  If we're
 ;;; after a transformed code point (i.e. an upcase or downcase
 ;;; operation), we can simply read it off now, beginning with an
@@ -208,8 +208,8 @@
 (defun ucd-index (char)
   (let* ((cp (char-code char))
          (cp-high (ash cp -8))
-         (page (aref **character-database** (+ 1720 cp-high))))
-    (+ 6072 (ash page 10) (ash (ldb (byte 8 0) cp) 2))))
+         (page (aref **character-database** (+ 1736 cp-high))))
+    (+ 6088 (ash page 10) (ash (ldb (byte 8 0) cp) 2))))
 
 (declaim (ftype (sfunction (t) (unsigned-byte 8)) ucd-value-0))
 (defun ucd-value-0 (char)
