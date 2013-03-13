@@ -43,20 +43,21 @@
                                          (unparse-specializers
                                           (method-specializers method)))
                        (make-symbol (format nil "~S" method))))
-        (multiple-value-bind (gf-spec quals specls)
-            (parse-defmethod spec)
-          (and (setq gf (and (or errorp (fboundp gf-spec))
-                             (gdefinition gf-spec)))
-               (let ((nreq (compute-discriminating-function-arglist-info gf)))
-                 (setq specls (append (parse-specializers specls)
-                                      (make-list (- nreq (length specls))
-                                                 :initial-element
-                                                 *the-class-t*)))
-                 (and
-                   (setq method (get-method gf quals specls errorp))
-                   (setq name
-                         (make-method-spec
-                          gf-spec quals (unparse-specializers specls))))))))
+        (let ((gf-spec (car spec)))
+          (multiple-value-bind (quals specls)
+              (parse-defmethod (cdr spec))
+            (and (setq gf (and (or errorp (fboundp gf-spec))
+                               (gdefinition gf-spec)))
+                 (let ((nreq (compute-discriminating-function-arglist-info gf)))
+                   (setq specls (append (parse-specializers specls)
+                                        (make-list (- nreq (length specls))
+                                                   :initial-element
+                                                   *the-class-t*)))
+                   (and
+                    (setq method (get-method gf quals specls errorp))
+                    (setq name
+                          (make-method-spec
+                           gf-spec quals (unparse-specializers specls)))))))))
     (values gf method name)))
 
 ;;; TRACE-METHOD and UNTRACE-METHOD accept method specs as arguments. A

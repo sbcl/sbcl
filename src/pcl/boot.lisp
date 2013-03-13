@@ -318,8 +318,8 @@ bootstrapping.
       ;; belong here!
       (aver (not morep)))))
 
-(defmacro defmethod (&rest args)
-  (multiple-value-bind (name qualifiers lambda-list body)
+(defmacro defmethod (name &rest args)
+  (multiple-value-bind (qualifiers lambda-list body)
       (parse-defmethod args)
     `(progn
       ;; KLUDGE: this double expansion is quite a monumental
@@ -2612,14 +2612,13 @@ bootstrapping.
 ;;; is really implemented.
 (defun parse-defmethod (cdr-of-form)
   (declare (list cdr-of-form))
-  (let ((name (pop cdr-of-form))
-        (qualifiers ())
+  (let ((qualifiers ())
         (spec-ll ()))
     (loop (if (and (car cdr-of-form) (atom (car cdr-of-form)))
               (push (pop cdr-of-form) qualifiers)
               (return (setq qualifiers (nreverse qualifiers)))))
     (setq spec-ll (pop cdr-of-form))
-    (values name qualifiers spec-ll cdr-of-form)))
+    (values qualifiers spec-ll cdr-of-form)))
 
 (defun parse-specializers (generic-function specializers)
   (declare (list specializers))
