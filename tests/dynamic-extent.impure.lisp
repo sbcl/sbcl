@@ -1098,3 +1098,11 @@
     (assert (every (lambda (x)
                      (sb-sys:sap= x (sb-sys:int-sap (+ 16 (ash 1 (1- width))))))
                    (funcall f (sb-sys:int-sap (ash 1 (1- width))))))))
+
+(with-test (:name :&more-bounds)
+  ;; lp#1154946
+  (assert (not (funcall (compile nil '(lambda (&rest args) (car args))))))
+  (assert (not (funcall (compile nil '(lambda (&rest args) (nth 6 args))))))
+  (assert (not (funcall (compile nil '(lambda (&rest args) (elt args 10))))))
+  (assert (not (funcall (compile nil '(lambda (&rest args) (cadr args))))))
+  (assert (not (funcall (compile nil '(lambda (&rest args) (third args)))))))

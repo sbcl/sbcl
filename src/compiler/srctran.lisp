@@ -4195,7 +4195,8 @@
 
 (deftransform %rest-ref ((n list context count))
   (cond ((rest-var-more-context-ok list)
-         `(%more-arg context n))
+         `(and (< (the index n) count)
+               (%more-arg context n)))
         ((and (constant-lvar-p n) (zerop (lvar-value n)))
          `(car list))
         (t

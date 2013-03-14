@@ -15,6 +15,8 @@ changes relative to sbcl-1.1.5:
   * bug fix: Better error messages for package operations (lp#1154776)
   * bug fix: delete-package on a nonexistent package should signal a cerror.
     (regression since 1.0.37.44).
+  * bug fix: accessing &MORE (stack allocated &REST) arguments checks bounds.
+    (lp#1154946)
 
 changes in sbcl-1.1.5 relative to sbcl-1.1.4:
   * minor incompatible change: SB-SPROF:WITH-PROFILING no longer loops
