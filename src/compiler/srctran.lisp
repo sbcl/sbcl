@@ -88,6 +88,9 @@
 ;;; Make source transforms to turn CxR forms into combinations of CAR
 ;;; and CDR. ANSI specifies that everything up to 4 A/D operations is
 ;;; defined.
+;;; Don't transform CAD*R, they are treated specially for &more args
+;;; optimizations
+
 (/show0 "about to set CxR source transforms")
 (loop for i of-type index from 2 upto 4 do
       ;; Iterate over BUF = all names CxR where x = an I-element
@@ -101,8 +104,10 @@
             (declare (type index k))
             (setf (aref buf (1+ k))
                   (if (logbitp k j) #\A #\D)))
-          (setf (info :function :source-transform (intern buf))
-                #'source-transform-cxr))))
+          (unless (member buf '("CADR" "CADDR" "CADDDR")
+                          :test #'equal)
+            (setf (info :function :source-transform (intern buf))
+                  #'source-transform-cxr)))))
 (/show0 "done setting CxR source transforms")
 
 ;;; Turn FIRST..FOURTH and REST into the obvious synonym, assuming
@@ -110,6 +115,7 @@
 ;;; Nth, which can be expanded into a CAR/CDR later on if policy
 ;;; favors it.
 (define-source-transform rest (x) `(cdr ,x))
+(define-source-transform first (x) `(car ,x))
 (define-source-transform second (x) `(cadr ,x))
 (define-source-transform third (x) `(caddr ,x))
 (define-source-transform fourth (x) `(cadddr ,x))
@@ -4151,17 +4157,27 @@
         `(%rest-ref ,n ,seq ,context ,count)
         (values nil t))))
 
-;;; CAR/FIRST -> %REST-REF
-(defun source-transform-car (list)
+;;; CAxR -> %REST-REF
+(defun source-transform-car (list nth)
   (multiple-value-bind (context count) (possible-rest-arg-context list)
     (if context
-        `(%rest-ref 0 ,list ,context ,count)
+        `(%rest-ref ,nth ,list ,context ,count)
         (values nil t))))
+
 (define-source-transform car (list)
-  (source-transform-car list))
-(define-source-transform first (list)
-  (or (source-transform-car list)
-      `(car ,list)))
+  (source-transform-car list 0))
+
+(define-source-transform cadr (list)
+  (or (source-transform-car list 1)
+      `(car (cdr ,list))))
+
+(define-source-transform caddr (list)
+  (or (source-transform-car list 2)
+      `(car (cdr (cdr ,list)))))
+
+(define-source-transform cadddr (list)
+  (or (source-transform-car list 3)
+      `(car (cdr (cdr (cdr ,list))))))
 
 ;;; LENGTH -> %REST-LENGTH
 (defun source-transform-length (list)
