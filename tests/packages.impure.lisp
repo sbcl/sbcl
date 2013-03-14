@@ -499,8 +499,10 @@ if a restart was invoked."
 (with-test (:name :package-local-nicknames)
   ;; Clear slate
   (without-package-locks
-    (delete-package :package-local-nicknames-test-1)
-    (delete-package :package-local-nicknames-test-2))
+    (when (find-package :package-local-nicknames-test-1)
+      (delete-package :package-local-nicknames-test-1))
+    (when (find-package :package-local-nicknames-test-2)
+      (delete-package :package-local-nicknames-test-2)))
   (eval `(defpackage :package-local-nicknames-test-1
            (:local-nicknames (:l :cl) (:sb :sb-ext))))
   (eval `(defpackage :package-local-nicknames-test-2
@@ -638,3 +640,14 @@ if a restart was invoked."
                 (let ((*package* p1))
                   (intern "FOO" :own-nickname))))))
 
+(with-test (:name :delete-package-restart)
+  (let* (ok
+         (result
+           (handler-bind
+               ((sb-kernel:simple-package-error
+                  (lambda (c)
+                    (setf ok t)
+                    (continue c))))
+             (delete-package (gensym)))))
+    (assert ok)
+    (assert (not result))))

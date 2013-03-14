@@ -363,6 +363,20 @@ Experimental: interface subject to change."
    (package-%local-nicknames
     (find-undeleted-package-or-lose package-designator))))
 
+(defun signal-package-error (package format-control &rest format-args)
+  (error 'simple-package-error
+         :package package
+         :format-control format-control
+         :format-arguments format-args))
+
+(defun signal-package-cerror (package continue-string
+                              format-control &rest format-args)
+  (cerror continue-string
+          'simple-package-error
+          :package package
+          :format-control format-control
+          :format-arguments format-args))
+
 (defun package-locally-nicknamed-by-list (package-designator)
   "Returns a list of packages which have a local nickname for the designated
 package.
@@ -406,38 +420,55 @@ Experimental: interface subject to change."
          (package (find-undeleted-package-or-lose package-designator))
          (existing (package-%local-nicknames package))
          (cell (assoc nick existing :test #'string=)))
+    (unless actual
+      (signal-package-error
+       package-designator
+       "The name ~S does not designate any package."
+       actual-package))
     (unless (package-name actual)
-      (error "Cannot add ~A as local nickname for a deleted package: ~S"
-             nick actual))
+      (signal-package-error
+       actual
+       "Cannot add ~A as local nickname for a deleted package: ~S"
+       nick actual))
     (with-single-package-locked-error
         (:package package "adding ~A as a local nickname for ~A"
                   nick actual))
     (when (member nick '("CL" "COMMON-LISP" "KEYWORD") :test #'string=)
-      (cerror "Continue, use it as local nickname anyways."
-              "Attempt to use ~A as a package local nickname (for ~A)."
-              nick (package-name actual)))
+      (signal-package-cerror
+       actual
+       "Continue, use it as local nickname anyways."
+       "Attempt to use ~A as a package local nickname (for ~A)."
+       nick (package-name actual)))
     (when (string= nick (package-name package))
-      (cerror "Continue, use it as a local nickname anyways."
-              "Attempt to use ~A as a package local nickname (for ~A) in ~
-               package named globally ~A."
-              nick (package-name actual) nick))
+      (signal-package-cerror
+       package
+       "Continue, use it as a local nickname anyways."
+       "Attempt to use ~A as a package local nickname (for ~A) in ~
+        package named globally ~A."
+       nick (package-name actual) nick))
     (when (member nick (package-nicknames package) :test #'string=)
-      (cerror "Continue, use it as a local nickname anyways."
-              "Attempt to use ~A as a package local nickname (for ~A) in ~
-               package nicknamed globally ~A."
-              nick (package-name actual) nick))
+      (signal-package-cerror
+       package
+       "Continue, use it as a local nickname anyways."
+       "Attempt to use ~A as a package local nickname (for ~A) in ~
+        package nicknamed globally ~A."
+       nick (package-name actual) nick))
     (when (and cell (neq actual (cdr cell)))
       (restart-case
-          (error "~@<Cannot add ~A as local nickname for ~A in ~S: already nickname for ~A.~:@>"
-                 nick actual package (cdr cell))
+          (signal-package-error
+           actual
+           "~@<Cannot add ~A as local nickname for ~A in ~A: ~
+            already nickname for ~A.~:@>"
+           nick (package-name actual)
+           (package-name package) (package-name (cdr cell)))
         (keep-old ()
           :report (lambda (s)
                     (format s "Keep ~A as local nicname for ~A."
-                            nick (cdr cell))))
+                            nick (package-name (cdr cell)))))
         (change-nick ()
           :report (lambda (s)
                     (format s "Use ~A as local nickname for ~A instead."
-                            nick actual))
+                            nick (package-name actual)))
           (let ((old (cdr cell)))
             (with-package-graph ()
               (setf (package-%locally-nicknamed-by old)
@@ -728,17 +759,17 @@ REMOVE-PACKAGE-LOCAL-NICKNAME, and the DEFPACKAGE option :LOCAL-NICKNAMES."
                           package)))))
       (cond ((eq found package))
             ((string= (the string (package-%name found)) n)
-             (cerror "Ignore this nickname."
-                     'simple-package-error
-                     :package package
-                     :format-control "~S is a package name, so it cannot be a nickname for ~S."
-                     :format-arguments (list n (package-%name package))))
+             (signal-package-cerror
+              package
+              "Ignore this nickname."
+              "~S is a package name, so it cannot be a nickname for ~S."
+              n (package-%name package)))
             (t
-             (cerror "Leave this nickname alone."
-                     'simple-package-error
-                     :package package
-                     :format-control "~S is already a nickname for ~S."
-                     :format-arguments (list n (package-%name found))))))))
+             (signal-package-cerror
+              package
+              "Leave this nickname alone."
+              "~S is already a nickname for ~S."
+              n (package-%name found)))))))
 
 (defun make-package (name &key
                           (use '#.*default-package-use-list*)
@@ -756,8 +787,10 @@ implementation it is ~S." *default-package-use-list*)
    :restart
      (when (find-package name)
        ;; ANSI specifies that this error is correctable.
-       (cerror "Clobber existing package."
-               "A package named ~S already exists" name)
+       (signal-package-cerror
+        name
+        "Clobber existing package."
+        "A package named ~S already exists" name)
        (setf clobber t))
      (with-package-graph ()
        ;; Check for race, signal the error outside the lock.
@@ -800,23 +833,20 @@ implementation it is ~S." *default-package-use-list*)
 (defun rename-package (package-designator name &optional (nicknames ()))
   #!+sb-doc
   "Changes the name and nicknames for a package."
-  (let ((package nil))
-  (tagbody :restart
-       (setq package (find-undeleted-package-or-lose package-designator))
-       (let* ((name (package-namify name))
-            (found (find-package name))
-            (nicks (mapcar #'string nicknames)))
+  (prog () :restart
+     (let ((package (find-undeleted-package-or-lose package-designator))
+           (name (package-namify name))
+           (found (find-package name))
+           (nicks (mapcar #'string nicknames)))
        (unless (or (not found) (eq found package))
-         (error 'simple-package-error
-                :package name
-                :format-control "A package named ~S already exists."
-                :format-arguments (list name)))
+         (signal-package-error name
+                               "A package named ~S already exists." name))
        (with-single-package-locked-error ()
          (unless (and (string= name (package-name package))
                       (null (set-difference nicks (package-nicknames package)
                                             :test #'string=)))
            (assert-package-unlocked package "rename as ~A~@[ with nickname~P ~
-                                           ~{~A~^, ~}~]"
+                                             ~{~A~^, ~}~]"
                                     name (length nicks) nicks))
          (with-package-names (names)
            ;; Check for race conditions now that we have the lock.
@@ -829,8 +859,8 @@ implementation it is ~S." *default-package-use-list*)
            (setf (package-%name package) name
                  (gethash name names) package
                  (package-%nicknames package) ()))
-           (%enter-new-nicknames package nicknames))))
-    package))
+         (%enter-new-nicknames package nicknames))
+       (return package))))
 
 (defun delete-package (package-designator)
   #!+sb-doc
@@ -840,14 +870,11 @@ implementation it is ~S." *default-package-use-list*)
      (let ((package (find-package package-designator)))
        (cond ((not package)
               ;; This continuable error is required by ANSI.
-              (cerror
-               "Return ~S."
-               (make-condition
-                'simple-package-error
-                :package package-designator
-                :format-control "There is no package named ~S."
-                :format-arguments (list package-designator))
-               (return-from delete-package nil)))
+              (signal-package-cerror
+               package-designator
+               "Ignore."
+               "There is no package named ~S." package-designator)
+              (return-from delete-package nil))
              ((not (package-name package)) ; already deleted
               (return-from delete-package nil))
              (t
@@ -856,16 +883,13 @@ implementation it is ~S." *default-package-use-list*)
                 (let ((use-list (package-used-by-list package)))
                   (when use-list
                     ;; This continuable error is specified by ANSI.
-                    (cerror
+                    (signal-package-cerror
+                     package
                      "Remove dependency in other packages."
-                     (make-condition
-                      'simple-package-error
-                      :package package
-                      :format-control
-                      "~@<Package ~S is used by package~P:~2I~_~S~@:>"
-                      :format-arguments (list (package-name package)
-                                              (length use-list)
-                                              (mapcar #'package-name use-list))))
+                     "~@<Package ~S is used by package~P:~2I~_~S~@:>"
+                     (package-name package)
+                     (length use-list)
+                     (mapcar #'package-name use-list))
                     (dolist (p use-list)
                       (unuse-package package p))))
                 (dolist (p (package-implements-list package))
@@ -1215,11 +1239,15 @@ uninterned."
 (defun symbol-listify (thing)
   (cond ((listp thing)
          (dolist (s thing)
-           (unless (symbolp s) (error "~S is not a symbol." s)))
+           (unless (symbolp s)
+             (signal-package-error nil
+                                   "~S is not a symbol." s)))
          thing)
         ((symbolp thing) (list thing))
         (t
-         (error "~S is neither a symbol nor a list of symbols." thing))))
+         (signal-package-error nil
+                               "~S is neither a symbol nor a list of symbols."
+                               thing))))
 
 (defun string-listify (thing)
   (mapcar #'string (if (listp thing)
@@ -1284,15 +1312,12 @@ uninterned."
                     ((eq w :inherited)
                      (push sym imports)))))
           (when missing
-            (cerror
-             "~S these symbols into the ~A package."
-             (make-condition
-              'simple-package-error
-              :package package
-              :format-control
-              "~@<These symbols are not accessible in the ~A package:~2I~_~S~@:>"
-              :format-arguments (list (package-%name package) missing))
-             'import (package-%name package))
+            (signal-package-cerror
+             package
+             (format nil "~S these symbols into the ~A package."
+                     'import (package-%name package))
+             "~@<These symbols are not accessible in the ~A package:~2I~_~S~@:>"
+             (package-%name package) missing)
             (import missing package))
           (import imports package))
 
@@ -1315,10 +1340,10 @@ uninterned."
       (dolist (sym symbols)
         (multiple-value-bind (s w) (find-symbol (symbol-name sym) package)
           (cond ((or (not w) (not (eq s sym)))
-                 (error 'simple-package-error
-                        :package package
-                        :format-control "~S is not accessible in the ~A package."
-                        :format-arguments (list sym (package-%name package))))
+                 (signal-package-error
+                  package
+                  "~S is not accessible in the ~A package."
+                  sym (package-%name package)))
                 ((eq w :external) (pushnew sym syms)))))
       (with-single-package-locked-error ()
         (when syms
