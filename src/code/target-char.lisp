@@ -203,6 +203,17 @@
 ;;; the character database once more to get to the relevant
 ;;; miscellaneous information.
 ;;;
+;;; As an optimization to the common case (pun intended) of looking up
+;;; case information for a character, the entries in C above are
+;;; sorted such that the characters which are UPPER-CASE-P in CL terms
+;;; have index values lower than all others, followed by those which
+;;; are LOWER-CASE-P in CL terms; this permits implementation of
+;;; character case tests without actually going to the trouble of
+;;; looking up the value associated with the index.  (Actually, this
+;;; isn't just a speed optimization; the information about whether a
+;;; character is BOTH-CASE-P is used just in the ordering and not
+;;; explicitly recorded in the database).
+;;;
 ;;; The moral of all this?  Next time, don't just say "FIXME: document
 ;;; this"
 (defun ucd-index (char)
