@@ -41,9 +41,9 @@
 (defparameter *decomposition-base* nil)
 
 (defun hash-misc (gc-index bidi-index ccc-index decimal-digit digit
-                  bidi-mirrored cl-both-case-p)
+                  bidi-mirrored cl-both-case-p decomposition-info)
   (let* ((list (list gc-index bidi-index ccc-index decimal-digit digit
-                     bidi-mirrored cl-both-case-p))
+                     bidi-mirrored cl-both-case-p decomposition-info))
          (index (gethash list *misc-hash*)))
     (or index
         (progn
@@ -54,37 +54,39 @@
 (defun compare-misc-entry (left right)
   (destructuring-bind (left-gc-index left-bidi-index left-ccc-index
                        left-decimal-digit left-digit left-bidi-mirrored
-                       left-cl-both-case-p)
+                       left-cl-both-case-p left-decomposition-info)
       left
     (destructuring-bind (right-gc-index right-bidi-index right-ccc-index
                          right-decimal-digit right-digit right-bidi-mirrored
-                         right-cl-both-case-p)
+                         right-cl-both-case-p right-decomposition-info)
         right
       (or (and left-cl-both-case-p (not right-cl-both-case-p))
           (and (or left-cl-both-case-p (not right-cl-both-case-p))
                (or (< left-gc-index right-gc-index)
                    (and (= left-gc-index right-gc-index)
-                        (or (< left-bidi-index right-bidi-index)
-                            (and (= left-bidi-index right-bidi-index)
-                                 (or (< left-ccc-index right-ccc-index)
-                                     (and (= left-ccc-index right-ccc-index)
-                                          (or (string< left-decimal-digit
-                                                       right-decimal-digit)
-                                              (and (string= left-decimal-digit
-                                                            right-decimal-digit)
-                                                   (or (string< left-digit right-digit)
-                                                       (and (string= left-digit
-                                                                     right-digit)
-                                                            (string< left-bidi-mirrored
-                                                                     right-bidi-mirrored))))))))))))))))
+                        (or (< left-decomposition-info right-decomposition-info)
+                            (and (= left-decomposition-info right-decomposition-info)
+                                 (or (< left-bidi-index right-bidi-index)
+                                     (and (= left-bidi-index right-bidi-index)
+                                          (or (< left-ccc-index right-ccc-index)
+                                              (and (= left-ccc-index right-ccc-index)
+                                                   (or (string< left-decimal-digit
+                                                                right-decimal-digit)
+                                                       (and (string= left-decimal-digit
+                                                                     right-decimal-digit)
+                                                            (or (string< left-digit right-digit)
+                                                                (and (string= left-digit
+                                                                              right-digit)
+                                                                     (string< left-bidi-mirrored
+                                                                              right-bidi-mirrored))))))))))))))))))
 
 (defun build-misc-table ()
   (sort *misc-table* #'compare-misc-entry)
   (setq *misc-mapping* (make-array (1+ *misc-index*)))
   (loop for i from 0 to *misc-index*
-        do (setf (aref *misc-mapping*
-                       (gethash (aref *misc-table* i) *misc-hash*))
-                 i)))
+     do (setf (aref *misc-mapping*
+                    (gethash (aref *misc-table* i) *misc-hash*))
+              i)))
 
 (defun slurp-ucd ()
   (setq *last-uppercase* nil)
@@ -94,10 +96,14 @@
   (setq *name-size* 0)
   (setq *misc-hash* (make-hash-table :test #'equal))
   (setq *misc-index* -1)
-  (setq *misc-table* (make-array 256 :fill-pointer 0))
+  (setq *misc-table* (make-array 2048 :fill-pointer 0))
   (setq *both-cases* nil)
   (setq *decompositions* 0)
-  (setq *decomposition-types* (make-hash-table :test #'equal))
+  (setq *decomposition-types*
+        (let ((array (make-array 256 :initial-element nil :fill-pointer 1)))
+          (vector-push "" array)
+          (vector-push "<compat>" array)
+          array))
   (setq *decomposition-length-max* 0)
   (setq *decomposition-base* (make-array (ash #x110000
                                               (- *page-size-exponent*))
@@ -220,19 +226,21 @@
                (cl-both-case-p
                 (not (null (or (and (= gc-index 0) lower-index)
                                (and (= gc-index 1) upper-index)))))
-               (misc-index (hash-misc gc-index bidi-index ccc-index
-                                      decimal-digit digit bidi-mirrored
-                                      cl-both-case-p)))
+               (decomposition-info 0))
           (declare (ignore digit-index))
           (when (and (not cl-both-case-p)
                      (< gc-index 2))
             (format t "~A~%" name))
           (incf *name-size* (length name))
           (when (string/= "" decomposition-type-and-mapping)
-            (let ((split (split-string decomposition-type-and-mapping
-                                       #\Space)))
-              (when (char= #\< (aref (first split) 0))
-                (setf (gethash (pop split) *decomposition-types*) t))
+            (let ((split (split-string decomposition-type-and-mapping #\Space)))
+              (cond
+                ((char= #\< (aref (first split) 0))
+                 (unless (position (first split) *decomposition-types*
+                                   :test #'equal)
+                   (vector-push (first split) *decomposition-types*))
+                 (setf decomposition-info (position (pop split) *decomposition-types* :test #'equal)))
+                (t (setf decomposition-info 1)))
               (unless (aref *decomposition-base* (cp-high code-point))
                 (setf (aref *decomposition-base* (cp-high code-point))
                       (make-array (ash 1 *page-size-exponent*)
@@ -263,8 +271,11 @@
              (setq *last-uppercase* nil)))
           (when (> ccc-index 255)
             (error "canonical combining class too large ~A" ccc-index))
-          (let ((result (make-ucd :misc misc-index
-                                  :transform (or upper-index lower-index 0))))
+          (let* ((misc-index (hash-misc gc-index bidi-index ccc-index
+                                        decimal-digit digit bidi-mirrored
+                                        cl-both-case-p decomposition-info))
+                 (result (make-ucd :misc misc-index
+                                   :transform (or upper-index lower-index 0))))
             (when (and (> (length name) 7)
                        (string= ", Last>" name :start2 (- (length name) 7)))
               (let ((page-start (ash (+ *block-first*
@@ -302,6 +313,10 @@
       (setf (aref (aref *ucd-base* code-high) code-low) encoding
             (gethash code-point *unicode-names*) name))))
 
+;;; this fixes up the case conversion discrepancy between CL and
+;;; Unicode: CL operators depend on char-downcase / char-upcase being
+;;; inverses, which is not true in general in Unicode even for
+;;; characters which change case to single characters.
 (defun second-pass ()
   (loop for i from 0 below (length *ucd-base*)
         when (aref *ucd-base* i)
@@ -320,19 +335,25 @@
                                  (+ (ash i *page-size-exponent*) j))))
                  do (destructuring-bind (gc-index bidi-index ccc-index
                                          decimal-digit digit bidi-mirrored
-                                         cl-both-case-p)
+                                         cl-both-case-p decomposition-info)
                         (aref *misc-table* (ucd-misc result))
                       (declare (ignore cl-both-case-p))
                       (format t "~A~%" (+ (ash i *page-size-exponent*) j))
                       (setf (ucd-misc result)
                             (hash-misc gc-index bidi-index ccc-index
                                        decimal-digit digit bidi-mirrored
-                                       nil))))))
+                                       nil decomposition-info))))))
 
 (defun write-3-byte (triplet stream)
   (write-byte (ldb (byte 8 0) triplet) stream)
   (write-byte (ldb (byte 8 8) triplet) stream)
   (write-byte (ldb (byte 8 16) triplet) stream))
+
+(defun write-4-byte (quadruplet stream)
+  (write-byte (ldb (byte 8 24) quadruplet) stream)
+  (write-byte (ldb (byte 8 16) quadruplet) stream)
+  (write-byte (ldb (byte 8 8) quadruplet) stream)
+  (write-byte (ldb (byte 8 0) quadruplet) stream))
 
 (defun digit-to-byte (digit)
   (if (string= "" digit)
@@ -361,7 +382,7 @@
                               :if-exists :supersede
                               :if-does-not-exist :create)
         (loop for (gc-index bidi-index ccc-index decimal-digit digit
-                            bidi-mirrored)
+                            bidi-mirrored nil decomposition-info)
               across *misc-table*
               do (write-byte gc-index stream)
               do (write-byte bidi-index stream)
@@ -369,16 +390,23 @@
               do (write-byte (digit-to-byte decimal-digit) stream)
               do (write-byte (digit-to-byte digit) stream)
               do (write-byte (if (string= "N" bidi-mirrored) 0 1) stream)
-              do (write-byte 0 stream)
+              do (write-byte decomposition-info stream)
               do (write-byte 0 stream))
         (loop for page across *ucd-base*
            do (write-byte (if page (gethash page hash) 0) stream))
         (loop for page across array
            do (loop for entry across page
+                 do (write-4-byte
+                     (dpb (if entry (aref *misc-mapping* (ucd-misc entry)) #x7ff)
+                          (byte 11 21)
+                          (if entry (ucd-transform entry) 0))
+                     stream)
+                   #+nil #+nil
                  do (write-byte (if entry
                                     (aref *misc-mapping* (ucd-misc entry))
                                     255)
                                 stream)
+                   #+nil #+nil
                  do (write-3-byte (if entry (ucd-transform entry) 0)
                                   stream))))))
   (with-open-file (f (make-pathname :name "ucd-names" :type "lisp-expr"
@@ -456,17 +484,18 @@
   (values))
 
 ;;; The stuff below is dependent on misc.lisp-expr being
-;;; (:LENGTH 217 :UPPERCASE (0 2) :LOWERCASE (1 3) :TITLECASE (4)).
 ;;;
-;;; There are two entries for UPPERCASE and LOWERCASE because some
-;;; characters have case (by Unicode standards) but are not
-;;; transformable character-by-character in a locale-independent way
-;;; (as CL requires for its standard operators).
+;;; (:LENGTH 395 :UPPERCASE (0 1 2 3 8 9 10 11) :LOWERCASE (4 5 6 7 12 13 14 15) :TITLECASE (16 17))
+;;;
+;;; There are two groups of entries for UPPERCASE and LOWERCASE
+;;; because some characters have case (by Unicode standards) but are
+;;; not transformable character-by-character in a locale-independent
+;;; way (as CL requires for its standard operators).
 ;;;
 ;;; for more details on these debugging functions, see the description
 ;;; of the character database format in src/code/target-char.lisp
 
-(defparameter *length* 217)
+(defparameter *length* 395)
 
 (defun cp-index (cp)
   (let* ((cp-high (cp-high cp))
@@ -477,13 +506,16 @@
        (* 4 (cp-low cp)))))
 
 (defun cp-value-0 (cp)
-  (aref *compiled-ucd* (cp-index cp)))
+  (let ((index (cp-index cp)))
+    (dpb (aref *compiled-ucd* index)
+         (byte 8 3)
+         (ldb (byte 3 5) (aref *compiled-ucd* (1+ index))))))
 
 (defun cp-value-1 (cp)
   (let ((index (cp-index cp)))
-    (dpb (aref *compiled-ucd* (+ index 3)) (byte 8 16)
+    (dpb (aref *compiled-ucd* (1+ index)) (byte 5 16)
          (dpb (aref *compiled-ucd* (+ index 2)) (byte 8 8)
-              (aref *compiled-ucd* (1+ index))))))
+              (aref *compiled-ucd* (+ index 3))))))
 
 (defun cp-general-category (cp)
   (aref *compiled-ucd* (* 8 (cp-value-0 cp))))
@@ -515,20 +547,20 @@
       (<= 160 cp)))
 
 (defun cp-char-upcase (cp)
-  (if (= (cp-value-0 cp) 1)
+  (if (< 3 (cp-value-0 cp) 8)
       (cp-value-1 cp)
       cp))
 
 (defun cp-char-downcase (cp)
-  (if (= (cp-value-0 cp) 0)
+  (if (< (cp-value-0 cp) 4)
       (cp-value-1 cp)
       cp))
 
 (defun cp-upper-case-p (cp)
-  (= (cp-value-0 cp) 0))
+  (< (cp-value-0 cp) 4))
 
 (defun cp-lower-case-p (cp)
-  (= (cp-value-0 cp) 1))
+  (< 3 (cp-value-0 cp) 8))
 
 (defun cp-both-case-p (cp)
-  (< (cp-value-0 cp) 2))
+  (< (cp-value-0 cp) 8))

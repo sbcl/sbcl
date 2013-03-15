@@ -162,7 +162,7 @@
 
 ;;;; UCD accessor functions
 
-;;; The first (* 8 217) => 1736 entries in **CHARACTER-DATABASE**
+;;; The first (* 8 395) => 3160 entries in **CHARACTER-DATABASE**
 ;;; contain entries for the distinct character attributes:
 ;;; specifically, indexes into the GC kinds, Bidi kinds, CCC kinds,
 ;;; the decimal digit property, the digit property and the
@@ -172,7 +172,7 @@
 ;;; the next (ash #x110000 -8) entries contain single-byte indexes
 ;;; into a table of 256-element 4-byte-sized entries.  These entries
 ;;; follow directly on, and are of the form
-;;; {attribute-index[1B],transformed-code-point[3B]}x256, where the
+;;; {attribute-index[11b],transformed-code-point[21b]}x256, where the
 ;;; attribute index is an index into the miscellaneous information
 ;;; table, and the transformed code point is the code point of the
 ;;; simple mapping of the character to its lowercase or uppercase
@@ -189,7 +189,7 @@
 ;;;
 ;;; To look up information about a character, take the high 13 bits of
 ;;; its code point, and index the character database with that and a
-;;; base of 1736 (going past the miscellaneous information[*], so
+;;; base of 3160 (going past the miscellaneous information[*], so
 ;;; treating (a) as the start of the array).  This, labelled A, gives
 ;;; us another index into the detailed pages[-], which we can use to
 ;;; look up the details for the character in question: we add the low
@@ -198,10 +198,10 @@
 ;;; to skip over everything else.  This gets us to point B.  If we're
 ;;; after a transformed code point (i.e. an upcase or downcase
 ;;; operation), we can simply read it off now, beginning with an
-;;; offset of 1 byte from point B in some endianness; if we're looking
-;;; for miscellaneous information, we take the value at B, and index
-;;; the character database once more to get to the relevant
-;;; miscellaneous information.
+;;; offset of 11 bits from point B in some endianness; if we're
+;;; looking for miscellaneous information, we take the 11-bit value at
+;;; B, and index the character database once more to get to the
+;;; relevant miscellaneous information.
 ;;;
 ;;; As an optimization to the common case (pun intended) of looking up
 ;;; case information for a character, the entries in C above are
@@ -219,22 +219,26 @@
 (defun ucd-index (char)
   (let* ((cp (char-code char))
          (cp-high (ash cp -8))
-         (page (aref **character-database** (+ 1736 cp-high))))
-    (+ 6088 (ash page 10) (ash (ldb (byte 8 0) cp) 2))))
+         (page (aref **character-database** (+ 3160 cp-high))))
+    (+ 7512 (ash page 10) (ash (ldb (byte 8 0) cp) 2))))
 
-(declaim (ftype (sfunction (t) (unsigned-byte 8)) ucd-value-0))
+(declaim (ftype (sfunction (t) (unsigned-byte 11)) ucd-value-0))
 (defun ucd-value-0 (char)
-  (aref **character-database** (ucd-index char)))
+  (let ((index (ucd-index char))
+        (character-database **character-database**))
+    (dpb (aref character-database index)
+         (byte 8 3)
+         (ldb (byte 3 5) (aref character-database (+ index 1))))))
 
-(declaim (ftype (sfunction (t) (unsigned-byte 24)) ucd-value-1))
+(declaim (ftype (sfunction (t) (unsigned-byte 21)) ucd-value-1))
 (defun ucd-value-1 (char)
   (let ((index (ucd-index char))
         (character-database **character-database**))
-    (dpb (aref character-database (+ index 3))
-         (byte 8 16)
+    (dpb (aref character-database (+ index 1))
+         (byte 5 16)
          (dpb (aref character-database (+ index 2))
               (byte 8 8)
-              (aref character-database (1+ index))))))
+              (aref character-database (+ index 3))))))
 
 (declaim (ftype (sfunction (t) (unsigned-byte 8)) ucd-general-category))
 (defun ucd-general-category (char)
@@ -370,20 +374,20 @@ argument is an alphabetic character, A-Z or a-z; otherwise NIL."
   #!+sb-doc
   "The argument must be a character object; UPPER-CASE-P returns T if the
 argument is an upper-case character, NIL otherwise."
-  (= (ucd-value-0 char) 0))
+  (< (ucd-value-0 char) 4))
 
 (defun lower-case-p (char)
   #!+sb-doc
   "The argument must be a character object; LOWER-CASE-P returns T if the
 argument is a lower-case character, NIL otherwise."
-  (= (ucd-value-0 char) 1))
+  (< 3 (ucd-value-0 char) 8))
 
 (defun both-case-p (char)
   #!+sb-doc
   "The argument must be a character object. BOTH-CASE-P returns T if the
 argument is an alphabetic character and if the character exists in both upper
 and lower case. For ASCII, this is the same as ALPHA-CHAR-P."
-  (< (ucd-value-0 char) 2))
+  (< (ucd-value-0 char) 8))
 
 (defun digit-char-p (char &optional (radix 10.))
   #!+sb-doc
@@ -579,14 +583,14 @@ Case is ignored."
   #!+sb-doc
   "Return CHAR converted to upper-case if that is possible. Don't convert
 lowercase eszet (U+DF)."
-  (if (= (ucd-value-0 char) 1)
+  (if (< 3 (ucd-value-0 char) 8)
       (code-char (ucd-value-1 char))
       char))
 
 (defun char-downcase (char)
   #!+sb-doc
   "Return CHAR converted to lower-case if that is possible."
-  (if (= (ucd-value-0 char) 0)
+  (if (< (ucd-value-0 char) 4)
       (code-char (ucd-value-1 char))
       char))
 
