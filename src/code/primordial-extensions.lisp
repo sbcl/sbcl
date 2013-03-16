@@ -222,7 +222,8 @@
                 ;; but it will immediately lead to undefined to behavior,
                 ;; since almost any operation on a deleted package is
                 ;; undefined.
-                (package-name maybe-package))
+                #-sb-xc-host
+                (package-%name maybe-package))
            maybe-package)
           (t
            ;; We're in the undefined behavior zone. First, munge the
