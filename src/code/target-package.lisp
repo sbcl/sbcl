@@ -579,19 +579,18 @@ REMOVE-PACKAGE-LOCAL-NICKNAME, and the DEFPACKAGE option :LOCAL-NICKNAMES."
                   (nicknamed (when nicknames
                                (cdr (assoc string nicknames :test #'string=))))
                   (packageoid (or nicknamed (gethash string *package-names*))))
-             (when (and (null packageoid)
-                        (not *in-package-init*) ; KLUDGE
-                        (let ((mismatch (mismatch "SB!" string)))
-                          (and mismatch (= mismatch 3))))
-               (restart-case
-                   (signal 'bootstrap-package-not-found :name string)
-                 (debootstrap-package ()
-                   (return-from find-package-using-package
+             (if (and (null packageoid)
+                      (not *in-package-init*) ; KLUDGE
+                      (let ((mismatch (mismatch "SB!" string)))
+                        (and mismatch (= mismatch 3))))
+                 (restart-case
+                     (signal 'bootstrap-package-not-found :name string)
+                   (debootstrap-package ()
                      (if (string= string "SB!XC")
                          (find-package "COMMON-LISP")
                          (find-package
-                          (substitute #\- #\! string :count 1)))))))
-             packageoid)))
+                          (substitute #\- #\! string :count 1)))))
+                 packageoid))))
     (typecase package-designator
       (package package-designator)
       (symbol (find-package-from-string (symbol-name package-designator)))
