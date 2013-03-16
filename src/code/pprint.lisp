@@ -75,12 +75,12 @@
   ;; Buffer holding the per-line prefix active at the buffer start.
   ;; Indentation is included in this. The length of this is stored
   ;; in the logical block stack.
-  (prefix (make-string initial-buffer-size) :type simple-string)
+  (prefix (make-string initial-buffer-size) :type (simple-array character (*)))
   ;; Buffer holding the total remaining suffix active at the buffer start.
   ;; The characters are right-justified in the buffer to make it easier
   ;; to output the buffer. The length is stored in the logical block
   ;; stack.
-  (suffix (make-string initial-buffer-size) :type simple-string)
+  (suffix (make-string initial-buffer-size) :type (simple-array character (*)))
   ;; Queue of pending operations. When empty, HEAD=TAIL=NIL. Otherwise,
   ;; TAIL holds the first (oldest) cons and HEAD holds the last (newest)
   ;; cons. Adding things to the queue is basically (setf (cdr head) (list
