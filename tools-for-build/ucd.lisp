@@ -344,11 +344,6 @@
                                        decimal-digit digit bidi-mirrored
                                        nil decomposition-info))))))
 
-(defun write-3-byte (triplet stream)
-  (write-byte (ldb (byte 8 0) triplet) stream)
-  (write-byte (ldb (byte 8 8) triplet) stream)
-  (write-byte (ldb (byte 8 16) triplet) stream))
-
 (defun write-4-byte (quadruplet stream)
   (write-byte (ldb (byte 8 24) quadruplet) stream)
   (write-byte (ldb (byte 8 16) quadruplet) stream)
@@ -400,15 +395,7 @@
                      (dpb (if entry (aref *misc-mapping* (ucd-misc entry)) #x7ff)
                           (byte 11 21)
                           (if entry (ucd-transform entry) 0))
-                     stream)
-                   #+nil #+nil
-                 do (write-byte (if entry
-                                    (aref *misc-mapping* (ucd-misc entry))
-                                    255)
-                                stream)
-                   #+nil #+nil
-                 do (write-3-byte (if entry (ucd-transform entry) 0)
-                                  stream))))))
+                     stream))))))
   (with-open-file (f (make-pathname :name "ucd-names" :type "lisp-expr"
                                     :defaults *output-directory*)
                      :direction :output
