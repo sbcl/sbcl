@@ -288,3 +288,13 @@
   (let ((a (make-array 1 :initial-element 5)))
     (assert (equalp (adjust-array a 2 :initial-element 10)
                     #(5 10)))))
+
+(with-test (:name (make-array-transform-unknown-type :bug-1156095))
+  (assert
+   (handler-case
+       (compile nil `(lambda () (make-array '(1 2)
+                                            :element-type ',(gensym))))
+     (style-warning ()
+       t)
+     (:no-error (&rest args)
+       nil))))

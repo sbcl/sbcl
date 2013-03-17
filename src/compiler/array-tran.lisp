@@ -609,7 +609,12 @@
     (unless (constant-lvar-p dims)
       (give-up-ir1-transform
        "The dimension list is not constant; cannot open code array creation."))
-    (let ((dims (lvar-value dims)))
+    (let ((dims (lvar-value dims))
+          (element-type-ctype (and (constant-lvar-p element-type)
+                                   (ir1-transform-specifier-type
+                                    (lvar-value element-type)))))
+      (when (unknown-type-p element-type-ctype)
+        (give-up-ir1-transform))
       (unless (every #'integerp dims)
         (give-up-ir1-transform
          "The dimension list contains something other than an integer: ~S"
@@ -626,9 +631,7 @@
                  (rank (length dims))
                  (spec `(simple-array
                          ,(cond ((null element-type) t)
-                                ((and (constant-lvar-p element-type)
-                                      (ir1-transform-specifier-type
-                                       (lvar-value element-type)))
+                                (element-type-ctype
                                  (sb!xc:upgraded-array-element-type
                                   (lvar-value element-type)))
                                 (t '*))

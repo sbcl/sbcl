@@ -17,6 +17,9 @@ changes relative to sbcl-1.1.5:
     (regression since 1.0.37.44).
   * bug fix: accessing &MORE (stack allocated &REST) arguments checks bounds.
     (lp#1154946)
+  * bug fix: compiling make-array no longer signals an error when the
+    element-type is an uknown type, a warning is issued instead.
+    Thanks to James Kalenius (lp#1156095)
 
 changes in sbcl-1.1.5 relative to sbcl-1.1.4:
   * minor incompatible change: SB-SPROF:WITH-PROFILING no longer loops
