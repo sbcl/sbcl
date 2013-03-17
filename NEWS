@@ -5,6 +5,8 @@ changes relative to sbcl-1.1.5:
     as a keyword argument to sb-c:defknown (after attributes). Useful
     to allow defknown to be re-loaded. Use with :allow-other-keys t
     for backward compatibility.
+  * optimization: compiler is much faster in compiling SVREF and (SETF SVREF)
+    forms.
   * bug fix: Prevent a make-array transform from modifying source forms
     causing problems for inlined code. Thanks to Bart Botta.
    (regression since 1.0.42.11-bis)

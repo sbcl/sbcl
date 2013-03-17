@@ -1009,9 +1009,43 @@
                   `(aref (the ,',type ,a) ,i))
                 (define-source-transform ,setter (a i v)
                   `(%aset (the ,',type ,a) ,i ,v)))))
-  (define-frob svref %svset simple-vector)
   (define-frob schar %scharset simple-string)
   (define-frob char %charset string))
+
+;;; We transform SVREF and %SVSET directly into DATA-VECTOR-REF/SET: this is
+;;; around 100 times faster than going through the general-purpose AREF
+;;; transform which ends up doing a lot of work -- and introducing many
+;;; intermediate lambdas, each meaning a new trip through the compiler -- to
+;;; get the same result.
+;;;
+;;; FIXME: [S]CHAR, and [S]BIT above would almost certainly benefit from a similar
+;;; treatment.
+(define-source-transform svref (vector index)
+  (let ((elt-type (or (when (symbolp vector)
+                        (let ((var (lexenv-find vector vars)))
+                          (when var
+                            (type-specifier
+                             (array-type-declared-element-type (lambda-var-type var))))))
+                      t)))
+    (with-unique-names (n-vector)
+      `(let ((,n-vector ,vector))
+         (the ,elt-type (data-vector-ref
+                         (the simple-vector ,n-vector)
+                         (%check-bound ,n-vector (length ,n-vector) ,index)))))))
+
+(define-source-transform %svset (vector index value)
+  (let ((elt-type (or (when (symbolp vector)
+                        (let ((var (lexenv-find vector vars)))
+                          (when var
+                            (type-specifier
+                             (array-type-declared-element-type (lambda-var-type var))))))
+                      t)))
+    (with-unique-names (n-vector)
+      `(let ((,n-vector ,vector))
+         (truly-the ,elt-type (data-vector-set
+                               (the simple-vector ,n-vector)
+                               (%check-bound ,n-vector (length ,n-vector) ,index)
+                               (the ,elt-type ,value)))))))
 
 (macrolet (;; This is a handy macro for computing the row-major index
            ;; given a set of indices. We wrap each index with a call
