@@ -35,8 +35,7 @@
 (defparameter *misc-table* nil)
 (defparameter *misc-mapping* nil)
 (defparameter *both-cases* nil)
-(defparameter *decompositions* nil)
-(defparameter *decomposition-length-max* nil)
+(defparameter *long-decompositions* nil)
 (defparameter *decomposition-types* nil)
 (defparameter *decomposition-base* nil)
 
@@ -98,13 +97,13 @@
   (setq *misc-index* -1)
   (setq *misc-table* (make-array 2048 :fill-pointer 0))
   (setq *both-cases* nil)
-  (setq *decompositions* 0)
+  (setq *long-decompositions*
+        (make-array 2048 :fill-pointer 0 :adjustable t))
   (setq *decomposition-types*
         (let ((array (make-array 256 :initial-element nil :fill-pointer 1)))
           (vector-push "" array)
           (vector-push "<compat>" array)
           array))
-  (setq *decomposition-length-max* 0)
   (setq *decomposition-base* (make-array (ash #x110000
                                               (- *page-size-exponent*))
                                          :initial-element nil))
@@ -121,7 +120,7 @@
   (second-pass)
   (build-misc-table)
   (fixup-hangul-syllables)
-  *decompositions*)
+  (length *long-decompositions*))
 
 (defun fixup-hangul-syllables ()
   ;; "Hangul Syllable Composition, Unicode 5.1 section 3-12"
@@ -247,12 +246,16 @@
                                   :initial-element nil)))
               (setf (aref (aref *decomposition-base* (cp-high code-point))
                           (cp-low code-point))
-                    (mapcar #'(lambda (string)
-                                (parse-integer string :radix 16))
-                            split))
-              (setq *decomposition-length-max*
-                    (max *decomposition-length-max* (length split)))
-              (incf *decompositions* (length split))))
+                    (let ((decomposition
+                           (mapcar #'(lambda (string)
+                                       (parse-integer string :radix 16))
+                                   split)))
+                      (if (= (length decomposition) 1)
+                          (cons 1 (car decomposition))
+                          (cons (length decomposition)
+                                (prog1 (fill-pointer *long-decompositions*)
+                                  (dolist (code decomposition)
+                                    (vector-push-extend code *long-decompositions*)))))))))
           (when (and (string/= "" simple-uppercase)
                      (string/= "" simple-lowercase))
             (push (list code-point upper-index lower-index) *both-cases*))
@@ -396,6 +399,43 @@
                           (byte 11 21)
                           (if entry (ucd-transform entry) 0))
                      stream))))))
+  ;; KLUDGE: this code, to write out decomposition information, is a
+  ;; little bit very similar to the ucd entries above.  Try factoring
+  ;; out the common stuff?
+  (let ((hash (make-hash-table :test #'equalp))
+        (index 0))
+    (loop for page across *decomposition-base*
+          do (when page
+               (unless (gethash page hash)
+                 (setf (gethash page hash)
+                       (prog1 index (incf index))))))
+    (let ((array (make-array index)))
+      (maphash #'(lambda (key value)
+                   (setf (aref array value) key))
+               hash)
+      (with-open-file (stream (make-pathname :name "decomp" :type "dat"
+                                             :defaults *output-directory*)
+                              :direction :output
+                              :element-type '(unsigned-byte 8)
+                              :if-exists :supersede
+                              :if-does-not-exist :create)
+        (loop for page across *decomposition-base*
+           do (write-byte (if page (gethash page hash) 0) stream))
+        (loop for page across array
+           do (loop for entry across page
+                 do (write-4-byte
+                     (dpb (if entry (car entry) 0)
+                          (byte 11 21)
+                          (if entry (cdr entry) 0))
+                     stream))))
+      (with-open-file (stream (make-pathname :name "ldecomp" :type "dat"
+                                             :defaults *output-directory*)
+                              :direction :output
+                              :element-type '(unsigned-byte 8)
+                              :if-exists :supersede
+                              :if-does-not-exist :create)
+        (loop for code across (copy-seq *long-decompositions*)
+           do (write-4-byte code stream)))))
   (with-open-file (f (make-pathname :name "ucd-names" :type "lisp-expr"
                                     :defaults *output-directory*)
                      :direction :output
