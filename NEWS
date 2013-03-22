@@ -9,7 +9,7 @@ changes relative to sbcl-1.1.5:
     forms.
   * bug fix: Prevent a make-array transform from modifying source forms
     causing problems for inlined code. Thanks to Bart Botta.
-   (regression since 1.0.42.11-bis)
+    (regression since 1.0.42.11-bis)
   * bug fix: clear-output calls the correct gray stream routine,
     sb-gray:stream-clear-output. (lp#1153257)
   * bug fix: an error is signalled for an invalid format modifier: ~<~@>.
@@ -18,7 +18,7 @@ changes relative to sbcl-1.1.5:
   * bug fix: delete-package on a nonexistent package should signal a cerror.
     (regression since 1.0.37.44).
   * bug fix: accessing &MORE (stack allocated &REST) arguments checks bounds.
-    (lp#1154946)
+    (lp#1154946, lp#1072112)
   * bug fix: compiling make-array no longer signals an error when the
     element-type is an uknown type, a warning is issued instead.
     Thanks to James Kalenius (lp#1156095)
