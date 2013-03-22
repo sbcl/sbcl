@@ -254,6 +254,9 @@
                              (+ 3 (* 8 (ucd-value-0 char))))))
     (when (< decimal-digit 10)
       decimal-digit)))
+(declaim (ftype (sfunction (t) (unsigned-byte 8)) ucd-ccc))
+(defun ucd-ccc (char)
+  (aref **character-database** (+ 2 (* 8 (ucd-value-0 char)))))
 
 (defun char-code (char)
   #!+sb-doc
@@ -617,7 +620,7 @@ character exists."
          (decompositions **character-decompositions**)
          (long-decompositions **character-long-decompositions**)
          (index (+ #x1100
-                   (ash  (aref decompositions cp-high) 10)
+                   (ash (aref decompositions cp-high) 10)
                    (ash (ldb (byte 8 0) cp) 2)))
          (v0 (aref decompositions index))
          (v1 (aref decompositions (+ index 1)))
@@ -643,3 +646,128 @@ character exists."
   (if (= (char-decomposition-info char) 0)
       (string char)
       (char-decomposition char)))
+
+(defun decompose-string (string &optional (kind :canonical))
+  (declare (type (member :canonical :compatibility) kind))
+  (flet ((canonical (char)
+           (= 1 (char-decomposition-info char)))
+         (compat (char)
+           (/= 0 (char-decomposition-info char))))
+    (let (result
+          (fun (ecase kind
+                 (:canonical #'canonical)
+                 (:compatibility #'compat))))
+      (do* ((start 0 (1+ end))
+            (end (position-if fun string :start start)
+                 (position-if fun string :start start)))
+           ((null end) (push (subseq string start end) result))
+        (unless (= start end)
+          (push (subseq string start end) result))
+        (push (decompose-char (char string end)) result))
+      (apply 'concatenate 'string (nreverse result)))))
+
+(defun sort-combiners (string)
+  (let (result (start 0) first-cc first-non-cc)
+    (tagbody
+     again
+       (setf first-cc (position 0 string :key #'ucd-ccc :test #'/= :start start))
+       (when first-cc
+         (setf first-non-cc (position 0 string :key #'ucd-ccc :test #'= :start first-cc)))
+       (push (subseq string start first-cc) result)
+       (when first-cc
+         (push (stable-sort (subseq string first-cc first-non-cc) #'< :key #'ucd-ccc) result))
+       (when first-non-cc
+         (setf start first-non-cc first-cc nil first-non-cc nil)
+         (go again)))
+    (apply 'concatenate 'string (nreverse result))))
+
+#+nil
+(defun primary-composition (char1 char2)
+  (when (and (char= char1 #\e)
+             (char= char2 #\combining_acute_accent))
+    #\latin_small_letter_e_with_acute))
+
+;;; generic sequences.  *sigh*.
+(defun lref (lstring index)
+  (dolist (l lstring)
+    (when (and (<= (first l) index)
+               (< index (second l)))
+      (return (aref (third l) (- index (first l)))))))
+(defun (setf lref) (newchar lstring index)
+  (dolist (l lstring)
+    (when (and (<= (first l) index)
+               (< index (second l)))
+      (return (setf (aref (third l) (- index (first l))) newchar)))))
+(defun llength (lstring)
+  (second (first (last lstring))))
+(defun lstring (lstring)
+  (let ((result (make-string (llength lstring))))
+    (dolist (l lstring result)
+      (replace result (third l) :start1 (first l) :end1 (second l)))))
+(defun ldelete (lstring index)
+  (do* ((ls lstring (cdr ls))
+        (l (car ls) (car ls))
+        so-fars)
+       ((and (<= (first l) index)
+             (< index (second l)))
+        (append
+         (nreverse so-fars)
+         (cond
+           ((= (first l) index)
+            (list (list (first l) (1- (second l)) (subseq (third l) 1))))
+           ((= index (1- (second l)))
+            (list (list (first l) (1- (second l)) (subseq (third l) 0 (1- (length (third l)))))))
+           (t
+            (list
+             (list (first l) index
+                   (subseq (third l) 0 (- index (first l))))
+             (list index (1- (second l))
+                   (subseq (third l) (1+ (- index (first l))))))))
+         (mapcar (lambda (x) (list (1- (first x)) (1- (second x)) (third x)))
+                 (cdr ls))))
+    (push l so-fars)))
+
+(defun canonically-compose (string)
+  (labels ()
+    (let* ((result (list (list 0 (length string) string)))
+           (previous-starter-index (position 0 string :key #'ucd-ccc))
+           (i (1+ previous-starter-index)))
+      (when (= i (length string))
+        (return-from canonically-compose string))
+      (tagbody
+       again
+         (when (and (> (- i previous-starter-index) 2)
+                    (= (ucd-ccc (lref result i)) (ucd-ccc (lref result (1- i)))))
+           (when (= (ucd-ccc (lref result i)) 0)
+             (setf previous-starter-index i))
+           (incf i)
+           (go next))
+
+         (let ((comp (primary-composition (lref result previous-starter-index)
+                                          (lref result i))))
+           (cond
+             (comp
+              (setf (lref result previous-starter-index) comp)
+              (setf result (ldelete result i)))
+             (t
+              (when (= (ucd-ccc (lref result i)) 0)
+                (setf previous-starter-index i))
+              (incf i))))
+       next
+         (unless (= i (llength result))
+           (go again)))
+      (if (= i (length string))
+          string
+          (lstring result)))))
+
+(defun normalize-string (string &optional (form :nfd))
+  (declare (type (member :nfd :nfkd :nfc :nfkc) form))
+  (etypecase string
+    (simple-base-string string)
+    ((simple-array character (*))
+     (ecase form
+       ((:nfd)
+        (sort-combiners (decompose-string string)))
+       ((:nfkd)
+        (sort-combiners (decompose-string string :compatibility)))))
+    ((simple-array nil (*)) string)))

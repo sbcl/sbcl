@@ -382,12 +382,24 @@
         (loop for (gc-index bidi-index ccc-index decimal-digit digit
                             bidi-mirrored nil decomposition-info)
               across *misc-table*
+              ;; three bits spare here
               do (write-byte gc-index stream)
+              ;; three bits spare here
               do (write-byte bidi-index stream)
               do (write-byte ccc-index stream)
+              ;; we could save some space here: decimal-digit and
+              ;; digit are constrained (CHECKME) to be between 0 and
+              ;; 9, so we could encode the pair in a single byte.
+              ;; (Also, decimal-digit is equal to digit or undefined,
+              ;; so we could encode decimal-digit as a single bit,
+              ;; meaning that we could save 11 bits here.
               do (write-byte (digit-to-byte decimal-digit) stream)
               do (write-byte (digit-to-byte digit) stream)
+              ;; there's an easy 7 bits to spare here
               do (write-byte (if (string= "N" bidi-mirrored) 0 1) stream)
+              ;; at the moment we store information about which type
+              ;; of compatibility decomposition is used, costing c.3
+              ;; bits.  We could elide that.
               do (write-byte decomposition-info stream)
               do (write-byte 0 stream))
         (loop for page across *ucd-base*
