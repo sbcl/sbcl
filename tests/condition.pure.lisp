@@ -51,6 +51,7 @@
                    (foo2 (make-condition 'error)))
                (handler-bind
                    ((error (lambda (c)
+                             (declare (ignore c))
                              (let ((restarts (remove 'res (compute-restarts foo1)
                                                      :key #'restart-name
                                                      :test-not #'eql)))
@@ -96,8 +97,11 @@
 (assert
  (eq (block nil
        (handler-bind
-           ((type-error (lambda (c) (return :failed)))
+           ((type-error (lambda (c)
+                          (declare (ignore c))
+                          (return :failed)))
             (simple-error (lambda (c)
+                            (declare (ignore c))
                             (return (if (find-restart 'continue)
                                         :passed
                                         :failed)))))
