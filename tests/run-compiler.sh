@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 platform="${SBCL_SOFTWARE_TYPE}-${SBCL_MACHINE_TYPE}"
 
@@ -13,6 +13,7 @@ case "$platform" in
     Darwin-X86)    args="-arch i386" ;;
     SunOS-X86-64)  args=-m64 ;;
     Linux-X86)     args="-m32" ;;
+    Linux-PowerPC) args="-m32" ;;
 esac
 
 while [ $# -gt 0 ]; do
@@ -24,6 +25,7 @@ while [ $# -gt 0 ]; do
                 FreeBSD-X86-64)  new=-fPIC ;;
                 Linux-MIPS)      new=-fPIC ;;
                 Linux-X86-64)    new=-fPIC ;;
+               Linux-PowerPC)   new=-fPIC ;;
                 NetBSD-PowerPC)  new=-fPIC ;;
                 NetBSD-X86-64)   new=-fPIC ;;
                 OpenBSD-PowerPC) new=-fPIC ;;
