@@ -118,8 +118,8 @@
           while line
           do (slurp-ucd-line line)))
   (second-pass)
-  (build-misc-table)
   (fixup-hangul-syllables)
+  (build-misc-table)
   (length *long-decompositions*))
 
 (defun fixup-hangul-syllables ()
@@ -145,10 +145,18 @@
       (let* ((l (+ lbase (floor sindex ncount)))
              (v (+ vbase (floor (mod sindex ncount) tcount)))
              (tee (+ tbase (mod sindex tcount)))
+             (code-point (+ sbase sindex))
              (name (format nil "HANGUL_SYLLABLE_~A~A~:[~A~;~]"
                            (gethash l table) (gethash v table)
                            (= tee tbase) (gethash tee table))))
-        (setf (gethash (+ sbase sindex) *unicode-names*) name)))))
+        (setf (gethash code-point *unicode-names*) name)
+        (unless (aref *decomposition-base* (cp-high code-point))
+          (setf (aref *decomposition-base* (cp-high code-point))
+                (make-array (ash 1 *page-size-exponent*)
+                            :initial-element nil)))
+        (setf (aref (aref *decomposition-base* (cp-high code-point))
+                    (cp-low code-point))
+              (cons (if (= tee tbase) 2 3) 0))))))
 
 (defun add-jamo-information (line table)
   (let* ((split (split-string line #\;))
@@ -159,16 +167,16 @@
 
 (defun split-string (line character)
   (loop for prev-position = 0 then (1+ position)
-        for position = (position character line :start prev-position)
-        collect (subseq line prev-position position)
-        do (unless position
-             (loop-finish))))
+     for position = (position character line :start prev-position)
+     collect (subseq line prev-position position)
+     do (unless position
+          (loop-finish))))
 
 (defun init-indices (strings)
   (let ((hash (make-hash-table :test #'equal)))
     (loop for string in strings
-          for index from 0
-          do (setf (gethash string hash) index))
+       for index from 0
+       do (setf (gethash string hash) index))
     hash))
 
 (defparameter *general-categories*
@@ -256,6 +264,17 @@
                                 (prog1 (fill-pointer *long-decompositions*)
                                   (dolist (code decomposition)
                                     (vector-push-extend code *long-decompositions*)))))))))
+          ;; Hangul decomposition; see Unicode 6.2 section 3-12
+          (when (= code-point #xd7a3)
+            ;; KLUDGE: it's a bit ugly to do this here when we've got
+            ;; a reasonable function to do this in
+            ;; (FIXUP-HANGUL-SYLLABLES).  The problem is that the
+            ;; fixup would be somewhat tedious to do, what with all
+            ;; the careful hashing of misc data going on.
+            (setf decomposition-info 1)
+            ;; the construction of *decomposition-base* entries is,
+            ;; however, easy to handle within FIXUP-HANGUL-SYLLABLES.
+            )
           (when (and (string/= "" simple-uppercase)
                      (string/= "" simple-lowercase))
             (push (list code-point upper-index lower-index) *both-cases*))
