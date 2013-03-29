@@ -1,5 +1,5 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
-changes relative to sbcl-1.1.5:
+changes in sbcl-1.1.6 relative to sbcl-1.1.5:
   * enhancement: the continuable error when defknown-ing over extant 
     fndb entries can be ignored by passing :overwrite-fndb-silently t
     as a keyword argument to sb-c:defknown (after attributes). Useful
