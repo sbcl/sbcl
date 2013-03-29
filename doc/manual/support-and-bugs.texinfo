@@ -56,17 +56,8 @@ available information - refer to the links they provide, the CREDITS
 file, mailing list archives, CVS commit messages, and so on. Please
 feel free to ask for advice on the sbcl-help list.
 
-@table @strong
-@item Steel Bank Studio Ltd
-provides commercial SBCL support and custom development, is run by
-SBCL developer @emph{Nikodemus Siivola}, and has another SBCL
-developer @emph{Richard Kreuter} as an affiliated consultant.
-
-Website: @url{http://sb-studio.net/}
-
-Email: @email{info@@sb-studio.net}
-
-@end table
+(At present, no companies or consultants wish to advertise paid support
+or custom SBCL development in this manual).
 
 @node Reporting Bugs
 @comment  node-name,  next,  previous,  up
