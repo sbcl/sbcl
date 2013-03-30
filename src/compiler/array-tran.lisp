@@ -1023,7 +1023,7 @@
 (define-source-transform svref (vector index)
   (let ((elt-type (or (when (symbolp vector)
                         (let ((var (lexenv-find vector vars)))
-                          (when var
+                          (when (lambda-var-p var)
                             (type-specifier
                              (array-type-declared-element-type (lambda-var-type var))))))
                       t)))
@@ -1036,7 +1036,7 @@
 (define-source-transform %svset (vector index value)
   (let ((elt-type (or (when (symbolp vector)
                         (let ((var (lexenv-find vector vars)))
-                          (when var
+                          (when (lambda-var-p var)
                             (type-specifier
                              (array-type-declared-element-type (lambda-var-type var))))))
                       t)))

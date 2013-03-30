@@ -1,4 +1,8 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
+changes relative to sbcl-1.1.6
+  * bug fix: svref/(setf svref) on symbol macros don't crash the compiler
+    anymore. (Minimal test case provided by James M. Lawrence on sbcl-devel)
+
 changes in sbcl-1.1.6 relative to sbcl-1.1.5:
   * enhancement: the continuable error when defknown-ing over extant 
     fndb entries can be ignored by passing :overwrite-fndb-silently t

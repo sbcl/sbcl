@@ -4378,3 +4378,8 @@
 (with-test (:name :second-open-coded)
   (let ((fun (compile nil `(lambda (x) (second x)))))
     (assert (not (ctu:find-named-callees fun)))))
+
+(with-test (:name :svref-of-symbol-macro)
+  (compile nil `(lambda (x)
+                  (symbol-macrolet ((sv x))
+                    (values (svref sv 0) (setf (svref sv 0) 99))))))
