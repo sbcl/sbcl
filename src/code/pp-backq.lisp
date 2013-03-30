@@ -96,14 +96,24 @@
   ;; stream, possibly with a space prepended.  However, this doesn't
   ;; work for pretty streams which need to do margin calculations.  Oh
   ;; well.  It was good while it lasted.  -- CSR, 2003-12-15
-  (let ((output (with-output-to-string (s)
-                  (write (cadr form) :stream s))))
-    (unless (= (length output) 0)
-      (when (and (eql (car form) 'backq-comma)
+  ;;
+  ;; This is an evil hack. If we print to a string and then print again,
+  ;; the circularity detection logic behaves as though it's already
+  ;; printed that data... and it has, to a string stream that we send
+  ;; to the bitbucket in the sky.  -- PK, 2013-03-30
+  (when (eql (car form) 'backq-comma)
+    (let ((output (with-output-to-string (s)
+                    ;; Patching evil with more evil.  The next step is
+                    ;; likely to stop the madness and unconditionally
+                    ;; insert a space.
+                    (let (*circularity-hash-table*
+                          *circularity-counter*)
+                      (write (cadr form) :stream s)))))
+      (when (and (plusp (length output))
                  (or (char= (char output 0) #\.)
                      (char= (char output 0) #\@)))
-        (write-char #\Space stream))
-      (write (cadr form) :stream stream))))
+        (write-char #\Space stream))))
+  (write (cadr form) :stream stream))
 
 ;;; This is called by !PPRINT-COLD-INIT, fairly late, because
 ;;; SET-PPRINT-DISPATCH doesn't work until the compiler works.

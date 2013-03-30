@@ -2,6 +2,8 @@
 changes relative to sbcl-1.1.6
   * bug fix: svref/(setf svref) on symbol macros don't crash the compiler
     anymore. (Minimal test case provided by James M. Lawrence on sbcl-devel)
+  * bug fix: no more bogus ## references when pretty printing backquoted
+    forms with non-trivial structure sharing. (lp#1161218)
 
 changes in sbcl-1.1.6 relative to sbcl-1.1.5:
   * enhancement: the continuable error when defknown-ing over extant 

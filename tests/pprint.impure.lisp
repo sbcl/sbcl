@@ -291,5 +291,11 @@
     (when errors
       (error "Can't PPRINT imporper lists: ~a" errors))))
 
+(with-test (:name :pprint-circular-backq-comma)
+  ;; LP 1161218 reported by James M. Lawrence
+  (let ((string (write-to-string '(let ((#1=#:var '(99)))
+                                   `(progn ,@(identity #1#)))
+                                 :circle t :pretty t)))
+    (assert (not (search "#2#" string)))))
 
 ;;; success
