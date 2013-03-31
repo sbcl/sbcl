@@ -654,6 +654,19 @@
                               :rest rest)
             exactp)))
 
+(defun compare-key-args (type1 type2)
+  (let ((keys1 (args-type-keywords type1))
+        (keys2 (args-type-keywords type2)))
+    (and (= (length keys1) (length keys2))
+         (eq (args-type-allowp type1)
+             (args-type-allowp type2))
+         (loop for key1 in keys1
+               for match = (find (key-info-name key1)
+                                 keys2 :key #'key-info-name)
+               always (and match
+                           (type= (key-info-type key1)
+                                  (key-info-type match)))))))
+
 (defun type=-args (type1 type2)
   (macrolet ((compare (comparator field)
                (let ((reader (symbolicate '#:args-type- field)))
@@ -668,7 +681,7 @@
      (and/type (and/type (compare type=-list required)
                          (compare type=-list optional))
                (if (or (args-type-keyp type1) (args-type-keyp type2))
-                   (values nil nil)
+                   (values (compare-key-args type1 type2) t)
                    (values t t))))))
 
 ;;; Do a union or intersection operation on types that might be values
