@@ -370,3 +370,10 @@
                                     (t #'shuffle))
                                   size type)
                          #'< :key #'car))))))))
+
+(with-test (:name &more-elt-index-too-large)
+  (assert (raises-error? (funcall
+                          (compile nil '(lambda (&rest args)
+                                         (declare (optimize safety))
+                                         (elt args 0))))
+                         sb-kernel:index-too-large-error)))

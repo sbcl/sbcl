@@ -4152,10 +4152,12 @@
         `(car (nthcdr ,n ,list)))))
 
 (define-source-transform elt (seq n)
-  (multiple-value-bind (context count) (possible-rest-arg-context seq)
-    (if context
-        `(%rest-ref ,n ,seq ,context ,count)
-        (values nil t))))
+  (if (policy *lexenv* (= safety 3))
+      (values nil t)
+      (multiple-value-bind (context count) (possible-rest-arg-context seq)
+        (if context
+            `(%rest-ref ,n ,seq ,context ,count)
+            (values nil t)))))
 
 ;;; CAxR -> %REST-REF
 (defun source-transform-car (list nth)
