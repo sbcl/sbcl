@@ -430,7 +430,6 @@
                                     (eq (car clause) 'ignore))))
                          (cdr decl))))
           decls))
-
 ;;; just like DOLIST, but with one-dimensional arrays
 (defmacro dovector ((elt vector &optional result) &body body)
   (multiple-value-bind (forms decls) (parse-body body :doc-string-allowed nil)
@@ -464,6 +463,19 @@
                 `(with-locked-system-table (,n-table)
                    ,iter-form)
                 iter-form))))))
+
+;;; Executes BODY for all entries of PLIST with KEY and VALUE bound to
+;;; the respective keys and values.
+(defmacro doplist ((key val) plist &body body)
+  (with-unique-names (tail)
+    `(let ((,tail ,plist) ,key ,val)
+       (loop (when (null ,tail) (return nil))
+             (setq ,key (pop ,tail))
+             (when (null ,tail)
+               (error "malformed plist, odd number of elements"))
+             (setq ,val (pop ,tail))
+             (progn ,@body)))))
+
 
 ;;;; hash cache utility
 

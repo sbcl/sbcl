@@ -31,8 +31,13 @@
   (class-slots nil :type list)
   ;; report function or NIL
   (report nil :type (or function null))
-  ;; list of alternating initargs and initforms
-  (default-initargs () :type list)
+  ;; list of specifications of the form
+  ;;
+  ;;   (INITARG INITFORM THUNK)
+  ;;
+  ;; where THUNK, when called without arguments, returns the value for
+  ;; INITARG.
+  (direct-default-initargs () :type list)
   ;; class precedence list as a list of CLASS objects, with all
   ;; non-CONDITION classes removed
   (cpl () :type list)
@@ -173,16 +178,17 @@
 (defun find-slot-default (class slot)
   (let ((initargs (condition-slot-initargs slot))
         (cpl (condition-classoid-cpl class)))
+    ;; When CLASS or a superclass has a default initarg for SLOT, use
+    ;; that.
     (dolist (class cpl)
-      (let ((default-initargs (condition-classoid-default-initargs class)))
+      (let ((direct-default-initargs
+              (condition-classoid-direct-default-initargs class)))
         (dolist (initarg initargs)
-          (let ((val (getf default-initargs initarg *empty-condition-slot*)))
-            (unless (eq val *empty-condition-slot*)
-              (return-from find-slot-default
-                           (if (functionp val)
-                               (funcall val)
-                               val)))))))
+          (let ((initfunction (third (assoc initarg direct-default-initargs))))
+            (when initfunction
+              (return-from find-slot-default (funcall initfunction)))))))
 
+    ;; Otherwise use the initform of SLOT, if there is one.
     (if (condition-slot-initform-p slot)
         (let ((initform (condition-slot-initform slot)))
           (if (functionp initform)
@@ -257,7 +263,7 @@
                           :datum type
                           :expected-type 'condition-class
                           :format-control
-                          "~s doesn't designate a condition class."
+                          "~s does not designate a condition class."
                           :format-arguments (list type)))))
          (res (make-condition-object args)))
     (setf (%instance-layout res) (classoid-layout class))
@@ -385,7 +391,7 @@
         report))
 
 (defun %define-condition (name parent-types layout slots documentation
-                          default-initargs all-readers all-writers
+                          direct-default-initargs all-readers all-writers
                           source-location)
   (with-single-package-locked-error
       (:symbol name "defining ~A as a condition")
@@ -394,9 +400,9 @@
       (setf (layout-source-location layout)
             source-location))
     (let ((class (find-classoid name)))
-      (setf (condition-classoid-slots class) slots)
-      (setf (condition-classoid-default-initargs class) default-initargs)
-      (setf (fdocumentation name 'type) documentation)
+      (setf (condition-classoid-slots class) slots
+            (condition-classoid-direct-default-initargs class) direct-default-initargs
+            (fdocumentation name 'type) documentation)
 
       (dolist (slot slots)
 
@@ -412,8 +418,8 @@
       (let ((eslots (compute-effective-slots class))
             (e-def-initargs
              (reduce #'append
-                     (mapcar #'condition-classoid-default-initargs
-                           (condition-classoid-cpl class)))))
+                     (mapcar #'condition-classoid-direct-default-initargs
+                             (condition-classoid-cpl class)))))
         (dolist (slot eslots)
           (ecase (condition-slot-allocation slot)
             (:class
@@ -430,7 +436,7 @@
              (setf (condition-slot-allocation slot) :instance)
              (when (or (functionp (condition-slot-initform slot))
                        (dolist (initarg (condition-slot-initargs slot) nil)
-                         (when (functionp (getf e-def-initargs initarg))
+                         (when (functionp (third (assoc initarg e-def-initargs)))
                            (return t))))
                (push slot (condition-classoid-hairy-slots class)))))))
       (when (boundp '*define-condition-hooks*)
@@ -462,7 +468,7 @@
          (layout (find-condition-layout name parent-types))
          (documentation nil)
          (report nil)
-         (default-initargs ()))
+         (direct-default-initargs ()))
     (collect ((slots)
               (all-readers nil append)
               (all-writers nil append))
@@ -518,10 +524,8 @@
                      :writers ',(writers)
                      :initform-p ',initform-p
                      :documentation ',documentation
-                     :initform
-                     ,(if (sb!xc:constantp initform)
-                          `',(constant-form-value initform)
-                          `#'(lambda () ,initform)))))))
+                     :initform ,(when initform-p
+                                  `#'(lambda () ,initform)))))))
 
       (dolist (option options)
         (unless (consp option)
@@ -538,15 +542,9 @@
                        `#'(lambda (condition stream)
                             (funcall #',arg condition stream))))))
           (:default-initargs
-           (do ((initargs (rest option) (cddr initargs)))
-               ((endp initargs))
-             (let ((val (second initargs)))
-               (setq default-initargs
-                     (list* `',(first initargs)
-                            (if (sb!xc:constantp val)
-                                `',(constant-form-value val)
-                                `#'(lambda () ,val))
-                            default-initargs)))))
+           (doplist (initarg initform) (rest option)
+             (push ``(,',initarg ,',initform ,#'(lambda () ,initform))
+                   direct-default-initargs)))
           (t
            (error "unknown option: ~S" (first option)))))
 
@@ -560,7 +558,7 @@
                               ',layout
                               (list ,@(slots))
                               ,documentation
-                              (list ,@default-initargs)
+                              (list ,@direct-default-initargs)
                               ',(all-readers)
                               ',(all-writers)
                               (sb!c:source-location))

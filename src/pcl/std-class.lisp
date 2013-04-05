@@ -567,18 +567,22 @@
                                      &key direct-slots direct-superclasses)
   (declare (ignore slot-names))
   (let ((classoid (find-classoid (slot-value class 'name))))
-    (with-slots (wrapper %class-precedence-list cpl-available-p
-                         prototype (direct-supers direct-superclasses))
+    (with-slots (wrapper
+                 %class-precedence-list cpl-available-p finalized-p
+                 prototype (direct-supers direct-superclasses)
+                 plist)
         class
       (setf (slot-value class 'direct-slots)
             (mapcar (lambda (pl) (make-direct-slotd class pl))
-                    direct-slots))
-      (setf (slot-value class 'finalized-p) t)
-      (setf (classoid-pcl-class classoid) class)
-      (setq direct-supers direct-superclasses)
-      (setq wrapper (classoid-layout classoid))
-      (setq %class-precedence-list (compute-class-precedence-list class))
-      (setq cpl-available-p t)
+                    direct-slots)
+            finalized-p t
+            (classoid-pcl-class classoid) class
+            direct-supers direct-superclasses
+            wrapper (classoid-layout classoid)
+            %class-precedence-list (compute-class-precedence-list class)
+            cpl-available-p t
+            (getf plist 'direct-default-initargs)
+            (sb-kernel::condition-classoid-direct-default-initargs classoid))
       (add-direct-subclasses class direct-superclasses)
       (let ((slots (compute-slots class)))
         (setf (slot-value class 'slots) slots)

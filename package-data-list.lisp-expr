@@ -1073,7 +1073,7 @@ possibly temporariliy, because it might be used internally."
 
                ;; ..and macros..
                "COLLECT"
-               "DO-ANONYMOUS" "DOHASH" "DOVECTOR"
+               "DO-ANONYMOUS" "DOVECTOR" "DOHASH" "DOPLIST"
                "NAMED-LET"
                "ONCE-ONLY"
                "DEFENUM"

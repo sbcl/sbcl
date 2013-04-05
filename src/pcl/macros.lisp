@@ -47,15 +47,6 @@
 
 (/show "pcl/macros.lisp 85")
 
-(defmacro doplist ((key val) plist &body body)
-  `(let ((.plist-tail. ,plist) ,key ,val)
-     (loop (when (null .plist-tail.) (return nil))
-           (setq ,key (pop .plist-tail.))
-           (when (null .plist-tail.)
-             (error "malformed plist, odd number of elements"))
-           (setq ,val (pop .plist-tail.))
-           (progn ,@body))))
-
 (/show "pcl/macros.lisp 101")
 
 (defmacro dolist-carefully ((var list improper-list-handler) &body body)

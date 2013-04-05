@@ -1,5 +1,9 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 changes relative to sbcl-1.1.6
+  * bug fix: CLASS-DIRECT-DEFAULT-INITARGS now works for condition classes
+    (lp#1164970)
+  * bug fix: function constants now work as initforms and default initarg
+    values of conditions (lp#539517)
   * bug fix: svref/(setf svref) on symbol macros don't crash the compiler
     anymore. (Minimal test case provided by James M. Lawrence on sbcl-devel)
   * bug fix: no more bogus ## references when pretty printing backquoted

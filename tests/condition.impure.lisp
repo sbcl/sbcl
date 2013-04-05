@@ -122,6 +122,7 @@
               (return-from restart-test-finds-restarts 42))
          :test-function
          (lambda (condition)
+           (declare (ignore condition))
            (find-restart 'qux))))
     (when (find-restart 'bar)
       (invoke-restart 'bar))))
@@ -142,3 +143,53 @@
     (assert
      (eq (eval `(define-condition ,name () ()))
          name))))
+
+;;; bug-1164970
+
+(define-condition condition-with-default-initargs (condition)
+  ()
+  (:default-initargs :foo 1))
+
+(with-test (:name (sb-mop:class-direct-default-initargs :for-condition-class
+                   :bug-1164970))
+  ;; CLASS-DIRECT-DEFAULT-INITARGS used to return nil for all
+  ;; condition classes.
+  (let ((initargs (sb-mop:class-direct-default-initargs
+                   (find-class 'condition-with-default-initargs))))
+    (assert (equal (subseq (first initargs) 0 2) '(:foo 1)))))
+
+;;; bug-539517
+
+(defconstant +error-when-called+ (lambda () (error "oops")))
+
+(define-condition condition-with-constant-function-initarg ()
+  ((foo :initarg :foo
+        :reader condition-with-constant-function-initarg-foo))
+  (:default-initargs :foo +error-when-called+))
+
+(with-test (:name (:condition-with-constant-function-initarg :bug-539517))
+  ;; The default initarg handling for condition classes used to
+  ;; confuse constant functions (thus +ERROR-WHEN-CALLED+) and
+  ;; initfunctions. This lead to +ERROR-WHEN-CALLED+ being called as
+  ;; if it was an initfunction.
+  (assert (functionp
+           (condition-with-constant-function-initarg-foo
+            (make-condition 'condition-with-constant-function-initarg))))
+  (assert (functionp
+           (condition-with-constant-function-initarg-foo
+            (make-instance 'condition-with-constant-function-initarg)))))
+
+;; Same problem
+
+(define-condition condition-with-constant-function-initform ()
+  ((foo :initarg :foo
+        :reader condition-with-constant-function-initform-foo
+        :initform +error-when-called+)))
+
+(with-test (:name (:condition-with-constant-function-slot-initform))
+  (assert (functionp
+           (condition-with-constant-function-initform-foo
+            (make-condition 'condition-with-constant-function-initform))))
+  (assert (functionp
+           (condition-with-constant-function-initform-foo
+            (make-instance 'condition-with-constant-function-initform)))))
