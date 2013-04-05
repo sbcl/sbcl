@@ -535,7 +535,8 @@
                      :initform-p ',initform-p
                      :documentation ',documentation
                      :initform ,(when initform-p
-                                  `#'(lambda () ,initform)))))))
+                                  `#'(lambda () ,initform))
+                     :allocation ',allocation)))))
 
       (dolist (option options)
         (unless (consp option)

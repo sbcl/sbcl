@@ -256,3 +256,17 @@
     (test :compile+make-instance
       (make-instance
        'condition-with-non-constant-default-initarg))))
+
+;;; bug-1049404
+
+(define-condition condition-with-class-allocation ()
+  ((count :accessor condition-with-class-allocation-count
+          :initform 0
+          :allocation :class)))
+
+(with-test (:name (:condition-with-class-allocation :bug-1049404))
+  (loop repeat 5 do
+           (incf (condition-with-class-allocation-count
+                  (make-condition 'condition-with-class-allocation))))
+  (assert (= 5 (condition-with-class-allocation-count
+                (make-condition 'condition-with-class-allocation)))))
