@@ -1925,6 +1925,8 @@ is a good idea, but see SB-SYS re. blurring of boundaries."
                "NAMESTRING-PARSE-ERROR" "NAMESTRING-PARSE-ERROR-OFFSET"
                "DESCRIBE-CONDITION" "MAKE-RESTART" "COERCE-TO-CONDITION"
 
+               "ALLOCATE-CONDITION"
+
                "CONDITION-READER-FUNCTION"
                "CONDITION-WRITER-FUNCTION"
 

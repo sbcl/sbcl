@@ -478,7 +478,7 @@
 
 ;;; FIXME: AMOP says that allocate-instance imples finalize-inheritance
 ;;; if the class is not yet finalized, but we don't seem to be taking
-;;; care of this for non-standard-classes.x
+;;; care of this for non-standard-classes.
 (defmethod allocate-instance ((class standard-class) &rest initargs)
   (declare (ignore initargs))
   (unless (class-finalized-p class)
@@ -492,11 +492,9 @@
         (funcall constructor)
         (error "Don't know how to allocate ~S" class))))
 
-;;; FIXME: It would be nicer to have allocate-instance return
-;;; uninitialized objects for conditions as well.
 (defmethod allocate-instance ((class condition-class) &rest initargs)
   (declare (ignore initargs))
-  (make-condition (class-name class)))
+  (allocate-condition (class-name class)))
 
 (defmethod allocate-instance ((class built-in-class) &rest initargs)
   (declare (ignore initargs))

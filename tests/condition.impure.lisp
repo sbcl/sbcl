@@ -193,3 +193,66 @@
   (assert (functionp
            (condition-with-constant-function-initform-foo
             (make-instance 'condition-with-constant-function-initform)))))
+
+;;; bug-
+
+(defvar bar-counter 0)
+
+(defvar baz-counter 0)
+
+(define-condition condition-with-non-constant-default-initarg ()
+  ((bar :initarg :bar
+        :reader condition-with-non-constant-default-initarg-bar)
+   (baz :initarg :baz
+        :reader condition-with-non-constant-default-initarg-baz
+        :initform (incf baz-counter)))
+  (:default-initargs :bar (incf bar-counter)))
+(define-condition condition-with-non-constant-default-initarg ()
+  ((bar :initarg :bar
+        :reader condition-with-non-constant-default-initarg-bar)
+   (baz :initarg :baz
+        :reader condition-with-non-constant-default-initarg-baz
+        :initform (incf baz-counter)))
+  (:default-initargs :bar (incf bar-counter)))
+
+(with-test (:name (:redefining-condition-with-non-constant-default-initarg
+                   :bug-1164969))
+  ;; Redefining conditions could lead to multiple evaluations of
+  ;; initfunctions for slots and default initargs. We need all the
+  ;; combinations of make-condition/instance and eval/compile because
+  ;; they failed differently.
+  (macrolet ((test (case &body body)
+               `(progn
+                  (setf bar-counter 0
+                        baz-counter 0)
+                  (let ((instance (progn ,@body)))
+                    (assert
+                     (= 1 (condition-with-non-constant-default-initarg-bar
+                           instance))
+                     nil
+                     ,(format nil "Assertion failed for default initarg initfunction for ~A"
+                              case))
+                    (assert
+                     (= 1 (condition-with-non-constant-default-initarg-baz
+                           instance))
+                     nil
+                     ,(format nil "Assertion failed for slot initfunction for ~A"
+                              case)))
+                  (assert (= 1 bar-counter))
+                  (assert (= 1 baz-counter)))))
+
+    ;; Go through EVAL to avoid optimizations.
+    (test :eval+make-condition
+      (eval '(make-condition
+              'condition-with-non-constant-default-initarg)))
+    (test :eval+make-instance
+      (eval '(make-instance
+              'condition-with-non-constant-default-initarg)))
+
+    ;; Allow optimizations.
+    (test :compile+make-condition
+      (make-condition
+       'condition-with-non-constant-default-initarg))
+    (test :compile+make-instance
+      (make-instance
+       'condition-with-non-constant-default-initarg))))

@@ -59,9 +59,6 @@
   :metaclass-constructor make-condition-classoid
   :dd-type structure)
 
-(defun make-condition-object (actual-initargs)
-  (%make-condition-object actual-initargs nil))
-
 (defstruct (condition-slot (:copier nil))
   (name (missing-arg) :type symbol)
   ;; list of all applicable initargs
@@ -239,19 +236,15 @@
 
 ;;;; MAKE-CONDITION
 
-(defun make-condition (type &rest args)
-  #!+sb-doc
-  "Make an instance of a condition object using the specified initargs."
-  ;; Note: ANSI specifies no exceptional situations in this function.
-  ;; signalling simple-type-error would not be wrong.
-  (let* ((type (or (and (symbolp type) (find-classoid type nil))
-                    type))
+(defun allocate-condition (type &rest initargs)
+  (let* ((type (if (symbolp type)
+                   (find-classoid type nil)
+                   type))
          (class (typecase type
                   (condition-classoid type)
                   (class
-                   ;; Punt to CLOS.
-                   (return-from make-condition
-                     (apply #'make-instance type args)))
+                   (return-from allocate-condition
+                     (apply #'allocate-condition (class-name type) initargs)))
                   (classoid
                    (error 'simple-type-error
                           :datum type
@@ -265,23 +258,37 @@
                           :format-control
                           "~s does not designate a condition class."
                           :format-arguments (list type)))))
-         (res (make-condition-object args)))
-    (setf (%instance-layout res) (classoid-layout class))
+         (condition (%make-condition-object initargs '())))
+    (setf (%instance-layout condition) (classoid-layout class))
+    (values condition class)))
+
+(defun make-condition (type &rest initargs)
+  #!+sb-doc
+  "Make an instance of a condition object using the specified initargs."
+  ;; Note: ANSI specifies no exceptional situations in this function.
+  ;; signalling simple-type-error would not be wrong.
+  (multiple-value-bind (condition class)
+      (apply #'allocate-condition type initargs)
+
     ;; Set any class slots with initargs present in this call.
     (dolist (cslot (condition-classoid-class-slots class))
       (dolist (initarg (condition-slot-initargs cslot))
-        (let ((val (getf args initarg *empty-condition-slot*)))
+        (let ((val (getf initargs initarg *empty-condition-slot*)))
           (unless (eq val *empty-condition-slot*)
             (setf (car (condition-slot-cell cslot)) val)))))
+
     ;; Default any slots with non-constant defaults now.
     (dolist (hslot (condition-classoid-hairy-slots class))
       (when (dolist (initarg (condition-slot-initargs hslot) t)
-              (unless (eq (getf args initarg *empty-condition-slot*)
+              (unless (eq (getf initargs initarg *empty-condition-slot*)
                           *empty-condition-slot*)
                 (return nil)))
-        (setf (getf (condition-assigned-slots res) (condition-slot-name hslot))
+        (setf (getf (condition-assigned-slots condition)
+                    (condition-slot-name hslot))
               (find-slot-default class hslot))))
-    res))
+
+    condition))
+
 
 ;;;; DEFINE-CONDITION
 
@@ -415,6 +422,7 @@
 
       ;; Compute effective slots and set up the class and hairy slots
       ;; (subsets of the effective slots.)
+      (setf (condition-classoid-hairy-slots class) '())
       (let ((eslots (compute-effective-slots class))
             (e-def-initargs
              (reduce #'append
@@ -438,6 +446,8 @@
                        (dolist (initarg (condition-slot-initargs slot) nil)
                          (when (functionp (third (assoc initarg e-def-initargs)))
                            (return t))))
+               ;; TODO temp
+               (assert (not (member slot (condition-classoid-hairy-slots class))))
                (push slot (condition-classoid-hairy-slots class)))))))
       (when (boundp '*define-condition-hooks*)
         (dolist (fun *define-condition-hooks*)

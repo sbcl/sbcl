@@ -1,5 +1,7 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 changes relative to sbcl-1.1.6
+  * bug fix: redefining conditions does not lead to multiple evaluations of
+    hairy slot initfunctions anymore (lp#1164969)
   * bug fix: CLASS-DIRECT-DEFAULT-INITARGS now works for condition classes
     (lp#1164970)
   * bug fix: function constants now work as initforms and default initarg
