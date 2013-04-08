@@ -4,9 +4,13 @@ changes relative to sbcl-1.1.6
     anymore. (Minimal test case provided by James M. Lawrence on sbcl-devel)
   * bug fix: no more bogus ## references when pretty printing backquoted
     forms with non-trivial structure sharing. (lp#1161218)
+  * bug fix: Don't signal an error on (setf (documentation nil 'function) "doc").
+    Signal a style-warning instead when trying to set documentation of NIL
+    for all other documentation types.
+    Reported by Zach Beane. Regression since 2e52fa05.
 
 changes in sbcl-1.1.6 relative to sbcl-1.1.5:
-  * enhancement: the continuable error when defknown-ing over extant 
+  * enhancement: the continuable error when defknown-ing over extant
     fndb entries can be ignored by passing :overwrite-fndb-silently t
     as a keyword argument to sb-c:defknown (after attributes). Useful
     to allow defknown to be re-loaded. Use with :allow-other-keys t

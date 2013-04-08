@@ -310,5 +310,14 @@
            (equal (documentation 'test 'function)
                   (documentation 'test2 'function)))))
 
+(with-test (:name :setf-documentation-on-nil)
+  (assert
+   (handler-case
+       (assert (equal (setf (documentation nil 'function) "foo") "foo"))
+     (style-warning () t)
+     (:no-error (x)
+       (declare (ignore x))
+       nil))))
+
 
 ;;;; success
