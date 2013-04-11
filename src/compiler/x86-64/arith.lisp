@@ -1155,6 +1155,79 @@ constant shift greater than word length")))
   (:arg-types unsigned-num (:constant (unsigned-byte 64)))
   (:info y))
 
+;; Stolen liberally from the x86 32-bit implementation.
+(macrolet ((define-logtest-vops ()
+             `(progn
+               ,@(loop for suffix in '(/fixnum -c/fixnum
+                                       /signed -c/signed
+                                       /unsigned -c/unsigned)
+                       for cost in '(4 3 6 5 6 5)
+                       collect
+                       `(define-vop (,(symbolicate "FAST-LOGTEST" suffix)
+                                     ,(symbolicate "FAST-CONDITIONAL" suffix))
+                         (:translate logtest)
+                         (:conditional :ne)
+                         (:generator ,cost
+                          (emit-optimized-test-inst x
+                           ,(if (eq suffix '-c/fixnum)
+                                ;; See whether (fixnumize y) fits in signed 32
+                                ;; to avoid chip's sign-extension of imm32 val.
+                                `(if (typep y 'short-tagged-num)
+                                     (fixnumize y)
+                                     (register-inline-constant :qword (fixnumize y)))
+                                `(cond ((typep y '(signed-byte 32)) ; same
+                                        y)
+                                       ((typep y '(or (unsigned-byte 64) (signed-byte 64)))
+                                        (register-inline-constant :qword y))
+                                       (t
+                                        y))))))))))
+  (define-logtest-vops))
+
+(defknown %logbitp (integer unsigned-byte) boolean
+  (movable foldable flushable always-translatable))
+
+;;; only for constant folding within the compiler
+(defun %logbitp (integer index)
+  (logbitp index integer))
+
+;;; too much work to do the non-constant case (maybe?)
+(define-vop (fast-logbitp-c/fixnum fast-conditional-c/fixnum)
+  (:translate %logbitp)
+  (:conditional :c)
+  (:arg-types tagged-num (:constant (integer 0 #.(- 63 n-fixnum-tag-bits))))
+  (:generator 4
+    (inst bt x (+ y n-fixnum-tag-bits))))
+
+(define-vop (fast-logbitp/signed fast-conditional/signed)
+  (:args (x :scs (signed-reg signed-stack))
+         (y :scs (signed-reg)))
+  (:translate %logbitp)
+  (:conditional :c)
+  (:generator 6
+    (inst bt x y)))
+
+(define-vop (fast-logbitp-c/signed fast-conditional-c/signed)
+  (:translate %logbitp)
+  (:conditional :c)
+  (:arg-types signed-num (:constant (integer 0 63)))
+  (:generator 5
+    (inst bt x y)))
+
+(define-vop (fast-logbitp/unsigned fast-conditional/unsigned)
+  (:args (x :scs (unsigned-reg unsigned-stack))
+         (y :scs (unsigned-reg)))
+  (:translate %logbitp)
+  (:conditional :c)
+  (:generator 6
+    (inst bt x y)))
+
+(define-vop (fast-logbitp-c/unsigned fast-conditional-c/unsigned)
+  (:translate %logbitp)
+  (:conditional :c)
+  (:arg-types unsigned-num (:constant (integer 0 63)))
+  (:generator 5
+    (inst bt x y)))
+
 (macrolet ((define-conditional-vop (tran cond unsigned not-cond not-unsigned)
              `(progn
                 ,@(mapcar

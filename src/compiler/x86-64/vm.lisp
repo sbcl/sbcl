@@ -555,5 +555,33 @@
 (def!constant cfp-offset rbp-offset) ; pfw - needed by stuff in /code
 
 (!def-vm-support-routine combination-implementation-style (node)
-  (declare (type sb!c::combination node) (ignore node))
-  (values :default nil))
+  (declare (type sb!c::combination node))
+  (flet ((valid-funtype (args result)
+           (sb!c::valid-fun-use node
+                                (sb!c::specifier-type
+                                 `(function ,args ,result)))))
+    (case (sb!c::combination-fun-source-name node)
+      (logtest
+       (cond
+         ((or (valid-funtype '(fixnum fixnum) '*)
+              ;; todo: nothing prevents this from testing an unsigned word against
+              ;; a signed word, except for the mess of VOPs it would demand
+              (valid-funtype '((signed-byte 64) (signed-byte 64)) '*)
+              (valid-funtype '((unsigned-byte 64) (unsigned-byte 64)) '*))
+          (values :direct nil))
+         (t
+          (values :default nil))))
+      (logbitp
+       (cond
+         ((or (and (valid-funtype '#.`((integer 0 ,(- 63 n-fixnum-tag-bits))
+                                       fixnum) '*)
+                   (sb!c::constant-lvar-p
+                    (first (sb!c::basic-combination-args node))))
+              (valid-funtype '((integer 0 63) (signed-byte 64)) '*)
+              (valid-funtype '((integer 0 63) (unsigned-byte 64)) '*))
+          (values :transform '(lambda (index integer)
+                               (%logbitp integer index))))
+         (t
+          (values :default nil))))
+      (t
+       (values :default nil)))))

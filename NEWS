@@ -8,6 +8,7 @@ changes relative to sbcl-1.1.6
     Signal a style-warning instead when trying to set documentation of NIL
     for all other documentation types.
     Reported by Zach Beane. Regression since 2e52fa05.
+  * LOGBITP and LOGTEST optimizations from x86 ported to x86_64.
 
 changes in sbcl-1.1.6 relative to sbcl-1.1.5:
   * enhancement: the continuable error when defknown-ing over extant
