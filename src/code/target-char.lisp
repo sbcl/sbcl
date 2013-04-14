@@ -709,7 +709,21 @@ character exists."
              (char= char2 #\combining_acute_accent))
     #\latin_small_letter_e_with_acute))
 
-;;; generic sequences.  *sigh*.
+;;; This implements a sequence data structure, specialized for
+;;; efficient deletion of characters at an index, along with tolerable
+;;; random access.  The purpose is to support the canonical
+;;; composition algorithm from Unicode, which involves replacing (not
+;;; necessarily consecutive) pairs of code points with a single code
+;;; point (e.g. [#\e #\combining_acute_accent] with
+;;; #\latin_small_letter_e_with_acute).  The data structure is a list
+;;; of three-element lists, each denoting a chunk of string data
+;;; starting at the first index and ending at the second.
+;;;
+;;; Actually, the implementation isn't particularly efficient, and
+;;; would probably benefit from being rewritten in terms of displaced
+;;; arrays, which would substantially reduce copying.
+;;;
+;;; (also, generic sequences.  *sigh*.)
 (defun lref (lstring index)
   (dolist (l lstring)
     (when (and (<= (first l) index)
