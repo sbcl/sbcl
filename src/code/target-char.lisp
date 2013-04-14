@@ -773,7 +773,9 @@ character exists."
       (tagbody
        again
          (when (and (> (- i previous-starter-index) 2)
-                    (= (ucd-ccc (lref result i)) (ucd-ccc (lref result (1- i)))))
+                    ;; test for Blocked (Unicode 3.11 para. D115)
+                    (>= (ucd-ccc (lref result (1- i)))
+                        (ucd-ccc (lref result i))))
            (when (= (ucd-ccc (lref result i)) 0)
              (setf previous-starter-index i))
            (incf i)
