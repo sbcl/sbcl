@@ -446,8 +446,6 @@
                        (dolist (initarg (condition-slot-initargs slot) nil)
                          (when (functionp (third (assoc initarg e-def-initargs)))
                            (return t))))
-               ;; TODO temp
-               (assert (not (member slot (condition-classoid-hairy-slots class))))
                (push slot (condition-classoid-hairy-slots class)))))))
       (when (boundp '*define-condition-hooks*)
         (dolist (fun *define-condition-hooks*)
