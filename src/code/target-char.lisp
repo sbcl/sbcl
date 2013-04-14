@@ -799,11 +799,12 @@ character exists."
 (defun normalize-string (string &optional (form :nfd))
   (declare (type (member :nfd :nfkd :nfc :nfkc) form))
   (etypecase string
-    (simple-base-string string)
-    ((simple-array character (*))
+    #!+sb-unicode
+    (base-string string)
+    ((or (array character (*)) #!-sb-unicode base-string)
      (ecase form
        ((:nfd)
         (sort-combiners (decompose-string string)))
        ((:nfkd)
         (sort-combiners (decompose-string string :compatibility)))))
-    ((simple-array nil (*)) string)))
+    ((array nil (*)) string)))
