@@ -39,8 +39,6 @@
 #define BREAKPOINT_WIDTH 2
 #endif
 
-unsigned long fast_random_state = 1;
-
 void arch_init(void)
 {}
 
