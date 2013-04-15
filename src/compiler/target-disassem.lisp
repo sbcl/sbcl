@@ -1428,7 +1428,7 @@
            (type stream stream)
            (type disassem-state dstate))
   (unless (null segments)
-    (format t "~&; Size: ~a bytes"
+    (format stream "~&; Size: ~a bytes"
             (reduce #'+ segments :key #'seg-length))
     (let ((first (car segments))
           (last (car (last segments))))
