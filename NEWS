@@ -1,5 +1,7 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 changes relative to sbcl-1.1.6
+  * enhancement: TRACE :PRINT-ALL handles multiple-valued forms.
+    (lp#457053)
   * bug fix: :allocation slot option works for condition slots
     (lp#1049404)
   * bug fix: redefining conditions does not lead to multiple evaluations of

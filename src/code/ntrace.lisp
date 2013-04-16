@@ -220,7 +220,9 @@
   (dolist (ele forms)
     (fresh-line)
     (print-trace-indentation)
-    (format t "~@<~S ~_= ~S~:>" (car ele) (funcall (cdr ele) frame))
+    (format t "~@<~S ~_= ~:[; No values~;~:*~{~S~^, ~}~]~:>"
+            (car ele)
+            (multiple-value-list (funcall (cdr ele) frame)))
     (terpri)))
 
 ;;; Test a BREAK option, and if true, break.
