@@ -426,6 +426,13 @@
         (loop for page across array
            do (loop for entry across page
                  do (write-4-byte
+                     ;; KLUDGE: while tests indicate that this works
+                     ;; by accident, actually this causes lookups on
+                     ;; characters undefined by Unicode (e.g. U+2FB00)
+                     ;; to zoom off into unrelated bits of
+                     ;; **CHARACTER-DATABASE** (see UCD-VALUE-[01] in
+                     ;; src/code/target-char.lisp).  It would be good
+                     ;; to make this work deliberately.
                      (dpb (if entry (aref *misc-mapping* (ucd-misc entry)) #x7ff)
                           (byte 11 21)
                           (if entry (ucd-transform entry) 0))
