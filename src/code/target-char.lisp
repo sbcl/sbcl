@@ -685,7 +685,14 @@ character exists."
            ((null end) (push (subseq string start end) result))
         (unless (= start end)
           (push (subseq string start end) result))
-        (push (decompose-char (char string end)) result))
+        ;; FIXME: this recursive call to DECOMPOSE-STRING is necessary
+        ;; for correctness given our direct encoding of the
+        ;; decomposition data in UnicodeData.txt.  It would, however,
+        ;; be straightforward enough to perform the recursion in table
+        ;; construction, and then have this simply revert to a single
+        ;; lookup.  (Wait for tests to be hooked in, then implement).
+        (push (decompose-string (decompose-char (char string end)) kind)
+              result))
       (apply 'concatenate 'string (nreverse result)))))
 
 (defun sort-combiners (string)
