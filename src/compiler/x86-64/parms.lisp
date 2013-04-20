@@ -20,7 +20,7 @@
 ;;; and register specs, we use the Intel convention. But whenever we
 ;;; are talking about stuff the rest of the lisp system might be
 ;;; interested in, we use ``word'' to mean the size of a descriptor
-;;; object, which is 32 bits.
+;;; object, which is 64 bits.
 
 ;;;; machine architecture parameters
 

@@ -2639,6 +2639,7 @@ core and return a descriptor to it."
          (code-object (pop-stack))
          (len (read-byte-arg))
          (sym (make-string len)))
+    #!-sb-dynamic-core (declare (ignore code-object))
     (read-string-as-bytes *fasl-input-stream* sym)
     #!+sb-dynamic-core
     (let ((offset (read-word-arg))
