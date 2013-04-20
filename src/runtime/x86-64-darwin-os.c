@@ -574,6 +574,9 @@ catch_exception_raise(mach_port_t exception_port,
         ret = KERN_INVALID_RIGHT;
     }
 
+    if (current_mach_task == MACH_PORT_NULL)
+        current_mach_task = mach_task_self();
+
     dealloc_ret = mach_port_deallocate (current_mach_task, thread);
     if (dealloc_ret) {
       lose("mach_port_deallocate (thread) failed with return_code %d\n", dealloc_ret);
