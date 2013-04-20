@@ -4383,3 +4383,17 @@
   (compile nil `(lambda (x)
                   (symbol-macrolet ((sv x))
                     (values (svref sv 0) (setf (svref sv 0) 99))))))
+
+;; The compiler used to update the receiving LVAR's type too
+;; aggressively when converting a large constant to a smaller
+;; (potentially signed) one, causing other branches to be
+;; inferred as dead.
+(with-test (:name :modular-cut-constant-to-width)
+  (let ((test (compile nil
+                       `(lambda (x)
+                          (logand 254
+                                  (case x
+                                    ((3) x)
+                                    ((2 2 0 -2 -1 2) 9223372036854775803)
+                                    (t 358458651)))))))
+    (assert (= (funcall test -10470605025) 26))))
