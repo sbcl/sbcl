@@ -1,11 +1,5 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 changes relative to sbcl-1.1.6
-  * bug fix: modular arithmetic involving large constants and conditionals
-    should no longer result in spurious dead code elimination. Reported by 
-    Eric Marsden on sbcl-devel.
-  * bug fix: our mach exception handler can seemingly called very early in
-    the program execution process on OS X 10.8.0. Try and handle that case
-    robustly, without potentially leaking mach ports too much.
   * enhancement: TRACE :PRINT-ALL handles multiple-valued forms.
     (lp#457053)
   * bug fix: :allocation slot option works for condition slots
@@ -20,11 +14,17 @@ changes relative to sbcl-1.1.6
     anymore. (Minimal test case provided by James M. Lawrence on sbcl-devel)
   * bug fix: no more bogus ## references when pretty printing backquoted
     forms with non-trivial structure sharing. (lp#1161218)
-  * bug fix: Don't signal an error on (setf (documentation nil 'function) "doc").
-    Signal a style-warning instead when trying to set documentation of NIL
-    for all other documentation types.
-    Reported by Zach Beane. Regression since 2e52fa05.
-  * LOGBITP and LOGTEST optimizations from x86 ported to x86_64.
+  * bug fix: Don't signal an error on (setf (documentation nil 'function)
+    "doc").  Signal a style-warning instead when trying to set documentation
+    of NIL for all other documentation types.  (Reported by Zach
+    Beane; regression since 2e52fa05.)
+  * bug fix: modular arithmetic involving large constants and conditionals
+    should no longer result in spurious dead code elimination.  (Reported by 
+    Eric Marsden).
+  * bug fix: our mach exception handler can seemingly called very early in
+    the program execution process on OS X 10.8.0. Try and handle that case
+    robustly, without potentially leaking mach ports too much.
+  * optimization: LOGBITP and LOGTEST optimizations from x86 ported to x86_64.
 
 changes in sbcl-1.1.6 relative to sbcl-1.1.5:
   * enhancement: the continuable error when defknown-ing over extant
