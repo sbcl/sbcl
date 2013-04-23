@@ -613,7 +613,8 @@ elif [ "$sbcl_arch" = "mips" ]; then
     printf ' :stack-allocatable-lists :stack-allocatable-fixed-objects' >> $ltf
     printf ' :alien-callbacks' >> $ltf
 elif [ "$sbcl_arch" = "ppc" ]; then
-    printf ' :gencgc :stack-allocatable-closures :stack-allocatable-lists' >> $ltf
+    printf ' :gencgc :stack-allocatable-closures' >> $ltf
+    printf ' :stack-allocatable-lists :stack-allocatable-fixed-objects' >> $ltf
     printf ' :linkage-table :raw-instance-init-vops :memory-barrier-vops' >> $ltf
     printf ' :compare-and-swap-vops :multiply-high-vops' >> $ltf
     if [ "$sbcl_os" = "linux" ]; then

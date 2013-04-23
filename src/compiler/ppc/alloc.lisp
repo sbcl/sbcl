@@ -177,12 +177,14 @@
 (define-vop (fixed-alloc)
   (:args)
   (:info name words type lowtag stack-allocate-p)
-  (:ignore name stack-allocate-p)
+  (:ignore name)
   (:results (result :scs (descriptor-reg)))
   (:temporary (:scs (non-descriptor-reg)) temp)
   (:temporary (:sc non-descriptor-reg :offset nl3-offset) pa-flag)
   (:generator 4
-    (with-fixed-allocation (result pa-flag temp type words :lowtag lowtag)
+    (with-fixed-allocation (result pa-flag temp type words
+                                   :lowtag lowtag
+                                   :stack-allocate-p stack-allocate-p)
       )))
 
 (define-vop (var-alloc)

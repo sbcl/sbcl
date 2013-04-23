@@ -265,7 +265,8 @@
        (inst ori ,result-tn ,result-tn ,lowtag)))
 
 (defmacro with-fixed-allocation ((result-tn flag-tn temp-tn type-code size
-                                            &key (lowtag other-pointer-lowtag))
+                                            &key (lowtag other-pointer-lowtag)
+                                                 stack-allocate-p)
                                  &body body)
   "Do stuff to allocate an other-pointer object of fixed Size with a single
   word header having the specified Type-Code.  The result is placed in
@@ -275,9 +276,14 @@
   (once-only ((result-tn result-tn) (temp-tn temp-tn) (flag-tn flag-tn)
               (type-code type-code) (size size) (lowtag lowtag))
     `(pseudo-atomic (,flag-tn)
-       (allocation ,result-tn (pad-data-block ,size) ,lowtag
-                   :temp-tn ,temp-tn
-                   :flag-tn ,flag-tn)
+       (if ,stack-allocate-p
+           (progn
+             (align-csp ,temp-tn)
+             (inst ori ,result-tn csp-tn ,lowtag)
+             (inst addi csp-tn csp-tn (pad-data-block ,size)))
+         (allocation ,result-tn (pad-data-block ,size) ,lowtag
+                     :temp-tn ,temp-tn
+                     :flag-tn ,flag-tn))
        (when ,type-code
          (inst lr ,temp-tn (logior (ash (1- ,size) n-widetag-bits) ,type-code))
          (storew ,temp-tn ,result-tn 0 ,lowtag))
