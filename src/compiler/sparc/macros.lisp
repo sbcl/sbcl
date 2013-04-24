@@ -372,4 +372,5 @@ garbage collection.  This is currently implemented by disabling GC"
     ,@body)
   #!+gencgc
   `(let ((*pinned-objects* (list* ,@objects *pinned-objects*)))
+     (declare (truly-dynamic-extent *pinned-objects*))
      ,@body))
