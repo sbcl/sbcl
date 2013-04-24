@@ -633,6 +633,21 @@
 (with-test (:name (:no-consing :hash-tables) :fails-on '(and :ppc :sb-thread))
   (assert-no-consing (test-hash-table)))
 
+;;; Both with-pinned-objects and without-gcing should not cons
+
+(defun call-without-gcing (fun)
+  (sb-sys:without-gcing (funcall fun)))
+
+(defun call-with-pinned-object (fun obj)
+  (sb-sys:with-pinned-objects (obj)
+    (funcall fun obj)))
+
+(with-test (:name (:no-consing :without-gcing))
+  (assert-no-consing (call-without-gcing (lambda ()))))
+
+(with-test (:name (:no-consing :with-pinned-objects))
+  (assert-no-consing (call-with-pinned-object #'identity 42)))
+
 ;;; with-mutex should use DX and not cons
 
 (defvar *mutex* (sb-thread::make-mutex :name "mutexlock"))
