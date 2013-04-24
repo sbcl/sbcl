@@ -4130,6 +4130,9 @@ gencgc_pickup_dynamic(void)
     void *alloc_ptr = (void *)get_alloc_pointer();
     lispobj *prev=(lispobj *)page_address(page);
     generation_index_t gen = PSEUDO_STATIC_GENERATION;
+
+    bytes_allocated = 0;
+
     do {
         lispobj *first,*ptr= (lispobj *)page_address(page);
 
@@ -4143,6 +4146,8 @@ gencgc_pickup_dynamic(void)
           page_table[page].write_protected_cleared = 0;
           page_table[page].dont_move = 0;
           page_table[page].need_to_zero = 1;
+
+          bytes_allocated += GENCGC_CARD_BYTES;
         }
 
         if (!gencgc_partial_pickup) {
@@ -4158,8 +4163,7 @@ gencgc_pickup_dynamic(void)
 
     last_free_page = page;
 
-    generations[gen].bytes_allocated = npage_bytes(page);
-    bytes_allocated = npage_bytes(page);
+    generations[gen].bytes_allocated = bytes_allocated;
 
     gc_alloc_update_all_page_tables();
     write_protect_generation_pages(gen);
