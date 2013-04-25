@@ -585,7 +585,6 @@
 
 (with-test (:name (:no-consing :dx-vectors) :skipped-on '(not :stack-allocatable-vectors))
   (assert-no-consing (force-make-array-on-stack 128))
-  (assert-no-consing (make-array-on-stack-1))
   (assert-no-consing (make-array-on-stack-2 5 '(1 2.0 3 4.0 5)))
   (assert-no-consing (make-array-on-stack-3 9 8 7))
   (assert-no-consing (make-array-on-stack-4))
@@ -596,6 +595,7 @@
             :fails-on :x86
             :skipped-on `(not (and :stack-allocatable-vectors
                                    :c-stack-is-control-stack)))
+  (assert-no-consing (make-array-on-stack-1))
   (assert-no-consing (make-array-on-stack-6))
   (assert-no-consing (make-array-on-stack-7))
   (assert-no-consing (make-array-on-stack-8))
