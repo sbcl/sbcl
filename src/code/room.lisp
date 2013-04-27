@@ -69,52 +69,17 @@
       (make-room-info :name 'closure
                       :kind :closure))
 
-;; FIXME: This looks rather brittle. Can we get more of these numbers
-;; from somewhere sensible?
-(dolist (stuff '((simple-bit-vector-widetag . -3)
-                 (simple-vector-widetag . #.sb!vm:word-shift)
-                 (simple-array-unsigned-byte-2-widetag . -2)
-                 (simple-array-unsigned-byte-4-widetag . -1)
-                 (simple-array-unsigned-byte-7-widetag . 0)
-                 (simple-array-unsigned-byte-8-widetag . 0)
-                 (simple-array-unsigned-byte-15-widetag . 1)
-                 (simple-array-unsigned-byte-16-widetag . 1)
-                 (simple-array-unsigned-byte-31-widetag . 2)
-                 (simple-array-unsigned-byte-32-widetag . 2)
-                 (simple-array-unsigned-fixnum-widetag . #.sb!vm:word-shift)
-                 (simple-array-unsigned-byte-63-widetag . 3)
-                 (simple-array-unsigned-byte-64-widetag . 3)
-                 (simple-array-signed-byte-8-widetag . 0)
-                 (simple-array-signed-byte-16-widetag . 1)
-                 (simple-array-fixnum-widetag . #.sb!vm:word-shift)
-                 (simple-array-signed-byte-32-widetag . 2)
-                 (simple-array-signed-byte-64-widetag . 3)
-                 (simple-array-single-float-widetag . 2)
-                 (simple-array-double-float-widetag . 3)
-                 (simple-array-complex-single-float-widetag . 3)
-                 (simple-array-complex-double-float-widetag . 4)))
-  (let* ((name (car stuff))
-         (size (cdr stuff))
-         (sname (string name)))
-    (when (boundp name)
-      (setf (svref *meta-room-info* (symbol-value name))
-            (make-room-info :name (intern (subseq sname
-                                                  0
-                                                  (mismatch sname "-WIDETAG"
-                                                            :from-end t)))
-                            :kind :vector
-                            :length size)))))
-
-(setf (svref *meta-room-info* simple-base-string-widetag)
-      (make-room-info :name 'simple-base-string
-                      :kind :string
-                      :length 0))
-
-#!+sb-unicode
-(setf (svref *meta-room-info* simple-character-string-widetag)
-      (make-room-info :name 'simple-character-string
-                      :kind :string
-                      :length 2))
+(dotimes (i (length *specialized-array-element-type-properties*))
+  (let* ((saetp (aref *specialized-array-element-type-properties* i))
+         (array-kind (if (characterp (saetp-initial-element-default saetp))
+                         :string
+                         :vector))
+        (element-shift (- (integer-length (saetp-n-bits saetp)) 4)))
+    (when (saetp-specifier saetp) ;; SIMPLE-ARRAY-NIL is a special case.
+      (setf (svref *meta-room-info* (saetp-typecode saetp))
+            (make-room-info :name (saetp-primitive-type-name saetp)
+                            :kind array-kind
+                            :length element-shift)))))
 
 (setf (svref *meta-room-info* simple-array-nil-widetag)
       (make-room-info :name 'simple-array-nil
