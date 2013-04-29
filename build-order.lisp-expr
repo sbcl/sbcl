@@ -518,6 +518,7 @@
  ("src/compiler/float-tran")
  ("src/compiler/saptran")
  ("src/compiler/srctran")
+ ("src/compiler/bitops-derive-type")
  ("src/compiler/generic/vm-tran")
  ("src/compiler/locall")
  ("src/compiler/dfo")
