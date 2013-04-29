@@ -349,9 +349,10 @@ process to continue normally."
   (setf sb!alien::*default-c-string-external-format* nil)
   ;; WITHOUT-GCING implies WITHOUT-INTERRUPTS.
   (without-gcing
+    ;; Initialize streams first, so that any errors can be printed later
+    (stream-reinit t)
     (os-cold-init-or-reinit)
     (thread-init-or-reinit)
-    (stream-reinit t)
     #!-(and win32 (not sb-thread))
     (signal-cold-init-or-reinit)
     (setf (sb!alien:extern-alien "internal_errors_enabled" boolean) t)

@@ -410,11 +410,10 @@ corresponds to NAME, or NIL if there is none."
   ;; helpful, either, as Solaris doesn't export PATH_MAX from
   ;; unistd.h.
   ;;
-  ;; FIXME: The (,stub,) nastiness produces an error message about a
-  ;; comma not inside a backquote. This error has absolutely nothing
-  ;; to do with the actual meaning of the error (and little to do with
-  ;; its location, either).
-  #!-(or linux openbsd freebsd netbsd sunos osf1 darwin hpux win32) (,stub,)
+  ;; Signal an error at compile-time, since it's needed for the
+  ;; runtime to start up
+  #!-(or linux openbsd freebsd netbsd sunos osf1 darwin hpux win32)
+  #.(error "POSIX-GETCWD is not implemented.")
   #!+(or linux openbsd freebsd netbsd sunos osf1 darwin hpux win32)
   (or (newcharstar-string (alien-funcall (extern-alien "getcwd"
                                                        (function (* char)
