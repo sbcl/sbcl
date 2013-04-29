@@ -497,7 +497,8 @@ any non-negative real number."
 
     ;; Delete all the options that we processed, so that only
     ;; user-level options are left visible to user code.
-    (setf (rest *posix-argv*) options)
+    (when *posix-argv*
+      (setf (rest *posix-argv*) options))
 
     ;; Disable debugger before processing initialization files & co.
     (when disable-debugger

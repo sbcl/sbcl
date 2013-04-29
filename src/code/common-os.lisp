@@ -25,18 +25,18 @@
                                     &key default
                                          explanation
                                          (condition 'error))
-  `(handler-case
-       (setf ,variable ,form)
-     (,condition (c)
-       (let ((default ,default))
-         (warn "Error initializing ~a~@[ ~a~]:~@
+  `(setf ,variable
+         (handler-case ,form
+           (,condition (c)
+             (let ((default ,default))
+               (warn "Error initializing ~a~@[ ~a~]:~@
              ~a
              ~% Using ~s instead."
-               ',variable
-               ,explanation
-               c
-               default)
-         default))))
+                     ',variable
+                     ,explanation
+                     c
+                     default)
+               default)))))
 
 ;;; If something ever needs to be done differently for one OS, then
 ;;; split out the different part into per-os functions.
