@@ -1406,31 +1406,66 @@ the first."
            ((fixnum bignum)
             (bignum-gcd (make-small-bignum u) v))))))
 
-;;;; from Robert Smith; slightly changed not to cons unnecessarily.
+;;; from Robert Smith; changed not to cons unnecessarily, and tuned for
+;;; faster operation on fixnum inputs by compiling the central recursive
+;;; algorithm twice, once using generic and once fixnum arithmetic, and
+;;; dispatching on function entry into the applicable part. For maximum
+;;; speed, the fixnum part recurs into itself, thereby avoiding further
+;;; type dispatching. This pattern is not supported by NUMBER-DISPATCH
+;;; thus some special-purpose macrology is needed.
 (defun isqrt (n)
   #!+sb-doc
   "Return the greatest integer less than or equal to the square root of N."
   (declare (type unsigned-byte n))
-  (cond
-    ((> n 24)
-     (let* ((n-fourth-size (ash (1- (integer-length n)) -2))
-            (n-significant-half (ash n (- (ash n-fourth-size 1))))
-            (n-significant-half-isqrt (isqrt n-significant-half))
-            (zeroth-iteration (ash n-significant-half-isqrt n-fourth-size)))
-       (multiple-value-bind (quot rem)
-           (floor n zeroth-iteration)
-         (let ((first-iteration (ash (+ zeroth-iteration quot) -1)))
-           (cond ((oddp quot)
-                  first-iteration)
-                 ((> (expt (- first-iteration zeroth-iteration) 2) rem)
-                  (1- first-iteration))
-                 (t
-                  first-iteration))))))
-    ((> n 15) 4)
-    ((> n  8) 3)
-    ((> n  3) 2)
-    ((> n  0) 1)
-    ((= n  0) 0)))
+  (macrolet
+      ((isqrt-recursion (arg recurse fixnum-p)
+         ;; Expands into code for the recursive step of the ISQRT
+         ;; calculation. ARG is the input variable and RECURSE the name
+         ;; of the function to recur into. If FIXNUM-P is true, some
+         ;; type declarations are added that, together with ARG being
+         ;; declared as a fixnum outside of here, make the resulting code
+         ;; compile into fixnum-specialized code without any calls to
+         ;; generic arithmetic. Else, the code works for bignums, too.
+         ;; The input must be at least 16 to ensure that RECURSE is called
+         ;; with a strictly smaller number and that the result is correct
+         ;; (provided that RECURSE correctly implements ISQRT, itself).
+         `(macrolet ((if-fixnum-p-truly-the (type expr)
+                       ,@(if fixnum-p
+                             '(`(truly-the ,type ,expr))
+                             '((declare (ignore type))
+                               expr))))
+            (let* ((fourth-size (ash (1- (integer-length ,arg)) -2))
+                   (significant-half (ash ,arg (- (ash fourth-size 1))))
+                   (significant-half-isqrt
+                    (if-fixnum-p-truly-the
+                     (integer 1 #.(isqrt sb!xc:most-positive-fixnum))
+                     (,recurse significant-half)))
+                   (zeroth-iteration (ash significant-half-isqrt
+                                          fourth-size)))
+              (multiple-value-bind (quot rem)
+                  (floor ,arg zeroth-iteration)
+                (let ((first-iteration (ash (+ zeroth-iteration quot) -1)))
+                  (cond ((oddp quot)
+                         first-iteration)
+                        ((> (if-fixnum-p-truly-the
+                             fixnum
+                             (expt (- first-iteration zeroth-iteration) 2))
+                            rem)
+                         (1- first-iteration))
+                        (t
+                         first-iteration))))))))
+    (typecase n
+      (fixnum (labels ((fixnum-isqrt (n)
+                         (declare (type fixnum n))
+                         (cond ((> n 24)
+                                (isqrt-recursion n fixnum-isqrt t))
+                               ((> n 15) 4)
+                               ((> n  8) 3)
+                               ((> n  3) 2)
+                               ((> n  0) 1)
+                               ((= n  0) 0))))
+                (fixnum-isqrt n)))
+      (bignum (isqrt-recursion n isqrt nil)))))
 
 ;;;; miscellaneous number predicates
 

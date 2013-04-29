@@ -576,6 +576,8 @@
                (test x2)
                (test (1+ x2))
                (test (1- x2)))))
+    (test most-positive-fixnum)
+    (test (1+ most-positive-fixnum))
     (loop for i from 1 to 200
           for pow = (expt 2 (1- i))
           for j = (+ pow (random pow))
