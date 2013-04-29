@@ -241,36 +241,58 @@
 ;;; (In fact, this is such a fearsome loop that executing it with the
 ;;; evaluator would take ages... Disable it under those circumstances.)
 #+#.(cl:if (cl:eq sb-ext:*evaluator-mode* :compile) '(and) '(or))
-(let* ((bits 5)
-       (size (ash 1 bits)))
-  (flet ((brute-force (a b c d op minimize)
-           (loop with extreme = (if minimize (ash 1 bits) 0)
-                 with collector = (if minimize #'min #'max)
-                 for i from a upto b do
-                 (loop for j from c upto d do
-                       (setf extreme (funcall collector
-                                              extreme
-                                              (funcall op i j))))
-                 finally (return extreme))))
-    (dolist (op '(logand logior logxor))
-      (dolist (minimize '(t nil))
-        (let ((deriver (intern (format nil "~A-DERIVE-UNSIGNED-~:[HIGH~;LOW~]-BOUND"
-                                       op minimize)
+(with-test (:name (:type-derivation :logical-operations :correctness))
+  (let* ((n-bits 5)
+         (size (ash 1 n-bits)))
+    (labels ((brute-force (a b c d op)
+               (loop with min = (ash 1 n-bits)
+                     with max = 0
+                     for i from a upto b do
+                     (loop for j from c upto d do
+                           (let ((x (funcall op i j)))
+                             (setf min (min min x)
+                                   max (max max x))))
+                     finally (return (values min max))))
+             (test (a b c d op deriver)
+               (multiple-value-bind (brute-low brute-high)
+                   (brute-force a b c d op)
+                 (multiple-value-bind (test-low test-high)
+                     (funcall deriver
+                              (sb-c::specifier-type `(integer ,a ,b))
+                              (sb-c::specifier-type `(integer ,c ,d)))
+                   (unless (and (= brute-low test-low)
+                                (= brute-high test-high))
+                     (format t "FAIL: ~A [~D, ~D] [~D, ~D]~%EXPECTED [~D, ~D] GOT [~D, ~D]~%"
+                             op a b c d
+                             brute-low brute-high test-low test-high)
+                     (assert (and (= brute-low test-low)
+                                  (= brute-high test-high))))))))
+      (dolist (op '(logand logior logxor))
+        (let ((deriver (intern (format nil "~A-DERIVE-UNSIGNED-BOUNDS" op)
                                (find-package :sb-c))))
           (format t "testing type derivation: ~A~%" deriver)
           (loop for a from 0 below size do
                 (loop for b from a below size do
                       (loop for c from 0 below size do
                             (loop for d from c below size do
-                                  (let* ((brute (brute-force a b c d op minimize))
-                                         (x-type (sb-c::specifier-type `(integer ,a ,b)))
-                                         (y-type (sb-c::specifier-type `(integer ,c ,d)))
-                                         (derived (funcall deriver x-type y-type)))
-                                    (unless (= brute derived)
-                                      (format t "FAIL: ~A [~D,~D] [~D,~D] ~A~%
-ACTUAL ~D DERIVED ~D~%"
-                                              op a b c d minimize brute derived)
-                                      (assert (= brute derived)))))))))))))
+                                  (test a b c d op deriver))))))))))
+
+(with-test (:name (:type-derivation :logical-operations :scaling))
+  (let ((type-x1 (sb-c::specifier-type `(integer ,(expt 2 10000)
+                                                 ,(expt 2 10000))))
+        (type-x2 (sb-c::specifier-type `(integer ,(expt 2 100000)
+                                                 ,(expt 2 100000))))
+        (type-y (sb-c::specifier-type '(integer 0 1))))
+    (dolist (op '(logand logior logxor))
+      (let* ((deriver (intern (format nil "~A-DERIVE-TYPE-AUX" op)
+                              (find-package :sb-c)))
+             (scale (/ (runtime (funcall deriver type-x2 type-y))
+                       (runtime (funcall deriver type-x1 type-y)))))
+        ;; Linear scaling is good, quadratical bad. Draw the line
+        ;; near the geometric mean of the corresponding SCALEs.
+        (when (> scale 32)
+          (error "Bad scaling of ~a: input 10 times but runtime ~a times as large."
+                 deriver scale))))))
 
 ;;; subtypep on CONS types wasn't taking account of the fact that a
 ;;; CONS type could be the empty type (but no other non-CONS type) in

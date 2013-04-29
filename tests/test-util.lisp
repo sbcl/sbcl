@@ -3,7 +3,8 @@
   (:export #:with-test #:report-test-status #:*failures*
            #:really-invoke-debugger
            #:*break-on-failure* #:*break-on-expected-failure*
-           #:make-kill-thread #:make-join-thread))
+           #:make-kill-thread #:make-join-thread
+           #:runtime))
 
 (in-package :test-util)
 
@@ -133,3 +134,36 @@
   (cons (format nil "SBCL_MACHINE_TYPE=~A" (machine-type))
         (cons (format nil "SBCL_SOFTWARE_TYPE=~A" (software-type))
               (posix-environ))))
+
+;;; Repeat calling THUNK until its cumulated runtime, measured using
+;;; GET-INTERNAL-RUN-TIME, is larger than PRECISION. Repeat this
+;;; REPETITIONS many times and return the time one call to THUNK took
+;;; in seconds as a float, according to the minimum of the cumulated
+;;; runtimes over the repetitions.
+;;; This allows to easily measure the runtime of expressions that take
+;;; much less time than one internal time unit. Also, the results are
+;;; unaffected, modulo quantization effects, by changes to
+;;; INTERNAL-TIME-UNITS-PER-SECOND.
+;;; Taking the minimum is intended to reduce the error introduced by
+;;; garbage collections occurring at unpredictable times. The inner
+;;; loop doubles the number of calls to THUNK each time before again
+;;; measuring the time spent, so that the time measurement overhead
+;;; doesn't distort the result if calling THUNK takes very little time.
+(defun runtime* (thunk repetitions precision)
+  (loop repeat repetitions
+        minimize
+        (loop with start = (get-internal-run-time)
+              with duration = 0
+              for n = 1 then (* n 2)
+              for total-runs = n then (+ total-runs n)
+              do (dotimes (i n)
+                   (funcall thunk))
+                 (setf duration (- (get-internal-run-time) start))
+              when (> duration precision)
+              return (/ (float duration) (float total-runs)))
+        into min-internal-time-units-per-call
+        finally (return (/ min-internal-time-units-per-call
+                           (float internal-time-units-per-second)))))
+
+(defmacro runtime (form &key (repetitions 3) (precision 10))
+  `(runtime* (lambda () ,form) ,repetitions ,precision))

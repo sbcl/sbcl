@@ -3,6 +3,9 @@ changes relative to sbcl-1.1.7:
   * enhancement: RUN-PROGRAM supports a :DIRECTORY argument to set
     the working directory of the spawned process.
     (lp#791800) (patch by Matthias Benkard)
+  * bug fix: type derivation for LOG{AND,IOR,XOR} scales linearly instead
+    of quadratically with the size of the input in the worst case.
+    (lp#1096444)
   * bug fix: handle errors when initializing *default-pathname-defaults*,
     sb-ext:*runtime-pathname*, sb-ext:*posix-argv* on startup, like character
     decoding errors, or directories being deleted.
