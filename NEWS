@@ -1,5 +1,8 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 changes relative to sbcl-1.1.7:
+  * enhancement: RUN-PROGRAM supports a :DIRECTORY argument to set
+    the working directory of the spawned process.
+    (lp#791800) (patch by Matthias Benkard)
   * bug fix: handle errors when initializing *default-pathname-defaults*,
     sb-ext:*runtime-pathname*, sb-ext:*posix-argv* on startup, like character
     decoding errors, or directories being deleted.

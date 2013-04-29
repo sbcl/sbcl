@@ -322,3 +322,19 @@
     (assert (null (sb-ext:run-program "/bin/cat" '() :output #.(or *compile-file-truename*
                                                                    *load-truename*)
                                       :if-output-exists nil)))))
+
+
+(with-test (:name (:run-program :set-directory))
+  (let* ((directory #-win32 "/"
+                    #+win32 "c:\\")
+         (out (sb-ext:process-output
+               (sb-ext:run-program #-win32 "/bin/sh"
+                                   #-win32 '("-c" "pwd")
+                                   #+win32 "cmd.exe"
+                                   #+win32 '("/c" "cd")
+                                   :output :stream
+                                   :directory directory
+                                   :search t))))
+    (assert
+     (equal directory
+            (string-right-trim '(#\Return) (read-line out))))))
