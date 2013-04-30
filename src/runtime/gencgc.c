@@ -221,7 +221,7 @@ static inline boolean protect_page_p(page_index_t page, generation_index_t gener
 
 /* To map addresses to page structures the address of the first page
  * is needed. */
-static void *heap_base = NULL;
+void *heap_base = NULL;
 
 /* Calculate the start address for the given page number. */
 inline void *

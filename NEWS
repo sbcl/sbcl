@@ -1,5 +1,8 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 changes relative to sbcl-1.1.7:
+  * notice: The implementation of MAP-ALLOCATED-OBJECTS (the heart of
+    ROOM, plus a few SB-INTROSPECT functions) has been completely
+    rewritten, it may now exhibit different bugs than before.
   * enhancement: RUN-PROGRAM supports a :DIRECTORY argument to set
     the working directory of the spawned process.
     (lp#791800) (patch by Matthias Benkard)
@@ -12,6 +15,9 @@ changes relative to sbcl-1.1.7:
     defoptimizer types ir2convert and stack-allocate-result.
   * enhancement: better type derivation for APPEND, NCONC, LIST.
     (lp#538957)
+  * enhancement: MAP-ALLOCATED-OBJECTS (the heart of ROOM) now walks the
+    heap in a manner similar to the GC rather than its previous ad-hoc
+    scheme, and is therefore no less and possibly more accurate.
   * bug fix: type derivation for LOG{AND,IOR,XOR} scales linearly instead
     of quadratically with the size of the input in the worst case.
     (lp#1096444)
@@ -36,6 +42,8 @@ changes relative to sbcl-1.1.7:
     their COMPLEX variants.
   * optimization: On x86 targets, more uses of ALIEN-FUNCALL during cross
     compilation now inline the INVOKE-WITH-SAVED-FP-AND-PC dance.
+  * optimization: ROOM no longer conses so egregiously on non-x86oid
+    systems.
 
 changes in sbcl-1.1.7 relative to sbcl-1.1.6:
   * enhancement: TRACE :PRINT-ALL handles multiple-valued forms.

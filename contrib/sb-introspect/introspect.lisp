@@ -613,8 +613,7 @@ list of the symbols :dynamic, :static, or :read-only."
      (lambda (obj header size)
        (when (= sb-vm:code-header-widetag header)
          (funcall fn obj size)))
-     space
-     t)))
+     space)))
 
 (declaim (inline map-caller-code-components))
 (defun map-caller-code-components (function spaces fn)

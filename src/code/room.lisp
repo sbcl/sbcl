@@ -20,12 +20,15 @@
   (def!struct (room-info (:make-load-form-fun just-dump-it-normally))
     ;; the name of this type
     (name nil :type symbol)
-    ;; kind of type (how we determine length)
+    ;; kind of type (how to reconstitute an object)
     (kind (missing-arg)
-          :type (member :lowtag :fixed :header :vector
-                        :string :code :closure :instance))
-    ;; length if fixed-length, shift amount for element size if :VECTOR
-    (length nil :type (or fixnum null))))
+          :type (member :other :closure :instance :list
+                        :code :vector-nil :weak-pointer))))
+
+(defun room-info-type-name (info)
+  (if (specialized-array-element-type-properties-p info)
+      (saetp-primitive-type-name info)
+      (room-info-name info)))
 
 (eval-when (:compile-toplevel :execute)
 
@@ -34,24 +37,13 @@
 (dolist (obj *primitive-objects*)
   (let ((widetag (primitive-object-widetag obj))
         (lowtag (primitive-object-lowtag obj))
-        (name (primitive-object-name obj))
-        (variable (primitive-object-variable-length-p obj))
-        (size (primitive-object-size obj)))
-    (cond
-     ((not lowtag))
-     ((not widetag)
-      (let ((info (make-room-info :name name
-                                  :kind :lowtag))
-            (lowtag (symbol-value lowtag)))
-        (declare (fixnum lowtag))
-        (dotimes (i 32)
-          (setf (svref *meta-room-info* (logior lowtag (ash i 3))) info))))
-     (variable)
-     (t
+        (name (primitive-object-name obj)))
+    (when (and (eq lowtag 'other-pointer-lowtag)
+               (not (member widetag '(t nil)))
+               (not (eq name 'weak-pointer)))
       (setf (svref *meta-room-info* (symbol-value widetag))
             (make-room-info :name name
-                            :kind :fixed
-                            :length size))))))
+                            :kind :other)))))
 
 (dolist (code (list #!+sb-unicode complex-character-string-widetag
                     complex-base-string-widetag simple-array-widetag
@@ -59,32 +51,24 @@
                     complex-array-widetag complex-vector-nil-widetag))
   (setf (svref *meta-room-info* code)
         (make-room-info :name 'array-header
-                        :kind :header)))
+                        :kind :other)))
 
 (setf (svref *meta-room-info* bignum-widetag)
       (make-room-info :name 'bignum
-                      :kind :header))
+                      :kind :other))
 
 (setf (svref *meta-room-info* closure-header-widetag)
       (make-room-info :name 'closure
                       :kind :closure))
 
 (dotimes (i (length *specialized-array-element-type-properties*))
-  (let* ((saetp (aref *specialized-array-element-type-properties* i))
-         (array-kind (if (characterp (saetp-initial-element-default saetp))
-                         :string
-                         :vector))
-        (element-shift (- (integer-length (saetp-n-bits saetp)) 4)))
+  (let ((saetp (aref *specialized-array-element-type-properties* i)))
     (when (saetp-specifier saetp) ;; SIMPLE-ARRAY-NIL is a special case.
-      (setf (svref *meta-room-info* (saetp-typecode saetp))
-            (make-room-info :name (saetp-primitive-type-name saetp)
-                            :kind array-kind
-                            :length element-shift)))))
+      (setf (svref *meta-room-info* (saetp-typecode saetp)) saetp))))
 
 (setf (svref *meta-room-info* simple-array-nil-widetag)
       (make-room-info :name 'simple-array-nil
-                      :kind :fixed
-                      :length 2))
+                      :kind :vector-nil))
 
 (setf (svref *meta-room-info* code-header-widetag)
       (make-room-info :name 'code
@@ -98,9 +82,56 @@
       (make-room-info :name 'funcallable-instance
                       :kind :closure))
 
+(setf (svref *meta-room-info* weak-pointer-widetag)
+      (make-room-info :name 'weak-pointer
+                      :kind :weak-pointer))
+
+(let ((cons-info (make-room-info :name 'cons
+                                 :kind :list)))
+  ;; A cons consists of two words, both of which may be either a
+  ;; pointer or immediate data.  Disregarding the possibility of an
+  ;; unbound-marker (permitted, according to the GC), this means
+  ;; either a fixnum, a character, a single-float on a 64-bit system,
+  ;; or a pointer.
+  (dotimes (i (ash 1 (- n-widetag-bits n-fixnum-tag-bits)))
+    (setf (svref *meta-room-info* (ash i n-fixnum-tag-bits)) cons-info))
+
+  (dotimes (i (ash 1 (- n-widetag-bits n-lowtag-bits)))
+    (setf (svref *meta-room-info* (logior (ash i n-lowtag-bits)
+                                          instance-pointer-lowtag))
+          cons-info)
+    (setf (svref *meta-room-info* (logior (ash i n-lowtag-bits)
+                                          list-pointer-lowtag))
+          cons-info)
+    (setf (svref *meta-room-info* (logior (ash i n-lowtag-bits)
+                                          fun-pointer-lowtag))
+          cons-info)
+    (setf (svref *meta-room-info* (logior (ash i n-lowtag-bits)
+                                          other-pointer-lowtag))
+          cons-info))
+
+  (setf (svref *meta-room-info* character-widetag) cons-info)
+
+  ;; Single-floats are immediate data on 64-bit systems.
+  #!+#.(cl:if (cl:= 64 sb!vm:n-word-bits) '(and) '(or))
+  (setf (svref *meta-room-info* single-float-widetag) cons-info))
+
 ) ; EVAL-WHEN
 
-(defparameter *room-info* '#.*meta-room-info*)
+(defparameter *room-info*
+  ;; SAETP instances don't dump properly from XC (or possibly
+  ;; normally), and we'd rather share structure with the master copy
+  ;; if we can anyway, so...
+  (make-array 256
+              :initial-contents
+              #.`(list
+                  ,@(map 'list
+                         (lambda (info)
+                           (if (specialized-array-element-type-properties-p info)
+                               `(aref *specialized-array-element-type-properties*
+                                      ,(position info *specialized-array-element-type-properties*))
+                               info))
+                         *meta-room-info*))))
 (deftype spaces () '(member :static :dynamic :read-only))
 
 ;;;; MAP-ALLOCATED-OBJECTS
@@ -136,20 +167,127 @@
 (defun round-to-dualword (size)
   (logand (the word (+ size lowtag-mask)) (lognot lowtag-mask)))
 
-;;; Return the total size of a vector in bytes, including any pad.
-#!-sb-fluid (declaim (inline vector-total-size))
-(defun vector-total-size (obj info)
-  (let ((shift (room-info-length info))
-        (len (+ (length (the (simple-array * (*)) obj))
-                (ecase (room-info-kind info)
-                  (:vector 0)
-                  (:string 1)))))
-    (round-to-dualword
-     (+ (* vector-data-offset n-word-bytes)
-        (if (minusp shift)
-            (ash (+ len (1- (ash 1 (- shift))))
-                 shift)
-            (ash len shift))))))
+;;; Return the vector OBJ, its WIDETAG, and the number of octets
+;;; required for its storage (including padding and alignment).
+(defun reconstitute-vector (obj saetp)
+  (declare (type (simple-array * (*)) obj)
+           (type specialized-array-element-type-properties saetp))
+  (let* ((length (+ (length obj)
+                    (saetp-n-pad-elements saetp)))
+         (n-bits (saetp-n-bits saetp))
+         (alignment-pad (floor 7 n-bits))
+         (n-data-octets (if (>= n-bits 8)
+                            (* length (ash n-bits -3))
+                            (ash (* (+ length alignment-pad)
+                                    n-bits)
+                                 -3))))
+    (values obj
+            (saetp-typecode saetp)
+            (round-to-dualword (+ (* vector-data-offset n-word-bytes)
+                                  n-data-octets)))))
+
+;;; Given the address (untagged, aligned, and interpreted as a FIXNUM)
+;;; of a lisp object, return the object, its "type code" (either
+;;; LIST-POINTER-LOWTAG or a header widetag), and the number of octets
+;;; required for its storage (including padding and alignment).  Note
+;;; that this function is designed to NOT CONS, even if called
+;;; out-of-line.
+(defun reconstitute-object (address)
+  (let* ((object-sap (int-sap (get-lisp-obj-address address)))
+         (header (sap-ref-word object-sap 0))
+         (widetag (logand header widetag-mask))
+         (header-value (ash header (- n-widetag-bits)))
+         (info (svref *room-info* widetag)))
+    (symbol-macrolet
+        ((boxed-size (round-to-dualword (ash (1+ header-value) word-shift))))
+      (macrolet
+          ((tagged-object (tag)
+             `(%make-lisp-obj (logior ,tag (get-lisp-obj-address address)))))
+        (cond
+          ;; Pick off arrays, as they're the only plausible cause for
+          ;; a non-nil, non-ROOM-INFO object as INFO.
+          ((specialized-array-element-type-properties-p info)
+           (reconstitute-vector (tagged-object other-pointer-lowtag) info))
+
+          ((null info)
+           (error "Unrecognized widetag #x~2,'0X in reconstitute-object"
+                  widetag))
+
+          ((eq (room-info-kind info) :list)
+           (values (tagged-object list-pointer-lowtag)
+                   list-pointer-lowtag
+                   (* 2 n-word-bytes)))
+
+          ((eq (room-info-kind info) :closure)
+           (values (tagged-object fun-pointer-lowtag)
+                   widetag
+                   boxed-size))
+
+          ((eq (room-info-kind info) :instance)
+           (values (tagged-object instance-pointer-lowtag)
+                   widetag
+                   boxed-size))
+
+          ((eq (room-info-kind info) :other)
+           (values (tagged-object other-pointer-lowtag)
+                   widetag
+                   boxed-size))
+
+          ((eq (room-info-kind info) :vector-nil)
+           (values (tagged-object other-pointer-lowtag)
+                   simple-array-nil-widetag
+                   (* 2 n-word-bytes)))
+
+          ((eq (room-info-kind info) :weak-pointer)
+           (values (tagged-object other-pointer-lowtag)
+                   weak-pointer-widetag
+                   (round-to-dualword
+                    (* weak-pointer-size
+                       n-word-bytes))))
+
+          ((eq (room-info-kind info) :code)
+           (values (tagged-object other-pointer-lowtag)
+                   code-header-widetag
+                   (round-to-dualword
+                    (* (+ header-value
+                          (the fixnum
+                            (sap-ref-lispobj object-sap
+                                             (* code-code-size-slot
+                                                n-word-bytes))))
+                       n-word-bytes))))
+
+          (t
+           (error "Unrecognized room-info-kind ~S in reconstitute-object"
+                  (room-info-kind info))))))))
+
+;;; Iterate over all the objects in the contiguous block of memory
+;;; with the low address at START and the high address just before
+;;; END, calling FUN with the object, the object's type code, and the
+;;; object's total size in bytes, including any header and padding.
+;;; START and END are untagged, aligned memory addresses interpreted
+;;; as FIXNUMs (unlike SAPs or tagged addresses, these will not cons).
+(defun map-objects-in-range (fun start end)
+  (declare (type function fun))
+  ;; If START is (unsigned) greater than END, then we have somehow
+  ;; blown past our endpoint.
+  (aver (<= (get-lisp-obj-address start)
+            (get-lisp-obj-address end)))
+  (unless (= start end)
+    (multiple-value-bind
+          (obj typecode size)
+        (reconstitute-object start)
+      (aver (zerop (logand n-lowtag-bits size)))
+      (let ((next-start
+             ;; This special little dance is to add a number of octets
+             ;; (and it had best be a number evenly divisible by our
+             ;; allocation granularity) to an unboxed, aligned address
+             ;; masquerading as a fixnum.  Without consing.
+             (%make-lisp-obj
+              (mask-field (byte #.n-word-bits 0)
+                          (+ (get-lisp-obj-address start)
+                             size)))))
+        (funcall fun obj typecode size)
+        (map-objects-in-range fun next-start end)))))
 
 ;;; Access to the GENCGC page table for better precision in
 ;;; MAP-ALLOCATED-OBJECTS
@@ -170,6 +308,8 @@
               (gen (signed 8))))
   (declaim (inline find-page-index))
   (define-alien-routine "find_page_index" long (index signed))
+  (define-alien-variable "last_free_page" sb!kernel::page-index-t)
+  (define-alien-variable "heap_base" (* t))
   (define-alien-variable "page_table" (* (struct page))))
 
 ;;; Iterate over all the objects allocated in SPACE, calling FUN with
@@ -179,146 +319,77 @@
 ;;; is intended for slightly more demanding uses of heap groveling
 ;;; then ROOM.
 #!-sb-fluid (declaim (maybe-inline map-allocated-objects))
-(defun map-allocated-objects (fun space &optional careful)
-  (declare (type function fun) (type spaces space))
-  (declare (optimize (sb!c:alien-funcall-saves-fp-and-pc 0)))
-  (flet ((make-obj (tagged-address)
-           (if careful
-               (make-lisp-obj tagged-address nil)
-               (values (%make-lisp-obj tagged-address) t))))
-    ;; Inlining MAKE-OBJ reduces consing on platforms where dynamic
-    ;; space extends past fixnum range.
-    (declare (inline make-obj))
-    (without-gcing
-      (multiple-value-bind (start end) (space-bounds space)
-        (declare (type system-area-pointer start end))
-        (declare (optimize (speed 3)))
-        (let ((current start)
-              #!+gencgc
-              (skip-tests-until-addr 0))
-          (labels ((maybe-finish-mapping ()
-                     (unless (sap< current end)
-                       (aver (sap= current end))
-                       (return-from map-allocated-objects)))
-                   ;; GENCGC doesn't allocate linearly, which means that the
-                   ;; dynamic space can contain large blocks zeros that get
-                   ;; accounted as conses in ROOM (and slow down other
-                   ;; applications of MAP-ALLOCATED-OBJECTS). To fix this
-                   ;; check the GC page structure for the current address.
-                   ;; If the page is free or the address is beyond the page-
-                   ;; internal allocation offset (bytes-used) skip to the
-                   ;; next page immediately.
-                   (maybe-skip-page ()
-                     #!+gencgc
-                     (when (eq space :dynamic)
-                       (loop with page-mask = #.(1- sb!vm:gencgc-card-bytes)
-                             for addr of-type sb!vm:word = (sap-int current)
-                             while (>= addr skip-tests-until-addr)
-                             do
-                             ;; For some reason binding PAGE with LET
-                             ;; conses like mad (but gives no compiler notes...)
-                             ;; Work around the problem with SYMBOL-MACROLET
-                             ;; instead of trying to figure out the real
-                             ;; issue. -- JES, 2005-05-17
-                             (symbol-macrolet
-                                 ((page (deref page-table
-                                               (find-page-index addr))))
-                               ;; Don't we have any nicer way to access C struct
-                               ;; bitfields?
-                               (let ((alloc-flag (ldb (byte 3 2)
-                                                      (slot page 'flags)))
-                                     (bytes-used (slot page 'bytes-used)))
-                                 ;; If the page is not free and the current
-                                 ;; pointer is still below the allocation offset
-                                 ;; of the page
-                                 (when (and (not (zerop alloc-flag))
-                                            (< (logand page-mask addr)
-                                               bytes-used))
-                                   ;; Don't bother testing again until we
-                                   ;; get past that allocation offset
-                                   (setf skip-tests-until-addr
-                                         (+ (logandc2 addr page-mask) bytes-used))
-                                   ;; And then continue with the
-                                   ;; scheduled mapping
-                                   (return-from maybe-skip-page))
-                                 ;; Move CURRENT to start of next page.
-                                 (setf current (int-sap (+ (logandc2 addr page-mask)
-                                                           sb!vm:gencgc-card-bytes)))
-                                 (maybe-finish-mapping))))))
-                   (maybe-map (obj obj-tag n-obj-bytes &optional (ok t))
-                     (let ((next (typecase n-obj-bytes
-                                   (fixnum (sap+ current n-obj-bytes))
-                                   (integer (sap+ current n-obj-bytes)))))
-                       ;; If this object would take us past END, it must
-                       ;; be either bogus, or it has been allocated after
-                       ;; the call to M-A-O.
-                       (cond ((and ok next (sap<= next end))
-                              (funcall fun obj obj-tag n-obj-bytes)
-                              (setf current next))
-                             (t
-                              (setf current (sap+ current n-word-bytes)))))))
-            (declare (inline maybe-finish-mapping maybe-skip-page maybe-map))
-            (loop
-              (maybe-finish-mapping)
-              (maybe-skip-page)
-              (let* ((header (sap-ref-word current 0))
-                     (header-widetag (logand header #xFF))
-                     (info (svref *room-info* header-widetag)))
-                (cond
-                  ((or (not info)
-                       (eq (room-info-kind info) :lowtag))
-                   (multiple-value-bind (obj ok)
-                       (make-obj (logior (sap-int current) list-pointer-lowtag))
-                     (maybe-map obj
-                                list-pointer-lowtag
-                                (* cons-size n-word-bytes)
-                                ok)))
-                  ((eq (room-info-kind info) :closure)
-                   (let* ((obj (%make-lisp-obj (logior (sap-int current)
-                                                       fun-pointer-lowtag)))
-                          (size (round-to-dualword
-                                 (* (the fixnum (1+ (get-closure-length obj)))
-                                    n-word-bytes))))
-                     (maybe-map obj header-widetag size)))
-                  ((eq (room-info-kind info) :instance)
-                   (let* ((obj (%make-lisp-obj
-                                (logior (sap-int current) instance-pointer-lowtag)))
-                          (size (round-to-dualword
-                                 (* (+ (%instance-length obj) 1) n-word-bytes))))
-                     (aver (zerop (logand size lowtag-mask)))
-                     (maybe-map obj header-widetag size)))
-                  (t
-                   (multiple-value-bind (obj ok)
-                       (make-obj (logior (sap-int current) other-pointer-lowtag))
-                     (let ((size (when ok
-                                   (ecase (room-info-kind info)
-                                     (:fixed
-                                      (aver (or (eql (room-info-length info)
-                                                     (1+ (get-header-data obj)))
-                                                (floatp obj)
-                                                (simple-array-nil-p obj)))
-                                      (round-to-dualword
-                                       (* (room-info-length info) n-word-bytes)))
-                                     ((:vector :string)
-                                      (vector-total-size obj info))
-                                     (:header
-                                      (round-to-dualword
-                                       (* (1+ (get-header-data obj)) n-word-bytes)))
-                                     (:code
-                                      (+ (the fixnum
-                                           (* (get-header-data obj) n-word-bytes))
-                                         (round-to-dualword
-                                          (* (the fixnum (%code-code-size obj))
-                                             n-word-bytes))))))))
-                       (macrolet ((frob ()
-                                    '(progn
-                                      (when size (aver (zerop (logand size lowtag-mask))))
-                                      (maybe-map obj header-widetag size))))
-                         (typecase size
-                           (fixnum (frob))
-                           (word (frob))
-                           (null (frob))))))))))))))))
+(defun map-allocated-objects (fun space)
+  (declare (type function fun)
+           (type spaces space))
+  (without-gcing
+    (ecase space
+      (:static
+       ;; Static space starts with NIL, which requires special
+       ;; handling, as the header and alignment are slightly off.
+       (multiple-value-bind (start end) (space-bounds space)
+         (funcall fun nil symbol-header-widetag (* 8 n-word-bytes))
+         (map-objects-in-range fun
+                               (%make-lisp-obj (+ (* 8 n-word-bytes)
+                                                  (sap-int start)))
+                               (%make-lisp-obj (sap-int end)))))
 
+      ((:read-only #!-gencgc :dynamic)
+       ;; Read-only space (and dynamic space on cheneygc) is a block
+       ;; of contiguous allocations.
+       (multiple-value-bind (start end) (space-bounds space)
+         (map-objects-in-range fun
+                               (%make-lisp-obj (sap-int start))
+                               (%make-lisp-obj (sap-int end)))))
+
+      #!+gencgc
+      (:dynamic
+       ;; Dynamic space on gencgc requires walking the GC page tables
+       ;; in order to determine what regions contain objects.
+
+       ;; We explicitly presume that any pages in an allocation region
+       ;; that are in-use have a BYTES-USED of GENCGC-CARD-BYTES
+       ;; (indicating a full page) or an otherwise-valid BYTES-USED.
+       ;; We also presume that the pages of an open allocation region
+       ;; after the first page, and any pages that are unallocated,
+       ;; have a BYTES-USED of zero.  GENCGC seems to guarantee this.
+
+       ;; Our procedure is to scan forward through the page table,
+       ;; maintaining an "end pointer" until we reach a page where
+       ;; BYTES-USED is not GENCGC-CARD-BYTES or we reach
+       ;; LAST-FREE-PAGE.  We then MAP-OBJECTS-IN-RANGE if the range
+       ;; is not empty, and proceed to the next page (unless we've hit
+       ;; LAST-FREE-PAGE).  We happily take advantage of the fact that
+       ;; MAP-OBJECTS-IN-RANGE will simply return if passed two
+       ;; coincident pointers for the range.
+
+       ;; FIXME: WITHOUT-GCING prevents a GC flip, but doesn't prevent
+       ;; closing allocation regions and opening new ones.  This may
+       ;; prove to be an issue with concurrent systems, or with
+       ;; spectacularly poor timing for closing an allocation region
+       ;; in a single-threaded system.
+
+       (loop
+          with page-size = (ash gencgc-card-bytes (- n-fixnum-tag-bits))
+          ;; This magic dance gets us an unboxed aligned pointer as a
+          ;; FIXNUM.
+          with start = (sap-ref-lispobj (alien-sap (addr heap-base)) 0)
+          with end = start
+
+          ;; This is our page range.
+          for page-index from 0 below last-free-page
+          for next-page-addr from (+ start page-size) by page-size
+          for page-bytes-used = (slot (deref page-table page-index) 'bytes-used)
+
+          when (< page-bytes-used gencgc-card-bytes)
+          do (progn
+               (incf end (ash page-bytes-used (- n-fixnum-tag-bits)))
+               (map-objects-in-range fun start end)
+               (setf start next-page-addr)
+               (setf end next-page-addr))
+          else do (incf end page-size)
+
+          finally (map-objects-in-range fun start end))))))
 
 ;;;; MEMORY-USAGE
 
@@ -339,7 +410,7 @@
         (let ((total-count (aref counts i)))
           (unless (zerop total-count)
             (let* ((total-size (aref sizes i))
-                   (name (room-info-name (aref *room-info* i)))
+                   (name (room-info-type-name (aref *room-info* i)))
                    (found (gethash name totals)))
               (cond (found
                      (incf (first found) total-size)
