@@ -704,7 +704,10 @@ Users Manual for details about the PROCESS structure."#-win32"
       This is a function the system calls whenever the status of the
       process changes.  The function takes the process as an argument.
    :EXTERNAL-FORMAT
-      The external-format to use for :INPUT, :OUTPUT, and :ERROR :STREAMs.")
+      The external-format to use for :INPUT, :OUTPUT, and :ERROR :STREAMs.
+   :DIRECTORY
+      Specifies the directory in which the program should be run.
+      NIL (the default) means the directory is unchanged.")
   #-win32
   (when (and env-p environment-p)
     (error "can't specify :ENV and :ENVIRONMENT simultaneously"))
