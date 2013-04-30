@@ -1043,6 +1043,54 @@ constant shift greater than word length")))
     (zeroize res)
     DONE))
 
+;; INTEGER-LENGTH is implemented by using the BSR instruction, which
+;; returns the position of the first 1-bit from the right. And that needs
+;; to be incremented to get the width of the integer, and BSR doesn't
+;; work on 0, so it needs a branch to handle 0.
+
+;; But fixnums are tagged by being shifted left n-fixnum-tag-bits times,
+;; untagging by shifting right n-fixnum-tag-bits-1 times (and if
+;; n-fixnum-tag-bits = 1, no shifting is required), will make the
+;; resulting integer one bit wider, making the increment unnecessary.
+;; Then, to avoid calling BSR on 0, OR the result with 1. That sets the
+;; first bit to 1, and if all other bits are 0, BSR will return 0,
+;; which is the correct value for INTEGER-LENGTH.
+(define-vop (positive-fixnum-len)
+  (:translate integer-length)
+  (:note "inline positive fixnum integer-length")
+  (:policy :fast-safe)
+  (:args (arg :scs (any-reg)))
+  (:arg-types positive-fixnum)
+  (:results (res :scs (unsigned-reg)))
+  (:result-types unsigned-num)
+  (:generator 24
+    (move res arg)
+    (when (> n-fixnum-tag-bits 1)
+      (inst shr res (1- n-fixnum-tag-bits)))
+    (inst or res 1)
+    (inst bsr res res)))
+
+(define-vop (fixnum-len)
+  (:translate integer-length)
+  (:note "inline fixnum integer-length")
+  (:policy :fast-safe)
+  (:args (arg :scs (any-reg) :target res))
+  (:arg-types tagged-num)
+  (:results (res :scs (unsigned-reg)))
+  (:result-types unsigned-num)
+  (:generator 25
+    (move res arg)
+    (when (> n-fixnum-tag-bits 1)
+      (inst shr res (1- n-fixnum-tag-bits)))
+    (if (sc-is res unsigned-reg)
+        (inst test res res)
+        (inst cmp res 0))
+    (inst jmp :ge POS)
+    (inst not res)
+    POS
+    (inst or res 1)
+    (inst bsr res res)))
+
 (define-vop (unsigned-byte-64-count)
   (:translate logcount)
   (:note "inline (unsigned-byte 64) logcount")

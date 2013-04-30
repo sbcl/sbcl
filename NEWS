@@ -10,6 +10,7 @@ changes relative to sbcl-1.1.7:
     sb-ext:*runtime-pathname*, sb-ext:*posix-argv* on startup, like character
     decoding errors, or directories being deleted.
   * optimization: faster ISQRT on fixnums and small bignums
+  * optimization: faster and smaller INTEGER-LENGTH on fixnums on x86-64.
 
 changes in sbcl-1.1.7 relative to sbcl-1.1.6:
   * enhancement: TRACE :PRINT-ALL handles multiple-valued forms.
