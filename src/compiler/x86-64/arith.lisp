@@ -1012,9 +1012,7 @@ constant shift greater than word length")))
   (:result-types unsigned-num)
   (:generator 28
     (move res arg)
-    (if (sc-is res unsigned-reg)
-        (inst test res res)
-        (inst cmp res 0))
+    (inst test res res)
     (inst jmp :ge POS)
     (inst not res)
     POS
@@ -1081,10 +1079,8 @@ constant shift greater than word length")))
   (:generator 25
     (move res arg)
     (when (> n-fixnum-tag-bits 1)
-      (inst shr res (1- n-fixnum-tag-bits)))
-    (if (sc-is res unsigned-reg)
-        (inst test res res)
-        (inst cmp res 0))
+      (inst sar res (1- n-fixnum-tag-bits)))
+    (inst test res res)
     (inst jmp :ge POS)
     (inst not res)
     POS
