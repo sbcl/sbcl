@@ -205,7 +205,6 @@
                   ;; the frame we expect. If we leave it out, the backtrace is
                   ;; fine -- but the test fails. I can only boggle right now.
             :fails-on `(or (and :x86 :linux)
-                           :darwin
                            :win32))
   (let ((m (sb-thread:make-mutex))
         (q (sb-thread:make-waitqueue)))
