@@ -1621,7 +1621,8 @@
 (eval-when (:compile-toplevel :execute)
   (defun double-shift-inst-printer-list (op)
     `((ext-reg-reg/mem ((op ,(logior op #b10)) (width 0)
-                        (imm nil :type signed-imm-byte)))
+                        (imm nil :type signed-imm-byte))
+         (:name :tab reg/mem ", " reg ", " imm))
       (ext-reg-reg/mem ((op ,(logior op #b10)) (width 1))
          (:name :tab reg/mem ", " reg ", " 'cl)))))
 

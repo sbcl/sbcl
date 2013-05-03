@@ -1,5 +1,6 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 changes relative to sbcl-1.1.7:
+  * bug fix: disassembler missing ",8" on SHLD
   * enhancement: RUN-PROGRAM supports a :DIRECTORY argument to set
     the working directory of the spawned process.
     (lp#791800) (patch by Matthias Benkard)

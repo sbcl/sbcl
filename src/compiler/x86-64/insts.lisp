@@ -2206,7 +2206,8 @@
 (eval-when (:compile-toplevel :execute)
   (defun double-shift-inst-printer-list (op)
     `((ext-reg-reg/mem-no-width ((op ,(logior op #b100))
-                                 (imm nil :type imm-byte)))
+                                 (imm nil :type imm-byte))
+         (:name :tab reg/mem ", " reg ", " imm))
       (ext-reg-reg/mem-no-width ((op ,(logior op #b101)))
          (:name :tab reg/mem ", " reg ", " 'cl)))))
 
