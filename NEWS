@@ -3,12 +3,17 @@ changes relative to sbcl-1.1.7:
   * enhancement: RUN-PROGRAM supports a :DIRECTORY argument to set
     the working directory of the spawned process.
     (lp#791800) (patch by Matthias Benkard)
+  * enhancement: vectors can now be stack-allocated on PPC.
+  * enhancement: "fixed objects" can now be stack-allocated on PPC.
+  * enhancement: WITH-PINNED-OBJECTS no longer conses on PPC/GENCGC.
   * bug fix: type derivation for LOG{AND,IOR,XOR} scales linearly instead
     of quadratically with the size of the input in the worst case.
     (lp#1096444)
   * bug fix: handle errors when initializing *default-pathname-defaults*,
     sb-ext:*runtime-pathname*, sb-ext:*posix-argv* on startup, like character
     decoding errors, or directories being deleted.
+  * bug fix: Loading a core with a discontiguous dynamic space now correctly
+    computes the amount of dynamic space used.
   * optimization: faster ISQRT on fixnums and small bignums
   * optimization: faster and smaller INTEGER-LENGTH on fixnums on x86-64.
 
