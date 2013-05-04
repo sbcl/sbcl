@@ -1,12 +1,13 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 changes relative to sbcl-1.1.7:
-  * bug fix: disassembler missing ",8" on SHLD
   * enhancement: RUN-PROGRAM supports a :DIRECTORY argument to set
     the working directory of the spawned process.
     (lp#791800) (patch by Matthias Benkard)
   * enhancement: vectors can now be stack-allocated on PPC.
   * enhancement: "fixed objects" can now be stack-allocated on PPC.
   * enhancement: WITH-PINNED-OBJECTS no longer conses on PPC/GENCGC.
+  * enhancement: (sb-introspect:find-definition-sources-by-name x :vop) now
+    also returns VOPs which do not translate any functions.
   * bug fix: type derivation for LOG{AND,IOR,XOR} scales linearly instead
     of quadratically with the size of the input in the worst case.
     (lp#1096444)
@@ -15,6 +16,7 @@ changes relative to sbcl-1.1.7:
     decoding errors, or directories being deleted.
   * bug fix: Loading a core with a discontiguous dynamic space now correctly
     computes the amount of dynamic space used.
+  * bug fix: disassembler missing ",8" on SHLD
   * optimization: faster ISQRT on fixnums and small bignums
   * optimization: faster and smaller INTEGER-LENGTH on fixnums on x86-64.
 

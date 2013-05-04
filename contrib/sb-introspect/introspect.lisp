@@ -124,6 +124,30 @@ FBOUNDP."
   ;; is.
   (description nil :type list))
 
+(defun vop-sources-from-fun-templates (name)
+  (let ((fun-info (sb-int:info :function :info name)))
+    (when fun-info
+      (loop for vop in (sb-c::fun-info-templates fun-info)
+            for source = (find-definition-source
+                          (sb-c::vop-info-generator-function vop))
+            do (setf (definition-source-description source)
+                     (list (sb-c::template-name vop)
+                           (sb-c::template-note vop)))
+            collect source))))
+
+(defun find-vop-source (name)
+  (let* ((templates (vop-sources-from-fun-templates name))
+         (vop (gethash name sb-c::*backend-template-names*))
+         (source (and vop
+                      (find-definition-source
+                       (sb-c::vop-info-generator-function vop)))))
+    (when source
+      (setf (definition-source-description source)
+            (list name)))
+    (if source
+        (cons source templates)
+        templates)))
+
 (defun find-definition-sources-by-name (name type)
   "Returns a list of DEFINITION-SOURCEs for the objects of type TYPE
 defined with name NAME. NAME may be a symbol or a extended function
@@ -288,15 +312,7 @@ If an unsupported TYPE is requested, the function will return NIL.
                         source)))))))
        ((:vop)
         (when (symbolp name)
-          (let ((fun-info (sb-int:info :function :info name)))
-            (when fun-info
-              (loop for vop in (sb-c::fun-info-templates fun-info)
-                    for source = (find-definition-source
-                                  (sb-c::vop-info-generator-function vop))
-                    do (setf (definition-source-description source)
-                             (list (sb-c::template-name vop)
-                                   (sb-c::template-note vop)))
-                    collect source)))))
+          (find-vop-source name)))
        ((:source-transform)
         (when (symbolp name)
           (let ((transform-fun (sb-int:info :function :source-transform name)))
