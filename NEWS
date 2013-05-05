@@ -8,6 +8,8 @@ changes relative to sbcl-1.1.7:
   * enhancement: WITH-PINNED-OBJECTS no longer conses on PPC/GENCGC.
   * enhancement: (sb-introspect:find-definition-sources-by-name x :vop) now
     also returns VOPs which do not translate any functions.
+  * enhancement: better type derivation for APPEND, NCONC, LIST.
+    (lp#538957)
   * bug fix: type derivation for LOG{AND,IOR,XOR} scales linearly instead
     of quadratically with the size of the input in the worst case.
     (lp#1096444)

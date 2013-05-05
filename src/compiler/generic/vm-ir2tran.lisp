@@ -275,13 +275,10 @@
 #!+stack-allocatable-lists
 (progn
   (defoptimizer (list stack-allocate-result) ((&rest args) node dx)
-    (declare (ignore node dx))
     (not (null args)))
   (defoptimizer (list* stack-allocate-result) ((&rest args) node dx)
-    (declare (ignore node dx))
     (not (null (rest args))))
   (defoptimizer (%listify-rest-args stack-allocate-result) ((&rest args) node dx)
-    (declare (ignore node dx))
     t))
 
 ;;; ...conses

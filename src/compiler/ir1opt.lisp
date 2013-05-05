@@ -2034,6 +2034,7 @@
           (flush-lvar-externally-checkable-type arg))
         (setf (combination-args use) nil)
         (flush-dest list)
+        (flush-combination use)
         (setf (combination-args node) args))
       t)))
 

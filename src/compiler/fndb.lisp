@@ -706,6 +706,7 @@
 ;;; All but last must be of type LIST, but there seems to be no way to
 ;;; express that in this syntax.
 (defknown append (&rest t) t (flushable))
+(defknown sb!impl::append2 (list t) t (flushable))
 
 (defknown copy-list (list) list (flushable))
 (defknown copy-alist (list) list (flushable))

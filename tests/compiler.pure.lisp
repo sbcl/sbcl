@@ -4397,3 +4397,17 @@
                                     ((2 2 0 -2 -1 2) 9223372036854775803)
                                     (t 358458651)))))))
     (assert (= (funcall test -10470605025) 26))))
+
+(with-test (:name :append-type-derivation)
+  (let ((test-cases
+          '((lambda () (append 10)) (integer 10 10)
+            (lambda () (append nil 10)) (integer 10 10)
+            (lambda (x) (append x 10)) t
+            (lambda (x) (append x (cons 1 2))) cons
+            (lambda (x y) (append x (cons 1 2) y)) cons
+            (lambda (x y) (nconc x (the list y) x)) t
+            (lambda (x y) (print (length y)) (append x y)) sequence)))
+    (loop for (function result-type) on test-cases by #'cddr
+          do (assert (equal (car (cdaddr (sb-kernel:%simple-fun-type
+                                          (compile nil function))))
+                            result-type)))))

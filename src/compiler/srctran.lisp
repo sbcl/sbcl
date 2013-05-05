@@ -134,6 +134,11 @@
     (1 `(cons ,(first args) nil))
     (t (values nil t))))
 
+(defoptimizer (list derive-type) ((&rest args) node)
+  (if args
+      (specifier-type 'cons)
+      (specifier-type 'null)))
+
 ;;; And similarly for LIST*.
 (define-source-transform list* (arg &rest others)
   (cond ((not others) arg)
@@ -144,6 +149,75 @@
   (if args
       (specifier-type 'cons)
       (lvar-type arg)))
+
+;;;
+
+(define-source-transform nconc (&rest args)
+  (case (length args)
+    (0 ())
+    (1 (car args))
+    (t (values nil t))))
+
+;;; (append nil nil nil fixnum) => fixnum
+;;; (append x x cons x x) => cons
+;;; (append x x x x list) => list
+;;; (append x x x x sequence) => sequence
+;;; (append fixnum x ...) => nil
+(defun derive-append-type (args)
+  (cond ((not args)
+         (specifier-type 'null))
+        (t
+         (let ((cons-type (specifier-type 'cons))
+               (null-type (specifier-type 'null))
+               (list-type (specifier-type 'list))
+               (last (lvar-type (car (last args)))))
+           (or
+            ;; Check that all but the last arguments are lists first
+            (loop for (arg next) on args
+                  while next
+                  do
+                  (let ((lvar-type (lvar-type arg)))
+                    (unless (or (csubtypep list-type lvar-type)
+                                (csubtypep lvar-type list-type))
+                      (assert-lvar-type arg list-type
+                                        (lexenv-policy *lexenv*))
+                      (return *empty-type*))))
+            (loop with all-nil = t
+                  for (arg next) on args
+                  for lvar-type = (lvar-type arg)
+                  while next
+                  do
+                  (cond
+                    ;; Cons in the middle guarantees the result will be a cons
+                    ((csubtypep lvar-type cons-type)
+                     (return cons-type))
+                    ;; If all but the last are NIL the type of the last arg
+                    ;; can be used
+                    ((csubtypep lvar-type null-type))
+                    (all-nil
+                     (setf all-nil nil)))
+                  finally
+                  (return
+                    (cond (all-nil
+                           last)
+                          ((csubtypep last cons-type)
+                           cons-type)
+                          ((csubtypep last list-type)
+                           list-type)
+                          ;; If the last is SEQUENCE (or similar) it'll
+                          ;; be either that sequence or a cons, which is a
+                          ;; sequence
+                          ((csubtypep list-type last)
+                           last)))))))))
+
+(defoptimizer (append derive-type) ((&rest args))
+  (derive-append-type args))
+
+(defoptimizer (sb!impl::append2 derive-type) ((&rest args))
+  (derive-append-type args))
+
+(defoptimizer (nconc derive-type) ((&rest args))
+  (derive-append-type args))
 
 ;;; Translate RPLACx to LET and SETF.
 (define-source-transform rplaca (x y)
