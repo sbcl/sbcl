@@ -21,6 +21,8 @@ changes relative to sbcl-1.1.7:
   * bug fix: disassembler missing ",8" on SHLD
   * optimization: faster ISQRT on fixnums and small bignums
   * optimization: faster and smaller INTEGER-LENGTH on fixnums on x86-64.
+  * optimization: On x86-64, the number of multi-byte NOP instructions used
+    for code alignment is now always minimal.
 
 changes in sbcl-1.1.7 relative to sbcl-1.1.6:
   * enhancement: TRACE :PRINT-ALL handles multiple-valued forms.

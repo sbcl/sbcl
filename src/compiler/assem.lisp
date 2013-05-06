@@ -910,14 +910,14 @@
         (offset (- (segment-current-posn segment)
                    (segment-sync-posn segment))))
     (cond ((> bits alignment)
-           ;; We need more bits of alignment. First emit enough noise
-           ;; to get back in sync with alignment, and then emit an
-           ;; alignment note to cover the rest.
-           (let ((slop (logand offset (1- (ash 1 alignment)))))
-             (unless (zerop slop)
-               (emit-skip segment (- (ash 1 alignment) slop) pattern)))
-           (let ((size (logand (1- (ash 1 bits))
-                               (lognot (1- (ash 1 alignment))))))
+           ;; We need more bits of alignment. Emit an alignment note.
+           ;; The ALIGNMENT many least significant bits of (- OFFSET)
+           ;; give the amount of bytes to skip to get back in sync with
+           ;; ALIGNMENT, and one-bits to the left of that up to position
+           ;; BITS provide the remaining amount.
+           (let ((size (deposit-field (- offset)
+                                      (byte 0 alignment)
+                                      (1- (ash 1 bits)))))
              (aver (> size 0))
              (emit-annotation segment (make-alignment bits size pattern))
              (emit-skip segment size pattern))
