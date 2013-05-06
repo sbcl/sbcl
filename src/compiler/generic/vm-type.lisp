@@ -172,9 +172,9 @@
 ;;; Return the most specific integer type that can be quickly checked that
 ;;; includes the given type.
 (defun containing-integer-type (subtype)
-  (dolist (type '(fixnum
-                  (signed-byte 32)
-                  (unsigned-byte 32)
+  (dolist (type `(fixnum
+                  (signed-byte ,sb!vm:n-word-bits)
+                  (unsigned-byte ,sb!vm:n-word-bits)
                   integer)
                 (error "~S isn't an integer type?" subtype))
     (when (csubtypep subtype (specifier-type type))

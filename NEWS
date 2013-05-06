@@ -23,6 +23,10 @@ changes relative to sbcl-1.1.7:
   * optimization: faster and smaller INTEGER-LENGTH on fixnums on x86-64.
   * optimization: On x86-64, the number of multi-byte NOP instructions used
     for code alignment is now always minimal.
+  * optimization: On 64-bit targets, the compiler generates much faster
+    code for type checks for types known at compile time that are smaller
+    than (SIGNED-BYTE 64) or (UNSIGNED-BYTE 64) and larger than FIXNUM, and
+    their COMPLEX variants.
 
 changes in sbcl-1.1.7 relative to sbcl-1.1.6:
   * enhancement: TRACE :PRINT-ALL handles multiple-valued forms.
