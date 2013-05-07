@@ -246,9 +246,9 @@ If an unsupported TYPE is requested, the function will return NIL.
         (let ((expander (or (sb-int:info :setf :inverse name)
                             (sb-int:info :setf :expander name))))
           (when expander
-            (sb-introspect:find-definition-source (if (symbolp expander)
-                                                      (symbol-function expander)
-                                                      expander)))))
+            (find-definition-source (if (symbolp expander)
+                                        (symbol-function expander)
+                                        expander)))))
        ((:structure)
         (let ((class (get-class name)))
           (if class
@@ -296,20 +296,22 @@ If an unsupported TYPE is requested, the function will return NIL.
                                  (list note)))
                     collect source)))))
        ((:optimizer)
-        (when (symbolp name)
-          (let ((fun-info (sb-int:info :function :info name)))
-            (when fun-info
-              (let ((otypes '((sb-c::fun-info-derive-type . sb-c:derive-type)
-                              (sb-c::fun-info-ltn-annotate . sb-c:ltn-annotate)
-                              (sb-c::fun-info-ltn-annotate . sb-c:ltn-annotate)
-                              (sb-c::fun-info-optimizer . sb-c:optimizer))))
-                (loop for (reader . name) in otypes
-                      for fn = (funcall reader fun-info)
-                      when fn collect
-                      (let ((source (find-definition-source fn)))
-                        (setf (definition-source-description source)
-                              (list name))
-                        source)))))))
+        (let ((fun-info (and (symbolp name)
+                             (sb-int:info :function :info name))))
+          (when fun-info
+            (let ((otypes '((sb-c:fun-info-derive-type . sb-c:derive-type)
+                            (sb-c:fun-info-ltn-annotate . sb-c:ltn-annotate)
+                            (sb-c:fun-info-optimizer . sb-c:optimizer)
+                            (sb-c:fun-info-ir2-convert . sb-c:ir2-convert)
+                            (sb-c::fun-info-stack-allocate-result
+                             . sb-c::stack-allocate-result))))
+              (loop for (reader . name) in otypes
+                    for fn = (funcall reader fun-info)
+                    when fn collect
+                    (let ((source (find-definition-source fn)))
+                      (setf (definition-source-description source)
+                            (list name))
+                      source))))))
        ((:vop)
         (when (symbolp name)
           (find-vop-source name)))
@@ -317,7 +319,7 @@ If an unsupported TYPE is requested, the function will return NIL.
         (when (symbolp name)
           (let ((transform-fun (sb-int:info :function :source-transform name)))
             (when transform-fun
-              (sb-introspect:find-definition-source transform-fun)))))
+              (find-definition-source transform-fun)))))
        (t
         nil)))))
 

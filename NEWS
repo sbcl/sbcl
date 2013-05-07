@@ -7,7 +7,8 @@ changes relative to sbcl-1.1.7:
   * enhancement: "fixed objects" can now be stack-allocated on PPC.
   * enhancement: WITH-PINNED-OBJECTS no longer conses on PPC/GENCGC.
   * enhancement: (sb-introspect:find-definition-sources-by-name x :vop) now
-    also returns VOPs which do not translate any functions.
+    also returns VOPs which do not translate any functions, and finds
+    defoptimizer types ir2convert and stack-allocate-result.
   * enhancement: better type derivation for APPEND, NCONC, LIST.
     (lp#538957)
   * bug fix: type derivation for LOG{AND,IOR,XOR} scales linearly instead
