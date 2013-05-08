@@ -421,9 +421,18 @@
   (/hexstr context)
   (infinite-error-protect
    (/show0 "about to bind ALIEN-CONTEXT")
-   (let ((alien-context (locally
-                            (declare (optimize (inhibit-warnings 3)))
-                          (sb!alien:sap-alien context (* os-context-t)))))
+   (let* ((alien-context (locally
+                             (declare (optimize (inhibit-warnings 3)))
+                           (sb!alien:sap-alien context (* os-context-t))))
+          #!+c-stack-is-control-stack
+          (*saved-fp-and-pcs*
+           (cons (cons (%make-lisp-obj (sb!vm:context-register
+                                        alien-context
+                                        sb!vm::cfp-offset))
+                       (sb!vm:context-pc alien-context))
+                 (when (boundp '*saved-fp-and-pcs*)
+                   *saved-fp-and-pcs*))))
+     (declare (truly-dynamic-extent *saved-fp-and-pcs*))
      (/show0 "about to bind ERROR-NUMBER and ARGUMENTS")
      (multiple-value-bind (error-number arguments)
          (sb!vm:internal-error-args alien-context)
