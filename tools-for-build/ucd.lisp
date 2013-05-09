@@ -80,7 +80,17 @@
                                                                               right-bidi-mirrored))))))))))))))))))
 
 (defun build-misc-table ()
-  (sort *misc-table* #'compare-misc-entry)
+  (let ((table (sort *misc-table* #'compare-misc-entry)))
+    ;; after sorting, insert at the end a special entry to handle
+    ;; unallocated characters.
+    (setf *misc-table* (make-array (1+ (length table))))
+    (replace *misc-table* table)
+    (setf (aref *misc-table* (length table))
+          ;; unallocated characters have a GC index of 31 (not
+          ;; colliding with any other GC), are not digits or decimal
+          ;; digits, aren't BOTH-CASE-P, don't decompose, and aren't
+          ;; interestingly bidi or combining.
+          '(31 0 0 "" "" "" nil 0)))
   (setq *misc-mapping* (make-array (1+ *misc-index*)))
   (loop for i from 0 to *misc-index*
      do (setf (aref *misc-mapping*
@@ -426,14 +436,13 @@
         (loop for page across array
            do (loop for entry across page
                  do (write-4-byte
-                     ;; KLUDGE: while tests indicate that this works
-                     ;; by accident, actually this causes lookups on
-                     ;; characters undefined by Unicode (e.g. U+2FB00)
-                     ;; to zoom off into unrelated bits of
-                     ;; **CHARACTER-DATABASE** (see UCD-VALUE-[01] in
-                     ;; src/code/target-char.lisp).  It would be good
-                     ;; to make this work deliberately.
-                     (dpb (if entry (aref *misc-mapping* (ucd-misc entry)) #x7ff)
+                     (dpb (if entry
+                              (aref *misc-mapping* (ucd-misc entry))
+                              ;; the last entry in *MISC-TABLE* (see
+                              ;; BUILD-MISC-TABLE) is special,
+                              ;; reserved for the information for
+                              ;; characters unallocated by Unicode.
+                              (1- (length *misc-table*)))
                           (byte 11 21)
                           (if entry (ucd-transform entry) 0))
                      stream))))))
