@@ -632,7 +632,8 @@
     (setf (frame-number frame) number)))
 
 (defun find-saved-frame-down (fp up-frame)
-  (multiple-value-bind (saved-fp saved-pc) (sb!c:find-saved-fp-and-pc fp)
+  (multiple-value-bind (saved-fp saved-pc)
+      (sb!alien-internals:find-saved-fp-and-pc fp)
     (when saved-fp
       (compute-calling-frame (descriptor-sap saved-fp)
                              (descriptor-sap saved-pc)

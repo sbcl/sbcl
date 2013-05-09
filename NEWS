@@ -28,6 +28,8 @@ changes relative to sbcl-1.1.7:
     code for type checks for types known at compile time that are smaller
     than (SIGNED-BYTE 64) or (UNSIGNED-BYTE 64) and larger than FIXNUM, and
     their COMPLEX variants.
+  * optimization: On x86 targets, more uses of ALIEN-FUNCALL during cross
+    compilation now inline the INVOKE-WITH-SAVED-FP-AND-PC dance.
 
 changes in sbcl-1.1.7 relative to sbcl-1.1.6:
   * enhancement: TRACE :PRINT-ALL handles multiple-valued forms.

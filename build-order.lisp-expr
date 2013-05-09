@@ -119,7 +119,7 @@
  ("src/code/parse-defmacro")   ; on host for PARSE-DEFMACRO
  ("src/compiler/deftype")      ; on host for SB!XC:DEFTYPE
  ("src/compiler/defconstant")
- ("src/code/early-alieneval")  ; for vars needed both at build and run time
+ ("src/code/early-alieneval")  ; for funs and vars needed at build and run time
 
  ("src/code/specializable-array")
 
