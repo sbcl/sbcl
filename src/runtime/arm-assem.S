@@ -13,7 +13,7 @@
 
 #define STATIC_SYMBOL_VALUE(sym) [reg_NULL, #(((sym)-NIL)+SYMBOL_VALUE_OFFSET)]
 
-	.align	2
+	.align
 	.global	call_into_lisp
 	.type	call_into_lisp, %function
 call_into_lisp:
@@ -60,9 +60,10 @@ call_into_lisp:
 	ldr     reg_OCFP, =foreign_function_call_active
 	str     reg_R2, [reg_OCFP]
 
-	@@ Save off the C stack pointer (should probably set it as the
-	@@ number stack or something).
+	@@ Save off the C stack pointer.  Once for our return sequence,
+	@@ and once for the number stack.
 	stmea	reg_CFP!, {sp}
+	str     sp, STATIC_SYMBOL_VALUE(NUMBER_STACK_POINTER)
 
 	@@ We need to set up the lisp stack pointer and the basics of
 	@@ our stack frame while we're still in P-A.  Any sooner and
@@ -104,10 +105,14 @@ call_into_lisp:
 	@@ Correct stack pointer for return processing.
 	moveq	reg_CSP, reg_OCFP
 
-	@@ FIXME: Save the various stack and frame pointers here.
-
 	@@ Enter PSEUDO-ATOMIC.
 	str     pc, STATIC_SYMBOL_VALUE(PSEUDO_ATOMIC_ATOMIC)
+
+        @@ Save the lisp stack and frame pointers.
+	ldr	reg_NFP, .frame_pointer_address
+	ldr	reg_OCFP, .stack_pointer_address
+	str	reg_CFP, [reg_NFP]
+	str	reg_CSP, [reg_OCFP]
 
 	@@ Set FFCA, so the runtime knows that we're not "in lisp".
 	ldr     reg_OCFP, =foreign_function_call_active
@@ -129,6 +134,146 @@ call_into_lisp:
 	.size	call_into_lisp, .-call_into_lisp
 .frame_pointer_address:	.word	current_control_frame_pointer
 .stack_pointer_address: .word	current_control_stack_pointer
+
+
+	.align
+	.global	call_into_c
+	.type	call_into_c, %function
+call_into_c:
+	@@ At this point, we have:
+	@@ R8 -- C function to call.  This routine doesn't support
+        @@       thumb interworking, but linkage-table (when we get
+        @@       around to implementing it) will, so we don't have to.
+        @@ LR -- Return address within the code component.
+        @@ OCFP -- First C register argument.
+        @@ NARGS -- Second C register argument.
+        @@ NL2 -- Third C register argument.
+        @@ NL3 -- Fourth C register argument.
+        @@ All other C arguments are already stashed on the C stack.
+
+	@@ We need to convert our return address to a GC-safe format,
+	@@ build a stack frame to count for the "foreign" frame,
+	@@ switch to C mode, move the register arguments to the
+        @@ correct locations, call the C function, move the result to
+        @@ the correct location, switch back to Lisp mode, tear down
+        @@ our stack frame, restore the return address, and return to
+        @@ our caller.
+
+        @@ We have ONE unboxed scratch register: NFP.  Use it as a
+	@@ temporary while we convert the (unboxed) return address to
+        @@ a (fixnum) offset within the component.
+        sub     reg_NFP, reg_LR, reg_CODE
+        add     reg_NFP, reg_NFP, #OTHER_POINTER_LOWTAG
+
+        @@ Build a Lisp stack frame.  We need to stash our frame link,
+        @@ the code component, and our return offset.  Frame link goes
+	@@ in slot 0 (OCFP-SAVE-OFFSET), the offset (a FIXNUM) goes in
+        @@ slot 1 (LRA-SAVE-OFFSET), and reg_CODE goes in slot 2.  The
+        @@ debugger knows about this layout (see COMPUTE-CALLING-FRAME
+        @@ in SYS:SRC;CODE;DEBUG-INT.LISP).  The stack is aligned, so
+        @@ we can use R0 (a boxed register) as our temporary.
+        mov     reg_R0, sp
+        add     sp, sp, #12
+        str     reg_CFP, [reg_R0]
+        str     reg_NFP, [reg_R0, #4]
+        str     reg_CODE, [reg_R0, #8]
+
+        @@ Enter PSEUDO-ATOMIC.
+	str     pc, STATIC_SYMBOL_VALUE(PSEUDO_ATOMIC_ATOMIC)
+
+        @@ Save the lisp stack and frame pointers.
+	ldr	reg_NFP, .frame_pointer_address
+	str	reg_R0, [reg_NFP]
+	ldr	reg_NFP, .stack_pointer_address
+	str	reg_CSP, [reg_NFP]
+
+        @@ We're done with R0, and we need to use OCFP when leaving
+        @@ pseudo-atomic, so move the first of the C register
+	@@ arguments to its final resting place now.
+        mov     r0, reg_OCFP
+
+	@@ Set FFCA, so the runtime knows that we're not "in lisp".
+	ldr     reg_NFP, =foreign_function_call_active
+	str     pc, [reg_NFP]
+
+        @@ Pick up the C stack pointer.
+        ldr     sp, STATIC_SYMBOL_VALUE(NUMBER_STACK_POINTER)
+
+	@@ Leave PSEUDO-ATOMIC and check for interrupts.
+	str     reg_NULL, STATIC_SYMBOL_VALUE(PSEUDO_ATOMIC_ATOMIC)
+	ldr     reg_OCFP, STATIC_SYMBOL_VALUE(PSEUDO_ATOMIC_INTERRUPTED)
+	cmp     reg_OCFP, reg_NULL
+	movlt   reg_OCFP, reg_OCFP, lsl #N_FIXNUM_TAG_BITS
+	swilt   #0
+
+        @@ Now that we're in C mode, move the remaining register args
+	@@ into place.
+        mov     r1, reg_NARGS
+        mov     r2, reg_NL2
+        mov     r3, reg_NL3
+
+        @@ And call the C function.  We don't support interworking
+	@@ here because we have to be able to pass the function
+	@@ pointer in a boxed register, but the linkage-table is quite
+        @@ capable of doing a tail-call to a Thumb routine.  Oh, wait,
+        @@ we don't have a linkage-table yet.  Oops.
+        bl      reg_R8
+
+        @@ We're back.  Our main tasks are to move the C return value
+        @@ to where Lisp expects it, and to re-establish the Lisp
+        @@ environment.
+
+        @@ Stash the return value into NARGS for Lisp.
+        mov     reg_NARGS, r0
+
+        @@ Re-establish NIL.
+        ldr     reg_NULL, .known_nil
+
+        @@ Blank the boxed registers.
+        mov     reg_R0, #0
+        mov     reg_R1, #0
+        mov     reg_R2, #0
+        mov     reg_LEXENV, #0
+        mov     reg_R8, #0
+        mov     reg_CODE, #0
+
+        @@ Enter PSEUDO-ATOMIC.
+	str     pc, STATIC_SYMBOL_VALUE(PSEUDO_ATOMIC_ATOMIC)
+
+	@@ Clear FFCA, so the runtime knows that we're "in lisp".
+	ldr     reg_OCFP, =foreign_function_call_active
+	str     reg_R2, [reg_OCFP]
+
+        @@ Save off the C stack pointer.
+        str     sp, STATIC_SYMBOL_VALUE(NUMBER_STACK_POINTER)
+
+        @@ Restore the Lisp stack and frame pointers, but store the
+        @@ control frame pointer in reg_NFP (saving a register move
+        @@ later).
+	ldr	reg_NFP, .stack_pointer_address
+	ldr	reg_CSP, [reg_NFP]
+	ldr	reg_NFP, .frame_pointer_address
+	ldr	reg_NFP, [reg_NFP]
+
+	@@ Leave PSEUDO-ATOMIC and check for interrupts.
+	str     reg_NULL, STATIC_SYMBOL_VALUE(PSEUDO_ATOMIC_ATOMIC)
+	ldr     reg_OCFP, STATIC_SYMBOL_VALUE(PSEUDO_ATOMIC_INTERRUPTED)
+	cmp     reg_OCFP, reg_NULL
+	movlt   reg_OCFP, reg_OCFP, lsl #N_FIXNUM_TAG_BITS
+	swilt   #0
+
+        @@ Restore our caller state from our stack frame.
+        ldr     reg_CODE, [reg_NFP, #8]
+        ldr     reg_NL2, [reg_NFP, #4]
+        ldr     reg_CFP, [reg_NFP]
+        mov     reg_CSP, reg_NFP
+
+        @@ Restore our return address... into the program counter.
+        sub     reg_NL2, reg_NL2, #OTHER_POINTER_LOWTAG
+        add     reg_PC, reg_NL2, reg_CODE
+
+	.size	call_into_c, .-call_into_c
+
 
 /* Trampolines, like on SPARC, use Lisp calling conventions. */
 	.align	3
