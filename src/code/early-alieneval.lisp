@@ -55,6 +55,6 @@
              sap>
              #!-:stack-grows-downward-not-upward
              sap<
-             (int-sap (get-lisp-obj-address (car x))) fp)
+             (int-sap (sb!kernel:get-lisp-obj-address (car x))) fp)
         (return (values (car x) (cdr x)))))))
 
