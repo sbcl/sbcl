@@ -75,10 +75,13 @@ struct page {
          * written during a GC. */
         write_protected_cleared :1,
         /*  000 free
-         *  10? boxed data
-         *  11? boxed code
-         *  01? unboxed data
-         *  ??1 open region
+         *  ?01 boxed data
+         *  ?10 unboxed data
+         *  ?11 code
+         *  1?? open region
+         *
+         * Constants for this field are defined in gc-internal.h, the
+         * xxx_PAGE_FLAG definitions.
          *
          * If the page is free the following slots are invalid, except
          * for the bytes_used which must be zero. */

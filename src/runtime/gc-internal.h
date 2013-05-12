@@ -79,7 +79,9 @@ NWORDS(uword_t x, uword_t n_bits)
 #define FUN_RAW_ADDR_OFFSET (offsetof(struct simple_fun, code) - FUN_POINTER_LOWTAG)
 #endif
 
-/* values for the *_alloc_* parameters */
+/* values for the *_alloc_* parameters, also see the commentary for
+ * struct page in gencgc-internal.h.  FIXME: Perhaps these constants
+ * should be there, or at least defined on gencgc only? */
 #define FREE_PAGE_FLAG 0
 #define BOXED_PAGE_FLAG 1
 #define UNBOXED_PAGE_FLAG 2
