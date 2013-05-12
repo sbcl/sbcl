@@ -2312,14 +2312,6 @@ preserve_pointer(void *addr)
         /* Mark the page static. */
         page_table[i].dont_move = 1;
 
-        /* Move the page to the new_space. XX I'd rather not do this
-         * but the GC logic is not quite able to copy with the static
-         * pages remaining in the from space. This also requires the
-         * generation bytes_allocated counters be updated. */
-        page_table[i].gen = new_space;
-        generations[new_space].bytes_allocated += page_table[i].bytes_used;
-        generations[from_space].bytes_allocated -= page_table[i].bytes_used;
-
         /* It is essential that the pages are not write protected as
          * they may have pointers into the old-space which need
          * scavenging. They shouldn't be write protected at this
@@ -3362,6 +3354,28 @@ preserve_context_registers (os_context_t *c)
 }
 #endif
 
+static void
+move_pinned_pages_to_newspace()
+{
+    page_index_t i;
+
+    /* scavenge() will evacuate all oldspace pages, but no newspace
+     * pages.  Pinned pages are precisely those pages which must not
+     * be evacuated, so move them to newspace directly. */
+
+    for (i = 0; i < last_free_page; i++) {
+        if (page_table[i].dont_move &&
+            /* dont_move is cleared lazily, so validate the space as well. */
+            page_table[i].gen == from_space) {
+            page_table[i].gen = new_space;
+            /* And since we're moving the pages wholesale, also adjust
+             * the generation allocation counters. */
+            generations[new_space].bytes_allocated += page_table[i].bytes_used;
+            generations[from_space].bytes_allocated -= page_table[i].bytes_used;
+        }
+    }
+}
+
 /* Garbage collect a generation. If raise is 0 then the remains of the
  * generation are not raised to the next generation. */
 static void
@@ -3528,6 +3542,12 @@ garbage_collect_generation(generation_index_t generation, int raise)
                 npage_bytes(num_dont_move_pages));
     }
 #endif
+
+    /* Now that all of the pinned (dont_move) pages are known, and
+     * before we start to scavenge (and thus relocate) objects,
+     * relocate the pinned pages to newspace, so that the scavenger
+     * will not attempt to relocate their contents. */
+    move_pinned_pages_to_newspace();
 
     /* Scavenge all the rest of the roots. */
 
