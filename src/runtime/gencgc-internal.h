@@ -51,8 +51,12 @@ int gencgc_handle_wp_violation(void *);
  * output the C version in genesis. -- JES, 2006-12-30.
  */
 struct page {
-    /* This is the offset from the start of the page to the start of
-     * the alloc_region which contains/contained it.
+    /* This is the offset from the first byte of some object in memory
+     * prior to and no closer than the start of the page to the start
+     * of the page.  Lower values here are better, 0 is ideal.  This
+     * is useful for determining where to start when scanning forward
+     * through a heap page (either for conservative root validation or
+     * for scavenging).
      */
     os_vm_size_t region_start_offset;
 
