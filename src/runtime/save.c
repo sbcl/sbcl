@@ -321,7 +321,7 @@ save_to_filehandle(FILE *file, char *filename, lispobj init_function,
                  * are always zero, so we can use them to store the
                  * allocation type -- region is always closed, so only
                  * the two low bits of allocation flags matter. */
-                word = page_table[i].region_start_offset;
+                word = page_table[i].scan_start_offset;
                 gc_assert((word & 0x03) == 0);
                 data[i] = word | (0x03 & page_table[i].allocated);
             }

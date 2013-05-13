@@ -58,7 +58,7 @@ struct page {
      * through a heap page (either for conservative root validation or
      * for scavenging).
      */
-    os_vm_size_t region_start_offset;
+    os_vm_size_t scan_start_offset;
 
     /* the number of bytes of this page that are used. This may be less
      * than the actual bytes used for pages within the current
