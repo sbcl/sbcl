@@ -204,8 +204,8 @@
 
 (defmethod describe-object ((x character) s)
   (print-standard-describe-header x s)
-  (format s "~%:_Char-code: ~S" (char-code x))
-  (format s "~%:_Char-name: ~A~%_" (char-name x)))
+  (format s "~%Char-code: ~S" (char-code x))
+  (format s "~%Char-name: ~A" (char-name x)))
 
 (defmethod describe-object ((x array) s)
   (print-standard-describe-header x s)
