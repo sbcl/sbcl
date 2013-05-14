@@ -238,6 +238,13 @@ page_scan_start(page_index_t page_index)
     return page_address(page_index)-page_table[page_index].scan_start_offset;
 }
 
+/* True if the page starts a contiguous block. */
+static inline boolean
+page_starts_contiguous_block_p(page_index_t page_index)
+{
+    return page_table[page_index].scan_start_offset == 0;
+}
+
 /* Find the page index within the page_table for the given
  * address. Return -1 on failure. */
 inline page_index_t
@@ -1035,7 +1042,7 @@ gc_alloc_update_page_tables(int page_type_flag, struct alloc_region *alloc_regio
         /* If the page was free then set up the gen, and
          * scan_start_offset. */
         if (page_table[first_page].bytes_used == 0)
-            gc_assert(page_table[first_page].scan_start_offset == 0);
+            gc_assert(page_starts_contiguous_block_p(first_page));
         page_table[first_page].allocated &= ~(OPEN_REGION_PAGE_FLAG);
 
         gc_assert(page_table[first_page].allocated & page_type_flag);
@@ -1480,7 +1487,7 @@ general_copy_large_object(lispobj object, word_t nwords, boolean boxedp)
          * new areas, but let's do it for them all (they'll probably
          * be written anyway?). */
 
-        gc_assert(page_table[first_page].scan_start_offset == 0);
+        gc_assert(page_starts_contiguous_block_p(first_page));
         next_page = first_page;
         remaining_bytes = nwords*N_WORD_BYTES;
 
@@ -2134,7 +2141,7 @@ maybe_adjust_large_object(lispobj *where)
      * but lets do it for them all (they'll probably be written
      * anyway?). */
 
-    gc_assert(page_table[first_page].scan_start_offset == 0);
+    gc_assert(page_starts_contiguous_block_p(first_page));
 
     next_page = first_page;
     remaining_bytes = nwords*N_WORD_BYTES;
@@ -2273,7 +2280,7 @@ preserve_pointer(void *addr)
     first_page = find_page_index(page_scan_start(addr_page_index))
 #else
     first_page = addr_page_index;
-    while (page_table[first_page].scan_start_offset != 0) {
+    while (!page_starts_contiguous_block_p(first_page)) {
         --first_page;
         /* Do some checks. */
         gc_assert(page_table[first_page].bytes_used == GENCGC_CARD_BYTES);
@@ -2324,7 +2331,7 @@ preserve_pointer(void *addr)
             || page_free_p(i+1)
             || (page_table[i+1].bytes_used == 0) /* next page free */
             || (page_table[i+1].gen != from_space) /* diff. gen */
-            || (page_table[i+1].scan_start_offset == 0))
+            || (page_starts_contiguous_block_p(i+1)))
             break;
     }
 
@@ -2458,7 +2465,7 @@ scavenge_generations(generation_index_t from, generation_index_t to)
             int write_protected=1;
 
             /* This should be the start of a region */
-            gc_assert(page_table[i].scan_start_offset == 0);
+            gc_assert(page_starts_contiguous_block_p(i));
 
             /* Now work forward until the end of the region */
             for (last_page = i; ; last_page++) {
@@ -2469,7 +2476,7 @@ scavenge_generations(generation_index_t from, generation_index_t to)
                     || (!page_boxed_p(last_page+1))
                     || (page_table[last_page+1].bytes_used == 0)
                     || (page_table[last_page+1].gen != generation)
-                    || (page_table[last_page+1].scan_start_offset == 0))
+                    || (page_starts_contiguous_block_p(last_page+1)))
                     break;
             }
             if (!write_protected) {
@@ -2585,7 +2592,7 @@ scavenge_newspace_generation_one_scan(generation_index_t generation)
                     || (!page_boxed_p(last_page+1))
                     || (page_table[last_page+1].bytes_used == 0)
                     || (page_table[last_page+1].gen != generation)
-                    || (page_table[last_page+1].scan_start_offset == 0))
+                    || (page_starts_contiguous_block_p(last_page+1)))
                     break;
             }
 
@@ -3184,7 +3191,7 @@ verify_generation(generation_index_t generation)
             int region_allocation = page_table[i].allocated;
 
             /* This should be the start of a contiguous block */
-            gc_assert(page_table[i].scan_start_offset == 0);
+            gc_assert(page_starts_contiguous_block_p(i));
 
             /* Need to find the full extent of this contiguous block in case
                objects span pages. */
@@ -3199,7 +3206,7 @@ verify_generation(generation_index_t generation)
                     || (page_table[last_page+1].allocated != region_allocation)
                     || (page_table[last_page+1].bytes_used == 0)
                     || (page_table[last_page+1].gen != generation)
-                    || (page_table[last_page+1].scan_start_offset == 0))
+                    || (page_starts_contiguous_block_p(last_page+1)))
                     break;
 
             verify_space(page_address(i),
