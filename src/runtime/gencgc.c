@@ -245,6 +245,22 @@ page_starts_contiguous_block_p(page_index_t page_index)
     return page_table[page_index].scan_start_offset == 0;
 }
 
+/* True if the page is the last page in a contiguous block. */
+static inline boolean
+page_ends_contiguous_block_p(page_index_t page_index, generation_index_t gen)
+{
+    return (/* page doesn't fill block */
+            (page_table[page_index].bytes_used < GENCGC_CARD_BYTES)
+            /* next page free */
+            || page_free_p(page_index + 1)
+            /* next page contains no data */
+            || (page_table[page_index + 1].bytes_used == 0)
+            /* next page is in different generation */
+            || (page_table[page_index + 1].gen != gen)
+            /* next page starts its own contiguous block */
+            || (page_starts_contiguous_block_p(page_index + 1)));
+}
+
 /* Find the page index within the page_table for the given
  * address. Return -1 on failure. */
 inline page_index_t
@@ -2326,12 +2342,7 @@ preserve_pointer(void *addr)
         gc_assert(!page_table[i].write_protected);
 
         /* Check whether this is the last page in this contiguous block.. */
-        if ((page_table[i].bytes_used < GENCGC_CARD_BYTES)
-            /* ..or it is CARD_BYTES and is the last in the block */
-            || page_free_p(i+1)
-            || (page_table[i+1].bytes_used == 0) /* next page free */
-            || (page_table[i+1].gen != from_space) /* diff. gen */
-            || (page_starts_contiguous_block_p(i+1)))
+        if (page_ends_contiguous_block_p(i, from_space))
             break;
     }
 
@@ -2471,12 +2482,7 @@ scavenge_generations(generation_index_t from, generation_index_t to)
             for (last_page = i; ; last_page++) {
                 write_protected =
                     write_protected && page_table[last_page].write_protected;
-                if ((page_table[last_page].bytes_used < GENCGC_CARD_BYTES)
-                    /* Or it is CARD_BYTES and is the last in the block */
-                    || (!page_boxed_p(last_page+1))
-                    || (page_table[last_page+1].bytes_used == 0)
-                    || (page_table[last_page+1].gen != generation)
-                    || (page_starts_contiguous_block_p(last_page+1)))
+                if (page_ends_contiguous_block_p(last_page, generation))
                     break;
             }
             if (!write_protected) {
@@ -2587,12 +2593,7 @@ scavenge_newspace_generation_one_scan(generation_index_t generation)
 
                 /* Check whether this is the last page in this
                  * contiguous block */
-                if ((page_table[last_page].bytes_used < GENCGC_CARD_BYTES)
-                    /* Or it is CARD_BYTES and is the last in the block */
-                    || (!page_boxed_p(last_page+1))
-                    || (page_table[last_page+1].bytes_used == 0)
-                    || (page_table[last_page+1].gen != generation)
-                    || (page_starts_contiguous_block_p(last_page+1)))
+                if (page_ends_contiguous_block_p(last_page, generation))
                     break;
             }
 
@@ -3201,12 +3202,7 @@ verify_generation(generation_index_t generation)
             for (last_page = i; ;last_page++)
                 /* Check whether this is the last page in this contiguous
                  * block. */
-                if ((page_table[last_page].bytes_used < GENCGC_CARD_BYTES)
-                    /* Or it is CARD_BYTES and is the last in the block */
-                    || (page_table[last_page+1].allocated != region_allocation)
-                    || (page_table[last_page+1].bytes_used == 0)
-                    || (page_table[last_page+1].gen != generation)
-                    || (page_starts_contiguous_block_p(last_page+1)))
+                if (page_ends_contiguous_block_p(last_page, generation))
                     break;
 
             verify_space(page_address(i),
