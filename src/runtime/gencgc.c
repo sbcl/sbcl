@@ -251,6 +251,8 @@ page_ends_contiguous_block_p(page_index_t page_index, generation_index_t gen)
 {
     return (/* page doesn't fill block */
             (page_table[page_index].bytes_used < GENCGC_CARD_BYTES)
+            /* page is last allocated page */
+            || ((page_index + 1) >= last_free_page)
             /* next page free */
             || page_free_p(page_index + 1)
             /* next page contains no data */
