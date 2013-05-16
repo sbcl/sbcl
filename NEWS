@@ -34,6 +34,7 @@ changes relative to sbcl-1.1.7:
     threaded FreeBSD/x86-64.
   * bug fix: some LOOP statements couldn't be compiled.
     (lp#1178989)
+  * bug fix: sb-sequence:dosequence works on literal vectors.
   * optimization: faster ISQRT on fixnums and small bignums
   * optimization: faster and smaller INTEGER-LENGTH on fixnums on x86-64.
   * optimization: On x86-64, the number of multi-byte NOP instructions used

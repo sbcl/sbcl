@@ -122,6 +122,7 @@
   (def-type-predicate-wrapper single-float-p)
   (def-type-predicate-wrapper %instancep)
   (def-type-predicate-wrapper symbolp)
+  (def-type-predicate-wrapper %other-pointer-p)
   (def-type-predicate-wrapper system-area-pointer-p)
   (def-type-predicate-wrapper weak-pointer-p)
   #!+#.(cl:if (cl:= 32 sb!vm:n-word-bits) '(and) '(or))

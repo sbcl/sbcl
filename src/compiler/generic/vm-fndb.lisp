@@ -20,7 +20,7 @@
            complex-rational-p complex-float-p complex-single-float-p
            complex-double-float-p #!+long-float complex-long-float-p
            complex-vector-p
-           base-char-p %standard-char-p %instancep %other-pointer-p
+           base-char-p %standard-char-p %instancep
            base-string-p simple-base-string-p
            #!+sb-unicode character-string-p
            #!+sb-unicode simple-character-string-p
@@ -64,9 +64,14 @@
            weak-pointer-p code-component-p lra-p
            funcallable-instance-p)
   (t) boolean (movable foldable flushable))
+
 (defknown #.(loop for (name) in *vector-without-complex-typecode-infos*
                   collect name)
-  (t) boolean (movable foldable flushable))
+    (t) boolean (movable foldable flushable))
+
+(defknown %other-pointer-p (t) boolean
+  (movable foldable flushable always-translatable))
+
 
 ;;;; miscellaneous "sub-primitives"
 
