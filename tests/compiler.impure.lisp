@@ -2382,4 +2382,13 @@
                   (with-output-to-string (*standard-output*)
                     (many-code-constants)))))
 
+(test-util:with-test (:name :bug-943953)
+  ;; we sometimes splice compiler structures like clambda in
+  ;; source, and our error reporting would happily use that
+  ;; as source forms.
+  (let* ((src "bug-943953.lisp")
+         (obj (compile-file-pathname src)))
+    (unwind-protect (compile-file src)
+      (ignore-errors (delete-file obj)))))
+
 ;;; success
