@@ -1767,6 +1767,46 @@
   (def list*))
 
 
+(defoptimizer (mask-signed-field ir2-convert) ((width x) node block)
+  (block nil
+    (when (constant-lvar-p width)
+      (case (lvar-value width)
+        (#.(- sb!vm:n-word-bits sb!vm:n-fixnum-tag-bits)
+         (when (or (csubtypep (lvar-type x)
+                              (specifier-type 'word))
+                   (csubtypep (lvar-type x)
+                              (specifier-type 'sb!vm:signed-word)))
+           (let* ((lvar (node-lvar node))
+                  (temp (make-normal-tn
+                         (if (csubtypep (lvar-type x)
+                                        (specifier-type 'word))
+                             (primitive-type-of most-positive-word)
+                             (primitive-type-of
+                              (- (ash most-positive-word -1))))))
+                  (results (lvar-result-tns
+                            lvar
+                            (list (primitive-type-or-lose 'fixnum)))))
+             (emit-move node block (lvar-tn node block x) temp)
+             (vop sb!vm::move-from-word/fixnum node block
+                  temp (first results))
+             (move-lvar-result node block results lvar)
+             (return))))
+        (#.sb!vm:n-word-bits
+         (when (csubtypep (lvar-type x) (specifier-type 'word))
+           (let* ((lvar (node-lvar node))
+                  (temp (make-normal-tn
+                         (primitive-type-of most-positive-word)))
+                  (results (lvar-result-tns
+                            lvar
+                            (list (primitive-type
+                                   (specifier-type 'sb!vm:signed-word))))))
+             (emit-move node block (lvar-tn node block x) temp)
+             (vop sb!vm::word-move node block
+                  temp (first results))
+             (move-lvar-result node block results lvar)
+             (return))))))
+    (ir2-convert-full-call node block)))
+
 ;;; Convert the code in a component into VOPs.
 (defun ir2-convert (component)
   (declare (type component component))
