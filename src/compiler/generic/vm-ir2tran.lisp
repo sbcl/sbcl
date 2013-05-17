@@ -31,7 +31,7 @@
 (defoptimizer ir2-convert-reffer ((object) node block name offset lowtag)
   (let* ((lvar (node-lvar node))
          (locs (lvar-result-tns lvar
-                                        (list *backend-t-primitive-type*)))
+                                (list *backend-t-primitive-type*)))
          (res (first locs)))
     (vop slot node block (lvar-tn node block object)
          name offset lowtag res)
@@ -75,22 +75,35 @@
             (slot (cdr init)))
         (case kind
           (:slot
-           (let ((raw-type (pop slot))
-                 (arg-tn (lvar-tn node block (pop args))))
-             (macrolet ((make-case ()
-                          `(ecase raw-type
-                             ((t)
-                              (vop init-slot node block object arg-tn
-                                   name (+ sb!vm:instance-slots-offset slot) lowtag))
-                             ,@(mapcar (lambda (rsd)
-                                         `(,(sb!kernel::raw-slot-data-raw-type rsd)
-                                            (vop ,(sb!kernel::raw-slot-data-init-vop rsd)
-                                                 node block
-                                                 object arg-tn instance-length slot)))
-                                       #!+raw-instance-init-vops
-                                       sb!kernel::*raw-slot-data-list*
-                                       #!-raw-instance-init-vops
-                                       nil))))
+           (let* ((raw-type (pop slot))
+                  (arg (pop args))
+                  (arg-tn (lvar-tn node block arg)))
+             (macrolet
+                 ((make-case ()
+                    `(ecase raw-type
+                       ((t)
+                        (vop init-slot node block object arg-tn
+                             name (+ sb!vm:instance-slots-offset slot) lowtag))
+                       ,@(mapcar
+                          (lambda (rsd)
+                            (let ((specifier (sb!kernel::raw-slot-data-raw-type
+                                              rsd)))
+                              `(,specifier
+                                (let ((type (specifier-type ',specifier))
+                                      (arg-tn arg-tn))
+                                  (unless (csubtypep (lvar-type arg) type)
+                                    (let ((tmp (make-normal-tn
+                                                (primitive-type type))))
+                                      (emit-type-check node block arg-tn
+                                                       tmp type)
+                                      (setf arg-tn tmp)))
+                                  (vop ,(sb!kernel::raw-slot-data-init-vop rsd)
+                                       node block
+                                       object arg-tn instance-length slot)))))
+                          #!+raw-instance-init-vops
+                          sb!kernel::*raw-slot-data-list*
+                          #!-raw-instance-init-vops
+                          nil))))
                (make-case))))
           (:dd
            (vop init-slot node block object

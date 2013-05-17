@@ -2391,4 +2391,16 @@
     (unwind-protect (compile-file src)
       (ignore-errors (delete-file obj)))))
 
+(declaim (inline vec-1177703))
+(defstruct (vec-1177703 (:constructor vec-1177703 (&optional x)))
+  (x 0.0d0 :type double-float))
+
+(declaim (inline norm-1177703))
+(defun norm-1177703 (v)
+  (vec-1177703 (sqrt (vec-1177703-x v))))
+
+(test-util:with-test (:name :bug-1177703)
+  (compile nil `(lambda (x)
+                  (norm-1177703 (vec-1177703 x)))))
+
 ;;; success
