@@ -527,10 +527,6 @@
               ((not inherited)
                (stuff `(declaim (inline ,name ,@(unless (dsd-read-only slot)
                                                         `((setf ,name))))))
-               ;; FIXME: The arguments in the next two DEFUNs should
-               ;; be gensyms. (Otherwise e.g. if NEW-VALUE happened to
-               ;; be the name of a special variable, things could get
-               ;; weird.)
                (stuff `(defun ,name (structure)
                         (declare (type ,ltype structure))
                         (the ,slot-type (elt structure ,index))))

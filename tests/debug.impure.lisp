@@ -273,6 +273,44 @@
                             '(((flet bar :in bug-308926) 13)
                               (bug-308926 &rest t)))))
 
+;;; Test backtrace through assembly routines
+;;; :bug-800343
+(macrolet ((test (predicate fun
+                    &optional (two-arg
+                               (find-symbol (format nil "TWO-ARG-~A" fun)
+                                            "SB-KERNEL")))
+               (let ((test-name (make-symbol (format nil "TEST-~A" fun))))
+                 `(flet ((,test-name (x y)
+                           ;; make sure it's not in tail position
+                           (list (,fun x y))))
+                    (with-test (:name (:bug-800343 ,fun))
+                      (assert (verify-backtrace
+                               (lambda ()
+                                 (eval `(funcall ,#',test-name 42 t)))
+                               '((,two-arg 42 t)
+                                 #+(or x86 x86-64)
+                                 ,@(and predicate
+                                    '(("no debug information for frame")))
+                                 ((flet ,test-name :in ,*p*) 42 t))))))))
+             (test-predicates (&rest functions)
+               `(progn ,@(mapcar (lambda (function)
+                                   (if (consp function)
+                                       `(test t ,@function)
+                                       `(test t ,function)))
+                                 functions)))
+             (test-functions (&rest functions)
+               `(progn ,@(mapcar (lambda (function)
+                                   (if (consp function)
+                                       `(test nil ,@function)
+                                       `(test nil ,function)))
+                                 functions))))
+    (test-predicates = < >)
+    (test-functions + - * /
+                    gcd lcm
+                    (logand sb-kernel:two-arg-and)
+                    (logior sb-kernel:two-arg-ior)
+                    (logxor sb-kernel:two-arg-xor)))
+
 ;;; test entry point handling in backtraces
 
 (defun oops ()

@@ -176,6 +176,8 @@
                 (inst ret)
 
                 DO-STATIC-FUN
+                (inst push rbp-tn)
+                (inst mov rbp-tn rsp-tn)
                 (inst sub rsp-tn (* n-word-bytes 3))
                 (inst mov (make-ea :qword :base rsp-tn
                                    :disp (frame-byte-offset
@@ -198,6 +200,7 @@
                     (:l `((inst mov y (1+ nil-value))
                           (inst cmp y x)))
                     (:g `((inst cmp x (1+ nil-value)))))
+                (inst pop rbp-tn)
                 (inst ret))
              #-sb-assembling
              `(define-vop (,name)
@@ -246,6 +249,8 @@
   (inst ret)
 
   DO-STATIC-FUN
+  (inst push rbp-tn)
+  (inst mov rbp-tn rsp-tn)
   (inst sub rsp-tn (* n-word-bytes 3))
   (inst mov (make-ea :qword :base rsp-tn
                      :disp (frame-byte-offset
@@ -263,6 +268,7 @@
                       :disp (+ nil-value (static-fun-offset 'eql))))
   (load-symbol y t)
   (inst cmp x y)
+  (inst pop rbp-tn)
   (inst ret))
 
 #-sb-assembling
@@ -308,6 +314,8 @@
   (inst ret)
 
   DO-STATIC-FUN
+  (inst push rbp-tn)
+  (inst mov rbp-tn rsp-tn)
   (inst sub rsp-tn (* n-word-bytes 3))
   (inst mov (make-ea :qword :base rsp-tn
                      :disp (frame-byte-offset
@@ -326,6 +334,7 @@
                       :disp (+ nil-value (static-fun-offset 'two-arg-=))))
   (load-symbol y t)
   (inst cmp x y)
+  (inst pop rbp-tn)
   (inst ret))
 
 #-sb-assembling

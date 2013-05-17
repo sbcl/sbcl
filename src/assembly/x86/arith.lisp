@@ -170,6 +170,8 @@
                 (inst ret)
 
                 DO-STATIC-FUN
+                (inst push ebp-tn)
+                (inst mov ebp-tn esp-tn)
                 (inst sub esp-tn (fixnumize 3))
                 (inst mov (make-ea :dword :base esp-tn
                                    :disp (frame-byte-offset
@@ -192,6 +194,7 @@
                     (:l `((inst mov y (1+ nil-value))
                           (inst cmp y x)))
                     (:g `((inst cmp x (1+ nil-value)))))
+                (inst pop ebp-tn)
                 (inst ret))
              #-sb-assembling
              `(define-vop (,name)
@@ -239,6 +242,8 @@
   (inst cmp x y)
   (inst jmp :e RET)
 
+  (inst push ebp-tn)
+  (inst mov ebp-tn esp-tn)
   (inst sub esp-tn (fixnumize 3))
   (inst mov (make-ea :dword :base esp-tn
                      :disp (frame-byte-offset
@@ -256,6 +261,7 @@
                       :disp (+ nil-value (static-fun-offset 'eql))))
   (load-symbol y t)
   (inst cmp x y)
+  (inst pop ebp-tn)
   (inst ret))
 
 #-sb-assembling
@@ -296,6 +302,8 @@
   (inst ret)
 
   DO-STATIC-FUN
+  (inst push ebp-tn)
+  (inst mov ebp-tn esp-tn)
   (inst sub esp-tn (fixnumize 3))
   (inst mov (make-ea :dword :base esp-tn
                      :disp (frame-byte-offset
@@ -313,6 +321,7 @@
                       :disp (+ nil-value (static-fun-offset 'two-arg-=))))
   (load-symbol y t)
   (inst cmp x y)
+  (inst pop ebp-tn)
   (inst ret))
 
 #-sb-assembling
