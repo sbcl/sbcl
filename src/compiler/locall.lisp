@@ -490,6 +490,24 @@
          (lexenv-policy (node-lexenv call))))))
   (values))
 
+;;; Convenience function to mark local calls as known bad.
+(defun transform-call-with-ir1-environment (node lambda default-name)
+  (aver (combination-p node))
+  (with-ir1-environment-from-node node
+    (transform-call node lambda
+                    (or (combination-fun-source-name node nil)
+                        default-name))))
+
+(defun warn-invalid-local-call (node count &rest warn-arguments)
+  (aver (combination-p node))
+  (aver (typep count 'unsigned-byte))
+  (apply 'warn warn-arguments)
+  (transform-call-with-ir1-environment node
+                                       `(lambda (&rest args)
+                                          (declare (ignore args))
+                                          (%arg-count-error ,count))
+                                       '%arg-count-error))
+
 ;;; Attempt to convert a call to a lambda. If the number of args is
 ;;; wrong, we give a warning and mark the call as :ERROR to remove it
 ;;; from future consideration. If the argcount is O.K. then we just
@@ -501,12 +519,11 @@
     (cond ((= n-call-args nargs)
            (convert-call ref call fun))
           (t
-           (warn
+           (warn-invalid-local-call call n-call-args
             'local-argument-mismatch
             :format-control
             "function called with ~R argument~:P, but wants exactly ~R"
-            :format-arguments (list n-call-args nargs))
-           (setf (basic-combination-kind call) :error)))))
+            :format-arguments (list n-call-args nargs))))))
 
 ;;;; &OPTIONAL, &MORE and &KEYWORD calls
 
@@ -522,12 +539,11 @@
         (max-args (optional-dispatch-max-args fun))
         (call-args (length (combination-args call))))
     (cond ((< call-args min-args)
-           (warn
+           (warn-invalid-local-call call call-args
             'local-argument-mismatch
             :format-control
             "function called with ~R argument~:P, but wants at least ~R"
-            :format-arguments (list call-args min-args))
-           (setf (basic-combination-kind call) :error))
+            :format-arguments (list call-args min-args)))
           ((<= call-args max-args)
            (convert-call ref call
                          (let ((*current-component* (node-component ref)))
@@ -536,13 +552,12 @@
           ((optional-dispatch-more-entry fun)
            (convert-more-call ref call fun))
           (t
-           (warn
+           (warn-invalid-local-call call call-args
             'local-argument-mismatch
             :format-control
             "function called with ~R argument~:P, but wants at most ~R"
             :format-arguments
-            (list call-args max-args))
-           (setf (basic-combination-kind call) :error))))
+            (list call-args max-args)))))
   (values))
 
 ;;; This function is used to convert a call to an entry point when
@@ -622,7 +637,12 @@
         (when (oddp (length more))
           (compiler-warn "function called with odd number of ~
                           arguments in keyword portion")
-          (setf (basic-combination-kind call) :error)
+          (transform-call-with-ir1-environment
+           call
+           `(lambda (&rest args)
+              (declare (ignore args))
+              (%odd-key-args-error))
+           '%odd-key-args-error)
           (return-from convert-more-call))
 
         (do ((key more (cddr key))
@@ -663,7 +683,12 @@
         (when (and loser (not (optional-dispatch-allowp fun)) (not allowp))
           (compiler-warn "function called with unknown argument keyword ~S"
                          (car loser))
-          (setf (basic-combination-kind call) :error)
+          (transform-call-with-ir1-environment
+           call
+           `(lambda (&rest args)
+              (declare (ignore args))
+              (%unknown-key-arg-error ',(car loser)))
+           '%unknown-key-arg-error)
           (return-from convert-more-call)))
 
       (collect ((call-args))

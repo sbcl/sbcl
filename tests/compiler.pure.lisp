@@ -4411,3 +4411,51 @@
           do (assert (equal (car (cdaddr (sb-kernel:%simple-fun-type
                                           (compile nil function))))
                             result-type)))))
+
+(with-test (:name :bug-504121)
+  (compile nil `(lambda (s)
+                  (let ((p1 #'upper-case-p))
+                    (funcall
+                     (lambda (g)
+                       (funcall p1 g))))
+                  (let ((p2 #'(lambda (char) (upper-case-p char))))
+                    (funcall p2 s)))))
+
+(with-test (:name (:bug-504121 :optional-missing))
+  (compile nil `(lambda (s)
+                  (let ((p1 #'upper-case-p))
+                    (funcall
+                     (lambda (g &optional x)
+                       (funcall p1 g))))
+                  (let ((p2 #'(lambda (char) (upper-case-p char))))
+                    (funcall p2 s)))))
+
+(with-test (:name (:bug-504121 :optional-superfluous))
+  (compile nil `(lambda (s)
+                  (let ((p1 #'upper-case-p))
+                    (funcall
+                     (lambda (g &optional x)
+                       (funcall p1 g))
+                     #\1 2 3))
+                  (let ((p2 #'(lambda (char) (upper-case-p char))))
+                    (funcall p2 s)))))
+
+(with-test (:name (:bug-504121 :key-odd))
+  (compile nil `(lambda (s)
+                  (let ((p1 #'upper-case-p))
+                    (funcall
+                     (lambda (g &key x)
+                       (funcall p1 g))
+                     #\1 :x))
+                  (let ((p2 #'(lambda (char) (upper-case-p char))))
+                    (funcall p2 s)))))
+
+(with-test (:name (:bug-504121 :key-unknown))
+  (compile nil `(lambda (s)
+                  (let ((p1 #'upper-case-p))
+                    (funcall
+                     (lambda (g &key x)
+                       (funcall p1 g))
+                     #\1 :y 2))
+                  (let ((p2 #'(lambda (char) (upper-case-p char))))
+                    (funcall p2 s)))))
