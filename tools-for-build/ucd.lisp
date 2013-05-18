@@ -97,7 +97,21 @@
                     (gethash (aref *misc-table* i) *misc-hash*))
               i)))
 
+(defvar *comp-table*)
+
+(defvar *exclusions*
+  (with-open-file (s (make-pathname :name "CompositionExclusions" :type "txt"
+                                    :defaults *unicode-character-database*))
+    (do ((line (read-line s nil nil) (read-line s nil nil))
+         result)
+        ((null line) result)
+      (when (and (> (length line) 0)
+                 (char/= (char line 0) #\#))
+        (push (parse-integer line :end (position #\Space line) :radix 16)
+              result)))))
+
 (defun slurp-ucd ()
+  (setf *comp-table* (make-hash-table :test 'equal))
   (setq *last-uppercase* nil)
   (setq *uppercase-transition-count* 0)
   (setq *different-titlecases* nil)
@@ -128,9 +142,23 @@
           while line
           do (slurp-ucd-line line)))
   (second-pass)
+  (fixup-compositions)
   (fixup-hangul-syllables)
   (build-misc-table)
   (length *long-decompositions*))
+
+(defun fixup-compositions ()
+  (flet ((fixup (k v)
+           (let* ((cp (car k))
+                  (ucd (aref (aref *ucd-base* (cp-high cp)) (cp-low cp)))
+                  (misc (aref *misc-table* (ucd-misc ucd)))
+                  (ccc-index (third misc)))
+             ;; we can do everything in the first pass except for
+             ;; accounting for decompositions where the first
+             ;; character of the decomposition is not a starter.
+             (when (/= ccc-index 0)
+               (remhash k *comp-table*)))))
+    (maphash #'fixup *comp-table*)))
 
 (defun fixup-hangul-syllables ()
   ;; "Hangul Syllable Composition, Unicode 5.1 section 3-12"
@@ -268,6 +296,25 @@
                            (mapcar #'(lambda (string)
                                        (parse-integer string :radix 16))
                                    split)))
+                      (when (= decomposition-info 1)
+                        ;; Primary composition excludes:
+                        ;; * singleton decompositions;
+                        ;; * decompositions of non-starters;
+                        ;; * script-specific decompositions;
+                        ;; * later-version decompositions;
+                        ;; * decompositions whose first character is a
+                        ;;   non-starter.
+                        ;; All but the last case can be handled here;
+                        ;; for the fixup, see FIXUP-COMPOSITIONS
+                        (when (and (> (length decomposition) 1)
+                                   (= ccc-index 0)
+                                   (not (member code-point *exclusions*)))
+                          (unless (= (length decomposition) 2)
+                            (error "canonical decomposition unexpectedly long"))
+                          (setf (gethash (cons (first decomposition)
+                                               (second decomposition))
+                                         *comp-table*)
+                                code-point)))
                       (if (= (length decomposition) 1)
                           (cons 1 (car decomposition))
                           (cons (length decomposition)
@@ -316,19 +363,19 @@
                                      (- *page-size-exponent*)))
                     (page-end (ash code-point (- *page-size-exponent*))))
                 (loop for point from *block-first*
-                      below (ash page-start *page-size-exponent*)
-                      do (setf (aref (aref *ucd-base* (cp-high point))
-                                     (cp-low point))
-                               result))
+                   below (ash page-start *page-size-exponent*)
+                   do (setf (aref (aref *ucd-base* (cp-high point))
+                                  (cp-low point))
+                            result))
                 (loop for page from page-start below page-end
-                      do (setf (aref *ucd-base* page)
-                               (make-array (ash 1 *page-size-exponent*)
-                                           :initial-element result)))
+                   do (setf (aref *ucd-base* page)
+                            (make-array (ash 1 *page-size-exponent*)
+                                        :initial-element result)))
                 (loop for point from (ash page-end *page-size-exponent*)
-                      below code-point
-                      do (setf (aref (aref *ucd-base* (cp-high point))
-                                     (cp-low point))
-                               result))))
+                   below code-point
+                   do (setf (aref (aref *ucd-base* (cp-high point))
+                                  (cp-low point))
+                            result))))
             (values result (normalize-character-name name)))))))
 
 (defun slurp-ucd-line (line)
@@ -350,31 +397,32 @@
 ;;; inverses, which is not true in general in Unicode even for
 ;;; characters which change case to single characters.
 (defun second-pass ()
-  (loop for i from 0 below (length *ucd-base*)
-        when (aref *ucd-base* i)
-        do (loop for j from 0 below (length (aref *ucd-base* i))
-                 for result = (aref (aref *ucd-base* i) j)
-                 when result
-                 when (let* ((transform-point (ucd-transform result))
-                             (transform-high (ash transform-point
-                                                  (- *page-size-exponent*)))
-                             (transform-low (ldb (byte *page-size-exponent* 0)
-                                                 transform-point)))
-                        (and (plusp transform-point)
-                             (/= (ucd-transform
-                                  (aref (aref *ucd-base* transform-high)
-                                        transform-low))
-                                 (+ (ash i *page-size-exponent*) j))))
-                 do (destructuring-bind (gc-index bidi-index ccc-index
-                                         decimal-digit digit bidi-mirrored
-                                         cl-both-case-p decomposition-info)
+  (dotimes (i (length *ucd-base*))
+    (let ((base (aref *ucd-base* i)))
+      (dotimes (j (length base)) ; base is NIL or an array
+        (let ((result (aref base j)))
+          (when result
+            ;; fixup case mappings for CL/Unicode mismatch
+            (let* ((transform-point (ucd-transform result))
+                   (transform-high (ash transform-point
+                                        (- *page-size-exponent*)))
+                   (transform-low (ldb (byte *page-size-exponent* 0)
+                                       transform-point)))
+              (when (and (plusp transform-point)
+                         (/= (ucd-transform
+                              (aref (aref *ucd-base* transform-high)
+                                    transform-low))
+                             (+ (ash i *page-size-exponent*) j)))
+                (destructuring-bind (gc-index bidi-index ccc-index
+                                     decimal-digit digit bidi-mirrored
+                                     cl-both-case-p decomposition-info)
                         (aref *misc-table* (ucd-misc result))
                       (declare (ignore cl-both-case-p))
                       (format t "~A~%" (+ (ash i *page-size-exponent*) j))
                       (setf (ucd-misc result)
                             (hash-misc gc-index bidi-index ccc-index
                                        decimal-digit digit bidi-mirrored
-                                       nil decomposition-info))))))
+                                       nil decomposition-info)))))))))))
 
 (defun write-4-byte (quadruplet stream)
   (write-byte (ldb (byte 8 24) quadruplet) stream)
@@ -387,7 +435,7 @@
       255
       (parse-integer digit)))
 
-(defun output ()
+(defun output-ucd-data ()
   (let ((hash (make-hash-table :test #'equalp))
         (index 0))
     (loop for page across *ucd-base*
@@ -445,17 +493,19 @@
                               (1- (length *misc-table*)))
                           (byte 11 21)
                           (if entry (ucd-transform entry) 0))
-                     stream))))))
-  ;; KLUDGE: this code, to write out decomposition information, is a
-  ;; little bit very similar to the ucd entries above.  Try factoring
-  ;; out the common stuff?
+                     stream)))))))
+
+;;; KLUDGE: this code, to write out decomposition information, is a
+;;; little bit very similar to the ucd entries above.  Try factoring
+;;; out the common stuff?
+(defun output-decomposition-data ()
   (let ((hash (make-hash-table :test #'equalp))
         (index 0))
     (loop for page across *decomposition-base*
-          do (when page
-               (unless (gethash page hash)
-                 (setf (gethash page hash)
-                       (prog1 index (incf index))))))
+       do (when page
+            (unless (gethash page hash)
+              (setf (gethash page hash)
+                    (prog1 index (incf index))))))
     (let ((array (make-array index)))
       (maphash #'(lambda (key value)
                    (setf (aref array value) key))
@@ -482,7 +532,31 @@
                               :if-exists :supersede
                               :if-does-not-exist :create)
         (loop for code across (copy-seq *long-decompositions*)
-           do (write-4-byte code stream)))))
+           do (write-4-byte code stream))))))
+
+(defun output-composition-data ()
+  #+nil ; later
+  (let (firsts seconds)
+    (flet ((frob (k v)
+             (declare (ignore v))
+             (pushnew (car k) firsts)
+             (pushnew (cdr k) seconds)))
+      (maphash #'frob *comp-table*)))
+  (with-open-file (stream (make-pathname :name "comp" :type "dat"
+                                         :defaults *output-directory*)
+                          :direction :output
+                          :element-type '(unsigned-byte 8)
+                          :if-exists :supersede :if-does-not-exist :create)
+    (maphash (lambda (k v)
+               (write-4-byte (car k) stream)
+               (write-4-byte (cdr k) stream)
+               (write-4-byte v stream))
+             *comp-table*)))
+
+(defun output ()
+  (output-ucd-data)
+  (output-decomposition-data)
+  (output-composition-data)
   (with-open-file (f (make-pathname :name "ucd-names" :type "lisp-expr"
                                     :defaults *output-directory*)
                      :direction :output
@@ -492,8 +566,8 @@
       (write-string ";;; Do not edit by hand: generated by ucd.lisp" f)
       (maphash (lambda (code name)
                  (when name
-                  (print code f)
-                  (prin1 name f)))
+                   (print code f)
+                   (prin1 name f)))
                *unicode-names*))
     (setf *unicode-names* nil))
   (with-open-file (*standard-output*
@@ -527,18 +601,18 @@
     (with-standard-io-syntax
       (let ((*print-pretty* t))
         (prin1 `(:length ,(length *misc-table*)
-                 :uppercase ,(loop for (gc-index) across *misc-table*
-                                for i from 0
-                                when (= gc-index 0)
-                                collect i)
-                 :lowercase ,(loop for (gc-index) across *misc-table*
-                                for i from 0
-                                when (= gc-index 1)
-                                collect i)
-                 :titlecase ,(loop for (gc-index) across *misc-table*
-                                for i from 0
-                                when (= gc-index 2)
-                                collect i))))))
+                         :uppercase ,(loop for (gc-index) across *misc-table*
+                                        for i from 0
+                                        when (= gc-index 0)
+                                        collect i)
+                         :lowercase ,(loop for (gc-index) across *misc-table*
+                                        for i from 0
+                                        when (= gc-index 1)
+                                        collect i)
+                         :titlecase ,(loop for (gc-index) across *misc-table*
+                                        for i from 0
+                                        when (= gc-index 2)
+                                        collect i))))))
   (values))
 
 ;;; Use of the generated files

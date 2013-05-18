@@ -51,6 +51,22 @@
               (defglobal **character-database** ,character-database)
               (defglobal **character-decompositions** ,decompositions)
               (defglobal **character-long-decompositions** ,long-decompositions)
+              (defglobal **character-primary-compositions**
+                (let ((table (make-hash-table))
+                      (info ,(read-ub8-vector (file "comp" "dat"))))
+                  (flet ((code (j)
+                           (dpb (aref info (* 4 j))
+                                (byte 8 24)
+                                (dpb (aref info (+ (* 4 j) 1))
+                                     (byte 8 16)
+                                     (dpb (aref info (+ (* 4 j) 2))
+                                          (byte 8 8)
+                                          (aref info (+ (* 4 j) 3)))))))
+                    (dotimes (i (/ (length info) 12) table)
+                      (setf (gethash (dpb (code (* 3 i)) (byte 21 21)
+                                          (code (1+ (* 3 i))))
+                                     table)
+                            (code-char (code (+ (* 3 i) 2))))))))
               (defun !character-database-cold-init ()
                 (setf **character-database** ,character-database))
               ,(with-open-file (stream (file "ucd-names" "lisp-expr")
@@ -710,11 +726,21 @@ character exists."
          (go again)))
     (apply 'concatenate 'string (nreverse result))))
 
-#+nil
 (defun primary-composition (char1 char2)
-  (when (and (char= char1 #\e)
-             (char= char2 #\combining_acute_accent))
-    #\latin_small_letter_e_with_acute))
+  (let ((c1 (char-code char1))
+        (c2 (char-code char2)))
+    (cond
+      ((gethash (dpb (char-code char1) (byte 21 21) (char-code char2))
+                **character-primary-compositions**))
+      ((and (<= #x1100 c1) (<= c1 #x1112)
+            (<= #x1161 c2) (<= c2 #x1175))
+       (let ((lindex (- c1 #x1100))
+             (vindex (- c2 #x1161)))
+         (code-char (+ #xac00 (* lindex 588) (* vindex 28)))))
+      ((and (<= #xac00 c1) (<= c1 #.(+ #xac00 11171))
+            (<= #x11a8 c2) (<= c2 #x11c2)
+            (= 0 (rem (- c1 #xac00) 28)))
+       (code-char (+ c1 (- c2 #x11a7)))))))
 
 ;;; This implements a sequence data structure, specialized for
 ;;; efficient deletion of characters at an index, along with tolerable
@@ -774,13 +800,16 @@ character exists."
   (labels ()
     (let* ((result (list (list 0 (length string) string)))
            (previous-starter-index (position 0 string :key #'ucd-ccc))
-           (i (1+ previous-starter-index)))
-      (when (= i (length string))
+           (i (and previous-starter-index (1+ previous-starter-index))))
+      (when (or (not i) (= i (length string)))
         (return-from canonically-compose string))
       (tagbody
        again
-         (when (and (> (- i previous-starter-index) 2)
+         (when (and (>= (- i previous-starter-index) 2)
                     ;; test for Blocked (Unicode 3.11 para. D115)
+                    ;;
+                    ;; (assumes here that string has sorted combiners,
+                    ;; so can look back just one step)
                     (>= (ucd-ccc (lref result (1- i)))
                         (ucd-ccc (lref result i))))
            (when (= (ucd-ccc (lref result i)) 0)
@@ -812,8 +841,12 @@ character exists."
     (base-string string)
     ((or (array character (*)) #!-sb-unicode base-string)
      (ecase form
+       ((:nfc)
+        (canonically-compose (sort-combiners (decompose-string string))))
        ((:nfd)
         (sort-combiners (decompose-string string)))
+       ((:nfkc)
+        (canonically-compose (sort-combiners (decompose-string string :compatibility))))
        ((:nfkd)
         (sort-combiners (decompose-string string :compatibility)))))
     ((array nil (*)) string)))

@@ -17,12 +17,10 @@
 
 (defun test-line (c1 c2 c3 c4 c5)
   ;; NFC
-  #+nil
   (assert-all-string= c2
     (normalize-string c1 :nfc)
     (normalize-string c2 :nfc)
     (normalize-string c3 :nfc))
-  #+nil
   (assert-all-string= c4
     (normalize-string c4 :nfc)
     (normalize-string c5 :nfc))
@@ -37,7 +35,6 @@
     (normalize-string c5 :nfd))
 
   ;; NFKC
-  #+nil
   (assert-all-string= c4
     (normalize-string c1 :nfkc)
     (normalize-string c2 :nfkc)
@@ -55,10 +52,8 @@
 
 (defun test-no-normalization (string)
   (assert-all-string= string
-    #+nil
     (normalize-string string :nfc)
     (normalize-string string :nfd)
-    #+nil
     (normalize-string string :nfkc)
     (normalize-string string :nfkd)))
 
