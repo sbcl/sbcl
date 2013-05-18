@@ -1004,18 +1004,16 @@
   (:report
    (lambda (condition stream)
      (let ((control (simple-condition-format-control condition))
-           (error-package (package-name (package-error-package condition)))
-           (current-package (package-name (package-lock-violation-in-package condition))))
-       (if control
-           (apply #'format stream
-                  (format nil "~~@<Lock on package ~A violated when ~A while in package ~A.~~:@>"
-                          error-package
-                          control
-                          current-package)
-                  (simple-condition-format-arguments condition))
-           (format stream "~@<Lock on package ~A violated while in package ~A.~:@>"
-                   error-package
-                   current-package)))))
+           (error-package (package-name
+                           (package-error-package condition)))
+           (current-package (package-name
+                             (package-lock-violation-in-package condition))))
+       (format stream "~@<Lock on package ~A violated~@[~{ when ~?~}~] ~
+                       while in package ~A.~:@>"
+               error-package
+               (when control
+                 (list control (simple-condition-format-arguments condition)))
+               current-package))))
   ;; no :default-initargs -- reference-stuff provided by the
   ;; signalling form in target-package.lisp
   #!+sb-doc
