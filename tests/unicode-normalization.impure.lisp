@@ -111,6 +111,9 @@
       (do ((line (read-line s) (read-line s)))
           ((char= #\# (char line 0))
            (assert (char= #\# (char (read-line s) 0)))
-           (assert (null (read-line s nil nil))))))))
+           (assert (null (read-line s nil nil))))
+        (destructuring-bind (c1 c2 c3 c4 c5)
+            (parse-one-line line)
+          (test-line c1 c2 c3 c4 c5))))))
 
 (test-normalization)
