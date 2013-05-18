@@ -2,7 +2,7 @@
 changes relative to sbcl-1.1.7:
   * notice: The implementation of MAP-ALLOCATED-OBJECTS (the heart of
     ROOM, plus a few SB-INTROSPECT functions) has been completely
-    rewritten, it may now exhibit different bugs than before.
+    rewritten; it may now exhibit different bugs than before.
   * enhancement: RUN-PROGRAM supports a :DIRECTORY argument to set
     the working directory of the spawned process.
     (lp#791800) (patch by Matthias Benkard)
@@ -18,6 +18,14 @@ changes relative to sbcl-1.1.7:
   * enhancement: MAP-ALLOCATED-OBJECTS (the heart of ROOM) now walks the
     heap in a manner similar to the GC rather than its previous ad-hoc
     scheme, and is therefore no less and possibly more accurate.
+  * fixes and enhancements related to Unicode:
+    ** the character database information has been updated to Unicode 6.2;
+    ** support for canonical and compatibility decomposition of characters has
+       been added, along with support for primary composition;
+    ** support for Unicode normalization forms of strings (NFC, NFKC, NFD and
+       NFKD) has been included;
+    ** querying the character database for code points not defined by Unicode
+       gives less wrong answers (lp#1178038, reported by Ken Harris)
   * bug fix: type derivation for LOG{AND,IOR,XOR} scales linearly instead
     of quadratically with the size of the input in the worst case.
     (lp#1096444)
