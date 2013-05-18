@@ -2826,53 +2826,84 @@
                (setf (block-reoptimize (node-block node)) t)
                (reoptimize-component (node-component node) :maybe))
              (cut-node (node &aux did-something)
-               (when (and (not (block-delete-p (node-block node)))
-                          (ref-p node)
-                          (constant-p (ref-leaf node)))
-                 (let* ((constant-value (constant-value (ref-leaf node)))
-                        (new-value (if signedp
-                                       (mask-signed-field width constant-value)
-                                       (ldb (byte width 0) constant-value))))
-                   (unless (= constant-value new-value)
-                     (change-ref-leaf node (make-constant new-value))
-                     (let ((lvar (node-lvar node)))
-                       (setf (lvar-%derived-type lvar)
-                             (and (lvar-has-single-use-p lvar)
-                                  (make-values-type :required (list (ctype-of new-value))))))
-                     (setf (block-reoptimize (node-block node)) t)
-                     (reoptimize-component (node-component node) :maybe)
-                     (return-from cut-node t))))
-               (when (and (not (block-delete-p (node-block node)))
-                          (combination-p node)
-                          (eq (basic-combination-kind node) :known))
-                 (let* ((fun-ref (lvar-use (combination-fun node)))
-                        (fun-name (leaf-source-name (ref-leaf fun-ref)))
-                        (modular-fun (find-modular-version fun-name kind signedp width)))
-                   (when (and modular-fun
-                              (not (and (eq fun-name 'logand)
-                                        (csubtypep
-                                         (single-value-type (node-derived-type node))
-                                         type))))
-                     (binding* ((name (etypecase modular-fun
-                                        ((eql :good) fun-name)
-                                        (modular-fun-info
-                                         (modular-fun-info-name modular-fun))
-                                        (function
-                                         (funcall modular-fun node width)))
-                                      :exit-if-null))
-                               (unless (eql modular-fun :good)
-                                 (setq did-something t)
-                                 (change-ref-leaf
-                                  fun-ref
-                                  (find-free-fun name "in a strange place"))
-                                 (setf (combination-kind node) :full))
-                               (unless (functionp modular-fun)
-                                 (dolist (arg (basic-combination-args node))
-                                   (when (cut-lvar arg)
-                                     (setq did-something t))))
-                               (when did-something
-                                 (reoptimize-node node name))
-                               did-something)))))
+               (when (block-delete-p (node-block node))
+                 (return-from cut-node))
+               (typecase node
+                 (ref
+                  (typecase (ref-leaf node)
+                    (constant
+                     (let* ((constant-value (constant-value (ref-leaf node)))
+                            (new-value (if signedp
+                                           (mask-signed-field width constant-value)
+                                           (ldb (byte width 0) constant-value))))
+                       (unless (= constant-value new-value)
+                         (change-ref-leaf node (make-constant new-value))
+                         (let ((lvar (node-lvar node)))
+                           (setf (lvar-%derived-type lvar)
+                                 (and (lvar-has-single-use-p lvar)
+                                      (make-values-type :required (list (ctype-of new-value))))))
+                         (setf (block-reoptimize (node-block node)) t)
+                         (reoptimize-component (node-component node) :maybe)
+                         t)))
+                    (lambda-var
+                     (binding* ((dest (lvar-dest lvar) :exit-if-null)
+                                (nil  (combination-p dest) :exit-if-null)
+                                (fun-ref (lvar-use (combination-fun dest)))
+                                (leaf (ref-leaf fun-ref))
+                                (name (and (leaf-has-source-name-p leaf)
+                                           (leaf-source-name leaf))))
+                       ;; we're about to insert an m-s-f/logand between a ref to
+                       ;; a variable and another m-s-f/logand. No point in doing
+                       ;; that; the parent m-s-f/logand was already cut to width
+                       ;; anyway.
+                       (unless (or (cond (signedp
+                                          (and (eql name 'mask-signed-field)
+                                               (eql lvar (second
+                                                          (combination-args
+                                                           dest)))))
+                                         (t
+                                          (eql name 'logand)))
+                                   (csubtypep (lvar-type lvar) type))
+                         (filter-lvar lvar
+                                      (if signedp
+                                          `((lambda (x)
+                                              (mask-signed-field ,width x))
+                                            'dummy)
+                                          `(logand 'dummy ,(ldb (byte width 0) -1))))
+                         (setf (block-reoptimize (node-block node)) t)
+                         (reoptimize-component (node-component node) :maybe)
+                         t)))))
+                 (combination
+                  (when (eq (basic-combination-kind node) :known)
+                    (let* ((fun-ref (lvar-use (combination-fun node)))
+                           (fun-name (leaf-source-name (ref-leaf fun-ref)))
+                           (modular-fun (find-modular-version fun-name kind
+                                                              signedp width)))
+                      (when (and modular-fun
+                                 (not (and (eq fun-name 'logand)
+                                           (csubtypep
+                                            (single-value-type (node-derived-type node))
+                                            type))))
+                        (binding* ((name (etypecase modular-fun
+                                           ((eql :good) fun-name)
+                                           (modular-fun-info
+                                            (modular-fun-info-name modular-fun))
+                                           (function
+                                            (funcall modular-fun node width)))
+                                         :exit-if-null))
+                          (unless (eql modular-fun :good)
+                            (setq did-something t)
+                            (change-ref-leaf
+                             fun-ref
+                             (find-free-fun name "in a strange place"))
+                            (setf (combination-kind node) :full))
+                          (unless (functionp modular-fun)
+                            (dolist (arg (basic-combination-args node))
+                              (when (cut-lvar arg)
+                                (setq did-something t))))
+                          (when did-something
+                            (reoptimize-node node name))
+                          did-something)))))))
              (cut-lvar (lvar &aux did-something)
                (do-uses (node lvar)
                  (when (cut-node node)
