@@ -322,9 +322,9 @@
 ;;;;
 
 ;;; Filter values of LVAR through FORM, which must be an ordinary/mv
-;;; call. First argument must be 'DUMMY, which will be replaced with
-;;; LVAR. In case of an ordinary call the function should not have
-;;; return type NIL. We create a new "filtered" lvar.
+;;; call. Exactly one argument must be 'DUMMY, which will be replaced
+;;; with LVAR. In case of an ordinary call the function should not
+;;; have return type NIL. We create a new "filtered" lvar.
 ;;;
 ;;; TODO: remove preconditions.
 (defun filter-lvar (lvar form)
@@ -358,11 +358,18 @@
         ;; Replace 'DUMMY with the LVAR. (We can find 'DUMMY because
         ;; no LET conversion has been done yet.) The [mv-]combination
         ;; code from the call in the form will be the use of the new
-        ;; check lvar. We substitute for the first argument of
-        ;; this node.
+        ;; check lvar. We substitute exactly one argument.
         (let* ((node (lvar-use filtered-lvar))
-               (args (basic-combination-args node))
-               (victim (principal-lvar (first args))))
+               victim)
+          (dolist (arg (basic-combination-args node) (aver victim))
+            (let* ((arg (principal-lvar arg))
+                   (use (lvar-use arg))
+                   leaf)
+              (when (and (ref-p use)
+                         (constant-p (setf leaf (ref-leaf use)))
+                         (eql (constant-value leaf) 'dummy))
+                (aver (not victim))
+                (setf victim arg))))
           (aver (eq (constant-value (ref-leaf (lvar-use victim)))
                     'dummy))
 

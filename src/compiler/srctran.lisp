@@ -2866,9 +2866,7 @@
                                    (csubtypep (lvar-type lvar) type))
                          (filter-lvar lvar
                                       (if signedp
-                                          `((lambda (x)
-                                              (mask-signed-field ,width x))
-                                            'dummy)
+                                          `(mask-signed-field ,width 'dummy)
                                           `(logand 'dummy ,(ldb (byte width 0) -1))))
                          (setf (block-reoptimize (node-block node)) t)
                          (reoptimize-component (node-component node) :maybe)
