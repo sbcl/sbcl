@@ -130,10 +130,14 @@
      +smallvec-length+))
 
 ;;; analogous to WRITE-SEQUENCE, but for a BIGVEC
-(defun write-bigvec-as-sequence (bigvec stream &key (start 0) end)
-  (loop for i of-type index from start below (or end (bvlength bigvec)) do
-        (write-byte (bvref bigvec i)
-                    stream)))
+(defun write-bigvec-as-sequence (bigvec stream &key (start 0) end pad-with-zeros)
+  (let* ((bvlength (bvlength bigvec))
+         (data-length (min (or end bvlength) bvlength)))
+    (loop for i of-type index from start below data-length do
+      (write-byte (bvref bigvec i)
+                  stream))
+    (when (and pad-with-zeros (< bvlength data-length))
+      (loop repeat (- data-length bvlength) do (write-byte 0 stream)))))
 
 ;;; analogous to READ-SEQUENCE-OR-DIE, but for a BIGVEC
 (defun read-bigvec-as-sequence-or-die (bigvec stream &key (start 0) end)
@@ -3172,7 +3176,8 @@ initially undefined function references:~2%")
     ;; 8K).
     (write-bigvec-as-sequence (gspace-bytes gspace)
                               *core-file*
-                              :end total-bytes)
+                              :end total-bytes
+                              :pad-with-zeros t)
     (force-output *core-file*)
     (file-position *core-file* posn)
 
