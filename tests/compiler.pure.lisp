@@ -4465,3 +4465,14 @@
                   (let ((hash #xD13CCD13))
                     (setf hash (logand most-positive-word
                                        (ash hash 5)))))))
+
+(with-test (:name (local-&optional-recursive-inline :bug-1180992))
+  (compile nil
+           `(lambda ()
+              (labels ((called (&optional a))
+                       (recursed (&optional b)
+                         (called)
+                         (recursed)))
+                (declare (inline recursed called))
+                (recursed)))))
+

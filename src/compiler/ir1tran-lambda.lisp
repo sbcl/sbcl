@@ -911,10 +911,13 @@
                                                ,*current-path*))))
         (min (or (position-if #'lambda-var-arg-info vars) (length vars))))
     (aver-live-component *current-component*)
-    (push res (component-new-functionals *current-component*))
     (ir1-convert-hairy-args res () () () () vars nil body aux-vars aux-vals
                             source-name debug-name nil post-binding-lexenv
                             system-lambda)
+    ;; ir1-convert-hairy-args can throw 'locall-already-let-converted
+    ;; push optional-dispatch into the current component only after it
+    ;; normally returned
+    (push res (component-new-functionals *current-component*))
     (setf (optional-dispatch-min-args res) min)
     (setf (optional-dispatch-max-args res)
           (+ (1- (length (optional-dispatch-entry-points res))) min))

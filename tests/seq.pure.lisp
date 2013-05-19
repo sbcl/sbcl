@@ -377,3 +377,7 @@
                                          (declare (optimize safety))
                                          (elt args 0))))
                          sb-kernel:index-too-large-error)))
+
+(with-test (:name do-sequence-on-literals)
+  (assert (= (sequence:dosequence (e #(1 2 3)) (return e))
+             1)))
