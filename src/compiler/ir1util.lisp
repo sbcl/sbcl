@@ -362,7 +362,7 @@
         ;; this node.
         (let* ((node (lvar-use filtered-lvar))
                (args (basic-combination-args node))
-               (victim (first args)))
+               (victim (principal-lvar (first args))))
           (aver (eq (constant-value (ref-leaf (lvar-use victim)))
                     'dummy))
 

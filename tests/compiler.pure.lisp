@@ -4459,3 +4459,9 @@
                      #\1 :y 2))
                   (let ((p2 #'(lambda (char) (upper-case-p char))))
                     (funcall p2 s)))))
+
+(with-test (:name :bug-1181684)
+  (compile nil `(lambda ()
+                  (let ((hash #xD13CCD13))
+                    (setf hash (logand most-positive-word
+                                       (ash hash 5)))))))
