@@ -2310,21 +2310,22 @@ preserve_pointer(void *addr)
     /* Adjust any large objects before promotion as they won't be
      * copied after promotion. */
     if (page_table[first_page].large_object) {
-        maybe_adjust_large_object(page_address(first_page));
-        /* If a large object has shrunk then addr may now point to a
-         * free area in which case it's ignored here. Note it gets
-         * through the valid pointer test above because the tail looks
-         * like conses. */
-        if (page_free_p(addr_page_index)
-            || (page_table[addr_page_index].bytes_used == 0)
-            /* Check the offset within the page. */
-            || (((uword_t)addr & (GENCGC_CARD_BYTES - 1))
-                > page_table[addr_page_index].bytes_used)) {
-            FSHOW((stderr,
-                   "weird? ignore ptr 0x%x to freed area of large object\n",
-                   addr));
+        /* Large objects (specifically vectors and bignums) can
+         * shrink, leaving a "tail" of zeroed space, which appears to
+         * the filter above as a seris of valid conses, both car and
+         * cdr of which contain the fixnum zero, but will be
+         * deallocated when the GC shrinks the large object region to
+         * fit the object within.  We allow raw pointers within code
+         * space, but for boxed and unboxed space we do not, nor do
+         * pointers to within a non-code object appear valid above.  A
+         * cons cell will never merit allocation to a large object
+         * page, so pick them off now, before we try to adjust the
+         * object. */
+        if ((lowtag_of((lispobj)addr) == LIST_POINTER_LOWTAG) &&
+            !code_page_p(first_page)) {
             return;
         }
+        maybe_adjust_large_object(page_address(first_page));
         /* It may have moved to unboxed pages. */
         region_allocation = page_table[first_page].allocated;
     }
