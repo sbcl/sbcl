@@ -2848,10 +2848,7 @@
                     (lambda-var
                      (binding* ((dest (lvar-dest lvar) :exit-if-null)
                                 (nil  (combination-p dest) :exit-if-null)
-                                (fun-ref (lvar-use (combination-fun dest)))
-                                (leaf (ref-leaf fun-ref))
-                                (name (and (leaf-has-source-name-p leaf)
-                                           (leaf-source-name leaf))))
+                                (name (lvar-fun-name (combination-fun dest))))
                        ;; we're about to insert an m-s-f/logand between a ref to
                        ;; a variable and another m-s-f/logand. No point in doing
                        ;; that; the parent m-s-f/logand was already cut to width
@@ -2874,7 +2871,7 @@
                  (combination
                   (when (eq (basic-combination-kind node) :known)
                     (let* ((fun-ref (lvar-use (combination-fun node)))
-                           (fun-name (leaf-source-name (ref-leaf fun-ref)))
+                           (fun-name (lvar-fun-name (combination-fun node)))
                            (modular-fun (find-modular-version fun-name kind
                                                               signedp width)))
                       (when (and modular-fun
