@@ -78,6 +78,9 @@ changes relative to sbcl-1.1.7:
     rational values.
   * optimization: quasiquote expressions now perform more constant folding,
     instead of consing equal lists at runtime. (lp#1026439)
+  * optimization: local call analysis of inlined higher-order function
+    should converge more quickly, resulting in better code for complex
+    functions.
 
 changes in sbcl-1.1.7 relative to sbcl-1.1.6:
   * enhancement: TRACE :PRINT-ALL handles multiple-valued forms.
