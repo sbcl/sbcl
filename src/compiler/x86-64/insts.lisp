@@ -1030,6 +1030,36 @@
   (op :field (byte 16 0))
   (code :field (byte 8 16)))
 
+;;; F3 escape map - Needs a ton more work.
+
+(sb!disassem:define-instruction-format (F3-escape 24)
+  (prefix1 :field (byte 8 0) :value #xF3)
+  (prefix2 :field (byte 8 8) :value #x0F)
+  (op      :field (byte 8 16)))
+
+(sb!disassem:define-instruction-format (rex-F3-escape 32)
+  ;; F3 is a legacy prefix which was generalized to select an alternate opcode
+  ;; map. Legacy prefixes are encoded in the instruction before a REX prefix.
+  (prefix1 :field (byte 8 0)  :value #xF3)
+  (rex     :field (byte 4 12) :value 4)    ; "prefix2"
+  (wrxb    :field (byte 4 8)  :type 'wrxb)
+  (prefix3 :field (byte 8 16) :value #x0F)
+  (op      :field (byte 8 24)))
+
+(sb!disassem:define-instruction-format (F3-escape-reg-reg/mem 32
+                                        :include 'F3-escape
+                                        :default-printer
+                                        '(:name :tab reg "," reg/mem))
+  (reg/mem :fields (list (byte 2 30) (byte 3 24)) :type 'sized-reg/mem)
+  (reg     :field  (byte 3 27) :type 'reg))
+
+(sb!disassem:define-instruction-format (rex-F3-escape-reg-reg/mem 40
+                                        :include 'rex-F3-escape
+                                        :default-printer
+                                        '(:name :tab reg "," reg/mem))
+  (reg/mem :fields (list (byte 2 38) (byte 3 32)) :type 'sized-reg/mem)
+  (reg     :field  (byte 3 35) :type 'reg))
+
 
 ;;;; primitive emitters
 
@@ -3431,6 +3461,19 @@
    (emit-byte segment #x0f)
    (emit-byte segment #xae)
    (emit-ea segment dst 3)))
+
+(define-instruction popcnt (segment dst src)
+  (:printer-list `((f3-escape-reg-reg/mem ((op #xB8)))
+                   (rex-f3-escape-reg-reg/mem ((op #xB8)))))
+  (:emitter
+   (aver (register-p dst))
+   (let ((size (matching-operand-size dst src)))
+     (maybe-emit-operand-size-prefix segment size)
+     (emit-byte segment #xF3)
+     (maybe-emit-rex-for-ea segment src dst)
+     (emit-byte segment #x0F)
+     (emit-byte segment #xB8)
+     (emit-ea segment src (reg-tn-encoding dst)))))
 
 ;;;; Miscellany
 
