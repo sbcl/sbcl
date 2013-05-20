@@ -12,10 +12,24 @@
 (in-package "SB!VM")
 
 
-;; A fixnum that can be represented in tagged form by a signed 32-bit
-;; value and that can therefore be used as an immediate argument of
-;; arithmetic machine instructions.
-(deftype short-tagged-num () '(signed-byte #.(- 32 n-fixnum-tag-bits)))
+;; If chopping X to 32 bits and sign-extending is equal to the original X,
+;; return the chopped X, which the CPU will always treat as signed.
+;; Notably this allows MOST-POSITIVE-WORD to be an immediate constant.
+(defun immediate32-p (x)
+  (typecase x
+    ((signed-byte 32) x)
+    ((unsigned-byte 64)
+     (let ((chopped (sb!c::mask-signed-field 32 x)))
+       (and (= x (ldb (byte 64 0) chopped))
+            chopped)))
+    (t nil)))
+
+;; If 'immediate32-p' is true, use it; otherwise use a RIP-relative constant.
+;; I couldn't think of a more accurate name for this other than maybe
+;; 'signed-immediate32-or-rip-relativize' which is just too awful.
+(defun constantize (x)
+  (or (immediate32-p x)
+      (register-inline-constant :qword x)))
 
 ;;;; unary operations
 
@@ -115,98 +129,110 @@
   (:note "inline (signed-byte 64) arithmetic"))
 
 (define-vop (fast-fixnum-binop-c fast-safe-arith-op)
-  (:args (x :target r :scs (any-reg)
-            :load-if (or (not (typep y 'short-tagged-num))
-                         (not (sc-is x any-reg control-stack)))))
+  (:args (x :target r :scs (any-reg) :load-if t))
   (:info y)
   (:arg-types tagged-num (:constant fixnum))
-  (:results (r :scs (any-reg)
-               :load-if (or (not (location= x r))
-                            (not (typep y 'short-tagged-num)))))
+  (:results (r :scs (any-reg) :load-if t))
   (:result-types tagged-num)
   (:note "inline fixnum arithmetic"))
 
 (define-vop (fast-unsigned-binop-c fast-safe-arith-op)
-  (:args (x :target r :scs (unsigned-reg)
-            :load-if (or (not (typep y '(unsigned-byte 31)))
-                         (not (sc-is x unsigned-reg unsigned-stack)))))
+  (:args (x :target r :scs (unsigned-reg) :load-if t))
   (:info y)
   (:arg-types unsigned-num (:constant (unsigned-byte 64)))
-  (:results (r :scs (unsigned-reg)
-               :load-if (or (not (location= x r))
-                            (not (typep y '(unsigned-byte 31))))))
+  (:results (r :scs (unsigned-reg) :load-if t))
   (:result-types unsigned-num)
   (:note "inline (unsigned-byte 64) arithmetic"))
 
 (define-vop (fast-signed-binop-c fast-safe-arith-op)
-  (:args (x :target r :scs (signed-reg)
-            :load-if (or (not (typep y '(signed-byte 32)))
-                         (not (sc-is x signed-reg signed-stack)))))
+  (:args (x :target r :scs (signed-reg) :load-if t))
   (:info y)
   (:arg-types signed-num (:constant (signed-byte 64)))
-  (:results (r :scs (signed-reg)
-               :load-if (or (not (location= x r))
-                            (not (typep y '(signed-byte 32))))))
+  (:results (r :scs (signed-reg) :load-if t))
   (:result-types signed-num)
   (:note "inline (signed-byte 64) arithmetic"))
 
-(macrolet ((define-binop (translate untagged-penalty op)
+(macrolet ((define-binop (translate untagged-penalty op
+                          &key fixnum=>fixnum c/fixnum=>fixnum
+                               signed=>signed c/signed=>signed
+                               unsigned=>unsigned c/unsigned=>unsigned)
+
              `(progn
                 (define-vop (,(symbolicate "FAST-" translate "/FIXNUM=>FIXNUM")
                              fast-fixnum-binop)
                   (:translate ,translate)
                   (:generator 2
-                              (move r x)
-                              (inst ,op r y)))
+                   ,@(or fixnum=>fixnum `((move r x) (inst ,op r y)))))
                 (define-vop (,(symbolicate 'fast- translate '-c/fixnum=>fixnum)
                              fast-fixnum-binop-c)
                   (:translate ,translate)
                   (:generator 1
-                  (move r x)
-                  (inst ,op r (if (typep y 'short-tagged-num)
-                                  (fixnumize y)
-                                  (register-inline-constant :qword (fixnumize y))))))
+                   ,@(or c/fixnum=>fixnum
+                         `((move r x)
+                           (inst ,op r (constantize (fixnumize y)))))))
                 (define-vop (,(symbolicate "FAST-" translate "/SIGNED=>SIGNED")
                              fast-signed-binop)
                   (:translate ,translate)
                   (:generator ,(1+ untagged-penalty)
-                  (move r x)
-                  (inst ,op r y)))
+                   ,@(or signed=>signed `((move r x) (inst ,op r y)))))
                 (define-vop (,(symbolicate 'fast- translate '-c/signed=>signed)
                              fast-signed-binop-c)
                   (:translate ,translate)
                   (:generator ,untagged-penalty
-                  (move r x)
-                  (inst ,op r (if (typep y '(signed-byte 32))
-                                  y
-                                  (register-inline-constant :qword y)))))
+                   ,@(or c/signed=>signed
+                         `((move r x) (inst ,op r (constantize y))))))
                 (define-vop (,(symbolicate "FAST-"
                                            translate
                                            "/UNSIGNED=>UNSIGNED")
-                fast-unsigned-binop)
+                             fast-unsigned-binop)
                   (:translate ,translate)
                   (:generator ,(1+ untagged-penalty)
-                  (move r x)
-                  (inst ,op r y)))
+                   ,@(or unsigned=>unsigned `((move r x) (inst ,op r y)))))
                 (define-vop (,(symbolicate 'fast-
                                            translate
                                            '-c/unsigned=>unsigned)
                              fast-unsigned-binop-c)
                   (:translate ,translate)
                   (:generator ,untagged-penalty
-                  (move r x)
-                  (inst ,op r (if (typep y '(unsigned-byte 31))
-                                  y
-                                  (register-inline-constant :qword y))))))))
+                   ,@(or c/unsigned=>unsigned
+                         `((move r x) (inst ,op r (constantize y)))))))))
 
   ;;(define-binop + 4 add)
   (define-binop - 4 sub)
-  (define-binop logand 2 and)
-  (define-binop logior 2 or)
-  (define-binop logxor 2 xor))
+
+  ;; The following have microoptimizations for some special cases
+  ;; not caught by the front end.
+
+  (define-binop logand 2 and
+    :c/unsigned=>unsigned
+    ((move r x)
+     (let ((y (constantize y)))
+       ;; ANDing with #xFFFF_FFFF_FFFF_FFFF is a no-op, other than
+       ;; the eflags state which we don't care about.
+       (unless (eql y -1) ; do nothing if this is true
+         (inst and r y)))))
+
+  (define-binop logior 2 or
+    :c/unsigned=>unsigned
+    ((let ((y (constantize y)))
+       (cond ((and (register-p r) (eql y -1)) ; special-case "OR reg, all-ones"
+              ;; I have yet to elicit this case. Can it happen?
+              (inst mov r -1))
+             (t
+              (move r x)
+              (inst or r y))))))
+
+  (define-binop logxor 2 xor
+    :c/unsigned=>unsigned
+    ((move r x)
+     (let ((y (constantize y)))
+       (if (eql y -1) ; special-case "XOR reg, [all-ones]"
+           (inst not r)
+           (inst xor r y))))))
 
 ;;; Special handling of add on the x86; can use lea to avoid a
 ;;; register load, otherwise it uses add.
+;;; FIXME: either inherit from fast-foo-binop or explain why not.
 (define-vop (fast-+/fixnum=>fixnum fast-safe-arith-op)
   (:translate +)
   (:args (x :scs (any-reg) :target r
@@ -233,26 +259,20 @@
 
 (define-vop (fast-+-c/fixnum=>fixnum fast-safe-arith-op)
   (:translate +)
-  (:args (x :target r :scs (any-reg)
-            :load-if (or (not (typep y 'short-tagged-num))
-                         (not (sc-is x any-reg control-stack)))))
+  (:args (x :target r :scs (any-reg) :load-if t))
   (:info y)
   (:arg-types tagged-num (:constant fixnum))
-  (:results (r :scs (any-reg)
-               :load-if (or (not (location= x r))
-                            (not (typep y 'short-tagged-num)))))
+  (:results (r :scs (any-reg) :load-if t))
   (:result-types tagged-num)
   (:note "inline fixnum arithmetic")
   (:generator 1
-    (cond ((and (sc-is x any-reg) (sc-is r any-reg) (not (location= x r))
-                (typep y 'short-tagged-num))
-           (inst lea r (make-ea :qword :base x :disp (fixnumize y))))
-          ((typep y 'short-tagged-num)
-           (move r x)
-           (inst add r (fixnumize y)))
-          (t
-           (move r x)
-           (inst add r (register-inline-constant :qword (fixnumize y)))))))
+    (let ((y (fixnumize y)))
+      (cond ((and (not (location= x r))
+                  (typep y '(signed-byte 32)))
+             (inst lea r (make-ea :qword :base x :disp y)))
+            (t
+             (move r x)
+             (inst add r (constantize y)))))))
 
 (define-vop (fast-+/signed=>signed fast-safe-arith-op)
   (:translate +)
@@ -277,7 +297,6 @@
            (move r x)
            (inst add r y)))))
 
-
 ;;;; Special logand cases: (logand signed unsigned) => unsigned
 
 (define-vop (fast-logand/signed-unsigned=>unsigned
@@ -290,11 +309,12 @@
          (y :scs (unsigned-reg unsigned-stack)))
   (:arg-types signed-num unsigned-num))
 
+;; This special case benefits from the special case for c/unsigned=>unsigned.
+;; In particular, converting a (signed-byte 64) to (unsigned-byte 64) by
+;; way of (LDB (byte 64 0)) doesn't need an AND instruction.
 (define-vop (fast-logand-c/signed-unsigned=>unsigned
              fast-logand-c/unsigned=>unsigned)
-  (:args (x :target r :scs (signed-reg)
-            :load-if (or (not (typep y '(unsigned-byte 31)))
-                         (not (sc-is r signed-reg signed-stack)))))
+  (:args (x :target r :scs (signed-reg)))
   (:arg-types signed-num (:constant (unsigned-byte 64))))
 
 (define-vop (fast-logand/unsigned-signed=>unsigned
@@ -329,10 +349,8 @@
            (move r x)
            (cond ((= y 1)
                   (inst inc r))
-                 ((typep y '(signed-byte 32))
-                  (inst add r y))
                  (t
-                  (inst add r (register-inline-constant :qword y))))))))
+                  (inst add r (constantize y))))))))
 
 (define-vop (fast-+/unsigned=>unsigned fast-safe-arith-op)
   (:translate +)
@@ -379,10 +397,8 @@
            (move r x)
            (cond ((= y 1)
                   (inst inc r))
-                 ((typep y '(unsigned-byte 31))
-                  (inst add r y))
                  (t
-                  (inst add r (register-inline-constant :qword y))))))))
+                  (inst add r (constantize y))))))))
 
 ;;;; multiplication and division
 
@@ -541,9 +557,7 @@
   (:generator 30
     (move eax x)
     (inst cqo)
-    (if (typep y 'short-tagged-num)
-        (inst mov y-arg (fixnumize y))
-        (setf y-arg (register-inline-constant :qword (fixnumize y))))
+    (inst mov y-arg (fixnumize y))
     (inst idiv eax y-arg)
     (if (location= quo eax)
         (inst shl eax n-fixnum-tag-bits)
@@ -599,9 +613,7 @@
   (:generator 32
     (move eax x)
     (inst xor edx edx)
-    (if (typep y '(unsigned-byte 31))
-        (inst mov y-arg y)
-        (setf y-arg (register-inline-constant :qword y)))
+    (inst mov y-arg y)
     (inst div eax y-arg)
     (move quo eax)
     (move rem edx)))
@@ -652,9 +664,7 @@
   (:generator 32
     (move eax x)
     (inst cqo)
-    (if (typep y '(signed-byte 32))
-        (inst mov y-arg y)
-        (setf y-arg (register-inline-constant :qword y)))
+    (inst mov y-arg y)
     (inst idiv eax y-arg)
     (move quo eax)
     (move rem edx)))
@@ -1151,9 +1161,6 @@ constant shift greater than word length")))
   (:affected)
   (:policy :fast-safe))
 
-;;; constant variants are declared for 32 bits not 64 bits, because
-;;; loading a 64 bit constant is silly
-
 (define-vop (fast-conditional/fixnum fast-conditional)
   (:args (x :scs (any-reg)
             :load-if (not (and (sc-is x control-stack)
@@ -1163,9 +1170,7 @@ constant shift greater than word length")))
   (:note "inline fixnum comparison"))
 
 (define-vop (fast-conditional-c/fixnum fast-conditional/fixnum)
-  (:args (x :scs (any-reg)
-            :load-if (or (not (typep y 'short-tagged-num))
-                         (not (sc-is x any-reg control-stack)))))
+  (:args (x :scs (any-reg) :load-if t))
   (:arg-types tagged-num (:constant fixnum))
   (:info y))
 
@@ -1178,9 +1183,7 @@ constant shift greater than word length")))
   (:note "inline (signed-byte 64) comparison"))
 
 (define-vop (fast-conditional-c/signed fast-conditional/signed)
-  (:args (x :scs (signed-reg)
-            :load-if (or (not (typep y '(signed-byte 32)))
-                         (not (sc-is x signed-reg signed-stack)))))
+  (:args (x :scs (signed-reg) :load-if t))
   (:arg-types signed-num (:constant (signed-byte 64)))
   (:info y))
 
@@ -1193,9 +1196,7 @@ constant shift greater than word length")))
   (:note "inline (unsigned-byte 64) comparison"))
 
 (define-vop (fast-conditional-c/unsigned fast-conditional/unsigned)
-  (:args (x :scs (unsigned-reg)
-            :load-if (or (not (typep y '(unsigned-byte 31)))
-                         (not (sc-is x unsigned-reg unsigned-stack)))))
+  (:args (x :scs (unsigned-reg) :load-if t))
   (:arg-types unsigned-num (:constant (unsigned-byte 64)))
   (:info y))
 
@@ -1213,18 +1214,13 @@ constant shift greater than word length")))
                          (:conditional :ne)
                          (:generator ,cost
                           (emit-optimized-test-inst x
-                           ,(if (eq suffix '-c/fixnum)
-                                ;; See whether (fixnumize y) fits in signed 32
-                                ;; to avoid chip's sign-extension of imm32 val.
-                                `(if (typep y 'short-tagged-num)
-                                     (fixnumize y)
-                                     (register-inline-constant :qword (fixnumize y)))
-                                `(cond ((typep y '(signed-byte 32)) ; same
-                                        y)
-                                       ((typep y '(or (unsigned-byte 64) (signed-byte 64)))
-                                        (register-inline-constant :qword y))
-                                       (t
-                                        y))))))))))
+                           ,(case suffix
+                             (-c/fixnum
+                              `(constantize (fixnumize y)))
+                             ((-c/signed -c/unsigned)
+                              `(constantize y))
+                             (t
+                              'y)))))))))
   (define-logtest-vops))
 
 (defknown %logbitp (integer unsigned-byte) boolean
@@ -1289,20 +1285,9 @@ constant shift greater than word length")))
                                     (inst cmp x
                                           ,(case suffix
                                              (-c/fixnum
-                                                `(if (typep y 'short-tagged-num)
-                                                     (fixnumize y)
-                                                     (register-inline-constant
-                                                      :qword (fixnumize y))))
-                                             (-c/signed
-                                                `(if (typep y '(signed-byte 32))
-                                                     y
-                                                     (register-inline-constant
-                                                      :qword y)))
-                                             (-c/unsigned
-                                                `(if (typep y '(unsigned-byte 31))
-                                                     y
-                                                     (register-inline-constant
-                                                      :qword y)))
+                                                `(constantize (fixnumize y)))
+                                             ((-c/signed -c/unsigned)
+                                                `(constantize y))
                                              (t 'y))))))
                    '(/fixnum -c/fixnum /signed -c/signed /unsigned -c/unsigned)
 ;                  '(/fixnum  /signed  /unsigned)
@@ -1322,10 +1307,8 @@ constant shift greater than word length")))
   (:generator 5
     (cond ((and (sc-is x signed-reg) (zerop y))
            (inst test x x))  ; smaller instruction
-          ((typep y '(signed-byte 32))
-           (inst cmp x y))
           (t
-           (inst cmp x (register-inline-constant :qword y))))))
+           (inst cmp x (constantize y))))))
 
 (define-vop (fast-if-eql/unsigned fast-conditional/unsigned)
   (:translate eql)
@@ -1337,10 +1320,8 @@ constant shift greater than word length")))
   (:generator 5
     (cond ((and (sc-is x unsigned-reg) (zerop y))
            (inst test x x))  ; smaller instruction
-          ((typep y '(unsigned-byte 31))
-           (inst cmp x y))
           (t
-           (inst cmp x (register-inline-constant :qword y))))))
+           (inst cmp x (constantize y))))))
 
 ;;; EQL/FIXNUM is funny because the first arg can be of any type, not just a
 ;;; known fixnum.
@@ -1370,23 +1351,21 @@ constant shift greater than word length")))
   (:arg-types * tagged-num)
   (:variant-cost 7))
 
-(define-vop (fast-eql-c/fixnum fast-conditional/fixnum)
-  (:args (x :scs (any-reg)
-            :load-if (or (not (typep y 'short-tagged-num))
-                         (not (sc-is x any-reg descriptor-reg control-stack)))))
+(define-vop (fast-eql-c/fixnum fast-conditional-c/fixnum)
+  (:args (x :scs (any-reg) :load-if t))
   (:arg-types tagged-num (:constant fixnum))
   (:info y)
+  (:conditional :e)
+  (:policy :fast-safe)
   (:translate eql)
   (:generator 2
     (cond ((and (sc-is x any-reg descriptor-reg) (zerop y))
            (inst test x x))  ; smaller instruction
-          ((typep y 'short-tagged-num)
-           (inst cmp x (fixnumize y)))
           (t
-           (inst cmp x (register-inline-constant :qword (fixnumize y)))))))
+           (inst cmp x (constantize (fixnumize y)))))))
 
 (define-vop (generic-eql-c/fixnum fast-eql-c/fixnum)
-  (:args (x :scs (any-reg descriptor-reg)))
+  (:args (x :scs (any-reg descriptor-reg) :load-if t))
   (:arg-types * (:constant fixnum))
   (:variant-cost 6))
 
@@ -1445,20 +1424,11 @@ constant shift greater than word length")))
 (defmacro define-mod-binop-c ((name prototype) function)
   `(define-vop (,name ,prototype)
        (:args (x :target r :scs (unsigned-reg signed-reg)
-                 :load-if (not (and (or (sc-is x unsigned-stack)
-                                        (sc-is x signed-stack))
-                                    (or (sc-is r unsigned-stack)
-                                        (sc-is r signed-stack))
-                                    (location= x r)
-                                    (typep y '(signed-byte 32))))))
+                 :load-if t))
      (:info y)
      (:arg-types untagged-num (:constant (or (unsigned-byte 64) (signed-byte 64))))
      (:results (r :scs (unsigned-reg signed-reg) :from (:argument 0)
-                  :load-if (not (and (or (sc-is x unsigned-stack)
-                                         (sc-is x signed-stack))
-                                     (or (sc-is r unsigned-stack)
-                                         (sc-is r unsigned-stack))
-                                     (location= x r)))))
+                  :load-if t))
      (:result-types unsigned-num)
      (:translate ,function)))
 

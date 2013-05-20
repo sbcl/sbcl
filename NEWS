@@ -27,7 +27,7 @@ changes relative to sbcl-1.1.7:
     ** querying the character database for code points not defined by Unicode
        gives less wrong answers (lp#1178038, reported by Ken Harris)
   * enhancement: print intermediate evaluation results for some ASSERTed
-    expressions. (lp#789497)
+    expressions. (lp#789497) (patch by Alexandra Barchunova)
   * enhancement: x86-64 disassemblies are annotated with unboxed constant
     values when there are references to (RIP-relative) unboxed constants.
   * bug fix: type derivation for LOG{AND,IOR,XOR} scales linearly instead
@@ -83,6 +83,10 @@ changes relative to sbcl-1.1.7:
   * optimization: local call analysis of inlined higher-order function
     should converge more quickly, resulting in better code for complex
     functions.
+  * optimization: On x86-64, medium (word-sized but wider than 32 bits)
+    integer constants are handled more cleverly, especially when they
+    can be represented as sign-extended (signed-byte 32). (Based on a
+    patch by Douglas Katzman)
 
 changes in sbcl-1.1.7 relative to sbcl-1.1.6:
   * enhancement: TRACE :PRINT-ALL handles multiple-valued forms.
