@@ -666,8 +666,10 @@
   `(member t nil))
 
 (define-alien-type-method (boolean :naturalize-gen) (type alien)
-  (declare (ignore type))
-  `(not (zerop ,alien)))
+  (let ((bits (alien-boolean-type-bits type)))
+    (if (= bits sb!vm:n-word-bits)
+        `(not (zerop ,alien))
+        `(logtest ,alien ,(ldb (byte bits 0) -1)))))
 
 (define-alien-type-method (boolean :deport-gen) (type value)
   (declare (ignore type))

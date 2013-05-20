@@ -55,6 +55,8 @@ changes relative to sbcl-1.1.7:
     modular arithemtic (mostly to exploit fixnum-width VOPs). (lp#1026634)
   * bug fix: a combination of inlined local function with &optional and
     recursion no longer causes undescriptive compiler errors. (lp#1180992)
+  * bug fix: sub-word BOOLEAN alien types now disregard higher order bits
+    when testing for non-zero-ness.
   * optimization: faster ISQRT on fixnums and small bignums
   * optimization: faster and smaller INTEGER-LENGTH on fixnums on x86-64.
   * optimization: On x86-64, the number of multi-byte NOP instructions used
