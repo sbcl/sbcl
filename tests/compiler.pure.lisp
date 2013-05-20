@@ -4476,3 +4476,10 @@
                 (declare (inline recursed called))
                 (recursed)))))
 
+(with-test (:name :constant-fold-logtest)
+  (assert (equal (sb-kernel:%simple-fun-type
+                  (compile nil `(lambda (x)
+                                  (declare (type (mod 1024) x)
+                                           (optimize speed))
+                                  (logtest x 2048))))
+                 '(function ((unsigned-byte 10)) (values null &optional)))))

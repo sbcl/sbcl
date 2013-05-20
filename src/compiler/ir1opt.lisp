@@ -889,7 +889,7 @@
                 ;; The VM mostly knows how to handle this.  We need
                 ;; to massage the call slightly, though.
                 (transform-call node transform (combination-fun-source-name node)))
-               (:default
+               ((:default :maybe)
                 ;; Let transforms have a crack at it.
                 (dolist (x (fun-info-transforms info))
                   #!+sb-show

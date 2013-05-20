@@ -310,8 +310,24 @@
 ;;; on the argument types), but we make it a regular transform so that
 ;;; the VM has a chance to see the bare LOGTEST and potentiall choose
 ;;; to implement it differently.  --njf, 06-02-2006
-(deftransform logtest ((x y) * *)
-  `(not (zerop (logand x y))))
+;;;
+;;; Other transforms may be useful even with direct LOGTEST VOPs; let
+;;; them fire (including the type-directed constant folding below), but
+;;; disable the inlining rewrite in such cases. -- PK, 2013-05-20
+(deftransform logtest ((x y) * * :node node)
+  (let ((type (two-arg-derive-type x y
+                                   #'logand-derive-type-aux
+                                   #'logand)))
+    (multiple-value-bind (typep definitely)
+        (ctypep 0 type)
+      (cond ((and (not typep) definitely)
+             t)
+            ((type= type (specifier-type '(eql 0)))
+             nil)
+            ((neq :default (combination-implementation-style node))
+             (give-up-ir1-transform))
+            (t
+             `(not (zerop (logand x y))))))))
 
 (deftransform logbitp
     ((index integer) (unsigned-byte (or (signed-byte #.sb!vm:n-word-bits)

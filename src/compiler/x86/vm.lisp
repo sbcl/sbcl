@@ -499,11 +499,11 @@
       (logtest
        (cond
          ((valid-funtype '(fixnum fixnum) '*)
-          (values :direct nil))
+          (values :maybe nil))
          ((valid-funtype '((signed-byte 32) (signed-byte 32)) '*)
-          (values :direct nil))
+          (values :maybe nil))
          ((valid-funtype '((unsigned-byte 32) (unsigned-byte 32)) '*)
-          (values :direct nil))
+          (values :maybe nil))
          (t (values :default nil))))
       (logbitp
        (cond

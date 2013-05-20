@@ -568,7 +568,7 @@
               ;; a signed word, except for the mess of VOPs it would demand
               (valid-funtype '((signed-byte 64) (signed-byte 64)) '*)
               (valid-funtype '((unsigned-byte 64) (unsigned-byte 64)) '*))
-          (values :direct nil))
+          (values :maybe nil))
          (t
           (values :default nil))))
       (logbitp

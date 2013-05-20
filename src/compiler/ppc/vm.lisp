@@ -369,7 +369,7 @@
          ((or (valid-funtype '(fixnum fixnum) '*)
               (valid-funtype '((signed-byte 32) (signed-byte 32)) '*)
               (valid-funtype '((unsigned-byte 32) (unsigned-byte 32)) '*))
-          (values :direct nil))
+          (values :maybe nil))
          (t (values :default nil))))
       (logbitp
        (cond
