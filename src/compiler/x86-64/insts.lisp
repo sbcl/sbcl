@@ -750,6 +750,12 @@
                                         :default-printer
                                         '(:name :tab reg/mem ", " imm))
   (imm :type 'signed-imm-data))
+
+(sb!disassem:define-instruction-format (ext-reg/mem-no-width+imm8 24
+                                        :include 'ext-reg/mem-no-width
+                                        :default-printer
+                                        '(:name :tab reg/mem ", " imm))
+  (imm :type 'imm-byte))
 
 ;;;; XMM instructions
 
@@ -2417,33 +2423,20 @@
 
 (eval-when (:compile-toplevel :execute)
   (defun bit-test-inst-printer-list (subop)
-    `((ext-reg/mem-imm ((op (#b1011101 ,subop))
-                        (reg/mem nil :type reg/mem)
-                        (imm nil :type imm-byte)
-                        (width 0)))
-      (ext-reg-reg/mem ((op ,(dpb subop (byte 3 2) #b1000001))
-                        (width 1))
-                       (:name :tab reg/mem ", " reg)))))
+    `((ext-reg/mem-no-width+imm8 ((op (#xBA ,subop))))
+      (ext-reg-reg/mem-no-width ((op ,(dpb subop (byte 3 3) #b10000011))
+                                 (reg/mem nil :type sized-reg/mem))
+                                (:name :tab reg/mem ", " reg)))))
 
-(define-instruction bt (segment src index)
-  (:printer-list (bit-test-inst-printer-list #b100))
-  (:emitter
-   (emit-bit-test-and-mumble segment src index #b100)))
-
-(define-instruction btc (segment src index)
-  (:printer-list (bit-test-inst-printer-list #b111))
-  (:emitter
-   (emit-bit-test-and-mumble segment src index #b111)))
-
-(define-instruction btr (segment src index)
-  (:printer-list (bit-test-inst-printer-list #b110))
-  (:emitter
-   (emit-bit-test-and-mumble segment src index #b110)))
-
-(define-instruction bts (segment src index)
-  (:printer-list (bit-test-inst-printer-list #b101))
-  (:emitter
-   (emit-bit-test-and-mumble segment src index #b101)))
+(macrolet ((define (inst opcode-extension)
+             `(define-instruction ,inst (segment src index)
+                (:printer-list (bit-test-inst-printer-list ,opcode-extension))
+                (:emitter (emit-bit-test-and-mumble segment src index
+                                                    ,opcode-extension)))))
+  (define bt  4)
+  (define bts 5)
+  (define btr 6)
+  (define btc 7))
 
 
 ;;;; control transfer

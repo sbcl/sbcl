@@ -295,6 +295,11 @@
                (let ((width (inst-operand-size dstate)))
                  (sb!disassem:read-signed-suffix (width-bits width) dstate))))
 
+(sb!disassem:define-arg-type imm-byte
+  :prefilter (lambda (value dstate)
+               (declare (ignore value)) ; always nil anyway
+               (sb!disassem:read-suffix 8 dstate)))
+
 (sb!disassem:define-arg-type signed-imm-byte
   :prefilter (lambda (value dstate)
                (declare (ignore value)) ; always nil anyway
@@ -540,6 +545,25 @@
   ;; optional fields
   (imm))
 
+(sb!disassem:define-instruction-format (ext-reg-reg/mem-no-width 24
+                                        :default-printer
+                                        `(:name :tab reg ", " reg/mem))
+  (prefix  :field (byte 8 0)    :value #b00001111)
+  (op      :field (byte 8 8))
+  (reg/mem :fields (list (byte 2 22) (byte 3 16))
+                                :type 'reg/mem)
+  (reg     :field (byte 3 19)   :type 'reg)
+  ;; optional fields
+  (imm))
+
+(sb!disassem:define-instruction-format (ext-reg/mem-no-width 24
+                                        :default-printer
+                                        `(:name :tab reg/mem))
+  (prefix  :field (byte 8 0)    :value #b00001111)
+  (op      :fields (list (byte 8 8) (byte 3 19)))
+  (reg/mem :fields (list (byte 2 22) (byte 3 16))
+                                :type 'reg/mem))
+
 ;;; reg-no-width with #x0f prefix
 (sb!disassem:define-instruction-format (ext-reg-no-width 16
                                         :default-printer '(:name :tab reg))
@@ -563,6 +587,12 @@
                                         :default-printer
                                         '(:name :tab reg/mem ", " imm))
   (imm :type 'imm-data))
+
+(sb!disassem:define-instruction-format (ext-reg/mem-no-width+imm8 24
+                                        :include 'ext-reg/mem-no-width
+                                        :default-printer
+                                        '(:name :tab reg/mem ", " imm))
+  (imm :type 'imm-byte))
 
 ;;;; This section was added by jrd, for fp instructions.
 
@@ -1821,33 +1851,20 @@
 
 (eval-when (:compile-toplevel :execute)
   (defun bit-test-inst-printer-list (subop)
-    `((ext-reg/mem-imm ((op (#b1011101 ,subop))
-                        (reg/mem nil :type word-reg/mem)
-                        (imm nil :type imm-data)
-                        (width 0)))
-      (ext-reg-reg/mem ((op ,(dpb subop (byte 3 2) #b1000001))
-                        (width 1))
-                       (:name :tab reg/mem ", " reg)))))
+    `((ext-reg/mem-no-width+imm8 ((op (#xBA ,subop))))
+      (ext-reg-reg/mem-no-width ((op ,(dpb subop (byte 3 3) #b10000011))
+                                 (reg/mem nil :type sized-reg/mem))
+                                (:name :tab reg/mem ", " reg)))))
 
-(define-instruction bt (segment src index)
-  (:printer-list (bit-test-inst-printer-list #b100))
-  (:emitter
-   (emit-bit-test-and-mumble segment src index #b100)))
-
-(define-instruction btc (segment src index)
-  (:printer-list (bit-test-inst-printer-list #b111))
-  (:emitter
-   (emit-bit-test-and-mumble segment src index #b111)))
-
-(define-instruction btr (segment src index)
-  (:printer-list (bit-test-inst-printer-list #b110))
-  (:emitter
-   (emit-bit-test-and-mumble segment src index #b110)))
-
-(define-instruction bts (segment src index)
-  (:printer-list (bit-test-inst-printer-list #b101))
-  (:emitter
-   (emit-bit-test-and-mumble segment src index #b101)))
+(macrolet ((define (inst opcode-extension)
+             `(define-instruction ,inst (segment src index)
+                (:printer-list (bit-test-inst-printer-list ,opcode-extension))
+                (:emitter (emit-bit-test-and-mumble segment src index
+                                                    ,opcode-extension)))))
+  (define bt  4)
+  (define bts 5)
+  (define btr 6)
+  (define btc 7))
 
 
 ;;;; control transfer
