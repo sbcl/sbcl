@@ -266,6 +266,16 @@
            :type '(and list (satisfies list-length)))))
 
 
+
+(defun emptyp (sequence)
+  #!+sb-doc
+  "Returns T if SEQUENCE is an empty sequence and NIL
+   otherwise. Signals an error if SEQUENCE is not a sequence."
+  (seq-dispatch sequence
+                (null sequence)
+                (zerop (length sequence))
+                (sb!sequence:emptyp sequence)))
+
 (defun elt (sequence index)
   #!+sb-doc "Return the element of SEQUENCE specified by INDEX."
   (seq-dispatch sequence
@@ -851,14 +861,10 @@ many elements are copied."
            ((eq type *empty-type*)
             (bad-sequence-type-error nil))
            ((type= type (specifier-type 'null))
-            (if (every (lambda (x) (or (null x)
-                                       (and (vectorp x) (= (length x) 0))))
-                       sequences)
-                'nil
-                (sequence-type-length-mismatch-error
-                 type
-                 ;; FIXME: circular list issues.
-                 (reduce #'+ sequences :key #'length))))
+            (unless (every #'emptyp sequences)
+              (sequence-type-length-mismatch-error
+               type (reduce #'+ sequences :key #'length))) ; FIXME: circular list issues.
+            '())
            ((cons-type-p type)
             (multiple-value-bind (min exactp)
                 (sb!kernel::cons-type-length-info type)

@@ -21,6 +21,8 @@
 
 (in-package :seq-test)
 
+;;; user-defined mock sequence class for testing generic versions of
+;;; sequence functions.
 (defclass list-backed-sequence (standard-object
                                 sequence)
   ((elements :initarg :elements :type list :accessor %elements)))
@@ -132,6 +134,12 @@
              (find #\f "herearesomeletters" :test #'char>)))
 (assert (eql 4 ; modified more, avoids charset technicalities completely
              (find 5 '(6 4) :test '>)))
+
+(with-test (:name sequence:emptyp)
+  (for-every-seq #()
+    '((eq t (sequence:emptyp seq))))
+  (for-every-seq #(1)
+    '((eq nil (sequence:emptyp seq)))))
 
 ;;; tests of FIND, POSITION, FIND-IF, and POSITION-IF (and a few for
 ;;; deprecated FIND-IF-NOT and POSITION-IF-NOT too)
@@ -327,6 +335,24 @@
     ;; ... though not in all cases.
     (assert-type-error (coerce '(#\f #\o #\o) 'simple-array))))
 
+;; CONCATENATE used to fail for generic sequences for result-type NULL.
+(with-test (:name (concatenate :result-type-null :bug-1162301))
+  (assert (sequence:emptyp (concatenate 'null)))
+
+  (for-every-seq #()
+    '((sequence:emptyp (concatenate 'null seq))
+      (sequence:emptyp (concatenate 'null seq seq))
+      (sequence:emptyp (concatenate 'null seq #()))
+      (sequence:emptyp (concatenate 'null seq ""))))
+
+  (for-every-seq #(1)
+    (mapcar (lambda (form)
+              `(typep (nth-value 1 (ignore-errors ,form)) 'type-error))
+            '((concatenate 'null seq)
+              (concatenate 'null seq seq)
+              (concatenate 'null seq #())
+              (concatenate 'null seq "2")))))
+
 ;;; As pointed out by Raymond Toy on #lisp IRC, MERGE had some issues
 ;;; with user-defined types until sbcl-0.7.8.11
 (deftype list-typeoid () 'list)
@@ -375,10 +401,8 @@
                4))
     (assert-type-error (merge 'nil () () '<))
     ;; CONCATENATE
-    (assert-type-error (concatenate 'null '(1) "2"))
     (assert-type-error (concatenate 'cons #() ()))
     (assert-type-error (concatenate '(cons t null) #(1 2 3) #(4 5 6)))
-    (assert (null (concatenate 'null () #())))
     (assert (= (length (concatenate 'cons #() '(1) "2 3")) 4))
     (assert (= (length (concatenate '(cons t cons) '(1) "34")) 3))
     (assert-type-error (concatenate 'nil '(3)))

@@ -2334,7 +2334,7 @@ be submitted as a CDR"
 
                "CANONIZE-TEST" "CANONIZE-KEY"
 
-               "LENGTH" "ELT"
+               "EMPTYP" "LENGTH" "ELT"
                "MAKE-SEQUENCE-LIKE" "ADJUST-SEQUENCE"
 
                "COUNT" "COUNT-IF" "COUNT-IF-NOT"

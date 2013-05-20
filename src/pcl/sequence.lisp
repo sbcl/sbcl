@@ -17,6 +17,11 @@
   (error 'sequence::protocol-unimplemented
          :datum sequence :expected-type '(or list vector)))
 
+(defgeneric sequence:emptyp (sequence)
+  (:method ((s list)) (null s))
+  (:method ((s vector)) (zerop (length s)))
+  (:method ((s sequence)) (zerop (length s))))
+
 (defgeneric sequence:length (sequence)
   (:method ((s list)) (length s))
   (:method ((s vector)) (length s))
