@@ -219,17 +219,19 @@
   (:args (value :scs (unsigned-reg)))
   (:arg-types unsigned-num)
   (:translate fixnump)
-  (:temporary (:sc unsigned-reg) tmp)
+  (:temporary (:sc unsigned-reg :from (:argument 0)) tmp)
   (:info)
   (:conditional :z)
   (:generator 5
-    (inst mov tmp value)
+    (move tmp value)
     (inst shr tmp n-positive-fixnum-bits)))
 
-(define-vop (fixnump/signed-byte-64 type-predicate)
+#-#.(cl:if (cl:= sb!vm:n-fixnum-tag-bits 1) '(:and) '(:or))
+(define-vop (fixnump/signed-byte-64 simple-type-predicate)
   (:args (value :scs (signed-reg)))
   (:info)
-  (:conditional #.(if (= sb!vm:n-fixnum-tag-bits 1) :ns :z))
+  (:conditional :z)
+  (:temporary (:sc unsigned-reg :offset eax-offset) eax)
   (:arg-types signed-num)
   (:translate fixnump)
   (:generator 5
@@ -239,8 +241,20 @@
     ;;    ((x-a) >> n) = 0
     (inst mov rax-tn #.(- sb!xc:most-negative-fixnum))
     (inst add rax-tn value)
-    (unless (= n-fixnum-tag-bits 1)
-      (inst shr rax-tn n-fixnum-bits))))
+    (inst shr rax-tn n-fixnum-bits)))
+
+#+#.(cl:if (cl:= sb!vm:n-fixnum-tag-bits 1) '(:and) '(:or))
+(define-vop (fixnump/signed-byte-64 simple-type-predicate)
+  (:args (value :scs (signed-reg) :target temp))
+  (:info)
+  (:conditional :no)
+  (:temporary (:sc unsigned-reg :from (:argument 0)) temp)
+  (:arg-types signed-num)
+  (:translate fixnump)
+  (:generator 5
+    (move temp value)
+    ;; The overflow flag will be set if the reg's sign bit changes.
+    (inst shl temp 1)))
 
 ;;; A (SIGNED-BYTE 64) can be represented with either fixnum or a bignum with
 ;;; exactly one digit.

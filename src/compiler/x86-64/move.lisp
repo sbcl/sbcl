@@ -256,25 +256,49 @@
 
 
 ;;; Arg is a fixnum or bignum, figure out which and load if necessary.
+#-#.(cl:if (cl:= sb!vm:n-fixnum-tag-bits 1) '(:and) '(:or))
 (define-vop (move-to-word/integer)
-  (:args (x :scs (descriptor-reg) :target eax))
+  (:args (x :scs (descriptor-reg) :target rax))
   (:results (y :scs (signed-reg unsigned-reg)))
   (:note "integer to untagged word coercion")
-  (:temporary (:sc unsigned-reg :offset eax-offset
-                   :from (:argument 0) :to (:result 0) :target y) eax)
+  ;; I'm not convinced that increasing the demand for rAX is
+  ;; better than adding 1 byte to some instruction encodings.
+  ;; I'll leave it alone though.
+  (:temporary (:sc unsigned-reg :offset rax-offset
+               :from (:argument 0) :to (:result 0) :target y) rax)
   (:generator 4
-    (move eax x)
+    (move rax x)
     (inst test al-tn fixnum-tag-mask)
     (inst jmp :z FIXNUM)
-    (loadw y eax bignum-digits-offset other-pointer-lowtag)
+    (loadw y rax bignum-digits-offset other-pointer-lowtag)
     (inst jmp DONE)
     FIXNUM
-    (inst sar eax n-fixnum-tag-bits)
-    (move y eax)
+    (inst sar rax n-fixnum-tag-bits)
+    (move y rax)
     DONE))
+
+#+#.(cl:if (cl:= sb!vm:n-fixnum-tag-bits 1) '(:and) '(:or))
+(define-vop (move-to-word/integer)
+  (:args (x :scs (descriptor-reg) :target y))
+  (:results (y :scs (signed-reg unsigned-reg)))
+  (:note "integer to untagged word coercion")
+  (:temporary (:sc unsigned-reg) backup)
+  (:generator 4
+    (move y x)
+    (if (location= x y)
+        ;; It would be great if a principled way existed to advise GC of
+        ;; algebraic transforms such as 2*R being a conservative root.
+        ;; Until that is possible, emit straightforward code that uses
+        ;; a copy of the potential reference.
+        (move backup x)
+        (setf backup x))
+    (inst sar y 1)      ; optimistically assume it's a fixnum
+    (inst jmp :nc DONE) ; no carry implies tag was 0
+    (loadw y backup bignum-digits-offset other-pointer-lowtag)
+    DONE))
+
 (define-move-vop move-to-word/integer :move
   (descriptor-reg) (signed-reg unsigned-reg))
-
 
 ;;; Result is a fixnum, so we can just shift. We need the result type
 ;;; restriction because of the control-stack ambiguity noted above.
