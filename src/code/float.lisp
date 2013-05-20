@@ -170,7 +170,7 @@
 (defun float-radix (x)
   #!+sb-doc
   "Return (as an integer) the radix b of its floating-point argument."
-  (declare (ignore x))
+  (declare (ignore x) (type float x))
   2)
 
 ;;;; INTEGER-DECODE-FLOAT and DECODE-FLOAT
