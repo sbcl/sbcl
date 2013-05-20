@@ -28,6 +28,8 @@ changes relative to sbcl-1.1.7:
        gives less wrong answers (lp#1178038, reported by Ken Harris)
   * enhancement: print intermediate evaluation results for some ASSERTed
     expressions. (lp#789497)
+  * enhancement: x86-64 disassemblies are annotated with unboxed constant
+    values when there are references to (RIP-relative) unboxed constants.
   * bug fix: type derivation for LOG{AND,IOR,XOR} scales linearly instead
     of quadratically with the size of the input in the worst case.
     (lp#1096444)

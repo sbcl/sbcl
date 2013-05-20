@@ -22,12 +22,12 @@
 ;;; symbol RIP or a full register, INDEX-REG a full register. If WIDTH
 ;;; is non-nil it should be one of the symbols :BYTE, :WORD, :DWORD or
 ;;; :QWORD and a corresponding size indicator is printed first.
-(defun print-mem-access (value width stream dstate)
+(defun print-mem-access (value width sized-p stream dstate)
   (declare (type list value)
            (type (member nil :byte :word :dword :qword) width)
            (type stream stream)
            (type sb!disassem:disassem-state dstate))
-  (when width
+  (when (and sized-p width)
     (princ width stream)
     (princ '| PTR | stream))
   (write-char #\[ stream)
@@ -64,7 +64,7 @@
                (when (plusp addr)
                  (or (nth-value 1
                                 (sb!disassem::note-code-constant-absolute
-                                 addr dstate))
+                                 addr dstate width))
                      (sb!disassem:maybe-note-assembler-routine addr
                                                                nil
                                                                dstate)))))

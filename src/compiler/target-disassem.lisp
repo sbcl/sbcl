@@ -1744,22 +1744,35 @@
          t)
         (values nil nil))))
 
-(defun get-code-constant-absolute (addr dstate)
+(defstruct code-constant-raw value)
+(def!method print-object ((self code-constant-raw) stream)
+  (format stream "#x~8,'0x" (code-constant-raw-value self)))
+
+(defun get-code-constant-absolute (addr dstate &optional width)
   (declare (type address addr))
   (declare (type disassem-state dstate))
   (let ((code (seg-code (dstate-segment dstate))))
     (if (null code)
       (return-from get-code-constant-absolute (values nil nil)))
-    (let ((code-size (ash (sb!kernel:get-header-data code) sb!vm:word-shift)))
-      (sb!sys:without-gcing
-       (let ((code-addr (- (sb!kernel:get-lisp-obj-address code)
-                           sb!vm:other-pointer-lowtag)))
-         (if (or (< addr code-addr) (>= addr (+ code-addr code-size)))
-           (values nil nil)
-           (values (sb!kernel:code-header-ref
-                    code
-                    (ash (- addr code-addr) (- sb!vm:word-shift)))
-                   t)))))))
+    (sb!sys:without-gcing
+     (let* ((n-header-words (sb!kernel:get-header-data code))
+            (n-code-words (sb!kernel:%code-code-size code))
+            (header-addr (- (sb!kernel:get-lisp-obj-address code)
+                             sb!vm:other-pointer-lowtag)))
+         (cond ((<= header-addr addr (+ header-addr (ash (1- n-header-words)
+                                                         sb!vm:word-shift)))
+                (values (sb!sys:sap-ref-lispobj (sb!sys:int-sap addr) 0) t))
+               ;; guess it's a non-descriptor constant from the instructions
+               ((and (eq width :qword)
+                     (< n-header-words
+                        ;; convert ADDR to header-relative Nth word
+                        (ash (- addr header-addr) (- sb!vm:word-shift))
+                        (+ n-header-words n-code-words)))
+                (values (make-code-constant-raw
+                         :value (sb!sys:sap-ref-64 (sb!sys:int-sap addr) 0))
+                        t))
+               (t
+                (values nil nil)))))))
 
 (defvar *assembler-routines-by-addr* nil)
 
@@ -1877,11 +1890,11 @@
 ;;; Store a note about the lisp constant located at ADDR in the
 ;;; current code-component, to be printed as an end-of-line comment
 ;;; after the current instruction is disassembled.
-(defun note-code-constant-absolute (addr dstate)
+(defun note-code-constant-absolute (addr dstate &optional width)
   (declare (type address addr)
            (type disassem-state dstate))
   (multiple-value-bind (const valid)
-      (get-code-constant-absolute addr dstate)
+      (get-code-constant-absolute addr dstate width)
     (when valid
       (note (lambda (stream)
               (prin1-quoted-short const stream))

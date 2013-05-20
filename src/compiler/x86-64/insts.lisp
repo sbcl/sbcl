@@ -156,7 +156,7 @@
            (type sb!disassem:disassem-state dstate))
   (if (typep value 'full-reg)
       (print-reg-with-width value width stream dstate)
-    (print-mem-access value (and sized-p width) stream dstate)))
+    (print-mem-access value width sized-p stream dstate)))
 
 ;;; Print a register or a memory reference. The width is determined by
 ;;; calling INST-OPERAND-SIZE.
@@ -219,7 +219,7 @@
            (type sb!disassem:disassem-state dstate))
   (if (typep value 'xmmreg)
       (print-xmmreg value stream dstate)
-    (print-mem-access value nil stream dstate)))
+    (print-mem-access value nil nil stream dstate)))
 
 ;;; This prefilter is used solely for its side effects, namely to put
 ;;; the bits found in the REX prefix into the DSTATE for use by other
