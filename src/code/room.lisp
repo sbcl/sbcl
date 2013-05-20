@@ -89,10 +89,9 @@
 (let ((cons-info (make-room-info :name 'cons
                                  :kind :list)))
   ;; A cons consists of two words, both of which may be either a
-  ;; pointer or immediate data.  Disregarding the possibility of an
-  ;; unbound-marker (permitted, according to the GC), this means
-  ;; either a fixnum, a character, a single-float on a 64-bit system,
-  ;; or a pointer.
+  ;; pointer or immediate data.  According to the runtime this means
+  ;; either a fixnum, a character, an unbound-marker, a single-float
+  ;; on a 64-bit system, or a pointer.
   (dotimes (i (ash 1 (- n-widetag-bits n-fixnum-tag-bits)))
     (setf (svref *meta-room-info* (ash i n-fixnum-tag-bits)) cons-info))
 
@@ -111,6 +110,8 @@
           cons-info))
 
   (setf (svref *meta-room-info* character-widetag) cons-info)
+
+  (setf (svref *meta-room-info* unbound-marker-widetag) cons-info)
 
   ;; Single-floats are immediate data on 64-bit systems.
   #!+#.(cl:if (cl:= 64 sb!vm:n-word-bits) '(and) '(or))
