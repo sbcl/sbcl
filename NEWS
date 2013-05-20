@@ -76,6 +76,8 @@ changes relative to sbcl-1.1.7:
   * optimization: associative bitwise operations reassociate patterns like
     (f (f x k1) k2) to expose (f x (f k1 k2)).  Same for + and * of
     rational values.
+  * optimization: quasiquote expressions now perform more constant folding,
+    instead of consing equal lists at runtime. (lp#1026439)
 
 changes in sbcl-1.1.7 relative to sbcl-1.1.6:
   * enhancement: TRACE :PRINT-ALL handles multiple-valued forms.

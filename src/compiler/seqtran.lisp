@@ -1614,3 +1614,75 @@
   (define-trimmer-transform string-left-trim t nil)
   (define-trimmer-transform string-right-trim nil t)
   (define-trimmer-transform string-trim t t))
+
+
+;;; (partially) constant-fold backq-* functions, or convert to their
+;;; plain CL equivalent (now that they're not needed for pprinting).
+
+;; Pop constant values from the end, list/list* them if any, and link
+;; the remainder with list* at runtime.
+(defun transform-backq-list-or-list* (function values)
+  (let ((gensyms (make-gensym-list (length values)))
+        (reverse (reverse values))
+        (constants '()))
+    (loop while (and reverse
+                     (constant-lvar-p (car reverse)))
+          do (push (lvar-value (pop reverse))
+                   constants))
+    (if (null constants)
+        `(lambda ,gensyms
+           (,function ,@gensyms))
+        (let ((tail (apply function constants)))
+          (if (null reverse)
+              `',tail
+              (let* ((nvariants (length reverse))
+                     (variants (subseq gensyms 0 nvariants)))
+                `(lambda ,gensyms
+                   (declare (ignore ,@(subseq gensyms nvariants)))
+                   ,(if tail
+                        `(list* ,@variants ',tail)
+                        `(list ,@variants)))))))))
+
+(deftransform sb!impl::backq-list ((&rest elts))
+  (transform-backq-list-or-list* 'list elts))
+
+(deftransform sb!impl::backq-list* ((&rest elts))
+  (transform-backq-list-or-list* 'list* elts))
+
+;; Merge adjacent constant values
+(deftransform sb!impl::backq-append ((&rest elts))
+  (let ((gensyms (make-gensym-list (length elts)))
+        (acc nil)
+        (ignored '())
+        (arguments '()))
+    (flet ((convert-accumulator ()
+             (let ((constant (apply 'append (nreverse (shiftf acc nil)))))
+               (when constant
+                 (push `',constant arguments)))))
+      (loop for gensym in gensyms
+            for (elt . next) on elts by #'cdr
+            do (cond ((constant-lvar-p elt)
+                      (let ((elt (lvar-value elt)))
+                        (when (and next (not (proper-list-p elt)))
+                          (abort-ir1-transform
+                           "Non-list or improper list spliced in ~
+                            the middle of a backquoted list."))
+                        (push gensym ignored)
+                        (push elt acc)))
+                     (t
+                      (convert-accumulator)
+                      (push gensym arguments)))
+            finally (convert-accumulator)))
+    (let ((arguments (nreverse arguments)))
+      `(lambda ,gensyms
+         (declare (ignore ,@ignored))
+         (append ,@arguments)))))
+
+;; Nothing special for nconc
+(define-source-transform sb!impl::backq-nconc (&rest elts)
+  `(nconc ,@elts))
+
+;; cons and vector are handled with regular constant folding...
+;; but we still want to convert backq-cons into cl:cons.
+(deftransform sb!impl::backq-cons ((x y))
+  `(cons x y))
