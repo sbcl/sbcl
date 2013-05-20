@@ -24,16 +24,64 @@
 ;;;
 ;;; ASSERT-ERROR isn't defined until a later file because it uses the
 ;;; macro RESTART-CASE, which isn't defined until a later file.
-(defmacro-mundanely assert (test-form &optional places datum &rest arguments)
+(defmacro-mundanely assert (test-form &optional places datum &rest arguments
+                            &environment env)
   #!+sb-doc
-  "Signals an error if the value of test-form is nil. Continuing from this
-   error using the CONTINUE restart will allow the user to alter the value of
-   some locations known to SETF, starting over with test-form. Returns NIL."
-  `(do () (,test-form)
-     (assert-error ',test-form ',places ,datum ,@arguments)
-     ,@(mapcar (lambda (place)
-                 `(setf ,place (assert-prompt ',place ,place)))
-               places)))
+  "Signals an error if the value of TEST-FORM is NIL. Returns NIL.
+
+   Optional DATUM and ARGUMENTS can be used to change the signaled
+   error condition and are interpreted as in (APPLY #'ERROR DATUM
+   ARGUMENTS).
+
+   Continuing from the signaled error using the CONTINUE restart will
+   allow the user to alter the values of the SETFable locations
+   specified in PLACES and then start over with TEST-FORM.
+
+   If TEST-FORM is of the form
+
+     (FUNCTION ARG*)
+
+   where FUNCTION is a function (but not a special operator like
+   CL:OR, CL:AND, etc.) the results of evaluating the ARGs will be
+   included in the error report if the assertion fails."
+  (collect ((bindings) (infos))
+    (let ((new-test
+            (flet ((process-place (place)
+                     (if (sb!xc:constantp place env)
+                         place
+                         (with-unique-names (temp)
+                           (bindings `(,temp ,place))
+                           (infos `(list ',place ,temp))
+                           temp))))
+              (cond
+                ;; TEST-FORM looks like a function call. We do not
+                ;; attempt this if TEST-FORM is the application of a
+                ;; special operator because of argument evaluation
+                ;; order issues.
+                ((and (typep test-form '(cons symbol list))
+                      (eq (info :function :kind (first test-form)) :function))
+                 (let ((name (first test-form))
+                       (args (mapcar #'process-place (rest test-form))))
+                   `(,name ,@args)))
+                ;; For all other cases, just evaluate TEST-FORM and do
+                ;; not report any details if the assertion fails.
+                (t
+                 test-form)))))
+      ;; If TEST-FORM, potentially using values from BINDINGS, does not
+      ;; hold, enter a loop which reports the assertion error,
+      ;; potentially changes PLACES, and retries TEST-FORM.
+      `(tagbody
+        :try
+          (let ,(bindings)
+            (when ,new-test
+              (go :done))
+            (assert-error ',test-form (list ,@(infos))
+                          ',places ,datum ,@arguments))
+          ,@(mapcar (lambda (place)
+                      `(setf ,place (assert-prompt ',place ,place)))
+                    places)
+          (go :try)
+        :done))))
 
 (defun assert-prompt (name value)
   (cond ((y-or-n-p "The old value of ~S is ~S.~

@@ -131,27 +131,25 @@ with that condition (or with no condition) will be returned."
          (args (interactive-restart-arguments real-restart)))
     (apply (restart-function real-restart) args)))
 
-(defun assert-error (assertion places datum &rest arguments)
+(defun assert-error (assertion args-and-values places datum &rest arguments)
   (let ((cond (if datum
-                (coerce-to-condition datum
-                                                    arguments
-                                                    'simple-error
-                                                    'error)
-                (make-condition 'simple-error
-                                :format-control "The assertion ~S failed."
-                                :format-arguments (list assertion)))))
+                  (coerce-to-condition
+                   datum arguments 'simple-error 'error)
+                  (make-condition
+                   'simple-error
+                   :format-control "~@<The assertion ~S failed~:[.~:; ~
+                                    with ~:*~{~{~S = ~S~}~^, ~}.~]~:@>"
+                   :format-arguments (list assertion args-and-values)))))
     (restart-case
         (error cond)
       (continue ()
-                :report (lambda (stream)
-                          (format stream "Retry assertion")
-                          (if places
-                              (format stream
-                                      " with new value~P for ~{~S~^, ~}."
-                                      (length places)
-                                      places)
-                              (format stream ".")))
-                nil))))
+        :report (lambda (stream)
+                  (format stream "Retry assertion")
+                  (if places
+                      (format stream " with new value~P for ~{~S~^, ~}."
+                              (length places) places)
+                      (format stream ".")))
+        nil))))
 
 ;;; READ-EVALUATED-FORM is used as the interactive method for restart cases
 ;;; setup by the Common Lisp "casing" (e.g., CCASE and CTYPECASE) macros

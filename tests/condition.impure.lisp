@@ -194,7 +194,7 @@
            (condition-with-constant-function-initform-foo
             (make-instance 'condition-with-constant-function-initform)))))
 
-;;; bug-
+;;; bug-1164969
 
 (defvar bar-counter 0)
 
@@ -270,3 +270,25 @@
                   (make-condition 'condition-with-class-allocation))))
   (assert (= 5 (condition-with-class-allocation-count
                 (make-condition 'condition-with-class-allocation)))))
+
+;;; bug-789497
+
+(with-test (:name (assert :print-intermediate-results :bug-789497))
+  (macrolet ((test (bindings expression expected-message)
+               `(let ,bindings
+                  (handler-case (assert ,expression)
+                    (simple-error (condition)
+                      (assert (string= (princ-to-string condition)
+                                       ,expected-message)))))))
+    ;; Constant and variables => no special report.
+    (test () nil "The assertion NIL failed.")
+    (test ((a nil)) a "The assertion A failed.")
+    ;; Special operators => no special report.
+    (test ((a nil) (b nil)) (or a b) "The assertion (OR A B) failed.")
+    (test ((a nil) (b t)) (and a b) "The assertion (AND A B) failed.")
+    ;; Functions with constant and non-constant arguments => include
+    ;; non-constant arguments in report.
+    (test ((a t)) (not a) "The assertion (NOT A) failed with A = T.")
+    (test () (not t) "The assertion (NOT T) failed.")
+    (test ((a -1)) (plusp (signum a))
+          "The assertion (PLUSP (SIGNUM A)) failed with (SIGNUM A) = -1.")))

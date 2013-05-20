@@ -26,6 +26,8 @@ changes relative to sbcl-1.1.7:
        NFKD) has been included;
     ** querying the character database for code points not defined by Unicode
        gives less wrong answers (lp#1178038, reported by Ken Harris)
+  * enhancement: print intermediate evaluation results for some ASSERTed
+    expressions. (lp#789497)
   * bug fix: type derivation for LOG{AND,IOR,XOR} scales linearly instead
     of quadratically with the size of the input in the worst case.
     (lp#1096444)
