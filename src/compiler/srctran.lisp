@@ -3265,6 +3265,60 @@
       (give-up-ir1-transform))
     'x))
 
+;;; Pick off easy association opportunities for constant folding.
+;;; More complicated stuff that also depends on commutativity
+;;; (e.g. (f (f x k1) (f y k2)) => (f (f x y) (f k1 k2))) should
+;;; probably be handled with a more general tree-rewriting pass.
+(macrolet ((def (operator &key (type 'integer) (folded operator))
+             `(deftransform ,operator ((x z) (,type (constant-arg ,type)))
+                ,(format nil "associate ~A/~A of constants"
+                         operator folded)
+                (binding* ((node  (if (lvar-has-single-use-p x)
+                                      (lvar-use x)
+                                      (give-up-ir1-transform)))
+                           (nil (or (and (combination-p node)
+                                         (eq (lvar-fun-name
+                                              (combination-fun node))
+                                             ',folded))
+                                    (give-up-ir1-transform)))
+                           (y   (second (combination-args node)))
+                           (nil (or (constant-lvar-p y)
+                                    (give-up-ir1-transform)))
+                           (y   (lvar-value y)))
+                  (unless (typep y ',type)
+                    (give-up-ir1-transform))
+                  (splice-fun-args x ',folded 2)
+                  `(lambda (x y z)
+                     (declare (ignore y z))
+                     (,',operator x ',(,folded y (lvar-value z))))))))
+  (def logand)
+  (def logior)
+  (def logxor)
+  (def logtest :folded logand)
+  (def + :type rational)
+  (def * :type rational))
+
+(deftransform mask-signed-field ((width x) ((constant-arg unsigned-byte) *))
+  "Fold mask-signed-field/mask-signed-field of constant width"
+  (binding* ((node  (if (lvar-has-single-use-p x)
+                        (lvar-use x)
+                        (give-up-ir1-transform)))
+             (nil (or (combination-p node)
+                      (give-up-ir1-transform)))
+             (nil (or (eq (lvar-fun-name (combination-fun node))
+                          'mask-signed-field)
+                      (give-up-ir1-transform)))
+             (x-width (first (combination-args node)))
+             (nil (or (constant-lvar-p x-width)
+                      (give-up-ir1-transform)))
+             (x-width (lvar-value x-width)))
+    (unless (typep x-width 'unsigned-byte)
+      (give-up-ir1-transform))
+    (splice-fun-args x 'mask-signed-field 2)
+    `(lambda (width x-width x)
+       (declare (ignore width x-width))
+       (mask-signed-field ,(min (lvar-value width) x-width) x))))
+
 ;;; These are restricted to rationals, because (- 0 0.0) is 0.0, not -0.0, and
 ;;; (* 0 -4.0) is -0.0.
 (deftransform - ((x y) ((constant-arg (member 0)) rational) *)
