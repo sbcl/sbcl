@@ -2403,4 +2403,19 @@
   (compile nil `(lambda (x)
                   (norm-1177703 (vec-1177703 x)))))
 
+(declaim (inline call-1035721))
+(defun call-1035721 (function)
+  (lambda (x)
+    (funcall function x)))
+
+(declaim (inline identity-1035721))
+(defun identity-1035721 (x)
+  x)
+
+(test-util:with-test (:name :bug-1035721)
+  (compile nil `(lambda ()
+                  (list
+                   (call-1035721 #'identity-1035721)
+                   (lambda (x)
+                     (identity-1035721 x))))))
 ;;; success

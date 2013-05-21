@@ -71,6 +71,8 @@ changes relative to sbcl-1.1.7:
   * bug fix: Type mismatch for the value of conditional expressions are
     correctly reported when detected at compile-time, instead of complaining
     about a constant NIL (similar for non-EQ-comparable catch tags).
+  * bug fix: Referring to INLINE global functions as values should not result
+    in a compilation failure. (lp#1035721)
   * optimization: faster ISQRT on fixnums and small bignums
   * optimization: faster and smaller INTEGER-LENGTH on fixnums on x86-64.
   * optimization: On x86-64, the number of multi-byte NOP instructions used
