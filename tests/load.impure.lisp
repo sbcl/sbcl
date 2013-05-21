@@ -358,3 +358,61 @@
                  (test-it)))))
       (when fasl
         (ignore-errors (delete-file fasl))))))
+
+(defvar *pack*)
+#+sb-simd-pack
+(with-test (:name :load-simd-pack-int)
+  (with-open-file (s *tmp-filename*
+                     :direction :output
+                     :if-exists :supersede
+                     :if-does-not-exist :create)
+    (print '(setq *pack* (sb-kernel:%make-simd-pack-ub64 2 4)) s))
+  (let (tmp-fasl)
+    (unwind-protect
+         (progn
+           (setq tmp-fasl (compile-file *tmp-filename*))
+           (let ((*pack* nil))
+             (load tmp-fasl)
+             (assert (typep *pack* '(sb-kernel:simd-pack integer)))
+             (assert (= 2 (sb-kernel:%simd-pack-low *pack*)))
+             (assert (= 4 (sb-kernel:%simd-pack-high *pack*)))))
+      (when tmp-fasl (delete-file tmp-fasl))
+      (delete-file *tmp-filename*))))
+
+#+sb-simd-pack
+(with-test (:name :load-simd-pack-single)
+  (with-open-file (s *tmp-filename*
+                     :direction :output
+                     :if-exists :supersede
+                     :if-does-not-exist :create)
+    (print '(setq *pack* (sb-kernel:%make-simd-pack-single 1f0 2f0 3f0 4f0)) s))
+  (let (tmp-fasl)
+    (unwind-protect
+         (progn
+           (setq tmp-fasl (compile-file *tmp-filename*))
+           (let ((*pack* nil))
+             (load tmp-fasl)
+             (assert (typep *pack* '(sb-kernel:simd-pack single-float)))
+             (assert (equal (multiple-value-list (sb-kernel:%simd-pack-singles *pack*))
+                            '(1f0 2f0 3f0 4f0)))))
+      (when tmp-fasl (delete-file tmp-fasl))
+      (delete-file *tmp-filename*))))
+
+#+sb-simd-pack
+(with-test (:name :load-simd-pack-double)
+  (with-open-file (s *tmp-filename*
+                     :direction :output
+                     :if-exists :supersede
+                     :if-does-not-exist :create)
+    (print '(setq *pack* (sb-kernel:%make-simd-pack-double 1d0 2d0)) s))
+  (let (tmp-fasl)
+    (unwind-protect
+         (progn
+           (setq tmp-fasl (compile-file *tmp-filename*))
+           (let ((*pack* nil))
+             (load tmp-fasl)
+             (assert (typep *pack* '(sb-kernel:simd-pack double-float)))
+             (assert (equal (multiple-value-list (sb-kernel:%simd-pack-doubles *pack*))
+                            '(1d0 2d0)))))
+      (when tmp-fasl (delete-file tmp-fasl))
+      (delete-file *tmp-filename*))))
