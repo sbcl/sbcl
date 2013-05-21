@@ -330,6 +330,12 @@
          :datum object
          :expected-type '(complex long-float)))
 
+#!+sb-simd-pack
+(deferr object-not-simd-pack-error (object)
+  (error 'type-error
+         :datum object
+         :expected-type 'simd-pack))
+
 (deferr object-not-weak-pointer-error (object)
   (error 'type-error
          :datum object

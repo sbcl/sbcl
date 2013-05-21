@@ -28,6 +28,14 @@
       ((double-reg complex-double-reg)
        (aver (xmm-register-p src))
        (inst movapd dst src))
+      #!+sb-simd-pack
+      ((int-sse-reg sse-reg)
+       (aver (xmm-register-p src))
+       (inst movdqa dst src))
+      #!+sb-simd-pack
+      ((single-sse-reg double-sse-reg)
+       (aver (xmm-register-p src))
+       (inst movaps dst src))
       (t
        (inst mov dst src)))))
 

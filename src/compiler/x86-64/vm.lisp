@@ -246,6 +246,10 @@
   (fp-complex-single-immediate immediate-constant)
   (fp-complex-double-immediate immediate-constant)
 
+  #!+sb-simd-pack (int-sse-immediate immediate-constant)
+  #!+sb-simd-pack (double-sse-immediate immediate-constant)
+  #!+sb-simd-pack (single-sse-immediate immediate-constant)
+
   (immediate immediate-constant)
 
   ;;
@@ -265,7 +269,12 @@
   (double-stack stack)
   (complex-single-stack stack)  ; complex-single-floats
   (complex-double-stack stack :element-size 2)  ; complex-double-floats
-
+  #!+sb-simd-pack
+  (int-sse-stack stack :element-size 2)
+  #!+sb-simd-pack
+  (double-sse-stack stack :element-size 2)
+  #!+sb-simd-pack
+  (single-sse-stack stack :element-size 2)
 
   ;;
   ;; magic SCs
@@ -377,6 +386,30 @@
                       :save-p t
                       :alternate-scs (complex-double-stack))
 
+  ;; temporary only
+  #!+sb-simd-pack
+  (sse-reg float-registers
+           :locations #.*float-regs*)
+  ;; regular values
+  #!+sb-simd-pack
+  (int-sse-reg float-registers
+               :locations #.*float-regs*
+               :constant-scs (int-sse-immediate)
+               :save-p t
+               :alternate-scs (int-sse-stack))
+  #!+sb-simd-pack
+  (double-sse-reg float-registers
+                  :locations #.*float-regs*
+                  :constant-scs (double-sse-immediate)
+                  :save-p t
+                  :alternate-scs (double-sse-stack))
+  #!+sb-simd-pack
+  (single-sse-reg float-registers
+                  :locations #.*float-regs*
+                  :constant-scs (single-sse-immediate)
+                  :save-p t
+                  :alternate-scs (single-sse-stack))
+
   ;; a catch or unwind block
   (catch-block stack :element-size kludge-nondeterministic-catch-block-size))
 
@@ -397,6 +430,9 @@
 (defparameter *double-sc-names* '(double-reg double-stack))
 (defparameter *complex-sc-names* '(complex-single-reg complex-single-stack
                                    complex-double-reg complex-double-stack))
+#!+sb-simd-pack
+(defparameter *oword-sc-names* '(sse-reg int-sse-reg single-sse-reg double-sse-reg
+                                 sse-stack int-sse-stack single-sse-stack double-sse-stack))
 ) ; EVAL-WHEN
 
 ;;;; miscellaneous TNs for the various registers
@@ -478,7 +514,19 @@
        (sc-number-or-lose
         (if (eql value #c(0d0 0d0))
             'fp-complex-double-zero
-            'fp-complex-double-immediate)))))
+            'fp-complex-double-immediate)))
+    #!+sb-simd-pack
+    (#+sb-xc-host nil
+     #-sb-xc-host (simd-pack double-float)
+        (sc-number-or-lose 'double-sse-immediate))
+    #!+sb-simd-pack
+    (#+sb-xc-host nil
+     #-sb-xc-host (simd-pack single-float)
+     (sc-number-or-lose 'single-sse-immediate))
+    #!+sb-simd-pack
+    (#+sb-xc-host nil
+     #-sb-xc-host simd-pack
+     (sc-number-or-lose 'int-sse-immediate))))
 
 (!def-vm-support-routine boxed-immediate-sc-p (sc)
   (eql sc (sc-number-or-lose 'immediate)))

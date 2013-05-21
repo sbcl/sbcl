@@ -35,7 +35,8 @@
          array-type
          character-set-type
          built-in-classoid
-         cons-type)
+         cons-type
+         #!+sb-simd-pack simd-pack-type)
      (values (%typep obj type) t))
     (classoid
      (if (if (csubtypep type (specifier-type 'function))

@@ -551,6 +551,8 @@
 
  ("src/compiler/target/move")
  ("src/compiler/target/float")
+ #!+sb-simd-pack
+ ("src/compiler/target/simd-pack")
  ("src/compiler/target/sap")
  ("src/compiler/target/system")
  ("src/compiler/target/char")

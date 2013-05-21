@@ -121,6 +121,12 @@
      (and (consp object)
           (%%typep (car object) (cons-type-car-type type) strict)
           (%%typep (cdr object) (cons-type-cdr-type type) strict)))
+    #!+sb-simd-pack
+    (simd-pack-type
+     (and (simd-pack-p object)
+          (let* ((tag (%simd-pack-tag object))
+                 (name (nth tag *simd-pack-element-types*)))
+            (not (not (member name (simd-pack-type-element-type type)))))))
     (character-set-type
      (and (characterp object)
          (let ((code (char-code object))

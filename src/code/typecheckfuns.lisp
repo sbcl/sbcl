@@ -217,6 +217,8 @@
            (numeric-type-p ctype)
            (array-type-p ctype)
            (cons-type-p ctype)
+           #!+sb-simd-pack
+           (simd-pack-type-p ctype)
            (intersection-type-p ctype)
            (union-type-p ctype)
            (negation-type-p ctype)

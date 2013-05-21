@@ -162,7 +162,7 @@
 (in-package "SB!C")
 
 ;;; the maximum number of SCs in any implementation
-(def!constant sc-number-limit 40)
+(def!constant sc-number-limit 62)
 
 ;;; Modular functions
 

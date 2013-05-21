@@ -174,7 +174,10 @@
   fdefn-widetag                             ; 01010110
 
   no-tls-value-marker-widetag               ; 01011010
-  unused01-widetag                          ; 01011110
+  #!-sb-simd-pack
+  unused01-widetag
+  #!+sb-simd-pack
+  simd-pack-widetag                          ; 01011110
   unused02-widetag                          ; 01100010
   unused03-widetag                          ; 01100110
   unused04-widetag                          ; 01101010

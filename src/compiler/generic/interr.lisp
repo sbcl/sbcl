@@ -131,6 +131,9 @@
   #!+long-float
   (object-not-complex-long-float
    "Object is not of type (COMPLEX LONG-FLOAT).")
+  #!+sb-simd-pack
+  (object-not-simd-pack
+   "Object is not of type SIMD-PACK.")
   (object-not-weak-pointer
    "Object is not a WEAK-POINTER.")
   (object-not-instance

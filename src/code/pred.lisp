@@ -120,6 +120,7 @@
   (def-type-predicate-wrapper realp)
   (def-type-predicate-wrapper short-float-p)
   (def-type-predicate-wrapper single-float-p)
+  #!+sb-simd-pack (def-type-predicate-wrapper simd-pack-p)
   (def-type-predicate-wrapper %instancep)
   (def-type-predicate-wrapper symbolp)
   (def-type-predicate-wrapper %other-pointer-p)

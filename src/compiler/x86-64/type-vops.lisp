@@ -184,34 +184,33 @@
   (:info target not-p)
   (:policy :fast-safe))
 
-(defun cost-to-test-types (type-codes)
-  (+ (* 2 (length type-codes))
-     (if (> (apply #'max type-codes) lowtag-limit) 7 2)))
-
 (defmacro !define-type-vops (pred-name check-name ptype error-code
                              (&rest type-codes)
                              &key (variant nil variant-p) &allow-other-keys)
   ;; KLUDGE: UGH. Why do we need this eval? Can't we put this in the
   ;; expansion?
-  (let* ((cost (cost-to-test-types (mapcar #'eval type-codes)))
-         (prefix (if variant-p
-                     (concatenate 'string (string variant) "-")
-                     "")))
-    `(progn
-       ,@(when pred-name
-           `((define-vop (,pred-name ,(intern (concatenate 'string prefix "TYPE-PREDICATE")))
-               (:translate ,pred-name)
-               (:generator ,cost
-                 (test-type value target not-p (,@type-codes))))))
-       ,@(when check-name
-           `((define-vop (,check-name ,(intern (concatenate 'string prefix "CHECK-TYPE")))
-               (:generator ,cost
-                 (let ((err-lab
-                        (generate-error-code vop ',error-code value)))
-                   (test-type value err-lab t (,@type-codes))
-                   (move result value))))))
-       ,@(when ptype
-           `((primitive-type-vop ,check-name (:check) ,ptype))))))
+  (flet ((cost-to-test-types (type-codes)
+           (+ (* 2 (length type-codes))
+              (if (> (apply #'max type-codes) lowtag-limit) 7 2))))
+    (let* ((cost (cost-to-test-types (mapcar #'eval type-codes)))
+           (prefix (if variant-p
+                       (concatenate 'string (string variant) "-")
+                       "")))
+      `(progn
+         ,@(when pred-name
+             `((define-vop (,pred-name ,(intern (concatenate 'string prefix "TYPE-PREDICATE")))
+                 (:translate ,pred-name)
+                 (:generator ,cost
+                   (test-type value target not-p (,@type-codes))))))
+         ,@(when check-name
+             `((define-vop (,check-name ,(intern (concatenate 'string prefix "CHECK-TYPE")))
+                 (:generator ,cost
+                   (let ((err-lab
+                           (generate-error-code vop ',error-code value)))
+                     (test-type value err-lab t (,@type-codes))
+                     (move result value))))))
+         ,@(when ptype
+             `((primitive-type-vop ,check-name (:check) ,ptype)))))))
 
 ;;;; other integer ranges
 
@@ -425,3 +424,67 @@
       (inst jmp :e error)
       (test-type value error t (list-pointer-lowtag))
       (move result value))))
+
+#!+sb-simd-pack
+(progn
+  (!define-type-vops simd-pack-p nil nil nil (simd-pack-widetag))
+
+  #!+x86-64
+  (define-vop (check-simd-pack check-type)
+    (:args (value :target result
+                  :scs (any-reg descriptor-reg
+                        int-sse-reg single-sse-reg double-sse-reg
+                        int-sse-stack single-sse-stack double-sse-stack)))
+    (:results (result :scs (any-reg descriptor-reg
+                           int-sse-reg single-sse-reg double-sse-reg)))
+    (:temporary (:sc unsigned-reg :offset eax-offset :to (:result 0)) eax)
+    (:ignore eax)
+    (:vop-var vop)
+    (:node-var node)
+    (:save-p :compute-only)
+    (:generator 50
+      (sc-case value
+        ((int-sse-reg single-sse-reg double-sse-reg
+          int-sse-stack single-sse-stack double-sse-stack)
+         (sc-case result
+           ((int-sse-reg single-sse-reg double-sse-reg)
+            (move result value))
+           ((any-reg descriptor-reg)
+            (with-fixed-allocation (result
+                                    simd-pack-widetag
+                                    simd-pack-size
+                                    node)
+              ;; see *simd-pack-element-types*
+              (storew (fixnumize
+                       (sc-case value
+                         ((int-sse-reg int-sse-stack) 0)
+                         ((single-sse-reg single-sse-stack) 1)
+                         ((double-sse-reg double-sse-stack) 2)))
+                  result simd-pack-tag-slot other-pointer-lowtag)
+              (let ((ea (make-ea-for-object-slot
+                         result simd-pack-lo-value-slot other-pointer-lowtag)))
+                (if (float-simd-pack-p value)
+                    (inst movaps ea value)
+                    (inst movdqa ea value)))))))
+        ((any-reg descriptor-reg)
+         (let ((leaf (sb!c::tn-leaf value)))
+           (unless (and (sb!c::lvar-p leaf)
+                        (csubtypep (sb!c::lvar-type leaf)
+                                   (specifier-type 'simd-pack)))
+             (test-type
+                 value
+                 (generate-error-code vop 'object-not-simd-pack-error value)
+                 t (simd-pack-widetag))))
+         (sc-case result
+           ((int-sse-reg)
+            (let ((ea (make-ea-for-object-slot
+                       value simd-pack-lo-value-slot other-pointer-lowtag)))
+              (inst movdqa result ea)))
+           ((single-sse-reg double-sse-reg)
+            (let ((ea (make-ea-for-object-slot
+                       value simd-pack-lo-value-slot other-pointer-lowtag)))
+              (inst movaps result ea)))
+           ((any-reg descriptor-reg)
+            (move result value)))))))
+
+  (primitive-type-vop check-simd-pack (:check) simd-pack-int simd-pack-single simd-pack-double))

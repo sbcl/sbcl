@@ -340,6 +340,20 @@
                             collect
                             `(<= ,(car pair) ,n-code ,(cdr pair)))))))))))
 
+#!+sb-simd-pack
+(defun source-transform-simd-pack-typep (object type)
+  (if (type= type (specifier-type 'simd-pack))
+      `(simd-pack-p ,object)
+      (once-only ((n-obj object))
+        (let ((n-tag (gensym "TAG")))
+          `(and
+            (simd-pack-p ,n-obj)
+            (let ((,n-tag (%simd-pack-tag ,n-obj)))
+              (or ,@(loop
+                      for type in (simd-pack-type-element-type type)
+                      for index = (position type *simd-pack-element-types*)
+                      collect `(eql ,n-tag ,index)))))))))
+
 ;;; Return the predicate and type from the most specific entry in
 ;;; *TYPE-PREDICATES* that is a supertype of TYPE.
 (defun find-supertype-predicate (type)
@@ -607,6 +621,9 @@
            (source-transform-cons-typep object ctype))
           (character-set-type
            (source-transform-character-set-typep object ctype))
+          #!+sb-simd-pack
+          (simd-pack-type
+           (source-transform-simd-pack-typep object ctype))
           (t nil))
         `(%typep ,object ',type))))
 

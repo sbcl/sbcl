@@ -358,6 +358,16 @@
   (real :c-type "double" :length #!-x86-64 2 #!+x86-64 1)
   (imag :c-type "double" :length #!-x86-64 2 #!+x86-64 1))
 
+#!+sb-simd-pack
+(define-primitive-object (simd-pack
+                          :lowtag other-pointer-lowtag
+                          :widetag simd-pack-widetag)
+  (tag :ref-trans %simd-pack-tag
+       :attributes (movable flushable)
+       :type fixnum)
+  (lo-value :c-type "long" :type (unsigned-byte 64))
+  (hi-value :c-type "long" :type (unsigned-byte 64)))
+
 ;;; this isn't actually a lisp object at all, it's a c structure that lives
 ;;; in c-land.  However, we need sight of so many parts of it from Lisp that
 ;;; it makes sense to define it here anyway, so that the GENESIS machinery

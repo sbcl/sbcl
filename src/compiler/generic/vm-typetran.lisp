@@ -104,6 +104,8 @@
 (define-type-predicate unsigned-byte-64-p (unsigned-byte 64))
 #!+#.(cl:if (cl:= 64 sb!vm:n-word-bits) '(and) '(or))
 (define-type-predicate signed-byte-64-p (signed-byte 64))
+#!+sb-simd-pack
+(define-type-predicate simd-pack-p simd-pack)
 (define-type-predicate vector-nil-p (vector nil))
 (define-type-predicate weak-pointer-p weak-pointer)
 (define-type-predicate code-component-p code-component)
