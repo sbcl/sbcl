@@ -2159,7 +2159,7 @@
 
           ;; FIXME: Do it in one step.
           (let ((context (cons (node-source-form cast)
-                               (lvar-source (cast-value cast)))))
+                               (lvar-all-sources (cast-value cast)))))
             (filter-lvar
              value
              (if (cast-single-value-p cast)

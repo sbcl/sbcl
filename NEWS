@@ -68,6 +68,9 @@ changes relative to sbcl-1.1.7:
     when testing for non-zero-ness.
   * bug fix: (CONCATENATE 'null ...) no longer fails for generic sequences.
     (lp#1162301)
+  * bug fix: Type mismatch for the value of conditional expressions are
+    correctly reported when detected at compile-time, instead of complaining
+    about a constant NIL (similar for non-EQ-comparable catch tags).
   * optimization: faster ISQRT on fixnums and small bignums
   * optimization: faster and smaller INTEGER-LENGTH on fixnums on x86-64.
   * optimization: On x86-64, the number of multi-byte NOP instructions used

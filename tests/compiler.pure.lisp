@@ -4483,3 +4483,35 @@
                                            (optimize speed))
                                   (logtest x 2048))))
                  '(function ((unsigned-byte 10)) (values null &optional)))))
+
+;; type mismatches on LVARs with multiple potential sources used to
+;; be reported as mismatches with the value NIL.  Make sure we get
+;; a warning, but that it doesn't complain about a constant NIL ...
+;; of type FIXNUM.
+(with-test (:name (:multiple-use-lvar-interpreted-as-NIL cast))
+  (block nil
+    (handler-bind ((sb-int:type-warning
+                     (lambda (c)
+                       (assert
+                        (not (search "Constant "
+                                     (simple-condition-format-control
+                                      c))))
+                       (return))))
+      (compile nil `(lambda (x y z)
+                      (declare (type fixnum y z))
+                      (aref (if x y z) 0))))
+    (error "Where's my warning?")))
+
+(with-test (:name (:multiple-use-lvar-interpreted-as-NIL catch))
+  (block nil
+    (handler-bind ((style-warning
+                     (lambda (c)
+                       (assert
+                        (not (position
+                              nil
+                              (simple-condition-format-arguments c))))
+                       (return))))
+      (compile nil `(lambda (x y z f)
+                      (declare (type fixnum y z))
+                      (catch (if x y z) (funcall f)))))
+    (error "Where's my style-warning?")))

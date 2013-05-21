@@ -892,33 +892,64 @@
   (declare (type lvar tag))
   (let ((ctype (lvar-type tag)))
     (when (csubtypep ctype (specifier-type '(or number character)))
-      (compiler-style-warn "~@<using ~S of type ~S as a catch tag (which ~
-                            tends to be unportable because THROW and CATCH ~
-                            use EQ comparison)~@:>"
-                           (lvar-source tag)
-                           (type-specifier (lvar-type tag))))))
+      (let ((sources (lvar-all-sources tag)))
+        (if (singleton-p sources)
+            (compiler-style-warn
+             "~@<using ~S of type ~S as a catch tag (which ~
+                 tends to be unportable because THROW and CATCH ~
+                 use EQ comparison)~@:>"
+             (first sources)
+             (type-specifier (lvar-type tag)))
+            (compiler-style-warn
+             "~@<using ~{~S~^~#[~; or ~:;, ~]~} in ~S of type ~S ~
+                 as a catch tag (which tends to be unportable ~
+                 because THROW and CATCH use EQ comparison)~@:>"
+             (rest sources) (first sources)
+             (type-specifier (lvar-type tag))))))))
 
 (defun %compile-time-type-error (values atype dtype context)
   (declare (ignore dtype))
   (destructuring-bind (form . detail) context
     (if (and (consp atype) (eq (car atype) 'values))
-        (error 'simple-type-error
-               :datum (car values)
-               :expected-type atype
-               :format-control
-               "~@<Value set ~2I~_[~{~S~^ ~}] ~I~_from ~S in ~2I~_~S ~I~_is ~
+        (if (singleton-p detail)
+            (error 'simple-type-error
+                   :datum (car values)
+                   :expected-type atype
+                   :format-control
+                   "~@<Value set ~2I~_[~{~S~^ ~}] ~I~_from ~S in ~2I~_~S ~I~_is ~
                    not of type ~2I~_~S.~:>"
-               :format-arguments (list values
-                                       detail form
-                                       atype))
-        (error 'simple-type-error
-               :datum (car values)
-               :expected-type atype
-               :format-control "~@<Value of ~S in ~2I~_~S ~I~_is ~2I~_~S, ~
+                   :format-arguments (list values
+                                           (first detail) form
+                                           atype))
+            (error 'simple-type-error
+                   :datum (car values)
+                   :expected-type atype
+                   :format-control
+                   "~@<Value set ~2I~_[~{~S~^ ~}] ~
+                   ~I~_from ~2I~_~{~S~^~#[~; or ~:;, ~]~} ~
+                   ~I~_of ~2I~_~S ~I~_in ~2I~_~S ~I~_is not of type ~2I~_~S.~:>"
+                   :format-arguments (list values
+                                           (rest detail) (first detail)
+                                           form
+                                           atype)))
+        (if (singleton-p detail)
+            (error 'simple-type-error
+                   :datum (car values)
+                   :expected-type atype
+                   :format-control "~@<Value of ~S in ~2I~_~S ~I~_is ~2I~_~S, ~
                                 ~I~_not a ~2I~_~S.~:@>"
-               :format-arguments (list detail form
-                                       (car values)
-                                       atype)))))
+                   :format-arguments (list (car detail) form
+                                           (car values)
+                                           atype))
+            (error 'simple-type-error
+                   :datum (car values)
+                   :expected-type atype
+                   :format-control "~@<Value from ~2I~_~{~S~^~#[~; or ~:;, ~]~} ~
+                                   ~I~_of ~2I~_~S ~I~_in ~2I~_~S ~I~_is ~2I~_~S, ~
+                                   ~I~_not a ~2I~_~S.~:@>"
+                   :format-arguments (list (rest detail) (first detail) form
+                                           (car values)
+                                           atype))))))
 
 (defoptimizer (%compile-time-type-error ir2-convert)
     ((objects atype dtype context) node block)
@@ -932,15 +963,24 @@
             (dtype (lvar-value dtype))
             (detail (cdr (lvar-value context))))
         (unless (eq atype nil)
-          (if (constantp detail)
+          (if (singleton-p detail)
+              (let ((detail (first detail)))
+                (if (constantp detail)
+                    (warn 'type-warning
+                          :format-control
+                          "~@<Constant ~2I~_~S ~Iconflicts with its ~
+                              asserted type ~2I~_~S.~@:>"
+                          :format-arguments (list (eval detail) atype))
+                    (warn 'type-warning
+                          :format-control
+                          "~@<Derived type of ~S is ~2I~_~S, ~
+                              ~I~_conflicting with ~
+                              its asserted type ~2I~_~S.~@:>"
+                          :format-arguments (list detail dtype atype))))
               (warn 'type-warning
-                 :format-control
-                 "~@<Constant ~2I~_~S ~Iconflicts with its asserted type ~
-                     ~2I~_~S.~@:>"
-                 :format-arguments (list (eval detail) atype))
-              (warn 'type-warning
-                 :format-control
-                 "~@<Derived type of ~S is ~2I~_~S, ~I~_conflicting with ~
-                     its asserted type ~2I~_~S.~@:>"
-                 :format-arguments (list detail dtype atype))))))
+                    :format-control
+                    "~@<Derived type of ~2I~_~{~S~^~#[~; and ~:;, ~]~} ~
+                     ~I~_in ~2I~_~S ~I~_is ~2I~_~S, ~I~_conflicting with ~
+                     their asserted type ~2I~_~S.~@:>"
+                    :format-arguments (list (rest detail) (first detail) dtype atype))))))
     (ir2-convert-full-call node block)))

@@ -797,6 +797,30 @@
         (values nil nil)
         (values (node-source-form use) t))))
 
+(defun common-suffix (x y)
+  (let ((mismatch (mismatch x y :from-end t)))
+    (if mismatch
+        (subseq x mismatch)
+        x)))
+
+;;; If the LVAR has a single use, return NODE-SOURCE-FORM as a
+;;; singleton.  Otherwise, return a list of the lowest common
+;;; ancestor source form of all the uses (if it can be found),
+;;; followed by all the uses' source forms.
+(defun lvar-all-sources (lvar)
+  (let ((use (lvar-uses lvar)))
+    (if (listp use)
+        (let ((forms  '())
+              (path   (node-source-path (first use))))
+          (dolist (use use (cons (if (find 'original-source-start path)
+                                     (find-original-source path)
+                                     "a hairy form")
+                                 forms))
+            (pushnew (node-source-form use) forms)
+            (setf path (common-suffix path
+                                      (node-source-path use)))))
+        (list (node-source-form use)))))
+
 ;;; Return the unique node, delivering a value to LVAR.
 #!-sb-fluid (declaim (inline lvar-use))
 (defun lvar-use (lvar)
