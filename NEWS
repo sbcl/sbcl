@@ -3,6 +3,11 @@ changes relative to sbcl-1.1.7:
   * notice: The implementation of MAP-ALLOCATED-OBJECTS (the heart of
     ROOM, plus a few SB-INTROSPECT functions) has been completely
     rewritten; it may now exhibit different bugs than before.
+  * new feature: minimal runtime/compiler intrastructure support for SSE
+    SIMD values, as SB-EXT:SIMD-PACK. Enabled on x86-64 via the build-time
+    feature :sb-simd-pack. This should enable intrinsics extensions as
+    libraries, without patching SBCL itself. Thanks to Alexander Gavrilov
+    for maintaining a branch for so long.
   * enhancement: RUN-PROGRAM supports a :DIRECTORY argument to set
     the working directory of the spawned process.
     (lp#791800) (patch by Matthias Benkard)
