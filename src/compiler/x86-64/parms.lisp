@@ -204,3 +204,6 @@
     sb!kernel:two-arg-xor
     sb!kernel:two-arg-gcd
     sb!kernel:two-arg-lcm))
+
+#!+sb-simd-pack
+(defvar *simd-pack-element-types* '(integer single-float double-float))

@@ -533,6 +533,29 @@
          (t (values min :maybe))))
     ()))
 
+;;; A SIMD-PACK-TYPE is used to represent a SIMD-PACK type.
+#!+sb-simd-pack
+(defstruct (simd-pack-type
+            (:include ctype (class-info (type-class-or-lose 'simd-pack)))
+            (:constructor %make-simd-pack-type (element-type))
+            (:copier nil))
+  (element-type (missing-arg)
+   :type (cons #||(member #.*simd-pack-element-types*) ||#)
+   :read-only t))
+
+#!+sb-simd-pack
+(defun make-simd-pack-type (element-type)
+  (aver (neq element-type *wild-type*))
+  (if (eq element-type *empty-type*)
+      *empty-type*
+      (%make-simd-pack-type
+       (dolist (pack-type *simd-pack-element-types*
+                          (error "~S element type must be a subtype of ~
+                                     ~{~S~#[~;, or ~:;, ~]~}."
+                                 'simd-pack *simd-pack-element-types*))
+         (when (csubtypep element-type (specifier-type pack-type))
+           (return (list pack-type)))))))
+
 
 ;;;; type utilities
 

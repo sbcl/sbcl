@@ -1104,6 +1104,9 @@
       :inherits (complex number)
       :codes (#.sb!vm:complex-long-float-widetag)
       :prototype-form (complex 42l0 42l0))
+     #!+sb-simd-pack
+     (simd-pack
+      :translation simd-pack)
      (real :translation real :inherits (number))
      (float
       :translation float

@@ -3494,6 +3494,60 @@ used for a COMPLEX component.~:@>"
                                       *wild-type*
                                       (specifier-type element-type)))))
 
+;;;; SIMD-PACK types
+#!+sb-simd-pack
+(progn
+  (!define-type-class simd-pack)
+
+  (!def-type-translator simd-pack (&optional (element-type-spec '*))
+     (if (eql element-type-spec '*)
+         (%make-simd-pack-type *simd-pack-element-types*)
+         (make-simd-pack-type (single-value-specifier-type element-type-spec))))
+
+  (!define-type-method (simd-pack :negate) (type)
+     (let ((remaining (set-difference *simd-pack-element-types*
+                                      (simd-pack-type-element-type type)))
+           (not-simd-pack (make-negation-type :type (specifier-type 'simd-pack))))
+       (if remaining
+           (type-union2 not-simd-pack (%make-simd-pack-type remaining))
+           not-simd-pack)))
+
+  (!define-type-method (simd-pack :unparse) (type)
+     (let ((eltypes (simd-pack-type-element-type type)))
+       (cond ((equal eltypes *simd-pack-element-types*)
+              'simd-pack)
+             ((= 1 (length eltypes))
+              `(simd-pack ,(first eltypes)))
+             (t
+              `(or ,@(mapcar (lambda (eltype)
+                               `(simd-pack ,eltype))
+                             eltypes))))))
+
+  (!define-type-method (simd-pack :simple-=) (type1 type2)
+     (declare (type simd-pack-type type1 type2))
+     (null (set-exclusive-or (simd-pack-type-element-type type1)
+                             (simd-pack-type-element-type type2))))
+
+  (!define-type-method (simd-pack :simple-subtypep) (type1 type2)
+     (declare (type simd-pack-type type1 type2))
+     (subsetp (simd-pack-type-element-type type1)
+              (simd-pack-type-element-type type2)))
+
+  (!define-type-method (simd-pack :simple-union2) (type1 type2)
+     (declare (type simd-pack-type type1 type2))
+     (%make-simd-pack-type (union (simd-pack-type-element-type type1)
+                                  (simd-pack-type-element-type type2))))
+
+  (!define-type-method (simd-pack :simple-intersection2) (type1 type2)
+     (declare (type simd-pack-type type1 type2))
+     (let ((intersection (intersection (simd-pack-type-element-type type1)
+                                       (simd-pack-type-element-type type2))))
+       (if intersection
+           (%make-simd-pack-type intersection)
+           *empty-type*)))
+
+  (!define-superclasses simd-pack ((simd-pack)) !cold-init-forms))
+
 ;;;; utilities shared between cross-compiler and target system
 
 ;;; Does the type derived from compilation of an actual function

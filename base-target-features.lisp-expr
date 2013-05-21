@@ -152,6 +152,11 @@
  ; :sb-hash-table-debug
 
  ;; Enabled automatically by make-config.sh for platforms which implement
+ ;; short vector SIMD intrinsics.
+ ;;
+ ; :sb-simd-pack
+
+ ;; Enabled automatically by make-config.sh for platforms which implement
  ;; the %READ-CYCLE-COUNTER VOP. Can be disabled manually: affects TIME.
  ;;
  ;; FIXME: Should this be :SB-CYCLE-COUNTER instead? If so, then the same goes
