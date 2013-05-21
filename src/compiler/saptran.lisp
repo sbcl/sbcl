@@ -19,8 +19,8 @@
   (if (and (constant-lvar-p symbol)
            (constant-lvar-p datap)
            #!+sb-dynamic-core (not (lvar-value datap)))
-      (values `(sap-int (foreign-symbol-sap symbol datap))
-              (or #!+sb-dynamic-core t))
+      `(values (sap-int (foreign-symbol-sap symbol datap))
+               (or #!+sb-dynamic-core t))
       (give-up-ir1-transform)))
 
 (deftransform foreign-symbol-sap ((symbol &optional datap)
