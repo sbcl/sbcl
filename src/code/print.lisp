@@ -524,6 +524,9 @@ variable: an unreadable object representing the error is printed instead.")
      (output-code-component object stream))
     (fdefn
      (output-fdefn object stream))
+    #!+sb-simd-pack
+    (simd-pack
+     (output-simd-pack object stream))
     (t
      (output-random object stream))))
 
@@ -1775,6 +1778,58 @@ variable: an unreadable object representing the error is printed instead.")
   (print-unreadable-object (fdefn stream)
     (write-string "FDEFINITION object for " stream)
     (output-object (fdefn-name fdefn) stream)))
+
+#!+sb-simd-pack
+(defun output-simd-pack (pack stream)
+  (declare (type simd-pack pack))
+  (cond ((and *print-readably* *read-eval*)
+         (etypecase pack
+           ((simd-pack double-float)
+            (multiple-value-call #'format stream
+              "#.(~S ~S ~S)"
+              '%make-simd-pack-double
+              (%simd-pack-doubles pack)))
+           ((simd-pack single-float)
+            (multiple-value-call #'format stream
+              "#.(~S ~S ~S ~S ~S)"
+              '%make-simd-pack-single
+              (%simd-pack-singles pack)))
+           (t
+            (multiple-value-call #'format stream
+              "#.(~S #X~16,'0X #X~16,'0X)"
+              '%make-simd-pack-ub64
+              (%simd-pack-ub64s pack)))))
+        (t
+         (print-unreadable-object (pack stream)
+           (flet ((all-ones-p (value start end &aux (mask (- (ash 1 end) (ash 1 start))))
+                      (= (logand value mask) mask))
+                    (split-num (value start)
+                      (loop
+                         for i from 0 to 3
+                         and v = (ash value (- start)) then (ash v -8)
+                         collect (logand v #xFF))))
+             (multiple-value-bind (low high)
+                 (%simd-pack-ub64s pack)
+               (etypecase pack
+                 ((simd-pack double-float)
+                  (multiple-value-bind (v0 v1) (%simd-pack-doubles pack)
+                    (format stream "~S~@{ ~:[~,13E~;~*TRUE~]~}"
+                            'simd-pack
+                            (all-ones-p low 0 64) v0
+                            (all-ones-p high 0 64) v1)))
+                 ((simd-pack single-float)
+                  (multiple-value-bind (v0 v1 v2 v3) (%simd-pack-singles pack)
+                    (format stream "~S~@{ ~:[~,7E~;~*TRUE~]~}"
+                            'simd-pack
+                            (all-ones-p low 0 32) v0
+                            (all-ones-p low 32 64) v1
+                            (all-ones-p high 0 32) v2
+                            (all-ones-p high 32 64) v3)))
+                 (t
+                  (format stream "~S~@{ ~{ ~2,'0X~}~}"
+                          'simd-pack
+                          (split-num low 0) (split-num low 32)
+                          (split-num high 0) (split-num high 32))))))))))
 
 ;;;; functions
 

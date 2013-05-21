@@ -320,7 +320,10 @@
                         symbol
                         number
                         character
-                        string)))
+                        string
+                        #!+sb-simd-pack
+                        #+sb-xc-host nil
+                        #-sb-xc-host sb!kernel:simd-pack)))
              (grovel (value)
                ;; Unless VALUE is an object which which obviously
                ;; can't contain other objects

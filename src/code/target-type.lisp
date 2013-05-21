@@ -167,6 +167,12 @@
      (make-cons-type *universal-type* *universal-type*))
     (character
      (specifier-type 'character))
+    #!+sb-simd-pack
+    (simd-pack
+     (let ((type (nth (%simd-pack-tag x) *simd-pack-element-types*)))
+       (if type
+           (specifier-type `(simd-pack ,type))
+           (specifier-type 'simd-pack))))
     (t
      (classoid-of x))))
 
