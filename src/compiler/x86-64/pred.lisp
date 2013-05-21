@@ -217,7 +217,7 @@
   (:conditional :e)
   (:policy :fast-safe)
   (:translate eq)
-  (:generator 3
+  (:generator 8
     (cond
      ((sc-is y immediate)
       (let ((val (tn-value y)))
@@ -258,3 +258,21 @@
                                character-widetag))))))
       (t
        (inst cmp x y)))))
+
+;; The template above is a very good fallback for the generic
+;; case.  However, it is sometimes possible to perform unboxed
+;; comparisons.  Repurpose char= and eql templates here, instead
+;; of forcing values to be boxed and then compared.
+;;
+;; We only weaken EQL => EQ for characters and fixnums, and detect
+;; when types definitely mismatch.  No need to import other EQL
+;; VOPs (e.g. floats).
+(macrolet ((def (eq-name eql-name)
+             `(define-vop (,eq-name ,eql-name)
+                (:translate eq))))
+  (def fast-if-eq-character fast-char=/character)
+  (def fast-if-eq-character/c fast-char=/character/c)
+  (def fast-if-eq/signed fast-if-eql/signed)
+  (def fast-if-eq-c/signed fast-if-eql-c/signed)
+  (def fast-if-eq/unsigned fast-if-eql/unsigned)
+  (def fast-if-eq-c/unsigned fast-if-eql-c/unsigned))
