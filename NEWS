@@ -87,6 +87,9 @@ changes relative to sbcl-1.1.7:
     integer constants are handled more cleverly, especially when they
     can be represented as sign-extended (signed-byte 32). (Based on a
     patch by Douglas Katzman)
+  * optimization: IF/IF conversion should reliably result in sane code
+    when (some of) the results of the inner IF are always false or
+    always true.
 
 changes in sbcl-1.1.7 relative to sbcl-1.1.6:
   * enhancement: TRACE :PRINT-ALL handles multiple-valued forms.
