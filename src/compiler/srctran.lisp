@@ -3429,6 +3429,20 @@
   (splice-fun-args x '%negate 1)
   '(the rational x))
 
+(deftransform %negate ((x) (number))
+  "Combine %negate/*"
+  (let ((use (lvar-uses x))
+        arg)
+    (unless (and (combination-p use)
+                 (eql '* (lvar-fun-name (combination-fun use)))
+                 (constant-lvar-p (setf arg (second (combination-args use))))
+                 (numberp (setf arg (lvar-value arg))))
+      (give-up-ir1-transform))
+    (splice-fun-args x '* 2)
+    `(lambda (x y)
+       (declare (ignore y))
+       (* x ,(- arg)))))
+
 ;;; Return T if in an arithmetic op including lvars X and Y, the
 ;;; result type is not affected by the type of X. That is, Y is at
 ;;; least as contagious as X.
