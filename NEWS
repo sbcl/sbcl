@@ -100,6 +100,9 @@ changes relative to sbcl-1.1.7:
   * optimization: IF/IF conversion should reliably result in sane code
     when (some of) the results of the inner IF are always false or
     always true.
+  * optimization: On x86oids, variable right shifts of machine words are
+    compiled into straight SAR/SHR, instead of going through the generic
+    VOP. (lp#1066204)
 
 changes in sbcl-1.1.7 relative to sbcl-1.1.6:
   * enhancement: TRACE :PRINT-ALL handles multiple-valued forms.

@@ -902,6 +902,52 @@ constant shift greater than word length")))
 
     DONE))
 
+#!+ash-right-vops
+(define-vop (fast-%ash/right/unsigned)
+  (:translate %ash/right)
+  (:policy :fast-safe)
+  (:args (number :scs (unsigned-reg) :target result)
+         (amount :scs (unsigned-reg) :target rcx))
+  (:arg-types unsigned-num unsigned-num)
+  (:results (result :scs (unsigned-reg) :from (:argument 0)))
+  (:result-types unsigned-num)
+  (:temporary (:sc signed-reg :offset rcx-offset :from (:argument 1)) rcx)
+  (:generator 4
+    (move result number)
+    (move rcx amount)
+    (inst shr result :cl)))
+
+#!+ash-right-vops
+(define-vop (fast-%ash/right/signed)
+  (:translate %ash/right)
+  (:policy :fast-safe)
+  (:args (number :scs (signed-reg) :target result)
+         (amount :scs (unsigned-reg) :target rcx))
+  (:arg-types signed-num unsigned-num)
+  (:results (result :scs (signed-reg) :from (:argument 0)))
+  (:result-types signed-num)
+  (:temporary (:sc signed-reg :offset rcx-offset :from (:argument 1)) rcx)
+  (:generator 4
+    (move result number)
+    (move rcx amount)
+    (inst sar result :cl)))
+
+#!+ash-right-vops
+(define-vop (fast-%ash/right/fixnum)
+  (:translate %ash/right)
+  (:policy :fast-safe)
+  (:args (number :scs (any-reg) :target result)
+         (amount :scs (unsigned-reg) :target rcx))
+  (:arg-types tagged-num unsigned-num)
+  (:results (result :scs (any-reg) :from (:argument 0)))
+  (:result-types tagged-num)
+  (:temporary (:sc signed-reg :offset rcx-offset :from (:argument 1)) rcx)
+  (:generator 3
+    (move result number)
+    (move rcx amount)
+    (inst sar result :cl)
+    (inst and result (lognot fixnum-tag-mask))))
+
 (in-package "SB!C")
 
 (defknown %lea (integer integer (member 1 2 4 8 16) (signed-byte 64))

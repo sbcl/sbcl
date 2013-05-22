@@ -1344,6 +1344,7 @@ is a good idea, but see SB-SYS re. blurring of boundaries."
                "%ARRAY-FILL-POINTER-P" "%ARRAY-RANK"
                #!+(or x86 x86-64 ppc)
                "%ARRAY-ATOMIC-INCF/WORD"
+               #!+ash-right-vops "%ASH/RIGHT"
                "%ASSOC"
                "%ASSOC-EQ"
                "%ASSOC-IF"

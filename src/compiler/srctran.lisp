@@ -2776,7 +2776,87 @@
               (specifier-type `(signed-byte ,size-high))
               *universal-type*))
         *universal-type*)))
+
+;;; Rightward ASH
+#!+ash-right-vops
+(progn
+  (defun %ash/right (integer amount)
+    (ash integer (- amount)))
 
+  (deftransform ash ((integer amount) (sb!vm:signed-word (integer * 0)))
+    "Convert ASH of signed word to %ASH/RIGHT"
+    (when (constant-lvar-p amount)
+      (give-up-ir1-transform))
+    (let ((use (lvar-uses amount)))
+      (cond ((and (combination-p use)
+                  (eql '%negate (lvar-fun-name (combination-fun use))))
+             (splice-fun-args amount '%negate 1)
+             `(lambda (integer amount)
+                (declare (type unsigned-byte amount))
+                (%ash/right integer (if (>= amount ,sb!vm:n-word-bits)
+                                        ,(1- sb!vm:n-word-bits)
+                                        amount))))
+            (t
+             `(%ash/right integer (if (<= amount ,(- sb!vm:n-word-bits))
+                                      ,(1- sb!vm:n-word-bits)
+                                      (- amount)))))))
+
+  (deftransform ash ((integer amount) (word (integer * 0)))
+    "Convert ASH of word to %ASH/RIGHT"
+    (when (constant-lvar-p amount)
+      (give-up-ir1-transform))
+    (let ((use (lvar-uses amount)))
+      (cond ((and (combination-p use)
+                  (eql '%negate (lvar-fun-name (combination-fun use))))
+             (splice-fun-args amount '%negate 1)
+             `(lambda (integer amount)
+                (declare (type unsigned-byte amount))
+                (if (>= amount ,sb!vm:n-word-bits)
+                    0
+                    (%ash/right integer amount))))
+            (t
+             `(if (<= amount ,(- sb!vm:n-word-bits))
+                  0
+                  (%ash/right integer (- amount)))))))
+
+  (deftransform %ash/right ((integer amount) (integer (constant-arg unsigned-byte)))
+    "Convert %ASH/RIGHT by constant back to ASH"
+    `(ash integer ,(- (lvar-value amount))))
+
+  (deftransform %ash/right ((integer amount) * (member -1 0) :node node)
+    ;; constant-fold large shifts
+    (let ((return-type (single-value-type (node-derived-type node))))
+      (cond ((type= return-type (specifier-type '(eql 0)))
+             0)
+            ((type= return-type (specifier-type '(eql -1)))
+             -1)
+            (t
+             (aver (csubtypep (lvar-type integer) (specifier-type 'sb!vm:signed-word)))
+             `(ash integer ,(- 1 sb!vm:n-word-bits))))))
+
+  (defun %ash/right-derive-type-aux (n-type shift same-arg)
+    (declare (ignore same-arg))
+    (or (and (or (csubtypep n-type (specifier-type 'sb!vm:signed-word))
+                 (csubtypep n-type (specifier-type 'word)))
+             (csubtypep shift (specifier-type `(mod ,sb!vm:n-word-bits)))
+             (let ((n-low (numeric-type-low n-type))
+                   (n-high (numeric-type-high n-type))
+                   (s-low (numeric-type-low shift))
+                   (s-high (numeric-type-high shift)))
+               (make-numeric-type :class 'integer :complexp :real
+                                  :low (when n-low
+                                         (if (minusp n-low)
+                                             (ash n-low (- s-low))
+                                             (ash n-low (- s-high))))
+                                  :high (when n-high
+                                          (if (minusp n-high)
+                                              (ash n-high (- s-high))
+                                              (ash n-high (- s-low)))))))
+        *universal-type*))
+
+  (defoptimizer (%ash/right derive-type) ((n shift))
+    (two-arg-derive-type n shift #'%ash/right-derive-type-aux #'%ash/right))
+  )
 
 ;;; Modular functions
 
