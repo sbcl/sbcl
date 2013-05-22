@@ -3344,6 +3344,11 @@
   "convert (* x 0) to 0"
   0)
 
+(deftransform %negate ((x) (rational))
+  "Eliminate %negate/%negate of rationals"
+  (splice-fun-args x '%negate 1)
+  '(the rational x))
+
 ;;; Return T if in an arithmetic op including lvars X and Y, the
 ;;; result type is not affected by the type of X. That is, Y is at
 ;;; least as contagious as X.
