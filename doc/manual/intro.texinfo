@@ -202,9 +202,12 @@ SBCL is essentially a compiler-only implementation of Common Lisp.
 That is, for all but a few special cases, @code{eval} creates a lambda
 expression, calls @code{compile} on the lambda expression to create a
 compiled function, and then calls @code{funcall} on the resulting
-function object. This is explicitly allowed by the ANSI standard, but
-leads to some oddities, e.g. collapsing @code{functionp} and
-@code{compiled-function-p} into the same predicate.
+function object. A more traditional interpreter is also available on
+default builds; it is usually only called internally.  This is
+explicitly allowed by the ANSI standard, but leads to some oddities;
+e.g. at default settings, @code{functionp} and
+@code{compiled-function-p} are equivalent, and they collapse into the
+same function when SBCL is built without the interpreter.
 
 @node Defining Constants
 @comment  node-name,  next,  previous,  up
