@@ -3081,11 +3081,11 @@
   (if (and (constant-lvar-p x)
            (not (constant-lvar-p y)))
       `(,(lvar-fun-name (basic-combination-fun node))
-        y
+        (truly-the ,(lvar-type y) y)
         ,(lvar-value x))
       (give-up-ir1-transform)))
 
-(dolist (x '(= char= + * logior logand logxor))
+(dolist (x '(= char= + * logior logand logxor logtest))
   (%deftransform x '(function * *) #'commutative-arg-swap
                  "place constant arg last"))
 
