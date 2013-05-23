@@ -62,11 +62,13 @@
                                      (dpb (aref info (+ (* 4 j) 2))
                                           (byte 8 8)
                                           (aref info (+ (* 4 j) 3)))))))
-                    (dotimes (i (/ (length info) 12) table)
+                    #!+sb-unicode
+                    (dotimes (i (/ (length info) 12))
                       (setf (gethash (dpb (code (* 3 i)) (byte 21 21)
                                           (code (1+ (* 3 i))))
                                      table)
-                            (code-char (code (+ (* 3 i) 2))))))))
+                            (code-char (code (+ (* 3 i) 2)))))
+                    table)))
               (defun !character-database-cold-init ()
                 (setf **character-database** ,character-database))
               ,(with-open-file (stream (file "ucd-names" "lisp-expr")
@@ -836,10 +838,17 @@ character exists."
 
 (defun normalize-string (string &optional (form :nfd))
   (declare (type (member :nfd :nfkd :nfc :nfkc) form))
+  #!-sb-unicode
   (etypecase string
-    #!+sb-unicode
+    ((array nil (*)) string)
+    (string
+     (ecase form
+       ((:nfc :nfkc) string)
+       ((:nfd :nfkd) (error "Cannot normalize to ~A form in #-SB-UNICODE builds" form)))))
+  #!+sb-unicode
+  (etypecase string
     (base-string string)
-    ((or (array character (*)) #!-sb-unicode base-string)
+    ((array character (*))
      (ecase form
        ((:nfc)
         (canonically-compose (sort-combiners (decompose-string string))))

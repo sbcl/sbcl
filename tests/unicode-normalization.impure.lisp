@@ -1,3 +1,17 @@
+;;;; This software is part of the SBCL system. See the README file for
+;;;; more information.
+;;;;
+;;;; While most of SBCL is derived from the CMU CL system, the test
+;;;; files (like this one) were written from scratch after the fork
+;;;; from CMU CL.
+;;;;
+;;;; This software is in the public domain and is provided with
+;;;; absolutely no warranty. See the COPYING and CREDITS files for
+;;;; more information.
+
+;;; KLUDGE: eventually we will export NORMALIZE-STRING from somewhere.
+;;; Until we do, import it here so we can test it without putting ::
+;;; everywhere.
 (import 'sb-impl::normalize-string)
 
 (defun parse-one-line (line)
