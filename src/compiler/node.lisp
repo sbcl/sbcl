@@ -173,17 +173,17 @@
 (!def-boolean-attribute block
   reoptimize flush-p type-check delete-p type-asserted test-modified)
 
-;;; FIXME: Tweak so that definitions of e.g. BLOCK-DELETE-P is
-;;; findable by grep for 'def.*block-delete-p'.
-(macrolet ((frob (slot)
-             `(defmacro ,(symbolicate "BLOCK-" slot) (block)
-                `(block-attributep (block-flags ,block) ,',slot))))
-  (frob reoptimize)
-  (frob flush-p)
-  (frob type-check)
-  (frob delete-p)
-  (frob type-asserted)
-  (frob test-modified))
+(macrolet ((defattr (block-slot)
+             `(defmacro ,block-slot (block)
+                `(block-attributep
+                  (block-flags ,block)
+                  ,(symbolicate (subseq (string ',block-slot) 6))))))
+  (defattr block-reoptimize)
+  (defattr block-flush-p)
+  (defattr block-type-check)
+  (defattr block-delete-p)
+  (defattr block-type-asserted)
+  (defattr block-test-modified))
 
 ;;; The CBLOCK structure represents a basic block. We include
 ;;; SSET-ELEMENT so that we can have sets of blocks. Initially the
