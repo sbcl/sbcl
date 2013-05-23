@@ -287,6 +287,18 @@ search_for_executable(const char *argv0)
             return search;
         }
     }
+    /* The above for-loop fails to process the last part of PATH if PATH does
+     * not end with ':'. We may consider appending an extra ':' to the end of
+     * SEARCH.  -- houjingyi 2013-05-24 */
+    if (start != NULL && *start != '\0') {
+        snprintf(buf, PATH_MAX + 1, "%s/%s", start, argv0);
+        if (access(buf, F_OK) == 0) {
+            free(search);
+            search = copied_realpath(buf);
+            free(buf);
+            return search;
+        }
+    }
 
     free(search);
     free(buf);
