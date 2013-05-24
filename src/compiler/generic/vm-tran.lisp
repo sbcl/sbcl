@@ -50,24 +50,20 @@
                               index offset &optional setter-p)
   (multiple-value-bind (func index-args) (extract-fun-args index '(+ -) 2)
     (destructuring-bind (x constant) index-args
-      (unless (and (constant-lvar-p constant)
-                   ;; the remaining argument must be a fixnum, otherwise we lose
-                   (csubtypep (lvar-type x) (specifier-type 'fixnum)))
-        (delay-ir1-transform :constraint)
+      (declare (ignorable x))
+      (unless (constant-lvar-p constant)
         (give-up-ir1-transform))
-      (let ((value (lvar-value constant))
-            new-offset)
+      (let ((value (lvar-value constant)))
         (unless (and (integerp value)
                      (sb!vm::foldable-constant-offset-p
                       element-size lowtag data-offset
-                      (setf new-offset (funcall func (lvar-value offset) value))))
+                      (funcall func value (lvar-value offset))))
           (give-up-ir1-transform "constant is too large for inlining"))
         (splice-fun-args index func 2)
         `(lambda (thing index off1 off2 ,@(when setter-p
                                             '(value)))
-           (declare (ignore off1 off2))
-           (,fun-name thing index ',new-offset ,@(when setter-p
-                                                   '(value))))))))
+           (,fun-name thing index (,func off2 off1) ,@(when setter-p
+                                                        '(value))))))))
 
 #!+(or x86 x86-64)
 (deftransform sb!bignum:%bignum-ref-with-offset

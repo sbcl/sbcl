@@ -4568,9 +4568,19 @@
           (test (- most-positive-fixnum x) y)
           (test (+ most-negative-fixnum x) y))))))
 
-(test-util:with-test (:name :fold-index-addressing-positive-offset)
+;; expected failure
+(test-util:with-test (:name :fold-index-addressing-positive-offset
+                      :fails-on '(and))
   (let ((f (compile nil `(lambda (i)
                            (if (typep i '(integer -31 31))
                                (aref #. (make-array 63) (+ i 31))
                                (error "foo"))))))
     (funcall f -31)))
+
+;; 5d3a728 broke something like this in CL-PPCRE
+(test-util:with-test (:name :fold-index-addressing-potentially-negative-index)
+  (compile nil `(lambda (index vector)
+                  (declare (optimize speed (safety 0))
+                           ((simple-array character (*)) vector)
+                           ((unsigned-byte 24) index))
+                  (aref vector (1+ (mod index (1- (length vector))))))))
