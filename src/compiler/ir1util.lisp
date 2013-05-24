@@ -110,7 +110,7 @@
                       (first new-uses)
                       new-uses)))
           (setf (lvar-uses lvar) nil))
-      (setf (node-lvar node) nil)))
+      (flush-node node)))
   (values))
 ;;; Delete NODE from its LVAR uses; if LVAR has no other uses, delete
 ;;; its DEST's block, which must be unreachable.
@@ -1421,6 +1421,20 @@
 
   (values))
 
+;;; This function is called to unlink a node from its LVAR;
+;;; we assume that the LVAR's USE list has already been updated,
+;;; and that we only have to mark the node as up for dead code
+;;; elimination, and to clear it LVAR slot.
+(defun flush-node (node)
+  (declare (type node node))
+  (let* ((prev (node-prev node))
+         (block (ctran-block prev)))
+    (reoptimize-component (block-component block) t)
+    (setf (block-attributep (block-flags block)
+                            flush-p type-asserted type-check)
+          t))
+  (setf (node-lvar node) nil))
+
 ;;; This function is called by people who delete nodes; it provides a
 ;;; way to indicate that the value of a lvar is no longer used. We
 ;;; null out the LVAR-DEST, set FLUSH-P in the blocks containing uses
@@ -1433,13 +1447,7 @@
     (setf (lvar-dest lvar) nil)
     (flush-lvar-externally-checkable-type lvar)
     (do-uses (use lvar)
-      (let ((prev (node-prev use)))
-        (let ((block (ctran-block prev)))
-          (reoptimize-component (block-component block) t)
-          (setf (block-attributep (block-flags block)
-                                  flush-p type-asserted type-check)
-                t)))
-      (setf (node-lvar use) nil))
+      (flush-node use))
     (setf (lvar-uses lvar) nil))
   (values))
 
