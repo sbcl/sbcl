@@ -4567,3 +4567,10 @@
           (test (- x) y)
           (test (- most-positive-fixnum x) y)
           (test (+ most-negative-fixnum x) y))))))
+
+(test-util:with-test (:name :fold-index-addressing-positive-offset)
+  (let ((f (compile nil `(lambda (i)
+                           (if (typep i '(integer -31 31))
+                               (aref #. (make-array 63) (+ i 31))
+                               (error "foo"))))))
+    (funcall f -31)))

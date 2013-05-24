@@ -1477,11 +1477,11 @@
   (movable foldable flushable dx-safe))
 (defknown data-vector-ref (simple-array index) t
   (foldable explicit-check always-translatable))
-(defknown data-vector-ref-with-offset (simple-array index fixnum) t
+(defknown data-vector-ref-with-offset (simple-array fixnum fixnum) t
   (foldable explicit-check always-translatable))
 (defknown data-vector-set (array index t) t
   (explicit-check always-translatable))
-(defknown data-vector-set-with-offset (array index fixnum t) t
+(defknown data-vector-set-with-offset (array fixnum fixnum t) t
   (explicit-check always-translatable))
 (defknown hairy-data-vector-ref (array index) t
   (foldable explicit-check))
