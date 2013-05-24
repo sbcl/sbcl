@@ -289,16 +289,20 @@
 ;;; What we do is intersect RTYPE with NODE's DERIVED-TYPE. If the
 ;;; intersection is different from the old type, then we do a
 ;;; REOPTIMIZE-LVAR on the NODE-LVAR.
-(defun derive-node-type (node rtype)
+(defun derive-node-type (node rtype &key from-scratch)
   (declare (type valued-node node) (type ctype rtype))
-  (let ((node-type (node-derived-type node)))
-    (unless (eq node-type rtype)
+  (let* ((initial-type (node-derived-type node))
+         (node-type (if from-scratch
+                        *wild-type*
+                        initial-type)))
+    (unless (eq initial-type rtype)
       (let ((int (values-type-intersection node-type rtype))
             (lvar (node-lvar node)))
-        (when (type/= node-type int)
+        (when (type/= initial-type int)
           (when (and *check-consistency*
                      (eq int *empty-type*)
                      (not (eq rtype *empty-type*)))
+            (aver (not from-scratch))
             (let ((*compiler-error-context* node))
               (compiler-warn
                "New inferred type ~S conflicts with old type:~

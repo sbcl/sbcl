@@ -1894,7 +1894,7 @@ is :ANY, the function name is not checked."
 ;;;; leaf hackery
 
 ;;; Change the LEAF that a REF refers to.
-(defun change-ref-leaf (ref leaf)
+(defun change-ref-leaf (ref leaf &key recklessly)
   (declare (type ref ref) (type leaf leaf))
   (unless (eq (ref-leaf ref) leaf)
     (push ref (leaf-refs leaf))
@@ -1909,7 +1909,7 @@ is :ANY, the function name is not checked."
                  (eq lvar (basic-combination-fun dest))
                  (csubtypep ltype (specifier-type 'function))))
           (setf (node-derived-type ref) vltype)
-          (derive-node-type ref vltype)))
+          (derive-node-type ref vltype :from-scratch recklessly)))
     (reoptimize-lvar (node-lvar ref)))
   (values))
 
