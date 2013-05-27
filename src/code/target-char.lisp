@@ -513,7 +513,7 @@ is either numeric or alphabetic."
 (defmacro equal-char-code (character)
   (let ((ch (gensym)))
     `(let ((,ch ,character))
-      (if (= (ucd-value-0 ,ch) 0)
+      (if (< (ucd-value-0 ,ch) 4)
           (ucd-value-1 ,ch)
           (char-code ,ch)))))
 

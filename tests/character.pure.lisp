@@ -126,3 +126,18 @@
                                            ((1 . ,(1- char-code-limit))))
                                           &optional))
                    (sb-impl::%fun-type f)))))
+
+(with-test (:name (:case-insensitive-char-comparisons :eacute))
+  (assert (char-equal (code-char 201) (code-char 233))))
+
+(with-test (:name (:case-insensitive-char-comparisons :exhaustive)
+            :fails-on '(and))
+  (dotimes (i char-code-limit)
+    (let* ((char (code-char i))
+           (down (char-downcase char))
+           (up (char-upcase char)))
+      (assert (char-equal char char))
+      (when (char/= char down)
+        (assert (char-equal char down)))
+      (when (char/= char up)
+        (assert (char-equal char up))))))
