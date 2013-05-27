@@ -451,10 +451,11 @@
          *empty-type*)
         ((not (values-type-p type))
          type)
-        (t (or (car (args-type-required type))
-               (car (args-type-optional type))
-               (args-type-rest type)
-               (specifier-type 'null)))))
+        ((car (args-type-required type)))
+        (t (type-union (specifier-type 'null)
+                       (or (car (args-type-optional type))
+                           (args-type-rest type)
+                           (specifier-type 'null))))))
 
 ;;; Return the minimum number of arguments that a function can be
 ;;; called with, and the maximum number or NIL. If not a function

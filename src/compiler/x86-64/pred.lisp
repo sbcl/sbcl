@@ -273,7 +273,7 @@
   (def fast-if-eq-character fast-char=/character)
   (def fast-if-eq-character/c fast-char=/character/c)
   (def fast-if-eq-fixnum fast-eql/fixnum)
-  (def fast-if-eq-fixnum/x fast-eql-c/fixnum)
+  (def fast-if-eq-fixnum/c fast-eql-c/fixnum)
   (def fast-if-eq/signed fast-if-eql/signed)
   (def fast-if-eq-c/signed fast-if-eql-c/signed)
   (def fast-if-eq/unsigned fast-if-eql/unsigned)

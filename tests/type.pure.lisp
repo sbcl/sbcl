@@ -462,3 +462,10 @@
   (assert (subtypep `(rational * -1/2)
                     `(or (integer * -1)
                          (and (rational * -1/2) (not integer))))))
+
+;; for the longest time (at least 05525d3a), single-value-type would
+;; return CHARACTER on this.
+(with-test (:name :single-value-&optional-type)
+  (assert (sb-c::type= (sb-c::single-value-type
+                        (sb-c::values-specifier-type '(values &optional character)))
+                       (sb-c::specifier-type '(or null character)))))
