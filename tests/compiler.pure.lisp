@@ -4584,3 +4584,15 @@
                            ((simple-array character (*)) vector)
                            ((unsigned-byte 24) index))
                   (aref vector (1+ (mod index (1- (length vector))))))))
+
+(test-util:with-test (:name :constant-fold-ash/right-fixnum)
+  (compile nil `(lambda (a b)
+                  (declare (type fixnum a)
+                           (type (integer * -84) b))
+                  (ash a b))))
+
+(test-util:with-test (:name :constant-fold-ash/right-word)
+  (compile nil `(lambda (a b)
+                  (declare (type word a)
+                           (type (integer * -84) b))
+                  (ash a b))))

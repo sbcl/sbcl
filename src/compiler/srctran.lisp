@@ -2823,16 +2823,17 @@
     "Convert %ASH/RIGHT by constant back to ASH"
     `(ash integer ,(- (lvar-value amount))))
 
-  (deftransform %ash/right ((integer amount) * (member -1 0) :node node)
-    ;; constant-fold large shifts
+  (deftransform %ash/right ((integer amount) * * :node node)
+    "strength reduce large variable right shift"
     (let ((return-type (single-value-type (node-derived-type node))))
       (cond ((type= return-type (specifier-type '(eql 0)))
              0)
             ((type= return-type (specifier-type '(eql -1)))
              -1)
+            ((csubtypep return-type (specifier-type '(member -1 0)))
+             `(ash integer ,(- sb!vm:n-word-bits)))
             (t
-             (aver (csubtypep (lvar-type integer) (specifier-type 'sb!vm:signed-word)))
-             `(ash integer ,(- 1 sb!vm:n-word-bits))))))
+             (give-up-ir1-transform)))))
 
   (defun %ash/right-derive-type-aux (n-type shift same-arg)
     (declare (ignore same-arg))
