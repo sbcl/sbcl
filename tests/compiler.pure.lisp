@@ -4408,6 +4408,8 @@
             (lambda (x) (append x (cons 1 2))) cons
             (lambda (x y) (append x (cons 1 2) y)) cons
             (lambda (x y) (nconc x (the list y) x)) t
+            (lambda (x y) (nconc (the atom x) y)) t
+            (lambda (x y) (nconc (the (or null (eql 10)) x) y)) t
             (lambda (x y) (print (length y)) (append x y)) sequence)))
     (loop for (function result-type) on test-cases by #'cddr
           do (assert (equal (car (cdaddr (sb-kernel:%simple-fun-type
