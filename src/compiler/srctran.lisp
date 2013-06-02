@@ -4677,3 +4677,16 @@
     (if (zerop (rem time-zone 1/3600))
         (encode-universal-time second minute hour date month year time-zone)
         (give-up-ir1-transform))))
+
+#!-(and win32 (not sb-thread))
+(deftransform sleep ((seconds) ((integer 0 #.(expt 10 8))))
+  `(sb!unix:nanosleep seconds 0))
+
+#!-(and win32 (not sb-thread))
+(deftransform sleep ((seconds) ((constant-arg (real 0))))
+  (let ((seconds-value (lvar-value seconds)))
+    (multiple-value-bind (seconds nano)
+        (sb!impl::split-seconds-for-sleep seconds-value)
+      (if (> seconds (expt 10 8))
+          (give-up-ir1-transform)
+          `(sb!unix:nanosleep ,seconds ,nano)))))

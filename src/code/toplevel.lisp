@@ -191,6 +191,31 @@ means to wait indefinitely.")
 
 ;;;; miscellaneous external functions
 
+(defun split-seconds-for-sleep (seconds)
+  (declare (optimize speed))
+  (flet ((split-float ()
+           ;; KLUDGE: This whole thing to avoid consing floats
+           (let ((whole-seconds (truly-the fixnum (%unary-truncate seconds))))
+             (values whole-seconds
+                     (truly-the fixnum
+                                (%unary-truncate (* (- seconds whole-seconds)
+                                                    (load-time-value 1s9 t))))))))
+    (declare (inline split-float))
+    (typecase seconds
+      ((single-float 0s0 #.(float most-positive-fixnum 1s0))
+       (split-float))
+      ((double-float 0d0 #.(float most-positive-fixnum 1d0))
+       (split-float))
+      (ratio
+       (multiple-value-bind (quot rem) (truncate (numerator seconds)
+                                                 (denominator seconds))
+         (values quot
+                 (* rem (/ 1000000000 (denominator seconds))))))
+      (t
+       (multiple-value-bind (sec frac)
+           (truncate seconds)
+         (values sec (truncate frac (load-time-value 1s-9 t))))))))
+
 (defun sleep (seconds)
   #!+sb-doc
   "This function causes execution to be suspended for SECONDS. SECONDS may be
@@ -207,9 +232,7 @@ any non-negative real number."
   (multiple-value-bind (sec nsec)
       (if (integerp seconds)
           (values seconds 0)
-          (multiple-value-bind (sec frac)
-              (truncate seconds)
-            (values sec (truncate frac 1e-9))))
+          (split-seconds-for-sleep seconds))
     ;; nanosleep() accepts time_t as the first argument, but on some platforms
     ;; it is restricted to 100 million seconds. Maybe someone can actually
     ;; have a reason to sleep for over 3 years?

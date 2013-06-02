@@ -6,6 +6,7 @@ changes relative to sbcl-1.1.8:
   * optimization: compute encode-universal-time at compile time when possible.
   * optimization: when referencing internal functions as #'x, don't go through
     an indirect fdefn structure.
+  * optimization: SLEEP doesn't cons on non-immediate floats and on ratios.
   
 changes in sbcl-1.1.8 relative to sbcl-1.1.7:
   * notice: The implementation of MAP-ALLOCATED-OBJECTS (the heart of
