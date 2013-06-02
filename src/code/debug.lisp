@@ -1106,11 +1106,11 @@ and LDB (the low-level debugger).  See also ENABLE-DEBUGGER."
              (flush-standard-output-streams)
              (debug-prompt *debug-io*)
              (force-output *debug-io*)
-             (let* ((exp (debug-read *debug-io*))
-                    (cmd-fun (debug-command-p exp restart-commands)))
-               (with-simple-restart (abort
-                                     "~@<Reduce debugger level (to debug level ~W).~@:>"
-                                     level)
+             (with-simple-restart (abort
+                                   "~@<Reduce debugger level (to debug level ~W).~@:>"
+                                   level)
+               (let* ((exp (debug-read *debug-io*))
+                      (cmd-fun (debug-command-p exp restart-commands)))
                  (cond ((not cmd-fun)
                         (debug-eval-print exp))
                        ((consp cmd-fun)
