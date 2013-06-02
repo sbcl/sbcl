@@ -4658,3 +4658,22 @@
                (policy-quality-name-p (lvar-value quality-name)))
     (give-up-ir1-transform))
   '(%policy-quality policy quality-name))
+
+(deftransform encode-universal-time
+    ((second minute hour date month year &optional time-zone)
+     ((constant-arg (mod 60)) (constant-arg (mod 60))
+      (constant-arg (mod 24))
+      (constant-arg (integer 1 31))
+      (constant-arg (integer 1 12))
+      (constant-arg (integer 1899))
+      (constant-arg (rational -24 24))))
+  (let ((second (lvar-value second))
+        (minute (lvar-value minute))
+        (hour (lvar-value hour))
+        (date (lvar-value date))
+        (month (lvar-value month))
+        (year (lvar-value year))
+        (time-zone (lvar-value time-zone)))
+    (if (zerop (rem time-zone 1/3600))
+        (encode-universal-time second minute hour date month year time-zone)
+        (give-up-ir1-transform))))
