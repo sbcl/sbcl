@@ -1794,7 +1794,17 @@
           (invert-address-hash sb!fasl:*assembler-routines*))
     (setf *assembler-routines-by-addr*
           (invert-address-hash sb!sys:*static-foreign-symbols*
-                               *assembler-routines-by-addr*)))
+                               *assembler-routines-by-addr*))
+    (loop for static in sb!vm:*static-funs*
+          for address = (+ sb!vm::nil-value
+                           (sb!vm::static-fun-offset static))
+          do
+          (setf (gethash address *assembler-routines-by-addr*)
+                static))
+    ;; Not really a routine, but it uses the similar logic for annotations
+    #!+sb-safepoint
+    (setf (gethash sb!vm::gc-safepoint-page-addr *assembler-routines-by-addr*)
+          "safepoint"))
   (gethash address *assembler-routines-by-addr*))
 
 ;;;; some handy function for machine-dependent code to use...
