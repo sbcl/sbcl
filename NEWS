@@ -2,6 +2,7 @@
 changes relative to sbcl-1.1.8:
   * enchancement: disassemble now annotates some previously missing static
     functions, like LENGTH.
+  * optimization: calls to static functions on x86-64 use less instructions.
   
 changes in sbcl-1.1.8 relative to sbcl-1.1.7:
   * notice: The implementation of MAP-ALLOCATED-OBJECTS (the heart of
