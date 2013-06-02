@@ -287,7 +287,8 @@
     sb!kernel:two-arg-ior
     sb!kernel:two-arg-xor
     sb!kernel:two-arg-gcd
-    sb!kernel:two-arg-lcm))
+    sb!kernel:two-arg-lcm
+    sb!kernel:%coerce-callable-to-fun))
 
 ;;;; stuff added by jrd
 

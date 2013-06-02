@@ -80,3 +80,5 @@
     DONE))
 
 (define-static-fun length (object) :translate length)
+(define-static-fun %coerce-callable-to-fun (callable)
+  :translate %coerce-callable-to-fun)
