@@ -1147,7 +1147,10 @@
                 (dump-push (cdr entry) fasl-output))
                (:fdefinition
                 (dump-object (cdr entry) fasl-output)
-                (dump-fop 'fop-fdefinition fasl-output))))
+                (dump-fop 'fop-fdefinition fasl-output))
+               (:known-fun
+                (dump-object (cdr entry) fasl-output)
+                (dump-fop 'fop-known-fun fasl-output))))
             (null
              (dump-fop 'fop-misc-trap fasl-output)))))
 

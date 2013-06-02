@@ -600,6 +600,9 @@
 (define-fop (fop-fdefinition 60)
   (fdefinition-object (pop-stack) t))
 
+(define-fop (fop-known-fun 65)
+  (%coerce-name-to-fun (pop-stack)))
+
 (define-fop (fop-sanctify-for-execution 61)
   (let ((component (pop-stack)))
     (sb!vm:sanctify-for-execution component)

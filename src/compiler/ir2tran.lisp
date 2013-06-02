@@ -178,10 +178,18 @@
              (vop fast-symbol-global-value node block name-tn res)
              (vop symbol-global-value node block name-tn res))))
       (:global-function
-       (let ((fdefn-tn (make-load-time-constant-tn :fdefinition name)))
-         (if unsafe
-             (vop fdefn-fun node block fdefn-tn res)
-             (vop safe-fdefn-fun node block fdefn-tn res)))))))
+       (cond #-sb-xc-host
+             ((and (info :function :definition name)
+                   (info :function :info name))
+              ;; Known functions can be saved without going through fdefns,
+              ;; except during cross-compilation
+              (emit-move node block (make-load-time-constant-tn :known-fun name)
+                         res))
+             (t
+              (let ((fdefn-tn (make-load-time-constant-tn :fdefinition name)))
+                (if unsafe
+                    (vop fdefn-fun node block fdefn-tn res)
+                    (vop safe-fdefn-fun node block fdefn-tn res)))))))))
 
 ;;; some sanity checks for a CLAMBDA passed to IR2-CONVERT-CLOSURE
 (defun assertions-on-ir2-converted-clambda (clambda)

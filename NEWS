@@ -3,7 +3,9 @@ changes relative to sbcl-1.1.8:
   * enchancement: disassemble now annotates some previously missing static
     functions, like LENGTH.
   * optimization: calls to static functions on x86-64 use less instructions.
-  * optimization: compute encode-universal-time at compile time when possible. 
+  * optimization: compute encode-universal-time at compile time when possible.
+  * optimization: when referencing internal functions as #'x, don't go through
+    an indirect fdefn structure.
   
 changes in sbcl-1.1.8 relative to sbcl-1.1.7:
   * notice: The implementation of MAP-ALLOCATED-OBJECTS (the heart of
