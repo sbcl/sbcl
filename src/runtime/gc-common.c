@@ -322,7 +322,7 @@ trans_code(struct code *code)
 
 #endif
 
-#if defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64)
+#ifdef LISP_FEATURE_X86
     gencgc_apply_code_fixups(code, new_code);
 #endif
 

@@ -116,9 +116,10 @@ extern struct page *page_table;
 
 
 /* forward declarations */
-
+#ifdef LISP_FEATURE_X86
 void sniff_code_object(struct code *code, os_vm_size_t displacement);
 void gencgc_apply_code_fixups(struct code *old_code, struct code *new_code);
+#endif
 
 sword_t update_dynamic_space_free_pointer(void);
 void gc_alloc_update_page_tables(int page_type_flag, struct alloc_region *alloc_region);

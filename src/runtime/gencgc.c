@@ -125,8 +125,10 @@ boolean verify_after_free_heap = 0;
  * during a heap verify? */
 boolean verify_dynamic_code_check = 0;
 
+#ifdef LISP_FEATURE_X86
 /* Should we check code objects for fixup errors after they are transported? */
 boolean check_code_fixups = 0;
+#endif
 
 /* Should we check that newly allocated regions are zero filled? */
 boolean gencgc_zero_check = 0;
@@ -1650,10 +1652,10 @@ static lispobj trans_boxed(lispobj object);
  *
  * Currently only absolute fixups to the constant vector, or to the
  * code area are checked. */
+#ifdef LISP_FEATURE_X86
 void
 sniff_code_object(struct code *code, os_vm_size_t displacement)
 {
-#ifdef LISP_FEATURE_X86
     sword_t nheader_words, ncode_words, nwords;
     os_vm_address_t constants_start_addr = NULL, constants_end_addr, p;
     os_vm_address_t code_start_addr, code_end_addr;
@@ -1822,14 +1824,13 @@ sniff_code_object(struct code *code, os_vm_size_t displacement)
                "/code start = %x, end = %x\n",
                code_start_addr, code_end_addr));
     }
-#endif
 }
+#endif
 
+#ifdef LISP_FEATURE_X86
 void
 gencgc_apply_code_fixups(struct code *old_code, struct code *new_code)
 {
-/* x86-64 uses pc-relative addressing instead of this kludge */
-#ifndef LISP_FEATURE_X86_64
     sword_t nheader_words, ncode_words, nwords;
     os_vm_address_t constants_start_addr, constants_end_addr;
     os_vm_address_t code_start_addr, code_end_addr;
@@ -1925,9 +1926,8 @@ gencgc_apply_code_fixups(struct code *old_code, struct code *new_code)
     if (check_code_fixups) {
         sniff_code_object(new_code,displacement);
     }
-#endif
 }
-
+#endif
 
 static lispobj
 trans_boxed_large(lispobj object)
