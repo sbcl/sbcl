@@ -63,12 +63,12 @@
   `(inst pop (make-ea-for-object-slot ,ptr ,slot ,lowtag)))
 
 (defun call-indirect (offset)
-  (let ((ea (make-ea :qword :disp offset)))
-   (cond ((immediate32-p offset)
-          (inst call ea))
-         (t
-          (inst mov temp-reg-tn ea)
-          (inst call temp-reg-tn)))))
+  (typecase offset
+    ((signed-byte 32)
+     (inst call (make-ea :qword :disp offset)))
+    (t
+     (inst mov temp-reg-tn offset)
+     (inst call (make-ea :qword :base temp-reg-tn)))))
 
 ;;;; macros to generate useful values
 
