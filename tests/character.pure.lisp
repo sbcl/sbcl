@@ -131,7 +131,7 @@
   (assert (char-equal (code-char 201) (code-char 233))))
 
 (with-test (:name (:case-insensitive-char-comparisons :exhaustive)
-            :fails-on '(and))
+            :fails-on :sb-unicode)
   (dotimes (i char-code-limit)
     (let* ((char (code-char i))
            (down (char-downcase char))
