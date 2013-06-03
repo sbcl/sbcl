@@ -2418,4 +2418,15 @@
                    (call-1035721 #'identity-1035721)
                    (lambda (x)
                      (identity-1035721 x))))))
+
+(test-util:with-test (:name :expt-type-derivation-and-method-redefinition)
+  (defmethod expt-type-derivation ((x list) &optional (y 0.0))
+    (declare (type float y))
+    (expt 2 y))
+  ;; the redefinition triggers a type lookup of the old
+  ;; fast-method-function's type, which had a bogus type specifier of
+  ;; the form (double-float 0) from EXPT type derivation
+  (defmethod expt-type-derivation ((x list) &optional (y 0.0))
+    (declare (type float y))
+    (expt 2 y)))
 ;;; success

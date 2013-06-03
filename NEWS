@@ -8,6 +8,8 @@ changes relative to sbcl-1.1.8:
   * optimization: when referencing internal functions as #'x, don't go through
     an indirect fdefn structure.
   * optimization: SLEEP doesn't cons on non-immediate floats and on ratios.
+  * bug fix: EXPT type derivation no longer constructs bogus floating-point
+    types.  (reported by Vsevolod Dyomkin)
   
 changes in sbcl-1.1.8 relative to sbcl-1.1.7:
   * notice: The implementation of MAP-ALLOCATED-OBJECTS (the heart of

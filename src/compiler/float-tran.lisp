@@ -982,9 +982,12 @@
                                 (single-float ,f-lo, f-hi)))))
            (float
             ;; A positive integer to a float power is a float.
-            (modified-numeric-type y-type
-                                   :low (interval-low bnd)
-                                   :high (interval-high bnd)))
+            (let ((format (numeric-type-format y-type)))
+              (aver format)
+              (modified-numeric-type
+               y-type
+               :low (coerce-numeric-bound (interval-low bnd) format)
+               :high (coerce-numeric-bound (interval-high bnd) format))))
            (t
             ;; A positive integer to a number is a number (for now).
             (specifier-type 'number))))
@@ -1014,9 +1017,12 @@
                                 (single-float ,f-lo, f-hi)))))
            (float
             ;; A positive rational to a float power is a float.
-            (modified-numeric-type y-type
-                                   :low (interval-low bnd)
-                                   :high (interval-high bnd)))
+            (let ((format (numeric-type-format y-type)))
+              (aver format)
+              (modified-numeric-type
+               y-type
+               :low (coerce-numeric-bound (interval-low bnd) format)
+               :high (coerce-numeric-bound (interval-high bnd) format))))
            (t
             ;; A positive rational to a number is a number (for now).
             (specifier-type 'number))))
@@ -1026,20 +1032,24 @@
            ((or integer rational)
             ;; A positive float to an integer or rational power is
             ;; always a float.
-            (make-numeric-type
-             :class 'float
-             :format (numeric-type-format x-type)
-             :low (interval-low bnd)
-             :high (interval-high bnd)))
+            (let ((format (numeric-type-format x-type)))
+              (aver format)
+              (make-numeric-type
+               :class 'float
+               :format format
+               :low (coerce-numeric-bound (interval-low bnd) format)
+               :high (coerce-numeric-bound (interval-high bnd) format))))
            (float
             ;; A positive float to a float power is a float of the
             ;; higher type.
-            (make-numeric-type
-             :class 'float
-             :format (float-format-max (numeric-type-format x-type)
-                                       (numeric-type-format y-type))
-             :low (interval-low bnd)
-             :high (interval-high bnd)))
+            (let ((format (float-format-max (numeric-type-format x-type)
+                                            (numeric-type-format y-type))))
+              (aver format)
+              (make-numeric-type
+               :class 'float
+               :format format
+               :low (coerce-numeric-bound (interval-low bnd) format)
+               :high (coerce-numeric-bound (interval-high bnd) format))))
            (t
             ;; A positive float to a number is a number (for now)
             (specifier-type 'number))))
