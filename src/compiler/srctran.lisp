@@ -177,10 +177,7 @@
                   while next
                   do
                   (let ((lvar-type (lvar-type arg)))
-                    (unless (or (csubtypep list-type lvar-type)
-                                (csubtypep lvar-type list-type)
-                                ;; Check for NIL specifically, because
-                                ;; SYMBOL or ATOM won't satisfie the above
+                    (unless (or (csubtypep cons-type lvar-type)
                                 (csubtypep null-type lvar-type))
                       (assert-lvar-type arg list-type
                                         (lexenv-policy *lexenv*))
