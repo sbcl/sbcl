@@ -279,7 +279,7 @@
                        #+darwin (integer addrlen "socklen_t" "ai_addrlen")
                        #-darwin (integer addrlen "size_t" "ai_addrlen")
                        ((* sockaddr-in) addr "struct sockaddr*" "ai_addr")
-                       (c-string canonname "char *" "ai_canonname")
+                       (c-string-pointer canonname "char *" "ai_canonname")
                        ((* t) next "struct addrinfo*" "ai_next")))
 
  #+sb-bsd-sockets-addrinfo

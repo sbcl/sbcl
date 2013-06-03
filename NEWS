@@ -2,14 +2,16 @@
 changes relative to sbcl-1.1.8:
   * enchancement: disassemble now annotates some previously missing static
     functions, like LENGTH.
-  * bug fix: problems with NCONC type derivation (reported by Jerry James).
   * optimization: calls to static functions on x86-64 use less instructions.
   * optimization: compute encode-universal-time at compile time when possible.
   * optimization: when referencing internal functions as #'x, don't go through
     an indirect fdefn structure.
   * optimization: SLEEP doesn't cons on non-immediate floats and on ratios.
+  * bug fix: problems with NCONC type derivation (reported by Jerry James).
   * bug fix: EXPT type derivation no longer constructs bogus floating-point
     types.  (reported by Vsevolod Dyomkin)
+  * bug fix: sb-bsd-sockets has correct declaration of the canonname field of
+    addrinfo. (lp#1187041, patch by Jerry James)
   
 changes in sbcl-1.1.8 relative to sbcl-1.1.7:
   * notice: The implementation of MAP-ALLOCATED-OBJECTS (the heart of
