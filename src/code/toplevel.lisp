@@ -181,7 +181,7 @@ means to wait indefinitely.")
        (multiple-value-bind (quot rem) (truncate (numerator seconds)
                                                  (denominator seconds))
          (values quot
-                 (* rem (/ 1000000000 (denominator seconds))))))
+                 (truncate (* rem (/ 1000000000 (denominator seconds)))))))
       (t
        (multiple-value-bind (sec frac)
            (truncate seconds)
