@@ -73,7 +73,7 @@
   (locally (declare (notinline sleep))
     (ctu:assert-no-consing (sleep 0.00001s0))
     (ctu:assert-no-consing (sleep 0.00001d0))
-    (ctu:assert-no-consing (sleep 1/100000000000000))))
+    (ctu:assert-no-consing (sleep 1/100000003))))
 
 ;;; SLEEP should work with large integers as well
 (with-test (:name (sleep pretty-much-forever))

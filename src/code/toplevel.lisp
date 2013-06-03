@@ -164,12 +164,12 @@ means to wait indefinitely.")
 
 (defun split-seconds-for-sleep (seconds)
   (declare (optimize speed))
+  ;; KLUDGE: This whole thing to avoid consing floats
   (flet ((split-float ()
-           ;; KLUDGE: This whole thing to avoid consing floats
            (let ((whole-seconds (truly-the fixnum (%unary-truncate seconds))))
              (values whole-seconds
                      (truly-the fixnum
-                                (%unary-truncate (* (- seconds whole-seconds)
+                                (%unary-truncate (* (- seconds (float whole-seconds))
                                                     (load-time-value 1s9 t))))))))
     (declare (inline split-float))
     (typecase seconds
@@ -181,7 +181,11 @@ means to wait indefinitely.")
        (multiple-value-bind (quot rem) (truncate (numerator seconds)
                                                  (denominator seconds))
          (values quot
-                 (* rem (truncate 1000000000 (denominator seconds))))))
+                 (* rem
+                    (if (typep 1000000000 'fixnum)
+                        (truncate 1000000000 (denominator seconds))
+                        ;; Can't truncate a bignum by a fixnum without consing
+                        (* 10 (truncate 100000000 (denominator seconds))))))))
       (t
        (multiple-value-bind (sec frac)
            (truncate seconds)
