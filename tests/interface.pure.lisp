@@ -68,12 +68,15 @@
       (sleep 2))))
 
 ;;; SLEEP should not cons
-(with-test (:name (sleep :non-consing) :fails-on '(or (not :x86-64) :win32))
-  (ctu:assert-no-consing (sleep 0.00001)))
+(with-test (:name (sleep :non-consing) :fails-on :win32)
+  (ctu:assert-no-consing (sleep 0.00001s0))
+  (locally (declare (notinline sleep))
+    (ctu:assert-no-consing (sleep 0.00001s0))
+    (ctu:assert-no-consing (sleep 0.00001d0))
+    (ctu:assert-no-consing (sleep 1/100000000000000))))
 
-;;; SLEEP should work with large integers as well -- no timers
-;;; on win32, so don't test there.
-(with-test (:name (sleep pretty-much-forever) :skipped-on :win32)
+;;; SLEEP should work with large integers as well
+(with-test (:name (sleep pretty-much-forever))
   (assert (eq :timeout
               (handler-case
                   (sb-ext:with-timeout 1
