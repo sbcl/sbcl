@@ -135,3 +135,19 @@
   (disassemble (lambda (x y)
                  (= (the (complex single-float) x)
                     (the (complex single-float) y)))))
+
+;;; Check that SLEEP called with ratios (with no common factors with
+;;; 1000000000, and smaller than 1/1000000000) works more or less as
+;;; expected.
+(with-test (:name :sleep-ratios)
+  (let ((fun0a (compile nil '(lambda () (sleep 1/7))))
+        (fun0b (compile nil '(lambda () (sleep 1/100000000000000000000000000))))
+        (fun1 (compile nil '(lambda (x) (sleep x))))
+        (start-time (get-universal-time)))
+    (sleep 1/7)
+    (sleep 1/100000000000000000000000000)
+    (funcall fun0a)
+    (funcall fun0b)
+    (funcall fun1 1/7)
+    (funcall fun1 1/100000000000000000000000000)
+    (assert (< (- (get-universal-time) start-time) 2))))
