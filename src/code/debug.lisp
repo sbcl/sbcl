@@ -1063,12 +1063,12 @@ and LDB (the low-level debugger).  See also ENABLE-DEBUGGER."
   "When set, avoid calling INVOKE-DEBUGGER recursively when errors occur while
    executing in the debugger.")
 
-(defun debug-read (stream)
+(defun debug-read (stream eof-restart)
   (declare (type stream stream))
   (let* ((eof-marker (cons nil nil))
          (form (read stream nil eof-marker)))
     (if (eq form eof-marker)
-        (abort)
+        (invoke-restart eof-restart)
         form)))
 
 (defun debug-loop-fun ()
@@ -1099,17 +1099,20 @@ and LDB (the low-level debugger).  See also ENABLE-DEBUGGER."
                                            '*flush-debug-errors*)
                                    (/show0 "throwing DEBUG-LOOP-CATCHER")
                                    (throw 'debug-loop-catcher nil)))))
-           ;; We have to bind LEVEL for the restart function created by
-           ;; WITH-SIMPLE-RESTART.
+           ;; We have to bind LEVEL for the restart function created
+           ;; by WITH-SIMPLE-RESTART, and we need the explicit ABORT
+           ;; restart that exists now so that EOF from read can drop
+           ;; one debugger level.
            (let ((level *debug-command-level*)
-                 (restart-commands (make-restart-commands)))
+                 (restart-commands (make-restart-commands))
+                 (abort-restart-for-eof (find-restart 'abort)))
              (flush-standard-output-streams)
              (debug-prompt *debug-io*)
              (force-output *debug-io*)
              (with-simple-restart (abort
                                    "~@<Reduce debugger level (to debug level ~W).~@:>"
                                    level)
-               (let* ((exp (debug-read *debug-io*))
+               (let* ((exp (debug-read *debug-io* abort-restart-for-eof))
                       (cmd-fun (debug-command-p exp restart-commands)))
                  (cond ((not cmd-fun)
                         (debug-eval-print exp))
