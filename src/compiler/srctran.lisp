@@ -176,12 +176,11 @@
             (loop for (arg next) on args
                   while next
                   do
-                  (let ((lvar-type (lvar-type arg)))
-                    (unless (or (csubtypep cons-type lvar-type)
-                                (csubtypep null-type lvar-type))
-                      (assert-lvar-type arg list-type
-                                        (lexenv-policy *lexenv*))
-                      (return *empty-type*))))
+                  (when (eq (type-intersection (lvar-type arg) list-type)
+                            *empty-type*)
+                    (assert-lvar-type arg list-type
+                                      (lexenv-policy *lexenv*))
+                    (return *empty-type*)))
             (loop with all-nil = t
                   for (arg next) on args
                   for lvar-type = (lvar-type arg)
@@ -189,7 +188,7 @@
                   do
                   (cond
                     ;; Cons in the middle guarantees the result will be a cons
-                    ((csubtypep lvar-type cons-type)
+                    ((not (csubtypep null-type lvar-type))
                      (return cons-type))
                     ;; If all but the last are NIL the type of the last arg
                     ;; can be used

@@ -4410,9 +4410,13 @@
             (lambda (x y) (nconc x (the list y) x)) t
             (lambda (x y) (nconc (the atom x) y)) t
             (lambda (x y) (nconc (the (or null (eql 10)) x) y)) t
-            (lambda (x y) (nconc (the (or cons vector) x) y)) t
+            (lambda (x y) (nconc (the (or cons vector) x) y)) cons
             (lambda (x y) (nconc (the sequence x) y)) t
-            (lambda (x y) (print (length y)) (append x y)) sequence)))
+            (lambda (x y) (print (length y)) (append x y)) sequence
+            (lambda (x y) (print (length y)) (append x y)) sequence
+            (lambda (x y) (append (the (member (a) (b)) x) y)) cons
+            (lambda (x y) (append (the (member (a) (b) c) x) y)) cons
+            (lambda (x y) (append (the (member (a) (b) nil) x) y)) t)))
     (loop for (function result-type) on test-cases by #'cddr
           do (assert (equal (car (cdaddr (sb-kernel:%simple-fun-type
                                           (compile nil function))))
