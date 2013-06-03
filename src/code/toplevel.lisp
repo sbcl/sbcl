@@ -159,35 +159,6 @@ means to wait indefinitely.")
         (t
          (/show0 "returning normally from INFINITE-ERROR-PROTECTOR")
          nil)))
-
-;;; FIXME: I had a badly broken version of INFINITE-ERROR-PROTECTOR at
-;;; one point (shown below), and SBCL cross-compiled it without
-;;; warning about FORMS being undefined. Check whether that problem
-;;; (missing warning) is repeatable in the final system and if so, fix
-;;; it.
-#|
-(defun infinite-error-protector ()
-  `(cond ((not *cold-init-complete-p*)
-          (%primitive print "Argh! error in cold init, halting")
-          (%primitive sb!c:halt))
-         ((or (not (boundp '*current-error-depth*))
-              (not (realp   *current-error-depth*))
-              (not (boundp '*maximum-error-depth*))
-              (not (realp   *maximum-error-depth*)))
-          (%primitive print "Argh! corrupted error depth, halting")
-          (%primitive sb!c:halt))
-         ((> *current-error-depth* *maximum-error-depth*)
-          (/show0 "in INFINITE-ERROR-PROTECTOR, calling ERROR-ERROR")
-          (error-error "Help! "
-                       *current-error-depth*
-                       " nested errors. "
-                       "SB-KERNEL:*MAXIMUM-ERROR-DEPTH* exceeded.")
-          (progn ,@forms)
-          t)
-         (t
-          (/show0 "in INFINITE-ERROR-PROTECTOR, returning normally")
-          nil)))
-|#
 
 ;;;; miscellaneous external functions
 
