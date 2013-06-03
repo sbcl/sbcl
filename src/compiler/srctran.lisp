@@ -164,50 +164,39 @@
 ;;; (append x x x x sequence) => sequence
 ;;; (append fixnum x ...) => nil
 (defun derive-append-type (args)
-  (cond ((not args)
-         (specifier-type 'null))
-        (t
-         (let ((cons-type (specifier-type 'cons))
-               (null-type (specifier-type 'null))
-               (list-type (specifier-type 'list))
-               (last (lvar-type (car (last args)))))
-           (or
-            ;; Check that all but the last arguments are lists first
-            (loop for (arg next) on args
-                  while next
-                  do
-                  (when (eq (type-intersection (lvar-type arg) list-type)
-                            *empty-type*)
-                    (assert-lvar-type arg list-type
-                                      (lexenv-policy *lexenv*))
-                    (return *empty-type*)))
-            (loop with all-nil = t
-                  for (arg next) on args
-                  for lvar-type = (lvar-type arg)
-                  while next
-                  do
-                  (cond
-                    ;; Cons in the middle guarantees the result will be a cons
-                    ((not (csubtypep null-type lvar-type))
-                     (return cons-type))
-                    ;; If all but the last are NIL the type of the last arg
-                    ;; can be used
-                    ((csubtypep lvar-type null-type))
-                    (all-nil
-                     (setf all-nil nil)))
-                  finally
-                  (return
-                    (cond (all-nil
-                           last)
-                          ((csubtypep last cons-type)
-                           cons-type)
-                          ((csubtypep last list-type)
-                           list-type)
-                          ;; If the last is SEQUENCE (or similar) it'll
-                          ;; be either that sequence or a cons, which is a
-                          ;; sequence
-                          ((csubtypep list-type last)
-                           last)))))))))
+  (when (null args)
+    (return-from derive-append-type (specifier-type 'null)))
+  (let* ((cons-type (specifier-type 'cons))
+         (null-type (specifier-type 'null))
+         (list-type (specifier-type 'list))
+         (last (lvar-type (car (last args)))))
+    ;; Derive the actual return type, assuming that all but the last
+    ;; arguments are LISTs (otherwise, APPEND/NCONC doesn't return).
+    (loop with all-nil = t       ; all but the last args are NIL?
+          with some-cons = nil   ; some args are conses?
+          for (arg next) on args
+          for lvar-type = (type-approx-intersection2 (lvar-type arg)
+                                                     list-type)
+          while next
+          do (multiple-value-bind (typep definitely)
+                 (ctypep nil lvar-type)
+               (cond ((type= lvar-type *empty-type*)
+                      ;; type mismatch! insert an inline check that'll cause
+                      ;; compile-time warnings.
+                      (assert-lvar-type arg list-type
+                                        (lexenv-policy *lexenv*)))
+                     (some-cons) ; we know result's a cons -- nothing to do
+                     ((and (not typep) definitely) ; can't be NIL
+                      (setf some-cons t))          ; must be a CONS
+                     (all-nil
+                      (setf all-nil (csubtypep lvar-type null-type)))))
+          finally
+             ;; if some of the previous arguments are CONSes so is the result;
+             ;; if all the previous values are NIL, we're a fancy identity;
+             ;; otherwise, could be either
+             (return (cond (some-cons cons-type)
+                           (all-nil last)
+                           (t (type-union last cons-type)))))))
 
 (defoptimizer (append derive-type) ((&rest args))
   (derive-append-type args))

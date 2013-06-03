@@ -4404,7 +4404,7 @@
   (let ((test-cases
           '((lambda () (append 10)) (integer 10 10)
             (lambda () (append nil 10)) (integer 10 10)
-            (lambda (x) (append x 10)) t
+            (lambda (x) (append x 10)) (or (integer 10 10) cons)
             (lambda (x) (append x (cons 1 2))) cons
             (lambda (x y) (append x (cons 1 2) y)) cons
             (lambda (x y) (nconc x (the list y) x)) t
@@ -4418,9 +4418,10 @@
             (lambda (x y) (append (the (member (a) (b) c) x) y)) cons
             (lambda (x y) (append (the (member (a) (b) nil) x) y)) t)))
     (loop for (function result-type) on test-cases by #'cddr
-          do (assert (equal (car (cdaddr (sb-kernel:%simple-fun-type
-                                          (compile nil function))))
-                            result-type)))))
+          do (assert (sb-kernel:type= (sb-kernel:specifier-type
+                                       (car (cdaddr (sb-kernel:%simple-fun-type
+                                                     (compile nil function)))))
+                                      (sb-kernel:specifier-type result-type))))))
 
 (with-test (:name :bug-504121)
   (compile nil `(lambda (s)
@@ -4604,3 +4605,10 @@
                   (declare (type word a)
                            (type (integer * -84) b))
                   (ash a b))))
+
+(test-util:with-test (:name :nconc-derive-type)
+  (let ((function (compile nil `(lambda (x y)
+                                  (declare (type (or cons fixnum) x))
+                                  (nconc x y)))))
+    (assert (equal (sb-kernel:%simple-fun-type function)
+                   '(function ((or cons fixnum) t) (values cons &optional))))))
