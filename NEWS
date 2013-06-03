@@ -12,6 +12,8 @@ changes relative to sbcl-1.1.8:
     types.  (reported by Vsevolod Dyomkin)
   * bug fix: sb-bsd-sockets has correct declaration of the canonname field of
     addrinfo. (lp#1187041, patch by Jerry James)
+  * bug fix: uninitialized type-error conditions can now be printed.
+    (lp#1184586)
   
 changes in sbcl-1.1.8 relative to sbcl-1.1.7:
   * notice: The implementation of MAP-ALLOCATED-OBJECTS (the heart of

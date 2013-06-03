@@ -189,3 +189,6 @@
                   (when (and (eq 'list (type-error-expected-type e))
                              (eql 8 (type-error-datum e)))
                     :type-error))))))
+
+(with-test (:name (:printing-unintitialized-condition :bug-1184586))
+  (prin1-to-string (make-condition 'simple-type-error)))

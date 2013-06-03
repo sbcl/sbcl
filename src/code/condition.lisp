@@ -623,7 +623,9 @@
              (type-error-expected-type condition)))))
 
 (def!method print-object ((condition type-error) stream)
-  (if *print-escape*
+  (if (and *print-escape*
+           (slot-boundp condition 'expected-type)
+           (slot-boundp condition 'datum))
       (flet ((maybe-string (thing)
                (ignore-errors
                  (write-to-string thing :lines 1 :readably nil :array nil :pretty t))))
