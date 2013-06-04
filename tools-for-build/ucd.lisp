@@ -50,6 +50,9 @@
           (setf (gethash list *misc-hash*)
                 (incf *misc-index*))))))
 
+(defun gc-index-sort-key (gc-index)
+  (or (cdr (assoc gc-index '((1 . 2) (2 . 1)))) gc-index))
+
 (defun compare-misc-entry (left right)
   (destructuring-bind (left-gc-index left-bidi-index left-ccc-index
                        left-decimal-digit left-digit left-bidi-mirrored
@@ -61,7 +64,8 @@
         right
       (or (and left-cl-both-case-p (not right-cl-both-case-p))
           (and (or left-cl-both-case-p (not right-cl-both-case-p))
-               (or (< left-gc-index right-gc-index)
+               (or (< (gc-index-sort-key left-gc-index)
+                      (gc-index-sort-key right-gc-index))
                    (and (= left-gc-index right-gc-index)
                         (or (< left-decomposition-info right-decomposition-info)
                             (and (= left-decomposition-info right-decomposition-info)
@@ -270,7 +274,11 @@
                               (parse-integer simple-titlecase :radix 16)))
                (cl-both-case-p
                 (not (null (or (and (= gc-index 0) lower-index)
-                               (and (= gc-index 1) upper-index)))))
+                               (and (= gc-index 1) upper-index)
+                               ;; deal with prosgegrammeni / titlecase
+                               (and (= gc-index 2)
+                                    (typep code-point '(integer #x1000 #x1fff))
+                                    lower-index)))))
                (decomposition-info 0))
           (declare (ignore digit-index))
           (when (and (not cl-both-case-p)

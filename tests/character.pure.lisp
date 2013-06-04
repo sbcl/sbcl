@@ -130,8 +130,7 @@
 (with-test (:name (:case-insensitive-char-comparisons :eacute))
   (assert (char-equal (code-char 201) (code-char 233))))
 
-(with-test (:name (:case-insensitive-char-comparisons :exhaustive)
-            :fails-on :sb-unicode)
+(with-test (:name (:case-insensitive-char-comparisons :exhaustive))
   (dotimes (i char-code-limit)
     (let* ((char (code-char i))
            (down (char-downcase char))

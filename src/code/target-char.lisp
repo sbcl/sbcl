@@ -400,20 +400,20 @@ argument is an alphabetic character, A-Z or a-z; otherwise NIL."
   #!+sb-doc
   "The argument must be a character object; UPPER-CASE-P returns T if the
 argument is an upper-case character, NIL otherwise."
-  (< (ucd-value-0 char) 4))
+  (< (ucd-value-0 char) 5))
 
 (defun lower-case-p (char)
   #!+sb-doc
   "The argument must be a character object; LOWER-CASE-P returns T if the
 argument is a lower-case character, NIL otherwise."
-  (< 3 (ucd-value-0 char) 8))
+  (< 4 (ucd-value-0 char) 9))
 
 (defun both-case-p (char)
   #!+sb-doc
   "The argument must be a character object. BOTH-CASE-P returns T if the
 argument is an alphabetic character and if the character exists in both upper
 and lower case. For ASCII, this is the same as ALPHA-CHAR-P."
-  (< (ucd-value-0 char) 8))
+  (< (ucd-value-0 char) 9))
 
 (defun digit-char-p (char &optional (radix 10.))
   #!+sb-doc
@@ -513,7 +513,7 @@ is either numeric or alphabetic."
 (defmacro equal-char-code (character)
   (let ((ch (gensym)))
     `(let ((,ch ,character))
-      (if (< (ucd-value-0 ,ch) 4)
+      (if (< (ucd-value-0 ,ch) 5)
           (ucd-value-1 ,ch)
           (char-code ,ch)))))
 
@@ -609,14 +609,14 @@ Case is ignored."
   #!+sb-doc
   "Return CHAR converted to upper-case if that is possible. Don't convert
 lowercase eszet (U+DF)."
-  (if (< 3 (ucd-value-0 char) 8)
+  (if (< 4 (ucd-value-0 char) 9)
       (code-char (ucd-value-1 char))
       char))
 
 (defun char-downcase (char)
   #!+sb-doc
   "Return CHAR converted to lower-case if that is possible."
-  (if (< (ucd-value-0 char) 4)
+  (if (< (ucd-value-0 char) 5)
       (code-char (ucd-value-1 char))
       char))
 
