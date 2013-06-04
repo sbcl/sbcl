@@ -98,18 +98,26 @@
   #-(or sbcl gencgc) (sb-ext:gc))
 
 (deftest inet-socket-bind
-  (let ((s (make-instance 'inet-socket :type :stream :protocol (get-protocol-by-name "tcp"))))
-    ;; Given the functions we've got so far, if you can think of a
-    ;; better way to make sure the bind succeeded than trying it
-    ;; twice, let me know
-    ;; 1974 has no special significance, unless you're the same age as me
-    (do-gc-portably) ;gc should clear out any old sockets bound to this port
-    (socket-bind s (make-inet-address "127.0.0.1") 1974)
-    (handler-case
-        (let ((s2 (make-instance 'inet-socket :type :stream :protocol (get-protocol-by-name "tcp"))))
-          (socket-bind s2 (make-inet-address "127.0.0.1") 1974)
-          nil)
-      (address-in-use-error () t)))
+  (let* ((tcp (get-protocol-by-name "tcp"))
+         (address (make-inet-address "127.0.0.1"))
+         (s (make-instance 'inet-socket :type :stream :protocol tcp)))
+    (do-gc-portably) ; gc should clear out any old sockets bound to this port
+    (unwind-protect
+         ;; Given the functions we've got so far, if you can think of a
+         ;; better way to make sure the bind succeeded than trying it
+         ;; twice, let me know
+         (progn
+           (socket-bind s address 0)
+           (handler-case
+               (let ((port (nth-value 1 (socket-name s)))
+                     (s2 (make-instance 'inet-socket
+                                        :type :stream :protocol tcp)))
+                 (unwind-protect
+                      (socket-bind s2 address port)
+                   (socket-close s2))
+                 nil)
+             (address-in-use-error () t)))
+      (socket-close s)))
   t)
 
 (deftest* (simple-sockopt-test)

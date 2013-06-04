@@ -14,6 +14,8 @@ changes relative to sbcl-1.1.8:
     addrinfo. (lp#1187041, patch by Jerry James)
   * bug fix: uninitialized type-error conditions can now be printed.
     (lp#1184586)
+  * bug fix: tests for sb-bsd-sockets no longer use a predefined port for
+    listening, allowing several tests to run in parallel.
   
 changes in sbcl-1.1.8 relative to sbcl-1.1.7:
   * notice: The implementation of MAP-ALLOCATED-OBJECTS (the heart of
