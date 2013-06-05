@@ -8,7 +8,7 @@
   (:export socket local-socket local-abstract-socket inet-socket
            make-local-socket make-inet-socket
            socket-bind socket-accept socket-connect
-           socket-send socket-receive socket-recv
+           socket-send socket-receive
            socket-name socket-peername socket-listen
            socket-close socket-file-descriptor
            socket-family socket-protocol socket-open-p
@@ -19,7 +19,6 @@
            host-ent-addresses host-ent-address
            host-ent-aliases host-ent-name
            name-service-error
-           getaddrinfo
            ;; not sure if these are really good names or not
            netdb-internal-error
            netdb-success-error

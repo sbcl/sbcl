@@ -219,14 +219,7 @@
     two-arg-+ two-arg-- two-arg-* two-arg-/ two-arg-< two-arg-> two-arg-=
     two-arg-<= two-arg->= two-arg-/= eql %negate
     two-arg-and two-arg-ior two-arg-xor two-arg-eqv
-    two-arg-gcd two-arg-lcm
-    ))
-
-;;;; Assembler parameters:
-
-;;; The number of bits per element in the assemblers code vector.
-(defparameter *assembly-unit-length* 8)
-
+    two-arg-gcd two-arg-lcm))
 
 ;;;; Pseudo-atomic trap number
 

@@ -214,10 +214,3 @@
     sb!kernel:two-arg-eqv
     sb!kernel:two-arg-gcd
     sb!kernel:two-arg-lcm))
-
-
-;;;; Assembler parameters:
-
-;;; The number of bits per element in the assemblers code vector.
-;;;
-(defparameter *assembly-unit-length* 8)

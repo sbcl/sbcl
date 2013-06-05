@@ -20,7 +20,7 @@
 ;;;       bignum-ashift-right bignum-ashift-left bignum-gcd
 ;;;       bignum-to-float bignum-integer-length
 ;;;       bignum-logical-and bignum-logical-ior bignum-logical-xor
-;;;       bignum-logical-not bignum-load-byte bignum-deposit-byte
+;;;       bignum-logical-not bignum-load-byte
 ;;;       bignum-truncate bignum-plus-p bignum-compare make-small-bignum
 ;;;       bignum-logbitp bignum-logcount
 ;;;   These symbols define the interface to the compiler:

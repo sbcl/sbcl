@@ -293,10 +293,6 @@
 (defknown %bignum-set (bignum-type bignum-index bignum-element-type)
   bignum-element-type
   ())
-#!+(or x86 x86-64)
-(defknown %bignum-set-with-offset
-  (bignum-type bignum-index (signed-byte 24) bignum-element-type)
-  bignum-element-type (always-translatable))
 
 (defknown %digit-0-or-plusp (bignum-element-type) boolean
   (foldable flushable movable))
@@ -414,9 +410,6 @@
 (defknown %funcallable-instance-info (function index) t (flushable))
 (defknown %set-funcallable-instance-info (function index t) t ())
 
-;;;; mutator accessors
-
-(defknown mutator-self () system-area-pointer (flushable movable))
 
 (defknown %data-vector-and-index (array index)
                                  (values (simple-array * (*)) index)

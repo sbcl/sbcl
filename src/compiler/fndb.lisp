@@ -473,10 +473,6 @@
 (defknown %map-to-list-arity-1 (callable sequence) list (flushable call))
 (defknown %map-to-simple-vector-arity-1 (callable sequence) simple-vector
   (flushable call))
-(defknown %map-to-nil-on-simple-vector (callable simple-vector) null
-  (flushable call))
-(defknown %map-to-nil-on-vector (callable vector) null (flushable call))
-(defknown %map-to-nil-on-sequence (callable sequence) null (flushable call))
 
 (defknown map-into (sequence callable &rest sequence)
   sequence
