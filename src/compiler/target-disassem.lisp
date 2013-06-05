@@ -2012,7 +2012,7 @@
   (car (svref sb!c:*backend-internal-errors* errnum)))
 
 (defun get-sc-name (sc-offs)
-  (sb!c::location-print-name
+  (sb!c:location-print-name
    ;; FIXME: This seems like an awful lot of computation just to get a name.
    ;; Couldn't we just use lookup in *BACKEND-SC-NAMES*, without having to cons
    ;; up a new object?

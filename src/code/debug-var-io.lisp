@@ -21,28 +21,29 @@
 
 ;;; Given a byte vector VEC and an index variable INDEX, read a
 ;;; variable length integer and advance index.
-;;;
-;;; FIXME: This is called O(20) times. It should be reimplemented
-;;; with much of its logic in a single service function which can
-;;; be called by the macro expansion:
-;;;   `(SETF ,INDEX (%READ-VAR-INTEGER ,VEC ,INDEX)).
+(defun %read-var-integer (vec index)
+  (let ((val (aref vec index)))
+    (cond ((<= val 253)
+           (values val (1+ index)))
+          ((= val 254)
+           (values
+            (logior (aref vec (+ index 1))
+                    (ash (aref vec (+ index 2)) 8))
+            (+ index 3)))
+          (t
+           (values
+            (logior (aref vec (+ index 1))
+                    (ash (aref vec (+ index 2)) 8)
+                    (ash (aref vec (+ index 3)) 16)
+                    (ash (aref vec (+ index 4)) 24))
+            (+ index 5))))))
+
 (defmacro read-var-integer (vec index)
-  (once-only ((val `(aref ,vec ,index)))
-    `(cond ((<= ,val 253)
-            (incf ,index)
-            ,val)
-           ((= ,val 254)
-            (prog1
-                (logior (aref ,vec (+ ,index 1))
-                        (ash (aref ,vec (+ ,index 2)) 8))
-              (incf ,index 3)))
-           (t
-            (prog1
-                (logior (aref ,vec (+ ,index 1))
-                        (ash (aref ,vec (+ ,index 2)) 8)
-                        (ash (aref ,vec (+ ,index 3)) 16)
-                        (ash (aref ,vec (+ ,index 4)) 24))
-              (incf ,index 5))))))
+  (once-only ((vec vec))
+    `(multiple-value-bind (vector new-index)
+         (%read-var-integer ,vec ,index)
+       (setf ,index new-index)
+       vector)))
 
 ;;; Take an adjustable vector VEC with a fill pointer and push the
 ;;; variable length representation of INT on the end.
