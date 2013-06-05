@@ -89,35 +89,24 @@
     (non-blocking-mode s))
   t)
 
-(defun do-gc-portably ()
-  ;; cmucl on linux has generational gc with a keyword argument,
-  ;; sbcl GC function takes same arguments no matter what collector is in
-  ;; use
-  #+(or sbcl gencgc) (SB-EXT:gc :full t)
-  ;; other platforms have full gc or nothing
-  #-(or sbcl gencgc) (sb-ext:gc))
-
 (deftest inet-socket-bind
   (let* ((tcp (get-protocol-by-name "tcp"))
          (address (make-inet-address "127.0.0.1"))
-         (s (make-instance 'inet-socket :type :stream :protocol tcp)))
-    (do-gc-portably) ; gc should clear out any old sockets bound to this port
+         (s1 (make-instance 'inet-socket :type :stream :protocol tcp))
+         (s2 (make-instance 'inet-socket :type :stream :protocol tcp)))
     (unwind-protect
          ;; Given the functions we've got so far, if you can think of a
          ;; better way to make sure the bind succeeded than trying it
          ;; twice, let me know
          (progn
-           (socket-bind s address 0)
+           (socket-bind s1 address 0)
            (handler-case
-               (let ((port (nth-value 1 (socket-name s)))
-                     (s2 (make-instance 'inet-socket
-                                        :type :stream :protocol tcp)))
-                 (unwind-protect
-                      (socket-bind s2 address port)
-                   (socket-close s2))
+               (let ((port (nth-value 1 (socket-name s1))))
+                 (socket-bind s2 address port)
                  nil)
              (address-in-use-error () t)))
-      (socket-close s)))
+      (socket-close s1)
+      (socket-close s2)))
   t)
 
 (deftest* (simple-sockopt-test)
