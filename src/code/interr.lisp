@@ -106,6 +106,11 @@
          :datum object
          :expected-type 'fixnum))
 
+(deferr object-not-mod-error (object limit)
+  (error 'type-error
+         :datum object
+         :expected-type `(mod ,(1+ limit))))
+
 (deferr object-not-vector-error (object)
   (error 'type-error
          :datum object

@@ -370,6 +370,35 @@
 
       (emit-label yep)
       (move result value))))
+
+(define-vop (check-mod-fixnum check-type)
+  (:info type)
+  (:temporary (:sc any-reg) temp)
+  (:generator 30
+     (let* ((low (numeric-type-low type))
+            (hi (fixnumize (numeric-type-high type)))
+            (error (gen-label)))
+       ;; FIXME: abstract
+       (assemble (*elsewhere*)
+         (emit-label error)
+         (inst mov temp hi)
+         (emit-error-break vop error-trap
+                           (error-number-or-lose 'object-not-mod-error)
+                           (list value temp)))
+       (aver (zerop low))
+       (cond
+         ;; Handle powers of two specially
+         ;; The higher bits and the fixnum tag can be tested in one go
+         ((= (logcount (1+ hi)) 1)
+          (inst test value (lognot hi))
+          (inst jmp :ne error))
+         (t
+          (generate-fixnum-test value)
+          (inst jmp :ne error)
+          (inst cmp value hi)
+          (inst jmp :a error)))
+       (move result value))))
+
 
 ;;;; list/symbol types
 ;;;

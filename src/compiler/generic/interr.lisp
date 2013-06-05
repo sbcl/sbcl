@@ -55,6 +55,8 @@
    "Object is not of type SIMPLE-STRING.")
   (object-not-fixnum
    "Object is not of type FIXNUM.")
+  (object-not-mod
+   "Object is not of type (MOD X).")
   (object-not-vector
    "Object is not of type VECTOR.")
   (object-not-string
