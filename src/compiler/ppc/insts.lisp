@@ -42,7 +42,7 @@
 
 (defvar *disassem-use-lisp-reg-names* t)
 
-(!def-vm-support-routine location-number (loc)
+(defun location-number (loc)
   (etypecase loc
     (null)
     (number)
@@ -1818,7 +1818,7 @@
     `(inst nor. ,ra ,rs ,rs))
 
 
-  (!def-vm-support-routine emit-nop (segment)
+  (defun emit-nop (segment)
                            (emit-word segment #x60000000))
 
   (define-instruction-macro extlwi (ra rs n b)

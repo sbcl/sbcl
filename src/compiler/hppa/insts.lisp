@@ -138,7 +138,7 @@
 ;  immediate or anything else.
 ; this routine will return an location-number
 ; this number must be less than *assem-max-locations*
-(!def-vm-support-routine location-number (loc)
+(defun location-number (loc)
   (etypecase loc
     (null)
     (number)

@@ -48,7 +48,7 @@
   "If non-NIL, print registers using the Lisp register names.
 Otherwise, use the Sparc register names")
 
-(!def-vm-support-routine location-number (loc)
+(defun location-number (loc)
   (etypecase loc
     (null)
     (number)
@@ -1733,7 +1733,7 @@ about function addresses and register values.")
   (:delay 0)
   (:emitter (emit-format-2-immed segment 0 0 #b100 0)))
 
-(!def-vm-support-routine emit-nop (segment)
+(defun emit-nop (segment)
   (emit-format-2-immed segment 0 0 #b100 0))
 
 (define-instruction cmp (segment src1 &optional src2)

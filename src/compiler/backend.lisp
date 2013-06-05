@@ -134,97 +134,51 @@
 (defvar *backend-internal-errors* nil)
 (declaim (type (or simple-vector null) *backend-internal-errors*))
 
-;;;; VM support routines
+;;;; VM support routines which backends need to implement
 
-;;; FIXME: Do we need this kind of indirection for the VM support
-;;; routines any more?
+;;; from vm.lisp
+;;; immediate-constant-sc
+;;; location-print-name
+;;; combination-implementation-style
+;;; convert-conditional-move-p
+;;; boxed-immediate-sc-p
 
-;;; forward declaration
-(defvar *backend-support-routines*)
+;;; from primtype.lisp
+;;; primitive-type-of
+;;; primitive-type
 
-(macrolet ((def-vm-support-routines (&rest routines)
-             `(progn
-                (eval-when (:compile-toplevel :load-toplevel :execute)
-                  (defparameter *vm-support-routines* ',routines))
-                (defstruct (vm-support-routines (:copier nil))
-                  ,@(mapcar (lambda (routine)
-                              `(,routine nil :type (or function null)))
-                            routines))
-                ,@(mapcar
-                   (lambda (name)
-                     `(defun ,name (&rest args)
-                        (apply (or (,(symbolicate "VM-SUPPORT-ROUTINES-"
-                                                  name)
-                                    *backend-support-routines*)
-                                   (error "machine-specific support ~S ~
-                                           routine undefined"
-                                          ',name))
-                               args)))
-                   routines))))
+;;; from c-call.lisp
+;;; make-call-out-tns
 
-  (def-vm-support-routines
+;;; from call.lisp
+;;; standard-arg-location
+;;; make-return-pc-passing-location
+;;; make-old-fp-passing-location
+;;; make-old-fp-save-location
+;;; make-return-pc-save-location
+;;; make-arg-count-location
+;;; make-nfp-tn
+;;; make-stack-pointer-tn
+;;; make-number-stack-pointer-tn
+;;; make-unknown-values-locations
+;;; select-component-format
 
-    ;; from vm.lisp
-    immediate-constant-sc
-    location-print-name
-    combination-implementation-style
-    boxed-immediate-sc-p
+;;; from nlx.lisp
+;;; make-nlx-sp-tn
+;;; make-dynamic-state-tns
+;;; make-nlx-entry-arg-start-location
 
-    ;; from primtype.lisp
-    primitive-type-of
-    primitive-type
+;;; from pred.lisp
+;;; convert-conditional-move-p
 
-    ;; from c-call.lisp
-    make-call-out-tns
+;;; from support.lisp
+;;; generate-call-sequence
+;;; generate-return-sequence
 
-    ;; from call.lisp
-    standard-arg-location
-    make-return-pc-passing-location
-    make-old-fp-passing-location
-    make-old-fp-save-location
-    make-return-pc-save-location
-    make-arg-count-location
-    make-nfp-tn
-    make-stack-pointer-tn
-    make-number-stack-pointer-tn
-    make-unknown-values-locations
-    select-component-format
+;;; for use with scheduler
+;;; emit-nop
+;;; location-number
 
-    ;; from nlx.lisp
-    make-nlx-sp-tn
-    make-dynamic-state-tns
-    make-nlx-entry-arg-start-location
-
-    ;; from pred.lisp
-    convert-conditional-move-p
-
-    ;; from support.lisp
-    generate-call-sequence
-    generate-return-sequence
-
-    ;; for use with scheduler
-    emit-nop
-    location-number))
-
-(defprinter (vm-support-routines))
-
-(defmacro !def-vm-support-routine (name ll &body body)
-  (unless (member (intern (string name) (find-package "SB!C"))
-                  *vm-support-routines*)
-    (warn "unknown VM support routine: ~A" name))
-  (let ((local-name (symbolicate "IMPL-OF-VM-SUPPORT-ROUTINE-" name)))
-    `(progn
-       (defun ,local-name ,ll ,@body)
-       (setf (,(intern (concatenate 'simple-string
-                                    "VM-SUPPORT-ROUTINES-"
-                                    (string name))
-                       (find-package "SB!C"))
-              *backend-support-routines*)
-             #',local-name))))
-
-;;; the VM support routines
-(defvar *backend-support-routines* (make-vm-support-routines))
-(declaim (type vm-support-routines *backend-support-routines*))
 
 ;;;; This is a prototype interface to support Christophe Rhodes' new
 ;;;; (sbcl-0.pre7.57) VOP :GUARD clauses for implementations which

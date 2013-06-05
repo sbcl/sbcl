@@ -36,7 +36,7 @@
 
 (defvar *disassem-use-lisp-reg-names* t)
 
-(!def-vm-support-routine location-number (loc)
+(defun location-number (loc)
   (etypecase loc
     (null)
     (number)
@@ -1117,7 +1117,7 @@
   (:emitter
    (emit-word segment 0)))
 
-(!def-vm-support-routine emit-nop (segment)
+(defun emit-nop (segment)
   (emit-word segment 0))
 
 (define-instruction word (segment word)

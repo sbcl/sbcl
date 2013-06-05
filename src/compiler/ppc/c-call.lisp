@@ -195,7 +195,7 @@
             (values 'unsigned-byte-32 'unsigned-reg))
       (my-make-wired-tn ptype reg-sc (result-reg-offset num-results)))))
 
-(!def-vm-support-routine make-call-out-tns (type)
+(defun make-call-out-tns (type)
   (declare (type alien-fun-type type))
   (let ((arg-state (make-arg-state)))
     (collect ((arg-tns))

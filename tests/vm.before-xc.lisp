@@ -19,10 +19,10 @@
 (flet ((yes (x)
          (assert
           (eql (sc-number-or-lose 'immediate)
-               (impl-of-vm-support-routine-immediate-constant-sc x))))
+               (immediate-constant-sc x))))
        (no (x)
          (assert
-          (not (impl-of-vm-support-routine-immediate-constant-sc x)))))
+          (not (immediate-constant-sc x)))))
   ;; target fixnums can be dealt with as immediates; target bignums
   ;; can not.
   (yes #.sb-xc:most-positive-fixnum)

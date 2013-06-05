@@ -11,7 +11,7 @@
 
 (in-package "SB!VM")
 
-(!def-vm-support-routine generate-call-sequence (name style vop)
+(defun generate-call-sequence (name style vop)
   (ecase style
     ((:raw :none)
      (let ((temp (make-symbol "TEMP"))
@@ -54,7 +54,7 @@
                       ,nfp-save)
           (:save-p :compute-only)))))))
 
-(!def-vm-support-routine generate-return-sequence (style)
+(defun generate-return-sequence (style)
   (ecase style
     (:raw
      `((inst j

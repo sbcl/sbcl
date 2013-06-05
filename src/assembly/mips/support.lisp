@@ -11,7 +11,7 @@
 
 (in-package "SB!VM")
 
-(!def-vm-support-routine generate-call-sequence (name style vop)
+(defun generate-call-sequence (name style vop)
   (ecase style
     ((:raw :none)
      (values
@@ -49,7 +49,7 @@
                       ,nfp-save)
           (:save-p t)))))))
 
-(!def-vm-support-routine generate-return-sequence (style)
+(defun generate-return-sequence (style)
   (ecase style
     (:raw
      `((inst j lip-tn)

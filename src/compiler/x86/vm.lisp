@@ -382,7 +382,7 @@
 
 ;;; If value can be represented as an immediate constant, then return
 ;;; the appropriate SC number, otherwise return NIL.
-(!def-vm-support-routine immediate-constant-sc (value)
+(defun immediate-constant-sc (value)
   (typecase value
     ((or (integer #.sb!xc:most-negative-fixnum #.sb!xc:most-positive-fixnum)
          character)
@@ -408,7 +408,7 @@
                  (eql value (log 2l0 2.718281828459045235360287471352662L0)))
          (sc-number-or-lose 'fp-constant)))))
 
-(!def-vm-support-routine boxed-immediate-sc-p (sc)
+(defun boxed-immediate-sc-p (sc)
   (eql sc (sc-number-or-lose 'immediate)))
 
 ;; For an immediate TN, return its value encoded for use as a literal.
@@ -463,7 +463,7 @@
 
 ;;; This function is called by debug output routines that want a pretty name
 ;;; for a TN's location. It returns a thing that can be printed with PRINC.
-(!def-vm-support-routine location-print-name (tn)
+(defun location-print-name (tn)
   (declare (type tn tn))
   (let* ((sc (tn-sc tn))
          (sb (sb-name (sc-sb sc)))
@@ -489,7 +489,7 @@
       (noise (symbol-name (sc-name sc))))))
 ;;; FIXME: Could this, and everything that uses it, be made #!+SB-SHOW?
 
-(!def-vm-support-routine combination-implementation-style (node)
+(defun combination-implementation-style (node)
   (declare (type sb!c::combination node))
   (flet ((valid-funtype (args result)
            (sb!c::valid-fun-use node

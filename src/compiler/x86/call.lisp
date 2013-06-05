@@ -15,7 +15,7 @@
 
 ;;; Return a wired TN describing the N'th full call argument passing
 ;;; location.
-(!def-vm-support-routine standard-arg-location (n)
+(defun standard-arg-location (n)
   (declare (type unsigned-byte n))
   (if (< n register-arg-count)
       (make-wired-tn *backend-t-primitive-type* descriptor-reg-sc-number
@@ -26,7 +26,7 @@
 ;;;
 ;;; Always wire the return PC location to the stack in its standard
 ;;; location.
-(!def-vm-support-routine make-return-pc-passing-location (standard)
+(defun make-return-pc-passing-location (standard)
   (declare (ignore standard))
   (make-wired-tn (primitive-type-or-lose 'system-area-pointer)
                  sap-stack-sc-number return-pc-save-offset))
@@ -38,7 +38,7 @@
 ;;; because we want to be able to assume it's always there. Besides,
 ;;; the x86 doesn't have enough registers to really make it profitable
 ;;; to pass it in a register.
-(!def-vm-support-routine make-old-fp-passing-location (standard)
+(defun make-old-fp-passing-location (standard)
   (declare (ignore standard))
   (make-wired-tn *fixnum-primitive-type* control-stack-sc-number
                  ocfp-save-offset))
@@ -49,12 +49,12 @@
 ;;;
 ;;; Without using a save-tn - which does not make much sense if it is
 ;;; wired to the stack?
-(!def-vm-support-routine make-old-fp-save-location (physenv)
+(defun make-old-fp-save-location (physenv)
   (physenv-debug-live-tn (make-wired-tn *fixnum-primitive-type*
                                         control-stack-sc-number
                                         ocfp-save-offset)
                          physenv))
-(!def-vm-support-routine make-return-pc-save-location (physenv)
+(defun make-return-pc-save-location (physenv)
   (physenv-debug-live-tn
    (make-wired-tn (primitive-type-or-lose 'system-area-pointer)
                   sap-stack-sc-number return-pc-save-offset)
@@ -63,23 +63,23 @@
 ;;; Make a TN for the standard argument count passing location. We only
 ;;; need to make the standard location, since a count is never passed when we
 ;;; are using non-standard conventions.
-(!def-vm-support-routine make-arg-count-location ()
+(defun make-arg-count-location ()
   (make-wired-tn *fixnum-primitive-type* any-reg-sc-number ecx-offset))
 
 ;;; Make a TN to hold the number-stack frame pointer. This is allocated
 ;;; once per component, and is component-live.
-(!def-vm-support-routine make-nfp-tn ()
+(defun make-nfp-tn ()
   (make-restricted-tn *fixnum-primitive-type* ignore-me-sc-number))
 
-(!def-vm-support-routine make-stack-pointer-tn ()
+(defun make-stack-pointer-tn ()
   (make-normal-tn *fixnum-primitive-type*))
 
-(!def-vm-support-routine make-number-stack-pointer-tn ()
+(defun make-number-stack-pointer-tn ()
   (make-restricted-tn *fixnum-primitive-type* ignore-me-sc-number))
 
 ;;; Return a list of TNs that can be used to represent an unknown-values
 ;;; continuation within a function.
-(!def-vm-support-routine make-unknown-values-locations ()
+(defun make-unknown-values-locations ()
   (list (make-stack-pointer-tn)
         (make-normal-tn *fixnum-primitive-type*)))
 
@@ -87,7 +87,7 @@
 ;;; VM-dependent initialization of the IR2-COMPONENT structure. We
 ;;; push placeholder entries in the CONSTANTS to leave room for
 ;;; additional noise in the code object header.
-(!def-vm-support-routine select-component-format (component)
+(defun select-component-format (component)
   (declare (type component component))
   ;; The 1+ here is because for the x86 the first constant is a
   ;; pointer to a list of fixups, or NIL if the code object has none.

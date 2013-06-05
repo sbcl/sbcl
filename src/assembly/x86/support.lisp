@@ -23,7 +23,7 @@
 ;;; value, which again simplifies the return path.
 ;;;    -- AB, 2006/Feb/05.
 
-(!def-vm-support-routine generate-call-sequence (name style vop)
+(defun generate-call-sequence (name style vop)
   (ecase style
     ((:raw :none)
      (values
@@ -44,7 +44,7 @@
              (emit-label single-value)))))
       '((:save-p :compute-only))))))
 
-(!def-vm-support-routine generate-return-sequence (style)
+(defun generate-return-sequence (style)
   (ecase style
     (:raw
      `(inst ret))

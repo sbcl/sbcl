@@ -295,7 +295,7 @@
 
 ;;; If VALUE can be represented as an immediate constant, then return the
 ;;; appropriate SC number, otherwise return NIL.
-(!def-vm-support-routine immediate-constant-sc (value)
+(defun immediate-constant-sc (value)
   (typecase value
     ((integer 0 0)
      (sc-number-or-lose 'zero))
@@ -313,7 +313,7 @@
     (character
      (sc-number-or-lose 'immediate))))
 
-(!def-vm-support-routine boxed-immediate-sc-p (sc)
+(defun boxed-immediate-sc-p (sc)
   (or (eql sc (sc-number-or-lose 'zero))
       (eql sc (sc-number-or-lose 'null))
       (eql sc (sc-number-or-lose 'immediate))))
@@ -362,7 +362,7 @@
 
 ;;; This function is called by debug output routines that want a pretty name
 ;;; for a TN's location.  It returns a thing that can be printed with PRINC.
-(!def-vm-support-routine location-print-name (tn)
+(defun location-print-name (tn)
   (declare (type tn tn))
   (let ((sb (sb-name (sc-sb (tn-sc tn))))
         (offset (tn-offset tn)))
@@ -375,7 +375,7 @@
       (constant (format nil "Const~D" offset))
       (immediate-constant "Immed"))))
 
-(!def-vm-support-routine combination-implementation-style (node)
+(defun combination-implementation-style (node)
   (declare (type sb!c::combination node) (ignore node))
   (values :default nil))
 

@@ -131,7 +131,7 @@
                 (invoke-alien-type-method :result-tn type state))
             values)))
 
-(!def-vm-support-routine make-call-out-tns (type)
+(defun make-call-out-tns (type)
   (let ((arg-state (make-arg-state)))
     (collect ((arg-tns))
       (dolist (arg-type (alien-fun-type-arg-types type))

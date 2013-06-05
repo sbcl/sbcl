@@ -132,7 +132,7 @@
 
 ;;; Return the most restrictive primitive type that contains OBJECT.
 (/show0 "primtype.lisp 147")
-(!def-vm-support-routine primitive-type-of (object)
+(defun primitive-type-of (object)
   (let ((type (ctype-of object)))
     (cond ((not (member-type-p type)) (primitive-type type))
           ((and (eql 1 (member-type-size type))
@@ -151,7 +151,7 @@
 ;;; We need an aux function because we need to use both
 ;;; !DEF-VM-SUPPORT-ROUTINE and DEFUN-CACHED.
 (/show0 "primtype.lisp 188")
-(!def-vm-support-routine primitive-type (type)
+(defun primitive-type (type)
   (sb!kernel::maybe-reparse-specifier! type)
   (primitive-type-aux type))
 (/show0 "primtype.lisp 191")

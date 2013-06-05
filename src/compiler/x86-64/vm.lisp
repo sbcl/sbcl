@@ -491,7 +491,7 @@
 
 ;;; If value can be represented as an immediate constant, then return
 ;;; the appropriate SC number, otherwise return NIL.
-(!def-vm-support-routine immediate-constant-sc (value)
+(defun immediate-constant-sc (value)
   (typecase value
     ((or (integer #.sb!xc:most-negative-fixnum #.sb!xc:most-positive-fixnum)
          character)
@@ -528,7 +528,7 @@
      #-sb-xc-host simd-pack
      (sc-number-or-lose 'int-sse-immediate))))
 
-(!def-vm-support-routine boxed-immediate-sc-p (sc)
+(defun boxed-immediate-sc-p (sc)
   (eql sc (sc-number-or-lose 'immediate)))
 
 ;;;; miscellaneous function call parameters
@@ -562,7 +562,7 @@
 
 ;;; This function is called by debug output routines that want a pretty name
 ;;; for a TN's location. It returns a thing that can be printed with PRINC.
-(!def-vm-support-routine location-print-name (tn)
+(defun location-print-name (tn)
   (declare (type tn tn))
   (let* ((sc (tn-sc tn))
          (sb (sb-name (sc-sb sc)))
@@ -602,7 +602,7 @@
 
 (def!constant cfp-offset rbp-offset) ; pfw - needed by stuff in /code
 
-(!def-vm-support-routine combination-implementation-style (node)
+(defun combination-implementation-style (node)
   (declare (type sb!c::combination node))
   (flet ((valid-funtype (args result)
            (sb!c::valid-fun-use node

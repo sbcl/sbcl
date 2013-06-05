@@ -15,7 +15,7 @@
 
 ;;; Return a wired TN describing the N'th full call argument passing
 ;;; location.
-(!def-vm-support-routine standard-arg-location (n)
+(defun standard-arg-location (n)
   (declare (type unsigned-byte n))
   (if (< n register-arg-count)
       (make-wired-tn *backend-t-primitive-type*
@@ -29,7 +29,7 @@
 ;;; is true, then use the standard (full call) location, otherwise use
 ;;; any legal location. Even in the non-standard case, this may be
 ;;; restricted by a desire to use a subroutine call instruction.
-(!def-vm-support-routine make-return-pc-passing-location (standard)
+(defun make-return-pc-passing-location (standard)
   (if standard
       (make-wired-tn *backend-t-primitive-type* register-arg-scn lra-offset)
       (make-restricted-tn *backend-t-primitive-type* register-arg-scn)))
@@ -39,7 +39,7 @@
 ;;; standard convention, but is totally unrestricted in non-standard
 ;;; conventions, since we can always fetch it off of the stack using
 ;;; the arg pointer.
-(!def-vm-support-routine make-old-fp-passing-location (standard)
+(defun make-old-fp-passing-location (standard)
   (if standard
       (make-wired-tn *fixnum-primitive-type* immediate-arg-scn ocfp-offset)
       (make-normal-tn *fixnum-primitive-type*)))
@@ -47,13 +47,13 @@
 ;;; These functions make the TNs used to hold Old-FP and Return-PC
 ;;; within the current function. We treat these specially so that the
 ;;; debugger can find them at a known location.
-(!def-vm-support-routine make-old-fp-save-location (env)
+(defun make-old-fp-save-location (env)
   (specify-save-tn
    (physenv-debug-live-tn (make-normal-tn *fixnum-primitive-type*) env)
    (make-wired-tn *fixnum-primitive-type*
                   control-stack-arg-scn
                   ocfp-save-offset)))
-(!def-vm-support-routine make-return-pc-save-location (env)
+(defun make-return-pc-save-location (env)
   (let ((ptype *backend-t-primitive-type*))
     (specify-save-tn
      (physenv-debug-live-tn (make-normal-tn ptype) env)
@@ -62,25 +62,25 @@
 ;;; Make a TN for the standard argument count passing location. We
 ;;; only need to make the standard location, since a count is never
 ;;; passed when we are using non-standard conventions.
-(!def-vm-support-routine make-arg-count-location ()
+(defun make-arg-count-location ()
   (make-wired-tn *fixnum-primitive-type* immediate-arg-scn nargs-offset))
 
 
 ;;; Make a TN to hold the number-stack frame pointer. This is
 ;;; allocated once per component, and is component-live.
-(!def-vm-support-routine make-nfp-tn ()
+(defun make-nfp-tn ()
   (component-live-tn
    (make-wired-tn *fixnum-primitive-type* immediate-arg-scn nfp-offset)))
 
-(!def-vm-support-routine make-stack-pointer-tn ()
+(defun make-stack-pointer-tn ()
   (make-normal-tn *fixnum-primitive-type*))
 
-(!def-vm-support-routine make-number-stack-pointer-tn ()
+(defun make-number-stack-pointer-tn ()
   (make-normal-tn *fixnum-primitive-type*))
 
 ;;; Return a list of TNs that can be used to represent an
 ;;; unknown-values continuation within a function.
-(!def-vm-support-routine make-unknown-values-locations ()
+(defun make-unknown-values-locations ()
   (list (make-stack-pointer-tn)
         (make-normal-tn *fixnum-primitive-type*)))
 
@@ -89,7 +89,7 @@
 ;;; VM-dependent initialization of the IR2-COMPONENT structure. We
 ;;; push placeholder entries in the CONSTANTS to leave room for
 ;;; additional noise in the code object header.
-(!def-vm-support-routine select-component-format (component)
+(defun select-component-format (component)
   (declare (type component component))
   (dotimes (i code-constants-offset)
     (vector-push-extend nil
