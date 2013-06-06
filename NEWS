@@ -1,6 +1,6 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 changes relative to sbcl-1.1.8:
-  * enchancement: disassemble now annotates some previously missing static
+  * enhancement: disassemble now annotates some previously missing static
     functions, like LENGTH.
   * optimization: calls to static functions on x86-64 use less instructions.
   * optimization: compute encode-universal-time at compile time when possible.
@@ -18,6 +18,9 @@ changes relative to sbcl-1.1.8:
     (lp#1184586)
   * bug fix: tests for sb-bsd-sockets no longer use a predefined port for
     listening, allowing several tests to run in parallel.
+  * bug fix: during disassembly to *COMPILER-TRACE-OUTPUT* instruction
+    prefixes as used on x86 and x86-64 no longer sometimes print incorrectly.
+    (lp#1085729)
   
 changes in sbcl-1.1.8 relative to sbcl-1.1.7:
   * notice: The implementation of MAP-ALLOCATED-OBJECTS (the heart of

@@ -1119,6 +1119,33 @@
                         (chooser-size note)))
               (t
                (setf prev remaining)))))))
+
+;;; Replace the SEGMENT-BUFFER of SEGMENT with a vector that contains
+;;; only the valid content of the original buffer, that is, the parts
+;;; not covered by fillers. Set FINAL-INDEX of SEGMENT to the length
+;;; of the new vector and return this length.
+(defun compact-segment-buffer (segment)
+  (let ((buffer (segment-buffer segment))
+        (new-buffer (make-array (segment-final-posn segment)
+                                :element-type 'assembly-unit))
+        (i0 0)
+        (index 0))
+    (declare (type (simple-array assembly-unit 1) buffer)
+             (type index index))
+    (flet ((frob (i0 i1)
+             (when (< i0 i1)
+               (replace new-buffer buffer :start1 index :start2 i0 :end2 i1)
+               (incf index (- i1 i0)))))
+      (dolist (note (segment-annotations segment))
+        (when (filler-p note)
+          (let ((i1 (filler-index note)))
+            (frob i0 i1)
+            (setf i0 (+ i1 (filler-bytes note))))))
+      (frob i0 (segment-final-index segment)))
+    (aver (= index (segment-final-posn segment)))
+    (setf (segment-buffer segment) new-buffer)
+    (setf (segment-final-index segment) (segment-final-posn segment))))
+
 
 ;;;; interface to the rest of the compiler
 
@@ -1326,48 +1353,23 @@
   (compress-output segment)
   (finalize-positions segment)
   (process-back-patches segment)
-  (segment-final-posn segment))
+  (compact-segment-buffer segment))
 
-;;; Call FUNCTION on all the stuff accumulated in SEGMENT. FUNCTION
-;;; should accept a single vector argument. It will be called zero or
-;;; more times on vectors of the appropriate byte type. The
-;;; concatenation of the vector arguments from all the calls is the
-;;; contents of SEGMENT.
-;;;
-;;; KLUDGE: This implementation is sort of slow and gross, calling
-;;; FUNCTION repeatedly and consing a fresh vector for its argument
-;;; each time. It might be possible to make a more efficient version
-;;; by making FINALIZE-SEGMENT do all the compacting currently done by
-;;; this function: then this function could become trivial and fast,
-;;; calling FUNCTION once on the entire compacted segment buffer. --
-;;; WHN 19990322
-(defun on-segment-contents-vectorly (segment function)
-  (declare (type function function))
-  (let ((buffer (segment-buffer segment))
-        (i0 0))
-    (declare (type (simple-array (unsigned-byte 8)) buffer))
-    (flet ((frob (i0 i1)
-             (when (< i0 i1)
-               (funcall function (subseq buffer i0 i1)))))
-      (dolist (note (segment-annotations segment))
-        (when (filler-p note)
-          (let ((i1 (filler-index note)))
-            (frob i0 i1)
-            (setf i0 (+ i1 (filler-bytes note))))))
-      (frob i0 (segment-final-index segment))))
-  (values))
+;;; Return the contents of SEGMENT as a vector. We assume SEGMENT has
+;;; been finalized so that we can simply return its buffer.
+(defun segment-contents-as-vector (segment)
+  (declare (type segment segment))
+  (aver (= (segment-final-index segment) (segment-final-posn segment)))
+  (segment-buffer segment))
 
 ;;; Write the code accumulated in SEGMENT to STREAM, and return the
-;;; number of bytes written.
+;;; number of bytes written. We assume that SEGMENT has been finalized.
 (defun write-segment-contents (segment stream)
-  (let ((result 0))
-    (declare (type index result))
-    (on-segment-contents-vectorly segment
-                                  (lambda (v)
-                                    (declare (type (vector assembly-unit) v))
-                                    (incf result (length v))
-                                    (write-sequence v stream)))
-    result))
+  (declare (type segment segment))
+  (let ((v (segment-contents-as-vector segment)))
+    (declare (type (simple-array assembly-unit 1) v))
+    (length (write-sequence v stream))))
+
 
 ;;;; interface to the instruction set definition
 
