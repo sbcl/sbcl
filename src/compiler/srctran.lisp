@@ -3113,6 +3113,24 @@
               (cut-to-width x kind w t)
               nil                ; After fixing above, replace with T.
               )))))))
+
+(defoptimizer (logior optimizer) ((x y) node)
+  (let ((result-type (single-value-type (node-derived-type node))))
+    (multiple-value-bind (low high)
+        (integer-type-numeric-bounds result-type)
+      (when (and (numberp low)
+                 (numberp high)
+                 (<= high 0))
+        (let ((width (integer-length low)))
+          (multiple-value-bind (w kind)
+              (best-modular-version (1+ width) t)
+            (when w
+              ;; FIXME: see comment in LOGAND optimizer
+              (let ((xact (cut-to-width x kind w t))
+                    (yact (cut-to-width y kind w t)))
+                (declare (ignore xact yact))
+                nil) ; After fixing above, replace with T
+              )))))))
 
 ;;; miscellanous numeric transforms
 
