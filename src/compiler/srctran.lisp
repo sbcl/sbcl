@@ -3401,14 +3401,17 @@
   (def logxor -1 (lognot x))
   (def logxor 0 x))
 
+(defun least-zero-bit (x)
+  (and (/= x -1)
+       (1- (integer-length (logxor x (1+ x))))))
+
 (deftransform logand ((x y) (* (constant-arg t)) *)
   "fold identity operation"
-  (let ((y (lvar-value y)))
-    (unless (and (plusp y)
-                 (= y (1- (ash 1 (integer-length y)))))
-      (give-up-ir1-transform))
-    (unless (csubtypep (lvar-type x)
-                       (specifier-type `(integer 0 ,y)))
+  (let* ((y (lvar-value y))
+         (width (or (least-zero-bit y) '*)))
+    (unless (and (neq width 0) ; (logand x 0) handled elsewhere
+                 (csubtypep (lvar-type x)
+                            (specifier-type `(unsigned-byte ,width))))
       (give-up-ir1-transform))
     'x))
 
@@ -3416,6 +3419,16 @@
   "fold identity operation"
   (let ((size (lvar-value size)))
     (unless (csubtypep (lvar-type x) (specifier-type `(signed-byte ,size)))
+      (give-up-ir1-transform))
+    'x))
+
+(deftransform logior ((x y) (* (constant-arg t)) *)
+  "fold identity operation"
+  (let* ((y (lvar-value y))
+         (width (or (least-zero-bit (lognot y))
+                    (give-up-ir1-transform)))) ; (logior x 0) handled elsewhere
+    (unless (csubtypep (lvar-type x)
+                       (specifier-type `(integer ,(- (ash 1 width)) -1)))
       (give-up-ir1-transform))
     'x))
 

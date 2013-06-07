@@ -608,3 +608,23 @@
                                         (the (integer 21371810342718833225 21371810343571293860) b))))
                 16779072918521075607 21371810342718833263)
                2923729245085762055)))
+
+(with-test (:name :complicated-logand-identity)
+  (loop for k from -8 upto 8 do
+    (loop for min from -16 upto 16 do
+      (loop for max from min upto 16 do
+        (let ((f (compile nil `(lambda (x)
+                                 (declare (type (integer ,min ,max) x))
+                                 (logand x ,k)))))
+          (loop for x from min upto max do
+            (assert (eql (logand x k) (funcall f x)))))))))
+
+(with-test (:name :complicated-logior-identity)
+  (loop for k from -8 upto 8 do
+    (loop for min from -16 upto 16 do
+      (loop for max from min upto 16 do
+        (let ((f (compile nil `(lambda (x)
+                                 (declare (type (integer ,min ,max) x))
+                                 (logior x ,k)))))
+          (loop for x from min upto max do
+            (assert (eql (logior x k) (funcall f x)))))))))
