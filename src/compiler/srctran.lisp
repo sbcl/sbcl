@@ -3052,53 +3052,67 @@
           (return-from best-modular-version
             (values (car ugt) :untagged (cdr ugt))))))))
 
+(defun integer-type-numeric-bounds (type)
+  (typecase type
+    (numeric-type (values (numeric-type-low type)
+                          (numeric-type-high type)))
+    (union-type
+     (let ((low  nil)
+           (high nil))
+       (dolist (type (union-type-types type) (values low high))
+         (unless (and (numeric-type-p type)
+                      (eql (numeric-type-class type) 'integer))
+           (return (values nil nil)))
+         (let ((this-low (numeric-type-low type))
+               (this-high (numeric-type-high type)))
+           (setf low  (min this-low  (or low  this-low))
+                 high (max this-high (or high this-high)))))))))
+
 (defoptimizer (logand optimizer) ((x y) node)
   (let ((result-type (single-value-type (node-derived-type node))))
-    (when (numeric-type-p result-type)
-      (let ((low (numeric-type-low result-type))
-            (high (numeric-type-high result-type)))
-        (when (and (numberp low)
-                   (numberp high)
-                   (>= low 0))
-          (let ((width (integer-length high)))
-            (multiple-value-bind (w kind signedp)
-                (best-modular-version width nil)
-              (when w
-                ;; FIXME: This should be (CUT-TO-WIDTH NODE KIND WIDTH SIGNEDP).
-                ;;
-                ;; FIXME: I think the FIXME (which is from APD) above
-                ;; implies that CUT-TO-WIDTH should do /everything/
-                ;; that's required, including reoptimizing things
-                ;; itself that it knows are necessary.  At the moment,
-                ;; CUT-TO-WIDTH sets up some new calls with
-                ;; combination-type :FULL, which later get noticed as
-                ;; known functions and properly converted.
-                ;;
-                ;; We cut to W not WIDTH if SIGNEDP is true, because
-                ;; signed constant replacement needs to know which bit
-                ;; in the field is the signed bit.
-                (let ((xact (cut-to-width x kind (if signedp w width) signedp))
-                      (yact (cut-to-width y kind (if signedp w width) signedp)))
-                  (declare (ignore xact yact))
-                  nil) ; After fixing above, replace with T, meaning
-                       ; "don't reoptimize this (LOGAND) node any more".
-                ))))))))
+    (multiple-value-bind (low high)
+        (integer-type-numeric-bounds result-type)
+      (when (and (numberp low)
+                 (numberp high)
+                 (>= low 0))
+        (let ((width (integer-length high)))
+          (multiple-value-bind (w kind signedp)
+              (best-modular-version width nil)
+            (when w
+              ;; FIXME: This should be (CUT-TO-WIDTH NODE KIND WIDTH SIGNEDP).
+              ;;
+              ;; FIXME: I think the FIXME (which is from APD) above
+              ;; implies that CUT-TO-WIDTH should do /everything/
+              ;; that's required, including reoptimizing things
+              ;; itself that it knows are necessary.  At the moment,
+              ;; CUT-TO-WIDTH sets up some new calls with
+              ;; combination-type :FULL, which later get noticed as
+              ;; known functions and properly converted.
+              ;;
+              ;; We cut to W not WIDTH if SIGNEDP is true, because
+              ;; signed constant replacement needs to know which bit
+              ;; in the field is the signed bit.
+              (let ((xact (cut-to-width x kind (if signedp w width) signedp))
+                    (yact (cut-to-width y kind (if signedp w width) signedp)))
+                (declare (ignore xact yact))
+                nil) ; After fixing above, replace with T, meaning
+                                        ; "don't reoptimize this (LOGAND) node any more".
+              )))))))
 
 (defoptimizer (mask-signed-field optimizer) ((width x) node)
   (let ((result-type (single-value-type (node-derived-type node))))
-    (when (numeric-type-p result-type)
-      (let ((low (numeric-type-low result-type))
-            (high (numeric-type-high result-type)))
-        (when (and (numberp low) (numberp high))
-          (let ((width (max (integer-length high) (integer-length low))))
-            (multiple-value-bind (w kind)
-                (best-modular-version (1+ width) t)
-              (when w
-                ;; FIXME: This should be (CUT-TO-WIDTH NODE KIND W T).
-                ;; [ see comment above in LOGAND optimizer ]
-                (cut-to-width x kind w t)
-                nil ; After fixing above, replace with T.
-                ))))))))
+    (multiple-value-bind (low high)
+        (integer-type-numeric-bounds result-type)
+      (when (and (numberp low) (numberp high))
+        (let ((width (max (integer-length high) (integer-length low))))
+          (multiple-value-bind (w kind)
+              (best-modular-version (1+ width) t)
+            (when w
+              ;; FIXME: This should be (CUT-TO-WIDTH NODE KIND W T).
+              ;; [ see comment above in LOGAND optimizer ]
+              (cut-to-width x kind w t)
+              nil                ; After fixing above, replace with T.
+              )))))))
 
 ;;; miscellanous numeric transforms
 

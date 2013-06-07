@@ -9,6 +9,8 @@ changes relative to sbcl-1.1.8:
   * optimization: SLEEP doesn't cons on non-immediate floats and on ratios.
   * optimization: (mod fixnum) type-checks are performed using one unsigned
     comparison, instead of two.
+  * optimization: enable more modular arithmetic transforms in the presence of
+    conditionals.
   * bug fix: problems with NCONC type derivation (reported by Jerry James).
   * bug fix: EXPT type derivation no longer constructs bogus floating-point
     types.  (reported by Vsevolod Dyomkin)
