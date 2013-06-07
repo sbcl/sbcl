@@ -21,6 +21,7 @@ changes relative to sbcl-1.1.8:
   * bug fix: during disassembly to *COMPILER-TRACE-OUTPUT* instruction
     prefixes as used on x86 and x86-64 no longer sometimes print incorrectly.
     (lp#1085729)
+  * bug fix: Specialised SIMD-PACK types can be negated.
   
 changes in sbcl-1.1.8 relative to sbcl-1.1.7:
   * notice: The implementation of MAP-ALLOCATED-OBJECTS (the heart of

@@ -3510,7 +3510,7 @@ used for a COMPLEX component.~:@>"
                                       (simd-pack-type-element-type type)))
            (not-simd-pack (make-negation-type :type (specifier-type 'simd-pack))))
        (if remaining
-           (type-union2 not-simd-pack (%make-simd-pack-type remaining))
+           (type-union not-simd-pack (%make-simd-pack-type remaining))
            not-simd-pack)))
 
   (!define-type-method (simd-pack :unparse) (type)
