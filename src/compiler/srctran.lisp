@@ -2910,9 +2910,47 @@
                (setf (node-reoptimize node) t)
                (setf (block-reoptimize (node-block node)) t)
                (reoptimize-component (node-component node) :maybe))
+             (insert-lvar-cut (lvar)
+               "Insert a LOGAND/MASK-SIGNED-FIELD to cut the value of LVAR
+                to the required bit width. Returns T if any change was made.
+
+                When the destination of LVAR will definitely cut LVAR's value
+                to width (i.e. it's a logand or mask-signed-field with constant
+                other argument), do nothing. Otherwise, splice LOGAND/M-S-F in."
+               (binding* ((dest (lvar-dest lvar) :exit-if-null)
+                          (nil  (combination-p dest) :exit-if-null)
+                          (name (lvar-fun-name (combination-fun dest) t))
+                          (args (combination-args dest)))
+                 (case name
+                   (logand
+                    (when (= 2 (length args))
+                      (let ((other (if (eql (first args) lvar)
+                                       (second args)
+                                       (first args))))
+                        (when (and (constant-lvar-p other)
+                                   (ctypep (lvar-value other) type)
+                                   (not signedp))
+                          (return-from insert-lvar-cut)))))
+                   (mask-signed-field
+                    (when (and signedp
+                               (eql lvar (second args))
+                               (constant-lvar-p (first args))
+                               (<= (lvar-value (first args)) width))
+                      (return-from insert-lvar-cut)))))
+               (filter-lvar lvar
+                            (if signedp
+                                `(mask-signed-field ,width 'dummy)
+                                `(logand 'dummy ,(ldb (byte width 0) -1))))
+               (do-uses (node lvar)
+                 (setf (block-reoptimize (node-block node)) t)
+                 (reoptimize-component (node-component node) :maybe))
+               t)
              (cut-node (node &aux did-something)
+               "Try to cut a node to width. The primary return value is
+                whether we managed to cut (cleverly), and the second whether
+                anything was changed."
                (when (block-delete-p (node-block node))
-                 (return-from cut-node))
+                 (return-from cut-node (values t nil)))
                (typecase node
                  (ref
                   (typecase (ref-leaf node)
@@ -2921,39 +2959,18 @@
                             (new-value (if signedp
                                            (mask-signed-field width constant-value)
                                            (ldb (byte width 0) constant-value))))
-                       (unless (= constant-value new-value)
-                         (change-ref-leaf node (make-constant new-value)
-                                          :recklessly t)
-                         (let ((lvar (node-lvar node)))
-                           (setf (lvar-%derived-type lvar)
-                                 (and (lvar-has-single-use-p lvar)
-                                      (make-values-type :required (list (ctype-of new-value))))))
-                         (setf (block-reoptimize (node-block node)) t)
-                         (reoptimize-component (node-component node) :maybe)
-                         t)))
-                    (lambda-var
-                     (binding* ((dest (lvar-dest lvar) :exit-if-null)
-                                (nil  (combination-p dest) :exit-if-null)
-                                (name (lvar-fun-name (combination-fun dest))))
-                       ;; we're about to insert an m-s-f/logand between a ref to
-                       ;; a variable and another m-s-f/logand. No point in doing
-                       ;; that; the parent m-s-f/logand was already cut to width
-                       ;; anyway.
-                       (unless (or (cond (signedp
-                                          (and (eql name 'mask-signed-field)
-                                               (eql lvar (second
-                                                          (combination-args
-                                                           dest)))))
-                                         (t
-                                          (eql name 'logand)))
-                                   (csubtypep (lvar-type lvar) type))
-                         (filter-lvar lvar
-                                      (if signedp
-                                          `(mask-signed-field ,width 'dummy)
-                                          `(logand 'dummy ,(ldb (byte width 0) -1))))
-                         (setf (block-reoptimize (node-block node)) t)
-                         (reoptimize-component (node-component node) :maybe)
-                         t)))))
+                       (cond ((= constant-value new-value)
+                              (values t nil)) ; we knew what to do and did nothing
+                             (t
+                              (change-ref-leaf node (make-constant new-value)
+                                               :recklessly t)
+                              (let ((lvar (node-lvar node)))
+                                (setf (lvar-%derived-type lvar)
+                                      (and (lvar-has-single-use-p lvar)
+                                           (make-values-type :required (list (ctype-of new-value))))))
+                              (setf (block-reoptimize (node-block node)) t)
+                              (reoptimize-component (node-component node) :maybe)
+                              (values t t)))))))
                  (combination
                   (when (eq (basic-combination-kind node) :known)
                     (let* ((fun-ref (lvar-use (combination-fun node)))
@@ -2984,11 +3001,30 @@
                                 (setq did-something t))))
                           (when did-something
                             (reoptimize-node node name))
-                          did-something)))))))
-             (cut-lvar (lvar &aux did-something)
+                          (values t did-something))))))))
+             (cut-lvar (lvar &aux did-something must-insert)
+               "Cut all the LVAR's use nodes. If any of them wasn't handled
+                and its type is too wide for the operation we wish to perform
+                insert an explicit bit-width narrowing operation (LOGAND or
+                MASK-SIGNED-FIELD) between the LVAR (*) and its destination.
+                The narrowing operation might not be inserted if the LVAR's
+                destination is already such an operation, to avoid endless
+                recursion.
+
+                (*) We can't easily do that for each node, and doing so might
+                result in code bloat, anyway. (I'm also not sure it would be
+                correct for complicated C/D FG)"
                (do-uses (node lvar)
-                 (when (cut-node node)
-                   (setq did-something t)))
+                 (multiple-value-bind (handled any-change)
+                     (cut-node node)
+                   (setf did-something (or did-something any-change)
+                         must-insert (or must-insert
+                                         (not (or handled
+                                                  (csubtypep (single-value-type
+                                                              (node-derived-type node))
+                                                             type)))))))
+               (when must-insert
+                 (setf did-something (or (insert-lvar-cut lvar) did-something)))
                did-something))
       (cut-lvar lvar))))
 

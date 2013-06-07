@@ -22,6 +22,8 @@ changes relative to sbcl-1.1.8:
     prefixes as used on x86 and x86-64 no longer sometimes print incorrectly.
     (lp#1085729)
   * bug fix: Specialised SIMD-PACK types can be negated.
+  * bug fix: Modular arithmetic is more robust. (incidentally fixes another bug
+    reported by Eric Marsden)
   
 changes in sbcl-1.1.8 relative to sbcl-1.1.7:
   * notice: The implementation of MAP-ALLOCATED-OBJECTS (the heart of

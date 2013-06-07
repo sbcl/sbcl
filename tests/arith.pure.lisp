@@ -598,3 +598,13 @@
                             (logand 8459622733968096971 x)))
                 12417237222845306758)
                2612793697039849090)))
+
+;; Also reported by Eric Marsden on sbcl-devel (2013-06-06)
+(with-test (:name :more-recursive-cut-to-width)
+  (assert (eql (funcall
+                (compile nil `(lambda (a b)
+                                (declare (optimize (speed 2) (safety 0)))
+                                (logand (the (eql 16779072918521075607) a)
+                                        (the (integer 21371810342718833225 21371810343571293860) b))))
+                16779072918521075607 21371810342718833263)
+               2923729245085762055)))
