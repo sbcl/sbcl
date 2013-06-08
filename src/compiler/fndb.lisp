@@ -1472,9 +1472,9 @@
 (defknown %check-bound (array index fixnum) index
   (movable foldable flushable dx-safe))
 (defknown data-vector-ref (simple-array index) t
-  (foldable explicit-check always-translatable))
+  (foldable unsafely-flushable explicit-check always-translatable))
 (defknown data-vector-ref-with-offset (simple-array index fixnum) t
-  (foldable explicit-check always-translatable))
+  (foldable unsafely-flushable explicit-check always-translatable))
 (defknown data-vector-set (array index t) t
   (explicit-check always-translatable))
 (defknown data-vector-set-with-offset (array index fixnum t) t
