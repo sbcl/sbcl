@@ -526,6 +526,13 @@ Examples:
         (return))
       (incf loop-count)))
 
+  (when *check-consistency*
+    (do-blocks-backwards (block component)
+      (awhen (flush-dead-code block)
+        (let ((*compiler-error-context* it))
+          (compiler-warn "dead code detected at the end of ~S"
+                         'ir1-phases)))))
+
   (ir1-finalize component)
   (values))
 
