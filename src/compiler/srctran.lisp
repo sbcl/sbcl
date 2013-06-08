@@ -2771,8 +2771,13 @@
   (defun %ash/right (integer amount)
     (ash integer (- amount)))
 
-  (deftransform ash ((integer amount) (sb!vm:signed-word (integer * 0)))
+  (deftransform ash ((integer amount))
     "Convert ASH of signed word to %ASH/RIGHT"
+    (unless (and (csubtypep (lvar-type integer) ; do that ourselves to avoid
+                            (specifier-type 'sb!vm:signed-word)) ; optimization
+                 (csubtypep (lvar-type amount)  ; notes.
+                            (specifier-type '(integer * 0))))
+      (give-up-ir1-transform))
     (when (constant-lvar-p amount)
       (give-up-ir1-transform))
     (let ((use (lvar-uses amount)))
@@ -2789,8 +2794,13 @@
                                       ,(1- sb!vm:n-word-bits)
                                       (- amount)))))))
 
-  (deftransform ash ((integer amount) (word (integer * 0)))
+  (deftransform ash ((integer amount))
     "Convert ASH of word to %ASH/RIGHT"
+    (unless (and (csubtypep (lvar-type integer)
+                            (specifier-type 'sb!vm:word))
+                 (csubtypep (lvar-type amount)
+                            (specifier-type '(integer * 0))))
+      (give-up-ir1-transform))
     (when (constant-lvar-p amount)
       (give-up-ir1-transform))
     (let ((use (lvar-uses amount)))
