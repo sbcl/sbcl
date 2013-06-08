@@ -14,6 +14,9 @@ changes relative to sbcl-1.1.8:
   * optimization: bitwise OR forms can now trigger modular arithmetic as well,
     when the result is known to be negative.
   * optimization: recognize more cases of useless LOGAND/LOGIOR with constants.
+  * optimization: comparisons between rationals and constant floats or between
+    integers and constant ratios are now converted to rationals/integers at
+    compile time.
   * bug fix: problems with NCONC type derivation (reported by Jerry James).
   * bug fix: EXPT type derivation no longer constructs bogus floating-point
     types.  (reported by Vsevolod Dyomkin)

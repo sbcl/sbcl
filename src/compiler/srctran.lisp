@@ -4032,6 +4032,48 @@
         `(values (the real ,arg0))
         `(let ((minrest (min ,@rest)))
           (if (<= ,arg0 minrest) ,arg0 minrest)))))
+
+;;; Simplify some cross-type comparisons
+(macrolet ((def (comparator round)
+             `(progn
+                (deftransform ,comparator
+                    ((x y) (rational (constant-arg float)))
+                  "open-code RATIONAL to FLOAT comparison"
+                  (let ((y (lvar-value y)))
+                    #-sb-xc-host
+                    (when (or (float-nan-p y)
+                              (float-infinity-p y))
+                      (give-up-ir1-transform))
+                    (setf y (rational y))
+                    `(,',comparator
+                      x ,(if (csubtypep (lvar-type x)
+                                        (specifier-type 'integer))
+                             (,round y)
+                             y))))
+                (deftransform ,comparator
+                    ((x y) (integer (constant-arg ratio)))
+                  "open-code INTEGER to RATIO comparison"
+                  `(,',comparator x ,(,round (lvar-value y)))))))
+  (def < ceiling)
+  (def > floor))
+
+(deftransform = ((x y) (rational (constant-arg float)))
+  "open-code RATIONAL to FLOAT comparison"
+  (let ((y (lvar-value y)))
+    #-sb-xc-host
+    (when (or (float-nan-p y)
+              (float-infinity-p y))
+      (give-up-ir1-transform))
+    (setf y (rational y))
+    (if (and (csubtypep (lvar-type x)
+                        (specifier-type 'integer))
+             (ratiop y))
+        nil
+        `(= x ,y))))
+
+(deftransform = ((x y) (integer (constant-arg ratio)))
+  "constant-fold INTEGER to RATIO comparison"
+  nil)
 
 ;;;; converting N-arg arithmetic functions
 ;;;;
