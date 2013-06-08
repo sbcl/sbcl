@@ -1795,9 +1795,6 @@
 
 (defoptimizer (mask-signed-field ir2-convert) ((width x) node block)
   (block nil
-    (when (template-p (basic-combination-info node))
-      (ir2-convert-template node block)
-      (return))
     (when (constant-lvar-p width)
       (case (lvar-value width)
         (#.(- sb!vm:n-word-bits sb!vm:n-fixnum-tag-bits)
@@ -1834,7 +1831,9 @@
                   temp (first results))
              (move-lvar-result node block results lvar)
              (return))))))
-    (ir2-convert-full-call node block)))
+    (if (template-p (basic-combination-info node))
+        (ir2-convert-template node block)
+        (ir2-convert-full-call node block))))
 
 ;;; Convert the code in a component into VOPs.
 (defun ir2-convert (component)
