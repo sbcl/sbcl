@@ -1795,6 +1795,9 @@
 
 (defoptimizer (mask-signed-field ir2-convert) ((width x) node block)
   (block nil
+    (when (template-p (basic-combination-info node))
+      (ir2-convert-template node block)
+      (return))
     (when (constant-lvar-p width)
       (case (lvar-value width)
         (#.(- sb!vm:n-word-bits sb!vm:n-fixnum-tag-bits)
