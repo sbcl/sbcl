@@ -16,8 +16,8 @@
 ;;;; We represent the place where some value is stored with a SC-OFFSET,
 ;;;; which is the SC number and offset encoded as an integer.
 
-(defconstant-eqx sc-offset-scn-byte (byte 5 0) #'equalp)
-(defconstant-eqx sc-offset-offset-byte (byte 22 5) #'equalp)
+(defconstant-eqx sc-offset-scn-byte (byte 6 0) #'equalp)
+(defconstant-eqx sc-offset-offset-byte (byte 21 6) #'equalp)
 (def!type sc-offset () '(unsigned-byte 27))
 
 (defmacro make-sc-offset (scn offset)
