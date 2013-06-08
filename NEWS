@@ -32,6 +32,8 @@ changes relative to sbcl-1.1.8:
   * bug fix: Specialised SIMD-PACK types can be negated.
   * bug fix: Modular arithmetic is more robust. (incidentally fixes another bug
     reported by Eric Marsden)
+  * bug fix: FP return values from foreign calls are always rounded to single
+    or double float precision on x87.
   
 changes in sbcl-1.1.8 relative to sbcl-1.1.7:
   * notice: The implementation of MAP-ALLOCATED-OBJECTS (the heart of

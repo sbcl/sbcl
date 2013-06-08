@@ -252,6 +252,21 @@
   (:generator 2
    (inst mov res (make-fixup foreign-symbol :foreign-dataref))))
 
+(defun force-x87-to-mem (tn fp-temp)
+  (aver (location= tn fr0-tn))
+  (sc-case tn
+    (single-reg
+     (let ((ea (ea-for-sf-stack fp-temp)))
+       (inst fstp ea)
+       (inst fld ea)))
+    (double-reg
+     (let ((ea (ea-for-df-stack fp-temp)))
+       (inst fstpd ea)
+       (inst fldd ea)))
+    #!+long-float
+    (long-reg  ; nothing to do!
+     )))
+
 (define-vop (call-out)
   (:args (function :scs (sap-reg))
          (args :more t))
@@ -262,6 +277,7 @@
                    :from :eval :to :result) ecx)
   (:temporary (:sc unsigned-reg :offset edx-offset
                    :from :eval :to :result) edx)
+  (:temporary (:sc double-stack) fp-temp)
   #!+sb-safepoint (:temporary (:sc unsigned-reg :offset esi-offset) esi)
   #!+sb-safepoint (:temporary (:sc unsigned-reg :offset edi-offset) edi)
   #!-sb-safepoint (:node-var node)
@@ -281,7 +297,10 @@
             ;; sufficiently motivated maintainer.
             #!-sb-safepoint (policy node (> space speed)))
            (move eax function)
-           (inst call (make-fixup "call_into_c" :foreign)))
+           (inst call (make-fixup "call_into_c" :foreign))
+           (when (and results
+                      (location= (tn-ref-tn results) fr0-tn))
+             (force-x87-to-mem (tn-ref-tn results) fp-temp)))
           (t
            ;; Setup the NPX for C; all the FP registers need to be
            ;; empty; pop them all.
@@ -300,12 +319,13 @@
            (dotimes (i 7)
              (inst fldz))
 
-           (if (and results
-                    (location= (tn-ref-tn results) fr0-tn))
-               ;; The return result is in fr0.
-               (inst fxch fr7-tn)       ; move the result back to fr0
-               (inst fldz))             ; insure no regs are empty
-           ))))
+           (cond ((and results
+                       (location= (tn-ref-tn results) fr0-tn))
+                  ;; The return result is in fr0.
+                  (inst fxch fr7-tn)       ; move the result back to fr0
+                  (force-x87-to-mem (tn-ref-tn results) fp-temp))
+                 (t ; ensure no regs are empty
+                  (inst fldz)))))))
 
 ;;; While SBCL uses the FPU in 53-bit mode, most C libraries assume that
 ;;; the FPU is in 64-bit mode. So we change the FPU mode to 64-bit with
