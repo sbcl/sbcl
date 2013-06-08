@@ -34,7 +34,9 @@ changes relative to sbcl-1.1.8:
     reported by Eric Marsden)
   * bug fix: FP return values from foreign calls are always rounded to single
     or double float precision on x87.
-  
+  * bug fix: Known-safe vector access on x86oids should not fail spuriously
+    when the index is of the form (+ x constant-positive-integer).
+
 changes in sbcl-1.1.8 relative to sbcl-1.1.7:
   * notice: The implementation of MAP-ALLOCATED-OBJECTS (the heart of
     ROOM, plus a few SB-INTROSPECT functions) has been completely

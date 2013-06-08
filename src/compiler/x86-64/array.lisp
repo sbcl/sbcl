@@ -353,7 +353,7 @@
      (:args (object :scs (descriptor-reg))
             (index :scs (any-reg)))
      (:info offset)
-     (:arg-types simple-array-single-float positive-fixnum
+     (:arg-types simple-array-single-float tagged-num
                  (:constant (constant-displacement other-pointer-lowtag
                                                    4 vector-data-offset)))
      ,@(when use-temp '((:temporary (:sc unsigned-reg) dword-index)))
@@ -391,7 +391,7 @@
             (index :scs (any-reg))
             (value :scs (single-reg) :target result))
      (:info offset)
-     (:arg-types simple-array-single-float positive-fixnum
+     (:arg-types simple-array-single-float tagged-num
                  (:constant (constant-displacement other-pointer-lowtag
                                                    4 vector-data-offset))
                   single-float)
@@ -431,7 +431,7 @@
   (:args (object :scs (descriptor-reg))
          (index :scs (any-reg)))
   (:info offset)
-  (:arg-types simple-array-double-float positive-fixnum
+  (:arg-types simple-array-double-float tagged-num
               (:constant (constant-displacement other-pointer-lowtag
                                                 8 vector-data-offset)))
   (:results (value :scs (double-reg)))
@@ -462,7 +462,7 @@
          (index :scs (any-reg))
          (value :scs (double-reg) :target result))
   (:info offset)
-  (:arg-types simple-array-double-float positive-fixnum
+  (:arg-types simple-array-double-float tagged-num
               (:constant (constant-displacement other-pointer-lowtag
                                                 8 vector-data-offset))
               double-float)
@@ -501,7 +501,7 @@
   (:args (object :scs (descriptor-reg))
          (index :scs (any-reg)))
   (:info offset)
-  (:arg-types simple-array-complex-single-float positive-fixnum
+  (:arg-types simple-array-complex-single-float tagged-num
               (:constant (constant-displacement other-pointer-lowtag
                                                 8 vector-data-offset)))
   (:results (value :scs (complex-single-reg)))
@@ -532,7 +532,7 @@
          (index :scs (any-reg))
          (value :scs (complex-single-reg) :target result))
   (:info offset)
-  (:arg-types simple-array-complex-single-float positive-fixnum
+  (:arg-types simple-array-complex-single-float tagged-num
               (:constant (constant-displacement other-pointer-lowtag
                                                 8 vector-data-offset))
               complex-single-float)
@@ -568,7 +568,7 @@
   (:args (object :scs (descriptor-reg))
          (index :scs (any-reg)))
   (:info offset)
-  (:arg-types simple-array-complex-double-float positive-fixnum
+  (:arg-types simple-array-complex-double-float tagged-num
               (:constant (constant-displacement other-pointer-lowtag
                                                 16 vector-data-offset)))
   (:results (value :scs (complex-double-reg)))
@@ -599,7 +599,7 @@
          (index :scs (any-reg))
          (value :scs (complex-double-reg) :target result))
   (:info offset)
-  (:arg-types simple-array-complex-double-float positive-fixnum
+  (:arg-types simple-array-complex-double-float tagged-num
               (:constant (constant-displacement other-pointer-lowtag
                                                 16 vector-data-offset))
               complex-double-float)
@@ -640,7 +640,7 @@
     (multiple-value-bind (index-sc scale)
         (if (>= n-bytes (ash 1 n-fixnum-tag-bits))
             (values 'any-reg (ash n-bytes (- n-fixnum-tag-bits)))
-            (values 'unsigned-reg n-bytes))
+            (values 'signed-reg n-bytes))
       `(progn
          (define-vop (,(symbolicate "DATA-VECTOR-REF-WITH-OFFSET/" ptype))
            (:translate data-vector-ref-with-offset)
@@ -648,7 +648,7 @@
            (:args (object :scs (descriptor-reg))
                   (index :scs (,index-sc)))
            (:info offset)
-           (:arg-types ,ptype positive-fixnum
+           (:arg-types ,ptype tagged-num
                        (:constant (constant-displacement other-pointer-lowtag
                                                          ,n-bytes vector-data-offset)))
            (:results (value :scs ,scs))
@@ -683,7 +683,7 @@
                   (index :scs (,index-sc) :to (:eval 0))
                   (value :scs ,scs :target result))
            (:info offset)
-           (:arg-types ,ptype positive-fixnum
+           (:arg-types ,ptype tagged-num
                        (:constant (constant-displacement other-pointer-lowtag
                                                          ,n-bytes vector-data-offset))
                        ,type)
