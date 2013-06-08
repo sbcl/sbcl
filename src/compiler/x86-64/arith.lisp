@@ -1891,6 +1891,27 @@ constant shift greater than word length")))
     (move ecx count)
     (inst shl result :cl)))
 
+(define-vop (logand-bignum/c)
+  (:translate logand)
+  (:policy :fast-safe)
+  (:args (x :scs (descriptor-reg)))
+  (:arg-types bignum (:constant word))
+  (:results (r :scs (unsigned-reg)))
+  (:info mask)
+  (:result-types unsigned-num)
+  (:generator 4
+    (let ((mask (constantize mask)))
+      (cond ((or (integerp mask)
+                 (location= x r))
+             (loadw r x bignum-digits-offset other-pointer-lowtag)
+             (unless (eql mask -1)
+               (inst and r mask)))
+            (t
+             (inst mov r mask)
+             (inst and r (make-ea-for-object-slot x
+                                                  bignum-digits-offset
+                                                  other-pointer-lowtag)))))))
+
 ;; Specialised mask-signed-field VOPs.
 (define-vop (mask-signed-field-word/c)
   (:translate sb!c::mask-signed-field)
