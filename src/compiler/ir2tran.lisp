@@ -1897,9 +1897,13 @@
 
 ;;; If necessary, emit a terminal unconditional branch to go to the
 ;;; successor block. If the successor is the component tail, then
-;;; there isn't really any successor, but if the end is an unknown,
-;;; non-tail call, then we emit an error trap just in case the
-;;; function really does return.
+;;; there isn't really any successor, but if the end is a non-tail
+;;; call to a function that's not *known* to never return, then we
+;;; emit an error trap just in case the function really does return.
+;;;
+;;; Trapping after known calls makes it easier to understand type
+;;; derivation bugs at runtime: they show up as nil-fun-returned-error,
+;;; rather than the execution of arbitrary code or error traps.
 (defun finish-ir2-block (block)
   (declare (type cblock block))
   (let* ((2block (block-info block))
@@ -1910,15 +1914,20 @@
       (let ((target (first succ)))
         (cond ((eq target (component-tail (block-component block)))
                (when (and (basic-combination-p last)
-                          (eq (basic-combination-kind last) :full))
+                          (or (eq (basic-combination-kind last) :full)
+                              (and (eq (basic-combination-kind last) :known)
+                                   (eq (basic-combination-info last) :full))))
                  (let* ((fun (basic-combination-fun last))
                         (use (lvar-uses fun))
                         (name (and (ref-p use)
                                    (leaf-has-source-name-p (ref-leaf use))
-                                   (leaf-source-name (ref-leaf use)))))
+                                   (leaf-source-name (ref-leaf use))))
+                        (ftype (and (info :function :info name) ; only use the FTYPE if
+                                    (info :function :type name)))) ; NAME was DEFKNOWN
                    (unless (or (node-tail-p last)
-                               (info :function :info name)
-                               (policy last (zerop safety)))
+                               (policy last (zerop safety))
+                               (and (fun-type-p ftype)
+                                    (eq *empty-type* (fun-type-returns ftype))))
                      (vop nil-fun-returned-error last 2block
                           (if name
                               (emit-constant name)
