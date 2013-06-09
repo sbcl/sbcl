@@ -16,8 +16,12 @@ typedef int sigset_t;
 
 /* 0 - Misc */
 
+#ifndef SIG_IGN
 #define SIG_IGN ((void (*)(int, siginfo_t, void*))-1)
+#endif
+#ifndef SIG_DFL
 #define SIG_DFL ((void (*)(int, siginfo_t, void*))-2)
+#endif
 
 #define SIGHUP    1
 #define SIGINT    2 /* Interactive attention */
@@ -42,7 +46,9 @@ typedef int sigset_t;
 
 #define SIGRTMIN  23
 
+#ifndef NSIG
 #define NSIG 32     /* maximum signal number + 1 */
+#endif
 
 /* To avoid overusing system TLS, pthread provides its own */
 #define PTHREAD_KEYS_MAX 128

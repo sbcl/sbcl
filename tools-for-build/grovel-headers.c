@@ -31,6 +31,7 @@
   #include <windows.h>
   #include <shlobj.h>
   #include <wincrypt.h>
+  #include <winsock2.h>
   #undef boolean
 #else
   #include <poll.h>
@@ -58,6 +59,10 @@
 #ifdef LISP_FEATURE_BSD
   #include <sys/param.h>
   #include <sys/sysctl.h>
+#endif
+
+#ifdef _WIN32
+  #include "pthreads_win32.h"
 #endif
 
 #include "wrap.h"
