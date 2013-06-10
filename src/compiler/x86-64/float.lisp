@@ -1266,17 +1266,21 @@
   (:policy :fast-safe)
   (:vop-var vop)
   (:generator 5
-     (sc-case float
-       (double-reg
-        (inst movsd temp float)
-        (move lo-bits temp))
-       (double-stack
-        (loadw lo-bits ebp-tn (frame-word-offset (tn-offset float))))
-       (descriptor-reg
-        (loadw lo-bits float double-float-value-slot
-               other-pointer-lowtag)))
-     (inst shl lo-bits 32)
-     (inst shr lo-bits 32)))
+     (let ((dword-lo-bits (reg-in-size lo-bits :dword)))
+       (sc-case float
+        (double-reg
+         (inst movsd temp float)
+         (inst mov dword-lo-bits
+               (make-ea :dword :base rbp-tn
+                        :disp (frame-byte-offset (tn-offset temp)))))
+        (double-stack
+         (inst mov dword-lo-bits
+               (make-ea :dword :base rbp-tn
+                        :disp (frame-byte-offset (tn-offset float)))))
+        (descriptor-reg
+         (inst mov dword-lo-bits
+               (make-ea-for-object-slot-half float double-float-value-slot
+                                             other-pointer-lowtag)))))))
 
 
 
