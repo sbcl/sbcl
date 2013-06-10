@@ -1110,7 +1110,8 @@
      (:lines (or unsigned-byte null))
      (:right-margin (or unsigned-byte null))
      (:miser-width (or unsigned-byte null))
-     (:pprint-dispatch t))
+     (:pprint-dispatch t)
+     (:suppress-errors t))
   t
   (any explicit-check)
   :derive-type #'result-type-first-arg)
