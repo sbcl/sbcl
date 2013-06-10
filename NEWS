@@ -2,6 +2,7 @@
 changes relative to sbcl-1.1.8:
   * enhancement: disassemble now annotates some previously missing static
     functions, like LENGTH.
+  * enhancement: clean.sh now also cleans doc/internals.
   * optimization: calls to static functions on x86-64 use less instructions.
   * optimization: compute encode-universal-time at compile time when possible.
   * optimization: when referencing internal functions as #'x, don't go through
