@@ -38,6 +38,7 @@ changes relative to sbcl-1.1.8:
     or double float precision on x87.
   * bug fix: Known-safe vector access on x86oids should not fail spuriously
     when the index is of the form (+ x constant-positive-integer).
+  * bug fix: Remove GPL-licensed files from source distribution.  (lp#1185668)
 
 changes in sbcl-1.1.8 relative to sbcl-1.1.7:
   * notice: The implementation of MAP-ALLOCATED-OBJECTS (the heart of
