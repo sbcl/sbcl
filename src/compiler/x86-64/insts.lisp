@@ -2983,7 +2983,9 @@
   (aver (<= 0 /i 7))
   (when prefix
     (emit-byte segment prefix))
-  (maybe-emit-rex-prefix segment operand-size dst/src nil nil)
+  ;; dst/src is encoded in the r/m field, not r; REX.B must be
+  ;; set to use extended XMM registers
+  (maybe-emit-rex-prefix segment operand-size nil nil dst/src)
   (emit-byte segment #x0F)
   (emit-byte segment opcode)
   (emit-byte segment (logior (ash (logior #b11000 /i) 3)
