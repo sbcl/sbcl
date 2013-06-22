@@ -823,4 +823,12 @@
   (assert (verify-backtrace (lambda () (gf-dispatch-test/f 42))
                             '(((sb-pcl::gf-dispatch gf-dispatch-test/gf) 42)))))
 
+(with-test (:name (:xep-arglist-clean-up :bug-1192929))
+  (assert
+   (block nil
+     (handler-bind ((error (lambda (e)
+                             (declare (ignore e))
+                             (return (< (length (car (sb-debug:backtrace-as-list 1))) 10)))))
+       (funcall (compile nil `(lambda (i) (declare ((mod 65536) i)) i)) nil)))))
+
 (write-line "/debug.impure.lisp done")

@@ -512,12 +512,22 @@ thread, NIL otherwise."
     (sb!di:lambda-list-unavailable ()
       (make-unprintable-object "unavailable lambda list"))))
 
-(defun clean-xep (name args info)
+(defun interrupted-frame-error (frame)
+  (when (and (sb!di::compiled-frame-p frame)
+             (sb!di::compiled-frame-escaped frame))
+    (let ((error-number (sb!vm:internal-error-args
+                         (sb!di::compiled-frame-escaped frame))))
+      (when (array-in-bounds-p sb!c:*backend-internal-errors* error-number)
+        (car (svref sb!c:*backend-internal-errors* error-number))))))
+
+(defun clean-xep (frame name args info)
   (values (second name)
           (if (consp args)
               (let* ((count (first args))
                      (real-args (rest args)))
-                (if (fixnump count)
+                (if (and (integerp count)
+                         (eq (interrupted-frame-error frame)
+                             'invalid-arg-count-error))
                     ;; So, this is a cheap trick -- but makes backtraces for
                     ;; too-many-arguments-errors much, much easier to to
                     ;; understand. FIXME: For :EXTERNAL frames at least we
@@ -568,21 +578,22 @@ thread, NIL otherwise."
          (values name args)))
     (values cname cargs (cons :fast-method info))))
 
-(defun clean-frame-call (name args method-frame-style info)
-  (if (consp name)
-      (case (first name)
-        ((sb!c::xep sb!c::tl-xep)
-         (clean-xep name args info))
-        ((sb!c::&more-processor)
-         (clean-&more-processor name args info))
-        ((sb!c::&optional-processor)
-         (clean-frame-call (second name) args method-frame-style
-                           info))
-        ((sb!pcl::fast-method)
-         (clean-fast-method name args method-frame-style info))
-        (t
-         (values name args info)))
-      (values name args info)))
+(defun clean-frame-call (frame name method-frame-style info)
+  (let ((args (frame-args-as-list frame)))
+    (if (consp name)
+        (case (first name)
+          ((sb!c::xep sb!c::tl-xep)
+           (clean-xep frame name args info))
+          ((sb!c::&more-processor)
+           (clean-&more-processor name args info))
+          ((sb!c::&optional-processor)
+           (clean-frame-call frame (second name) method-frame-style
+                             info))
+          ((sb!pcl::fast-method)
+           (clean-fast-method name args method-frame-style info))
+          (t
+           (values name args info)))
+        (values name args info))))
 
 (defun frame-call (frame &key (method-frame-style *method-frame-style*)
                               replace-dynamic-extent-objects)
@@ -603,8 +614,8 @@ the current thread are replaced with dummy objects which can safely escape."
   (let* ((debug-fun (sb!di:frame-debug-fun frame))
          (kind (sb!di:debug-fun-kind debug-fun)))
     (multiple-value-bind (name args info)
-        (clean-frame-call (sb!di:debug-fun-name debug-fun)
-                          (frame-args-as-list frame)
+        (clean-frame-call frame
+                          (sb!di:debug-fun-name debug-fun)
                           method-frame-style
                           (when kind (list kind)))
       (let ((args (if (and (consp args) replace-dynamic-extent-objects)
