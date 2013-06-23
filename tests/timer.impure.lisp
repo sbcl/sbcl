@@ -326,3 +326,29 @@
           (dolist (thread threads)
             (sched thread)))
         (mapcar #'sb-thread:join-thread threads)))))
+
+;; SB-THREAD:MAKE-THREAD used to lock SB-THREAD:*MAKE-THREAD-LOCK*
+;; before entering WITHOUT-INTERRUPTS. When a thread which was
+;; executing SB-THREAD:MAKE-THREAD was interrupted with code which
+;; also called SB-THREAD:MAKE-THREAD, it could happen that the first
+;; thread already owned SB-THREAD:*MAKE-THREAD-LOCK* and the
+;; interrupting code thus made a recursive lock attempt. A timer with
+;; :THREAD T or :THREAD <some thread spawning child threads> could
+;; also trigger this problem.
+;;
+;; See (MAKE-THREAD :INTERRUPT-WITH MAKE-THREAD :BUG-1180102) in
+;; threads.pure.lisp.
+(with-test (:name (:timer :dispatch-thread :make-thread :bug-1180102)
+            :skipped-on '(not :sb-thread))
+  (flet ((test (thread)
+           (let ((timer (make-timer (lambda ()) :thread thread)))
+             (schedule-timer timer .01 :repeat-interval 0.1)
+             (dotimes (i 100)
+               (let ((threads '()))
+                 (dotimes (i 100)
+                   (push (sb-thread:make-thread (lambda () (sleep .01)))
+                         threads))
+                 (mapc #'sb-thread:join-thread threads)))
+             (unschedule-timer timer))))
+    (test t)
+    (test sb-thread:*current-thread*)))

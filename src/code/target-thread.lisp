@@ -1384,7 +1384,7 @@ have the foreground next."
     (setf (thread-os-thread thread) (current-thread-os-thread))
     (with-mutex ((thread-result-lock thread))
       (with-all-threads-lock
-          (push thread *all-threads*))
+        (push thread *all-threads*))
       (with-session-lock (*session*)
         (push thread (session-threads *session*)))
       (setf (thread-%alive-p thread) t)
@@ -1449,32 +1449,31 @@ See also: RETURN-FROM-THREAD, ABORT-THREAD."
                        'make-thread arguments)
   #!+sb-thread
   (let ((thread (%make-thread :name name :%ephemeral-p ephemeral)))
-     (with-mutex (*make-thread-lock*)
-       (let* ((setup-sem (make-semaphore :name "Thread setup semaphore"))
-              (real-function (coerce function 'function))
-              (arguments     (if (listp arguments)
-                                 arguments
-                                 (list arguments)))
-              (initial-function
-               (named-lambda initial-thread-function ()
-                 ;; As it is, this lambda must not cons until we are ready
-                 ;; to run GC. Be very careful.
-                 (initial-thread-function-trampoline
-                  thread setup-sem real-function arguments nil nil nil))))
-         ;; If the starting thread is stopped for gc before it signals the
-         ;; semaphore then we'd be stuck.
-         (assert (not *gc-inhibit*))
-         ;; Keep INITIAL-FUNCTION pinned until the child thread is
-         ;; initialized properly. Wrap the whole thing in
-         ;; WITHOUT-INTERRUPTS because we pass INITIAL-FUNCTION to another
-         ;; thread.
-         (without-interrupts
-           (with-pinned-objects (initial-function)
-             (if (zerop
-                  (%create-thread (get-lisp-obj-address initial-function)))
-                 (setf thread nil)
-                 (wait-on-semaphore setup-sem))))))
-     (or thread (error "Could not create a new thread."))))
+    (let* ((setup-sem (make-semaphore :name "Thread setup semaphore"))
+           (real-function (coerce function 'function))
+           (arguments     (if (listp arguments)
+                              arguments
+                              (list arguments)))
+           (initial-function
+             (named-lambda initial-thread-function ()
+               ;; As it is, this lambda must not cons until we are
+               ;; ready to run GC. Be very careful.
+               (initial-thread-function-trampoline
+                thread setup-sem real-function arguments nil nil nil))))
+      ;; If the starting thread is stopped for gc before it signals
+      ;; the semaphore then we'd be stuck.
+      (assert (not *gc-inhibit*))
+      ;; Keep INITIAL-FUNCTION pinned until the child thread is
+      ;; initialized properly. Wrap the whole thing in
+      ;; WITHOUT-INTERRUPTS because we pass INITIAL-FUNCTION to
+      ;; another thread.
+      (with-system-mutex (*make-thread-lock*)
+        (with-pinned-objects (initial-function)
+          (if (zerop
+               (%create-thread (get-lisp-obj-address initial-function)))
+              (setf thread nil)
+              (wait-on-semaphore setup-sem)))))
+    (or thread (error "Could not create a new thread."))))
 
 (defun join-thread (thread &key (default nil defaultp) timeout)
   #!+sb-doc
