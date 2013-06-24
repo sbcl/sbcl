@@ -114,18 +114,15 @@
 
 (def!constant sc-bits (integer-length (1- sc-number-limit)))
 
-;; a function that emits the VOPs for this template. Arguments:
-;;  1] Node for source context.
-;;  2] IR2-BLOCK that we place the VOP in.
-;;  3] This structure.
-;;  4] Head of argument TN-REF list.
-;;  5] Head of result TN-REF list.
-;;  6] If INFO-ARG-COUNT is non-zero, then a list of the magic
-;;     arguments.
-;;
-;; Two values are returned: the first and last VOP emitted. This vop
-;; sequence must be linked into the VOP Next/Prev chain for the
-;; block. At least one VOP is always emitted.
+;;; Emit a VOP for TEMPLATE. Arguments:
+;;; NODE Node for source context.
+;;; BLOCK IR2-BLOCK that we place the VOP in.
+;;; TEMPLATE: VOP template
+;;; ARGS Head of argument TN-REF list.
+;;; RESULT Head of result TN-REF list.
+;;; INFO If INFO-ARG-COUNT is non-zero, then a list of the magic arguments.
+;;;
+;;; Return the emitted vop
 (defun emit-vop (node block template args results &optional info)
   (let* ((vop (make-vop block node template args results))
          (num-args (vop-info-num-args template))
@@ -195,7 +192,7 @@
                    (target-if-desirable
                     (aref refs (ldb (byte 8 8) target))
                     (aref refs (ldb (byte 8 0) target)))))))
-           (values vop vop))
+           vop)
       (fill *vop-tn-refs* nil))))
 
 ;;;; function translation stuff

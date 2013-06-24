@@ -343,10 +343,7 @@
            (type template template) (type tn x y))
   (let ((arg (reference-tn x nil))
         (result (reference-tn y t)))
-    (multiple-value-bind (first last)
-        (emit-vop node block template arg result)
-      (insert-vop-sequence first last block before)
-      last)))
+    (emit-and-insert-vop node block template arg result before)))
 
 ;;; like EMIT-MOVE-TEMPLATE, except that we pass in INFO args too
 (defun emit-load-template (node block template x y info &optional before)
@@ -354,10 +351,7 @@
            (type template template) (type tn x y))
   (let ((arg (reference-tn x nil))
         (result (reference-tn y t)))
-    (multiple-value-bind (first last)
-        (emit-vop node block template arg result info)
-      (insert-vop-sequence first last block before)
-      last)))
+    (emit-and-insert-vop node block template arg result before info)))
 
 ;;; like EMIT-MOVE-TEMPLATE, except that the VOP takes two args
 (defun emit-move-arg-template (node block template x f y &optional before)
@@ -367,20 +361,14 @@
         (f-ref (reference-tn f nil))
         (y-ref (reference-tn y t)))
     (setf (tn-ref-across x-ref) f-ref)
-    (multiple-value-bind (first last)
-        (emit-vop node block template x-ref y-ref)
-      (insert-vop-sequence first last block before)
-      last)))
+    (emit-and-insert-vop node block template x-ref y-ref before)))
 
 ;;; like EMIT-MOVE-TEMPLATE, except that the VOP takes no args
 (defun emit-context-template (node block template y &optional before)
   (declare (type node node) (type ir2-block block)
            (type template template) (type tn y))
   (let ((y-ref (reference-tn y t)))
-    (multiple-value-bind (first last)
-        (emit-vop node block template nil y-ref)
-      (insert-vop-sequence first last block before)
-      last)))
+    (emit-and-insert-vop node block template nil y-ref before)))
 
 ;;; Return the label marking the start of Block, assigning one if necessary.
 (defun block-label (block)
@@ -406,26 +394,32 @@
     (setf (ir2-block-dropped-thru-to 2block) t))
   nil)
 
-;;; Link a list of VOPs from First to Last into Block, Before the specified
-;;; VOP. If Before is NIL, insert at the end.
-(defun insert-vop-sequence (first last block before)
-  (declare (type vop first last) (type ir2-block block)
+;;; Insert a VOP into BLOCK, before the specified
+;;; BEFORE VOP. If BEFORE is NIL, insert at the end.
+(defun insert-vop (vop block before)
+  (declare (type vop vop) (type ir2-block block)
            (type (or vop null) before))
   (if before
       (let ((prev (vop-prev before)))
-        (setf (vop-prev first) prev)
+        (setf (vop-prev vop) prev)
         (if prev
-            (setf (vop-next prev) first)
-            (setf (ir2-block-start-vop block) first))
-        (setf (vop-next last) before)
-        (setf (vop-prev before) last))
+            (setf (vop-next prev) vop)
+            (setf (ir2-block-start-vop block) vop))
+        (setf (vop-next vop) before)
+        (setf (vop-prev before) vop))
       (let ((current (ir2-block-last-vop block)))
-        (setf (vop-prev first) current)
-        (setf (ir2-block-last-vop block) last)
+        (setf (vop-prev vop) current)
+        (setf (ir2-block-last-vop block) vop)
         (if current
-            (setf (vop-next current) first)
-            (setf (ir2-block-start-vop block) first))))
+            (setf (vop-next current) vop)
+            (setf (ir2-block-start-vop block) vop))))
   (values))
+
+(defun emit-and-insert-vop (node block template arg result before
+                            &optional info)
+  (let ((vop (emit-vop node block template arg result info)))
+    (insert-vop vop block before)
+    vop))
 
 ;;; Delete all of the TN-REFs associated with VOP and remove VOP from the IR2.
 (defun delete-vop (vop)

@@ -82,8 +82,7 @@
    the values, and VOP-name the name of the VOP that will be used
    to execute the conditional move.")
 
-(defun
-    convert-conditional-move-p (node dst-tn x-tn y-tn)
+(defun convert-conditional-move-p (node dst-tn x-tn y-tn)
   (declare (ignore node))
   (let* ((ptype (sb!c::tn-primitive-type dst-tn))
          (name  (sb!c::primitive-type-name ptype))

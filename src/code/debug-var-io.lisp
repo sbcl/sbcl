@@ -40,10 +40,10 @@
 
 (defmacro read-var-integer (vec index)
   (once-only ((vec vec))
-    `(multiple-value-bind (vector new-index)
+    `(multiple-value-bind (value new-index)
          (%read-var-integer ,vec ,index)
        (setf ,index new-index)
-       vector)))
+       value)))
 
 ;;; Take an adjustable vector VEC with a fill pointer and push the
 ;;; variable length representation of INT on the end.

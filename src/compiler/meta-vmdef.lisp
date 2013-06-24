@@ -1741,14 +1741,8 @@
 ;;; Call the emit function for TEMPLATE, linking the result in at the
 ;;; end of BLOCK.
 (defmacro emit-template (node block template args results &optional info)
-  (with-unique-names (first last)
-    (once-only ((n-node node)
-                (n-block block)
-                (n-template template))
-      `(multiple-value-bind (,first ,last)
-           (emit-vop ,n-node ,n-block ,n-template ,args ,results
-                     ,@(when info `(,info)))
-         (insert-vop-sequence ,first ,last ,n-block nil)))))
+  `(emit-and-insert-vop ,node ,block ,template ,args ,results nil
+                        ,@(when info `(,info))))
 
 ;;; VOP Name Node Block Arg* Info* Result*
 ;;;

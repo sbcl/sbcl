@@ -128,13 +128,11 @@
   (delete-vop vop)
   (flet ((load-and-coerce (dst src)
            (when (and dst (neq dst src))
-             (let ((end  (ir2-block-last-vop 2block))
-                   (move (template-or-lose 'move)))
-               (multiple-value-bind (first last)
-                   (emit-vop node 2block move
-                             (reference-tn src nil)
-                             (reference-tn dst t))
-                 (insert-vop-sequence first last 2block end))))))
+             (emit-and-insert-vop node 2block
+                                  (template-or-lose 'move)
+                                  (reference-tn src nil)
+                                  (reference-tn dst t)
+                                  (ir2-block-last-vop 2block)))))
     (load-and-coerce arg-if   value-if)
     (load-and-coerce arg-else value-else))
   (emit-template node 2block (template-or-lose cmove-vop)
