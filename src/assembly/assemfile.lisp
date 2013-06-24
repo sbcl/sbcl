@@ -116,7 +116,7 @@
     ,@(unless (eq (reg-spec-kind reg) :res)
         `(:target ,(reg-spec-temp reg)))))
 
-(defun emit-vop (name options vars)
+(defun emit-assemble-vop (name options vars)
   (let* ((args (remove :arg vars :key #'reg-spec-kind :test #'neq))
          (temps (remove :temp vars :key #'reg-spec-kind :test #'neq))
          (results (remove :res vars :key #'reg-spec-kind :test #'neq))
@@ -190,4 +190,4 @@
     (let ((regs (mapcar (lambda (var) (apply #'parse-reg-spec var)) vars)))
       (if *emit-assembly-code-not-vops-p*
           (emit-assemble name options regs code)
-          (emit-vop name options regs)))))
+          (emit-assemble-vop name options regs)))))

@@ -595,20 +595,7 @@
   ;; the number of trailing arguments to VOP or %PRIMITIVE that we
   ;; bundle into a list and pass into the emit function. This provides
   ;; a way to pass uninterpreted stuff directly to the code generator.
-  (info-arg-count 0 :type index)
-  ;; a function that emits the VOPs for this template. Arguments:
-  ;;  1] Node for source context.
-  ;;  2] IR2-BLOCK that we place the VOP in.
-  ;;  3] This structure.
-  ;;  4] Head of argument TN-REF list.
-  ;;  5] Head of result TN-REF list.
-  ;;  6] If INFO-ARG-COUNT is non-zero, then a list of the magic
-  ;;     arguments.
-  ;;
-  ;; Two values are returned: the first and last VOP emitted. This vop
-  ;; sequence must be linked into the VOP Next/Prev chain for the
-  ;; block. At least one VOP is always emitted.
-  (emit-function (missing-arg) :type function))
+  (info-arg-count 0 :type index))
 (defprinter (template)
   name
   arg-types
@@ -695,7 +682,7 @@
   ;; counts as one, and all the more args/results together count as 1.
   (num-args 0 :type index)
   (num-results 0 :type index)
-  ;; a vector of the temporaries the vop needs. See EMIT-GENERIC-VOP
+  ;; a vector of the temporaries the vop needs. See EMIT-VOP
   ;; in vmdef for information on how the temps are encoded.
   (temps nil :type (or null (specializable-vector (unsigned-byte 16))))
   ;; the order all the refs for this vop should be put in. Each

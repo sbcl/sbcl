@@ -344,8 +344,7 @@
   (let ((arg (reference-tn x nil))
         (result (reference-tn y t)))
     (multiple-value-bind (first last)
-        (funcall (template-emit-function template) node block template arg
-                 result)
+        (emit-vop node block template arg result)
       (insert-vop-sequence first last block before)
       last)))
 
@@ -356,8 +355,7 @@
   (let ((arg (reference-tn x nil))
         (result (reference-tn y t)))
     (multiple-value-bind (first last)
-        (funcall (template-emit-function template) node block template arg
-                 result info)
+        (emit-vop node block template arg result info)
       (insert-vop-sequence first last block before)
       last)))
 
@@ -370,8 +368,7 @@
         (y-ref (reference-tn y t)))
     (setf (tn-ref-across x-ref) f-ref)
     (multiple-value-bind (first last)
-        (funcall (template-emit-function template) node block template x-ref
-                 y-ref)
+        (emit-vop node block template x-ref y-ref)
       (insert-vop-sequence first last block before)
       last)))
 
@@ -381,8 +378,7 @@
            (type template template) (type tn y))
   (let ((y-ref (reference-tn y t)))
     (multiple-value-bind (first last)
-        (funcall (template-emit-function template) node block template nil
-                 y-ref)
+        (emit-vop node block template nil y-ref)
       (insert-vop-sequence first last block before)
       last)))
 

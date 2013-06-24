@@ -97,7 +97,7 @@
 ;;;; generation of emit functions
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
-  ;; We need the EVAL-WHEN because %EMIT-GENERIC-VOP (below)
+  ;; We need the EVAL-WHEN because EMIT-VOP (below)
   ;; uses #.MAX-VOP-TN-REFS, not just MAX-VOP-TN-REFS.
   ;; -- AL 20010218
   ;;
@@ -114,10 +114,19 @@
 
 (def!constant sc-bits (integer-length (1- sc-number-limit)))
 
-(defun emit-generic-vop (node block template args results &optional info)
-  (%emit-generic-vop node block template args results info))
-
-(defun %emit-generic-vop (node block template args results info)
+;; a function that emits the VOPs for this template. Arguments:
+;;  1] Node for source context.
+;;  2] IR2-BLOCK that we place the VOP in.
+;;  3] This structure.
+;;  4] Head of argument TN-REF list.
+;;  5] Head of result TN-REF list.
+;;  6] If INFO-ARG-COUNT is non-zero, then a list of the magic
+;;     arguments.
+;;
+;; Two values are returned: the first and last VOP emitted. This vop
+;; sequence must be linked into the VOP Next/Prev chain for the
+;; block. At least one VOP is always emitted.
+(defun emit-vop (node block template args results &optional info)
   (let* ((vop (make-vop block node template args results))
          (num-args (vop-info-num-args template))
          (last-arg (1- num-args))

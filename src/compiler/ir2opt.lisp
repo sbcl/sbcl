@@ -131,9 +131,9 @@
              (let ((end  (ir2-block-last-vop 2block))
                    (move (template-or-lose 'move)))
                (multiple-value-bind (first last)
-                   (funcall (template-emit-function move) node 2block
-                            move (reference-tn src nil)
-                            (reference-tn dst t))
+                   (emit-vop node 2block move
+                             (reference-tn src nil)
+                             (reference-tn dst t))
                  (insert-vop-sequence first last 2block end))))))
     (load-and-coerce arg-if   value-if)
     (load-and-coerce arg-else value-else))
