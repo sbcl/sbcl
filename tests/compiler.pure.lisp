@@ -4719,3 +4719,53 @@
           (b -3745511761))
       (assert (eql (funcall f1 a b)
                    (funcall f2 a b))))))
+
+;; win32 is very specific about the order in which catch blocks
+;; must be allocated on the stack
+(with-test (:name :bug-121581169)
+  (let ((f (compile nil
+                    `(lambda ()
+                       (STRING=
+                        (LET ((% 23))
+                          (WITH-OUTPUT-TO-STRING (G13908)
+                            (PRINC
+                             (LET ()
+                               (DECLARE (OPTIMIZE (SB-EXT:INHIBIT-WARNINGS 3)))
+                               (HANDLER-CASE
+                                   (WITH-OUTPUT-TO-STRING (G13909) (PRINC %A%B% G13909) G13909)
+                                 (UNBOUND-VARIABLE NIL
+                                   (HANDLER-CASE
+                                       (WITH-OUTPUT-TO-STRING (G13914)
+                                         (PRINC %A%B% G13914)
+                                         (PRINC "" G13914)
+                                         G13914)
+                                     (UNBOUND-VARIABLE NIL
+                                       (HANDLER-CASE
+                                           (WITH-OUTPUT-TO-STRING (G13913)
+                                             (PRINC %A%B G13913)
+                                             (PRINC "%" G13913)
+                                             G13913)
+                                         (UNBOUND-VARIABLE NIL
+                                           (HANDLER-CASE
+                                               (WITH-OUTPUT-TO-STRING (G13912)
+                                                 (PRINC %A% G13912)
+                                                 (PRINC "b%" G13912)
+                                                 G13912)
+                                             (UNBOUND-VARIABLE NIL
+                                               (HANDLER-CASE
+                                                   (WITH-OUTPUT-TO-STRING (G13911)
+                                                     (PRINC %A G13911)
+                                                     (PRINC "%b%" G13911)
+                                                     G13911)
+                                                 (UNBOUND-VARIABLE NIL
+                                                   (HANDLER-CASE
+                                                       (WITH-OUTPUT-TO-STRING (G13910)
+                                                         (PRINC % G13910)
+                                                         (PRINC "a%b%" G13910)
+                                                         G13910)
+                                                     (UNBOUND-VARIABLE NIL
+                                                       (ERROR "Interpolation error in \"%a%b%\"
+"))))))))))))))
+                             G13908)))
+                        "23a%b%")))))
+    (assert (funcall f))))
