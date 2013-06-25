@@ -168,7 +168,7 @@ means to wait indefinitely.")
   (flet ((split-float ()
            (let ((whole-seconds (truly-the fixnum (%unary-truncate seconds))))
              (values whole-seconds
-                     (truly-the fixnum
+                     (truly-the (integer 0 #.(expt 10 9))
                                 (%unary-truncate (* (- seconds (float whole-seconds))
                                                     (load-time-value 1s9 t))))))))
     (declare (inline split-float))
