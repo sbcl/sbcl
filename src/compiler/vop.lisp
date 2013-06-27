@@ -752,6 +752,12 @@
 ;;; A FINITE-SB holds information needed by the packing algorithm for
 ;;; finite SBs.
 (def!struct (finite-sb (:include sb))
+  ;; the minimum number of location by which to grow this SB
+  ;; if it is :unbounded
+  (size-increment 1 :type index)
+  ;; current-size must always be a multiple of this. It is assumed
+  ;; to be a power of two.
+  (size-alignment 1 :type index)
   ;; the number of locations currently allocated in this SB
   (current-size 0 :type index)
   ;; the last location packed in, used by pack to scatter TNs to
@@ -842,6 +848,7 @@
   ;; true if this SC or one of its alternates in in the NUMBER-STACK SB.
   (number-stack-p nil :type boolean)
   ;; alignment restriction. The offset must be an even multiple of this.
+  ;; this must be a power of two.
   (alignment 1 :type (and index (integer 1)))
   ;; a list of locations that we avoid packing in during normal
   ;; register allocation to ensure that these locations will be free
