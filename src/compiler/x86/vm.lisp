@@ -118,7 +118,7 @@
 ;;; the new way:
 (define-storage-base float-registers :finite :size 8)
 
-(define-storage-base stack :unbounded :size 8)
+(define-storage-base stack :unbounded :size 4 :size-increment 1)
 (define-storage-base constant :non-packed)
 (define-storage-base immediate-constant :non-packed)
 (define-storage-base noise :unbounded :size 2)
