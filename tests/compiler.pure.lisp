@@ -4656,3 +4656,15 @@
                         ((some (lambda (c)
                                  (digit-char-p c))
                                string))))))
+
+;; the x87 backend used to sometimes signal FP errors during boxing,
+;; because converting between double and single float values was a
+;; noop (fixed), and no doubt many remaining issues.  We now store
+;; the value outside pseudo-atomic, so any SIGFPE should be handled
+;; corrrectly.
+;;
+;; When it fails, this test lands into ldb.
+(with-test (:name :no-overflow-during-allocation)
+  (handler-case (eval '(cosh 90))
+    (floating-point-overflow ()
+      t)))

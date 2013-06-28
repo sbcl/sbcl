@@ -1648,11 +1648,12 @@
   #!+long-float
   (frob %long-float/unsigned %long-float long-reg long-float))
 
-;;; These should be no-ops but the compiler might want to move some
-;;; things around.
-(macrolet ((frob (name translate from-sc from-type to-sc to-type)
+(macrolet ((frob (name translate from-sc from-type to-sc to-type
+                  &optional to-stack-sc store-inst load-inst)
              `(define-vop (,name)
                (:args (x :scs (,from-sc) :target y))
+                ,@(and to-stack-sc
+                       `((:temporary (:sc ,to-stack-sc) temp)))
                (:results (y :scs (,to-sc)))
                (:arg-types ,from-type)
                (:result-types ,to-type)
@@ -1662,32 +1663,41 @@
                (:vop-var vop)
                (:save-p :compute-only)
                (:generator 2
-                (note-this-location vop :internal-error)
-                (unless (location= x y)
-                  (cond
-                   ((zerop (tn-offset x))
-                    ;; x is in ST0, y is in another reg. not ST0
-                    (inst fst  y))
-                   ((zerop (tn-offset y))
-                    ;; y is in ST0, x is in another reg. not ST0
-                    (copy-fp-reg-to-fr0 x))
-                   (t
-                    ;; Neither x or y are in ST0, and they are not in
-                    ;; the same reg.
-                    (inst fxch x)
-                    (inst fst  y)
-                    (inst fxch x))))))))
+                 (note-this-location vop :internal-error)
+                ,(if to-stack-sc
+                     `(progn
+                        (with-tn@fp-top (x)
+                          (inst ,store-inst temp))
+                        (with-empty-tn@fp-top (y)
+                          (inst ,load-inst temp)))
+                     `(unless (location= x y)
+                        (cond
+                          ((zerop (tn-offset x))
+                           ;; x is in ST0, y is in another reg. not ST0
+                           (inst fst  y))
+                          ((zerop (tn-offset y))
+                           ;; y is in ST0, x is in another reg. not ST0
+                           (copy-fp-reg-to-fr0 x))
+                          (t
+                           ;; Neither x or y are in ST0, and they are not in
+                           ;; the same reg.
+                           (inst fxch x)
+                           (inst fst  y)
+                           (inst fxch x)))))))))
 
-  (frob %single-float/double-float %single-float double-reg
-        double-float single-reg single-float)
+  (frob %single-float/double-float %single-float double-reg double-float
+        single-reg single-float
+        single-stack fst fld)
   #!+long-float
   (frob %single-float/long-float %single-float long-reg
-        long-float single-reg single-float)
+        long-float single-reg single-float
+        single-stack fst fld)
   (frob %double-float/single-float %double-float single-reg single-float
         double-reg double-float)
   #!+long-float
   (frob %double-float/long-float %double-float long-reg long-float
-        double-reg double-float)
+        double-reg double-float
+        double-stack fstd fldd)
   #!+long-float
   (frob %long-float/single-float %long-float single-reg single-float
         long-reg long-float)
