@@ -1,5 +1,7 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 changes relative to sbcl-1.1.8:
+  * new feature: the contrib SB-GMP links with libgmp at runtime to speed
+    up arithmetic on bignums and ratios.  (contributed by Stephan Frank)
   * enhancement: disassemble now annotates some previously missing static
     functions, like LENGTH.
   * enhancement: clean.sh now also cleans doc/internals.

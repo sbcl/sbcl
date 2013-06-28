@@ -588,6 +588,10 @@ Andreas Fuchs:
   regressions of SBCL.  He assisted with the integration of the
   Unicode work.
 
+Stephan Frank:
+  He contributed the SB-GMP contrib to exploit libgmp in bignum and
+  ratio arithmetic.
+
 Nathan Froyd:
   He has fixed various bugs, and also done a lot of internal
   cleanup, not visible at the user level but important for
@@ -856,6 +860,7 @@ NS   Nikodemus Siivola
 PFD  Paul F. Dietz
 PRM  Pierre Mai
 PVE  Peter Van Eynde
+PK/PVK Paul-Virak Khuong
 PW   Paul Werkowski
 RAM  Robert MacLachlan
 RLT  Raymond Toy
