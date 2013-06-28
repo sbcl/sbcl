@@ -4,6 +4,9 @@ changes relative to sbcl-1.1.9:
   * optimization: stack frames are packed more efficiently on x86oids, which
     ought to reduce the frequency of Methuselahn conservative references (it
     certainly helps with gc.impure.lisp / BUG-936304 on x86).
+  * optimization: on x86 and x86-64, integer negation forms like (- x) are now
+    recognized in modular arithmetic contexts, and compile to native negate,
+    rather than going through bignums only to keep the low bits.
   * bug fix: Compiling potential modularic arithmetic forms does not cause type
     errors when some integer types lack lower or upper bounds. (lp#1199127)
   * bug fix: Non-trivial modular arithmetic forms are always cut to the right

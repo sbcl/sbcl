@@ -1362,6 +1362,22 @@ constant shift greater than word length")))
   ;; (no -C variant as x86 MUL instruction doesn't take an immediate)
   (def * nil))
 
+(define-modular-fun %negate-mod32 (x) %negate :untagged nil 32)
+(define-vop (%negate-mod32)
+  (:translate %negate-mod32)
+  (:policy :fast-safe)
+  (:args (x :scs (unsigned-reg) :target r))
+  (:arg-types unsigned-num)
+  (:results (r :scs (unsigned-reg)))
+  (:result-types unsigned-num)
+  (:generator 3
+    (move r x)
+    (inst neg r)))
+
+(define-modular-fun %negate-modfx (x) %negate :tagged t #.(- n-word-bits
+                                                             n-fixnum-tag-bits))
+(define-vop (%negate-modfx fast-negate/fixnum)
+  (:translate %negate-modfx))
 
 (define-vop (fast-ash-left-mod32-c/unsigned=>unsigned
              fast-ash-c/unsigned=>unsigned)
