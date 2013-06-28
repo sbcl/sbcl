@@ -4647,3 +4647,12 @@
                                       ,(sb-c::primitive-type-or-lose
                                         'fixnum))))
                 collect info))))))
+
+(with-test (:name :maybe-inline-ref-to-dead-lambda)
+  (compile nil `(lambda (string)
+                  (declare (optimize speed (space 0)))
+                  (cond ((every #'digit-char-p string)
+                         nil)
+                        ((some (lambda (c)
+                                 (digit-char-p c))
+                               string))))))

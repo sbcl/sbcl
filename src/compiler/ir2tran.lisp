@@ -250,35 +250,39 @@
            (type ir2-block ir2-block)
            (type functional functional)
            (type tn res))
-  (aver (not (eql (functional-kind functional) :deleted)))
-  (unless (leaf-info functional)
-    (setf (leaf-info functional)
-          (make-entry-info :name (functional-debug-name functional))))
-  (let ((closure (etypecase functional
-                   (clambda
-                    (assertions-on-ir2-converted-clambda functional)
-                    (physenv-closure (get-lambda-physenv functional)))
-                   (functional
-                    (aver (eq (functional-kind functional) :toplevel-xep))
-                    nil)))
-        global-var)
-    (cond (closure
-           (let* ((physenv (node-physenv ref))
-                  (tn (find-in-physenv functional physenv)))
-             (emit-move ref ir2-block tn res)))
-          ;; we're about to emit a reference to a "closure" that's actually
-          ;; an inlinable global function.
-          ((and (global-var-p (setf global-var
-                                    (functional-inline-expanded functional)))
-                (eq :global-function (global-var-kind global-var)))
-           (ir2-convert-global-var ref ir2-block global-var res))
-          (t
-           ;; if we're here, we should have either a toplevel-xep (some
-           ;; global scope function in a different component) or an external
-           ;; reference to the "closure"'s body.
-           (aver (memq (functional-kind functional) '(:external :toplevel-xep)))
-           (let ((entry (make-load-time-constant-tn :entry functional)))
-             (emit-move ref ir2-block entry res)))))
+  (flet ((prepare ()
+           (aver (not (eql (functional-kind functional) :deleted)))
+           (unless (leaf-info functional)
+             (setf (leaf-info functional)
+                   (make-entry-info :name
+                                    (functional-debug-name functional))))))
+    (let ((closure (etypecase functional
+                     (clambda
+                      (assertions-on-ir2-converted-clambda functional)
+                      (physenv-closure (get-lambda-physenv functional)))
+                     (functional
+                      (aver (eq (functional-kind functional) :toplevel-xep))
+                      nil)))
+          global-var)
+      (cond (closure
+             (prepare)
+             (let* ((physenv (node-physenv ref))
+                    (tn (find-in-physenv functional physenv)))
+               (emit-move ref ir2-block tn res)))
+            ;; we're about to emit a reference to a "closure" that's actually
+            ;; an inlinable global function.
+            ((and (global-var-p (setf global-var
+                                      (functional-inline-expanded functional)))
+                  (eq :global-function (global-var-kind global-var)))
+             (ir2-convert-global-var ref ir2-block global-var res))
+            (t
+             ;; if we're here, we should have either a toplevel-xep (some
+             ;; global scope function in a different component) or an external
+             ;; reference to the "closure"'s body.
+             (prepare)
+             (aver (memq (functional-kind functional) '(:external :toplevel-xep)))
+             (let ((entry (make-load-time-constant-tn :entry functional)))
+               (emit-move ref ir2-block entry res))))))
   (values))
 
 (defun closure-initial-value (what this-env current-fp)
