@@ -415,8 +415,10 @@
      (with-fixed-allocation (y
                              single-float-widetag
                              single-float-size node)
-       (with-tn@fp-top(x)
-         (inst fst (ea-for-sf-desc y))))))
+       ;; w-f-a checks for empty body
+       nil)
+     (with-tn@fp-top(x)
+       (inst fst (ea-for-sf-desc y)))))
 (define-move-vop move-from-single :move
   (single-reg) (descriptor-reg))
 
@@ -430,8 +432,9 @@
                              double-float-widetag
                              double-float-size
                              node)
-       (with-tn@fp-top(x)
-         (inst fstd (ea-for-df-desc y))))))
+       nil)
+     (with-tn@fp-top(x)
+       (inst fstd (ea-for-df-desc y)))))
 (define-move-vop move-from-double :move
   (double-reg) (descriptor-reg))
 
@@ -446,8 +449,9 @@
                              long-float-widetag
                              long-float-size
                              node)
-       (with-tn@fp-top(x)
-         (store-long-float (ea-for-lf-desc y))))))
+       nil)
+     (with-tn@fp-top(x)
+       (store-long-float (ea-for-lf-desc y)))))
 #!+long-float
 (define-move-vop move-from-long :move
   (long-reg) (descriptor-reg))

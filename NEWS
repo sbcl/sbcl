@@ -47,6 +47,8 @@ changes relative to sbcl-1.1.8:
   * bug fix: Remove GPL-licensed files from source distribution. (lp#1185668)
   * bug fix: backtrace printer no longer tries to create very large lists when
     the arg-count register is clobberred by other code. (lp#1192929)
+  * bug fix: x86 should never signal an FP exception while boxing an FP value,
+    a situation that lands us into ldb.
 
 changes in sbcl-1.1.8 relative to sbcl-1.1.7:
   * notice: The implementation of MAP-ALLOCATED-OBJECTS (the heart of
