@@ -192,3 +192,7 @@
 
 (with-test (:name (:printing-unintitialized-condition :bug-1184586))
   (prin1-to-string (make-condition 'simple-type-error)))
+
+(with-test (:name (:print-undefined-function-condition))
+  (handler-case (funcall '#:foo)
+    (undefined-function (c) (princ c))))

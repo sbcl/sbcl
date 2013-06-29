@@ -696,9 +696,10 @@
 (define-condition undefined-function (cell-error) ()
   (:report
    (lambda (condition stream)
-     (format stream
-             "The function ~/sb!ext:print-symbol-with-prefix/ is undefined."
-             (cell-error-name condition)))))
+     (let ((*package* (find-package :keyword)))
+       (format stream
+               "The function ~S is undefined."
+               (cell-error-name condition))))))
 
 (define-condition special-form-function (undefined-function) ()
   (:report
