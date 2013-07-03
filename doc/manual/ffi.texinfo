@@ -49,12 +49,11 @@ by the Lisp implementation.  This can require a considerable amount of
 dependent on the internal implementation details of the Lisp system.
 
 @item
-The Lisp system can automatically convert objects back and forth
-between the Lisp and foreign representations.  This is convenient, but
+The Lisp system can automatically convert objects back and forth between
+the Lisp and foreign representations.  This is convenient, but
 translation becomes prohibitively slow when large or complex data
 structures must be shared. This approach is supported by the SBCL
-@acronym{FFI}, and used automatically by the when passing integers and
-strings.
+@acronym{FFI}, and used automatically when passing integers and strings.
 
 @item
 The Lisp program can directly manipulate foreign objects through the
