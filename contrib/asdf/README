@@ -1,20 +1,25 @@
 ASDF: another system definition facility
 ========================================
 
-If you want to use ASDF, read our manual:
+If you cloned our git repository, bootstrap a copy of build/asdf.lisp with:
+    make
 
+
+To use ASDF, read our manual:
     http://common-lisp.net/project/asdf/asdf.html
-
 The first few sections, Loading ASDF, Configuring ASDF and Using ASDF,
 will get you started as a simple user.
-
 If you want to define your own systems, further read the section
 Defining systems with defsystem.
 
-More information and additional links can be found on ASDF's
-home page at:
 
+ASDF 3 now includes an extensive runtime support library:
+UIOP, the Utilities for Implementation- and OS- Portability.
+Its documentation unhappily lies mainly in the source code and docstrings.
+
+
+More information and additional links can be found on ASDF's home page at:
     http://common-lisp.net/project/asdf/
 
 
-last updated Wednesday; May 5, 2010
+Last updated Thursday, April 10th, 2013.
