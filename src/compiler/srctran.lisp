@@ -3075,6 +3075,8 @@
            (return (values nil nil)))
          (let ((this-low (numeric-type-low type))
                (this-high (numeric-type-high type)))
+           (unless (and this-low this-high)
+             (return (values nil nil)))
            (setf low  (min this-low  (or low  this-low))
                  high (max this-high (or high this-high)))))))))
 

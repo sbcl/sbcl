@@ -1,6 +1,8 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 changes relative to sbcl-1.1.9:
   * enhancement: ASDF has been updated to 3.0.2.
+  * bug fix: Compiling potential modularic arithmetic forms does not cause type
+    errors when some integer types lack lower or upper bounds. (lp#1199127)
 
 changes in sbcl-1.1.9 relative to sbcl-1.1.8:
   * new feature: the contrib SB-GMP links with libgmp at runtime to speed

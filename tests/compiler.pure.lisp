@@ -1,3 +1,4 @@
+
 ;;;; various compiler tests without side effects
 
 ;;;; This software is part of the SBCL system. See the README file for
@@ -4668,3 +4669,16 @@
   (handler-case (eval '(cosh 90))
     (floating-point-overflow ()
       t)))
+
+;; unbounded integer types could break integer arithmetic.
+(with-test (:name :bug-1199127)
+  (compile nil `(lambda (b)
+                  (declare (type (integer -1225923945345 -832450738898) b))
+                  (declare (optimize (speed 3) (space 3) (safety 2)
+                                     (debug 0) (compilation-speed 1)))
+                  (loop for lv1 below 3
+                        sum (logorc2
+                             (if (>= 0 lv1)
+                                 (ash b (min 25 lv1))
+                                 0)
+                             -2)))))
