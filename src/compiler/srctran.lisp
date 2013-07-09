@@ -3044,7 +3044,10 @@
   ;; 3. >/>= width-matched :untagged
   (let* ((uuwidths (modular-class-widths *untagged-unsigned-modular-class*))
          (uswidths (modular-class-widths *untagged-signed-modular-class*))
-         (uwidths (merge 'list uuwidths uswidths #'< :key #'car))
+         (uwidths (if (and uuwidths uswidths)
+                      (merge 'list (copy-list uuwidths) (copy-list uswidths)
+                             #'< :key #'car)
+                      (or uuwidths uswidths)))
          (twidths (modular-class-widths *tagged-modular-class*)))
     (let ((exact (find (cons width signedp) uwidths :test #'equal)))
       (when exact
