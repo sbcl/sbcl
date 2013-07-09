@@ -11,6 +11,8 @@ changes relative to sbcl-1.1.16:
   * bug fix: Change COND error message (lp#1254511)
   * bug fix: LOAD is no longer confused when called on a directory.
     (lp#1077996)
+  * bug fix: MAKE-CONDITION reports names of missing condition classes
+    properly (lp#1199223)
 
 changes in sbcl-1.1.16 relative to sbcl-1.1.15:
   * minor incompatible change: improve read/print consistency for pathnames on

@@ -259,3 +259,21 @@
         (with-input-from-string (stream "no-such-package::symbol")
           (read stream))
       (reader-error (condition) (princ-to-string condition))))))
+
+(with-test (:name (make-condition :non-condition-class))
+  (handler-case
+      (make-condition 'standard-class)
+    (type-error (condition)
+      (assert (search "not a condition class"
+                      (princ-to-string condition))))))
+
+;; When called with a symbol not designating a condition class,
+;; MAKE-CONDITION used to signal an error which printed as "NIL does
+;; not designate a condition class.".
+(with-test (:name (make-condition :correct-error-for-undefined-condition
+                   :bug-1199223))
+  (handler-case
+      (make-condition 'no-such-condition)
+    (type-error (condition)
+      (assert (search (string 'no-such-condition)
+                      (princ-to-string condition))))))

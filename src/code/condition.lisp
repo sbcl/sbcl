@@ -237,17 +237,17 @@
 ;;;; MAKE-CONDITION
 
 (defun allocate-condition (type &rest initargs)
-  (let* ((type (if (symbolp type)
-                   (find-classoid type nil)
-                   type))
-         (class (typecase type
-                  (condition-classoid type)
+  (let* ((classoid (if (symbolp type)
+                       (find-classoid type nil)
+                       type))
+         (class (typecase classoid
+                  (condition-classoid classoid)
                   (class
                    (return-from allocate-condition
-                     (apply #'allocate-condition (class-name type) initargs)))
+                     (apply #'allocate-condition (class-name classoid) initargs)))
                   (classoid
                    (error 'simple-type-error
-                          :datum type
+                          :datum classoid
                           :expected-type 'condition-class
                           :format-control "~S is not a condition class."
                           :format-arguments (list type)))
@@ -256,7 +256,7 @@
                           :datum type
                           :expected-type 'condition-class
                           :format-control
-                          "~s does not designate a condition class."
+                          "~S does not designate a condition class."
                           :format-arguments (list type)))))
          (condition (%make-condition-object initargs '())))
     (setf (%instance-layout condition) (classoid-layout class))
