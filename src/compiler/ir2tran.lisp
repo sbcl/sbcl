@@ -31,16 +31,14 @@
 
 ;;; If there is any CHECK-xxx template for TYPE, then return it,
 ;;; otherwise return NIL.
-;;; The second value is T if the template needs TYPE to be passed
 (defun type-check-template (type)
   (declare (type ctype type))
   (multiple-value-bind (check-ptype exact) (primitive-type type)
     (if exact
         (primitive-type-check check-ptype)
-        (multiple-value-bind (name type-needed)
-            (hairy-type-check-template-name type)
+        (let ((name (hairy-type-check-template-name type)))
           (if name
-              (values (template-or-lose name) type-needed)
+              (template-or-lose name)
               nil)))))
 
 ;;; Emit code in BLOCK to check that VALUE is of the specified TYPE,
@@ -51,10 +49,7 @@
 (defun emit-type-check (node block value result type)
   (declare (type tn value result) (type node node) (type ir2-block block)
            (type ctype type))
-  (multiple-value-bind (template type-needed) (type-check-template type)
-   (if type-needed
-       (emit-load-template node block template value result (list type))
-       (emit-move-template node block template value result)))
+  (emit-move-template node block (type-check-template type) value result)
   (values))
 
 ;;; Allocate an indirect value cell.

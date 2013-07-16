@@ -232,8 +232,14 @@
     (once-only ((n-object object))
       (ecase (numeric-type-complexp type)
         (:real
-         `(and (typep ,n-object ',base)
-               ,(transform-numeric-bound-test n-object type base)))
+         (if (and #!-(or x86 x86-64) ;; Not implemented elsewhere yet
+                  nil
+                  (eql (numeric-type-class type) 'integer)
+                  (eql (numeric-type-low type) 0)
+                  (fixnump (numeric-type-high type)))
+             `(fixnum-mod-p ,n-object ,(numeric-type-high type))
+             `(and (typep ,n-object ',base)
+                   ,(transform-numeric-bound-test n-object type base))))
         (:complex
          `(and (complexp ,n-object)
                ,(once-only ((n-real `(realpart (truly-the complex ,n-object)))

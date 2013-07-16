@@ -385,42 +385,62 @@
       (emit-label yep)
       (move result value))))
 
-(define-vop (check-mod-fixnum check-type)
-  (:info type)
-  (:temporary (:sc any-reg) temp)
-  (:generator 30
-     (let* ((low (numeric-type-low type))
-            (hi (numeric-type-high type))
-            (fixnum-hi (fixnumize hi))
-            (error (gen-label)))
-       ;; FIXME: abstract
-       (assemble (*elsewhere*)
-         (emit-label error)
-         ;; The general case uses the number directly,
-         ;; and it will already have the number constantized
-         ;; even though MOV can use 64-bit immediates,
-         ;; using the same inlined constant will save space
-         (if (= (logcount (1+ hi)) 1)
-             (inst mov temp fixnum-hi)
-             (inst mov temp (constantize fixnum-hi)))
-         (emit-error-break vop error-trap
-                           (error-number-or-lose 'object-not-mod-error)
-                           (list value temp)))
-       (aver (zerop low))
-       (cond
-         ;; Handle powers of two specially
-         ;; The higher bits and the fixnum tag can be tested in one go
-         ((= (logcount (1+ hi)) 1)
-          (inst test value
-                (constantize (lognot fixnum-hi)))
-          (inst jmp :ne error))
-         (t
-          (generate-fixnum-test value)
-          (inst jmp :ne error)
-          (inst cmp value (constantize fixnum-hi))
-          (inst jmp :a error)))
-       (move result value))))
+(defun power-of-two-limit-p (x)
+  (and (fixnump x)
+       (= (logcount (1+ x)) 1)))
 
+(define-vop (test-fixnum-mod-power-of-two)
+  (:args (value :scs (any-reg descriptor-reg
+                              unsigned-reg signed-reg
+                              immediate)))
+  (:arg-types *
+              (:constant (satisfies power-of-two-limit-p)))
+  (:translate fixnum-mod-p)
+  (:conditional :e)
+  (:info hi)
+  (:save-p :compute-only)
+  (:policy :fast-safe)
+  (:generator 4
+     (aver (not (sc-is value immediate)))
+     (let* ((fixnum-hi (if (sc-is value unsigned-reg signed-reg)
+                           hi
+                           (fixnumize hi))))
+       (inst test value (constantize (lognot fixnum-hi))))))
+
+(define-vop (test-fixnum-mod-tagged-unsigned)
+  (:args (value :scs (any-reg descriptor-reg
+                              unsigned-reg signed-reg
+                              immediate)))
+  (:arg-types (:or tagged-num unsigned-num signed-num)
+              (:constant fixnum))
+  (:translate fixnum-mod-p)
+  (:conditional :be)
+  (:info hi)
+  (:save-p :compute-only)
+  (:policy :fast-safe)
+  (:generator 5
+     (aver (not (sc-is value immediate)))
+     (let ((fixnum-hi (if (sc-is value unsigned-reg signed-reg)
+                          hi
+                          (fixnumize hi))))
+       (inst cmp value (constantize fixnum-hi)))))
+
+(define-vop (test-fixnum-mod-*)
+  (:args (value :scs (any-reg descriptor-reg)))
+  (:arg-types * (:constant fixnum))
+  (:translate fixnum-mod-p)
+  (:conditional)
+  (:info target not-p hi)
+  (:save-p :compute-only)
+  (:policy :fast-safe)
+  (:generator 6
+     (let* ((fixnum-hi (fixnumize hi))
+            (skip (gen-label)))
+       (generate-fixnum-test value)
+       (inst jmp :ne (if not-p target skip))
+       (inst cmp value (constantize fixnum-hi))
+       (inst jmp (if not-p :a :be) target)
+       (emit-label skip))))
 
 ;;;; list/symbol types
 ;;;

@@ -1407,14 +1407,18 @@
         ((symbolp type)
          ``(:or ,(primitive-type-or-lose ',type)))
         (t
-         (ecase (first type)
+         (ecase (car type)
            (:or
             ``(:or ,,@(mapcar (lambda (type)
                                 `(primitive-type-or-lose ',type))
                               (rest type))))
            (:constant
             ``(:constant ,#'(lambda (x)
-                              (sb!xc:typep x ',(second type)))
+                              ;; Can't handle SATISFIES during XC
+                              ,(if (and (consp (second type))
+                                        (eq (caadr type) 'satisfies))
+                                   `(,(cadadr type) x)
+                                   `(sb!xc:typep x ',(second type))))
                          ,',(second type)))))))
 
 (defun specify-operand-types (types ops more-ops)

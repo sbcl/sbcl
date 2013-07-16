@@ -149,6 +149,12 @@
   (def-type-predicate-wrapper stringp)
   (def-type-predicate-wrapper vectorp)
   (def-type-predicate-wrapper vector-nil-p))
+
+#!+(or x86 x86-64)
+(defun fixnum-mod-p (x limit)
+  (and (fixnump x)
+       (<= 0 x limit)))
+
 
 ;;; Return the specifier for the type of object. This is not simply
 ;;; (TYPE-SPECIFIER (CTYPE-OF OBJECT)) because CTYPE-OF has different
