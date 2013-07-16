@@ -257,10 +257,9 @@
 (defun check-slot-name-for-defclass (name class-name env)
   (flet ((slot-name-illegal (reason)
            (error 'simple-program-error
-                  :format-control
-                  (format nil "~~@<In DEFCLASS ~~S, the slot name ~~S ~
-                               is ~A.~~@:>" reason)
-                  :format-arguments (list class-name name))))
+                  :format-control "~@<In DEFCLASS ~S, the slot name ~S ~
+                                   is ~A.~@:>"
+                  :format-arguments (list class-name name reason))))
     (cond ((not (symbolp name))
            (slot-name-illegal "not a symbol"))
           ((keywordp name)
