@@ -426,25 +426,26 @@ evaluated as a PROGN."
 
 (defmacro-mundanely restart-bind (bindings &body forms)
   #!+sb-doc
-  "Executes forms in a dynamic context where the given restart bindings are
-   in effect. Users probably want to use RESTART-CASE. When clauses contain
-   the same restart name, FIND-RESTART will find the first such clause."
-  `(let ((*restart-clusters*
-          (cons (list
-                 ,@(mapcar (lambda (binding)
-                             (unless (or (car binding)
-                                         (member :report-function
-                                                 binding
-                                                 :test #'eq))
-                               (warn "Unnamed restart does not have a ~
-                                      report function: ~S"
-                                     binding))
-                             `(make-restart :name ',(car binding)
-                                            :function ,(cadr binding)
-                                            ,@(cddr binding)))
-                           bindings))
-                *restart-clusters*)))
-     ,@forms))
+  "(RESTART-BIND ({(case-name function {keyword value}*)}*) forms)
+   Executes forms in a dynamic context where the given bindings are in
+   effect. Users probably want to use RESTART-CASE. A case-name of NIL
+   indicates an anonymous restart. When bindings contain the same
+   restart name, FIND-RESTART will find the first such binding."
+  (flet ((parse-binding (binding)
+           (unless (>= (length binding) 2)
+             (error "ill-formed restart binding: ~S" binding))
+           (destructuring-bind (name function
+                                &rest args
+                                &key report-function &allow-other-keys)
+               binding
+             (unless (or name report-function)
+               (warn "Unnamed restart does not have a report function: ~
+                      ~S" binding))
+             `(make-restart :name ',name :function ,function ,@args))))
+    `(let ((*restart-clusters*
+             (cons (list ,@(mapcar #'parse-binding bindings))
+                   *restart-clusters*)))
+       ,@forms)))
 
 ;;; Wrap the RESTART-CASE expression in a WITH-CONDITION-RESTARTS if
 ;;; appropriate. Gross, but it's what the book seems to say...
