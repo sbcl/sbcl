@@ -307,26 +307,19 @@
   (values))
 
 (defun preinform-compiler-about-accessors (readers writers slots)
-  (flet ((inform (name type)
-           ;; FIXME: This matches what PROCLAIM FTYPE does, except
-           ;; that :WHERE-FROM is :DEFINED, not :DECLARED, and should
-           ;; probably be factored into a common function -- eg.
-           ;; (%proclaim-ftype name declared-or-defined).
-           (when (eq (info :function :where-from name) :assumed)
-             (proclaim-as-fun-name name)
-             (note-name-defined name :function)
-             (setf (info :function :where-from name) :defined
-                   (info :function :type name) type))))
+  (flet ((inform (names type &key key)
+           (mapc (lambda (name)
+                   (let ((name (if key (funcall key name) name)))
+                     (when (eq (info :function :where-from name) :assumed)
+                       (sb-c:proclaim-ftype name type :defined))))
+                 names)))
     (let ((rtype (specifier-type '(function (t) t)))
           (wtype (specifier-type '(function (t t) t))))
-      (dolist (reader readers)
-        (inform reader rtype))
-      (dolist (writer writers)
-        (inform writer wtype))
-      (dolist (slot slots)
-        (inform (slot-reader-name slot) rtype)
-        (inform (slot-boundp-name slot) rtype)
-        (inform (slot-writer-name slot) wtype)))))
+      (inform readers rtype)
+      (inform writers wtype)
+      (inform slots rtype :key #'slot-reader-name)
+      (inform slots rtype :key #'slot-boundp-name)
+      (inform slots wtype :key #'slot-writer-name))))
 
 ;;; This is the early definition of LOAD-DEFCLASS. It just collects up
 ;;; all the class definitions in a list. Later, in braid1.lisp, these

@@ -1565,30 +1565,56 @@ the usual naming convention (names like *FOO*) for special variables"
              (format stream "using deprecated EVAL-WHEN situation names~{ ~S~}"
                      (deprecated-eval-when-situations-situations warning)))))
 
-(define-condition proclamation-mismatch (style-warning)
-  ((name :initarg :name :reader proclamation-mismatch-name)
+(define-condition proclamation-mismatch (condition)
+  ((kind :initarg :kind :reader proclamation-mismatch-kind)
+   (description :initarg :description :reader proclamation-mismatch-description :initform nil)
+   (name :initarg :name :reader proclamation-mismatch-name)
    (old :initarg :old :reader proclamation-mismatch-old)
-   (new :initarg :new :reader proclamation-mismatch-new)))
+   (new :initarg :new :reader proclamation-mismatch-new))
+  (:report
+   (lambda (condition stream)
+     ;; if we later decide we want package-qualified names, bind
+     ;; *PACKAGE* to (find-package "KEYWORD") here.
+     (format stream
+             "~@<The new ~A proclamation for~@[ ~A~] ~S~
+              ~@:_~2@T~S~@:_~
+              does not match the old ~4:*~A~3* proclamation~
+              ~@:_~2@T~S~@:>"
+             (proclamation-mismatch-kind condition)
+             (proclamation-mismatch-description condition)
+             (proclamation-mismatch-name condition)
+             (proclamation-mismatch-new condition)
+             (proclamation-mismatch-old condition)))))
 
 (define-condition type-proclamation-mismatch (proclamation-mismatch)
   ()
-  (:report (lambda (warning stream)
-             (format stream
-                     "The new TYPE proclamation~% ~S for ~S does not ~
-                     match the old TYPE proclamation ~S"
-                     (proclamation-mismatch-new warning)
-                     (proclamation-mismatch-name warning)
-                     (proclamation-mismatch-old warning)))))
+  (:default-initargs :kind 'type))
+
+(define-condition type-proclamation-mismatch-warning (style-warning
+                                                      type-proclamation-mismatch)
+  ())
+
+(defun type-proclamation-mismatch-warn (name old new &optional description)
+  (warn 'type-proclamation-mismatch-warning
+        :name name :old old :new new :description description))
 
 (define-condition ftype-proclamation-mismatch (proclamation-mismatch)
   ()
-  (:report (lambda (warning stream)
-             (format stream
-                     "The new FTYPE proclamation~% ~S for ~S does not ~
-                     match the old FTYPE proclamation ~S"
-                     (proclamation-mismatch-new warning)
-                     (proclamation-mismatch-name warning)
-                     (proclamation-mismatch-old warning)))))
+  (:default-initargs :kind 'ftype))
+
+(define-condition ftype-proclamation-mismatch-warning (style-warning
+                                                       ftype-proclamation-mismatch)
+  ())
+
+(defun ftype-proclamation-mismatch-warn (name old new &optional description)
+  (warn 'ftype-proclamation-mismatch-warning
+        :name name :old old :new new :description description))
+
+(define-condition ftype-proclamation-mismatch-error (error
+                                                     ftype-proclamation-mismatch)
+  ()
+  (:default-initargs :kind 'ftype :description "known function"))
+
 
 ;;;; deprecation conditions
 

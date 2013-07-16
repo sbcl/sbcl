@@ -122,12 +122,9 @@ restarts associated with CONDITION (or with no condition) will be returned."
          (named-restart-p (restart)
            (when (eq identifier (restart-name restart))
              (return-from %find-restart restart))))
-    ;; TODO Question for reviewer: does the compiler infer this dx
-    ;; automatically?
+    ;; KLUDGE: can the compiler infer this dx automatically?
     (declare (truly-dynamic-extent #'eq-restart-p #'named-restart-p))
     (if (typep identifier 'restart)
-        ;; TODO Questions for reviewer:
-        ;;
         ;; The code under #+previous-... below breaks the abstraction
         ;; introduced by MAP-RESTARTS, but is about twice as
         ;; fast as #+equivalent-... . Also, it is a common case due to

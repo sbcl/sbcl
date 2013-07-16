@@ -162,31 +162,74 @@
 (!cold-init-forms (setf *queued-proclaims* nil))
 (!defun-from-collected-cold-init-forms !early-proclaim-cold-init)
 
+(defun proclaim-type (name type where-from)
+  (unless (symbolp name)
+    (error "Cannot proclaim TYPE of a non-symbol: ~S" name))
+
+  (with-single-package-locked-error
+      (:symbol name "globally declaring the TYPE of ~A")
+    (when (eq (info :variable :where-from name) :declared)
+      (let ((old-type (info :variable :type name)))
+        (when (type/= type old-type)
+          (type-proclamation-mismatch-warn
+           name (type-specifier old-type) (type-specifier type)))))
+    (setf (info :variable :type name) type
+          (info :variable :where-from name) where-from)))
+
+(defun proclaim-ftype (name type where-from)
+  (unless (legal-fun-name-p name)
+    (error "Cannot declare FTYPE of illegal function name ~S" name))
+  (unless (csubtypep type (specifier-type 'function))
+    (error "Not a function type: ~S" (type-specifier type)))
+
+  (with-single-package-locked-error
+      (:symbol name "globally declaring the FTYPE of ~A")
+    (when (eq (info :function :where-from name) :declared)
+      (let ((old-type (info :function :type name)))
+        (cond
+          ((not (type/= type old-type))) ; not changed
+          ((not (info :function :info name)) ; not a known function
+           (ftype-proclamation-mismatch-warn
+            name (type-specifier old-type) (type-specifier type)))
+          ((csubtypep type old-type)) ; tighten known function type
+          (t
+           (cerror "Continue"
+                   'ftype-proclamation-mismatch-error
+                   :name name
+                   :old (type-specifier old-type)
+                   :new (type-specifier type))))))
+    ;; Now references to this function shouldn't be warned about as
+    ;; undefined, since even if we haven't seen a definition yet, we
+    ;; know one is planned.
+    ;;
+    ;; Other consequences of we-know-you're-a-function-now are
+    ;; appropriate too, e.g. any MACRO-FUNCTION goes away.
+    (proclaim-as-fun-name name)
+    (note-name-defined name :function)
+
+    ;; The actual type declaration.
+    (setf (info :function :type name) type
+          (info :function :where-from name) where-from)))
+
 (defun sb!xc:proclaim (raw-form)
   #+sb-xc (/show0 "entering PROCLAIM, RAW-FORM=..")
   #+sb-xc (/hexstr raw-form)
-  (let* ((form (canonized-decl-spec raw-form))
-         (kind (first form))
-         (args (rest form)))
+  (destructuring-bind (&whole form &optional kind &rest args)
+      (canonized-decl-spec raw-form)
     (case kind
       ((special global)
-       (flet ((make-special (name old)
-                (unless (member old '(:special :unknown))
-                  (error "Cannot proclaim a ~(~A~) variable special: ~S" old name))
-                (with-single-package-locked-error
-                    (:symbol name "globally declaring ~A special")
-                  (setf (info :variable :kind name) :special)))
-              (make-global (name old)
-                (unless (member old '(:global :unknown))
-                  (error "Cannot proclaim a ~(~A~) variable global: ~S" old name))
-                (with-single-package-locked-error
-                    (:symbol name "globally declaring ~A global")
-                  (setf (info :variable :kind name) :global))))
-         (let ((fun (if (eq 'special kind) #'make-special #'make-global)))
-           (dolist (name args)
-            (unless (symbolp name)
-              (error "Can't declare a non-symbol as ~S: ~S" kind name))
-            (funcall fun name (info :variable :kind name))))))
+       (let ((kind/keyword (ecase kind
+                             (special :special)
+                             (global :global))))
+         (dolist (name args)
+           (unless (symbolp name)
+             (error "Can't declare a non-symbol as ~(~A~): ~S" kind name))
+           (let ((old (info :variable :kind name)))
+             (unless (member old (list kind/keyword :unknown))
+               (error "Cannot proclaim a ~(~A~) variable ~(~A~): ~S" old kind name)))
+           (with-single-package-locked-error
+               (:symbol name "globally declaring ~A ~(~A~)" kind)
+             (setf (info :variable :kind name) kind/keyword)))))
       (always-bound
        (dolist (name args)
          (unless (symbolp name)
@@ -198,63 +241,14 @@
          (with-single-package-locked-error
              (:symbol name "globally declaring ~A always bound")
            (setf (info :variable :always-bound name) t))))
-      (type
+      ((type ftype)
        (if *type-system-initialized*
-           (let ((type (specifier-type (first args))))
-             (dolist (name (rest args))
-               (unless (symbolp name)
-                 (error "can't declare TYPE of a non-symbol: ~S" name))
-               (with-single-package-locked-error
-                   (:symbol name "globally declaring the type of ~A"))
-               (when (eq (info :variable :where-from name) :declared)
-                 (let ((old-type (info :variable :type name)))
-                   (when (type/= type old-type)
-                     ;; FIXME: changing to TYPE-PROCLAMATION-MISMATCH
-                     ;; broke late-proclaim.lisp.
-                     (style-warn
-                      "~@<new TYPE proclamation for ~S~@:_  ~S~@:_~
-                        does not match the old TYPE proclamation:~@:_  ~S~@:>"
-                      name (type-specifier type) (type-specifier old-type)))))
-               (setf (info :variable :type name) type)
-               (setf (info :variable :where-from name) :declared)))
-           (push raw-form *queued-proclaims*)))
-      (ftype
-       (if *type-system-initialized*
-           (let ((ctype (specifier-type (first args))))
-             (unless (csubtypep ctype (specifier-type 'function))
-               (error "not a function type: ~S" (first args)))
-             (dolist (name (rest args))
-               (with-single-package-locked-error
-                   (:symbol name "globally declaring the ftype of ~A")
-                 (when (eq (info :function :where-from name) :declared)
-                   (let ((old-type (info :function :type name)))
-                     (when (type/= ctype old-type)
-                       ;; FIXME: changing to FTYPE-PROCLAMATION-MISMATCH
-                       ;; broke late-proclaim.lisp.
-                       (if (info :function :info name)
-                           ;; Allow for tightening of known function types
-                           (unless (csubtypep ctype old-type)
-                             (cerror "Continue"
-                                     "~@<new FTYPE proclamation for known function ~S~@:_  ~S~@:_~
-                                      does not match its old FTYPE:~@:_  ~S~@:>"
-                                     name (type-specifier ctype) (type-specifier old-type)))
-                           (#+sb-xc-host warn
-                            #-sb-xc-host style-warn
-                            "~@<new FTYPE proclamation for ~S~@:_  ~S~@:_~
-                             does not match the old FTYPE proclamation:~@:_  ~S~@:>"
-                            name (type-specifier ctype) (type-specifier old-type))))))
-                 ;; Now references to this function shouldn't be warned
-                 ;; about as undefined, since even if we haven't seen a
-                 ;; definition yet, we know one is planned.
-                 ;;
-                 ;; Other consequences of we-know-you're-a-function-now
-                 ;; are appropriate too, e.g. any MACRO-FUNCTION goes away.
-                 (proclaim-as-fun-name name)
-                 (note-name-defined name :function)
-
-                 ;; the actual type declaration
-                 (setf (info :function :type name) ctype
-                       (info :function :where-from name) :declared))))
+           (destructuring-bind (type &rest names) args
+             (let ((ctype (specifier-type type)))
+               (dolist (name names)
+                 (ecase kind
+                   (type (proclaim-type name ctype :declared))
+                   (ftype (proclaim-ftype name ctype :declared))))))
            (push raw-form *queued-proclaims*)))
       (freeze-type
        (dolist (type args)
@@ -279,7 +273,7 @@
                (process-package-lock-decl form *disabled-package-locks*)))
       ((inline notinline maybe-inline)
        (dolist (name args)
-         ; since implicitly it is a function, also scrubs *FREE-FUNS*
+         ;; since implicitly it is a function, also scrubs *FREE-FUNS*
          (proclaim-as-fun-name name)
          (setf (info :function :inlinep name)
                (ecase kind
