@@ -567,4 +567,15 @@
                   (when (eq 'ftype (sb-ext:package-locked-error-symbol e))
                     :ok))))))
 
+(with-test (:name :assert-symbol-home-package-unlocked)
+  (assert (raises-error? ; TODO use assert-signals
+           (sb-impl::assert-symbol-home-package-unlocked
+            'cl:cons "trying to foo ~S")
+           symbol-package-locked-error))
+  (assert (raises-error?
+           (sb-impl::assert-symbol-home-package-unlocked
+            'cl:cons "trying to ~*~S ~2:*~A~* as a ~S"
+            :foo :bar)
+           symbol-package-locked-error)))
+
 ;;; WOOT! Done.

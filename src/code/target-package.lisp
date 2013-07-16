@@ -296,28 +296,27 @@ error if any of PACKAGES is not a valid package designator."
 ;;; FIXME: Maybe we should establish such contours for he toplevel
 ;;; and others, so that %set-fdefinition and others could just use
 ;;; this.
-(defun assert-symbol-home-package-unlocked (name format)
+(defun assert-symbol-home-package-unlocked (name &optional format-control
+                                            &rest format-arguments)
   #!-sb-package-locks
-  (declare (ignore format))
+  (declare (ignore format-control format-arguments))
   #!+sb-package-locks
   (let* ((symbol (etypecase name
                    (symbol name)
-                   (list (if (and (consp (cdr name))
-                                  (eq 'setf (first name)))
-                             (second name)
-                             ;; Skip lists of length 1, single conses and
-                             ;; (class-predicate foo), etc.
-                             ;; FIXME: MOP and package-lock
-                             ;; interaction needs to be thought about.
-                             (return-from
-                              assert-symbol-home-package-unlocked
-                               name)))))
+                   ((cons (eql setf) cons) (second name))
+                   ;; Skip lists of length 1, single conses and
+                   ;; (class-predicate foo), etc.  FIXME: MOP and
+                   ;; package-lock interaction needs to be thought
+                   ;; about.
+                   (list
+                    (return-from assert-symbol-home-package-unlocked
+                      name))))
          (package (symbol-package symbol)))
     (when (package-lock-violation-p package symbol)
       (package-lock-violation package
                               :symbol symbol
-                              :format-control format
-                              :format-arguments (list name))))
+                              :format-control format-control
+                              :format-arguments (cons name format-arguments))))
   name)
 
 
