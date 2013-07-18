@@ -2987,31 +2987,46 @@
                            (fun-name (lvar-fun-name (combination-fun node)))
                            (modular-fun (find-modular-version fun-name kind
                                                               signedp width)))
-                      (when (and modular-fun
-                                 (not (and (eq fun-name 'logand)
-                                           (csubtypep
-                                            (single-value-type (node-derived-type node))
-                                            type))))
-                        (binding* ((name (etypecase modular-fun
-                                           ((eql :good) fun-name)
-                                           (modular-fun-info
-                                            (modular-fun-info-name modular-fun))
-                                           (function
-                                            (funcall modular-fun node width)))
-                                         :exit-if-null))
-                          (unless (eql modular-fun :good)
-                            (setq did-something t)
-                            (change-ref-leaf
-                             fun-ref
-                             (find-free-fun name "in a strange place"))
-                            (setf (combination-kind node) :full))
-                          (unless (functionp modular-fun)
-                            (dolist (arg (basic-combination-args node))
-                              (when (cut-lvar arg)
-                                (setq did-something t))))
-                          (when did-something
-                            (reoptimize-node node name))
-                          (values t did-something))))))))
+                      (cond ((not modular-fun)
+                             ;; don't know what to do here
+                             (values nil nil))
+                            ((let ((dtype (single-value-type
+                                           (node-derived-type node))))
+                               (and
+                                (case fun-name
+                                  (logand
+                                   (csubtypep dtype
+                                              (specifier-type 'unsigned-byte)))
+                                  (logior
+                                   (csubtypep dtype
+                                              (specifier-type '(integer * 0))))
+                                  (mask-signed-field
+                                   t)
+                                  (t nil))
+                                (csubtypep dtype type)))
+                             ;; nothing to do
+                             (values t nil))
+                            (t
+                             (binding* ((name (etypecase modular-fun
+                                                ((eql :good) fun-name)
+                                                (modular-fun-info
+                                                 (modular-fun-info-name modular-fun))
+                                                (function
+                                                 (funcall modular-fun node width)))
+                                              :exit-if-null))
+                               (unless (eql modular-fun :good)
+                                 (setq did-something t)
+                                 (change-ref-leaf
+                                  fun-ref
+                                  (find-free-fun name "in a strange place"))
+                                 (setf (combination-kind node) :full))
+                               (unless (functionp modular-fun)
+                                 (dolist (arg (basic-combination-args node))
+                                   (when (cut-lvar arg)
+                                     (setq did-something t))))
+                               (when did-something
+                                 (reoptimize-node node name))
+                               (values t did-something)))))))))
              (cut-lvar (lvar &aux did-something must-insert)
                "Cut all the LVAR's use nodes. If any of them wasn't handled
                 and its type is too wide for the operation we wish to perform
