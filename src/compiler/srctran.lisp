@@ -2955,10 +2955,11 @@
                  (setf (block-reoptimize (node-block node)) t)
                  (reoptimize-component (node-component node) :maybe))
                t)
-             (cut-node (node &aux did-something)
+             (cut-node (node &aux did-something over-wide)
                "Try to cut a node to width. The primary return value is
                 whether we managed to cut (cleverly), and the second whether
-                anything was changed."
+                anything was changed.  The third return value tells whether
+                the cut value might be wider than expected."
                (when (block-delete-p (node-block node))
                  (return-from cut-node (values t nil)))
                (typecase node
@@ -3015,19 +3016,23 @@
                                                  (funcall modular-fun node width)))
                                               :exit-if-null))
                                (unless (eql modular-fun :good)
-                                 (setq did-something t)
+                                 (setq did-something t
+                                       over-wide t)
                                  (change-ref-leaf
                                   fun-ref
                                   (find-free-fun name "in a strange place"))
                                  (setf (combination-kind node) :full))
                                (unless (functionp modular-fun)
                                  (dolist (arg (basic-combination-args node))
-                                   (when (cut-lvar arg)
-                                     (setq did-something t))))
+                                   (multiple-value-bind (change wide)
+                                       (cut-lvar arg)
+                                     (setf did-something (or did-something change)
+                                           over-wide (or over-wide wide)))))
                                (when did-something
                                  (reoptimize-node node name))
-                               (values t did-something)))))))))
-             (cut-lvar (lvar &aux did-something must-insert)
+                               (values t did-something over-wide)))))))))
+             (cut-lvar (lvar &key head
+                        &aux did-something must-insert over-wide)
                "Cut all the LVAR's use nodes. If any of them wasn't handled
                 and its type is too wide for the operation we wish to perform
                 insert an explicit bit-width narrowing operation (LOGAND or
@@ -3036,22 +3041,29 @@
                 destination is already such an operation, to avoid endless
                 recursion.
 
+                If we're at the head, forcibly insert a cut operation if the
+                result might be too wide.
+
                 (*) We can't easily do that for each node, and doing so might
                 result in code bloat, anyway. (I'm also not sure it would be
                 correct for complicated C/D FG)"
                (do-uses (node lvar)
-                 (multiple-value-bind (handled any-change)
+                 (multiple-value-bind (handled any-change wide)
                      (cut-node node)
                    (setf did-something (or did-something any-change)
                          must-insert (or must-insert
                                          (not (or handled
                                                   (csubtypep (single-value-type
                                                               (node-derived-type node))
-                                                             type)))))))
-               (when must-insert
-                 (setf did-something (or (insert-lvar-cut lvar) did-something)))
-               did-something))
-      (cut-lvar lvar))))
+                                                             type))))
+                         over-wide (or over-wide wide))))
+               (when (or must-insert
+                         (and head over-wide))
+                 (setf did-something (or (insert-lvar-cut lvar) did-something)
+                       ;; we're just the right width after an explicit cut.
+                       over-wide nil))
+               (values did-something over-wide)))
+      (cut-lvar lvar :head t))))
 
 (defun best-modular-version (width signedp)
   ;; 1. exact width-matched :untagged
