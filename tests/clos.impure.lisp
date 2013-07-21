@@ -1226,8 +1226,7 @@
 ;;; test case from Gerd Moellmann
 (define-method-combination r-c/c-m-1 ()
   ((primary () :required t))
-  `(restart-case (call-method ,(first primary))
-     ()))
+  `(restart-case (call-method ,(first primary))))
 
 (defgeneric r-c/c-m-1-gf ()
   (:method-combination r-c/c-m-1)

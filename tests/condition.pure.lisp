@@ -145,24 +145,61 @@
 
 ;;; If CERROR is given a condition, any remaining arguments are only
 ;;; used for the continue format control.
-(let ((x 0))
-  (handler-bind
-      ((simple-error (lambda (c) (incf x) (continue c))))
-    (cerror "Continue from ~A at ~A"
-            (make-condition 'simple-error :format-control "foo"
-                            :format-arguments nil)
-            'cerror (get-universal-time))
-    (assert (= x 1))))
+(with-test (:name (cerror :condition-object-and-format-arguments))
+  (let ((x 0))
+    (handler-bind
+        ((simple-error (lambda (c) (incf x) (continue c))))
+      (cerror "Continue from ~A at ~A"
+              (make-condition 'simple-error :format-control "foo"
+                                            :format-arguments nil)
+              'cerror (get-universal-time))
+      (assert (= x 1)))))
 
-(with-test (:name :malformed-restart-case-clause)
-  (assert (eq :ok
-              (handler-case
-                  (macroexpand `(restart-case (error "foo")
-                                  (foo :report "quux" (quux))))
-                (simple-error (e)
-                  (assert (equal '(restart-case (foo :report "quux" (quux)))
-                                 (simple-condition-format-arguments e)))
-                  :ok)))))
+;; Test some of the variations permitted by the RESTART-CASE syntax.
+(with-test (:name (restart-case :smoke))
+  (macrolet
+      ((test (clause &optional (expected ''(:ok)) (args '(:ok)))
+         `(assert (equal ,expected
+                         (multiple-value-list
+                          (restart-case
+                              (handler-bind
+                                  ((error (lambda (c)
+                                            (invoke-restart ',(first clause) ,@args))))
+                                (error "foo"))
+                            ,clause))))))
+
+    (test (foo (quux) quux))
+    (test (foo (&optional quux) quux))
+    ;; Multiple values should work.
+    (test (foo (a b) (values a b)) '(1 2) (1 2))
+    ;; Although somewhat unlikely, these should be legal and return
+    ;; the respective keyword when the restart is invoked.
+    (test (foo () :report) '(:report) ())
+    (test (foo () :interactive) '(:interactive) ())
+    (test (foo () :test) '(:test) ())
+    ;; Declarations should work normally as part of the restart body.
+    (test (foo (quux) :declare ()) '(nil))
+    (test (foo () :declare () :report "quux") '("quux") ())))
+
+(with-test (:name (restart-case :malformed-clauses))
+  (macrolet
+      ((test (clause &optional (expected clause))
+         `(assert (eq :ok
+                      (handler-case
+                          (macroexpand
+                           `(restart-case (error "foo") ,',clause))
+                        (simple-error (e)
+                          (assert (equal '(restart-case ,expected)
+                                         (simple-condition-format-arguments e)))
+                          :ok))))))
+
+    (test :report)                     ; not even a list
+    (test ())                          ; empty
+    (test (foo))                       ; no lambda-list
+    (test (foo :report))               ; no lambda-list
+    (test (foo :report "quux"))        ; no lambda-list
+    (test (foo :report "quux" (quux))) ; confused report and lambda list
+    ))
 
 (with-test (:name :simple-condition-without-args)
   (let ((sc (make-condition 'simple-condition)))

@@ -471,107 +471,81 @@ evaluated as a PROGN."
               expression))
         expression)))
 
-;;; FIXME: I did a fair amount of rearrangement of this code in order to
-;;; get WITH-KEYWORD-PAIRS to work cleanly. This code should be tested..
 (defmacro-mundanely restart-case (expression &body clauses &environment env)
   #!+sb-doc
-  "(RESTART-CASE form
-   {(case-name arg-list {keyword value}* body)}*)
-   The form is evaluated in a dynamic context where the clauses have special
-   meanings as points to which control may be transferred (see INVOKE-RESTART).
-   When clauses contain the same case-name, FIND-RESTART will find the first
-   such clause. If Expression is a call to SIGNAL, ERROR, CERROR or WARN (or
-   macroexpands into such) then the signalled condition will be associated with
-   the new restarts."
-  (flet ((transform-keywords (&key report interactive test)
-           (let ((result '()))
-             (when report
-               (setq result (list* (if (stringp report)
+  "(RESTART-CASE form {(case-name arg-list {keyword value}* body)}*)
+   The form is evaluated in a dynamic context where the clauses have
+   special meanings as points to which control may be transferred (see
+   INVOKE-RESTART).  When clauses contain the same case-name,
+   FIND-RESTART will find the first such clause. If form is a call to
+   SIGNAL, ERROR, CERROR or WARN (or macroexpands into such) then the
+   signalled condition will be associated with the new restarts."
+  ;; PARSE-CLAUSE (which uses PARSE-KEYWORDS-AND-BODY) is used to
+  ;; parse all clauses into lists of the form
+  ;;
+  ;;  (NAME TAG KEYWORDS LAMBDA-LIST BODY)
+  ;;
+  ;; where KEYWORDS are suitable keywords for use in HANDLER-BIND
+  ;; bindings. These lists are then passed to
+  ;; * MAKE-BINDING which generates bindings for the respective NAME
+  ;;   for HANDLER-BIND
+  ;; * MAKE-APPLY-AND-RETURN which generates TAGBODY entries executing
+  ;;   the respective BODY.
+  (let ((block-tag (sb!xc:gensym "BLOCK"))
+        (temp-var (gensym)))
+    (labels ((parse-keywords-and-body (keywords-and-body)
+               (do ((form keywords-and-body (cddr form))
+                    (result '())) (nil)
+                 (destructuring-bind (&optional key (arg nil argp) &rest rest)
+                     form
+                   (declare (ignore rest))
+                   (setq result
+                         (append
+                          (cond
+                            ((and (eq key :report) argp)
+                             (list :report-function
+                                   (if (stringp arg)
                                        `#'(lambda (stream)
-                                            (write-string ,report stream))
-                                       `#',report)
-                                   :report-function
-                                   result)))
-             (when interactive
-               (setq result (list* `#',interactive
-                                   :interactive-function
-                                   result)))
-             (when test
-               (setq result (list* `#',test :test-function result)))
-             (nreverse result)))
-         (parse-keyword-pairs (list keys)
-           (do ((l list (cddr l))
-                (k '() (list* (cadr l) (car l) k)))
-               ((or (null l) (not (member (car l) keys)))
-                (values (nreverse k) l)))))
-    (let ((block-tag (sb!xc:gensym "BLOCK"))
-          (temp-var (gensym))
-          (data
-           (macrolet (;; KLUDGE: This started as an old DEFMACRO
-                      ;; WITH-KEYWORD-PAIRS general utility, which was used
-                      ;; only in this one place in the code. It was translated
-                      ;; literally into this MACROLET in order to avoid some
-                      ;; cross-compilation bootstrap problems. It would almost
-                      ;; certainly be clearer, and it would certainly be more
-                      ;; concise, to do a more idiomatic translation, merging
-                      ;; this with the TRANSFORM-KEYWORDS logic above.
-                      ;;   -- WHN 19990925
-                      (with-keyword-pairs ((names expression) &body forms)
-                        (let ((temp (member '&rest names)))
-                          (unless (= (length temp) 2)
-                            (error "&REST keyword is ~:[missing~;misplaced~]."
-                                   temp))
-                          (let* ((key-vars (ldiff names temp))
-                                 (keywords (mapcar #'keywordicate key-vars))
-                                 (key-var (gensym))
-                                 (rest-var (cadr temp)))
-                            `(multiple-value-bind (,key-var ,rest-var)
-                                 (parse-keyword-pairs ,expression ',keywords)
-                               (let ,(mapcar (lambda (var keyword)
-                                               `(,var (getf ,key-var
-                                                            ,keyword)))
-                                             key-vars keywords)
-                                 ,@forms))))))
-             (mapcar (lambda (clause)
-                       (unless (listp (second clause))
-                         (error "Malformed ~S clause, no lambda-list:~%  ~S"
-                                'restart-case clause))
-                       (with-keyword-pairs ((report interactive test
-                                                    &rest forms)
-                                            (cddr clause))
-                         (list (car clause) ;name=0
-                               (sb!xc:gensym "TAG") ;tag=1
-                               (transform-keywords :report report ;keywords=2
-                                                   :interactive interactive
-                                                   :test test)
-                               (cadr clause) ;bvl=3
-                               forms))) ;body=4
-                   clauses))))
-      `(block ,block-tag
-         (let ((,temp-var nil))
-           (declare (ignorable ,temp-var))
-           (tagbody
-            (restart-bind
-                ,(mapcar (lambda (datum)
-                           (let ((name (nth 0 datum))
-                                 (tag  (nth 1 datum))
-                                 (keys (nth 2 datum)))
-                             `(,name #'(lambda (&rest temp)
-                                         (setq ,temp-var temp)
-                                         (go ,tag))
-                                     ,@keys)))
-                         data)
-              (return-from ,block-tag
-                           ,(munge-restart-case-expression expression env)))
-            ,@(mapcan (lambda (datum)
-                        (let ((tag  (nth 1 datum))
-                              (bvl  (nth 3 datum))
-                              (body (nth 4 datum)))
-                          (list tag
-                                `(return-from ,block-tag
-                                   (apply (lambda ,bvl ,@body)
-                                          ,temp-var)))))
-                      data)))))))
+                                            (write-string ,arg stream))
+                                       `#',arg)))
+                            ((and (eq key :interactive) argp)
+                             (list :interactive-function `#',arg))
+                            ((and (eq key :test) argp)
+                             (list :test-function `#',arg))
+                            (t
+                             (return (values result form))))
+                          result)))))
+             (parse-clause (clause)
+               (unless (and (listp clause ) (>= (length clause) 2)
+                            (listp (second clause)))
+                 (error "ill-formed ~S clause, no lambda-list:~%  ~S"
+                        'restart-case clause))
+               (destructuring-bind (name lambda-list &body body) clause
+                 (multiple-value-bind (keywords body)
+                     (parse-keywords-and-body body)
+                   (list name (sb!xc:gensym "TAG") keywords lambda-list body))))
+             (make-binding (clause-data)
+               (destructuring-bind (name tag keywords &rest rest) clause-data
+                 (declare (ignore rest))
+                 `(,name #'(lambda (&rest temp)
+                             (setq ,temp-var temp)
+                             (go ,tag))
+                         ,@keywords)))
+             (make-apply-and-return (clause-data)
+               (destructuring-bind (name tag keywords lambda-list body) clause-data
+                 (declare (ignore name keywords))
+                 `(,tag (return-from ,block-tag
+                          (apply (lambda ,lambda-list ,@body) ,temp-var))))))
+      (let ((clauses-data (mapcar #'parse-clause clauses)))
+        `(block ,block-tag
+           (let ((,temp-var nil))
+             (declare (ignorable ,temp-var))
+             (tagbody
+                (restart-bind
+                    ,(mapcar #'make-binding clauses-data)
+                  (return-from ,block-tag
+                    ,(munge-restart-case-expression expression env)))
+                ,@(mapcan #'make-apply-and-return clauses-data))))))))
 
 (defmacro-mundanely with-simple-restart ((restart-name format-string
                                                        &rest format-arguments)
