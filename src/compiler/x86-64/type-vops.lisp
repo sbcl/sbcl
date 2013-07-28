@@ -306,8 +306,9 @@
               (values not-target target)
               (values target not-target))
         ;; Is it a fixnum?
-        (generate-fixnum-test value)
+        ;; Is it a fixnum?
         (move rax-tn value)
+        (inst test al-tn fixnum-tag-mask)
         (inst jmp :e fixnum)
 
         ;; If not, is it an other pointer?

@@ -14,7 +14,7 @@
 ;;;; test generation utilities
 
 (defun generate-fixnum-test (value)
-  (emit-optimized-test-inst value 3))
+  (emit-optimized-test-inst value fixnum-tag-mask))
 
 (defun %test-fixnum (value target not-p)
   (generate-fixnum-test value)
@@ -65,8 +65,6 @@
         (if not-p
             (values :ne :a :b drop-through target)
             (values :e :na :nb target drop-through))
-      ;; %test-lowtag loads an untagged pointer into EAX, which allows
-      ;; to avoid untagging below
       (%test-lowtag value when-false t lowtag)
       (cond
         ((and (null (cdr headers))
@@ -77,10 +75,10 @@
          ;; [BIGNUM-WIDETAG..FOO-WIDETAG]) is also possible, but such
          ;; opportunities don't come up very often and the code would
          ;; get pretty hairy...
-         (inst cmp (make-ea :byte :base eax-tn) (car headers))
+         (inst cmp (make-ea :byte :base value :disp (- lowtag)) (car headers))
          (inst jmp equal target))
         (t
-         (inst mov al-tn (make-ea :byte :base eax-tn))
+         (inst mov al-tn (make-ea :byte :base value :disp (- lowtag)))
          (do ((remaining headers (cdr remaining)))
              ((null remaining))
            (let ((header (car remaining))
@@ -295,8 +293,8 @@
               (values not-target target)
               (values target not-target))
         ;; Is it a fixnum?
-        (generate-fixnum-test value)
         (move eax-tn value)
+        (inst test al-tn fixnum-tag-mask)
         (inst jmp :e fixnum)
 
         ;; If not, is it an other pointer?
