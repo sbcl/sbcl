@@ -80,10 +80,9 @@
   (%test-headers value target not-p nil headers drop-through))
 
 (defun %test-lowtag (value target not-p lowtag)
-  (move-qword-to-eax value)
-  (inst and al-tn lowtag-mask)
-  (inst cmp al-tn lowtag)
-  (inst jmp (if not-p :ne :e) target))
+  (inst lea eax-tn (make-ea :dword :base value :disp (- lowtag)))
+  (inst test al-tn lowtag-mask)
+  (inst jmp (if not-p :nz :z) target))
 
 (defun %test-headers (value target not-p function-p headers
                             &optional (drop-through (gen-label)))
