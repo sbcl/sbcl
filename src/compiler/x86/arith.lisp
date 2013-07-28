@@ -1185,10 +1185,14 @@ constant shift greater than word length")))
                                            cond
                                            unsigned))
                         (:generator ,cost
-                                    (inst cmp x
-                                          ,(if (eq suffix '-c/fixnum)
-                                               '(fixnumize y)
-                                               'y)))))
+                          (cond ((and (sc-is x any-reg signed-reg unsigned-reg)
+                                      (eql y 0))
+                                 (inst test x x))
+                                (t
+                                 (inst cmp x
+                                       ,(if (eq suffix '-c/fixnum)
+                                            '(fixnumize y)
+                                            'y)))))))
                    '(/fixnum -c/fixnum /signed -c/signed /unsigned -c/unsigned)
                    '(4 3 6 5 6 5)
                    '(t t t t nil nil)))))
