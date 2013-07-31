@@ -48,25 +48,25 @@ provided with absolutely no warranty. See the @file{COPYING} and
 @w{ } @w{ } @url{\text\}
 @end macro
 
-@ifnottex
-
-@c We use @&key, etc to escape & from TeX in lambda lists --
+@c We use @andkey, etc to escape & from TeX in lambda lists --
 @c so we need to define them for info as well.
-@macro &allow-other-keys
+@macro andallowotherkeys
 &allow-other-keys
 @end macro
-@macro &optional
+@macro andoptional
 &optional
 @end macro
-@macro &rest
+@macro andrest
 &rest
 @end macro
-@macro &key
+@macro andkey
 &key
 @end macro
-@macro &body
+@macro andbody
 &body
 @end macro
+
+@ifnottex
 
 @node Top
 @comment  node-name,  next,  previous,  up

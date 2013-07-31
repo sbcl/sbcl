@@ -743,10 +743,10 @@ followed another tabulation label or a tabulation body."
             (title-name doc)
             ;; &foo would be amusingly bold in the pdf thanks to TeX/Texinfo
             ;; interactions,so we escape the ampersand -- amusingly for TeX.
-            ;; sbcl.texinfo defines macros that expand @&key and friends to &key.
+            ;; sbcl.texinfo defines macros that expand @andkey and friends to &key.
             (mapcar (lambda (name)
                       (if (member name lambda-list-keywords)
-                          (format nil "@~A" name)
+                          (format nil "@and~A{}" (remove #\- (subseq (string name) 1)))
                           name))
                     (lambda-list doc)))))
 
