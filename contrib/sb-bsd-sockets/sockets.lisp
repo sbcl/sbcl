@@ -376,6 +376,24 @@ Otherwise closes the socket file descriptor using close(2)."))
                 (declare (ignore r))
                 (drop-it))))))))
 
+(defgeneric socket-shutdown (socket &key direction)
+  (:documentation
+   "Indicate that no communication in DIRECTION will be performed on SOCKET.
+
+DIRECTION has to be one of :INPUT, :OUTPUT or :IO.
+
+After a shutdown, no input and/or output of the indicated DIRECTION
+can be performed on SOCKET."))
+
+(defmethod socket-shutdown ((socket socket) &key direction)
+  (let* ((fd  (socket-file-descriptor socket))
+         (how (ecase direction
+                (:input sockint::SHUT_RD)
+                (:output sockint::SHUT_WR)
+                (:io sockint::SHUT_RDWR))))
+    (when (minusp (sockint::shutdown fd how))
+      (socket-error "shutdown"))))
+
 (defgeneric socket-make-stream (socket &key input output
                                        element-type external-format
                                        buffering

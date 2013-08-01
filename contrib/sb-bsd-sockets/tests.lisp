@@ -362,3 +362,63 @@
         (server))
       result)
   :ok)
+
+(defmacro with-client-and-server ((server-socket-var client-socket-var) &body body)
+  (let ((listen-socket (gensym "LISTEN-SOCKET")))
+    `(let ((,listen-socket (make-instance 'inet-socket
+                                          :type :stream
+                                          :protocol :tcp))
+           (,client-socket-var (make-instance 'inet-socket
+                                              :type :stream
+                                              :protocol :tcp))
+           (,server-socket-var))
+      (unwind-protect
+           (progn
+             (setf (sockopt-reuse-address ,listen-socket) t)
+             (socket-bind ,listen-socket (make-inet-address "127.0.0.1") 0)
+             (socket-listen ,listen-socket 5)
+             (socket-connect ,client-socket-var (make-inet-address "127.0.0.1")
+                             (nth-value 1 (socket-name ,listen-socket)))
+             (setf ,server-socket-var (socket-accept ,listen-socket))
+             ,@body)
+        (socket-close ,client-socket-var)
+        (socket-close ,listen-socket)
+        (when ,server-socket-var
+          (socket-close ,server-socket-var))))))
+
+;; For stream sockets, make sure a shutdown of the output direction
+;; translates into an END-OF-FILE on the other end, no matter which
+;; end performs the shutdown and independent of the element-type of
+;; the stream.
+(macrolet
+    ((define-shutdown-test (name who-shuts-down who-reads element-type direction)
+       `(deftest ,name
+          (with-client-and-server (client server)
+            (socket-shutdown ,who-shuts-down :direction ,direction)
+            (handler-case
+                (sb-ext:with-timeout 2
+                  (,(if (eql element-type 'character)
+                        'read-char 'read-byte)
+                   (socket-make-stream
+                    ,who-reads :input t :output t
+                    :element-type ',element-type)))
+              (end-of-file ()
+                :ok)
+              (sb-ext:timeout () :timeout)))
+          :ok))
+     (define-shutdown-tests (direction)
+       (flet ((make-name (name)
+                (intern (concatenate
+                         'string (string name) "." (string direction)))))
+         `(progn
+            (define-shutdown-test ,(make-name 'shutdown.server.character)
+              server client character ,direction)
+            (define-shutdown-test ,(make-name 'shutdown.server.ub8)
+              server client (unsigned-byte 8) ,direction)
+            (define-shutdown-test ,(make-name 'shutdown.client.character)
+              client server character ,direction)
+            (define-shutdown-test ,(make-name 'shutdown.client.ub8)
+              client server (unsigned-byte 8) ,direction)))))
+
+  (define-shutdown-tests :output)
+  (define-shutdown-tests :io))

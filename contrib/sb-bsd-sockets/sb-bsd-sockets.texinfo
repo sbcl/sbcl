@@ -36,7 +36,7 @@ Where the C API would typically return -1 and set @code{errno},
 of @code{sb-bsd-sockets:socket-condition} and generally correspond one
 for one with possible @code{errno} values.
 
-@item 
+@item
 We use multiple return values in many places where the C API would use
 pass-by-reference values.
 
@@ -74,6 +74,8 @@ than "network-endian integers".
 @include fun-sb-bsd-sockets-socket-open-p.texinfo
 
 @include fun-sb-bsd-sockets-socket-close.texinfo
+
+@include fun-sb-bsd-sockets-socket-shutdown.texinfo
 
 @include fun-sb-bsd-sockets-socket-make-stream.texinfo
 
@@ -141,7 +143,7 @@ port, so for example, (socket-connect s #(192 168 1 1) 80).
 Local domain (@code{AF_LOCAL}) sockets are also known as Unix-domain
 sockets, but were renamed by POSIX presumably on the basis that they
 may be available on other systems too.
-                                                                                
+
 A local socket address is a string, which is used to create a node in
 the local filesystem. This means of course that they cannot be used
 across a network.
@@ -157,7 +159,7 @@ Presently name service is implemented by calling out to the
 the preferred functions are not available. The exact details of
 the name resolving process (for example the choice of whether
 DNS or a hosts file is used for lookup) are platform dependent.
-                                                                                 
+
 @c Direct links to the asynchronous @code{resolver(3)} routines would be
 @c nice to have eventually, so that we can do DNS lookups in parallel
 @c with other things.

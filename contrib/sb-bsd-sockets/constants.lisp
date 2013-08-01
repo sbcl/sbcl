@@ -67,6 +67,12 @@
  #+linux (:integer so-bindtodevice "SO_BINDTODEVICE")
  (:integer ifnamsiz "IFNAMSIZ")
 
+;; socket shutdown flags
+(:integer SHUT_RD "SHUT_RD")
+(:integer SHUT_WR "SHUT_WR")
+(:integer SHUT_RDWR "SHUT_RDWR")
+
+;; errors
  (:integer EADDRINUSE "EADDRINUSE")
  (:integer EAGAIN "EAGAIN")
  (:integer EBADF "EBADF")
@@ -214,6 +220,8 @@
                     (addrlen socklen-t)))
  (:function close ("close" int
                    (fd int)))
+ (:function shutdown ("shutdown" int
+                      (fd int) (how int)))
  (:function recvfrom ("recvfrom" ssize-t
                                  (socket int)
                                  (buf (* t))

@@ -10,7 +10,7 @@
            socket-bind socket-accept socket-connect
            socket-send socket-receive
            socket-name socket-peername socket-listen
-           socket-close socket-file-descriptor
+           socket-close socket-shutdown socket-file-descriptor
            socket-family socket-protocol socket-open-p
            socket-type socket-make-stream get-protocol-by-name
 
