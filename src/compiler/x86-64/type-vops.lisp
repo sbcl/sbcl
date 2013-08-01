@@ -264,9 +264,10 @@
         (if not-p
             (values not-target target)
             (values target not-target))
-      (generate-fixnum-test value)
-      (inst jmp :e yep)
       (move-qword-to-eax value)
+      (inst test al-tn fixnum-tag-mask)
+      (inst jmp :e yep)
+
       (inst and al-tn lowtag-mask)
       (inst cmp al-tn other-pointer-lowtag)
       (inst jmp :ne nope)
@@ -305,7 +306,6 @@
           (if not-p
               (values not-target target)
               (values target not-target))
-        ;; Is it a fixnum?
         ;; Is it a fixnum?
         (move rax-tn value)
         (inst test al-tn fixnum-tag-mask)
