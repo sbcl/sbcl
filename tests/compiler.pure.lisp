@@ -150,10 +150,11 @@
 
 ;;; on the PPC, we got the magic numbers in undefined_tramp wrong for
 ;;; a while; fixed by CSR 2002-07-18
-(multiple-value-bind (value error)
-    (ignore-errors (some-undefined-function))
-  (assert (null value))
-  (assert (eq (cell-error-name error) 'some-undefined-function)))
+(with-test (:name :undefined-function-error)
+  (multiple-value-bind (value error)
+      (ignore-errors (some-undefined-function))
+    (assert (null value))
+    (assert (eq (cell-error-name error) 'some-undefined-function))))
 
 ;;; Non-symbols shouldn't be allowed as VARs in lambda lists. (Where VAR
 ;;; is a variable name, as in section 3.4.1 of the ANSI spec.)

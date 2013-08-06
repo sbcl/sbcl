@@ -392,8 +392,8 @@ lra:	.word	RETURN_PC_HEADER_WIDETAG
 	   See debug-var-io.lisp. */
 	.byte	254
 	/* reg_FDEFN is #14. */
-	.byte	((14 << 5) + sc_DescriptorReg) % 0x100
-	.byte	((14 << 5) + sc_DescriptorReg) / 0x100
+	.byte	((14 << 6) + sc_DescriptorReg) % 0x100
+	.byte	((14 << 6) + sc_DescriptorReg) / 0x100
 	.align	2
 	.set	reorder
 1:	lw	reg_CODE, FDEFN_FUN_OFFSET(reg_FDEFN)

@@ -2,6 +2,8 @@
 changes relative to sbcl-1.1.10
   * enhancement: support building the manual under texinfo version 5.
     (lp#1189146)
+  * bug fix: undefined function errors are now properly reported on PPC and MIPS.
+    (regression since 1.1.9)
 
 changes in sbcl-1.1.10 relative to sbcl-1.1.9:
   * enhancement: ASDF has been updated to 3.0.2.

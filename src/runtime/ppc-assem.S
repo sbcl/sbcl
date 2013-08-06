@@ -654,7 +654,7 @@ CSYMBOL(undefined_tramp):
 	twllei reg_ZERO,trap_Cerror
 	.byte 4
 	.byte UNDEFINED_FUN_ERROR
-	.byte 254, sc_DescriptorReg+0x40, 1 /* 140?  sparc says sc_descriptorReg */
+	.byte 254, sc_DescriptorReg+0x80, 0x2 /* 280 */
 	/* This stuff is for the continuable error.  I don't think there's
 	 * any support for it on the lisp side */
 	.align 2
