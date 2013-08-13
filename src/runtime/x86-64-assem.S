@@ -13,6 +13,11 @@
  * files for more information.
  */
 
+#ifdef __ELF__
+// Mark the object as not requiring an executable stack.
+.section .note.GNU-stack,"",%progbits
+#endif
+
 #define LANGUAGE_ASSEMBLY
 #include "genesis/config.h"
 #include "validate.h"

@@ -1,3 +1,8 @@
+#ifdef __ELF__
+// Mark the object as not requiring an executable stack.
+.section .note.GNU-stack,"",%progbits
+#endif
+
 #define _ASM
 
 #include "sparc-funcdef.h"

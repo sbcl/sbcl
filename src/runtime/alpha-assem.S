@@ -8,7 +8,12 @@
  * provided with absolutely no warranty. See the COPYING and CREDITS
  * files for more information.
  */
-	
+
+#ifdef __ELF__
+// Mark the object as not requiring an executable stack.
+.section .note.GNU-stack,"",%progbits
+#endif
+
 #include "validate.h"		
 #include <alpha/regdef.h>
 #ifdef linux
