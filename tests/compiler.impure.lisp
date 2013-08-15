@@ -1409,6 +1409,18 @@
       (compile nil `(lambda (x) (cmacro-with-tricky-key x 42)))
     (assert (and (not warn) (not fail)))
     (assert (string= "fun=42" (funcall fun 'tricky-key)))))
+
+(defun test-function-983 (x) x)
+(define-compiler-macro test-function-983 (x) x)
+
+(with-test (:name funcall-compiler-macro)
+  (assert
+   (handler-case
+       (compile nil
+                `(lambda ()
+                   (funcall (function test-function-983 junk) 1)))
+     (sb-c:compiler-error () t)
+     (:no-error () nil))))
 
 ;;;; tests not in the problem domain, but of the consistency of the
 ;;;; compiler machinery itself
