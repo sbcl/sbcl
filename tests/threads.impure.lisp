@@ -1553,3 +1553,17 @@
                (sb-thread:join-thread reader)))))
       (writer))
     (assert (eq result :ok))))
+
+(with-test (:name :thread-alloca)
+  (sb-ext:run-program "/bin/sh"
+                      '("run-compiler.sh" "-sbcl-pic" "-sbcl-shared"
+                        "alloca.c" "-o" "alloca.so")
+                      :environment (test-util::test-env))
+
+  (load-shared-object (truename "alloca.so"))
+
+  (alien-funcall (extern-alien "alloca_test" (function void)))
+  (sb-thread:join-thread
+   (sb-thread:make-thread
+    (lambda ()
+      (alien-funcall (extern-alien "alloca_test" (function void)))))))

@@ -695,7 +695,7 @@ create_thread_struct(lispobj initial_function) {
     th->state_not_stopped_waitcount = 0;
 #endif
     th->state=STATE_RUNNING;
-#ifdef LISP_FEATURE_STACK_GROWS_DOWNWARD_NOT_UPWARD
+#ifdef ALIEN_STACK_GROWS_DOWNWARD
     th->alien_stack_pointer=((void *)th->alien_stack_start
                              + ALIEN_STACK_SIZE-N_WORD_BYTES);
 #else

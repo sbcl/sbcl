@@ -14,5 +14,6 @@ release_spinlock(lispobj *word)
 }
 
 #define ARCH_HAS_NPC_REGISTER
+#define ALIEN_STACK_GROWS_DOWNWARD
 
 #endif /* _SPARC_ARCH_H */

@@ -38,6 +38,7 @@
 
 #if !defined(LANGUAGE_ASSEMBLY)
 #include <thread.h>
+
 #ifdef LISP_FEATURE_STACK_GROWS_DOWNWARD_NOT_UPWARD
 
 #define CONTROL_STACK_HARD_GUARD_PAGE(th) \
@@ -46,14 +47,6 @@
     (CONTROL_STACK_HARD_GUARD_PAGE(th) + os_vm_page_size)
 #define CONTROL_STACK_RETURN_GUARD_PAGE(th) \
     (CONTROL_STACK_GUARD_PAGE(th) + os_vm_page_size)
-
-#define ALIEN_STACK_HARD_GUARD_PAGE(th) \
-    ((os_vm_address_t)(th->alien_stack_start))
-#define ALIEN_STACK_GUARD_PAGE(th) \
-    (ALIEN_STACK_HARD_GUARD_PAGE(th) + os_vm_page_size)
-#define ALIEN_STACK_RETURN_GUARD_PAGE(th) \
-    (ALIEN_STACK_GUARD_PAGE(th) + os_vm_page_size)
-
 #else
 
 #define CONTROL_STACK_HARD_GUARD_PAGE(th) \
@@ -63,6 +56,19 @@
 #define CONTROL_STACK_RETURN_GUARD_PAGE(th) \
     (CONTROL_STACK_GUARD_PAGE(th) - os_vm_page_size)
 
+#endif
+
+#ifdef ALIEN_STACK_GROWS_DOWNWARD
+
+#define ALIEN_STACK_HARD_GUARD_PAGE(th)         \
+    ((os_vm_address_t)(th->alien_stack_start))
+#define ALIEN_STACK_GUARD_PAGE(th) \
+    (ALIEN_STACK_HARD_GUARD_PAGE(th) + os_vm_page_size)
+#define ALIEN_STACK_RETURN_GUARD_PAGE(th) \
+    (ALIEN_STACK_GUARD_PAGE(th) + os_vm_page_size)
+
+#elif ALIEN_STACK_GROWS_UPWARD
+
 #define ALIEN_STACK_HARD_GUARD_PAGE(th)                            \
     (((os_vm_address_t)th->alien_stack_start) + ALIEN_STACK_SIZE - \
      os_vm_page_size)
@@ -71,6 +77,8 @@
 #define ALIEN_STACK_RETURN_GUARD_PAGE(th) \
     (ALIEN_STACK_GUARD_PAGE(th) - os_vm_page_size)
 
+#else
+#error ALIEN_STACK_GROWS_DOWNWARD or ALIEN_STACK_GROWS_UPWARD has to be defined
 #endif
 
 #define BINDING_STACK_HARD_GUARD_PAGE(th)                              \
