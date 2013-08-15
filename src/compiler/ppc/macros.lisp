@@ -354,6 +354,7 @@
          (inst twi :ne ,flag-tn 0))
        (inst ori alloc-tn alloc-tn pseudo-atomic-flag))
      ,@forms
+     (inst sync)
      (without-scheduling ()
        (inst subi alloc-tn alloc-tn pseudo-atomic-flag)
        ;; Now test to see if the pseudo-atomic interrupted bit is set.
