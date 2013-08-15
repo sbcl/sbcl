@@ -168,8 +168,7 @@
 ;;; object.
 (defun allocation-tramp (alloc-tn size lowtag)
   (inst push size)
-  (inst lea temp-reg-tn (make-ea :qword
-                            :disp (make-fixup "alloc_tramp" :foreign)))
+  (inst mov temp-reg-tn (make-fixup "alloc_tramp" :foreign))
   (inst call temp-reg-tn)
   (inst pop alloc-tn)
   (when lowtag

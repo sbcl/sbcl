@@ -156,7 +156,7 @@
            (type sb!disassem:disassem-state dstate))
   (if (typep value 'full-reg)
       (print-reg-with-width value width stream dstate)
-    (print-mem-access value width sized-p stream dstate)))
+      (print-mem-access value width sized-p stream dstate)))
 
 ;;; Print a register or a memory reference. The width is determined by
 ;;; calling INST-OPERAND-SIZE.
@@ -343,6 +343,9 @@
     (:dword 32)
     (:qword 64)))
 
+(defun print-imm/asm-routine (value stream dstate)
+  (sb!disassem:maybe-note-assembler-routine value nil dstate)
+  (princ value stream))
 ) ; EVAL-WHEN
 
 ;;;; disassembler argument types
@@ -403,6 +406,10 @@
                    (setf width 32))
                  (sb!disassem:read-signed-suffix width dstate))))
 
+(sb!disassem:define-arg-type signed-imm-data/asm-routine
+  :type 'signed-imm-data
+  :printer #'print-imm/asm-routine)
+
 ;;; Used by the variant of the MOV instruction with opcode B8 which can
 ;;; move immediates of all sizes (i.e. including :qword) into a
 ;;; register.
@@ -412,6 +419,11 @@
                (sb!disassem:read-signed-suffix
                 (width-bits (inst-operand-size dstate))
                 dstate)))
+
+(sb!disassem:define-arg-type signed-imm-data-upto-qword/asm-routine
+  :type 'signed-imm-data-upto-qword
+  :printer #'print-imm/asm-routine)
+
 
 ;;; Used by those instructions that have a default operand size of
 ;;; :qword. Nevertheless the immediate is at most of size :dword.
@@ -687,6 +699,13 @@
                                         '(:name :tab reg/mem ", " imm))
   (reg/mem :type 'sized-reg/mem)
   (imm     :type 'signed-imm-data))
+
+(sb!disassem:define-instruction-format (reg/mem-imm/asm-routine 16
+                                        :include 'reg/mem-imm
+                                        :default-printer
+                                        '(:name :tab reg/mem ", " imm))
+  (reg/mem :type 'sized-reg/mem)
+  (imm     :type 'signed-imm-data/asm-routine))
 
 ;;; Same as reg/mem, but with using the accumulator in the default printer
 (sb!disassem:define-instruction-format
@@ -1737,9 +1756,9 @@
 
 (define-instruction mov (segment dst src)
   ;; immediate to register
-  (:printer reg ((op #b1011) (imm nil :type 'signed-imm-data))
+  (:printer reg ((op #b1011) (imm nil :type 'signed-imm-data/asm-routine))
             '(:name :tab reg ", " imm))
-  (:printer rex-reg ((op #b1011) (imm nil :type 'signed-imm-data-upto-qword))
+  (:printer rex-reg ((op #b1011) (imm nil :type 'signed-imm-data-upto-qword/asm-routine))
             '(:name :tab reg ", " imm))
   ;; absolute mem to/from accumulator
   (:printer simple-dir ((op #b101000) (imm nil :type 'imm-addr))
@@ -1747,7 +1766,7 @@
   ;; register to/from register/memory
   (:printer reg-reg/mem-dir ((op #b100010)))
   ;; immediate to register/memory
-  (:printer reg/mem-imm ((op '(#b1100011 #b000))))
+  (:printer reg/mem-imm/asm-routine ((op '(#b1100011 #b000))))
 
   (:emitter
    (let ((size (matching-operand-size dst src)))
@@ -1765,6 +1784,12 @@
                                                   #b10111)
                                               (reg-tn-encoding dst))
                           (emit-sized-immediate segment size src))))
+                  ((and (fixup-p src)
+                        (or (eq (fixup-flavor src) :foreign)
+                            (eq (fixup-flavor src) :assembly-routine)))
+                   (maybe-emit-rex-prefix segment :dword nil nil dst)
+                   (emit-byte-with-reg segment #b10111 (reg-tn-encoding dst))
+                   (emit-absolute-fixup segment src))
                   (t
                    (maybe-emit-rex-for-ea segment src dst)
                    (emit-byte segment

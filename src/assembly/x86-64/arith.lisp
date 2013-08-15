@@ -224,8 +224,7 @@
                 (:generator 10
                    (move rdx x)
                    (move rdi y)
-                   (inst lea rcx (make-ea :qword
-                                          :disp (make-fixup ',name :assembly-routine)))
+                   (inst mov rcx (make-fixup ',name :assembly-routine))
                    (inst call rcx)))))
 
   (define-cond-assem-rtn generic-< < two-arg-< :l)
@@ -293,8 +292,7 @@
   (:generator 10
     (move rdx x)
     (move rdi y)
-    (inst lea rcx (make-ea :qword
-                           :disp (make-fixup 'generic-eql :assembly-routine)))
+    (inst mov rcx (make-fixup 'generic-eql :assembly-routine))
     (inst call rcx)))
 
 #+sb-assembling
@@ -359,6 +357,5 @@
   (:generator 10
     (move rdx x)
     (move rdi y)
-    (inst lea rcx (make-ea :qword
-                           :disp (make-fixup 'generic-= :assembly-routine)))
+    (inst mov rcx (make-fixup 'generic-= :assembly-routine))
     (inst call rcx)))

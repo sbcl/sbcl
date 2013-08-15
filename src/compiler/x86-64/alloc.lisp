@@ -177,7 +177,7 @@
   (:args)
   (:results (result :scs (any-reg)))
   (:generator 1
-    (inst lea result (make-fixup "funcallable_instance_tramp" :foreign))))
+    (inst mov result (make-fixup "funcallable_instance_tramp" :foreign))))
 
 (define-vop (fixed-alloc)
   (:args)

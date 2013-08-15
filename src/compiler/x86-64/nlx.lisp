@@ -266,7 +266,7 @@
             catch-block-entry-pc-slot)
 
     ;; Run any required UWPs.
-    (inst lea temp-reg-tn (make-fixup 'unwind :assembly-routine))
+    (inst mov temp-reg-tn (make-fixup 'unwind :assembly-routine))
     (inst jmp temp-reg-tn)
     ENTRY-LABEL
 

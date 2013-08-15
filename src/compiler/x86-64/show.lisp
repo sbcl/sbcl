@@ -32,10 +32,8 @@
     (inst push rbp-tn)
     (inst and rsp-tn -16)
     (storew rax rsp-tn)
-    (inst lea rax (make-fixup "debug_print" :foreign))
-    (inst lea call-target
-          (make-ea :qword
-                   :disp (make-fixup "call_into_c" :foreign)))
+    (inst mov rax (make-fixup "debug_print" :foreign))
+    (inst mov call-target (make-fixup "call_into_c" :foreign))
     (inst call call-target)
     (inst mov rsp-tn rbp-tn)
     (inst pop rbp-tn)

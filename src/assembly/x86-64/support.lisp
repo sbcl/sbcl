@@ -13,23 +13,20 @@
   (ecase style
     (:raw
      (values
-      `((inst lea temp-reg-tn
-              (make-ea :qword :disp (make-fixup ',name :assembly-routine)))
+      `((inst mov temp-reg-tn (make-fixup ',name :assembly-routine))
         (inst call temp-reg-tn))
       nil))
     (:full-call
      (values
       `((note-this-location ,vop :call-site)
-        (inst lea temp-reg-tn
-              (make-ea :qword :disp (make-fixup ',name :assembly-routine)))
+        (inst mov temp-reg-tn (make-fixup ',name :assembly-routine))
         (inst call temp-reg-tn)
         (note-this-location ,vop :single-value-return)
         (inst cmov :c rsp-tn rbx-tn))
       '((:save-p :compute-only))))
     (:none
      (values
-      `((inst lea temp-reg-tn
-              (make-ea :qword :disp (make-fixup ',name :assembly-routine)))
+      `((inst mov temp-reg-tn (make-fixup ',name :assembly-routine))
         (inst jmp temp-reg-tn))
       nil))))
 

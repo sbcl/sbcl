@@ -941,9 +941,7 @@
     (move rsi args)
     (move rax function)
     ;; And jump to the assembly routine.
-    (inst lea call-target
-          (make-ea :qword
-                   :disp (make-fixup 'tail-call-variable :assembly-routine)))
+    (inst mov call-target (make-fixup 'tail-call-variable :assembly-routine))
     (inst jmp call-target)))
 
 ;;;; unknown values return
@@ -1089,9 +1087,7 @@
         (emit-label not-single)))
     (move rsi vals)
     (move rcx nvals)
-    (inst lea return-asm
-          (make-ea :qword :disp (make-fixup 'return-multiple
-                                            :assembly-routine)))
+    (inst mov return-asm (make-fixup 'return-multiple :assembly-routine))
     (inst jmp return-asm)
     (trace-table-entry trace-table-normal)))
 
