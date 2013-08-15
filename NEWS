@@ -7,6 +7,9 @@ changes relative to sbcl-1.1.10
   * bug fix: (funcall (function X junk)) didn't causes an error when X had a
     compiler macro.
     Patch by Douglas Katzman.
+  * bug fix: signal a warning when defining a setf-function when a
+    setf-expander is already present.
+    Patch by Douglas Katzman.
 
 changes in sbcl-1.1.10 relative to sbcl-1.1.9:
   * enhancement: ASDF has been updated to 3.0.2.

@@ -1416,11 +1416,21 @@
 (with-test (:name funcall-compiler-macro)
   (assert
    (handler-case
-       (compile nil
-                `(lambda ()
-                   (funcall (function test-function-983 junk) 1)))
-     (sb-c:compiler-error () t)
-     (:no-error () nil))))
+       (and (compile nil
+                     `(lambda ()
+                        (funcall (function test-function-983 junk) 1)))
+            nil)
+     (sb-c:compiler-error () t))))
+
+(defsetf test-984 %test-984)
+
+(with-test (:name :setf-function-with-setf-expander)
+  (assert
+   (handler-case
+       (and
+        (defun (setf test-984) ())
+        nil)
+     (style-warning () t))))
 
 ;;;; tests not in the problem domain, but of the consistency of the
 ;;;; compiler machinery itself

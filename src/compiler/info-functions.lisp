@@ -85,9 +85,10 @@
 ;;; can't assume that they aren't just naming a function (SETF FOO)
 ;;; for the heck of it. NAME is already known to be well-formed.
 (defun note-if-setf-fun-and-macro (name)
-  (when (consp name)
-    (when (or (info :setf :inverse name)
-              (info :setf :expander name))
+  (when (and (consp name)
+             (eq (car name) 'setf))
+    (when (or (info :setf :inverse (second name))
+              (info :setf :expander (second name)))
       (compiler-style-warn
        "defining as a SETF function a name that already has a SETF macro:~
        ~%  ~S"
