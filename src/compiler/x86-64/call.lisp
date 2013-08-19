@@ -1233,7 +1233,7 @@
                                 :disp n-word-bytes))))
 
 (define-vop (more-arg)
-    (:translate sb!c::%more-arg)
+  (:translate sb!c::%more-arg)
   (:policy :fast-safe)
   (:args (object :scs (descriptor-reg) :to (:result 1))
          (index :scs (any-reg) :to (:result 1) :target value))
@@ -1272,8 +1272,6 @@
       (inst lea dst (make-ea :qword :index rcx :scale (ash 2 (- word-shift n-fixnum-tag-bits))))
       (maybe-pseudo-atomic stack-allocate-p
        (allocation dst dst node stack-allocate-p list-pointer-lowtag)
-       ;; Set decrement mode (successive args at lower addresses)
-       (inst std)
        ;; Set up the result.
        (move result dst)
        ;; Jump into the middle of the loop, 'cause that's where we want
@@ -1293,8 +1291,7 @@
        (inst sub rcx (fixnumize 1))
        (inst jmp :nz loop)
        ;; NIL out the last cons.
-       (storew nil-value dst 1 list-pointer-lowtag)
-       (inst cld))
+       (storew nil-value dst 1 list-pointer-lowtag))
       (emit-label done))))
 
 ;;; Return the location and size of the &MORE arg glob created by
