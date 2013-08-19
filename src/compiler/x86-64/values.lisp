@@ -76,6 +76,7 @@
             (count :scs (any-reg)))
   (:temporary (:sc descriptor-reg :from (:argument 0) :to (:result 1)) list)
   (:temporary (:sc dword-reg :offset eax-offset :to (:result 1)) eax)
+  (:ignore eax)
   (:vop-var vop)
   (:save-p :compute-only)
   (:generator 0
@@ -87,10 +88,7 @@
     (inst jmp :e DONE)
     (pushw list cons-car-slot list-pointer-lowtag)
     (loadw list list cons-cdr-slot list-pointer-lowtag)
-    (inst mov eax (make-dword-tn list))
-    (inst and al-tn lowtag-mask)
-    (inst cmp al-tn list-pointer-lowtag)
-    (inst jmp :e LOOP)
+    (%test-lowtag list LOOP nil list-pointer-lowtag)
     (error-call vop 'bogus-arg-to-values-list-error list)
 
     DONE

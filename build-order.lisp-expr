@@ -578,8 +578,10 @@
   ;; x what the problem is and fix it.
   #!+(or ppc) :ignore-failure-p)
  ("src/code/cross-modular"  :not-target)
- ("src/compiler/target/subprim")
 
+ ("src/compiler/target/type-vops")
+
+ ("src/compiler/target/subprim")
  ("src/compiler/target/debug")
  ;; src/compiler/sparc/c-call contains a deftransform for
  ;; %ALIEN-FUNCALL -- CSR
@@ -596,7 +598,6 @@
  ("src/compiler/generic/array")
  ("src/compiler/target/pred")
 
- ("src/compiler/target/type-vops")
  ("src/compiler/generic/late-type-vops")
 
  ;; KLUDGE: The assembly files need to be compiled twice: once as
