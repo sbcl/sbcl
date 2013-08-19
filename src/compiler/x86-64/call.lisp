@@ -1148,12 +1148,12 @@
            ;; We must stop when we run out of stack args, not when we
            ;; run out of more args.
            ;; Number to copy = nargs-3
-           (inst sub rcx-tn (fixnumize register-arg-count))
+           (inst sub rbx-tn (fixnumize register-arg-count))
            ;; Everything of interest in registers.
            (inst jmp :be DO-REGS))
           (t
            ;; Number to copy = nargs-fixed
-           (inst sub rcx-tn (fixnumize fixed))))
+           (inst sub rbx-tn (fixnumize fixed))))
 
     ;; Initialize R8 to be the end of args.
     (inst lea source (make-ea :qword :base rbp-tn
@@ -1162,7 +1162,7 @@
 
     ;; We need to copy from downwards up to avoid overwriting some of
     ;; the yet uncopied args. So we need to use R9 as the copy index
-    ;; and RCX as the loop counter, rather than using RCX for both.
+    ;; and RBX as the loop counter, rather than using RBX for both.
     (zeroize copy-index)
 
     ;; We used to use REP MOVS here, but on modern x86 it performs
@@ -1171,13 +1171,10 @@
     (inst mov temp (make-ea :qword :base source :index copy-index))
     (inst mov (make-ea :qword :base rsp-tn :index copy-index) temp)
     (inst add copy-index n-word-bytes)
-    (inst sub rcx-tn (fixnumize 1))
+    (inst sub rbx-tn (fixnumize 1))
     (inst jmp :nz COPY-LOOP)
 
     DO-REGS
-
-    ;; Restore RCX
-    (inst mov rcx-tn rbx-tn)
 
     ;; Here: nargs>=1 && nargs>fixed
     (when (< fixed register-arg-count)
