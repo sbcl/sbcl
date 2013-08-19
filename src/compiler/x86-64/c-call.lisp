@@ -243,7 +243,7 @@
   (:results (res :scs (sap-reg)))
   (:result-types system-area-pointer)
   (:generator 2
-   (inst lea res (make-fixup foreign-symbol :foreign))))
+   (inst mov res (make-fixup foreign-symbol :foreign))))
 
 #!+linkage-table
 (define-vop (foreign-symbol-dataref-sap)
