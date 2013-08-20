@@ -67,7 +67,7 @@ struct page {
      */
     page_bytes_t bytes_used;
 
-    unsigned
+    unsigned char
         /* This is set when the page is write-protected. This should
          * always reflect the actual write_protect status of a page.
          * (If the page is written into, we catch the exception, make

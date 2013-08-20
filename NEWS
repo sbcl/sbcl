@@ -11,6 +11,7 @@ changes relative to sbcl-1.1.10
     setf-expander is already present.
     Patch by Douglas Katzman.
   * bug fix: improved threading on PPC.
+  * bug fix: ROOM works again on Windows.
 
 changes in sbcl-1.1.10 relative to sbcl-1.1.9:
   * enhancement: ASDF has been updated to 3.0.2.
