@@ -1,4 +1,3 @@
-#include <alloca.h>
 #include <string.h>
 
 #define SIZE 128*1024 // twice the largest page size

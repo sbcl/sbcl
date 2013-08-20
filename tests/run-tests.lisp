@@ -215,7 +215,6 @@
   ;; What? No SB-POSIX:EXECV?
   `(let ((process (sb-ext:run-program "/bin/sh"
                                       (list (native-namestring ,file))
-                                      :environment (test-util::test-env)
                                       :output *error-output*)))
      (let ((*failures* nil))
        (test-util:report-test-status))

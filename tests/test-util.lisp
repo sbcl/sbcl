@@ -17,6 +17,14 @@
 (defvar *threads-to-kill*)
 (defvar *threads-to-join*)
 
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (require :sb-posix))
+
+;;; run-program on Windows doesn't have an :environment parameter,
+;;; set these globally
+(sb-posix:putenv (format nil "SBCL_MACHINE_TYPE=~A" (machine-type)))
+(sb-posix:putenv (format nil "SBCL_SOFTWARE_TYPE=~A" (software-type)))
+
 #+sb-thread
 (defun make-kill-thread (&rest args)
   (let ((thread (apply #'sb-thread:make-thread args)))
@@ -129,11 +137,6 @@
 
 (defun skipped-p (skipped-on)
   (sb-impl::featurep skipped-on))
-
-(defun test-env ()
-  (cons (format nil "SBCL_MACHINE_TYPE=~A" (machine-type))
-        (cons (format nil "SBCL_SOFTWARE_TYPE=~A" (software-type))
-              (posix-environ))))
 
 ;;; Repeat calling THUNK until its cumulated runtime, measured using
 ;;; GET-INTERNAL-RUN-TIME, is larger than PRECISION. Repeat this

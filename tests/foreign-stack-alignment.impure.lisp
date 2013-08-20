@@ -22,7 +22,6 @@
          (output
           (with-output-to-string (s)
             (setf proc (run-program program arguments
-                                    :environment (test-util::test-env)
                                     :output s)))))
     (unless (zerop (process-exit-code proc))
       (error "Bad exit code: ~S~%Output:~% ~S"
