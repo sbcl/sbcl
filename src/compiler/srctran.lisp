@@ -4340,7 +4340,7 @@
 
 (deftransform %rest-values ((list context count))
   (if (rest-var-more-context-ok list)
-      `(%more-arg-values context 0 count)
+      `(%more-arg-values context count)
       `(values-list list)))
 
 (deftransform %rest-ref ((n list context count))

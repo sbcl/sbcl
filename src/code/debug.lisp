@@ -508,7 +508,7 @@ thread, NIL otherwise."
                            (setf reversed-result
                                  (append (reverse
                                           (multiple-value-list
-                                           (sb!c::%more-arg-values context 0 count)))
+                                           (sb!c::%more-arg-values context count)))
                                          reversed-result))
                            (return-from enumerating))
                          (push (make-unprintable-object "unavailable &MORE argument")
@@ -559,7 +559,7 @@ thread, NIL otherwise."
                  (butlast args 2)
                  (if (fixnump count)
                      (multiple-value-list
-                      (sb!c:%more-arg-values context 0 count))
+                      (sb!c:%more-arg-values context count))
                      (list
                       (make-unprintable-object "more unavailable arguments")))))
               args)
@@ -1595,7 +1595,7 @@ and LDB (the low-level debugger).  See also ENABLE-DEBUGGER."
           (when (and more-context more-count)
             (format *debug-io* "~S  =  ~S~%"
                     'more
-                    (multiple-value-list (sb!c:%more-arg-values more-context 0 more-count))))
+                    (multiple-value-list (sb!c:%more-arg-values more-context more-count))))
           (cond
            ((not any-p)
             (format *debug-io*

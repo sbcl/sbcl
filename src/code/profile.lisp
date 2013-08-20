@@ -180,7 +180,8 @@
              (dconsing 0)
              (inner-enclosed-profiles 0)
              (dgc-run-time 0))
-         (declare (truly-dynamic-extent dticks dconsing inner-enclosed-profiles))
+         (declare (truly-dynamic-extent dticks dconsing
+                                        inner-enclosed-profiles))
          (unwind-protect
              (let* ((start-ticks (get-internal-ticks))
                     (start-gc-run-time *gc-run-time*)
@@ -190,11 +191,12 @@
                     (nbf0 *n-bytes-freed-or-purified*)
                     (dynamic-usage-0 (sb-kernel:dynamic-usage))
                     (*enclosed-gc-run-time* (make-counter)))
-               (declare (dynamic-extent *enclosed-ticks* *enclosed-consing* *enclosed-profiles* *enclosed-gc-run-time*))
+               (declare (dynamic-extent *enclosed-ticks* *enclosed-consing*
+                                        *enclosed-profiles*
+                                        *enclosed-gc-run-time*))
                (unwind-protect
                    (multiple-value-call encapsulated-fun
                                         (sb-c:%more-arg-values arg-context
-                                                               0
                                                                arg-count))
                  (let ((*computing-profiling-data-for* encapsulated-fun)
                        (dynamic-usage-1 (sb-kernel:dynamic-usage)))

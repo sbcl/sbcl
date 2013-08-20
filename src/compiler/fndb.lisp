@@ -1446,7 +1446,7 @@
 ;;; FIXME: The second argument here should really be NEGATIVE-INDEX, but doing that
 ;;; breaks the build, and I cannot seem to figure out why. --NS 2006-06-29
 (defknown %more-kw-arg (t fixnum) (values t t))
-(defknown %more-arg-values (t index index) * (flushable))
+(defknown %more-arg-values (t index) * (flushable))
 (defknown %verify-arg-count (index index) (values))
 (defknown %arg-count-error (t) nil)
 (defknown %unknown-values () *)
