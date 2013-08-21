@@ -12,6 +12,8 @@ changes relative to sbcl-1.1.10
     Patch by Douglas Katzman.
   * bug fix: improved threading on PPC.
   * bug fix: ROOM works again on Windows.
+  * bug fix: Streams were flushed even when there was one byte still left in
+    the buffer. (lp#910213)
 
 changes in sbcl-1.1.10 relative to sbcl-1.1.9:
   * enhancement: ASDF has been updated to 3.0.2.

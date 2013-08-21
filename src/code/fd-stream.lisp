@@ -525,7 +525,7 @@
             (tail (buffer-tail obuf))
             (size ,size))
       ,(unless (eq (car buffering) :none)
-         `(when (<= (buffer-length obuf) (+ tail size))
+         `(when (< (buffer-length obuf) (+ tail size))
             (setf obuf (flush-output-buffer ,stream-var)
                   tail (buffer-tail obuf))))
       ,(unless (eq (car buffering) :none)
@@ -552,28 +552,28 @@
     `(let* ((,stream-var ,stream)
             (obuf (fd-stream-obuf ,stream-var))
             (tail (buffer-tail obuf)))
-      ,(unless (eq (car buffering) :none)
-         `(when (<= (buffer-length obuf) (+ tail ,size))
-            (setf obuf (flush-output-buffer ,stream-var)
-                  tail (buffer-tail obuf))))
-      ;; FIXME: Why this here? Doesn't seem necessary.
-      ,(unless (eq (car buffering) :none)
-         `(synchronize-stream-output ,stream-var))
-      ,(if restart
-           `(catch 'output-nothing
-              ,@body
-              (setf (buffer-tail obuf) (+ tail ,size)))
-           `(progn
-             ,@body
-             (setf (buffer-tail obuf) (+ tail ,size))))
-      ,(ecase (car buffering)
-         (:none
-          `(flush-output-buffer ,stream-var))
-         (:line
-          `(when (eql byte #\Newline)
-             (flush-output-buffer ,stream-var)))
-         (:full))
-    (values))))
+       ,(unless (eq (car buffering) :none)
+          `(when (< (buffer-length obuf) (+ tail ,size))
+             (setf obuf (flush-output-buffer ,stream-var)
+                   tail (buffer-tail obuf))))
+       ;; FIXME: Why this here? Doesn't seem necessary.
+       ,(unless (eq (car buffering) :none)
+          `(synchronize-stream-output ,stream-var))
+       ,(if restart
+            `(catch 'output-nothing
+               ,@body
+               (setf (buffer-tail obuf) (+ tail ,size)))
+            `(progn
+               ,@body
+               (setf (buffer-tail obuf) (+ tail ,size))))
+       ,(ecase (car buffering)
+          (:none
+           `(flush-output-buffer ,stream-var))
+          (:line
+           `(when (eql byte #\Newline)
+              (flush-output-buffer ,stream-var)))
+          (:full))
+       (values))))
 
 (defmacro def-output-routines/variable-width
     ((name-fmt size restart external-format &rest bufferings)
