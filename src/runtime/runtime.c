@@ -217,7 +217,15 @@ SBCL is free software, provided as is, with absolutely no warranty.\n\
 It is mostly in the public domain; some portions are provided under\n\
 BSD-style licenses.  See the CREDITS and COPYING files in the\n\
 distribution for more information.\n\
-", SBCL_VERSION_STRING);
+"
+#ifdef LISP_FEATURE_WIN32
+"\n\
+WARNING: the Windows port is fragile, particularly for multithreaded\n\
+code.  Unfortunately, the development team currently lacks the time\n\
+and resources this platform demands.\n\
+"
+#endif
+, SBCL_VERSION_STRING);
 }
 
 /* Look for a core file to load, first in the directory named by the
@@ -700,14 +708,7 @@ main(int argc, char *argv[], char *envp[])
 
     FSHOW((stderr, "/funcalling initial_function=0x%lx\n",
           (unsigned long)initial_function));
-#ifdef LISP_FEATURE_WIN32
-    fprintf(stderr, "\n\
-This is experimental prerelease support for the Windows platform: use\n\
-at your own risk.  \"Your Kitten of Death awaits!\"\n");
-    fflush(stdout);
-    fflush(stderr);
-#endif
     create_initial_thread(initial_function);
-    lose("CATS.  CATS ARE NICE.\n");
+    lose("unexpected return from initial thread in main()\n");
     return 0;
 }

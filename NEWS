@@ -2,6 +2,9 @@
 changes relative to sbcl-1.1.10
   * enhancement: support building the manual under texinfo version 5.
     (lp#1189146)
+  * enhancement: Windows builds no longer display the "Kitten of Death" message.
+    A warning is instead appended to the regular banner, and may be muted with
+    --noinform.
   * bug fix: undefined function errors are now properly reported on PPC and MIPS.
     (regression since 1.1.9)
   * bug fix: (funcall (function X junk)) didn't causes an error when X had a
