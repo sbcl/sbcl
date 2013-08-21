@@ -2289,12 +2289,12 @@
 
 (defun open (filename
              &key
-             (direction :input)
-             (element-type 'base-char)
-             (if-exists nil if-exists-given)
-             (if-does-not-exist nil if-does-not-exist-given)
-             (external-format :default)
-             &aux ; Squelch assignment warning.
+               (direction :input)
+               (element-type 'base-char)
+               (if-exists nil if-exists-given)
+               (if-does-not-exist nil if-does-not-exist-given)
+               (external-format :default)
+             &aux                       ; Squelch assignment warning.
              (direction direction)
              (if-does-not-exist if-does-not-exist)
              (if-exists if-exists))
@@ -2316,7 +2316,7 @@
         (:io     (values   t   t sb!unix:o_rdwr))
         (:probe  (values   t nil sb!unix:o_rdonly)))
     (declare (type index mask))
-    (let* (;; PATHNAME is the pathname we associate with the stream.
+    (let* ( ;; PATHNAME is the pathname we associate with the stream.
            (pathname (merge-pathnames filename))
            (physical (physicalize-pathname pathname))
            (truename (probe-file physical))
@@ -2327,147 +2327,164 @@
                                   (and input (eq if-does-not-exist :create))
                                   (and (eq direction :io) (not if-does-not-exist-given)))
                               (native-namestring physical :as-file t)))))
-      ;; Process if-exists argument if we are doing any output.
-      (cond (output
-             (unless if-exists-given
-               (setf if-exists
-                     (if (eq (pathname-version pathname) :newest)
-                         :new-version
-                         :error)))
-             (ensure-one-of if-exists
-                            '(:error :new-version :rename
-                                     :rename-and-delete :overwrite
-                                     :append :supersede nil)
-                            :if-exists)
-             (case if-exists
-               ((:new-version :error nil)
-                (setf mask (logior mask sb!unix:o_excl)))
-               ((:rename :rename-and-delete)
-                (setf mask (logior mask sb!unix:o_creat)))
-               ((:supersede)
-                (setf mask (logior mask sb!unix:o_trunc)))
-               (:append
-                (setf mask (logior mask sb!unix:o_append)))))
-            (t
-             (setf if-exists :ignore-this-arg)))
+      (flet ((open-error (format-control &rest format-arguments)
+               (error 'simple-file-error
+                      :pathname pathname
+                      :format-control format-control
+                      :format-arguments format-arguments)))
+        ;; Process if-exists argument if we are doing any output.
+        (cond (output
+               (unless if-exists-given
+                 (setf if-exists
+                       (if (eq (pathname-version pathname) :newest)
+                           :new-version
+                           :error)))
+               (ensure-one-of if-exists
+                              '(:error :new-version :rename
+                                :rename-and-delete :overwrite
+                                :append :supersede nil)
+                              :if-exists)
+               (case if-exists
+                 ((:new-version :error nil)
+                  (setf mask (logior mask sb!unix:o_excl)))
+                 ((:rename :rename-and-delete)
+                  (setf mask (logior mask sb!unix:o_creat)))
+                 ((:supersede)
+                  (setf mask (logior mask sb!unix:o_trunc)))
+                 (:append
+                  (setf mask (logior mask sb!unix:o_append)))))
+              (t
+               (setf if-exists :ignore-this-arg)))
 
-      (unless if-does-not-exist-given
-        (setf if-does-not-exist
-              (cond ((eq direction :input) :error)
-                    ((and output
-                          (member if-exists '(:overwrite :append)))
-                     :error)
-                    ((eq direction :probe)
+        (unless if-does-not-exist-given
+          (setf if-does-not-exist
+                (cond ((eq direction :input) :error)
+                      ((and output
+                            (member if-exists '(:overwrite :append)))
+                       :error)
+                      ((eq direction :probe)
+                       nil)
+                      (t
+                       :create))))
+        (ensure-one-of if-does-not-exist
+                       '(:error :create nil)
+                       :if-does-not-exist)
+        (cond ((eq if-does-not-exist :create)
+               (setf mask (logior mask sb!unix:o_creat)))
+              ((not (member if-exists '(:new-version :error nil))))
+              ;; Both if-does-not-exist and if-exists now imply
+              ;; that there will be no opening of files, and either
+              ;; an error would be signalled, or NIL returned
+              ((and (not if-exists) (not if-does-not-exist))
+               (return-from open))
+              ((and if-exists if-does-not-exist)
+               (open-error "OPEN :IF-DOES-NOT-EXIST ~s ~
+                                 :IF-EXISTS ~s will always signal an error."
+                           if-does-not-exist if-exists))
+              ((sb!unix:unix-stat namestring)
+               (if if-exists
+                   (open-error "File exists ~s." pathname)
+                   (return-from open)))
+              (if-does-not-exist
+               (open-error "File does not exist ~s." pathname))
+              (t
+               (return-from open)))
+        (let ((original (case if-exists
+                          ((:rename :rename-and-delete)
+                           (pick-backup-name namestring))
+                          ((:append :overwrite)
+                           ;; KLUDGE: Prevent CLOSE from deleting
+                           ;; appending streams when called with :ABORT T
+                           namestring)))
+              (delete-original (eq if-exists :rename-and-delete))
+              (mode #o666))
+          (when (and original (not (eq original namestring)))
+            ;; We are doing a :RENAME or :RENAME-AND-DELETE. Determine
+            ;; whether the file already exists, make sure the original
+            ;; file is not a directory, and keep the mode.
+            (let ((exists
+                    (and namestring
+                         (multiple-value-bind (okay err/dev inode orig-mode)
+                             (sb!unix:unix-stat namestring)
+                           (declare (ignore inode)
+                                    (type (or index null) orig-mode))
+                           (cond
+                             (okay
+                              (when (and output (= (logand orig-mode #o170000)
+                                                   #o40000))
+                                (error 'simple-file-error
+                                       :pathname pathname
+                                       :format-control
+                                       "can't open ~S for output: is a directory"
+                                       :format-arguments (list namestring)))
+                              (setf mode (logand orig-mode #o777))
+                              t)
+                             ((eql err/dev sb!unix:enoent)
+                              nil)
+                             (t
+                              (simple-file-perror "can't find ~S"
+                                                  namestring
+                                                  err/dev)))))))
+              (unless (and exists
+                           (rename-the-old-one namestring original))
+                (setf original nil)
+                (setf delete-original nil)
+                ;; In order to use :SUPERSEDE instead, we have to make
+                ;; sure SB!UNIX:O_CREAT corresponds to
+                ;; IF-DOES-NOT-EXIST. SB!UNIX:O_CREAT was set before
+                ;; because of IF-EXISTS being :RENAME.
+                (unless (eq if-does-not-exist :create)
+                  (setf mask
+                        (logior (logandc2 mask sb!unix:o_creat)
+                                sb!unix:o_trunc)))
+                (setf if-exists :supersede))))
+
+          ;; Now we can try the actual Unix open(2).
+          (multiple-value-bind (fd errno)
+              (if namestring
+                  (sb!unix:unix-open namestring mask mode)
+                  (values nil sb!unix:enoent))
+            (flet ((vanilla-open-error ()
+                     (simple-file-perror "error opening ~S" pathname errno)))
+              (cond ((numberp fd)
+                     (case direction
+                       ((:input :output :io)
+                        ;; For O_APPEND opened files, lseek returns 0 until first write.
+                        ;; So we jump ahead here.
+                        (when (eq if-exists :append)
+                          (sb!unix:unix-lseek fd 0 sb!unix:l_xtnd))
+                        (make-fd-stream fd
+                                        :input input
+                                        :output output
+                                        :element-type element-type
+                                        :external-format external-format
+                                        :file namestring
+                                        :original original
+                                        :delete-original delete-original
+                                        :pathname pathname
+                                        :dual-channel-p nil
+                                        :serve-events nil
+                                        :input-buffer-p t
+                                        :auto-close t))
+                       (:probe
+                        (let ((stream
+                                (%make-fd-stream :name namestring
+                                                 :fd fd
+                                                 :pathname pathname
+                                                 :element-type element-type)))
+                          (close stream)
+                          stream))))
+                    ((eql errno sb!unix:enoent)
+                     (case if-does-not-exist
+                       (:error (vanilla-open-error))
+                       (:create
+                        (open-error "~@<The path ~2I~_~S ~I~_does not exist.~:>"
+                                    pathname))
+                       (t nil)))
+                    ((and (eql errno sb!unix:eexist) (null if-exists))
                      nil)
                     (t
-                     :create))))
-      (ensure-one-of if-does-not-exist
-                     '(:error :create nil)
-                     :if-does-not-exist)
-      (if (eq if-does-not-exist :create)
-        (setf mask (logior mask sb!unix:o_creat)))
-
-      (let ((original (case if-exists
-                        ((:rename :rename-and-delete)
-                         (pick-backup-name namestring))
-                        ((:append :overwrite)
-                         ;; KLUDGE: Provent CLOSE from deleting
-                         ;; appending streams when called with :ABORT T
-                         namestring)))
-            (delete-original (eq if-exists :rename-and-delete))
-            (mode #o666))
-        (when (and original (not (eq original namestring)))
-          ;; We are doing a :RENAME or :RENAME-AND-DELETE. Determine
-          ;; whether the file already exists, make sure the original
-          ;; file is not a directory, and keep the mode.
-          (let ((exists
-                 (and namestring
-                      (multiple-value-bind (okay err/dev inode orig-mode)
-                          (sb!unix:unix-stat namestring)
-                        (declare (ignore inode)
-                                 (type (or index null) orig-mode))
-                        (cond
-                         (okay
-                          (when (and output (= (logand orig-mode #o170000)
-                                               #o40000))
-                            (error 'simple-file-error
-                                   :pathname pathname
-                                   :format-control
-                                   "can't open ~S for output: is a directory"
-                                   :format-arguments (list namestring)))
-                          (setf mode (logand orig-mode #o777))
-                          t)
-                         ((eql err/dev sb!unix:enoent)
-                          nil)
-                         (t
-                          (simple-file-perror "can't find ~S"
-                                              namestring
-                                              err/dev)))))))
-            (unless (and exists
-                         (rename-the-old-one namestring original))
-              (setf original nil)
-              (setf delete-original nil)
-              ;; In order to use :SUPERSEDE instead, we have to make
-              ;; sure SB!UNIX:O_CREAT corresponds to
-              ;; IF-DOES-NOT-EXIST. SB!UNIX:O_CREAT was set before
-              ;; because of IF-EXISTS being :RENAME.
-              (unless (eq if-does-not-exist :create)
-                (setf mask
-                      (logior (logandc2 mask sb!unix:o_creat)
-                              sb!unix:o_trunc)))
-              (setf if-exists :supersede))))
-
-        ;; Now we can try the actual Unix open(2).
-        (multiple-value-bind (fd errno)
-            (if namestring
-                (sb!unix:unix-open namestring mask mode)
-                (values nil sb!unix:enoent))
-          (labels ((open-error (format-control &rest format-arguments)
-                     (error 'simple-file-error
-                            :pathname pathname
-                            :format-control format-control
-                            :format-arguments format-arguments))
-                   (vanilla-open-error ()
-                     (simple-file-perror "error opening ~S" pathname errno)))
-            (cond ((numberp fd)
-                   (case direction
-                     ((:input :output :io)
-                      ;; For O_APPEND opened files, lseek returns 0 until first write.
-                      ;; So we jump ahead here.
-                      (when (eq if-exists :append)
-                        (sb!unix:unix-lseek fd 0 sb!unix:l_xtnd))
-                      (make-fd-stream fd
-                                      :input input
-                                      :output output
-                                      :element-type element-type
-                                      :external-format external-format
-                                      :file namestring
-                                      :original original
-                                      :delete-original delete-original
-                                      :pathname pathname
-                                      :dual-channel-p nil
-                                      :serve-events nil
-                                      :input-buffer-p t
-                                      :auto-close t))
-                     (:probe
-                      (let ((stream
-                             (%make-fd-stream :name namestring
-                                              :fd fd
-                                              :pathname pathname
-                                              :element-type element-type)))
-                        (close stream)
-                        stream))))
-                  ((eql errno sb!unix:enoent)
-                   (case if-does-not-exist
-                     (:error (vanilla-open-error))
-                     (:create
-                      (open-error "~@<The path ~2I~_~S ~I~_does not exist.~:>"
-                                  pathname))
-                     (t nil)))
-                  ((and (eql errno sb!unix:eexist) (null if-exists))
-                   nil)
-                  (t
-                   (vanilla-open-error)))))))))
+                     (vanilla-open-error))))))))))
 
 ;;;; initialization
 

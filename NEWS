@@ -17,6 +17,8 @@ changes relative to sbcl-1.1.10
   * bug fix: ROOM works again on Windows.
   * bug fix: Streams were flushed even when there was one byte still left in
     the buffer. (lp#910213)
+  * bug fix: OPEN handles correctly when :if-exists and :if-does-not-exist are
+    either NIL or :ERROR.
 
 changes in sbcl-1.1.10 relative to sbcl-1.1.9:
   * enhancement: ASDF has been updated to 3.0.2.

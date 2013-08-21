@@ -191,3 +191,34 @@
                  (directory (make-pathname
                              :name :unspecific
                              :type :unspecific)))))
+
+;;; Generated with
+;;; (loop for exist in '(nil t)
+;;;       append
+;;;       (loop for (if-exists if-does-not-exist) in '((nil :error)
+;;;                                                    (:error nil)
+;;;                                                    (nil nil)
+;;;                                                    (:error :error))
+;;;             collect (list 'do-open exist if-exists if-does-not-exist)))
+(with-test (:name :open-never-openning)
+  (flet ((do-open (existing if-exists if-does-not-exist)
+           (open (if existing
+                     #.(or *compile-file-truename* *load-truename*)
+                     "a-really-non-existing-file")
+                 :direction :output
+                 :if-exists if-exists :if-does-not-exist if-does-not-exist)))
+    (assert (raises-error?
+             (do-open nil nil :error)))
+    (assert (not
+             (do-open nil :error nil)))
+    (assert (not
+             (do-open t nil :error)))
+    (assert (raises-error?
+             (do-open t :error nil)))
+    (assert (not
+             (do-open nil nil nil)))
+    (assert (raises-error?
+             (do-open nil :error :error)))
+    (assert (not
+             (do-open t nil nil)))
+    (assert (raises-error? (do-open t :error :error)))))
