@@ -4,21 +4,21 @@ changes relative to sbcl-1.1.10
     (lp#1189146)
   * enhancement: Windows builds no longer display the "Kitten of Death" message.
     A warning is instead appended to the regular banner, and may be muted with
-    --noinform.
+    --noinform.  (lp#728247)
+  * enhancement: support building under new linker handling of syscalls under
+    NetBSD.  (thanks to Robert Swindells)
   * bug fix: undefined function errors are now properly reported on PPC and MIPS.
     (regression since 1.1.9)
   * bug fix: (funcall (function X junk)) didn't causes an error when X had a
-    compiler macro.
-    Patch by Douglas Katzman.
+    compiler macro.  (thanks to Douglas Katzman).
   * bug fix: signal a warning when defining a setf-function when a
-    setf-expander is already present.
-    Patch by Douglas Katzman.
-  * bug fix: improved threading on PPC.
-  * bug fix: ROOM works again on Windows.
+    setf-expander is already present.  (thanks to Douglas Katzman).
+  * bug fix: improved threading on PPC.  
+  * bug fix: ROOM works again on Windows.  (lp#1206456)
   * bug fix: Streams were flushed even when there was one byte still left in
     the buffer. (lp#910213)
   * bug fix: OPEN handles correctly when :if-exists and :if-does-not-exist are
-    either NIL or :ERROR.
+    either NIL or :ERROR.  (reported by Jan Moringen)
 
 changes in sbcl-1.1.10 relative to sbcl-1.1.9:
   * enhancement: ASDF has been updated to 3.0.2.

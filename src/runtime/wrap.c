@@ -38,7 +38,9 @@
 
 #ifndef LISP_FEATURE_WIN32
 #include <pwd.h>
+#include <time.h>
 #include <sys/wait.h>
+#include <sys/resource.h>
 #include <netdb.h>
 #endif
 #include <stdio.h>
@@ -376,7 +378,7 @@ wrapped_environ()
  * faked-up implementation of select(). Right now just enough to get through
  * second genesis.
  */
-int select(int top_fd, DWORD *read_set, DWORD *write_set, DWORD *except_set, time_t *timeout)
+int sb_select(int top_fd, DWORD *read_set, DWORD *write_set, DWORD *except_set, time_t *timeout)
 {
     /*
      * FIXME: Going forward, we may want to use MsgWaitForMultipleObjects
@@ -425,7 +427,7 @@ int select(int top_fd, DWORD *read_set, DWORD *write_set, DWORD *except_set, tim
  */
 #define UNIX_EPOCH_FILETIME 116444736000000000ULL
 
-int gettimeofday(long *timeval, long *timezone)
+int sb_gettimeofday(long *timeval, long *timezone)
 {
     FILETIME ft;
     ULARGE_INTEGER uft;
@@ -512,3 +514,37 @@ int s_issock(mode_t mode)
 #endif
 }
 #endif /* !LISP_FEATURE_WIN32 */
+
+#ifndef LISP_FEATURE_WIN32
+int sb_getrusage(int who, struct rusage *rusage)
+{
+        return getrusage(who, rusage);
+}
+
+int sb_gettimeofday(struct timeval *tp, void *tzp)
+{
+        return gettimeofday(tp, tzp);
+}
+
+int sb_nanosleep(struct timespec *rqtp, struct timespec *rmtp)
+{
+        return nanosleep(rqtp, rmtp);
+}
+
+int sb_select(int nfds, fd_set *readfds, fd_set *writefds, fd_set *exceptfds,
+    struct timeval *timeout)
+{
+        return select(nfds, readfds, writefds, exceptfds, timeout);
+}
+
+int sb_getitimer(int which, struct itimerval *value)
+{
+        return getitimer(which, value);
+}
+
+int sb_setitimer(int which, struct itimerval *value, struct itimerval *ovalue)
+{
+        return setitimer(which, value, ovalue);
+}
+#endif /* !LISP_FEATURE_WIN32 */
+

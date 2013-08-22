@@ -537,10 +537,10 @@ avoiding atexit(3) hooks, etc. Otherwise exit(2) is called."
 #!-win32
 (defun unix-fast-getrusage (who)
   (declare (values (member t)
-                   (unsigned-byte 31) (integer 0 1000000)
-                   (unsigned-byte 31) (integer 0 1000000)))
+                   unsigned-byte fixnum
+                   unsigned-byte fixnum))
   (with-alien ((usage (struct rusage)))
-    (syscall* ("getrusage" int (* (struct rusage)))
+    (syscall* ("sb_getrusage" int (* (struct rusage)))
               (values t
                       (slot (slot usage 'ru-utime) 'tv-sec)
                       (slot (slot usage 'ru-utime) 'tv-usec)
@@ -556,7 +556,7 @@ avoiding atexit(3) hooks, etc. Otherwise exit(2) is called."
 #!-win32
 (defun unix-getrusage (who)
   (with-alien ((usage (struct rusage)))
-    (syscall ("getrusage" int (* (struct rusage)))
+    (syscall ("sb_getrusage" int (* (struct rusage)))
               (values t
                       (+ (* (slot (slot usage 'ru-utime) 'tv-sec) 1000000)
                          (slot (slot usage 'ru-utime) 'tv-usec))
@@ -654,7 +654,7 @@ avoiding atexit(3) hooks, etc. Otherwise exit(2) is called."
            (type (or null (unsigned-byte 31)) timeout-secs timeout-usecs))
   (with-fd-setsize (num-descriptors)
     (flet ((select (tv-sap)
-             (int-syscall ("select" int (* (struct fd-set)) (* (struct fd-set))
+             (int-syscall ("sb_select" int (* (struct fd-set)) (* (struct fd-set))
                                     (* (struct fd-set)) (* (struct timeval)))
                           num-descriptors read-fds write-fds exception-fds
                           tv-sap)))
@@ -719,7 +719,7 @@ avoiding atexit(3) hooks, etc. Otherwise exit(2) is called."
                    `(if (zerop ,lispvar)
                         (int-sap 0)
                         (alien-sap (addr ,alienvar)))))
-        (syscall ("select" int (* (struct fd-set)) (* (struct fd-set))
+        (syscall ("sb_select" int (* (struct fd-set)) (* (struct fd-set))
                            (* (struct fd-set)) (* (struct timeval)))
                  (values result
                          (fd-set-to-num nfds rdf)
@@ -938,7 +938,7 @@ avoiding atexit(3) hooks, etc. Otherwise exit(2) is called."
           (slot req 'tv-nsec) nsecs)
     (loop while (and (eql sb!unix:eintr
                           (nth-value 1
-                                     (int-syscall ("nanosleep" (* (struct timespec))
+                                     (int-syscall ("sb_nanosleep" (* (struct timespec))
                                                                (* (struct timespec)))
                                                   (addr req) (addr rem))))
                      ;; KLUDGE: On Darwin, if an interrupt cases nanosleep to
@@ -1001,14 +1001,14 @@ avoiding atexit(3) hooks, etc. Otherwise exit(2) is called."
    T, it-interval-secs, it-interval-usec, it-value-secs, it-value-usec."
   (declare (type (member :real :virtual :profile) which)
            (values t
-                   (unsigned-byte 29) (mod 1000000)
-                   (unsigned-byte 29) (mod 1000000)))
+                   unsigned-byte (mod 1000000)
+                   unsigned-byte (mod 1000000)))
   (let ((which (ecase which
                  (:real itimer-real)
                  (:virtual itimer-virtual)
                  (:profile itimer-prof))))
     (with-alien ((itv (struct itimerval)))
-      (syscall* ("getitimer" int (* (struct itimerval)))
+      (syscall* ("sb_getitimer" int (* (struct itimerval)))
                 (values t
                         (slot (slot itv 'it-interval) 'tv-sec)
                         (slot (slot itv 'it-interval) 'tv-usec)
@@ -1027,11 +1027,11 @@ avoiding atexit(3) hooks, etc. Otherwise exit(2) is called."
    unix-setitimer returns the old contents of the INTERVAL and VALUE
    slots as in unix-getitimer."
   (declare (type (member :real :virtual :profile) which)
-           (type (unsigned-byte 29) int-secs val-secs)
+           (type unsigned-byte int-secs val-secs)
            (type (integer 0 (1000000)) int-usec val-usec)
            (values t
-                   (unsigned-byte 29) (mod 1000000)
-                   (unsigned-byte 29) (mod 1000000)))
+                   unsigned-byte (mod 1000000)
+                   unsigned-byte (mod 1000000)))
   (let ((which (ecase which
                  (:real itimer-real)
                  (:virtual itimer-virtual)
@@ -1042,7 +1042,7 @@ avoiding atexit(3) hooks, etc. Otherwise exit(2) is called."
             (slot (slot itvn 'it-interval) 'tv-usec) int-usec
             (slot (slot itvn 'it-value   ) 'tv-sec ) val-secs
             (slot (slot itvn 'it-value   ) 'tv-usec) val-usec)
-      (syscall* ("setitimer" int (* (struct timeval))(* (struct timeval)))
+      (syscall* ("sb_setitimer" int (* (struct timeval))(* (struct timeval)))
                 (values t
                         (slot (slot itvo 'it-interval) 'tv-sec)
                         (slot (slot itvo 'it-interval) 'tv-usec)
@@ -1070,23 +1070,23 @@ avoiding atexit(3) hooks, etc. Otherwise exit(2) is called."
   (defun get-time-of-day ()
     "Return the number of seconds and microseconds since the beginning of
 the UNIX epoch (January 1st 1970.)"
-    #!+darwin
+    #!+(or darwin netbsd)
     (with-alien ((tv (struct timeval)))
       ;; CLH: FIXME! This seems to be a MacOS bug, but on x86-64/darwin,
       ;; gettimeofday occasionally fails. passing in a null pointer for the
       ;; timezone struct seems to work around the problem. NS notes: Darwin
       ;; manpage says the timezone is not used anymore in their implementation
       ;; at all.
-      (syscall* ("gettimeofday" (* (struct timeval))
+      (syscall* ("sb_gettimeofday" (* (struct timeval))
                                 (* (struct timezone)))
                 (values (slot tv 'tv-sec)
                         (slot tv 'tv-usec))
                 (addr tv)
                 nil))
-    #!-(and x86-64 darwin)
+    #!-(or darwin netbsd)
     (with-alien ((tv (struct timeval))
                  (tz (struct timezone)))
-      (syscall* ("gettimeofday" (* (struct timeval))
+      (syscall* ("sb_gettimeofday" (* (struct timeval))
                                 (* (struct timezone)))
                 (values (slot tv 'tv-sec)
                         (slot tv 'tv-usec))
@@ -1098,7 +1098,7 @@ the UNIX epoch (January 1st 1970.)"
 
   (defun system-real-time-values ()
     (multiple-value-bind (sec usec) (get-time-of-day)
-      (declare (type (unsigned-byte 32) sec usec))
+      (declare (type unsigned-byte sec) (type (unsigned-byte 31) usec))
       (values sec (truncate usec micro-seconds-per-internal-time-unit))))
 
   ;; There are two optimizations here that actually matter (on 32-bit
@@ -1123,7 +1123,7 @@ the UNIX epoch (January 1st 1970.)"
         (c-sec 0)
         (c-msec 0)
         (now 0))
-    (declare (type (unsigned-byte 32) e-sec c-sec)
+    (declare (type unsigned-byte e-sec c-sec)
              (type fixnum e-msec c-msec)
              (type unsigned-byte now))
     (defun reinit-internal-real-time ()
@@ -1159,12 +1159,12 @@ the UNIX epoch (January 1st 1970.)"
     (multiple-value-bind (ignore utime-sec utime-usec stime-sec stime-usec)
         (unix-fast-getrusage rusage_self)
       (declare (ignore ignore)
-               (type (unsigned-byte 31) utime-sec stime-sec)
+               (type unsigned-byte utime-sec stime-sec)
                ;; (Classic CMU CL had these (MOD 1000000) instead, but
                ;; at least in Linux 2.2.12, the type doesn't seem to
                ;; be documented anywhere and the observed behavior is
                ;; to sometimes return 1000000 exactly.)
-               (type (integer 0 1000000) utime-usec stime-usec))
+               (type fixnum utime-usec stime-usec))
       (let ((result (+ (* (+ utime-sec stime-sec)
                           sb!xc:internal-time-units-per-second)
                        (floor (+ utime-usec
