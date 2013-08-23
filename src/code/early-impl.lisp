@@ -47,7 +47,6 @@
                   #!+sb-safepoint *in-safepoint*
                   *free-interrupt-context-index*
                   sb!kernel::*gc-epoch*
-                  sb!vm::*unwind-to-frame-function*
                   sb!vm::*allocation-pointer*
                   sb!vm::*binding-stack-pointer*
                   sb!vm::*fp-constant-0d0*

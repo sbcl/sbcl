@@ -1846,11 +1846,6 @@ and LDB (the low-level debugger).  See also ENABLE-DEBUGGER."
   (sb!di:debug-var-info-available
    (sb!di:code-location-debug-fun
     (sb!di:frame-code-location frame))))
-
-;; Hack: ensure that *U-T-F-F* has a tls index.
-#!+unwind-to-frame-and-call-vop
-(let ((sb!vm::*unwind-to-frame-function* (lambda ()))))
-
 
 ;;;; debug loop command utilities
 
