@@ -1619,12 +1619,6 @@ and LDB (the low-level debugger).  See also ENABLE-DEBUGGER."
 
 ;;;; source location printing
 
-;;; Stuff to clean up before saving a core
-(defun debug-deinit ()
-  ;; Nothing to do right now. Once there was, maybe once there
-  ;; will be again.
-  )
-
 (defun code-location-source-form (location context &optional (errorp t))
   (let* ((start-location (maybe-block-start-location location))
          (form-num (sb!di:code-location-form-number start-location)))

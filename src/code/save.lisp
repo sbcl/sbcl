@@ -200,7 +200,6 @@ sufficiently motivated to do lengthy fixes."
     (error "Cannot save core with multiple threads running."))
   (float-deinit)
   (profile-deinit)
-  (debug-deinit)
   (foreign-deinit)
   (stream-deinit)
   (deinit-finalizers)

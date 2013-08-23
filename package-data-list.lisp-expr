@@ -1989,7 +1989,6 @@ is a good idea, but see SB-SYS re. blurring of boundaries."
                "STREAM-COLD-INIT-OR-RESET"
 
                ;; Cleanups to run before saving a core
-               "DEBUG-DEINIT"
                "FLOAT-DEINIT"
                "FOREIGN-DEINIT"
                "PROFILE-DEINIT"
