@@ -688,7 +688,7 @@
       (unless (lambda-var-ignorep rest)
         ;; Make up two extra variables, and squirrel them away in
         ;; ARG-INFO-DEFAULT for transforming (VALUES-LIST REST) into
-        ;; (%MORE-ARG-VALUES CONTEXT COUNT) when possible.
+        ;; (%MORE-ARG-VALUES CONTEXT 0 COUNT) when possible.
         (let* ((context-name (sb!xc:gensym "REST-CONTEXT-"))
                (context (make-lambda-var :%source-name context-name
                                          :arg-info (make-arg-info :kind :more-context)))

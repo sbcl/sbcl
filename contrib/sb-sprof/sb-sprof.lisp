@@ -1409,7 +1409,9 @@ functions during statistical profiling."
                   (incf (the (unsigned-byte 59)
                           (car info)))
                   (multiple-value-call original-fun
-                    (sb-c:%more-arg-values more-context more-count)))))))))
+                    (sb-c:%more-arg-values more-context
+                                           0
+                                           more-count)))))))))
 
 
 ;;; silly examples

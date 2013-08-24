@@ -1518,7 +1518,7 @@
                        (eq (ir2-lvar-kind 2lvar) :fixed)))
              (ir2-convert-full-call node block)))))
 
-(defoptimizer (%more-arg-values ir2-convert) ((context count) node block)
+(defoptimizer (%more-arg-values ir2-convert) ((context start count) node block)
   (binding* ((lvar (node-lvar node) :exit-if-null)
              (2lvar (lvar-info lvar)))
     (ecase (ir2-lvar-kind 2lvar)
@@ -1537,6 +1537,7 @@
        (let ((locs (ir2-lvar-locs 2lvar)))
          (vop* %more-arg-values node block
                ((lvar-tn node block context)
+                (lvar-tn node block start)
                 (lvar-tn node block count)
                 nil)
                ((reference-tn-list locs t))))))))

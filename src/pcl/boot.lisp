@@ -1076,7 +1076,7 @@ bootstrapping.
             (values (fast-method-call-pv ,method-call))
             (values (fast-method-call-next-method-call ,method-call))
             ,@required-args
-            (sb-c::%more-arg-values ,more-context ,more-count))))))
+            (sb-c::%more-arg-values ,more-context 0 ,more-count))))))
 
 (defstruct (fast-instance-boundp (:copier nil))
   (index 0 :type fixnum))

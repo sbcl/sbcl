@@ -2656,6 +2656,7 @@ register."
              (let ((count-var (fourth bind)))
                (specs `(,name (multiple-value-list
                                (sb!c:%more-arg-values (debug-var-value ',var ,n-frame)
+                                                      0
                                                       (debug-var-value ',count-var ,n-frame)))))))
             (:unknown
              (specs `(,name (debug-signal 'invalid-value
