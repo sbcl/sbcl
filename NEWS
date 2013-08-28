@@ -1,5 +1,5 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
-changes relative to sbcl-1.1.10:
+changes in sbcl-1.1.11 relative to sbcl-1.1.10:
   * enhancement: support building the manual under texinfo version 5.
     (lp#1189146)
   * enhancement: Windows builds no longer display the "Kitten of Death" message.
