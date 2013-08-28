@@ -303,28 +303,53 @@ fractional bits."
 ;; (:range-reduction :x87) above.
 (with-test (:name (:range-reduction :precise-pi)
             :skipped-on :x86)
-  (let ((rational-2pi (* 2 (pi-gauss-legendre 2200))))
-    (labels ((mod-2pi (x)
-               "Return X modulo 2 pi, where pi is precise enough that the
-                result is exact to double-float precision for all possible
-                double-float arguments."
+  (let ((rational-pi-half (/ (pi-gauss-legendre 2200) 2)))
+    (labels ((round-pi-half (x)
+               "Return two values as if (ROUND X (/ PI 2)) was called
+                but where PI is precise enough that for all possible
+                double-float arguments the quotient is exact and the
+                remainder is exact to double-float precision."
                (declare (type double-float x))
-               (coerce (mod (rational x) rational-2pi)
-                       'double-float))
+               (multiple-value-bind (q r)
+                   (round (rational x) rational-pi-half)
+                 (values q (coerce r 'double-float))))
+             (expected-val (op x)
+               "Calculate (OP X) precisely by shifting the argument by
+                an integral multiple of (/ PI 2) into the range from
+                (- (/ PI 4)) to (/ PI 4) and applying the phase-shift
+                formulas for the trigonometric functions. PI here is
+                precise enough that the result is exact to double-float
+                precision."
+               (labels ((precise-val (op q r)
+                          (ecase op
+                            (sin (let ((x (if (zerop (mod q 2))
+                                              (sin r)
+                                              (cos r))))
+                                   (if (<= (mod q 4) 1)
+                                       x
+                                       (- x))))
+                            (cos (precise-val 'sin (1+ q) r))
+                            (tan (if (zerop (mod q 2))
+                                     (tan r)
+                                     (/ (- (tan r))))))))
+                 (multiple-value-bind (q r)
+                     (round-pi-half x)
+                   (precise-val op q r))))
              (test (op x)
                (let ((actual (funcall op x))
-                     (expected (funcall op (mod-2pi x))))
-                 ;; Some of the test values are chosen to reduce modulo
-                 ;; 2 pi to small numbers (between 1d-10 and 1d-7),
-                 ;; making their sine and tangent this small, too.
-                 ;; For other test values the absolute value of the
-                 ;; tangent may be much larger than 1. Therefore we
+                     (expected (expected-val op x)))
+                 ;; Some of the test values are chosen to lie very near
+                 ;; to an integral multiple of pi/2 (within a distance of
+                 ;; between 1d-11 and 1d-8), making the absolute value of
+                 ;; their sine or cosine this small, too. The absolute
+                 ;; value of the tangent is then either similarly small or
+                 ;; as large as the reciprocal of this value. Therefore we
                  ;; measure relative instead of absolute error.
                  (unless (or (= actual expected 0)
                              (and (= (signum actual) (signum expected))
                                   (< (abs (/ (- actual expected)
                                              (+ actual expected)))
-                                     (/ 1d-12 2))))
+                                     (* 8 double-float-epsilon))))
                    (error "Inaccurate result for ~a: expected ~a, got ~a"
                           (list op x) expected actual)))))
       (dolist (op '(sin cos tan))
@@ -333,8 +358,16 @@ fractional bits."
                                then (expt v 4/5)
                                while (> v (expt 2 50))
                                collect v)
-                       6.543554061677196d28
-                       1.5334254929660437d43
-                       1.837213298702053d93
-                       4.913896894631919d229))
+                       ;; The following values cover all eight combinations
+                       ;; of values slightly below or above integral
+                       ;; multiples of pi/2 with the integral factor
+                       ;; congruent to 0, 1, 2 or 3 modulo 4.
+                       5.526916451564098d71
+                       4.913896894631919d229
+                       7.60175752894437d69
+                       3.8335637324151093d42
+                       1.8178427396473695d155
+                       9.41634760758887d89
+                       4.2766818550391727d188
+                       1.635888515419299d28))
           (test op val))))))
