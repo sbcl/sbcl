@@ -637,7 +637,7 @@ avoiding atexit(3) hooks, etc. Otherwise exit(2) is called."
   `(let ((,n (if (< 0 ,n fd-setsize)
                  ,n
                  (error "Cannot select(2) on ~D: above FD_SETSIZE limit."
-                        (1- num-descriptors)))))
+                        (1- ,n)))))
      (declare (type (integer 0 #.fd-setsize) ,n))
      ,@body))
 
@@ -670,28 +670,29 @@ avoiding atexit(3) hooks, etc. Otherwise exit(2) is called."
 
 ;;; UNIX-SELECT accepts sets of file descriptors and waits for an event
 ;;; to happen on one of them or to time out.
-(defmacro num-to-fd-set (fdset num)
-  `(if (fixnump ,num)
-       (progn
-         (setf (deref (slot ,fdset 'fds-bits) 0) ,num)
-         ,@(loop for index upfrom 1 below (/ fd-setsize
-                                             sb!vm:n-machine-word-bits)
-             collect `(setf (deref (slot ,fdset 'fds-bits) ,index) 0)))
-       (progn
-         ,@(loop for index upfrom 0 below (/ fd-setsize
-                                             sb!vm:n-machine-word-bits)
-             collect `(setf (deref (slot ,fdset 'fds-bits) ,index)
-                            (ldb (byte sb!vm:n-machine-word-bits
-                                       ,(* index sb!vm:n-machine-word-bits))
-                                 ,num))))))
+(declaim (inline num-to-fd-set fd-set-to-num))
+(defun num-to-fd-set (fdset num)
+  (typecase num
+    (fixnum
+     (setf (deref (slot fdset 'fds-bits) 0) num)
+     (loop for index from 1 below (/ fd-setsize
+                                     sb!vm:n-machine-word-bits)
+           do (setf (deref (slot fdset 'fds-bits) index) 0)))
+    (t
+     (loop for index from 0 below (/ fd-setsize
+                                     sb!vm:n-machine-word-bits)
+           do (setf (deref (slot fdset 'fds-bits) index)
+                    (ldb (byte sb!vm:n-machine-word-bits
+                               (* index sb!vm:n-machine-word-bits))
+                         num))))))
 
-(defmacro fd-set-to-num (nfds fdset)
-  `(if (<= ,nfds sb!vm:n-machine-word-bits)
-       (deref (slot ,fdset 'fds-bits) 0)
-       (+ ,@(loop for index upfrom 0 below (/ fd-setsize
-                                              sb!vm:n-machine-word-bits)
-              collect `(ash (deref (slot ,fdset 'fds-bits) ,index)
-                            ,(* index sb!vm:n-machine-word-bits))))))
+(defun fd-set-to-num (nfds fdset)
+  (if (<= nfds sb!vm:n-machine-word-bits)
+      (deref (slot fdset 'fds-bits) 0)
+      (loop for index below (/ fd-setsize
+                               sb!vm:n-machine-word-bits)
+            sum (ash (deref (slot fdset 'fds-bits) index)
+                     (* index sb!vm:n-machine-word-bits)))))
 
 ;;; Examine the sets of descriptors passed as arguments to see whether
 ;;; they are ready for reading and writing. See the UNIX Programmer's
@@ -701,7 +702,7 @@ avoiding atexit(3) hooks, etc. Otherwise exit(2) is called."
            (type unsigned-byte rdfds wrfds xpfds)
            (type (or (unsigned-byte 31) null) to-secs)
            (type (unsigned-byte 31) to-usecs)
-           (optimize (speed 3) (safety 0) (inhibit-warnings 3)))
+           (optimize (speed 3) (safety 0)))
   (with-fd-setsize (nfds)
     (with-alien ((tv (struct timeval))
                  (rdf (struct fd-set))
@@ -728,38 +729,33 @@ avoiding atexit(3) hooks, etc. Otherwise exit(2) is called."
                  nfds (frob rdfds rdf) (frob wrfds wrf) (frob xpfds xpf)
                  (if to-secs (alien-sap (addr tv)) (int-sap 0)))))))
 
-;;; Lisp-side implmentations of FD_FOO macros. Abandon all hope who enters
-;;; here...
-;;;
-(defmacro fd-set (offset fd-set)
-  (with-unique-names (word bit)
-    `(multiple-value-bind (,word ,bit) (floor ,offset
-                                              sb!vm:n-machine-word-bits)
-       (setf (deref (slot ,fd-set 'fds-bits) ,word)
-             (logior (truly-the (unsigned-byte #.sb!vm:n-machine-word-bits)
-                                (ash 1 ,bit))
-                     (deref (slot ,fd-set 'fds-bits) ,word))))))
+;;; Lisp-side implmentations of FD_FOO macros.
+(declaim (inline fd-set fd-clr fd-isset fd-zero))
+(defun fd-set (offset fd-set)
+  (multiple-value-bind (word bit) (floor offset
+                                            sb!vm:n-machine-word-bits)
+     (setf (deref (slot fd-set 'fds-bits) word)
+           (logior (truly-the (unsigned-byte #.sb!vm:n-machine-word-bits)
+                              (ash 1 bit))
+                   (deref (slot fd-set 'fds-bits) word)))))
 
-(defmacro fd-clr (offset fd-set)
-  (with-unique-names (word bit)
-    `(multiple-value-bind (,word ,bit) (floor ,offset
-                                              sb!vm:n-machine-word-bits)
-       (setf (deref (slot ,fd-set 'fds-bits) ,word)
-             (logand (deref (slot ,fd-set 'fds-bits) ,word)
-                     (sb!kernel:word-logical-not
-                      (truly-the (unsigned-byte #.sb!vm:n-machine-word-bits)
-                                 (ash 1 ,bit))))))))
+(defun fd-clr (offset fd-set)
+  (multiple-value-bind (word bit) (floor offset
+                                         sb!vm:n-machine-word-bits)
+    (setf (deref (slot fd-set 'fds-bits) word)
+          (logand (deref (slot fd-set 'fds-bits) word)
+                  (sb!kernel:word-logical-not
+                   (truly-the (unsigned-byte #.sb!vm:n-machine-word-bits)
+                              (ash 1 bit)))))))
 
-(defmacro fd-isset (offset fd-set)
-  (with-unique-names (word bit)
-    `(multiple-value-bind (,word ,bit) (floor ,offset
-                                              sb!vm:n-machine-word-bits)
-       (logbitp ,bit (deref (slot ,fd-set 'fds-bits) ,word)))))
+(defun fd-isset (offset fd-set)
+  (multiple-value-bind (word bit) (floor offset
+                                         sb!vm:n-machine-word-bits)
+     (logbitp bit (deref (slot fd-set 'fds-bits) word))))
 
-(defmacro fd-zero (fd-set)
-  `(progn
-     ,@(loop for index upfrom 0 below (/ fd-setsize sb!vm:n-machine-word-bits)
-         collect `(setf (deref (slot ,fd-set 'fds-bits) ,index) 0))))
+(defun fd-zero (fd-set)
+  (loop for index below (/ fd-setsize sb!vm:n-machine-word-bits)
+        do (setf (deref (slot fd-set 'fds-bits) index) 0)))
 
 #!-os-provides-poll
 (defun unix-simple-poll (fd direction to-msec)

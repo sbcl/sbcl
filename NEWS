@@ -2,6 +2,7 @@
 changes relative to sbcl-1.1.11:
   * bug fix: probe-file now can access symlinks to pipes and sockets in
     /proc/pid/fd on Linux. (reported by Eric Schulte)
+  * bug fix: SBCL can now be built on Solaris x86-64.
   
 changes in sbcl-1.1.11 relative to sbcl-1.1.10:
   * enhancement: support building the manual under texinfo version 5.
