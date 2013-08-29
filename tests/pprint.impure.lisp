@@ -297,5 +297,11 @@
                                    `(progn ,@(identity #1#)))
                                  :circle t :pretty t)))
     (assert (not (search "#2#" string)))))
+
+(with-test (:name :pprint-dotted-setf)
+  (let ((*print-pretty* t))
+    (equal (format nil "~a" '(setf . a))
+           "(SETF . A)")))
+
 
 ;;; success

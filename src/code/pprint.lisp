@@ -1218,6 +1218,8 @@ line break."
     (output-object (pprint-pop) stream)
     (pprint-exit-if-list-exhausted)
     (write-char #\space stream)
+    (unless (listp (cdr list))
+      (write-string ". " stream))
     (pprint-newline :miser stream)
     (pprint-logical-block (stream (cdr list) :prefix "" :suffix "")
       (loop
