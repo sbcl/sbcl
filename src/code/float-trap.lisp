@@ -195,8 +195,12 @@ sets the floating point modes to their current values (and thus is a no-op)."
   (declare (type system-area-pointer info))
   (let ((code (sb!unix::siginfo-code info)))
     (with-interrupts
-        (error (or (cdr (assoc code *sigfpe-code-error-alist*))
-                   'floating-point-exception)))))
+      ;; Reset the accumulated exceptions, may be needed on other
+      ;; platforms too, at least Linux doesn't seem to require it.
+      #!+sunos
+      (setf (ldb sb!vm::float-sticky-bits (floating-point-modes)) 0)
+      (error (or (cdr (assoc code *sigfpe-code-error-alist*))
+                 'floating-point-exception)))))
 
 ;;; Execute BODY with the floating point exceptions listed in TRAPS
 ;;; masked (disabled). TRAPS should be a list of possible exceptions
