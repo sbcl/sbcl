@@ -3195,7 +3195,6 @@ verify_generation(generation_index_t generation)
             && (page_table[i].bytes_used != 0)
             && (page_table[i].gen == generation)) {
             page_index_t last_page;
-            int region_allocation = page_table[i].allocated;
 
             /* This should be the start of a contiguous block */
             gc_assert(page_starts_contiguous_block_p(i));

@@ -1695,7 +1695,6 @@ sword_t
 scav_vector (lispobj *where, lispobj object)
 {
     uword_t kv_length;
-    lispobj *kv_vector;
     struct hash_table *hash_table;
 
     /* SB-VM:VECTOR-VALID-HASHING-SUBTYPE is set for EQ-based and weak
@@ -1705,7 +1704,6 @@ scav_vector (lispobj *where, lispobj object)
         return 1;
 
     kv_length = fixnum_value(where[1]);
-    kv_vector = where + 2;  /* Skip the header and length. */
     /*FSHOW((stderr,"/kv_length = %d\n", kv_length));*/
 
     /* Scavenge element 0, which may be a hash-table structure. */
