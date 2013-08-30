@@ -4,7 +4,7 @@ platform="${SBCL_SOFTWARE_TYPE}-${SBCL_MACHINE_TYPE}"
 
 if [ -z "$CC" ]
 then
-    CC=cc
+    CC=gcc
 fi
 
 args=
