@@ -70,11 +70,13 @@
 ;;; SLEEP should not cons except on 32-bit platforms when
 ;;; (> (mod seconds 1) (* most-positive-fixnum 1e-9))
 (with-test (:name (sleep :non-consing) :fails-on :win32)
-  (ctu:assert-no-consing (sleep 0.00001s0))
-  (locally (declare (notinline sleep))
-    (ctu:assert-no-consing (sleep 0.00001s0))
-    (ctu:assert-no-consing (sleep 0.00001d0))
-    (ctu:assert-no-consing (sleep 1/100000003))))
+  (handler-case (sb-ext:with-timeout 5
+                  (ctu:assert-no-consing (sleep 0.00001s0))
+                  (locally (declare (notinline sleep))
+                    (ctu:assert-no-consing (sleep 0.00001s0))
+                    (ctu:assert-no-consing (sleep 0.00001d0))
+                    (ctu:assert-no-consing (sleep 1/100000003))))
+    (timeout ())))
 
 ;;; Changes to make SLEEP cons less led to SLEEP
 ;;; not sleeping at all on 32-bit platforms when
