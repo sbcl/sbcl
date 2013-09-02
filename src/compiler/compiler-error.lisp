@@ -99,6 +99,20 @@
     (funcall *compiler-error-bailout* condition)
     (bug "Control returned from *COMPILER-ERROR-BAILOUT*.")))
 
+(defmacro with-compiler-error-resignalling (&body body)
+  `(handler-bind
+       ((compiler-error
+          (lambda (c)
+            (if (boundp '*compiler-error-bailout*)
+                ;; if we're in the compiler, delegate either to a higher
+                ;; authority or, if that's us, back down to the
+                ;; outermost compiler handler...
+                (signal c)
+                ;; ... if we're not in the compiler, better signal the
+                ;; error straight away.
+                (invoke-restart 'signal-error)))))
+     ,@body))
+
 (defun compiler-warn (datum &rest arguments)
   (apply #'warn datum arguments)
   (values))

@@ -1184,27 +1184,16 @@
 (defun eval-in-native-environment (form lexenv)
   (handler-bind
       ((sb!impl::eval-error
-        (lambda (condition)
-          (error 'interpreted-program-error
-                 :condition (sb!int:encapsulated-condition condition)
-                 :form form)))
-       (sb!c:compiler-error
-        (lambda (c)
-          (if (boundp 'sb!c::*compiler-error-bailout*)
-              ;; if we're in the compiler, delegate either to a higher
-              ;; authority or, if that's us, back down to the
-              ;; outermost compiler handler...
-              (progn
-                (signal c)
-                nil)
-              ;; ... if we're not in the compiler, better signal the
-              ;; error straight away.
-              (invoke-restart 'sb!c::signal-error)))))
-    (handler-case
-        (let ((env (make-env-from-native-environment lexenv)))
-          (%eval form env))
-      (compiler-environment-too-complex-error (condition)
-        (declare (ignore condition))
-        (sb!int:style-warn 'sb!kernel:lexical-environment-too-complex
-                           :form form :lexenv lexenv)
-        (sb!int:simple-eval-in-lexenv form lexenv)))))
+         (lambda (condition)
+           (error 'interpreted-program-error
+                  :condition (sb!int:encapsulated-condition condition)
+                  :form form))))
+    (sb!c:with-compiler-error-resignalling
+      (handler-case
+          (let ((env (make-env-from-native-environment lexenv)))
+            (%eval form env))
+        (compiler-environment-too-complex-error (condition)
+          (declare (ignore condition))
+          (sb!int:style-warn 'sb!kernel:lexical-environment-too-complex
+                             :form form :lexenv lexenv)
+          (sb!int:simple-eval-in-lexenv form lexenv))))))

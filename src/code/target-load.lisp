@@ -118,7 +118,9 @@
              (return-from load
                (if faslp
                    (load-as-fasl stream verbose print)
-                   (load-as-source stream :verbose verbose :print print))))))
+                   (sb!c:with-compiler-error-resignalling
+                     (load-as-source stream :verbose verbose
+                                            :print print)))))))
     ;; Case 1: stream.
     (when (streamp pathspec)
       (return-from load (load-stream pathspec (fasl-header-p pathspec))))

@@ -127,25 +127,13 @@
   (declare (optimize (safety 1)))
   ;; (aver (lexenv-simple-p lexenv))
   (incf *eval-calls*)
-  (handler-bind
-      ((sb!c:compiler-error
-        (lambda (c)
-          (if (boundp 'sb!c::*compiler-error-bailout*)
-              ;; if we're in the compiler, delegate either to a higher
-              ;; authority or, if that's us, back down to the
-              ;; outermost compiler handler...
-              (progn
-                (signal c)
-                nil)
-              ;; ... if we're not in the compiler, better signal the
-              ;; error straight away.
-              (invoke-restart 'sb!c::signal-error)))))
+  (sb!c:with-compiler-error-resignalling
     (let ((exp (macroexpand original-exp lexenv)))
       (handler-bind ((eval-error
-                      (lambda (condition)
-                        (error 'interpreted-program-error
-                               :condition (encapsulated-condition condition)
-                               :form exp))))
+                       (lambda (condition)
+                         (error 'interpreted-program-error
+                                :condition (encapsulated-condition condition)
+                                :form exp))))
         (typecase exp
           (symbol
            (ecase (info :variable :kind exp)
@@ -241,13 +229,13 @@
                 (destructuring-bind (definitions &rest body)
                     (rest exp)
                   (let ((lexenv
-                         (let ((sb!c:*lexenv* lexenv))
-                           (sb!c::funcall-in-macrolet-lexenv
-                            definitions
-                            (lambda (&key funs)
-                              (declare (ignore funs))
-                              sb!c:*lexenv*)
-                            :eval))))
+                          (let ((sb!c:*lexenv* lexenv))
+                            (sb!c::funcall-in-macrolet-lexenv
+                             definitions
+                             (lambda (&key funs)
+                               (declare (ignore funs))
+                               sb!c:*lexenv*)
+                             :eval))))
                     (simple-eval-locally `(locally ,@body) lexenv))))
                ((symbol-macrolet)
                 (destructuring-bind (definitions &rest body) (rest exp)
