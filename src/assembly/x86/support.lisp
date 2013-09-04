@@ -33,15 +33,7 @@
      (values
       `((note-this-location ,vop :call-site)
         (inst call (make-fixup ',name :assembly-routine))
-        (note-this-location ,vop :single-value-return)
-        (cond
-          ((member :cmov *backend-subfeatures*)
-           (inst cmov :c esp-tn ebx-tn))
-          (t
-           (let ((single-value (gen-label)))
-             (inst jmp :nc single-value)
-             (move esp-tn ebx-tn)
-             (emit-label single-value)))))
+        (note-this-location ,vop :single-value-return))
       '((:save-p :compute-only))))))
 
 (defun generate-return-sequence (style)

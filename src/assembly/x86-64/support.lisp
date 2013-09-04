@@ -21,8 +21,7 @@
       `((note-this-location ,vop :call-site)
         (inst mov temp-reg-tn (make-fixup ',name :assembly-routine))
         (inst call temp-reg-tn)
-        (note-this-location ,vop :single-value-return)
-        (inst cmov :c rsp-tn rbx-tn))
+        (note-this-location ,vop :single-value-return))
       '((:save-p :compute-only))))
     (:none
      (values

@@ -21,9 +21,7 @@
                                         (:policy :safe)
                                         (:save-p t))
                 ((:arg x (descriptor-reg any-reg) rdx-offset)
-                 (:arg y (descriptor-reg any-reg)
-                       ;; this seems wrong esi-offset -- FIXME: What's it mean?
-                       rdi-offset)
+                 (:arg y (descriptor-reg any-reg) rdi-offset)
 
                  (:res res (descriptor-reg any-reg) rdx-offset)
 
