@@ -1246,6 +1246,8 @@
 (defknown pathname-version (pathname-designator)
   pathname-version (flushable))
 
+(defknown pathname= (pathname pathname) boolean (movable foldable flushable))
+
 (defknown (namestring file-namestring directory-namestring host-namestring)
   (pathname-designator) (or simple-string null)
   (unsafely-flushable))

@@ -2,6 +2,8 @@
 changes relative to sbcl-1.1.11:
   * enhancement: Add sb-bsd-sockets:socket-shutdown, for calling
     shutdown(3). (lp#1207483 patch by Jan Moringen)
+  * optimization: EQUAL transform is smarter.
+    (lp#1220084 thanks to Elias Martenson)
   * bug fix: probe-file now can access symlinks to pipes and sockets in
     /proc/pid/fd on Linux. (reported by Eric Schulte)
   * bug fix: SBCL can now be built on Solaris x86-64.

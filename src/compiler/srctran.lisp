@@ -3822,7 +3822,10 @@
   (let ((x-type (lvar-type x))
         (y-type (lvar-type y))
         (string-type (specifier-type 'string))
-        (bit-vector-type (specifier-type 'bit-vector)))
+        (bit-vector-type (specifier-type 'bit-vector))
+        (pathname-type (specifier-type 'pathname))
+        (combination-type (specifier-type '(or bit-vector string
+                                            cons pathname))))
     (cond
       ((same-leaf-ref-p x y) t)
       ((and (csubtypep x-type string-type)
@@ -3831,14 +3834,14 @@
       ((and (csubtypep x-type bit-vector-type)
             (csubtypep y-type bit-vector-type))
        '(bit-vector-= x y))
-      ;; if at least one is not a string, and at least one is not a
-      ;; bit-vector, then we can reason from types.
-      ((and (not (and (types-equal-or-intersect x-type string-type)
-                      (types-equal-or-intersect y-type string-type)))
-            (not (and (types-equal-or-intersect x-type bit-vector-type)
-                      (types-equal-or-intersect y-type bit-vector-type)))
-            (not (types-equal-or-intersect x-type y-type)))
+      ((and (csubtypep x-type pathname-type)
+            (csubtypep y-type pathname-type))
+       '(pathname= x y))
+      ((not (types-equal-or-intersect y-type x-type))
        nil)
+      ((or (not (types-equal-or-intersect x-type combination-type))
+           (not (types-equal-or-intersect y-type combination-type)))
+       '(eql x y))
       (t (give-up-ir1-transform)))))
 
 ;;; Convert to EQL if both args are rational and complexp is specified

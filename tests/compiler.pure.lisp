@@ -4770,3 +4770,33 @@
                              G13908)))
                         "23a%b%")))))
     (assert (funcall f))))
+
+(defvar *global-equal-function* #'equal
+  "Global reference to the EQUAL function. This reference is funcalled
+in order to prevent the compiler from inlining the call.")
+
+(defmacro equal-reduction-macro ()
+  (let* ((s "foo")
+         (bit-vector #*11001100)
+         (values `(nil 1 2 "test"
+                       ;; Floats duplicated here to ensure we get newly created instances
+                       (read-from-string "1.1") (read-from-string "1.2d0")
+                       (read-from-string "1.1") (read-from-string "1.2d0")
+                       1.1 1.2d0 '("foo" "bar" "test")
+                       #(1 2 3 4) #*101010 (make-broadcast-stream) #p"/tmp/file"
+                       ,s (copy-seq ,s) ,bit-vector (copy-seq ,bit-vector))))
+    ;; Test all permutations of different types
+    `(progn
+       ,@(loop
+            for x in values
+            append (loop
+                      for y in values
+                      collect (let ((result1-sym (gensym "RESULT1-"))
+                                    (result2-sym (gensym "RESULT2-")))
+                                `(let ((,result1-sym (equal ,x ,y))
+                                       (,result2-sym (funcall *global-equal-function* ,x ,y)))
+                                   (assert (or (and ,result1-sym ,result2-sym)
+                                               (and (not ,result1-sym) (not ,result2-sym)))))))))))
+
+(with-test (:name :equal-reduction)
+  (equal-reduction-macro))
