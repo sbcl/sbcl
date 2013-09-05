@@ -243,16 +243,18 @@
 
 (defun bit-vector-= (x y)
   (declare (type bit-vector x y))
-  (if (and (simple-bit-vector-p x)
-           (simple-bit-vector-p y))
-      (bit-vector-= x y) ; DEFTRANSFORM
-      (and (= (length x) (length y))
-           (do ((i 0 (1+ i))
-                (length (length x)))
-               ((= i length) t)
-             (declare (fixnum i))
-             (unless (= (bit x i) (bit y i))
-               (return nil))))))
+  (cond ((eq x y))
+        ((and (simple-bit-vector-p x)
+              (simple-bit-vector-p y))
+         (bit-vector-= x y))            ; DEFTRANSFORM
+        (t
+         (and (= (length x) (length y))
+              (do ((i 0 (1+ i))
+                   (length (length x)))
+                  ((= i length) t)
+                (declare (fixnum i))
+                (unless (= (bit x i) (bit y i))
+                  (return nil)))))))
 
 (defun equal (x y)
   #!+sb-doc

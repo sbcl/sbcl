@@ -518,7 +518,8 @@ is either numeric or alphabetic."
           (char-code ,ch)))))
 
 (defun two-arg-char-equal (c1 c2)
-  (= (equal-char-code c1) (equal-char-code c2)))
+  (or (eq c1 c2)
+      (= (equal-char-code c1) (equal-char-code c2))))
 
 (defun char-equal (character &rest more-characters)
   #!+sb-doc

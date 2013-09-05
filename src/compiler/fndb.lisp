@@ -844,6 +844,7 @@
 (defknown hash-table-test (hash-table) symbol (foldable flushable))
 (defknown sxhash (t) hash (#-sb-xc-host foldable flushable))
 (defknown psxhash (t &optional t) hash (#-sb-xc-host foldable flushable))
+(defknown hash-table-equalp (hash-table hash-table) boolean (foldable flushable))
 
 ;;;; from the "Arrays" chapter
 
