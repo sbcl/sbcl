@@ -4,8 +4,8 @@ changes relative to sbcl-1.1.11:
     shutdown(3). (thanks to Jan Moringen, lp#1207483)
   * enhancement: document extensible sequences.  (thanks to Jan Moringen,
     lp#994528)
-  * optimization: EQUAL transform is smarter.  (thanks to Elias Martenson,
-    lp#1220084)
+  * optimization: EQUAL and EQUALP transforms are smarter.
+    (thanks to Elias Martenson, lp#1220084)
   * bug fix: probe-file now can access symlinks to pipes and sockets in
     /proc/pid/fd on Linux. (reported by Eric Schulte)
   * bug fix: SBCL can now be built on Solaris x86-64.

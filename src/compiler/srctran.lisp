@@ -3821,28 +3821,72 @@
   "convert to simpler equality predicate"
   (let ((x-type (lvar-type x))
         (y-type (lvar-type y))
-        (string-type (specifier-type 'string))
-        (bit-vector-type (specifier-type 'bit-vector))
-        (pathname-type (specifier-type 'pathname))
         (combination-type (specifier-type '(or bit-vector string
                                             cons pathname))))
-    (cond
-      ((same-leaf-ref-p x y) t)
-      ((and (csubtypep x-type string-type)
-            (csubtypep y-type string-type))
-       '(string= x y))
-      ((and (csubtypep x-type bit-vector-type)
-            (csubtypep y-type bit-vector-type))
-       '(bit-vector-= x y))
-      ((and (csubtypep x-type pathname-type)
-            (csubtypep y-type pathname-type))
-       '(pathname= x y))
-      ((not (types-equal-or-intersect y-type x-type))
-       nil)
-      ((or (not (types-equal-or-intersect x-type combination-type))
-           (not (types-equal-or-intersect y-type combination-type)))
-       '(eql x y))
-      (t (give-up-ir1-transform)))))
+    (flet ((both-csubtypep (type)
+             (let ((ctype (specifier-type type)))
+               (and (csubtypep x-type ctype)
+                    (csubtypep y-type ctype)))))
+      (cond
+        ((same-leaf-ref-p x y) t)
+        ((both-csubtypep 'string)
+         '(string= x y))
+        ((both-csubtypep 'bit-vector)
+         '(bit-vector-= x y))
+        ((both-csubtypep 'pathname)
+         '(pathname= x y))
+        ((or (not (types-equal-or-intersect x-type combination-type))
+             (not (types-equal-or-intersect y-type combination-type)))
+         (if (types-equal-or-intersect x-type y-type)
+             '(eql x y)
+             ;; Can't simply check for type intersection if both types are combination-type
+             ;; since array specialization would mean types don't intersect, even when EQUAL
+             ;; doesn't care for specialization.
+             ;; Previously checking for intersection in the outer COND resulted in
+             ;;
+             ;; (equal (the (cons (or simple-bit-vector
+             ;;                       simple-base-string))
+             ;;             x)
+             ;;        (the (cons (or (and bit-vector (not simple-array))
+             ;;                       (simple-array character (*))))
+             ;;             y))
+             ;; being incorrectly folded to NIL
+             nil))
+        (t (give-up-ir1-transform))))))
+
+(deftransform equalp ((x y) * *)
+  "convert to simpler equality predicate"
+  (let ((x-type (lvar-type x))
+        (y-type (lvar-type y))
+        (combination-type (specifier-type '(or number array
+                                            character
+                                            cons pathname
+                                            instance hash-table))))
+    (flet ((both-csubtypep (type)
+             (let ((ctype (specifier-type type)))
+               (and (csubtypep x-type ctype)
+                    (csubtypep y-type ctype)))))
+      (cond
+        ((same-leaf-ref-p x y) t)
+        ((both-csubtypep 'string)
+         '(string-equal x y))
+        ((both-csubtypep 'bit-vector)
+         '(bit-vector-= x y))
+        ((both-csubtypep 'pathname)
+         '(pathname= x y))
+        ((both-csubtypep 'character)
+         '(char-equal x y))
+        ((both-csubtypep 'number)
+         '(= x y))
+        ((both-csubtypep 'hash-table)
+         '(hash-table-equalp x y))
+        ((or (not (types-equal-or-intersect x-type combination-type))
+             (not (types-equal-or-intersect y-type combination-type)))
+         ;; See the comment about specialized types in the EQUAL transform above
+         (if (types-equal-or-intersect y-type x-type)
+             '(eq x y)
+             nil))
+        (t (give-up-ir1-transform))))))
 
 ;;; Convert to EQL if both args are rational and complexp is specified
 ;;; and the same for both.
