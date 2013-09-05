@@ -4054,15 +4054,15 @@
                                                             'character))
 
 (define-source-transform char-equal (&rest args)
-  (multi-compare 'sb!impl::two-arg-char-equal args nil 'character t))
+  (multi-compare 'two-arg-char-equal args nil 'character t))
 (define-source-transform char-lessp (&rest args)
-  (multi-compare 'sb!impl::two-arg-char-lessp args nil 'character t))
+  (multi-compare 'two-arg-char-lessp args nil 'character t))
 (define-source-transform char-greaterp (&rest args)
-  (multi-compare 'sb!impl::two-arg-char-greaterp args nil 'character t))
+  (multi-compare 'two-arg-char-greaterp args nil 'character t))
 (define-source-transform char-not-greaterp (&rest args)
-  (multi-compare 'sb!impl::two-arg-char-greaterp args t 'character t))
+  (multi-compare 'two-arg-char-greaterp args t 'character t))
 (define-source-transform char-not-lessp (&rest args)
-  (multi-compare 'sb!impl::two-arg-char-lessp args t 'character t))
+  (multi-compare 'two-arg-char-lessp args t 'character t))
 
 ;;; This function does source transformation of N-arg inequality
 ;;; functions such as /=. This is similar to MULTI-COMPARE in the <3

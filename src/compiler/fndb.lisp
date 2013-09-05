@@ -418,6 +418,14 @@
                  char-lessp char-greaterp char-not-greaterp char-not-lessp)
   (character &rest character) boolean (movable foldable flushable))
 
+(defknown (two-arg-char-equal
+           two-arg-char-not-equal
+           two-arg-char-lessp
+           two-arg-char-not-lessp
+           two-arg-char-greaterp
+           two-arg-char-not-greaterp)
+    (character character) boolean (movable foldable flushable))
+
 (defknown character (t) character (movable foldable unsafely-flushable))
 (defknown char-code (character) char-code (movable foldable flushable))
 (defknown (char-upcase char-downcase) (character) character
