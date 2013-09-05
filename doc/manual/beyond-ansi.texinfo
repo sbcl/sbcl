@@ -7,20 +7,21 @@ ANSI standard. SBCL doesn't support as many extensions as CMUCL, but
 it still has quite a few.  @xref{Contributed Modules}.
 
 @menu
-* Reader Extensions::           
-* Package-Local Nicknames::     
-* Package Variance::            
-* Garbage Collection::          
-* Metaobject Protocol::         
-* Support For Unix::            
-* Customization Hooks for Users::  
-* Tools To Help Developers::    
-* Resolution of Name Conflicts::  
-* Hash Table Extensions::       
-* Random Number Generation::    
-* Miscellaneous Extensions::    
-* Stale Extensions::            
-* Efficiency Hacks::            
+* Reader Extensions::
+* Package-Local Nicknames::
+* Package Variance::
+* Garbage Collection::
+* Metaobject Protocol::
+* Extensible Sequences::
+* Support For Unix::
+* Customization Hooks for Users::
+* Tools To Help Developers::
+* Resolution of Name Conflicts::
+* Hash Table Extensions::
+* Random Number Generation::
+* Miscellaneous Extensions::
+* Stale Extensions::
+* Efficiency Hacks::
 @end menu
 
 @node Reader Extensions
@@ -69,7 +70,7 @@ Options are extended to include
 
 @itemize
 @item
-@code{:local-nicknames} @var{(local-nickname actual-package-name)}*
+@code{:local-nicknames (@var{local-nickname} @var{actual-package-name})*}
 
 The package has the specified local nicknames for the corresponding
 actual packages.
@@ -362,14 +363,218 @@ to the constant @code{+slot-unbound+}.
 
 @end itemize
 
+@node Extensible Sequences
+@comment  node-name,  next,  previous,  up
+@section Extensible Sequences
+
+@menu
+* Iterator Protocol::
+* Simple Iterator Protocol::
+@end menu
+
+ANSI Common Lisp has a class @code{sequence} with subclasses @code{list} and
+@code{vector} on which the ``sequence functions'' like @code{find},
+@code{subseq}, etc. operate. As an extension to the ANSI specification,
+SBCL allows additional subclasses of @code{sequence} to be defined
+@footnote{A motivation, rationale and additional examples for the design
+of this extension can be found in the paper @cite{Rhodes, Christophe
+(2007): User-extensible sequences in Common Lisp} available for download
+at
+@url{http://www.doc.gold.ac.uk/~mas01cr/papers/ilc2007/sequences-20070301.pdf}.}.
+@tindex @cl{sequence}
+@tindex @cl{vector}
+@findex @cl{find}
+@findex @cl{subseq}
+
+Users of this extension just make instances of @cl{sequence} subclasses
+and transparently operate on them using sequence functions:
+@lisp
+(coerce (subseq (make-instance 'my-sequence) 5 10) 'list)
+@end lisp
+From this perspective, no distinction between builtin and user-defined
+@code{sequence} subclasses should be necessary.
+@findex @cl{coerce}
+@findex @cl{subseq}
+@findex @cl{make-instance}
+@tindex @cl{list}
+
+Providers of the extension, that is of user-defined @code{sequence}
+subclasses, have to adhere to a ``sequence protocol'' which consists of
+a set of generic functions in the @code{sequence} package.
+@c
+A minimal @code{sequence} subclass has to specify @code{standard-object} and
+@code{sequence} as its superclasses and has to be the specializer of the
+@code{sequence} parameter of methods on at least the following generic
+functions:
+@tindex @cl{sequence}
+@tindex @cl{standard-object}
+
+@include fun-sb-sequence-length.texinfo
+@include fun-sb-sequence-elt.texinfo
+@include fun-sb-sequence-setf-elt.texinfo
+@include fun-sb-sequence-adjust-sequence.texinfo
+@include fun-sb-sequence-make-sequence-like.texinfo
+
+@code{make-sequence-like} is needed for functions returning
+freshly-allocated sequences such as @code{subseq} or
+@code{copy-seq}. @code{adjust-sequence} is needed for functions which
+destructively modify their arguments such as @code{delete}. In fact, all
+other sequence functions can be implemented in terms of the above
+functions and actually are, if no additional methods are
+defined. However, relying on these generic implementations, in
+particular not implementing the iterator protocol can incur a high
+performance penalty @xref{Iterator Protocol}.
+@tindex @cl{sequence}
+@findex @sequence{make-sequence-like}
+@findex @cl{subseq}
+@findex @cl{copy-seq}
+@findex @sequence{adjust-sequence}
+
+In addition to the mandatory functions above, methods on the following
+sequence functions can be defined:
+
+@include fun-sb-sequence-emptyp.texinfo
+
+@itemize
+@item
+@code{sb-sequence:count}, @code{sb-sequence:count-if}, @code{sb-sequence:count-if-not}
+
+@item
+@code{sb-sequence:find}, @code{sb-sequence:find-if}, @code{sb-sequence:find-if-not}
+
+@item
+@code{sb-sequence:position}, @code{sb-sequence:position-if}, @code{sb-sequence:position-if-not}
+
+@item
+@code{sb-sequence:subseq}
+
+@item
+@code{sb-sequence:copy-seq}
+
+@item
+@code{sb-sequence:fill}
+
+@item
+@code{sb-sequence:nsubstitute}, @code{sb-sequence:nsubstitute-if},
+@code{sb-sequence:nsubstitute-if-not}, @code{sb-sequence:substitute},
+@code{sb-sequence:substitute-if}, @code{sb-sequence:substitute-if-not}
+
+@item
+@code{sb-sequence:replace}
+
+@item
+@code{sb-sequence:nreverse}, @code{sb-sequence:reverse}
+
+@item
+@code{sb-sequence:reduce}
+
+@item
+@code{sb-sequence:mismatch}
+
+@item
+@code{sb-sequence:search}
+
+@item
+@code{sb-sequence:delete}, @code{sb-sequence:delete-if}, @code{sb-sequence:delete-if-not},
+@code{sb-sequence:remove}, @code{sb-sequence:remove-if}, @code{sb-sequence:remove-if-not},
+
+@item
+@code{sb-sequence:delete-duplicates}, @code{sb-sequence:remove-duplicates}
+
+@item
+@code{sb-sequence:sort}, @code{sb-sequence:stable-sort}
+@end itemize
+
+In the spirit of @code{dolist}, generic sequences can be traversed using
+the macro
+@findex @cl{dolist}
+
+@include macro-sb-sequence-dosequence.texinfo
+
+@node Iterator Protocol
+@comment  node-name,  next,  previous,  up
+@subsection Iterator Protocol
+
+The iterator protocol allows subsequently accessing some or all elements
+of a sequence in forward or reverse direction. Users first call
+@code{make-sequence-iterator} to create an iteration state and
+receive functions to query and mutate it. These functions allow, among
+other things, moving to, retrieving or modifying elements of the
+sequence. An iteration state consists of a state object, a limit object,
+a from-end indicator and the following six functions to query or mutate
+this state:
+@findex @sequence{make-sequence-iterator}
+@deffn {Function} @code{step function} sequence iterator from-end
+Moves the iterator one position forward or backward in the associated
+sequence depending on the iteration direction.
+@end deffn
+@deffn {Function} @code{endp function} sequence iterator limit from-end
+Returns non-@code{nil} when the iterator has reached the end of the
+associated sequence with respect to the iteration direction.
+@end deffn
+@deffn {Function} @code{element function} sequence iterator
+Returns the sequence element associated to the current position of the
+iteration.
+@end deffn
+@deffn {Function} @code{setf element function} new-value sequence iterator
+Destructively modifies the associates sequence by replacing the sequence
+element associated to the current iteration position with a new value.
+@end deffn
+@deffn {Function} @code{index function} sequence iterator
+Returns the position of the iteration in the associated sequence.
+@end deffn
+@deffn {Function} @code{copy function} sequence iterator
+Returns a copy of the iteration state which can be mutated independently
+of the copied iteration state.
+@end deffn
+
+An iterator is created by calling:
+
+@include fun-sb-sequence-make-sequence-iterator.texinfo
+
+Note that @code{make-sequence-iterator} calls
+@code{make-simple-sequence-iterator} when there is no specialized
+method for a particular @code{sequence} subclass. @xref{Simple Iterator
+Protocol}.
+@findex @sequence{make-sequence-iterator}
+@findex @sequence{make-simple-sequence-iterator}
+@tindex @cl{sequence}
+
+The following convenience macros simplify traversing sequences using
+iterators:
+
+@include macro-sb-sequence-with-sequence-iterator.texinfo
+@include macro-sb-sequence-with-sequence-iterator-functions.texinfo
+
+@node Simple Iterator Protocol
+@comment  node-name,  next,  previous,  up
+@subsection Simple Iterator Protocol
+
+For cases in which the full flexibility and performance of the general
+sequence iterator protocol is not required, there is a simplified
+sequence iterator protocol consisting of a few generic functions which
+can be specialized for iterator classes:
+
+@include fun-sb-sequence-iterator-step.texinfo
+@include fun-sb-sequence-iterator-endp.texinfo
+@include fun-sb-sequence-iterator-element.texinfo
+@include fun-sb-sequence-setf-iterator-element.texinfo
+@include fun-sb-sequence-iterator-index.texinfo
+@include fun-sb-sequence-iterator-copy.texinfo
+
+Iterator objects implementing the above simple iteration protocol are
+created by calling the following generic function:
+
+@include fun-sb-sequence-make-simple-sequence-iterator.texinfo
+
 @node  Support For Unix
 @comment  node-name,  next,  previous,  up
 @section Support For Unix
 
 @menu
-* Command-line arguments::      
-* Querying the process environment::  
-* Running external programs::   
+* Command-line arguments::
+* Querying the process environment::
+* Running external programs::
 @end menu
 
 @node Command-line arguments

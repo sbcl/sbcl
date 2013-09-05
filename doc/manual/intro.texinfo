@@ -8,13 +8,13 @@ not on behavior which is common to all implementations of ANSI Common
 Lisp.
 
 @menu
-* ANSI Conformance::            
-* Extensions::                  
-* Idiosyncrasies::              
-* Development Tools::           
-* More SBCL Information::       
-* More Common Lisp Information::  
-* History and Implementation of SBCL::  
+* ANSI Conformance::
+* Extensions::
+* Idiosyncrasies::
+* Development Tools::
+* More SBCL Information::
+* More Common Lisp Information::
+* History and Implementation of SBCL::
 @end menu
 
 
@@ -64,6 +64,10 @@ non-blocking IO on multiple streams without using threads.
 @item Metaobject Protocol
 @code{sb-mop} package provides a metaobject protocol for the Common
 Lisp Object System as described in @cite{Art of Metaobject Protocol}.
+
+@item Extensible Sequences
+SBCL allows users to define subclasses of the @code{sequence}
+class. @xref{Extensible Sequences}.
 
 @item Native Threads
 SBCL has native threads on x86/Linux, capable of taking advantage
@@ -149,11 +153,11 @@ deals with choices that the ANSI standard leaves to the
 implementation.
 
 @menu
-* Declarations::                
-* FASL Format::                 
-* Compiler-only Implementation::  
-* Defining Constants::          
-* Style Warnings::              
+* Declarations::
+* FASL Format::
+* Compiler-only Implementation::
+* Defining Constants::
+* Style Warnings::
 @end menu
 
 @node Declarations
@@ -230,7 +234,7 @@ compiling and loading reasonable code like
 runs into this undefined behavior. Many implementations of Common Lisp
 try to help the programmer around this annoyance by silently accepting
 the undefined code and trying to do what the programmer probably
-meant. 
+meant.
 
 SBCL instead treats the undefined behavior as an error. Often such
 code can be rewritten in portable ANSI Common Lisp which has the
@@ -257,13 +261,13 @@ SBCL gives style warnings about various kinds of perfectly legal code,
 e.g.
 
 @itemize
-  
+
 @item
 @code{defmethod} without a preceding @code{defgeneric};
-  
+
 @item
 multiple @code{defun}s of the same symbol in different units;
-  
+
 @item
 special variables not named in the conventional @code{*foo*} style,
 and lexical variables unconventionally named in the @code{*foo*} style
@@ -291,9 +295,9 @@ case, but still isn't as of SBCL 0.7.6.)
 @section Development Tools
 
 @menu
-* Editor Integration::          
-* Language Reference::          
-* Generating Executables::      
+* Editor Integration::
+* Language Reference::
+* Generating Executables::
 @end menu
 
 @node Editor Integration
@@ -310,7 +314,7 @@ Currently @dfn{SLIME}@footnote{Historically, the ILISP package at
 @uref{http://ilisp.cons.org/} provided similar functionality, but it
 does not support modern SBCL versions.} (Superior Lisp Interaction
 Mode for Emacs) together with Emacs is recommended for use with
-SBCL, though other options exist as well. 
+SBCL, though other options exist as well.
 
 SLIME can be downloaded from
 @uref{http://www.common-lisp.net/project/slime/}.
@@ -342,10 +346,10 @@ sb-ext:save-lisp-and-die}.
 @section More SBCL Information
 
 @menu
-* SBCL Homepage::               
-* Online Documentation::        
-* Additional Documentation Files::  
-* Internals Documentation::     
+* SBCL Homepage::
+* Online Documentation::
+* Additional Documentation Files::
+* Internals Documentation::
 @end menu
 
 @node SBCL Homepage
@@ -420,9 +424,9 @@ it is not installed by default.
 @section More Common Lisp Information
 
 @menu
-* Internet Community::          
-* Third-party Libraries::       
-* Common Lisp Books::           
+* Internet Community::
+* Third-party Libraries::
+* Common Lisp Books::
 @end menu
 
 @node Internet Community
@@ -465,7 +469,7 @@ learn about Common Lisp, some books stand out:
 @item Practical Common Lisp, by Peter Seibel
 An excellent introduction to the language, covering both the basics
 and ``advanced topics'' like macros, CLOS, and packages. Available
-both in print format and on the web: @uref{http://www.gigamonkeys.com/book/}. 
+both in print format and on the web: @uref{http://www.gigamonkeys.com/book/}.
 
 @item Paradigms Of Artificial Intelligence Programming, by Peter Norvig
 Good information on general Common Lisp programming, and many
@@ -559,7 +563,7 @@ the @code{eval} function only truly ``interprets'' a few easy kinds of
 forms, such as symbols which are @code{boundp}. More complicated forms
 are evaluated by calling @code{compile} and then calling @code{funcall}
 on the returned result.
-  
+
 The direct ancestor of SBCL is the x86 port of CMUCL. This port was in
 some ways the most cobbled-together of all the CMUCL ports, since a
 number of strange changes had to be made to support the register-poor

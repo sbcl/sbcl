@@ -798,24 +798,27 @@ many elements are copied."
 
 ;;;; CONCATENATE
 
-(defmacro sb!sequence:dosequence ((e sequence &optional return) &body body)
+(defmacro sb!sequence:dosequence ((element sequence &optional return) &body body)
+  #!+sb-doc
+  "Executes BODY with ELEMENT subsequently bound to each element of
+  SEQUENCE, then returns RETURN."
   (multiple-value-bind (forms decls) (parse-body body :doc-string-allowed nil)
     (let ((s sequence)
           (sequence (gensym "SEQUENCE")))
       `(block nil
         (let ((,sequence ,s))
           (seq-dispatch ,sequence
-            (dolist (,e ,sequence ,return) ,@body)
-            (do-vector-data (,e ,sequence ,return) ,@body)
+            (dolist (,element ,sequence ,return) ,@body)
+            (do-vector-data (,element ,sequence ,return) ,@body)
             (multiple-value-bind (state limit from-end step endp elt)
                 (sb!sequence:make-sequence-iterator ,sequence)
               (do ((state state (funcall step ,sequence state from-end)))
                   ((funcall endp ,sequence state limit from-end)
-                   (let ((,e nil))
+                   (let ((,element nil))
                      ,@(filter-dolist-declarations decls)
-                     ,e
+                     ,element
                      ,return))
-                (let ((,e (funcall elt ,sequence state)))
+                (let ((,element (funcall elt ,sequence state)))
                   ,@decls
                   (tagbody
                      ,@forms))))))))))

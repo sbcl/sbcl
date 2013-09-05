@@ -847,6 +847,10 @@ package, as well as for the package itself."
 (defun write-package-macro (package)
   (let* ((package-name (package-shortest-name package))
          (macro-name (package-macro-name package)))
+    ;; KLUDGE: SB-SEQUENCE has a shorter nickname SEQUENCE, but we
+    ;; want to document the SB- variant.
+    (when (eql (find-package "SB-SEQUENCE") (find-package package))
+      (setf package-name "SB-SEQUENCE"))
     (write-packageish-macro package-name macro-name)))
 
 (defun write-packageish-macro (package-name macro-name)

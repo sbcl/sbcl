@@ -20,24 +20,44 @@
 (defgeneric sequence:emptyp (sequence)
   (:method ((s list)) (null s))
   (:method ((s vector)) (zerop (length s)))
-  (:method ((s sequence)) (zerop (length s))))
+  (:method ((s sequence)) (zerop (length s)))
+  #+sb-doc
+  (:documentation
+   "Returns T if SEQUENCE is an empty sequence and NIL
+   otherwise. Signals an error if SEQUENCE is not a sequence."))
 
 (defgeneric sequence:length (sequence)
   (:method ((s list)) (length s))
   (:method ((s vector)) (length s))
-  (:method ((s sequence)) (sequence::protocol-unimplemented s)))
+  (:method ((s sequence)) (sequence::protocol-unimplemented s))
+  #+sb-doc
+  (:documentation
+   "Returns the length of SEQUENCE or signals a PROTOCOL-UNIMPLEMENTED
+   error if the sequence protocol is not implemented for the class of
+   SEQUENCE."))
 
 (defgeneric sequence:elt (sequence index)
   (:method ((s list) index) (elt s index))
   (:method ((s vector) index) (elt s index))
-  (:method ((s sequence) index) (sequence::protocol-unimplemented s)))
+  (:method ((s sequence) index) (sequence::protocol-unimplemented s))
+  #+sb-doc
+  (:documentation
+   "Returns the element at position INDEX of SEQUENCE or signals a
+   PROTOCOL-UNIMPLEMENTED error if the sequence protocol is not
+   implemented for the class of SEQUENCE."))
 
 (defgeneric (setf sequence:elt) (new-value sequence index)
   (:argument-precedence-order sequence new-value index)
   (:method (new-value (s list) index) (setf (elt s index) new-value))
   (:method (new-value (s vector) index) (setf (elt s index) new-value))
   (:method (new-value (s sequence) index)
-    (sequence::protocol-unimplemented s)))
+    (sequence::protocol-unimplemented s))
+  #+sb-doc
+  (:documentation
+   "Replaces the element at position INDEX of SEQUENCE with NEW-VALUE
+   and returns NEW-VALUE or signals a PROTOCOL-UNIMPLEMENTED error if
+   the sequence protocol is not implemented for the class of
+   SEQUENCE."))
 
 (defgeneric sequence:make-sequence-like
     (sequence length &key initial-element initial-contents)
@@ -63,7 +83,16 @@
       (t (make-array length :element-type (array-element-type s)))))
   (:method ((s sequence) length &key initial-element initial-contents)
     (declare (ignore initial-element initial-contents))
-    (sequence::protocol-unimplemented s)))
+    (sequence::protocol-unimplemented s))
+  #+sb-doc
+  (:documentation
+   "Returns a freshly allocated sequence of length LENGTH and of the
+   same class as SEQUENCE. Elements of the new sequence are
+   initialized to INITIAL-ELEMENT, if supplied, initialized to
+   INITIAL-CONTENTS if supplied, or identical to the elements of
+   SEQUENCE if neither is supplied. Signals a PROTOCOL-UNIMPLEMENTED
+   error if the sequence protocol is not implemented for the class of
+   SEQUENCE."))
 
 (defgeneric sequence:adjust-sequence
     (sequence length &key initial-element initial-contents)
@@ -95,7 +124,17 @@
       (t (apply #'adjust-array s length args))))
   (:method (new-value (s sequence) &rest args)
     (declare (ignore args))
-    (sequence::protocol-unimplemented s)))
+    (sequence::protocol-unimplemented s))
+  #+sb-doc
+  (:documentation
+   "Return destructively modified SEQUENCE or a freshly allocated
+   sequence of the same class as SEQUENCE of length LENGTH. Elements
+   of the returned sequence are initialized to INITIAL-ELEMENT, if
+   supplied, initialized to INITIAL-CONTENTS if supplied, or identical
+   to the elements of SEQUENCE if neither is supplied. Signals a
+   PROTOCOL-UNIMPLEMENTED error if the sequence protocol is not
+   implemented for the class of SEQUENCE."))
+
 
 ;;;; iterator protocol
 
@@ -114,7 +153,26 @@
     (declare (ignore from-end start end))
     (error 'type-error
            :datum s
-           :expected-type 'sequence)))
+           :expected-type 'sequence))
+  #+sb-doc
+  (:documentation
+   "Returns a sequence iterator for SEQUENCE or, if START and/or END
+   are supplied, the subsequence bounded by START and END as nine
+   values:
+
+   1. iterator state
+   2. limit
+   3. from-end
+   4. step function
+   5. endp function
+   6. element function
+   7. setf element function
+   8. index function
+   9. copy state function
+
+   If FROM-END is NIL, the constructed iterator visits the specified
+   elements in the order in which they appear in SEQUENCE. Otherwise,
+   the elements are visited in the opposite order."))
 
 ;;; the simple protocol: the simple iterator returns three values,
 ;;; STATE, LIMIT and FROM-END.
@@ -144,7 +202,19 @@
     (let ((end (or end (length s))))
       (if from-end
           (values (1- end) (1- start) from-end)
-          (values start end nil)))))
+          (values start end nil))))
+  #+sb-doc
+  (:documentation
+   "Returns a sequence iterator for SEQUENCE, START, END and FROM-END
+   as three values:
+
+   1. iterator state
+   2. limit
+   3. from-end
+
+   The returned iterator can be used with the generic iterator
+   functions ITERATOR-STEP, ITERATOR-ENDP, ITERATOR-ELEMENT, (SETF
+   ITERATOR-ELEMENT), ITERATOR-INDEX and ITERATOR-COPY."))
 
 (defgeneric sequence:iterator-step (sequence iterator from-end)
   (:method ((s list) iterator from-end)
@@ -161,7 +231,11 @@
   (:method ((s sequence) iterator from-end)
     (if from-end
         (1- iterator)
-        (1+ iterator))))
+        (1+ iterator)))
+  #+sb-doc
+  (:documentation
+   "Moves ITERATOR one position forward or backward in SEQUENCE
+   depending on the iteration direction encoded in FROM-END."))
 
 (defgeneric sequence:iterator-endp (sequence iterator limit from-end)
   (:method ((s list) iterator limit from-end)
@@ -169,7 +243,12 @@
   (:method ((s vector) iterator limit from-end)
     (= iterator limit))
   (:method ((s sequence) iterator limit from-end)
-    (= iterator limit)))
+    (= iterator limit))
+  #+sb-doc
+  (:documentation
+   "Returns non-NIL when ITERATOR has reached LIMIT (which may
+   correspond to the end of SEQUENCE) with respect to the iteration
+   direction encoded in FROM-END."))
 
 (defgeneric sequence:iterator-element (sequence iterator)
   (:method ((s list) iterator)
@@ -177,7 +256,11 @@
   (:method ((s vector) iterator)
     (aref s iterator))
   (:method ((s sequence) iterator)
-    (elt s iterator)))
+    (elt s iterator))
+  #+sb-doc
+  (:documentation
+   "Returns the element of SEQUENCE associated to the position of
+   ITERATOR."))
 
 (defgeneric (setf sequence:iterator-element) (new-value sequence iterator)
   (:method (o (s list) iterator)
@@ -185,7 +268,11 @@
   (:method (o (s vector) iterator)
     (setf (aref s iterator) o))
   (:method (o (s sequence) iterator)
-    (setf (elt s iterator) o)))
+    (setf (elt s iterator) o))
+  #+sb-doc
+  (:documentation
+   "Destructively modifies SEQUENCE by replacing the sequence element
+   associated to position of ITERATOR with NEW-VALUE."))
 
 (defgeneric sequence:iterator-index (sequence iterator)
   (:method ((s list) iterator)
@@ -193,15 +280,27 @@
     ;; Apple implementation in Dylan...)
     (loop for l on s for i from 0 when (eq l iterator) return i))
   (:method ((s vector) iterator) iterator)
-  (:method ((s sequence) iterator) iterator))
+  (:method ((s sequence) iterator) iterator)
+  #+sb-doc
+  (:documentation
+   "Returns the position of ITERATOR in SEQUENCE."))
 
 (defgeneric sequence:iterator-copy (sequence iterator)
   (:method ((s list) iterator) iterator)
   (:method ((s vector) iterator) iterator)
-  (:method ((s sequence) iterator) iterator))
+  (:method ((s sequence) iterator) iterator)
+  #+sb-doc
+  (:documentation
+   "Returns a copy of ITERATOR which also traverses SEQUENCE but can
+   be mutated independently of ITERATOR."))
 
 (defmacro sequence:with-sequence-iterator
-    ((&rest vars) (s &rest args &key from-end start end) &body body)
+    ((&rest vars) (sequence &rest args &key from-end start end) &body body)
+  #+sb-doc
+  "Executes BODY with the elements of VARS bound to the iteration
+  state returned by MAKE-SEQUENCE-ITERATOR for SEQUENCE and
+  ARGS. Elements of VARS may be NIL in which case the corresponding
+  value returned by MAKE-SEQUENCE-ITERATOR is ignored."
   (declare (ignore from-end start end))
   (let* ((ignored '())
          (vars (mapcar (lambda (x)
@@ -209,15 +308,21 @@
                                  (push name ignored)
                                  name)))
                        vars)))
-   `(multiple-value-bind (,@vars) (sequence:make-sequence-iterator ,s ,@args)
+   `(multiple-value-bind (,@vars) (sequence:make-sequence-iterator ,sequence ,@args)
       (declare (type function ,@(nthcdr 3 vars))
                (ignore ,@ignored))
       ,@body)))
 
 (defmacro sequence:with-sequence-iterator-functions
     ((step endp elt setf index copy)
-     (s &rest args &key from-end start end)
+     (sequence &rest args &key from-end start end)
      &body body)
+  #+sb-doc
+  "Executes BODY with the names STEP, ENDP, ELT, SETF, INDEX and COPY
+  bound to local functions which execute the iteration state query and
+  mutation functions returned by MAKE-SEQUENCE-ITERATOR for SEQUENCE
+  and ARGS. STEP, ENDP, ELT, SETF, INDEX and COPY have dynamic
+  extent."
   (declare (ignore from-end start end))
   (let ((nstate (gensym "STATE")) (nlimit (gensym "LIMIT"))
         (nfrom-end (gensym "FROM-END-")) (nstep (gensym "STEP"))
@@ -226,13 +331,13 @@
         (ncopy (gensym "COPY")))
     `(sequence:with-sequence-iterator
          (,nstate ,nlimit ,nfrom-end ,nstep ,nendp ,nelt ,nsetf ,nindex ,ncopy)
-       (,s ,@args)
-       (flet ((,step () (setq ,nstate (funcall ,nstep ,s ,nstate ,nfrom-end)))
-              (,endp () (funcall ,nendp ,s ,nstate ,nlimit ,nfrom-end))
-              (,elt () (funcall ,nelt ,s ,nstate))
-              (,setf (new-value) (funcall ,nsetf new-value ,s ,nstate))
-              (,index () (funcall ,nindex ,s ,nstate))
-              (,copy () (funcall ,ncopy ,s ,nstate)))
+       (,sequence,@args)
+       (flet ((,step () (setq ,nstate (funcall ,nstep ,sequence,nstate ,nfrom-end)))
+              (,endp () (funcall ,nendp ,sequence,nstate ,nlimit ,nfrom-end))
+              (,elt () (funcall ,nelt ,sequence,nstate))
+              (,setf (new-value) (funcall ,nsetf new-value ,sequence,nstate))
+              (,index () (funcall ,nindex ,sequence,nstate))
+              (,copy () (funcall ,ncopy ,sequence,nstate)))
          (declare (truly-dynamic-extent #',step #',endp #',elt
                                   #',setf #',index #',copy))
          ,@body))))
