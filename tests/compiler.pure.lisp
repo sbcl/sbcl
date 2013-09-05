@@ -2986,8 +2986,8 @@
         (compile nil `(lambda (x)
                         (declare (character x) (optimize speed))
                         (,name x))))
-      (dolist (name '(char= char/= char< char> char<= char>= char-equal
-                      char-not-equal char-lessp char-greaterp char-not-greaterp
+      (dolist (name '(char= char/= char< char> char<= char>=
+                      char-lessp char-greaterp char-not-greaterp
                       char-not-lessp))
         (setf current name)
         (compile nil `(lambda (x y)

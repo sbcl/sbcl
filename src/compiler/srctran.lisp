@@ -3185,7 +3185,7 @@
         ,(lvar-value x))
       (give-up-ir1-transform)))
 
-(dolist (x '(= char= + * logior logand logxor logtest))
+(dolist (x '(= char= two-arg-char-equal + * logior logand logxor logtest))
   (%deftransform x '(function * *) #'commutative-arg-swap
                  "place constant arg last"))
 
@@ -3707,7 +3707,8 @@
 
 ;;;; character operations
 
-(deftransform char-equal ((a b) (base-char base-char))
+(deftransform two-arg-char-equal ((a b) (base-char base-char) *
+                                  :policy (> speed space))
   "open code"
   '(let* ((ac (char-code a))
           (bc (char-code b))
@@ -3718,6 +3719,19 @@
              (or (and (> sum 161) (< sum 213))
                  (and (> sum 415) (< sum 461))
                  (and (> sum 463) (< sum 477))))))))
+
+(deftransform two-arg-char-equal ((a b) (* (constant-arg character)) *
+                                  :node node)
+  (let ((char (lvar-value b)))
+    (if (both-case-p char)
+        (let ((reverse (if (upper-case-p char)
+                           (char-downcase char)
+                           (char-upcase char))))
+          (if (policy node (> speed space))
+              `(or (char= a ,char)
+                   (char= a ,reverse))
+              `(char-equal-constant a ,char ,reverse)))
+        '(char= a b))))
 
 (deftransform char-upcase ((x) (base-char))
   "open code"
