@@ -471,17 +471,21 @@ invoked. In that case it will store into PLACE and start over."
                  ;; (see FILL-POINTER-OUTPUT-STREAM FIXME in stream.lisp),
                  ;; but it still has to be evaluated for side-effects.
                  (,element-type-var ,element-type))
-            (declare (ignore ,element-type-var))
-            ,@decls
-            (unwind-protect
-                 (progn ,@forms)
-              (close ,var))))
-      `(let ((,var (make-string-output-stream :element-type ,element-type)))
-         ,@decls
-         (unwind-protect
-             (progn ,@forms)
-           (close ,var))
-         (get-output-stream-string ,var)))))
+             (declare (ignore ,element-type-var))
+             ,@decls
+             (unwind-protect
+                  (progn ,@forms)
+               (close ,var))))
+        `(let ((,var (make-string-output-stream
+                      ;; CHARACTER is the default element-type of
+                      ;; string-ouput-stream, save a few bytes when passing it
+                      ,@(and (not (equal element-type ''character))
+                             `(:element-type ,element-type)))))
+           ,@decls
+           (unwind-protect
+                (progn ,@forms)
+             (close ,var))
+           (get-output-stream-string ,var)))))
 
 ;;;; miscellaneous macros
 
