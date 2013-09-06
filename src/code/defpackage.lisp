@@ -387,9 +387,7 @@ specifies to signal a warning if SWANK package is in variance, and an error othe
            (type list nicknames shadows shadowing-imports
                  imports interns exports)
            (type (or list (member :default)) use)
-           (type (or simple-string null) doc-string)
-           #!-sb-package-locks
-           (ignore implement lock))
+           (type (or simple-string null) doc-string))
   (with-package-graph ()
     (let* ((existing-package (find-package name))
            (use (use-list-packages existing-package use))
