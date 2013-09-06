@@ -195,3 +195,7 @@
   (test-n-cases '/ 'mpq-div
                 (gen-mpq :limbs limbs :sign t)
                 (gen-mpq :limbs limbs :sign t)))
+
+(define-gmp-test (pow)
+  (test-one-case 'expt 'mpz-pow
+                 16 3)) 

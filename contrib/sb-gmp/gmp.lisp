@@ -449,9 +449,6 @@ be (1+ COUNT)."
         (__gmpz_tdiv_qr (addr quot) (addr rem) (addr gn) (addr gd))))))
 
 (defun mpz-pow (base exp)
-  (declare (optimize (speed 3) (space 3) (safety 0))
-           (type bignum-type base))
-  (check-type exp (unsigned-byte #.sb-vm:n-word-bits))
   (with-gmp-mpz-results (rop)
     (with-mpz-vars ((base gbase))
       (__gmpz_pow_ui (addr rop) (addr gbase) exp))))
