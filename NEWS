@@ -14,6 +14,10 @@ changes relative to sbcl-1.1.11:
   * bug fix: (setf . a) is pprinted correctly (reported by Douglas Katzman).
   * bug fix: handle compiler-error in LOAD when it's not run from inside EVAL.
     (lp#1219601)
+  * bug fix: SB-GMP:MPZ-POW no longer segfaults given a non-bignum base.
+    (thanks to Stephan Frank)
+  * bug fix: space allocation of result bignums in SB-GMP is more accurate.
+    (thanks to Stephan Frank, lp#1206191)
   
 changes in sbcl-1.1.11 relative to sbcl-1.1.10:
   * enhancement: support building the manual under texinfo version 5.
