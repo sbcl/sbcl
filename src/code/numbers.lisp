@@ -1176,18 +1176,22 @@ the first."
   (deposit-field newbyte bytespec integer))
 
 (defun %ldb (size posn integer)
+  (declare (type bit-index size posn))
   (logand (ash integer (- posn))
           (1- (ash 1 size))))
 
 (defun %mask-field (size posn integer)
+  (declare (type bit-index size posn))
   (logand integer (ash (1- (ash 1 size)) posn)))
 
 (defun %dpb (newbyte size posn integer)
+  (declare (type bit-index size posn))
   (let ((mask (1- (ash 1 size))))
     (logior (logand integer (lognot (ash mask posn)))
             (ash (logand newbyte mask) posn))))
 
 (defun %deposit-field (newbyte size posn integer)
+  (declare (type bit-index size posn))
   (let ((mask (ash (ldb (byte size 0) -1) posn)))
     (logior (logand newbyte mask)
             (logand integer (lognot mask)))))

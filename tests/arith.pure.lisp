@@ -628,3 +628,29 @@
                                  (logior x ,k)))))
           (loop for x from min upto max do
             (assert (eql (logior x k) (funcall f x)))))))))
+
+(with-test (:name :ldb-negative-index-no-error)
+  (assert
+   (raises-error?
+    (funcall (compile nil
+                      `(lambda (x y)
+                         (ldb (byte x y) 100)))
+             -1 -2)))
+  (assert
+   (raises-error?
+    (funcall (compile nil
+                      `(lambda (x y)
+                         (mask-field (byte x y) 100)))
+             -1 -2)))
+  (assert
+   (raises-error?
+    (funcall (compile nil
+                      `(lambda (x y)
+                         (dpb 0 (byte x y) 100)))
+             -1 -2)))
+  (assert
+   (raises-error?
+    (funcall (compile nil
+                      `(lambda (x y)
+                         (deposit-field 0 (byte x y) 100)))
+             -1 -2))))
