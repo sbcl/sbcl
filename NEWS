@@ -18,6 +18,9 @@ changes relative to sbcl-1.1.11:
     (thanks to Stephan Frank)
   * bug fix: space allocation of result bignums in SB-GMP is more accurate.
     (thanks to Stephan Frank, lp#1206191)
+  * bug fix: sb-safepoint can now reliably handle signal interruptions of
+    foreign code. (lp#1133018)
+  
   
 changes in sbcl-1.1.11 relative to sbcl-1.1.10:
   * enhancement: support building the manual under texinfo version 5.
