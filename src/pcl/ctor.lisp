@@ -604,7 +604,7 @@
   (declare (ignore ii-methods si-methods))
   (let ((class (ctor-class ctor))
         (lambda-list (make-ctor-parameter-list ctor))
-        (initargs (quote-plist-keys (ctor-initargs ctor))))
+        (initargs (ctor-initargs ctor)))
     (if use-make-instance
         `(lambda ,lambda-list
            (declare #.*optimize-speed*)
@@ -612,13 +612,13 @@
            ;; *COMPILING-OPTIMIZED-CONSTRUCTOR* which is bound around
            ;; compilation of the constructor, hence avoiding the
            ;; possibility of endless recursion.
-           (make-instance ,class ,@initargs))
+           (make-instance ,class ,@(quote-plist-keys initargs)))
         (let ((defaults (class-default-initargs class)))
           (when defaults
             (setf initargs (ctor-default-initargs initargs defaults)))
           `(lambda ,lambda-list
              (declare #.*optimize-speed*)
-             (fast-make-instance ,class ,@initargs))))))
+             (fast-make-instance ,class ,@(quote-plist-keys initargs)))))))
 
 ;;; Not as good as the real optimizing generator, but faster than going
 ;;; via MAKE-INSTANCE: 1 GF call less, and no need to check initargs.
