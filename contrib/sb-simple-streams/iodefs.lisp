@@ -14,7 +14,7 @@
 
 (in-package "SB-SIMPLE-STREAMS")
 
-(defun file-namestring (pathname)
+(defun %file-namestring (pathname)
   (sb-ext:native-namestring (sb-int:physicalize-pathname pathname) :as-file t))
 
 (defmacro def-stream-class (name superclasses slots &rest options)

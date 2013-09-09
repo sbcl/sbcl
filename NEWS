@@ -25,6 +25,8 @@ changes relative to sbcl-1.1.11:
     (thanks to Jan Moringen, lp#1179858)
   * bug fix: the compiler-macro for MAKE-INSTANCE when emitting "fallback"
     constructors handles non-KEYWORD initialization arguments more correctly.
+  * bug fix: loading the SB-SIMPLE-STREAMS contributed module no longer
+    clobbers FILE-NAMESTRING.  (thanks to Anton Kovalenko, lp#884603)
   
 changes in sbcl-1.1.11 relative to sbcl-1.1.10:
   * enhancement: support building the manual under texinfo version 5.

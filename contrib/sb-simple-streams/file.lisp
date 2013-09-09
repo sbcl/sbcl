@@ -285,6 +285,6 @@
   (let ((pathname (getf options :filename)))
     (with-stream-class (probe-simple-stream stream)
       (add-stream-instance-flags stream :simple)
-      (when (sb-unix:unix-access (file-namestring pathname) sb-unix:f_ok)
+      (when (sb-unix:unix-access (%file-namestring pathname) sb-unix:f_ok)
         (setf (sm pathname stream) pathname)
         t))))
