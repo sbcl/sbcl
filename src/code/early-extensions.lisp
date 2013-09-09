@@ -30,18 +30,23 @@
 (def!type hash ()
   `(integer 0 ,max-hash))
 
-;;; a type used for indexing into arrays, and for related quantities
-;;; like lengths of lists
+;;; a type used for indexing into sequences, and for related
+;;; quantities like lengths of lists and other sequences.
 ;;;
-;;; It's intentionally limited to one less than the
-;;; ARRAY-DIMENSION-LIMIT for efficiency reasons, because in SBCL
-;;; ARRAY-DIMENSION-LIMIT is MOST-POSITIVE-FIXNUM, and staying below
-;;; that lets the system know it can increment a value of this type
-;;; without having to worry about using a bignum to represent the
-;;; result.
+;;; A more correct value for the exclusive upper bound for indexing
+;;; would be (1- ARRAY-DIMENSION-LIMIT) since ARRAY-DIMENSION-LIMIT is
+;;; the exclusive maximum *size* of one array dimension (As specified
+;;; in CLHS entries for MAKE-ARRAY and "valid array dimensions"). The
+;;; current value is maintained to avoid breaking existing code that
+;;; also uses that type for upper bounds on indices (e.g. sequence
+;;; length).
 ;;;
-;;; (It should be safe to use ARRAY-DIMENSION-LIMIT as an exclusive
-;;; bound because ANSI specifies it as an exclusive bound.)
+;;; In SBCL, ARRAY-DIMENSION-LIMIT is arranged to be a little smaller
+;;; than MOST-POSITIVE-FIXNUM, for implementation (see comment above
+;;; ARRAY-DIMENSION-LIMIT) and efficiency reasons: staying below
+;;; MOST-POSITIVE-FIXNUM lets the system know it can increment a value
+;;; of type INDEX without having to worry about using a bignum to
+;;; represent the result.
 (def!type index () `(integer 0 (,sb!xc:array-dimension-limit)))
 
 ;;; like INDEX, but only up to half the maximum. Used by hash-table
