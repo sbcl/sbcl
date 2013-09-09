@@ -577,8 +577,7 @@ REMOVE-PACKAGE-LOCAL-NICKNAME, and the DEFPACKAGE option :LOCAL-NICKNAMES."
 ;;; Return a list of packages given a package designator or list of
 ;;; package designators, or die trying.
 (defun package-listify (thing)
-  (mapcar #'find-undeleted-package-or-lose
-          (if (listp thing) thing (list thing))))
+  (mapcar #'find-undeleted-package-or-lose (ensure-list thing)))
 
 ;;; ANSI specifies (in the definition of DELETE-PACKAGE) that PACKAGE-NAME
 ;;; returns NIL (not an error) for a deleted package, so this is a special
@@ -1244,9 +1243,7 @@ uninterned."
                                thing))))
 
 (defun string-listify (thing)
-  (mapcar #'string (if (listp thing)
-                       thing
-                       (list thing))))
+  (mapcar #'string (ensure-list thing)))
 
 (defun export (symbols &optional (package (sane-package)))
   #!+sb-doc

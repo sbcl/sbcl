@@ -257,9 +257,7 @@
            "The return value of NSET-DIFFERENCE should not be discarded.")
           ((progn (nset-exclusive-or (list 1 3) (list 2 4)) t)
            "The return value of NSET-EXCLUSIVE-OR should not be discarded."))
-      for expected = (if (listp expected-des)
-                       expected-des
-                       (list expected-des))
+      for expected = (sb-int:ensure-list expected-des)
       do
   (multiple-value-bind (fun warnings-p failure-p)
       (handler-bind ((style-warning (lambda (c)

@@ -761,7 +761,7 @@
 
 (defun get-wrappers-from-classes (nkeys wrappers classes metatypes)
   (let* ((w wrappers) (w-tail w) (mt-tail metatypes))
-    (dolist (class (if (listp classes) classes (list classes)))
+    (dolist (class (ensure-list classes))
       (unless (eq t (car mt-tail))
         (let ((c-w (class-wrapper class)))
           (unless c-w (return-from get-wrappers-from-classes nil))

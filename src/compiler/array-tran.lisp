@@ -319,7 +319,7 @@
                          '*))
                  ,(cond ((constant-lvar-p dims)
                          (let* ((val (lvar-value dims))
-                                (cdims (if (listp val) val (list val))))
+                                (cdims (ensure-list val)))
                            (if simple
                                cdims
                                (length cdims))))
@@ -413,7 +413,7 @@
       (multiple-value-bind (new-dimensions rank)
           (flet ((constant-dims (dimensions)
                    (let* ((dims (constant-form-value dimensions env))
-                          (canon (if (listp dims) dims (list dims)))
+                          (canon (ensure-list dims))
                           (rank (length canon)))
                      (values (if (= rank 1)
                                  (list 'quote (car canon))

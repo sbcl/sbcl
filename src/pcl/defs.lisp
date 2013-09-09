@@ -128,7 +128,7 @@
          (let ((class (find-class type nil)))
            (if class
                (let ((type (specializer-type class)))
-                 (if (listp type) type `(,type)))
+                 (ensure-list type))
                `(,type))))
         ((or (not (eq **boot-state** 'complete))
              (specializerp type))

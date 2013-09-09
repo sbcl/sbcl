@@ -63,10 +63,9 @@
           (*requiring* (cons name *requiring*)))
       (unless (member name *modules* :test #'string=)
         (cond (pathnames
-               (unless (listp pathnames) (setf pathnames (list pathnames)))
                ;; ambiguity in standard: should we try all pathnames in the
                ;; list, or should we stop as soon as one of them calls PROVIDE?
-               (dolist (ele pathnames t)
+               (dolist (ele (ensure-list pathnames) t)
                  (load ele)))
               (t
                (unless (some (lambda (p) (funcall p module-name))

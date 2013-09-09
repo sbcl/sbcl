@@ -299,7 +299,7 @@ comments from CMU CL:
 (defun matches-pattern (name pattern)
   (declare (simple-string name))
   (let ((name (concatenate 'string "$" name "$")))
-    (dolist (pat (if (listp pattern) pattern (list pattern)) nil)
+    (dolist (pat (ensure-list pattern) nil)
       (when (search (the simple-string (string pat))
                     name :test #'char=)
         (return t)))))

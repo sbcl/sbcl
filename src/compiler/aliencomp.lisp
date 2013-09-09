@@ -812,28 +812,26 @@
                   (vop sb!vm::move-single-to-int-arg call block
                        float-tn i1-tn))))))
       (aver (null args))
-      (unless (listp result-tns)
-        (setf result-tns (list result-tns)))
       (let ((arg-tns (remove-if-not #'tn-p (flatten-list arg-tns)))
-            (result-tns (remove-if-not #'tn-p result-tns)))
+            (result-tns (remove-if-not #'tn-p (ensure-list result-tns))))
         (vop* call-out call block
               ((lvar-tn call block function)
                (reference-tn-list arg-tns nil))
-              ((reference-tn-list result-tns t))))
-      #!-x86
-      (vop dealloc-number-stack-space call block stack-frame-size)
-      #!+x86
-      (progn
-        (vop reset-stack-pointer call block stack-pointer)
-        (vop set-fpu-word-for-lisp call block))
-      (cond
-        #!+arm-softfp
-        ((and lvar
-              (proper-list-of-length-p result-tns 3)
-              (symbolp (third result-tns)))
-         (emit-template call block
-                        (template-or-lose (third result-tns))
-                        (reference-tn-list (butlast result-tns) nil)
-                        (reference-tn (car (ir2-lvar-locs (lvar-info lvar))) t)))
-        (t
-         (move-lvar-result call block result-tns lvar))))))
+              ((reference-tn-list result-tns t)))
+        #!-x86
+        (vop dealloc-number-stack-space call block stack-frame-size)
+        #!+x86
+        (progn
+          (vop reset-stack-pointer call block stack-pointer)
+          (vop set-fpu-word-for-lisp call block))
+        (cond
+          #!+arm-softfp
+          ((and lvar
+                (proper-list-of-length-p result-tns 3)
+                (symbolp (third result-tns)))
+           (emit-template call block
+                          (template-or-lose (third result-tns))
+                          (reference-tn-list (butlast result-tns) nil)
+                          (reference-tn (car (ir2-lvar-locs (lvar-info lvar))) t)))
+          (t
+           (move-lvar-result call block result-tns lvar)))))))

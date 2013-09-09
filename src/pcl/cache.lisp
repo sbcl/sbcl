@@ -426,9 +426,7 @@
                 (%fill-cache (copy-cache cache) layouts value t))
                (t
                 (copy-and-expand-cache cache layouts value)))))
-    (if (listp layouts)
-        (%fill-cache cache layouts value nil)
-        (%fill-cache cache (list layouts) value nil))))
+    (%fill-cache cache (ensure-list layouts) value nil)))
 
 ;;; Calls FUNCTION with all layouts and values in cache.
 (defun map-cache (function cache)

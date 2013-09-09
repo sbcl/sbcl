@@ -1544,10 +1544,7 @@
            (disassemble-fun fun
                             :stream stream
                             :use-labels use-labels)))
-    (let ((funs (compiled-funs-or-lose object)))
-      (if (listp funs)
-          (dolist (fun funs) (disassemble1 fun))
-          (disassemble1 funs))))
+    (mapc #'disassemble1 (ensure-list (compiled-funs-or-lose object))))
   nil)
 
 ;;; Disassembles the given area of memory starting at ADDRESS and

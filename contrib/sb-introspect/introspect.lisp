@@ -221,11 +221,7 @@ name. Type can currently be one of the following:
 
 If an unsupported TYPE is requested, the function will return NIL.
 "
-  (flet ((listify (x)
-           (if (listp x)
-               x
-               (list x)))
-         (get-class (name)
+  (flet ((get-class (name)
            (and (symbolp name)
                 (find-class name nil)))
          (real-fdefinition (name)
@@ -235,7 +231,7 @@ If an unsupported TYPE is requested, the function will return NIL.
              (if profile-info
                  (sb-profile::profile-info-encapsulated-fun profile-info)
                  (fdefinition name)))))
-    (listify
+    (sb-int:ensure-list
      (case type
        ((:variable)
         (when (and (symbolp name)

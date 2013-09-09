@@ -1109,7 +1109,7 @@ of specialized arrays is supported."
   "Adjust ARRAY's dimensions to the given DIMENSIONS and stuff."
   (when (invalid-array-p array)
     (invalid-array-error array))
-  (binding* ((dimensions (if (listp dimensions) dimensions (list dimensions)))
+  (binding* ((dimensions (ensure-list dimensions))
              (array-rank (array-rank array))
              (()
               (unless (= (length dimensions) array-rank)

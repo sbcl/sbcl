@@ -64,13 +64,11 @@
   (mapcan (lambda (entry)
             (destructuring-bind (ptypes &optional sc vop)
                 entry
-              (unless (listp ptypes)
-                (setf ptypes (list ptypes)))
               (mapcar (if (and vop sc)
                           (lambda (ptype)
                             (list ptype sc vop))
                           #'list)
-                      ptypes)))
+                      (ensure-list ptypes))))
           '((t descriptor-reg move-if/t)
 
             ((fixnum positive-fixnum)

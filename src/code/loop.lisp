@@ -1464,16 +1464,13 @@ code to be loaded.
 (defun add-loop-path (names function universe
                       &key preposition-groups inclusive-permitted user-data)
   (declare (type loop-universe universe))
-  (unless (listp names)
-    (setq names (list names)))
-  (let ((ht (loop-universe-path-keywords universe))
-        (lp (make-loop-path
+  (let* ((names (sb!int:ensure-list names))
+         (ht (loop-universe-path-keywords universe))
+         (lp (make-loop-path
               :names (mapcar #'symbol-name names)
               :function function
               :user-data user-data
-              :preposition-groups (mapcar (lambda (x)
-                                            (if (listp x) x (list x)))
-                                          preposition-groups)
+              :preposition-groups (mapcar #'sb!int:ensure-list preposition-groups)
               :inclusive-permitted inclusive-permitted)))
     (dolist (name names)
       (setf (gethash (symbol-name name) ht) lp))

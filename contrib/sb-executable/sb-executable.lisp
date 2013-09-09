@@ -48,7 +48,7 @@ exec sbcl --noinform ~{~A ~}--eval \"(with-open-file (i \\\"$0\\\" :element-type
     (write-sequence (map 'vector #'char-code
                          (format nil *exec-header* runtime-flags
                                  (or initial-function 'values))) out)
-    (dolist (input-file (if (listp fasls) fasls (list fasls)))
+    (dolist (input-file (sb-int:ensure-list fasls))
       (with-open-file (in (merge-pathnames input-file
                                            (make-pathname :type "fasl"))
                           :element-type '(unsigned-byte 8))

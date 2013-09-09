@@ -1523,9 +1523,7 @@ See also: RETURN-FROM-THREAD, ABORT-THREAD."
                      make-mutex))
     (let* ((setup-sem (make-semaphore :name "Thread setup semaphore"))
            (real-function (coerce function 'function))
-           (arguments     (if (listp arguments)
-                              arguments
-                              (list arguments)))
+           (arguments     (ensure-list arguments))
            #!+win32
            (fp-modes (dpb 0 sb!vm::float-sticky-bits ;; clear accrued bits
                           (sb!vm:floating-point-modes)))
