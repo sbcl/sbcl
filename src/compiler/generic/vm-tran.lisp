@@ -87,13 +87,6 @@
 (define-source-transform %set-funcallable-instance-layout (x val)
   `(setf (%funcallable-instance-info ,x 0) (the layout ,val)))
 
-;;;; character support
-
-;;; In our implementation there are really only BASE-CHARs.
-#+nil
-(define-source-transform characterp (obj)
-  `(base-char-p ,obj))
-
 ;;;; simplifying HAIRY-DATA-VECTOR-REF and HAIRY-DATA-VECTOR-SET
 
 (deftransform hairy-data-vector-ref ((string index) (simple-string t))

@@ -518,20 +518,26 @@ is either numeric or alphabetic."
           (char-code ,ch)))))
 
 (defun two-arg-char-equal (c1 c2)
-  (or (eq c1 c2)
-      (typecase c1
-        (base-char
-         (and (base-char-p c2)
-              (let* ((code1 (char-code c1))
-                     (code2 (char-code c2))
-                     (sum (logxor code1 code2)))
-                (when (eql sum #x20)
-                  (let ((sum (+ code1 code2)))
-                    (or (and (> sum 161) (< sum 213))
-                        (and (> sum 415) (< sum 461))
-                        (and (> sum 463) (< sum 477))))))))
-        (t
-         (= (equal-char-code c1) (equal-char-code c2))))))
+  (flet ((base-char-equal-p ()
+           (let* ((code1 (char-code c1))
+                  (code2 (char-code c2))
+                  (sum (logxor code1 code2)))
+             (when (eql sum #x20)
+               (let ((sum (+ code1 code2)))
+                 (or (and (> sum 161) (< sum 213))
+                     (and (> sum 415) (< sum 461))
+                     (and (> sum 463) (< sum 477))))))))
+    (declare (inline base-char-equal-p))
+    (or (eq c1 c2)
+        #!-sb-unicode
+        (base-char-equal-p)
+        #!+sb-unicode
+        (typecase c1
+          (base-char
+           (and (base-char-p c2)
+                (base-char-equal-p)))
+          (t
+           (= (equal-char-code c1) (equal-char-code c2)))))))
 
 (defun char-equal-constant (x char reverse-case-char)
   (declare (type character x))

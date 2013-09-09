@@ -2876,7 +2876,7 @@
          (aver (integerp value))
          (cons type value))
       ((:base-char)
-         (aver (base-char-p value))
+         #!+sb-unicode (aver (base-char-p value))
          (cons :byte (char-code value)))
       ((:character)
          (aver (characterp value))
