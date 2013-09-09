@@ -103,9 +103,7 @@
         (let ((val (tn-value x)))
           (etypecase val
             (integer
-             (if (and (zerop val) (sc-is y any-reg descriptor-reg))
-                 (zeroize y)
-                 (move-immediate y (fixnumize val) temp)))
+             (move-immediate y (fixnumize val) temp))
             (symbol
              (inst mov y (+ nil-value (static-symbol-offset val))))
             (character
@@ -127,7 +125,9 @@
     ;; If target is a register, we can just mov it there directly
     ((and (tn-p target)
           (sc-is target signed-reg unsigned-reg descriptor-reg any-reg))
-     (inst mov target val))
+     (if (zerop val)
+         (zeroize target)
+         (inst mov target val)))
     ;; Likewise if the value is small enough.
     ((typep val '(signed-byte 32))
      (inst mov target val))

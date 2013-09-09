@@ -91,7 +91,7 @@
                 (inst enter n-word-bytes)))
 
          ,(if (zerop num-args)
-              '(inst xor ecx ecx)
+              '(zeroize ecx)
               `(inst mov ecx ,(fixnumize num-args)))
 
          (note-this-location vop :call-site)
