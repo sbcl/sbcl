@@ -2066,4 +2066,16 @@
     (assert
      (foo= 15 (funcall (compile nil '(lambda () (make-instance 'bug-1179858b 'foo 15))))))))
 
+(with-test (:name (cpl-violation-setup :bug-309076))
+  (assert (raises-error?
+           (progn
+             (defclass bug-309076-broken-class (standard-class) ()
+               (:metaclass sb-mop:funcallable-standard-class))
+             (sb-mop:finalize-inheritance (find-class 'bug-309076-broken-class))))))
+
+(with-test (:name (cpl-violation-irrelevant-class :bug-309076))
+  (defclass bug-309076-class (standard-class) ())
+  (defmethod sb-mop:validate-superclass ((x bug-309076-class) (y standard-class)) t)
+  (assert (typep (make-instance 'bug-309076-class) 'bug-309076-class)))
+
 ;;;; success

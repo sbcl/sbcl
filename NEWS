@@ -27,6 +27,8 @@ changes relative to sbcl-1.1.11:
     constructors handles non-KEYWORD initialization arguments more correctly.
   * bug fix: loading the SB-SIMPLE-STREAMS contributed module no longer
     clobbers FILE-NAMESTRING.  (thanks to Anton Kovalenko, lp#884603)
+  * bug fix: class definitions with CPLs inconsistent with their metaclasses
+    are less likely to destroy the object system's integrity.  (lp#309076)
   
 changes in sbcl-1.1.11 relative to sbcl-1.1.10:
   * enhancement: support building the manual under texinfo version 5.

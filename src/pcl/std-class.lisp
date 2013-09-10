@@ -886,6 +886,19 @@
              (find-class 'function)
              (cpl-protocol-violation-cpl c)))))
 
+(defun class-has-a-cpl-protocol-violation-p (class)
+  (labels ((find-in-superclasses (class classes)
+             (cond
+               ((null classes) nil)
+               ((eql class (car classes)) t)
+               (t (find-in-superclasses class (append (class-direct-superclasses (car classes)) (cdr classes)))))))
+    (let ((metaclass (class-of class)))
+      (cond
+        ((eql metaclass *the-class-standard-class*)
+         (find-in-superclasses (find-class 'function) (list class)))
+        ((eql metaclass *the-class-funcallable-standard-class*)
+         (not (find-in-superclasses (find-class 'function) (list class))))))))
+
 (defun %update-cpl (class cpl)
   (when (eq (class-of class) *the-class-standard-class*)
     (when (find (find-class 'function) cpl)

@@ -1441,7 +1441,8 @@ Except see also BREAK-VICIOUS-METACIRCLE.  -- CSR, 2003-05-28
 
         ;; if we can finalize an unfinalized class, then do so
         (when (and (not (class-finalized-p class))
-                   (not (class-has-a-forward-referenced-superclass-p class)))
+                   (not (class-has-a-forward-referenced-superclass-p class))
+                   (not (class-has-a-cpl-protocol-violation-p class)))
           (finalize-inheritance class)
           (class-precedence-list class)))
 
