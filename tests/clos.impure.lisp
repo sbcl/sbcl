@@ -2043,8 +2043,7 @@
 (defmethod shared-initialize :around ((instance bug-1179858) (slot-names t) &key)
   (call-next-method))
 
-(with-test (:name (make-instance :fallback-generator-initarg-handling
-                   :bug-1179858))
+(with-test (:name (:make-instance :fallback-generator-initarg-handling :bug-1179858))
   ;; Now compile a lambda containing MAKE-INSTANCE to exercise the
   ;; fallback constructor generator. Call the resulting compiled
   ;; function to trigger the bug.
@@ -2058,22 +2057,21 @@
 (defmethod shared-initialize :around ((instance bug-1179858b) (slot-names t) &key)
   (call-next-method))
 
-(with-test (:name (make-instance :fallback-generator-non-keyword-initarg
-                   :bug-1179858))
+(with-test (:name (:make-instance :fallback-generator-non-keyword-initarg :bug-1179858))
   (flet ((foo= (n i) (= (bug-1179858b-foo i) n)))
     (assert
      (foo= 14 (funcall (compile nil '(lambda () (make-instance 'bug-1179858b))))))
     (assert
      (foo= 15 (funcall (compile nil '(lambda () (make-instance 'bug-1179858b 'foo 15))))))))
 
-(with-test (:name (cpl-violation-setup :bug-309076))
+(with-test (:name (:cpl-violation-setup :bug-309076))
   (assert (raises-error?
            (progn
              (defclass bug-309076-broken-class (standard-class) ()
                (:metaclass sb-mop:funcallable-standard-class))
              (sb-mop:finalize-inheritance (find-class 'bug-309076-broken-class))))))
 
-(with-test (:name (cpl-violation-irrelevant-class :bug-309076))
+(with-test (:name (:cpl-violation-irrelevant-class :bug-309076))
   (defclass bug-309076-class (standard-class) ())
   (defmethod sb-mop:validate-superclass ((x bug-309076-class) (y standard-class)) t)
   (assert (typep (make-instance 'bug-309076-class) 'bug-309076-class)))
