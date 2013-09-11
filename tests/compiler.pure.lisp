@@ -1775,7 +1775,7 @@
       (error "bad RANDOM event"))))
 
 ;;; 0.8.17.28-sma.1 lost derived type information.
-(with-test (:name "0.8.17.28-sma.1" :fails-on :sparc)
+(with-test (:name :0.8.17.28-sma.1 :fails-on :sparc)
   (handler-bind ((sb-ext:compiler-note (lambda (c) (error "~A" c))))
     (compile nil
       '(lambda (x y v)
@@ -3091,7 +3091,7 @@
          (array-in-bounds-p a 5 2))))))
 
 ;;; optimizing (EXPT -1 INTEGER)
-(with-test (:name (expt minus-one integer))
+(with-test (:name (expt -1 integer))
   (dolist (x '(-1 -1.0 -1.0d0))
     (let ((fun (compile nil `(lambda (x) (expt ,x (the fixnum x))))))
       (assert (not (ctu:find-named-callees fun)))
@@ -4479,7 +4479,7 @@
                     (setf hash (logand most-positive-word
                                        (ash hash 5)))))))
 
-(with-test (:name (local-&optional-recursive-inline :bug-1180992))
+(with-test (:name (:local-&optional-recursive-inline :bug-1180992))
   (compile nil
            `(lambda ()
               (labels ((called (&optional a))
@@ -4501,7 +4501,7 @@
 ;; be reported as mismatches with the value NIL.  Make sure we get
 ;; a warning, but that it doesn't complain about a constant NIL ...
 ;; of type FIXNUM.
-(with-test (:name (:multiple-use-lvar-interpreted-as-NIL cast))
+(with-test (:name (:multiple-use-lvar-interpreted-as-NIL :cast))
   (block nil
     (handler-bind ((sb-int:type-warning
                      (lambda (c)

@@ -232,7 +232,7 @@
     "bar"
     (incf x y)))
 
-(with-test (:name (documentation closure))
+(with-test (:name (documentation :closure))
   (assert (string= (documentation 'docfoo 'function) "bar"))
   (assert (string= (setf (documentation 'docfoo 'function) "baz") "baz"))
   (assert (string= (documentation 'docfoo 'function) "baz"))
@@ -243,10 +243,10 @@
   (assert (not (setf (documentation 'docfoo 'function) nil)))
   (assert (not (documentation 'docfoo 'function))))
 
-(with-test (:name (documentation built-in-macro) :skipped-on '(not :sb-doc))
+(with-test (:name (documentation :built-in-macro) :skipped-on '(not :sb-doc))
   (assert (documentation 'trace 'function)))
 
-(with-test (:name (documentation built-in-function) :skipped-on '(not :sb-doc))
+(with-test (:name (documentation :built-in-function) :skipped-on '(not :sb-doc))
   (assert (documentation 'cons 'function)))
 
 (with-test (:name :describe-generic-function-with-assumed-type)

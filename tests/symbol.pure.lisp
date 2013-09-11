@@ -20,11 +20,11 @@
     (assert (simple-string-p (symbol-name sym)))
     (print sym (make-broadcast-stream))))
 
-(with-test (:name (gentemp pprinter))
+(with-test (:name (gentemp :pprinter))
   (let* ((*print-pprint-dispatch* (copy-pprint-dispatch)))
     (set-pprint-dispatch 'string
                          (lambda (stream obj) (write-string "BAR-" stream)))
     (assert (string= "FOO-" (gentemp "FOO-") :end2 4))))
 
-(with-test (:name (gensym-fixnum-restriction))
+(with-test (:name (gensym :fixnum-restriction))
   (gensym (1+ most-positive-fixnum)))

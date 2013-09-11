@@ -226,7 +226,7 @@
 (with-test (:name :toplevel-declare)
   (assert (raises-error? (eval '(declare (type pathname *scratch*))))))
 
-(with-test (:name (eval no-compiler-notes))
+(with-test (:name (eval :no-compiler-notes))
   (handler-bind ((sb-ext:compiler-note #'error))
     (let ((sb-ext:*evaluator-mode* :compile))
       (eval '(let ((x 42))

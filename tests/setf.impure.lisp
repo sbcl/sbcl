@@ -92,7 +92,7 @@
 
 ;;; Not required by the spec, but allowes compiler-macros for SETF-functiosn
 ;;; to see their constant argument forms.
-(with-test (:name constantp-aware-get-setf-expansion)
+(with-test (:name :constantp-aware-get-setf-expansion)
   (multiple-value-bind (temps values stores set get)
       (get-setf-expansion '(foo 1 2 3))
     (assert (not temps))

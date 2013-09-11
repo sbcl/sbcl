@@ -204,7 +204,7 @@
            :ok)))))
 
 ;;; Unused local alien caused a compiler error
-(with-test (:name unused-local-alien)
+(with-test (:name :unused-local-alien)
   (let ((fun `(lambda ()
                 (sb-alien:with-alien ((alien1923 (array (sb-alien:unsigned 8) 72)))
                   (values)))))
@@ -250,7 +250,7 @@
 #-win32 ;kludge: This reader conditional masks a bug, but allows the test
         ;to fail cleanly.
 (sb-alien:define-alien-routine bug-316075 void (result char :out))
-(with-test (:name bug-316075 :fails-on :win32)
+(with-test (:name :bug-316075 :fails-on :win32)
   #+win32 (error "fail")
   (handler-bind ((warning #'error))
     (compile nil '(lambda () (multiple-value-list (bug-316075))))))
@@ -267,7 +267,7 @@
     ((foo (unsigned 32)))
   foo)
 
-(with-test (:name bug-316325 :skipped-on '(not (or :x86-64 :x86)))
+(with-test (:name :bug-316325 :skipped-on '(not (or :x86-64 :x86)))
   ;; This test works by defining a callback function that provides an
   ;; identity transform over a full-width machine word, then calling
   ;; it as if it returned a narrower type and checking to see if any

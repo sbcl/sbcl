@@ -123,7 +123,7 @@
 
 ;;; Tests the compiler's incremental rejiggering of GF types.
 (fmakunbound 'foo)
-(with-test (:name keywords-supplied-in-methods-ok-1)
+(with-test (:name :keywords-supplied-in-methods-ok-1)
   (assert
    (null
     (nth-value
@@ -134,7 +134,7 @@
        (compile nil '(lambda () (foo (read) :bar 10))))))))
 
 (fmakunbound 'foo)
-(with-test (:name keywords-supplied-in-methods-ok-2)
+(with-test (:name :keywords-supplied-in-methods-ok-2)
   (assert
    (nth-value
     1
@@ -149,7 +149,7 @@
 ;; parse the tail of the arglist as keywords, so we don't treat the
 ;; function type as having &KEY in it.
 (fmakunbound 'foo)
-(with-test (:name gf-rest-method-key)
+(with-test (:name :gf-rest-method-key)
   (defgeneric foo (x &rest y))
   (defmethod foo ((i integer) &key w) (list i w))
   ;; 1.0.20.30 failed here.
@@ -161,7 +161,7 @@
 ;; If the GF has &KEY and &ALLOW-OTHER-KEYS, the methods' keys can be
 ;; anything, and we don't warn about unrecognized keys.
 (fmakunbound 'foo)
-(with-test (:name gf-allow-other-keys)
+(with-test (:name :gf-allow-other-keys)
   (defgeneric foo (x &key &allow-other-keys))
   (defmethod foo ((i integer) &key y z) (list i y z))
   (assert
@@ -176,7 +176,7 @@
 ;; If any method has &ALLOW-OTHER-KEYS, 7.6.4 point 5 seems to say the
 ;; GF should be construed to have &ALLOW-OTHER-KEYS.
 (fmakunbound 'foo)
-(with-test (:name method-allow-other-keys)
+(with-test (:name :method-allow-other-keys)
   (defgeneric foo (x &key))
   (defmethod foo ((x integer) &rest y &key &allow-other-keys) (list x y))
   (assert (null (nth-value 1 (compile nil '(lambda () (foo 10 :foo 20))))))

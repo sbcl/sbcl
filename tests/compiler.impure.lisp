@@ -1413,7 +1413,7 @@
 (defun test-function-983 (x) x)
 (define-compiler-macro test-function-983 (x) x)
 
-(with-test (:name funcall-compiler-macro)
+(with-test (:name :funcall-compiler-macro)
   (assert
    (handler-case
        (and (compile nil

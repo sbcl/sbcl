@@ -399,7 +399,7 @@
 (defun custom-hash-hash (x)
   (sxhash (custom-hash-key-name x)))
 (define-hash-table-test custom-hash-test custom-hash-hash)
-(with-test (:name define-hash-table-test.1)
+(with-test (:name :define-hash-table-test.1)
   (let ((table (make-hash-table :test 'custom-hash-test)))
     (setf (gethash (make-custom-hash-key :name "foo") table) :foo)
     (setf (gethash (make-custom-hash-key :name "bar") table) :bar)
@@ -420,7 +420,7 @@
     (lambda (x)
       (logand most-positive-fixnum
               (reduce #'+ (map 'list #'sxhash (subseq x 0 3))))))
-(with-test (:name define-hash-table-test.2)
+(with-test (:name :define-hash-table-test.2)
   (let ((table (make-hash-table :test 'head-eql)))
     (setf (gethash #(1 2 3 4) table) :|123|)
     (setf (gethash '(2 3 4 7) table) :|234|)
@@ -438,7 +438,7 @@
     (assert (eq :foo (gethash '(#\f #\o #\o 1 2 3) table)))
     (assert (eq 'head-eql (hash-table-test table)))))
 
-(with-test (:name make-hash-table/hash-fun)
+(with-test (:name :make-hash-table/hash-fun)
   (let ((table (make-hash-table
                 :test #'=
                 :hash-function (lambda (x)

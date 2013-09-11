@@ -462,12 +462,12 @@
             *manyraw*)))
   (room)
   (sb-ext:gc))
-(with-test (:name defstruct-raw-slot-gc)
+(with-test (:name :defstruct-raw-slot-gc)
   (check-manyraws *manyraw*))
 
 ;;; try a full GC, too
 (sb-ext:gc :full t)
-(with-test (:name (defstruct-raw-slot-gc :full))
+(with-test (:name (:defstruct-raw-slot-gc :full))
   (check-manyraws *manyraw*))
 
 ;;; fasl dumper and loader also have special handling of raw slots, so
@@ -488,7 +488,7 @@
 
 ;;; re-read the dumped structures and check them
 (load "tmp-defstruct.manyraw.fasl")
-(with-test (:name (defstruct-raw-slot load))
+(with-test (:name (:defstruct-raw-slot load))
   (check-manyraws (dumped-manyraws)))
 
 
@@ -681,7 +681,7 @@
 ;;; of the same class. (Putting this FIXME here, since this is the only
 ;;; place where they appear together.)
 
-(with-test (:name obsolete-defstruct/print-object)
+(with-test (:name :obsolete-defstruct/print-object)
   (eval '(defstruct born-to-change))
   (let ((x (make-born-to-change)))
     (handler-bind ((error 'continue))
@@ -692,7 +692,7 @@
                   (sb-pcl::obsolete-structure ()
                     :error))))))
 
-(with-test (:name obsolete-defstruct/typep)
+(with-test (:name :obsolete-defstruct/typep)
   (eval '(defstruct born-to-change-2))
   (let ((x (make-born-to-change-2)))
     (handler-bind ((error 'continue))
@@ -710,7 +710,7 @@
   c
   (a 0d0 :type double-float))
 
-(with-test (:name raw-slot-equalp)
+(with-test (:name :raw-slot-equalp)
   (assert (equalp (make-raw-slot-equalp-bug :a 1d0 :b 2s0)
                   (make-raw-slot-equalp-bug :a 1d0 :b 2s0)))
   (assert (equalp (make-raw-slot-equalp-bug :a 1d0 :b 0s0)
@@ -853,7 +853,7 @@ redefinition."
 
 ;;; Tests begin.
 ;; Base case: recklessly-continue.
-(with-defstruct-redefinition-test defstruct/recklessly
+(with-defstruct-redefinition-test :defstruct/recklessly
     (((defstruct ctor pred) :class-name redef-test-1 :slots (a))
      ((defstruct*) :class-name redef-test-1 :slots (a b)))
     ((path1 defstruct)
@@ -865,7 +865,7 @@ redefinition."
     (assert-is pred instance)))
 
 ;; Base case: continue (i.e., invalidate instances).
-(with-defstruct-redefinition-test defstruct/continue
+(with-defstruct-redefinition-test :defstruct/continue
     (((defstruct ctor pred) :class-name redef-test-2 :slots (a))
      ((defstruct*) :class-name redef-test-2 :slots (a b)))
     ((path1 defstruct)
@@ -878,7 +878,7 @@ redefinition."
 
 ;; Compiling a file with an incompatible defstruct should emit a
 ;; warning and an error, but the fasl should be loadable.
-(with-defstruct-redefinition-test defstruct/compile-file-should-warn
+(with-defstruct-redefinition-test :defstruct/compile-file-should-warn
     (((defstruct) :class-name redef-test-3 :slots (a))
      ((defstruct*) :class-name redef-test-3 :slots (a b)))
     ((path1 defstruct)
@@ -889,7 +889,7 @@ redefinition."
 
 ;; After compiling a file with an incompatible DEFSTRUCT, load the
 ;; fasl and ensure that an old instance remains valid.
-(with-defstruct-redefinition-test defstruct/compile-file-reckless
+(with-defstruct-redefinition-test :defstruct/compile-file-reckless
     (((defstruct ctor pred) :class-name redef-test-4 :slots (a))
      ((defstruct*) :class-name redef-test-4 :slots (a b)))
     ((path1 defstruct)
@@ -902,7 +902,7 @@ redefinition."
 
 ;; After compiling a file with an incompatible DEFSTRUCT, load the
 ;; fasl and ensure that an old instance has become invalid.
-(with-defstruct-redefinition-test defstruct/compile-file-continue
+(with-defstruct-redefinition-test :defstruct/compile-file-continue
     (((defstruct ctor pred) :class-name redef-test-5 :slots (a))
      ((defstruct*) :class-name redef-test-5 :slots (a b)))
     ((path1 defstruct)
@@ -917,7 +917,7 @@ redefinition."
 ;; Ensure that recklessly continuing DT(expected)T to instances of
 ;; subclasses.  (This is a case where recklessly continuing is
 ;; actually dangerous, but we don't care.)
-(with-defstruct-redefinition-test defstruct/subclass-reckless
+(with-defstruct-redefinition-test :defstruct/subclass-reckless
     (((defstruct ignore pred1) :class-name redef-test-6 :slots (a))
      ((substruct ctor pred2) :class-name redef-test-6-sub
                              :super-name redef-test-6 :slots (z))
@@ -932,7 +932,7 @@ redefinition."
     (assert-is pred2 instance)))
 
 ;; Ensure that continuing invalidates instances of subclasses.
-(with-defstruct-redefinition-test defstruct/subclass-continue
+(with-defstruct-redefinition-test :defstruct/subclass-continue
     (((defstruct) :class-name redef-test-7 :slots (a))
      ((substruct ctor pred) :class-name redef-test-7-sub
                             :super-name redef-test-7 :slots (z))
@@ -946,7 +946,7 @@ redefinition."
     (assert-invalid pred instance)))
 
 ;; Reclkessly continuing doesn't invalidate instances of subclasses.
-(with-defstruct-redefinition-test defstruct/subclass-in-other-file-reckless
+(with-defstruct-redefinition-test :defstruct/subclass-in-other-file-reckless
     (((defstruct ignore pred1) :class-name redef-test-8 :slots (a))
      ((substruct ctor pred2) :class-name redef-test-8-sub
                              :super-name redef-test-8 :slots (z))
@@ -966,7 +966,7 @@ redefinition."
 ;; file, CONTINUE'ing from LOAD of a file containing an incompatible
 ;; superclass definition leaves the predicates and accessors into the
 ;; subclass in a bad way until the subclass form is evaluated.
-(with-defstruct-redefinition-test defstruct/subclass-in-other-file-continue
+(with-defstruct-redefinition-test :defstruct/subclass-in-other-file-continue
     (((defstruct ignore pred1) :class-name redef-test-9 :slots (a))
      ((substruct ctor pred2) :class-name redef-test-9-sub
                              :super-name redef-test-9 :slots (z))
@@ -992,7 +992,7 @@ redefinition."
 ;; Some other subclass wrinkles have to do with splitting definitions
 ;; accross files and compiling and loading things in a funny order.
 (with-defstruct-redefinition-test
-    defstruct/subclass-in-other-file-funny-operation-order-continue
+    :defstruct/subclass-in-other-file-funny-operation-order-continue
     (((defstruct ignore pred1) :class-name redef-test-10 :slots (a))
      ((substruct ctor pred2) :class-name redef-test-10-sub
                              :super-name redef-test-10 :slots (z))
@@ -1019,7 +1019,7 @@ redefinition."
     (assert-invalid pred2 instance)))
 
 (with-defstruct-redefinition-test
-    defstruct/subclass-in-other-file-funny-operation-order-continue
+    :defstruct/subclass-in-other-file-funny-operation-order-continue
     (((defstruct ignore pred1) :class-name redef-test-11 :slots (a))
      ((substruct ctor pred2) :class-name redef-test-11-sub
                              :super-name redef-test-11 :slots (z))
@@ -1066,7 +1066,7 @@ redefinition."
       (assert (eq 'string (type-error-expected-type e)))
       (assert (zerop (type-error-datum e))))))
 
-(with-test (:name defstruct-copier-typechecks-argument)
+(with-test (:name :defstruct-copier-typechecks-argument)
   (assert (not (raises-error? (copy-person (make-astronaut :name "Neil")))))
   (assert (raises-error? (copy-astronaut (make-person :name "Fred")))))
 

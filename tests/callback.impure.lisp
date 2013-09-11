@@ -130,7 +130,7 @@
 
 ;;; callbacks with void return values
 
-(with-test (:name void-return)
+(with-test (:name :void-return)
   (sb-alien::alien-lambda void ()
     (values)))
 

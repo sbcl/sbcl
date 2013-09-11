@@ -225,12 +225,12 @@
                 (type-error ()
                   :good)))))
 
-(with-test (:name (adjust-array multidimensional))
+(with-test (:name (adjust-array :multidimensional))
   (let ((ary (make-array '(2 2))))
     ;; SBCL used to give multidimensional arrays a bogus fill-pointer
     (assert (not (array-has-fill-pointer-p (adjust-array ary '(2 2)))))))
 
-(with-test (:name %set-fill-pointer/error)
+(with-test (:name :%set-fill-pointer/error)
   (let ((v (make-array 3 :fill-pointer 0)))
     (handler-case
         (progn
@@ -253,7 +253,7 @@
                   (sb-ext::array-storage-vector
                    (make-array 5 :fill-pointer 4)))))))
 
-(with-test (:name invalid-array-index-error)
+(with-test (:name :invalid-array-index-error)
   (let ((array (make-array '(3 3 3))))
     (assert
      (eq :right
@@ -289,7 +289,7 @@
     (assert (equalp (adjust-array a 2 :initial-element 10)
                     #(5 10)))))
 
-(with-test (:name (make-array-transform-unknown-type :bug-1156095))
+(with-test (:name (:make-array-transform-unknown-type :bug-1156095))
   (assert
    (handler-case
        (compile nil `(lambda () (make-array '(1 2)

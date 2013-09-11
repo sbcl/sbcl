@@ -117,7 +117,7 @@ if a restart was invoked."
 
 ;;;; Tests
 ;;; USE-PACKAGE
-(with-test (:name use-package.1)
+(with-test (:name :use-package.1)
   (with-packages (("FOO" (:export "SYM"))
                   ("BAR" (:export "SYM"))
                   ("BAZ" (:use)))
@@ -127,7 +127,7 @@ if a restart was invoked."
       (is (eq (sym "BAR" "SYM")
               (sym "BAZ" "SYM"))))))
 
-(with-test (:name use-package.2)
+(with-test (:name :use-package.2)
   (with-packages (("FOO" (:export "SYM"))
                   ("BAZ" (:use) (:intern "SYM")))
     (with-name-conflict-resolution ((sym "FOO" "SYM") :restarted restartedp)
@@ -136,7 +136,7 @@ if a restart was invoked."
       (is (eq (sym "FOO" "SYM")
               (sym "BAZ" "SYM"))))))
 
-(with-test (:name use-package.2a)
+(with-test (:name :use-package.2a)
   (with-packages (("FOO" (:export "SYM"))
                   ("BAZ" (:use) (:intern "SYM")))
     (with-name-conflict-resolution ((sym "BAZ" "SYM") :restarted restartedp)
@@ -145,7 +145,7 @@ if a restart was invoked."
       (is (equal (list (sym "BAZ" "SYM") :internal)
                  (multiple-value-list (sym "BAZ" "SYM")))))))
 
-(with-test (:name use-package-conflict-set :fails-on :sbcl)
+(with-test (:name :use-package-conflict-set :fails-on :sbcl)
   (with-packages (("FOO" (:export "SYM"))
                   ("QUX" (:export "SYM"))
                   ("BAR" (:intern "SYM"))
@@ -167,7 +167,7 @@ if a restart was invoked."
                  conflict-set)))))
 
 ;;; EXPORT
-(with-test (:name export.1)
+(with-test (:name :export.1)
   (with-packages (("FOO" (:intern "SYM"))
                   ("BAR" (:export "SYM"))
                   ("BAZ" (:use "FOO" "BAR")))
@@ -177,7 +177,7 @@ if a restart was invoked."
       (is (eq (sym "FOO" "SYM")
               (sym "BAZ" "SYM"))))))
 
-(with-test (:name export.1a)
+(with-test (:name :export.1a)
   (with-packages (("FOO" (:intern "SYM"))
                   ("BAR" (:export "SYM"))
                   ("BAZ" (:use "FOO" "BAR")))
@@ -187,7 +187,7 @@ if a restart was invoked."
       (is (eq (sym "BAR" "SYM")
               (sym "BAZ" "SYM"))))))
 
-(with-test (:name export.ensure-exported)
+(with-test (:name :export.ensure-exported)
   (with-packages (("FOO" (:intern "SYM"))
                   ("BAR" (:export "SYM"))
                   ("BAZ" (:use "FOO" "BAR") (:IMPORT-FROM "BAR" "SYM")))
@@ -199,7 +199,7 @@ if a restart was invoked."
       (is (eq (sym "FOO" "SYM")
               (sym "BAZ" "SYM"))))))
 
-(with-test (:name export.3.intern)
+(with-test (:name :export.3.intern)
   (with-packages (("FOO" (:intern "SYM"))
                   ("BAZ" (:use "FOO") (:intern "SYM")))
     (with-name-conflict-resolution ((sym "FOO" "SYM") :restarted restartedp)
@@ -208,7 +208,7 @@ if a restart was invoked."
       (is (eq (sym "FOO" "SYM")
               (sym "BAZ" "SYM"))))))
 
-(with-test (:name export.3a.intern)
+(with-test (:name :export.3a.intern)
   (with-packages (("FOO" (:intern "SYM"))
                   ("BAZ" (:use "FOO") (:intern "SYM")))
     (with-name-conflict-resolution ((sym "BAZ" "SYM") :restarted restartedp)
@@ -218,7 +218,7 @@ if a restart was invoked."
                  (multiple-value-list (sym "BAZ" "SYM")))))))
 
 ;;; IMPORT
-(with-test (:name import-nil.1)
+(with-test (:name :import-nil.1)
   (with-packages (("FOO" (:use) (:intern "NIL"))
                   ("BAZ" (:use) (:intern "NIL")))
     (with-name-conflict-resolution ((sym "FOO" "NIL") :restarted restartedp)
@@ -227,7 +227,7 @@ if a restart was invoked."
       (is (eq (sym "FOO" "NIL")
               (sym "BAZ" "NIL"))))))
 
-(with-test (:name import-nil.2)
+(with-test (:name :import-nil.2)
   (with-packages (("BAZ" (:use) (:intern "NIL")))
     (with-name-conflict-resolution ('CL:NIL :restarted restartedp)
         (import '(CL:NIL) "BAZ")
@@ -235,7 +235,7 @@ if a restart was invoked."
       (is (eq 'CL:NIL
               (sym "BAZ" "NIL"))))))
 
-(with-test (:name import-single-conflict :fails-on :sbcl)
+(with-test (:name :import-single-conflict :fails-on :sbcl)
   (with-packages (("FOO" (:export "NIL"))
                   ("BAR" (:export "NIL"))
                   ("BAZ" (:use)))
@@ -253,7 +253,7 @@ if a restart was invoked."
 ;;; Make sure that resolving a name-conflict in IMPORT doesn't leave
 ;;; multiple symbols of the same name in the package (this particular
 ;;; scenario found in 1.0.38.9, but clearly a longstanding issue).
-(with-test (:name import-conflict-resolution)
+(with-test (:name :import-conflict-resolution)
   (with-packages (("FOO" (:export "NIL"))
                   ("BAR" (:use)))
     (with-name-conflict-resolution ((sym "FOO" "NIL"))
@@ -262,7 +262,7 @@ if a restart was invoked."
       (assert (eq sym (sym "FOO" "NIL"))))))
 
 ;;; UNINTERN
-(with-test (:name unintern.1)
+(with-test (:name :unintern.1)
   (with-packages (("FOO" (:export "SYM"))
                   ("BAR" (:export "SYM"))
                   ("BAZ" (:use "FOO" "BAR") (:shadow "SYM")))
@@ -272,13 +272,13 @@ if a restart was invoked."
       (is (eq (sym "FOO" "SYM")
               (sym "BAZ" "SYM"))))))
 
-(with-test (:name unintern.2)
+(with-test (:name :unintern.2)
   (with-packages (("FOO" (:intern "SYM")))
     (unintern :sym "FOO")
     (assert (find-symbol "SYM" "FOO"))))
 
 ;;; WITH-PACKAGE-ITERATOR error signalling had problems
-(with-test (:name with-package-itarator.error)
+(with-test (:name :with-package-iterator.error)
   (assert (eq :good
               (handler-case
                   (progn

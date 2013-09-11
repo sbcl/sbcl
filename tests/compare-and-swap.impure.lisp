@@ -3,7 +3,7 @@
 (defstruct xxx yyy)
 
 (macrolet ((test (init op)
-             `(with-test (:name (:cas :basics ,op))
+             `(with-test (:name (:cas :basics ,(intern (symbol-name op) "KEYWORD")))
                 (let ((x ,init)
                       (y (list 'foo))
                       (z (list 'bar)))
@@ -431,7 +431,7 @@
     (assert (eq :ok (cas bar :ok nil)))
     (assert (not (cas bar nil t)))))
 
-(with-test (:name atomic-push
+(with-test (:name :atomic-push
             :skipped-on '(not :sb-thread))
   (let ((store (cons nil nil))
         (n 100000))

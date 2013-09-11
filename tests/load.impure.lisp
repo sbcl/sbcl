@@ -307,10 +307,10 @@
                (error () nil)))
         (ignore-errors (delete-file pathname)))))
 
-(with-test (:name (load "empty.lisp"))
+(with-test (:name (load :empty.lisp))
   (assert (load-empty-file "lisp")))
 
-(with-test (:name (load "empty.fasl"))
+(with-test (:name (load :empty.fasl))
   (assert (not (load-empty-file "fasl"))))
 
 (with-test (:name :parallel-fasl-load)

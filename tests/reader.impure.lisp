@@ -125,7 +125,7 @@
   (funcall fun)
   (assert (equal '(:ok) (read-from-string "{:ok)"))))
 
-(with-test (:name bad-recursive-read)
+(with-test (:name :bad-recursive-read)
   ;; This use to signal an unbound-variable error instead.
   (assert (eq :error
               (handler-case
@@ -134,7 +134,7 @@
                 (reader-error (e)
                   :error)))))
 
-(with-test (:name standard-readtable-modified)
+(with-test (:name :standard-readtable-modified)
   (macrolet ((test (form &optional op)
                `(assert
                  (eq :error
@@ -166,7 +166,7 @@
     (assert (eq (find-package :cl) (test "cl:no-such-sym")))))
 
 ;;; THIS SHOULD BE LAST as it frobs the standard readtable
-(with-test (:name set-macro-character-nil)
+(with-test (:name :set-macro-character-nil)
   (handler-bind ((sb-int:standard-readtable-modified-error #'continue))
     (let ((fun (lambda (&rest args) 'ok)))
       ;; NIL means the standard readtable.

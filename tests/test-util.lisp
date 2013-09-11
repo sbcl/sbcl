@@ -49,6 +49,17 @@
                      &body body)
   (let ((block-name (gensym))
         #+sb-thread (threads (gensym "THREADS")))
+    (flet ((name-ok (x y)
+             (declare (ignore y))
+             (typecase x
+               (symbol (let ((package (symbol-package x)))
+                         (or (null package)
+                             (eql package (find-package "CL"))
+                             (eql package (find-package "KEYWORD"))
+                             (eql (mismatch "SB-" (package-name package)) 3))))
+               (integer t))))
+      (unless (tree-equal name name :test #'name-ok)
+        (error "test name must be all-keywords: ~S" name)))
     `(progn
        (start-test)
        (cond

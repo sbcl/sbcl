@@ -547,7 +547,7 @@
     (assert (search "TRACE-THIS" out))
     (assert (search "returned OK" out))))
 
-(with-test (:name (trace-recursive :encapsulate nil)
+(with-test (:name (:trace-recursive :encapsulate nil)
             :fails-on '(or (and :ppc (not :linux)) :sparc :mips :sunos)
             :broken-on '(or :darwin (and :x86 :sunos)))
   (let ((out (with-output-to-string (*trace-output*)
@@ -622,7 +622,7 @@
     (format t "recursive condition: ~A~%" condition) (force-output)
     (error "recursive condition: ~A" condition)))
 
-(defun test-inifinite-error-protection ()
+(defun test-infinite-error-protection ()
   ;; after 50 successful throws to SB-IMPL::TOPLEVEL-CATCHER sbcl used
   ;; to halt, it produces so much garbage that's hard to suppress that
   ;; it is tested only once
@@ -640,14 +640,14 @@
                      :normal-exit)))))))
   (write-line "--END OF H-B-A-B--"))
 
-(with-test (:name infinite-error-protection)
+(with-test (:name :infinite-error-protection)
   (enable-debugger)
-  (test-inifinite-error-protection))
+  (test-infinite-error-protection))
 
-(with-test (:name (infinite-error-protection :thread)
+(with-test (:name (:infinite-error-protection :thread)
                   :skipped-on '(not :sb-thread))
   (enable-debugger)
-  (let ((thread (sb-thread:make-thread #'test-inifinite-error-protection)))
+  (let ((thread (sb-thread:make-thread #'test-infinite-error-protection)))
     (loop while (sb-thread:thread-alive-p thread))))
 
 ;; unconditional, in case either previous left it enabled
@@ -658,7 +658,7 @@
 ;;; Older GENCGC systems had a bug in the pointer validation used by
 ;;; MAKE-LISP-OBJ that made SIMPLE-FUN objects always fail to
 ;;; validate.
-(with-test (:name (make-lisp-obj :simple-funs))
+(with-test (:name (:make-lisp-obj :simple-funs))
   (sb-sys:without-gcing
     (assert (eq #'identity
                 (sb-kernel:make-lisp-obj
@@ -667,7 +667,7 @@
 
 ;;; Older CHENEYGC systems didn't perform any real pointer validity
 ;;; checks beyond "is this pointer to somewhere in heap space".
-(with-test (:name (make-lisp-obj :pointer-validation))
+(with-test (:name (:make-lisp-obj :pointer-validation))
   ;; Fun and games: We need to test MAKE-LISP-OBJ with a known-bogus
   ;; address, but we also need the GC to not pitch a fit if it sees an
   ;; object with said bogus address.  Thus, construct our known-bogus

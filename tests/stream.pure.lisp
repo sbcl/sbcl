@@ -324,7 +324,7 @@
 ;;; immediately be completely filled for normal files, and that the
 ;;; buffer-fill routine is responsible for figuring out when we've
 ;;; reached EOF.
-(with-test (:name (stream listen-vs-select) :fails-on :win32)
+(with-test (:name (stream :listen-vs-select) :fails-on :win32)
   (let ((listen-testfile-name "stream.impure.lisp.testqfile")
         ;; If non-NIL, size (in bytes) of the file that will exercise
         ;; the LISTEN problem.

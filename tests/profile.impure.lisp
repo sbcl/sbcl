@@ -80,7 +80,7 @@
 
 (in-package :cl-user)
 
-(with-test (:name (profile threads))
+(with-test (:name (profile :threads))
   (profile "PROFILE-TEST")
   ;; This used to signal an error with threads
   (let* ((n #+sb-thread 5 #-sb-thread 1)

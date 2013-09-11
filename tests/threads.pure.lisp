@@ -55,7 +55,7 @@
 
 ;;; Condition-wait should not be interruptible under WITHOUT-INTERRUPTS
 
-(with-test (:name without-interrupts+condition-wait
+(with-test (:name :without-interrupts+condition-wait
             :skipped-on '(not :sb-thread)
             :fails-on '(and :win32 :sb-futex))
   (let* ((lock (make-mutex))
@@ -75,7 +75,7 @@
 
 ;;; GRAB-MUTEX should not be interruptible under WITHOUT-INTERRUPTS
 
-(with-test (:name without-interrupts+grab-mutex :skipped-on '(not :sb-thread))
+(with-test (:name :without-interrupts+grab-mutex :skipped-on '(not :sb-thread))
   (let* ((lock (make-mutex))
          (bar (progn (grab-mutex lock) nil))
          (thread (make-thread (lambda ()
@@ -93,7 +93,7 @@
     (assert (eq :aborted (join-thread thread :default :aborted)))
     (assert bar)))
 
-(with-test (:name parallel-find-class :skipped-on '(not :sb-thread))
+(with-test (:name :parallel-find-class :skipped-on '(not :sb-thread))
   (let* ((oops nil)
          (threads (loop repeat 10
                         collect (make-thread (lambda ()
@@ -171,14 +171,14 @@
 
 ;;;; SYMBOL-VALUE-IN-THREAD
 
-(with-test (:name symbol-value-in-thread.1)
+(with-test (:name :symbol-value-in-thread.1)
   (let ((* (cons t t)))
     (assert (eq * (symbol-value-in-thread '* *current-thread*)))
     (setf (symbol-value-in-thread '* *current-thread*) 123)
     (assert (= 123 (symbol-value-in-thread '* *current-thread*)))
     (assert (= 123 *))))
 
-(with-test (:name symbol-value-in-thread.2 :skipped-on '(not :sb-thread))
+(with-test (:name :symbol-value-in-thread.2 :skipped-on '(not :sb-thread))
   (let* ((parent *current-thread*)
          (semaphore (make-semaphore))
          (child (make-thread (lambda ()
@@ -194,7 +194,7 @@
 ;;; Disabled on Darwin due to deadlocks caused by apparent OS specific deadlocks,
 ;;; wich _appear_ to be caused by malloc() and free() not being thread safe: an
 ;;; interrupted malloc in one thread can apparently block a free in another.
-(with-test (:name symbol-value-in-thread.3
+(with-test (:name :symbol-value-in-thread.3
             :skipped-on '(not :sb-thread))
   (let* ((parent *current-thread*)
          (semaphore (make-semaphore))
@@ -228,7 +228,7 @@
     (setf running nil)
     (join-thread noise)))
 
-(with-test (:name symbol-value-in-thread.4 :skipped-on '(not :sb-thread))
+(with-test (:name :symbol-value-in-thread.4 :skipped-on '(not :sb-thread))
   (let* ((parent *current-thread*)
          (semaphore (make-semaphore))
          (child (make-thread (lambda ()
@@ -237,7 +237,7 @@
     (signal-semaphore semaphore)
     (assert (equal '(nil nil) (multiple-value-list (join-thread child))))))
 
-(with-test (:name symbol-value-in-thread.5 :skipped-on '(not :sb-thread))
+(with-test (:name :symbol-value-in-thread.5 :skipped-on '(not :sb-thread))
   (let* ((parent *current-thread*)
          (semaphore (make-semaphore))
          (child (make-thread (lambda ()
@@ -252,7 +252,7 @@
     (assert (equal (list *current-thread* 'this-is-new (list :read :unbound-in-thread))
                    (join-thread child)))))
 
-(with-test (:name symbol-value-in-thread.6 :skipped-on '(not :sb-thread))
+(with-test (:name :symbol-value-in-thread.6 :skipped-on '(not :sb-thread))
   (let* ((parent *current-thread*)
          (semaphore (make-semaphore))
          (name (gensym))
@@ -270,7 +270,7 @@
       (unless (equal res want)
         (error "wanted ~S, got ~S" want res)))))
 
-(with-test (:name symbol-value-in-thread.7 :skipped-on '(not :sb-thread))
+(with-test (:name :symbol-value-in-thread.7 :skipped-on '(not :sb-thread))
   (let ((child (make-thread (lambda ())))
         (error-occurred nil))
     (join-thread child)
@@ -284,7 +284,7 @@
                        (sb-thread::symbol-value-in-thread-error-info e)))))
     (assert error-occurred)))
 
-(with-test (:name symbol-value-in-thread.8  :skipped-on '(not :sb-thread))
+(with-test (:name :symbol-value-in-thread.8  :skipped-on '(not :sb-thread))
   (let ((child (make-thread (lambda ())))
         (error-occurred nil))
     (join-thread child)
@@ -298,7 +298,7 @@
                        (sb-thread::symbol-value-in-thread-error-info e)))))
     (assert error-occurred)))
 
-(with-test (:name deadlock-detection.1  :skipped-on '(not :sb-thread))
+(with-test (:name :deadlock-detection.1  :skipped-on '(not :sb-thread))
   (loop
     repeat 1000
     do (flet ((test (ma mb sa sb)
@@ -324,7 +324,7 @@
              (assert (or (equal '(:deadlock :ok) res)
                          (equal '(:ok :deadlock) res))))))))
 
-(with-test (:name deadlock-detection.2 :skipped-on '(not :sb-thread))
+(with-test (:name :deadlock-detection.2 :skipped-on '(not :sb-thread))
   (let* ((m1 (sb-thread:make-mutex :name "M1"))
          (m2 (sb-thread:make-mutex :name "M2"))
          (s1 (sb-thread:make-semaphore :name "S1"))
@@ -359,7 +359,7 @@
        (assert (stringp err)))
     (assert (eq :ok (sb-thread:join-thread t1)))))
 
-(with-test (:name deadlock-detection.3  :skipped-on '(not :sb-thread))
+(with-test (:name :deadlock-detection.3  :skipped-on '(not :sb-thread))
   (let* ((m1 (sb-thread:make-mutex :name "M1"))
          (m2 (sb-thread:make-mutex :name "M2"))
          (s1 (sb-thread:make-semaphore :name "S1"))
