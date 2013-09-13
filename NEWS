@@ -29,6 +29,8 @@ changes relative to sbcl-1.1.11:
     clobbers FILE-NAMESTRING.  (thanks to Anton Kovalenko, lp#884603)
   * bug fix: class definitions with CPLs inconsistent with their metaclasses
     are less likely to destroy the object system's integrity.  (lp#309076)
+  * bug fix: restart clause parsing in RESTART-CASE is more in line with the
+    standard.  (lp#1203595, thanks to Jan Moringen)
   
 changes in sbcl-1.1.11 relative to sbcl-1.1.10:
   * enhancement: support building the manual under texinfo version 5.
