@@ -4723,7 +4723,7 @@
 
 ;; win32 is very specific about the order in which catch blocks
 ;; must be allocated on the stack
-(with-test (:name :bug-121581169)
+(with-test (:name :bug-1072739)
   (let ((f (compile nil
                     `(lambda ()
                        (STRING=
@@ -4822,3 +4822,16 @@
                                y))))
               (list (string 'list))
               (list "lisT")))))
+
+(with-test (:name (restart-case optimize speed compiler-note))
+  (handler-bind ((compiler-note #'error))
+    (compile nil '(lambda ()
+                   (declare (optimize speed))
+                   (restart-case () (c ()))))
+    (compile nil '(lambda ()
+                   (declare (optimize speed))
+                   (let (x)
+                     (restart-case (setf x (car (compute-restarts)))
+                       (c ()))
+                     x)))))
+

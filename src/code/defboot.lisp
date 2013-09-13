@@ -530,7 +530,8 @@ evaluated as a PROGN."
                  (declare (ignore rest))
                  `(,name #'(lambda (&rest temp)
                              (setq ,temp-var temp)
-                             (go ,tag))
+                             (locally (declare (optimize (safety 0)))
+                               (go ,tag)))
                          ,@keywords)))
              (make-apply-and-return (clause-data)
                (destructuring-bind (name tag keywords lambda-list body) clause-data
