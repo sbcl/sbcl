@@ -29,8 +29,6 @@
 
 (defvar *linkage-info* (make-hash-table :test 'equal :synchronized t))
 
-(defstruct linkage-info datap address)
-
 (defun write-linkage-table-entry (table-address real-address datap)
   (/show0 "write-linkage-table-entry")
   (let ((reloc (int-sap table-address))
@@ -53,17 +51,15 @@
              (hash-table-count *linkage-info*)
              name))
     (write-linkage-table-entry table-address real-address datap)
-    (setf (gethash (cons name datap) *linkage-info*)
-          (make-linkage-info :address table-address :datap datap))))
+    (setf (gethash (cons name datap) *linkage-info*) table-address)))
 
 ;;; Add a foreign linkage entry if none exists, return the address
 ;;; in the linkage table.
 (defun ensure-foreign-symbol-linkage (name datap)
   (/show0 "ensure-foreign-symbol-linkage")
   (with-locked-system-table (*linkage-info*)
-    (let ((info (or (gethash (cons name datap) *linkage-info*)
-                    (link-foreign-symbol name datap))))
-      (linkage-info-address info))))
+    (or (gethash (cons name datap) *linkage-info*)
+        (link-foreign-symbol name datap))))
 
 ;;; Update the linkage-table. Called during initialization after all
 ;;; shared libraries have been reopened, and after a previously loaded
@@ -72,10 +68,9 @@
 ;;; FIXME: Should figure out how to write only those entries that need
 ;;; updating.
 (defun update-linkage-table ()
-  (dohash ((name-and-datap info) *linkage-info* :locked t)
+  (dohash ((name-and-datap table-address) *linkage-info* :locked t)
     (let* ((name (car name-and-datap))
            (datap (cdr name-and-datap))
-           (table-address (linkage-info-address info))
            (real-address
             (ensure-dynamic-foreign-symbol-address name datap)))
       (aver (and table-address real-address))

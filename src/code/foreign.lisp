@@ -127,11 +127,10 @@ if the symbol isn't found."
     (when (<= sb!vm:linkage-table-space-start
               addr
               sb!vm:linkage-table-space-end)
-      (dohash ((name-and-datap info) *linkage-info* :locked t)
-        (let ((table-addr (linkage-info-address info)))
-          (when (and (<= table-addr addr)
-                     (< addr (+ table-addr sb!vm:linkage-table-entry-size)))
-            (return-from sap-foreign-symbol (car name-and-datap))))))
+      (dohash ((name-and-datap table-addr) *linkage-info* :locked t)
+        (when (and (<= table-addr addr)
+                   (< addr (+ table-addr sb!vm:linkage-table-entry-size)))
+          (return-from sap-foreign-symbol (car name-and-datap)))))
     #!+os-provides-dladdr
     (with-alien ((info (struct dl-info
                                (filename c-string)
@@ -163,9 +162,7 @@ if the symbol isn't found."
   (loop for table-address from sb!vm::linkage-table-space-start
           by sb!vm::linkage-table-entry-size
           and reference in sb!vm::*required-runtime-c-symbols*
-        do (setf (gethash reference *linkage-info*)
-                 (make-linkage-info :datap (cdr reference)
-                      :address table-address)))
+        do (setf (gethash reference *linkage-info*) table-address))
   #!+os-provides-dlopen
   (setf *runtime-dlhandle* (dlopen-or-lose))
   #!+os-provides-dlopen
