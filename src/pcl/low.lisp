@@ -117,8 +117,14 @@
 (import 'sb-kernel:funcallable-instance-p)
 
 (defun set-funcallable-instance-function (fin new-value)
-  (declare (type function new-value))
-  (aver (funcallable-instance-p fin))
+  (declare (type function new-value)
+           ;; KLUDGE: it might be nice to restrict
+           ;; SB-MOP:SET-FUNCALLABLE-INSTANCE-FUNCTION to operate only
+           ;; on generalized instances of
+           ;; SB-MOP:FUNCALLABLE-STANDARD-OBJECT; at present, even
+           ;; PCL's internal use of SET-FUNCALLABLE-INSTANCE-FUNCTION
+           ;; doesn't obey this restriction.
+           (type funcallable-instance fin))
   (setf (funcallable-instance-fun fin) new-value))
 
 ;;; FIXME: these macros should just go away.  It's not clear whether

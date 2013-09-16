@@ -33,6 +33,9 @@ changes relative to sbcl-1.1.11:
     standard.  (lp#1203585, thanks to Jan Moringen)
   * bug fix: silence a note from RESTART-CASE under high-SPEED optimization
     settings.  (lp#1023721)
+  * bug fix: getting the order of arguments to
+    SB-MOP:SET-FUNCALLABLE-INSTANCE-FUNCTION wrong produces a sensible error
+    rather than a failed AVER.  (reported by Paul Nathan)
   
 changes in sbcl-1.1.11 relative to sbcl-1.1.10:
   * enhancement: support building the manual under texinfo version 5.

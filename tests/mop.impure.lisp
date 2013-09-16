@@ -677,5 +677,12 @@
                               ((instance :initform 2)
                                (class :allocation :class :initform :ok))))
                      (slot-value o 'instance))))))
+
+(defgeneric definitely-a-funcallable-instance (x))
+(with-test (:name (set-funcallable-instance-function :typechecking))
+  (assert (raises-error? (set-funcallable-instance-function
+                          (lambda (y) nil)
+                          #'definitely-a-funcallable-instance)
+                         type-error)))
 
 ;;;; success
