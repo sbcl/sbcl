@@ -347,7 +347,7 @@
                             (dpb (cref 3) (byte 8 24)
                                  (dpb (cref 2) (byte 8 16)
                                       (dpb (cref 1) (byte 8 8) (cref 0))))))))
-          (if (< code char-code-limit)
+          (if (< code sb!xc:char-code-limit)
               (code-char code)
               (decoding-error array pos (+ pos bytes) :ucs-4le
                               'octet-decoding-error pos))))
@@ -366,7 +366,7 @@
                             (dpb (cref 0) (byte 8 24)
                                  (dpb (cref 1) (byte 8 16)
                                       (dpb (cref 2) (byte 8 8) (cref 3))))))))
-          (if (< code char-code-limit)
+          (if (< code sb!xc:char-code-limit)
               (code-char code)
               (decoding-error array pos (+ pos bytes) :ucs-4be
                               'octet-decoding-error pos)))))))
@@ -422,7 +422,7 @@
   (setf (sap-ref-32le sap tail) bits)
   4
   (let ((code (sap-ref-32le sap head)))
-    (if (< code char-code-limit)
+    (if (< code sb!xc:char-code-limit)
         (code-char code)
         (return-from decode-break-reason 4)))
   ucs-4le->string-aref
@@ -434,7 +434,7 @@
   (setf (sap-ref-32be sap tail) bits)
   4
   (let ((code (sap-ref-32be sap head)))
-    (if (< code char-code-limit)
+    (if (< code sb!xc:char-code-limit)
         (code-char code)
         (return-from decode-break-reason 4)))
   ucs-4be->string-aref

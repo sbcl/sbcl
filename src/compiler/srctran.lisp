@@ -2522,7 +2522,7 @@
             `(mod ,base-char-code-limit)))
           (t
            (specifier-type
-            `(mod ,char-code-limit))))))
+            `(mod ,sb!xc:char-code-limit))))))
 
 (defoptimizer (code-char derive-type) ((code))
   (let ((type (lvar-type code)))
