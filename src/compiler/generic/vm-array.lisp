@@ -51,10 +51,9 @@
   ;; which is used for a fixed #\NULL so that when we call out to C
   ;; we don't need to cons a new copy)
   (n-pad-elements (missing-arg) :type index :read-only t)
-  ;; the relative importance of this array type.  Used for determining
-  ;; the order of the TYPECASE in HAIRY-DATA-VECTOR-{REF,SET}.  High
-  ;; positive numbers are near the top; low negative numbers near the
-  ;; bottom.
+  ;; the relative importance of this array type.  Previously used for
+  ;; determining the order of the TYPECASE in
+  ;; HAIRY-DATA-VECTOR-{REF,SET}; currently (as of 2013-09-18) unused.
   (importance (missing-arg) :type fixnum :read-only t))
 
 (defparameter *specialized-array-element-type-properties*

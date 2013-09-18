@@ -868,68 +868,52 @@
                  (dump-word len file)
                  (dump-byte size file))
                (dump-raw-bytes vec bytes file)))
+      #+sb-xc-host
       (etypecase vec
-        #-sb-xc-host
-        ((simple-array nil (*))
-         (dump-unsigned-vector 0 0))
-        (simple-bit-vector
-         (dump-unsigned-vector 1 (ceiling len 8))) ; bits to bytes
-        ;; KLUDGE: This isn't the best way of expressing that the host
-        ;; may not have specializations for (unsigned-byte 2) and
-        ;; (unsigned-byte 4), which means that these types are
-        ;; type-equivalent to (simple-array (unsigned-byte 8) (*));
-        ;; the workaround is to remove them from the etypecase, since
-        ;; they can't be dumped from the cross-compiler anyway. --
-        ;; CSR, 2002-05-07
-        #-sb-xc-host
-        ((simple-array (unsigned-byte 2) (*))
-         (dump-unsigned-vector 2 (ceiling (ash len 1) 8))) ; bits to bytes
-        #-sb-xc-host
-        ((simple-array (unsigned-byte 4) (*))
-         (dump-unsigned-vector 4 (ceiling (ash len 2) 8))) ; bits to bytes
-        #-sb-xc-host
-        ((simple-array (unsigned-byte 7) (*))
-         (dump-unsigned-vector 7 len))
         ((simple-array (unsigned-byte 8) (*))
          (dump-unsigned-vector 8 len))
-        #-sb-xc-host
-        ((simple-array (unsigned-byte 15) (*))
-         (dump-unsigned-vector 15 (* 2 len)))
         ((simple-array (unsigned-byte 16) (*))
          (dump-unsigned-vector 16 (* 2 len)))
-        #-sb-xc-host
-        ((simple-array (unsigned-byte 31) (*))
-         (dump-unsigned-vector 31 (* 4 len)))
         ((simple-array (unsigned-byte 32) (*))
-         (dump-unsigned-vector 32 (* 4 len)))
-        #-sb-xc-host
-        #!+#.(cl:if (cl:= 64 sb!vm:n-word-bits) '(and) '(or))
-        ((simple-array (unsigned-byte 63) (*))
-         (dump-unsigned-vector 63 (* 8 len)))
-        #!+#.(cl:if (cl:= 64 sb!vm:n-word-bits) '(and) '(or))
-        ((simple-array (unsigned-byte 64) (*))
-         (dump-unsigned-vector 64 (* 8 len)))
-        ((simple-array (signed-byte 8) (*))
-         (dump-signed-vector 8 len))
-        ((simple-array (signed-byte 16) (*))
-         (dump-signed-vector 16 (* 2 len)))
-        #!+#.(cl:if (cl:= 32 sb!vm:n-word-bits) '(and) '(or))
-        ((simple-array (unsigned-byte 29) (*))
-         (dump-signed-vector 29 (* 4 len)))
-        #!+#.(cl:if (cl:= 32 sb!vm:n-word-bits) '(and) '(or))
-        ((simple-array (signed-byte 30) (*))
-         (dump-signed-vector 30 (* 4 len)))
-        ((simple-array (signed-byte 32) (*))
-         (dump-signed-vector 32 (* 4 len)))
-        #!+#.(cl:if (cl:= 64 sb!vm:n-word-bits) '(and) '(or))
-        ((simple-array (unsigned-byte 60) (*))
-         (dump-signed-vector 60 (* 8 len)))
-        #!+#.(cl:if (cl:= 64 sb!vm:n-word-bits) '(and) '(or))
-        ((simple-array (signed-byte 61) (*))
-         (dump-signed-vector 61 (* 8 len)))
-        #!+#.(cl:if (cl:= 64 sb!vm:n-word-bits) '(and) '(or))
-        ((simple-array (signed-byte 64) (*))
-         (dump-signed-vector 64 (* 8 len)))))))
+         (dump-unsigned-vector 32 (* 4 len))))
+      #-sb-xc-host
+      (macrolet ((frob ()
+                   (labels ((bytes (saetp len)
+                              (let ((n-bits (sb!vm:saetp-n-bits saetp)))
+                                (if (zerop (rem n-bits 8))
+                                    `(* ,len ,(/ n-bits 8))
+                                    `(ceiling (* ,len ,n-bits) 8))))
+                            (size (ctype)
+                              (aver (numeric-type-p ctype))
+                              (let ((low (numeric-type-low ctype))
+                                    (high (numeric-type-high ctype)))
+                                (cond
+                                  ((zerop low) (integer-length high))
+                                  ((minusp low)
+                                   (aver (= (integer-length low) (integer-length high)))
+                                   (1+ (integer-length low)))
+                                  (t (bug "confused ctype: ~S" ctype)))))
+                            (clause (saetp)
+                              (let ((ctype (sb!vm:saetp-ctype saetp))
+                                    (specifier (sb!vm:saetp-specifier saetp)))
+                                (aver (or (eql ctype *empty-type*)
+                                          (numeric-type-p ctype)))
+                                (cond
+                                  ((eql ctype *empty-type*)
+                                   `((simple-array ,specifier (*))
+                                     (dump-unsigned-vector 0 0)))
+                                  ((minusp (numeric-type-low ctype))
+                                   `((simple-array ,specifier (*))
+                                     (dump-signed-vector ,(size ctype) ,(bytes saetp 'len))))
+                                  (t
+                                   (aver (zerop (numeric-type-low ctype)))
+                                   `((simple-array ,specifier (*))
+                                     (dump-unsigned-vector ,(size ctype) ,(bytes saetp 'len))))))))
+                     `(etypecase vec
+                        ,@(loop for x across sb!vm:*specialized-array-element-type-properties*
+                               when (csubtypep (sb!vm:saetp-ctype x) (specifier-type 'integer))
+                               collect (clause x))))))
+        (frob)))))
 
 ;;; Dump characters and string-ish things.
 
