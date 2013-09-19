@@ -411,94 +411,29 @@
                       t)
     res))
 
-(define-fop (fop-single-float-vector 84)
+(defglobal **saetp-bits-per-length**
+    (let ((array (make-array 255 :element-type '(unsigned-byte 8)
+                                 :initial-element 255)))
+      (loop for saetp across sb!vm:*specialized-array-element-type-properties*
+            do
+            (setf (aref array (sb!vm:saetp-typecode saetp))
+                  (sb!vm:saetp-n-bits saetp)))
+      array)
+    "255 means bad entry.")
+(declaim (type (simple-array (unsigned-byte 8) (255))
+               **saetp-bits-per-length**))
+
+(define-fop (fop-spec-vector 43)
   (let* ((length (read-word-arg))
-         (result (make-array length :element-type 'single-float)))
-    (read-n-bytes *fasl-input-stream* result 0 (* length 4))
-    result))
-
-(define-fop (fop-double-float-vector 85)
-  (let* ((length (read-word-arg))
-         (result (make-array length :element-type 'double-float)))
-    (read-n-bytes *fasl-input-stream* result 0 (* length 8))
-    result))
-
-(define-fop (fop-complex-single-float-vector 86)
-  (let* ((length (read-word-arg))
-         (result (make-array length :element-type '(complex single-float))))
-    (read-n-bytes *fasl-input-stream* result 0 (* length 8))
-    result))
-
-(define-fop (fop-complex-double-float-vector 87)
-  (let* ((length (read-word-arg))
-         (result (make-array length :element-type '(complex double-float))))
-    (read-n-bytes *fasl-input-stream* result 0 (* length 16))
-    result))
-
-;;; CMU CL comment:
-;;;   *** NOT *** the FOP-INT-VECTOR as currently documented in rtguts.
-;;;   Size must be a directly supported I-vector element size, with no
-;;;   extra bits. This must be packed according to the local
-;;;   byte-ordering, allowing us to directly read the bits.
-(define-fop (fop-int-vector 43)
-  (let* ((len (read-word-arg))
-         (size (read-byte-arg))
-         (res (case size
-                (0 (make-array len :element-type 'nil))
-                (1 (make-array len :element-type 'bit))
-                (2 (make-array len :element-type '(unsigned-byte 2)))
-                (4 (make-array len :element-type '(unsigned-byte 4)))
-                (7 (prog1 (make-array len :element-type '(unsigned-byte 7))
-                     (setf size 8)))
-                (8 (make-array len :element-type '(unsigned-byte 8)))
-                (15 (prog1 (make-array len :element-type '(unsigned-byte 15))
-                      (setf size 16)))
-                (16 (make-array len :element-type '(unsigned-byte 16)))
-                (31 (prog1 (make-array len :element-type '(unsigned-byte 31))
-                      (setf size 32)))
-                (32 (make-array len :element-type '(unsigned-byte 32)))
-                #!+#.(cl:if (cl:= 64 sb!vm:n-word-bits) '(and) '(or))
-                (63 (prog1 (make-array len :element-type '(unsigned-byte 63))
-                      (setf size 64)))
-                (64 (make-array len :element-type '(unsigned-byte 64)))
-                (t (bug "losing i-vector element size: ~S" size)))))
-    (declare (type index len))
-    (read-n-bytes *fasl-input-stream*
-                  res
-                  0
-                  (ceiling (the index (* size len)) sb!vm:n-byte-bits))
-    res))
-
-;;; This is the same as FOP-INT-VECTOR, except this is for signed
-;;; SIMPLE-ARRAYs.
-(define-fop (fop-signed-int-vector 50)
-  (let* ((len (read-word-arg))
-         (size (read-byte-arg))
-         (res (case size
-                (8 (make-array len :element-type '(signed-byte 8)))
-                (16 (make-array len :element-type '(signed-byte 16)))
-                #!+#.(cl:if (cl:= 32 sb!vm:n-word-bits) '(and) '(or))
-                (29 (prog1 (make-array len :element-type '(unsigned-byte 29))
-                      (setf size 32)))
-                #!+#.(cl:if (cl:= 32 sb!vm:n-word-bits) '(and) '(or))
-                (30 (prog1 (make-array len :element-type '(signed-byte 30))
-                      (setf size 32)))
-                (32 (make-array len :element-type '(signed-byte 32)))
-                #!+#.(cl:if (cl:= 64 sb!vm:n-word-bits) '(and) '(or))
-                (60 (prog1 (make-array len :element-type '(unsigned-byte 60))
-                      (setf size 64)))
-                #!+#.(cl:if (cl:= 64 sb!vm:n-word-bits) '(and) '(or))
-                (61 (prog1 (make-array len :element-type '(signed-byte 61))
-                      (setf size 64)))
-                #!+#.(cl:if (cl:= 64 sb!vm:n-word-bits) '(and) '(or))
-                (64 (make-array len :element-type '(signed-byte 64)))
-                (t (bug "losing si-vector element size: ~S" size)))))
-    (declare (type index len))
-    (read-n-bytes *fasl-input-stream*
-                  res
-                  0
-                  (ceiling (the index (* size len)) sb!vm:n-byte-bits))
-    res))
+         (widetag (read-byte-arg))
+         (bits-per-length (aref **saetp-bits-per-length** widetag))
+         (bytes  (progn
+                   (aver (< bits-per-length 255))
+                   (ceiling (* length bits-per-length) sb!vm:n-byte-bits)))
+         (vector (allocate-vector widetag length (* bytes sb!vm:n-word-bytes))))
+    (declare (type index length))
+    (read-n-bytes *fasl-input-stream* vector 0 bytes)
+    vector))
 
 (define-fop (fop-eval 53)
   (if *skip-until*

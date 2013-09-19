@@ -57,50 +57,6 @@
     (dump-word rank file)
     (eq-save-object array file)))
 
-;;;; various dump-a-number operations
-
-(defun dump-single-float-vector (vec file)
-  (let ((length (length vec)))
-    (dump-fop 'fop-single-float-vector file)
-    (dump-word length file)
-    (dump-raw-bytes vec (* length 4) file)))
-
-(defun dump-double-float-vector (vec file)
-  (let ((length (length vec)))
-    (dump-fop 'fop-double-float-vector file)
-    (dump-word length file)
-    (dump-raw-bytes vec (* length 8) file)))
-
-#!+long-float
-(defun dump-long-float-vector (vec file)
-  (let ((length (length vec)))
-    (dump-fop 'fop-long-float-vector file)
-    (dump-word length file)
-    (dump-raw-bytes vec
-                    (* length sb!vm:n-word-bytes #!+x86 3 #!+sparc 4)
-                    file)))
-
-(defun dump-complex-single-float-vector (vec file)
-  (let ((length (length vec)))
-    (dump-fop 'fop-complex-single-float-vector file)
-    (dump-word length file)
-    (dump-raw-bytes vec (* length 8) file)))
-
-(defun dump-complex-double-float-vector (vec file)
-  (let ((length (length vec)))
-    (dump-fop 'fop-complex-double-float-vector file)
-    (dump-word length file)
-    (dump-raw-bytes vec (* length 16) file)))
-
-#!+long-float
-(defun dump-complex-long-float-vector (vec file)
-  (let ((length (length vec)))
-    (dump-fop 'fop-complex-long-float-vector file)
-    (dump-word length file)
-    (dump-raw-bytes vec
-                    (* length sb!vm:n-word-bytes #!+x86 3 #!+sparc 4 2)
-                    file)))
-
 #!+(and long-float x86)
 (defun dump-long-float (float file)
   (declare (long-float float))

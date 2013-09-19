@@ -2263,30 +2263,12 @@ core and return a descriptor to it."
                          (pop-stack)))
     result))
 
-(define-cold-fop (fop-int-vector)
+(define-cold-fop (fop-spec-vector)
   (let* ((len (read-word-arg))
-         (sizebits (read-byte-arg))
-         (type (case sizebits
-                 (0 sb!vm:simple-array-nil-widetag)
-                 (1 sb!vm:simple-bit-vector-widetag)
-                 (2 sb!vm:simple-array-unsigned-byte-2-widetag)
-                 (4 sb!vm:simple-array-unsigned-byte-4-widetag)
-                 (7 (prog1 sb!vm:simple-array-unsigned-byte-7-widetag
-                      (setf sizebits 8)))
-                 (8 sb!vm:simple-array-unsigned-byte-8-widetag)
-                 (15 (prog1 sb!vm:simple-array-unsigned-byte-15-widetag
-                       (setf sizebits 16)))
-                 (16 sb!vm:simple-array-unsigned-byte-16-widetag)
-                 (31 (prog1 sb!vm:simple-array-unsigned-byte-31-widetag
-                       (setf sizebits 32)))
-                 (32 sb!vm:simple-array-unsigned-byte-32-widetag)
-                 #!+#.(cl:if (cl:= 64 sb!vm:n-word-bits) '(and) '(or))
-                 (63 (prog1 sb!vm:simple-array-unsigned-byte-63-widetag
-                       (setf sizebits 64)))
-                 #!+#.(cl:if (cl:= 64 sb!vm:n-word-bits) '(and) '(or))
-                 (64 sb!vm:simple-array-unsigned-byte-64-widetag)
-                 (t (error "losing element size: ~W" sizebits))))
-         (result (allocate-vector-object *dynamic* sizebits len type))
+         (type (read-byte-arg))
+         (sizebits (aref **saetp-bits-per-length** type))
+         (result (progn (aver (< sizebits 255))
+                        (allocate-vector-object *dynamic* sizebits len type)))
          (start (+ (descriptor-byte-offset result)
                    (ash sb!vm:vector-data-offset sb!vm:word-shift)))
          (end (+ start
@@ -2297,28 +2279,6 @@ core and return a descriptor to it."
                                     :start start
                                     :end end)
     result))
-
-(define-cold-fop (fop-single-float-vector)
-  (let* ((len (read-word-arg))
-         (result (allocate-vector-object
-                  *dynamic*
-                  sb!vm:n-word-bits
-                  len
-                  sb!vm:simple-array-single-float-widetag))
-         (start (+ (descriptor-byte-offset result)
-                   (ash sb!vm:vector-data-offset sb!vm:word-shift)))
-         (end (+ start (* len 4))))
-    (read-bigvec-as-sequence-or-die (descriptor-bytes result)
-                                    *fasl-input-stream*
-                                    :start start
-                                    :end end)
-    result))
-
-(not-cold-fop fop-double-float-vector)
-#!+long-float (not-cold-fop fop-long-float-vector)
-(not-cold-fop fop-complex-single-float-vector)
-(not-cold-fop fop-complex-double-float-vector)
-#!+long-float (not-cold-fop fop-complex-long-float-vector)
 
 (define-cold-fop (fop-array)
   (let* ((rank (read-word-arg))

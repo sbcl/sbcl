@@ -768,28 +768,8 @@
       (simple-vector
        (dump-simple-vector simple-version file)
        (eq-save-object x file))
-      ((simple-array single-float (*))
-       (dump-single-float-vector simple-version file)
-       (eq-save-object x file))
-      ((simple-array double-float (*))
-       (dump-double-float-vector simple-version file)
-       (eq-save-object x file))
-      #!+long-float
-      ((simple-array long-float (*))
-       (dump-long-float-vector simple-version file)
-       (eq-save-object x file))
-      ((simple-array (complex single-float) (*))
-       (dump-complex-single-float-vector simple-version file)
-       (eq-save-object x file))
-      ((simple-array (complex double-float) (*))
-       (dump-complex-double-float-vector simple-version file)
-       (eq-save-object x file))
-      #!+long-float
-      ((simple-array (complex long-float) (*))
-       (dump-complex-long-float-vector simple-version file)
-       (eq-save-object x file))
       (t
-       (dump-i-vector simple-version file)
+       (dump-specialized-vector simple-version file)
        (eq-save-object x file)))))
 
 ;;; Dump a SIMPLE-VECTOR, handling any circularities.
@@ -816,104 +796,49 @@
 
 ;;; In the grand scheme of things I don't pretend to understand any
 ;;; more how this works, or indeed whether.  But to write out specialized
-;;; vectors in the same format as fop-int-vector expects to read them
+;;; vectors in the same format as fop-spec-vector expects to read them
 ;;; we need to be target-endian.  dump-integer-as-n-bytes always writes
 ;;; little-endian (which is correct for all other integers) so for a bigendian
 ;;; target we need to swap octets -- CSR, after DB
+#+sb-xc-host
+(defun dump-specialized-vector (vector file &key data-only)
+  (labels ((octet-swap (word bits)
+             "BITS must be a multiple of 8"
+             (do ((input word (ash input -8))
+                  (output 0 (logior (ash output 8) (logand input #xff)))
+                  (bits bits (- bits 8)))
+                 ((<= bits 0) output)))
+           (dump-unsigned-vector (widetag bytes bits)
+             (unless data-only
+               (dump-fop 'fop-spec-vector file)
+               (dump-word (length vector) file)
+               (dump-byte widetag file))
+             (dovector (i vector)
+               (dump-integer-as-n-bytes
+                (ecase sb!c:*backend-byte-order*
+                  (:little-endian i)
+                  (:big-endian (octet-swap i bits)))
+                bytes file))))
+    (etypecase vector
+      ((simple-array (unsigned-byte 8) (*))
+       (dump-unsigned-vector sb!vm:simple-array-unsigned-byte-8-widetag 1 8))
+      ((simple-array (unsigned-byte 16) (*))
+       (dump-unsigned-vector sb!vm:simple-array-unsigned-byte-16-widetag 2 16))
+      ((simple-array (unsigned-byte 32) (*))
+       (dump-unsigned-vector sb!vm:simple-array-unsigned-byte-32-widetag 4 32)))))
 
-(defun octet-swap (word bits)
-  "BITS must be a multiple of 8"
-  (do ((input word (ash input -8))
-       (output 0 (logior (ash output 8) (logand input #xff)))
-       (bits bits (- bits 8)))
-      ((<= bits 0) output)))
-
-(defun dump-i-vector (vec file &key data-only)
-  (declare (type (simple-array * (*)) vec))
-  (let ((len (length vec)))
-    (labels ((dump-unsigned-vector (size bytes)
-               (unless data-only
-                 (dump-fop 'fop-int-vector file)
-                 (dump-word len file)
-                 (dump-byte size file))
-               ;; The case which is easy to handle in a portable way is when
-               ;; the element size is a multiple of the output byte size, and
-               ;; happily that's the only case we need to be portable. (The
-               ;; cross-compiler has to output debug information (including
-               ;; (SIMPLE-ARRAY (UNSIGNED-BYTE 8) *).) The other cases are only
-               ;; needed in the target SBCL, so we let them be handled with
-               ;; unportable bit bashing.
-               (cond ((>= size 7) ; easy cases
-                      (multiple-value-bind (floor rem) (floor size 8)
-                        (aver (or (zerop rem) (= rem 7)))
-                        (when (= rem 7)
-                          (setq size (1+ size))
-                          (setq floor (1+ floor)))
-                        (dovector (i vec)
-                          (dump-integer-as-n-bytes
-                           (ecase sb!c:*backend-byte-order*
-                             (:little-endian i)
-                             (:big-endian (octet-swap i size)))
-                           floor file))))
-                     (t ; harder cases, not supported in cross-compiler
-                      (dump-raw-bytes vec bytes file))))
-             (dump-signed-vector (size bytes)
-               ;; Note: Dumping specialized signed vectors isn't
-               ;; supported in the cross-compiler. (All cases here end
-               ;; up trying to call DUMP-RAW-BYTES, which isn't
-               ;; provided in the cross-compilation host, only on the
-               ;; target machine.)
-               (unless data-only
-                 (dump-fop 'fop-signed-int-vector file)
-                 (dump-word len file)
-                 (dump-byte size file))
-               (dump-raw-bytes vec bytes file)))
-      #+sb-xc-host
-      (etypecase vec
-        ((simple-array (unsigned-byte 8) (*))
-         (dump-unsigned-vector 8 len))
-        ((simple-array (unsigned-byte 16) (*))
-         (dump-unsigned-vector 16 (* 2 len)))
-        ((simple-array (unsigned-byte 32) (*))
-         (dump-unsigned-vector 32 (* 4 len))))
-      #-sb-xc-host
-      (macrolet ((frob ()
-                   (labels ((bytes (saetp len)
-                              (let ((n-bits (sb!vm:saetp-n-bits saetp)))
-                                (if (zerop (rem n-bits 8))
-                                    `(* ,len ,(/ n-bits 8))
-                                    `(ceiling (* ,len ,n-bits) 8))))
-                            (size (ctype)
-                              (aver (numeric-type-p ctype))
-                              (let ((low (numeric-type-low ctype))
-                                    (high (numeric-type-high ctype)))
-                                (cond
-                                  ((zerop low) (integer-length high))
-                                  ((minusp low)
-                                   (aver (= (integer-length low) (integer-length high)))
-                                   (1+ (integer-length low)))
-                                  (t (bug "confused ctype: ~S" ctype)))))
-                            (clause (saetp)
-                              (let ((ctype (sb!vm:saetp-ctype saetp))
-                                    (specifier (sb!vm:saetp-specifier saetp)))
-                                (aver (or (eql ctype *empty-type*)
-                                          (numeric-type-p ctype)))
-                                (cond
-                                  ((eql ctype *empty-type*)
-                                   `((simple-array ,specifier (*))
-                                     (dump-unsigned-vector 0 0)))
-                                  ((minusp (numeric-type-low ctype))
-                                   `((simple-array ,specifier (*))
-                                     (dump-signed-vector ,(size ctype) ,(bytes saetp 'len))))
-                                  (t
-                                   (aver (zerop (numeric-type-low ctype)))
-                                   `((simple-array ,specifier (*))
-                                     (dump-unsigned-vector ,(size ctype) ,(bytes saetp 'len))))))))
-                     `(etypecase vec
-                        ,@(loop for x across sb!vm:*specialized-array-element-type-properties*
-                               when (csubtypep (sb!vm:saetp-ctype x) (specifier-type 'integer))
-                               collect (clause x))))))
-        (frob)))))
+#-sb-xc-host
+(defun dump-specialized-vector (vector file &key data-only)
+  (declare (type (simple-array * (*)) vector))
+  (let* ((length (length vector))
+         (widetag (widetag-of vector))
+         (bits-per-length (aref **saetp-bits-per-length** widetag)))
+    (aver (< bits-per-length 255))
+    (unless data-only
+      (dump-fop 'fop-spec-vector file)
+      (dump-word length file)
+      (dump-byte widetag file))
+    (dump-raw-bytes vector (ceiling (* length bits-per-length) sb!vm:n-byte-bits) file)))
 
 ;;; Dump characters and string-ish things.
 
@@ -1159,7 +1084,7 @@
       ;; These two dumps are only ones which contribute to our
       ;; TOTAL-LENGTH value.
       (dump-segment code-segment code-length fasl-output)
-      (dump-i-vector packed-trace-table fasl-output :data-only t)
+      (dump-specialized-vector packed-trace-table fasl-output :data-only t)
 
       ;; DUMP-FIXUPS does its own internal DUMP-FOPs: the bytes it
       ;; dumps aren't included in the TOTAL-LENGTH passed to our

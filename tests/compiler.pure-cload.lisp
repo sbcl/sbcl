@@ -162,3 +162,20 @@
 ;;; MAYBE-INFER-ITERATION-VAR-TYPE did not deal with types (REAL * (n)).
 (let ((s (loop for x from (- pi) below (floor (* 2 pi)) by (/ pi 75) count t)))
   (assert (= s 219)))
+
+(with-test (:name :specialized-array-dumping)
+  (macrolet
+      ((make-tests ()
+         `(progn
+            ,@(loop for saetp across
+                    sb-vm:*specialized-array-element-type-properties*
+                    for specifier = (sb-vm:saetp-specifier saetp)
+                    for array = (make-array (if specifier 10 0)
+                                            :element-type specifier)
+                    for make-array = `(make-array ,(if specifier 10 0)
+                                                  :element-type ',specifier)
+                    collect `(assert (and (equal (type-of ,array)
+                                                 ',(type-of array))
+                                          (equalp ,array
+                                                  ,make-array)))))))
+    (make-tests)))
