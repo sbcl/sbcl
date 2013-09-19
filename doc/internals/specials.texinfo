@@ -3,8 +3,8 @@
 @chapter Specials
 
 @menu
-* Overview::                    
-* Binding and unbinding::       
+* Overview::
+* Binding and unbinding::
 @end menu
 
 @node Overview
@@ -27,8 +27,9 @@ value locally in a thread.
 @section Binding and unbinding
 
 Binding goes like this: the binding stack pointer (bsp) is bumped, old
-value and symbol are stored at bsp - 1, new value is stored in
-symbol's value slot or the tls.
+value and symbol are stored at bsp - 1, new value is stored in symbol's
+value slot or the tls. On multithreaded builds, @code{TLS-INDEX} is
+stored on the binding stack in place of the symbol.
 
 Unbinding: the symbol's value is restored from bsp - 1, value and
 symbol at bsp - 1 are set to zero, and finally bsp is decremented.
@@ -62,3 +63,15 @@ garbage around that may wreck the ship on the next @code{BIND}.
 In other words, the invariant is that the binding stack above bsp only
 contains zeros. This makes @code{BIND} safe in face of gc triggered at
 any point during its execution.
+
+On platforms with the @code{UNWIND-TO-FRAME-AND-CALL-VOP} feature, it's
+possible to restart frames in the debugger, unwinding the binding stack.
+To know how much to unwind, @code{BIND-SENTINEL} in the beginning of a
+function puts the current frame pointer on the binding stack with
+@code{UNBOUND-MARKER-WIDETAG} instead of the symbol/tls-index.
+@code{UNBIND-SENTINEL} removes it before returning. The debugger then
+search for @code{UNBOUND-MARKER-WIDETAG} with the value being equal to
+the desired frame, and calls @code{UNBIND-TO-HERE}. Consequently,
+@code{UNBIND-TO-HERE} treats @code{UNBOUND-MARKER-WIDETAG} the same way
+as zeros.
+

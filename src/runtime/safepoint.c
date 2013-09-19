@@ -576,7 +576,7 @@ check_pending_gc(os_context_t *ctx)
             block_deferrable_signals(NULL,&sigset);
             if(SymbolTlValue(GC_PENDING,self)==T)
                 gc_happened = funcall0(StaticSymbolFunction(SUB_GC));
-            unbind_variable(IN_SAFEPOINT,self);
+            unbind(self);
             thread_sigmask(SIG_SETMASK,&sigset,NULL);
             if (gc_happened == T) {
                 /* POST_GC wants to enable interrupts */

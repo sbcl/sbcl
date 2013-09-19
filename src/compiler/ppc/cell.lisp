@@ -289,7 +289,7 @@
 ;;; BIND -- Establish VAL as a binding for SYMBOL.  Save the old value and
 ;;; the symbol on the binding stack and stuff the new value into the
 ;;; symbol.
-
+;;; See the "Chapter 9: Specials" of the SBCL Internals Manual.
 #!+sb-thread
 (define-vop (bind)
   (:args (val :scs (any-reg descriptor-reg))
@@ -341,9 +341,9 @@
 
      TLS-VALID
      (inst lwzx temp thread-base-tn tls-index)
-     (inst addi bsp-tn bsp-tn (* 2 n-word-bytes))
+     (inst addi bsp-tn bsp-tn (* binding-size n-word-bytes))
      (storew temp bsp-tn (- binding-value-slot binding-size))
-     (storew symbol bsp-tn (- binding-symbol-slot binding-size))
+     (storew tls-index bsp-tn (- binding-symbol-slot binding-size))
      (inst stwx val thread-base-tn tls-index)))
 
 #!-sb-thread
@@ -353,7 +353,7 @@
   (:temporary (:scs (descriptor-reg)) temp)
   (:generator 5
     (loadw temp symbol symbol-value-slot other-pointer-lowtag)
-    (inst addi bsp-tn bsp-tn (* 2 n-word-bytes))
+    (inst addi bsp-tn bsp-tn (* binding-size n-word-bytes))
     (storew temp bsp-tn (- binding-value-slot binding-size))
     (storew symbol bsp-tn (- binding-symbol-slot binding-size))
     (storew val symbol symbol-value-slot other-pointer-lowtag)))
@@ -363,12 +363,11 @@
   (:temporary (:scs (descriptor-reg)) tls-index value)
   (:generator 0
     (loadw tls-index bsp-tn (- binding-symbol-slot binding-size))
-    (loadw tls-index tls-index symbol-tls-index-slot other-pointer-lowtag)
     (loadw value bsp-tn (- binding-value-slot binding-size))
     (inst stwx value thread-base-tn tls-index)
     (storew zero-tn bsp-tn (- binding-symbol-slot binding-size))
     (storew zero-tn bsp-tn (- binding-value-slot binding-size))
-    (inst subi bsp-tn bsp-tn (* 2 n-word-bytes))))
+    (inst subi bsp-tn bsp-tn (* binding-size n-word-bytes))))
 
 #!-sb-thread
 (define-vop (unbind)
@@ -379,7 +378,7 @@
     (storew value symbol symbol-value-slot other-pointer-lowtag)
     (storew zero-tn bsp-tn (- binding-symbol-slot binding-size))
     (storew zero-tn bsp-tn (- binding-value-slot binding-size))
-    (inst subi bsp-tn bsp-tn (* 2 n-word-bytes))))
+    (inst subi bsp-tn bsp-tn (* binding-size n-word-bytes))))
 
 
 (define-vop (unbind-to-here)
@@ -400,8 +399,6 @@
       (inst beq skip)
       (loadw value bsp-tn (- binding-value-slot binding-size))
       #!+sb-thread
-      (loadw symbol symbol symbol-tls-index-slot other-pointer-lowtag)
-      #!+sb-thread
       (inst stwx value thread-base-tn symbol)
       #!-sb-thread
       (storew value symbol symbol-value-slot other-pointer-lowtag)
@@ -409,7 +406,7 @@
 
       (emit-label skip)
       (storew zero-tn bsp-tn (- binding-value-slot binding-size))
-      (inst subi bsp-tn bsp-tn (* 2 n-word-bytes))
+      (inst subi bsp-tn bsp-tn (* binding-size n-word-bytes))
       (inst cmpw where bsp-tn)
       (inst bne loop)
 

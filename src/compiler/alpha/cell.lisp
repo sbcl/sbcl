@@ -168,6 +168,9 @@
 
 ;;; Establish VAL as a binding for SYMBOL. Save the old value and the
 ;;; symbol on the binding stack and stuff the new value into the symbol.
+;;;
+;;; See the "Chapter 9: Specials" of the SBCL Internals Manual.
+
 (define-vop (bind)
   (:args (val :scs (any-reg descriptor-reg))
          (symbol :scs (descriptor-reg)))

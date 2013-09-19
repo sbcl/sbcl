@@ -1,5 +1,6 @@
 /*
  * support for dynamic binding from C
+ * See the "Chapter 9: Specials" of the SBCL Internals Manual.
  */
 
 /*
@@ -54,10 +55,13 @@ void bind_variable(lispobj symbol, lispobj value, void *th)
             if (get_pseudo_atomic_interrupted(thread))
                 do_pending_interrupt();
         }
+        binding->symbol = sym->tls_index;
+        binding->value = SymbolTlValue(symbol, thread);
     }
-#endif
-    binding->value = SymbolTlValue(symbol, thread);
+#else
     binding->symbol = symbol;
+    binding->value = SymbolTlValue(symbol, thread);
+#endif
     SetTlSymbolValue(symbol, value, thread);
 }
 
@@ -70,31 +74,16 @@ unbind(void *th)
 
     binding = ((struct binding *)get_binding_stack_pointer(thread)) - 1;
 
+    /* On sb-thread, it's actually a tls-index */
     symbol = binding->symbol;
 
-    SetTlSymbolValue(symbol, binding->value,thread);
+#ifdef LISP_FEATURE_SB_THREAD
 
-    binding->symbol = 0;
-    binding->value = 0;
-
-    set_binding_stack_pointer(thread,binding);
-}
-
-void
-unbind_variable(lispobj name, void *th)
-{
-    struct thread *thread=(struct thread *)th;
-    struct binding *binding;
-    lispobj symbol;
-
-    binding = ((struct binding *)get_binding_stack_pointer(thread)) - 1;
-
-    symbol = binding->symbol;
-
-    if (symbol != name)
-      lose("unbind_variable, 0x%p != 0x%p", symbol, name);
-
-    SetTlSymbolValue(symbol, binding->value,thread);
+    ((union per_thread_data *)thread)->dynamic_values[(symbol) >> WORD_SHIFT]
+        = binding->value;
+#else
+    SetSymbolValue(symbol, binding->value, thread);
+#endif
 
     binding->symbol = 0;
     binding->value = 0;
@@ -116,7 +105,12 @@ unbind_to_here(lispobj *bsp,void *th)
         symbol = binding->symbol;
         if (symbol) {
             if (symbol != UNBOUND_MARKER_WIDETAG) {
-                SetTlSymbolValue(symbol, binding->value,thread);
+#ifdef LISP_FEATURE_SB_THREAD
+                ((union per_thread_data *)thread)->dynamic_values[(symbol) >> WORD_SHIFT]
+                    = binding->value;
+#else
+                SetSymbolValue(symbol, binding->value, thread);
+#endif
             }
             binding->symbol = 0;
             binding->value = 0;

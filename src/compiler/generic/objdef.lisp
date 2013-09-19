@@ -282,7 +282,7 @@
 
 (define-primitive-object (binding)
   value
-  symbol)
+  symbol) ;; on sb-thread, this is actually a tls-index
 
 (define-primitive-object (unwind-block)
   (current-uwp :c-type #!-alpha "struct unwind_block *" #!+alpha "u32")
@@ -339,7 +339,9 @@
   (package :ref-trans symbol-package
            :set-trans %set-symbol-package
            :init :null)
-  #!+sb-thread (tls-index :ref-known (flushable) :ref-trans symbol-tls-index))
+  ;; 0 tls-index means no tls-index is allocated
+  #!+sb-thread
+  (tls-index :ref-known (flushable) :ref-trans symbol-tls-index))
 
 (define-primitive-object (complex-single-float
                           :lowtag other-pointer-lowtag

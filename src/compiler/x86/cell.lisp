@@ -274,7 +274,8 @@
 ;;; BIND -- Establish VAL as a binding for SYMBOL. Save the old value and
 ;;; the symbol on the binding stack and stuff the new value into the
 ;;; symbol.
-
+;;; See the "Chapter 9: Specials" of the SBCL Internals Manual.
+;;
 ;;; FIXME: Split into DYNBIND and BIND: DYNBIND needs to ensure
 ;;; TLS-INDEX, whereas BIND should assume it is already in place. Make
 ;;; LET &co compile into BIND, and PROGV into DYNBIND, plus ensure
@@ -286,29 +287,28 @@
          (symbol :scs (descriptor-reg)))
   (:temporary (:sc unsigned-reg) tls-index bsp)
   (:generator 10
-    (let ((tls-index-valid (gen-label)))
-      (load-binding-stack-pointer bsp)
-      (loadw tls-index symbol symbol-tls-index-slot other-pointer-lowtag)
-      (inst add bsp (* binding-size n-word-bytes))
-      (store-binding-stack-pointer bsp)
-      (inst test tls-index tls-index)
-      (inst jmp :ne tls-index-valid)
-      (inst mov tls-index symbol)
-      (inst call (make-fixup
-                  (ecase (tn-offset tls-index)
-                    (#.eax-offset 'alloc-tls-index-in-eax)
-                    (#.ebx-offset 'alloc-tls-index-in-ebx)
-                    (#.ecx-offset 'alloc-tls-index-in-ecx)
-                    (#.edx-offset 'alloc-tls-index-in-edx)
-                    (#.edi-offset 'alloc-tls-index-in-edi)
-                    (#.esi-offset 'alloc-tls-index-in-esi))
-                  :assembly-routine))
-      (emit-label tls-index-valid)
-      (with-tls-ea (EA :base tls-index :base-already-live-p t)
-        (inst push EA :maybe-fs)
-        (popw bsp (- binding-value-slot binding-size))
-        (storew symbol bsp (- binding-symbol-slot binding-size))
-        (inst mov EA val :maybe-fs)))))
+     (load-binding-stack-pointer bsp)
+     (loadw tls-index symbol symbol-tls-index-slot other-pointer-lowtag)
+     (inst add bsp (* binding-size n-word-bytes))
+     (store-binding-stack-pointer bsp)
+     (inst test tls-index tls-index)
+     (inst jmp :ne tls-index-valid)
+     (inst mov tls-index symbol)
+     (inst call (make-fixup
+                 (ecase (tn-offset tls-index)
+                   (#.eax-offset 'alloc-tls-index-in-eax)
+                   (#.ebx-offset 'alloc-tls-index-in-ebx)
+                   (#.ecx-offset 'alloc-tls-index-in-ecx)
+                   (#.edx-offset 'alloc-tls-index-in-edx)
+                   (#.edi-offset 'alloc-tls-index-in-edi)
+                   (#.esi-offset 'alloc-tls-index-in-esi))
+                 :assembly-routine))
+     TLS-INDEX-VALID
+     (with-tls-ea (EA :base tls-index :base-already-live-p t)
+       (inst push EA :maybe-fs)
+       (popw bsp (- binding-value-slot binding-size))
+       (storew tls-index bsp (- binding-symbol-slot binding-size))
+       (inst mov EA val :maybe-fs))))
 
 #!-sb-thread
 (define-vop (bind)
@@ -330,16 +330,15 @@
   (:generator 0
     (load-binding-stack-pointer bsp)
     ;; Load SYMBOL from stack, and get the TLS-INDEX.
-    (loadw temp bsp (- binding-symbol-slot binding-size))
-    (loadw tls-index temp symbol-tls-index-slot other-pointer-lowtag)
+    (loadw tls-index bsp (- binding-symbol-slot binding-size))
     ;; Load VALUE from stack, then restore it to the TLS area.
     (loadw temp bsp (- binding-value-slot binding-size))
     (with-tls-ea (EA :base tls-index :base-already-live-p t)
       (inst mov EA temp :maybe-fs))
     ;; Zero out the stack.
-    (storew 0 bsp (- binding-symbol-slot binding-size))
-    (storew 0 bsp (- binding-value-slot binding-size))
     (inst sub bsp (* binding-size n-word-bytes))
+    (storew 0 bsp binding-symbol-slot)
+    (storew 0 bsp binding-value-slot)
     (store-binding-stack-pointer bsp)))
 
 #!-sb-thread
@@ -358,31 +357,28 @@
 
 (define-vop (unbind-to-here)
   (:args (where :scs (descriptor-reg any-reg)))
-  (:temporary (:sc unsigned-reg) symbol value bsp #!+sb-thread tls-index)
+  (:temporary (:sc unsigned-reg) symbol value bsp)
   (:generator 0
     (load-binding-stack-pointer bsp)
     (inst cmp where bsp)
     (inst jmp :e done)
 
     LOOP
-    (loadw symbol bsp (- binding-symbol-slot binding-size))
+    (inst sub bsp (* binding-size n-word-bytes))
+    (loadw symbol bsp binding-symbol-slot)
     (inst test symbol symbol)
     (inst jmp :z skip)
     ;; Bind stack debug sentinels have the unbound marker in the symbol slot
     (inst cmp symbol unbound-marker-widetag)
     (inst jmp :eq skip)
-    (loadw value bsp (- binding-value-slot binding-size))
+    (loadw value bsp binding-value-slot)
     #!-sb-thread (storew value symbol symbol-value-slot other-pointer-lowtag)
-
-    #!+sb-thread (loadw
-                  tls-index symbol symbol-tls-index-slot other-pointer-lowtag)
-    #!+sb-thread (with-tls-ea (EA :base tls-index :base-already-live-p t)
+    #!+sb-thread (with-tls-ea (EA :base symbol :base-already-live-p t)
                    (inst mov EA value :maybe-fs))
-    (storew 0 bsp (- binding-symbol-slot binding-size))
+    (storew 0 bsp binding-symbol-slot)
 
     SKIP
-    (storew 0 bsp (- binding-value-slot binding-size))
-    (inst sub bsp (* binding-size n-word-bytes))
+    (storew 0 bsp binding-value-slot)
     (inst cmp where bsp)
     (inst jmp :ne loop)
     (store-binding-stack-pointer bsp)
