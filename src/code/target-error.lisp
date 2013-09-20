@@ -44,10 +44,11 @@
 
 (defstruct (restart (:copier nil) (:predicate nil))
   (name (missing-arg) :type symbol :read-only t)
-  (function (missing-arg) :type function)
-  (report-function nil :type (or null function))
-  (interactive-function nil :type (or null function))
-  (test-function (lambda (cond) (declare (ignore cond)) t) :type function))
+  (function (missing-arg) :type function :read-only t)
+  (report-function nil :type (or null function) :read-only t)
+  (interactive-function nil :type (or null function) :read-only t)
+  (test-function (lambda (cond) (declare (ignore cond)) t) :type function :read-only t))
+
 (def!method print-object ((restart restart) stream)
   (if *print-escape*
       (print-unreadable-object (restart stream :type t :identity t)
