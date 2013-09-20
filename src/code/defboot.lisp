@@ -405,8 +405,10 @@ evaluated as a PROGN."
 
 ;;; KLUDGE: we PROCLAIM these special here so that we can use restart
 ;;; macros in the compiler before the DEFVARs are compiled.
-(sb!xc:proclaim
- '(special *handler-clusters* *restart-clusters* *condition-restarts*))
+;;;
+;;; For an explanation of these data structures, see DEFVARs in
+;;; target-error.lisp.
+(sb!xc:proclaim '(special *handler-clusters* *restart-clusters* *condition-restarts*))
 
 (defmacro-mundanely with-condition-restarts
     (condition-form restarts-form &body body)

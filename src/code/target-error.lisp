@@ -11,13 +11,6 @@
 ;;;; files for more information.
 
 (in-package "SB!KERNEL")
-
-;;; a list of lists of restarts
-(defvar *restart-clusters* '())
-
-;;; an ALIST (condition . restarts) which records the restarts currently
-;;; associated with Condition
-(defvar *condition-restarts* ())
 
 (defun muffle-warning-p (warning)
   (declare (special *muffled-warnings*))
@@ -28,7 +21,26 @@
                      (when (muffle-warning-p warning)
                        (muffle-warning warning)))))))
 
+;;; an alist with elements of the form
+;;;
+;;;  (CONDITION . (HANDLER1 HANDLER2 ...))
+;;;
+;;; Recently established handlers are added at the beginning of the
+;;; list. Elements to the left of the alist take precedence over
+;;; elements to the right.
 (defvar *handler-clusters* (initial-handler-clusters))
+
+;;; a list of lists of currently active RESTART instances. maintained
+;;; by RESTART-BIND.
+(defvar *restart-clusters* '())
+
+;;; an ALIST with elements of the form
+;;;
+;;;   (CONDITION . (RESTART1 RESTART2 ...))
+;;;
+;;; which records the restarts currently associated with
+;;; conditions. maintained by WITH-CONDITION-RESTARTS.
+(defvar *condition-restarts* ())
 
 (defstruct (restart (:copier nil) (:predicate nil))
   (name (missing-arg) :type symbol :read-only t)
@@ -41,6 +53,17 @@
       (print-unreadable-object (restart stream :type t :identity t)
         (prin1 (restart-name restart) stream))
       (restart-report restart stream)))
+
+#!+sb-doc
+(setf (fdocumentation 'restart-name 'function)
+      "Return the name of the given restart object.")
+
+(defun restart-report (restart stream)
+  (funcall (or (restart-report-function restart)
+               (lambda (stream)
+                 (format stream "~S" (or (restart-name restart)
+                                         restart))))
+           stream))
 
 (defvar *restart-test-stack* nil)
 
@@ -73,18 +96,6 @@ restarts associated with CONDITION (or with no condition) will be returned."
                          (funcall (restart-test-function restart) condition)))
              (res restart)))))
       (res))))
-
-#!+sb-doc
-(setf (fdocumentation 'restart-name 'function)
-      "Return the name of the given restart object.")
-
-(defun restart-report (restart stream)
-  (funcall (or (restart-report-function restart)
-               (let ((name (restart-name restart)))
-                 (lambda (stream)
-                   (if name (format stream "~S" name)
-                       (format stream "~S" restart)))))
-           stream))
 
 (defun find-restart (identifier &optional condition)
   #!+sb-doc
