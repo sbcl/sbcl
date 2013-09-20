@@ -51,27 +51,42 @@
                '(and condition counted-condition)))
 
 (define-condition picky-condition () ())
-(restart-case
-    (handler-case
-        (error 'picky-condition)
-      (picky-condition (c)
-        (assert (eq (car (compute-restarts)) (car (compute-restarts c))))))
-  (picky-restart ()
-    :report "Do nothing."
-    :test (lambda (c)
-            (typep c '(or null picky-condition)))
-    'ok))
+
+(with-test (:name (:picky-condition compute-restarts))
+  (restart-case
+      (handler-case
+          (error 'picky-condition)
+        (picky-condition (c)
+          ;; The PICKY-RESTART should be applicable for the
+          ;; PICKY-CONDITION and all other cases.
+          (assert (eq (restart-name (first (compute-restarts))) 'picky-restart))
+          (assert (eq (restart-name (first (compute-restarts c))) 'picky-restart))
+          (assert (eq (car (compute-restarts)) (car (compute-restarts c))))
+          ;; ANOTHER-PICKY-RESTART should not be applicable for the
+          ;; PICKY-CONDITION, but all other cases.
+          (assert (not (find 'another-picky-restart (compute-restarts c)
+                             :key #'restart-name)))
+          (assert (find 'another-picky-restart (compute-restarts)
+                        :key #'restart-name))
+          :ok))
+    (picky-restart ()
+      :report "Do nothing."
+      :test (lambda (c) (typep c '(or null picky-condition))))
+    (another-picky-restart ()
+      :report "Do nothing as well"
+      :test (lambda (c) (typep c '(not picky-condition))))))
 
 ;;; adapted from Helmut Eller on cmucl-imp
-(assert (eq 'it
-            (restart-case
-                (handler-case
-                    (error 'picky-condition)
-                  (picky-condition (c)
-                    (invoke-restart (find-restart 'give-it c))))
-              (give-it ()
-                :test (lambda (c) (typep c 'picky-condition))
-                'it))))
+(with-test (:name (:picky-condition invoke-restart))
+  (assert (eq 'it
+              (restart-case
+                  (handler-case
+                      (error 'picky-condition)
+                    (picky-condition (c)
+                      (invoke-restart (find-restart 'give-it c))))
+                (give-it ()
+                  :test (lambda (c) (typep c 'picky-condition))
+                  'it)))))
 
 ;;; In sbcl-1.0.9, a condition derived from CL:STREAM-ERROR (or
 ;;; CL:READER-ERROR or or CL:PARSE-ERROR) didn't inherit a usable
@@ -292,3 +307,21 @@
     (test () (not t) "The assertion (NOT T) failed.")
     (test ((a -1)) (plusp (signum a))
           "The assertion (PLUSP (SIGNUM A)) failed with (SIGNUM A) = -1.")))
+
+(with-test (:name (find-restart :recheck-conditions-and-tests :bug-774410))
+  (let ((activep t))
+    (restart-bind ((switchable-restart
+                     (constantly 'irrelevant)
+                     :test-function (lambda (condition)
+                                      (declare (ignore condition))
+                                      activep)))
+      (let ((actual-restart (find-restart 'switchable-restart)))
+        ;; Inactive because of condition-restarts associations.
+        (let ((required-condition (make-condition 'condition))
+              (wrong-condition (make-condition 'condition)))
+          (with-condition-restarts required-condition (list actual-restart)
+            (assert (null (find-restart actual-restart wrong-condition)))))
+
+        ;; Inactive because of test-function.
+        (setf activep nil)
+        (assert (null (find-restart actual-restart)))))))

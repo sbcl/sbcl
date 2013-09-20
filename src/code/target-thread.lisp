@@ -1369,7 +1369,6 @@ have the foreground next."
   (let* ((*current-thread* thread)
          (*restart-clusters* nil)
          (*handler-clusters* (sb!kernel::initial-handler-clusters))
-         (*condition-restarts* nil)
          (*exit-in-process* nil)
          (sb!impl::*deadline* nil)
          (sb!impl::*deadline-seconds* nil)

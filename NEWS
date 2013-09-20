@@ -9,6 +9,10 @@ changes relative to sbcl-1.1.12:
   * enhancement: sb-ext:run-program now supports :environment on Windows.
   * enhancement: ASDF is no longer required to load contribs at runtime.
     (lp#1132254)
+  * enhancement: when called with a symbol, FIND-RESTART no longer calls
+    COMPUTE-RESTARTS, making it faster and cons less (lp#769615)
+  * enhancement: FIND-RESTART and COMPUTE-RESTARTS handle huge restart
+    clusters better in some cases
   * bug fix: forward references to classes in fasls can now be loaded.
     (lp#746132)
   * bug fix: don't warn on a interpreted->compiled function redefinition
@@ -28,6 +32,9 @@ changes relative to sbcl-1.1.12:
     protocol.  (lp#309072)
   * bug fix: run-sbcl.sh works better in the presence of symlinks on OS X.
     (thanks to Stelian Ionescu, lp#1242643)
+  * bug fix: when given a restart object, FIND-RESTART checks whether the
+    restart is active and, when a condition is supplied, whether the restart
+    is associated to a different condition (lp#774410)
 
 changes in sbcl-1.1.12 relative to sbcl-1.1.11:
   * enhancement: Add sb-bsd-sockets:socket-shutdown, for calling

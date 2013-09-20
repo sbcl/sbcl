@@ -408,7 +408,7 @@ evaluated as a PROGN."
 ;;;
 ;;; For an explanation of these data structures, see DEFVARs in
 ;;; target-error.lisp.
-(sb!xc:proclaim '(special *handler-clusters* *restart-clusters* *condition-restarts*))
+(sb!xc:proclaim '(special *handler-clusters* *restart-clusters*))
 
 (defmacro-mundanely with-condition-restarts
     (condition-form restarts-form &body body)
@@ -417,14 +417,17 @@ evaluated as a PROGN."
    RESTARTS-FORM are associated with the condition returned by CONDITION-FORM.
    This allows FIND-RESTART, etc., to recognize restarts that are not related
    to the error currently being debugged. See also RESTART-CASE."
-  (let ((n-cond (gensym)))
-    `(let ((*condition-restarts*
-            (cons (let ((,n-cond ,condition-form))
-                    (cons ,n-cond
-                          (append ,restarts-form
-                                  (cdr (assoc ,n-cond *condition-restarts*)))))
-                  *condition-restarts*)))
-       ,@body)))
+  (once-only ((restarts restarts-form))
+    (with-unique-names (restart)
+      ;; FIXME: check the need for interrupt-safety.
+      `(unwind-protect
+           (progn
+             (dolist (,restart ,restarts)
+               (push ,condition-form
+                     (restart-associated-conditions ,restart)))
+             ,@body)
+         (dolist (,restart ,restarts)
+           (pop (restart-associated-conditions ,restart)))))))
 
 (defmacro-mundanely restart-bind (bindings &body forms)
   #!+sb-doc
