@@ -36,7 +36,11 @@ changes relative to sbcl-1.1.11:
   * bug fix: getting the order of arguments to
     SB-MOP:SET-FUNCALLABLE-INSTANCE-FUNCTION wrong produces a sensible error
     rather than a failed AVER.  (reported by Paul Nathan)
-  
+  * bug fix: Parsing of &optional/&key/&rest arguments now never overwrites
+    arguments during copying on x86 and x86-64; it may still happen on other
+    platforms when there are more fixed arguments than stack slots.
+    (reported by Jan Moringen)
+
 changes in sbcl-1.1.11 relative to sbcl-1.1.10:
   * enhancement: support building the manual under texinfo version 5.
     (lp#1189146)

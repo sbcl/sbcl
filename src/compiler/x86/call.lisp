@@ -1198,12 +1198,19 @@
 
     ;; Allocate the space on the stack.
     ;; stack = ebp + sp->fp-offset - (max 3 frame-size) - (nargs - fixed)
+    ;;
+    ;; Problem: this might leave some &more args outside esp, so
+    ;; clamp the movement for now.  If fixed > frame-size, reset
+    ;; esp to the end of the current &more args (which *should*
+    ;; be a noop?)
     (inst lea ebx-tn
           (make-ea :dword :base ebp-tn
-                   :disp (* n-word-bytes
-                            (- (+ sp->fp-offset fixed)
-                               (max 3 (sb-allocated-size 'stack))))))
-    (inst sub ebx-tn ecx-tn)  ; Got the new stack in ebx
+                          :disp (* n-word-bytes
+                                   (- sp->fp-offset
+                                      (max 0
+                                           (- (max 3 (sb-allocated-size 'stack))
+                                              fixed))))))
+    (inst sub ebx-tn ecx-tn)          ; Got the new stack in ebx
     (inst mov esp-tn ebx-tn)
 
     ;; Now: nargs>=1 && nargs>fixed
@@ -1222,41 +1229,65 @@
            ;; Number to copy = nargs-fixed
            (inst sub ecx-tn (fixnumize fixed))))
 
-    ;; Save edi and esi register args.
-    (inst push edi-tn)
-    (inst push esi-tn)
-    (inst push ebx-tn)
-    ;; Okay, we have pushed the register args. We can trash them
-    ;; now.
+    (let ((delta (* n-word-bytes
+                    (- (max 3 (sb-allocated-size 'stack))
+                       fixed)))
+          (LOOP (gen-label)))
+      (cond ((zerop delta)
+             ;; nothing to move!
+             )
+            ((minusp delta)
+             ;; stack frame smaller than fixed; moving args to higher
+             ;; addresses (stack grows downard), so copy from the
+             ;; end.  Moreover, because we'd have to shrink the frame,
+             ;; esp currently points at the end of the source args.
+             (inst push ebx-tn)
 
-    ;; Initialize src to be end of args.
-    (inst lea esi-tn (make-ea :dword :base ebp-tn
-                              :disp (* sp->fp-offset n-word-bytes)))
-    (inst sub esi-tn ebx-tn)
+             (emit-label LOOP)
+             (inst sub ecx-tn n-word-bytes)
+             (inst mov ebx-tn (make-ea :dword
+                                       :base esp-tn :index ecx-tn
+                                       ;; compensate for PUSH above
+                                       :disp n-word-bytes))
+             (inst mov (make-ea :dword
+                                :base esp-tn :index ecx-tn
+                                ;; compensate for PUSH, and
+                                ;; add (abs delta)
+                                :disp (- n-word-bytes delta))
+                   ebx-tn)
+             (inst jmp :nz LOOP)
 
-    ;; We need to copy from downwards up to avoid overwriting some of
-    ;; the yet uncopied args. So we need to use EBX as the copy index
-    ;; and ECX as the loop counter, rather than using ECX for both.
-    (inst xor ebx-tn ebx-tn)
+             (inst pop ebx-tn))
+            ((plusp delta)
+             ;; stack frame larger than fixed. Moving args to lower
+             ;; addresses, so copy from the lowest address.  esp
+             ;; already points to the lowest address of the destination.
+             (inst push ebx-tn)
+             (inst push esi-tn)
 
-    ;; We used to use REP MOVS here, but on modern x86 it performs
-    ;; much worse than an explicit loop for small blocks.
-    COPY-LOOP
-    (inst mov edi-tn (make-ea :dword :base esi-tn :index ebx-tn))
-    ;; The :DISP is to account for the registers saved on the stack
-    (inst mov (make-ea :dword :base esp-tn :disp (* 3 n-word-bytes)
-                       :index ebx-tn)
-          edi-tn)
-    (inst add ebx-tn n-word-bytes)
-    (inst sub ecx-tn n-word-bytes)
-    (inst jmp :nz COPY-LOOP)
+             (inst xor ebx-tn ebx-tn)
+             (emit-label LOOP)
+             (inst mov esi-tn (make-ea :dword
+                                       :base esp-tn :index ebx-tn
+                                       ;; PUSHed 2 words
+                                       :disp (+ (* 2 n-word-bytes)
+                                                delta)))
+             (inst mov (make-ea :dword
+                                :base esp-tn :index ebx-tn
+                                :disp (* 2 n-word-bytes))
+                   esi-tn)
+             (inst add ebx-tn n-word-bytes)
+             (inst sub ecx-tn n-word-bytes)
+             (inst jmp :nz LOOP)
 
-    ;; So now we need to restore EDI and ESI.
-    (inst pop ebx-tn)
-    (inst pop esi-tn)
-    (inst pop edi-tn)
-
+             (inst pop esi-tn)
+             (inst pop ebx-tn))))
     DO-REGS
+    ;; stack can now be set to its final size
+    (when (< (max 3 (sb-allocated-size 'stack)) fixed)
+      (inst add esp-tn (* n-word-bytes
+                          (- fixed
+                             (max 3 (sb-allocated-size 'stack))))))
 
     ;; Restore ECX
     (inst mov ecx-tn ebx-tn)

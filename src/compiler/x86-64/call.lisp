@@ -1132,12 +1132,15 @@
 
     ;; Allocate the space on the stack.
     ;; stack = rbp + sp->fp-offset - (max 3 frame-size) - (nargs - fixed)
-    (inst lea rsp-tn
+    ;; if we'd move SP backward, swap the meaning of rsp and source
+    (inst lea (if (<= fixed (max 3 (sb-allocated-size 'stack)))
+                  rsp-tn
+                  source)
           (make-ea :qword :base rbp-tn
-                   :index temp :scale (ash 1 (- word-shift n-fixnum-tag-bits))
-                   :disp (* n-word-bytes
-                            (- (+ sp->fp-offset fixed)
-                               (max 3 (sb-allocated-size 'stack))))))
+                          :index temp :scale (ash 1 (- word-shift n-fixnum-tag-bits))
+                          :disp (* n-word-bytes
+                                   (- (+ sp->fp-offset fixed)
+                                      (max 3 (sb-allocated-size 'stack))))))
 
     ;; Now: nargs>=1 && nargs>fixed
 
@@ -1145,6 +1148,12 @@
     (inst mov rbx-tn rcx-tn)
 
     (cond ((< fixed register-arg-count)
+           ;; the code above only moves the final value of rsp in
+           ;; rsp directly if that condition is satisfied.  Currently,
+           ;; r-a-c is 3, so the aver is OK. If the calling convention
+           ;; ever changes, the logic above with LEA will have to be
+           ;; adjusted.
+           (aver (<= fixed (max 3 (sb-allocated-size 'stack))))
            ;; We must stop when we run out of stack args, not when we
            ;; run out of more args.
            ;; Number to copy = nargs-3
@@ -1156,24 +1165,45 @@
            (inst sub rbx-tn (fixnumize fixed))))
 
     ;; Initialize R8 to be the end of args.
-    (inst lea source (make-ea :qword :base rbp-tn
-                              :index temp :scale (ash 1 (- word-shift n-fixnum-tag-bits))
-                              :disp (* sp->fp-offset n-word-bytes)))
+    ;; Swap with SP if necessary to mirror the previous condition
+    (inst lea (if (<= fixed (max 3 (sb-allocated-size 'stack)))
+                  source
+                  rsp-tn)
+          (make-ea :qword :base rbp-tn
+                          :index temp :scale (ash 1 (- word-shift n-fixnum-tag-bits))
+                          :disp (* sp->fp-offset n-word-bytes)))
 
-    ;; We need to copy from downwards up to avoid overwriting some of
-    ;; the yet uncopied args. So we need to use R9 as the copy index
-    ;; and RBX as the loop counter, rather than using RBX for both.
-    (zeroize copy-index)
+    ;; src: rbp + temp + sp->fp
+    ;; dst: rbp + temp + sp->fp + (fixed - (max 3 [stack-size]))
+    (let ((delta (- fixed (max 3 (sb-allocated-size 'stack))))
+          (loop (gen-label))
+          (fixnum->word (ash 1 (- word-shift n-fixnum-tag-bits))))
+      (cond ((zerop delta)) ; no-op move
+            ((minusp delta)
+             ;; dst is lower than src, copy forward
+             (zeroize copy-index)
+             ;; We used to use REP MOVS here, but on modern x86 it performs
+             ;; much worse than an explicit loop for small blocks.
 
-    ;; We used to use REP MOVS here, but on modern x86 it performs
-    ;; much worse than an explicit loop for small blocks.
-    COPY-LOOP
-    (inst mov temp (make-ea :qword :base source :index copy-index))
-    (inst mov (make-ea :qword :base rsp-tn :index copy-index) temp)
-    (inst add copy-index n-word-bytes)
-    (inst sub rbx-tn (fixnumize 1))
-    (inst jmp :nz COPY-LOOP)
-
+             (emit-label loop)
+             (inst mov temp (make-ea :qword :base source :index copy-index))
+             (inst mov (make-ea :qword :base rsp-tn :index copy-index) temp)
+             (inst add copy-index n-word-bytes)
+             (inst sub rbx-tn (fixnumize 1))
+             (inst jmp :nz loop))
+            ((plusp delta)
+             ;; dst is higher than src; copy backward
+             (emit-label loop)
+             (inst sub rbx-tn (fixnumize 1))
+             (inst mov temp (make-ea :qword :base rsp-tn
+                                     :index rbx-tn :scale fixnum->word))
+             (inst mov (make-ea :qword :base source
+                                :index rbx-tn :scale fixnum->word)
+                   temp)
+             (inst jmp :nz loop)
+             ;; done with the stack--stack copy. Reset RSP to its final
+             ;; value
+             (inst mov rsp-tn source))))
     DO-REGS
 
     ;; Here: nargs>=1 && nargs>fixed

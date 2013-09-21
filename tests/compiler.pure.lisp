@@ -4835,3 +4835,27 @@
                        (c ()))
                      x)))))
 
+(with-test (:name :copy-more-arg
+            :fails-on '(not (or :x86 :x86-64)))
+  ;; copy-more-arg might not copy in the right direction
+  ;; when there are more fixed args than stack frame slots,
+  ;; and thus end up splatting a single argument everywhere.
+  ;; Fixed on x86oids only, but other platforms still start
+  ;; their stack frames at 8 slots, so this is less likely
+  ;; to happen.
+  (labels ((iota (n)
+             (loop for i below n collect i))
+           (test-function (function skip)
+             ;; function should just be (subseq x skip)
+             (loop for i from skip below (+ skip 16) do
+               (let* ((values (iota i))
+                      (f (apply function values))
+                      (subseq (subseq values skip)))
+                 (assert (equal f subseq)))))
+           (make-function (n)
+             (let ((gensyms (loop for i below n collect (gensym))))
+               (compile nil `(lambda (,@gensyms &rest rest)
+                               (declare (ignore ,@gensyms))
+                               rest)))))
+    (dotimes (i 16)
+      (test-function (make-function i) i))))
