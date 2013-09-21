@@ -329,11 +329,10 @@
                       :assembly-routine))
     (inst call tmp)
     TLS-INDEX-VALID
-    (inst mov tmp (make-ea :qword :base thread-base-tn :scale 1 :index tls-index))
-    (storew tls-index bsp (- binding-symbol-slot binding-size))
+    (inst mov tmp (make-ea :qword :base thread-base-tn :index tls-index))
     (storew tmp bsp (- binding-value-slot binding-size))
-    (inst mov (make-ea :qword :base thread-base-tn :scale 1 :index tls-index)
-          val)))
+    (storew tls-index bsp (- binding-symbol-slot binding-size))
+    (inst mov (make-ea :qword :base thread-base-tn :index tls-index) val)))
 
 #!-sb-thread
 (define-vop (bind)
@@ -359,7 +358,7 @@
     (loadw tls-index bsp binding-symbol-slot)
     ;; Load VALUE from stack, then restore it to the TLS area.
     (loadw temp bsp binding-value-slot)
-    (inst mov (make-ea :qword :base thread-base-tn :scale 1 :index tls-index)
+    (inst mov (make-ea :qword :base thread-base-tn :index tls-index)
           temp)
     ;; Zero out the stack.
     (zeroize temp)
@@ -402,7 +401,7 @@
     #!-sb-thread
     (storew value symbol symbol-value-slot other-pointer-lowtag)
     #!+sb-thread
-    (inst mov (make-ea :qword :base thread-base-tn :scale 1 :index symbol)
+    (inst mov (make-ea :qword :base thread-base-tn :index symbol)
           value)
     (storew zero bsp binding-symbol-slot)
 
