@@ -1132,7 +1132,10 @@
 
     ;; Allocate the space on the stack.
     ;; stack = rbp + sp->fp-offset - (max 3 frame-size) - (nargs - fixed)
-    ;; if we'd move SP backward, swap the meaning of rsp and source
+    ;; if we'd move SP backward, swap the meaning of rsp and source;
+    ;; otherwise, we'd be accessing values below SP, and that's no good
+    ;; if a signal interrupts this code sequence.  In that case, store
+    ;; the final value in rsp after the stack-stack memmove loop.
     (inst lea (if (<= fixed (max 3 (sb-allocated-size 'stack)))
                   rsp-tn
                   source)

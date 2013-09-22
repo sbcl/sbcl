@@ -1202,7 +1202,10 @@
     ;; Problem: this might leave some &more args outside esp, so
     ;; clamp the movement for now.  If fixed > frame-size, reset
     ;; esp to the end of the current &more args (which *should*
-    ;; be a noop?)
+    ;; be a noop?), and only set esp to its final value after the
+    ;; stack-stack memmove loop.  Otherwise, an unlucky signal
+    ;; could end up overwriting the &more arguments before they're
+    ;; moved in their final place.
     (inst lea ebx-tn
           (make-ea :dword :base ebp-tn
                           :disp (* n-word-bytes
