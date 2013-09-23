@@ -373,3 +373,7 @@
 
 ;;; FIND on lists should not call key outside the specified subsquence.
 (assert (not (find :a '(0 (:c) 1) :start 1 :end 2 :key #'car)))
+
+(with-test (:name :adjoin-folding)
+  (flet ((%f () (adjoin 'x '(a b))))
+    (assert (not (eq (%f) (%f))))))

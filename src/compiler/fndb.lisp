@@ -794,7 +794,7 @@
 
 (defknown adjoin (t list &key (:key callable) (:test callable)
                     (:test-not callable))
-  cons (foldable flushable call))
+  cons (flushable call))
 
 (defknown (union intersection set-difference set-exclusive-or)
   (list list &key (:key callable) (:test callable) (:test-not callable))
@@ -1545,13 +1545,23 @@
   function
   (flushable foldable))
 
-(defknown (%adjoin %adjoin-eq %member %member-eq
+(defknown (%adjoin %adjoin-eq)
+    (t list)
+    list
+    (explicit-check flushable))
+
+(defknown (%member %member-eq
            %assoc %assoc-eq %rassoc %rassoc-eq)
     (t list)
     list
     (explicit-check foldable flushable))
 
-(defknown (%adjoin-key %adjoin-key-eq %member-key %member-key-eq
+(defknown (%adjoin-key %adjoin-key-eq)
+    (t list function)
+    list
+    (explicit-check flushable call))
+
+(defknown (%member-key %member-key-eq
            %assoc-key %assoc-key-eq %rassoc-key %rassoc-key-eq)
   (t list function)
   list
@@ -1569,16 +1579,24 @@
   list
   (explicit-check foldable flushable call))
 
-(defknown (%adjoin-test %adjoin-test-not
-           %member-test %member-test-not
+(defknown (%adjoin-test %adjoin-test-not)
+    (t list function)
+    list
+    (explicit-check flushable call))
+
+(defknown (%member-test %member-test-not
            %assoc-test %assoc-test-not
            %rassoc-test %rassoc-test-not)
     (t list function)
     list
     (explicit-check foldable flushable call))
 
-(defknown (%adjoin-key-test %adjoin-key-test-not
-           %member-key-test %member-key-test-not
+(defknown (%adjoin-key-test %adjoin-key-test-not)
+    (t list function function)
+    list
+    (explicit-check flushable call))
+
+(defknown (%member-key-test %member-key-test-not
            %assoc-key-test %assoc-key-test-not
            %rassoc-key-test %rassoc-key-test-not)
     (t list function function)
