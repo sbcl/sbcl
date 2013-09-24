@@ -2325,7 +2325,8 @@
                               (native-namestring truename :as-file t))
                              ((or (not input)
                                   (and input (eq if-does-not-exist :create))
-                                  (and (eq direction :io) (not if-does-not-exist-given)))
+                                  (and (eq direction :io)
+                                       (not if-does-not-exist-given)))
                               (native-namestring physical :as-file t)))))
       (flet ((open-error (format-control &rest format-arguments)
                (error 'simple-file-error
@@ -2371,7 +2372,7 @@
                        :if-does-not-exist)
         (cond ((eq if-does-not-exist :create)
                (setf mask (logior mask sb!unix:o_creat)))
-              ((not (member if-exists '(:new-version :error nil))))
+              ((not (member if-exists '(:error nil))))
               ;; Both if-does-not-exist and if-exists now imply
               ;; that there will be no opening of files, and either
               ;; an error would be signalled, or NIL returned
@@ -2381,7 +2382,7 @@
                (open-error "OPEN :IF-DOES-NOT-EXIST ~s ~
                                  :IF-EXISTS ~s will always signal an error."
                            if-does-not-exist if-exists))
-              ((sb!unix:unix-stat namestring)
+              (truename
                (if if-exists
                    (open-error "File exists ~s." pathname)
                    (return-from open)))

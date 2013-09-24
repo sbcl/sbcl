@@ -201,11 +201,12 @@
 ;;;                                                    (:error :error))
 ;;;             collect (list 'do-open exist if-exists if-does-not-exist)))
 (with-test (:name :open-never-openning)
-  (flet ((do-open (existing if-exists if-does-not-exist)
+  (flet ((do-open (existing if-exists if-does-not-exist
+                   &optional (direction :output))
            (open (if existing
                      #.(or *compile-file-truename* *load-truename*)
                      "a-really-non-existing-file")
-                 :direction :output
+                 :direction direction
                  :if-exists if-exists :if-does-not-exist if-does-not-exist)))
     (assert (raises-error?
              (do-open nil nil :error)))
@@ -221,4 +222,20 @@
              (do-open nil :error :error)))
     (assert (not
              (do-open t nil nil)))
-    (assert (raises-error? (do-open t :error :error)))))
+    (assert (raises-error? (do-open t :error :error)))
+
+    (assert (raises-error?
+             (do-open nil nil :error :io)))
+    (assert (not
+             (do-open nil :error nil :io)))
+    (assert (not
+             (do-open t nil :error :io)))
+    (assert (raises-error?
+             (do-open t :error nil :io)))
+    (assert (not
+             (do-open nil nil nil :io)))
+    (assert (raises-error?
+             (do-open nil :error :error :io)))
+    (assert (not
+             (do-open t nil nil :io)))
+    (assert (raises-error? (do-open t :error :error :io)))))
