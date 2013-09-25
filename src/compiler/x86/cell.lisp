@@ -285,7 +285,8 @@
 (define-vop (bind)
   (:args (val :scs (any-reg descriptor-reg))
          (symbol :scs (descriptor-reg)))
-  (:temporary (:sc unsigned-reg) tls-index bsp)
+  (:temporary (:sc unsigned-reg) tls-index bsp
+                                 #!+win32 temp)
   (:generator 10
      (load-binding-stack-pointer bsp)
      (loadw tls-index symbol symbol-tls-index-slot other-pointer-lowtag)
@@ -304,10 +305,15 @@
                    (#.esi-offset 'alloc-tls-index-in-esi))
                  :assembly-routine))
      TLS-INDEX-VALID
+     ;; with-tls-ea on win32 causes tls-index to be an absolute address
+     ;; which is problematic when UNBIND uses with-tls-ea too.
+     #!+win32(move temp tls-index)
      (with-tls-ea (EA :base tls-index :base-already-live-p t)
        (inst push EA :maybe-fs)
        (popw bsp (- binding-value-slot binding-size))
-       (storew tls-index bsp (- binding-symbol-slot binding-size))
+       (storew #!-win32 tls-index
+               #!+win32 temp
+               bsp (- binding-symbol-slot binding-size))
        (inst mov EA val :maybe-fs))))
 
 #!-sb-thread
