@@ -56,7 +56,12 @@
  (:integer msg-peek "MSG_PEEK")
  (:integer msg-dontroute "MSG_DONTROUTE")
 
+ ;; socket shutdown flags
+ (:integer SHUT_RD "SD_RECEIVE")
+ (:integer SHUT_WR "SD_SEND")
+ (:integer SHUT_RDWR "SD_BOTH")
 
+ ;; errors
  (:integer EADDRINUSE "WSAEADDRINUSE")
  (:integer EAGAIN "WSAEWOULDBLOCK")
  (:integer EBADF "WSAEBADF")
@@ -111,6 +116,13 @@
  (:function getprotobynumber ("getprotobynumber" (* protoent)
                                                  (proto int)))
 
+ ;; FIXME: We should probably grovel the windows SOCKET type and use it in
+ ;; these instead of int...
+
+ ;; KLUDGE: For historical reasons many of these prepend win32- to the symbol
+ ;; names. Life for Windows users of SBCL is already hard enough, so rather
+ ;; than break compatibility for those who directly use these, win32-sockets.lisp
+ ;; wraps them with prefixless wrappers.
  (:function win32-bind
             ("bind" int
              (sockfd int)
@@ -143,6 +155,10 @@
 
  (:function win32-close ("closesocket" int
                          (fd int)))
+
+ (:function shutdown ("shutdown" int
+                      (socket int) ; KLUDGE: should be SOCKET, not int.
+                      (how int)))
 
  (:function win32-recvfrom ("recvfrom" ssize-t
                             (socket int)

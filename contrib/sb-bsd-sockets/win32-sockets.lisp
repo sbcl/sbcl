@@ -32,6 +32,9 @@
 ;;; prepend "win32-" to the symbol names.  Rather than break compatibility
 ;;; for users depending on those names, wrap the misnamed functions in
 ;;; correctly named ones...
+;;;
+;;; FIXME: We have a deprecation pipe these days. Remove the win32-prefixes,
+;;; and make deprecation-wrappers with the prefixes.
 (macrolet ((define-socket-fd-arg-routines (&rest names)
              `(progn
                 (declaim (inline ,@names))
