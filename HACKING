@@ -3,6 +3,17 @@ SBCL Hacking Guide
   (This is not a most actively maintained file, but recommended
   reading anyways.)
 
+Table of Contests
+
+* Patch Submissions
+* Coding Style
+  * Reader Conditionals
+  * Comments and Documentation
+  * Syntax-related Conventions
+  * Error and Warning Messages
+  * Format Strings
+* Writing Tests
+
 Patch Submissions
 =================
 
@@ -15,7 +26,8 @@ little is needed, but in most cases more is better.
 
 Please include test-cases in your patch if at all possible: if you're
 not sure which file in tests/ to put your test case in, just pick one
-that seems vaguely appropriate.
+that seems vaguely appropriate. See the "Writing Tests" section for
+more information.
 
 Please format your submission for ease of reading: unless the change
 is whitespace only, avoid re-indenting code you are not touching, etc.
@@ -87,10 +99,10 @@ usage fussiness:
 	(defun primify (x) ..)
     instead of telling the reader that you're going to tell him what
     the function does, e.g.
-	;;; PRIMIFY returns the first prime number greater than or 
+	;;; PRIMIFY returns the first prime number greater than or
 	;;; equal to X.
 	(defun primify (x) ..)
-    or 
+    or
 	;;; When you call this function on X, you get back the first
 	;;; prime number greater than or equal to X.
 	(defun primify (x) ..)
@@ -110,6 +122,50 @@ style because they duplicate information (and they illustrate one
 of the evils of duplicating information by the way that they have
 drifted out of sync with the code).
 
+Writing Tests
+=============
+
+As mentioned in the "Patch Submissions" section, new features as well
+as bug fixes should always be accompanied by smoke, unit or regression
+tests as appropriate.
+
+New tests should be added in the appropriate file in the "tests"
+directory. Files named TOPIC.pure.lisp contain tests which do not have
+side effects such as modifying the environment, defining functions or
+variables or starting new threads while files named TOPIC.impure.lisp
+contain test which do (impure test files are run each in a separate
+SBCL process).
+
+All tests should use the WITH-TEST macro to associate a unique name
+with each test (see below) and prevent a whole test file from going up
+in smoke without an adequate description of the problem. The basic
+syntax is
+
+  (with-test (:name NAME)
+    BODY)
+
+where NAME is either a symbol or a list of symbols. All of these
+symbols have to be in one of the packages KEYWORD, CL or SB-* to make
+test names READable in SBCL images that did not read the test
+files. For tests associated to Launchpad bugs (because a feature
+requested in the LP bug has been implemented or a bug has been fixed),
+the LP bug number should be a part of the test name:
+
+  (with-test (:name (coerce :invalid-target-type :bug-12345))
+    …)
+
+When a test can be associated to a name in the CL package or one of
+the SB-* packages, that name should appear as a separate component in
+the test name, like COERCE in the exaple above. This may be useful in
+order to automatically associate functions and tests.
+
+If possible, tests should not signal warnings during compilation or
+runtime and should not produce output in order to not clutter the
+output of the test runner and make real problems easier to identify.
+
+Misc
+----
+
 There are a number of style practices on display in the code
 which are not good examples to follow:
   * using conditional compilation to support different architectures,
@@ -122,14 +178,14 @@ which are not good examples to follow:
     many places, and arrange for the FOO feature to be set once and
     only once -- probably in make-config.sh. (That way future
     maintainers won't curse you.)
-  * putting the defined symbol, and information about whether it's 
+  * putting the defined symbol, and information about whether it's
     exported or not, into the comments around the definition of the symbol;
   * naming anything DO-FOO if it isn't an iteration macro
-  * not using a consistent abbreviation style in global names (e.g. 
-    naming some things DEFINE-FOO and other things DEF-BAR, with 
+  * not using a consistent abbreviation style in global names (e.g.
+    naming some things DEFINE-FOO and other things DEF-BAR, with
     no rule to determine whether the abbreviation is used).
   * using lots of single-colon package prefixes (distracting and hard
-    to read, and obstacles to reaching package nirvana where 
+    to read, and obstacles to reaching package nirvana where
     package dependencies are a directed acyclic graph) or even
     double-colon package prefixes (hard to understand and hard
     to maintain). (One exception: I've sometimes been tempted to
