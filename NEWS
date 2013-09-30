@@ -1,5 +1,5 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
-changes relative to sbcl-1.1.11:
+changes in sbcl-1.1.12 relative to sbcl-1.1.11:
   * enhancement: Add sb-bsd-sockets:socket-shutdown, for calling
     shutdown(3). (thanks to Jan Moringen, lp#1207483)
   * enhancement: document extensible sequences.  (thanks to Jan Moringen,
