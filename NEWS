@@ -2,6 +2,8 @@
 changes relative to sbcl-1.1.12:
   * optimization: better distribution of SXHASH over small conses of related
     values.  (lp#309443)
+  * other improvements to SXHASH:
+    ** use the whole of the positive-fixnum range for SXHASH of fixnums
 
 changes in sbcl-1.1.12 relative to sbcl-1.1.11:
   * enhancement: Add sb-bsd-sockets:socket-shutdown, for calling

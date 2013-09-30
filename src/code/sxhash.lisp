@@ -38,10 +38,9 @@
 ;;; SXHASH of FIXNUM values is defined as a DEFTRANSFORM because it's so
 ;;; simple.
 (deftransform sxhash ((x) (fixnum))
-  '(logand most-positive-fixnum
-           (logxor (ash (logand x (ash most-positive-fixnum -4)) 4)
-                   (logand (ash x -1) most-positive-fixnum) ; to get sign bit into hash
-                   361475658)))
+  (let ((c (logand 1193941380939624010 sb!xc:most-positive-fixnum)))
+    ;; shift by -1 to get sign bit into hash
+    `(logand (logxor (ash x 4) (ash x -1) ,c) sb!xc:most-positive-fixnum)))
 
 ;;; SXHASH of SIMPLE-BIT-VECTOR values is defined as a DEFTRANSFORM
 ;;; because it is endian-dependent.
