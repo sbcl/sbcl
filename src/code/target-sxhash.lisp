@@ -37,41 +37,39 @@
 ;;;     SXHASH function does, again helping to avoid pathologies like
 ;;;     hashing all bit vectors to 1.
 ;;;   * We'd like this to be simple and fast, too.
-;;;
-;;; FIXME: Should this be INLINE?
 (declaim (ftype (sfunction ((and fixnum unsigned-byte)
                             (and fixnum unsigned-byte))
                            (and fixnum unsigned-byte))
                 mix))
 (declaim (inline mix))
 (defun mix (x y)
-  ;; FIXME: We wouldn't need the nasty (SAFETY 0) here if the compiler
-  ;; were smarter about optimizing ASH. (Without the THE FIXNUM below,
-  ;; and the (SAFETY 0) declaration here to get the compiler to trust
-  ;; it, the sbcl-0.5.0m cross-compiler running under Debian
-  ;; cmucl-2.4.17 turns the ASH into a full call, requiring the
-  ;; UNSIGNED-BYTE 32 argument to be coerced to a bignum, requiring
-  ;; consing, and thus generally obliterating performance.)
-  (declare (optimize (speed 3) (safety 0)))
+  (declare (optimize (speed 3)))
   (declare (type (and fixnum unsigned-byte) x y))
   ;; the ideas here:
-  ;;   * Bits diffuse in both directions (shifted left by up to 2 places
-  ;;     in the calculation of XY, and shifted right by up to 5 places
-  ;;     by the ASH).
+  ;;   * Bits diffuse in both directions (shifted arbitrarily left by
+  ;;     the multiplication in the calculation of XY, and shifted
+  ;;     right by up to 5 places by the ASH).
   ;;   * The #'+ and #'LOGXOR operations don't commute with each other,
   ;;     so different bit patterns are mixed together as they shift
   ;;     past each other.
-  ;;   * The arbitrary constant in the #'LOGXOR expression is intended
-  ;;     to help break up any weird anomalies we might otherwise get
-  ;;     when hashing highly regular patterns.
+  ;;   * The arbitrary constant XOR used in the LOGXOR expression is
+  ;;     intended to help break up any weird anomalies we might
+  ;;     otherwise get when hashing highly regular patterns.
   ;; (These are vaguely like the ideas used in many cryptographic
   ;; algorithms, but we're not pushing them hard enough here for them
   ;; to be cryptographically strong.)
-  (let* ((xy (+ (* x 3) y)))
-    (logand most-positive-fixnum
-            (logxor 441516657
-                    xy
-                    (ash xy -5)))))
+  ;;
+  ;; note: 3622009729038463111 is a 62-bit prime such that its low 61
+  ;; bits, low 60 bits and low 29 bits are all also primes, thus
+  ;; giving decent distributions no matter which of the possible
+  ;; values of most-positive-fixnum we have.  It is derived by simple
+  ;; search starting from 2^60*pi.  The multiplication should be
+  ;; efficient no matter what the platform thanks to modular
+  ;; arithmetic.
+  (let* ((mul (logand 3622009729038463111 sb!xc:most-positive-fixnum))
+         (xor (logand 608948948376289905 sb!xc:most-positive-fixnum))
+         (xy (logand (+ (* x mul) y) sb!xc:most-positive-fixnum)))
+    (logand (logxor xor xy (ash xy -5)) sb!xc:most-positive-fixnum)))
 
 ;;;; hashing strings
 ;;;;
