@@ -997,7 +997,7 @@ in_range_p(os_vm_address_t a, lispobj sbeg, size_t slen)
 boolean
 is_linkage_table_addr(os_vm_address_t addr)
 {
-    return in_range_p(addr, LINKAGE_TABLE_SPACE_START, LINKAGE_TABLE_SPACE_END);
+    return in_range_p(addr, LINKAGE_TABLE_SPACE_START, LINKAGE_TABLE_SPACE_SIZE);
 }
 
 static boolean is_some_thread_local_addr(os_vm_address_t addr);
