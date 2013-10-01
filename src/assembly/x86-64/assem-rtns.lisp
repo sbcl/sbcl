@@ -28,7 +28,9 @@
      (:temp eax unsigned-reg rax-offset)
      (:temp ebx unsigned-reg rbx-offset)
      (:temp edx unsigned-reg rdx-offset)
-     (:temp edi unsigned-reg rdi-offset))
+     (:temp edi unsigned-reg rdi-offset)
+     (:temp temp unsigned-reg r8-offset)
+     (:temp loop-index unsigned-reg r9-offset))
 
   ;; Pick off the cases where everything fits in register args.
   (inst jrcxz ZERO-VALUES)
@@ -55,21 +57,23 @@
   ;; we have to be careful not to clobber values before we've read
   ;; them. Because the stack builds down, we are copying to a larger
   ;; address. Therefore, we need to iterate from larger addresses to
-  ;; smaller addresses. pfw-this says copy ecx words from esi to edi
-  ;; counting down.
-  (inst shr ecx n-fixnum-tag-bits)
-  (inst std)                            ; count down
-  (inst sub esi n-word-bytes)
-  (inst lea edi (make-ea :qword :base ebx :disp (- n-word-bytes)))
-  (inst rep)
-  (inst movs :qword)
-  (inst cld)
+  ;; smaller addresses.
+  (zeroize loop-index)
+  LOOP
+  (inst sub loop-index n-word-bytes)
+  (inst mov temp
+        (make-ea :qword :base esi
+                        :index loop-index))
+  (inst mov
+        (make-ea :qword :base ebx
+                        :index loop-index)
+        temp)
 
-  ;; Restore the count.
-  (inst mov ecx edx)
+  (inst sub edx (fixnumize 1))
+  (inst jmp :nz LOOP)
 
   ;; Set the stack top to the last result.
-  (inst lea rsp-tn (make-ea :qword :base edi :disp n-word-bytes))
+  (inst lea rsp-tn (make-ea :qword :base ebx :index loop-index))
 
   ;; Load the register args.
   (loadw edx ebx -1)
