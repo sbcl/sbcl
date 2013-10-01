@@ -288,7 +288,7 @@
                        #-darwin (integer addrlen "size_t" "ai_addrlen")
                        ((* sockaddr-in) addr "struct sockaddr*" "ai_addr")
                        (c-string-pointer canonname "char *" "ai_canonname")
-                       ((* t) next "struct addrinfo*" "ai_next")))
+                       ((* (struct addrinfo)) next "struct addrinfo*" "ai_next")))
 
  #+sb-bsd-sockets-addrinfo
  (:function getaddrinfo ("getaddrinfo"

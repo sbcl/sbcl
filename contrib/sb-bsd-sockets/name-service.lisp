@@ -19,6 +19,7 @@
 (defmethod host-ent-address ((host-ent host-ent))
   (car (host-ent-addresses host-ent)))
 
+#-sb-bsd-sockets-addrinfo
 (defun make-host-ent (h &optional errno)
   (when (sb-alien:null-alien h)
     (name-service-error "gethostbyname" errno))
@@ -53,6 +54,7 @@
                    :aliases aliases
                    :addresses addresses)))
 
+(declaim (inline naturalize-unsigned-byte-8-array))
 (defun naturalize-unsigned-byte-8-array (array length)
   (let ((addr (make-array 4 :element-type '(unsigned-byte 8))))
     (dotimes (i length)
@@ -94,39 +96,46 @@ weird stuff - see gethostbyname(3) or getaddrinfo(3) for the details."
 ;;; Emulate the above two functions with getaddrinfo / getnameinfo
 
 #+sb-bsd-sockets-addrinfo
+(declaim (inline get-address-info))
+#+sb-bsd-sockets-addrinfo 
 (defun get-address-info (node)
-  (sb-alien:with-alien ((buf (sb-alien:array (* sockint::addrinfo) 1)))
-    (let* ((res (sb-alien:addr (sb-alien:deref buf 0)))
-           (err (sockint::getaddrinfo node nil nil res)))
+  (declare (optimize speed))
+  (sb-alien:with-alien ((info (* sockint::addrinfo)))
+    (let* ((err (sockint::getaddrinfo node nil nil (sb-alien:addr info)))
+           (to-free info))
       (if (zerop err)
           (let ((host-ent (make-instance 'host-ent
                                          :name node
                                          :type sockint::af-inet
                                          :aliases nil
                                          :addresses nil)))
-            (loop for sap = (sb-alien:deref res) then (sockint::addrinfo-next info)
-                  until (sb-alien::null-alien sap)
-                  for info = (sb-alien:cast sap (* sockint::addrinfo))
+            (loop until (sb-alien::null-alien info)
                   ;; Only handle AF_INET currently.
-                  do (when (eq (sockint::addrinfo-family info) sockint::af-inet)
-                       (let* ((sockaddr (sockint::addrinfo-addr info))
-                              (address (sockint::sockaddr-in-addr sockaddr)))
-                         ;; The same effective result can be multiple time
-                         ;; in the list, with different socktypes. Only record
-                         ;; each address once.
-                         (setf (slot-value host-ent 'addresses)
-                               (adjoin (naturalize-unsigned-byte-8-array address
-                                                                         4)
-                                       (host-ent-addresses host-ent)
-                                       :test 'equalp)))))
-            (sockint::freeaddrinfo (sb-alien:deref res))
+                  do
+                  (when (eq (sockint::addrinfo-family info) sockint::af-inet)
+                    (let* ((sockaddr (sockint::addrinfo-addr info))
+                           (address (sockint::sockaddr-in-addr sockaddr)))
+                      ;; The same effective result can be multiple time
+                      ;; in the list, with different socktypes. Only record
+                      ;; each address once.
+                      (setf (slot-value host-ent 'addresses)
+                            (adjoin (naturalize-unsigned-byte-8-array address
+                                                                      4)
+                                    (host-ent-addresses host-ent)
+                                    :test 'equalp))))
+                     (setf info (sockint::addrinfo-next info)))
+            (sockint::freeaddrinfo to-free)
             host-ent)
           (addrinfo-error "getaddrinfo" err)))))
 
 (defconstant ni-max-host 1025)
 
 #+sb-bsd-sockets-addrinfo
+(declaim (inline get-name-info))
+#+sb-bsd-sockets-addrinfo
 (defun get-name-info (address)
+  (declare (optimize speed)
+           (vector address))
   (assert (= (length address) 4))
   (sockint::with-sockaddr-in sockaddr ()
     (sb-alien:with-alien ((host-buf (array char #.ni-max-host)))
@@ -135,7 +144,7 @@ weird stuff - see gethostbyname(3) or getaddrinfo(3) for the details."
       (dotimes (i 4)
         (setf (sb-alien:deref (sockint::sockaddr-in-addr sockaddr) i)
               (aref address i)))
-      (let ((err (sockint::getnameinfo (sb-alien:alien-sap sockaddr)
+      (let ((err (sockint::getnameinfo sockaddr
                                        (sb-alien:alien-size sockint::sockaddr-in :bytes)
                                        (sb-alien:cast host-buf (* char)) ni-max-host
                                        nil 0
