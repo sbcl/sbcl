@@ -168,8 +168,6 @@ static inline lispobj cdr(lispobj conscell)
     return FOLLOW(conscell,LIST_POINTER,cons).cdr;
 }
 
-extern void undefined_alien_function(); /* see interrupt.c */
-
 #ifndef LISP_FEATURE_WIN32
 void *
 os_dlsym_default(char *name)

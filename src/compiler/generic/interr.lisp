@@ -88,6 +88,9 @@
    ;; FIXME: Isn't this used for calls to unbound (SETF FOO) too? If so, revise
    ;; the name.
    "An attempt was made to use an undefined FDEFINITION.")
+  #!+x86-64
+  (undefined-alien-fun
+   "An attempt was made to use an undefined alien function")
   (invalid-arg-count
    "invalid argument count")
   (bogus-arg-to-values-list

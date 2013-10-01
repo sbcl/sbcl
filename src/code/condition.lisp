@@ -1053,8 +1053,11 @@ SB-EXT:PACKAGE-LOCKED-ERROR-SYMBOL."))
 (define-condition undefined-alien-function-error (undefined-alien-error) ()
   (:report
    (lambda (condition stream)
-     (declare (ignore condition))
-     (format stream "Attempt to call an undefined alien function."))))
+     (if (and (slot-boundp condition 'name)
+              (cell-error-name condition))
+         (format stream "The alien function ~s is undefined."
+                 (cell-error-name condition))
+         (format stream "Attempt to call an undefined alien function.")))))
 
 
 ;;;; various other (not specified by ANSI) CONDITIONs

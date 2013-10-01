@@ -258,9 +258,13 @@
    (inst mov res (make-fixup foreign-symbol :foreign-dataref))))
 
 (define-vop (call-out)
-  (:args (function :scs (sap-reg))
+  (:args (function :scs (sap-reg)
+                   :target rbx)
          (args :more t))
   (:results (results :more t))
+  ;; RBX is used to first load the address, allowing the debugger to
+  ;; determine which alien was accessed in case it's undefined.
+  (:temporary (:sc sap-reg :offset rbx-offset) rbx)
   (:temporary (:sc unsigned-reg :offset rax-offset :to :result) rax)
   ;; For safepoint builds: Force values of non-volatiles to the stack.
   ;; These are the callee-saved registers in the native ABI, but
@@ -300,16 +304,17 @@
     ;; for vararg calls.
     (move-immediate rax
                     (loop for tn-ref = args then (tn-ref-across tn-ref)
-                       while tn-ref
-                       count (eq (sb-name (sc-sb (tn-sc (tn-ref-tn tn-ref))))
-                                 'float-registers)))
-    #!+win32 (inst sub rsp-tn #x20)     ;MS_ABI: shadow zone
+                          while tn-ref
+                          count (eq (sb-name (sc-sb (tn-sc (tn-ref-tn tn-ref))))
+                                    'float-registers)))
+    #!+win32 (inst sub rsp-tn #x20) ;MS_ABI: shadow zone
     #!+sb-safepoint
-    (progn                              ;Store SP and PC in thread struct
+    (progn                 ;Store SP and PC in thread struct
       (storew rsp-tn thread-base-tn thread-saved-csp-offset)
       (storew r14 thread-base-tn thread-pc-around-foreign-call-slot))
-    (inst call function)
-    #!+win32 (inst add rsp-tn #x20)     ;MS_ABI: remove shadow space
+    (move rbx function)
+    (inst call rbx)
+    #!+win32 (inst add rsp-tn #x20) ;MS_ABI: remove shadow space
     #!+sb-safepoint
     (progn
       ;; Zeroing out

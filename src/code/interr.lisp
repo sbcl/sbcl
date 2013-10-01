@@ -183,6 +183,17 @@
                  (symbol fdefn-or-symbol)
                  (fdefn (fdefn-name fdefn-or-symbol)))))
 
+#!+x86-64
+(deferr undefined-alien-fun-error (address)
+  (error 'undefined-alien-function-error
+         :name
+         (and (integerp address)
+              (sap-foreign-symbol (int-sap address)))))
+
+#!-x86-64
+(defun undefined-alien-fun-error ()
+  (error 'undefined-alien-function-error))
+
 (deferr invalid-arg-count-error (nargs)
   (error 'simple-program-error
          :format-control "invalid number of arguments: ~S"
@@ -523,9 +534,6 @@
 
 (defun undefined-alien-variable-error ()
   (error 'undefined-alien-variable-error))
-
-(defun undefined-alien-function-error ()
-  (error 'undefined-alien-function-error))
 
 #!-win32
 (define-alien-variable current-memory-fault-address unsigned)

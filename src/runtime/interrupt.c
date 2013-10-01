@@ -1574,6 +1574,8 @@ arrange_return_to_lisp_function(os_context_t *context, lispobj function)
 #endif
 }
 
+// x86-64 has an undefined_alien_function tramp in x86-64-assem.S
+#ifndef LISP_FEATURE_X86_64
 /* KLUDGE: Theoretically the approach we use for undefined alien
  * variables should work for functions as well, but on PPC/Darwin
  * we get bus error at bogus addresses instead, hence this workaround,
@@ -1583,8 +1585,9 @@ arrange_return_to_lisp_function(os_context_t *context, lispobj function)
 void
 undefined_alien_function(void)
 {
-    funcall0(StaticSymbolFunction(UNDEFINED_ALIEN_FUNCTION_ERROR));
+    funcall0(StaticSymbolFunction(UNDEFINED_ALIEN_FUN_ERROR));
 }
+#endif
 
 void lower_thread_control_stack_guard_page(struct thread *th)
 {

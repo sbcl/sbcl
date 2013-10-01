@@ -301,6 +301,24 @@ GNAME(undefined_tramp):
 	ret
 	SIZE(GNAME(undefined_tramp))
 
+	.text
+	.align	align_16byte,0x90
+	.globl  GNAME(undefined_alien_function)
+	TYPE(GNAME(undefined_alien_function))
+GNAME(undefined_alien_function):
+	pop	8(%rbp)         # Save return PC for backtrace.
+	TRAP
+	.byte	trap_Error
+        .byte   4
+        .byte   UNDEFINED_ALIEN_FUN_ERROR
+        /* Encode RBX
+           FIXME: make independt of the encoding changes. */
+        .byte   0xFE 
+        .byte   0x9F
+        .byte   0x01
+	ret
+	SIZE(GNAME(undefined_alien_function))
+
 /* KLUDGE: FIND-ESCAPED-FRAME (SYS:SRC;CODE;DEBUG-INT.LISP) needs
  * to know the name of the function immediately following the
  * undefined-function trampoline. */
