@@ -144,17 +144,20 @@
 
 (defun-cached (make-values-type-cached
                :hash-bits 8
-               :hash-function (lambda (req opt rest allowp)
-                                (logand (logxor
-                                         (type-list-cache-hash req)
-                                         (type-list-cache-hash opt)
-                                         (if rest
-                                             (type-hash-value rest)
-                                             42)
-                                         (if allowp
-                                             #.(logand #xFF (sxhash t))
-                                             #.(logand #xFF (sxhash nil))))
-                                        #xFF)))
+               :hash-function
+               (lambda (req opt rest allowp)
+                 (logand (logxor
+                          (type-list-cache-hash req)
+                          (type-list-cache-hash opt)
+                          (if rest
+                              (type-hash-value rest)
+                              42)
+                          ;; Results (logand #xFF (sxhash t/nil))
+                          ;; hardcoded to avoid relying on the xc host. 
+                          (if allowp
+                              194
+                              11))
+                         #xFF)))
     ((required equal-but-no-car-recursion)
      (optional equal-but-no-car-recursion)
      (rest eq)
