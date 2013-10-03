@@ -151,7 +151,9 @@
                                          (if rest
                                              (type-hash-value rest)
                                              42)
-                                         (sxhash allowp))
+                                         (if allowp
+                                             #.(logand #xFF (sxhash t))
+                                             #.(logand #xFF (sxhash nil))))
                                         #xFF)))
     ((required equal-but-no-car-recursion)
      (optional equal-but-no-car-recursion)

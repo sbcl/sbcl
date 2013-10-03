@@ -97,7 +97,7 @@ weird stuff - see gethostbyname(3) or getaddrinfo(3) for the details."
 
 #+sb-bsd-sockets-addrinfo
 (declaim (inline get-address-info))
-#+sb-bsd-sockets-addrinfo 
+#+sb-bsd-sockets-addrinfo
 (defun get-address-info (node)
   (declare (optimize speed))
   (sb-alien:with-alien ((info (* sockint::addrinfo)))

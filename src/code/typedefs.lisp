@@ -140,12 +140,12 @@
 #!-sb-fluid (declaim (inline type-list-cache-hash))
 (declaim (ftype (function (list) (unsigned-byte 8)) type-list-cache-hash))
 (defun type-list-cache-hash (types)
-  (logand (loop with res = 0
-             for type in types
-             for hash = (type-hash-value type)
-             do (setq res (logxor res hash))
-             finally (return res))
-          #xFF))
+  (logand #xFF
+          (loop with res fixnum = 0
+                for type in types
+                for hash = (type-hash-value type)
+                do (setq res (logxor res hash))
+                finally (return res))))
 
 ;;;; cold loading initializations
 

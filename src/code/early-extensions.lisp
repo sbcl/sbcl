@@ -715,13 +715,13 @@
 ;;; our equality tests, because MEMBER and friends refer to EQLity.
 ;;; So:
 (defun equal-but-no-car-recursion (x y)
-  (cond
-    ((eql x y) t)
-    ((consp x)
-     (and (consp y)
-          (eql (car x) (car y))
-          (equal-but-no-car-recursion (cdr x) (cdr y))))
-    (t nil)))
+  (do () (())
+    (cond ((eql x y) (return t))
+          ((and (consp x)
+                (consp y)
+                (eql (pop x) (pop y))))
+          (t
+           (return)))))
 
 ;;;; package idioms
 
