@@ -6,6 +6,8 @@ changes relative to sbcl-1.1.12:
     ** use the whole of the positive-fixnum range for SXHASH of fixnums
   * enhancement: The error message when calling an undefined alien function
     includes the name of the function on x86-64.
+  * bug fix: forward references to classes in fasls can now be loaded.
+    (lp#746132)
 
 changes in sbcl-1.1.12 relative to sbcl-1.1.11:
   * enhancement: Add sb-bsd-sockets:socket-shutdown, for calling

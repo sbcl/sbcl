@@ -153,7 +153,7 @@
                               (type-hash-value rest)
                               42)
                           ;; Results (logand #xFF (sxhash t/nil))
-                          ;; hardcoded to avoid relying on the xc host. 
+                          ;; hardcoded to avoid relying on the xc host.
                           (if allowp
                               194
                               11))

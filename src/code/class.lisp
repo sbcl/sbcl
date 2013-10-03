@@ -685,7 +685,7 @@
              (:make-load-form-fun (lambda (c)
                                     `(find-classoid-cell
                                       ',(classoid-cell-name c)
-                                      :errorp t)))
+                                      :create t)))
              #-no-ansi-print-object
              (:print-object (lambda (s stream)
                               (print-unreadable-object (s stream :type t)
