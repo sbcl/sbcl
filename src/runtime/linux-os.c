@@ -273,7 +273,9 @@ os_init(char *argv[], char *envp[])
              * in an error or if the value didn't change. Otherwise
              * this might result in an infinite loop.
              */
-            if (retval != -1 && newpers != pers) {
+
+            if (!getenv("SBCL_IS_RESTARTING") &&
+                retval != -1 && newpers != pers) {
                 /* Use /proc/self/exe instead of trying to figure out
                  * the executable path from PATH and argv[0], since
                  * that's unreliable. We follow the symlink instead of
@@ -282,15 +284,21 @@ os_init(char *argv[], char *envp[])
                 char runtime[PATH_MAX+1];
                 int i = readlink("/proc/self/exe", runtime, PATH_MAX);
                 if (i != -1) {
+                    environ = envp;
+                    setenv("SBCL_IS_RESTARTING", "T", 1);
                     runtime[i] = '\0';
-                    execve(runtime, argv, envp);
+                    execv(runtime, argv);
                 }
             }
             /* Either changing the personality or execve() failed. Either
              * way we might as well continue, and hope that the random
              * memory maps are ok this time around.
              */
-            fprintf(stderr, "WARNING: Couldn't re-execute SBCL with the proper personality flags (maybe /proc isn't mounted?). Trying to continue anyway.\n");
+            fprintf(stderr, "WARNING:\
+\nCouldn't re-execute SBCL with proper personality flags (/proc isn't mounted? setuid?)\
+\nTrying to continue anyway.\n");
+        } else {
+            unsetenv("SBCL_IS_RESTARTING");
         }
     }
 #ifdef LISP_FEATURE_X86
