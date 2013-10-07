@@ -374,20 +374,21 @@ process to continue normally."
 #!+sb-show
 (defun hexstr (thing)
   (/noshow0 "entering HEXSTR")
-  (let ((addr (get-lisp-obj-address thing))
-        (str (make-string 10 :element-type 'base-char)))
+  (let* ((addr (get-lisp-obj-address thing))
+         (nchars (* sb!vm:n-word-bytes 2))
+         (str (make-string (+ nchars 2) :element-type 'base-char)))
     (/noshow0 "ADDR and STR calculated")
     (setf (char str 0) #\0
           (char str 1) #\x)
     (/noshow0 "CHARs 0 and 1 set")
-    (dotimes (i 8)
+    (dotimes (i nchars)
       (/noshow0 "at head of DOTIMES loop")
       (let* ((nibble (ldb (byte 4 0) addr))
              (chr (char "0123456789abcdef" nibble)))
         (declare (type (unsigned-byte 4) nibble)
                  (base-char chr))
         (/noshow0 "NIBBLE and CHR calculated")
-        (setf (char str (- 9 i)) chr
+        (setf (char str (- (1+ nchars) i)) chr
               addr (ash addr -4))))
     str))
 
@@ -407,6 +408,6 @@ process to continue normally."
                       (%cold-print (car obj) d)
                       (%cold-print (cdr obj) d)))
                    (t
-                    (sb!sys:%primitive print (hexstr x)))))))
+                    (sb!sys:%primitive print (hexstr obj)))))))
     (%cold-print x 0))
   (values))
