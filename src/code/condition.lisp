@@ -1397,13 +1397,14 @@ handled by any other handler, it will be muffled.")
   (let ((new (function-redefinition-warning-new-function warning))
         (source-location (redefinition-warning-new-location warning)))
     (or
-     ;; Compiled->Interpreted is interesting.
+     ;; compiled->interpreted is interesting.
      (and (typep old 'compiled-function)
           (typep new '(not compiled-function)))
-     ;; FIN->Regular is interesting.
-     (and (typep old 'funcallable-instance)
+     ;; fin->regular is interesting except for interpreted->compiled.
+     (and (typep old '(and funcallable-instance
+                           #!+sb-eval (not sb!eval:interpreted-function)))
           (typep new '(not funcallable-instance)))
-     ;; Different file or unknown location is interesting.
+     ;; different file or unknown location is interesting.
      (let* ((old-namestring (function-file-namestring old))
             (new-namestring
              (or (function-file-namestring new)

@@ -8,6 +8,8 @@ changes relative to sbcl-1.1.12:
     includes the name of the function on x86-64.
   * bug fix: forward references to classes in fasls can now be loaded.
     (lp#746132)
+  * bug fix: don't warn on a interpreted->compiled function redefinition
+    from the same location.  (patch by Douglas Katzman, lp#1042405)
 
 changes in sbcl-1.1.12 relative to sbcl-1.1.11:
   * enhancement: Add sb-bsd-sockets:socket-shutdown, for calling
