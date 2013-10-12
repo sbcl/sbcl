@@ -838,7 +838,9 @@
       (dump-fop 'fop-spec-vector file)
       (dump-word length file)
       (dump-byte widetag file))
-    (dump-raw-bytes vector (ceiling (* length bits-per-length) sb!vm:n-byte-bits) file)))
+    (dump-raw-bytes vector
+                    (ceiling (* length bits-per-length) sb!vm:n-byte-bits)
+                    file)))
 
 ;;; Dump characters and string-ish things.
 

@@ -10,6 +10,8 @@ changes relative to sbcl-1.1.12:
     (lp#746132)
   * bug fix: don't warn on a interpreted->compiled function redefinition
     from the same location.  (patch by Douglas Katzman, lp#1042405)
+  * bug fix: Create vectors of proper internal length when reading literal
+    vectors from FASLs. (Reported by Jan Moringen)
 
 changes in sbcl-1.1.12 relative to sbcl-1.1.11:
   * enhancement: Add sb-bsd-sockets:socket-shutdown, for calling
