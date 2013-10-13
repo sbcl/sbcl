@@ -32,8 +32,8 @@ SBCL_RUNTIME="${TEST_SBCL_RUNTIME:-$SBCL_PWD/../src/runtime/sbcl}"
 SBCL_ARGS="${TEST_SBCL_ARGS:---noinform --no-sysinit --no-userinit --noprint --disable-debugger}"
 
 # Scripts that use these variables should quote them.
-TEST_BASENAME="`basename $0`"
-TEST_FILESTEM="$(basename "${TEST_BASENAME}" | sed -e 's/\.sh$//' -e 's/\./-/g')"
+TEST_BASENAME=`basename $0`
+TEST_FILESTEM=`basename "${TEST_BASENAME}" | sed -e 's/\.sh$//' -e 's/\./-/g'`
 : ${TEST_BASEDIR:="$SBCL_PWD"}
 TEST_DIRECTORY="${TEST_BASEDIR}/${TEST_FILESTEM}-$$"
 export TEST_DIRECTORY

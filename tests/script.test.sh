@@ -114,7 +114,7 @@ fi
 echo '(format t "Hello, Fasl~%")' > $tmpscript
 run_sbcl --eval "(compile-file \"$tmpscript\" :output-file \"$tmpfasl\")"  </dev/null >/dev/null
 chmod +x $tmpfasl
-SBCL_HOME=$(dirname $SBCL_CORE) ./$tmpfasl >$tmpout 2>$tmperr
+SBCL_HOME=`dirname $SBCL_CORE` ./$tmpfasl >$tmpout 2>$tmperr
 check_status_maybe_lose "--script exit status from fasl" $? 0 "(ok)"
 if [ -s $tmperr ] || [ "Hello, Fasl" != "`cat $tmpout`" ]
 then
