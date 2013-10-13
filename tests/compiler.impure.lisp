@@ -1431,6 +1431,12 @@
         (defun (setf test-984) ())
         nil)
      (style-warning () t))))
+
+(with-test (:name :compile-setf-function)
+  (defun (setf compile-setf) ())
+  (assert (equal (compile '(setf compile-setf))
+                 '(setf compile-setf))))
+
 
 ;;;; tests not in the problem domain, but of the consistency of the
 ;;;; compiler machinery itself

@@ -151,7 +151,8 @@
           (t
            (values compiled-definition warnings-p failure-p)))))
 
-(defun compile (name &optional (definition (or (macro-function name)
+(defun compile (name &optional (definition (or (and (symbolp name)
+                                                    (macro-function name))
                                                (fdefinition name))))
   #!+sb-doc
   "Produce a compiled function from DEFINITION. If DEFINITION is a
