@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 
 platform="${SBCL_SOFTWARE_TYPE}-${SBCL_MACHINE_TYPE}"
 
