@@ -202,6 +202,10 @@
     (matchp-name :function 'cl-user::loaded-as-source-fun 3)
   t)
 
+(deftest find-source-stuff.
+    (matchp-name :variable 'cl-user::**global** 29)
+  t)
+
 ;;; Check wrt. interplay of generic functions and their methods.
 
 (defgeneric xuuq (gf.a gf.b          &rest gf.rest &key gf.k-X))

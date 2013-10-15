@@ -74,3 +74,5 @@
 (eval-when (:compile-toplevel)
   (defun compile-time-too-fun ()
     :foo))
+
+(sb-ext:defglobal **global** 'value)

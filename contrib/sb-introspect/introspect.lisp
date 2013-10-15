@@ -195,7 +195,8 @@ If an unsupported TYPE is requested, the function will return NIL.
      (case type
        ((:variable)
         (when (and (symbolp name)
-                   (eq (sb-int:info :variable :kind name) :special))
+                   (member (sb-int:info :variable :kind name)
+                           '(:global :special)))
           (translate-source-location (sb-int:info :source-location type name))))
        ((:constant)
         (when (and (symbolp name)

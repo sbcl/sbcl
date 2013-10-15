@@ -63,8 +63,8 @@
          (make-pathname :directory (pathname-directory
                                     '#.(or *compile-file-pathname*
                                            *load-pathname*)))))
-    (multiple-value-bind (soft strict pending)
-        (funcall (intern "DO-TESTS" (find-package "SB-RT")))
+    (multiple-value-bind (soft strict #+sb-testing-contrib pending)
+        (funcall (find-symbol "DO-TESTS" "SB-RT"))
       (fresh-line)
       (unless strict
         #+sb-testing-contrib
