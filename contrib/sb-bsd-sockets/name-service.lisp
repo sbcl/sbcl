@@ -64,101 +64,99 @@
 ;;; Resolving
 
 #-sb-bsd-sockets-addrinfo
-(sb-ext:defglobal **gethostby-lock** (sb-thread:make-mutex :name "gethostby lock"))
+(progn
+  (sb-ext:defglobal **gethostby-lock**
+      (sb-thread:make-mutex :name "gethostby lock"))
 
-(defun get-host-by-name (host-name)
-  "Returns a HOST-ENT instance for HOST-NAME or signals a NAME-SERVICE-ERROR.
+  (defun get-host-by-name (host-name)
+    "Returns a HOST-ENT instance for HOST-NAME or signals a NAME-SERVICE-ERROR.
 HOST-NAME may also be an IP address in dotted quad notation or some other
-weird stuff - see gethostbyname(3) or getaddrinfo(3) for the details."
-  #+sb-bsd-sockets-addrinfo
-  (get-address-info host-name)
-  #-sb-bsd-sockets-addrinfo
-  (sb-thread::with-system-mutex (**gethostby-lock** :allow-with-interrupts t)
-    (make-host-ent (sockint::gethostbyname host-name))))
+weird stuff - see gethostbyname(3) for the details."
+    (sb-thread::with-system-mutex (**gethostby-lock** :allow-with-interrupts t)
+      (make-host-ent (sockint::gethostbyname host-name))))
 
-(defun get-host-by-address (address)
-  "Returns a HOST-ENT instance for ADDRESS, which should be a vector of
- (integer 0 255), or signals a NAME-SERVICE-ERROR.  See gethostbyaddr(3)
- or gethostinfo(3) for details."
-  #+sb-bsd-sockets-addrinfo
-  (get-name-info address)
-  #-sb-bsd-sockets-addrinfo
-  (sb-thread::with-system-mutex (**gethostby-lock** :allow-with-interrupts t)
-    (sockint::with-in-addr packed-addr ()
-      (let ((addr-vector (coerce address 'vector)))
-        (loop for i from 0 below (length addr-vector)
-              do (setf (sb-alien:deref (sockint::in-addr-addr packed-addr) i)
-                       (elt addr-vector i)))
-        (make-host-ent (sockint::gethostbyaddr packed-addr
-                                               4
-                                               sockint::af-inet))))))
-
-;;; Emulate the above two functions with getaddrinfo / getnameinfo
+  (defun get-host-by-address (address)
+    "Returns a HOST-ENT instance for ADDRESS, which should be a vector of
+ (integer 0 255), or signals a NAME-SERVICE-ERROR. See gethostbyaddr(3)
+ for details."
+    (sb-thread::with-system-mutex (**gethostby-lock** :allow-with-interrupts t)
+      (sockint::with-in-addr packed-addr ()
+        (let ((addr-vector (coerce address 'vector)))
+          (loop for i from 0 below (length addr-vector)
+                do (setf (sb-alien:deref (sockint::in-addr-addr packed-addr) i)
+                         (elt addr-vector i)))
+          (make-host-ent (sockint::gethostbyaddr packed-addr
+                                                 4
+                                                 sockint::af-inet)))))))
 
 #+sb-bsd-sockets-addrinfo
-(declaim (inline get-address-info))
-#+sb-bsd-sockets-addrinfo
-(defun get-address-info (node)
-  (declare (optimize speed))
-  (sb-alien:with-alien ((info (* sockint::addrinfo)))
-    (let* ((err (sockint::getaddrinfo node nil nil (sb-alien:addr info)))
-           (to-free info))
-      (if (zerop err)
-          (let ((host-ent (make-instance 'host-ent
-                                         :name node
-                                         :type sockint::af-inet
-                                         :aliases nil
-                                         :addresses nil)))
-            (loop until (sb-alien::null-alien info)
-                  ;; Only handle AF_INET currently.
-                  do
-                  (when (eq (sockint::addrinfo-family info) sockint::af-inet)
-                    (let* ((sockaddr (sockint::addrinfo-addr info))
-                           (address (sockint::sockaddr-in-addr sockaddr)))
-                      ;; The same effective result can be multiple time
-                      ;; in the list, with different socktypes. Only record
-                      ;; each address once.
-                      (setf (slot-value host-ent 'addresses)
-                            (adjoin (naturalize-unsigned-byte-8-array address
-                                                                      4)
-                                    (host-ent-addresses host-ent)
-                                    :test 'equalp))))
-                     (setf info (sockint::addrinfo-next info)))
-            (sockint::freeaddrinfo to-free)
-            host-ent)
-          (addrinfo-error "getaddrinfo" err)))))
-
-(defconstant ni-max-host 1025)
+(defconstant ni-max-host 1025) ;; Not inside PROGN because of #.
 
 #+sb-bsd-sockets-addrinfo
-(declaim (inline get-name-info))
-#+sb-bsd-sockets-addrinfo
-(defun get-name-info (address)
-  (declare (optimize speed)
-           (vector address))
-  (assert (= (length address) 4))
-  (sockint::with-sockaddr-in sockaddr ()
-    (sb-alien:with-alien ((host-buf (array char #.ni-max-host)))
-      #+darwin (setf (sockint::sockaddr-in-len sockaddr) 16)
-      (setf (sockint::sockaddr-in-family sockaddr) sockint::af-inet)
-      (dotimes (i 4)
-        (setf (sb-alien:deref (sockint::sockaddr-in-addr sockaddr) i)
-              (aref address i)))
-      (let ((err (sockint::getnameinfo sockaddr
-                                       (sb-alien:alien-size sockint::sockaddr-in :bytes)
-                                       (sb-alien:cast host-buf (* char)) ni-max-host
-                                       nil 0
-                                       sockint::ni-namereqd)))
+(progn
+  (defun get-host-by-name (node)
+    "Returns a HOST-ENT instance for HOST-NAME or signals a NAME-SERVICE-ERROR.
+HOST-NAME may also be an IP address in dotted quad notation or some other
+weird stuff - see getaddrinfo(3) for the details."
+    (declare (optimize speed))
+    (sb-alien:with-alien ((info (* sockint::addrinfo)))
+      (let* ((err (sockint::getaddrinfo node nil nil (sb-alien:addr info)))
+             (to-free info))
         (if (zerop err)
-            (make-instance 'host-ent
-                           :name (sb-alien::c-string-to-string
-                                  (sb-alien:alien-sap host-buf)
-                                  (sb-impl::default-external-format)
-                                  'character)
-                           :type sockint::af-inet
-                           :aliases nil
-                           :addresses (list address))
-            (addrinfo-error "getnameinfo" err))))))
+            (let ((host-ent (make-instance 'host-ent
+                                           :name node
+                                           :type sockint::af-inet
+                                           :aliases nil
+                                           :addresses nil)))
+              (loop until (sb-alien::null-alien info)
+                    ;; Only handle AF_INET currently.
+                    do
+                    (when (eq (sockint::addrinfo-family info) sockint::af-inet)
+                      (let* ((sockaddr (sockint::addrinfo-addr info))
+                             (address (sockint::sockaddr-in-addr sockaddr)))
+                        ;; The same effective result can be multiple time
+                        ;; in the list, with different socktypes. Only record
+                        ;; each address once.
+                        (setf (slot-value host-ent 'addresses)
+                              (adjoin (naturalize-unsigned-byte-8-array address
+                                                                        4)
+                                      (host-ent-addresses host-ent)
+                                      :test 'equalp))))
+                    (setf info (sockint::addrinfo-next info)))
+              (sockint::freeaddrinfo to-free)
+              host-ent)
+            (addrinfo-error "getaddrinfo" err)))))
+
+  (defun get-host-by-address (address)
+    "Returns a HOST-ENT instance for ADDRESS, which should be a vector of
+ (integer 0 255), or signals a NAME-SERVICE-ERROR.
+ See gethostbyaddr(3) for details."
+    (declare (optimize speed)
+             (vector address))
+    (assert (= (length address) 4))
+    (sockint::with-sockaddr-in sockaddr ()
+      (sb-alien:with-alien ((host-buf (array char #.ni-max-host)))
+        #+darwin (setf (sockint::sockaddr-in-len sockaddr) 16)
+        (setf (sockint::sockaddr-in-family sockaddr) sockint::af-inet)
+        (dotimes (i 4)
+          (setf (sb-alien:deref (sockint::sockaddr-in-addr sockaddr) i)
+                (aref address i)))
+        (let ((err (sockint::getnameinfo
+                    sockaddr
+                    (sb-alien:alien-size sockint::sockaddr-in :bytes)
+                    (sb-alien:cast host-buf (* char)) ni-max-host
+                    nil 0
+                    sockint::ni-namereqd)))
+          (if (zerop err)
+              (make-instance 'host-ent
+                             :name (sb-alien::c-string-to-string
+                                    (sb-alien:alien-sap host-buf)
+                                    (sb-impl::default-external-format)
+                                    'character)
+                             :type sockint::af-inet
+                             :aliases nil
+                             :addresses (list address))
+              (addrinfo-error "getnameinfo" err)))))))
 
 ;;; Error handling
 
