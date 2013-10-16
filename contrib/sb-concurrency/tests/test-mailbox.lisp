@@ -166,7 +166,7 @@
                      `(:errors   . ,errors)
                      `(:timeouts . ,timeouts))))))))
 
-
+#-win32
 (deftest mailbox.single-producer-single-consumer
     (test-mailbox-producers-consumers :n-senders 1
                                       :n-receivers 1
@@ -176,6 +176,7 @@
   (:errors   . 0)
   (:timeouts . 0))
 
+#-win32
 (deftest mailbox.single-producer-multiple-consumers
     (test-mailbox-producers-consumers :n-senders 1
                                       :n-receivers 100
@@ -185,6 +186,7 @@
   (:errors   . 0)
   (:timeouts . 0))
 
+#-win32
 (deftest mailbox.multiple-producers-single-consumer
     (test-mailbox-producers-consumers :n-senders 10
                                       :n-receivers 1
@@ -194,6 +196,7 @@
   (:errors   . 0)
   (:timeouts . 0))
 
+#-win32
 (deftest mailbox.multiple-producers-multiple-consumers
     (test-mailbox-producers-consumers :n-senders 50
                                       :n-receivers 50
