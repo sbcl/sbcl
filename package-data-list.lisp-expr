@@ -1226,10 +1226,6 @@ possibly temporariliy, because it might be used internally."
                "SET-FLOATING-POINT-MODES"
                "WITH-FLOAT-TRAPS-MASKED"
 
-               ;; compatibility hacks for old-style CMU CL data formats
-               "UNIX-ENVIRONMENT-CMUCL-FROM-SBCL"
-               "UNIX-ENVIRONMENT-SBCL-FROM-CMUCL"
-
                ;; a sort of quasi-unbound tag for use in hash tables
                "+EMPTY-HT-SLOT+"
 

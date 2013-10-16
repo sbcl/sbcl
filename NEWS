@@ -6,7 +6,7 @@ changes relative to sbcl-1.1.12:
     ** use the whole of the positive-fixnum range for SXHASH of fixnums
   * enhancement: The error message when calling an undefined alien function
     includes the name of the function on x86-64.
-  * enhancement: sb-ext:run-program now supports :environment on windows.
+  * enhancement: sb-ext:run-program now supports :environment on Windows.
   * bug fix: forward references to classes in fasls can now be loaded.
     (lp#746132)
   * bug fix: don't warn on a interpreted->compiled function redefinition
@@ -15,6 +15,8 @@ changes relative to sbcl-1.1.12:
     vectors from FASLs. (Reported by Jan Moringen)
   * bug fix: COMPILE can now succefully compile setf functions.
     (Reported by Douglas Katzman)
+  * bug fix: run-prorgram performs more correct escaping of arguments on
+    Windows. (lp#1239242)
 
 changes in sbcl-1.1.12 relative to sbcl-1.1.11:
   * enhancement: Add sb-bsd-sockets:socket-shutdown, for calling
