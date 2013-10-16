@@ -67,8 +67,8 @@
 (define-alien-routine ("GetExitCodeThread" get-exit-code-thread) int
   (handle handle) (exit-code dword :out))
 
-(defun mswin-spawn (program argv stdin stdout stderr searchp envp waitp pwd)
-  (declare (ignorable envp))
+(defun mswin-spawn (program argv stdin stdout stderr searchp envp waitp
+                    directory)
   (let ((std-handles (multiple-value-list (get-std-handles)))
         (inheritp nil))
     (flet ((maybe-std-handle (arg)
@@ -93,7 +93,7 @@
           (if (create-process (if searchp nil program)
                               argv
                               nil nil
-                              inheritp 0 nil pwd
+                              inheritp 0 envp directory
                               (alien-sap startup-info)
                               (alien-sap process-information))
               (let ((child (slot process-information 'process-handle)))

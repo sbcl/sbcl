@@ -52,7 +52,46 @@
     "Return the Unix environment (\"man environ\") as a list of SIMPLE-STRINGs."
     (c-strings->string-list (wrapped-environ))))
 
-;#+win32 (sb-alien:define-alien-routine msvcrt-environ (* c-string))
+#+win32
+(progn
+  (defun decode-windows-environment (environment)
+    (loop until (zerop (sap-ref-8 environment 0))
+          collect
+          (let ((string (sb-alien::c-string-to-string environment
+                                                      (sb-alien::default-c-string-external-format)
+                                                      'character)))
+            (loop for value = (sap-ref-8 environment 0)
+                  do (setf environment (sap+ environment 1))
+                  until (zerop value))
+            string)))
+
+  (defun encode-windows-environment (list)
+    (let* ((external-format (sb-alien::default-c-string-external-format))
+           octets
+           (length 1)) ;; 1 for \0 at the very end
+      (setf octets
+            (loop for x in list
+                  for octet =
+                  (string-to-octets x :external-format external-format
+                                      :null-terminate t)
+                  collect octet
+                  do
+                  (incf length (length octet))))
+      (let ((mem (allocate-system-memory length))
+            (index 0))
+
+        (loop for string in octets
+              for length = (length string)
+              do
+              (copy-ub8-to-system-area string 0 mem index length)
+              (incf index length))
+        (setf (sap-ref-8 mem index) 0)
+        (values mem mem length))))
+
+  (defun posix-environ ()
+    (decode-windows-environment
+     (alien-funcall (extern-alien "GetEnvironmentStrings"
+                                  (function system-area-pointer))))))
 
 ;;; Convert as best we can from an SBCL representation of a Unix
 ;;; environment to a CMU CL representation.
@@ -259,7 +298,7 @@ PROCESS."
         (t
          (when (zerop (car (process-cookie process)))
            (return))))
-      (sb-sys:serve-all-events 1))
+      (serve-all-events 1))
   process)
 
 #-win32
@@ -268,7 +307,7 @@ PROCESS."
   (with-alien ((result sb-alien:int))
     (multiple-value-bind
           (wonp error)
-        (sb-unix:unix-ioctl (sb-sys:fd-stream-fd (process-pty proc))
+        (sb-unix:unix-ioctl (fd-stream-fd (process-pty proc))
                             sb-unix:TIOCGPGRP
                             (alien-sap (sb-alien:addr result)))
       (unless wonp
@@ -478,7 +517,7 @@ status slot."
           (push new-fd *close-on-error*)
           (copy-descriptor-to-stream new-fd pty cookie external-format)))
       (values name
-              (sb-sys:make-fd-stream master :input t :output t
+              (make-fd-stream master :input t :output t
                                      :external-format external-format
                                      :element-type :default
                                      :dual-channel-p t)))))
@@ -494,10 +533,9 @@ status slot."
                (1- ,bytes-per-word))))
 
 (defun string-list-to-c-strvec (string-list)
-  (let* ((bytes-per-word (/ sb-vm:n-machine-word-bits sb-vm:n-byte-bits))
-         ;; We need an extra for the null, and an extra 'cause exect
+  (let* (;; We need an extra for the null, and an extra 'cause exect
          ;; clobbers argv[-1].
-         (vec-bytes (* bytes-per-word (+ (length string-list) 2)))
+         (vec-bytes (* sb-vm:n-word-bytes (+ (length string-list) 2)))
          (octet-vector-list (mapcar (lambda (s)
                                       (string-to-octets s))
                                     string-list))
@@ -507,13 +545,13 @@ status slot."
                                        (length s)))))
          (total-bytes (+ string-bytes vec-bytes))
          ;; Memory to hold the vector of pointers and all the strings.
-         (vec-sap (sb-sys:allocate-system-memory total-bytes))
+         (vec-sap (allocate-system-memory total-bytes))
          (string-sap (sap+ vec-sap vec-bytes))
          ;; Index starts from [1]!
-         (vec-index-offset bytes-per-word))
+         (vec-index-offset sb-vm:n-word-bytes))
     (declare (sb-vm:signed-word vec-bytes)
              (sb-vm:word string-bytes total-bytes)
-             (sb-sys:system-area-pointer vec-sap string-sap))
+             (system-area-pointer vec-sap string-sap))
     (dolist (octets octet-vector-list)
       (declare (type (simple-array (unsigned-byte 8) (*)) octets))
       (let ((size (length octets)))
@@ -526,23 +564,37 @@ status slot."
         ;; Advance string-sap for the next string.
         (setf string-sap (sap+ string-sap
                                (round-null-terminated-bytes-to-words size)))
-        (incf vec-index-offset bytes-per-word)))
+        (incf vec-index-offset sb-vm:n-word-bytes)))
     ;; Final null pointer.
     (setf (sap-ref-sap vec-sap vec-index-offset) (int-sap 0))
-    (values vec-sap (sap+ vec-sap bytes-per-word) total-bytes)))
+    (values vec-sap (sap+ vec-sap sb-vm:n-word-bytes) total-bytes)))
 
 (defmacro with-c-strvec ((var str-list &key null) &body body)
   (once-only ((null null))
     (with-unique-names (sap size)
       `(multiple-value-bind (,sap ,var ,size)
            (if ,null
-               (values nil (sb-sys:int-sap 0))
+               (values nil (int-sap 0))
                (string-list-to-c-strvec ,str-list))
          (unwind-protect
               (progn
                 ,@body)
            (unless ,null
-             (sb-sys:deallocate-system-memory ,sap ,size)))))))
+             (deallocate-system-memory ,sap ,size)))))))
+
+(defmacro with-environment ((var str-list &key null) &body body)
+  (once-only ((null null))
+    (with-unique-names (sap size)
+      `(multiple-value-bind (,sap ,var ,size)
+           (if ,null
+               (values nil (int-sap 0))
+               #-win32 (string-list-to-c-strvec ,str-list)
+               #+win32 (encode-windows-environment ,str-list))
+         (unwind-protect
+              (progn
+                ,@body)
+           (unless ,null
+             (deallocate-system-memory ,sap ,size)))))))
 
 (sb-alien:define-alien-routine spawn
     #-win32 sb-alien:int
@@ -603,8 +655,8 @@ status slot."
 ;;; the fork worked, and NIL if it did not.
 (defun run-program (program args
                     &key
-                    #-win32 (env nil env-p)
-                    #-win32 (environment
+                    (env nil env-p)
+                    (environment
                              (when env-p
                                (unix-environment-sbcl-from-cmucl env))
                              environment-p)
@@ -650,14 +702,13 @@ Users Manual for details about the PROCESS structure."#-win32"
      programs.)""
 
    The &KEY arguments have the following meanings:
-"#-win32"
    :ENVIRONMENT
       a list of STRINGs describing the new Unix environment
       (as in \"man environ\"). The default is to copy the environment of
       the current process.
    :ENV
       an alternative lossy representation of the new Unix environment,
-      for compatibility with CMU CL""
+      for compatibility with CMU CL
    :SEARCH
       Look for PROGRAM in each of the directories in the child's $PATH
       environment variable.  Otherwise an absolute pathname is required.
@@ -708,7 +759,6 @@ Users Manual for details about the PROCESS structure."#-win32"
    :DIRECTORY
       Specifies the directory in which the program should be run.
       NIL (the default) means the directory is unchanged.")
-  #-win32
   (when (and env-p environment-p)
     (error "can't specify :ENV and :ENVIRONMENT simultaneously"))
   ;; Prepend the program to the argument list.
@@ -781,9 +831,7 @@ Users Manual for details about the PROCESS structure."#-win32"
                         `(with-c-strvec (,vec ,args)
                            ,@body))
                       (with-environment-vec ((vec) &body body)
-                        #+win32 `(let (,vec) ,@body)
-                        #-win32
-                        `(with-c-strvec
+                        `(with-environment
                              (,vec environment
                               :null (not (or environment environment-p)))
                            ,@body)))
@@ -812,46 +860,45 @@ Users Manual for details about the PROCESS structure."#-win32"
                          (with-active-processes-lock ()
                            (with-no-with (#+win32 (args-vec))
                              (with-args-vec (args-vec simple-args)
-                               (with-no-with (#+win32 (environment-vec))
-                                 (with-environment-vec (environment-vec)
-                                   (let ((pwd-string
-                                           (and directory-p (native-namestring directory))))
-                                     (setq child
-                                           #+win32
-                                           (sb-win32::mswin-spawn
-                                            progname
-                                            (with-output-to-string (argv)
-                                              (dolist (arg simple-args)
-                                                (write-string arg argv)
-                                                (write-char #\Space argv)))
-                                            stdin stdout stderr
-                                            search nil wait pwd-string)
-                                           #-win32
-                                           (without-gcing
-                                             (spawn progname args-vec
-                                                    stdin stdout stderr
-                                                    (if search 1 0)
-                                                    environment-vec pty-name
-                                                    (if wait 1 0)
-                                                    pwd-string))))
-                                   (unless (minusp child)
-                                     (setf proc
-                                           (apply
-                                            #'make-process
-                                            :input input-stream
-                                            :output output-stream
-                                            :error error-stream
-                                            :status-hook status-hook
-                                            :cookie cookie
-                                            #-win32 (list :pty pty-stream
-                                                          :%status :running
-                                                          :pid child)
-                                            #+win32 (if wait
-                                                        (list :%status :exited
-                                                              :%exit-code child)
-                                                        (list :%status :running
-                                                              :pid child))))
-                                     (push proc *active-processes*)))))))
+                               (with-environment-vec (environment-vec)
+                                 (let ((pwd-string
+                                         (and directory-p (native-namestring directory))))
+                                   (setq child
+                                         #+win32
+                                         (sb-win32::mswin-spawn
+                                          progname
+                                          (with-output-to-string (argv)
+                                            (dolist (arg simple-args)
+                                              (write-string arg argv)
+                                              (write-char #\Space argv)))
+                                          stdin stdout stderr
+                                          search environment-vec wait pwd-string)
+                                         #-win32
+                                         (without-gcing
+                                           (spawn progname args-vec
+                                                  stdin stdout stderr
+                                                  (if search 1 0)
+                                                  environment-vec pty-name
+                                                  (if wait 1 0)
+                                                  pwd-string))))
+                                 (unless (minusp child)
+                                   (setf proc
+                                         (apply
+                                          #'make-process
+                                          :input input-stream
+                                          :output output-stream
+                                          :error error-stream
+                                          :status-hook status-hook
+                                          :cookie cookie
+                                          #-win32 (list :pty pty-stream
+                                                        :%status :running
+                                                        :pid child)
+                                          #+win32 (if wait
+                                                      (list :%status :exited
+                                                            :%exit-code child)
+                                                      (list :%status :running
+                                                            :pid child))))
+                                   (push proc *active-processes*))))))
                          ;; Report the error outside the lock.
                          (case child
                            (-1
@@ -870,13 +917,13 @@ Users Manual for details about the PROCESS structure."#-win32"
             (sb-unix:unix-close fd))
           #-win32
           (dolist (handler *handlers-installed*)
-            (sb-sys:remove-fd-handler handler)))
+            (remove-fd-handler handler)))
         #-win32
         (when (and wait proc)
           (unwind-protect
                (process-wait proc)
             (dolist (handler *handlers-installed*)
-              (sb-sys:remove-fd-handler handler)))))
+              (remove-fd-handler handler)))))
       proc)))
 
 ;;; Install a handler for any input that shows up on the file
@@ -917,7 +964,7 @@ Users Manual for details about the PROCESS structure."#-win32"
              (error "Don't know how to copy to stream of element-type ~S"
                     et)))))
     (setf handler
-          (sb-sys:add-fd-handler
+          (add-fd-handler
            descriptor
            :input
            (lambda (fd)
@@ -948,7 +995,7 @@ Users Manual for details about the PROCESS structure."#-win32"
                                            (eql errno sb-unix:eio))
                                       (eql count 0))
                           #+win32 (<= count 0))
-                     (sb-sys:remove-fd-handler handler)
+                     (remove-fd-handler handler)
                      (setf handler nil)
                      (decf (car cookie))
                      (sb-unix:unix-close descriptor)
@@ -958,7 +1005,7 @@ Users Manual for details about the PROCESS structure."#-win32"
                                while reading from child: ~S~:>" buf))
                      (return))
                     ((null count)
-                     (sb-sys:remove-fd-handler handler)
+                     (remove-fd-handler handler)
                      (setf handler nil)
                      (decf (car cookie))
                      (error
@@ -979,8 +1026,8 @@ Users Manual for details about the PROCESS structure."#-win32"
 ;;; maybe also with SB-POSIX)?
 (defun get-stream-fd-and-external-format (stream direction)
   (typecase stream
-    (sb-sys:fd-stream
-     (values (sb-sys:fd-stream-fd stream) nil (stream-external-format stream)))
+    (fd-stream
+     (values (fd-stream-fd stream) nil (stream-external-format stream)))
     (synonym-stream
      (get-stream-fd-and-external-format
       (symbol-value (synonym-stream-symbol stream)) direction))
@@ -1023,7 +1070,7 @@ Users Manual for details about the PROCESS structure."#-win32"
              (unless fd
                (error "could not open a temporary file: ~A"
                       (strerror name/errno)))
-             ;; Can't unlink an opened file on Windows
+             ;; Can't unlink an open file on Windows
              #-win32
              (unless (sb-unix:unix-unlink name/errno)
                (sb-unix:unix-close fd)
@@ -1065,7 +1112,7 @@ Users Manual for details about the PROCESS structure."#-win32"
                  (:input
                     (push read-fd *close-in-parent*)
                     (push write-fd *close-on-error*)
-                    (let ((stream (sb-sys:make-fd-stream write-fd :output t
+                    (let ((stream (make-fd-stream write-fd :output t
                                                          :element-type :default
                                                          :external-format
                                                          external-format)))
@@ -1073,7 +1120,7 @@ Users Manual for details about the PROCESS structure."#-win32"
                  (:output
                     (push read-fd *close-on-error*)
                     (push write-fd *close-in-parent*)
-                    (let ((stream (sb-sys:make-fd-stream read-fd :input t
+                    (let ((stream (make-fd-stream read-fd :input t
                                                          :element-type :default
                                                          :external-format
                                                          external-format)))
@@ -1092,7 +1139,7 @@ Users Manual for details about the PROCESS structure."#-win32"
                (when file
                  (multiple-value-bind
                        (fd errno)
-                     (sb-unix:unix-dup (sb-sys:fd-stream-fd file))
+                     (sb-unix:unix-dup (fd-stream-fd file))
                    (cond (fd
                           (push fd *close-in-parent*)
                           (values fd nil))

@@ -6,6 +6,7 @@ changes relative to sbcl-1.1.12:
     ** use the whole of the positive-fixnum range for SXHASH of fixnums
   * enhancement: The error message when calling an undefined alien function
     includes the name of the function on x86-64.
+  * enhancement: sb-ext:run-program now supports :environment on windows.
   * bug fix: forward references to classes in fasls can now be loaded.
     (lp#746132)
   * bug fix: don't warn on a interpreted->compiled function redefinition
