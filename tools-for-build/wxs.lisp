@@ -95,7 +95,7 @@
       (free-alien guid))))
 
 (defun list-all-contribs ()
-  (loop for flag in (directory "../contrib/*/test-passed")
+  (loop for flag in (directory "../obj/asdf-cache/*/test-passed.test-report")
         collect (car (last (pathname-directory flag)))))
 
 (defvar *id-char-substitutions* '((#\\ . #\_)
@@ -170,7 +170,7 @@
                 append (collect-components directory))))
 
 (defun collect-contrib-components ()
-  (loop for contrib in (directory "../contrib/*/test-passed")
+  (loop for contrib in (directory "../obj/asdf-cache/*/test-passed.test-report")
         append (collect-components (make-pathname :name nil
                                                   :type nil
                                                   :version nil

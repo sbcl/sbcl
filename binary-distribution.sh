@@ -10,6 +10,7 @@ set -e
 # switched over to trying to do this the way everyone else does.)
 
 b=${1:?"missing base directory name argument"}
+
 tar -cf $b-binary.tar \
     $b/output/sbcl.core $b/src/runtime/sbcl $b/output/prefix.def \
     $b/BUGS $b/COPYING $b/CREDITS $b/INSTALL $b/NEWS $b/README \
@@ -18,8 +19,10 @@ tar -cf $b-binary.tar \
     $b/pubring.pgp \
     $b/contrib/asdf-module.mk \
     $b/contrib/vanilla-module.mk \
-    `for dir in $b/contrib/*; do
-         if test -d $dir && test -f $dir/test-passed; then
-             find $dir -name CVS -type d -prune -o \! -type d \! -name '.cvsignore' -print
+    `for contrib in $(cd $b/contrib && echo *); do
+         src_dir=$b/contrib/$contrib
+         if test -d $src_dir && test -f $obj_dir/test-passed.test-report; then
+             find $src_dir -name CVS -type d -prune -o \! -type d \! -name '.cvsignore' -print
          fi
-     done`
+     done` \
+    $b/obj/sbcl-home

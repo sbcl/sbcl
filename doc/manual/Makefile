@@ -12,8 +12,9 @@ HTMLFILES=sbcl.html asdf.html
 # DOCSTRINGDIR has to end with a slash or you lose (it's passed to
 # Lisp's `pathname' function).
 DOCSTRINGDIR="docstrings/"
-CONTRIBDIR="../../contrib/"
-I_FLAGS=-I $(DOCSTRINGDIR) -I $(CONTRIBDIR)
+CONTRIB_SRC_DIR="../../contrib/"
+CONTRIB_OBJ_DIR="../../obj/asdf-cache/"
+I_FLAGS=-I $(DOCSTRINGDIR) -I $(CONTRIB_SRC_DIR)
 # List of contrib modules that docstring docs will be created for.
 MODULES=':sb-md5 :sb-queue :sb-concurrency :sb-rotate-byte :sb-grovel \
          :sb-sprof :sb-bsd-sockets :sb-cover :sb-posix'
@@ -93,11 +94,11 @@ info: $(INFOFILES)
 # Texinfo docstring snippets
 # Note: assumes contrib module names are the same as the names of
 # directories containing the modules, and that these directories
-# are in $(CONTRIBDIR).
-CONTRIB_FASLS=$(shell find $(shell echo $(MODULES) | sed "s|:|$(CONTRIBDIR)|g") -name '*.fasl')
+# are in $(CONTRIB_OBJ_DIR).
+CONTRIB_FASLS=$(shell find $(shell echo $(MODULES) | sed "s|:|$(CONTRIB_OBJ_DIR)|g") -name '*.fasl')
 docstrings: $(CONTRIB_FASLS) tempfiles-stamp
 	for module in $(shell echo $(MODULES)); do \
-		test -f $(CONTRIBDIR)/`echo $$module | tr -d :`/test-passed \
+		test -f $(CONTRIB_OBJ_DIR)/`echo $$module | tr -d :`/test-passed.test-report \
 		|| { echo "The documented contrib $$module seems \
                            to have failed its tests." && exit 1; } \
 	done
