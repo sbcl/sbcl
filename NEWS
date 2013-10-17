@@ -7,6 +7,8 @@ changes relative to sbcl-1.1.12:
   * enhancement: The error message when calling an undefined alien function
     includes the name of the function on x86-64.
   * enhancement: sb-ext:run-program now supports :environment on Windows.
+  * enhancement: ASDF is no longer required to load contribs at runtime.
+    (lp#1132254)
   * bug fix: forward references to classes in fasls can now be loaded.
     (lp#746132)
   * bug fix: don't warn on a interpreted->compiled function redefinition
@@ -17,6 +19,8 @@ changes relative to sbcl-1.1.12:
     (Reported by Douglas Katzman)
   * bug fix: run-prorgram performs more correct escaping of arguments on
     Windows. (lp#1239242)
+  * bug fix: function-lambda-expression on generic functions returns the
+    actual name.
 
 changes in sbcl-1.1.12 relative to sbcl-1.1.11:
   * enhancement: Add sb-bsd-sockets:socket-shutdown, for calling
