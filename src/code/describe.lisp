@@ -616,7 +616,7 @@
                                            (:declared :declared)
                                            ;; This is hopefully clearer to users
                                            ((:defined-method :defined) :derived))))))
-                       (if (typep fun 'generic-function)
+                       (if (typep fun 'standard-generic-function)
                            (values fun
                                    "a generic function"
                                    (sb-mop:generic-function-lambda-list fun)

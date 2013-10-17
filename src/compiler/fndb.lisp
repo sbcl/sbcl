@@ -1374,6 +1374,7 @@
   null)
 
 (defknown describe (t &optional (or stream (member t nil))) (values))
+(defknown function-lambda-expression (function) (values t boolean t))
 (defknown inspect (t) (values))
 (defknown room (&optional (member t nil :default)) (values))
 (defknown ed (&optional (or symbol cons filename))
