@@ -1011,9 +1011,14 @@
 (defknown streamp (t) boolean (movable foldable flushable))
 (defknown stream-element-type (stream) type-specifier
   (movable foldable flushable))
+(defknown stream-external-format (stream) t (flushable))
 (defknown (output-stream-p input-stream-p) (stream) boolean
   (movable foldable flushable))
+(defknown open-stream-p (stream) boolean (flushable))
 (defknown close (stream &key (:abort t)) (eql t) ())
+(defknown file-string-length (ansi-stream (or string character))
+  (or unsigned-byte null)
+  (flushable))
 
 ;;;; from the "Input/Output" chapter:
 
@@ -1142,6 +1147,9 @@
   t
   (any explicit-check)
   :derive-type #'result-type-first-arg)
+
+(defknown (pprint) (t &optional stream-designator) (values)
+  (explicit-check))
 
 ;;; xxx-TO-STRING functions are not foldable because they depend on
 ;;; the dynamic environment, the state of the pretty printer dispatch
@@ -1367,6 +1375,13 @@
    (:emit-cfasl t))
   (values (or pathname null) boolean boolean))
 
+(defknown (compile-file-pathname)
+  (pathname-designator &key (:output-file (or pathname-designator
+                                              null
+                                              (member t)))
+                       &allow-other-keys)
+  pathname)
+
 ;; FIXME: consider making (OR CALLABLE CONS) something like
 ;; EXTENDED-FUNCTION-DESIGNATOR
 (defknown disassemble ((or callable cons) &key
@@ -1408,6 +1423,9 @@
   () internal-time (flushable))
 
 (defknown sleep ((real 0)) null (explicit-check))
+
+(defknown call-with-timing (callable callable &rest t) *
+  (call))
 
 ;;; Even though ANSI defines LISP-IMPLEMENTATION-TYPE and
 ;;; LISP-IMPLEMENTATION-VERSION to possibly punt and return NIL, we

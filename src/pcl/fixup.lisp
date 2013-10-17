@@ -41,7 +41,13 @@
 (in-package "SB-C")
 
 (defknown slot-value (t symbol) t (any))
+(defknown (slot-boundp slot-exists-p) (t symbol) boolean)
 (defknown sb-pcl::set-slot-value (t symbol t) t (any))
+
+(defknown find-class (symbol &optional t lexenv-designator)
+  (or class null))
+(defknown class-of (t) class (flushable))
+(defknown class-name (class) symbol (flushable))
 
 (deftransform slot-value ((object slot-name) (t (constant-arg symbol)) *
                           :node node)
