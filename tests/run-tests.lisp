@@ -1,7 +1,3 @@
-#+#.(cl:if (cl:find-package "ASDF") '(or) '(and))
-(require :asdf)
-
-#+#.(cl:if (cl:find-package "SB-POSIX") '(or) '(and))
 (handler-bind (#+win32 (warning #'muffle-warning))
   (require :sb-posix))
 
