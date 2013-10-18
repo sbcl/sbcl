@@ -230,9 +230,9 @@
   (assert-array-rank array (length indices))
   (derive-aref-type array))
 
-(defoptimizer (%aset derive-type) ((array &rest stuff))
-  (assert-array-rank array (1- (length stuff)))
-  (assert-new-value-type (car (last stuff)) array))
+(defoptimizer ((setf aref) derive-type) ((new-value array &rest subscripts))
+  (assert-array-rank array (length subscripts))
+  (assert-new-value-type new-value array))
 
 (macrolet ((define (name)
              `(defoptimizer (,name derive-type) ((array index))
@@ -987,28 +987,30 @@
 
 ;;;; array accessors
 
-;;; We convert all typed array accessors into AREF and %ASET with type
+;;; We convert all typed array accessors into AREF and (SETF AREF) with type
 ;;; assertions on the array.
-(macrolet ((define-bit-frob (reffer setter simplep)
+(macrolet ((define-bit-frob (reffer simplep)
              `(progn
                 (define-source-transform ,reffer (a &rest i)
                   `(aref (the (,',(if simplep 'simple-array 'array)
                                   bit
                                   ,(mapcar (constantly '*) i))
                            ,a) ,@i))
-                (define-source-transform ,setter (a &rest i)
-                  `(%aset (the (,',(if simplep 'simple-array 'array)
-                                   bit
-                                   ,(cdr (mapcar (constantly '*) i)))
-                            ,a) ,@i)))))
-  (define-bit-frob sbit %sbitset t)
-  (define-bit-frob bit %bitset nil))
+                (define-source-transform (setf ,reffer) (value a &rest i)
+                  `(setf (aref (the (,',(if simplep 'simple-array 'array)
+                                     bit
+                                     ,(mapcar (constantly '*) i))
+                                    ,a) ,@i)
+                         ,value)))))
+  (define-bit-frob sbit t)
+  (define-bit-frob bit nil))
+
 (macrolet ((define-frob (reffer setter type)
              `(progn
                 (define-source-transform ,reffer (a i)
                   `(aref (the ,',type ,a) ,i))
                 (define-source-transform ,setter (a i v)
-                  `(%aset (the ,',type ,a) ,i ,v)))))
+                  `(setf (aref (the ,',type ,a) ,i) ,v)))))
   (define-frob schar %scharset simple-string)
   (define-frob char %charset string))
 
@@ -1061,8 +1063,8 @@
                   (push (make-symbol (format nil "DIM-~D" i)) dims))
                 (setf n-indices (nreverse n-indices))
                 (setf dims (nreverse dims))
-                `(lambda (,',array ,@n-indices
-                                   ,@',(when new-value (list new-value)))
+                `(lambda (,@',(when new-value (list new-value))
+                          ,',array ,@n-indices)
                    (let* (,@(let ((,index -1))
                               (mapcar (lambda (name)
                                         `(,name (array-dimension
@@ -1095,17 +1097,16 @@
     (with-row-major-index (array indices index)
       index))
 
-  ;; Convert AREF and %ASET into a HAIRY-DATA-VECTOR-REF (or
+  ;; Convert AREF and (SETF AREF) into a HAIRY-DATA-VECTOR-REF (or
   ;; HAIRY-DATA-VECTOR-SET) with the set of indices replaced with the an
   ;; expression for the row major index.
   (deftransform aref ((array &rest indices))
     (with-row-major-index (array indices index)
       (hairy-data-vector-ref array index)))
 
-  (deftransform %aset ((array &rest stuff))
-    (let ((indices (butlast stuff)))
-      (with-row-major-index (array indices index new-value)
-        (hairy-data-vector-set array index new-value)))))
+  (deftransform (setf aref) ((new-value array &rest subscripts))
+    (with-row-major-index (array subscripts index new-value)
+                          (hairy-data-vector-set array index new-value))))
 
 ;; For AREF of vectors we do the bounds checking in the callee. This
 ;; lets us do a significantly more efficient check for simple-arrays
@@ -1130,7 +1131,7 @@
        `(hairy-data-vector-ref array index))
       (t `(hairy-data-vector-ref/check-bounds array index)))))
 
-(deftransform %aset ((array index new-value) (t t t) * :node node)
+(deftransform (setf aref) ((new-value array index) (t t t) * :node node)
   (if (policy node (zerop insert-array-bounds-checks))
       `(hairy-data-vector-set array index new-value)
       `(hairy-data-vector-set/check-bounds array index new-value)))

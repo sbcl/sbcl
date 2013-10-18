@@ -315,7 +315,7 @@
   '(nth i s))
 
 (deftransform %setelt ((s i v) ((simple-array * (*)) * *) *)
-  '(%aset s i v))
+  '(setf (aref s i) v))
 
 (deftransform %setelt ((s i v) (list * *) * :policy (< safety 3))
   '(setf (car (nthcdr i s)) v))

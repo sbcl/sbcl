@@ -2013,9 +2013,8 @@ is a good idea, but see SB-SYS re. blurring of boundaries."
                "STRING<*" "STRING/=*" "%SVSET"
                "%SP-STRING-COMPARE" "%SETNTH" "%SETELT"
                "%SET-ROW-MAJOR-AREF" "%SET-FILL-POINTER"
-               "%SET-FDEFINITION" "%SCHARSET" "%SBITSET"
-               "%RPLACD" "%RPLACA" "%PUT" "%CHARSET" "%BITSET"
-               "%ASET"))
+               "%SET-FDEFINITION" "%SCHARSET"
+               "%RPLACD" "%RPLACA" "%PUT" "%CHARSET"))
 
    #s(sb-cold:package-data
       :name "SB!THREAD"

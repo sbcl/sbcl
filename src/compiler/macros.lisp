@@ -514,21 +514,28 @@
 (defmacro defoptimizer (what (lambda-list &optional (n-node (sb!xc:gensym))
                                           &rest vars)
                              &body body)
-  (let ((name (if (symbolp what) what
-                  (symbolicate (first what) "-" (second what) "-OPTIMIZER"))))
+  (flet ((function-name (name)
+           (etypecase name
+             (symbol name)
+             ((cons (eql setf) (cons symbol null))
+              (symbolicate (car name) "-" (cadr name))))))
+   (let ((name (if (symbolp what)
+                   what
+                   (symbolicate (function-name (first what))
+                                "-" (second what) "-OPTIMIZER"))))
 
-    (let ((n-args (gensym)))
-      `(progn
-        (defun ,name (,n-node ,@vars)
-          (declare (ignorable ,@vars))
-          (let ((,n-args (basic-combination-args ,n-node)))
-            ,(parse-deftransform lambda-list body n-args
-                                 `(return-from ,name nil))))
-        ,@(when (consp what)
-            `((setf (,(let ((*package* (symbol-package 'sb!c::fun-info)))
-                        (symbolicate "FUN-INFO-" (second what)))
-                     (fun-info-or-lose ',(first what)))
-                    #',name)))))))
+     (let ((n-args (gensym)))
+       `(progn
+          (defun ,name (,n-node ,@vars)
+            (declare (ignorable ,@vars))
+            (let ((,n-args (basic-combination-args ,n-node)))
+              ,(parse-deftransform lambda-list body n-args
+                                   `(return-from ,name nil))))
+          ,@(when (consp what)
+              `((setf (,(let ((*package* (symbol-package 'sb!c::fun-info)))
+                          (symbolicate "FUN-INFO-" (second what)))
+                       (fun-info-or-lose ',(first what)))
+                      #',name))))))))
 
 ;;;; IR groveling macros
 

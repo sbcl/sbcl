@@ -1638,8 +1638,9 @@
 
 ;;;; SETF inverses
 
-(defknown %aset (array &rest t) t ()
-  :destroyed-constant-args (nth-constant-args 1))
+(defknown (setf aref) (t array &rest index) t ()
+  :destroyed-constant-args (nth-constant-args 2)
+  :derive-type #'result-type-first-arg)
 (defknown %set-row-major-aref (array index t) t ()
   :destroyed-constant-args (nth-constant-args 1))
 (defknown (%rplaca %rplacd) (cons t) t ()
@@ -1651,10 +1652,10 @@
   :derive-type #'result-type-last-arg)
 (defknown %svset (simple-vector index t) t ()
   :destroyed-constant-args (nth-constant-args 1))
-(defknown %bitset ((array bit) &rest index) bit ()
-  :destroyed-constant-args (nth-constant-args 1))
-(defknown %sbitset ((simple-array bit) &rest index) bit ()
-  :destroyed-constant-args (nth-constant-args 1))
+(defknown (setf bit) (bit (array bit) &rest index) bit ()
+  :destroyed-constant-args (nth-constant-args 2))
+(defknown (setf sbit) (bit (simple-array bit) &rest index) bit ()
+  :destroyed-constant-args (nth-constant-args 2))
 (defknown %charset (string index character) character ()
   :destroyed-constant-args (nth-constant-args 1))
 (defknown %scharset (simple-string index character) character ()

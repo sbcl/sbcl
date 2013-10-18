@@ -4860,3 +4860,13 @@
                                  rest)))))
       (dotimes (i limit)
         (test-function (make-function i) i)))))
+
+(with-test (:name :apply-aref)
+  (flet ((test (form)
+           (let (warning)
+             (handler-bind ((warning (lambda (c) (setf warning c))))
+               (compile nil `(lambda (x y) (setf (apply #'sbit x y) 10))))
+             (assert (not warning)))))
+    (test `(lambda (x y) (setf (apply #'aref x y) 21)))
+    (test `(lambda (x y) (setf (apply #'bit x y) 1)))
+    (test `(lambda (x y) (setf (apply #'sbit x y) 0)))))

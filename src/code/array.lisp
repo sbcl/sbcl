@@ -576,42 +576,14 @@ of specialized arrays is supported."
   (declare (truly-dynamic-extent subscripts))
   (row-major-aref array (%array-row-major-index array subscripts)))
 
-(defun %aset (array &rest stuff)
-  (declare (truly-dynamic-extent stuff))
-  (let ((subscripts (butlast stuff))
-        (new-value (car (last stuff))))
-    (setf (row-major-aref array (%array-row-major-index array subscripts))
-          new-value)))
-
-;;; FIXME: What's supposed to happen with functions
-;;; like AREF when we (DEFUN (SETF FOO) ..) when
-;;; DEFSETF FOO is also defined? It seems as though the logical
-;;; thing to do would be to nuke the macro definition for (SETF FOO)
-;;; and replace it with the (SETF FOO) function, issuing a warning,
-;;; just as for ordinary functions
-;;;  * (LISP-IMPLEMENTATION-VERSION)
-;;;  "18a+ release x86-linux 2.4.7 6 November 1998 cvs"
-;;;  * (DEFMACRO ZOO (X) `(+ ,X ,X))
-;;;  ZOO
-;;;  * (DEFUN ZOO (X) (* 3 X))
-;;;  Warning: ZOO previously defined as a macro.
-;;;  ZOO
-;;; But that doesn't seem to be what happens in CMU CL.
-;;;
-;;; KLUDGE: this is probably because ANSI, in its wisdom (CLHS
-;;; 5.1.2.5) requires implementations to support
-;;;   (SETF (APPLY #'AREF ...) ...)
-;;; [and also #'BIT and #'SBIT].  Yes, this is terrifying, and it's
-;;; also terrifying that this sequence of definitions causes it to
-;;; work.
-;;;
-;;; Also, it would be nice to make DESCRIBE FOO tell whether a symbol
-;;; has a setf expansion and/or a setf function defined.
-
-#!-sb-fluid (declaim (inline (setf aref)))
+;;; (setf aref/bit/sbit) are implemented using setf-functions,
+;;; because they have to work with (setf (apply #'aref array subscripts))
+;;; All other setfs can be done using setf-functions too, but I
+;;; haven't found technical advantages or disatvantages for either
+;;; scheme.
 (defun (setf aref) (new-value array &rest subscripts)
-  (declare (truly-dynamic-extent subscripts))
-  (declare (type array array))
+  (declare (truly-dynamic-extent subscripts)
+           (type array array))
   (setf (row-major-aref array (%array-row-major-index array subscripts))
         new-value))
 
@@ -639,20 +611,14 @@ of specialized arrays is supported."
 (defun bit (bit-array &rest subscripts)
   #!+sb-doc
   "Return the bit from the BIT-ARRAY at the specified SUBSCRIPTS."
-  (declare (type (array bit) bit-array) (optimize (safety 1)))
+  (declare (type (array bit) bit-array)
+           (optimize (safety 1)))
   (row-major-aref bit-array (%array-row-major-index bit-array subscripts)))
 
-(defun %bitset (bit-array &rest stuff)
-  (declare (type (array bit) bit-array) (optimize (safety 1)))
-  (let ((subscripts (butlast stuff))
-        (new-value (car (last stuff))))
-    (setf (row-major-aref bit-array
-                          (%array-row-major-index bit-array subscripts))
-          new-value)))
-
-#!-sb-fluid (declaim (inline (setf bit)))
 (defun (setf bit) (new-value bit-array &rest subscripts)
-  (declare (type (array bit) bit-array) (optimize (safety 1)))
+  (declare (type (array bit) bit-array)
+           (type bit new-value)
+           (optimize (safety 1)))
   (setf (row-major-aref bit-array
                         (%array-row-major-index bit-array subscripts))
         new-value))
@@ -660,25 +626,15 @@ of specialized arrays is supported."
 (defun sbit (simple-bit-array &rest subscripts)
   #!+sb-doc
   "Return the bit from SIMPLE-BIT-ARRAY at the specified SUBSCRIPTS."
-  (declare (type (simple-array bit) simple-bit-array) (optimize (safety 1)))
+  (declare (type (simple-array bit) simple-bit-array)
+           (optimize (safety 1)))
   (row-major-aref simple-bit-array
                   (%array-row-major-index simple-bit-array subscripts)))
 
-;;; KLUDGE: Not all these things (%SET-ROW-MAJOR-AREF, %SET-FILL-POINTER,
-;;; %SET-FDEFINITION, %SCHARSET, %SBITSET..) seem to deserve separate names.
-;;; Could we just DEFUN (SETF SBIT) etc. and get rid of the non-ANSI names?
-;;; -- WHN 19990911
-(defun %sbitset (simple-bit-array &rest stuff)
-  (declare (type (simple-array bit) simple-bit-array) (optimize (safety 1)))
-  (let ((subscripts (butlast stuff))
-        (new-value (car (last stuff))))
-    (setf (row-major-aref simple-bit-array
-                          (%array-row-major-index simple-bit-array subscripts))
-          new-value)))
-
-#!-sb-fluid (declaim (inline (setf sbit)))
 (defun (setf sbit) (new-value bit-array &rest subscripts)
-  (declare (type (simple-array bit) bit-array) (optimize (safety 1)))
+  (declare (type (simple-array bit) bit-array)
+           (type bit new-value)
+           (optimize (safety 1)))
   (setf (row-major-aref bit-array
                         (%array-row-major-index bit-array subscripts))
         new-value))
