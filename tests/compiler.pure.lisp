@@ -4870,3 +4870,13 @@
     (test `(lambda (x y) (setf (apply #'aref x y) 21)))
     (test `(lambda (x y) (setf (apply #'bit x y) 1)))
     (test `(lambda (x y) (setf (apply #'sbit x y) 0)))))
+
+(with-test (:name :warn-on-the-values-constant)
+  (multiple-value-bind (fun warnings-p failure-p)
+      (compile nil
+               ;; The compiler used to elide this test without
+               ;; noting that the type demands multiple values.
+               '(lambda () (the (values fixnum fixnum) 1)))
+    (declare (ignore warnings-p))
+    (assert (functionp fun))
+    (assert failure-p)))

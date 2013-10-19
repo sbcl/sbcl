@@ -17,10 +17,13 @@ changes relative to sbcl-1.1.12:
     vectors from FASLs. (Reported by Jan Moringen)
   * bug fix: COMPILE can now succefully compile setf functions.
     (Reported by Douglas Katzman)
-  * bug fix: run-prorgram performs more correct escaping of arguments on
+  * bug fix: run-program performs more correct escaping of arguments on
     Windows. (lp#1239242)
   * bug fix: function-lambda-expression on generic functions returns the
     actual name.
+  * bug fix: (the [type] [constant]) now warns when [constant] matches
+    [type] except for the number of values.  (Reported by Nathan Trapuzzano
+    on sbcl-help)
 
 changes in sbcl-1.1.12 relative to sbcl-1.1.11:
   * enhancement: Add sb-bsd-sockets:socket-shutdown, for calling

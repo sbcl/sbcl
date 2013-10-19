@@ -912,6 +912,8 @@ other."
                     (values-subtypep (make-single-value-type (leaf-type value))
                                      type))
                (and (sb!xc:constantp value)
+                    (or (not (values-type-p type))
+                        (values-type-may-be-single-value-p type))
                     (ctypep (constant-form-value value)
                             (single-value-type type))))
            (ir1-convert start next result value))
