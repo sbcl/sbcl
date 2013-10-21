@@ -113,6 +113,7 @@
                   *the-class-global-writer-method*
                   *the-class-global-boundp-method*
                   *the-class-standard-generic-function*
+                  *the-class-standard-direct-slot-definition*
                   *the-class-standard-effective-slot-definition*
 
                   *the-eslotd-standard-class-slots*

@@ -446,14 +446,6 @@
     :initform nil
     :initarg :initfunction
     :accessor slot-definition-initfunction)
-   (readers
-    :initform nil
-    :initarg :readers
-    :accessor slot-definition-readers)
-   (writers
-    :initform nil
-    :initarg :writers
-    :accessor slot-definition-writers)
    (initargs
     :initform nil
     :initarg :initargs
@@ -501,7 +493,14 @@
      :accessor slot-definition-internal-writer-function)))
 
 (defclass direct-slot-definition (slot-definition)
-  ())
+  ((readers
+    :initform nil
+    :initarg :readers
+    :accessor slot-definition-readers)
+   (writers
+    :initform nil
+    :initarg :writers
+    :accessor slot-definition-writers)))
 
 (defclass effective-slot-definition (slot-definition)
   ((accessor-flags

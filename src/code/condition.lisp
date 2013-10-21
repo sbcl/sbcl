@@ -68,12 +68,13 @@
   (writers (missing-arg) :type list)
   ;; true if :INITFORM was specified
   (initform-p (missing-arg) :type (member t nil))
-  ;; If this is a function, call it with no args. Otherwise, it's the
-  ;; actual value.
-  (initform (missing-arg) :type t)
+  ;; the initform if :INITFORM was specified, otherwise NIL
+  (initform nil :type t)
+  ;; if this is a function, call it with no args to get the initform value
+  (initfunction (missing-arg) :type t)
   ;; allocation of this slot, or NIL until defaulted
   (allocation nil :type (member :instance :class nil))
-  ;; If ALLOCATION is :CLASS, this is a cons whose car holds the value.
+  ;; If ALLOCATION is :CLASS, this is a cons whose car holds the value
   (cell nil :type (or cons null))
   ;; slot documentation
   (documentation nil :type (or string null)))
@@ -187,10 +188,9 @@
 
     ;; Otherwise use the initform of SLOT, if there is one.
     (if (condition-slot-initform-p slot)
-        (let ((initform (condition-slot-initform slot)))
-          (if (functionp initform)
-              (funcall initform)
-              initform))
+        (let ((initfun (condition-slot-initfunction slot)))
+          (aver (functionp initfun))
+          (funcall initfun))
         (error "unbound condition slot: ~S" (condition-slot-name slot)))))
 
 (defun find-condition-class-slot (condition-class slot-name)
@@ -364,7 +364,9 @@
                    (setf (condition-slot-initform-p found)
                          (condition-slot-initform-p sslot))
                    (setf (condition-slot-initform found)
-                         (condition-slot-initform sslot)))
+                         (condition-slot-initform sslot))
+                   (setf (condition-slot-initfunction sslot)
+                         (condition-slot-initfunction found)))
                  (unless (condition-slot-allocation found)
                    (setf (condition-slot-allocation found)
                          (condition-slot-allocation sslot))))
@@ -434,15 +436,15 @@
              (unless (condition-slot-cell slot)
                (setf (condition-slot-cell slot)
                      (list (if (condition-slot-initform-p slot)
-                               (let ((initform (condition-slot-initform slot)))
-                                 (if (functionp initform)
-                                     (funcall initform)
-                                     initform))
+                               (let ((initfun (condition-slot-initfunction slot)))
+                                 (aver (functionp initfun))
+                                 (funcall initfun))
                                *empty-condition-slot*))))
              (push slot (condition-classoid-class-slots class)))
             ((:instance nil)
              (setf (condition-slot-allocation slot) :instance)
-             (when (or (functionp (condition-slot-initform slot))
+             ;; FIXME: isn't this "always hairy"?
+             (when (or (functionp (condition-slot-initfunction slot))
                        (dolist (initarg (condition-slot-initargs slot) nil)
                          (when (functionp (third (assoc initarg e-def-initargs)))
                            (return t))))
@@ -532,8 +534,9 @@
                      :writers ',(writers)
                      :initform-p ',initform-p
                      :documentation ',documentation
-                     :initform ,(when initform-p
-                                  `#'(lambda () ,initform))
+                     :initform ,(when initform-p `',initform)
+                     :initfunction ,(when initform-p
+                                      `#'(lambda () ,initform))
                      :allocation ',allocation)))))
 
       (dolist (option options)

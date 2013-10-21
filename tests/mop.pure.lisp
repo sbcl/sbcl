@@ -93,3 +93,47 @@
     (ensure-generic-function 'make-instance :method-combination mc))
   ;; Let's make sure the list works too...
   (ensure-generic-function 'make-instance :method-combination '(standard)))
+
+(with-test (:name :bug-309072)
+  ;; original reported test cases
+  (raises-error? (make-instance 'sb-mop:slot-definition))
+  (raises-error? (make-instance 'sb-mop:slot-definition :name 'pi))
+  (raises-error? (make-instance 'sb-mop:slot-definition :name 3))
+  ;; extra cases from the MOP dictionary
+  (raises-error? (make-instance 'sb-mop:slot-definition :name 'x
+                                :initform nil))
+  (raises-error? (make-instance 'sb-mop:slot-definition :name 'x
+                                :initfunction (lambda () nil)))
+  (raises-error? (make-instance 'sb-mop:slot-definition :name 'x
+                                :initfunction (lambda () nil)))
+  (raises-error? (make-instance 'sb-mop:slot-definition :name 'x
+                                :allocation ""))
+  (raises-error? (make-instance 'sb-mop:slot-definition :name 'x
+                                :initargs ""))
+  (raises-error? (make-instance 'sb-mop:slot-definition :name 'x
+                                :initargs '(foo . bar)))
+  (raises-error? (make-instance 'sb-mop:slot-definition :name 'x
+                                :initargs '(foo bar 3)))
+  (raises-error? (make-instance 'sb-mop:slot-definition :name 'x
+                                :documentation '(())))
+  ;; distinction between DIRECT- and EFFECTIVE- slot definitions
+  (raises-error? (make-instance 'sb-mop:effective-slot-definition
+                                :name 'x :readers '(foo)))
+  (raises-error? (make-instance 'sb-mop:effective-slot-definition
+                                :name 'x :writers '(foo)))
+  (make-instance 'sb-mop:direct-slot-definition
+                 :name 'x :readers '(foo))
+  (make-instance 'sb-mop:direct-slot-definition
+                 :name 'x :writers '(foo))
+  (raises-error? (make-instance 'sb-mop:direct-slot-definition
+                                :name 'x :readers ""))
+  (raises-error? (make-instance 'sb-mop:direct-slot-definition
+                                :name 'x :readers '(3)))
+  (raises-error? (make-instance 'sb-mop:direct-slot-definition
+                                :name 'x :readers '(foo . bar)))
+  (raises-error? (make-instance 'sb-mop:direct-slot-definition
+                                :name 'x :writers ""))
+  (raises-error? (make-instance 'sb-mop:direct-slot-definition
+                                :name 'x :writers '(3)))
+  (raises-error? (make-instance 'sb-mop:direct-slot-definition
+                                :name 'x :writers '(foo . bar))))

@@ -100,6 +100,94 @@
              (setf (gethash type **typecheck-cache**) fun
                    (slot-info-typecheck info) fun))))))))
 
+(define-condition slotd-initialization-error (reference-condition error)
+  ((initarg :initarg :initarg :reader slotd-initialization-error-initarg)
+   (kind :initarg :kind :reader slotd-initialization-error-kind)
+   (value :initarg :value :initform nil :reader slotd-initialization-error-value))
+  (:default-initargs :references (list '(:amop :initialization slot-definition)))
+  (:report (lambda (condition stream)
+             (let ((initarg (slotd-initialization-error-initarg condition))
+                   (kind (slotd-initialization-error-kind condition))
+                   (value (slotd-initialization-error-value condition)))
+               (format stream
+                       "~@<Invalid ~S initialization: the initialization ~
+                        argument ~S was ~
+                        ~[missing~*~;not a symbol: ~S~;constant: ~S~].~@:>"
+                       'slot-definition initarg
+                       (getf '(:missing 0 :symbol 1 :constant 2) kind)
+                       value)))))
+
+(define-condition slotd-initialization-type-error (slotd-initialization-error type-error)
+  ((value :initarg :datum))
+  (:report (lambda (condition stream)
+             (let ((initarg (slotd-initialization-error-initarg condition))
+                   (datum (type-error-datum condition))
+                   (expected-type (type-error-expected-type condition)))
+               (format stream
+                       "~@<Invalid ~S initialization: the initialization ~
+                        argument ~S was ~S, which is not of type ~S.~@:>"
+                       'slot-definition initarg
+                       datum expected-type)))))
+
+(defmethod initialize-instance :before ((slotd slot-definition)
+                                        &key (name nil namep)
+                                          (initform nil initformp)
+                                          (initfunction nil initfunp)
+                                          (type nil typep)
+                                          (allocation nil allocationp)
+                                          (initargs nil initargsp)
+                                          (documentation nil docp))
+  (unless namep
+    (error 'slotd-initialization-error :initarg :name :kind :missing))
+  (unless (symbolp name)
+    (error 'slotd-initialization-type-error :initarg :name :datum name :expected-type 'symbol))
+  (when (constantp name)
+    (error 'slotd-initialization-error :initarg :name :kind :constant :value name))
+  (when (and initformp (not initfunp))
+    (error 'slotd-initialization-error :initarg :initfunction :kind :missing))
+  (when (and initfunp (not initformp))
+    (error 'slotd-initialization-error :initarg :initform :kind :missing))
+  (when (and typep (not t))
+    ;; FIXME: do something.  Need SYNTACTICALLY-VALID-TYPE-SPECIFIER-P
+    )
+  (when (and allocationp (not (symbolp allocation)))
+    (error 'slotd-initialization-type-error :initarg :allocation :datum allocation :expected-type 'symbol))
+  (when initargsp
+    (unless (typep initargs 'list)
+      (error 'slotd-initialization-type-error :initarg :initarg :datum initargs :expected-type 'list))
+    (do ((is initargs (cdr is)))
+        ((atom is)
+         (unless (null is)
+           (error 'slotd-initialization-type-error :initarg :initarg :datum initargs :expected-type '(satisfies proper-list-p))))
+      (unless (symbolp (car is))
+        (error 'slotd-initialization-type-error :initarg :initarg :datum is :expected-type '(or null (cons symbol))))))
+  (when docp
+    (unless (typep documentation '(or null string))
+      (error 'slotd-initialization-type-error :initarg :documentation :datum documentation :expected-type '(or null string)))))
+
+(defmethod initialize-instance :before ((dslotd direct-slot-definition)
+                                        &key
+                                          (readers nil readersp)
+                                          (writers nil writersp))
+  (macrolet ((check (arg argp)
+               `(when ,argp
+                  (unless (typep ,arg 'list)
+                    (error 'slotd-initialization-type-error
+                           :initarg ,(keywordicate arg)
+                           :datum ,arg :expected-type 'list))
+                  (do ((as ,arg (cdr as)))
+                      ((atom as)
+                       (unless (null as)
+                         (error 'slotd-initialization-type-error
+                                :initarg ,(keywordicate arg)
+                                :datum ,arg :expected-type '(satisfies proper-list-p))))
+                    (unless (valid-function-name-p (car as))
+                      (error 'slotd-initialization-type-error
+                             :initarg ,(keywordicate arg)
+                             :datum ,arg :expected-type '(or null (cons (satisfies valid-function-name-p)))))))))
+    (check readers readersp)
+    (check writers writersp)))
+
 (defmethod initialize-instance :after ((slotd effective-slot-definition) &key)
   (let ((info (make-slot-info :slotd slotd)))
     (generate-slotd-typecheck slotd info)

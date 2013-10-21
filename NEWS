@@ -24,6 +24,8 @@ changes relative to sbcl-1.1.12:
   * bug fix: (the [type] [constant]) now warns when [constant] matches
     [type] except for the number of values.  (Reported by Nathan Trapuzzano
     on sbcl-help)
+  * bug fix: signal errors in required cases of slot-definition initialization
+    protocol.  (lp#309072)
 
 changes in sbcl-1.1.12 relative to sbcl-1.1.11:
   * enhancement: Add sb-bsd-sockets:socket-shutdown, for calling

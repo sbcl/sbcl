@@ -1940,6 +1940,7 @@ is a good idea, but see SB-SYS re. blurring of boundaries."
                "CONDITION-SLOT-INITARGS"
                "CONDITION-SLOT-INITFORM"
                "CONDITION-SLOT-INITFORM-P"
+               "CONDITION-SLOT-INITFUNCTION"
                "CONDITION-SLOT-NAME" "CONDITION-SLOT-READERS"
                "CONDITION-SLOT-WRITERS"
 

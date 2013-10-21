@@ -181,8 +181,13 @@ Except see also BREAK-VICIOUS-METACIRCLE.  -- CSR, 2003-05-28
 ;;; lookup machinery.
 
 (defvar *standard-classes*
+  ;; KLUDGE: order matters!  finding effective slot definitions
+  ;; involves calling slot-definition-name, and we need to do that to
+  ;; break metacycles, so STANDARD-EFFECTIVE-SLOT-DEFINITION must
+  ;; precede STANDARD-DIRECT-SLOT-DEFINITION in this list, at least
+  ;; until ACCESSES-STANDARD-CLASS-SLOT-P is generalized
   '(standard-method standard-generic-function standard-class
-    standard-effective-slot-definition))
+    standard-effective-slot-definition standard-direct-slot-definition))
 
 (defvar *standard-slot-locations* (make-hash-table :test 'equal))
 
@@ -223,6 +228,10 @@ Except see also BREAK-VICIOUS-METACIRCLE.  -- CSR, 2003-05-28
 (defun standard-slot-value/eslotd (slotd slot-name)
   (standard-slot-value slotd slot-name
                        *the-class-standard-effective-slot-definition*))
+
+(defun standard-slot-value/dslotd (slotd slot-name)
+  (standard-slot-value slotd slot-name
+                       *the-class-standard-direct-slot-definition*))
 
 (defun standard-slot-value/class (class slot-name)
   (standard-slot-value class slot-name *the-class-standard-class*))
@@ -1107,17 +1116,32 @@ Except see also BREAK-VICIOUS-METACIRCLE.  -- CSR, 2003-05-28
 ;;; object of the slot accessed, and ACCESSOR-TYPE is one of the symbols
 ;;; READER or WRITER describing the slot access.
 (defun accesses-standard-class-slot-p (gf)
-  (flet ((standard-class-slot-access (gf class)
-           (loop with gf-name = (standard-slot-value/gf gf 'name)
-                 for slotd in (standard-slot-value/class class 'slots)
-                 ;; FIXME: where does BOUNDP fit in here?  Is it
-                 ;; relevant?
-                 as readers = (standard-slot-value/eslotd slotd 'readers)
-                 as writers = (standard-slot-value/eslotd slotd 'writers)
-                 if (member gf-name readers :test #'equal)
-                   return (values slotd 'reader)
-                 else if (member gf-name writers :test #'equal)
-                   return (values slotd 'writer))))
+  (labels
+      ((all-dslotds (class &aux done)
+         (labels ((all-dslotds-aux (class)
+                    (if (or (member class done) (not (eq (class-of class) *the-class-standard-class*)))
+                        nil
+                        (progn
+                          (push class done)
+                          (append (standard-slot-value/class class 'direct-slots)
+                                  (mapcan #'(lambda (c)
+                                              (copy-list (all-dslotds-aux c)))
+                                          (standard-slot-value/class class 'direct-superclasses)))))))
+           (all-dslotds-aux class)))
+       (standard-class-slot-access (gf class)
+
+         (loop with gf-name = (standard-slot-value/gf gf 'name)
+            with eslotds = (standard-slot-value/class class 'slots)
+            with dslotds = (all-dslotds class)
+            for dslotd in dslotds
+            as readers = (standard-slot-value/dslotd dslotd 'readers)
+            as writers = (standard-slot-value/dslotd dslotd 'writers)
+            as name = (standard-slot-value/dslotd dslotd 'name)
+            as eslotd = (find name eslotds :key (lambda (x) (standard-slot-value/eslotd x 'name)))
+            if (member gf-name readers :test #'equal)
+            return (values eslotd 'reader)
+            else if (member gf-name writers :test #'equal)
+            return (values eslotd 'writer))))
     (dolist (class-name *standard-classes*)
       (let ((class (find-class class-name)))
         (multiple-value-bind (slotd accessor-type)
