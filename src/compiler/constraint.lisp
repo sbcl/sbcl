@@ -561,9 +561,7 @@
            (ok-lvar-lambda-var (cast-value use) constraints)))))
 ;;;; Searching constraints
 
-;;; Add the indicated test constraint to BLOCK. We don't add the
-;;; constraint if the block has multiple predecessors, since it only
-;;; holds on this particular path.
+;;; Add the indicated test constraint to TARGET.
 (defun precise-add-test-constraint (fun x y not-p constraints target)
   (if (and (eq 'eql fun) (lambda-var-p y) (not not-p))
       (add-eql-var-var-constraint x y constraints target)
@@ -606,6 +604,48 @@
       (precise-add-complement-constraints fun x y not-p constraints
                                           consequent-constraints
                                           alternative-constraints)))
+
+(defun add-combination-test-constraints (use constraints
+                                         consequent-constraints
+                                         alternative-constraints
+                                         quick-p)
+  (flet ((add (fun x y not-p)
+           (add-complement-constraints quick-p
+                                       fun x y not-p
+                                       constraints
+                                       consequent-constraints
+                                       alternative-constraints))
+         (prop (triples target)
+           (map nil (lambda (constraint)
+                      (destructuring-bind (kind x y &optional not-p)
+                          constraint
+                        (when (and kind x y)
+                          (add-test-constraint quick-p
+                                               kind x y
+                                               not-p constraints
+                                               target))))
+                triples)))
+    (when (eq (combination-kind use) :known)
+      (binding* ((info (combination-fun-info use) :exit-if-null)
+                 (propagate (fun-info-constraint-propagate-if
+                             info)
+                            :exit-if-null))
+        (multiple-value-bind (lvar type if else)
+            (funcall propagate use constraints)
+          (prop if consequent-constraints)
+          (prop else alternative-constraints)
+          (when (and lvar type)
+            (add 'typep (ok-lvar-lambda-var lvar constraints)
+                 type nil)
+            (return-from add-combination-test-constraints)))))
+    (let* ((name (lvar-fun-name
+                  (basic-combination-fun use)))
+           (args (basic-combination-args use))
+           (ptype (gethash name *backend-predicate-types*)))
+      (when ptype
+        (add 'typep (ok-lvar-lambda-var (first args)
+                                        constraints)
+             ptype nil)))))
 
 ;;; Add test constraints to the consequent and alternative blocks of
 ;;; the test represented by USE.
@@ -686,10 +726,10 @@
                     (when var2
                       (add (if (eq name '<) '> '<) var2 (lvar-type arg1) nil))))
                  (t
-                  (let ((ptype (gethash name *backend-predicate-types*)))
-                    (when ptype
-                      (add 'typep (ok-lvar-lambda-var (first args) constraints)
-                           ptype nil))))))))))
+                  (add-combination-test-constraints use constraints
+                                                    consequent-constraints
+                                                    alternative-constraints
+                                                    quick-p))))))))
       (values consequent-constraints alternative-constraints))))
 
 ;;;; Applying constraints
@@ -954,7 +994,25 @@
            (unless (eq type *universal-type*)
              (conset-add-constraint gen 'typep var type nil)))
          (unless (policy node (> compilation-speed speed))
-           (maybe-add-eql-var-var-constraint var (set-value node) gen))))))
+           (maybe-add-eql-var-var-constraint var (set-value node) gen))))
+      (combination
+       (when (eq (combination-kind node) :known)
+         (binding* ((info (combination-fun-info node) :exit-if-null)
+                    (propagate (fun-info-constraint-propagate info)
+                               :exit-if-null)
+                    (constraints (funcall propagate node gen))
+                    (register (if (policy node
+                                          (> compilation-speed speed))
+                                  #'conset-add-constraint
+                                  #'conset-add-constraint-to-eql)))
+           (map nil (lambda (constraint)
+                      (destructuring-bind (kind x y &optional not-p)
+                          constraint
+                        (when (and kind x y)
+                          (funcall register gen
+                                   kind x y
+                                   not-p))))
+                constraints))))))
   gen)
 
 (defun constraint-propagate-if (block gen)

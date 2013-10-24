@@ -131,6 +131,27 @@
   ;; If true, the function can stack-allocate the result. The
   ;; COMBINATION node is passed as an argument.
   (stack-allocate-result nil :type (or function null))
+  ;; If true, the function can add flow-sensitive type information
+  ;; about the state of the world after its execution. The COMBINATION
+  ;; node is passed as an argument, along with the current set of
+  ;; active constraints for the block.  The function returns a
+  ;; sequence of constraints; a constraint is a triplet of a
+  ;; constraint kind (a symbol, see (defstruct (constraint ...)) in
+  ;; constraint.lisp) and arguments, either LVARs, LAMBDA-VARs, or
+  ;; CTYPEs.  If any of these arguments is NIL, the constraint is
+  ;; skipped. This simplifies integration with OK-LVAR-LAMBDA-VAR,
+  ;; which maps LVARs to LAMBDA-VARs.  An optional fourth value in
+  ;; each constraint flips the meaning of the constraint if it is
+  ;; non-NIL.
+  (constraint-propagate nil :type (or function null))
+  ;; If true, the function can add flow-sensitive type information
+  ;; depending on the truthiness of its return value.  Returns two
+  ;; values, a LVAR and a CTYPE. The LVAR is of that CTYPE iff the
+  ;; function returns true.
+  ;; It may also return additional third and fourth values. Each is
+  ;; a sequence of constraints (see CONSTRAINT-PROPAGATE), for the
+  ;; consequent and alternative branches, respectively.
+  (constraint-propagate-if nil :type (or function null))
   ;; all the templates that could be used to translate this function
   ;; into IR2, sorted by increasing cost.
   (templates nil :type list)
