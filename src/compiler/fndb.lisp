@@ -1478,6 +1478,9 @@
   (movable flushable explicit-check))
 (defknown %instance-typep (t (or type-specifier ctype)) boolean
   (movable flushable explicit-check always-translatable))
+;;; We should never emit a call to %typep-wrapper
+(defknown %typep-wrapper (t t (or type-specifier ctype)) t
+  (movable flushable always-translatable))
 
 (defknown %cleanup-point () t)
 (defknown %special-bind (t t) t)

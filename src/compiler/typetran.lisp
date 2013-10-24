@@ -132,6 +132,35 @@
     `(or (classoid-cell-classoid ',cell)
          (error "class not yet defined: ~S" name))))
 
+(defoptimizer (%typep-wrapper constraint-propagate-if)
+    ((test-value variable type) node gen)
+  (aver (constant-lvar-p type))
+  (let ((type (lvar-value type)))
+    (values variable (if (ctype-p type)
+                         type
+                         (handler-case (careful-specifier-type type)
+                           (t () nil))))))
+
+(deftransform %typep-wrapper ((test-value variable type) * * :node node)
+  (aver (constant-lvar-p type))
+  (if (constant-lvar-p test-value)
+      `',(lvar-value test-value)
+      (let* ((type (lvar-value type))
+             (type (if (ctype-p type)
+                       type
+                       (handler-case (careful-specifier-type type)
+                         (t () nil))))
+             (value-type (lvar-type variable)))
+        (cond ((not type)
+               'test-value)
+              ((csubtypep value-type type)
+               t)
+              ((not (types-equal-or-intersect value-type type))
+               nil)
+              (t
+               (delay-ir1-transform node :constraint)
+               'test-value)))))
+
 ;;;; standard type predicates, i.e. those defined in package COMMON-LISP,
 ;;;; plus at least one oddball (%INSTANCEP)
 ;;;;
@@ -590,11 +619,11 @@
 ;;; to that predicate. Otherwise, we dispatch off of the type's type.
 ;;; These transformations can increase space, but it is hard to tell
 ;;; when, so we ignore policy and always do them.
-(defun source-transform-typep (object type)
+(defun %source-transform-typep (object type)
   (let ((ctype (careful-specifier-type type)))
     (or (when (not ctype)
           (compiler-warn "illegal type specifier for TYPEP: ~S" type)
-          (return-from source-transform-typep (values nil t)))
+          (return-from %source-transform-typep (values nil t)))
         (multiple-value-bind (constantp value) (type-singleton-p ctype)
           (and constantp
                `(eql ,object ',value)))
@@ -614,7 +643,7 @@
            `(if (member ,object ',(member-type-members ctype)) t))
           (args-type
            (compiler-warn "illegal type specifier for TYPEP: ~S" type)
-           (return-from source-transform-typep (values nil t)))
+           (return-from %source-transform-typep (values nil t)))
           (t nil))
         (typecase ctype
           (numeric-type
@@ -632,6 +661,15 @@
            (source-transform-simd-pack-typep object ctype))
           (t nil))
         `(%typep ,object ',type))))
+
+(defun source-transform-typep (object type)
+  (let ((name (gensym "OBJECT")))
+    (multiple-value-bind (transform error)
+        (%source-transform-typep name type)
+      (if error
+          (values nil t)
+          (values `(let ((,name ,object))
+                     (%typep-wrapper ,transform ,name ',type)))))))
 
 (define-source-transform typep (object spec &optional env)
   ;; KLUDGE: It looks bad to only do this on explicitly quoted forms,

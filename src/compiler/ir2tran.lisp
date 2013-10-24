@@ -1833,6 +1833,13 @@
     (if (template-p (basic-combination-info node))
         (ir2-convert-template node block)
         (ir2-convert-full-call node block))))
+
+;; just a fancy identity
+(defoptimizer (%typep-wrapper ir2-convert) ((value variable type) node block)
+  (let* ((lvar (node-lvar node))
+         (results (lvar-result-tns lvar (list (primitive-type-or-lose t)))))
+    (emit-move node block (lvar-tn node block value) (first results))
+    (move-lvar-result node block results lvar)))
 
 ;;; Convert the code in a component into VOPs.
 (defun ir2-convert (component)
