@@ -852,8 +852,7 @@
   (or (when (forward-referenced-class-p class)
         class)
       (some #'class-has-a-forward-referenced-superclass-p
-            ;; KLUDGE: SOME conses without knowing the type
-            (the list (class-direct-superclasses class)))))
+            (class-direct-superclasses class))))
 
 ;;; This is called by :after shared-initialize whenever a class is initialized
 ;;; or reinitialized. The class may or may not be finalized.

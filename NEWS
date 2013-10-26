@@ -13,6 +13,8 @@ changes relative to sbcl-1.1.12:
     COMPUTE-RESTARTS, making it faster and cons less (lp#769615)
   * enhancement: FIND-RESTART and COMPUTE-RESTARTS handle huge restart
     clusters better in some cases
+  * enhancement: SOME/ANY/other quantification higher-order functions no
+    longer cons. (lp#1070635)
   * bug fix: forward references to classes in fasls can now be loaded.
     (lp#746132)
   * bug fix: don't warn on a interpreted->compiled function redefinition

@@ -1207,17 +1207,20 @@ many elements are copied."
                 ;; from the old seq.lisp into target-seq.lisp.
                 (define-compiler-macro ,name (pred first-seq &rest more-seqs)
                   (let ((elements (make-gensym-list (1+ (length more-seqs))))
-                        (blockname (sb!xc:gensym "BLOCK")))
+                        (blockname (sb!xc:gensym "BLOCK"))
+                        (wrapper (sb!xc:gensym "WRAPPER")))
                     (once-only ((pred pred))
                       `(block ,blockname
-                         (map nil
-                              (lambda (,@elements)
-                                (let ((pred-value (funcall ,pred ,@elements)))
-                                  (,',found-test pred-value
-                                    (return-from ,blockname
-                                      ,',found-result))))
-                              ,first-seq
-                              ,@more-seqs)
+                         (flet ((,wrapper (,@elements)
+                                  (declare (optimize (sb!c::check-tag-existence 0)))
+                                  (let ((pred-value (funcall ,pred ,@elements)))
+                                    (,',found-test pred-value
+                                                   (return-from ,blockname
+                                                     ,',found-result)))))
+                           (declare (inline ,wrapper)
+                                    (dynamic-extent #',wrapper))
+                           (map nil #',wrapper ,first-seq
+                                ,@more-seqs))
                          ,',unfound-result)))))))
   (defquantifier some when pred-value :unfound-result nil :doc
   "Apply PREDICATE to the 0-indexed elements of the sequences, then
