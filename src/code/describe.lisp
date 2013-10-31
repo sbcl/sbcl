@@ -594,7 +594,8 @@
                         from
                         (type-specifier (info :function :type name)))))))
         ;; Defined.
-        (multiple-value-bind (fun what lambda-list ftype from inline methods)
+        (multiple-value-bind (fun what lambda-list derived-type declared-type
+                              inline methods)
             (cond ((and (not function) (symbolp name) (special-operator-p name))
                    (let ((fun (symbol-function name)))
                      (values fun "a special operator" (%fun-lambda-list fun))))
@@ -602,54 +603,62 @@
                    (let ((fun (macro-function name)))
                      (values fun "a macro" (%fun-lambda-list fun))))
                   (t
-                   (let ((fun (or function (fdefinition name))))
-                     (multiple-value-bind (ftype from)
-                         (if function
-                             (values (%fun-type function) :derived)
-                             (let ((ctype (info :function :type name)))
-                               (values (when ctype (type-specifier ctype))
-                                       (when ctype
-                                         ;; Ensure lazy pickup of information
-                                         ;; from methods.
-                                         (sb-c::maybe-update-info-for-gf name)
-                                         (ecase (info :function :where-from name)
-                                           (:declared :declared)
-                                           ;; This is hopefully clearer to users
-                                           ((:defined-method :defined) :derived))))))
-                       (if (typep fun 'standard-generic-function)
-                           (values fun
-                                   "a generic function"
-                                   (sb-mop:generic-function-lambda-list fun)
-                                   ftype
-                                   from
-                                   nil
-                                   (or (sb-mop:generic-function-methods fun)
-                                       :none))
-                           (values fun
-                                   (if (compiled-function-p fun)
-                                       "a compiled function"
-                                       "an interpreted function")
-                                   (%fun-lambda-list fun)
-                                   ftype
-                                   from
-                                   (unless function
-                                     (cons
-                                      (info :function :inlinep name)
-                                      (info :function :inline-expansion-designator name)))))))))
+                   (let* ((fun (or function (fdefinition name)))
+                          (derived-type (and function
+                                             (%fun-type function)))
+                          (legal-name-p (legal-fun-name-p name))
+                          (ctype (and legal-name-p
+                                      (info :function :type name)))
+                          (type (and ctype (type-specifier ctype)))
+                          (from (and legal-name-p
+                                     (info :function :where-from name)))
+                          declared-type)
+                     ;; Ensure lazy pickup of information
+                     ;; from methods.
+                     (when legal-name-p
+                       (sb-c::maybe-update-info-for-gf name))
+                     (cond ((not type))
+                           ((eq from :declared)
+                            (setf declared-type type))
+                           ((and (not derived-type)
+                                 (member from '(:defined-method :defined)))
+                            (setf derived-type type)))
+                     (unless derived-type
+                       (setf derived-type (%fun-type fun)))
+                     (if (typep fun 'standard-generic-function)
+                         (values fun
+                                 "a generic function"
+                                 (sb-mop:generic-function-lambda-list fun)
+                                 derived-type
+                                 declared-type
+                                 nil
+                                 (or (sb-mop:generic-function-methods fun)
+                                     :none))
+                         (values fun
+                                 (if (compiled-function-p fun)
+                                     "a compiled function"
+                                     "an interpreted function")
+                                 (%fun-lambda-list fun)
+                                 derived-type
+                                 declared-type
+                                 (cons
+                                  (info :function :inlinep name)
+                                  (info :function :inline-expansion-designator
+                                        name)))))))
           (pprint-logical-block (stream nil)
             (unless function
               (format stream "~%~A names ~A:" name what)
               (pprint-indent :block 2 stream))
             (describe-lambda-list lambda-list stream)
-            (when (and ftype from)
-              (format stream "~@:_~:(~A~) type: ~S" from ftype))
-            (when (eq :declared from)
-              (let ((derived-ftype (%fun-type fun)))
-                (unless (equal derived-ftype ftype)
-                  (format stream "~@:_Derived type: ~S" derived-ftype))))
+            (when declared-type
+              (format stream "~@:_Declared type: ~S" declared-type))
+            (when (and derived-type
+                       (not (equal declared-type derived-type)))
+              (format stream "~@:_Derived type: ~S" derived-type))
             (describe-documentation name 'function stream)
             (when (car inline)
-              (format stream "~@:_Inline proclamation: ~A (~:[no ~;~]inline expansion available)"
+              (format stream "~@:_Inline proclamation: ~
+                              ~A (~:[no ~;~]inline expansion available)"
                       (car inline)
                       (cdr inline)))
             (awhen (info :function :info name)
@@ -670,7 +679,8 @@
                          (format stream "~@:_(~A ~{~S ~}~:S)"
                                  name
                                  (method-qualifiers method)
-                                 (sb-pcl::unparse-specializers fun (sb-mop:method-specializers method)))
+                                 (sb-pcl::unparse-specializers
+                                  fun (sb-mop:method-specializers method)))
                          (pprint-indent :block 4 stream)
                          (describe-documentation method t stream nil))))))
             (describe-function-source fun stream)
