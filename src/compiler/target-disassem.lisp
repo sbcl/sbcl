@@ -1673,6 +1673,7 @@
   (when (null *assembler-routines-by-addr*)
     (setf *assembler-routines-by-addr*
           (invert-address-hash sb!fasl:*assembler-routines*))
+    #!-sb-dynamic-core
     (setf *assembler-routines-by-addr*
           (invert-address-hash sb!sys:*static-foreign-symbols*
                                *assembler-routines-by-addr*))

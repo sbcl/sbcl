@@ -2379,6 +2379,7 @@ SB-KERNEL) have been undone, but probably more remain."
                "*PERIODIC-POLLING-PERIOD*"
                "*RUNTIME-DLHANDLE*"
                "*SHARED-OBJECTS*"
+               #!-sb-dynamic-core
                "*STATIC-FOREIGN-SYMBOLS*"
                "*STDERR*" "*STDIN*"
                "*STDOUT*"
