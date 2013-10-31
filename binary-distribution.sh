@@ -21,8 +21,10 @@ tar -cf $b-binary.tar \
     $b/contrib/vanilla-module.mk \
     `for contrib in $(cd $b/contrib && echo *); do
          src_dir=$b/contrib/$contrib
-         if test -d $src_dir && test -f $obj_dir/test-passed.test-report; then
-             find $src_dir -name CVS -type d -prune -o \! -type d \! -name '.cvsignore' -print
+         cache_dir=$b/obj/asdf-cache/$contrib
+         if test -d $src_dir && test -f $cache_dir/test-passed.test-report; then
+             echo $src_dir/Makefile
+             echo $cache_dir/test-passed.test-report
          fi
      done` \
     $b/obj/sbcl-home

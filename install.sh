@@ -80,8 +80,8 @@ export SBCL SBCL_BUILDING_CONTRIB SBCL_PWD
 . ./find-gnumake.sh
 find_gnumake
 
-for i in `cd contrib ; echo *`; do
-    test -d contrib/$i && test -f obj/asdf-cache/$i/test-passed.test-report || continue;
+for i in `cd obj/asdf-cache ; echo *`; do
+    test -d obj/asdf-cache/$i && test -f obj/asdf-cache/$i/test-passed.test-report || continue;
     INSTALL_DIR="$SBCL_HOME/contrib/"
     export INSTALL_DIR
     ensure_dirs "$BUILD_ROOT$INSTALL_DIR" && $GNUMAKE -C contrib/$i install < /dev/null
