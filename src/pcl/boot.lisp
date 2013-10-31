@@ -588,8 +588,13 @@ bootstrapping.
     ;; if there is are no non-standard prior MAKE-METHOD-LAMBDA methods -- or
     ;; unless they're fantastically unintrusive.
     (let* ((method-name *method-name*)
+           (method-lambda-list *method-lambda-list*)
+           ;; Macroexpansion caused by code-walking may call make-method-lambda and
+           ;; end up with wrong values
+           (*method-name* nil)
+           (*method-lambda-list* nil)
            (generic-function-name (when method-name (car method-name)))
-           (specialized-lambda-list (or *method-lambda-list*
+           (specialized-lambda-list (or method-lambda-list
                                         (ecase (car method-lambda)
                                           (lambda (second method-lambda))
                                           (named-lambda (third method-lambda)))))

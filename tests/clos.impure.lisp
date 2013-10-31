@@ -2075,4 +2075,31 @@
   (defmethod sb-mop:validate-superclass ((x bug-309076-class) (y standard-class)) t)
   (assert (typep (make-instance 'bug-309076-class) 'bug-309076-class)))
 
+
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (require 'sb-cltl2)
+  (defmethod b ()))
+
+(defmacro macro ()
+  (let ((a 20))
+    (declare (special a))
+    (assert
+     (=
+      (funcall
+       (compile nil
+                (sb-mop:make-method-lambda
+                 #'b
+                 (find-method #'b () ())
+                 '(lambda () (declare (special a)) a)
+                 nil))
+       '(1) ())
+      20))))
+
+(with-test (:name :make-method-lambda-leakage)
+  ;; lambda list of X leaks into the invocation of make-method-lambda
+  ;; during code-walking performed by make-method-lambda invoked by
+  ;; DEFMETHOD
+  (sb-cltl2:macroexpand-all '(defmethod x (a) (macro))))
+
+
 ;;;; success
