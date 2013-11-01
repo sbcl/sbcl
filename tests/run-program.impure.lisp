@@ -160,53 +160,47 @@
 ;;; buffering of stdin and stdout depends on their TTYness, and ed isn't sufficiently
 ;;; agressive about flushing them. So, here's another test using :PTY.
 
-#-win32 (progn ;; kludge: It would be nicer to disable individual test cases,
-               ;; but we are not using WITH-TEST yet here.
+#-win32
+(with-test (:name :is-/bin/ed-installed?)
+  (assert (probe-file "/bin/ed")))
 
-(defparameter *tmpfile* "run-program-ed-test.tmp")
+#-win32
+(progn
+  (defparameter *tmpfile* "run-program-ed-test.tmp")
 
-(with-open-file (f *tmpfile*
-                   :direction :output
-                   :if-exists :supersede)
-  (write-line "bar" f))
-
-(defparameter *ed*
-  (run-program "/bin/ed" (list *tmpfile*) :wait nil :pty t))
-
-(defparameter *ed-pipe* (make-two-way-stream (process-pty *ed*) (process-pty *ed*)))
-(defparameter *ed-in* (make-synonym-stream '*ed-pipe*))
-(defparameter *ed-out* (make-synonym-stream '*ed-pipe*))
-
-(defun read-linish (stream)
-  (with-output-to-string (s)
-    (loop for c = (read-char stream)
-          while (and c (not (eq #\newline c)))
-             ;; Some eds like to send \r\n
-          do (unless (eq #\return c)
-               (write-char c s)))))
-
-(defun assert-ed (command response)
-  (when command
-    (write-line command *ed-in*)
-    (force-output *ed-in*))
-  (when response
-    (let ((got (read-linish *ed-out*)))
-      (unless (equal response got)
-        (error "wanted '~A' from ed, got '~A'" response got))))
-  *ed*)
-
-(unwind-protect
-     (with-test (:name :run-program-ed)
-       (assert-ed nil "4")
-       (assert-ed ".s/bar/baz/g" nil)
-       (assert-ed "w" "4")
-       (assert-ed "q" nil)
-       (process-wait *ed*)
-       (with-open-file (f *tmpfile*)
-         (assert (equal "baz" (read-line f)))))
-  (delete-file *tmpfile*))
-
-) ;; #-win32
+  (with-test (:name :run-program-/bin/ed)
+    (with-open-file (f *tmpfile*
+                       :direction :output
+                       :if-exists :supersede)
+      (write-line "bar" f))
+    (unwind-protect
+         (let* ((ed (run-program "/bin/ed" (list *tmpfile*) :wait nil :pty t))
+                (ed-in (process-pty ed))
+                (ed-out (process-pty ed)))
+           (labels ((read-linish (stream)
+                      (with-output-to-string (s)
+                        (loop for c = (read-char stream)
+                              while (and c (not (eq #\newline c)))
+                              ;; Some eds like to send \r\n
+                              do (unless (eq #\return c)
+                                   (write-char c s)))))
+                    (assert-ed (command response)
+                      (when command
+                        (write-line command ed-in)
+                        (force-output ed-in))
+                      (when response
+                        (let ((got (read-linish ed-out)))
+                          (unless (equal response got)
+                            (error "wanted '~A' from ed, got '~A'" response got))))
+                      ed))
+             (assert-ed nil "4")
+             (assert-ed ".s/bar/baz/g" nil)
+             (assert-ed "w" "4")
+             (assert-ed "q" nil)
+             (process-wait ed)
+             (with-open-file (f *tmpfile*)
+               (assert (equal "baz" (read-line f))))))
+      (delete-file *tmpfile*)))) ;; #-win32
 
 ;; Around 1.0.12 there was a regression when :INPUT or :OUTPUT was a
 ;; pathname designator.  Since these use the same code, it should
