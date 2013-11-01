@@ -1,19 +1,5 @@
 #!/bin/sh
 
-# Run the regression tests in this directory.
-#
-# Usage: run-tests.sh [OPTIONS] [files]
-#
-# Valid options are as follows:
-#
-#  --break-on-failure            Break into the debugger when a test fails
-#                                unexpectedly
-#  --break-on-expected-failure   Break into the debugger when any test fails
-#  --report-skipped-tests        Include tests :skipped-on target SBCL in
-#                                the test report.
-#
-# If no test files are specified, runs all tests.
-
 # This software is part of the SBCL system. See the README file for
 # more information.
 #
@@ -24,6 +10,27 @@
 # This software is in the public domain and is provided with
 # absolutely no warranty. See the COPYING and CREDITS files for
 # more information.
+
+if [ $1 = "--help" ]; then
+    cat <<EOF
+Run the regression tests in this directory.
+
+Usage: $0 [OPTIONS] [files]
+
+Options:
+
+  --break-on-failure            Break into the debugger when a test fails
+                                unexpectedly
+  --break-on-expected-failure   Break into the debugger when any test fails
+  --report-skipped-tests        Include tests :skipped-on target SBCL in
+                                the test report.
+  --no-color                    Disable coloring of results. 
+
+If no test files are specified, runs all tests.
+EOF
+    exit 0
+fi
+
 
 . ./subr.sh
 
