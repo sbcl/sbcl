@@ -322,6 +322,8 @@ bootstrapping.
   (multiple-value-bind (qualifiers lambda-list body)
       (parse-defmethod args)
     `(progn
+       (eval-when (:compile-toplevel :load-toplevel :execute)
+         (compile-or-load-defgeneric ',name))
       ;; KLUDGE: this double expansion is quite a monumental
       ;; workaround: it comes about because of a fantastic interaction
       ;; between the processing rules of CLHS 3.2.3.1 and the

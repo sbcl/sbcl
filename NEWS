@@ -1,4 +1,8 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
+changes relative to sbcl-1.1.13:
+  * enhancement: Top-level defmethod without defgeneric no longer causes
+    undefined-function warnings in subsequent forms. (lp#503095)
+
 changes in sbcl-1.1.13 relative to sbcl-1.1.12:
   * optimization: better distribution of SXHASH over small conses of related
     values.  (lp#309443)
@@ -21,7 +25,7 @@ changes in sbcl-1.1.13 relative to sbcl-1.1.12:
     from the same location.  (patch by Douglas Katzman, lp#1042405)
   * bug fix: Create vectors of proper internal length when reading literal
     vectors from FASLs. (Reported by Jan Moringen)
-  * bug fix: COMPILE can now succefully compile setf functions.
+  * bug fix: COMPILE can now successfully compile setf functions.
     (Reported by Douglas Katzman)
   * bug fix: run-program performs more correct escaping of arguments on
     Windows. (lp#1239242)
