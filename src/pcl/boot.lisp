@@ -322,38 +322,40 @@ bootstrapping.
   (multiple-value-bind (qualifiers lambda-list body)
       (parse-defmethod args)
     `(progn
-       (eval-when (:compile-toplevel :load-toplevel :execute)
+       (eval-when (:compile-toplevel :execute)
+         ;; :compile-toplevel is needed for subsequent forms
+         ;; :execute is needed for references to itself inside the body
          (compile-or-load-defgeneric ',name))
-      ;; KLUDGE: this double expansion is quite a monumental
-      ;; workaround: it comes about because of a fantastic interaction
-      ;; between the processing rules of CLHS 3.2.3.1 and the
-      ;; bizarreness of MAKE-METHOD-LAMBDA.
-      ;;
-      ;; MAKE-METHOD-LAMBDA can be called by the user, and if the
-      ;; lambda itself doesn't refer to outside bindings the return
-      ;; value must be compileable in the null lexical environment.
-      ;; However, the function must also refer somehow to the
-      ;; associated method object, so that it can call NO-NEXT-METHOD
-      ;; with the appropriate arguments if there is no next method --
-      ;; but when the function is generated, the method object doesn't
-      ;; exist yet.
-      ;;
-      ;; In order to resolve this issue, we insert a literal cons cell
-      ;; into the body of the method lambda, return the same cons cell
-      ;; as part of the second (initargs) return value of
-      ;; MAKE-METHOD-LAMBDA, and a method on INITIALIZE-INSTANCE fills
-      ;; in the cell when the method is created.  However, this
-      ;; strategy depends on having a fresh cons cell for every method
-      ;; lambda, which (without the workaround below) is skewered by
-      ;; the processing in CLHS 3.2.3.1, which permits implementations
-      ;; to macroexpand the bodies of EVAL-WHEN forms with both
-      ;; :COMPILE-TOPLEVEL and :LOAD-TOPLEVEL only once.  The
-      ;; expansion below forces the double expansion in those cases,
-      ;; while expanding only once in the common case.
-      (eval-when (:load-toplevel)
-        (%defmethod-expander ,name ,qualifiers ,lambda-list ,body))
-      (eval-when (:execute)
-        (%defmethod-expander ,name ,qualifiers ,lambda-list ,body)))))
+       ;; KLUDGE: this double expansion is quite a monumental
+       ;; workaround: it comes about because of a fantastic interaction
+       ;; between the processing rules of CLHS 3.2.3.1 and the
+       ;; bizarreness of MAKE-METHOD-LAMBDA.
+       ;;
+       ;; MAKE-METHOD-LAMBDA can be called by the user, and if the
+       ;; lambda itself doesn't refer to outside bindings the return
+       ;; value must be compileable in the null lexical environment.
+       ;; However, the function must also refer somehow to the
+       ;; associated method object, so that it can call NO-NEXT-METHOD
+       ;; with the appropriate arguments if there is no next method --
+       ;; but when the function is generated, the method object doesn't
+       ;; exist yet.
+       ;;
+       ;; In order to resolve this issue, we insert a literal cons cell
+       ;; into the body of the method lambda, return the same cons cell
+       ;; as part of the second (initargs) return value of
+       ;; MAKE-METHOD-LAMBDA, and a method on INITIALIZE-INSTANCE fills
+       ;; in the cell when the method is created.  However, this
+       ;; strategy depends on having a fresh cons cell for every method
+       ;; lambda, which (without the workaround below) is skewered by
+       ;; the processing in CLHS 3.2.3.1, which permits implementations
+       ;; to macroexpand the bodies of EVAL-WHEN forms with both
+       ;; :COMPILE-TOPLEVEL and :LOAD-TOPLEVEL only once.  The
+       ;; expansion below forces the double expansion in those cases,
+       ;; while expanding only once in the common case.
+       (eval-when (:load-toplevel)
+         (%defmethod-expander ,name ,qualifiers ,lambda-list ,body))
+       (eval-when (:execute)
+         (%defmethod-expander ,name ,qualifiers ,lambda-list ,body)))))
 
 (defmacro %defmethod-expander
     (name qualifiers lambda-list body &environment env)
