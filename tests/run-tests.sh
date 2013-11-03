@@ -11,7 +11,7 @@
 # absolutely no warranty. See the COPYING and CREDITS files for
 # more information.
 
-if [ $1 = "--help" ]; then
+if [ "$1" = "--help" ]; then
     cat <<EOF
 Run the regression tests in this directory.
 
