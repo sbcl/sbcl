@@ -404,10 +404,14 @@
         for accessor = (when rsd
                          (raw-slot-data-accessor-name rsd))
         always (or (not accessor)
-                   (prog1
-                       (equalp (funcall accessor x i)
-                               (funcall accessor y i))
-                     (incf i (raw-slot-data-n-words rsd))))))
+                   (progn
+                     #!-(or x86 x86-64 ppc)
+                     (setf i (logandc2 (+ i (1- (raw-slot-data-alignment rsd)))
+                                       (1- (raw-slot-data-alignment rsd))))
+                     (prog1
+                         (equalp (funcall accessor x i)
+                                 (funcall accessor y i))
+                       (incf i (raw-slot-data-n-words rsd)))))))
 
 ;;; default PRINT-OBJECT method
 
