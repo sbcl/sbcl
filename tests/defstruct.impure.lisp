@@ -710,6 +710,12 @@
   c
   (a 0d0 :type double-float))
 
+(defstruct raw-slot-equalp-bug-2
+  (b (complex 1d0) :type (complex double-float))
+  (x (complex 1d0) :type (complex double-float))
+  c
+  (a 1s0 :type single-float))
+
 (with-test (:name :raw-slot-equalp)
   (assert (equalp (make-raw-slot-equalp-bug :a 1d0 :b 2s0)
                   (make-raw-slot-equalp-bug :a 1d0 :b 2s0)))
@@ -718,7 +724,15 @@
   (assert (not (equalp (make-raw-slot-equalp-bug :a 1d0 :b 2s0)
                        (make-raw-slot-equalp-bug :a 1d0 :b 3s0))))
   (assert (not (equalp (make-raw-slot-equalp-bug :a 1d0 :b 2s0)
-                       (make-raw-slot-equalp-bug :a 2d0 :b 2s0)))))
+                       (make-raw-slot-equalp-bug :a 2d0 :b 2s0))))
+  (assert (equalp (make-raw-slot-equalp-bug-2 :b (complex 1d0) :a 2s0)
+                  (make-raw-slot-equalp-bug-2 :b (complex 1d0) :a 2s0)))
+  (assert (equalp (make-raw-slot-equalp-bug-2 :b (complex 1d0) :a 0s0)
+                  (make-raw-slot-equalp-bug-2 :b (complex 1d0) :a -0s0)))
+  (assert (not (equalp (make-raw-slot-equalp-bug-2 :b (complex 1d0) :a 2s0)
+                       (make-raw-slot-equalp-bug-2 :b (complex 1d0) :a 3s0))))
+  (assert (not (equalp (make-raw-slot-equalp-bug-2 :b (complex 1d0) :a 2s0)
+                       (make-raw-slot-equalp-bug-2 :b (complex 2d0) :a 2s0)))))
 
 ;;; Check that all slot types (non-raw and raw) can be initialized with
 ;;; constant arguments.

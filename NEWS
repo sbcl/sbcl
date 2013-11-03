@@ -2,6 +2,8 @@
 changes relative to sbcl-1.1.13:
   * enhancement: Top-level defmethod without defgeneric no longer causes
     undefined-function warnings in subsequent forms. (lp#503095)
+  * bug fix: EQUALP now compares correctly structures with raw slots larger
+    than a single word.
 
 changes in sbcl-1.1.13 relative to sbcl-1.1.12:
   * optimization: better distribution of SXHASH over small conses of related
