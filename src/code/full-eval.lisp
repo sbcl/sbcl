@@ -357,9 +357,10 @@
 ;;; Evaluate LET*-like (sequential) bindings.
 ;;;
 ;;; Given an alist of BINDINGS, evaluate the value form of the first
-;;; binding in ENV, bind the variable to the value in ENV, and then
-;;; evaluate the next binding form. Once all binding forms have been
-;;; handled, END-ACTION is funcalled.
+;;; binding in ENV, generate an augmented environment with a binding
+;;; of the variable to the value in ENV, and then evaluate the next
+;;; binding form. Once all binding forms have been handled, END-ACTION
+;;; is funcalled with the final environment.
 ;;;
 ;;; SPECIALS is a list of variables that have a bound special declaration.
 ;;; These variables (and those that have been declaimed as special) are
@@ -370,7 +371,11 @@
            ;; due to function calls.  (see PARSE-ARGUMENTS)
            (if (and (consp exp) (eq (car exp) 'quote))
                (second exp)
-               (%eval exp env))))
+               (%eval exp env)))
+         (maybe-new-env (env exp)
+           (if (and (consp exp) (eq (car exp) 'quote))
+               env
+               (make-env :parent env))))
     (if bindings
         (let* ((binding-name (car (car bindings)))
                (binding-value (cdr (car bindings))))
@@ -380,13 +385,15 @@
                   (list (maybe-eval binding-value))
                 ;; Mark the variable as special in this environment
                 (push-var binding-name *special* env)
-                (eval-next-let*-binding (cdr bindings)
-                                        specials env end-action))
+                (eval-next-let*-binding
+                 (cdr bindings) specials
+                 (maybe-new-env env binding-value) end-action))
               (progn
                 (push-var binding-name (maybe-eval binding-value) env)
-                (eval-next-let*-binding (cdr bindings)
-                                        specials env end-action))))
-        (funcall end-action))))
+                (eval-next-let*-binding
+                 (cdr bindings) specials
+                 (maybe-new-env env binding-value) end-action))))
+        (funcall end-action env))))
 
 ;;; Create a new environment based on OLD-ENV by adding the variable
 ;;; bindings in BINDINGS to it, and call FUNCTION with the new environment
@@ -461,7 +468,7 @@
            ;; Then deal with optionals / keywords / etc.
            (eval-next-let*-binding
             let*-like-binding var-specials env
-            #'(lambda ()
+            #'(lambda (env)
                 ;; And now that we have evaluated all the
                 ;; initialization forms for the bindings, add the free
                 ;; special declarations to the environment. To see why
@@ -646,7 +653,7 @@
                              (binding-value binding)))
                    bindings)
            var-specials env
-           #'(lambda ()
+           #'(lambda (env)
                ;; Now that we're done evaluating the bindings, add the
                ;; free special declarations. See also
                ;; CALL-WITH-NEW-ENV-FULL-PARSING.
