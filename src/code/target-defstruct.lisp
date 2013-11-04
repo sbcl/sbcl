@@ -401,16 +401,13 @@
                     (find raw-type
                           *raw-slot-data-list*
                           :key 'raw-slot-data-raw-type))
-        for accessor = (when rsd
-                         (raw-slot-data-accessor-name rsd))
-        always (or (not accessor)
+        always (or (not rsd)
                    (progn
                      #!-(or x86 x86-64 ppc)
                      (setf i (logandc2 (+ i (1- (raw-slot-data-alignment rsd)))
                                        (1- (raw-slot-data-alignment rsd))))
                      (prog1
-                         (equalp (funcall accessor x i)
-                                 (funcall accessor y i))
+                         (funcall (raw-slot-data-comparer rsd) i x y)
                        (incf i (raw-slot-data-n-words rsd)))))))
 
 ;;; default PRINT-OBJECT method
