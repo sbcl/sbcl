@@ -36,7 +36,9 @@
   #+mips 8
   #+(and x86 (not darwin)) 4
   #+(and x86 darwin) 16
-  #-(or x86 x86-64 mips ppc) (error "Unknown platform"))
+  #+sparc 8
+  #-(or x86 x86-64 mips ppc sparc)
+  (error "Unknown platform"))
 
 ;;;; Build the offset-tool as regular excutable, and run it with
 ;;;; fork/exec, so that no lisp is on the stack. This is our known-good
@@ -59,6 +61,7 @@
   (load-shared-object (truename "stack-alignment-offset.so"))
 
   (define-alien-routine stack-alignment-offset int (alignment int))
+  #+alien-callbacks
   (define-alien-routine trampoline int (callback (function int))))
 
 ;;;; Now get the offset by calling from lisp, first with a regular foreign function
@@ -67,9 +70,11 @@
 (with-test (:name :regular :fails-on :win32)
   (assert (= *good-offset* (stack-alignment-offset *required-alignment*))))
 
+#+alien-callbacks
 (with-test (:name :callback :fails-on :win32)
-  (assert (= *good-offset* (trampoline (alien-lambda int ()
-                                       (stack-alignment-offset *required-alignment*))))))
+  (assert (= *good-offset*
+             (trampoline (alien-lambda int ()
+                           (stack-alignment-offset *required-alignment*))))))
 
 (when (probe-file "stack-alignment-offset.so")
   (delete-file "stack-alignment-offset")
