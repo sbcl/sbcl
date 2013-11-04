@@ -522,45 +522,40 @@
       ((atom 2nd) 3rd)
     (rplacd 2nd 3rd)))
 
-(flet (;; Return the number of conses at the head of the
-       ;; possibly-improper list LIST. (Or if LIST is circular, you
-       ;; lose.)
-       (count-conses (list)
-         (do ((in-list list (cdr in-list))
-              (result 0 (1+ result)))
-             ((atom in-list)
-              result)
-           (declare (type index result)))))
-  (declare (ftype (function (t) index) count-conses))
-  (defun butlast (list &optional (n 1))
-    (if (typep n 'index)
-        (let ((n-conses-in-list (count-conses list)))
-          (cond ((zerop n)
-                 ;; (We can't use SUBSEQ in this case because LIST isn't
-                 ;; necessarily a proper list, but SUBSEQ expects a
-                 ;; proper sequence. COPY-LIST isn't so fussy.)
-                 (copy-list list))
-                ((>= n n-conses-in-list)
-                 nil)
-                (t
-                 ;; (LIST isn't necessarily a proper list in this case
-                 ;; either, and technically SUBSEQ wants a proper
-                 ;; sequence, but no reasonable implementation of SUBSEQ
-                 ;; will actually walk down to the end of the list to
-                 ;; check, and since we're calling our own implementation
-                 ;; we know it's reasonable, so it's OK.)
-                 (subseq list 0 (- n-conses-in-list n)))))
-        nil))
-  (defun nbutlast (list &optional (n 1))
-    (cond ((zerop n)
-           list)
-          ((not (typep n 'index))
-           nil)
-          (t (let ((n-conses-in-list (count-conses list)))
-               (unless (<= n-conses-in-list n)
-                 (setf (cdr (nthcdr (- n-conses-in-list n 1) list))
-                       nil)
-                 list))))))
+(defun butlast (list &optional (n 1))
+  (cond ((zerop n)
+         (copy-list list))
+        ((not (typep n 'index))
+         nil)
+        (t
+         (let ((head (nthcdr (1- n) list)))
+           (and (consp head)      ; there are at least n
+                (collect ((copy)) ; conses; copy!
+                  (do ((trail list (cdr trail))
+                       (head head (cdr head)))
+                      ;; HEAD is n-1 conses ahead of TRAIL;
+                      ;; when HEAD is at the last cons, return
+                      ;; the data copied so far.
+                      ((atom (cdr head))
+                       (copy))
+                    (copy (car trail)))))))))
+
+(defun nbutlast (list &optional (n 1))
+  (cond ((zerop n)
+         list)
+        ((not (typep n 'index))
+         nil)
+        (t
+         (let ((head (nthcdr (1- n) list)))
+           (and (consp head)       ; there are more than n
+                (consp (cdr head)) ; conses.
+                ;; TRAIL trails by n cons to be able to
+                ;; cut the list at the cons just before.
+                (do ((trail list (cdr trail))
+                     (head (cdr head) (cdr head)))
+                    ((atom (cdr head))
+                     (setf (cdr trail) nil)
+                     list)))))))
 
 (defun ldiff (list object)
   "Return a new list, whose elements are those of LIST that appear before
