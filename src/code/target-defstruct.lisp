@@ -394,21 +394,14 @@
   ;; all this with %RAW-INSTANCE-REF/WORD and bitwise comparisons, but
   ;; that'll fail in some cases. For example -0.0 and 0.0 are EQUALP
   ;; but have different bit patterns. -- JES, 2007-08-21
-  (loop with i = 0
-        for dsd in (dd-slots (layout-info layout))
+  (loop for dsd in (dd-slots (layout-info layout))
         for raw-type = (dsd-raw-type dsd)
-        for rsd = (when raw-type
+        for rsd = (unless (eql raw-type t)
                     (find raw-type
                           *raw-slot-data-list*
                           :key 'raw-slot-data-raw-type))
         always (or (not rsd)
-                   (progn
-                     #!-(or x86 x86-64 ppc)
-                     (setf i (logandc2 (+ i (1- (raw-slot-data-alignment rsd)))
-                                       (1- (raw-slot-data-alignment rsd))))
-                     (prog1
-                         (funcall (raw-slot-data-comparer rsd) i x y)
-                       (incf i (raw-slot-data-n-words rsd)))))))
+                   (funcall (raw-slot-data-comparer rsd) (dsd-index dsd) x y))))
 
 ;;; default PRINT-OBJECT method
 

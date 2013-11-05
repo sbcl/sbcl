@@ -1229,9 +1229,10 @@
                               :complexp :real
                               :low (numeric-type-low type)
                               :high (numeric-type-high type))))))
-#-sb-xc-host ; (See CROSS-FLOAT-INFINITY-KLUDGE.)
+
 (defoptimizer (realpart derive-type) ((num))
   (one-arg-derive-type num #'realpart-derive-type-aux #'realpart))
+
 (defun imagpart-derive-type-aux (type)
   (let ((class (numeric-type-class type))
         (format (numeric-type-format type)))
@@ -1253,7 +1254,7 @@
                               :complexp :real
                               :low (numeric-type-low type)
                               :high (numeric-type-high type))))))
-#-sb-xc-host ; (See CROSS-FLOAT-INFINITY-KLUDGE.)
+
 (defoptimizer (imagpart derive-type) ((num))
   (one-arg-derive-type num #'imagpart-derive-type-aux #'imagpart))
 
