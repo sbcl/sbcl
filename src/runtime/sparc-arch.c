@@ -268,6 +268,9 @@ arch_handle_allocation_trap(os_context_t *context)
     boolean were_in_lisp;
     char* memory;
 
+    if (foreign_function_call_active)
+      lose("Allocation trap inside foreign code.");
+
     pc = (unsigned int*) *os_context_pc_addr(context);
     or_inst = pc[-1];
 
@@ -276,8 +279,8 @@ arch_handle_allocation_trap(os_context_t *context)
      * instruction!
      */
     if (!(((or_inst >> 30) == 2) && (((or_inst >> 19) & 0x1f) == 2)))
-        lose(stderr, "Whoa!!! Got an allocation trap not preceeded by an OR inst: 0x%08x!\n",
-                or_inst);
+        lose("Allocation trap not preceded by an OR instruction: 0x%08x",
+             or_inst);
 
     /*
      * An OR instruction.  RS1 is the register we want to allocate to.
@@ -293,8 +296,6 @@ arch_handle_allocation_trap(os_context_t *context)
         size = *os_context_register_addr(context, size);
     }
 
-    if (foreign_function_call_active)
-        lose(stderr, "Whoa! allocation trap and we weren't in lisp!\n");
     fake_foreign_function_call(context);
 
     /*
