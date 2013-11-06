@@ -242,7 +242,7 @@
    (t (values nil t))))
 (define-source-transform get (&rest args)
   (case (length args)
-   (2 `(sb!impl::get2 ,@args))
+   (2 `(sb!impl::get3 ,@args nil))
    (3 `(sb!impl::get3 ,@args))
    (t (values nil t))))
 
