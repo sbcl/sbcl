@@ -579,8 +579,7 @@ exist or if is a file or a symbolic link."
     ;; SBCL_HOME isn't set for :EXECUTABLE T embedded cores
     (when (and sbcl-home (not (string= sbcl-home "")))
       (parse-native-namestring sbcl-home
-                               #!-win32 sb!impl::*unix-host*
-                               #!+win32 sb!impl::*win32-host*
+                               *physical-host*
                                *default-pathname-defaults*
                                :as-directory t))))
 
@@ -606,8 +605,7 @@ system. HOST argument is ignored by SBCL."
     (or (user-homedir-namestring)
         #!+win32
         (sb!win32::get-folder-namestring sb!win32::csidl_profile))
-    #!-win32 sb!impl::*unix-host*
-    #!+win32 sb!impl::*win32-host*
+    *physical-host*
     *default-pathname-defaults*
     :as-directory t)))
 

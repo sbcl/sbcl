@@ -13,49 +13,12 @@
 
 #!-sb-fluid (declaim (freeze-type logical-pathname logical-host))
 
-;;;; PHYSICAL-HOST stuff
+;;; To be initialized in unix/win32-pathname.lisp
+(defvar *physical-host*)
 
-(def!struct (unix-host
-             (:make-load-form-fun make-unix-host-load-form)
-             (:include host
-                       (parse #'parse-unix-namestring)
-                       (parse-native #'parse-native-unix-namestring)
-                       (unparse #'unparse-unix-namestring)
-                       (unparse-native #'unparse-native-unix-namestring)
-                       (unparse-host #'unparse-unix-host)
-                       (unparse-directory #'unparse-physical-directory)
-                       (unparse-file #'unparse-unix-file)
-                       (unparse-enough #'unparse-unix-enough)
-                       (unparse-directory-separator "/")
-                       (simplify-namestring #'simplify-unix-namestring)
-                       (customary-case :lower))))
-(defvar *unix-host* (make-unix-host))
-(defun make-unix-host-load-form (host)
+(defun make-host-load-form (host)
   (declare (ignore host))
-  '*unix-host*)
-
-(def!struct (win32-host
-             (:make-load-form-fun make-win32-host-load-form)
-             (:include host
-                       (parse #'parse-win32-namestring)
-                       (parse-native #'parse-native-win32-namestring)
-                       (unparse #'unparse-win32-namestring)
-                       (unparse-native #'unparse-native-win32-namestring)
-                       (unparse-host #'unparse-win32-host)
-                       (unparse-directory #'unparse-physical-directory)
-                       (unparse-file #'unparse-win32-file)
-                       (unparse-enough #'unparse-win32-enough)
-                       (unparse-directory-separator "\\")
-                       (simplify-namestring #'simplify-win32-namestring)
-                       (customary-case :lower))))
-(defparameter *win32-host* (make-win32-host))
-(defun make-win32-host-load-form (host)
-  (declare (ignore host))
-  '*win32-host*)
-
-(defvar *physical-host*
-  #!-win32 *unix-host*
-  #!+win32 *win32-host*)
+  '*physical-host*)
 
 ;;; Return a value suitable, e.g., for preinitializing
 ;;; *DEFAULT-PATHNAME-DEFAULTS* before *DEFAULT-PATHNAME-DEFAULTS* is
@@ -278,7 +241,7 @@
                               (%pathname-name pathname2))
            (compare-component (%pathname-type pathname1)
                               (%pathname-type pathname2))
-           (or (eq (%pathname-host pathname1) *unix-host*)
+           (or (eq (%pathname-host pathname1) *physical-host*)
                (compare-component (%pathname-version pathname1)
                                   (%pathname-version pathname2))))))
 
@@ -1293,7 +1256,7 @@ unspecified elements into a completed to-pathname based on the to-wildname."
                (frob %pathname-directory translate-directories)
                (frob %pathname-name)
                (frob %pathname-type)
-               (if (eq from-host *unix-host*)
+               (if (eq from-host *physical-host*)
                    (if (or (eq (%pathname-version to) :wild)
                            (eq (%pathname-version to) nil))
                        (%pathname-version source)

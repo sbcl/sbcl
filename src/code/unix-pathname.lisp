@@ -11,6 +11,23 @@
 
 (in-package "SB!IMPL")
 
+(def!struct (unix-host
+             (:make-load-form-fun make-host-load-form)
+             (:include host
+                       (parse #'parse-unix-namestring)
+                       (parse-native #'parse-native-unix-namestring)
+                       (unparse #'unparse-unix-namestring)
+                       (unparse-native #'unparse-native-unix-namestring)
+                       (unparse-host #'unparse-unix-host)
+                       (unparse-directory #'unparse-physical-directory)
+                       (unparse-file #'unparse-unix-file)
+                       (unparse-enough #'unparse-unix-enough)
+                       (unparse-directory-separator "/")
+                       (simplify-namestring #'simplify-unix-namestring)
+                       (customary-case :lower))))
+
+(defvar *physical-host* (make-unix-host))
+
 ;;; Take a string and return a list of cons cells that mark the char
 ;;; separated subseq. The first value is true if absolute directories
 ;;; location.

@@ -11,6 +11,24 @@
 
 (in-package "SB!IMPL")
 
+(def!struct (win32-host
+             (:make-load-form-fun make-host-load-form)
+             (:include host
+                       (parse #'parse-win32-namestring)
+                       (parse-native #'parse-native-win32-namestring)
+                       (unparse #'unparse-win32-namestring)
+                       (unparse-native #'unparse-native-win32-namestring)
+                       (unparse-host #'unparse-win32-host)
+                       (unparse-directory #'unparse-physical-directory)
+                       (unparse-file #'unparse-win32-file)
+                       (unparse-enough #'unparse-win32-enough)
+                       (unparse-directory-separator "\\")
+                       (simplify-namestring #'simplify-win32-namestring)
+                       (customary-case :lower))))
+
+(defvar *physical-host* (make-win32-host))
+
+;;;
 (define-symbol-macro +long-file-name-prefix+ (quote "\\\\?\\"))
 (define-symbol-macro +unc-file-name-prefix+ (quote "\\\\?\\UNC"))
 
