@@ -291,17 +291,26 @@
          (ecase (pop directory)
            (:absolute
             (let ((next (pop directory)))
+              ;; Don't use USER-HOMEDIR-NAMESTRING, since
+              ;; it can be specified as C:/User/user
+              ;; and (native-namestring (user-homedir-pathname))
+              ;; will be not equal to it, because it's parsed first.
               (cond ((eq :home next)
-                     (write-string (user-homedir-namestring) s))
+                     (write-string (native-namestring (user-homedir-pathname))
+                                   s))
                     ((and (consp next) (eq :home (car next)))
-                     (let ((where (user-homedir-namestring (second next))))
+                     (let ((where (user-homedir-pathname (second next))))
                        (if where
-                           (write-string where s)
+                           (write-string (native-namestring where) s)
                            (error "User homedir unknown for: ~S"
                                   (second next)))))
+                    ;; namestring of user-homedir-pathname already has
+                    ;; // at the end
                     (next
-                     (push next directory)))
-              (write-char #\\ s)))
+                     (write-char #\\ s)
+                     (push next directory))
+                    (t
+                     (write-char #\\ s)))))
            (:relative)))
        (loop for (piece . subdirs) on directory
              do (typecase piece
@@ -324,7 +333,7 @@
                  (error "ungood type component in NATIVE-NAMESTRING: ~S" type))
                (write-char #\. s)
                (write-string type-string s)))
-           (when type-present-p ;
+           (when type-present-p
              (error
               "type component without a name component in NATIVE-NAMESTRING: ~S"
               type)))
