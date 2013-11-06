@@ -9,6 +9,7 @@ changes relative to sbcl-1.1.13:
     undefined-function warnings in subsequent forms. (lp#503095)
   * bug fix: EQUALP now compares correctly structures with raw slots larger
     than a single word.
+  * bug fix: contribs couldn't be built on Windows with MinGW.
 
 changes in sbcl-1.1.13 relative to sbcl-1.1.12:
   * optimization: better distribution of SXHASH over small conses of related
