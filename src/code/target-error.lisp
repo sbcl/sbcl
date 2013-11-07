@@ -37,7 +37,14 @@
 (declaim (inline restart-test-function
                  restart-associated-conditions
                  (setf restart-associated-conditions)))
-(defstruct (restart (:copier nil) (:predicate nil))
+(defstruct (restart (:constructor make-restart
+                        ;; Having TEST-FUNCTION at the end allows
+                        ;; to not replicate its default value in RESTART-BIND.
+                        (name function
+                         &optional report-function
+                                   interactive-function
+                                   test-function))
+                    (:copier nil) (:predicate nil))
   (name (missing-arg) :type symbol :read-only t)
   (function (missing-arg) :type function :read-only t)
   (report-function nil :type (or null function) :read-only t)
@@ -49,6 +56,8 @@
   ;; however, since safe uses of restarts have to assume dynamic
   ;; extent.
   (associated-conditions '() :type list))
+
+#!-sb-fluid (declaim (freeze-type restart))
 
 (def!method print-object ((restart restart) stream)
   (if *print-escape*

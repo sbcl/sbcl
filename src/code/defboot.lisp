@@ -440,13 +440,18 @@ evaluated as a PROGN."
            (unless (>= (length binding) 2)
              (error "ill-formed restart binding: ~S" binding))
            (destructuring-bind (name function
-                                &rest args
-                                &key report-function &allow-other-keys)
+                                &key interactive-function
+                                     test-function
+                                     report-function)
                binding
              (unless (or name report-function)
                (warn "Unnamed restart does not have a report function: ~
                       ~S" binding))
-             `(make-restart :name ',name :function ,function ,@args))))
+             `(make-restart ',name ,function
+                            ,report-function
+                            ,interactive-function
+                            ,@(and test-function
+                                   `(,test-function))))))
     `(let ((*restart-clusters*
              (cons (list ,@(mapcar #'parse-binding bindings))
                    *restart-clusters*)))
