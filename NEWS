@@ -5,6 +5,8 @@ changes relative to sbcl-1.1.13:
   * optimization: [N]BUTLAST perform a single pass over the list. (lp#1245697)
   * optimization: EQUALP on structures with raw slots (double-float/complex)
     no longer conses and is faster.
+  * optimization: RESTART-CASE expands to more compact code.
+    Thanks to Jan Moringen. (lp#1249055)
   * enhancement: Top-level defmethod without defgeneric no longer causes
     undefined-function warnings in subsequent forms. (lp#503095)
   * bug fix: EQUALP now compares correctly structures with raw slots larger

@@ -522,7 +522,7 @@ evaluated as a PROGN."
                              (return (values result form))))
                           result)))))
              (parse-clause (clause)
-               (unless (and (listp clause ) (>= (length clause) 2)
+               (unless (and (listp clause) (>= (length clause) 2)
                             (listp (second clause)))
                  (error "ill-formed ~S clause, no lambda-list:~%  ~S"
                         'restart-case clause))
@@ -531,18 +531,33 @@ evaluated as a PROGN."
                      (parse-keywords-and-body body)
                    (list name (sb!xc:gensym "TAG") keywords lambda-list body))))
              (make-binding (clause-data)
-               (destructuring-bind (name tag keywords &rest rest) clause-data
-                 (declare (ignore rest))
-                 `(,name #'(lambda (&rest temp)
-                             (setq ,temp-var temp)
-                             (locally (declare (optimize (safety 0)))
-                               (go ,tag)))
-                         ,@keywords)))
+               (destructuring-bind (name tag keywords lambda-list body) clause-data
+                 (declare (ignore body))
+                 `(,name
+                   (lambda ,(cond ((null lambda-list)
+                                   ())
+                                  ((and (null (cdr lambda-list))
+                                        (not (member (car lambda-list)
+                                                     '(&optional &key &aux))))
+                                   '(temp))
+                                  (t
+                                   '(&rest temp)))
+                     ,@(when lambda-list `((setq ,temp-var temp)))
+                     (locally (declare (optimize (safety 0)))
+                       (go ,tag)))
+                   ,@keywords)))
              (make-apply-and-return (clause-data)
                (destructuring-bind (name tag keywords lambda-list body) clause-data
                  (declare (ignore name keywords))
                  `(,tag (return-from ,block-tag
-                          (apply (lambda ,lambda-list ,@body) ,temp-var))))))
+                          ,(cond ((null lambda-list)
+                                  `(progn ,@body))
+                                 ((and (null (cdr lambda-list))
+                                       (not (member (car lambda-list)
+                                                    '(&optional &key &aux))))
+                                  `(funcall (lambda ,lambda-list ,@body) ,temp-var))
+                                 (t
+                                  `(apply (lambda ,lambda-list ,@body) ,temp-var))))))))
       (let ((clauses-data (mapcar #'parse-clause clauses)))
         `(block ,block-tag
            (let ((,temp-var nil))
