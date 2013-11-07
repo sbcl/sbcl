@@ -4,7 +4,7 @@
 # This ensures that SBCL_PWD is a path understandable to SBCL.
 
 sbcl_pwd() {
-    case $OSTYPE in
+    case "${OSTYPE:-}" in
         cygwin)
             SBCL_PWD="`cygpath -m \"$(pwd)\"`" ;;
         msys)
