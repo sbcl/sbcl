@@ -543,13 +543,8 @@
            ((and (eq (classoid-state class) :sealed) layout
                  (not (classoid-subclasses class)))
             ;; Sealed and has no subclasses.
-            (let ((n-layout (gensym)))
-              `(and (,pred object)
-                    (let ((,n-layout (,get-layout object)))
-                      ,@(when (policy *lexenv* (>= safety speed))
-                              `((when (layout-invalid ,n-layout)
-                                  (%layout-invalid-error object ',layout))))
-                      (eq ,n-layout ',layout)))))
+            `(and (,pred object)
+                  (eq (,get-layout object) ',layout)))
            ((and (typep class 'structure-classoid) layout)
             ;; structure type tests; hierarchical layout depths
             (let ((depthoid (layout-depthoid layout))
