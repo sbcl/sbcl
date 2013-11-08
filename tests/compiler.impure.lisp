@@ -1430,7 +1430,13 @@
        (and
         (defun (setf test-984) ())
         nil)
-     (style-warning () t))))
+     (style-warning () t)))
+  (assert
+   (handler-case
+       (and
+        (compile nil `(lambda () #'(setf test-984)))
+        t)
+     (warning () nil))))
 
 (with-test (:name :compile-setf-function)
   (defun (setf compile-setf) ())

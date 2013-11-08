@@ -222,7 +222,6 @@
                          context))
         ((:function nil)
          (check-fun-name name)
-         (note-if-setf-fun-and-macro name)
          (let ((expansion (fun-name-inline-expansion name))
                (inlinep (info :function :inlinep name)))
            (setf (gethash name *free-funs*)
