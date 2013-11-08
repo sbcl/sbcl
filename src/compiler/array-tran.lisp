@@ -1065,6 +1065,7 @@
                 (setf dims (nreverse dims))
                 `(lambda (,@',(when new-value (list new-value))
                           ,',array ,@n-indices)
+                   (declare (ignorable ,',array))
                    (let* (,@(let ((,index -1))
                               (mapcar (lambda (name)
                                         `(,name (array-dimension
