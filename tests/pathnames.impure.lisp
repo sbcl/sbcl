@@ -579,7 +579,9 @@
   ;; Not at the start of the first directory
   (assert (equal (native-namestring #p"foo/~/bar")
                  #-win32 "foo/~/bar"
-                 #+win32 "foo\\~\\bar")))
+                 #+win32 "foo\\~\\bar"))
+  (equal (native-namestring (merge-pathnames "~/"))
+         (native-namestring (user-homedir-pathname))))
 
 ;;; lp#673625
 (with-test (:name :pathname-escape-first-directory-component

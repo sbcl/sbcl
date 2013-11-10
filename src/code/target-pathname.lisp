@@ -453,15 +453,21 @@ the operating system native pathname conventions."
              (diddle-case
               (and default-host pathname-host
                    (not (eq (host-customary-case default-host)
-                            (host-customary-case pathname-host))))))
+                            (host-customary-case pathname-host)))))
+             (directory (merge-directories (%pathname-directory pathname)
+                                           (%pathname-directory defaults)
+                                           diddle-case)))
         (%make-maybe-logical-pathname
          (or pathname-host default-host)
-         (or (%pathname-device pathname)
-             (maybe-diddle-case (%pathname-device defaults)
-                                diddle-case))
-         (merge-directories (%pathname-directory pathname)
-                            (%pathname-directory defaults)
-                            diddle-case)
+         (and ;; The device of ~/ shouldn't be merged,
+              ;; because the expansion may have a different device
+              (not (and (>= (length directory) 2)
+                        (eql (car directory) :absolute)
+                        (eql (cadr directory) :home)))
+              (or (%pathname-device pathname)
+                  (maybe-diddle-case (%pathname-device defaults)
+                                     diddle-case)))
+         directory
          (or (%pathname-name pathname)
              (maybe-diddle-case (%pathname-name defaults)
                                 diddle-case))
