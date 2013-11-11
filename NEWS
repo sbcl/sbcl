@@ -9,6 +9,8 @@ changes relative to sbcl-1.1.13:
     Thanks to Jan Moringen. (lp#1249055)
   * enhancement: Top-level defmethod without defgeneric no longer causes
     undefined-function warnings in subsequent forms. (lp#503095)
+  * enhancement: Errors during loading foreign libraries on Windows now
+    include error messages instead of error codes.
   * bug fix: EQUALP now compares correctly structures with raw slots larger
     than a single word.
   * bug fix: contribs couldn't be built on Windows with MinGW.

@@ -74,21 +74,6 @@
 ;;; last-error code is maintained on a per-thread basis.
 (define-alien-routine ("GetLastError" get-last-error) dword)
 
-;;; Flag constants for FORMAT-MESSAGE.
-(defconstant format-message-from-system #x1000)
-
-;;; Format an error message based on a lookup table.  See MSDN for the
-;;; full meaning of the all options---most are not used when getting
-;;; system error codes.
-(define-alien-routine ("FormatMessageA" format-message) dword
-  (flags dword)
-  (source (* t))
-  (message-id dword)
-  (language-id dword)
-  (buffer c-string)
-  (size dword)
-  (arguments (* t)))
-
 ;;;; File Handles
 
 ;;; Historically, SBCL on Windows used CRT (lowio) file descriptors,
@@ -521,16 +506,17 @@
 (defmacro void-syscall* ((name &rest arg-types) &rest args)
   `(syscall* (,name ,@arg-types) (values t 0) ,@args))
 
-(defun get-last-error-message (err)
+(defun format-system-message (err)
   "http://msdn.microsoft.com/library/default.asp?url=/library/en-us/debug/base/retrieving_the_last_error_code.asp"
   (let ((message
          (with-alien ((amsg (* char)))
            (syscall (("FormatMessage" t)
                      dword dword dword dword dword (* (* char)) dword dword)
                     (cast-and-free amsg :free-function local-free)
-                    (logior FORMAT_MESSAGE_ALLOCATE_BUFFER
-                            FORMAT_MESSAGE_FROM_SYSTEM
-                            FORMAT_MESSAGE_MAX_WIDTH_MASK)
+                    (logior format-message-allocate-buffer
+                            format-message-from-system
+                            format-message-max-width-mask
+                            format-message-ignore-inserts)
                     0 err 0 (addr amsg) 0 0))))
     (and message (string-right-trim '(#\Space) message))))
 
@@ -540,7 +526,7 @@
      (error "~%Win32 Error [~A] - ~A~%~A"
             ,func-name
             err-code
-            (get-last-error-message err-code))))
+            (format-system-message err-code))))
 
 (defun get-folder-namestring (csidl)
   "http://msdn.microsoft.com/library/en-us/shellcc/platform/shell/reference/functions/shgetfolderpath.asp"

@@ -204,9 +204,10 @@ main(int argc, char *argv[])
 
     printf(";;; FormatMessage\n");
 
-    defconstant("FORMAT_MESSAGE_ALLOCATE_BUFFER", FORMAT_MESSAGE_ALLOCATE_BUFFER);
-    defconstant("FORMAT_MESSAGE_FROM_SYSTEM", FORMAT_MESSAGE_FROM_SYSTEM);
-    defconstant("FORMAT_MESSAGE_MAX_WIDTH_MASK", FORMAT_MESSAGE_MAX_WIDTH_MASK);
+    defconstant("format-message-allocate-buffer", FORMAT_MESSAGE_ALLOCATE_BUFFER);
+    defconstant("format-message-from-system", FORMAT_MESSAGE_FROM_SYSTEM);
+    defconstant("format-message-max-width-mask", FORMAT_MESSAGE_MAX_WIDTH_MASK);
+    defconstant("format-message-ignore-inserts", FORMAT_MESSAGE_IGNORE_INSERTS);
 
     printf(";;; Errors\n");
 

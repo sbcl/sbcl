@@ -23,8 +23,6 @@
   (handle hinstance)
   (symbol c-string))
 
-(define-alien-routine ("GetLastError" getlasterror) unsigned-int)
-
 (define-alien-routine ("SetStdHandle" set-std-handle)
    void
  (id int)
@@ -61,8 +59,8 @@
         (aver namestring)
         (when (zerop handle)
           (setf (shared-object-handle obj) nil)
-          (error "Error opening shared object ~S:~%  ~A."
-                 namestring (getlasterror)))
+          (error "Error opening shared object ~S:~% ~A"
+                 namestring (sb!win32:format-system-message (sb!win32:get-last-error))))
         (setf (shared-object-handle obj) handle)
         handle)
       (extern-alien "runtime_module_handle" hinstance)))
@@ -72,9 +70,9 @@
     (unless (freelibrary (shared-object-handle obj))
       (cerror "Ignore the error and continue as if closing succeeded."
               "FreeLibrary() caused an error while trying to close ~
-               shared object ~S: ~S"
+               shared object ~S:~% ~A"
               (shared-object-namestring obj)
-              (getlasterror)))
+              (sb!win32:format-system-message (sb!win32:get-last-error))))
     (setf (shared-object-handle obj) nil)))
 
 (defun find-dynamic-foreign-symbol-address (symbol)
