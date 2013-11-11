@@ -4935,3 +4935,8 @@
                                   (typep x '(member 1 3 15)))))
                  `(function ((or (integer 1 1) (integer 3 3)))
                             (values (member t) &optional)))))
+
+(with-test (:name :quietly-row-major-index-no-dimensions)
+  (assert (handler-case
+              (compile nil `(lambda (x) (array-row-major-index x)))
+            (warning () nil))))
