@@ -632,6 +632,7 @@
  ("src/compiler/represent")
  ("src/compiler/ir2opt")
  ("src/compiler/pack")
+ ("src/compiler/pack-iterative")
  ("src/compiler/codegen")
  ("src/compiler/debug")
 

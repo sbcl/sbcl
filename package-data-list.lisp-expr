@@ -2260,7 +2260,8 @@ ISBN 0-262-61074-4, with exceptions as noted in the User Manual."
                      "VOP-INFO-TARGET-FUN" "VOP-NEXT" "VOP-NODE"
                      "VOP-PARSE-OR-LOSE" "VOP-PARSE-TEMPS" "VOP-PREV"
                      "VOP-REFS" "VOP-RESULTS" "VOP-SAVE-SET" "VOP-TEMPS"))
-      :export ("PACK" "TARGET-IF-DESIRABLE"
+      :export ("PACK" "TARGET-IF-DESIRABLE" "*REGISTER-ALLOCATION-METHOD*"
+               "*PACK-ITERATIONS*"
                "*PACK-ASSIGN-COSTS*" "*PACK-OPTIMIZE-SAVES*"
                "*TN-WRITE-COSTS*" "*TN-LOOP-DEPTH-MULTIPLIER*"))
 

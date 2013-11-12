@@ -1588,15 +1588,26 @@
           most-positive-fixnum
           (length path)))))
 
+(declaim (type (member :iterative :greedy :adaptive)
+               *register-allocation-method*))
+(defvar *register-allocation-method* :adaptive)
+
+(declaim (ftype function pack-greedy pack-iterative))
+
 (defun pack (component)
   (unwind-protect
        (let ((optimize nil)
+             (speed-3 nil)
              (2comp (component-info component)))
          (init-sb-vectors component)
 
          ;; Determine whether we want to do more expensive packing by
          ;; checking whether any blocks in the component have (> SPEED
          ;; COMPILE-SPEED).
+         ;;
+         ;; Also, determine if any such block also declares (speed 3),
+         ;; in which case :adaptive register allocation will switch to
+         ;; the iterative Chaitin-Briggs spilling/coloring algorithm.
          ;;
          ;; FIXME: This means that a declaration can have a minor
          ;; effect even outside its scope, and as the packing is done
@@ -1606,10 +1617,12 @@
          ;; doesn't affect the semantics of the generated code in any
          ;; way. -- JES 2004-10-06
          (do-ir2-blocks (block component)
-           (when (policy (block-last (ir2-block-block block))
-                         (> speed compilation-speed))
-             (setf optimize t)
-             (return)))
+           (let ((block (block-last (ir2-block-block block))))
+             (when (policy block (> speed compilation-speed))
+               (setf optimize t)
+               (when (policy block (= speed 3))
+                 (setf speed-3 t)
+                 (return)))))
 
          ;; Call the target functions.
          (do-ir2-blocks (block component)
@@ -1627,7 +1640,11 @@
          ;; Actually allocate registers for most TNs. After this, only
          ;; :normal tns may be left unallocated (or TNs :restricted to
          ;; an unbounded SC).
-         (pack-greedy component 2comp optimize)
+         (funcall (ecase *register-allocation-method*
+                    (:greedy #'pack-greedy)
+                    (:iterative #'pack-iterative)
+                    (:adaptive (if speed-3 #'pack-iterative #'pack-greedy)))
+                  component 2comp optimize)
 
          ;; Pack any leftover normal/restricted TN that is not already
          ;; allocated to a finite SC, or TNs that do not appear in any
