@@ -759,29 +759,36 @@
       (setq block (ir2-block-prev block)))))
 
 ;;; Iterate over the normal TNs, finding the cost of packing on the
-;;; stack in units of the number of references. We count all
-;;; references as +1, and subtract out REGISTER-SAVE-PENALTY for each
-;;; place where we would have to save a register.
+;;; stack in units of the number of references. We count all read
+;;; references as +1, write references as + *tn-write-cost*, and
+;;; subtract out REGISTER-SAVE-PENALTY for each place where we would
+;;; have to save a register.
+;;; The subtraction reflects the fact that having a value in a
+;;; register around a call means that code to spill and unspill must
+;;; be inserted.
+(defvar *tn-write-cost* 2)
 (defun assign-tn-costs (component)
-  (do-ir2-blocks (block component)
-    (do ((vop (ir2-block-start-vop block) (vop-next vop)))
-        ((null vop))
-      (when (eq (vop-info-save-p (vop-info vop)) t)
-        (do-live-tns (tn (vop-save-set vop) block)
-          (decf (tn-cost tn) *backend-register-save-penalty*)))))
+  (let ((save-penalty *backend-register-save-penalty*))
+    (do-ir2-blocks (block component)
+      (do ((vop (ir2-block-start-vop block) (vop-next vop)))
+          ((null vop))
+        (when (eq (vop-info-save-p (vop-info vop)) t)
+          (do-live-tns (tn (vop-save-set vop) block)
+            (decf (tn-cost tn) save-penalty))))))
 
-  (do ((tn (ir2-component-normal-tns (component-info component))
-           (tn-next tn)))
-      ((null tn))
-    (let ((cost (tn-cost tn)))
-      (declare (fixnum cost))
-      (do ((ref (tn-reads tn) (tn-ref-next ref)))
-          ((null ref))
-        (incf cost))
-      (do ((ref (tn-writes tn) (tn-ref-next ref)))
-          ((null ref))
-        (incf cost))
-      (setf (tn-cost tn) cost))))
+  (let ((write-cost *tn-write-cost*))
+    (do ((tn (ir2-component-normal-tns (component-info component))
+             (tn-next tn)))
+        ((null tn))
+      (let ((cost (tn-cost tn)))
+        (declare (fixnum cost))
+        (do ((ref (tn-reads tn) (tn-ref-next ref)))
+            ((null ref))
+          (incf cost))
+        (do ((ref (tn-writes tn) (tn-ref-next ref)))
+            ((null ref))
+          (incf cost write-cost))
+        (setf (tn-cost tn) cost)))))
 
 ;;; Iterate over the normal TNs, storing the depth of the deepest loop
 ;;; that the TN is used in TN-LOOP-DEPTH.
