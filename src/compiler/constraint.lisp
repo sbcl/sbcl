@@ -155,16 +155,12 @@
 
   (defun conset-empty (conset)
     (or (= (conset-min conset) (conset-max conset))
-        ;; TODO: I bet FIND on bit-vectors can be optimized, if it
-        ;; isn't.
         (not (find 1 (conset-vector conset)
                    :start (conset-min conset)
-                   ;; By inspection, supplying :END here breaks the
-                   ;; build with a "full call to
-                   ;; DATA-VECTOR-REF-WITH-OFFSET" in the
-                   ;; cross-compiler.  If that should change, add
-                   ;; :end (conset-max conset)
-                   ))))
+                   ;; the :end argument can be commented out when
+                   ;; bootstrapping on a < 1.0.9 SBCL errors out with
+                   ;; a full call to DATA-VECTOR-REF-WITH-OFFSET.
+                   :end (conset-max conset)))))
 
   (defun copy-conset (conset)
     (let ((ret (%copy-conset conset)))
