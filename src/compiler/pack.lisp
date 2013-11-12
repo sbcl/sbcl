@@ -790,39 +790,34 @@
           (incf cost write-cost))
         (setf (tn-cost tn) cost)))))
 
-;;; Iterate over the normal TNs, storing the depth of the deepest loop
-;;; that the TN is used in TN-LOOP-DEPTH.
-(defun assign-tn-depths (component)
+;;; Iterate over the normal TNs, folding over the depth of the looops
+;;; that the TN is used in and storing the result in TN-LOOP-DEPTH.
+;;: reducer is the function used to join depth values together. #'max
+;;; gives the maximum depth, #'+ the sum.
+(defun assign-tn-depths (component &key (reducer #'max))
+  (declare (type function reducer))
   (when *loop-analyze*
-    (do-ir2-blocks (block component)
-      (do ((vop (ir2-block-start-vop block)
-                (vop-next vop)))
-          ((null vop))
-        (flet ((find-all-tns (head-fun)
-                 (collect ((tns))
-                   (do ((ref (funcall head-fun vop) (tn-ref-across ref)))
-                       ((null ref))
-                     (tns (tn-ref-tn ref)))
-                   (tns))))
-          (dolist (tn (nconc (find-all-tns #'vop-args)
-                             (find-all-tns #'vop-results)
-                             (find-all-tns #'vop-temps)
-                             ;; What does "references in this VOP
-                             ;; mean"? Probably something that isn't
-                             ;; useful in this context, since these
-                             ;; TN-REFs are linked with TN-REF-NEXT
-                             ;; instead of TN-REF-ACROSS. --JES
-                             ;; 2004-09-11
-                             ;; (find-all-tns #'vop-refs)
-                             ))
-            (setf (tn-loop-depth tn)
-                  (max (tn-loop-depth tn)
-                       (let* ((ir1-block (ir2-block-block (vop-block vop)))
-                              (loop (block-loop ir1-block)))
-                         (if loop
-                             (loop-depth loop)
-                             0))))))))))
-
+    ;; We only use tn depth for normal TNs
+    (do ((tn (ir2-component-normal-tns (component-info component))
+             (tn-next tn)))
+        ((null tn))
+      (let ((depth 0))
+        (declare (type fixnum depth))
+        (flet ((frob (ref)
+                 (declare (type (or null tn-ref) ref))
+                 (do ((ref ref (tn-ref-next ref)))
+                     ((null ref))
+                   (let* ((vop (tn-ref-vop ref))
+                          (block (ir2-block-block (vop-block vop)))
+                          (loop (block-loop block)))
+                     (setf depth (funcall reducer
+                                          depth
+                                          (if loop
+                                              (loop-depth loop)
+                                              0)))))))
+          (frob (tn-reads tn))
+          (frob (tn-writes tn))
+          (setf (tn-loop-depth tn) depth))))))
 
 ;;;; load TN packing
 
