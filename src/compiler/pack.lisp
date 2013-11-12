@@ -1458,7 +1458,8 @@
                          (or (= offset 0)
                              (= offset 1))))
                (conflicts-in-sc original sc offset))
-      (error "~S is wired to a location that it conflicts with." tn))
+      (error "~S is wired to location ~D in SC ~A of kind ~S that it conflicts with."
+             tn offset sc (tn-kind tn)))
 
     (add-location-conflicts original sc offset optimize)))
 
