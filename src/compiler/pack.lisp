@@ -818,6 +818,14 @@
           (frob (tn-reads tn))
           (frob (tn-writes tn))
           (setf (tn-loop-depth tn) depth))))))
+
+(defun tn-loop-depth-cost-> (x y)
+  (declare (type tn x y))
+  (let ((depth-x (tn-loop-depth x))
+        (depth-y (tn-loop-depth y)))
+    (or (> depth-x depth-y)
+        (and (= depth-x depth-y)
+             (> (tn-cost x) (tn-cost y))))))
 
 ;;;; load TN packing
 
@@ -1601,6 +1609,11 @@
                (when target-fun
                  (funcall target-fun vop)))))
 
+         ;; Assign costs to normal TNs so we know which ones should always
+         ;; be packed on the stack, and which are important not to spill.
+         (when *pack-assign-costs*
+           (assign-tn-costs component))
+
          ;; Pack wired TNs first.
          (do ((tn (ir2-component-wired-tns 2comp) (tn-next tn)))
              ((null tn))
@@ -1609,79 +1622,87 @@
          ;; Pack restricted component TNs.
          (do ((tn (ir2-component-restricted-tns 2comp) (tn-next tn)))
              ((null tn))
-           (when (eq (tn-kind tn) :component)
+           (when (and (eq (tn-kind tn) :component) (not (unbounded-tn-p tn)))
+             ;; unbounded SCs will be handled in the final pass
              (pack-tn tn t optimize)))
 
          ;; Pack other restricted TNs.
          (do ((tn (ir2-component-restricted-tns 2comp) (tn-next tn)))
              ((null tn))
-           (unless (tn-offset tn)
+           (unless (or (tn-offset tn) (unbounded-tn-p tn))
              (pack-tn tn t optimize)))
 
-         ;; Assign costs to normal TNs so we know which ones should
-         ;; always be packed on the stack.
-         (when *pack-assign-costs*
-           (assign-tn-costs component)
-           (assign-tn-depths component))
+         (cond (*loop-analyze*
+                ;; Allocate normal TNs, starting with the TNs that are used
+                ;; in deep loops.  Only allocate in finite SCs (i.e. not on
+                ;; the stack).
+                (when *pack-assign-costs*
+                  (assign-tn-depths component))
+                (collect ((tns))
+                  (do ((tn (ir2-component-normal-tns 2comp) (tn-next tn)))
+                      ((null tn))
+                    (unless (or (tn-offset tn)
+                                (eq (tn-kind tn) :more)
+                                (unbounded-tn-p tn))
+                      (tns tn)))
+                  (dolist (tn (stable-sort (tns) #'tn-loop-depth-cost->))
+                    (unless (tn-offset tn)
+                      (pack-tn tn nil optimize :allow-unbounded-sc nil)))))
+               (t
+                ;; If loop analysis has been disabled we might as well revert
+                ;; to the old behaviour of just packing TNs linearly as they
+                ;; appear.
+                (do-ir2-blocks (block component)
+                  (let ((ltns (ir2-block-local-tns block)))
+                    (do ((i (1- (ir2-block-local-tn-count block)) (1- i)))
+                        ((minusp i))
+                      (declare (fixnum i))
+                      (let ((tn (svref ltns i)))
+                        (unless (or (null tn)
+                                    (eq tn :more)
+                                    (tn-offset tn)
+                                    (unbounded-tn-p tn))
+                          (pack-tn tn nil optimize :allow-unbounded-sc nil))))))))
 
-         ;; Allocate normal TNs, starting with the TNs that are used
-         ;; in deep loops.  Only allocate in finite SCs (i.e. not on
-         ;; the stack).
-         (collect ((tns))
-           (do-ir2-blocks (block component)
-             (let ((ltns (ir2-block-local-tns block)))
-               (do ((i (1- (ir2-block-local-tn-count block)) (1- i)))
-                   ((minusp i))
-                 (declare (fixnum i))
-                 (let ((tn (svref ltns i)))
-                   (unless (or (null tn)
-                               (eq tn :more)
-                               (tn-offset tn))
-                     ;; If loop analysis has been disabled we might as
-                     ;; well revert to the old behaviour of just
-                     ;; packing TNs linearly as they appear.
-                     (unless *loop-analyze*
-                       (pack-tn tn nil optimize :allow-unbounded-sc nil))
-                     (tns tn))))))
-           (dolist (tn (stable-sort (tns)
-                                    (lambda (a b)
-                                      (cond
-                                        ((> (tn-loop-depth a)
-                                            (tn-loop-depth b))
-                                         t)
-                                        ((= (tn-loop-depth a)
-                                            (tn-loop-depth b))
-                                         (> (tn-cost a) (tn-cost b)))
-                                        (t nil)))))
-             (unless (tn-offset tn)
-               (pack-tn tn nil optimize :allow-unbounded-sc nil))))
-
-         ;; Pack any leftover normal TNs that could not be allocated
-         ;; to finite SCs, or TNs that do not appear in any local TN
-         ;; map (e.g. :MORE TNs).  Since we'll likely be allocating
-         ;; on the stack, first allocate TNs that are associated with
-         ;; code at shallow lexical depths: this will allocate long
-         ;; live ranges (i.e. TNs with more conflicts) first, and
-         ;; hopefully minimise stack fragmentation.
-         ;;
-         ;; Collect in reverse order to give priority to older TNs.
-         (let ((contiguous-tns '())
+         ;; Pack any leftover normal/restricted TN that is not already
+         ;; allocated to a finite SC, or TNs that do not appear in any
+         ;; local TN map (e.g. :MORE TNs).  Since we'll likely be
+         ;; allocating on the stack, first allocate TNs that are
+         ;; associated with code at shallow lexical depths: this will
+         ;; allocate long live ranges (i.e. TNs with more conflicts)
+         ;; first, and hopefully minimise stack fragmentation.
+         ;; Component TNs are a degenerate case: they are always live.
+         (let ((component-tns '())
+               (contiguous-tns '())
                (tns '()))
-           (do ((tn (ir2-component-normal-tns 2comp) (tn-next tn)))
-               ((null tn))
-             (unless (tn-offset tn)
-               (let ((key (cons tn (tn-lexical-depth tn))))
-                 (if (memq (tn-kind tn) '(:environment :debug-environment
-                                          :component))
-                     (push key contiguous-tns)
-                     (push key tns)))))
-           (flet ((pack-tns (tns)
-                    (dolist (tn (stable-sort tns #'< :key #'cdr))
-                      (let ((tn (car tn)))
-                        (unless (tn-offset tn)
-                          (pack-tn tn nil optimize))))))
-             ;; first pack TNs that are known to have simple
-             ;; live ranges (contiguous lexical scopes)
+           (flet ((register-tn (tn)
+                    (unless (tn-offset tn)
+                      (case (tn-kind tn)
+                        (:component
+                         (push tn component-tns))
+                        ((:environment :debug-environment)
+                         (push tn contiguous-tns))
+                        (t
+                         (push tn tns))))))
+             (do ((tn (ir2-component-restricted-tns 2comp) (tn-next tn)))
+                 ((null tn))
+               ;; by this time, restricted TNs must either be
+               ;; allocated in the right SC or unbounded
+               (aver (or (tn-offset tn) (unbounded-tn-p tn)))
+               (register-tn tn))
+             (do ((tn (ir2-component-normal-tns 2comp) (tn-next tn)))
+                 ((null tn))
+               (register-tn tn)))
+           (flet ((pack-tns (tns &optional in-order)
+                    (dolist (tn (if in-order
+                                    tns
+                                    (schwartzian-stable-sort-list
+                                     tns #'< :key #'tn-lexical-depth)))
+                      (unless (tn-offset tn)
+                        (pack-tn tn nil optimize)))))
+             ;; first pack TNs that are known to have simple live
+             ;; ranges (contiguous lexical scopes)
+             (pack-tns component-tns t)
              (pack-tns contiguous-tns)
              (pack-tns tns)))
 
