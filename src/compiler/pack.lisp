@@ -24,8 +24,8 @@
 
 ;;;; conflict determination
 
-;;; Return true if the element at the specified offset in SB has a
-;;; conflict with TN:
+;;; Return true if the element at the specified offset, or in any of
+;;; the [size-1] subsequent offsets, in SB has a conflict with TN:
 ;;; -- If a component-live TN (:COMPONENT kind), then iterate over
 ;;;    all the blocks. If the element at OFFSET is used anywhere in
 ;;;    any of the component's blocks (always-live /= 0), then there
@@ -39,44 +39,58 @@
 ;;;    that block.
 ;;; -- If TN is local, then we just check for a conflict in the block
 ;;;    it is local to.
-(defun offset-conflicts-in-sb (tn sb offset)
-  (declare (type tn tn) (type finite-sb sb) (type index offset))
+;;;
+;;; If there is a conflict, returns the first such conflicting offset.
+(defun offset-conflicts-in-sb (tn sb offset &key (size 1))
+  (declare (type tn tn) (type finite-sb sb) (type index offset size))
   (let ((confs (tn-global-conflicts tn))
-        (kind (tn-kind tn)))
-    (cond
-     ((eq kind :component)
-      (let ((loc-live (svref (finite-sb-always-live sb) offset)))
-        (dotimes (i (ir2-block-count *component-being-compiled*) nil)
-          (when (/= (sbit loc-live i) 0)
-            (return t)))))
-     (confs
-      (let ((loc-confs (svref (finite-sb-conflicts sb) offset))
-            (loc-live (svref (finite-sb-always-live sb) offset)))
-        (do ((conf confs (global-conflicts-next-tnwise conf)))
-            ((null conf)
-             nil)
-          (let* ((block (global-conflicts-block conf))
-                 (num (ir2-block-number block)))
-            (if (eq (global-conflicts-kind conf) :live)
-                (when (/= (sbit loc-live num) 0)
-                  (return t))
-                (when (/= (sbit (svref loc-confs num)
-                                (global-conflicts-number conf))
-                          0)
-                  (return t)))))))
-     (t
-      (/= (sbit (svref (svref (finite-sb-conflicts sb) offset)
-                       (ir2-block-number (tn-local tn)))
-                (tn-local-number tn))
-          0)))))
+        (kind (tn-kind tn))
+        (sb-conflicts (finite-sb-conflicts sb))
+        (sb-always-live (finite-sb-always-live sb)))
+    (macrolet ((do-offsets (&body body)
+                 `(loop repeat size
+                        for offset upfrom offset
+                        thereis (progn ,@body))))
+      (cond
+        ((eq kind :component)
+         (do-offsets
+             (let ((loc-live (svref sb-always-live offset)))
+               (dotimes (i (ir2-block-count *component-being-compiled*))
+                 (when (/= (sbit loc-live i) 0)
+                   (return offset))))))
+        (confs
+         ;; TN is global, iterate over the blocks TN is live in.
+         (do ((conf confs (global-conflicts-next-tnwise conf)))
+             ((null conf)
+              nil)
+           (let* ((block (global-conflicts-block conf))
+                  (num (ir2-block-number block)))
+             (if (eq (global-conflicts-kind conf) :live)
+                 (do-offsets
+                     (let ((loc-live (svref sb-always-live offset)))
+                       (when (/= (sbit loc-live num) 0)
+                         (return-from offset-conflicts-in-sb offset))))
+                 (do-offsets
+                     (let ((loc-confs (svref sb-conflicts offset)))
+                       (when (/= (sbit (svref loc-confs num)
+                                       (global-conflicts-number conf))
+                                 0)
+                         (return-from offset-conflicts-in-sb offset))))))))
+        (t
+         (do-offsets
+             (and (/= (sbit (svref (svref sb-conflicts offset)
+                                   (ir2-block-number (tn-local tn)))
+                            (tn-local-number tn))
+                      0)
+                  offset)))))))
 
 ;;; Return true if TN has a conflict in SC at the specified offset.
+(declaim (ftype (function (tn sc index) (values (or null index) &optional))
+                conflicts-in-sc))
 (defun conflicts-in-sc (tn sc offset)
   (declare (type tn tn) (type sc sc) (type index offset))
-  (let ((sb (sc-sb sc)))
-    (dotimes (i (sc-element-size sc) nil)
-      (when (offset-conflicts-in-sb tn sb (+ offset i))
-        (return t)))))
+  (offset-conflicts-in-sb tn (sc-sb sc) offset
+                          :size (sc-element-size sc)))
 
 ;;; Add TN's conflicts into the conflicts for the location at OFFSET
 ;;; in SC. We iterate over each location in TN, adding to the
@@ -1303,14 +1317,11 @@
          (align-mask (1- alignment))
          (size (finite-sb-current-size sb)))
     (flet ((attempt-location (start-offset)
-             (dotimes (i element-size
-                       (return-from select-location start-offset))
-               (declare (type index i))
-               (let ((offset (+ start-offset i)))
-                 (when (offset-conflicts-in-sb tn sb offset)
-                   (return (logandc2 (the index (+ (the index (1+ offset))
-                                                   align-mask))
-                                     align-mask)))))))
+             (let ((conflict (conflicts-in-sc tn sc start-offset)))
+               (if conflict
+                   (logandc2 (+ conflict align-mask 1)
+                             align-mask)
+                   (return-from select-location start-offset)))))
       (if (eq (sb-kind sb) :unbounded)
           (loop with offset = 0
                 until (> (+ offset element-size) size) do
