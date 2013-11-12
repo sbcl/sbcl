@@ -1546,9 +1546,10 @@
 (defun tn-lexical-depth (tn)
   (let ((path t)) ; dummy initial value
     (labels ((path (lambda)
-               (nreverse (loop while lambda
-                               collect lambda
-                               do (setf lambda (lambda-parent lambda)))))
+               (do ((acc '())
+                    (lambda lambda (lambda-parent lambda)))
+                   ((null lambda) acc)
+                 (push lambda acc)))
              (register-scope (lambda)
                (let ((new-path (path lambda)))
                  (setf path (if (eql path t)
@@ -1557,11 +1558,10 @@
                                         0 (mismatch path new-path))))))
              (walk-tn-refs (ref)
                (do ((ref ref (tn-ref-next ref)))
-                   ((null ref))
-                 (binding* ((node (vop-node (tn-ref-vop ref))
-                                  :exit-if-null))
-                   (register-scope (lexenv-lambda
-                                    (node-lexenv node)))))))
+                   ((or (null ref)
+                        (null path)))
+                 (awhen (vop-node (tn-ref-vop ref))
+                   (register-scope (lexenv-lambda (node-lexenv it)))))))
       (walk-tn-refs (tn-reads tn))
       (walk-tn-refs (tn-writes tn))
       (if (eql path t)
