@@ -1049,7 +1049,7 @@
                     (setq ,n (ir2-block-number (global-conflicts-block ,c)))))
                (scan (g l lc)
                  `(do ()
-                      ((>= ,g ,l))
+                      ((>= ,l ,g))
                     (advance ,l ,lc))))
 
       (loop
