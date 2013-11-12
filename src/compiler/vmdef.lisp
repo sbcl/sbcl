@@ -189,7 +189,7 @@
              (when targets
                (dotimes (i (length targets))
                  (let ((target (aref targets i)))
-                   (target-if-desirable
+                   (sb!regalloc:target-if-desirable
                     (aref refs (ldb (byte 8 8) target))
                     (aref refs (ldb (byte 8 0) target)))))))
            vop)
