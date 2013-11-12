@@ -15,7 +15,7 @@
 (defvar *args* ()
   #!+sb-doc
   "This variable is bound to the format arguments when an error is signalled
-  by BARF or BURP.")
+by BARF or BURP.")
 
 (defvar *ignored-errors* (make-hash-table :test 'equal))
 
@@ -36,7 +36,7 @@
 (defvar *burp-action* :warn
   #!+sb-doc
   "Action taken by the BURP function when a possible compiler bug is detected.
-  One of :WARN, :ERROR or :NONE.")
+One of :WARN, :ERROR or :NONE.")
 (declaim (type (member :warn :error :none) *burp-action*))
 
 ;;; Called when something funny but possibly correct is noticed.

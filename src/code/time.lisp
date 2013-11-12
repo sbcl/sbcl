@@ -393,7 +393,7 @@ normally during operations like SLEEP."
 ;;; function, report the times.
 (defun call-with-timing (timer function &rest arguments)
   #!+sb-doc
-  "Calls FUNCTION with ARGUMENTS, and gathers timing infomation about it.
+  "Calls FUNCTION with ARGUMENTS, and gathers timing information about it.
 Then calls TIMER with keyword arguments describing the information collected.
 Calls TIMER even if FUNCTION performs a non-local transfer of control. Finally
 returns values returned by FUNCTION.

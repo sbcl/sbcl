@@ -404,8 +404,8 @@ Examples:
 (defparameter *max-optimize-iterations* 3 ; ARB
   #!+sb-doc
   "The upper limit on the number of times that we will consecutively do IR1
-  optimization that doesn't introduce any new code. A finite limit is
-  necessary, since type inference may take arbitrarily long to converge.")
+optimization that doesn't introduce any new code. A finite limit is
+necessary, since type inference may take arbitrarily long to converge.")
 
 (defevent ir1-optimize-until-done "IR1-OPTIMIZE-UNTIL-DONE called")
 (defevent ir1-optimize-maxed-out "hit *MAX-OPTIMIZE-ITERATIONS* limit")

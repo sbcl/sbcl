@@ -220,7 +220,7 @@ potentially stale even before the function returns, as the thread may exit at
 any time."
   (thread-%alive-p thread))
 
-(defun thread-emphemeral-p (thread)
+(defun thread-ephemeral-p (thread)
   #!+sb-doc
   "Return T if THREAD is `ephemeral', which indicates that this thread is
 used by SBCL for internal purposes, and specifically that it knows how to
@@ -1022,7 +1022,7 @@ is initially NIL.")
 (defun semaphore-notification-status (semaphore-notification)
   #!+sb-doc
   "Returns T if a WAIT-ON-SEMAPHORE or TRY-SEMAPHORE using
-SEMAPHORE-NOTICATION has succeeded since the notification object was created
+SEMAPHORE-NOTIFICATION has succeeded since the notification object was created
 or cleared."
   (barrier (:read))
   (semaphore-notification-%status semaphore-notification))
@@ -1435,7 +1435,7 @@ list designator provided (defaults to no argument). Thread exits when
 the function returns. The return values of FUNCTION are kept around
 and can be retrieved by JOIN-THREAD.
 
-Invoking the initial ABORT restart estabilished by MAKE-THREAD
+Invoking the initial ABORT restart established by MAKE-THREAD
 terminates the thread.
 
 See also: RETURN-FROM-THREAD, ABORT-THREAD."
@@ -1486,7 +1486,7 @@ Trying to join the main thread will cause JOIN-THREAD to block until
 TIMEOUT occurs or the process exits: when main thread exits, the
 entire process exits.
 
-NOTE: Return convention in case of a timeout is exprimental and
+NOTE: Return convention in case of a timeout is experimental and
 subject to change."
   (let ((lock (thread-result-lock thread))
         (got-it nil)
@@ -1602,16 +1602,16 @@ With those caveats in mind, what you need to know when using it:
    given that asynch-unwind-safety does not compose: a function calling
    only asynch-unwind-safe function isn't automatically asynch-unwind-safe.
 
-   This means that in order for an asych unwind to be safe, the entire
+   This means that in order for an asynch unwind to be safe, the entire
    callstack at the point of interruption needs to be asynch-unwind-safe.
 
  * In addition to asynch-unwind-safety you must consider the issue of
-   re-entrancy. INTERRUPT-THREAD can cause function that are never normally
+   reentrancy. INTERRUPT-THREAD can cause function that are never normally
    called recursively to be re-entered during their dynamic contour,
    which may cause them to misbehave. (Consider binding of special variables,
    values of global variables, etc.)
 
-Take togather, these two restrict the \"safe\" things to do using
+Take together, these two restrict the \"safe\" things to do using
 INTERRUPT-THREAD to a fairly minimal set. One useful one -- exclusively for
 interactive development use is using it to force entry to debugger to inspect
 the state of a thread:

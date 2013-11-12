@@ -95,7 +95,7 @@
                       (unless (or (not (sb-thread:thread-alive-p thread))
                                   (eql thread sb-thread:*current-thread*)
                                   (member thread ,threads)
-                                  (sb-thread:thread-emphemeral-p thread))
+                                  (sb-thread:thread-ephemeral-p thread))
                         (setf any-leftover thread)
                         (ignore-errors (sb-thread:terminate-thread thread))))
                     (when any-leftover

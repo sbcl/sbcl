@@ -269,7 +269,7 @@ is :DEBUGGER-FRAME.
 
   :INTERRUPTED-FRAME
     specifies the first interrupted frame on the stack \(typically the frame
-    where the error occured, as opposed to error handling frames) if any,
+    where the error occurred, as opposed to error handling frames) if any,
     otherwise behaving as :CURRENT-FRAME.
 
   :DEBUGGER-FRAME
@@ -1175,8 +1175,8 @@ and LDB (the low-level debugger).  See also ENABLE-DEBUGGER."
 (defvar *auto-eval-in-frame* t
   #!+sb-doc
   "When set (the default), evaluations in the debugger's command loop occur
-   relative to the current frame's environment without the need of debugger
-   forms that explicitly control this kind of evaluation.")
+relative to the current frame's environment without the need of debugger
+forms that explicitly control this kind of evaluation.")
 
 (defun debug-eval (expr)
   (cond ((not (and (fboundp 'compile) *auto-eval-in-frame*))

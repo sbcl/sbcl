@@ -176,7 +176,7 @@
 (defgeneric stream-unread-char (stream character)
   #+sb-doc
   (:documentation
-   "Un-do the last call to STREAM-READ-CHAR, as in UNREAD-CHAR.
+   "Undo the last call to STREAM-READ-CHAR, as in UNREAD-CHAR.
   Return NIL. Every subclass of FUNDAMENTAL-CHARACTER-INPUT-STREAM
   must define a method for this function."))
 
@@ -403,7 +403,7 @@
   #+sb-doc
   (:documentation
    "Outputs a new line to the Stream if it is not positioned at the
-  begining of a line. Returns T if it output a new line, nil
+  beginning of a line. Returns T if it output a new line, nil
   otherwise. Used by FRESH-LINE. The default method uses
   STREAM-START-LINE-P and STREAM-TERPRI."))
 

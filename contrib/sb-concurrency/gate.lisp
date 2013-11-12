@@ -17,7 +17,7 @@
 (defstruct (gate (:constructor %make-gate)
                  (:copier nil)
                  (:predicate gatep))
-  "GATE type. Gates are syncronization constructs suitable for making
+  "GATE type. Gates are synchronization constructs suitable for making
 multiple threads wait for single event before proceeding.
 
 Use WAIT-ON-GATE to wait for a gate to open, OPEN-GATE to open one,

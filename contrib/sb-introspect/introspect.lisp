@@ -803,7 +803,7 @@ allocation.
 For :HEAP objects the secondary value is a plist:
 
   :SPACE
-    Inficates the heap segment the object is allocated in.
+    Indicates the heap segment the object is allocated in.
 
   :GENERATION
     Is the current generation of the object: 0 for nursery, 6 for pseudo-static

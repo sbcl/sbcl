@@ -111,7 +111,7 @@
       (heap-extract-maximum contents :key keyfun :test #'<=))))
 
 (defun priority-queue-insert (priority-queue new-item)
-  "Add NEW-ITEM to PRIOIRITY-QUEUE."
+  "Add NEW-ITEM to PRIORITY-QUEUE."
   (symbol-macrolet ((contents (%pqueue-contents priority-queue))
                     (keyfun (%pqueue-keyfun priority-queue)))
     (heap-insert contents new-item :key keyfun :test #'<=)))

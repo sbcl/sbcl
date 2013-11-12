@@ -506,8 +506,8 @@ not supported."
         :documentation "Initial working directory.")
    (shell :initarg :shell :accessor passwd-shell
           :documentation "Program to use as shell."))
-  (:documentation "Instances of this class represent entries in
-                   the system's user database."))
+  (:documentation
+   "Instances of this class represent entries in the system's user database."))
 
 ;;; group database
 #-win32
@@ -572,9 +572,8 @@ not supported."
    (mtime :initarg :mtime :reader stat-mtime
           :documentation "Time of last data modification.")
    (ctime :initarg :ctime :reader stat-ctime
-          :documentation "Time of last status change"))
-  (:documentation "Instances of this class represent Posix file
-                   metadata."))
+          :documentation "Time of last status change."))
+  (:documentation "Instances of this class represent POSIX file metadata."))
 
 (defmacro define-stat-call (name arg designator-fun type)
   ;; FIXME: this isn't the documented way of doing this, surely?
@@ -653,8 +652,8 @@ not supported."
           :documentation "Local modes.")
    (cc :initarg :cc :accessor sb-posix:termios-cc :array-length nccs
        :documentation "Control characters."))
-  (:documentation "Instances of this class represent I/O
-                   characteristics of the terminal."))
+  (:documentation
+   "Instances of this class represent I/O characteristics of the terminal."))
 
 #-win32
 (progn

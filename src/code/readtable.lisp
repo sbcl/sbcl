@@ -52,7 +52,7 @@
                             (:copier nil))
   #!+sb-doc
   "A READTABLE is a data structure that maps characters into syntax
-   types for the Common Lisp expression reader."
+types for the Common Lisp expression reader."
   ;; The CHARACTER-ATTRIBUTE-TABLE is a vector of BASE-CHAR-CODE-LIMIT
   ;; integers for describing the character type. Conceptually, there
   ;; are 4 distinct "primary" character attributes:

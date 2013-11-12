@@ -657,7 +657,7 @@ profiling, and :TIME for wallclock profiling.")
 loop around the BODY until a sufficient number of samples has been collected.
 Returns the values from the last evaluation of BODY.
 
-In multi-threaded operation, only the thread in which WITH-PROFILING was
+In multithreaded operation, only the thread in which WITH-PROFILING was
 evaluated will be profiled by default. If you want to profile multiple
 threads, invoke the profiler with START-PROFILING.
 
@@ -704,7 +704,7 @@ The following keyword args are recognized:
    of this. In this case using :MODE :TIME is likely to work better.
 
  :LOOP <bool>
-   If false (the default), evaluete BODY only once. If true repeatedly
+   If false (the default), evaluate BODY only once. If true repeatedly
    evaluate BODY."
   (declare (type report-type report))
   (check-type loop boolean)

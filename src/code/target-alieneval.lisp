@@ -257,7 +257,7 @@ interpreted depends on TYPE:
 
   * When TYPE is a foreign array type, an array of that type is
     allocated, and a pointer to it is returned. Note that you
-    must use DEREF to first access the arrey through the pointer.
+    must use DEREF to first access the array through the pointer.
 
     If supplied, SIZE is used as the first dimension for the array.
 
@@ -489,7 +489,7 @@ null byte.
 ;;; Dereference the alien and return the results.
 (defun deref (alien &rest indices)
   #!+sb-doc
-  "De-reference an Alien pointer or array. If an array, the indices are used
+  "Dereference an Alien pointer or array. If an array, the indices are used
    as the indices of the array element to access. If a pointer, one index can
    optionally be specified, giving the equivalent of C pointer arithmetic."
   (declare (type alien-value alien)
@@ -683,7 +683,7 @@ null byte.
 (defun alien-funcall (alien &rest args)
   #!+sb-doc
   "Call the foreign function ALIEN with the specified arguments. ALIEN's
-   type specifies the argument and result types."
+type specifies the argument and result types."
   (declare (type alien-value alien))
   (let ((type (alien-value-type alien)))
     (typecase type
@@ -717,41 +717,41 @@ null byte.
   #!+sb-doc
   "DEFINE-ALIEN-ROUTINE Name Result-Type {(Arg-Name Arg-Type [Style])}*
 
-  Define a foreign interface function for the routine with the specified NAME.
-  Also automatically DECLAIM the FTYPE of the defined function.
+Define a foreign interface function for the routine with the specified NAME.
+Also automatically DECLAIM the FTYPE of the defined function.
 
-  NAME may be either a string, a symbol, or a list of the form (string symbol).
+NAME may be either a string, a symbol, or a list of the form (string symbol).
 
-  RETURN-TYPE is the alien type for the function return value. VOID may be
-  used to specify a function with no result.
+RETURN-TYPE is the alien type for the function return value. VOID may be
+used to specify a function with no result.
 
-  The remaining forms specify individual arguments that are passed to the
-  routine. ARG-NAME is a symbol that names the argument, primarily for
-  documentation. ARG-TYPE is the C type of the argument. STYLE specifies the
-  way that the argument is passed.
+The remaining forms specify individual arguments that are passed to the
+routine. ARG-NAME is a symbol that names the argument, primarily for
+documentation. ARG-TYPE is the C type of the argument. STYLE specifies the
+way that the argument is passed.
 
-  :IN
-        An :IN argument is simply passed by value. The value to be passed is
-        obtained from argument(s) to the interface function. No values are
-        returned for :In arguments. This is the default mode.
+:IN
+      An :IN argument is simply passed by value. The value to be passed is
+      obtained from argument(s) to the interface function. No values are
+      returned for :In arguments. This is the default mode.
 
-  :OUT
-        The specified argument type must be a pointer to a fixed sized object.
-        A pointer to a preallocated object is passed to the routine, and the
-        the object is accessed on return, with the value being returned from
-        the interface function. :OUT and :IN-OUT cannot be used with pointers
-        to arrays, records or functions.
+:OUT
+      The specified argument type must be a pointer to a fixed sized object.
+      A pointer to a preallocated object is passed to the routine, and the
+      the object is accessed on return, with the value being returned from
+      the interface function. :OUT and :IN-OUT cannot be used with pointers
+      to arrays, records or functions.
 
-  :COPY
-        This is similar to :IN, except that the argument values are stored
-        on the stack, and a pointer to the object is passed instead of
-        the value itself.
+:COPY
+      This is similar to :IN, except that the argument values are stored
+      on the stack, and a pointer to the object is passed instead of
+      the value itself.
 
-  :IN-OUT
-        This is a combination of :OUT and :COPY. A pointer to the argument is
-        passed, with the object being initialized from the supplied argument
-        and the return value being determined by accessing the object on
-        return."
+:IN-OUT
+      This is a combination of :OUT and :COPY. A pointer to the argument is
+      passed, with the object being initialized from the supplied argument
+      and the return value being determined by accessing the object on
+      return."
   (multiple-value-bind (lisp-name alien-name)
       (pick-lisp-and-alien-names name)
     (collect ((docs) (lisp-args) (lisp-arg-types)
@@ -860,12 +860,12 @@ memoization: we don't create new callbacks if one pointing to the correct
 function with the same specifier already exists.")
 
 (defvar *alien-callback-wrappers* (make-hash-table :test #'equal)
-  "Cache of existing lisp weappers, indexed with SPECIFER. Used for memoization:
+  "Cache of existing lisp wrappers, indexed with SPECIFER. Used for memoization:
 we don't create new wrappers if one for the same specifier already exists.")
 
 (defvar *alien-callback-trampolines* (make-array 32 :fill-pointer 0 :adjustable t)
   "Lisp trampoline store: assembler wrappers contain indexes to this, and
-ENTER-ALIEN-CALLBACK pulls the corresponsing trampoline out and calls it.")
+ENTER-ALIEN-CALLBACK pulls the corresponding trampoline out and calls it.")
 
 (defun %alien-callback-sap (specifier result-type argument-types function wrapper
                             &optional call-type)

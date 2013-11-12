@@ -324,7 +324,7 @@ evaluated as a PROGN."
   evaluated before each evaluation of the body Forms. When the Test is true,
   the Exit-Forms are evaluated as a PROGN, with the result being the value
   of the DO. A block named NIL is established around the entire expansion,
-  allowing RETURN to be used as an laternate exit mechanism."
+  allowing RETURN to be used as an alternate exit mechanism."
   (frob-do-body varlist endlist body 'let* 'setq 'do* nil))
 
 ;;; DOTIMES and DOLIST could be defined more concisely using

@@ -174,7 +174,7 @@ Examples:
 
   ;; We want to use objects of type FOO as keys (by their
   ;; names.) EQUALP would work, but would make the names
-  ;; case-insensitive -- wich we don't want.
+  ;; case-insensitive -- which we don't want.
   (defstruct foo (name nil :type (or null string)))
 
   ;; Define an equivalence test function and a hash function.

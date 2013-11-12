@@ -1322,7 +1322,7 @@ the first."
 (defun gcd (&rest integers)
   #!+sb-doc
   "Return the greatest common divisor of the arguments, which must be
-  integers. Gcd with no arguments is defined to be 0."
+  integers. GCD with no arguments is defined to be 0."
   (case (length integers)
     (0 0)
     (1 (abs (the integer (nth 0 integers))))

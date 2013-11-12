@@ -907,7 +907,7 @@ Lisp extension proposal by David N. Gray"
       :doc
       "private: miscellaneous unsupported extensions to the ANSI spec. Much of
 the stuff in here originated in CMU CL's EXTENSIONS package and is retained,
-possibly temporariliy, because it might be used internally."
+possibly temporarily, because it might be used internally."
       :use ("CL" "SB!ALIEN" "SB!GRAY" "SB!FASL" "SB!SYS")
       :export (;; lambda list keyword extensions
                "&MORE"
@@ -2046,7 +2046,7 @@ is a good idea, but see SB-SYS re. blurring of boundaries."
                "THREAD-ERROR"
                "THREAD-ERROR-THREAD"
                "THREAD-ALIVE-P"
-               "THREAD-EMPHEMERAL-P"
+               "THREAD-EPHEMERAL-P"
                "THREAD-NAME"
                "THREAD-YIELD"
                "FOREIGN-THREAD"

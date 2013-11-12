@@ -19,7 +19,7 @@
 
 (defun restrict-compiler-policy (&optional quality (min 0))
   #!+sb-doc
-  "Assing a minimum value to an optimization quality. QUALITY is the name of
+  "Assign a minimum value to an optimization quality. QUALITY is the name of
 the optimization quality to restrict, and MIN (defaulting to zero) is the
 minimum allowed value.
 

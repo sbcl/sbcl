@@ -66,7 +66,7 @@
 ;;; Add a new handler to *descriptor-handlers*.
 (defun add-fd-handler (fd direction function)
   #!+sb-doc
-  "Arange to call FUNCTION whenever FD is usable. DIRECTION should be
+  "Arrange to call FUNCTION whenever FD is usable. DIRECTION should be
   either :INPUT or :OUTPUT. The value returned should be passed to
   SYSTEM:REMOVE-FD-HANDLER when it is no longer needed."
   (unless (member direction '(:input :output))
@@ -90,8 +90,8 @@
 ;;; Search *descriptor-handlers* for any reference to fd, and nuke 'em.
 (defun invalidate-descriptor (fd)
   #!+sb-doc
-  "Remove any handers refering to fd. This should only be used when attempting
-  to recover from a detected inconsistancy."
+  "Remove any handlers referring to FD. This should only be used when attempting
+  to recover from a detected inconsistency."
   (with-descriptor-handlers
     (setf *descriptor-handlers*
           (delete fd *descriptor-handlers*

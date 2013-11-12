@@ -582,7 +582,7 @@
       Inherit all arguments and properties of the given format. Any
       arguments defined in the current format definition will either modify
       the copy of an existing argument (keeping in the same order with
-      respect to when pre-filter's are called), if it has the same name as
+      respect to when prefilters are called), if it has the same name as
       one, or be added to the end.
   :DEFAULT-PRINTER printer-list
       Use the given PRINTER-LIST as a format to print any instructions of

@@ -151,7 +151,7 @@ current real time."
 global deadlines into account: TO-SEC, TO-USEC, STOP-SEC, STOP-USEC,
 DEADLINEP.
 
-TO-SEC and TO-USEC indicate the relative timeout in seconds and microsconds.
+TO-SEC and TO-USEC indicate the relative timeout in seconds and microseconds.
 STOP-SEC and STOP-USEC indicate the absolute timeout in seconds and
 microseconds. DEADLINEP is true if the returned values reflect a global
 deadline instead of the local timeout indicated by SECONDS.

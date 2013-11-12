@@ -606,7 +606,7 @@
 
 (defvar *efficiency-note-cost-threshold* 5
   #!+sb-doc
-  "This is the minumum cost difference between the chosen implementation and
+  "This is the minimum cost difference between the chosen implementation and
   the next alternative that justifies an efficiency note.")
 (declaim (type index *efficiency-note-cost-threshold*))
 

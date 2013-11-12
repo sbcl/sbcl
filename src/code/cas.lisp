@@ -21,7 +21,7 @@
 (def!macro cas (place old new &environment env)
   "Synonym for COMPARE-AND-SWAP.
 
-Addtionally DEFUN, DEFGENERIC, DEFMETHOD, FLET, and LABELS can be also used to
+Additionally DEFUN, DEFGENERIC, DEFMETHOD, FLET, and LABELS can be also used to
 define CAS-functions analogously to SETF-functions:
 
   (defvar *foo* nil)

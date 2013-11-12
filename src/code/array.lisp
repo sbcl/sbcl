@@ -589,8 +589,8 @@ of specialized arrays is supported."
 
 (defun row-major-aref (array index)
   #!+sb-doc
-  "Return the element of array corressponding to the row-major index. This is
-   SETF'able."
+  "Return the element of array corresponding to the row-major index. This is
+   SETFable."
   (declare (optimize (safety 1)))
   (row-major-aref array index))
 
@@ -600,7 +600,7 @@ of specialized arrays is supported."
 
 (defun svref (simple-vector index)
   #!+sb-doc
-  "Return the INDEX'th element of the given Simple-Vector."
+  "Return the INDEXth element of the given Simple-Vector."
   (declare (optimize (safety 1)))
   (aref simple-vector index))
 
@@ -785,10 +785,10 @@ of specialized arrays is supported."
 ;;; should probably be based on the VECTOR-PUSH-EXTEND code (which is
 ;;; new ca. sbcl-0.7.0) rather than the VECTOR-PUSH code (which dates
 ;;; back to CMU CL).
-(defun vector-push (new-el array)
+(defun vector-push (new-element array)
   #!+sb-doc
   "Attempt to set the element of ARRAY designated by its fill pointer
-   to NEW-EL, and increment the fill pointer by one. If the fill pointer is
+   to NEW-ELEMENT, and increment the fill pointer by one. If the fill pointer is
    too large, NIL is returned, otherwise the index of the pushed element is
    returned."
   (let ((fill-pointer (fill-pointer array)))
@@ -797,7 +797,7 @@ of specialized arrays is supported."
            nil)
           (t
            (locally (declare (optimize (safety 0)))
-             (setf (aref array fill-pointer) new-el))
+             (setf (aref array fill-pointer) new-element))
            (setf (%array-fill-pointer array) (1+ fill-pointer))
            fill-pointer))))
 

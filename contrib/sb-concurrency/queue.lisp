@@ -45,7 +45,7 @@ Use ENQUEUE to add objects to the queue, and DEQUEUE to remove them."
 (setf (documentation 'queuep 'function)
       "Returns true if argument is a QUEUE, NIL otherwise."
       (documentation 'queue-name 'function)
-      "Name of a QUEUE. Can be assingned to using SETF. Queue names
+      "Name of a QUEUE. Can be assignned to using SETF. Queue names
 can be arbitrary printable objects, and need not be unique.")
 
 (defun make-queue (&key name initial-contents)

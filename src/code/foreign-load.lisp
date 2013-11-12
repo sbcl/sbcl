@@ -39,17 +39,17 @@
 container specified by designated PATHNAME, such as a .so on an ELF platform.
 
 Locating the shared object follows standard rules of the platform, consult the
-manual page for dlopen(3) for details. Typically paths speficied by
+manual page for dlopen(3) for details. Typically paths specified by
 environment variables such as LD_LIBRARY_PATH are searched if the PATHNAME has
 no directory, but on some systems (eg. Mac OS X) search may happen even if
 PATHNAME is absolute. (On Windows LoadLibrary is used instead of dlopen(3).)
 
-On non-Windows platoforms calling LOAD-SHARED-OBJECT again with an PATHNAME
+On non-Windows platforms calling LOAD-SHARED-OBJECT again with a PATHNAME
 EQUAL to the designated pathname of a previous call will replace the old
-definitions; if a symbol was previously referenced thru the object and is not
-present in the reloaded version an error will be signalled. Reloading may not
-work as expected if user or library-code has called dlopen(3) on the same
-shared object.
+definitions; if a symbol was previously referenced through the object and
+is not present in the reloaded version an error will be signalled. Reloading
+may not work as expected if user or library-code has called dlopen(3) on the
+same shared object.
 
 LOAD-SHARED-OBJECT interacts with SB-EXT:SAVE-LISP-AND-DIE:
 

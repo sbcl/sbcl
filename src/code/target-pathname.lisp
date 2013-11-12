@@ -991,7 +991,7 @@ system's syntax for files."
                           &optional
                           (defaults *default-pathname-defaults*))
   #!+sb-doc
-  "Return an abbreviated pathname sufficent to identify the pathname relative
+  "Return an abbreviated pathname sufficient to identify the pathname relative
    to the defaults."
   (declare (type pathname-designator pathname))
   (with-pathname (pathname pathname)
@@ -1697,8 +1697,8 @@ is returned.
 The file should contain a single form, suitable for use with
 \(SETF LOGICAL-PATHNAME-TRANSLATIONS).
 
-Note: behaviour of this function is higly implementation dependent, and
-historically it used to be a no-op in SBcL -- the current approach is somewhat
+Note: behaviour of this function is highly implementation dependent, and
+historically it used to be a no-op in SBCL -- the current approach is somewhat
 experimental and subject to change."
   (declare (type string host)
            (values (member t nil)))
