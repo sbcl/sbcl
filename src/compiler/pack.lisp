@@ -1614,55 +1614,10 @@
          (when *pack-assign-costs*
            (assign-tn-costs component))
 
-         ;; Pack wired TNs first.
-         (do ((tn (ir2-component-wired-tns 2comp) (tn-next tn)))
-             ((null tn))
-           (pack-wired-tn tn optimize))
-
-         ;; Pack restricted component TNs.
-         (do ((tn (ir2-component-restricted-tns 2comp) (tn-next tn)))
-             ((null tn))
-           (when (and (eq (tn-kind tn) :component) (not (unbounded-tn-p tn)))
-             ;; unbounded SCs will be handled in the final pass
-             (pack-tn tn t optimize)))
-
-         ;; Pack other restricted TNs.
-         (do ((tn (ir2-component-restricted-tns 2comp) (tn-next tn)))
-             ((null tn))
-           (unless (or (tn-offset tn) (unbounded-tn-p tn))
-             (pack-tn tn t optimize)))
-
-         (cond (*loop-analyze*
-                ;; Allocate normal TNs, starting with the TNs that are used
-                ;; in deep loops.  Only allocate in finite SCs (i.e. not on
-                ;; the stack).
-                (when *pack-assign-costs*
-                  (assign-tn-depths component))
-                (collect ((tns))
-                  (do ((tn (ir2-component-normal-tns 2comp) (tn-next tn)))
-                      ((null tn))
-                    (unless (or (tn-offset tn)
-                                (eq (tn-kind tn) :more)
-                                (unbounded-tn-p tn))
-                      (tns tn)))
-                  (dolist (tn (stable-sort (tns) #'tn-loop-depth-cost->))
-                    (unless (tn-offset tn)
-                      (pack-tn tn nil optimize :allow-unbounded-sc nil)))))
-               (t
-                ;; If loop analysis has been disabled we might as well revert
-                ;; to the old behaviour of just packing TNs linearly as they
-                ;; appear.
-                (do-ir2-blocks (block component)
-                  (let ((ltns (ir2-block-local-tns block)))
-                    (do ((i (1- (ir2-block-local-tn-count block)) (1- i)))
-                        ((minusp i))
-                      (declare (fixnum i))
-                      (let ((tn (svref ltns i)))
-                        (unless (or (null tn)
-                                    (eq tn :more)
-                                    (tn-offset tn)
-                                    (unbounded-tn-p tn))
-                          (pack-tn tn nil optimize :allow-unbounded-sc nil))))))))
+         ;; Actually allocate registers for most TNs. After this, only
+         ;; :normal tns may be left unallocated (or TNs :restricted to
+         ;; an unbounded SC).
+         (pack-greedy component 2comp optimize)
 
          ;; Pack any leftover normal/restricted TN that is not already
          ;; allocated to a finite SC, or TNs that do not appear in any
@@ -1726,3 +1681,56 @@
 
          (values))
     (clean-up-pack-structures)))
+
+(defun pack-greedy (component 2comp optimize)
+  (declare (type component component)
+           (type ir2-component 2comp))
+  ;; Pack wired TNs first.
+  (do ((tn (ir2-component-wired-tns 2comp) (tn-next tn)))
+      ((null tn))
+    (pack-wired-tn tn optimize))
+
+  ;; Pack restricted component TNs.
+  (do ((tn (ir2-component-restricted-tns 2comp) (tn-next tn)))
+      ((null tn))
+    (when (and (eq (tn-kind tn) :component) (not (unbounded-tn-p tn)))
+      ;; unbounded SCs will be handled in the final pass
+      (pack-tn tn t optimize)))
+
+  ;; Pack other restricted TNs.
+  (do ((tn (ir2-component-restricted-tns 2comp) (tn-next tn)))
+      ((null tn))
+    (unless (or (tn-offset tn) (unbounded-tn-p tn))
+      (pack-tn tn t optimize)))
+
+  (cond (*loop-analyze*
+         ;; Allocate normal TNs, starting with the TNs that are used
+         ;; in deep loops.  Only allocate in finite SCs (i.e. not on
+         ;; the stack).
+         (when *pack-assign-costs*
+           (assign-tn-depths component))
+         (collect ((tns))
+           (do ((tn (ir2-component-normal-tns 2comp) (tn-next tn)))
+               ((null tn))
+             (unless (or (tn-offset tn)
+                         (eq (tn-kind tn) :more)
+                         (unbounded-tn-p tn))
+               (tns tn)))
+           (dolist (tn (stable-sort (tns) #'tn-loop-depth-cost->))
+             (unless (tn-offset tn)
+               (pack-tn tn nil optimize :allow-unbounded-sc nil)))))
+        (t
+         ;; If loop analysis has been disabled we might as well revert
+         ;; to the old behaviour of just packing TNs linearly as they
+         ;; appear.
+         (do-ir2-blocks (block component)
+           (let ((ltns (ir2-block-local-tns block)))
+             (do ((i (1- (ir2-block-local-tn-count block)) (1- i)))
+                 ((minusp i))
+               (declare (fixnum i))
+               (let ((tn (svref ltns i)))
+                 (unless (or (null tn)
+                             (eq tn :more)
+                             (tn-offset tn)
+                             (unbounded-tn-p tn))
+                   (pack-tn tn nil optimize :allow-unbounded-sc nil)))))))))
