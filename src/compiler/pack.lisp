@@ -1264,24 +1264,27 @@
         nil)))
 
 ;;; Scan along the target path from TN, looking at readers or writers.
-;;; When we find a packed TN, return CHECK-OK-TARGET of that TN. If
-;;; there is no target, or if the TN has multiple readers (writers),
-;;; then we return NIL. We also always return NIL after 10 iterations
-;;; to get around potential circularity problems.
+;;; When we find a TN, call CALLEE with that TN, and then resume
+;;; walking down that TN's target.  As soon as there is no target, or
+;;; if the TN has multiple readers (writers), we stop walking the
+;;; targetting chain. We also always stop after 10 iterations to get
+;;; around potential circularity problems.
 ;;;
-;;; FIXME: (30 minutes of reverse engineering?) It'd be nice to
-;;; rewrite the header comment here to explain the interface and its
-;;; motivation, and move remarks about implementation details (like
-;;; 10!) inside.
-(defun find-ok-target-offset (tn sc)
-  (declare (type tn tn) (type sc sc))
-  (flet ((frob-slot (slot-fun)
-           (declare (type function slot-fun))
-           (let ((count 10)
+;;; Why the single-reader/writer constraint?  As far as I can tell,
+;;; this is concerned with straight pipeline of data, e.g. CASTs.  In
+;;; that case, limiting to chains of length 10 seems to be more than
+;;; enough.
+(declaim (inline %call-with-target-tns))
+(defun %call-with-target-tns (tn callee
+                              &key (limit 10) (reads t) (writes t))
+  (declare (type tn tn) (type function callee) (type index limit))
+  (flet ((frob-slot (slot-function)
+           (declare (type function slot-function))
+           (let ((count limit)
                  (current tn))
              (declare (type index count))
              (loop
-              (let ((refs (funcall slot-fun current)))
+              (let ((refs (funcall slot-function current)))
                 (unless (and (plusp count)
                              refs
                              (not (tn-ref-next refs)))
@@ -1289,12 +1292,30 @@
                 (let ((target (tn-ref-target refs)))
                   (unless target (return nil))
                   (setq current (tn-ref-tn target))
-                  (when (tn-offset current)
-                    (return (check-ok-target current tn sc)))
+                  (funcall callee current)
                   (decf count)))))))
-    (declare (inline frob-slot)) ; until DYNAMIC-EXTENT works
-    (or (frob-slot #'tn-reads)
-        (frob-slot #'tn-writes))))
+    (when reads
+      (frob-slot #'tn-reads))
+    (when writes
+      (frob-slot #'tn-writes))
+    nil))
+
+(defmacro do-target-tns ((target-variable source-tn
+                          &rest keys &key limit reads writes)
+                         &body body)
+  (declare (ignore limit reads writes))
+  (let ((callback (gensym "CALLBACK")))
+    `(flet ((,callback (,target-variable)
+              ,@body))
+       (declare (dynamic-extent #',callback))
+       (%call-with-target-tns ,source-tn #',callback ,@keys))))
+
+(defun find-ok-target-offset (tn sc)
+  (declare (type tn tn) (type sc sc))
+  (do-target-tns (target tn)
+    (awhen (and (tn-offset target)
+                (check-ok-target target tn sc))
+      (return-from find-ok-target-offset it))))
 
 ;;;; location selection
 
