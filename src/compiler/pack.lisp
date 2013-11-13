@@ -1375,6 +1375,15 @@
 
 ;;;; pack interface
 
+;; Misc. utilities
+(declaim (inline unbounded-sc-p))
+(defun unbounded-sc-p (sc)
+  (eq (sb-kind (sc-sb sc)) :unbounded))
+
+(defun unbounded-tn-p (tn)
+  (unbounded-sc-p (tn-sc tn)))
+(declaim (notinline unbounded-sc-p))
+
 ;;; Attempt to pack TN in all possible SCs, first in the SC chosen by
 ;;; representation selection, then in the alternate SCs in the order
 ;;; they were specified in the SC definition. If the TN-COST is
