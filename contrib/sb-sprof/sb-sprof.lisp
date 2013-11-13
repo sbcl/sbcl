@@ -1412,40 +1412,5 @@ functions during statistical profiling."
                     (sb-c:%more-arg-values more-context
                                            0
                                            more-count)))))))))
-
 
-;;; silly examples
-
-(defun test-0 (n &optional (depth 0))
-  (declare (optimize (debug 3)))
-  (when (< depth n)
-    (dotimes (i n)
-      (test-0 n (1+ depth))
-      (test-0 n (1+ depth)))))
-
-(defun test ()
-  (with-profiling (:reset t :max-samples 1000 :report :graph)
-    (test-0 7)))
-
-(defun consalot ()
-  (let ((junk '()))
-    (loop repeat 10000 do
-         (push (make-array 10) junk))
-    junk))
-
-(defun consing-test ()
-  ;; 0.0001 chosen so that it breaks rather reliably when sprof does not
-  ;; respect pseudo atomic.
-  (with-profiling (:reset t :sample-interval 0.0001 :report :graph :loop nil)
-    (let ((target (+ (get-universal-time) 15)))
-      (princ #\.)
-      (force-output)
-      (loop
-         while (< (get-universal-time) target)
-         do (consalot)))))
-
-
-;;; provision
 (provide 'sb-sprof)
-
-;;; end of file
