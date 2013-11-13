@@ -1351,13 +1351,14 @@
           (let ((locations (sc-locations sc)))
             (when optimize
               (setf locations
-                    (stable-sort (copy-list locations) #'>
-                                 :key (lambda (location-offset)
-                                        (loop for offset from location-offset
-                                              repeat element-size
-                                              maximize (svref
-                                                        (finite-sb-always-live-count sb)
-                                                        offset))))))
+                    (schwartzian-stable-sort-list
+                     locations '>
+                     :key (lambda (location-offset)
+                            (loop for offset from location-offset
+                                  repeat element-size
+                                  maximize (svref
+                                            (finite-sb-always-live-count sb)
+                                            offset))))))
             (dolist (offset locations)
               (when (or use-reserved-locs
                         (not (member offset
