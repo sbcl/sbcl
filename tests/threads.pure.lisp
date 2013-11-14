@@ -505,6 +505,54 @@
                              :timeout 0.01
                              :default cookie)))))
 
+(with-test (:name (:semaphore-notification :wait-on-semaphore :lp-1038034)
+            :skipped-on '(not :sb-thread)
+            :fails-on :sb-thread)
+  ;; Test robustness of semaphore acquisition and notification with
+  ;; asynchronous thread termination...  Which we know is currently
+  ;; fragile.
+  (dotimes (run 180)
+    (let ((sem (make-semaphore)))
+      ;; In CRITICAL, WAIT-ON-SEMAPHORE and SLEEP can be interrupted
+      ;; by TERMINATE-THREAD below. But the SIGNAL-SEMAPHORE cleanup
+      ;; cannot be interrupted.
+      (flet ((critical (sleep)
+               (let ((note (make-semaphore-notification)))
+                 (sb-sys:without-interrupts
+                     (unwind-protect
+                          (sb-sys:with-local-interrupts
+                            (wait-on-semaphore sem :notification note)
+                            (sleep sleep))
+                       ;; Re-increment on exit if we decremented it.
+                       (when (semaphore-notification-status note)
+                         (signal-semaphore sem)))))))
+        ;; Create /parallel/ threads trying to acquire and then signal
+        ;; the semaphore. Try to asynchronously abort T2 just as T1 is
+        ;; exiting.
+        (destructuring-bind (t1 t2 t3)
+            (loop for i from 1
+               for sleep in '(0.01 0.02 0.02)
+               collect (make-thread #'critical :arguments sleep
+                                    :name (format nil "T~A" i)))
+          (signal-semaphore sem)
+          (sleep 0.01)
+          (ignore-errors
+            (terminate-thread t2))
+          (flet ((safe-join-thread (thread &key timeout)
+                   (assert timeout)
+                   (when (eq :timeout
+                             (join-thread thread
+                                          :timeout timeout
+                                          :default :timeout))
+                     (error "Hang in (join-thread ~A) ?" thread))))
+            (safe-join-thread t1 :timeout 10)
+            (safe-join-thread t3 :timeout 10)))))
+    (when (zerop (mod run 60))
+      (fresh-line)
+      (write-string "; "))
+    (write-char #\.)
+    (force-output)))
+
 (with-test (:name (:semaphore-notification :wait-on-semaphore)
             :skipped-on '(not :sb-thread))
   (let ((sem (make-semaphore))
