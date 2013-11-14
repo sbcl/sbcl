@@ -371,28 +371,23 @@
            ;; due to function calls.  (see PARSE-ARGUMENTS)
            (if (and (consp exp) (eq (car exp) 'quote))
                (second exp)
-               (%eval exp env)))
-         (maybe-new-env (env exp)
-           (if (and (consp exp) (eq (car exp) 'quote))
-               env
-               (make-env :parent env))))
+               (%eval exp env))))
     (if bindings
         (let* ((binding-name (car (car bindings)))
-               (binding-value (cdr (car bindings))))
+               (binding-value (cdr (car bindings)))
+               (new-env (make-env :parent env)))
           (if (specialp binding-name specials)
               (progv
                   (list binding-name)
                   (list (maybe-eval binding-value))
                 ;; Mark the variable as special in this environment
-                (push-var binding-name *special* env)
+                (push-var binding-name *special* new-env)
                 (eval-next-let*-binding
-                 (cdr bindings) specials
-                 (maybe-new-env env binding-value) end-action))
+                 (cdr bindings) specials new-env end-action))
               (progn
-                (push-var binding-name (maybe-eval binding-value) env)
+                (push-var binding-name (maybe-eval binding-value) new-env)
                 (eval-next-let*-binding
-                 (cdr bindings) specials
-                 (maybe-new-env env binding-value) end-action))))
+                 (cdr bindings) specials new-env end-action))))
         (funcall end-action env))))
 
 ;;; Create a new environment based on OLD-ENV by adding the variable

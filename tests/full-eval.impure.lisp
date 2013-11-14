@@ -99,3 +99,8 @@
            (x (progn (funcall *stash* :after-binding-z) 'new-x)))
       (funcall *stash* :in-body)
       (values))))
+
+(with-test (:name (let* :nested-environment-again))
+  (let* ((foo 3)
+         (foo (lambda () (typep foo 'integer))))
+    (assert (funcall foo))))
