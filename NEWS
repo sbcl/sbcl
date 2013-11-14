@@ -13,6 +13,10 @@ changes relative to sbcl-1.1.13:
     include error messages instead of error codes.
   * enhancement: run-sbcl.sh is usefully handled by rlwrap.  Thanks to William
     Cushing. (lp#1249183)
+  * enhancement: new function SB-EXT:ASSERT-VERSION->= accepts a version
+    specification (multiple integer arguments) and signals a continuable error
+    if the current SBCL version is lower (older) than the specification.
+    (lp#674372)
   * bug fix: EQUALP now compares correctly structures with raw slots larger
     than a single word.
   * bug fix: contribs couldn't be built on Windows with MinGW.

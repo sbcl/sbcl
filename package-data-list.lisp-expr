@@ -871,7 +871,10 @@ like *STACK-TOP-HINT* and unsupported stuff like *TRACED-FUN-LIST*."
                #!+sb-simd-pack "%SIMD-PACK-UB32S"
                #!+sb-simd-pack "%SIMD-PACK-UB64S"
                #!+sb-simd-pack "%SIMD-PACK-DOUBLES"
-               #!+sb-simd-pack "%SIMD-PACK-SINGLES"))
+               #!+sb-simd-pack "%SIMD-PACK-SINGLES"
+
+               ;; versioning utility
+               "ASSERT-VERSION->="))
 
    #s(sb-cold:package-data
       :name "SB!FORMAT"

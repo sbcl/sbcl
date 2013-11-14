@@ -168,3 +168,10 @@
     (funcall fun1 1/7)
     (funcall fun1 1/100000000000000000000000000)
     (assert (< (- (get-universal-time) start-time) 2))))
+
+(with-test (:name :version-assert-ok)
+  (sb-ext:assert-version->= 1 1 13))
+
+(with-test (:name :version-assert-fails)
+  (assert (raises-error?
+           (sb-ext:assert-version->= most-positive-fixnum))))
