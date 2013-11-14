@@ -21,6 +21,9 @@ changes relative to sbcl-1.1.13:
     than a single word.
   * bug fix: contribs couldn't be built on Windows with MinGW.
   * bug fix: Better pathname handling on Windows. (lp#922117)
+  * bug fix: OPEN reports a more meaningful error when an existing file is
+    opened for output with :if-exists :new-version.  Thanks to Philip
+    Munksgaard. (lp#455381)
 
 changes in sbcl-1.1.13 relative to sbcl-1.1.12:
   * optimization: better distribution of SXHASH over small conses of related

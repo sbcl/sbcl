@@ -2370,7 +2370,12 @@
         (ensure-one-of if-does-not-exist
                        '(:error :create nil)
                        :if-does-not-exist)
-        (cond ((eq if-does-not-exist :create)
+        (cond ((and if-exists-given
+                    truename
+                    (eq if-exists :new-version))
+               (open-error "OPEN :IF-EXISTS :NEW-VERSION is not supported ~
+                            when a new version must be created."))
+              ((eq if-does-not-exist :create)
                (setf mask (logior mask sb!unix:o_creat)))
               ((not (member if-exists '(:error nil))))
               ;; Both if-does-not-exist and if-exists now imply
