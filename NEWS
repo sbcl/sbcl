@@ -11,6 +11,8 @@ changes relative to sbcl-1.1.13:
     undefined-function warnings in subsequent forms. (lp#503095)
   * enhancement: Errors during loading foreign libraries on Windows now
     include error messages instead of error codes.
+  * enhancement: run-sbcl.sh is usefully handled by rlwrap.  Thanks to William
+    Cushing. (lp#1249183)
   * bug fix: EQUALP now compares correctly structures with raw slots larger
     than a single word.
   * bug fix: contribs couldn't be built on Windows with MinGW.
