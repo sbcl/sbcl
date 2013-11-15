@@ -3719,63 +3719,64 @@
   ;; Like all tests trying to verify that something doesn't blow up
   ;; compile-times this is bound to be a bit brittle, but at least
   ;; here we try to establish a decent baseline.
-  (flet ((time-it (lambda want)
-           (gc :full t) ; let's keep GCs coming from other code out...
-           (let* ((start (get-internal-run-time))
-                  (fun (dotimes (internal-time-resolution-too-low-workaround
-                                  #+win32 10
-                                  #-win32 0
-                                  (compile nil lambda))
-                         (compile nil lambda)))
-                  (end (get-internal-run-time))
-                  (got (funcall fun)))
-             (unless (eql want got)
-               (error "wanted ~S, got ~S" want got))
-             (- end start))))
-    (let ((time-1/simple
-           ;; This is mostly identical as the next one, but doesn't create
-           ;; hairy unions of numeric types.
-           (time-it `(lambda ()
-                       (labels ((bar (baz bim)
-                                  (let ((n (+ baz bim)))
-                                 (* n (+ n 1) bim))))
-                      (let ((a (bar 1 1))
-                            (b (bar 1 1))
-                            (c (bar 1 1)))
-                        (- (+ a b) c))))
-                    6))
-          (time-1/hairy
-           (time-it `(lambda ()
-                       (labels ((bar (baz bim)
-                                  (let ((n (+ baz bim)))
-                                 (* n (+ n 1) bim))))
-                      (let ((a (bar 1 1))
-                            (b (bar 1 5))
-                            (c (bar 1 15)))
-                        (- (+ a b) c))))
-                    -3864)))
-      (assert (>= (* 10 (1+ time-1/simple)) time-1/hairy)))
-    (let ((time-2/simple
-           ;; This is mostly identical as the next one, but doesn't create
-           ;; hairy unions of numeric types.
-           (time-it `(lambda ()
-                       (labels ((sum-d (n)
-                                  (let ((m (truncate 999 n)))
-                                    (/ (* n m (1+ m)) 2))))
-                         (- (+ (sum-d 3)
-                               (sum-d 3))
-                            (sum-d 3))))
-                    166833))
-          (time-2/hairy
-           (time-it `(lambda ()
-                       (labels ((sum-d (n)
-                                  (let ((m (truncate 999 n)))
-                                    (/ (* n m (1+ m)) 2))))
-                         (- (+ (sum-d 3)
-                               (sum-d 5))
-                            (sum-d 15))))
-                    233168)))
-      (assert (>= (* 10 (1+ time-2/simple)) time-2/hairy)))))
+  (labels ((time-it (lambda want &optional times)
+             (gc :full t) ; let's keep GCs coming from other code out...
+             (let* ((start (get-internal-run-time))
+                    (iterations 0)
+                    (fun (if times
+                             (loop repeat times
+                                   for result = (compile nil lambda)
+                                   finally (return result))
+                             (loop for result = (compile nil lambda)
+                                   do (incf iterations)
+                                   until (> (get-internal-run-time) (+ start 10))
+                                   finally (return result))))
+                    (end (get-internal-run-time))
+                    (got (funcall fun)))
+               (unless (eql want got)
+                 (error "wanted ~S, got ~S" want got))
+               (values (- end start) iterations)))
+           (test-it (simple result1 complex result2)
+             (multiple-value-bind (time-simple iterations)
+                 (time-it simple result1)
+               (assert (>= (* 10 (1+ time-simple))
+                           (time-it complex result2 iterations))))))
+    ;; This is mostly identical as the next one, but doesn't create
+    ;; hairy unions of numeric types.
+    (test-it `(lambda ()
+                (labels ((bar (baz bim)
+                           (let ((n (+ baz bim)))
+                             (* n (+ n 1) bim))))
+                  (let ((a (bar 1 1))
+                        (b (bar 1 1))
+                        (c (bar 1 1)))
+                    (- (+ a b) c))))
+             6
+             `(lambda ()
+                (labels ((bar (baz bim)
+                           (let ((n (+ baz bim)))
+                             (* n (+ n 1) bim))))
+                  (let ((a (bar 1 1))
+                        (b (bar 1 5))
+                        (c (bar 1 15)))
+                    (- (+ a b) c))))
+             -3864)
+    (test-it `(lambda ()
+                (labels ((sum-d (n)
+                           (let ((m (truncate 999 n)))
+                             (/ (* n m (1+ m)) 2))))
+                  (- (+ (sum-d 3)
+                        (sum-d 3))
+                     (sum-d 3))))
+             166833
+             `(lambda ()
+                (labels ((sum-d (n)
+                           (let ((m (truncate 999 n)))
+                             (/ (* n m (1+ m)) 2))))
+                  (- (+ (sum-d 3)
+                        (sum-d 5))
+                     (sum-d 15))))
+             233168)))
 
 (with-test (:name :regression-1.0.44.34)
   (compile nil '(lambda (z &rest args)
