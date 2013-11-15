@@ -684,5 +684,10 @@
                           (lambda (y) nil)
                           #'definitely-a-funcallable-instance)
                          type-error)))
+
+(with-test (:name (defstruct :nil-slot-name :bug-633911))
+  (defstruct nil-slot-name nil)
+  (let ((fun (compile nil '(lambda (x) (slot-value x 'nil)))))
+    (assert (= 3 (funcall fun (make-nil-slot-name :nil 3))))))
 
 ;;;; success

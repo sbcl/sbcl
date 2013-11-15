@@ -1187,6 +1187,8 @@ Except see also BREAK-VICIOUS-METACIRCLE.  -- CSR, 2003-05-28
     (accessor-values-internal accessor-type accessor-class methods)))
 
 (defun accessor-values-internal (accessor-type accessor-class methods)
+  (unless accessor-class
+    (return-from accessor-values-internal (values nil nil)))
   (dolist (meth methods)
     (when (if (consp meth)
               (early-method-qualifiers meth)
@@ -1194,31 +1196,26 @@ Except see also BREAK-VICIOUS-METACIRCLE.  -- CSR, 2003-05-28
       (return-from accessor-values-internal (values nil nil))))
   (let* ((meth (car methods))
          (early-p (not (eq **boot-state** 'complete)))
-         (slot-name (when accessor-class
-                      (if (consp meth)
-                          (and (early-method-standard-accessor-p meth)
-                               (early-method-standard-accessor-slot-name meth))
-                          (and (member *the-class-standard-object*
-                                       (if early-p
-                                           (early-class-precedence-list
-                                            accessor-class)
-                                           (class-precedence-list
-                                            accessor-class))
-                                       :test #'eq)
-                               (accessor-method-p meth)
-                               (accessor-method-slot-name meth)))))
-         (slotd (and accessor-class
-                     (if early-p
-                         (dolist (slot (early-class-slotds accessor-class) nil)
-                           (when (eql slot-name
-                                      (early-slot-definition-name slot))
-                             (return slot)))
-                         (find-slot-definition accessor-class slot-name)))))
+         (slot-name
+          (cond
+            ((and (consp meth)
+                  (early-method-standard-accessor-p meth))
+             (early-method-standard-accessor-slot-name meth))
+            ((and (atom meth)
+                  (member *the-class-standard-object*
+                          (if early-p
+                              (early-class-precedence-list accessor-class)
+                              (class-precedence-list accessor-class))))
+             (accessor-method-slot-name meth))
+            (t (return-from accessor-values-internal (values nil nil)))))
+         (slotd (if early-p
+                    (dolist (slot (early-class-slotds accessor-class) nil)
+                      (when (eql slot-name (early-slot-definition-name slot))
+                        (return slot)))
+                    (find-slot-definition accessor-class slot-name))))
     (when (and slotd
-               (or early-p
-                   (slot-accessor-std-p slotd accessor-type))
-               (or early-p
-                   (not (safe-p accessor-class))))
+               (or early-p (slot-accessor-std-p slotd accessor-type))
+               (or early-p (not (safe-p accessor-class))))
       (values (if early-p
                   (early-slot-definition-location slotd)
                   (slot-definition-location slotd))

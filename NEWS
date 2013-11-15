@@ -24,6 +24,8 @@ changes relative to sbcl-1.1.13:
   * bug fix: OPEN reports a more meaningful error when an existing file is
     opened for output with :if-exists :new-version.  Thanks to Philip
     Munksgaard. (lp#455381)
+  * bug fix: DEFSTRUCTs with NIL as a slot name no longer cause strange
+    CLOS-related errors.  (lp#633911)
 
 changes in sbcl-1.1.13 relative to sbcl-1.1.12:
   * optimization: better distribution of SXHASH over small conses of related
