@@ -1141,7 +1141,7 @@ redefinition."
   (let ((sb-ext:*evaluator-mode* :compile))
     (handler-bind ((warning #'error))
      (eval `(let ()
-              (defstruct destruct-no-warning-not-at-toplevel bar))))))
+              (defstruct defstruct-no-warning-not-at-toplevel bar))))))
 
 (with-test (:name :bug-941102)
   (let ((test `((defstruct bug-941102)
@@ -1153,3 +1153,8 @@ redefinition."
     (multiple-value-bind (warn2 fail2) (ctu:file-compile test)
       (assert (not warn2))
       (assert (not fail2)))))
+
+(with-test (:name (defstruct :constant-slot-names))
+  (defstruct defstruct-constant-slot-names t)
+  (assert (= 3 (defstruct-constant-slot-names-t
+                (make-defstruct-constant-slot-names :t 3)))))

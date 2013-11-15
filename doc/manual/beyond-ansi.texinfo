@@ -309,6 +309,19 @@ however, it is not consistent with the weaker requirement in AMOP, which
 states that any class found by @code{find-class}, no matter what its
 @code{class-name}, is redefined.
 
+@item
+@findex @sbmop{slot-definition-name}
+@tindex @cl{structure-class}
+@findex @cl{defstruct}
+an error is not signaled in the case of the @code{:name} initialization
+argument for @code{slot-definition} objects being a constant, when the
+slot definition is of type @code{structure-slot-definition} (i.e. it is
+associated with a class of type @code{structure-class}).
+
+This allows code which uses constant names for structure slots to
+continue working as specified in ANSI, while enforcing the constraint
+for all other types of slot.
+
 @end itemize
 
 @subsection Metaobject Protocol Extensions
@@ -386,7 +399,7 @@ at
 @findex @cl{find}
 @findex @cl{subseq}
 
-Users of this extension just make instances of @cl{sequence} subclasses
+Users of this extension just make instances of @code{sequence} subclasses
 and transparently operate on them using sequence functions:
 @lisp
 (coerce (subseq (make-instance 'my-sequence) 5 10) 'list)

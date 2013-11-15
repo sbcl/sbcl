@@ -141,7 +141,12 @@
     (error 'slotd-initialization-error :initarg :name :kind :missing))
   (unless (symbolp name)
     (error 'slotd-initialization-type-error :initarg :name :datum name :expected-type 'symbol))
-  (when (constantp name)
+  (when (and (constantp name)
+             ;; KLUDGE: names of structure slots are weird, and their
+             ;; weird behaviour gets grandfathered in this way.  (The
+             ;; negative constraint is hard to express in normal
+             ;; CLOS method terms).
+             (not (typep slotd 'structure-slot-definition)))
     (error 'slotd-initialization-error :initarg :name :kind :constant :value name))
   (when (and initformp (not initfunp))
     (error 'slotd-initialization-error :initarg :initfunction :kind :missing))
