@@ -555,13 +555,13 @@
            (type sb!unix:unix-file-mode mode)
            (ignore mode))
   (syscall (("CreateDirectory" t) lispbool system-string (* t))
-           (values result (if result 0 (- (get-last-error))))
+           (values result (if result 0 (get-last-error)))
            name nil))
 
 (defun sb!unix:unix-rename (name1 name2)
   (declare (type sb!unix:unix-pathname name1 name2))
   (syscall (("MoveFile" t) lispbool system-string system-string)
-           (values result (if result 0 (- (get-last-error))))
+           (values result (if result 0 (get-last-error)))
            name1 name2))
 
 (defun sb!unix::posix-getenv (name)
@@ -880,7 +880,7 @@ absense."
       (set-file-pointer-ex handle offset whence)
     (if moved
         (values to-place 0)
-        (values -1 (- (get-last-error))))))
+        (values -1 (get-last-error)))))
 
 ;; File mapping support routines
 (define-alien-routine (#!+sb-unicode "CreateFileMappingW"
@@ -1016,7 +1016,7 @@ absense."
                        sb!unix:enoent)
                       ((#.error_already_exists #.error_file_exists)
                        sb!unix:eexist)
-                      (otherwise (- error-code)))))
+                      (otherwise error-code))))
           (progn
             ;; FIXME: seeking to the end is not enough for real APPEND
             ;; semantics, but it's better than nothing.
@@ -1160,7 +1160,7 @@ absense."
         (duplicate-handle me fd me 0 t +duplicate-same-access+)
       (if duplicated
           (values handle 0)
-          (values nil (- (get-last-error)))))))
+          (values nil (get-last-error))))))
 
 (defun call-with-crt-fd (thunk handle &optional (flags 0))
   (multiple-value-bind (duplicate errno)

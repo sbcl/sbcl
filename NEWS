@@ -9,8 +9,7 @@ changes relative to sbcl-1.1.13:
     Thanks to Jan Moringen. (lp#1249055)
   * enhancement: Top-level defmethod without defgeneric no longer causes
     undefined-function warnings in subsequent forms. (lp#503095)
-  * enhancement: Errors during loading foreign libraries on Windows now
-    include error messages instead of error codes.
+  * enhancement: Better error messages for system errors on Windows.
   * enhancement: run-sbcl.sh is usefully handled by rlwrap.  Thanks to William
     Cushing. (lp#1249183)
   * enhancement: new function SB-EXT:ASSERT-VERSION->= accepts a version

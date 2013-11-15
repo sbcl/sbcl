@@ -308,12 +308,12 @@
                    (pathname-host pathname)
                    (sane-default-pathname-defaults)
                    :as-directory (eq :directory kind)))
-                 (fail "couldn't resolve ~A" filename
-                       (- (sb!win32:get-last-error))))))
+                 (fail (format nil "Failed to find the ~A of ~~A" query-for) filename
+                       (sb!win32:get-last-error)))))
           (:write-date
            (or (sb!win32::native-file-write-date filename)
-               (fail "couldn't query write date of ~A" filename
-                     (- (sb!win32:get-last-error))))))
+               (fail (format nil "Failed to find the ~A of ~~A" query-for) filename
+                       (sb!win32:get-last-error)))))
         #!-win32
         (multiple-value-bind (existsp errno ino mode nlink uid gid rdev size
                                       atime mtime)
@@ -390,7 +390,7 @@
                              (:write-date (+ unix-to-universal-time mtime))))))
                      ;; If we're still here, the file doesn't exist; error.
                      (fail
-                      (format nil "failed to find the ~A of ~~A" query-for)
+                      (format nil "Failed to find the ~A of ~~A" query-for)
                       pathspec errno)))
             (if existsp
                 (case query-for
@@ -497,7 +497,7 @@ per standard Unix unlink() behaviour."
     (multiple-value-bind (res err)
         #!-win32 (sb!unix:unix-unlink namestring)
         #!+win32 (or (sb!win32::native-delete-file namestring)
-                     (values nil (- (sb!win32:get-last-error))))
+                     (values nil (sb!win32:get-last-error)))
         (unless res
           (simple-file-perror "couldn't delete ~A" namestring err))))
   t)
@@ -556,7 +556,7 @@ exist or if is a file or a symbolic link."
                  (multiple-value-bind (res errno)
                      #!+win32
                      (or (sb!win32::native-delete-directory namestring)
-                         (values nil (- (sb!win32:get-last-error))))
+                         (values nil (sb!win32:get-last-error)))
                      #!-win32
                      (values
                       (not (minusp (alien-funcall
