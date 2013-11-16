@@ -1565,3 +1565,22 @@
    (sb-thread:make-thread
     (lambda ()
       (alien-funcall (extern-alien "alloca_test" (function void)))))))
+
+(with-test (:name :fp-mode-inheritance-threads)
+  (flet ((test ()
+           (let ((thread-fp-mode)
+                 (fp-mode (dpb 0 sb-vm::float-sticky-bits (sb-vm:floating-point-modes))))
+             (sb-thread:join-thread
+              (sb-thread:make-thread
+               (lambda ()
+                 (setf thread-fp-mode
+                       (dpb 0 sb-vm::float-sticky-bits (sb-vm:floating-point-modes))))))
+             (assert (= fp-mode thread-fp-mode)))))
+    (test)
+    (sb-int:with-float-traps-masked (:divide-by-zero)
+      (test))
+    (setf (sb-vm:floating-point-modes)
+          (dpb sb-vm:float-divide-by-zero-trap-bit
+               sb-vm::float-traps-byte
+               (sb-vm:floating-point-modes)))
+    (test)))

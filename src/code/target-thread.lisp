@@ -1453,8 +1453,15 @@ See also: RETURN-FROM-THREAD, ABORT-THREAD."
            (arguments     (if (listp arguments)
                               arguments
                               (list arguments)))
+           #!+win32
+           (fp-modes (dpb 0 sb!vm::float-sticky-bits ;; clear accrued bits
+                          (sb!vm:floating-point-modes)))
            (initial-function
              (named-lambda initial-thread-function ()
+               ;; Win32 doesn't inherit parent thread's FP modes,
+               ;; while it seems to happen everywhere else
+               #!+win32
+               (setf (sb!vm:floating-point-modes) fp-modes)
                ;; As it is, this lambda must not cons until we are
                ;; ready to run GC. Be very careful.
                (initial-thread-function-trampoline
