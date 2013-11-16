@@ -2119,4 +2119,17 @@
         (and fasl (delete-file fasl))))
     (test-load "bug-503095-2.lisp")))
 
+(with-test (:name :accessor-and-plain-method)
+  (defclass a-633911 ()
+    ((x-633911 :initform nil
+               :accessor x-633911)))
+
+  (defmethod x-633911 ((b a-633911)) 10)
+
+  (defclass b-633911 ()
+    ((x-633911 :initform nil
+               :accessor x-633911)))
+
+  (assert (= (x-633911 (make-instance 'a-633911)) 10)))
+
 ;;;; success

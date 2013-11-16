@@ -1201,7 +1201,7 @@ Except see also BREAK-VICIOUS-METACIRCLE.  -- CSR, 2003-05-28
             ((and (consp meth)
                   (early-method-standard-accessor-p meth))
              (early-method-standard-accessor-slot-name meth))
-            ((and (atom meth)
+            ((and (accessor-method-p meth)
                   (member *the-class-standard-object*
                           (if early-p
                               (early-class-precedence-list accessor-class)
