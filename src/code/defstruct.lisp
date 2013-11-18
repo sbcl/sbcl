@@ -624,7 +624,6 @@
 ;;; Given name and options, return a DD holding that info.
 (defun parse-defstruct-name-and-options (name-and-options)
   (destructuring-bind (name &rest options) name-and-options
-    (aver name) ; A null name doesn't seem to make sense here.
     (let ((dd (make-defstruct-description name))
           (predicate-named-p nil))
       (dolist (option options)
