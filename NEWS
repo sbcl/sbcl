@@ -16,6 +16,7 @@ changes relative to sbcl-1.1.13:
     specification (multiple integer arguments) and signals a continuable error
     if the current SBCL version is lower (older) than the specification.
     (lp#674372)
+  * enhancement: better ARRAY-RANK result derivation. (lp#1252108)
   * bug fix: EQUALP now compares correctly structures with raw slots larger
     than a single word.
   * bug fix: contribs couldn't be built on Windows with MinGW.

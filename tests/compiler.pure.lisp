@@ -4941,3 +4941,19 @@
   (assert (handler-case
               (compile nil `(lambda (x) (array-row-major-index x)))
             (warning () nil))))
+
+(with-test (:name :array-rank-transform)
+  (compile nil `(lambda (a) (array-rank (the an-imaginary-type a)))))
+
+(with-test (:name (:array-rank-fold :bug-1252108))
+  (let (noted)
+    (handler-bind ((sb-ext::code-deletion-note
+                     (lambda (x)
+                       (setf noted x))))
+      (compile nil
+               `(lambda (a)
+                  (typecase a
+                    ((array t 2)
+                     (when (= (array-rank a) 3)
+                       (array-dimension a 2)))))))
+    (assert noted)))

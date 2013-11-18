@@ -722,14 +722,16 @@
     (t :maybe)))
 
 ;;; If we can tell the rank from the type info, use it instead.
-(deftransform array-rank ((array))
+(deftransform array-rank ((array) (array) * :node node)
   (let ((array-type (lvar-type array)))
     (let ((dims (array-type-dimensions-or-give-up array-type)))
       (cond ((listp dims)
              (length dims))
-            ((eq t (array-type-complexp array-type))
+            ((eq t (and (array-type-p array-type)
+                        (array-type-complexp array-type)))
              '(%array-rank array))
             (t
+             (delay-ir1-transform node :constraint)
              `(if (array-header-p array)
                   (%array-rank array)
                   1))))))
