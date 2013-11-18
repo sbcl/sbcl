@@ -692,19 +692,29 @@
   (multiple-value-bind (name default default-p type type-p read-only ro-p)
       (typecase spec
         (symbol
-         (when (keywordp spec)
-           (style-warn "Keyword slot name indicates probable syntax ~
-                        error in DEFSTRUCT: ~S."
-                       spec))
+         (typecase spec
+           ((or null (member :conc-name :constructor :copier :predicate :named))
+            (warn "slot name of ~S indicates probable syntax error in DEFSTRUCT" spec))
+           (keyword
+            (style-warn "slot name of ~S indicates possible syntax error in DEFSTRUCT" spec)))
          spec)
         (cons
          (destructuring-bind
-               (name
-                &optional (default nil default-p)
-                &key (type nil type-p) (read-only nil ro-p))
+               (name &optional (default nil default-p)
+                     &key (type nil type-p) (read-only nil ro-p))
              spec
-           (values name
-                   default default-p
+           (when (dd-conc-name defstruct)
+             ;; the warning here is useful, but in principle we cannot
+             ;; distinguish between legitimate and erroneous use of
+             ;; these names when :CONC-NAME is NIL.  In the common
+             ;; case (CONC-NAME non-NIL), there are alternative ways
+             ;; of writing code with the same effect, so a full
+             ;; warning is justified.
+             (typecase name
+               ((member :conc-name :constructor :copier :predicate :include
+                        :print-function :print-object :type :initial-offset :pure)
+                (warn "slot name of ~S indicates probable syntax error in DEFSTRUCT" name))))
+           (values name default default-p
                    (uncross type) type-p
                    read-only ro-p)))
         (t (error 'simple-program-error
