@@ -808,7 +808,7 @@ different type of generator.
 @include fun-sb-ext-delete-directory.texinfo
 @include fun-sb-ext-get-time-of-day.texinfo
 @include macro-sb-ext-wait-for.texinfo
-@include fun-sb-ext-version-assert.texinfo
+@include fun-sb-ext-assert-version-gt=.texinfo
 
 @node Stale Extensions
 @comment  node-name,  next,  previous,  up
