@@ -1396,6 +1396,7 @@
 ;;; of allocating a new stack location.
 (defun pack-tn (tn restricted optimize &key (allow-unbounded-sc t))
   (declare (type tn tn))
+  (aver (not (tn-offset tn)))
   (let* ((original (original-tn tn))
          (fsc (tn-sc tn))
          (alternates (unless restricted (sc-alternate-scs fsc)))
@@ -1408,7 +1409,7 @@
         ((null sc)
          (failed-to-pack-error tn restricted))
       (unless (or allow-unbounded-sc
-                  (neq (sb-kind (sc-sb sc)) :unbounded))
+                  (not (unbounded-sc-p sc)))
         (return nil))
       (when (eq sc specified-save-sc)
         (unless (tn-offset save)
@@ -1419,10 +1420,11 @@
       (when (or restricted
                 (not (and (minusp (tn-cost tn)) (sc-save-p sc))))
         (let ((loc (or (find-ok-target-offset original sc)
-                       (select-location original sc)
+                       (select-location original sc :optimize optimize)
                        (and restricted
-                            (select-location original sc :use-reserved-locs t))
-                       (when (eq (sb-kind (sc-sb sc)) :unbounded)
+                            (select-location original sc :use-reserved-locs t
+                                                         :optimize optimize))
+                       (when (unbounded-sc-p sc)
                          (grow-sc sc)
                          (or (select-location original sc)
                              (error "failed to pack after growing SC?"))))))
