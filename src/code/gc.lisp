@@ -220,65 +220,92 @@ statistics are appended to it."
          (setf *gc-pending* t)
          nil)
         (t
-         (without-interrupts
-           (setf *gc-pending* :in-progress)
-           ;; Tricks to to prevent triggerring a recursive gc. This is
-           ;; like a WITHOUT-GCING inside the lock except that we
-           ;; cannot call MAYBE-HANDLE-PENDING-GC at the end, because
-           ;; that would lead to a recursive attempt on the lock. In
-           ;; case you are wondering, wrapping the lock in a
-           ;; WITHOUT-GCING would also deadlock. The
-           ;; *IN-WITHOUT-GCING* part is used to tell the runtime that
-           ;; it's ok to have a pending gc even though *GC-INHIBIT* is
-           ;; NIL.
-           ;;
-           ;; Now, if GET-MUTEX did not cons, that would be enough.
-           ;; Because it does, we need the :IN-PROGRESS bit above to
-           ;; tell the runtime not to trigger gcs.
-           (sb!thread::without-thread-waiting-for (:already-without-interrupts t)
-             (let* ((sb!impl::*in-without-gcing* t)
-                    (sb!impl::*deadline* nil)
-                    (sb!impl::*deadline-seconds* nil))
-               (sb!thread:with-mutex (*already-in-gc*)
-                 (let ((*gc-inhibit* t))
-                   (let ((old-usage (dynamic-usage))
-                         (new-usage 0))
-                     (unsafe-clear-roots gen)
-                     (gc-stop-the-world)
-                     (let ((start-time (get-internal-run-time)))
-                       (collect-garbage gen)
-                       (setf *gc-epoch* (cons nil nil))
-                       (let ((run-time (- (get-internal-run-time) start-time)))
-                         ;; KLUDGE: Sometimes we see the second getrusage() call
-                         ;; return a smaller value than the first, which can
-                         ;; lead to *GC-RUN-TIME* to going negative, which in
-                         ;; turn is a type-error.
-                         (when (plusp run-time)
-                           (incf *gc-run-time* run-time))))
-                     #!+sb-safepoint
-                     (setf *stop-for-gc-pending* nil)
-                     (setf *gc-pending* nil
-                           new-usage (dynamic-usage))
-                     #!+sb-thread
-                     (assert (not *stop-for-gc-pending*))
-                     (gc-start-the-world)
-                     ;; In a multithreaded environment the other threads
-                     ;; will see *n-b-f-o-p* change a little late, but
-                     ;; that's OK.
-                     (let ((freed (- old-usage new-usage)))
-                       ;; GENCGC occasionally reports negative here, but
-                       ;; the current belief is that it is part of the
-                       ;; normal order of things and not a bug.
-                       (when (plusp freed)
-                         (incf *n-bytes-freed-or-purified* freed))))))))
-           ;; While holding the mutex we were protected from
-           ;; SIG_STOP_FOR_GC and recursive GCs. Now, in order to
-           ;; preserve the invariant (*GC-PENDING* ->
-           ;; pseudo-atomic-interrupted or *GC-INHIBIT*), let's check
-           ;; explicitly for a pending gc before interrupts are
-           ;; enabled again.
-           (maybe-handle-pending-gc))
-         t)))
+         (flet ((perform-gc ()
+                  ;; Called from WITHOUT-GCING and WITHOUT-INTERRUPTS
+                  ;; after the world has been stopped, but it's an
+                  ;; awkwardly long piece of code to nest so deeply.
+                  (let ((old-usage (dynamic-usage))
+                        (new-usage 0)
+                        (start-time (get-internal-run-time)))
+                    (collect-garbage gen)
+                    (setf *gc-epoch* (cons nil nil))
+                    (let ((run-time (- (get-internal-run-time) start-time)))
+                      ;; KLUDGE: Sometimes we see the second getrusage() call
+                      ;; return a smaller value than the first, which can
+                      ;; lead to *GC-RUN-TIME* to going negative, which in
+                      ;; turn is a type-error.
+                      (when (plusp run-time)
+                        (incf *gc-run-time* run-time)))
+                    #!+sb-safepoint
+                    (setf *stop-for-gc-pending* nil)
+                    (setf *gc-pending* nil
+                          new-usage (dynamic-usage))
+                    #!+sb-thread
+                    (assert (not *stop-for-gc-pending*))
+                    (gc-start-the-world)
+                    ;; In a multithreaded environment the other threads
+                    ;; will see *n-b-f-o-p* change a little late, but
+                    ;; that's OK.
+                    ;; N.B. the outer without-gcing prevents this
+                    ;; function from being entered, so no need for
+                    ;; locking.
+                    (let ((freed (- old-usage new-usage)))
+                      ;; GENCGC occasionally reports negative here, but
+                      ;; the current belief is that it is part of the
+                      ;; normal order of things and not a bug.
+                      (when (plusp freed)
+                        (incf *n-bytes-freed-or-purified* freed))))))
+           (declare (inline perform-gc))
+           ;; Let's make sure we're not interrupted and that none of
+           ;; the deadline or deadlock detection stuff triggers.
+           (without-interrupts
+             (sb!thread::without-thread-waiting-for
+                 (:already-without-interrupts t)
+               (let ((sb!impl::*deadline* nil)
+                     (sb!impl::*deadline-seconds* nil)
+                     (epoch *gc-epoch*))
+                 (loop
+                  ;; GCing must be done without-gcing to avoid
+                  ;; recursive GC... but we can't block on
+                  ;; *already-in-gc* inside without-gcing: that would
+                  ;; cause a deadlock.
+                  (without-gcing
+                    ;; Try to grab that mutex.  On acquisition, stop
+                    ;; the world from with the mutex held, and then
+                    ;; execute the remainder of the GC: stopping the
+                    ;; world with interrupts disabled is the mother of
+                    ;; all critical sections.
+                    (cond ((sb!thread:with-mutex (*already-in-gc* :wait-p nil)
+                             (unsafe-clear-roots gen)
+                             (gc-stop-the-world)
+                             t)
+                           ;; Success! GC.
+                           (perform-gc)
+                           ;; Return, but leave *gc-pending* as is: we
+                           ;; did allocate a tiny bit after GCing.  In
+                           ;; theory, this could lead to a long chain
+                           ;; of tail-recursive (but not in explicit
+                           ;; tail position) GCs, but that doesn't
+                           ;; seem likely to happen too often... And
+                           ;; the old code already suffered from this
+                           ;; problem.
+                           (return t))
+                          (t
+                           ;; Some other thread is trying to GC. Clear
+                           ;; *gc-pending* (we already know we want a
+                           ;; GC to happen) and either let
+                           ;; without-gcing figure out that the world
+                           ;; is stopping, or try again.
+                           (setf *gc-pending* nil))))
+                  ;; we just wanted a minor GC, and a GC has
+                  ;; occurred. Leave, but don't execute after-gc
+                  ;; hooks.
+                  ;;
+                  ;; Return a 0 for easy ternary logic in the C
+                  ;; runtime.
+                  (when (and (eql gen 0)
+                             (neq epoch *gc-pending*))
+                    (return 0))))))))))
 
 (defun post-gc ()
   ;; Outside the mutex, interrupts may be enabled: these may cause
@@ -329,7 +356,7 @@ which may in turn trigger a collection of one or more older
 generations as well. If FULL is true, all generations are collected.
 If GEN is provided, it can be used to specify the oldest generation
 guaranteed to be collected."
-  (when (sub-gc :gen (if full sb!vm:+pseudo-static-generation+ gen))
+  (when (eq t (sub-gc :gen (if full sb!vm:+pseudo-static-generation+ gen)))
     (post-gc)))
 
 (define-alien-routine scrub-control-stack sb!alien:void)

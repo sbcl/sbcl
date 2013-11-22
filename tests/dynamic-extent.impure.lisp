@@ -518,7 +518,8 @@
     (declare (dynamic-extent x))
     (unless (equalp (caar x) (make-nested-good :bar *bar*))
       (error "got ~S, wanted ~S" (caar x) (make-nested-good :bar *bar*)))
-    (caar x)))
+    ;; the NESTED instance itself *should* be DX!
+    (copy-nested (caar x))))
 
 (with-test (:name :conservative-nested-dx)
   ;; NESTED-BAD should not stack-allocate :BAR due to the SETF.

@@ -26,6 +26,7 @@ changes relative to sbcl-1.1.13:
     Munksgaard. (lp#455381)
   * bug fix: DEFSTRUCTs with NIL as a slot name no longer cause strange
     CLOS-related errors.  (lp#633911)
+  * bug fix: GC deadlocks caused by concurrent consing on Windows.
 
 changes in sbcl-1.1.13 relative to sbcl-1.1.12:
   * optimization: better distribution of SXHASH over small conses of related

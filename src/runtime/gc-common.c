@@ -2661,8 +2661,24 @@ maybe_gc(os_context_t *context)
      * we may even be in a WITHOUT-INTERRUPTS. */
     gc_happened = funcall0(StaticSymbolFunction(SUB_GC));
     FSHOW((stderr, "/maybe_gc: gc_happened=%s\n",
-           (gc_happened == NIL) ? "NIL" : "T"));
-    if ((gc_happened != NIL) &&
+           (gc_happened == NIL)
+           ? "NIL"
+           : ((gc_happened == T)
+              ? "T"
+              : "0")));
+    /* gc_happened can take three values: T, NIL, 0.
+     *
+     * T means that the thread managed to trigger a GC, and post-gc
+     * must be called.
+     *
+     * NIL means that the thread is within without-gcing, and no GC
+     * has occurred.
+     *
+     * Finally, 0 means that *a* GC has occurred, but it wasn't
+     * triggered by this thread; success, but post-gc doesn't have
+     * to be called.
+     */
+    if ((gc_happened == T) &&
         /* See if interrupts are enabled or it's possible to enable
          * them. POST-GC has a similar check, but we don't want to
          * unlock deferrables in that case and get a pending interrupt
