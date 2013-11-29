@@ -356,8 +356,10 @@ which may in turn trigger a collection of one or more older
 generations as well. If FULL is true, all generations are collected.
 If GEN is provided, it can be used to specify the oldest generation
 guaranteed to be collected."
-  (when (eq t (sub-gc :gen (if full sb!vm:+pseudo-static-generation+ gen)))
-    (post-gc)))
+  #!-gencgc (declare (ignore full))
+  (let (#!+gencgc (gen (if full sb!vm:+pseudo-static-generation+ gen)))
+    (when (eq t (sub-gc :gen gen))
+      (post-gc))))
 
 (define-alien-routine scrub-control-stack sb!alien:void)
 
