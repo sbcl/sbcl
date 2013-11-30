@@ -485,6 +485,11 @@
   ()
   :derive-type (creation-result-type-specifier-nth-arg 1))
 
+(defknown %concatenate-to-string (&rest sequence) simple-string
+  (explicit-check flushable))
+(defknown %concatenate-to-base-string (&rest sequence) simple-base-string
+  (explicit-check flushable))
+
 (defknown (map %map) (type-specifier callable sequence &rest sequence)
   consed-sequence
   (call)

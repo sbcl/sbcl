@@ -1167,10 +1167,10 @@
         `(lambda (.dummy. ,@vars)
            (declare (ignore .dummy.))
            ,(ecase type
-                   ((string simple-string)
-                    `(%concatenate-to-string ,@vars))
-                   ((base-string simple-base-string)
-                    `(%concatenate-to-base-string ,@vars))))
+              ((string simple-string)
+               `(%concatenate-to-string ,@vars))
+              ((base-string simple-base-string)
+               `(%concatenate-to-base-string ,@vars))))
         ;; Inline
         (let* ((element-type (ecase type
                                ((string simple-string) 'character)
@@ -1179,47 +1179,65 @@
                                   collect (when (constant-lvar-p lvar)
                                             (lvar-value lvar))))
                (lengths
-                (loop for value in lvar-values
-                      for var in vars
-                      collect (if value
-                                  (length value)
-                                  `(sb!impl::string-dispatch ((simple-array * (*))
-                                                              sequence)
-                                       ,var
-                                     (declare (muffle-conditions compiler-note))
-                                     (length ,var))))))
+                 (loop for value in lvar-values
+                       for var in vars
+                       collect (if value
+                                   (length value)
+                                   `(sb!impl::string-dispatch ((simple-array * (*))
+                                                               sequence)
+                                                              ,var
+                                      (declare (muffle-conditions compiler-note))
+                                      (length ,var)))))
+               (non-constant-start
+                 (loop for value in lvar-values
+                       while (and (stringp value)
+                                    (< (length value) *concatenate-open-code-limit*))
+                       sum (length value))))
           `(apply
             (lambda ,vars
               (declare (ignorable ,@vars))
               (declare (optimize (insert-array-bounds-checks 0)))
               (let* ((.length. (+ ,@lengths))
-                     (.pos. 0)
+                     (.pos. ,non-constant-start)
                      (.string. (make-string .length. :element-type ',element-type)))
                 (declare (type index .length. .pos.)
                          (muffle-conditions compiler-note))
-                ,@(loop for value in lvar-values
+                ,@(loop with first-constants = t
+                        for first = t then nil
+                        for value in lvar-values
                         for var in vars
-                        collect (if (and (stringp value)
-                                         (< (length value) *concatenate-open-code-limit*))
-                                    ;; Fold the array reads for constant arguments
-                                    `(progn
-                                       ,@(loop for c across value
-                                               for i from 0
-                                               collect
-                                               ;; Without truly-the we get massive numbers
-                                               ;; of pointless error traps.
-                                                  `(setf (aref .string.
-                                                               (truly-the index (+ .pos. ,i)))
-                                                         ,c))
-                                       (incf .pos. ,(length value)))
-                                    `(sb!impl::string-dispatch
-                                         (#!+sb-unicode
-                                          (simple-array character (*))
-                                          (simple-array base-char (*))
-                                          t)
-                                         ,var
-                                       (replace .string. ,var :start1 .pos.)
-                                       (incf .pos. (length ,var)))))
+                        collect
+                        (cond ((and (stringp value)
+                                    (< (length value) *concatenate-open-code-limit*))
+                               ;; Fold the array reads for constant arguments
+                               `(progn
+                                  ,@(loop for c across value
+                                          for i from 0
+                                          collect
+                                          ;; Without truly-the we get massive numbers
+                                          ;; of pointless error traps.
+                                          `(setf (aref .string.
+                                                       (truly-the index ,(if first-constants
+                                                                             i
+                                                                             `(+ .pos. ,i))))
+                                                 ,c))
+                                  ,(unless first-constants
+                                     `(incf (truly-the index .pos.) ,(length value)))))
+                              (t
+                               (prog1
+                                   `(sb!impl::string-dispatch
+                                        (#!+sb-unicode
+                                         (simple-array character (*))
+                                         (simple-array base-char (*))
+                                         t)
+                                        ,var
+                                      (replace .string. ,var
+                                               ,@(cond ((not first-constants)
+                                                        '(:start1 .pos.))
+                                                       ((plusp non-constant-start)
+                                                        `(:start1 ,non-constant-start))))
+                                      (incf (truly-the index .pos.) (length ,var)))
+                                 (setf first-constants nil)))))
                 .string.))
             lvars)))))
 

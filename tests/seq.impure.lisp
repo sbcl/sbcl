@@ -230,27 +230,28 @@
     (null (find-if 'upper-case-p seq))))
 
 ;;; SUBSEQ
-(let ((avec (make-array 10
-                        :fill-pointer 4
-                        :initial-contents '(0 1 2 3 iv v vi vii iix ix))))
-  ;; These first five always worked AFAIK.
-  (assert (equalp (subseq avec 0 3) #(0 1 2)))
-  (assert (equalp (subseq avec 3 3) #()))
-  (assert (equalp (subseq avec 1 3) #(1 2)))
-  (assert (equalp (subseq avec 1) #(1 2 3)))
-  (assert (equalp (subseq avec 1 4) #(1 2 3)))
-  ;; SBCL bug found ca. 2002-05-01 by OpenMCL's correct handling of
-  ;; SUBSEQ, CSR's driving portable cross-compilation far enough to
-  ;; reach the SUBSEQ calls in assem.lisp, and WHN's sleazy
-  ;; translation of old CMU CL new-assem.lisp into sufficiently grotty
-  ;; portable Lisp that it passed suitable illegal values to SUBSEQ to
-  ;; exercise the bug:-|
-  ;;
-  ;; SUBSEQ should check its END value against logical LENGTH, not
-  ;; physical ARRAY-DIMENSION 0.
-  ;;
-  ;; fixed in sbcl-0.7.4.22 by WHN
-  (assert (null (ignore-errors (aref (subseq avec 1 5) 0)))))
+(with-test (:name :subseq)
+  (let ((avec (make-array 10
+                          :fill-pointer 4
+                          :initial-contents '(0 1 2 3 iv v vi vii iix ix))))
+    ;; These first five always worked AFAIK.
+    (assert (equalp (subseq avec 0 3) #(0 1 2)))
+    (assert (equalp (subseq avec 3 3) #()))
+    (assert (equalp (subseq avec 1 3) #(1 2)))
+    (assert (equalp (subseq avec 1) #(1 2 3)))
+    (assert (equalp (subseq avec 1 4) #(1 2 3)))
+    ;; SBCL bug found ca. 2002-05-01 by OpenMCL's correct handling of
+    ;; SUBSEQ, CSR's driving portable cross-compilation far enough to
+    ;; reach the SUBSEQ calls in assem.lisp, and WHN's sleazy
+    ;; translation of old CMU CL new-assem.lisp into sufficiently grotty
+    ;; portable Lisp that it passed suitable illegal values to SUBSEQ to
+    ;; exercise the bug:-|
+    ;;
+    ;; SUBSEQ should check its END value against logical LENGTH, not
+    ;; physical ARRAY-DIMENSION 0.
+    ;;
+    ;; fixed in sbcl-0.7.4.22 by WHN
+    (assert (null (ignore-errors (aref (subseq avec 1 5) 0))))))
 
 ;;; FILL
 (defun test-fill-typecheck (x)
@@ -263,77 +264,79 @@
 
 ;;; MAKE-SEQUENCE, COERCE, CONCATENATE, MERGE, MAP and requested
 ;;; result type (BUGs 46a, 46b, 66)
-(macrolet ((assert-type-error (form)
-             `(assert (typep (nth-value 1 (ignore-errors ,form))
-                             'type-error))))
-  (dolist (type-stub '((simple-vector)
-                       (vector *)
-                       (vector (signed-byte 8))
-                       (vector (unsigned-byte 16))
-                       (vector (signed-byte 32))
-                       (simple-bit-vector)))
-    (declare (optimize safety))
-    (format t "~&~S~%" type-stub)
-    ;; MAKE-SEQUENCE
-    (assert (= (length (make-sequence `(,@type-stub) 10)) 10))
-    (assert (= (length (make-sequence `(,@type-stub 10) 10)) 10))
-    (assert-type-error (make-sequence `(,@type-stub 10) 11))
-    ;; COERCE
-    (assert (= (length (coerce '(0 0 0) `(,@type-stub))) 3))
-    (assert (= (length (coerce #(0 0 0) `(,@type-stub 3))) 3))
-    (assert-type-error (coerce #*111 `(,@type-stub 4)))
-    ;; CONCATENATE
-    (assert (= (length (concatenate `(,@type-stub) #(0 0 0) #*111)) 6))
-    (assert (equalp (concatenate `(,@type-stub) #(0 0 0) #*111)
-                   (coerce #(0 0 0 1 1 1) `(,@type-stub))))
-    (assert (= (length (concatenate `(,@type-stub 6) #(0 0 0) #*111)) 6))
-    (assert (equalp (concatenate `(,@type-stub 6) #(0 0 0) #*111)
-                   (coerce #(0 0 0 1 1 1) `(,@type-stub 6))))
-    (assert-type-error (concatenate `(,@type-stub 5) #(0 0 0) #*111))
-    ;; MERGE
-    (macrolet ((test (type)
-                 `(merge ,type (copy-seq #(0 1 0)) (copy-seq #*111) #'>)))
-      (assert (= (length (test `(,@type-stub))) 6))
-      (assert (equalp (test `(,@type-stub))
-                      (coerce #(1 1 1 0 1 0) `(,@type-stub))))
-      (assert (= (length (test `(,@type-stub 6))) 6))
-      (assert (equalp (test `(,@type-stub 6))
-                      (coerce #(1 1 1 0 1 0) `(,@type-stub 6))))
-      (assert-type-error (test `(,@type-stub 4))))
-    ;; MAP
-    (assert (= (length (map `(,@type-stub) #'logxor #(0 0 1 1) '(0 1 0 1))) 4))
-    (assert (equalp (map `(,@type-stub) #'logxor #(0 0 1 1) '(0 1 0 1))
-                   (coerce #(0 1 1 0) `(,@type-stub))))
-    (assert (= (length (map `(,@type-stub 4) #'logxor #(0 0 1 1) '(0 1 0 1)))
-               4))
-    (assert (equalp (map `(,@type-stub 4) #'logxor #(0 0 1 1) '(0 1 0 1))
-                   (coerce #(0 1 1 0) `(,@type-stub 4))))
-    (assert-type-error (map `(,@type-stub 5) #'logxor #(0 0 1 1) '(0 1 0 1))))
-  ;; some more CONCATENATE tests for strings
-  (locally
+(with-test (:name :sequence-functions)
+  (macrolet ((assert-type-error (form)
+               `(assert (typep (nth-value 1 (ignore-errors ,form))
+                               'type-error))))
+    (dolist (type-stub '((simple-vector)
+                         (vector *)
+                         (vector (signed-byte 8))
+                         (vector (unsigned-byte 16))
+                         (vector (signed-byte 32))
+                         (simple-bit-vector)))
       (declare (optimize safety))
-    (assert (string= (concatenate 'string "foo" " " "bar") "foo bar"))
-    (assert (string= (concatenate '(string 7) "foo" " " "bar") "foo bar"))
-    (assert-type-error (concatenate '(string 6) "foo" " " "bar"))
-    (assert (string= (concatenate '(string 6) "foo" #(#\b #\a #\r)) "foobar"))
-    (assert-type-error (concatenate '(string 7) "foo" #(#\b #\a #\r))))
-  ;; Non-VECTOR ARRAY types aren't allowed as vector type specifiers.
-  (locally
-    (declare (optimize safety))
-    (assert-type-error (concatenate 'simple-array "foo" "bar"))
-    (assert-type-error (map 'simple-array #'identity '(1 2 3)))
-    (assert (equalp #(11 13)
-                    (map '(simple-array fixnum (*)) #'+ '(1 2 3) '(10 11))))
-    (assert-type-error (coerce '(1 2 3) 'simple-array))
-    (assert-type-error (merge 'simple-array (list 1 3) (list 2 4) '<))
-    (assert (equalp #(3 2 1) (coerce '(3 2 1) '(vector fixnum))))
-    (assert-type-error (map 'array #'identity '(1 2 3)))
-    (assert-type-error (map '(array fixnum) #'identity '(1 2 3)))
-    (assert (equalp #(1 2 3) (coerce '(1 2 3) '(vector fixnum))))
-    ;; but COERCE has an exemption clause:
-    (assert (string= "foo" (coerce "foo" 'simple-array)))
-    ;; ... though not in all cases.
-    (assert-type-error (coerce '(#\f #\o #\o) 'simple-array))))
+      (format t "~&~S~%" type-stub)
+      ;; MAKE-SEQUENCE
+      (assert (= (length (make-sequence `(,@type-stub) 10)) 10))
+      (assert (= (length (make-sequence `(,@type-stub 10) 10)) 10))
+      (assert-type-error (make-sequence `(,@type-stub 10) 11))
+      ;; COERCE
+      (assert (= (length (coerce '(0 0 0) `(,@type-stub))) 3))
+      (assert (= (length (coerce #(0 0 0) `(,@type-stub 3))) 3))
+      (assert-type-error (coerce #*111 `(,@type-stub 4)))
+      ;; CONCATENATE
+      (assert (= (length (concatenate `(,@type-stub) #(0 0 0) #*111)) 6))
+      (assert (equalp (concatenate `(,@type-stub) #(0 0 0) #*111)
+                      (coerce #(0 0 0 1 1 1) `(,@type-stub))))
+      (assert (= (length (concatenate `(,@type-stub 6) #(0 0 0) #*111)) 6))
+      (assert (equalp (concatenate `(,@type-stub 6) #(0 0 0) #*111)
+                      (coerce #(0 0 0 1 1 1) `(,@type-stub 6))))
+      (assert-type-error (concatenate `(,@type-stub 5) #(0 0 0) #*111))
+      ;; MERGE
+      (macrolet ((test (type)
+                   `(merge ,type (copy-seq #(0 1 0)) (copy-seq #*111) #'>)))
+        (assert (= (length (test `(,@type-stub))) 6))
+        (assert (equalp (test `(,@type-stub))
+                        (coerce #(1 1 1 0 1 0) `(,@type-stub))))
+        (assert (= (length (test `(,@type-stub 6))) 6))
+        (assert (equalp (test `(,@type-stub 6))
+                        (coerce #(1 1 1 0 1 0) `(,@type-stub 6))))
+        (assert-type-error (test `(,@type-stub 4))))
+      ;; MAP
+      (assert (= (length (map `(,@type-stub) #'logxor #(0 0 1 1) '(0 1 0 1))) 4))
+      (assert (equalp (map `(,@type-stub) #'logxor #(0 0 1 1) '(0 1 0 1))
+                      (coerce #(0 1 1 0) `(,@type-stub))))
+      (assert (= (length (map `(,@type-stub 4) #'logxor #(0 0 1 1) '(0 1 0 1)))
+                 4))
+      (assert (equalp (map `(,@type-stub 4) #'logxor #(0 0 1 1) '(0 1 0 1))
+                      (coerce #(0 1 1 0) `(,@type-stub 4))))
+      (assert-type-error (map `(,@type-stub 5) #'logxor #(0 0 1 1) '(0 1 0 1))))
+    ;; some more CONCATENATE tests for strings
+    (locally
+        (declare (optimize safety))
+      (assert (string= (concatenate 'string "foo" " " "bar") "foo bar"))
+      (assert (string= (concatenate '(string 7) "foo" " " "bar") "foo bar"))
+      (assert-type-error (concatenate '(string 6) "foo" " " "bar"))
+      (assert (string= (concatenate '(string 6) "foo" #(#\b #\a #\r)) "foobar"))
+      (assert (string= (concatenate '(string 6) #(#\b #\a #\r) "foo") "barfoo"))
+      (assert-type-error (concatenate '(string 7) "foo" #(#\b #\a #\r))))
+    ;; Non-VECTOR ARRAY types aren't allowed as vector type specifiers.
+    (locally
+        (declare (optimize safety))
+      (assert-type-error (concatenate 'simple-array "foo" "bar"))
+      (assert-type-error (map 'simple-array #'identity '(1 2 3)))
+      (assert (equalp #(11 13)
+                      (map '(simple-array fixnum (*)) #'+ '(1 2 3) '(10 11))))
+      (assert-type-error (coerce '(1 2 3) 'simple-array))
+      (assert-type-error (merge 'simple-array (list 1 3) (list 2 4) '<))
+      (assert (equalp #(3 2 1) (coerce '(3 2 1) '(vector fixnum))))
+      (assert-type-error (map 'array #'identity '(1 2 3)))
+      (assert-type-error (map '(array fixnum) #'identity '(1 2 3)))
+      (assert (equalp #(1 2 3) (coerce '(1 2 3) '(vector fixnum))))
+      ;; but COERCE has an exemption clause:
+      (assert (string= "foo" (coerce "foo" 'simple-array)))
+      ;; ... though not in all cases.
+      (assert-type-error (coerce '(#\f #\o #\o) 'simple-array)))))
 
 ;; CONCATENATE used to fail for generic sequences for result-type NULL.
 (with-test (:name (concatenate :result-type-null :bug-1162301))
@@ -355,60 +358,62 @@
 
 ;;; As pointed out by Raymond Toy on #lisp IRC, MERGE had some issues
 ;;; with user-defined types until sbcl-0.7.8.11
-(deftype list-typeoid () 'list)
-(assert (equal '(1 2 3 4) (merge 'list-typeoid (list 1 3) (list 2 4) '<)))
+(with-test (:name :merge-user-types)
+ (deftype list-typeoid () 'list)
+ (assert (equal '(1 2 3 4) (merge 'list-typeoid (list 1 3) (list 2 4) '<)))
 ;;; and also with types that weren't precicely LIST
-(assert (equal '(1 2 3 4) (merge 'cons (list 1 3) (list 2 4) '<)))
+ (assert (equal '(1 2 3 4) (merge 'cons (list 1 3) (list 2 4) '<))))
 
 ;;; but wait, there's more! The NULL and CONS types also have implicit
 ;;; length requirements:
-(macrolet ((assert-type-error (form)
-             `(assert (typep (nth-value 1 (ignore-errors ,form))
-                             'type-error))))
-  (locally
-      (declare (optimize safety))
-    ;; MAKE-SEQUENCE
-    (assert-type-error (make-sequence 'cons 0))
-    (assert-type-error (make-sequence 'null 1))
-    (assert-type-error (make-sequence '(cons t null) 0))
-    (assert-type-error (make-sequence '(cons t null) 2))
-    ;; KLUDGE: I'm not certain that this test actually tests for what
-    ;; it should test, in that the type deriver and optimizers might
-    ;; be too smart for the good of an exhaustive test system.
-    ;; However, it makes me feel good.  -- CSR, 2002-10-18
-    (assert (null (make-sequence 'null 0)))
-    (assert (= (length (make-sequence 'cons 3)) 3))
-    (assert (= (length (make-sequence '(cons t null) 1)) 1))
-    ;; and NIL is not a valid type for MAKE-SEQUENCE
-    (assert-type-error (make-sequence 'nil 0))
-    ;; COERCE
-    (assert-type-error (coerce #(1) 'null))
-    (assert-type-error (coerce #() 'cons))
-    (assert-type-error (coerce #() '(cons t null)))
-    (assert-type-error (coerce #(1 2) '(cons t null)))
-    (assert (null (coerce #() 'null)))
-    (assert (= (length (coerce #(1) 'cons)) 1))
-    (assert (= (length (coerce #(1) '(cons t null))) 1))
-    (assert-type-error (coerce #() 'nil))
-    ;; MERGE
-    (assert-type-error (merge 'null (list 1 3) (list 2 4) '<))
-    (assert-type-error (merge 'cons () () '<))
-    (assert (null (merge 'null () () '<)))
-    (assert (= (length (merge 'cons (list 1 3) (list 2 4) '<)) 4))
-    (assert (= (length (merge '(cons t (cons t (cons t (cons t null))))
-                              (list 1 3) (list 2 4)
-                              '<))
-               4))
-    (assert-type-error (merge 'nil () () '<))
-    ;; CONCATENATE
-    (assert-type-error (concatenate 'cons #() ()))
-    (assert-type-error (concatenate '(cons t null) #(1 2 3) #(4 5 6)))
-    (assert (= (length (concatenate 'cons #() '(1) "2 3")) 4))
-    (assert (= (length (concatenate '(cons t cons) '(1) "34")) 3))
-    (assert-type-error (concatenate 'nil '(3)))
-    ;; FIXME: tests for MAP to come when some brave soul implements
-    ;; the analogous type checking for MAP/%MAP.
-    ))
+(with-test (:name :sequence-functions-list-types)
+  (macrolet ((assert-type-error (form)
+               `(assert (typep (nth-value 1 (ignore-errors ,form))
+                               'type-error))))
+    (locally
+        (declare (optimize safety))
+      ;; MAKE-SEQUENCE
+      (assert-type-error (make-sequence 'cons 0))
+      (assert-type-error (make-sequence 'null 1))
+      (assert-type-error (make-sequence '(cons t null) 0))
+      (assert-type-error (make-sequence '(cons t null) 2))
+      ;; KLUDGE: I'm not certain that this test actually tests for what
+      ;; it should test, in that the type deriver and optimizers might
+      ;; be too smart for the good of an exhaustive test system.
+      ;; However, it makes me feel good.  -- CSR, 2002-10-18
+      (assert (null (make-sequence 'null 0)))
+      (assert (= (length (make-sequence 'cons 3)) 3))
+      (assert (= (length (make-sequence '(cons t null) 1)) 1))
+      ;; and NIL is not a valid type for MAKE-SEQUENCE
+      (assert-type-error (make-sequence 'nil 0))
+      ;; COERCE
+      (assert-type-error (coerce #(1) 'null))
+      (assert-type-error (coerce #() 'cons))
+      (assert-type-error (coerce #() '(cons t null)))
+      (assert-type-error (coerce #(1 2) '(cons t null)))
+      (assert (null (coerce #() 'null)))
+      (assert (= (length (coerce #(1) 'cons)) 1))
+      (assert (= (length (coerce #(1) '(cons t null))) 1))
+      (assert-type-error (coerce #() 'nil))
+      ;; MERGE
+      (assert-type-error (merge 'null (list 1 3) (list 2 4) '<))
+      (assert-type-error (merge 'cons () () '<))
+      (assert (null (merge 'null () () '<)))
+      (assert (= (length (merge 'cons (list 1 3) (list 2 4) '<)) 4))
+      (assert (= (length (merge '(cons t (cons t (cons t (cons t null))))
+                                (list 1 3) (list 2 4)
+                                '<))
+                 4))
+      (assert-type-error (merge 'nil () () '<))
+      ;; CONCATENATE
+      (assert-type-error (concatenate 'cons #() ()))
+      (assert-type-error (concatenate '(cons t null) #(1 2 3) #(4 5 6)))
+      (assert (= (length (concatenate 'cons #() '(1) "2 3")) 4))
+      (assert (= (length (concatenate '(cons t cons) '(1) "34")) 3))
+      (assert-type-error (concatenate 'nil '(3)))
+      ;; FIXME: tests for MAP to come when some brave soul implements
+      ;; the analogous type checking for MAP/%MAP.
+      )))
 
 ;;; ELT should signal an error of type TYPE-ERROR if its index
 ;;; argument isn't a valid sequence index for sequence:
