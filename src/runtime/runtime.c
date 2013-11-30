@@ -519,14 +519,22 @@ main(int argc, char *argv[], char *envp[])
                 ++argi;
                 if (argi >= argc)
                     lose("missing argument for --dynamic-space-size");
-                  dynamic_space_size = parse_size_arg(argv[argi++], "--dynamic-space-size");
+                  dynamic_space_size = parse_size_arg(argv[argi++],
+                                                      "--dynamic-space-size");
 #               ifdef MAX_DYNAMIC_SPACE_END
                 if (!((DYNAMIC_SPACE_START <
                        DYNAMIC_SPACE_START+dynamic_space_size) &&
                       (DYNAMIC_SPACE_START+dynamic_space_size <=
-                       MAX_DYNAMIC_SPACE_END)))
-                  lose("--dynamic-space-size argument %s is too large, max %lu",
-                       argv[argi-1], MAX_DYNAMIC_SPACE_END-DYNAMIC_SPACE_START);
+                       MAX_DYNAMIC_SPACE_END))) {
+                  char* suffix = "";
+                  char* size = argv[argi-1];
+                  if (!strchr(size, 'B') && !strchr(size, 'b')) {
+                    suffix = " [MB]";
+                  }
+                  lose("--dynamic-space-size argument %s%s is too large, max %lu KB",
+                       size, suffix,
+                       (MAX_DYNAMIC_SPACE_END-DYNAMIC_SPACE_START) / 1024);
+                }
 #               endif
             } else if (0 == strcmp(arg, "--control-stack-size")) {
                 ++argi;
