@@ -1,5 +1,5 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
-changes relative to sbcl-1.1.13:
+changes in sbcl-1.1.14 relative to sbcl-1.1.13:
   * optimization: complicated TYPEP tests are less opaque to the type
     propagation pass. (lp#1229340)
   * optimization: [N]BUTLAST perform a single pass over the list. (lp#1245697)
