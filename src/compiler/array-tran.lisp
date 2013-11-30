@@ -414,12 +414,13 @@
                   (t
                    (let ((n-elements-per-word (/ sb!vm:n-word-bits n-bits)))
                      (declare (type index n-elements-per-word)) ; i.e., not RATIO
-                     `(ceiling ,padded-length-form ,n-elements-per-word)))))))
+                     `(ceiling (truly-the index ,padded-length-form)
+                               ,n-elements-per-word)))))))
          (result-spec
           `(simple-array ,(sb!vm:saetp-specifier saetp) (,(or c-length '*))))
          (alloc-form
-          `(truly-the ,result-spec
-                      (allocate-vector ,typecode (the index length) ,n-words-form))))
+           `(truly-the ,result-spec
+                       (allocate-vector ,typecode (the index length) ,n-words-form))))
     (cond ((and initial-element initial-contents)
            (abort-ir1-transform "Both ~S and ~S specified."
                                 :initial-contents :initial-element))
