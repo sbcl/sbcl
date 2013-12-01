@@ -2262,7 +2262,7 @@ ISBN 0-262-61074-4, with exceptions as noted in the User Manual."
                      "VOP-REFS" "VOP-RESULTS" "VOP-SAVE-SET" "VOP-TEMPS"))
       :export ("PACK" "TARGET-IF-DESIRABLE"
                "*PACK-ASSIGN-COSTS*" "*PACK-OPTIMIZE-SAVES*"
-               "*TN-WRITE-COSTS*"))
+               "*TN-WRITE-COSTS*" "*TN-LOOP-DEPTH-MULTIPLIER*"))
 
    #s(sb-cold:package-data
       :name "SB!PCL"
