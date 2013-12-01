@@ -1,4 +1,8 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
+changes relative to sbcl-1.1.14:
+  * bug fix: Windows applications without the console window no longer misbehave.
+    (patch by Wilfredo Velazquez, lp#1256034).
+
 changes in sbcl-1.1.14 relative to sbcl-1.1.13:
   * optimization: complicated TYPEP tests are less opaque to the type
     propagation pass. (lp#1229340)

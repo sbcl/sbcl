@@ -2550,33 +2550,63 @@
     (multiple-value-bind (in out err)
         #!-win32 (values 0 1 2)
         #!+win32 (sb!win32::get-std-handles)
-      (flet ((stdio-stream (handle name inputp outputp)
-               (make-fd-stream
-                handle
-                :name name
-                :input inputp
-                :output outputp
-                :buffering :line
-                :element-type :default
-                :serve-events inputp
-                :external-format (stdstream-external-format handle outputp))))
-        (setf *stdin*  (stdio-stream in  "standard input"    t nil))
-        (setf *stdout* (stdio-stream out "standard output" nil   t))
-        (setf *stderr* (stdio-stream err "standard error"  nil   t))))
+      (labels (#!+win32
+               (nul-stream (name inputp outputp)
+                 (let* ((nul-name #.(coerce "NUL" 'simple-base-string))
+                        (nul-handle
+                          (cond
+                            ((and inputp outputp)
+                             (sb!win32:unixlike-open nul-name sb!unix:o_rdwr 0))
+                            (inputp
+                             (sb!win32:unixlike-open nul-name sb!unix:o_rdonly 0))
+                            (outputp
+                             (sb!win32:unixlike-open nul-name sb!unix:o_wronly 0))
+                            (t
+                             ;; Not quite sure what to do in this case.
+                             nil))))
+                   (make-fd-stream
+                    nul-handle
+                    :name name
+                    :input inputp
+                    :output outputp
+                    :buffering :line
+                    :element-type :default
+                    :serve-events inputp
+                    :auto-close t
+                    :external-format (stdstream-external-format nul-handle outputp))))
+               (stdio-stream (handle name inputp outputp)
+                 (cond
+                   #!+win32
+                   ((null handle)
+                    ;; If no actual handle was present, create a stream to NUL
+                    (nul-stream name inputp outputp))
+                   (t
+                    (make-fd-stream
+                     handle
+                     :name name
+                     :input inputp
+                     :output outputp
+                     :buffering :line
+                     :element-type :default
+                     :serve-events inputp
+                     :external-format (stdstream-external-format handle outputp))))))
+        (setf *stdin*  (stdio-stream in  "standard input"  t   nil)
+              *stdout* (stdio-stream out "standard output" nil t)
+              *stderr* (stdio-stream err "standard error"  nil t))))
     #!+win32
     (setf *tty* (make-two-way-stream *stdin* *stdout*))
     #!-win32
     (let* ((ttyname #.(coerce "/dev/tty" 'simple-base-string))
            (tty (sb!unix:unix-open ttyname sb!unix:o_rdwr #o666)))
-      (if tty
-          (setf *tty*
+      (setf *tty*
+            (if tty
                 (make-fd-stream tty :name "the terminal"
-                                :input t :output t :buffering :line
-                                :external-format (stdstream-external-format
-                                                  tty t)
-                                :serve-events (or #!-win32 t)
-                                :auto-close t))
-          (setf *tty* (make-two-way-stream *stdin* *stdout*))))
+                                    :input t :output t :buffering :line
+                                    :external-format (stdstream-external-format
+                                                      tty t)
+                                    :serve-events t
+                                    :auto-close t)
+                (make-two-way-stream *stdin* *stdout*))))
     (princ (get-output-stream-string *error-output*) *stderr*))
   (values))
 
