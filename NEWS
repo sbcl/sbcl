@@ -1,5 +1,8 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 changes relative to sbcl-1.1.14:
+  * enhancement: sb-ext:save-lisp-and-die on Windows now accepts
+    :application-type argument, which can be :console or :gui. :gui allows
+    having GUI applications without an automatically appearing console window.
   * bug fix: Windows applications without the console window no longer misbehave.
     (patch by Wilfredo Velazquez, lp#1256034).
 

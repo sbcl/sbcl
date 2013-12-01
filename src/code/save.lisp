@@ -23,7 +23,8 @@
   (prepend-runtime int)
   (save-runtime-options int)
   (compressed int)
-  (compression-level int))
+  (compression-level int)
+  (application-type int))
 
 #!+gencgc
 (define-alien-routine "gc_and_save" void
@@ -31,7 +32,8 @@
   (prepend-runtime int)
   (save-runtime-options int)
   (compressed int)
-  (compression-level int))
+  (compression-level int)
+  (application-type int))
 
 #!+gencgc
 (defvar sb!vm::*restart-lisp-function*)
@@ -43,7 +45,9 @@
                                          (purify t)
                                          (root-structures ())
                                          (environment-name "auxiliary")
-                                         (compression nil))
+                                         (compression nil)
+                                         #!+win32
+                                         (application-type :console))
   #!+sb-doc
   "Save a \"core image\", i.e. enough information to restart a Lisp
 process later in the same state, in the file of the specified name.
@@ -99,6 +103,12 @@ The following &KEY arguments are defined:
      :SB-CORE-COMPRESSION was enabled at build-time, the argument may also be
      an integer from -1 to 9, corresponding to zlib compression levels, or T
      (which is equivalent to the default compression level, -1).
+
+  :APPLICATION-TYPE
+     Present only on Windows and is meaningful only with :EXECUTABLE T.
+     Specifies the subsystem of the executable, :CONSOLE or :GUI.
+     The notable difference is that :GUI doesn't automatically create a console
+     window. The default is :CONSOLE.
 
 The save/load process changes the values of some global variables:
 
@@ -165,14 +175,24 @@ sufficiently motivated to do lengthy fixes."
                                         (foreign-bool executable)
                                         (foreign-bool save-runtime-options)
                                         (foreign-bool compression)
-                                        (or compression 0)))
+                                        (or compression 0)
+                                        #!+win32
+                                        (ecase application-type
+                                          (:console 0)
+                                          (:gui 1))
+                                        #!-win32 0))
                (without-gcing
                  (save name
                        (get-lisp-obj-address #'restart-lisp)
                        (foreign-bool executable)
                        (foreign-bool save-runtime-options)
                        (foreign-bool compression)
-                       (or compression 0))))))
+                       (or compression 0)
+                       #!+win32
+                       (ecase application-type
+                         (:console 0)
+                         (:gui 1))
+                       #!-win32 0)))))
     ;; Save the restart function into a static symbol, to allow GC-AND-SAVE
     ;; access to it even after the GC has moved it.
     #!+gencgc

@@ -4531,8 +4531,8 @@ prepare_for_final_gc ()
  * SB!VM:RESTART-LISP-FUNCTION */
 void
 gc_and_save(char *filename, boolean prepend_runtime,
-            boolean save_runtime_options,
-            boolean compressed, int compression_level)
+            boolean save_runtime_options, boolean compressed,
+            int compression_level, int application_type)
 {
     FILE *file;
     void *runtime_bytes = NULL;
@@ -4562,7 +4562,8 @@ gc_and_save(char *filename, boolean prepend_runtime,
     collect_garbage(HIGHEST_NORMAL_GENERATION+1);
 
     if (prepend_runtime)
-        save_runtime_to_filehandle(file, runtime_bytes, runtime_size);
+        save_runtime_to_filehandle(file, runtime_bytes, runtime_size,
+                                   application_type);
 
     /* The dumper doesn't know that pages need to be zeroed before use. */
     zero_all_free_pages();
