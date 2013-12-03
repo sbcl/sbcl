@@ -280,15 +280,16 @@
 (defoptimizer (%set-row-major-aref derive-type) ((array index new-value))
   (assert-new-value-type new-value array))
 
-(defoptimizer (make-array derive-type)
-              ((dims &key initial-element element-type initial-contents
-                adjustable fill-pointer displaced-index-offset displaced-to))
+(defun derive-make-array-type (dims element-type adjustable
+                               fill-pointer displaced-to)
   (let* ((simple (and (unsupplied-or-nil adjustable)
                       (unsupplied-or-nil displaced-to)
                       (unsupplied-or-nil fill-pointer)))
          (spec
-          (or `(,(if simple 'simple-array 'array)
+           (or `(,(if simple 'simple-array 'array)
                  ,(cond ((not element-type) t)
+                        ((ctype-p element-type)
+                         (type-specifier element-type))
                         ((constant-lvar-p element-type)
                          (let ((ctype (careful-specifier-type
                                        (lvar-value element-type))))
@@ -309,13 +310,31 @@
                          '(*))
                         (t
                          '*)))
-              'array)))
+               'array)))
     (if (and (not simple)
              (or (supplied-and-true adjustable)
                  (supplied-and-true displaced-to)
                  (supplied-and-true fill-pointer)))
         (careful-specifier-type `(and ,spec (not simple-array)))
         (careful-specifier-type spec))))
+
+(defoptimizer (make-array derive-type)
+    ((dims &key element-type adjustable fill-pointer displaced-to))
+  (derive-make-array-type dims element-type adjustable
+                          fill-pointer displaced-to))
+
+(defoptimizer (%make-array derive-type)
+    ((dims widetag n-bits &key adjustable fill-pointer displaced-to))
+  (declare (ignore n-bits))
+  (let ((saetp (and (constant-lvar-p widetag)
+                    (find (lvar-value widetag)
+                          sb!vm:*specialized-array-element-type-properties*
+                          :key #'sb!vm:saetp-typecode))))
+    (derive-make-array-type dims (if saetp
+                                     (sb!vm:saetp-ctype saetp)
+                                     *wild-type*)
+                            adjustable fill-pointer displaced-to)))
+
 
 ;;;; constructors
 
@@ -524,9 +543,9 @@
 
 (deftransform make-array ((dims &key initial-element element-type
                                      adjustable fill-pointer)
-                          (t &rest *))
-  (when (null initial-element)
-    (give-up-ir1-transform))
+                          (t &rest *) *
+                          :node node)
+  (delay-ir1-transform node :constraint)
   (let* ((eltype (cond ((not element-type) t)
                        ((not (constant-lvar-p element-type))
                         (give-up-ir1-transform
@@ -534,22 +553,28 @@
                        (t
                         (lvar-value element-type))))
          (eltype-type (ir1-transform-specifier-type eltype))
-         (saetp (find-if (lambda (saetp)
-                           (csubtypep eltype-type (sb!vm:saetp-ctype saetp)))
-                         sb!vm:*specialized-array-element-type-properties*))
-         (creation-form `(make-array dims
-                          :element-type ',(type-specifier (sb!vm:saetp-ctype saetp))
+         (saetp (if (unknown-type-p eltype-type)
+                    (give-up-ir1-transform
+                     "ELEMENT-TYPE ~s is not a known type"
+                     eltype-type)
+                    (find eltype-type
+                          sb!vm:*specialized-array-element-type-properties*
+                          :key #'sb!vm:saetp-ctype
+                          :test #'csubtypep)))
+         (creation-form `(%make-array
+                          dims
+                          ,(if saetp
+                               (sb!vm:saetp-typecode saetp)
+                               (give-up-ir1-transform))
+                          ,(sb!vm:saetp-n-bits saetp)
                           ,@(when fill-pointer
-                                  '(:fill-pointer fill-pointer))
+                              '(:fill-pointer fill-pointer))
                           ,@(when adjustable
-                                  '(:adjustable adjustable)))))
-
-    (unless saetp
-      (give-up-ir1-transform "ELEMENT-TYPE not found in *SAETP*: ~S" eltype))
-
-    (cond ((and (constant-lvar-p initial-element)
-                (eql (lvar-value initial-element)
-                     (sb!vm:saetp-initial-element-default saetp)))
+                              '(:adjustable adjustable)))))
+    (cond ((or (not initial-element)
+               (and (constant-lvar-p initial-element)
+                    (eql (lvar-value initial-element)
+                         (sb!vm:saetp-initial-element-default saetp))))
            creation-form)
           (t
            ;; error checking for target, disabled on the host because
@@ -576,10 +601,10 @@
                   (compiler-style-warn "~S is not a ~S."
                                        value eltype)))))
            `(let ((array ,creation-form))
-             (multiple-value-bind (vector)
-                 (%data-vector-and-index array 0)
-               (fill vector (the ,(sb!vm:saetp-specifier saetp) initial-element)))
-             array)))))
+              (multiple-value-bind (vector)
+                  (%data-vector-and-index array 0)
+                (fill vector (the ,(sb!vm:saetp-specifier saetp) initial-element)))
+              array)))))
 
 ;;; The list type restriction does not ensure that the result will be a
 ;;; multi-dimensional array. But the lack of adjustable, fill-pointer,
