@@ -1443,6 +1443,20 @@
   (assert (equal (compile '(setf compile-setf))
                  '(setf compile-setf))))
 
+(declaim (inline cut-test))
+(defun cut-test (b)
+  (cond ((integerp b) b)
+        (b 469)
+        (t 2)))
+
+(with-test (:name :cut-to-width-bad-constant)
+  (assert (= (funcall (compile nil
+                               `(lambda ()
+                                  (multiple-value-bind (a b) (values t t)
+                                    (declare (ignore b))
+                                    (mask-field (byte 10 0) (cut-test a))))))
+             469)))
+
 
 ;;;; tests not in the problem domain, but of the consistency of the
 ;;;; compiler machinery itself

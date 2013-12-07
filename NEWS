@@ -15,6 +15,8 @@ changes relative to sbcl-1.1.14:
     having GUI applications without an automatically appearing console window.
   * bug fix: Windows applications without the console window no longer misbehave.
     (patch by Wilfredo Velazquez, lp#1256034).
+  * bug fix: modular arithmetic optimizations do not stumble on dead branches
+    with bad constants. (reported by Douglas Katzman)
 
 changes in sbcl-1.1.14 relative to sbcl-1.1.13:
   * optimization: complicated TYPEP tests are less opaque to the type

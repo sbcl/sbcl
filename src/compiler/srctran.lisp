@@ -2955,7 +2955,7 @@
                  (setf (block-reoptimize (node-block node)) t)
                  (reoptimize-component (node-component node) :maybe))
                t)
-             (cut-node (node &aux did-something over-wide)
+             (cut-node (node)
                "Try to cut a node to width. The primary return value is
                 whether we managed to cut (cleverly), and the second whether
                 anything was changed.  The third return value tells whether
@@ -2967,9 +2967,13 @@
                   (typecase (ref-leaf node)
                     (constant
                      (let* ((constant-value (constant-value (ref-leaf node)))
-                            (new-value (if signedp
-                                           (mask-signed-field width constant-value)
-                                           (ldb (byte width 0) constant-value))))
+                            (new-value
+                              (cond ((not (integerp constant-value))
+                                     (return-from cut-node (values t nil)))
+                                    (signedp
+                                     (mask-signed-field width constant-value))
+                                    (t
+                                     (ldb (byte width 0) constant-value)))))
                        (cond ((= constant-value new-value)
                               (values t nil)) ; we knew what to do and did nothing
                              (t
@@ -3014,7 +3018,9 @@
                                                  (modular-fun-info-name modular-fun))
                                                 (function
                                                  (funcall modular-fun node width)))
-                                              :exit-if-null))
+                                              :exit-if-null)
+                                        (did-something nil)
+                                        (over-wide nil))
                                (unless (eql modular-fun :good)
                                  (setq did-something t
                                        over-wide t)
