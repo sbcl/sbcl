@@ -1,8 +1,11 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 changes relative to sbcl-1.1.16:
+  * enhancement: printing backtraces respects
+    SB-DEBUG:*DEBUG-PRINT-VARIABLE-ALIST* when printing call arguments
+    (lp#1261646)
   * bug fix: LOAD is no longer confused when called on a directory.
     (lp#1077996)
-  
+
 changes in sbcl-1.1.16 relative to sbcl-1.1.15:
   * minor incompatible change: improve read/print consistency for pathnames on
     Win32, by using the circumflex character #\^ as the escape character.

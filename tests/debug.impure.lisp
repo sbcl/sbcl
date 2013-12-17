@@ -831,4 +831,29 @@
                              (return (< (length (car (sb-debug:backtrace-as-list 1))) 10)))))
        (funcall (compile nil `(lambda (i) (declare ((mod 65536) i)) i)) nil)))))
 
+;;; bug-1261646
+
+(defun print-backtrace-to-string/debug-print-variable-alist (x)
+  (values
+   (with-output-to-string (stream)
+     (let ((*debug-print-variable-alist* '((*print-length* . 5)
+                                           (*print-level* . 3))))
+       (sb-debug:print-backtrace :stream stream :count 5)))
+   x)) ; Force use of X to prevent flushing
+
+(with-test (:name (:print-frame-call :respect *debug-print-variable-alist*
+                   *print-length* :bug-1261646))
+  (let* ((printed (print-backtrace-to-string/debug-print-variable-alist (make-array 200)))
+         (call "(PRINT-BACKTRACE-TO-STRING/DEBUG-PRINT-VARIABLE-ALIST ")
+         (position (+ (search call printed) (length call))))
+    (assert (eql position (search "#(0 0 0 0 0 ...)" printed :start2 position)))))
+
+(with-test (:name (:print-frame-call :respect *debug-print-variable-alist*
+                   *print-level* :bug-1261646))
+  (let* ((printed (print-backtrace-to-string/debug-print-variable-alist
+                   '(((((1)))))))
+         (call "(PRINT-BACKTRACE-TO-STRING/DEBUG-PRINT-VARIABLE-ALIST ")
+         (position (+ (search call printed) (length call))))
+    (assert (eql position (search "((#))" printed :start2 position)))))
+
 (write-line "/debug.impure.lisp done")

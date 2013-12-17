@@ -660,19 +660,22 @@ the current thread are replaced with dummy objects which can safely escape."
   (multiple-value-bind (name args info)
       (frame-call frame :method-frame-style method-frame-style)
     (pprint-logical-block (stream nil :prefix "(" :suffix ")")
-      ;; Since we go to some trouble to make nice informative function
-      ;; names like (PRINT-OBJECT :AROUND (CLOWN T)), let's make sure
-      ;; that they aren't truncated by *PRINT-LENGTH* and *PRINT-LEVEL*.
-      ;; For the function arguments, we can just print normally.
-      (let ((*print-length* nil)
-            (*print-level* nil)
-            (*print-pretty* nil)
-            (*print-circle* t)
-            (name (ensure-printable-object name)))
-        (write name :stream stream :escape t :pretty (equal '(lambda ()) name))
-        ;; If we hit a &REST arg, then print as many of the values as
-        ;; possible, punting the loop over lambda-list variables since any
-        ;; other arguments will be in the &REST arg's list of values.
+      (let ((*print-pretty* nil)
+            (*print-circle* t))
+        ;; Since we go to some trouble to make nice informative
+        ;; function names like (PRINT-OBJECT :AROUND (CLOWN T)), let's
+        ;; make sure that they aren't truncated by *PRINT-LENGTH* and
+        ;; *PRINT-LEVEL*.
+        (let ((*print-length* nil)
+              (*print-level* nil)
+              (name (ensure-printable-object name)))
+          (write name :stream stream :escape t :pretty (equal '(lambda ()) name)))
+
+        ;; For the function arguments, we can just print normally.  If
+        ;; we hit a &REST arg, then print as many of the values as
+        ;; possible, punting the loop over lambda-list variables since
+        ;; any other arguments will be in the &REST arg's list of
+        ;; values.
         (let ((args (ensure-printable-object args)))
           (if (listp args)
               (format stream "~{ ~_~S~}" args)
