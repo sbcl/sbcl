@@ -18,7 +18,7 @@ changes relative to sbcl-1.1.14:
   * bug fix: modular arithmetic optimizations do not stumble on dead branches
     with bad constants. (reported by Douglas Katzman)
   * bug fix: CLISP can be used again as a cross-compilation host.
-    (Thanks to Vasily Postnicov)
+    (Thanks to Vasily Postnicov, lp#1261451)
 
 changes in sbcl-1.1.14 relative to sbcl-1.1.13:
   * optimization: complicated TYPEP tests are less opaque to the type

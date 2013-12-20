@@ -47,17 +47,17 @@
         (kind (tn-kind tn))
         (sb-conflicts (finite-sb-conflicts sb))
         (sb-always-live (finite-sb-always-live sb)))
-    (macrolet ((do-offsets (&body body)
-                 `(loop repeat size
-                        for offset upfrom offset
+    (macrolet ((do-offsets ((var) &body body)
+                 `(loop for ,var upfrom offset
+                        repeat size
                         thereis (progn ,@body))))
       (cond
         ((eq kind :component)
-         (do-offsets
-             (let ((loc-live (svref sb-always-live offset)))
+         (do-offsets (offset-iter)
+             (let ((loc-live (svref sb-always-live offset-iter)))
                (dotimes (i (ir2-block-count *component-being-compiled*))
                  (when (/= (sbit loc-live i) 0)
-                   (return offset))))))
+                   (return offset-iter))))))
         (confs
          ;; TN is global, iterate over the blocks TN is live in.
          (do ((conf confs (global-conflicts-next-tnwise conf)))
@@ -66,23 +66,23 @@
            (let* ((block (global-conflicts-block conf))
                   (num (ir2-block-number block)))
              (if (eq (global-conflicts-kind conf) :live)
-                 (do-offsets
-                     (let ((loc-live (svref sb-always-live offset)))
+                 (do-offsets (offset-iter)
+                     (let ((loc-live (svref sb-always-live offset-iter)))
                        (when (/= (sbit loc-live num) 0)
-                         (return-from offset-conflicts-in-sb offset))))
-                 (do-offsets
-                     (let ((loc-confs (svref sb-conflicts offset)))
+                         (return-from offset-conflicts-in-sb offset-iter))))
+                 (do-offsets (offset-iter)
+                     (let ((loc-confs (svref sb-conflicts offset-iter)))
                        (when (/= (sbit (svref loc-confs num)
                                        (global-conflicts-number conf))
                                  0)
-                         (return-from offset-conflicts-in-sb offset))))))))
+                         (return-from offset-conflicts-in-sb offset-iter))))))))
         (t
-         (do-offsets
-             (and (/= (sbit (svref (svref sb-conflicts offset)
+         (do-offsets (offset-iter)
+             (and (/= (sbit (svref (svref sb-conflicts offset-iter)
                                    (ir2-block-number (tn-local tn)))
                             (tn-local-number tn))
                       0)
-                  offset)))))))
+                  offset-iter)))))))
 
 ;;; Return true if TN has a conflict in SC at the specified offset.
 (declaim (ftype (function (tn sc index) (values (or null index) &optional))
