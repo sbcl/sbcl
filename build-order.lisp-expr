@@ -705,6 +705,8 @@
  #!+sb-unicode
  ("src/code/external-formats/enc-win" :not-host)
  #!+sb-unicode
+ ("src/code/external-formats/enc-mac" :not-host)
+ #!+sb-unicode
  ("src/code/external-formats/mb-util" :not-host)
  #!+sb-unicode
  ("src/code/external-formats/enc-cn-tbl" :not-host)

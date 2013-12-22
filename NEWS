@@ -1,5 +1,6 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 changes relative to sbcl-1.1.14:
+  * improvement: support for "Mac Roman" external format.
   * new feature: the iterative spilling/coloring register allocator developed
     by Alexandra Barchunova during Google Summer of Code 2013 is now merged
     in.  By default, it only activates for functions that optimize with
