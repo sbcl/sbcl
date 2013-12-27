@@ -84,6 +84,7 @@
                           restart-name)
                     new)))))
     new))
+
 (declaim (ftype (function (list list) list)
                 process-muffle-conditions-decl))
 (defun process-muffle-conditions-decl (spec list)
@@ -112,6 +113,7 @@
               ;; do nothing?
               nil))))
     new))
+
 (declaim (ftype (function (list list) list)
                 process-unmuffle-conditions-decl))
 (defun process-unmuffle-conditions-decl (spec list)
@@ -123,44 +125,41 @@
 (declaim (ftype (function (list list) list)
                 process-package-lock-decl))
 (defun process-package-lock-decl (spec old)
-  (let ((decl (car spec))
-        (list (cdr spec)))
+  (destructuring-bind (decl &rest names) spec
     (ecase decl
       (disable-package-locks
-       (union old list :test #'equal))
+       (union old names :test #'equal))
       (enable-package-locks
-       (set-difference old list :test #'equal)))))
-
-;;; ANSI defines the declaration (FOO X Y) to be equivalent to
-;;; (TYPE FOO X Y) when FOO is a type specifier. This function
-;;; implements that by converting (FOO X Y) to (TYPE FOO X Y).
-(defun canonized-decl-spec (decl-spec)
-  (let ((id (first decl-spec)))
-    (let ((id-is-type (if (symbolp id)
-                          (info :type :kind id)
-                          ;; A cons might not be a valid type specifier,
-                          ;; but it can't be a declaration either.
-                          (or (consp id)
-                              (typep id 'class))))
-          (id-is-declared-decl (info :declaration :recognized id)))
-      ;; FIXME: Checking ID-IS-DECLARED is probably useless these days,
-      ;; since we refuse to use the same symbol as both a type name and
-      ;; recognized declaration name.
-      (cond ((and id-is-type id-is-declared-decl)
-             (compiler-error
-              "ambiguous declaration ~S:~%  ~
-              ~S was declared as a DECLARATION, but is also a type name."
-              decl-spec id))
-            (id-is-type
-             (cons 'type decl-spec))
-            (t
-             decl-spec)))))
+       (set-difference old names :test #'equal)))))
 
 (defvar *queued-proclaims*) ; initialized in !COLD-INIT-FORMS
 
 (!begin-collecting-cold-init-forms)
 (!cold-init-forms (setf *queued-proclaims* nil))
 (!defun-from-collected-cold-init-forms !early-proclaim-cold-init)
+
+(defun process-variable-declaration (name kind)
+  (unless (symbolp name)
+    (error "Cannot proclaim a non-symbol as ~A: ~S" kind name))
+
+  (when (and (eq kind 'always-bound) (not (boundp name)))
+    (error "Cannot proclaim an unbound symbol as ~A: ~S" kind name))
+
+  (multiple-value-bind (allowed test)
+      (ecase kind
+        (special (values '(:special :unknown) #'eq))
+        (global (values '(:global :unknown) #'eq))
+        (always-bound (values '(:constant) (complement #'eq))))
+    (let ((old (info :variable :kind name)))
+      (unless (member old allowed :test test)
+        (error "Cannot proclaim a ~A variable ~A: ~S" old kind name))))
+
+  (with-single-package-locked-error
+      (:symbol name "globally declaring ~A ~A" kind)
+    (ecase kind
+      (special (setf (info :variable :kind name) :special))
+      (global (setf (info :variable :kind name) :global))
+      (always-bound (setf (info :variable :always-bound name) t)))))
 
 (defun proclaim-type (name type where-from)
   (unless (symbolp name)
@@ -211,86 +210,105 @@
     (setf (info :function :type name) type
           (info :function :where-from name) where-from)))
 
+(defun seal-class (class)
+  (declare (type classoid class))
+  (setf (classoid-state class) :sealed)
+  (let ((subclasses (classoid-subclasses class)))
+    (when subclasses
+      (dohash ((subclass layout) subclasses :locked t)
+        (declare (ignore layout))
+        (setf (classoid-state subclass) :sealed)))))
+
+(defun process-freeze-type-declaration (type-specifier)
+  (let ((class (specifier-type type-specifier)))
+    (when (typep class 'classoid)
+      (seal-class class))))
+
+(defun process-inline-declaration (name kind)
+  ;; since implicitly it is a function, also scrubs *FREE-FUNS*
+  (proclaim-as-fun-name name)
+  (setf (info :function :inlinep name)
+        (ecase kind
+          (inline :inline)
+          (notinline :notinline)
+          (maybe-inline :maybe-inline))))
+
+(defun process-declaration-declaration (name form)
+  (unless (symbolp name)
+    (error "In~%  ~S~%the declaration to be recognized is not a ~
+            symbol:~%  ~S"
+           form name))
+  (with-single-package-locked-error
+      (:symbol name "globally declaring ~A as a declaration proclamation"))
+  (setf (info :declaration :recognized name) t))
+
+;;; ANSI defines the declaration (FOO X Y) to be equivalent to
+;;; (TYPE FOO X Y) when FOO is a type specifier. This function
+;;; implements that by converting (FOO X Y) to (TYPE FOO X Y).
+(defun canonized-decl-spec (decl-spec)
+  (let* ((id (first decl-spec))
+         (id-is-type (if (symbolp id)
+                         (info :type :kind id)
+                         ;; A cons might not be a valid type specifier,
+                         ;; but it can't be a declaration either.
+                         (or (consp id)
+                             (typep id 'class))))
+         (id-is-declared-decl (info :declaration :recognized id)))
+    ;; FIXME: Checking ID-IS-DECLARED is probably useless these days,
+    ;; since we refuse to use the same symbol as both a type name and
+    ;; recognized declaration name.
+    (cond ((and id-is-type id-is-declared-decl)
+           (compiler-error
+            "ambiguous declaration ~S:~%  ~
+             ~S was declared as a DECLARATION, but is also a type name."
+            decl-spec id))
+          (id-is-type
+           (list* 'type decl-spec))
+          (t
+           decl-spec))))
+
 (defun sb!xc:proclaim (raw-form)
   #+sb-xc (/show0 "entering PROCLAIM, RAW-FORM=..")
   #+sb-xc (/hexstr raw-form)
   (destructuring-bind (&whole form &optional kind &rest args)
       (canonized-decl-spec raw-form)
-    (case kind
-      ((special global)
-       (let ((kind/keyword (ecase kind
-                             (special :special)
-                             (global :global))))
-         (dolist (name args)
-           (unless (symbolp name)
-             (error "Can't declare a non-symbol as ~(~A~): ~S" kind name))
-           (let ((old (info :variable :kind name)))
-             (unless (member old (list kind/keyword :unknown))
-               (error "Cannot proclaim a ~(~A~) variable ~(~A~): ~S" old kind name)))
-           (with-single-package-locked-error
-               (:symbol name "globally declaring ~A ~(~A~)" kind)
-             (setf (info :variable :kind name) kind/keyword)))))
-      (always-bound
-       (dolist (name args)
-         (unless (symbolp name)
-           (error "Can't proclaim a non-symbol as ~S: ~S" kind name))
-         (unless (boundp name)
-           (error "Can't proclaim an unbound symbol as ~S: ~S" kind name))
-         (when (eq :constant (info :variable :kind name))
-           (error "Can't proclaim a constant variable as ~S: ~S" kind name))
-         (with-single-package-locked-error
-             (:symbol name "globally declaring ~A always bound")
-           (setf (info :variable :always-bound name) t))))
-      ((type ftype)
-       (if *type-system-initialized*
-           (destructuring-bind (type &rest names) args
-             (let ((ctype (specifier-type type)))
-               (dolist (name names)
-                 (ecase kind
-                   (type (proclaim-type name ctype :declared))
-                   (ftype (proclaim-ftype name ctype :declared))))))
-           (push raw-form *queued-proclaims*)))
-      (freeze-type
-       (dolist (type args)
-         (let ((class (specifier-type type)))
-           (when (typep class 'classoid)
-             (setf (classoid-state class) :sealed)
-             (let ((subclasses (classoid-subclasses class)))
-               (when subclasses
-                 (dohash ((subclass layout) subclasses :locked t)
-                   (declare (ignore layout))
-                   (setf (classoid-state subclass) :sealed))))))))
-      (optimize
-       (setq *policy* (process-optimize-decl form *policy*)))
-      (muffle-conditions
-       (setq *handled-conditions*
-             (process-muffle-conditions-decl form *handled-conditions*)))
-      (unmuffle-conditions
-       (setq *handled-conditions*
-             (process-unmuffle-conditions-decl form *handled-conditions*)))
-      ((disable-package-locks enable-package-locks)
+    (labels ((map-names (names function &rest extra-args)
+               (mapc (lambda (name)
+                       (apply function name extra-args))
+                     names))
+             (map-args (function &rest extra-args)
+               (apply #'map-names args function extra-args)))
+      (case kind
+        ((special global always-bound)
+         (map-args #'process-variable-declaration kind))
+        ((type ftype)
+         (if *type-system-initialized*
+             (destructuring-bind (type &rest names) args
+               (let ((ctype (specifier-type type)))
+                 (map-names names (ecase kind
+                                    (type #'proclaim-type)
+                                    (ftype #'proclaim-ftype))
+                            ctype :declared)))
+             (push raw-form *queued-proclaims*)))
+        (freeze-type
+         (map-args #'process-freeze-type-declaration))
+        (optimize
+         (setq *policy* (process-optimize-decl form *policy*)))
+        (muffle-conditions
+         (setq *handled-conditions*
+               (process-muffle-conditions-decl form *handled-conditions*)))
+        (unmuffle-conditions
+         (setq *handled-conditions*
+               (process-unmuffle-conditions-decl form *handled-conditions*)))
+        ((disable-package-locks enable-package-locks)
          (setq *disabled-package-locks*
                (process-package-lock-decl form *disabled-package-locks*)))
-      ((inline notinline maybe-inline)
-       (dolist (name args)
-         ;; since implicitly it is a function, also scrubs *FREE-FUNS*
-         (proclaim-as-fun-name name)
-         (setf (info :function :inlinep name)
-               (ecase kind
-                 (inline :inline)
-                 (notinline :notinline)
-                 (maybe-inline :maybe-inline)))))
-      (declaration
-       (dolist (decl args)
-         (unless (symbolp decl)
-           (error "In~%  ~S~%the declaration to be recognized is not a ~
-                  symbol:~%  ~S"
-                  form decl))
-         (with-single-package-locked-error
-             (:symbol decl "globally declaring ~A as a declaration proclamation"))
-         (setf (info :declaration :recognized decl) t)))
-      (t
-       (unless (info :declaration :recognized kind)
-         (compiler-warn "unrecognized declaration ~S" raw-form)))))
+        ((inline notinline maybe-inline)
+         (map-args #'process-inline-declaration kind))
+        (declaration
+         (map-args #'process-declaration-declaration form))
+        (t
+         (unless (info :declaration :recognized kind)
+           (compiler-warn "unrecognized declaration ~S" raw-form))))))
   #+sb-xc (/show0 "returning from PROCLAIM")
   (values))
