@@ -1411,32 +1411,46 @@ to :INTERPRET, an interpreter will be used.")
   ;; defsystemish operation where the ERROR-STREAM had been CL:CLOSEd,
   ;; I think by nonlocally exiting through a WITH-OPEN-FILE, by the
   ;; time an error was reported.)
-  (if posp
-      (ignore-errors (file-position stream pos))
-      (ignore-errors (file-position stream))))
+  (ignore-errors
+   (if posp
+       (file-position stream pos)
+       (file-position stream))))
 
 (defun stream-error-position-info (stream &optional position)
-  (unless (interactive-stream-p stream)
-    (let ((now (file-position-or-nil-for-error stream))
-          (pos position))
-      (when (and (not pos) now (plusp now))
-        ;; FILE-POSITION is the next character -- error is at the previous one.
-        (setf pos (1- now)))
-      (let (lineno colno)
-        (when (and pos
-                   (< pos sb!xc:array-dimension-limit)
-                   (file-position stream :start))
-          (let ((string
-                  (make-string pos :element-type (stream-element-type stream))))
-            (when (= pos (read-sequence string stream))
-              ;; Lines count from 1, columns from 0. It's stupid and traditional.
-              (setq lineno (1+ (count #\Newline string))
-                    colno (- pos (or (position #\Newline string :from-end t) 0)))))
-          (file-position-or-nil-for-error stream now))
-        (remove-if-not #'second
-                       (list (list :line lineno)
-                             (list :column colno)
-                             (list :file-position pos)))))))
+  ;; Give up early for interactive streams and non-character stream.
+  (when (or (ignore-errors (interactive-stream-p stream))
+            (not (subtypep (ignore-errors (stream-element-type stream))
+                           'character)))
+    (return-from stream-error-position-info))
+
+  (flet ((read-content (old-position position)
+           "Read the content of STREAM into a buffer in order to count
+lines and columns."
+           (unless (and old-position position
+                        (< position sb!xc:array-dimension-limit))
+             (return-from read-content))
+           (let ((content
+                   (make-string position :element-type (stream-element-type stream))))
+             (when (and (file-position-or-nil-for-error stream :start)
+                        (eql position (ignore-errors (read-sequence content stream))))
+               (file-position-or-nil-for-error stream old-position)
+               content)))
+         ;; Lines count from 1, columns from 0. It's stupid and
+         ;; traditional.
+         (line (string)
+           (1+ (count #\Newline string)))
+         (column (string position)
+           (- position (or (position #\Newline string :from-end t) 0))))
+   (let* ((stream-position (file-position-or-nil-for-error stream))
+          (position (or position
+                        ;; FILE-POSITION is the next character --
+                        ;; error is at the previous one.
+                        (and stream-position (plusp stream-position)
+                             (1- stream-position))))
+          (content (read-content stream-position position)))
+     `(,@(when content `((:line ,(line content))
+                         (:column ,(column content position))))
+       ,@(when position `((:file-position ,position)))))))
 
 (declaim (inline schwartzian-stable-sort-list))
 (defun schwartzian-stable-sort-list (list comparator &key key)
