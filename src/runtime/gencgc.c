@@ -201,7 +201,18 @@ static inline boolean page_boxed_p(page_index_t page) {
 }
 
 static inline boolean code_page_p(page_index_t page) {
-    return (page_table[page].allocated & CODE_PAGE_FLAG);
+    /* This is used by the conservative pinning logic to determine if
+     * a page can contain code objects.  Ideally, we'd be able to
+     * check the page allocation flag to see if it is CODE_PAGE_FLAG,
+     * but this turns out not to be reliable (in fact, badly
+     * unreliable) at the moment.  On the upside, all code objects are
+     * boxed objects, so we can simply re-use the boxed_page_p() logic
+     * for a tighter result than merely "is this page allocated". */
+#if 0
+    return (page_table[page].allocated & CODE_PAGE_FLAG) == CODE_PAGE_FLAG;
+#else
+    return page_boxed_p(page);
+#endif
 }
 
 static inline boolean page_boxed_no_region_p(page_index_t page) {
