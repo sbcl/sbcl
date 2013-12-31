@@ -24,6 +24,7 @@ changes relative to sbcl-1.1.14:
     with bad constants. (reported by Douglas Katzman)
   * bug fix: CLISP can be used again as a cross-compilation host.
     (Thanks to Vasily Postnicov, lp#1261451)
+  * bug fix: run-program crashed with :directory nil. (lp#1265077)
 
 changes in sbcl-1.1.14 relative to sbcl-1.1.13:
   * optimization: complicated TYPEP tests are less opaque to the type

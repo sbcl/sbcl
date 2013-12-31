@@ -332,3 +332,11 @@
     (assert
      (equal directory
             (string-right-trim '(#\Return) (read-line out))))))
+
+(with-test (:name (:run-program :directory-nil))
+  (sb-ext:run-program #-win32 "/bin/sh"
+                      #-win32 '("-c" "pwd")
+                      #+win32 "cmd.exe"
+                      #+win32 '("/c" "cd")
+                      :directory nil
+                      :search t))

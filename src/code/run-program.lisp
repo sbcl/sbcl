@@ -690,7 +690,7 @@ status slot."
                     (if-error-exists :error)
                     status-hook
                     (external-format :default)
-                    (directory nil directory-p))
+                    directory)
   #+sb-doc
   #.(concatenate
      'string
@@ -790,7 +790,7 @@ Users Manual for details about the PROCESS structure.
          proc
          (progname (native-namestring program))
          (args (prepare-args (cons progname args)))
-         (directory (and directory-p (native-namestring directory)))
+         (directory (and directory (native-namestring directory)))
          ;; Gag.
          (cookie (list 0)))
     (unwind-protect
