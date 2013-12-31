@@ -2077,6 +2077,16 @@ possibly_valid_dynamic_space_pointer(lispobj *pointer)
 static int
 valid_conservative_root_p(void *addr, page_index_t addr_page_index)
 {
+#ifdef GENCGC_IS_PRECISE
+    /* If we're in precise gencgc (non-x86oid as of this writing) then
+     * we are only called on valid object pointers in the first place,
+     * so we just have to do a bounds-check against the heap, a
+     * generation check, and the already-pinned check. */
+    if ((addr_page_index == -1)
+        || (page_table[addr_page_index].gen != from_space)
+        || (page_table[addr_page_index].dont_move != 0))
+        return 0;
+#else
     /* quick check 1: Address is quite likely to have been invalid. */
     if ((addr_page_index == -1)
         || page_free_p(addr_page_index)
@@ -2099,12 +2109,7 @@ valid_conservative_root_p(void *addr, page_index_t addr_page_index)
      * address referring to something in a CodeObject). This is
      * expensive but important, since it vastly reduces the
      * probability that random garbage will be bogusly interpreted as
-     * a pointer which prevents a page from moving.
-     *
-     * This only needs to happen on x86oids, where this is used for
-     * conservative roots.  Non-x86oid systems only ever call this
-     * function on known-valid lisp objects. */
-#if defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64)
+     * a pointer which prevents a page from moving. */
     if (!(code_page_p(addr_page_index)
           || (is_lisp_pointer((lispobj)addr) &&
               possibly_valid_dynamic_space_pointer(addr))))
