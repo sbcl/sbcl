@@ -2074,6 +2074,46 @@ possibly_valid_dynamic_space_pointer(lispobj *pointer)
 
 #endif  // defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64)
 
+static int
+valid_conservative_root_p(void *addr, page_index_t addr_page_index)
+{
+    /* quick check 1: Address is quite likely to have been invalid. */
+    if ((addr_page_index == -1)
+        || page_free_p(addr_page_index)
+        || (page_table[addr_page_index].bytes_used == 0)
+        || (page_table[addr_page_index].gen != from_space)
+        /* Skip if already marked dont_move. */
+        || (page_table[addr_page_index].dont_move != 0))
+        return 0;
+    gc_assert(!(page_table[addr_page_index].allocated&OPEN_REGION_PAGE_FLAG));
+
+    /* quick check 2: Check the offset within the page.
+     *
+     */
+    if (((uword_t)addr & (GENCGC_CARD_BYTES - 1)) >
+        page_table[addr_page_index].bytes_used)
+        return 0;
+
+    /* Filter out anything which can't be a pointer to a Lisp object
+     * (or, as a special case which also requires dont_move, a return
+     * address referring to something in a CodeObject). This is
+     * expensive but important, since it vastly reduces the
+     * probability that random garbage will be bogusly interpreted as
+     * a pointer which prevents a page from moving.
+     *
+     * This only needs to happen on x86oids, where this is used for
+     * conservative roots.  Non-x86oid systems only ever call this
+     * function on known-valid lisp objects. */
+#if defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64)
+    if (!(code_page_p(addr_page_index)
+          || (is_lisp_pointer((lispobj)addr) &&
+              possibly_valid_dynamic_space_pointer(addr))))
+        return 0;
+#endif
+
+    return 1;
+}
+
 /* Adjust large bignum and vector objects. This will adjust the
  * allocated region if the size has shrunk, and move unboxed objects
  * into unboxed pages. The pages are not promoted here, and the
@@ -2261,42 +2301,12 @@ preserve_pointer(void *addr)
     page_index_t i;
     unsigned int region_allocation;
 
-    /* quick check 1: Address is quite likely to have been invalid. */
-    if ((addr_page_index == -1)
-        || page_free_p(addr_page_index)
-        || (page_table[addr_page_index].bytes_used == 0)
-        || (page_table[addr_page_index].gen != from_space)
-        /* Skip if already marked dont_move. */
-        || (page_table[addr_page_index].dont_move != 0))
+    if (!valid_conservative_root_p(addr, addr_page_index))
         return;
-    gc_assert(!(page_table[addr_page_index].allocated&OPEN_REGION_PAGE_FLAG));
+
     /* (Now that we know that addr_page_index is in range, it's
      * safe to index into page_table[] with it.) */
     region_allocation = page_table[addr_page_index].allocated;
-
-    /* quick check 2: Check the offset within the page.
-     *
-     */
-    if (((uword_t)addr & (GENCGC_CARD_BYTES - 1)) >
-        page_table[addr_page_index].bytes_used)
-        return;
-
-    /* Filter out anything which can't be a pointer to a Lisp object
-     * (or, as a special case which also requires dont_move, a return
-     * address referring to something in a CodeObject). This is
-     * expensive but important, since it vastly reduces the
-     * probability that random garbage will be bogusly interpreted as
-     * a pointer which prevents a page from moving.
-     *
-     * This only needs to happen on x86oids, where this is used for
-     * conservative roots.  Non-x86oid systems only ever call this
-     * function on known-valid lisp objects. */
-#if defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64)
-    if (!(code_page_p(addr_page_index)
-          || (is_lisp_pointer((lispobj)addr) &&
-              possibly_valid_dynamic_space_pointer(addr))))
-        return;
-#endif
 
     /* Find the beginning of the region.  Note that there may be
      * objects in the region preceding the one that we were passed a
