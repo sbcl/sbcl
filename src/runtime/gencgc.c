@@ -2060,7 +2060,7 @@ search_dynamic_space(void *pointer)
  * address) which should prevent us from moving the referred-to thing?
  * This is called from preserve_pointers() */
 static int
-possibly_valid_dynamic_space_pointer(lispobj *pointer)
+possibly_valid_dynamic_space_pointer(lispobj *pointer, page_index_t addr_page_index)
 {
     lispobj *start_addr;
 
@@ -2074,6 +2074,15 @@ possibly_valid_dynamic_space_pointer(lispobj *pointer)
      * address. */
     if (widetag_of(*start_addr) == CODE_HEADER_WIDETAG)
         return 1;
+
+    /* Large object pages only contain ONE object, and it will never
+     * be a CONS.  However, arrays and bignums can be allocated larger
+     * than necessary and then shrunk to fit, leaving what look like
+     * (0 . 0) CONSes at the end.  These appear valid to
+     * looks_like_valid_lisp_pointer_p(), so pick them off here. */
+    if (page_table[addr_page_index].large_object &&
+        (lowtag_of((lispobj)pointer) == LIST_POINTER_LOWTAG))
+        return 0;
 
     return looks_like_valid_lisp_pointer_p(pointer, start_addr);
 }
@@ -2116,7 +2125,7 @@ valid_conservative_root_p(void *addr, page_index_t addr_page_index)
      * expensive but important, since it vastly reduces the
      * probability that random garbage will be bogusly interpreted as
      * a pointer which prevents a page from moving. */
-    if (!possibly_valid_dynamic_space_pointer(addr))
+    if (!possibly_valid_dynamic_space_pointer(addr, addr_page_index))
         return 0;
 #endif
 
@@ -2982,7 +2991,7 @@ verify_space(lispobj *start, size_t words)
                  *   FIXME: Add a variable to enable this
                  * dynamically. */
                 /*
-                if (!possibly_valid_dynamic_space_pointer((lispobj *)thing)) {
+                if (!possibly_valid_dynamic_space_pointer((lispobj *)thing, page_index)) {
                     lose("ptr %p to invalid object %p\n", thing, start);
                 }
                 */
