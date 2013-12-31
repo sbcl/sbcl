@@ -15,9 +15,9 @@ changes relative to sbcl-1.1.14:
     :application-type argument, which can be :console or :gui. :gui allows
     having GUI applications without an automatically appearing console window.
   * enhancement: reduced conservativism on GENCGC platforms:
-    conservative roots that point to unboxed pages must be tagged
-    pointers to the start of a valid-looking object, not merely point
-    to within the allocated part of the page, in order to pin the page.
+    conservative roots must be valid-looking tagged pointers or point
+    within a code object, not merely point to within the allocated part
+    of a page, in order to pin a page.
   * bug fix: Windows applications without the console window no longer misbehave.
     (patch by Wilfredo Velazquez, lp#1256034).
   * bug fix: modular arithmetic optimizations do not stumble on dead branches

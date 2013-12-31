@@ -2069,6 +2069,12 @@ possibly_valid_dynamic_space_pointer(lispobj *pointer)
         return 0;
     }
 
+    /* If the containing object is a code object, presume that the
+     * pointer is valid, simply because it could be an unboxed return
+     * address. */
+    if (widetag_of(*start_addr) == CODE_HEADER_WIDETAG)
+        return 1;
+
     return looks_like_valid_lisp_pointer_p(pointer, start_addr);
 }
 
@@ -2110,9 +2116,7 @@ valid_conservative_root_p(void *addr, page_index_t addr_page_index)
      * expensive but important, since it vastly reduces the
      * probability that random garbage will be bogusly interpreted as
      * a pointer which prevents a page from moving. */
-    if (!(code_page_p(addr_page_index)
-          || (is_lisp_pointer((lispobj)addr) &&
-              possibly_valid_dynamic_space_pointer(addr))))
+    if (!possibly_valid_dynamic_space_pointer(addr))
         return 0;
 #endif
 
