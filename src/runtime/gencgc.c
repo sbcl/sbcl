@@ -200,21 +200,6 @@ static inline boolean page_boxed_p(page_index_t page) {
     return (page_table[page].allocated & BOXED_PAGE_FLAG);
 }
 
-static inline boolean code_page_p(page_index_t page) {
-    /* This is used by the conservative pinning logic to determine if
-     * a page can contain code objects.  Ideally, we'd be able to
-     * check the page allocation flag to see if it is CODE_PAGE_FLAG,
-     * but this turns out not to be reliable (in fact, badly
-     * unreliable) at the moment.  On the upside, all code objects are
-     * boxed objects, so we can simply re-use the boxed_page_p() logic
-     * for a tighter result than merely "is this page allocated". */
-#if 0
-    return (page_table[page].allocated & CODE_PAGE_FLAG) == CODE_PAGE_FLAG;
-#else
-    return page_boxed_p(page);
-#endif
-}
-
 static inline boolean page_boxed_no_region_p(page_index_t page) {
     return page_boxed_p(page) && page_no_region_p(page);
 }
@@ -2349,21 +2334,6 @@ preserve_pointer(void *addr)
     /* Adjust any large objects before promotion as they won't be
      * copied after promotion. */
     if (page_table[first_page].large_object) {
-        /* Large objects (specifically vectors and bignums) can
-         * shrink, leaving a "tail" of zeroed space, which appears to
-         * the filter above as a seris of valid conses, both car and
-         * cdr of which contain the fixnum zero, but will be
-         * deallocated when the GC shrinks the large object region to
-         * fit the object within.  We allow raw pointers within code
-         * space, but for boxed and unboxed space we do not, nor do
-         * pointers to within a non-code object appear valid above.  A
-         * cons cell will never merit allocation to a large object
-         * page, so pick them off now, before we try to adjust the
-         * object. */
-        if ((lowtag_of((lispobj)addr) == LIST_POINTER_LOWTAG) &&
-            !code_page_p(first_page)) {
-            return;
-        }
         maybe_adjust_large_object(page_address(first_page));
         /* It may have moved to unboxed pages. */
         region_allocation = page_table[first_page].allocated;
