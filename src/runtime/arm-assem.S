@@ -217,7 +217,7 @@ call_into_c:
 	@@ pointer in a boxed register, but the linkage-table is quite
         @@ capable of doing a tail-call to a Thumb routine.  Oh, wait,
         @@ we don't have a linkage-table yet.  Oops.
-        bl      reg_R8
+        blx      reg_R8
 
         @@ We're back.  Our main tasks are to move the C return value
         @@ to where Lisp expects it, and to re-establish the Lisp
