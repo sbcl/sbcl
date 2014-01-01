@@ -65,7 +65,7 @@
   (:results (result :scs (any-reg)))
   (:generator 1
     (let ((fixup (gen-label)))
-      (inst ldr result fixup)
+      (inst ldr result (@ fixup))
       (assemble (*elsewhere*)
         (emit-label fixup)
         (inst word (make-fixup "funcallable_instance_tramp" :foreign))))))
