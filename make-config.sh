@@ -350,6 +350,7 @@ case `uname -m` in
     parisc) guessed_sbcl_arch=hppa ;;
     9000/800) guessed_sbcl_arch=hppa ;;
     mips*) guessed_sbcl_arch=mips ;;
+    arm*) guessed_sbcl_arch=arm ;;
     *)
         # If we're not building on a supported target architecture, we
         # we have no guess, but it's not an error yet, since maybe
@@ -661,6 +662,8 @@ elif [ "$sbcl_arch" = "hppa" ]; then
     printf ' :cheneygc' >> $ltf
     printf ' :stack-allocatable-vectors :stack-allocatable-fixed-objects' >> $ltf
     printf ' :stack-allocatable-lists' >> $ltf
+elif [ "$sbcl_arch" = "arm" ]; then
+    printf ' :cheneygc' >> $ltf
 else
     # Nothing need be done in this case, but sh syntax wants a placeholder.
     echo > /dev/null
