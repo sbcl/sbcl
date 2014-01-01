@@ -19,4 +19,5 @@
 
 (defun !cold-init ()
   (test-uwp)
+  (%primitive print "Testing %PRIMITIVE PRINT.")
   #+(or) (%halt))

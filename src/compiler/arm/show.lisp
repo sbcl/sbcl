@@ -12,4 +12,32 @@
 
 (in-package "SB!VM")
 
-;;; Dummy placeholder file.
+
+(define-vop (print)
+  (:args (object :scs (descriptor-reg any-reg) :target ocfp))
+  (:results (result :scs (descriptor-reg)))
+  (:save-p t)
+  (:temporary (:sc any-reg :offset ocfp-offset :from (:argument 0)) ocfp)
+  (:temporary (:sc any-reg :offset r8-offset) cfunc)
+  (:temporary (:scs (non-descriptor-reg)) temp)
+  (:temporary (:sc non-descriptor-reg :offset nargs-offset) nargs)
+  (:temporary (:sc control-stack :offset nfp-save-offset) nfp-save)
+  (:vop-var vop)
+  (:generator 100
+    (let ((call-into-c-fixup (gen-label))
+          (debug-print-fixup (gen-label))
+          (cur-nfp (current-nfp-tn vop)))
+      (assemble (*elsewhere*)
+        (emit-label call-into-c-fixup)
+        (inst word (make-fixup "call_into_c" :foreign))
+        (emit-label debug-print-fixup)
+        (inst word (make-fixup "debug_print" :foreign)))
+      (when cur-nfp
+        (store-stack-tn nfp-save cur-nfp))
+      (move ocfp object)
+      (inst ldr temp (@ call-into-c-fixup))
+      (inst ldr cfunc (@ debug-print-fixup))
+      (inst blx temp)
+      (when cur-nfp
+        (load-stack-tn cur-nfp nfp-save))
+      (move result nargs))))
