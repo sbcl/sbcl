@@ -40,6 +40,64 @@
 (define-vop (set cell-set)
   (:variant symbol-value-slot other-pointer-lowtag))
 
+;;;; Fdefinition (fdefn) objects.
+
+(define-vop (fdefn-fun cell-ref)
+  (:variant fdefn-fun-slot other-pointer-lowtag))
+
+(define-vop (safe-fdefn-fun)
+  (:args (object :scs (descriptor-reg) :target obj-temp))
+  (:results (value :scs (descriptor-reg any-reg)))
+  (:vop-var vop)
+  (:save-p :compute-only)
+  (:temporary (:scs (descriptor-reg) :from (:argument 0)) obj-temp)
+  (:temporary (:scs (non-descriptor-reg) :offset ocfp-offset) err-temp)
+  (:generator 10
+    (move obj-temp object)
+    (loadw value obj-temp fdefn-fun-slot other-pointer-lowtag)
+    (inst cmp value null-tn)
+    (let ((err-lab (generate-error-code vop err-temp 'undefined-fun-error obj-temp)))
+      (inst b :eq err-lab))))
+
+(define-vop (set-fdefn-fun)
+  (:policy :fast-safe)
+  (:translate (setf fdefn-fun))
+  (:args (function :scs (descriptor-reg) :target result)
+         (fdefn :scs (descriptor-reg)))
+  (:temporary (:scs (interior-reg)) lip)
+  (:temporary (:scs (non-descriptor-reg)) type)
+  (:results (result :scs (descriptor-reg)))
+  (:generator 38
+    (let ((closure-tramp-fixup (gen-label)))
+      (assemble (*elsewhere*)
+        (emit-label closure-tramp-fixup)
+        (inst word (make-fixup "closure_tramp" :foreign)))
+      (load-type type function (- fun-pointer-lowtag))
+      (inst cmp type simple-fun-header-widetag)
+      (inst mov :eq lip function)
+      (inst ldr :ne lip (@ closure-tramp-fixup))
+      (storew lip fdefn fdefn-raw-addr-slot other-pointer-lowtag)
+      (storew function fdefn fdefn-fun-slot other-pointer-lowtag)
+      (move result function))))
+
+(define-vop (fdefn-makunbound)
+  (:policy :fast-safe)
+  (:translate fdefn-makunbound)
+  (:args (fdefn :scs (descriptor-reg) :target result))
+  (:temporary (:scs (non-descriptor-reg)) temp)
+  (:results (result :scs (descriptor-reg)))
+  (:generator 38
+    (let ((undefined-tramp-fixup (gen-label)))
+      (assemble (*elsewhere*)
+        (emit-label undefined-tramp-fixup)
+        (inst word (make-fixup "undefined_tramp" :foreign)))
+      (storew null-tn fdefn fdefn-fun-slot other-pointer-lowtag)
+      (inst ldr temp (@ undefined-tramp-fixup))
+      (storew temp fdefn fdefn-raw-addr-slot other-pointer-lowtag)
+      (move result fdefn))))
+
+
+
 ;;;; Binding and Unbinding.
 
 ;;; BIND -- Establish VAL as a binding for SYMBOL.  Save the old value and

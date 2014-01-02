@@ -195,9 +195,6 @@
               (emit-move node block (make-load-time-constant-tn :known-fun name)
                          res))
              (t
-              #!+arm
-              (error "Don't know how to {SAFE-,}FDEFN-FUN")
-              #!-arm
               (let ((fdefn-tn (make-load-time-constant-tn :fdefinition name)))
                 (if unsafe
                     (vop fdefn-fun node block fdefn-tn res)
