@@ -32,6 +32,14 @@
   ((immediate) (character-reg))
   (inst mov y (char-code (tn-value x))))
 
+(define-move-fun (load-system-area-pointer 1) (vop x y)
+  ((immediate) (sap-reg))
+  (let ((immediate-label (gen-label)))
+    (assemble (*elsewhere*)
+      (emit-label immediate-label)
+      (inst word (sap-int (tn-value x))))
+    (inst ldr y (@ immediate-label))))
+
 (define-move-fun (load-constant 5) (vop x y)
   ((constant) (descriptor-reg))
   (loadw y code-tn (tn-offset x) other-pointer-lowtag))
