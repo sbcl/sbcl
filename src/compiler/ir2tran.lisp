@@ -1424,7 +1424,6 @@
 ;;; the first argument: all the other argument lvar TNs are
 ;;; ignored. This is because we require all of the values globs to be
 ;;; contiguous and on stack top.
-#!-arm
 (defun ir2-convert-mv-call (node block)
   (declare (type mv-combination node) (type ir2-block block))
   (aver (basic-combination-args node))
@@ -1441,16 +1440,25 @@
       (cond
        (tails
         (let ((env (physenv-info (node-physenv node))))
+          #!+arm
+          (error "Don't know how to TAIL-CALL-VARIABLE")
+          #!-arm
           (vop tail-call-variable node block start fun
                (ir2-physenv-old-fp env)
                (ir2-physenv-return-pc env))))
        ((and 2lvar
              (eq (ir2-lvar-kind 2lvar) :unknown))
+        #!+arm
+        (error "Don't know how to MULTIPLE-CALL-VARIABLE")
+        #!-arm
         (vop* multiple-call-variable node block (start fun nil)
               ((reference-tn-list (ir2-lvar-locs 2lvar) t))
               (emit-step-p node)))
        (t
         (let ((locs (standard-result-tns lvar)))
+          #!+arm
+          (error "Don't know how to CALL-VARIABLE")
+          #!-arm
           (vop* call-variable node block (start fun nil)
                 ((reference-tn-list locs t)) (length locs)
                 (emit-step-p node))
