@@ -977,7 +977,6 @@
 ;;; Otherwise, we use STANDARD-RESULT-TNS to get wired result TNs, and
 ;;; then call MOVE-LVAR-RESULT to do any necessary type checks or
 ;;; coercions.
-#!-arm
 (defun ir2-convert-local-unknown-call (node block fun lvar start)
   (declare (type node node) (type ir2-block block) (type clambda fun)
            (type (or lvar null) lvar) (type label start))
@@ -987,10 +986,16 @@
           (env (physenv-info (lambda-physenv fun)))
           (temp-refs (reference-tn-list temps nil)))
       (if (and 2lvar (eq (ir2-lvar-kind 2lvar) :unknown))
+          #!+arm
+          (error "Don't know how to MULTIPLE-CALL-LOCAL")
+          #!-arm
           (vop* multiple-call-local node block (fp nfp temp-refs)
                 ((reference-tn-list (ir2-lvar-locs 2lvar) t))
                 arg-locs env start)
           (let ((locs (standard-result-tns lvar)))
+            #!+arm
+            (error "Don't know how to CALL-LOCAL")
+            #!-arm
             (vop* call-local node block
                   (fp nfp temp-refs)
                   ((reference-tn-list locs t))
