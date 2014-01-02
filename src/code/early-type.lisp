@@ -595,10 +595,9 @@
             (when (and (atom spec)
                        (member spec '(and or not member eql satisfies values)))
               (error "The symbol ~S is not valid as a type specifier." spec))
-            (let* ((lspec (if (atom spec) (list spec) spec))
-                   (fun (info :type :translator (car lspec))))
+            (let ((fun (info :type :translator (if (consp spec) (car spec) spec))))
               (cond (fun
-                     (funcall fun lspec))
+                     (funcall fun (if (atom spec) (list spec) spec)))
                     ((or (and (consp spec) (symbolp (car spec))
                               (not (info :type :builtin (car spec))))
                          (and (symbolp spec) (not (info :type :builtin spec))))
@@ -652,7 +651,7 @@ expansion happened."
                ;; b) so (EQUAL (TYPEXPAND 'STRING) (TYPEXPAND-ALL 'STRING))
                (values nil nil))
               ((symbolp spec)
-               (values (info :type :expander spec) (list spec)))
+               (values (info :type :expander spec) spec))
               ((and (consp spec) (symbolp (car spec)) (info :type :builtin (car spec)))
                ;; see above
                (values nil nil))
@@ -660,7 +659,10 @@ expansion happened."
                (values (info :type :expander (car spec)) spec))
               (t nil)))
     (if expander
-        (values (funcall expander lspec) t)
+        (values (funcall expander (if (symbolp lspec)
+                                      (list lspec)
+                                      lspec))
+                t)
         (values type-specifier nil))))
 
 (defun typexpand (type-specifier &optional env)

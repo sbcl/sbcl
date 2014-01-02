@@ -70,41 +70,188 @@
                          ,@(cdr spec)))
                      specs))))
 
+(defun %integer-vector-widetag-and-n-bits (signed high)
+  (let ((unsigned-table
+          #.(let ((map (make-array (1+ sb!vm:n-word-bits))))
+              (loop for saetp across
+                    (reverse sb!vm:*specialized-array-element-type-properties*)
+                    for ctype = (sb!vm:saetp-ctype saetp)
+                    when (and (numeric-type-p ctype)
+                              (eq (numeric-type-class ctype) 'integer)
+                              (zerop (numeric-type-low ctype)))
+                    do (fill map (cons (sb!vm:saetp-typecode saetp)
+                                       (sb!vm:saetp-n-bits saetp))
+                             :end (1+ (integer-length (numeric-type-high ctype)))))
+              map))
+        (signed-table
+          #.(let ((map (make-array (1+ sb!vm:n-word-bits))))
+              (loop for saetp across
+                    (reverse sb!vm:*specialized-array-element-type-properties*)
+                    for ctype = (sb!vm:saetp-ctype saetp)
+                    when (and (numeric-type-p ctype)
+                              (eq (numeric-type-class ctype) 'integer)
+                              (minusp (numeric-type-low ctype)))
+                    do (fill map (cons (sb!vm:saetp-typecode saetp)
+                                       (sb!vm:saetp-n-bits saetp))
+                             :end (+ (integer-length (numeric-type-high ctype)) 2)))
+              map)))
+    (cond ((> high sb!vm:n-word-bits)
+           (values #.sb!vm:simple-vector-widetag #.sb!vm:n-word-bits))
+          (signed
+           (let ((x (aref signed-table high)))
+             (values (car x) (cdr x))))
+          (t
+           (let ((x (aref unsigned-table high)))
+             (values (car x) (cdr x)))))))
+
 ;;; These functions are used in the implementation of MAKE-ARRAY for
 ;;; complex arrays. There are lots of transforms to simplify
 ;;; MAKE-ARRAY for various easy cases, but not for all reasonable
 ;;; cases, so e.g. as of sbcl-0.6.6 we still make full calls to
-;;; MAKE-ARRAY for any non-simple array. Thus, there's some value to
-;;; making this somewhat efficient, at least not doing full calls to
-;;; SUBTYPEP in the easy cases.
+;;; MAKE-ARRAY for any non-simple array.
 (defun %vector-widetag-and-n-bits (type)
-  (case type
-    ;; Pick off some easy common cases.
-    ;;
-    ;; (Perhaps we should make a much more exhaustive table of easy
-    ;; common cases here. Or perhaps the effort would be better spent
-    ;; on smarter compiler transforms which do the calculation once
-    ;; and for all in any reasonable user programs.)
-    ((t)
-     (values #.sb!vm:simple-vector-widetag #.sb!vm:n-word-bits))
-    ((base-char standard-char #!-sb-unicode character)
-     (values #.sb!vm:simple-base-string-widetag #.sb!vm:n-byte-bits))
-    #!+sb-unicode
-    ((character)
-     (values #.sb!vm:simple-character-string-widetag #.sb!vm:n-word-bits))
-    ((bit)
-     (values #.sb!vm:simple-bit-vector-widetag 1))
-    ;; OK, we have to wade into SUBTYPEPing after all.
-    (t
-     (unless *type-system-initialized*
-       (bug "SUBTYPEP dispatch for MAKE-ARRAY before the type system is ready"))
-     #.`(pick-vector-type type
-         ,@(map 'list
-                (lambda (saetp)
-                  `(,(sb!vm:saetp-specifier saetp)
-                    (values ,(sb!vm:saetp-typecode saetp)
-                            ,(sb!vm:saetp-n-bits saetp))))
-                sb!vm:*specialized-array-element-type-properties*)))))
+  (flet ((ill-type ()
+           (error "Invalid type specifier: ~s" type)))
+    (macrolet ((with-parameters ((arg-type &key (min-length 0))
+                                 (&rest args) &body body)
+                 (let ((type-sym (gensym)))
+                   `(let (,@(loop for arg in args
+                                  collect `(,arg '*)))
+                      (declare (ignorable ,@args))
+                      (when ,(if (plusp min-length)
+                                 t
+                                 '(consp type))
+                        (let ((,type-sym (cdr type)))
+                          (unless (proper-list-of-length-p ,type-sym ,min-length ,(length args))
+                            (ill-type))
+                          (block nil
+                            ,@(loop for arg in args
+                                    for i from 0
+                                    collect
+                                    `(if ,type-sym
+                                         (let ((value (pop ,type-sym)))
+                                           (if (or ,(if (>= i min-length)
+                                                        `(eq value '*))
+                                                   (typep value ',arg-type))
+                                               (setf ,arg value)
+                                               (ill-type)))
+                                         (return))))))
+                      ,@body)))
+               (result (widetag)
+                 (let ((value (symbol-value widetag)))
+                   `(values ,value
+                            ,(sb!vm:saetp-n-bits
+                              (find value
+                                    sb!vm:*specialized-array-element-type-properties*
+                                    :key #'sb!vm:saetp-typecode))))))
+      (let* ((consp (consp type))
+             (type-name (if consp
+                            (car type)
+                            type)))
+        (case type-name
+          ((t)
+           (when consp
+             (ill-type))
+           (result sb!vm:simple-vector-widetag))
+          ((base-char standard-char #!-sb-unicode character)
+           (when consp
+             (ill-type))
+           (result sb!vm:simple-base-string-widetag))
+          #!+sb-unicode
+          (character
+           (when consp
+             (ill-type))
+           (result sb!vm:simple-character-string-widetag))
+          (bit
+           (when consp
+             (ill-type))
+           (result sb!vm:simple-bit-vector-widetag))
+          (fixnum
+           (when consp
+             (ill-type))
+           (result sb!vm:simple-array-fixnum-widetag))
+          (unsigned-byte
+           (with-parameters ((integer 1)) (high)
+             (if (eq high '*)
+                 (result sb!vm:simple-vector-widetag)
+                 (%integer-vector-widetag-and-n-bits nil high))))
+          (signed-byte
+           (with-parameters ((integer 1)) (high)
+             (if (eq high '*)
+                 (result sb!vm:simple-vector-widetag)
+                 (%integer-vector-widetag-and-n-bits t high))))
+          (double-float
+           (with-parameters (double-float) (low high)
+             (if (and (not (eq low '*))
+                      (not (eq high '*))
+                      (> low high))
+                 (result sb!vm:simple-array-nil-widetag)
+                 (result sb!vm:simple-array-double-float-widetag))))
+          (single-float
+           (with-parameters (single-float) (low high)
+             (if (and (not (eq low '*))
+                      (not (eq high '*))
+                      (> low high))
+                 (result sb!vm:simple-array-nil-widetag)
+                 (result sb!vm:simple-array-single-float-widetag))))
+          (mod
+           (with-parameters ((integer 1) :min-length 1) (n)
+             (%integer-vector-widetag-and-n-bits nil (integer-length (1- n)))))
+          #!+long-float
+          (long-float
+           (with-parameters (long-float) (low high)
+             (if (and (not (eq low '*))
+                      (not (eq high '*))
+                      (> low high))
+                 (result sb!vm:simple-array-nil-widetag)
+                 (result sb!vm:simple-array-long-float-widetag))))
+          (integer
+           (with-parameters (integer) (low high)
+             (cond ((or (eq high '*)
+                        (eq low '*))
+                    (result sb!vm:simple-vector-widetag))
+                   ((> low high)
+                    (result sb!vm:simple-array-nil-widetag))
+                   (t
+                    (if (minusp low)
+                        (%integer-vector-widetag-and-n-bits
+                         t
+                         (1+ (max (integer-length low) (integer-length high))))
+                        (%integer-vector-widetag-and-n-bits
+                         nil
+                         (max (integer-length low) (integer-length high))))))))
+          (complex
+           (with-parameters (t) (subtype)
+             (if (eq type '*)
+                 (result sb!vm:simple-vector-widetag)
+                 (let ((ctype (specifier-type type)))
+                   (if (eq ctype *empty-type*)
+                       (result sb!vm:simple-array-nil-widetag)
+                       (case (numeric-type-format ctype)
+                         (double-float
+                          (result
+                           sb!vm:simple-array-complex-double-float-widetag))
+                         (single-float
+                          (result
+                           sb!vm:simple-array-complex-single-float-widetag))
+                         #!+long-float
+                         (long-float
+                          (result
+                           sb!vm:simple-array-complex-long-float-widetag))
+                         (t
+                          (result sb!vm:simple-vector-widetag))))))))
+          ((nil)
+           (result sb!vm:simple-array-nil-widetag))
+          (t
+           (block nil
+             (let ((expansion
+                     (type-specifier
+                      (handler-case (specifier-type type)
+                        (parse-unknown-type ()
+                          (return (result sb!vm:simple-vector-widetag)))))))
+               (if (equal expansion type)
+                   (result sb!vm:simple-vector-widetag)
+                   (%vector-widetag-and-n-bits expansion))))))))))
 
 (defun %complex-vector-widetag (widetag)
   (macrolet ((make-case ()

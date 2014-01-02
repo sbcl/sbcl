@@ -9,8 +9,10 @@ changes relative to sbcl-1.1.14:
     execution.  The previous behaviour can be obtained by instead setting that
     variable to :greedy.  Thanks again to Google for their support, and, more
     crucially, to Alexandra Barchunova for her hard work.
-  * optimization: make-array with known element-type and unkown dimensions is
+  * optimization: make-array with known element-type and unknown dimensions is
     much faster.
+  * optimization: make-array with unknown element-type is faster as well.
+    (lp#1004501)
   * enhancement: sb-ext:save-lisp-and-die on Windows now accepts
     :application-type argument, which can be :console or :gui. :gui allows
     having GUI applications without an automatically appearing console window.

@@ -3281,7 +3281,9 @@
     (ctu:assert-no-consing (funcall f))))
 
 (with-test (:name :array-type-predicates)
-  (dolist (et sb-kernel::*specialized-array-element-types*)
+  (dolist (et (list* '(integer -1 200) '(integer -256 1)
+                     '(integer 0 128)
+                     sb-kernel::*specialized-array-element-types*))
     (when et
       (let* ((v (make-array 3 :element-type et))
              (fun (compile nil `(lambda ()
