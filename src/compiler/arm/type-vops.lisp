@@ -128,3 +128,46 @@
                    (move result value))))))
        ,@(when ptype
            `((primitive-type-vop ,check-name (:check) ,ptype))))))
+
+;;;; List/symbol types:
+;;;
+;;; symbolp (or symbol (eq nil))
+;;; consp (and list (not (eq nil)))
+
+(define-vop (symbolp type-predicate)
+  (:translate symbolp)
+  (:generator 12
+    (let* ((drop-thru (gen-label))
+           (is-symbol-label (if not-p drop-thru target)))
+      (inst cmp value null-tn)
+      (inst b :eq is-symbol-label)
+      (test-type value target not-p (symbol-header-widetag) :temp temp)
+      (emit-label drop-thru))))
+
+(define-vop (check-symbol check-type)
+  (:generator 12
+    (let ((drop-thru (gen-label))
+          (error (generate-error-code vop temp 'object-not-symbol-error value)))
+      (inst cmp value null-tn)
+      (inst b :eq drop-thru)
+      (test-type value error t (symbol-header-widetag) :temp temp)
+      (emit-label drop-thru)
+      (move result value))))
+
+(define-vop (consp type-predicate)
+  (:translate consp)
+  (:generator 8
+    (let* ((drop-thru (gen-label))
+           (is-not-cons-label (if not-p target drop-thru)))
+      (inst cmp value null-tn)
+      (inst b :eq is-not-cons-label)
+      (test-type value target not-p (list-pointer-lowtag) :temp temp)
+      (emit-label drop-thru))))
+
+(define-vop (check-cons check-type)
+  (:generator 8
+    (let ((error (generate-error-code vop temp 'object-not-cons-error value)))
+      (inst cmp value null-tn)
+      (inst b :eq error)
+      (test-type value error t (list-pointer-lowtag) :temp temp)
+      (move result value))))
