@@ -870,6 +870,9 @@
 (define-full-call multiple-call-named t :unknown nil)
 (define-full-call tail-call nil :tail nil)
 (define-full-call tail-call-named t :tail nil)
+
+(define-full-call call-variable nil :fixed t)
+(define-full-call multiple-call-variable nil :unknown t)
 
 ;;;; Unknown values return:
 

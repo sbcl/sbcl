@@ -1448,17 +1448,11 @@
                (ir2-physenv-return-pc env))))
        ((and 2lvar
              (eq (ir2-lvar-kind 2lvar) :unknown))
-        #!+arm
-        (error "Don't know how to MULTIPLE-CALL-VARIABLE")
-        #!-arm
         (vop* multiple-call-variable node block (start fun nil)
               ((reference-tn-list (ir2-lvar-locs 2lvar) t))
               (emit-step-p node)))
        (t
         (let ((locs (standard-result-tns lvar)))
-          #!+arm
-          (error "Don't know how to CALL-VARIABLE")
-          #!-arm
           (vop* call-variable node block (start fun nil)
                 ((reference-tn-list locs t)) (length locs)
                 (emit-step-p node))
