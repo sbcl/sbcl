@@ -13,6 +13,31 @@
 
 (defconstant +number-stack-allocation-granularity+ n-word-bytes)
 
+(define-vop (call-out)
+  (:args (function :scs (sap-reg) :target cfunc)
+         (args :more t))
+  (:results (results :more t))
+  (:ignore args results)
+  (:save-p t)
+  (:temporary (:sc any-reg :offset r8-offset
+                   :from (:argument 0) :to (:result 0)) cfunc)
+  (:temporary (:sc control-stack :offset nfp-save-offset) nfp-save)
+  (:temporary (:scs (non-descriptor-reg)) temp)
+  (:vop-var vop)
+  (:generator 0
+    (let ((call-into-c-fixup (gen-label))
+          (cur-nfp (current-nfp-tn vop)))
+      (assemble (*elsewhere*)
+        (emit-label call-into-c-fixup)
+        (inst word (make-fixup "call_into_c" :foreign)))
+      (when cur-nfp
+        (store-stack-tn nfp-save cur-nfp))
+      (inst ldr temp (@ call-into-c-fixup))
+      (move cfunc function)
+      (inst blx temp)
+      (when cur-nfp
+        (load-stack-tn cur-nfp nfp-save)))))
+
 (define-vop (alloc-number-stack-space)
   (:info amount)
   (:result-types system-area-pointer)
