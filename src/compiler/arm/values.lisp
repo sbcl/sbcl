@@ -39,3 +39,35 @@
            (load-stack-tn temp tn)
            (storew temp start i)))))
     (inst mov count (fixnumize nvals))))
+
+;;; Push a list of values on the stack, returning Start and Count as used in
+;;; unknown values continuations.
+;;;
+(define-vop (values-list)
+  (:args (arg :scs (descriptor-reg) :target list))
+  (:arg-types list)
+  (:policy :fast-safe)
+  (:results (start :scs (any-reg))
+            (count :scs (any-reg)))
+  (:temporary (:scs (descriptor-reg) :type list :from (:argument 0)) list)
+  (:temporary (:scs (descriptor-reg)) temp)
+  (:temporary (:scs (non-descriptor-reg)) ndescr)
+  (:temporary (:scs (non-descriptor-reg) :offset ocfp-offset) err-temp)
+  (:vop-var vop)
+  (:save-p :compute-only)
+  (:generator 0
+    (move list arg)
+    (move start csp-tn)
+
+    LOOP
+    (inst cmp list null-tn)
+    (loadw temp list cons-car-slot list-pointer-lowtag)
+    (inst b :eq DONE)
+    (loadw list list cons-cdr-slot list-pointer-lowtag)
+    (inst add csp-tn csp-tn n-word-bytes)
+    (storew temp csp-tn -1)
+    (test-type list LOOP nil (list-pointer-lowtag) :temp ndescr)
+    (error-call vop err-temp 'bogus-arg-to-values-list-error list)
+
+    DONE
+    (inst sub count csp-tn start)))

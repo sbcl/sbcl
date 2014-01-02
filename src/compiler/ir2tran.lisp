@@ -1527,9 +1527,6 @@
 ;;; defaulting any unsupplied values. It seems unworthwhile to
 ;;; optimize this case.
 (defoptimizer (values-list ir2-convert) ((list) node block)
-  #!+arm
-  (error "Don't know how to VALUES-LIST")
-  #!-arm
   (let* ((lvar (node-lvar node))
          (2lvar (and lvar (lvar-info lvar))))
     (cond ((and 2lvar
