@@ -4970,3 +4970,7 @@
                      (when (= (array-rank a) 3)
                        (array-dimension a 2)))))))
     (assert noted)))
+
+(with-test (:name :upgraded-array-element-type-undefined-type)
+  (raises-error? (upgraded-array-element-type 'an-undefined-type))
+  (raises-error? (upgraded-array-element-type '(and fixnum an-undefined-type))))
