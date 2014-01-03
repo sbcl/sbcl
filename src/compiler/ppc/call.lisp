@@ -665,7 +665,7 @@ default-value-8
      (:temporary (:sc descriptor-reg
                   :offset lra-offset
                   :from (:argument ,(if (eq return :tail) 2 1))
-                  :to :eval)
+                  :to (:result 0))
                  return-pc-pass)
 
      ,(if named
