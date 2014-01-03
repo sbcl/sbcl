@@ -3283,6 +3283,17 @@
 (with-test (:name :array-type-predicates)
   (dolist (et (list* '(integer -1 200) '(integer -256 1)
                      '(integer 0 128)
+                     '(integer 0 (128))
+                     '(double-float 0d0 (1d0))
+                     '(single-float (0s0) (1s0))
+                     '(or (eql 1d0) (eql 10d0))
+                     '(member 1 2 10)
+                     '(complex (member 10 20))
+                     '(complex (member 10d0 20d0))
+                     '(complex (member 10s0 20s0))
+                     '(or integer double-float)
+                     '(mod 1)
+                     #+sb-unicode 'extended-char
                      sb-kernel::*specialized-array-element-types*))
     (when et
       (let* ((v (make-array 3 :element-type et))
