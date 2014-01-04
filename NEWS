@@ -1,6 +1,5 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 changes relative to sbcl-1.1.14:
-  * improvement: support for "Mac Roman" external format.
   * new feature: the iterative spilling/coloring register allocator developed
     by Alexandra Barchunova during Google Summer of Code 2013 is now merged
     in.  By default, it only activates for functions that optimize with
@@ -20,6 +19,9 @@ changes relative to sbcl-1.1.14:
     conservative roots must be valid-looking tagged pointers or point
     within a code object, not merely point to within the allocated part
     of a page, in order to pin a page.
+  * enhancement: support for "Mac Roman" external format.
+  * enhancement: encapsulation of named generic functions now happens without
+    altering the identity of the function bound to the name.
   * bug fix: Windows applications without the console window no longer misbehave.
     (patch by Wilfredo Velazquez, lp#1256034).
   * bug fix: modular arithmetic optimizations do not stumble on dead branches

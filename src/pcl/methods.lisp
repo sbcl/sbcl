@@ -1556,74 +1556,106 @@
       (eq gf #'(setf slot-value-using-class))
       (eq gf #'slot-boundp-using-class)))
 
+;;; this is the normal function for computing the discriminating
+;;; function of a standard-generic-function
 (let (initial-print-object-cache)
-  (defmethod compute-discriminating-function ((gf standard-generic-function))
+  (defun standard-compute-discriminating-function (gf)
     (let ((dfun-state (slot-value gf 'dfun-state)))
-      (when (special-case-for-compute-discriminating-function-p gf)
-        ;; if we have a special case for
-        ;; COMPUTE-DISCRIMINATING-FUNCTION, then (at least for the
-        ;; special cases implemented as of 2006-05-09) any information
-        ;; in the cache is misplaced.
-        (aver (null dfun-state)))
-      (typecase dfun-state
-        (null
-         (when (eq gf #'compute-applicable-methods)
-           (update-all-c-a-m-gf-info gf))
-         (cond
-           ((eq gf #'slot-value-using-class)
-            (update-slot-value-gf-info gf 'reader)
-            #'slot-value-using-class-dfun)
-           ((eq gf #'(setf slot-value-using-class))
-            (update-slot-value-gf-info gf 'writer)
-            #'setf-slot-value-using-class-dfun)
-           ((eq gf #'slot-boundp-using-class)
-            (update-slot-value-gf-info gf 'boundp)
-            #'slot-boundp-using-class-dfun)
-           ;; KLUDGE: PRINT-OBJECT is not a special-case in the sense
-           ;; of having a desperately special discriminating function.
-           ;; However, it is important that the machinery for printing
-           ;; conditions for stack and heap exhaustion, and the
-           ;; restarts offered by the debugger, work without consuming
-           ;; many extra resources.  This way (testing by name of GF
-           ;; rather than by identity) was the only way I found to get
-           ;; this to bootstrap, given that the PRINT-OBJECT generic
-           ;; function is only set up later, in
-           ;; SRC;PCL;PRINT-OBJECT.LISP.  -- CSR, 2008-06-09
-           ((eq (slot-value gf 'name) 'print-object)
-            (let ((nkeys (nth-value 3 (get-generic-fun-info gf))))
-              (cond ((/= nkeys 1)
-                     ;; KLUDGE: someone has defined a method
-                     ;; specialized on the second argument: punt.
-                     (setf initial-print-object-cache nil)
-                     (make-initial-dfun gf))
-                    (initial-print-object-cache
-                     (multiple-value-bind (dfun cache info)
-                         (make-caching-dfun gf (copy-cache initial-print-object-cache))
-                       (set-dfun gf dfun cache info)))
-                    ;; the relevant PRINT-OBJECT methods get defined
-                    ;; late, by delayed DEF!METHOD.  We mustn't cache
-                    ;; the effective method for our classes earlier
-                    ;; than the relevant PRINT-OBJECT methods are
-                    ;; defined...
-                    ((boundp 'sb-impl::*delayed-def!method-args*)
-                     (make-initial-dfun gf))
-                    (t (multiple-value-bind (dfun cache info)
-                           (make-final-dfun-internal
-                            gf
-                            (mapcar (lambda (x) (list (find-class x)))
-                                    '(sb-kernel::control-stack-exhausted
-                                      sb-kernel::binding-stack-exhausted
-                                      sb-kernel::alien-stack-exhausted
-                                      sb-kernel::heap-exhausted-error
-                                      restart)))
-                         (setq initial-print-object-cache cache)
-                         (set-dfun gf dfun (copy-cache cache) info))))))
-           ((gf-precompute-dfun-and-emf-p (slot-value gf 'arg-info))
-            (make-final-dfun gf))
-           (t
-            (make-initial-dfun gf))))
-        (function dfun-state)
-        (cons (car dfun-state))))))
+          (when (special-case-for-compute-discriminating-function-p gf)
+            ;; if we have a special case for
+            ;; COMPUTE-DISCRIMINATING-FUNCTION, then (at least for the
+            ;; special cases implemented as of 2006-05-09) any information
+            ;; in the cache is misplaced.
+            (aver (null dfun-state)))
+          (typecase dfun-state
+            (null
+             (when (eq gf #'compute-applicable-methods)
+               (update-all-c-a-m-gf-info gf))
+             (cond
+               ((eq gf #'slot-value-using-class)
+                (update-slot-value-gf-info gf 'reader)
+                #'slot-value-using-class-dfun)
+               ((eq gf #'(setf slot-value-using-class))
+                (update-slot-value-gf-info gf 'writer)
+                #'setf-slot-value-using-class-dfun)
+               ((eq gf #'slot-boundp-using-class)
+                (update-slot-value-gf-info gf 'boundp)
+                #'slot-boundp-using-class-dfun)
+               ;; KLUDGE: PRINT-OBJECT is not a special-case in the sense
+               ;; of having a desperately special discriminating function.
+               ;; However, it is important that the machinery for printing
+               ;; conditions for stack and heap exhaustion, and the
+               ;; restarts offered by the debugger, work without consuming
+               ;; many extra resources.  This way (testing by name of GF
+               ;; rather than by identity) was the only way I found to get
+               ;; this to bootstrap, given that the PRINT-OBJECT generic
+               ;; function is only set up later, in
+               ;; SRC;PCL;PRINT-OBJECT.LISP.  -- CSR, 2008-06-09
+               ((eq (slot-value gf 'name) 'print-object)
+                (let ((nkeys (nth-value 3 (get-generic-fun-info gf))))
+                  (cond ((/= nkeys 1)
+                         ;; KLUDGE: someone has defined a method
+                         ;; specialized on the second argument: punt.
+                         (setf initial-print-object-cache nil)
+                         (make-initial-dfun gf))
+                        (initial-print-object-cache
+                         (multiple-value-bind (dfun cache info)
+                             (make-caching-dfun gf (copy-cache initial-print-object-cache))
+                           (set-dfun gf dfun cache info)))
+                        ;; the relevant PRINT-OBJECT methods get defined
+                        ;; late, by delayed DEF!METHOD.  We mustn't cache
+                        ;; the effective method for our classes earlier
+                        ;; than the relevant PRINT-OBJECT methods are
+                        ;; defined...
+                        ((boundp 'sb-impl::*delayed-def!method-args*)
+                         (make-initial-dfun gf))
+                        (t (multiple-value-bind (dfun cache info)
+                               (make-final-dfun-internal
+                                gf
+                                (mapcar (lambda (x) (list (find-class x)))
+                                        '(sb-kernel::control-stack-exhausted
+                                          sb-kernel::binding-stack-exhausted
+                                          sb-kernel::alien-stack-exhausted
+                                          sb-kernel::heap-exhausted-error
+                                          restart)))
+                             (setq initial-print-object-cache cache)
+                             (set-dfun gf dfun (copy-cache cache) info))))))
+               ((gf-precompute-dfun-and-emf-p (slot-value gf 'arg-info))
+                (make-final-dfun gf))
+               (t
+                (make-initial-dfun gf))))
+            (function dfun-state)
+            (cons (car dfun-state))))))
+
+;;; in general we need to support SBCL's encapsulation for generic
+;;; functions: the default implementation of encapsulation changes the
+;;; identity of the function bound to a name, which breaks anything
+;;; class-based, so we implement the encapsulation ourselves in the
+;;; discriminating function.
+(defun sb-impl::encapsulate-generic-function (gf type body)
+  (push (cons type body) (generic-function-encapsulations gf))
+  (reinitialize-instance gf))
+(defun sb-impl::unencapsulate-generic-function (gf type)
+  (setf (generic-function-encapsulations gf)
+        (remove type (generic-function-encapsulations gf)
+                :key #'car :count 1))
+  (reinitialize-instance gf))
+(defun sb-impl::encapsulated-generic-function-p (gf type)
+  (position type (generic-function-encapsulations gf) :key #'car))
+(defun standard-compute-discriminating-function-with-encapsulations (gf encs)
+  (if (null encs)
+      (standard-compute-discriminating-function gf)
+      (let ((inner (standard-compute-discriminating-function-with-encapsulations
+                    gf (cdr encs)))
+            (body (cdar encs)))
+        (lambda (&rest args)
+          (let ((sb-int:arg-list args)
+                (sb-int:basic-definition inner))
+            (declare (special sb-int:arg-list sb-int:basic-definition))
+            (eval body))))))
+(defmethod compute-discriminating-function ((gf standard-generic-function))
+  (standard-compute-discriminating-function-with-encapsulations
+   gf (generic-function-encapsulations gf)))
 
 (defmethod (setf class-name) (new-value class)
   (let ((classoid (wrapper-classoid (class-wrapper class))))

@@ -106,6 +106,9 @@
   (let ((fdefn (fdefinition-object name nil)))
     (unless (and fdefn (fdefn-fun fdefn))
       (error 'undefined-function :name name))
+    (when (typep (fdefn-fun fdefn) 'generic-function)
+      (return-from encapsulate
+        (encapsulate-generic-function (fdefn-fun fdefn) type body)))
     ;; We must bind and close over INFO. Consider the case where we
     ;; encapsulate (the second) an encapsulated (the first)
     ;; definition, and later someone unencapsulates the encapsulated
@@ -153,6 +156,9 @@
   (let* ((fdefn (fdefinition-object name nil))
          (encap-info (encapsulation-info (fdefn-fun fdefn))))
     (declare (type (or encapsulation-info null) encap-info))
+    (when (and fdefn (typep (fdefn-fun fdefn) 'generic-function))
+      (return-from unencapsulate
+        (unencapsulate-generic-function (fdefn-fun fdefn) type)))
     (cond ((not encap-info)
            ;; It disappeared on us, so don't worry about it.
            )
@@ -179,6 +185,9 @@
 ;;; Does NAME have an encapsulation of the given TYPE?
 (defun encapsulated-p (name type)
   (let ((fdefn (fdefinition-object name nil)))
+    (when (and fdefn (typep (fdefn-fun fdefn) 'generic-function))
+      (return-from encapsulated-p
+        (encapsulated-generic-function-p (fdefn-fun fdefn) type)))
     (do ((encap-info (encapsulation-info (fdefn-fun fdefn))
                      (encapsulation-info
                       (encapsulation-info-definition encap-info))))

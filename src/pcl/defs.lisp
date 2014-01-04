@@ -307,9 +307,7 @@
                             definition-source-mixin
                             metaobject
                             funcallable-standard-object)
-  ((%documentation
-    :initform nil
-    :initarg :documentation)
+  ((%documentation :initform nil :initarg :documentation)
    ;; We need to make a distinction between the methods initially set
    ;; up by :METHOD options to DEFGENERIC and the ones set up later by
    ;; DEFMETHOD, because ANSI specifies that executing DEFGENERIC on
@@ -321,9 +319,8 @@
    ;; DEFMETHOD, then modifying and reloading a.lisp and/or b.lisp
    ;; tends to leave the generic function in a state consistent with
    ;; the most-recently-loaded state of a.lisp and b.lisp.)
-   (initial-methods
-    :initform ()
-    :accessor generic-function-initial-methods))
+   (initial-methods :initform () :accessor generic-function-initial-methods)
+   (encapsulations :initform () :accessor generic-function-encapsulations))
   (:metaclass funcallable-standard-class))
 
 (defclass standard-generic-function (generic-function)

@@ -328,5 +328,18 @@
        (declare (ignore x))
        nil))))
 
+(with-test (:name (trace generic-function))
+  (defgeneric traced-gf (x))
+  (defmethod traced-gf (x) (1+ x))
+  (assert (= (traced-gf 3) 4))
+  (trace traced-gf)
+  (let ((output (with-output-to-string (*trace-output*)
+                  (assert (= (traced-gf 3) 4)))))
+    (assert (> (length output) 0)))
+  (assert (typep #'traced-gf 'standard-generic-function))
+  (untrace traced-gf)
+  (let ((output (with-output-to-string (*trace-output*)
+                  (assert (= (traced-gf 3) 4)))))
+    (assert (= (length output) 0))))
 
 ;;;; success
