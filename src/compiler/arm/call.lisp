@@ -574,6 +574,62 @@
         sb!c::%unknown-key-arg-error key)
   (frob nil-fun-returned-error nil-fun-returned-error nil fun))
 
+;;;; Local call with unknown values convention return:
+
+;;; Non-TR local call for a fixed number of values passed according to the
+;;; unknown values convention.
+;;;
+;;; Args are the argument passing locations, which are specified only to
+;;; terminate their lifetimes in the caller.
+;;;
+;;; Values are the return value locations (wired to the standard passing
+;;; locations).
+;;;
+;;; Save is the save info, which we can ignore since saving has been done.
+;;; Return-PC is the TN that the return PC should be passed in.
+;;; Target is a continuation pointing to the start of the called function.
+;;; Nvals is the number of values received.
+;;;
+;;; Note: we can't use normal load-tn allocation for the fixed args, since all
+;;; registers may be tied up by the more operand.  Instead, we use
+;;; MAYBE-LOAD-STACK-TN.
+(define-vop (call-local)
+  (:args (fp)
+         (nfp)
+         (args :more t))
+  (:results (values :more t))
+  (:save-p t)
+  (:move-args :local-call)
+  (:info arg-locs callee target nvals)
+  (:vop-var vop)
+  (:temporary (:scs (descriptor-reg) :from (:eval 0)) move-temp)
+  (:temporary (:scs (non-descriptor-reg)) temp)
+  (:temporary (:sc control-stack :offset nfp-save-offset) nfp-save)
+  (:temporary (:sc any-reg :offset ocfp-offset :from (:eval 0)) ocfp)
+  (:temporary (:scs (interior-reg)) lip)
+  (:ignore arg-locs args ocfp)
+  (:generator 5
+    (trace-table-entry trace-table-call-site)
+    (let ((label (gen-label))
+          (cur-nfp (current-nfp-tn vop)))
+      (when cur-nfp
+        (store-stack-tn nfp-save cur-nfp))
+      (let ((callee-nfp (callee-nfp-tn callee)))
+        (when callee-nfp
+          (maybe-load-stack-tn callee-nfp nfp)))
+      (maybe-load-stack-tn cfp-tn fp)
+      (inst compute-lra lip lip label)
+      (store-stack-tn (callee-return-pc-tn callee) lip)
+      (note-this-location vop :call-site)
+      (inst b target)
+      (emit-return-pc label)
+      (default-unknown-values vop values nvals move-temp temp lip label)
+      ;; alpha uses (maybe-load-stack-nfp-tn cur-nfp nfp-save temp)
+      ;; instead of the clause below
+      (when cur-nfp
+        (load-stack-tn cur-nfp nfp-save)))
+    (trace-table-entry trace-table-normal)))
+
 ;;;; Local call with known values return:
 
 ;;; Non-TR local call with known return locations.  Known-value return works

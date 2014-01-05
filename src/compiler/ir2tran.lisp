@@ -993,9 +993,6 @@
                 ((reference-tn-list (ir2-lvar-locs 2lvar) t))
                 arg-locs env start)
           (let ((locs (standard-result-tns lvar)))
-            #!+arm
-            (error "Don't know how to CALL-LOCAL")
-            #!-arm
             (vop* call-local node block
                   (fp nfp temp-refs)
                   ((reference-tn-list locs t))
