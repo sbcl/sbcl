@@ -11,4 +11,62 @@
 
 (in-package "SB!VM")
 
-;;; Dummy placeholder file.
+;;;; Moves and coercions:
+
+;;; Move a tagged char to an untagged representation.
+(define-vop (move-to-character)
+  (:args (x :scs (any-reg descriptor-reg)))
+  (:results (y :scs (character-reg)))
+  (:note "character untagging")
+  (:generator 1
+    (inst mov y (lsr x n-widetag-bits))))
+(define-move-vop move-to-character :move
+  (any-reg descriptor-reg) (character-reg))
+
+;;; Move an untagged char to a tagged representation.
+(define-vop (move-from-character)
+  (:args (x :scs (character-reg)))
+  (:results (y :scs (any-reg descriptor-reg)))
+  (:note "character tagging")
+  (:generator 1
+    (inst mov y (lsl x n-widetag-bits))
+    (inst orr y y character-widetag)))
+(define-move-vop move-from-character :move
+  (character-reg) (any-reg descriptor-reg))
+
+;;; Move untagged character values.
+(define-vop (character-move)
+  (:args (x :target y
+            :scs (character-reg)
+            :load-if (not (location= x y))))
+  (:results (y :scs (character-reg)
+               :load-if (not (location= x y))))
+  (:note "character move")
+  (:effects)
+  (:affected)
+  (:generator 0
+    (move y x)))
+(define-move-vop character-move :move
+  (character-reg) (character-reg))
+
+;;; Move untagged character arguments/return-values.
+(define-vop (move-character-arg)
+  (:args (x :target y
+            :scs (character-reg))
+         (fp :scs (any-reg)
+             :load-if (not (sc-is y character-reg))))
+  (:results (y))
+  (:note "character arg move")
+  (:generator 0
+    (sc-case y
+      (character-reg
+       (move y x))
+      (character-stack
+       (storew x fp (tn-offset y))))))
+(define-move-vop move-character-arg :move-arg
+  (any-reg character-reg) (character-reg))
+
+;;; Use standard MOVE-ARG + coercion to move an untagged character
+;;; to a descriptor passing location.
+(define-move-vop move-arg :move-arg
+  (character-reg) (any-reg descriptor-reg))
