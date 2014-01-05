@@ -205,9 +205,8 @@
   (typecase value
     (null
      (sc-number-or-lose 'null))
-    ((unsigned-byte 8)
-     ;; FIXME: Shifter arguments allow more range than this under
-     ;; certain circumstances (mostly to do with trailing zeros).
+    ((or (integer #.sb!xc:most-negative-fixnum #.sb!xc:most-positive-fixnum)
+         character)
      (sc-number-or-lose 'immediate))
     (symbol
      (if (static-symbol-p value)

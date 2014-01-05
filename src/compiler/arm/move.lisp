@@ -17,7 +17,28 @@
   (let ((val (tn-value x)))
     (etypecase val
       (integer
-       (inst mov y (fixnumize val)))
+       (let ((tagged-value (fixnumize val)))
+         ;; FIXME: There should be a way to generate more optimal code
+         ;; for this (for some values, there is no more optimal code,
+         ;; but for some values this will tend to be terrible).
+         (inst mov y (mask-field (byte 8 2) tagged-value))
+         (when (> (integer-length tagged-value) 10)
+           (inst orr y y (mask-field (byte 8 10) tagged-value)))
+         (when (> (integer-length tagged-value) 18)
+           (inst orr y y (mask-field (byte 8 18) tagged-value)))
+         (when (> (integer-length tagged-value) 26)
+           (inst orr y y (mask-field (byte 8 26) tagged-value)))))
+      (character
+       (let ((codepoint (char-code val)))
+         ;; FIXME: There should be a way to generate more optimal code
+         ;; for this (for some values, there is no more optimal code,
+         ;; but for some values this will tend to be terrible).
+         (inst mov y character-widetag)
+         (inst orr y y (ash 8 (ldb (byte 8 0) codepoint)))
+         (when (> codepoint #x100)
+           (inst orr y y (ash 16 (ldb (byte 8 8) codepoint))))
+         (when (> codepoint #x10000)
+           (inst orr y y (ash 24 (ldb (byte 8 16) codepoint))))))
       (null
        (move y null-tn))
       (symbol
