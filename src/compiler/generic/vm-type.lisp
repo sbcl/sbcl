@@ -107,13 +107,6 @@
     (double-float 'double-float)
     #!+long-float (long-float 'long-float)))
 
-(defun contains-unknown-type-p (ctype)
-  (cond ((unknown-type-p ctype) t)
-        ((intersection-type-p ctype)
-         (some #'contains-unknown-type-p (intersection-type-types ctype)))
-        ((union-type-p ctype)
-         (some #'contains-unknown-type-p (union-type-types ctype)))))
-
 ;;; This function is called when the type code wants to find out how
 ;;; an array will actually be implemented. We set the
 ;;; SPECIALIZED-ELEMENT-TYPE to correspond to the actual

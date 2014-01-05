@@ -4973,4 +4973,10 @@
 
 (with-test (:name :upgraded-array-element-type-undefined-type)
   (raises-error? (upgraded-array-element-type 'an-undefined-type))
-  (raises-error? (upgraded-array-element-type '(and fixnum an-undefined-type))))
+  (raises-error? (upgraded-array-element-type '(and fixnum an-undefined-type)))
+  (compile nil '(lambda ()
+                 (make-array 10
+                  :element-type '(or null an-undefined-type))))
+  (compile nil '(lambda ()
+                 (make-array '(10 10)
+                  :element-type '(or null an-undefined-type)))))

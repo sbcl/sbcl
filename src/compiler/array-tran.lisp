@@ -294,7 +294,7 @@
                          (let ((ctype (careful-specifier-type
                                        (lvar-value element-type))))
                            (cond
-                             ((or (null ctype) (unknown-type-p ctype)) '*)
+                             ((or (null ctype) (contains-unknown-type-p ctype)) '*)
                              (t (sb!xc:upgraded-array-element-type
                                  (lvar-value element-type))))))
                         (t
@@ -639,7 +639,7 @@
           (element-type-ctype (and (constant-lvar-p element-type)
                                    (ir1-transform-specifier-type
                                     (lvar-value element-type)))))
-      (when (unknown-type-p element-type-ctype)
+      (when (contains-unknown-type-p element-type-ctype)
         (give-up-ir1-transform))
       (unless (every #'integerp dims)
         (give-up-ir1-transform
