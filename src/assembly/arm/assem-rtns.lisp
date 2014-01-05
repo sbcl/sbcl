@@ -94,6 +94,74 @@
   ;; Return.
   (lisp-return lra :multiple-values))
 
+;;;; tail-call-variable.
+
+#+sb-assembling ;; no vop for this one either.
+(define-assembly-routine
+    (tail-call-variable
+     (:return-style :none))
+
+    ;; These are really args.
+    ((:temp args any-reg nl2-offset)
+     (:temp lexenv descriptor-reg lexenv-offset)
+
+     ;; We need to compute this
+     (:temp nargs any-reg nargs-offset)
+
+     ;; These are needed by the blitting code.
+     (:temp dest any-reg nl2-offset) ;; Not live concurrent with ARGS.
+     (:temp count any-reg nl3-offset)
+     (:temp temp descriptor-reg r8-offset)
+
+     ;; These are needed so we can get at the register args.
+     (:temp r0 descriptor-reg r0-offset)
+     (:temp r1 descriptor-reg r1-offset)
+     (:temp r2 descriptor-reg r2-offset))
+
+  ;; We're in a tail-call scenario, so we use the existing LRA and
+  ;; OCFP, both already set up in the stack frame.  We have a set of
+  ;; arguments, represented as the address of the first argument
+  ;; (ARGS) and the address just beyond the last argument (CSP-TN),
+  ;; and need to set up the arg-passing-registers (R0, R1, and R2),
+  ;; any stack arguments (the fourth and subsequent arguments, if such
+  ;; exist), and the total arg count (NARGS).
+
+  ;; Calculate NARGS (as a fixnum)
+  (inst sub nargs csp-tn args)
+
+  ;; Load the argument regs (must do this now, 'cause the blt might
+  ;; trash these locations, and we need ARGS to be dead for the blt)
+  (loadw r0 args 0)
+  (loadw r1 args 1)
+  (loadw r2 args 2)
+
+  ;; ARGS is now dead, we access the remaining arguments by offset
+  ;; from CSP-TN.
+
+  ;; Figure out how many arguments we really need to shift.
+  (inst subs count nargs (fixnumize register-arg-count))
+  ;; If there aren't any stack args then we're done.
+  (inst b :le DONE)
+
+  ;; Find where our shifted arguments ned to go.
+  (inst add dest cfp-tn nargs)
+
+  LOOP
+  ;; Copy one arg.
+  (inst ldr temp (@ csp-tn (- count)))
+  (inst str temp (@ dest (- count)))
+  (inst subs count count n-word-bytes)
+  (inst b :ne LOOP)
+
+  DONE
+  ;; The call frame is all set up, so all that remains is to jump to
+  ;; the new function.  We need a boxed register to hold the actual
+  ;; function object (in case of closure functions or funcallable
+  ;; instances), and R8 (known as TEMP) and, technically, CODE happen
+  ;; to be the only ones available.
+  (loadw temp lexenv closure-fun-slot fun-pointer-lowtag)
+  (lisp-jump temp))
+
 ;;;; Non-local exit noise.
 
 (define-assembly-routine (throw

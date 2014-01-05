@@ -929,6 +929,33 @@
 
 (define-full-call call-variable nil :fixed t)
 (define-full-call multiple-call-variable nil :unknown t)
+
+;;; Defined separately, since needs special code that BLT's the
+;;; arguments down.
+(define-vop (tail-call-variable)
+  (:args
+   (args-arg :scs (any-reg) :target args)
+   (function-arg :scs (descriptor-reg) :target lexenv)
+   (old-fp-arg :scs (any-reg) :load-if nil)
+   (lra-arg :scs (descriptor-reg) :load-if nil))
+  (:temporary (:sc any-reg :offset nl2-offset :from (:argument 0)) args)
+  (:temporary (:sc any-reg :offset lexenv-offset :from (:argument 1)) lexenv)
+  (:temporary (:sc any-reg) temp)
+  (:ignore old-fp-arg lra-arg)
+  (:vop-var vop)
+  (:generator 75
+    ;; Move these into the passing locations if they are not already there.
+    (move args args-arg)
+    (move lexenv function-arg)
+    ;; Clear the number stack if anything is there.
+    (let ((cur-nfp (current-nfp-tn vop)))
+      (when cur-nfp
+        (error "Don't know how to clear number stack space in TAIL-CALL-VARIABLE")))
+    (let ((fixup-lab (gen-label)))
+      (assemble (*elsewhere*)
+        (emit-label fixup-lab)
+        (inst word (make-fixup 'tail-call-variable :assembly-routine)))
+      (inst ldr pc-tn (@ fixup-lab)))))
 
 ;;;; Unknown values return:
 

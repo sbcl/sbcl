@@ -1442,9 +1442,6 @@
       (cond
        (tails
         (let ((env (physenv-info (node-physenv node))))
-          #!+arm
-          (error "Don't know how to TAIL-CALL-VARIABLE")
-          #!-arm
           (vop tail-call-variable node block start fun
                (ir2-physenv-old-fp env)
                (ir2-physenv-return-pc env))))
