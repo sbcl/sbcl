@@ -150,9 +150,6 @@
                                  (primitive-type (leaf-type leaf))))))
              (if reffer
                  (funcall reffer node block tn (leaf-info leaf) res)
-                 #!+arm
-                 (error "Don't know how to ANCESTOR-FRAME-REF")
-                 #!-arm
                  (vop ancestor-frame-ref node block tn (leaf-info leaf) res))))
           (t (emit-move node block tn res)))))
       (constant
@@ -389,9 +386,6 @@
                                     (primitive-type (leaf-type leaf))))))
              (if setter
                  (funcall setter node block tn val (leaf-info leaf))
-                 #!+arm
-                 (error "Don't know how to VOP ANCESTOR-FRAME-SET")
-                 #!-arm
                  (vop ancestor-frame-set node block tn val (leaf-info leaf)))))
             (t (emit-move node block val tn))))))
       (global-var
