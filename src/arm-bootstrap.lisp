@@ -17,7 +17,15 @@
       (setf value (logand value 4)))
     value))
 
+(defun test-tcv-result (arg1 arg2 arg3 arg4)
+  (values arg1 arg2 arg3 arg4))
+
+(defun test-tail-call-variable (fun arg1 &rest args)
+  (declare (function fun))
+  (apply fun arg1 args))
+
 (defun !cold-init ()
   (test-uwp)
+  (test-tail-call-variable #'test-tcv-result 42 57 69 104)
   (%primitive print "Testing %PRIMITIVE PRINT.")
   #+(or) (%halt))
