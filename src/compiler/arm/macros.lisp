@@ -290,7 +290,7 @@
          (inst ,(ecase size
                        (:byte (if signed 'ldrsb 'ldrb))
                        (:short (if signed 'ldrsh 'ldrh)))
-               value lip (- (* ,offset n-word-bytes) ,lowtag))))))
+               value (@ lip (- (* ,offset n-word-bytes) ,lowtag)))))))
 
 (defmacro define-partial-setter (name type size offset lowtag scs el-type
                                  &optional translate)
@@ -311,5 +311,5 @@
               '(inst add lip object index)
               '(inst add lip object (lsl index 1)))
          (inst ,(ecase size (:byte 'strb) (:short 'strh))
-               value lip (- (* ,offset n-word-bytes) ,lowtag))
+               value (@ lip (- (* ,offset n-word-bytes) ,lowtag)))
          (move result value)))))
