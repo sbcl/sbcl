@@ -16,7 +16,9 @@
    (any-reg descriptor-reg))
   (let ((val (tn-value x)))
     (etypecase val
-      (integer
+      (unsigned-byte
+       ;; This is a non-negative FIXNUM, as IMMEDIATE-CONSTANT-SC only
+       ;; accepts integers if they are FIXNUMs.
        (let ((tagged-value (fixnumize val)))
          ;; FIXME: There should be a way to generate more optimal code
          ;; for this (for some values, there is no more optimal code,
@@ -28,6 +30,24 @@
            (inst orr y y (mask-field (byte 8 18) tagged-value)))
          (when (> (integer-length tagged-value) 26)
            (inst orr y y (mask-field (byte 8 26) tagged-value)))))
+      (integer
+       ;; This is a negative FIXNUM, as should be obvious from the
+       ;; preceding clause.
+       (let ((tagged-value (lognot (fixnumize val))))
+         ;; FIXME: There should be a way to generate more optimal code
+         ;; for this (for some values, there is no more optimal code,
+         ;; but for some values this will tend to be terrible).
+         ;; NOTE: Unlike the preceeding case, we MUST set the tag
+         ;; bits, and we must do so FIRST, otherwise we end up with an
+         ;; OTHER-POINTER-LOWTAG with random address bits, which won't
+         ;; end well.
+         (inst mvn y (mask-field (byte 8 0) tagged-value))
+         (when (> (integer-length tagged-value) 8)
+           (inst bic y y (mask-field (byte 8 8) tagged-value)))
+         (when (> (integer-length tagged-value) 16)
+           (inst bic y y (mask-field (byte 8 16) tagged-value)))
+         (when (> (integer-length tagged-value) 24)
+           (inst bic y y (mask-field (byte 8 24) tagged-value)))))
       (character
        (let ((codepoint (char-code val)))
          ;; FIXME: There should be a way to generate more optimal code
