@@ -1544,9 +1544,6 @@
              (ir2-convert-full-call node block)))))
 
 (defoptimizer (%more-arg-values ir2-convert) ((context start count) node block)
-  #!+arm
-  (error "Don't know how to %MORE-ARG-VALUES")
-  #!-arm
   (binding* ((lvar (node-lvar node) :exit-if-null)
              (2lvar (lvar-info lvar)))
     (ecase (ir2-lvar-kind 2lvar)

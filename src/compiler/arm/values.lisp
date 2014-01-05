@@ -71,3 +71,38 @@
 
     DONE
     (inst sub count csp-tn start)))
+
+
+;;; Copy the more arg block to the top of the stack so we can use them
+;;; as function arguments.
+;;;
+(define-vop (%more-arg-values)
+  (:args (context :scs (descriptor-reg any-reg) :target src)
+         (skip :scs (any-reg immediate))
+         (num :scs (any-reg) :target count))
+  (:arg-types * positive-fixnum positive-fixnum)
+  (:temporary (:sc any-reg :from (:argument 0)) src)
+  (:temporary (:sc any-reg :from (:argument 2)) dst)
+  (:temporary (:sc descriptor-reg :from (:argument 1)) temp)
+  (:temporary (:sc any-reg) i)
+  (:results (start :scs (any-reg))
+            (count :scs (any-reg)))
+  (:generator 20
+    (sc-case skip
+      (immediate
+       (inst add src context (* (tn-value skip) n-word-bytes)))
+      (any-reg
+       (inst add src context skip)))
+    (inst adds count num 0)
+    (inst mov start csp-tn)
+    (inst b :eq DONE)
+    (inst mov dst csp-tn)
+    (inst add csp-tn csp-tn count)
+    (inst mov i count)
+    LOOP
+    (inst cmp i 4)
+    (inst sub i i 4)
+    (inst ldr temp (@ src i))
+    (inst str temp (@ dst i))
+    (inst b :ne LOOP)
+    DONE))
