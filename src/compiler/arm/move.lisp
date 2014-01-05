@@ -145,6 +145,39 @@
 (define-move-vop move-to-word/fixnum :move
   (any-reg descriptor-reg) (signed-reg unsigned-reg))
 
+;;; ARG is a non-immediate constant; load it.
+(define-vop (move-to-word-c)
+  (:args (x :scs (constant)))
+  (:results (y :scs (signed-reg unsigned-reg)))
+  (:note "constant load")
+  (:generator 1
+    (cond ((sb!c::tn-leaf x)
+           (inst mov y (tn-value x)))
+          (t
+           (loadw y code-tn (tn-offset x) other-pointer-lowtag)
+           (inst mov y (asr y n-fixnum-tag-bits))))))
+(define-move-vop move-to-word-c :move
+  (constant) (signed-reg unsigned-reg))
+
+;;; ARG is a fixnum or bignum; figure out which and load if necessary.
+(define-vop (move-to-word/integer)
+  (:args (x :scs (descriptor-reg)))
+  (:results (y :scs (signed-reg unsigned-reg)))
+  (:note "integer to untagged word coercion")
+  (:temporary (:scs (non-descriptor-reg)) temp)
+  (:generator 4
+    (let ((done (gen-label)))
+      (inst tst x fixnum-tag-mask)
+      (sc-case y
+        (signed-reg
+         (inst mov :eq y (asr x n-fixnum-tag-bits)))
+        (unsigned-reg
+         (inst mov :eq y (lsr x n-fixnum-tag-bits))))
+
+      (loadw y x bignum-digits-offset other-pointer-lowtag :ne))))
+(define-move-vop move-to-word/integer :move
+  (descriptor-reg) (signed-reg unsigned-reg))
+
 ;;; RESULT is a fixnum, so we can just shift.  We need the result type
 ;;; restriction because of the control-stack ambiguity noted above.
 (define-vop (move-from-word/fixnum)
@@ -155,4 +188,96 @@
   (:generator 1
     (inst mov y (lsl x n-fixnum-tag-bits))))
 (define-move-vop move-from-word/fixnum :move
+  (signed-reg unsigned-reg) (any-reg descriptor-reg))
+
+
+;;; RESULT may be a bignum, so we have to check.  Use a worst-case
+;;; cost to make sure people know they may be number consing.
+(define-vop (move-from-signed)
+  (:args (arg :scs (signed-reg unsigned-reg) :target x))
+  (:results (y :scs (any-reg descriptor-reg)))
+  (:temporary (:scs (non-descriptor-reg) :from (:argument 0)) x)
+  (:temporary (:sc non-descriptor-reg :offset ocfp-offset) pa-flag)
+  (:note "signed word to integer coercion")
+  (:generator 20
+    (move x arg)
+    (inst adds pa-flag x x)
+    (inst adds :vc y pa-flag pa-flag)
+    (inst b :vc DONE)
+
+    (with-fixed-allocation (y pa-flag bignum-widetag (1+ bignum-digits-offset))
+      (storew x y bignum-digits-offset other-pointer-lowtag))
+    DONE))
+(define-move-vop move-from-signed :move
+  (signed-reg) (descriptor-reg))
+
+;;; Check for fixnum, and possibly allocate one or two word bignum
+;;; result.  Use a worst-case cost to make sure people know they may
+;;; be number consing.
+(define-vop (move-from-unsigned)
+  (:args (arg :scs (signed-reg unsigned-reg) :target x))
+  (:results (y :scs (any-reg descriptor-reg)))
+  (:temporary (:scs (non-descriptor-reg) :from (:argument 0)) x temp)
+  (:temporary (:sc non-descriptor-reg :offset ocfp-offset) pa-flag)
+  (:note "unsigned word to integer coercion")
+  (:generator 20
+    (move x arg)
+    (inst tst x (ash (1- (ash 1 (- n-word-bits
+                                   n-positive-fixnum-bits)))
+                     n-positive-fixnum-bits))
+    (inst mov y (lsl x n-fixnum-tag-bits))
+    (inst b :eq DONE)
+
+    (with-fixed-allocation
+        (y pa-flag bignum-widetag (+ 2 bignum-digits-offset))
+      ;; WITH-FIXED-ALLOCATION, when using a supplied type-code,
+      ;; leaves PA-FLAG containing the computed header value.  In our
+      ;; case, configured for a 2-word bignum.  If the sign bit in the
+      ;; value we're boxing is CLEAR, we need to shrink the bignum by
+      ;; one word, hence the following:
+      (inst orrs x x 0)
+      (inst sub :pl pa-flag pa-flag #x100)
+      (storew temp y 0 other-pointer-lowtag :pl)
+      (storew x y bignum-digits-offset other-pointer-lowtag))
+    DONE))
+(define-move-vop move-from-unsigned :move
+  (unsigned-reg) (descriptor-reg))
+
+
+;;; Move untagged numbers.
+(define-vop (word-move)
+  (:args (x :target y
+            :scs (signed-reg unsigned-reg)
+            :load-if (not (location= x y))))
+  (:results (y :scs (signed-reg unsigned-reg)
+               :load-if (not (location= x y))))
+  (:effects)
+  (:affected)
+  (:note "word integer move")
+  (:generator 0
+    (move y x)))
+(define-move-vop word-move :move
+  (signed-reg unsigned-reg) (signed-reg unsigned-reg))
+
+
+;;; Move untagged number arguments/return-values.
+(define-vop (move-word-arg)
+  (:args (x :target y
+            :scs (signed-reg unsigned-reg))
+         (fp :scs (any-reg)
+             :load-if (not (sc-is y sap-reg))))
+  (:results (y))
+  (:note "word integer argument move")
+  (:generator 0
+    (sc-case y
+      ((signed-reg unsigned-reg)
+       (move y x))
+      ((signed-stack unsigned-stack)
+       (storew x fp (tn-offset y))))))
+(define-move-vop move-word-arg :move-arg
+  (descriptor-reg any-reg signed-reg unsigned-reg) (signed-reg unsigned-reg))
+
+;;; Use standard MOVE-ARG + coercion to move an untagged number to a
+;;; descriptor passing location.
+(define-move-vop move-arg :move-arg
   (signed-reg unsigned-reg) (any-reg descriptor-reg))
