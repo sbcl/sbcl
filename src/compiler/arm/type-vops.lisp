@@ -11,6 +11,11 @@
 
 (in-package "SB!VM")
 
+(defun %test-fixnum (value target not-p &key temp)
+  (assemble ()
+    (inst tst value fixnum-tag-mask)
+    (inst b (if not-p :ne :eq) target)))
+
 (defun %test-fixnum-and-headers (value target not-p headers &key temp)
   (let ((drop-through (gen-label)))
     (assemble ()
@@ -18,6 +23,12 @@
       (inst b :eq (if not-p drop-through target)))
     (%test-headers value target not-p nil headers
                    :drop-through drop-through :temp temp)))
+
+(defun %test-immediate (value target not-p immediate &key temp)
+  (assemble ()
+    (inst and temp value widetag-mask)
+    (inst cmp temp immediate)
+    (inst b (if not-p :ne :eq) target)))
 
 (defun %test-lowtag (value target not-p lowtag &key temp)
   (assemble ()
