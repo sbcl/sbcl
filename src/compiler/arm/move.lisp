@@ -11,6 +11,37 @@
 
 (in-package "SB!VM")
 
+(defun lowest-set-bit-index (integer-value)
+  (max 0 (1- (integer-length (logand integer-value (- integer-value))))))
+
+;; FIXME: This load-immediate-word / load-negative-immediate-word
+;; stuff could be more clever.  First, the structure is obnoxiously
+;; repetitive.  Second, the decision on loading positive or negative
+;; shouldn't depend on the sign of the value, it should depend on the
+;; logcount of the two's complement representation (or maybe an even
+;; smarter selection criterion).
+
+(defun load-immediate-word (y val)
+  (let ((bytespec (byte 8 (logandc1 1 (lowest-set-bit-index val)))))
+    (inst mov y (mask-field bytespec val))
+    (setf (ldb bytespec val) 0))
+  (do ((bytespec (byte 8 (logandc1 1 (lowest-set-bit-index val)))
+                 (byte 8 (logandc1 1 (lowest-set-bit-index val)))))
+      ((zerop val))
+    (inst orr y y (mask-field bytespec val))
+    (setf (ldb bytespec val) 0)))
+
+(defun load-negative-immediate-word (y val)
+  (let ((unval (lognot val)))
+    (let ((bytespec (byte 8 (logandc1 1 (lowest-set-bit-index unval)))))
+      (inst mvn y (mask-field bytespec unval))
+      (setf (ldb bytespec unval) 0))
+    (do ((bytespec (byte 8 (logandc1 1 (lowest-set-bit-index unval)))
+                   (byte 8 (logandc1 1 (lowest-set-bit-index unval)))))
+        ((zerop unval))
+      (inst bic y y (mask-field bytespec unval))
+      (setf (ldb bytespec unval) 0))))
+
 (define-move-fun (load-immediate 1) (vop x y)
   ((null immediate)
    (any-reg descriptor-reg))
@@ -67,7 +98,10 @@
 (define-move-fun (load-number 1) (vop x y)
   ((immediate)
    (signed-reg unsigned-reg))
-  (inst mov y (tn-value x)))
+  (let ((val (tn-value x)))
+    (if (not (minusp val))
+        (load-immediate-word y val)
+        (load-negative-immediate-word y val))))
 
 (define-move-fun (load-character 1) (vop x y)
   ((immediate) (character-reg))
