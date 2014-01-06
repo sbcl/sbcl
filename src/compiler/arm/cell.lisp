@@ -162,6 +162,18 @@
 
 ;;;; Closure indexing.
 
+(define-full-reffer closure-index-ref *
+  closure-info-offset fun-pointer-lowtag
+  (descriptor-reg any-reg) * %closure-index-ref)
+
+(define-full-setter set-funcallable-instance-info *
+  funcallable-instance-info-offset fun-pointer-lowtag
+  (descriptor-reg any-reg null) * %set-funcallable-instance-info)
+
+(define-full-reffer funcallable-instance-info *
+  funcallable-instance-info-offset fun-pointer-lowtag
+  (descriptor-reg any-reg) * %funcallable-instance-info)
+
 (define-vop (closure-ref slot-ref)
   (:variant closure-info-offset fun-pointer-lowtag))
 
