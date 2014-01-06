@@ -29,38 +29,44 @@
   (:results (result :scs (unsigned-reg) :from (:eval 0)))
   (:result-types positive-fixnum)
   (:generator 6
-    ;; Deal with pointers out-of-line.
+    ;; First, pick off the immediate types, starting with FIXNUM.
+    (inst ands result object fixnum-tag-mask)
+    ;; If it wasn't a fixnum, start with the full widetag.
+    (inst and :ne result object widetag-mask)
+
+    ;; Now, we have our result for an immediate type, but we might
+    ;; have a pointer object instead, in which case we need to do more
+    ;; work.  Check for a pointer type.
+
     ;; KLUDGE: We're a 32-bit port, so all pointer lowtags have the
     ;; low bit set, but there's no obvious named constant for this.
     ;; On 64-bit ports, all pointer lowtags have the low two bits set,
     ;; so this wouldn't work as easily.
     (inst tst object 1)
-    (inst b :ne POINTER-TYPE)
 
-    ;; Okay, it is an immediate.  If fixnum, we want zero.  Otherwise,
-    ;; we want the low 8 bits.
-    (inst ands result object fixnum-tag-mask)
-    ;; If it wasn't a fixnum, get the low 8 bits.
-    (inst and :ne result object widetag-mask)
-    (inst b DONE)
+    ;; If we have a pointer type, we need to compute a different
+    ;; answer.  For lists and instances, we just need the lowtag.  For
+    ;; functions and "other", we need to load the widetag from the
+    ;; object header.  In both cases, having just the widetag
+    ;; available is handy.
+    (inst and :ne result object lowtag-mask)
 
-    ;; Check for various pointer types.
-    POINTER-TYPE
-    ;; The default answer, for lists and instances, is the lowtag
-    ;; (which we need to be able to check anyway).
-    (inst and result object lowtag-mask)
-    ;; Check for and conditionally load the widetags of the two cases
-    ;; where we actually want the widetag.  The widetag space doesn't
-    ;; overlap the pointer lowtag space, so the tag loaded in the
-    ;; other-pointer case won't be a fun-pointer-lowtag.  This could
-    ;; be tightened up further for little-endian systems (and should
-    ;; be no worse on big-endian systems) if we inline LOAD-TYPE.
-    (inst cmp result other-pointer-lowtag)
-    (load-type result object (- other-pointer-lowtag) :eq)
-    (inst cmp result fun-pointer-lowtag)
-    (load-type result object (- fun-pointer-lowtag) :eq)
+    ;; We now have the correct answer for list-pointer-lowtag and
+    ;; instance-pointer-lowtag, but need to pick off the case for the
+    ;; other two pointer types.  KLUDGE: FUN-POINTER-LOWTAG and
+    ;; OTHER-POINTER-LOWTAG are both in the upper half of the lowtag
+    ;; space, while LIST-POINTER-LOWTAG and INSTANCE-POINTER-LOWTAG
+    ;; are in the lower half, so we distinguish with a bit test.
+    (inst tst :ne object 4)
 
-    DONE))
+    ;; We can't use both register and immediate offsets in the same
+    ;; load/store instruction, so we need to bias our register offset
+    ;; on big-endian systems.
+    (when (eq *backend-byte-order* :big-endian)
+      (inst sub :ne result (1- n-word-bytes)))
+
+    ;; And, finally, pick out the widetag from the header.
+    (inst ldrb :ne result (@ object (- result)))))
 
 
 (define-vop (fun-subtype)
