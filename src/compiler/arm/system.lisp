@@ -173,6 +173,37 @@
   (:generator 1
     (move int csp-tn)))
 
+;;;; Code object frobbing.
+
+(define-vop (code-instructions)
+  (:translate code-instructions)
+  (:policy :fast-safe)
+  (:args (code :scs (descriptor-reg)))
+  (:temporary (:scs (non-descriptor-reg)) ndescr)
+  (:results (sap :scs (sap-reg)))
+  (:result-types system-area-pointer)
+  (:generator 10
+    (loadw ndescr code 0 other-pointer-lowtag)
+    ;; CODE-HEADER-WIDETAG is #x38, which has the top two bits clear,
+    ;; so we don't to clear the low bits here.  If we do, use BIC.
+    (inst mov ndescr (lsr ndescr (- n-widetag-bits word-shift)))
+    (inst sub ndescr ndescr other-pointer-lowtag)
+    (inst add sap code ndescr)))
+
+(define-vop (compute-fun)
+  (:args (code :scs (descriptor-reg))
+         (offset :scs (signed-reg unsigned-reg)))
+  (:arg-types * positive-fixnum)
+  (:results (func :scs (descriptor-reg)))
+  (:temporary (:scs (non-descriptor-reg)) ndescr)
+  (:generator 10
+    (loadw ndescr code 0 other-pointer-lowtag)
+    ;; CODE-HEADER-WIDETAG is #x38, which has the top two bits clear,
+    ;; so we don't to clear the low bits here.  If we do, use BIC.
+    (inst add ndescr offset (lsr ndescr (- n-widetag-bits word-shift)))
+    (inst add ndescr ndescr (- fun-pointer-lowtag other-pointer-lowtag))
+    (inst add func code ndescr)))
+
 ;;;; other miscellaneous VOPs
 
 (define-vop (halt)
