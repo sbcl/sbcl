@@ -184,5 +184,19 @@
 
 ;;;; Instance hackery:
 
+(define-vop (instance-length)
+  (:policy :fast-safe)
+  (:translate %instance-length)
+  (:args (struct :scs (descriptor-reg)))
+  (:temporary (:scs (non-descriptor-reg)) temp)
+  (:results (res :scs (unsigned-reg)))
+  (:result-types positive-fixnum)
+  (:generator 4
+    (loadw temp struct 0 instance-pointer-lowtag)
+    (inst mov res (lsr temp n-widetag-bits))))
+
 (define-full-reffer instance-index-ref * instance-slots-offset
   instance-pointer-lowtag (descriptor-reg any-reg) * %instance-ref)
+
+(define-full-setter instance-index-set * instance-slots-offset
+  instance-pointer-lowtag (descriptor-reg any-reg null) * %instance-set)
