@@ -47,7 +47,7 @@
                (ash symbol-value-slot word-shift)
                (- other-pointer-lowtag)))))
 
-(defmacro load-type (target source &optional (offset 0))
+(defmacro load-type (target source &optional (offset 0) (predicate :al))
   "Loads the type bits of a pointer into target independent of
   byte-ordering issues."
   (once-only ((n-target target)
@@ -56,7 +56,7 @@
     (let ((target-offset (ecase *backend-byte-order*
                            (:little-endian n-offset)
                            (:big-endian `(+ ,n-offset (1- n-word-bytes))))))
-      `(inst ldrb ,n-target (@ ,n-source ,target-offset)))))
+      `(inst ldrb ,predicate ,n-target (@ ,n-source ,target-offset)))))
 
 ;;; Macros to handle the fact that we cannot use the machine native call and
 ;;; return instructions.
