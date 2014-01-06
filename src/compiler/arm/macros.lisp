@@ -53,11 +53,10 @@
   (once-only ((n-target target)
               (n-source source)
               (n-offset offset))
-    (ecase *backend-byte-order*
-      (:little-endian
-       `(inst ldrb ,n-target (@ ,n-source ,n-offset)))
-      (:big-endian
-       `(inst ldrb ,n-target (@ ,n-source (+ ,n-offset (1- n-word-bytes))))))))
+    (let ((target-offset (ecase *backend-byte-order*
+                           (:little-endian n-offset)
+                           (:big-endian `(+ ,n-offset (1- n-word-bytes))))))
+      `(inst ldrb ,n-target (@ ,n-source ,target-offset)))))
 
 ;;; Macros to handle the fact that we cannot use the machine native call and
 ;;; return instructions.
