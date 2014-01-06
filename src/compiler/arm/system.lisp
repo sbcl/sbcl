@@ -147,6 +147,32 @@
     (inst bic res ptr lowtag-mask)
     (inst mov res (lsr res 1))))
 
+;;;; Allocation
+
+(define-vop (dynamic-space-free-pointer)
+  (:results (int :scs (sap-reg)))
+  (:result-types system-area-pointer)
+  (:translate dynamic-space-free-pointer)
+  (:policy :fast-safe)
+  (:generator 1
+    (load-symbol-value int *allocation-pointer*)))
+
+(define-vop (binding-stack-pointer-sap)
+  (:results (int :scs (sap-reg)))
+  (:result-types system-area-pointer)
+  (:translate binding-stack-pointer-sap)
+  (:policy :fast-safe)
+  (:generator 1
+    (load-symbol-value int *binding-stack-pointer*)))
+
+(define-vop (control-stack-pointer-sap)
+  (:results (int :scs (sap-reg)))
+  (:result-types system-area-pointer)
+  (:translate control-stack-pointer-sap)
+  (:policy :fast-safe)
+  (:generator 1
+    (move int csp-tn)))
+
 ;;;; other miscellaneous VOPs
 
 (define-vop (halt)
