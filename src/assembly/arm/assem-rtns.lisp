@@ -203,7 +203,7 @@
                           (:arg count (any-reg descriptor-reg) nargs-offset)
                           (:temp ocfp non-descriptor-reg ocfp-offset)
                           (:temp lra descriptor-reg lexenv-offset)
-                          (:temp cur-uwp any-reg nfp-offset))
+                          (:temp cur-uwp any-reg nl2-offset))
   (declare (ignore start count))
 
   (let ((error (generate-error-code nil ocfp 'invalid-unwind-error)))
