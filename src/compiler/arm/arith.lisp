@@ -47,6 +47,7 @@
   (:note "inline (signed-byte 32) arithmetic"))
 
 
+#+(or) ;; FIXME: Sort out the :constant ranges for these
 (define-vop (fast-fixnum-binop-c fast-safe-arith-op)
   (:args (x :target r :scs (any-reg)))
   (:info y)
@@ -56,6 +57,7 @@
   (:result-types tagged-num)
   (:note "inline fixnum arithmetic"))
 
+#+(or)
 (define-vop (fast-unsigned-binop-c fast-safe-arith-op)
   (:args (x :target r :scs (unsigned-reg)))
   (:info y)
@@ -65,6 +67,7 @@
   (:result-types unsigned-num)
   (:note "inline (unsigned-byte 32) arithmetic"))
 
+#+(or)
 (define-vop (fast-signed-binop-c fast-safe-arith-op)
   (:args (x :target r :scs (signed-reg)))
   (:info y)
@@ -84,6 +87,7 @@
          ,(if arg-swap
               `(inst ,op r y x)
               `(inst ,op r x y))))
+     #+(or)
      ,@(unless arg-swap
          `((define-vop (,(symbolicate 'fast- translate '-c/fixnum=>fixnum)
                         fast-fixnum-binop-c)
@@ -97,6 +101,7 @@
          ,(if arg-swap
               `(inst ,op r y x)
               `(inst ,op r x y))))
+     #+(or)
      ,@(unless arg-swap
          `((define-vop (,(symbolicate 'fast- translate '-c/signed=>signed)
                         fast-signed-binop-c)
@@ -110,6 +115,7 @@
          ,(if arg-swap
               `(inst ,op r y x)
               `(inst ,op r x y))))
+     #+(or)
      ,@(unless arg-swap
          `((define-vop (,(symbolicate 'fast- translate '-c/unsigned=>unsigned)
                         fast-unsigned-binop-c)
