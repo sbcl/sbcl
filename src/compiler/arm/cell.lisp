@@ -212,3 +212,11 @@
 
 (define-full-setter instance-index-set * instance-slots-offset
   instance-pointer-lowtag (descriptor-reg any-reg null) * %instance-set)
+
+;;;; Code object frobbing.
+
+(define-full-reffer code-header-ref * 0 other-pointer-lowtag
+  (descriptor-reg any-reg) * code-header-ref)
+
+(define-full-setter code-header-set * 0 other-pointer-lowtag
+  (descriptor-reg any-reg null) * code-header-set)
