@@ -866,3 +866,59 @@
       segment 12 2
       #'three-instruction-maybe-shrink
       #'three-instruction-emitter))))
+
+;;; Load a register from a "nearby" LABEL by dead reckoning from the
+;;; location of the current instruction.
+(define-instruction load-from-label (segment &rest args)
+  (:vop-var vop)
+  (:emitter
+   (with-condition-defaulted (args (condition dest lip label))
+     ;; We can load the word addressed by a label in a single
+     ;; instruction if the overall offset puts it to within a 12-bit
+     ;; displacement.  Otherwise, we need to build an address by parts
+     ;; into LIP until we're down to a 12-bit displacement, and then
+     ;; apply the final 12 bits with LDR.  For now, we'll allow up to 20
+     ;; bits of displacement, as that should be easy to implement, and a
+     ;; megabyte large code object is already a bit unwieldly.  If
+     ;; neccessary, we can expand to a 28 bit displacement.
+     (labels ((compute-delta (position &optional magic-value)
+                (- (+ (label-position label
+                                      (when magic-value position)
+                                      magic-value)
+                      other-pointer-lowtag)
+                   ;; The 8 below is the displacement
+                   ;; from reading the program counter.
+                   (+ position 8)))
+
+              (load-chunk (segment delta dst src chunk)
+                (assemble (segment vop)
+                  (if (< delta 0)
+                      (inst sub condition dst src chunk)
+                      (inst add condition dst src chunk))))
+
+              (two-instruction-emitter (segment position)
+                (let* ((delta (compute-delta position))
+                       (absolute-delta (abs delta)))
+                  (assemble (segment vop)
+                    (load-chunk segment delta
+                                lip pc-tn (ldb (byte 8 12) absolute-delta))
+                    (inst ldr condition dest (@ lip (ldb (byte 12 0) delta))))))
+
+              (one-instruction-emitter (segment position)
+                (let* ((delta (compute-delta position)))
+                  (assemble (segment vop)
+                    (inst ldr condition dest (@ pc-tn delta)))))
+
+              (two-instruction-maybe-shrink (segment posn magic-value)
+                (let ((delta (compute-delta posn magic-value)))
+                  (when (<= (integer-length delta) 12)
+                    (emit-back-patch segment 4
+                                     #'one-instruction-emitter)
+                    t))))
+       (emit-chooser
+        ;; We need to emit up to two instructions, which is 8 octets,
+        ;; but might wish to emit only one.  This preserves a mere two
+        ;; bits of alignment.
+        segment 8 2
+        #'two-instruction-maybe-shrink
+        #'two-instruction-emitter)))))
