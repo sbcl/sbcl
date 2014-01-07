@@ -20,7 +20,7 @@
             ,@(if (eq style :none)
                   `((inst ldr pc-tn (@ ,fixup-address)))
                   `((inst ldr lr-tn (@ ,fixup-address))
-                    (inst bl lr-tn)))
+                    (inst blx lr-tn)))
             (assemble (*elsewhere* ,vop)
               (emit-label ,fixup-address)
               (inst word (make-fixup ',name :assembly-routine)))))
@@ -63,7 +63,7 @@
 (defun generate-return-sequence (style)
   (ecase style
     (:raw
-     `((inst b lr-tn)))
+     `((inst bx lr-tn)))
     #+(or)
     (:full-call
      `((lisp-return (make-random-tn :kind :normal
