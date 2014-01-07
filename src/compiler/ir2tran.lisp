@@ -167,18 +167,12 @@
     (ecase (global-var-kind leaf)
       ((:special :unknown)
        (aver (symbolp name))
-       #!+arm
-       (error "Don't know how to {FAST-,}SYMBOL-VALUE")
-       #!-arm
        (let ((name-tn (emit-constant name)))
          (if (or unsafe (always-boundp name))
              (vop fast-symbol-value node block name-tn res)
              (vop symbol-value node block name-tn res))))
       (:global
        (aver (symbolp name))
-       #!+arm
-       (error "Don't know how to {FAST-,}SYMBOL-GLOBAL-VALUE")
-       #!-arm
        (let ((name-tn (emit-constant name)))
          (if (or unsafe (always-boundp name))
              (vop fast-symbol-global-value node block name-tn res)
@@ -394,9 +388,6 @@
          ((:special)
           (vop set node block (emit-constant (leaf-source-name leaf)) val))
          ((:global)
-          #!+arm
-          (error "Don't know how to VOP %SET-SYMBOL-GLOBAL-VALUE")
-          #!-arm
           (vop %set-symbol-global-value node
                block (emit-constant (leaf-source-name leaf)) val)))))
     (when locs

@@ -39,6 +39,71 @@
 ;;;
 (define-vop (set cell-set)
   (:variant symbol-value-slot other-pointer-lowtag))
+
+;;; Do a cell ref with an error check for being unbound.
+;;;
+(define-vop (checked-cell-ref)
+  (:args (object :scs (descriptor-reg) :target obj-temp))
+  (:results (value :scs (descriptor-reg any-reg)))
+  (:policy :fast-safe)
+  (:vop-var vop)
+  (:save-p :compute-only)
+  (:temporary (:scs (non-descriptor-reg) :offset ocfp-offset) err-temp)
+  (:temporary (:scs (descriptor-reg) :from (:argument 0)) obj-temp))
+
+;;; With Symbol-Value, we check that the value isn't the trap object.  So
+;;; Symbol-Value of NIL is NIL.
+;;;
+(define-vop (symbol-value checked-cell-ref)
+  (:translate symbol-value)
+  (:generator 9
+    (move obj-temp object)
+    (loadw value obj-temp symbol-value-slot other-pointer-lowtag)
+    (let ((err-lab (generate-error-code vop err-temp 'unbound-symbol-error obj-temp)))
+      (inst cmp value unbound-marker-widetag)
+      (inst b :eq err-lab))))
+
+;;; Like CHECKED-CELL-REF, only we are a predicate to see if the cell is bound.
+(define-vop (boundp-frob)
+  (:args (object :scs (descriptor-reg)))
+  (:conditional)
+  (:info target not-p)
+  (:policy :fast-safe)
+  (:temporary (:scs (descriptor-reg)) value))
+
+(define-vop (boundp boundp-frob)
+  (:translate boundp)
+  (:generator 9
+    (loadw value object symbol-value-slot other-pointer-lowtag)
+    (inst cmp value unbound-marker-widetag)
+    (inst b (if not-p :eq :ne) target)))
+
+(define-vop (fast-symbol-value cell-ref)
+  (:variant symbol-value-slot other-pointer-lowtag)
+  (:policy :fast)
+  (:translate symbol-value))
+
+(define-vop (symbol-hash)
+  (:policy :fast-safe)
+  (:translate symbol-hash)
+  (:args (symbol :scs (descriptor-reg)))
+  (:temporary (:scs (non-descriptor-reg)) temp)
+  (:results (res :scs (any-reg)))
+  (:result-types positive-fixnum)
+  (:generator 2
+    ;; The symbol-hash slot of NIL holds NIL because it is also the
+    ;; cdr slot, so we have to strip off the two low bits to make sure
+    ;; it is a fixnum.  The lowtag selection magic that is required to
+    ;; ensure this is explained in the comment in objdef.lisp
+    (loadw temp symbol symbol-hash-slot other-pointer-lowtag)
+    (inst bic res temp (1- n-fixnum-tag-bits))))
+
+;;; On unithreaded builds these are just copies of the non-global versions.
+(define-vop (%set-symbol-global-value set))
+(define-vop (symbol-global-value symbol-value)
+  (:translate symbol-global-value))
+(define-vop (fast-symbol-global-value fast-symbol-value)
+  (:translate symbol-global-value))
 
 ;;;; Fdefinition (fdefn) objects.
 
