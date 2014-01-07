@@ -49,7 +49,7 @@
          (out-contrib (subpathname sbcl-pwd "obj/sbcl-home/contrib/"))
          (cache-module (subpathname sbcl-pwd (format nil "obj/asdf-cache/~a/" name)))
          (system (find-system name))
-         (system.fasl (output-file 'fasl-op system))
+         (system.fasl (output-file 'compile-bundle-op system))
          (module.fasl (subpathname out-contrib (strcat name ".fasl")))
          (module-setup.lisp (subpathname cache-module "module-setup.lisp"))
            (module-setup.fasl (subpathname cache-module "module-setup.fasl"))
@@ -61,7 +61,7 @@
                        :direction :output :if-exists :rename-and-delete)
       (format o "(provide :~A)~%~{(require ~(~S~))~%~}" name dependencies))
     (compile-file module-setup.lisp :output-file module-setup.fasl)
-    (operate 'fasl-op system)
+    (operate 'compile-bundle-op system)
     (concatenate-files input-fasls module.fasl)))
 
 (defun test-asdf-contrib (system)

@@ -1,8 +1,14 @@
 DEST=$(SBCL_PWD)/obj/sbcl-home/contrib/
-FASL=$(DEST)/asdf.fasl
+ASDF_FASL=$(DEST)/asdf.fasl
+UIOP_FASL=$(DEST)/uiop.fasl
+FASL=$(UIOP_FASL) $(ASDF_FASL)
 
-fasl:: $(FASL)
-$(FASL):: asdf.lisp ../../output/sbcl.core
+fasl:: $(UIOP_FASL) $(ASDF_FASL)
+$(UIOP_FASL):: uiop.lisp ../../output/sbcl.core
+	mkdir -p $(DEST)
+	$(SBCL) --eval '(compile-file #p"SYS:CONTRIB;ASDF;UIOP.LISP" :output-file (parse-native-namestring "$@"))' </dev/null
+
+$(ASDF_FASL):: asdf.lisp ../../output/sbcl.core
 	if [ -d asdf-upstream ] ; then rm -rf asdf-upstream ; fi
 	mkdir -p $(DEST)
 	$(SBCL) --eval '(compile-file #p"SYS:CONTRIB;ASDF;ASDF.LISP" :output-file (parse-native-namestring "$@"))' </dev/null
@@ -16,6 +22,5 @@ test:: $(FASL)
 UPSTREAM=../../obj/asdf-upstream
 up::
 	sh pull-asdf.sh
-	ln -f $(UPSTREAM)/build/asdf.lisp asdf.lisp
 	ln -f $(UPSTREAM)/doc/asdf.texinfo asdf.texinfo
 	ln -f $(UPSTREAM)/README README
