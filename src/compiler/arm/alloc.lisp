@@ -13,6 +13,24 @@
 
 ;;;; Special purpose inline allocators.
 
+(define-vop (make-fdefn)
+  (:args (name :scs (descriptor-reg) :to :eval))
+  (:temporary (:scs (non-descriptor-reg)) temp)
+  (:temporary (:sc non-descriptor-reg :offset ocfp-offset) pa-flag)
+  (:results (result :scs (descriptor-reg) :from :argument))
+  (:policy :fast-safe)
+  (:translate make-fdefn)
+  (:generator 37
+    (let ((undefined-tramp-fixup (gen-label)))
+      (with-fixed-allocation (result pa-flag fdefn-widetag fdefn-size)
+        (inst ldr temp (@ undefined-tramp-fixup))
+        (storew name result fdefn-name-slot other-pointer-lowtag)
+        (storew null-tn result fdefn-fun-slot other-pointer-lowtag)
+        (storew temp result fdefn-raw-addr-slot other-pointer-lowtag))
+      (assemble (*elsewhere*)
+        (emit-label undefined-tramp-fixup)
+        (inst word (make-fixup "undefined_tramp" :foreign))))))
+
 (define-vop (make-closure)
   (:args (function :to :save :scs (descriptor-reg)))
   (:info length stack-allocate-p)
