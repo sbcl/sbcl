@@ -164,3 +164,10 @@
   (def-small-data-vector-frobs simple-bit-vector 1)
   (def-small-data-vector-frobs simple-array-unsigned-byte-2 2)
   (def-small-data-vector-frobs simple-array-unsigned-byte-4 4))
+
+;;; These vops are useful for accessing the bits of a vector irrespective of
+;;; what type of vector it is.
+(define-full-reffer vector-raw-bits * vector-data-offset other-pointer-lowtag
+  (unsigned-reg) unsigned-num %vector-raw-bits)
+(define-full-setter set-vector-raw-bits * vector-data-offset other-pointer-lowtag
+  (unsigned-reg) unsigned-num %set-vector-raw-bits)
