@@ -11,5 +11,27 @@
 ;;;; files for more information.
 
 (in-package "SB!VM")
+
+(define-assembly-routine (allocate-vector
+                          (:policy :fast-safe)
+                          (:translate allocate-vector)
+                          (:arg-types positive-fixnum
+                                      positive-fixnum
+                                      positive-fixnum))
+    ((:arg type any-reg r0-offset)
+     (:arg length any-reg r1-offset)
+     (:arg words any-reg r2-offset)
+     (:res result descriptor-reg r0-offset)
 
-;;; Dummy placeholder file.
+     (:temp ndescr non-descriptor-reg nl2-offset)
+     (:temp pa-flag non-descriptor-reg ocfp-offset)
+     (:temp vector descriptor-reg r8-offset))
+  (pseudo-atomic (pa-flag)
+    ;; boxed words == unboxed bytes
+    (inst add ndescr words (* (1+ vector-data-offset) n-word-bytes))
+    (inst bic ndescr ndescr (1- n-lowtag-bits))
+    (allocation vector ndescr other-pointer-lowtag :flag-tn pa-flag)
+    (inst mov ndescr (lsr type word-shift))
+    (storew ndescr vector 0 other-pointer-lowtag)
+    (storew length vector vector-length-slot other-pointer-lowtag))
+  (move result vector))
