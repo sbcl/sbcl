@@ -140,7 +140,7 @@
       (load-type type function (- fun-pointer-lowtag))
       (inst cmp type simple-fun-header-widetag)
       (inst mov :eq lip function)
-      (inst ldr :ne lip (@ closure-tramp-fixup))
+      (inst load-from-label :ne lip lip closure-tramp-fixup)
       (storew lip fdefn fdefn-raw-addr-slot other-pointer-lowtag)
       (storew function fdefn fdefn-fun-slot other-pointer-lowtag)
       (move result function))))
@@ -150,6 +150,7 @@
   (:translate fdefn-makunbound)
   (:args (fdefn :scs (descriptor-reg) :target result))
   (:temporary (:scs (non-descriptor-reg)) temp)
+  (:temporary (:scs (interior-reg)) lip)
   (:results (result :scs (descriptor-reg)))
   (:generator 38
     (let ((undefined-tramp-fixup (gen-label)))
@@ -157,7 +158,7 @@
         (emit-label undefined-tramp-fixup)
         (inst word (make-fixup "undefined_tramp" :foreign)))
       (storew null-tn fdefn fdefn-fun-slot other-pointer-lowtag)
-      (inst ldr temp (@ undefined-tramp-fixup))
+      (inst load-from-label temp lip undefined-tramp-fixup)
       (storew temp fdefn fdefn-raw-addr-slot other-pointer-lowtag)
       (move result fdefn))))
 

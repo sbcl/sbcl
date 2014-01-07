@@ -1000,6 +1000,7 @@
   (:temporary (:sc any-reg :offset nl2-offset :from (:argument 0)) args)
   (:temporary (:sc any-reg :offset lexenv-offset :from (:argument 1)) lexenv)
   (:temporary (:sc any-reg) temp)
+  (:temporary (:sc interior-reg) lip)
   (:ignore old-fp-arg lra-arg)
   (:vop-var vop)
   (:generator 75
@@ -1014,7 +1015,7 @@
       (assemble (*elsewhere*)
         (emit-label fixup-lab)
         (inst word (make-fixup 'tail-call-variable :assembly-routine)))
-      (inst ldr pc-tn (@ fixup-lab)))))
+      (inst load-from-label pc-tn lip fixup-lab))))
 
 ;;;; Unknown values return:
 

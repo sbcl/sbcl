@@ -23,6 +23,7 @@
                    :from (:argument 0) :to (:result 0)) cfunc)
   (:temporary (:sc control-stack :offset nfp-save-offset) nfp-save)
   (:temporary (:scs (non-descriptor-reg)) temp)
+  (:temporary (:sc interior-reg) lip)
   (:vop-var vop)
   (:generator 0
     (let ((call-into-c-fixup (gen-label))
@@ -32,7 +33,7 @@
         (inst word (make-fixup "call_into_c" :foreign)))
       (when cur-nfp
         (store-stack-tn nfp-save cur-nfp))
-      (inst ldr temp (@ call-into-c-fixup))
+      (inst load-from-label temp lip call-into-c-fixup)
       (move cfunc function)
       (inst blx temp)
       (when cur-nfp

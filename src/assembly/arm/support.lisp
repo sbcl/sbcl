@@ -18,8 +18,8 @@
        (values
         `((let ((,fixup-address (gen-label)))
             ,@(if (eq style :none)
-                  `((inst ldr pc-tn (@ ,fixup-address)))
-                  `((inst ldr lr-tn (@ ,fixup-address))
+                  `((inst load-from-label pc-tn lr-tn ,fixup-address))
+                  `((inst load-from-label lr-tn lr-tn ,fixup-address)
                     (inst blx lr-tn)))
             (assemble (*elsewhere* ,vop)
               (emit-label ,fixup-address)

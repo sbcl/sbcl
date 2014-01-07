@@ -22,6 +22,7 @@
   (:temporary (:scs (non-descriptor-reg)) temp)
   (:temporary (:sc non-descriptor-reg :offset nargs-offset) nargs)
   (:temporary (:sc control-stack :offset nfp-save-offset) nfp-save)
+  (:temporary (:sc interior-reg) lip)
   (:vop-var vop)
   (:generator 100
     (let ((call-into-c-fixup (gen-label))
@@ -35,8 +36,8 @@
       (when cur-nfp
         (store-stack-tn nfp-save cur-nfp))
       (move ocfp object)
-      (inst ldr temp (@ call-into-c-fixup))
-      (inst ldr cfunc (@ debug-print-fixup))
+      (inst load-from-label temp lip call-into-c-fixup)
+      (inst load-from-label cfunc lip debug-print-fixup)
       (inst blx temp)
       (when cur-nfp
         (load-stack-tn cur-nfp nfp-save))
