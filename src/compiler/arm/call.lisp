@@ -647,6 +647,47 @@
       (when cur-nfp
         (load-stack-tn cur-nfp nfp-save)))
     (trace-table-entry trace-table-normal)))
+
+
+;;; Non-TR local call for a variable number of return values passed according
+;;; to the unknown values convention.  The results are the start of the values
+;;; glob and the number of values received.
+;;;
+;;; Note: we can't use normal load-tn allocation for the fixed args, since all
+;;; registers may be tied up by the more operand.  Instead, we use
+;;; MAYBE-LOAD-STACK-TN.
+(define-vop (multiple-call-local unknown-values-receiver)
+  (:args (fp)
+         (nfp)
+         (args :more t))
+  (:save-p t)
+  (:move-args :local-call)
+  (:info save callee target)
+  (:ignore args save)
+  (:vop-var vop)
+  (:temporary (:sc control-stack :offset nfp-save-offset) nfp-save)
+  (:temporary (:scs (non-descriptor-reg)) temp)
+  (:temporary (:scs (interior-reg)) lip)
+  (:generator 20
+    (trace-table-entry trace-table-call-site)
+    (let ((label (gen-label))
+          (cur-nfp (current-nfp-tn vop)))
+      (when cur-nfp
+        (store-stack-tn nfp-save cur-nfp))
+      (let ((callee-nfp (callee-nfp-tn callee)))
+        ;; alpha doesn't test this before the maybe-load
+        (when callee-nfp
+          (maybe-load-stack-tn callee-nfp nfp)))
+      (maybe-load-stack-tn cfp-tn fp)
+      (inst compute-lra lip lip label)
+      (note-this-location vop :call-site)
+      (inst b target)
+      (emit-return-pc label)
+      (note-this-location vop :unknown-return)
+      (receive-unknown-values values-start nvals start count label temp lip)
+      (when cur-nfp
+        (load-stack-tn cur-nfp nfp-save)))
+    (trace-table-entry trace-table-normal)))
 
 ;;;; Local call with known values return:
 

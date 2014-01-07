@@ -980,9 +980,6 @@
           (env (physenv-info (lambda-physenv fun)))
           (temp-refs (reference-tn-list temps nil)))
       (if (and 2lvar (eq (ir2-lvar-kind 2lvar) :unknown))
-          #!+arm
-          (error "Don't know how to MULTIPLE-CALL-LOCAL")
-          #!-arm
           (vop* multiple-call-local node block (fp nfp temp-refs)
                 ((reference-tn-list (ir2-lvar-locs 2lvar) t))
                 arg-locs env start)
