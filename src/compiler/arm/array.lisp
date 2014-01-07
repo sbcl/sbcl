@@ -12,6 +12,34 @@
 (in-package "SB!VM")
 
 
+;;;; Allocator for the array header.
+
+(define-vop (make-array-header)
+  (:translate make-array-header)
+  (:policy :fast-safe)
+  (:args (type :scs (any-reg))
+         (rank :scs (any-reg)))
+  (:arg-types tagged-num tagged-num)
+  (:temporary (:scs (descriptor-reg) :to (:result 0) :target result) header)
+  (:temporary (:sc non-descriptor-reg :offset ocfp-offset) pa-flag)
+  (:temporary (:scs (non-descriptor-reg)) ndescr)
+  (:results (result :scs (descriptor-reg)))
+  (:generator 0
+    ;; Compute the allocation size.
+    (inst add ndescr rank (+ (* (1+ array-dimensions-offset) n-word-bytes)
+                             lowtag-mask))
+    (inst bic ndescr ndescr (1- n-lowtag-bits))
+    (pseudo-atomic (pa-flag)
+      (allocation header ndescr other-pointer-lowtag :flag-tn pa-flag)
+      ;; Now that we have the space allocated, compute the header
+      ;; value.
+      (inst add ndescr rank (fixnumize (1- array-dimensions-offset)))
+      (inst mov ndescr (lsl ndescr (- n-widetag-bits n-fixnum-tag-bits)))
+      (inst orr ndescr ndescr (lsr type n-fixnum-tag-bits))
+      ;; And store the header value.
+      (storew ndescr header 0 other-pointer-lowtag))
+    (move result header)))
+
 ;;;; Accessors/Setters
 
 ;;; Variants built on top of word-index-ref, etc.  I.e. those vectors whos
