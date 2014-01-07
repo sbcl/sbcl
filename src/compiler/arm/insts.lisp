@@ -814,23 +814,37 @@
                  ;; from reading the program counter.
                  (+ position 8)))
 
+            (load-chunk (segment delta dst src chunk)
+              (assemble (segment vop)
+                (if (< delta 0)
+                    (inst sub dst src chunk)
+                    (inst add dst src chunk))))
+
             (three-instruction-emitter (segment position)
-              (let ((delta (compute-delta position)))
-                (assemble (segment vop)
-                  (inst add lip pc-tn (ldb (byte 8 16) delta))
-                  (inst add lip lip (ldb (byte 8 8) delta))
-                  (inst add dest lip (ldb (byte 8 0) delta)))))
+              (let* ((delta (compute-delta position))
+                     (absolute-delta (abs delta)))
+                (load-chunk segment delta
+                            lip pc-tn (ldb (byte 8 16) absolute-delta))
+                (load-chunk segment delta
+                            lip lip (ldb (byte 8 8) absolute-delta))
+                (load-chunk segment delta
+                            dest lip (ldb (byte 8 0) absolute-delta))))
 
             (two-instruction-emitter (segment position)
-              (let ((delta (compute-delta position)))
+              (let* ((delta (compute-delta position))
+                     (absolute-delta (abs delta)))
                 (assemble (segment vop)
-                  (inst add lip pc-tn (ldb (byte 8 8) delta))
-                  (inst add dest lip (ldb (byte 8 0) delta)))))
+                  (load-chunk segment delta
+                              lip pc-tn (ldb (byte 8 8) absolute-delta))
+                  (load-chunk segment delta
+                              dest lip (ldb (byte 8 0) absolute-delta)))))
 
             (one-instruction-emitter (segment position)
-              (let ((delta (compute-delta position)))
+              (let* ((delta (compute-delta position))
+                     (absolute-delta (abs delta)))
                 (assemble (segment vop)
-                  (inst add dest pc-tn delta))))
+                  (load-chunk segment delta
+                              dest pc-tn absolute-delta))))
 
             (two-instruction-maybe-shrink (segment posn magic-value)
               (let ((delta (compute-delta posn magic-value)))
