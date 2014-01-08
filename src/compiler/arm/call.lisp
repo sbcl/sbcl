@@ -102,6 +102,13 @@
 
 ;;;; Frame hackery:
 
+;;; Return the number of bytes needed for the current non-descriptor
+;;; stack frame.  What's this "PMAX" that almost every other backend
+;;; mentions, and why does it need 8-byte granularity?
+(defun bytes-needed-for-non-descriptor-stack-frame ()
+  (* (sb-allocated-size 'non-descriptor-stack)
+     n-word-bytes))
+
 ;;; Used for setting up the Old-FP in local call.
 (define-vop (current-fp)
   (:results (val :scs (any-reg)))
@@ -148,7 +155,10 @@
             (* n-word-bytes (sb-allocated-size 'control-stack)))
       (let ((nfp-tn (current-nfp-tn vop)))
         (when nfp-tn
-          (error "Don't know how to allocate number stack space"))))
+          (let* ((nbytes (bytes-needed-for-non-descriptor-stack-frame)))
+            (load-symbol-value nfp-tn *number-stack-pointer*)
+            (inst sub nfp-tn nfp-tn nbytes)
+            (store-symbol-value nfp-tn *number-stack-pointer*)))))
     (trace-table-entry trace-table-normal)))
 
 (define-vop (allocate-frame)
@@ -162,12 +172,10 @@
     (inst add csp-tn csp-tn (* (max 1 (sb-allocated-size 'control-stack))
                                n-word-bytes))
     (when (ir2-physenv-number-stack-p callee)
-      (error "Don't know how to allocate number stack space")
-      #!+(or)
       (let* ((nbytes (bytes-needed-for-non-descriptor-stack-frame)))
-        (when (> nbytes number-stack-displacement)
-          (inst stwu nsp-tn nsp-tn (- (bytes-needed-for-non-descriptor-stack-frame)))
-          (inst addi nfp nsp-tn number-stack-displacement))))
+        (load-symbol-value nfp *number-stack-pointer*)
+        (inst sub nfp nfp nbytes)
+        (store-symbol-value nfp *number-stack-pointer*)))
     (trace-table-entry trace-table-normal)))
 
 ;;; Allocate a partial frame for passing stack arguments in a full call.  Nargs
@@ -452,7 +460,10 @@
         ;; number stack frame.
         (let ((nfp-tn (current-nfp-tn vop)))
           (when nfp-tn
-            (error "Don't know how to allocate number stack space")))))))
+            (load-symbol-value nfp-tn *number-stack-pointer*)
+            (inst sub nfp-tn nfp-tn
+                  (bytes-needed-for-non-descriptor-stack-frame))
+            (store-symbol-value nfp-tn *number-stack-pointer*)))))))
 
 ;;; More args are stored consecutively on the stack, starting
 ;;; immediately at the context pointer.  The context pointer is not
@@ -754,11 +765,8 @@
     (move csp-tn cfp-tn)
     (let ((cur-nfp (current-nfp-tn vop)))
       (when cur-nfp
-        (error "Don't know how to release number stack allocation")
-        #!+(or)
-        (inst addi nsp-tn cur-nfp
-              (- (bytes-needed-for-non-descriptor-stack-frame)
-                 number-stack-displacement))))
+        (inst add cur-nfp cur-nfp (bytes-needed-for-non-descriptor-stack-frame))
+        (store-symbol-value cur-nfp *number-stack-pointer*)))
     (move cfp-tn old-fp-temp)
     (lisp-return return-pc-temp :known)
     (trace-table-entry trace-table-normal)))
@@ -1010,7 +1018,8 @@
     ;; Clear the number stack if anything is there.
     (let ((cur-nfp (current-nfp-tn vop)))
       (when cur-nfp
-        (error "Don't know how to clear number stack space in TAIL-CALL-VARIABLE")))
+        (inst add cur-nfp cur-nfp (bytes-needed-for-non-descriptor-stack-frame))
+        (store-symbol-value cur-nfp *number-stack-pointer*)))
     (let ((fixup-lab (gen-label)))
       (assemble (*elsewhere*)
         (emit-label fixup-lab)
@@ -1031,7 +1040,8 @@
     ;; Clear the number stack.
     (let ((cur-nfp (current-nfp-tn vop)))
       (when cur-nfp
-        (error "Don't know how to clear number stack space in RETURN-SINGLE")))
+        (inst add cur-nfp cur-nfp (bytes-needed-for-non-descriptor-stack-frame))
+        (store-symbol-value cur-nfp *number-stack-pointer*)))
     ;; Clear the control stack, and restore the frame pointer.
     (move csp-tn cfp-tn)
     (move cfp-tn old-fp)
@@ -1071,7 +1081,9 @@
     ;; Clear the number stack.
     (let ((cur-nfp (current-nfp-tn vop)))
       (when cur-nfp
-        (error "Don't know how to clear number stack in VOP RETURN")))
+        (inst add cur-nfp cur-nfp
+              (bytes-needed-for-non-descriptor-stack-frame))
+        (store-symbol-value cur-nfp *number-stack-pointer*)))
     (cond ((= nvals 1)
            ;; Clear the control stack, and restore the frame pointer.
            (move csp-tn cfp-tn)
@@ -1117,11 +1129,9 @@
     ;; Clear the number stack.
     (let ((cur-nfp (current-nfp-tn vop)))
       (when cur-nfp
-        (error "Don't know how to clear number stack.")
-        #!+(or)
-        (inst addi nsp-tn cur-nfp
-              (- (bytes-needed-for-non-descriptor-stack-frame)
-                 number-stack-displacement))))
+        (inst add cur-nfp cur-nfp
+              (bytes-needed-for-non-descriptor-stack-frame))
+        (store-symbol-value cur-nfp *number-stack-pointer*)))
 
     ;; Check for the single case.
     (inst cmp nvals-arg (fixnumize 1))
