@@ -87,11 +87,12 @@
   (:args)
   (:arg-types (:constant simple-string))
   (:info foreign-symbol)
+  (:temporary (:sc interior-reg) lip)
   (:results (res :scs (sap-reg)))
   (:result-types system-area-pointer)
   (:generator 2
     (let ((fixup-label (gen-label)))
-      (inst load-from-label res fixup-label)
+      (inst load-from-label res lip fixup-label)
       (assemble (*elsewhere*)
         (emit-label fixup-label)
         (inst word (make-fixup foreign-symbol :foreign))))))
