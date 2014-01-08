@@ -128,12 +128,12 @@
   (:result-types system-area-pointer)
   (:results (result :scs (sap-reg any-reg)))
   (:generator 0
-    (load-symbol-value result number-stack-pointer)
+    (load-symbol-value result *number-stack-pointer*)
     (unless (zerop amount)
       (let ((delta (logandc2 (+ amount (1- +number-stack-allocation-granularity+))
                              (1- +number-stack-allocation-granularity+))))
         (inst sub result result delta)
-        (store-symbol-value result number-stack-pointer)))))
+        (store-symbol-value result *number-stack-pointer*)))))
 
 (define-vop (dealloc-number-stack-space)
   (:info amount)
@@ -143,6 +143,6 @@
     (unless (zerop amount)
       (let ((delta (logandc2 (+ amount (1- +number-stack-allocation-granularity+))
                              (1- +number-stack-allocation-granularity+))))
-        (load-symbol-value temp number-stack-pointer)
+        (load-symbol-value temp *number-stack-pointer*)
         (inst add temp temp delta)
-        (store-symbol-value temp number-stack-pointer)))))
+        (store-symbol-value temp *number-stack-pointer*)))))
