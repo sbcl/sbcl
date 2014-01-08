@@ -37,9 +37,6 @@
  ;;; miscellaneous
  ("src/code/cross-early" :not-target)
 
- ;; This is our arm bootstrapping hack.
- #!+arm ("src/arm-bootstrap" :not-host :arm-bootstrap :trace-file)
-
  ;; This comes early because it's useful for debugging everywhere.
  ("src/code/show")
 
@@ -777,6 +774,9 @@
  ("src/code/sxhash") ; needs SB!XC:DEFINE-MODIFY-MACRO
  ("src/code/signal")
  ("src/code/late-defbangmethod")
+
+ ;; This is our arm bootstrapping hack.
+ #!+arm ("src/arm-bootstrap" :not-host :arm-bootstrap :trace-file)
 
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
  ;; PCL-related stuff, which shouldn't need to be done earlier than
