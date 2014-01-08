@@ -64,9 +64,14 @@ ldso_stub__~A: ;                                \\
 #include \"sbcl.h\""
 
 #!+arm "
-/* KLUDGE: This is a dummy placeholder to get us through make-host-1.
- * It needs to be replaced once we're at the point of trying to get
- * make-target-1 to complete.  -- AJB, 2012-10-01 */"
+#define LDSO_STUBIFY(fct)               \\
+  .align                              ; \\
+  .global ldso_stub__ ## fct          ; \\
+  .type ldso_stub__ ## fct, %function ; \\
+ldso_stub__ ## fct:                   ; \\
+  ldr r8, =fct                        ; \\
+  bx r8                               ; \\
+  .size ldso_stub__ ## fct, .-ldso_stub__ ## fct"
 
 #!+sparc "
 #ifdef LISP_FEATURE_SPARC

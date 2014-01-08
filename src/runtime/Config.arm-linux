@@ -13,7 +13,7 @@ CFLAGS = -g
 #LINKFLAGS += -v -rdynamic -m32
 NM = ./linux-nm
 
-ASSEM_SRC = arm-assem.S # ldso-stubs.S
+ASSEM_SRC = arm-assem.S ldso-stubs.S
 ARCH_SRC = arm-arch.c
 
 OS_SRC = linux-os.c arm-linux-os.c
