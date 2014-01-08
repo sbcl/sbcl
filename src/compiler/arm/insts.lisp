@@ -882,10 +882,9 @@
      ;; megabyte large code object is already a bit unwieldly.  If
      ;; neccessary, we can expand to a 28 bit displacement.
      (labels ((compute-delta (position &optional magic-value)
-                (- (+ (label-position label
-                                      (when magic-value position)
-                                      magic-value)
-                      other-pointer-lowtag)
+                (- (label-position label
+                                   (when magic-value position)
+                                   magic-value)
                    ;; The 8 below is the displacement
                    ;; from reading the program counter.
                    (+ position 8)))
