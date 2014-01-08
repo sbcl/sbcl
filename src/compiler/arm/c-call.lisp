@@ -13,6 +13,21 @@
 
 (defconstant +number-stack-allocation-granularity+ n-word-bytes)
 
+(define-vop (foreign-symbol-sap)
+  (:translate foreign-symbol-sap)
+  (:policy :fast-safe)
+  (:args)
+  (:arg-types (:constant simple-string))
+  (:info foreign-symbol)
+  (:results (res :scs (sap-reg)))
+  (:result-types system-area-pointer)
+  (:generator 2
+    (let ((fixup-label (gen-label)))
+      (inst load-from-label res fixup-label)
+      (assemble (*elsewhere*)
+        (emit-label fixup-label)
+        (inst word (make-fixup foreign-symbol :foreign))))))
+
 (define-vop (call-out)
   (:args (function :scs (sap-reg) :target cfunc)
          (args :more t))
