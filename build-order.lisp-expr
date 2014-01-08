@@ -38,13 +38,13 @@
  ("src/code/cross-early" :not-target)
 
  ;; This comes early because it's useful for debugging everywhere.
- ("src/code/show")
+ ("src/code/show" :arm-bootstrap)
 
  ;; This comes as early as possible, so that we catch the source locations
  ;; for everything.
- ("src/code/early-source-location")
+ ("src/code/early-source-location" :arm-bootstrap)
 
- ("src/code/early-constants")
+ ("src/code/early-constants" :arm-bootstrap)
 
  ;; This comes early because the cross-compilation host's backquote
  ;; logic can expand into something which can't be executed on the
@@ -53,12 +53,12 @@
  ;; logic with our own as early as possible, we minimize the chance of
  ;; any forms referring to cross-compilation host internal functions
  ;; leaking into target SBCL code.
- ("src/code/backq")
+ ("src/code/backq" :arm-bootstrap)
 
  ;; It's difficult to be too early with a DECLAIM SPECIAL (or DEFVAR
  ;; or whatever) thanks to the sullenly-do-the-wrong-thing semantics
  ;; of CL special binding when the variable is undeclared.
- ("src/code/globals" :not-host)
+ ("src/code/globals" :not-host :arm-bootstrap)
 
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
  ;; various DEFSETFs and/or other DEFMACROish things, defined as early as
@@ -71,9 +71,9 @@
  ;; use. It might be pretty tedious, though, working through any
  ;; transforms and translators and optimizers and so forth to make sure
  ;; that they can handle the change. -- WHN 19990919
- ("src/code/defsetfs")
+ ("src/code/defsetfs" :arm-bootstrap)
 
- ("src/code/cold-init-helper-macros")
+ ("src/code/cold-init-helper-macros" :arm-bootstrap)
 
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
  ;;; cross-compiler-only replacements for stuff which in target Lisp would be
@@ -93,89 +93,89 @@
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
  ;;; stuff needed early both in cross-compilation host and in target Lisp
 
- ("src/code/uncross")
- ("src/code/primordial-type")
- ("src/code/early-defbangmethod")
+ ("src/code/uncross" :arm-bootstrap)
+ ("src/code/primordial-type" :arm-bootstrap)
+ ("src/code/early-defbangmethod" :arm-bootstrap)
 
- ("src/code/defbangtype")
- ("src/code/defbangmacro")
- ("src/code/defbangconstant")
+ ("src/code/defbangtype" :arm-bootstrap)
+ ("src/code/defbangmacro" :arm-bootstrap)
+ ("src/code/defbangconstant" :arm-bootstrap)
 
- ("src/code/primordial-extensions")
+ ("src/code/primordial-extensions" :arm-bootstrap)
 
  ;; comes early so that stuff can reason about function names
- ("src/code/function-names")
+ ("src/code/function-names" :arm-bootstrap)
 
  ;; for various constants e.g. SB!XC:MOST-POSITIVE-FIXNUM and
  ;; SB!VM:N-LOWTAG-BITS, needed by "early-objdef" and others
- ("src/compiler/generic/parms")
- ("src/compiler/target/parms")
- ("src/compiler/generic/early-vm")
- ("src/compiler/generic/early-objdef")
- ("src/code/early-array") ; needs "early-vm" numbers
+ ("src/compiler/generic/parms" :arm-bootstrap)
+ ("src/compiler/target/parms" :arm-bootstrap)
+ ("src/compiler/generic/early-vm" :arm-bootstrap)
+ ("src/compiler/generic/early-objdef" :arm-bootstrap)
+ ("src/code/early-array" :arm-bootstrap) ; needs "early-vm" numbers
 
- ("src/code/early-extensions") ; on host for COLLECT, SYMBOLICATE, etc.
- ("src/code/parse-body")       ; on host for PARSE-BODY
- ("src/code/parse-defmacro")   ; on host for PARSE-DEFMACRO
- ("src/compiler/deftype")      ; on host for SB!XC:DEFTYPE
- ("src/compiler/defconstant")
- ("src/code/early-alieneval")  ; for funs and vars needed at build and run time
+ ("src/code/early-extensions" :arm-bootstrap) ; on host for COLLECT, SYMBOLICATE, etc.
+ ("src/code/parse-body" :arm-bootstrap)       ; on host for PARSE-BODY
+ ("src/code/parse-defmacro" :arm-bootstrap)   ; on host for PARSE-DEFMACRO
+ ("src/compiler/deftype" :arm-bootstrap)      ; on host for SB!XC:DEFTYPE
+ ("src/compiler/defconstant" :arm-bootstrap)
+ ("src/code/early-alieneval" :arm-bootstrap)  ; for funs and vars needed at build and run time
 
- ("src/code/specializable-array")
+ ("src/code/specializable-array" :arm-bootstrap)
 
- ("src/code/early-cl")
- ("src/code/early-fasl")
+ ("src/code/early-cl" :arm-bootstrap)
+ ("src/code/early-fasl" :arm-bootstrap)
 
  ;; mostly needed by stuff from comcom, but also used by "x86-vm"
- ("src/code/debug-var-io")
+ ("src/code/debug-var-io" :arm-bootstrap)
 
- ("src/code/early-thread")
+ ("src/code/early-thread" :arm-bootstrap)
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
  ;;; basic machinery for the target Lisp. Note that although most of these
  ;;; files are flagged :NOT-HOST, a few might not be.
 
- ("src/code/target-defbangmethod" :not-host)
+ ("src/code/target-defbangmethod" :not-host :arm-bootstrap)
 
- ("src/code/early-print" :not-host)
- ("src/code/early-pprint" :not-host)
- ("src/code/early-impl" :not-host)
+ ("src/code/early-print" :not-host :arm-bootstrap)
+ ("src/code/early-pprint" :not-host :arm-bootstrap)
+ ("src/code/early-impl" :not-host :arm-bootstrap)
 
- ("src/code/target-extensions" :not-host)
+ ("src/code/target-extensions" :not-host :arm-bootstrap)
 
  ;; Needed before the first use of WITH-SINGLE-PACKAGE-LOCKED-ERROR.
- ("src/code/early-package" :not-host)
+ ("src/code/early-package" :not-host :arm-bootstrap)
 
- ("src/code/early-defstructs" :not-host) ; gotta-be-first DEFSTRUCTs
+ ("src/code/early-defstructs" :not-host :arm-bootstrap) ; gotta-be-first DEFSTRUCTs
  ("src/code/early-raw-slots")
 
- ("src/code/defbangstruct")
+ ("src/code/defbangstruct" :arm-bootstrap)
 
- ("src/code/unportable-float")
+ ("src/code/unportable-float" :arm-bootstrap)
 
- ("src/code/funutils" :not-host)
+ ("src/code/funutils" :not-host :arm-bootstrap)
 
  ;; This needs DEF!STRUCT, and is itself needed early so that structure
  ;; accessors and inline functions defined here can be compiled inline
  ;; later. (Avoiding full calls not only increases efficiency, but also
  ;; avoids some cold init issues involving full calls to structure
  ;; accessors.)
- ("src/code/type-class")
+ ("src/code/type-class" :arm-bootstrap)
 
- ("src/code/ansi-stream" :not-host)
+ ("src/code/ansi-stream" :not-host :arm-bootstrap)
 
- ("src/code/sysmacs" :not-host)
+ ("src/code/sysmacs" :not-host :arm-bootstrap)
 
  ;; "assembly/assemfile" was here in the sequence inherited from
  ;; CMU CL worldcom.lisp, but also appears later in the sequence
  ;; inherited from CMU CL comcom.lisp. We shouldn't need two versions,
  ;; so I've deleted the one here. -- WHN 19990620
 
- ("src/code/target-error" :not-host)
+ ("src/code/target-error" :not-host :arm-bootstrap)
 
- ("src/compiler/early-backend")
+ ("src/compiler/early-backend" :arm-bootstrap)
  ;; "src/code/toplevel.lisp" si the first to need this. It's generated
  ;; automatically by grovel_headers.c, i.e. it's not in CVS.
- ("output/stuff-groveled-from-headers" :not-host)
+ ("output/stuff-groveled-from-headers" :not-host :arm-bootstrap)
 
  ;; a comment from classic CMU CL:
  ;;   "These guys can supposedly come in any order, but not really.
@@ -183,23 +183,23 @@
  ;;    and stuff."
  ;; Dunno exactly what this meant or whether it still holds. -- WHN 19990803
  ;; FIXME: more informative and up-to-date comment?
- ("src/code/kernel"      :not-host)
- ("src/code/toplevel"    :not-host)
- ("src/code/cold-error"  :not-host)
+ ("src/code/kernel"      :not-host :arm-bootstrap)
+ ("src/code/toplevel"    :not-host :arm-bootstrap)
+ ("src/code/cold-error"  :not-host :arm-bootstrap)
  ;; 'info-vector' is needed at least as early as 'fdefinition' so that the
  ;; inlined INFO-VECTOR-FDEFINITION is available to %COERCE-CALLABLE-TO-FUN.
  ("src/compiler/info-vector")
- ("src/code/fdefinition" :not-host)
+ ("src/code/fdefinition" :not-host :arm-bootstrap)
 
  ;; In classic CMU CL, code/type was here. I've since split that into
  ;; lots of smaller pieces, some of which are here and some of which
  ;; are handled later in the sequence, when the cross-compiler is
  ;; built. -- WHN 19990620
- ("src/code/target-type" :not-host)
+ ("src/code/target-type" :not-host :arm-bootstrap)
 
  ("src/code/pred" :not-host)
 
- ("src/code/target-alieneval" :not-host)
+ ("src/code/target-alieneval" :not-host :arm-bootstrap)
  ("src/code/target-c-call"    :not-host)
  ("src/code/target-allocate"  :not-host)
 
@@ -617,7 +617,7 @@
 
  ("src/compiler/pseudo-vops")
 
- #!-arm ("src/compiler/aliencomp")
+ ("src/compiler/aliencomp")
 
  ("src/compiler/ltv")
  ("src/compiler/gtn")
