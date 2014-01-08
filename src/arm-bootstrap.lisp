@@ -24,4 +24,9 @@
   (test-uwp)
   (test-tail-call-variable #'test-tcv-result 42 57 69 104)
   (%primitive print "Testing %PRIMITIVE PRINT.")
+
+  (alien-funcall (extern-alien "debug_print"
+                               (function (values) (unsigned 32)))
+                 (sb!kernel:get-lisp-obj-address
+                  "Testing ALIEN-FUNCALL."))
   #+(or) (%halt))
