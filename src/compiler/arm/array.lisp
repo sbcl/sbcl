@@ -40,6 +40,43 @@
       (storew ndescr header 0 other-pointer-lowtag))
     (move result header)))
 
+;;;; Additional accessors and setters for the array header.
+(define-full-reffer %array-dimension *
+  array-dimensions-offset other-pointer-lowtag
+  (any-reg) positive-fixnum sb!kernel:%array-dimension)
+
+(define-full-setter %set-array-dimension *
+  array-dimensions-offset other-pointer-lowtag
+  (any-reg) positive-fixnum sb!kernel:%set-array-dimension)
+
+(define-vop (array-rank-vop)
+  (:translate sb!kernel:%array-rank)
+  (:policy :fast-safe)
+  (:args (x :scs (descriptor-reg)))
+  (:temporary (:scs (non-descriptor-reg)) temp)
+  (:results (res :scs (any-reg descriptor-reg)))
+  (:generator 6
+    (loadw temp x 0 other-pointer-lowtag)
+    (inst mov temp (asr temp n-widetag-bits))
+    (inst sub temp temp (1- array-dimensions-offset))
+    (inst mov res (lsl temp n-fixnum-tag-bits))))
+;;;; Bounds checking routine.
+(define-vop (check-bound)
+  (:translate %check-bound)
+  (:policy :fast-safe)
+  (:args (array :scs (descriptor-reg))
+         (bound :scs (any-reg descriptor-reg))
+         (index :scs (any-reg descriptor-reg) :target result))
+  (:temporary (:scs (non-descriptor-reg) :offset ocfp-offset) temp)
+  (:results (result :scs (any-reg descriptor-reg)))
+  (:vop-var vop)
+  (:save-p :compute-only)
+  (:generator 5
+    (let ((error (generate-error-code vop temp 'invalid-array-index-error array bound index)))
+      (inst cmp index bound)
+      (inst b :eq error)
+      (move result index))))
+
 ;;;; Accessors/Setters
 
 ;;; Variants built on top of word-index-ref, etc.  I.e. those vectors whos
@@ -124,9 +161,9 @@
            (inst mov temp (lsr index ,bit-shift))
            ;; Load the word in question.
            (inst add lip object (lsl temp word-shift))
-           (inst ldr result lip
-                 (- (* vector-data-offset n-word-bytes)
-                    other-pointer-lowtag))
+           (inst ldr result (@ lip
+                               (- (* vector-data-offset n-word-bytes)
+                                  other-pointer-lowtag)))
            ;; Compute the position of the bitfield we need.
            (inst and temp index ,(1- elements-per-word))
            ,@(when (eq *backend-byte-order* :big-endian)
@@ -158,9 +195,9 @@
            (inst mov temp (lsl temp n-fixnum-tag-bits))
            ;; Load the word in question.
            (inst add lip object temp)
-           (inst ldr old lip
-                 (- (* vector-data-offset n-word-bytes)
-                    other-pointer-lowtag))
+           (inst ldr old (@ lip
+                            (- (* vector-data-offset n-word-bytes)
+                               other-pointer-lowtag)))
            ;; Compute the position of the bitfield we need.
            (inst and shift index ,(1- elements-per-word))
            ,@(when (eq *backend-byte-order* :big-endian)
@@ -178,11 +215,11 @@
               (inst mov temp (logand (tn-value value) ,(1- (ash 1 bits)))))
              (unsigned-reg
               (inst and temp value ,(1- (ash 1 bits)))))
-           (inst orr old (lsl temp shift))
+           (inst orr old old (lsl temp shift))
            ;; Write the altered word back to the array.
-           (inst str old lip
-                 (- (* vector-data-offset n-word-bytes)
-                    other-pointer-lowtag))
+           (inst str old (@ lip
+                            (- (* vector-data-offset n-word-bytes)
+                               other-pointer-lowtag)))
            ;; And present the result properly.
            (sc-case value
              (immediate
