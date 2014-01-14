@@ -47,86 +47,81 @@
   (:note "inline (signed-byte 32) arithmetic"))
 
 
-#+(or) ;; FIXME: Sort out the :constant ranges for these
 (define-vop (fast-fixnum-binop-c fast-safe-arith-op)
   (:args (x :target r :scs (any-reg)))
   (:info y)
   (:arg-types tagged-num
-              (:constant (and (signed-byte 11) (not (integer 0 0)))))
+              (:constant fixnum))
   (:results (r :scs (any-reg)))
   (:result-types tagged-num)
   (:note "inline fixnum arithmetic"))
 
-#+(or)
 (define-vop (fast-unsigned-binop-c fast-safe-arith-op)
   (:args (x :target r :scs (unsigned-reg)))
   (:info y)
   (:arg-types unsigned-num
-              (:constant (and (signed-byte 13) (not (integer 0 0)))))
+              (:constant (unsigned-byte 32)))
   (:results (r :scs (unsigned-reg)))
   (:result-types unsigned-num)
   (:note "inline (unsigned-byte 32) arithmetic"))
 
-#+(or)
 (define-vop (fast-signed-binop-c fast-safe-arith-op)
   (:args (x :target r :scs (signed-reg)))
   (:info y)
   (:arg-types signed-num
-              (:constant (and (signed-byte 13) (not (integer 0 0)))))
+              (:constant (signed-byte 32)))
   (:results (r :scs (signed-reg)))
   (:result-types signed-num)
   (:note "inline (signed-byte 32) arithmetic"))
 
 (defmacro define-binop (translate untagged-penalty op
-                        &optional arg-swap)
-  `(progn
-     (define-vop (,(symbolicate 'fast translate '/fixnum=>fixnum)
-                  fast-fixnum-binop)
-       (:translate ,translate)
-       (:generator 2
-         ,(if arg-swap
-              `(inst ,op r y x)
-              `(inst ,op r x y))))
-     #+(or)
-     ,@(unless arg-swap
-         `((define-vop (,(symbolicate 'fast- translate '-c/fixnum=>fixnum)
-                        fast-fixnum-binop-c)
-             (:translate ,translate)
-             (:generator 1
-               (inst ,op r x (fixnumize y))))))
-     (define-vop (,(symbolicate 'fast- translate '/signed=>signed)
-                  fast-signed-binop)
-       (:translate ,translate)
-       (:generator ,(1+ untagged-penalty)
-         ,(if arg-swap
-              `(inst ,op r y x)
-              `(inst ,op r x y))))
-     #+(or)
-     ,@(unless arg-swap
-         `((define-vop (,(symbolicate 'fast- translate '-c/signed=>signed)
-                        fast-signed-binop-c)
-             (:translate ,translate)
-             (:generator ,untagged-penalty
-               (inst ,op r x y)))))
-     (define-vop (,(symbolicate 'fast- translate '/unsigned=>unsigned)
-                  fast-unsigned-binop)
-       (:translate ,translate)
-       (:generator ,(1+ untagged-penalty)
-         ,(if arg-swap
-              `(inst ,op r y x)
-              `(inst ,op r x y))))
-     #+(or)
-     ,@(unless arg-swap
-         `((define-vop (,(symbolicate 'fast- translate '-c/unsigned=>unsigned)
-                        fast-unsigned-binop-c)
-             (:translate ,translate)
-             (:generator ,untagged-penalty
-               (inst ,op r x y)))))))
+                        &key cop arg-swap neg-op invert-y invert-r try-single-op)
+  (let ((cop (or cop op)))
+    `(progn
+       (define-vop (,(symbolicate 'fast translate '/fixnum=>fixnum)
+                     fast-fixnum-binop)
+         (:translate ,translate)
+         (:generator 2
+                     ,(if arg-swap
+                          `(inst ,op r y x)
+                          `(inst ,op r x y))))
+       #+(or)
+       (define-vop (,(symbolicate 'fast- translate '-c/fixnum=>fixnum)
+                     fast-fixnum-binop-c)
+         (:translate ,translate)
+         (:generator 1
+          (composite-immediate-instruction ,cop r x y :fixnumize t :neg-op ,neg-op :invert-y ,invert-y :invert-r ,invert-r :single-op-op ,(when try-single-op op))))
+       (define-vop (,(symbolicate 'fast- translate '/signed=>signed)
+                     fast-signed-binop)
+         (:translate ,translate)
+         (:generator ,(1+ untagged-penalty)
+                     ,(if arg-swap
+                          `(inst ,op r y x)
+                          `(inst ,op r x y))))
+       #+(or)
+       (define-vop (,(symbolicate 'fast- translate '-c/signed=>signed)
+                     fast-signed-binop-c)
+         (:translate ,translate)
+         (:generator ,untagged-penalty
+          (composite-immediate-instruction ,cop r x y :neg-op ,neg-op :invert-y ,invert-y :invert-r ,invert-r :single-op-op ,(when try-single-op op))))
+       (define-vop (,(symbolicate 'fast- translate '/unsigned=>unsigned)
+                     fast-unsigned-binop)
+         (:translate ,translate)
+         (:generator ,(1+ untagged-penalty)
+                     ,(if arg-swap
+                          `(inst ,op r y x)
+                          `(inst ,op r x y))))
+       #+(or)
+       (define-vop (,(symbolicate 'fast- translate '-c/unsigned=>unsigned)
+                     fast-unsigned-binop-c)
+         (:translate ,translate)
+         (:generator ,untagged-penalty
+          (composite-immediate-instruction ,cop r x y :neg-op ,neg-op :invert-y ,invert-y :invert-r ,invert-r :single-op-op ,(when try-single-op op)))))))
 
-(define-binop + 4 add)
-(define-binop - 4 sub)
-(define-binop logand 2 and)
-(define-binop logandc1 2 bic t)
+(define-binop + 4 add :neg-op sub)
+(define-binop - 4 sub :neg-op add)
+(define-binop logand 2 and :cop bic :invert-y t :try-single-op t)
+(define-binop logandc1 2 bic :cop orr :arg-swap t :invert-y t :invert-r t)
 (define-binop logandc2 2 bic)
 (define-binop logior 2 orr)
 (define-binop logxor 2 eor)

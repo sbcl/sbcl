@@ -186,6 +186,9 @@
 
   (make-shifter-operand :register register :function-code 3 :operand 0))
 
+(define-condition cannot-encode-immediate-operand (error)
+  ((value :initarg value)))
+
 (defun encode-shifter-immediate (operand)
   ;; 32-bit immediate data is encoded as an 8-bit immediate data value
   ;; and a 4-bit immediate shift count.  The actual value is the
@@ -202,7 +205,7 @@
   ;; or spacewise) than simply attempting to encode it?
   (labels ((try-immediate-encoding (value shift)
              (unless (<= 0 shift 15)
-               (error "Unable to encode #x~X as an immediate operand." operand))
+               (error 'cannot-encode-immediate-operand :value operand))
              (if (typep value '(unsigned-byte 8))
                  (dpb shift (byte 4 8) value)
                  (try-immediate-encoding (dpb value (byte 30 2)
@@ -240,6 +243,58 @@
                (dpb shift-code (byte 2 5)
                     (dpb 1 (byte 1 4)
                          Rm)))))))))
+
+(defmacro composite-immediate-instruction (op r x y &key fixnumize neg-op invert-y invert-r single-op-op first-op first-no-source)
+  ;; Successively applies 8-bit wide chunks of Y to X using OP storing the result in R.
+  ;;
+  ;; If FIXNUMIZE is true, Y is fixnumized before being used.
+  ;; If NEG-OP is given and Y is negative, NEG-OP is used instead of OP.
+  ;; If INVERT-Y is given LOGNOT is applied to Y before it being used (but after possibly
+  ;; being fixnumized.
+  ;; If INVERT-R is given R is bit wise inverted at the end.
+  ;; If SINGLE-OP-OP is given and (possibly fixnumized) Y fits into a single ARM immediate
+  ;; it is used for a single operation instead of OP.
+  ;; If FIRST-OP is given, it is used in the first iteration instead of OP.
+  ;; If FIRST-NO-SOURCE is given, there will be ne source register (X) in the first iteration.
+  (let ((bytespec (gensym "bytespec"))
+        (value (gensym "value"))
+        (transformed (gensym "transformed")))
+    (labels ((instruction (source-reg op neg-op &optional no-source)
+               `(,@(if neg-op
+                        `((if (< ,y 0)
+                              (inst ,neg-op ,r ,@(when (not no-source)`(,source-reg))
+                                    (mask-field ,bytespec ,value))
+                              (inst ,op ,r ,@(when (not no-source) `(,source-reg))
+                                    (mask-field ,bytespec ,value))))
+                        `((inst ,op ,r ,@(when (not no-source) `(,source-reg))
+                                (mask-field ,bytespec ,value))))
+                  (setf (ldb ,bytespec ,value) 0)))
+             (composite ()
+               `((let ((,bytespec (byte 8 (logandc1 1 (lowest-set-bit-index ,value)))))
+                    ,@(instruction x (or first-op op) neg-op first-no-source))
+                  (do ((,bytespec (byte 8 (logandc1 1 (lowest-set-bit-index ,value)))
+                                  (byte 8 (logandc1 1 (lowest-set-bit-index ,value)))))
+                      ((zerop ,value))
+                    ,@(instruction r op neg-op)
+                    ,@(when invert-r
+                            `((inst mvn ,r ,r)))))))
+      `(let* ((,transformed ,(if fixnumize
+                                 `(fixnumize ,y)
+                                 `,y))
+              (,value (ldb (byte 32 0)
+                           ,@(if neg-op
+                                 `((if (< ,transformed 0) (- ,transformed) ,transformed))
+                                 (if invert-y
+                                     `((lognot ,transformed))
+                                     `(,transformed))))))
+         ,@(if single-op-op
+              `((handler-case
+                    (progn
+                      (inst ,single-op-op ,r ,x ,transformed))
+                  (cannot-encode-immediate-operand ()
+                    ,@(composite))))
+              (composite))))))
+
 
 ;;;; Addressing mode 2 support
 
