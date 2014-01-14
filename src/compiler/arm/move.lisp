@@ -14,49 +14,31 @@
 (defun lowest-set-bit-index (integer-value)
   (max 0 (1- (integer-length (logand integer-value (- integer-value))))))
 
-;; FIXME: This load-immediate-word / load-negative-immediate-word
-;; stuff could be more clever.  First, the structure is obnoxiously
-;; repetitive.  Second, the decision on loading positive or negative
-;; shouldn't depend on the sign of the value, it should depend on the
-;; logcount of the two's complement representation (or maybe an even
-;; smarter selection criterion).
+;; FIXME: This load-immediate-word stuff could me more clever. The
+;; decision on loading positive or negative shouldn't depend on the sign
+;; of the value, it should depend on the logcount of the two's complement
+;; representation (or maybe an even smarter selection criterion).
 
 (defun load-immediate-word (y val)
-  (let ((bytespec (byte 8 (logandc1 1 (lowest-set-bit-index val)))))
-    (inst mov y (mask-field bytespec val))
-    (setf (ldb bytespec val) 0))
-  (do ((bytespec (byte 8 (logandc1 1 (lowest-set-bit-index val)))
-                 (byte 8 (logandc1 1 (lowest-set-bit-index val)))))
-      ((zerop val))
-    (inst orr y y (mask-field bytespec val))
-    (setf (ldb bytespec val) 0)))
-
-(defun load-negative-immediate-word (y val)
-  (let ((unval (lognot val)))
-    (let ((bytespec (byte 8 (logandc1 1 (lowest-set-bit-index unval)))))
-      (inst mvn y (mask-field bytespec unval))
-      (setf (ldb bytespec unval) 0))
-    (do ((bytespec (byte 8 (logandc1 1 (lowest-set-bit-index unval)))
-                   (byte 8 (logandc1 1 (lowest-set-bit-index unval)))))
-        ((zerop unval))
-      (inst bic y y (mask-field bytespec unval))
-      (setf (ldb bytespec unval) 0))))
+  (if (< val 0)
+      (composite-immediate-instruction bic y y val :first-op mvn :first-no-source t :invert-y t)
+      (composite-immediate-instruction orr y y val :first-op mov :first-no-source t)))
 
 (define-move-fun (load-immediate 1) (vop x y)
   ((null immediate)
    (any-reg descriptor-reg))
   (let ((val (tn-value x)))
     (etypecase val
-      (unsigned-byte
-       ;; This is a non-negative FIXNUM, as IMMEDIATE-CONSTANT-SC only
+      (integer
+       ;; This is a FIXNUM, as IMMEDIATE-CONSTANT-SC only
        ;; accepts integers if they are FIXNUMs.
        (load-immediate-word y (fixnumize val)))
-      (integer
-       ;; This is a negative FIXNUM, as should be obvious from the
-       ;; preceding clause.
-       (load-negative-immediate-word y (fixnumize val)))
       (character
-       (let ((codepoint (char-code val)))
+       (let* ((codepoint (char-code val))
+              (encoded-character (logior character-widetag
+                                         (ash n-widetag-bits (ldb (byte 24 0) codepoint)))))
+         (load-immediate-word y encoded-character)))
+#|
          ;; FIXME: There should be a way to generate more optimal code
          ;; for this (for some values, there is no more optimal code,
          ;; but for some values this will tend to be terrible).
@@ -66,6 +48,7 @@
            (inst orr y y (ash 16 (ldb (byte 8 8) codepoint))))
          (when (> codepoint #x10000)
            (inst orr y y (ash 24 (ldb (byte 8 16) codepoint))))))
+|#
       (null
        (move y null-tn))
       (symbol
@@ -74,10 +57,7 @@
 (define-move-fun (load-number 1) (vop x y)
   ((immediate)
    (signed-reg unsigned-reg))
-  (let ((val (tn-value x)))
-    (if (not (minusp val))
-        (load-immediate-word y val)
-        (load-negative-immediate-word y val))))
+  (load-immediate-word y (tn-value x)))
 
 (define-move-fun (load-character 1) (vop x y)
   ((immediate) (character-reg))
