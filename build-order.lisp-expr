@@ -197,21 +197,21 @@
  ;; built. -- WHN 19990620
  ("src/code/target-type" :not-host :arm-bootstrap)
 
- ("src/code/pred" :not-host)
+ ("src/code/pred" :not-host :arm-bootstrap)
 
  ("src/code/target-alieneval" :not-host :arm-bootstrap)
- ("src/code/target-c-call"    :not-host)
- ("src/code/target-allocate"  :not-host)
+ ("src/code/target-c-call"    :not-host :arm-bootstrap)
+ ("src/code/target-allocate"  :not-host :arm-bootstrap)
 
  ;; This needs DEFINE-ALIEN-ROUTINE from target-alieneval.
  ("src/code/misc-aliens" :not-host)
 
  ("src/compiler/generic/vm-array")
- ("src/code/array"         :not-host)
+ ("src/code/array"         :not-host :arm-bootstrap)
  ("src/code/early-float"   :not-host)
  ("src/code/target-sxhash" :not-host) ; needs most-fooative-foo-float constants
 
- ("src/code/list"   :not-host)
+ ("src/code/list"   :not-host :arm-bootstrap)
  ("src/code/seq"    :not-host) ; "code/seq" should come after "code/list".
  ("src/code/coerce" :not-host)
 
