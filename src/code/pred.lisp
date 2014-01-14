@@ -226,17 +226,21 @@
                                                (,fn obj1 obj2)))))
                                     stuff))))
             (foo
+             #!-arm
              (single-float eql)
+             #!-arm
              (double-float eql)
              #!+long-float
              (long-float eql)
              (bignum
               (lambda (x y)
                 (zerop (bignum-compare x y))))
+             #!-arm
              (ratio
               (lambda (x y)
                 (and (eql (numerator x) (numerator y))
                      (eql (denominator x) (denominator y)))))
+             #!-arm
              (complex
               (lambda (x y)
                 (and (eql (realpart x) (realpart y))
