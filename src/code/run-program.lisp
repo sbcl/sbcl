@@ -936,14 +936,23 @@ Users Manual for details about the PROCESS structure.
                    (when (/= decode-end (length buf))
                      (replace buf buf :start2 decode-end :end2 read-end))
                    (decf read-end decode-end)))))
-            ((member et '(:default (unsigned-byte 8)) :test #'equal)
-             (lambda ()
-               (write-sequence buf stream :end read-end)
-               (setf read-end 0)))
             (t
-             ;; FIXME.
-             (error "Don't know how to copy to stream of element-type ~S"
-                    et)))))
+             (lambda ()
+               (handler-bind
+                   ((type-error
+                      (lambda (c)
+                        (error 'simple-type-error
+                                         :format-control
+                                         "Error using ~s for program output:~@
+                                          ~a"
+                                         :format-arguments
+                                         (list stream c)
+                                         :expected-type
+                                         (type-error-expected-type c)
+                                         :datum
+                                         (type-error-datum c)))))
+                 (write-sequence buf stream :end read-end))
+               (setf read-end 0))))))
     (setf handler
           (add-fd-handler
            descriptor
@@ -1177,15 +1186,24 @@ Users Manual for details about the PROCESS structure.
                                (return)
                                (sb-unix:unix-write
                                 fd #.(string #\Newline) 0 1)))))
-                        ((member et '(:default (unsigned-byte 8))
-                                 :test 'equal)
-                         (loop with buf = (make-array 256 :element-type '(unsigned-byte 8))
-                               for p = (read-sequence buf object)
-                               until (zerop p)
-                               do (sb-unix:unix-write fd buf 0 p)))
                         (t
-                         (error "Don't know how to copy from stream of element-type ~S"
-                                et)))
+                         (handler-bind
+                             ((type-error
+                                (lambda (c)
+                                  (error 'simple-type-error
+                                         :format-control
+                                         "Error using ~s for program input:~@
+                                          ~a"
+                                         :format-arguments
+                                         (list object c)
+                                         :expected-type
+                                         (type-error-expected-type c)
+                                         :datum
+                                         (type-error-datum c)))))
+                           (loop with buf = (make-array 256 :element-type '(unsigned-byte 8))
+                                 for p = (read-sequence buf object)
+                                 until (zerop p)
+                                 do (sb-unix:unix-write fd buf 0 p)))))
                   (sb-unix:unix-lseek fd 0 sb-unix:l_set)
                   (push fd *close-in-parent*)
                   (return (values fd nil)))))
