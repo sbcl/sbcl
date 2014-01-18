@@ -151,28 +151,31 @@ a list of protocol aliases"
 ;;; our protocol provides make-sockaddr-for, size-of-sockaddr,
 ;;; bits-of-sockaddr
 
-(defmethod make-sockaddr-for ((socket inet-socket) &optional sockaddr &rest address &aux (host (first address)) (port (second address)))
-  (let ((sockaddr (or sockaddr (sockint::allocate-sockaddr-in))))
+(defmethod make-sockaddr-for ((socket inet-socket) &optional sockaddr &rest address)
+  (let ((host (first address))
+        (port (second address))
+        (sockaddr (or sockaddr (sockint::allocate-sockaddr-in))))
     (when (and host port)
-      (setf host (coerce host '(simple-array (unsigned-byte 8) (4))))
-      ;; port and host are represented in C as "network-endian" unsigned
-      ;; integers of various lengths.  This is stupid.  The value of the
-      ;; integer doesn't matter (and will change depending on your
-      ;; machine's endianness); what the bind(2) call is interested in
-      ;; is the pattern of bytes within that integer.
+      (let ((in-port (sockint::sockaddr-in-port sockaddr))
+            (in-addr (sockint::sockaddr-in-addr sockaddr)))
+        (declare (fixnum port))
+        ;; port and host are represented in C as "network-endian" unsigned
+        ;; integers of various lengths.  This is stupid.  The value of the
+        ;; integer doesn't matter (and will change depending on your
+        ;; machine's endianness); what the bind(2) call is interested in
+        ;; is the pattern of bytes within that integer.
 
-      ;; We have no truck with such dreadful type punning.  Octets to
-      ;; octets, dust to dust.
+        ;; We have no truck with such dreadful type punning.  Octets to
+        ;; octets, dust to dust.
+        (setf (sockint::sockaddr-in-family sockaddr) sockint::af-inet)
+        (setf (sb-alien:deref in-port 0) (ldb (byte 8 8) port))
+        (setf (sb-alien:deref in-port 1) (ldb (byte 8 0) port))
 
-      (setf (sockint::sockaddr-in-family sockaddr) sockint::af-inet)
-      (setf (sb-alien:deref (sockint::sockaddr-in-port sockaddr) 0) (ldb (byte 8 8) port))
-      (setf (sb-alien:deref (sockint::sockaddr-in-port sockaddr) 1) (ldb (byte 8 0) port))
-
-      (setf (sb-alien:deref (sockint::sockaddr-in-addr sockaddr) 0) (elt host 0))
-      (setf (sb-alien:deref (sockint::sockaddr-in-addr sockaddr) 1) (elt host 1))
-      (setf (sb-alien:deref (sockint::sockaddr-in-addr sockaddr) 2) (elt host 2))
-      (setf (sb-alien:deref (sockint::sockaddr-in-addr sockaddr) 3) (elt host 3)))
-    sockaddr))
+        (setf (sb-alien:deref in-addr 0) (elt host 0))
+        (setf (sb-alien:deref in-addr 1) (elt host 1))
+        (setf (sb-alien:deref in-addr 2) (elt host 2))
+        (setf (sb-alien:deref in-addr 3) (elt host 3))))
+  sockaddr))
 
 (defmethod free-sockaddr-for ((socket inet-socket) sockaddr)
   (sockint::free-sockaddr-in sockaddr))
@@ -182,12 +185,17 @@ a list of protocol aliases"
 
 (defmethod bits-of-sockaddr ((socket inet-socket) sockaddr)
   "Returns address and port of SOCKADDR as multiple values"
-  (values
-   (coerce (loop for i from 0 below 4
-                 collect (sb-alien:deref (sockint::sockaddr-in-addr sockaddr) i))
-           '(vector (unsigned-byte 8) 4))
-   (+ (* 256 (sb-alien:deref (sockint::sockaddr-in-port sockaddr) 0))
-      (sb-alien:deref (sockint::sockaddr-in-port sockaddr) 1))))
+  (declare (type (sb-alien:alien
+                  (* (sb-alien:struct sb-bsd-sockets-internal::sockaddr-in)))
+                 sockaddr))
+  (let ((vector (make-array 4 :element-type '(unsigned-byte 8))))
+    (loop for i below 4
+          do (setf (aref vector i)
+                   (sb-alien:deref (sockint::sockaddr-in-addr sockaddr) i)))
+    (values
+     vector
+     (+ (* 256 (sb-alien:deref (sockint::sockaddr-in-port sockaddr) 0))
+        (sb-alien:deref (sockint::sockaddr-in-port sockaddr) 1)))))
 
 (defun make-inet-socket (type protocol)
   "Make an INET socket.  Deprecated in favour of make-instance"
