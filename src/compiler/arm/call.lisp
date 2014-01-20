@@ -915,7 +915,8 @@
                             '((:load-return-pc
                                (error "RETURN-PC not in its passing location"))
                               (:frob-nfp
-                               (error "Don't know how to :FROB-NFP for TAIL call")))
+                               (inst add cur-nfp cur-nfp (bytes-needed-for-non-descriptor-stack-frame))
+                               (store-symbol-value cur-nfp *number-stack-pointer*)))
                             `((:comp-lra
                                (inst compute-lra lip lip lra-label)
                                (inst str lip (@ new-fp (* lra-save-offset
