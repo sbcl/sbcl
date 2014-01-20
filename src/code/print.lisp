@@ -1457,14 +1457,17 @@ variable: an unreadable object representing the error is printed instead.")
 ;;;
 ;;; possible extension for the enthusiastic: printing floats in bases
 ;;; other than base 10.
+#!-arm
 (defconstant single-float-min-e
   (- 2 sb!vm:single-float-bias sb!vm:single-float-digits))
+#!-arm
 (defconstant double-float-min-e
   (- 2 sb!vm:double-float-bias sb!vm:double-float-digits))
 #!+long-float
 (defconstant long-float-min-e
   (nth-value 1 (decode-float least-positive-long-float)))
 
+#!-arm
 (defun flonum-to-digits (v &optional position relativep)
   (let ((print-base 10) ; B
         (float-radix 2) ; b
@@ -1652,6 +1655,7 @@ variable: an unreadable object representing the error is printed instead.")
 ;;; fixed-format printing.
 
 ;;; Print the appropriate exponent marker for X and the specified exponent.
+#!-arm
 (defun print-float-exponent (x exp stream)
   (declare (type float x) (type integer exp) (type stream stream))
   (let ((*print-radix* nil))
@@ -1666,6 +1670,7 @@ variable: an unreadable object representing the error is printed instead.")
                   (long-float #\L))
                 exp))))
 
+#!-arm
 (defun output-float-infinity (x stream)
   (declare (float x) (stream stream))
   (cond (*read-eval*
@@ -1683,6 +1688,7 @@ variable: an unreadable object representing the error is printed instead.")
   (unless *read-eval*
     (write-string ">" stream)))
 
+#!-arm
 (defun output-float-nan (x stream)
   (print-unreadable-object (x stream)
     (princ (float-format-name x) stream)
@@ -1690,6 +1696,7 @@ variable: an unreadable object representing the error is printed instead.")
     (write-string " NaN" stream)))
 
 ;;; the function called by OUTPUT-OBJECT to handle floats
+#!-arm
 (defun output-float (x stream)
   (cond
    ((float-infinity-p x)
@@ -1709,6 +1716,7 @@ variable: an unreadable object representing the error is printed instead.")
        (t
         (output-float-aux x stream -3 8)))))))
 
+#!-arm
 (defun output-float-aux (x stream e-min e-max)
   (multiple-value-bind (e string)
       (flonum-to-digits x)
