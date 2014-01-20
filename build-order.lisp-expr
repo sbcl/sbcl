@@ -204,6 +204,7 @@
  ("src/code/target-allocate"  :not-host :arm-bootstrap)
 
  ;; This needs DEFINE-ALIEN-ROUTINE from target-alieneval.
+ ;; FIXME-ARM: TOO FEW REGISTERS (SAP-REG)
  ("src/code/misc-aliens" :not-host)
 
  ("src/compiler/generic/vm-array")
@@ -212,24 +213,26 @@
  ("src/code/target-sxhash" :not-host) ; needs most-fooative-foo-float constants
 
  ("src/code/list"   :not-host :arm-bootstrap)
- ("src/code/seq"    :not-host) ; "code/seq" should come after "code/list".
- ("src/code/coerce" :not-host)
+ ("src/code/seq"    :not-host :arm-bootstrap) ; "code/seq" should come after "code/list".
+ ("src/code/coerce" :not-host :arm-bootstrap)
 
- ("src/code/string"     :not-host)
- ("src/code/mipsstrops" :not-host)
+ ("src/code/string"     :not-host :arm-bootstrap)
+ ("src/code/mipsstrops" :not-host :arm-bootstrap)
 
- ("src/code/early-time" :not-host)
+ ("src/code/early-time" :not-host :arm-bootstrap)
+ ;; FIXME-ARM: TOO FEW REGISTERS (SAP-REG)
  ("src/code/unix" :not-host)
  #!+win32 ("src/code/win32" :not-host)
  #!+mach  ("src/code/mach"     :not-host)
 
- ("src/code/common-os" :not-host)
+ ("src/code/common-os" :not-host :arm-bootstrap)
  #!+mach  ("src/code/mach-os"  :not-host)
  #!+sunos ("src/code/sunos-os" :not-host)
  #!+hpux  ("src/code/hpux-os"  :not-host)
  #!+osf1  ("src/code/osf1-os"  :not-host)
  #!+irix  ("src/code/irix-os"  :not-host)
  #!+bsd   ("src/code/bsd-os"   :not-host)
+ ;; FIXME-ARM: NEEDS src/code/unix
  #!+linux ("src/code/linux-os" :not-host)
  #!+win32 ("src/code/win32-os" :not-host)
 
@@ -237,7 +240,7 @@
  ;; error args. This file contains stuff previously in
  ;; debug-info.lisp.  Should it therefore be :not-host?  -- CSR,
  ;; 2002-02-05
- ("src/code/sc-offset")
+ ("src/code/sc-offset" :arm-bootstrap)
 
  ;; KLUDGE: I'd prefer to have this done with a "code/target" softlink
  ;; instead of a bunch of reader macros. -- WHN 19990308
@@ -248,32 +251,33 @@
  #!+ppc   ("src/code/ppc-vm"   :not-host)
  #!+alpha ("src/code/alpha-vm" :not-host)
  #!+mips  ("src/code/mips-vm"  :not-host)
+ #!+arm   ("src/code/arm-vm" :not-host :arm-bootstrap)
 
  ;; FIXME: do we really want to keep this? -- CSR, 2002-08-31
- #!+rt    ("src/code/rt-vm"    :not-host)
+ #!+rt    ("src/code/rt-vm"    :not-host :arm-bootstrap)
 
- #!-win32 ("src/code/target-signal" :not-host) ; needs OS-CONTEXT-T from x86-vm
+ #!-win32 ("src/code/target-signal" :not-host :arm-bootstrap) ; needs OS-CONTEXT-T from x86-vm
  #!+win32 ("src/code/target-exception" :not-host)
 
- ("src/code/symbol"     :not-host)
- ("src/code/bignum"     :not-host)
- ("src/code/numbers"    :not-host)
+ ("src/code/symbol"     :not-host :arm-bootstrap)
+ ("src/code/bignum"     :not-host :arm-bootstrap)
+ ("src/code/numbers"    :not-host :arm-bootstrap)
  ("src/code/float-trap" :not-host)
  ("src/code/float"      :not-host)
  ("src/code/irrat"      :not-host)
 
- ("src/code/char")
- ("src/code/huffman")
- ("src/code/target-char" :not-host)
- ("src/code/target-misc" :not-host)
- ("src/code/misc")
+ ("src/code/char" :arm-bootstrap)
+ ("src/code/huffman" :arm-bootstrap)
+ ("src/code/target-char" :not-host :arm-bootstrap)
+ ("src/code/target-misc" :not-host :arm-bootstrap)
+ ("src/code/misc" :arm-bootstrap)
 
- ("src/code/room"   :not-host)
+ ("src/code/room"   :not-host :arm-bootstrap)
 
- ("src/code/stream"        :not-host)
- ("src/code/print"         :not-host)
- ("src/code/pprint"        :not-host)
- ("src/code/early-format")
+ ("src/code/stream"        :not-host :arm-bootstrap)
+ ("src/code/print"         :not-host :arm-bootstrap)
+ ("src/code/pprint"        :not-host :arm-bootstrap)
+ ("src/code/early-format" :arm-bootstrap)
  ("src/code/target-format" :not-host)
  ("src/code/defpackage"    :not-host)
  ("src/code/pp-backq"      :not-host)
