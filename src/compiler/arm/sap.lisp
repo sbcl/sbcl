@@ -112,16 +112,27 @@
   (:generator 2
     (inst add res ptr offset)))
 
-(define-vop (pointer+-c)
+(define-vop (pointer+-unsigned-c)
   (:translate sap+)
   (:args (ptr :scs (sap-reg)))
   (:info offset)
-  (:arg-types system-area-pointer (:constant (signed-byte 8)))
+  (:arg-types system-area-pointer (:constant (unsigned-byte 8)))
   (:results (res :scs (sap-reg)))
   (:result-types system-area-pointer)
   (:policy :fast-safe)
   (:generator 1
     (inst add res ptr offset)))
+
+(define-vop (pointer+-signed-c)
+  (:translate sap+)
+  (:args (ptr :scs (sap-reg)))
+  (:info offset)
+  (:arg-types system-area-pointer (:constant (integer -255 -1)))
+  (:results (res :scs (sap-reg)))
+  (:result-types system-area-pointer)
+  (:policy :fast-safe)
+  (:generator 1
+    (inst sub res ptr (- offset))))
 
 (define-vop (pointer-)
   (:translate sap-)
