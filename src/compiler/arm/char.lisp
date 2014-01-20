@@ -70,3 +70,24 @@
 ;;; to a descriptor passing location.
 (define-move-vop move-arg :move-arg
   (character-reg) (any-reg descriptor-reg))
+
+;;;; Other operations:
+(define-vop (char-code)
+  (:translate char-code)
+  (:policy :fast-safe)
+  (:args (ch :scs (character-reg) :target res))
+  (:arg-types character)
+  (:results (res :scs (any-reg)))
+  (:result-types positive-fixnum)
+  (:generator 1
+    (inst mov res (lsl ch n-fixnum-tag-bits))))
+
+(define-vop (code-char)
+  (:translate code-char)
+  (:policy :fast-safe)
+  (:args (code :scs (any-reg) :target res))
+  (:arg-types positive-fixnum)
+  (:results (res :scs (character-reg)))
+  (:result-types character)
+  (:generator 1
+    (inst mov res (lsr code n-fixnum-tag-bits))))
