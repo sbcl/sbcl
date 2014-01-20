@@ -290,8 +290,10 @@
     #!+long-float
     ((complex long-float)
      (truly-the long-float (realpart number)))
+    #!-arm
     ((complex double-float)
      (truly-the double-float (realpart number)))
+    #!-arm
     ((complex single-float)
      (truly-the single-float (realpart number)))
     ((complex rational)
@@ -306,8 +308,10 @@
     #!+long-float
     ((complex long-float)
      (truly-the long-float (imagpart number)))
+    #!-arm
     ((complex double-float)
      (truly-the double-float (imagpart number)))
+    #!-arm
     ((complex single-float)
      (truly-the single-float (imagpart number)))
     ((complex rational)
@@ -586,12 +590,14 @@
 
 (defun %negate (n)
   (number-dispatch ((n number))
-    (((foreach fixnum single-float double-float #!+long-float long-float))
+    (((foreach fixnum #!-arm single-float #!-arm double-float #!+long-float long-float))
      (%negate n))
     ((bignum)
      (negate-bignum n))
+    #!-arm
     ((ratio)
      (%make-ratio (- (numerator n)) (denominator n)))
+    #!-arm
     ((complex)
      (complex (- (realpart n)) (- (imagpart n))))))
 
