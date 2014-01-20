@@ -38,17 +38,6 @@
               (encoded-character (logior character-widetag
                                          (ash n-widetag-bits (ldb (byte 24 0) codepoint)))))
          (load-immediate-word y encoded-character)))
-#|
-         ;; FIXME: There should be a way to generate more optimal code
-         ;; for this (for some values, there is no more optimal code,
-         ;; but for some values this will tend to be terrible).
-         (inst mov y character-widetag)
-         (inst orr y y (ash 8 (ldb (byte 8 0) codepoint)))
-         (when (> codepoint #x100)
-           (inst orr y y (ash 16 (ldb (byte 8 8) codepoint))))
-         (when (> codepoint #x10000)
-           (inst orr y y (ash 24 (ldb (byte 8 16) codepoint))))))
-|#
       (null
        (move y null-tn))
       (symbol
@@ -183,7 +172,7 @@
   (:note "constant load")
   (:generator 1
     (cond ((sb!c::tn-leaf x)
-           (inst mov y (tn-value x)))
+           (load-immediate-word y (tn-value x)))
           (t
            (loadw y code-tn (tn-offset x) other-pointer-lowtag)
            (inst mov y (asr y n-fixnum-tag-bits))))))
