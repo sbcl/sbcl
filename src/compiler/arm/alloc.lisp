@@ -115,8 +115,8 @@
     (inst mov header (lsl bytes (- n-widetag-bits n-fixnum-tag-bits)))
     (inst add header header type)
     ;; Round up to the actual allocation granularity.
-    (inst add bytes n-word-bytes)
-    (inst bic bytes lowtag-mask)
+    (inst add bytes bytes n-word-bytes)
+    (inst bic bytes bytes lowtag-mask)
     ;; Allocate the object and set its header.
     (pseudo-atomic (pa-flag)
       (allocation result bytes lowtag :flag-tn pa-flag)
