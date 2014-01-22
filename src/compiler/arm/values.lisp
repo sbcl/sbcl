@@ -11,6 +11,11 @@
 
 (in-package "SB!VM")
 
+(define-vop (reset-stack-pointer)
+  (:args (ptr :scs (any-reg)))
+  (:generator 1
+    (move csp-tn ptr)))
+
 ;;; Push some values onto the stack, returning the start and number of values
 ;;; pushed as results.  It is assumed that the Vals are wired to the standard
 ;;; argument locations.  Nvals is the number of values to push.

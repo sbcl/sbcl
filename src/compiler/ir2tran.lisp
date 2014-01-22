@@ -1443,9 +1443,6 @@
 ;;; unknown-values lvar (discarding it and all values globs on top of
 ;;; it.)
 (defoptimizer (%pop-values ir2-convert) ((%lvar) node block)
-  #!+arm
-  (error "Don't know how to %POP-VALUES")
-  #!-arm
   (let* ((lvar (lvar-value %lvar))
          (2lvar (lvar-info lvar)))
     (cond ((eq (ir2-lvar-kind 2lvar) :unknown)
