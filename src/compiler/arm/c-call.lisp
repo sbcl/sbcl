@@ -98,7 +98,7 @@
         (inst word (make-fixup foreign-symbol :foreign))))))
 
 (define-vop (call-out)
-  (:args (function :scs (sap-reg) :target cfunc)
+  (:args (function :scs (sap-stack))
          (args :more t))
   (:results (results :more t))
   (:ignore args results)
@@ -106,7 +106,7 @@
   (:temporary (:sc any-reg :offset r8-offset
                    :from (:argument 0) :to (:result 0)) cfunc)
   (:temporary (:sc control-stack :offset nfp-save-offset) nfp-save)
-  (:temporary (:scs (non-descriptor-reg)) temp)
+  (:temporary (:sc any-reg) temp)
   (:temporary (:sc interior-reg) lip)
   (:vop-var vop)
   (:generator 0
@@ -118,7 +118,7 @@
       (when cur-nfp
         (store-stack-tn nfp-save cur-nfp))
       (inst load-from-label temp lip call-into-c-fixup)
-      (move cfunc function)
+      (loadw cfunc cur-nfp (tn-offset function))
       (inst blx temp)
       (when cur-nfp
         (load-stack-tn cur-nfp nfp-save)))))
