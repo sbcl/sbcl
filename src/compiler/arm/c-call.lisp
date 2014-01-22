@@ -98,7 +98,7 @@
         (inst word (make-fixup foreign-symbol :foreign))))))
 
 (define-vop (call-out)
-  (:args (function :scs (sap-stack))
+  (:args (function :scs (sap-reg sap-stack))
          (args :more t))
   (:results (results :more t))
   (:ignore args results)
@@ -118,7 +118,9 @@
       (when cur-nfp
         (store-stack-tn nfp-save cur-nfp))
       (inst load-from-label temp lip call-into-c-fixup)
-      (loadw cfunc cur-nfp (tn-offset function))
+      (sc-case function
+        (sap-reg (move cfunc function))
+        (sap-stack (loadw cfunc cur-nfp (tn-offset function))))
       (inst blx temp)
       (when cur-nfp
         (load-stack-tn cur-nfp nfp-save)))))
