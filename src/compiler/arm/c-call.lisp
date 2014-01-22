@@ -34,8 +34,6 @@
            (setf (arg-state-num-register-args state) (1+ reg-args))
            (my-make-wired-tn prim-type reg-sc (register-args-offset reg-args)))
           (t
-           (error "Don't know how to allocate stack arguments")
-           #+(or)
            (let ((frame-size (arg-state-stack-frame-size state)))
              (setf (arg-state-stack-frame-size state) (1+ frame-size))
              (my-make-wired-tn prim-type stack-sc frame-size))))))
