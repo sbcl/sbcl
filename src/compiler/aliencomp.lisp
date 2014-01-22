@@ -705,7 +705,15 @@
                   (lvar-value type)
                   (error "Something is broken.")))
         (lvar (node-lvar call))
-        (args args)
+        ;; KLUDGE: On ARM systems our register pressure is so high
+        ;; that if we process register args before stack args we end
+        ;; up with all of our non-descriptor regs either
+        ;; component-live (NFP) or wired (everything else) and can't
+        ;; actually process the stack args.  Processing the arguments
+        ;; in reverse order here doesn't change the semantics, but we
+        ;; deal with all of the stack arguments before the wired
+        ;; register arguments become live.
+        (args #!-arm args #!+arm (reverse args))
         #!+x86
         (stack-pointer (make-stack-pointer-tn)))
     (multiple-value-bind (nsp stack-frame-size arg-tns result-tns)
@@ -715,7 +723,9 @@
         (vop set-fpu-word-for-c call block)
         (vop current-stack-pointer call block stack-pointer))
       (vop alloc-number-stack-space call block stack-frame-size nsp)
-      (dolist (tn arg-tns)
+      ;; KLUDGE: This is where the second half of the ARM
+      ;; register-pressure change lives (see above).
+      (dolist (tn #!-arm arg-tns #!+arm (reverse arg-tns))
         ;; On PPC, TN might be a list. This is used to indicate
         ;; something special needs to happen. See below.
         ;;
