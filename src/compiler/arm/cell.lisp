@@ -286,3 +286,47 @@
 
 (define-full-setter code-header-set * 0 other-pointer-lowtag
   (descriptor-reg any-reg null) * code-header-set)
+
+;;;; raw instance slot accessors
+
+(define-vop (raw-instance-ref/word)
+  (:translate %raw-instance-ref/word)
+  (:policy :fast-safe)
+  (:args (object :scs (descriptor-reg))
+         (index :scs (any-reg)))
+  (:arg-types * positive-fixnum)
+  (:results (value :scs (unsigned-reg)))
+  (:temporary (:scs (non-descriptor-reg)) offset)
+  (:temporary (:scs (interior-reg)) lip)
+  (:result-types unsigned-num)
+  (:generator 5
+    (loadw offset object 0 instance-pointer-lowtag)
+    (inst mov offset (lsr offset n-widetag-bits))
+    (inst mov offset (lsl offset n-fixnum-tag-bits))
+    (inst sub offset offset index)
+    (inst sub offset offset n-word-bytes)
+    (inst add lip offset object)
+    (inst ldr value (@ lip (- (* instance-slots-offset n-word-bytes)
+                              instance-pointer-lowtag)))))
+
+(define-vop (raw-instance-set/word)
+  (:translate %raw-instance-set/word)
+  (:policy :fast-safe)
+  (:args (object :scs (descriptor-reg))
+         (index :scs (any-reg))
+         (value :scs (unsigned-reg) :target result))
+  (:arg-types * positive-fixnum unsigned-num)
+  (:results (result :scs (unsigned-reg)))
+  (:temporary (:scs (non-descriptor-reg)) offset)
+  (:temporary (:scs (interior-reg)) lip)
+  (:result-types unsigned-num)
+  (:generator 5
+    (loadw offset object 0 instance-pointer-lowtag)
+    (inst mov offset (lsr offset n-widetag-bits))
+    (inst mov offset (lsl offset n-fixnum-tag-bits))
+    (inst sub offset offset index)
+    (inst sub offset offset n-word-bytes)
+    (inst add lip offset object)
+    (inst str value (@ lip (- (* instance-slots-offset n-word-bytes)
+                              instance-pointer-lowtag)))
+    (move result value)))
