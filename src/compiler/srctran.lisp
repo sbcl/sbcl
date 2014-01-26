@@ -443,10 +443,12 @@
          ;; NIL in that case.
          (simple-type-error ()))))
 
+#+sb-xc-host
 (defun safe-double-coercion-p (x)
   (or (typep x 'double-float)
       (<= most-negative-double-float x most-positive-double-float)))
 
+#+sb-xc-host
 (defun safe-single-coercion-p (x)
   (or (typep x 'single-float)
       (and
@@ -494,15 +496,19 @@
 
 (defmacro safely-binop (op x y)
   `(cond
+     #+sb-xc-host
      ((typep ,x 'double-float)
       (when (safe-double-coercion-p ,y)
         (,op ,x ,y)))
+     #+sb-xc-host
      ((typep ,y 'double-float)
       (when (safe-double-coercion-p ,x)
         (,op ,x ,y)))
+     #+sb-xc-host
      ((typep ,x 'single-float)
       (when (safe-single-coercion-p ,y)
         (,op ,x ,y)))
+     #+sb-xc-host
      ((typep ,y 'single-float)
       (when (safe-single-coercion-p ,x)
         (,op ,x ,y)))
@@ -556,9 +562,11 @@
             xbound
             (list xbound)))
       (cond
+        #+sb-xc-host
         ((subtypep type 'double-float)
          (if (<= most-negative-double-float val most-positive-double-float)
              (coerce val type)))
+        #+sb-xc-host
         ((or (subtypep type 'single-float) (subtypep type 'float))
          ;; coerce to float returns a single-float
          (if (<= most-negative-single-float val most-positive-single-float)
@@ -573,11 +581,13 @@
               xbound
               (list xbound)))
         (cond
+          #+sb-xc-host
           ((subtypep type 'double-float)
            (if (<= most-negative-double-float val most-positive-double-float)
                (coerce val type)
                (if (< val most-negative-double-float)
                    most-negative-double-float most-positive-double-float)))
+          #+sb-xc-host
           ((or (subtypep type 'single-float) (subtypep type 'float))
            ;; coerce to float returns a single-float
            (if (<= most-negative-single-float val most-positive-single-float)
