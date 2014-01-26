@@ -201,7 +201,7 @@
     ;; CODE-HEADER-WIDETAG is #x38, which has the top two bits clear,
     ;; so we don't to clear the low bits here.  If we do, use BIC.
     (inst add ndescr offset (lsr ndescr (- n-widetag-bits word-shift)))
-    (inst add ndescr ndescr (- fun-pointer-lowtag other-pointer-lowtag))
+    (inst sub ndescr ndescr (- other-pointer-lowtag fun-pointer-lowtag))
     (inst add func code ndescr)))
 
 ;;;; other miscellaneous VOPs
