@@ -31,7 +31,8 @@
 
 (defmacro load-symbol (reg symbol)
   (once-only ((reg reg) (symbol symbol))
-    `(inst add ,reg null-tn (static-symbol-offset ,symbol))))
+    `(progn
+       (composite-immediate-instruction add ,reg null-tn (static-symbol-offset ,symbol)))))
 
 (defmacro load-symbol-value (reg symbol &optional (predicate :al))
   `(inst ldr ,predicate ,reg
