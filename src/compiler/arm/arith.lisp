@@ -195,7 +195,6 @@
   (:translate ash)
   (:policy :fast-safe)
   (:temporary (:sc non-descriptor-reg) ndesc)
-  (:temporary (:sc non-descriptor-reg :to :eval) temp)
   (:generator 3
     (let ((positive (gen-label))
           (done (gen-label)))
