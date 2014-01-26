@@ -2282,6 +2282,9 @@ used for a COMPLEX component.~:@>"
 ;;; in the specified format. KLUDGE: In general, open float bounds are
 ;;; screwed up. -- (comment from original CMU CL)
 (defun round-numeric-bound (x class format up-p)
+  ;; FIXME-ARM: se #+sb-xc-host below
+  #-sb-xc-host
+  (declare (ignore format))
   (if x
       (let ((cx (if (consp x) (car x) x)))
         (ecase class
@@ -2290,6 +2293,8 @@ used for a COMPLEX component.~:@>"
            (if (and (consp x) (integerp cx))
                (if up-p (1+ cx) (1- cx))
                (if up-p (ceiling cx) (floor cx))))
+          ;; FIXME-ARM: no floats on ARM yet, have to deactive for host-2
+          #+sb-xc-host
           (float
            (let ((res
                   (cond
