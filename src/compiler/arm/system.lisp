@@ -216,3 +216,9 @@
     (inst byte halt-trap)
     ;; Re-align to the next instruction boundary.
     (emit-alignment word-shift)))
+
+;;;; Dummy definition for a spin-loop hint VOP
+(define-vop (spin-loop-hint)
+  (:translate spin-loop-hint)
+  (:policy :fast-safe)
+  (:generator 0))
