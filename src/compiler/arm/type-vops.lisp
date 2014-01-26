@@ -12,6 +12,7 @@
 (in-package "SB!VM")
 
 (defun %test-fixnum (value target not-p &key temp)
+  (declare (ignore temp))
   (assemble ()
     (inst tst value fixnum-tag-mask)
     (inst b (if not-p :ne :eq) target)))
