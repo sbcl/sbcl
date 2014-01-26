@@ -41,9 +41,13 @@
 (defsetf %instance-ref %instance-set)
 
 (defsetf %raw-instance-ref/word %raw-instance-set/word)
+#!-arm
 (defsetf %raw-instance-ref/single %raw-instance-set/single)
+#!-arm
 (defsetf %raw-instance-ref/double %raw-instance-set/double)
+#!-arm
 (defsetf %raw-instance-ref/complex-single %raw-instance-set/complex-single)
+#!-arm
 (defsetf %raw-instance-ref/complex-double %raw-instance-set/complex-double)
 
 (defsetf %instance-layout %set-instance-layout)
