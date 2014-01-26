@@ -184,17 +184,15 @@
   (:args (x :scs (descriptor-reg)))
   (:results (y :scs (signed-reg unsigned-reg)))
   (:note "integer to untagged word coercion")
-  (:temporary (:scs (non-descriptor-reg)) temp)
   (:generator 4
-    (let ((done (gen-label)))
-      (inst tst x fixnum-tag-mask)
-      (sc-case y
-        (signed-reg
-         (inst mov :eq y (asr x n-fixnum-tag-bits)))
-        (unsigned-reg
-         (inst mov :eq y (lsr x n-fixnum-tag-bits))))
+    (inst tst x fixnum-tag-mask)
+    (sc-case y
+      (signed-reg
+       (inst mov :eq y (asr x n-fixnum-tag-bits)))
+      (unsigned-reg
+       (inst mov :eq y (lsr x n-fixnum-tag-bits))))
+    (loadw y x bignum-digits-offset other-pointer-lowtag :ne)))
 
-      (loadw y x bignum-digits-offset other-pointer-lowtag :ne))))
 (define-move-vop move-to-word/integer :move
   (descriptor-reg) (signed-reg unsigned-reg))
 
