@@ -176,7 +176,6 @@
   (:results (res :scs (any-reg))
             (nfp :scs (any-reg)))
   (:info callee)
-  (:ignore nfp)
   (:generator 2
     (trace-table-entry trace-table-fun-prologue)
     (move res csp-tn)
@@ -730,7 +729,6 @@
   (:ignore args res save)
   (:vop-var vop)
   (:temporary (:sc control-stack :offset nfp-save-offset) nfp-save)
-  (:temporary (:scs (non-descriptor-reg)) temp)
   (:temporary (:scs (interior-reg)) lip)
   (:generator 5
     (trace-table-entry trace-table-call-site)
@@ -893,7 +891,6 @@
        (let* ((cur-nfp (current-nfp-tn vop))
               ,@(unless (eq return :tail)
                   '((lra-label (gen-label))))
-              (step-done-label (gen-label))
               (filler
                (remove nil
                        (list :load-nargs
@@ -938,6 +935,8 @@
                                (move cfp-tn new-fp))))
                       ((nil)))))
                 (insert-step-instrumenting (callable-tn)
+                  ;; FIXME-ARM: appeased the compiler for now
+                  (declare (ignorable callable-tn))
                   ;; Conditionally insert a conditional trap:
                   (when step-instrumenting
                     ;; Get the symbol-value of SB!IMPL::*STEPPING*
@@ -1019,7 +1018,6 @@
    (lra-arg :scs (descriptor-reg) :load-if nil))
   (:temporary (:sc any-reg :offset nl2-offset :from (:argument 0)) args)
   (:temporary (:sc any-reg :offset lexenv-offset :from (:argument 1)) lexenv)
-  (:temporary (:sc any-reg) temp)
   (:temporary (:sc interior-reg) lip)
   (:ignore old-fp-arg lra-arg)
   (:vop-var vop)
