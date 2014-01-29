@@ -4980,3 +4980,12 @@
   (compile nil '(lambda ()
                  (make-array '(10 10)
                   :element-type '(or null an-undefined-type)))))
+
+(with-test (:name :xchg-misencoding)
+  (assert (eql (funcall (compile nil '(lambda (a b)
+                                       (declare (optimize (speed 3) (safety 2))
+                                        (type single-float a))
+                                       (unless (eql b 1/2)
+                                         (min a -1f0))))
+                        0f0 1)
+               -1f0)))

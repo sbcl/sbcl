@@ -2,6 +2,8 @@
 changes relative to sbcl-1.1.15:
   * bug fix: problems when redefining classes and doing TYPEP on classes
     concurrently. (lp#1272742)
+  * bug fix: x86-64 XCHG instruction was misencoded when used with RAX, R8-R15
+    registers. (reported by Eric Marsden)
 
 changes in sbcl-1.1.15 relative to sbcl-1.1.14:
   * new feature: the iterative spilling/coloring register allocator developed

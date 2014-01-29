@@ -1953,7 +1953,7 @@
      (labels ((xchg-acc-with-something (acc something)
                 (if (and (not (eq size :byte)) (register-p something))
                     (progn
-                      (maybe-emit-rex-for-ea segment acc something)
+                      (maybe-emit-rex-for-ea segment something acc)
                       (emit-byte-with-reg segment
                                           #b10010
                                           (reg-tn-encoding something)))
