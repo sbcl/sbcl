@@ -1359,34 +1359,36 @@
 ;;;
 ;;; Thanks to Gerd Moellmann for the explanation.  -- CSR, 2002-10-29
 (defun %force-cache-flushes (class)
-  (let* ((owrapper (class-wrapper class)))
-    ;; We only need to do something if the wrapper is still valid. If
-    ;; the wrapper isn't valid, state will be FLUSH or OBSOLETE, and
-    ;; both of those will already be doing what we want. In
-    ;; particular, we must be sure we never change an OBSOLETE into a
-    ;; FLUSH since OBSOLETE means do what FLUSH does and then some.
-    (when (or (not (invalid-wrapper-p owrapper))
-              ;; KLUDGE: despite the observations above, this remains
-              ;; a violation of locality or what might be considered
-              ;; good style.  There has to be a better way!  -- CSR,
-              ;; 2002-10-29
-              (eq (layout-invalid owrapper) t))
-      (let ((nwrapper (make-wrapper (layout-length owrapper)
-                                    class)))
-        (setf (wrapper-slots nwrapper)
-              (wrapper-slots owrapper))
-        (setf (wrapper-slot-table nwrapper)
-              (wrapper-slot-table owrapper))
-        (%update-lisp-class-layout class nwrapper)
-        (setf (slot-value class 'wrapper) nwrapper)
-        ;; Use :OBSOLETE instead of :FLUSH if any superclass has
-        ;; been obsoleted.
-        (if (find-if (lambda (x)
-                       (and (consp x) (eq :obsolete (car x))))
-                     (layout-inherits owrapper)
-                     :key #'layout-invalid)
-            (%invalidate-wrapper owrapper :obsolete nwrapper)
-            (%invalidate-wrapper owrapper :flush nwrapper))))))
+  (with-world-lock ()
+    (let* ((owrapper (class-wrapper class)))
+      ;; We only need to do something if the wrapper is still valid. If
+      ;; the wrapper isn't valid, state will be FLUSH or OBSOLETE, and
+      ;; both of those will already be doing what we want. In
+      ;; particular, we must be sure we never change an OBSOLETE into a
+      ;; FLUSH since OBSOLETE means do what FLUSH does and then some.
+      (when (or (not (invalid-wrapper-p owrapper))
+                ;; KLUDGE: despite the observations above, this remains
+                ;; a violation of locality or what might be considered
+                ;; good style.  There has to be a better way!  -- CSR,
+                ;; 2002-10-29
+                (eq (layout-invalid owrapper) t))
+        (let ((nwrapper (make-wrapper (layout-length owrapper)
+                                      class)))
+          (setf (wrapper-slots nwrapper)
+                (wrapper-slots owrapper))
+          (setf (wrapper-slot-table nwrapper)
+                (wrapper-slot-table owrapper))
+          (%update-lisp-class-layout class nwrapper)
+          (setf (slot-value class 'wrapper) nwrapper)
+          ;; Use :OBSOLETE instead of :FLUSH if any superclass has
+          ;; been obsoleted.
+          (if (find-if (lambda (x)
+                         (and (consp x) (eq :obsolete (car x))))
+                       (layout-inherits owrapper)
+                       :key #'layout-invalid)
+              (%invalidate-wrapper owrapper :obsolete nwrapper)
+              (%invalidate-wrapper owrapper :flush nwrapper))))))
+  nil)
 
 ;;; MAKE-INSTANCES-OBSOLETE can be called by user code. It will cause
 ;;; the next access to the instance (as defined in 88-002R) to trap
