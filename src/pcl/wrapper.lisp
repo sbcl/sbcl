@@ -121,6 +121,10 @@
 (defun invalid-wrapper-p (wrapper)
   (not (null (layout-invalid wrapper))))
 
+(declaim (inline wrapper-of))
+(defun wrapper-of (x)
+  (layout-of x))
+
 ;;; We only use this inside INVALIDATE-WRAPPER.
 (defvar *previous-nwrappers* (make-hash-table))
 

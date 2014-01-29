@@ -544,10 +544,6 @@
                                        (cons name cpl)
                                        wrapper prototype))))))
 
-#-sb-fluid (declaim (inline wrapper-of))
-(defun wrapper-of (x)
-  (layout-of x))
-
 (defun class-of (x)
   (wrapper-class* (wrapper-of x)))
 

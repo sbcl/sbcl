@@ -298,14 +298,6 @@ comparison.")
     `(progn
        (aver (typep ,wrapper 'wrapper))
        ,wrapper)))
-
-;;; FIXME: could be an inline function or ordinary function (like many
-;;; other things around here)
-(defmacro get-instance-wrapper-or-nil (inst)
-  (once-only ((wrapper `(wrapper-of ,inst)))
-    `(if (typep ,wrapper 'wrapper)
-         ,wrapper
-         nil)))
 
 ;;;; support for useful hashing of PCL instances
 
