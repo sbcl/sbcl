@@ -316,12 +316,80 @@
                                       (declare (ignore condition))
                                       activep)))
       (let ((actual-restart (find-restart 'switchable-restart)))
-        ;; Inactive because of condition-restarts associations.
+        ;; Active/inactive because of condition-restarts associations.
         (let ((required-condition (make-condition 'condition))
               (wrong-condition (make-condition 'condition)))
           (with-condition-restarts required-condition (list actual-restart)
-            (assert (null (find-restart actual-restart wrong-condition)))))
+            (assert (find-restart actual-restart required-condition))
+            (assert (not (find-restart actual-restart wrong-condition)))))
 
         ;; Inactive because of test-function.
         (setf activep nil)
-        (assert (null (find-restart actual-restart)))))))
+        (assert (not (find-restart actual-restart)))
+        (assert (not (find-restart actual-restart (make-condition 'condition))))))))
+
+(macrolet
+    ((with-testing-restart ((&key
+                             (condition-var (gensym))
+                             (condition-restart-p t))
+                            &body body)
+       `(block block
+          (handler-bind ((condition (lambda (,condition-var)
+                                      (declare (ignorable ,condition-var))
+                                      ,@body)))
+            (restart-bind ((testing-restart
+                             (lambda () (return-from block :transfer))
+                             :test-function (lambda (condition)
+                                              (typep condition 'condition))))
+              ,(if condition-restart-p
+                   `(let ((condition (make-condition 'condition)))
+                      (with-condition-restarts condition (car sb-kernel:*restart-clusters*)
+                        (signal condition)))
+                   `(signal (make-condition 'condition)))
+              :no-transfer)))))
+
+  (with-test (:name (invoke-restart :test-function))
+
+    ;; When given a restart name, there is no condition so
+    ;; INVOKE-RESTART cannot call the :test-function. SBCL considers
+    ;; the restart unsuitable for the requested invocation. See
+    ;; comment in INVOKE-RESTART.
+    (assert (raises-error? (with-testing-restart ()
+                             (invoke-restart 'testing-restart))
+                           control-error))
+
+    ;; When given a RESTART instance (which could only have been found
+    ;; by passing an appropriate condition to FIND-RESTART),
+    ;; INVOKE-RESTART does not call the :test-function. Again, see
+    ;; comment in INVOKE-RESTART.
+    (assert (eq :transfer
+                (with-testing-restart (:condition-var condition)
+                  (invoke-restart
+                   (find-restart 'testing-restart condition)))))
+
+    ;; Some other condition, even if it passes the :test-function,
+    ;; only works if the restart has not been associated to the
+    ;; original condition.
+    (assert (eq :transfer
+                (with-testing-restart (:condition-restart-p nil)
+                  (invoke-restart
+                   (find-restart 'testing-restart (make-condition 'condition))))))
+    (with-testing-restart ()
+      (assert (not (find-restart 'testing-restart (make-condition 'condition))))))
+
+  (with-test (:name (invoke-restart-interactively :test-function))
+    ;; Comments in (INVOKE-RESTART :TEST-FUNCTION) apply here as well.
+    (assert (raises-error?
+             (with-testing-restart ()
+               (invoke-restart-interactively 'testing-restart))
+             control-error))
+
+    (assert (eq :transfer
+                (with-testing-restart (:condition-var condition)
+                  (invoke-restart-interactively
+                   (find-restart 'testing-restart condition)))))
+
+    (assert (eq :transfer
+                (with-testing-restart (:condition-restart-p nil)
+                  (invoke-restart-interactively
+                   (find-restart 'testing-restart (make-condition 'condition))))))))

@@ -213,9 +213,13 @@ with that condition (or with no condition) will be returned."
   "Calls the function associated with the given restart, prompting for any
    necessary arguments. If the argument restart is not a restart or a
    currently active non-NIL restart name, then a CONTROL-ERROR is signalled."
-  (let* ((real-restart (find-restart-or-control-error restart))
+  ;; For an explanation of the call to FIND-RESTART-OR-CONTROL-ERROR,
+  ;; see comment in INVOKE-RESTART.
+  (let* ((real-restart (find-restart-or-control-error
+                        restart nil (symbolp restart)))
          (args (interactive-restart-arguments real-restart)))
     (apply (restart-function real-restart) args)))
+
 
 (defun assert-error (assertion args-and-values places datum &rest arguments)
   (let ((cond (if datum
