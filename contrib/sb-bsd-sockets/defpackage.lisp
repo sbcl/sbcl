@@ -6,7 +6,7 @@
 
 (defpackage "SB-BSD-SOCKETS"
   (:export socket local-socket local-abstract-socket inet-socket
-           make-local-socket make-inet-socket
+           make-inet-socket
            socket-bind socket-accept socket-connect
            socket-send socket-receive
            socket-name socket-peername socket-listen
