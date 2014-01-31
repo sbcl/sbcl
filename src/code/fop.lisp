@@ -192,6 +192,12 @@
 
 ;;;; fops for loading symbols
 
+(defstruct (undefined-package
+            (:copier nil))
+  error)
+
+(declaim (freeze-type undefined-package))
+
 (defun aux-fop-intern (smallp package)
   (declare (optimize speed))
   (let* ((size (if smallp
@@ -206,11 +212,17 @@
       (read-string-as-unsigned-byte-32 *fasl-input-stream* buffer size)
       #!-sb-unicode
       (read-string-as-bytes *fasl-input-stream* buffer size))
-    (push-fop-table (without-package-locks
-                      (intern* buffer
-                               size
-                               package
-                               :no-copy t)))))
+    (if (undefined-package-p package)
+        (error 'simple-package-error
+               :format-control "Error finding package for symbol ~s:~% ~a"
+               :format-arguments
+               (list (subseq buffer 0 size)
+                     (undefined-package-error package)))
+        (push-fop-table (without-package-locks
+                          (intern* buffer
+                                   size
+                                   package
+                                   :no-copy t))))))
 
 (macrolet ((def (name code smallp package-form)
              `(define-fop (,name ,code)
@@ -260,7 +272,10 @@
       (read-string-as-bytes *fasl-input-stream* package-name)
       #!+sb-unicode
       (read-string-as-unsigned-byte-32 *fasl-input-stream* package-name))
-    (push-fop-table (find-undeleted-package-or-lose package-name))))
+    (push-fop-table
+     (handler-case (find-undeleted-package-or-lose package-name)
+       (simple-package-error (c)
+         (make-undefined-package :error (princ-to-string c)))))))
 
 ;;;; fops for loading numbers
 

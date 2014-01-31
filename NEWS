@@ -1,5 +1,7 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 changes relative to sbcl-1.1.15:
+  * enhancement: Loading fasls with symbols from an undefined package includes
+    the name of the symbol in the error message.
   * bug fix: problems when redefining classes and doing TYPEP on classes
     concurrently. (lp#1272742)
   * bug fix: x86-64 XCHG instruction was misencoded when used with RAX, R8-R15
