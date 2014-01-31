@@ -37,6 +37,7 @@ tests/test-status.lisp-expr
 tests/*.so
 tests/run-tests-*
 tools-for-build/determine-endianness
+tools-for-build/determine-endianness.exe
 tools-for-build/grovel-headers
 tools-for-build/grovel-headers.exe
 tools-for-build/os-provides-putwc-test
