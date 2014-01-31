@@ -214,17 +214,20 @@ Lstack:
 	xor	%rdx,%rdx	# clear any descriptor registers 
 	xor	%rdi,%rdi	# that we can't be sure we'll 
 	xor	%rsi,%rsi	# initialise properly.  XX do r8-r15 too?
-	shl	$(N_FIXNUM_TAG_BITS),%rcx	# (fixnumize num-args)
 	cmp	$0,%rcx
+        # It's tempting to think 'cmov' for these assignments, but don't:
+        # cmov does a memory cycle whether or not it moves, succumbing to
+        # a classic buffer overrun bug if argv[] is "badly" placed.
 	je	Ldone
 	mov	0(%rbx),%rdx	# arg0
-	cmp	$8,%rcx
+	cmp	$1,%rcx
 	je	Ldone
 	mov	8(%rbx),%rdi	# arg1
-	cmp	$16,%rcx
+	cmp	$2,%rcx
 	je	Ldone
 	mov	16(%rbx),%rsi	# arg2
 Ldone:	
+	shl	$(N_FIXNUM_TAG_BITS),%rcx	# (fixnumize num-args)
 	/* Registers rax, rcx, rdx, rdi, and rsi are now live. */
 	xor	%rbx,%rbx	# available
 
