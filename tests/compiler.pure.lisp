@@ -4989,3 +4989,10 @@
                                          (min a -1f0))))
                         0f0 1)
                -1f0)))
+
+(with-test (:name :malformed-declare)
+  (multiple-value-bind (fun warnings-p failure-p)
+      (compile nil '(lambda (x)
+                     (declare (unsigned-byte (x)))
+                     x))
+    (assert (and fun warnings-p failure-p))))

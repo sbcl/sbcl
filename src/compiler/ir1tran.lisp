@@ -1161,6 +1161,8 @@
     (collect ((restr nil cons)
              (new-vars nil cons))
       (dolist (var-name (rest decl))
+        (unless (symbolp var-name)
+          (compiler-error "Variable name is not a symbol: ~S." var-name))
         (when (boundp var-name)
           (program-assert-symbol-home-package-unlocked
            context var-name "declaring the type of ~A"))
