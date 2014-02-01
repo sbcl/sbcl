@@ -355,6 +355,7 @@
 
 (flet ((guts (stream not-p)
          (unless (if (let ((*package* *keyword-package*)
+                           (*reader-package* *keyword-package*)
                            (*read-suppress* nil))
                        (featurep (read stream t nil t)))
                      (not not-p)

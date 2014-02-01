@@ -277,6 +277,8 @@
 (with-test (:name :read-in-package-syntax)
   (assert (equal '(sb-c::a (sb-kernel::x sb-kernel::y) sb-c::b)
                  (read-from-string "sb-c::(a sb-kernel::(x y) b)")))
+  (assert (equal '(cl-user::yes-this-is-sbcl)
+                 (read-from-string "cl-user::(#+sbcl yes-this-is-sbcl)")))
   #+sb-package-locks
   (assert (eq :violated!
               (handler-case
