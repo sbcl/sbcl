@@ -260,16 +260,29 @@
   system-area-pointer (flushable))
 
 #!+sb-thread
+(progn
+(define-vop (current-thread-offset-sap/c)
+  (:results (sap :scs (sap-reg)))
+  (:result-types system-area-pointer)
+  (:translate current-thread-offset-sap)
+  (:info n)
+  ;; CONSTANT-DISPLACEMENT could be used here (modulo its incorrectness),
+  ;; except that negative indices are clearly nonsensical in this case.
+  (:arg-types (:constant (unsigned-byte 27))) ; as per 'target-thread.lisp'
+  (:policy :fast-safe)
+  (:generator 2
+    (inst mov sap (make-ea :qword :base thread-base-tn :disp (ash n 3)))))
 (define-vop (current-thread-offset-sap)
   (:results (sap :scs (sap-reg)))
   (:result-types system-area-pointer)
   (:translate current-thread-offset-sap)
-  (:args (n :scs (unsigned-reg) :target sap))
-  (:arg-types unsigned-num)
+  (:args (n :scs (any-reg) :target sap))
+  (:arg-types tagged-num)
   (:policy :fast-safe)
   (:generator 2
     (inst mov sap
-          (make-ea :qword :base thread-base-tn :disp 0 :index n :scale 8))))
+          (make-ea :qword :base thread-base-tn :index n
+                          :scale (ash 1 (- 3 n-fixnum-tag-bits)))))))
 
 (define-vop (halt)
   (:generator 1
