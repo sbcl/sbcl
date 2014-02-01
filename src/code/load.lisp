@@ -435,44 +435,52 @@
 ;;; Return true if we successfully load a group from the stream, or
 ;;; NIL if EOF was encountered while trying to read from the stream.
 ;;; Dispatch to the right function for each fop.
-(defun load-fasl-group (stream)
+(defun load-fasl-group (stream print)
+  ;;
+  ;; PRINT causes most tlf-equivalent forms to print their primary value.
+  ;; This differs from loading of Lisp source, which prints all values of
+  ;; only truly-toplevel forms.  This is permissible per CLHS -
+  ;;  "If print is true, load incrementally prints information to standard
+  ;;   output showing the progress of the loading process. [...]
+  ;;   For a compiled file, what is printed might not reflect precisely the
+  ;;   contents of the source file, but some information is generally printed."
+  ;;
   (when (check-fasl-header stream)
     (catch 'fasl-group-end
       (reset-fop-table)
-      (let ((*skip-until* nil))
+      (let ((*skip-until* nil)
+            ;; FOP numbers are in 'fop.lisp' but that file need this file,
+            ;; so figure out the secret code at runtime instead of compile-time
+            ;; which avoids one unnecessary bootstrap headache.
+            (funcall-for-effect (get 'sb!fasl::fop-funcall-for-effect
+                                     'sb!fasl::fop-code)))
         (declare (special *skip-until*))
         (loop
           (let ((byte (read-byte stream)))
             ;; Do some debugging output.
             #!+sb-show
             (when *show-fops-p*
-              (let* ((stack *fop-stack*)
-                     (ptr (svref stack 0)))
-                (fresh-line *trace-output*)
-                ;; The FOP operations are stack based, so it's sorta
-                ;; logical to display the operand before the operator.
-                ;; ("reverse Polish notation")
-                (unless (= ptr 0)
-                  (write-char #\space *trace-output*)
-                  (prin1 (aref stack ptr) *trace-output*)
-                  (terpri *trace-output*))
-                ;; Display the operator.
-                (format *trace-output*
-                        "~&~S (#X~X at ~D) (~S)~%"
-                        (aref *fop-names* byte)
-                        byte
-                        (1- (file-position stream))
-                        (svref *fop-funs* byte))))
-
+              (format *trace-output* "~&~6x : [~D,~D] ~2,'0x(~A)"
+                      (1- (file-position stream))
+                      (svref *fop-stack* 0) ; stack pointer
+                      (svref *fop-table* 0) ; table pointer
+                      byte (aref *fop-names* byte)))
             ;; Actually execute the fop.
-            (funcall (the function (svref *fop-funs* byte)))))))))
+            (let ((result (funcall (the function (svref *fop-funs* byte)))))
+              #!+sb-show
+              (when *show-fops-p*
+                (let* ((stack *fop-stack*)
+                       (ptr (svref stack 0)))
+                  (format *trace-output* " -- ~[<empty>,~D~:;[~:*~D,~D] ~S~]"
+                          ptr (svref *fop-table* 0)
+                          (unless (eql ptr 0) (aref stack ptr)))
+                  (terpri *trace-output*)))
+              (when (and print (eq byte funcall-for-effect)
+                         (eql (svref *fop-stack* 0) 0)) ; (presumed) end of TLF
+                (load-fresh-line)
+                (prin1 result)))))))))
 
 (defun load-as-fasl (stream verbose print)
-  ;; KLUDGE: ANSI says it's good to do something with the :PRINT
-  ;; argument to LOAD when we're fasloading a file, but currently we
-  ;; don't. (CMU CL did, but implemented it in a non-ANSI way, and I
-  ;; just disabled that instead of rewriting it.) -- WHN 20000131
-  (declare (ignore print))
   (when (zerop (file-length stream))
     (error "attempt to load an empty FASL file:~%  ~S" (namestring stream)))
   (maybe-announce-load stream verbose)
@@ -480,7 +488,7 @@
          (*fop-table* (make-fop-vector 1000))
          (*fop-stack* (make-fop-vector 100)))
     (unwind-protect
-         (loop while (load-fasl-group stream))
+         (loop while (load-fasl-group stream print))
       ;; Nuke the table and stack to avoid keeping garbage on
       ;; conservatively collected platforms.
       (nuke-fop-vector *fop-table*)
