@@ -880,12 +880,14 @@ necessary, since type inference may take arbitrarily long to converge.")
 ;;; popularized by Kent Pitman, of returning STREAM itself. If an
 ;;; error happens, then convert it to standard abort-the-compilation
 ;;; error condition (possibly recording some extra location
-;;; information).
-(defun read-for-compile-file (stream position)
+;;; information).  CONDITION-NAME is what to signal on error,
+;;; and should be INPUT-ERROR-IN-COMPILE-FILE or a subclass of it.
+;;; The signaled condition encapsulates a reader condition.
+(defun read-for-compile-file (stream position condition-name)
   (handler-case
       (read-preserving-whitespace stream nil stream)
     (reader-error (condition)
-      (compiler-error 'input-error-in-compile-file
+      (compiler-error condition-name
                       ;; We don't need to supply :POSITION here because
                       ;; READER-ERRORs already know their position in the file.
                       :condition condition
@@ -894,7 +896,7 @@ necessary, since type inference may take arbitrarily long to converge.")
     ;; (and that this is not a READER-ERROR) when it encounters end of
     ;; file in the middle of something it's trying to read.
     (end-of-file (condition)
-      (compiler-error 'input-error-in-compile-file
+      (compiler-error condition-name
                       :condition condition
                       ;; We need to supply :POSITION here because the END-OF-FILE
                       ;; condition doesn't carry the position that the user
@@ -902,7 +904,7 @@ necessary, since type inference may take arbitrarily long to converge.")
                       :position position
                       :stream stream))
     (error (condition)
-      (compiler-error 'input-error-in-compile-file
+      (compiler-error condition-name
                       :condition condition
                       :position position
                       :stream stream))))
@@ -940,8 +942,9 @@ necessary, since type inference may take arbitrarily long to converge.")
 
 ;;; Loop over FORMS retrieved from INFO.  Used by COMPILE-FILE and
 ;;; LOAD when loading from a FILE-STREAM associated with a source
-;;; file.
-(defmacro do-forms-from-info (((form &rest keys) info)
+;;; file.  ON-ERROR is the name of a condition class that should
+;;; be signaled if anything goes wrong during a READ.
+(defmacro do-forms-from-info (((form &rest keys) info on-error)
                               &body body)
   (aver (symbolp form))
   (once-only ((info info))
@@ -950,7 +953,7 @@ necessary, since type inference may take arbitrarily long to converge.")
                  (let* ((file-info (source-info-file-info ,info))
                         (stream (get-source-stream ,info))
                         (pos (file-position stream))
-                        (form (read-for-compile-file stream pos)))
+                        (form (read-for-compile-file stream pos ,on-error)))
                    (if (eq form stream) ; i.e., if EOF
                        (return)
                        (let* ((forms (file-info-forms file-info))
@@ -965,7 +968,8 @@ necessary, since type inference may take arbitrarily long to converge.")
 
 ;;; Read and compile the source file.
 (defun sub-sub-compile-file (info)
-  (do-forms-from-info ((form current-index) info)
+  (do-forms-from-info ((form current-index) info
+                       'input-error-in-compile-file)
     (with-source-paths
       (find-source-paths form current-index)
       (process-toplevel-form

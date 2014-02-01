@@ -416,3 +416,20 @@
                             '(1d0 2d0)))))
       (when tmp-fasl (delete-file tmp-fasl))
       (delete-file *tmp-filename*))))
+
+(with-test (:name :load-reader-error)
+  (unwind-protect
+       (block result
+         (with-open-file (f *tmp-filename* :direction :output
+                            :if-does-not-exist :create :if-exists :supersede)
+           (write-string "(defun fool () (nosuchpackage: " f))
+         (handler-bind
+             ((condition
+               (lambda (e)
+                 (if (eql (search "READ error during LOAD:"
+                                  (write-to-string e :escape nil))
+                          0)
+                     (return-from result t)
+                     (error "Unexpectedly erred: ~S" e)))))
+           (load *tmp-filename* :verbose nil)))
+    (delete-file *tmp-filename*)))

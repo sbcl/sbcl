@@ -152,12 +152,15 @@
 ;;; deeply confused, so we violate what'd otherwise be good compiler
 ;;; practice by not trying to recover from this error and bailing out
 ;;; instead.)
+;;; This name is inaccurate. Perhaps COMPILE/LOAD-INPUT-ERROR would be better.
 (define-condition input-error-in-compile-file (reader-error encapsulated-condition)
   (;; the position where the bad READ began, or NIL if unavailable,
    ;; redundant, or irrelevant
    (position :reader input-error-in-compile-file-position
              :initarg :position
-             :initform nil))
+             :initform nil)
+   (invoker :reader input-error-in-compile-file-invoker
+            :initarg :invoker :initform 'compile-file))
   (:report
    (lambda (condition stream)
      (format stream
@@ -166,9 +169,12 @@
                   ~@[~@:_~@:_(in form starting at ~:{~(~A~): ~S~:^, ~:_~})~]~
               ~:>"
              'read
-             'compile-file
+             (input-error-in-compile-file-invoker condition)
              (encapsulated-condition condition)
              (when (input-error-in-compile-file-position condition)
                (sb!kernel::stream-error-position-info
                 (stream-error-stream condition)
                 (input-error-in-compile-file-position condition)))))))
+
+(define-condition input-error-in-load (input-error-in-compile-file) ()
+  (:default-initargs :invoker 'load))
