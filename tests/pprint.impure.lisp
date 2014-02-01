@@ -164,7 +164,18 @@
   (assert (equal
            (with-output-to-string (s)
              (write '``(((,,foo) ,',foo) foo) :stream s :pretty t))
-           "``(((,,FOO) ,',FOO) FOO)")))
+           "``(((,,FOO) ,',FOO) FOO)"))
+  (assert (equal
+           (with-output-to-string (s)
+             (write '(let ((foo (x))) `(let (,foo) (setq ,foo (y)) (baz ,foo)))
+                    :stream s :pretty t))
+           ;; PPRINT-LET emits a mandatory newline after the bindings,
+           ;; otherwise this'd fit on one line given an adequate right margin.
+           "(LET ((FOO (X)))
+  `(LET (,FOO)
+     (SETQ ,FOO (Y))
+     (BAZ ,FOO)))")))
+
 
 ;;; SET-PPRINT-DISPATCH should accept function name arguments, and not
 ;;; rush to coerce them to functions.
@@ -289,7 +300,7 @@
                        when (nth-value 1 (ignore-errors (pprint list stream)))
                        collect (format nil "(~{~a ~}~a . 10)" (butlast list) symbol)))))
     (when errors
-      (error "Can't PPRINT imporper lists: ~a" errors))))
+      (error "Can't PPRINT improper lists: ~a" errors))))
 
 (with-test (:name :pprint-circular-backq-comma)
   ;; LP 1161218 reported by James M. Lawrence

@@ -11,23 +11,29 @@
 
 (in-package "SB!IMPL")
 
+(defstruct (backq-comma (:constructor make-backq-comma (form))
+                        (:copier nil) (:predicate nil))
+  form)
+(defstruct (backq-comma-at (:include backq-comma)
+                           (:constructor make-backq-comma-at (form))
+                           (:copier nil) (:predicate nil)))
+(defstruct (backq-comma-dot (:include backq-comma)
+                            (:constructor make-backq-comma-dot (form))
+                            (:copier nil) (:predicate nil)))
+
 (defun backq-unparse-expr (form splicing)
   (ecase splicing
-    ((nil)
-     `(backq-comma ,form))
-    ((t)
-     `((backq-comma-at ,form)))
-    (:nconc
-     `((backq-comma-dot ,form)))
-    ))
+    ((nil) (make-backq-comma form))
+    ((t) `(,(make-backq-comma-at form)))
+    (:nconc `(,(make-backq-comma-dot form)))))
 
 (defun backq-unparse (form &optional splicing)
   #!+sb-doc
   "Given a lisp form containing the magic functions BACKQ-LIST, BACKQ-LIST*,
   BACKQ-APPEND, etc. produced by the backquote reader macro, will return a
   corresponding backquote input form. In this form, `,' `,@' and `,.' are
-  represented by lists whose cars are BACKQ-COMMA, BACKQ-COMMA-AT, and
-  BACKQ-COMMA-DOT respectively, and whose cadrs are the form after the comma.
+  represented by structures of type BACKQ-COMMA, BACKQ-COMMA-AT, and
+  BACKQ-COMMA-DOT respectively.
   SPLICING indicates whether a comma-escape return should be modified for
   splicing with other forms: a value of T or :NCONC meaning that an extra
   level of parentheses should be added."
@@ -62,13 +68,18 @@
       (backq-vector
        (coerce (backq-unparse (cadr form)) 'vector))
       (quote
-       (cond
-         ((atom (cadr form)) (cadr form))
-         ((and (consp (cadr form))
-               (member (caadr form) *backq-tokens*))
-          (backq-unparse-expr form splicing))
-         (t (cons (backq-unparse `(quote ,(caadr form)))
-                  (backq-unparse `(quote ,(cdadr form)))))))
+       ;; FIXME: This naively assumes that the form is exactly (QUOTE x).
+       ;; Therefore (QUOTE . x) and (QUOTE x y z*) will lose.
+       (let ((thing (cadr form)))
+         (cond ((atom thing)
+                (if (typep thing 'backq-comma)
+                    (backq-unparse-expr form splicing)
+                    thing))
+               ((member (car thing) *backq-tokens*)
+                (backq-unparse-expr form splicing))
+               (t
+                (cons (backq-unparse `(quote ,(car thing)))
+                      (backq-unparse `(quote ,(cdr thing))))))))
       (t
        (backq-unparse-expr form splicing))))))
 
@@ -77,43 +88,22 @@
   (write-char #\` stream)
   (write (backq-unparse form) :stream stream))
 
-(defun pprint-backq-comma (stream form &rest noise)
-  (declare (ignore noise))
-  (ecase (car form)
-    (backq-comma
-     (write-char #\, stream))
+(defun pprint-backq-comma (stream thing &rest noise)
+  (declare (ignore noise) (backq-comma thing))
+  (etypecase thing
     (backq-comma-at
      (write-string ",@" stream))
     (backq-comma-dot
-     (write-string ",." stream)))
-  ;; Ha!  an example of where the per-process specials for stream
-  ;; attributes rather than per-stream actually makes life easier.
-  ;; Since all of the attributes are shared in the dynamic state, we
-  ;; can do... -- CSR, 2003-09-30
-  ;;
-  ;; [...] above referred to the trick of printing to a string stream,
-  ;; and then simply printing the resulting sequence to the pretty
-  ;; stream, possibly with a space prepended.  However, this doesn't
-  ;; work for pretty streams which need to do margin calculations.  Oh
-  ;; well.  It was good while it lasted.  -- CSR, 2003-12-15
-  ;;
-  ;; This is an evil hack. If we print to a string and then print again,
-  ;; the circularity detection logic behaves as though it's already
-  ;; printed that data... and it has, to a string stream that we send
-  ;; to the bitbucket in the sky.  -- PK, 2013-03-30
-  (when (eql (car form) 'backq-comma)
-    (let ((output (with-output-to-string (s)
-                    ;; Patching evil with more evil.  The next step is
-                    ;; likely to stop the madness and unconditionally
-                    ;; insert a space.
-                    (let (*circularity-hash-table*
-                          *circularity-counter*)
-                      (write (cadr form) :stream s)))))
-      (when (and (plusp (length output))
-                 (or (char= (char output 0) #\.)
-                     (char= (char output 0) #\@)))
-        (write-char #\Space stream))))
-  (write (cadr form) :stream stream))
+     (write-string ",." stream))
+    (backq-comma
+     (write-char #\, stream)
+     (setf (sb!pretty::pretty-stream-char-out-oneshot-hook stream)
+           (lambda (stream char)
+             ;; Ensure a space is written before any output that would
+             ;; erroneously be interpreted as a splicing frob on readback.
+             (when (or (char= char #\.) (char= char #\@))
+               (write-char #\Space stream))))))
+  (write (backq-comma-form thing) :stream stream))
 
 ;;; This is called by !PPRINT-COLD-INIT, fairly late, because
 ;;; SET-PPRINT-DISPATCH doesn't work until the compiler works.
@@ -127,7 +117,5 @@
   (set-pprint-dispatch '(cons (eql backq-nconc)) #'pprint-backquote)
   (set-pprint-dispatch '(cons (eql backq-cons)) #'pprint-backquote)
   (set-pprint-dispatch '(cons (eql backq-vector)) #'pprint-backquote)
+  (set-pprint-dispatch 'backq-comma #'pprint-backq-comma))
 
-  (set-pprint-dispatch '(cons (eql backq-comma)) #'pprint-backq-comma)
-  (set-pprint-dispatch '(cons (eql backq-comma-at)) #'pprint-backq-comma)
-  (set-pprint-dispatch '(cons (eql backq-comma-dot)) #'pprint-backq-comma))

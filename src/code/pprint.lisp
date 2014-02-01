@@ -42,6 +42,8 @@
                    (sb!impl::line-length target)
                    default-line-length)
                :type column)
+  ;; If non-nil, a function to call before performing OUT or SOUT
+  (char-out-oneshot-hook nil :type (or null function))
   ;; A simple string holding all the text that has been output but not yet
   ;; printed.
   (buffer (make-string initial-buffer-size) :type (simple-array character (*)))
@@ -120,6 +122,10 @@
 (defun pretty-out (stream char)
   (declare (type pretty-stream stream)
            (type character char))
+  (let ((f (pretty-stream-char-out-oneshot-hook stream)))
+    (when f
+      (setf (pretty-stream-char-out-oneshot-hook stream) nil)
+      (funcall f stream char)))
   (cond ((char= char #\newline)
          (enqueue-newline stream :literal))
         (t
@@ -142,6 +148,10 @@
           string
         ;; For POSITION transform
         (declare (optimize (speed 2)))
+        (let ((f (pretty-stream-char-out-oneshot-hook stream)))
+          (when f
+            (setf (pretty-stream-char-out-oneshot-hook stream) nil)
+            (funcall f stream (aref string start))))
         (let ((newline (position #\newline string :start start :end end)))
           (cond
             (newline
