@@ -789,6 +789,7 @@
 
 (defun looks-like-name-of-special-var-p (x)
   (and (symbolp x)
+       (symbol-package x)
        (let ((name (symbol-name x)))
          (and (> (length name) 2) ; to exclude '* and '**
               (char= #\* (aref name 0))

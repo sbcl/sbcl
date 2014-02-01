@@ -4996,3 +4996,20 @@
                      (declare (unsigned-byte (x)))
                      x))
     (assert (and fun warnings-p failure-p))))
+
+(with-test (:name :no-dubious-asterisk-warning)
+  (multiple-value-bind (fun warnings-p failure-p)
+      (compile
+       nil
+       '(lambda (foo)
+         (macrolet ((frob-some-stuff (&rest exprs)
+                      (let ((temps
+                             (mapcar
+                              (lambda (x)
+                                (if (symbolp x) (copy-symbol x) (gensym)))
+                              exprs)))
+                        `(let ,(mapcar #'list temps exprs)
+                           (if (and ,@temps)
+                               (format t "Got~@{ ~S~^ and~}~%" ,@temps))))))
+           (frob-some-stuff *print-base* (car foo)))))
+    (assert (and fun (not warnings-p) (not failure-p)))))
