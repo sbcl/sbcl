@@ -130,9 +130,9 @@ dump_cmd(char **ptr)
     lastcount = count;
 
     if (count > 0)
-        displacement = 4;
+        displacement = N_WORD_BYTES;
     else {
-        displacement = -4;
+        displacement = -N_WORD_BYTES;
         count = -count;
     }
 
@@ -151,6 +151,14 @@ dump_cmd(char **ptr)
             unsigned short *sptr = (unsigned short *)addr;
             unsigned char *cptr = (unsigned char *)addr;
 
+#if N_WORD_BYTES == 8
+            printf("0x%016lx | %c%c%c%c%c%c%c%c\n",
+                   lptr[0],
+                   visible(cptr[0]), visible(cptr[1]),
+                   visible(cptr[2]), visible(cptr[3]),
+                   visible(cptr[4]), visible(cptr[5]),
+                   visible(cptr[6]), visible(cptr[7]));
+#else
             printf("0x%08lx   0x%04x 0x%04x   "
                    "0x%02x 0x%02x 0x%02x 0x%02x    "
                    "%c%c"
@@ -159,6 +167,7 @@ dump_cmd(char **ptr)
                    cptr[0], cptr[1], cptr[2], cptr[3],
                    visible(cptr[0]), visible(cptr[1]),
                    visible(cptr[2]), visible(cptr[3]));
+#endif
         }
         else
             printf("invalid Lisp-level address\n");
