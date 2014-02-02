@@ -324,8 +324,10 @@ static inline struct thread *arch_os_get_current_thread(void)
     /* If enabled by make-config (currently Darwin and FreeBSD only),
      * re-setup %fs.  This is an out-of-line call, and potentially
      * expensive.*/
-    if (th)
+    if (th) {
+        void arch_os_load_ldt(struct thread*);
         arch_os_load_ldt(th);
+    }
 # endif
 
     return th;
