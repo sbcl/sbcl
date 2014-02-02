@@ -6,6 +6,8 @@ changes relative to sbcl-1.1.15:
     concurrently. (lp#1272742)
   * bug fix: x86-64 XCHG instruction was misencoded when used with RAX, R8-R15
     registers. (reported by Eric Marsden)
+  * bug fix: the disassembler outputs source annotations in the right place
+    and no longer randomly drops some of them. (lp#1249205)
 
 changes in sbcl-1.1.15 relative to sbcl-1.1.14:
   * new feature: the iterative spilling/coloring register allocator developed

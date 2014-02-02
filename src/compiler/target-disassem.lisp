@@ -1167,7 +1167,7 @@
   (let ((last-block-pc -1))
     (flet ((add-hook (pc fun &optional before-address)
              (push (make-offs-hook
-                    :offset pc ;; ### FIX to account for non-zero offs in code
+                    :offset (code-insts-offs-to-segment-offs pc segment)
                     :fun fun
                     :before-address before-address)
                    (seg-hooks segment))))
