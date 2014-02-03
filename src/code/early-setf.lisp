@@ -342,24 +342,35 @@
     #+sb-xc-host (declare (ignore expander-lambda-list))
     (with-single-package-locked-error
         (:symbol name "defining a setf-expander for ~A"))
-    (cond ((gethash name sb!c:*setf-assumed-fboundp*)
-           (warn
-            "defining setf macro for ~S when ~S was previously ~
-             treated as a function"
-            name
-            `(setf ,name)))
-          ((not (fboundp `(setf ,name)))
-           ;; All is well, we don't need any warnings.
-           (values))
-          ((not (eq (symbol-package name) (symbol-package 'aref)))
+    (let ((setf-fn-name `(setf ,name)))
+      (multiple-value-bind (where-from present-p)
+          (info :function :where-from setf-fn-name)
+        ;; One might think that :DECLARED merits a style warning, but SBCL
+        ;; provides ~58 standard accessors as both (SETF F) and a macro.
+        ;; So allow the user to declaim an FTYPE and we'll hush up.
+        ;; What's good for the the goose is good for the gander.
+        (case where-from
+          (:assumed
+           ;; This indicates probable user error. Compilation assumed something
+           ;; to be functional; a macro says otherwise. Because :where-from's
+           ;; default can be :assumed, PRESENT-P disambiguates "defaulted" from
+           ;; "known" to have made an existence assumption. Also, we define
+           ;; (SETF SLOT-VALUE) as a macro in warm build of PCL after
+           ;; its functional nature has been assumed, so it gets an exception.
+           ;; FIXME: maybe declaim its type earlier outside of the PCL build.
+           (when (and present-p (not (eq name 'slot-value)))
+             (warn "defining setf macro for ~S when ~S was previously ~
+             treated as a function" name setf-fn-name)))
+          (:defined
+           ;; Somebody defined (SETF F) but then also said F has a macro.
+           ;; A soft warning seems appropriate because in this case it's
+           ;; at least in theory not wrong to call the function.
+           ;; The user can declare an FTYPE if both things are intentional.
            (style-warn "defining setf macro for ~S when ~S is fbound"
-                       name `(setf ,name))))
-    (remhash name sb!c:*setf-assumed-fboundp*)
+                       name setf-fn-name)))))
     #-sb-xc-host
     (when expander
       (setf (%fun-lambda-list expander) expander-lambda-list))
-    ;; FIXME: It's probably possible to join these checks into one form which
-    ;; is appropriate both on the cross-compilation host and on the target.
     (when (or inverse (info :setf :inverse name))
       (setf (info :setf :inverse name) inverse))
     (when (or expander (info :setf :expander name))

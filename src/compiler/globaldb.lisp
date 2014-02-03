@@ -1346,22 +1346,4 @@
     (let ((info (type-info-or-lose class type)))
       `(clear-info-value ,name ,(type-info-number info)))))
 
-;;;; a hack for detecting
-;;;;   (DEFUN FOO (X Y)
-;;;;     ..
-;;;;     (SETF (BAR A FFH) 12) ; compiles to a call to #'(SETF BAR)
-;;;;     ..)
-;;;;   (DEFSETF BAR SET-BAR) ; can't influence previous compilation
-;;;;
-;;;; KLUDGE: Arguably it should be another class/type combination in
-;;;; the globaldb. However, IMHO the whole globaldb/fdefinition
-;;;; treatment of SETF functions is a mess which ought to be
-;;;; rewritten, and I'm not inclined to mess with it short of that. So
-;;;; I just put this bag on the side of it instead..
-
-;;; true for symbols FOO which have been assumed to have '(SETF FOO)
-;;; bound to a function
-(defvar *setf-assumed-fboundp*)
-(!cold-init-forms (setf *setf-assumed-fboundp* (make-hash-table)))
-
 (!defun-from-collected-cold-init-forms !globaldb-cold-init)

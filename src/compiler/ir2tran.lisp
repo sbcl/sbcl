@@ -1154,8 +1154,6 @@
 ;;;     never be full called? (Except as of sbcl-0.7.18 or so, we no
 ;;;     longer try to ensure this behavior when *FAILURE-P* has already
 ;;;     been detected.)
-;;;   * Is this a full call to (SETF FOO) which might conflict with
-;;;     a DEFSETF or some such thing elsewhere in the program?
 (defun ponder-full-call (node)
   (let* ((lvar (basic-combination-fun node))
          (fname (lvar-fun-name lvar t)))
@@ -1191,10 +1189,7 @@
           (bug "full call to ~S" fname))))
 
     (when (consp fname)
-      (aver (legal-fun-name-p fname))
-      (destructuring-bind (setfoid &rest stem) fname
-        (when (eq setfoid 'setf)
-          (setf (gethash (car stem) *setf-assumed-fboundp*) t))))))
+      (aver (legal-fun-name-p fname))))) ;; FIXME: needless check?
 
 ;;; If the call is in a tail recursive position and the return
 ;;; convention is standard, then do a tail full call. If one or fewer
