@@ -910,7 +910,8 @@
               (return
                 (values code pc-offset context)))))))))
 
-#!-(or x86 x86-64)
+;;
+#!-(or x86 x86-64 arm)
 (defun find-escaped-frame (frame-pointer)
   (declare (type system-area-pointer frame-pointer))
   (/noshow0 "entering FIND-ESCAPED-FRAME")
@@ -2120,15 +2121,19 @@ register."
       #!-(or x86 x86-64)
       (#.sb!vm:interior-reg-sc-number
        (error "Local interior register access?"))
+      #!-arm
       (#.sb!vm:single-reg-sc-number
        (escaped-float-value single-float))
+      #!-arm
       (#.sb!vm:double-reg-sc-number
        (escaped-float-value double-float))
       #!+long-float
       (#.sb!vm:long-reg-sc-number
        (escaped-float-value long-float))
+      #!-arm
       (#.sb!vm:complex-single-reg-sc-number
        (escaped-complex-float-value single-float 1))
+      #!-arm
       (#.sb!vm:complex-double-reg-sc-number
        (escaped-complex-float-value double-float #!+sparc 2 #!-sparc 1))
       #!+long-float
@@ -2136,9 +2141,11 @@ register."
        (escaped-complex-float-value long-float
                                     #!+sparc 4 #!+(or x86 x86-64) 1
                                     #!-(or sparc x86 x86-64) 0))
+      #!-arm
       (#.sb!vm:single-stack-sc-number
        (with-nfp (nfp)
          (sap-ref-single nfp (stack-frame-offset 1 0))))
+      #!-arm
       (#.sb!vm:double-stack-sc-number
        (with-nfp (nfp)
          (sap-ref-double nfp (stack-frame-offset 2 0))))
@@ -2146,11 +2153,13 @@ register."
       (#.sb!vm:long-stack-sc-number
        (with-nfp (nfp)
          (sap-ref-long nfp (stack-frame-offset 3 0))))
+      #!-arm
       (#.sb!vm:complex-single-stack-sc-number
        (with-nfp (nfp)
          (complex
           (sap-ref-single nfp (stack-frame-offset 1 0))
           (sap-ref-single nfp (stack-frame-offset 1 1)))))
+      #!-arm
       (#.sb!vm:complex-double-stack-sc-number
        (with-nfp (nfp)
          (complex
@@ -2302,9 +2311,11 @@ register."
       #!-(or x86 x86-64)
       (#.sb!vm:interior-reg-sc-number
        (error "Local interior register access?"))
+      #!-arm
       (#.sb!vm:single-reg-sc-number
        #!-(or x86 x86-64) ;; don't have escaped floats.
        (set-escaped-float-value single-float value))
+      #!-arm
       (#.sb!vm:double-reg-sc-number
        #!-(or x86 x86-64) ;; don't have escaped floats -- still in npx?
        (set-escaped-float-value double-float value))
@@ -2312,19 +2323,21 @@ register."
       (#.sb!vm:long-reg-sc-number
        #!-(or x86 x86-64) ;; don't have escaped floats -- still in npx?
        (set-escaped-float-value long-float value))
-      #!-(or x86 x86-64)
+      #!-(or x86 x86-64 arm)
       (#.sb!vm:complex-single-reg-sc-number
        (set-escaped-complex-float-value single-float 1 value))
-      #!-(or x86 x86-64)
+      #!-(or x86 x86-64 arm)
       (#.sb!vm:complex-double-reg-sc-number
        (set-escaped-complex-float-value double-float #!+sparc 2 #!-sparc 1 value))
       #!+(and long-float (not (or x86 x86-64)))
       (#.sb!vm:complex-long-reg-sc-number
        (set-escaped-complex-float-value long-float #!+sparc 4 #!-sparc 0 value))
+      #!-arm
       (#.sb!vm:single-stack-sc-number
        (with-nfp (nfp)
          (setf (sap-ref-single nfp (stack-frame-offset 1 0))
                (the single-float value))))
+      #!-arm
       (#.sb!vm:double-stack-sc-number
        (with-nfp (nfp)
          (setf (sap-ref-double nfp (stack-frame-offset 2 0))
@@ -2334,6 +2347,7 @@ register."
        (with-nfp (nfp)
          (setf (sap-ref-long nfp (stack-frame-offset 3 0))
                (the long-float value))))
+      #!-arm
       (#.sb!vm:complex-single-stack-sc-number
        (with-nfp (nfp)
          (setf (sap-ref-single
@@ -2348,6 +2362,7 @@ register."
                (imagpart (the (complex single-float) value))
                #!-(or x86 x86-64)
                (the single-float (realpart value)))))
+      #!-arm
       (#.sb!vm:complex-double-stack-sc-number
        (with-nfp (nfp)
          (setf (sap-ref-double
