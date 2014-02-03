@@ -619,4 +619,9 @@
       (sb-ext:delete-directory shallow :recursive t))
     (assert (not (probe-file shallow)))))
 
+#+unix
+(with-test (:name :simplify-namestring)
+  (assert (string= (sb-int:simplify-namestring "./a/b/../c/")
+                   "a/c/")))
+
 ;;;; success
