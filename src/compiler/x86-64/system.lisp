@@ -256,7 +256,10 @@
     (emit-safepoint)))
 
 #!+sb-thread
-(defknown current-thread-offset-sap ((unsigned-byte 64))
+;; 28 unsigned bits is the max before shifting left by 3 that fits in the
+;; 'displacement' of an EA. This is hugely generous. The largest offset
+;; you'd ever supply is THREAD-NONPOINTER-DATA-SLOT + interrupt depth.
+(defknown current-thread-offset-sap ((unsigned-byte 28))
   system-area-pointer (flushable))
 
 #!+sb-thread
@@ -266,11 +269,9 @@
   (:result-types system-area-pointer)
   (:translate current-thread-offset-sap)
   (:info n)
-  ;; CONSTANT-DISPLACEMENT could be used here (modulo its incorrectness),
-  ;; except that negative indices are clearly nonsensical in this case.
-  (:arg-types (:constant (unsigned-byte 27))) ; as per 'target-thread.lisp'
+  (:arg-types (:constant unsigned-byte))
   (:policy :fast-safe)
-  (:generator 2
+  (:generator 1
     (inst mov sap (make-ea :qword :base thread-base-tn :disp (ash n 3)))))
 (define-vop (current-thread-offset-sap)
   (:results (sap :scs (sap-reg)))

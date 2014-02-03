@@ -388,6 +388,20 @@ See also: RETURN-FROM-THREAD and SB-EXT:EXIT."
         int (word unsigned) (n unsigned-long))))
 
 ;;; used by debug-int.lisp to access interrupt contexts
+
+;;; The two uses immediately below of (unsigned-byte 27) are arbitrary,
+;;; as a more reasonable type restriction is an integer from 0 to
+;;;  (+ (primitive-object-size
+;;;      (find 'thread *primitive-objects* :key #'primitive-object-name))
+;;;     MAX-INTERRUPTS) ; defined only for C in 'interrupt.h'
+;;;
+;;; The x86 32-bit port is helped slightly by having a stricter constraint
+;;; than the (unsigned-byte 32) from its DEFKNOWN of this function.
+;;; Ideally a single defknown would work for any backend because the thread
+;;; structure is, after all, defined in the generic objdefs. But the VM needs
+;;; the defknown before the VOP, and this file comes too late, so we'd
+;;; need to pick some other place - maybe 'thread.lisp'?
+
 #!-(or sb-fluid sb-thread) (declaim (inline sb!vm::current-thread-offset-sap))
 #!-sb-thread
 (defun sb!vm::current-thread-offset-sap (n)
