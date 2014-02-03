@@ -86,7 +86,7 @@
   (:args (x :target r :scs (any-reg)))
   (:info y)
   (:arg-types tagged-num
-              (:constant fixnum))
+              (:constant (signed-byte #.n-fixnum-bits)))
   (:results (r :scs (any-reg)))
   (:result-types tagged-num)
   (:note "inline fixnum arithmetic"))
