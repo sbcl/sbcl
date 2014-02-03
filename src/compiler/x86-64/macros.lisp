@@ -215,8 +215,8 @@
                          (make-ea :qword :base temp-reg-tn :index size)))
                (inst lea alloc-tn
                      (make-ea :qword :base temp-reg-tn :disp size)))
-           (inst cmp end-addr alloc-tn)
-           (inst jmp :be NOT-INLINE)
+           (inst cmp alloc-tn end-addr)
+           (inst jmp :g NOT-INLINE)
            (inst mov free-pointer alloc-tn)
            (if lowtag
                (inst lea alloc-tn (make-ea :byte :base temp-reg-tn :disp lowtag))
