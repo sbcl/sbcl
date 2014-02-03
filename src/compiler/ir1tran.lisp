@@ -653,6 +653,13 @@
                   (use-continuation cast next result)))
           (t (use-continuation ref next result)))))
 
+(defun always-boundp (name)
+  (case (info :variable :always-bound name)
+    (:always-bound t)
+    ;; Compiling to fasl considers a symbol always-bound if its
+    ;; :always-bound info value is now T or will eventually be T.
+    (:eventually (fasl-output-p *compile-object*))))
+
 ;;; Convert a reference to a symbolic constant or variable. If the
 ;;; symbol is entered in the LEXENV-VARS we use that definition,
 ;;; otherwise we find the current global definition. This is also
@@ -660,7 +667,7 @@
 (defun ir1-convert-var (start next result name)
   (declare (type ctran start next) (type (or lvar null) result) (symbol name))
   (let ((var (or (lexenv-find name vars) (find-free-var name))))
-    (if (and (global-var-p var) (not (info :variable :always-bound name)))
+    (if (and (global-var-p var) (not (always-boundp name)))
         ;; KLUDGE: If the variable may be unbound, convert using SYMBOL-VALUE
         ;; which is not flushable, so that unbound dead variables signal an
         ;; error (bug 412, lp#722734): checking for null RESULT is not enough,

@@ -684,6 +684,7 @@ like *STACK-TOP-HINT* and unsupported stuff like *TRACED-FUN-LIST*."
 
                ;; global lexicals, access to global symbol values
                "DEFGLOBAL"
+               "DEFINE-LOAD-TIME-GLOBAL"
                "SYMBOL-GLOBAL-VALUE"
 
                ;; package extensions

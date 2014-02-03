@@ -66,7 +66,8 @@ distinct from the global value. Can also be SETF."
   #!+sb-doc
   "Make SYMBOL unbound, removing any value it may currently have."
   (with-single-package-locked-error (:symbol symbol "unbinding the symbol ~A")
-    (when (and (info :variable :always-bound symbol))
+    ;; :EVENTUALLY is allowed for :always-bound here, as it has no bearing
+    (when (eq (info :variable :always-bound symbol) :always-bound)
       (error "Can't make ~A variable unbound: ~S" 'always-bound symbol))
     (about-to-modify-symbol-value symbol 'makunbound)
     (%makunbound symbol)

@@ -997,7 +997,7 @@
 (define-info-type
   :class :variable
   :type :always-bound
-  :type-spec boolean
+  :type-spec (member nil :eventually :always-bound)
   :default nil)
 
 (define-info-type

@@ -138,28 +138,28 @@
 (!cold-init-forms (setf *queued-proclaims* nil))
 (!defun-from-collected-cold-init-forms !early-proclaim-cold-init)
 
-(defun process-variable-declaration (name kind)
+(defun process-variable-declaration (name kind info-value)
   (unless (symbolp name)
     (error "Cannot proclaim a non-symbol as ~A: ~S" kind name))
 
-  (when (and (eq kind 'always-bound) (not (boundp name)))
+  (when (and (eq kind 'always-bound) (eq info-value :always-bound)
+             (not (boundp name)))
     (error "Cannot proclaim an unbound symbol as ~A: ~S" kind name))
 
   (multiple-value-bind (allowed test)
       (ecase kind
         (special (values '(:special :unknown) #'eq))
         (global (values '(:global :unknown) #'eq))
-        (always-bound (values '(:constant) (complement #'eq))))
+        (always-bound (values '(:constant) #'neq)))
     (let ((old (info :variable :kind name)))
       (unless (member old allowed :test test)
         (error "Cannot proclaim a ~A variable ~A: ~S" old kind name))))
 
   (with-single-package-locked-error
       (:symbol name "globally declaring ~A ~A" kind)
-    (ecase kind
-      (special (setf (info :variable :kind name) :special))
-      (global (setf (info :variable :kind name) :global))
-      (always-bound (setf (info :variable :always-bound name) t)))))
+    (if (eq kind 'always-bound)
+        (setf (info :variable :always-bound name) info-value)
+        (setf (info :variable :kind name) info-value))))
 
 (defun proclaim-type (name type where-from)
   (unless (symbolp name)
@@ -280,7 +280,11 @@
                (apply #'map-names args function extra-args)))
       (case kind
         ((special global always-bound)
-         (map-args #'process-variable-declaration kind))
+         (map-args #'process-variable-declaration kind
+                   (case kind
+                     (special :special)
+                     (global :global)
+                     (always-bound :always-bound))))
         ((type ftype)
          (if *type-system-initialized*
              (destructuring-bind (type &rest names) args

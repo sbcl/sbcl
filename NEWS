@@ -1,5 +1,6 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 changes relative to sbcl-1.1.15:
+  * enhancement: SB-EXT:DEFINE-LOAD-TIME-GLOBAL. (lp#1253688)
   * enhancement: Loading fasls with symbols from an undefined package includes
     the name of the symbol in the error message.
   * bug fix: problems when redefining classes and doing TYPEP on classes

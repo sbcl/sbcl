@@ -232,26 +232,51 @@ locally bound, declared special, defined as constants, and neither bound
 nor defined as symbol macros.
 
 See also the declarations SB-EXT:GLOBAL and SB-EXT:ALWAYS-BOUND."
-  `(progn
-     (eval-when (:compile-toplevel)
-       (let ((boundp (boundp ',name)))
-         (%compiler-defglobal ',name (unless boundp ,value) boundp)))
-     (eval-when (:load-toplevel :execute)
-       (let ((boundp (boundp ',name)))
-         (%defglobal ',name (unless boundp ,value) boundp ',doc ,docp
-                     (sb!c:source-location))))))
+  (let ((boundp (make-symbol "BOUNDP")))
+    `(progn
+       (eval-when (:compile-toplevel)
+         (let ((,boundp (boundp ',name)))
+           (%compiler-defglobal ',name :always-bound
+                                (unless ,boundp ,value) (not ,boundp))))
+       (eval-when (:load-toplevel :execute)
+         (let ((,boundp (boundp ',name)))
+           (%defglobal ',name (unless ,boundp ,value) ,boundp ',doc ,docp
+                       (sb!c:source-location)))))))
 
-(defun %compiler-defglobal (name value boundp)
+(defmacro-mundanely define-load-time-global (name value &optional (doc nil docp))
+  #!+sb-doc
+  "Defines NAME as a global variable that is always bound. VALUE is evaluated
+and assigned to NAME at load-time, but only if NAME is not already bound.
+
+Attempts to read NAME at compile-time will signal an UNBOUND-VARIABLE error
+unless it has otherwise been assigned a value.
+
+See also DEFGLOBAL which assigns the VALUE at compile-time too."
+  (let ((boundp (make-symbol "BOUNDP")))
+    `(progn
+       (eval-when (:compile-toplevel)
+         (%compiler-defglobal ',name :eventually nil nil))
+       (eval-when (:load-toplevel :execute)
+         (let ((,boundp (boundp ',name)))
+           (%defglobal ',name (unless ,boundp ,value) ,boundp ',doc ,docp
+                       (sb!c:source-location)))))))
+
+(defun %compiler-defglobal (name always-boundp value assign-it-p)
   (sb!xc:proclaim `(global ,name))
-  (unless boundp
+  (when assign-it-p
     #-sb-xc-host
     (set-symbol-global-value name value)
     #+sb-xc-host
     (set name value))
-  (sb!xc:proclaim `(always-bound ,name)))
+  (sb!c::process-variable-declaration
+   name 'always-bound
+   ;; don't "weaken" the proclamation if it's in fact always bound now
+   (if (eq (info :variable :always-bound name) :always-bound)
+       :always-bound
+       always-boundp)))
 
 (defun %defglobal (name value boundp doc docp source-location)
-  (%compiler-defglobal name value boundp)
+  (%compiler-defglobal name :always-bound value (not boundp))
   (when docp
     (setf (fdocumentation name 'variable) doc))
   (sb!c:with-source-location (source-location)
