@@ -204,12 +204,13 @@
  ("src/code/target-allocate"  :not-host :arm-bootstrap)
 
  ;; This needs DEFINE-ALIEN-ROUTINE from target-alieneval.
- ;; FIXME-ARM: TOO FEW REGISTERS (SAP-REG)
- ("src/code/misc-aliens" :not-host)
+ ("src/code/misc-aliens" :not-host :arm-bootstrap)
 
- ("src/compiler/generic/vm-array")
+ ("src/compiler/generic/vm-array" :arm-bootstrap)
  ("src/code/array"         :not-host :arm-bootstrap)
+ ;; FIXME-ARM: no floating point support yet
  ("src/code/early-float"   :not-host)
+ ;; FIXME-ARM: no floating point support yet
  ("src/code/target-sxhash" :not-host) ; needs most-fooative-foo-float constants
 
  ("src/code/list"   :not-host :arm-bootstrap)
@@ -220,8 +221,7 @@
  ("src/code/mipsstrops" :not-host :arm-bootstrap)
 
  ("src/code/early-time" :not-host :arm-bootstrap)
- ;; FIXME-ARM: TOO FEW REGISTERS (SAP-REG)
- ("src/code/unix" :not-host)
+ ("src/code/unix" :not-host :arm-bootstrap)
  #!+win32 ("src/code/win32" :not-host)
  #!+mach  ("src/code/mach"     :not-host)
 
@@ -232,8 +232,7 @@
  #!+osf1  ("src/code/osf1-os"  :not-host)
  #!+irix  ("src/code/irix-os"  :not-host)
  #!+bsd   ("src/code/bsd-os"   :not-host)
- ;; FIXME-ARM: NEEDS src/code/unix
- #!+linux ("src/code/linux-os" :not-host)
+ #!+linux ("src/code/linux-os" :not-host :arm-bootstrap)
  #!+win32 ("src/code/win32-os" :not-host)
 
  ;; sparc-vm and ppc-vm need sc-offset defined to get at internal
@@ -262,8 +261,11 @@
  ("src/code/symbol"     :not-host :arm-bootstrap)
  ("src/code/bignum"     :not-host :arm-bootstrap)
  ("src/code/numbers"    :not-host :arm-bootstrap)
+ ;; FIXME-ARM: no floating point support yet
  ("src/code/float-trap" :not-host)
+ ;; FIXME-ARM: no floating point support yet
  ("src/code/float"      :not-host)
+ ;; FIXME-ARM: no floating point support yet
  ("src/code/irrat"      :not-host)
 
  ("src/code/char" :arm-bootstrap)
@@ -278,150 +280,151 @@
  ("src/code/print"         :not-host :arm-bootstrap)
  ("src/code/pprint"        :not-host :arm-bootstrap)
  ("src/code/early-format" :arm-bootstrap)
- ("src/code/target-format" :not-host)
- ("src/code/defpackage"    :not-host)
- ("src/code/pp-backq"      :not-host)
+ ("src/code/target-format" :not-host :arm-bootstrap)
+ ("src/code/defpackage"    :not-host :arm-bootstrap)
+ ("src/code/pp-backq"      :not-host :arm-bootstrap)
 
- ("src/code/error-error" :not-host) ; needs WITH-STANDARD-IO-SYNTAX macro
+ ("src/code/error-error" :not-host :arm-bootstrap) ; needs WITH-STANDARD-IO-SYNTAX macro
 
- ("src/code/deadline" :not-host)
- ("src/code/serve-event" :not-host)
- ("src/code/fd-stream"   :not-host)
+ ("src/code/deadline" :not-host :arm-bootstrap)
+ ;; NOTE BEFORE COMMIT: UP TO HERE WORKS AT THE CURRENT GIT HEAD
+ ("src/code/serve-event" :not-host :arm-bootstrap)
+ ("src/code/fd-stream"   :not-host :arm-bootstrap)
 
- ("src/code/module" :not-host)
+ ("src/code/module" :not-host :arm-bootstrap)
 
- ("src/code/interr" :not-host)
+ ("src/code/interr" :not-host :arm-bootstrap)
 
- ("src/code/query"  :not-host)
+ ("src/code/query"  :not-host :arm-bootstrap)
 
- ("src/code/sort"  :not-host)
- ("src/code/time"  :not-host)
- ("src/code/timer" :not-host)
- ("src/code/weak"  :not-host)
- ("src/code/final" :not-host)
+ ("src/code/sort"  :not-host :arm-bootstrap)
+ ("src/code/time"  :not-host :arm-bootstrap)
+ ("src/code/timer" :not-host :arm-bootstrap)
+ ("src/code/weak"  :not-host :arm-bootstrap)
+ ("src/code/final" :not-host :arm-bootstrap)
 
- ("src/code/setf-funs" :not-host)
+ ("src/code/setf-funs" :not-host :arm-bootstrap)
 
- ("src/code/stubs" :not-host)
+ ("src/code/stubs" :not-host :arm-bootstrap)
 
- ("src/code/exhaust" :not-host)
+ ("src/code/exhaust" :not-host :arm-bootstrap)
 
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
  ;;; compiler (and a few miscellaneous files whose dependencies make it
  ;;; convenient to stick them here)
 
- ("src/compiler/early-c")
- ("src/compiler/policy")
- ("src/compiler/policies")
- ("src/code/typedefs")
+ ("src/compiler/early-c" :arm-bootstrap)
+ ("src/compiler/policy" :arm-bootstrap)
+ ("src/compiler/policies" :arm-bootstrap)
+ ("src/code/typedefs" :arm-bootstrap)
 
  ;; ("src/code/defbangmacro" was here until sbcl-0.6.7.3.)
 
- ("src/compiler/macros")
- ("src/compiler/generic/vm-macs")
+ ("src/compiler/macros" :arm-bootstrap)
+ ("src/compiler/generic/vm-macs" :arm-bootstrap)
 
  ;; needed by "compiler/vop"
- ("src/compiler/sset")
+ ("src/compiler/sset" :arm-bootstrap)
 
  ;; for e.g. BLOCK-ANNOTATION, needed by "compiler/vop"
- ("src/compiler/node")
+ ("src/compiler/node" :arm-bootstrap)
 
  ;; for e.g. PRIMITIVE-TYPE, needed by "vmdef"
- ("src/compiler/vop")
+ ("src/compiler/vop" :arm-bootstrap)
 
  ;; needed by "vm" and "primtype"
- ("src/compiler/backend")
+ ("src/compiler/backend" :arm-bootstrap)
 
  ;; for e.g. MAX-VOP-TN-REFS, needed by "meta-vmdef"
- ("src/compiler/vmdef")
+ ("src/compiler/vmdef" :arm-bootstrap)
 
  ;; needs "backend"
- ("src/compiler/target/backend-parms")
+ ("src/compiler/target/backend-parms" :arm-bootstrap)
 
  ;; for INFO and SB!XC:MACRO-FUNCTION, needed by defmacro.lisp
- ("src/compiler/globaldb")
- ("src/compiler/info-functions")
+ ("src/compiler/globaldb" :arm-bootstrap)
+ ("src/compiler/info-functions" :arm-bootstrap)
 
- ("src/code/force-delayed-defbangconstants")
- ("src/code/defmacro")
- ("src/code/force-delayed-defbangmacros")
+ ("src/code/force-delayed-defbangconstants" :arm-bootstrap)
+ ("src/code/defmacro" :arm-bootstrap)
+ ("src/code/force-delayed-defbangmacros" :arm-bootstrap)
 
- ("src/compiler/late-macros")
+ ("src/compiler/late-macros" :arm-bootstrap)
 
  ;; for e.g. !DEF-PRIMITIVE-TYPE, needed by primtype.lisp, and
  ;; DEFINE-STORAGE-CLASS, needed by target/vm.lisp
- ("src/compiler/meta-vmdef")
+ ("src/compiler/meta-vmdef" :arm-bootstrap)
 
  ;; for e.g. DESCRIPTOR-REG, needed by primtype.lisp
- ("src/compiler/target/vm")
- ("src/code/xset")
+ ("src/compiler/target/vm" :arm-bootstrap)
+ ("src/code/xset" :arm-bootstrap)
  ;; for e.g. SPECIFIER-TYPE, needed by primtype.lisp
- ("src/code/early-type")
+ ("src/code/early-type" :arm-bootstrap)
 
  ;; FIXME: Classic CMU CL had (OPTIMIZE (SAFETY 2) (DEBUG 2) declared
  ;; around the compilation of "code/class". Why?
- ("src/code/class")
+ ("src/code/class" :arm-bootstrap)
 
  ;; The definition of CONDITION-CLASS depends on SLOT-CLASS, defined
  ;; in class.lisp.
- ("src/code/condition" :not-host)
+ ("src/code/condition" :not-host :arm-bootstrap)
 
- ("src/compiler/generic/primtype")
+ ("src/compiler/generic/primtype" :arm-bootstrap)
 
  ;; the implementation of the compiler-affecting part of forms like
  ;; DEFMACRO and DEFTYPE; must be loaded before we can start
  ;; defining types
- ("src/compiler/parse-lambda-list")
+ ("src/compiler/parse-lambda-list" :arm-bootstrap)
 
  ;; for DEFSTRUCT ALIEN-TYPE, needed by host-type.lisp
- ("src/code/host-alieneval")
+ ("src/code/host-alieneval" :arm-bootstrap)
 
  ;; can't be done until definition of e.g. DEFINE-ALIEN-TYPE-CLASS in
  ;; host-alieneval.lisp
- ("src/code/host-c-call")
+ ("src/code/host-c-call" :arm-bootstrap)
 
  ;; SB!XC:DEFTYPE is needed in order to compile late-type
  ;; in the host Common Lisp, and in order to run, it needs
  ;; %COMPILER-DEFTYPE.
- ("src/compiler/compiler-deftype")
+ ("src/compiler/compiler-deftype" :arm-bootstrap)
 
  ;; These appear here in the build sequence because they require
  ;;   * the macro INFO, defined in globaldb.lisp, and
  ;;   * the function PARSE-DEFMACRO, defined in parse-defmacro.lisp,
  ;; and because they define
  ;;   * the function SPECIFIER-TYPE, which is used in fndb.lisp.
- ("src/code/late-type")
- ("src/code/deftypes-for-target")
+ ("src/code/late-type" :arm-bootstrap)
+ ("src/code/deftypes-for-target" :arm-bootstrap)
 
  ;; defines IR1-ATTRIBUTES macro, needed by proclaim.lisp
- ("src/compiler/knownfun")
- ("src/compiler/constantp")
+ ("src/compiler/knownfun" :arm-bootstrap)
+ ("src/compiler/constantp" :arm-bootstrap)
 
  ;; needs FUN-INFO structure slot setters, defined in knownfun.lisp
- ("src/compiler/fun-info-funs")
+ ("src/compiler/fun-info-funs" :arm-bootstrap)
 
  ;; stuff needed by "code/defstruct"
  ("src/code/cross-type" :not-target)
- ("src/compiler/generic/vm-type")
- ("src/compiler/proclaim")
+ ("src/compiler/generic/vm-type" :arm-bootstrap)
+ ("src/compiler/proclaim" :arm-bootstrap)
 
- ("src/code/class-init")
+ ("src/code/class-init" :arm-bootstrap)
 
  ;; The DEFSTRUCT machinery needs SB!XC:SUBTYPEP, defined in
  ;; "code/late-type", and SB!XC:TYPEP, defined in "code/cross-type",
  ;; and SPECIALIZE-ARRAY-TYPE, defined in "compiler/generic/vm-type",
  ;; and SB!XC:PROCLAIM, defined in "src/compiler/proclaim"
- ("src/code/defstruct")
- ("src/code/target-defstruct" :not-host)
+ ("src/code/defstruct" :arm-bootstrap)
+ ("src/code/target-defstruct" :not-host :arm-bootstrap)
 
  ;; ALIEN-VALUE has to be defined as a class (done by DEFSTRUCT
  ;; machinery) before we can set its superclasses here.
- ("src/code/alien-type")
+ ("src/code/alien-type" :arm-bootstrap)
 
  ;; This needs not just the SB!XC:DEFSTRUCT machinery, but also
  ;; the TYPE= stuff defined in late-type.lisp, and the
  ;; CHECK-FUN-NAME defined in proclaim.lisp.
- ("src/code/force-delayed-defbangstructs")
+ ("src/code/force-delayed-defbangstructs" :arm-bootstrap)
 
  ;; early-full-eval uses !DEFSTRUCT-WITH-ALTERNATE-METACLASS and
  ;; DEF!METHOD.  It split out from the rest of full-eval because
@@ -429,27 +432,27 @@
  ;; INTERPRETED-FUNCTION before it is used in compiler/main and in the
  ;; definition of the COMPILED-FUNCTION type.
  #!+sb-eval
- ("src/code/early-full-eval")
+ ("src/code/early-full-eval" :arm-bootstrap)
 
- ("src/code/typep" :not-host)
+ ("src/code/typep" :not-host :arm-bootstrap)
 
- ("src/compiler/compiler-error")
+ ("src/compiler/compiler-error" :arm-bootstrap)
 
- ("src/code/late-deftypes-for-target")
+ ("src/code/late-deftypes-for-target" :arm-bootstrap)
 
- ("src/code/type-init")
+ ("src/code/type-init" :arm-bootstrap)
  ;; Now that the type system is initialized, fix up UNKNOWN types that
  ;; have crept in.
- ("src/compiler/fixup-type")
+ ("src/compiler/fixup-type" :arm-bootstrap)
 
  ;; These define target types needed by fndb.lisp.
- ("src/code/package")
- ("src/code/random")
- ("src/code/hash-table")
- ("src/code/readtable")
- ("src/code/pathname")
- ("src/code/host-pprint")
- ("src/compiler/lexenv")
+ ("src/code/package" :arm-bootstrap)
+ ("src/code/random" :arm-bootstrap)
+ ("src/code/hash-table" :arm-bootstrap)
+ ("src/code/readtable" :arm-bootstrap)
+ ("src/code/pathname" :arm-bootstrap)
+ ("src/code/host-pprint" :arm-bootstrap)
+ ("src/compiler/lexenv" :arm-bootstrap)
 
  ;; KLUDGE: Much stuff above here is the type system and/or the INFO
  ;; system, not really the compiler proper. It might be easier to
@@ -460,110 +463,110 @@
  ;; in building from scratch, these must be loaded before
  ;; "compiler/generic/objdef" in order to allow forms like
  ;; (DEFINE-PRIMITIVE-OBJECT (..) (CAR ..) ..) to work.
- ("src/compiler/fndb")
- ("src/compiler/generic/vm-fndb")
+ ("src/compiler/fndb" :arm-bootstrap)
+ ("src/compiler/generic/vm-fndb" :arm-bootstrap)
 
- ("src/compiler/generic/objdef")
+ ("src/compiler/generic/objdef" :arm-bootstrap)
 
- ("src/compiler/generic/interr")
+ ("src/compiler/generic/interr" :arm-bootstrap)
 
- ("src/compiler/bit-util")
+ ("src/compiler/bit-util" :arm-bootstrap)
 
  ;; This has ASSEMBLY-UNIT-related stuff needed by core.lisp.
- ("src/compiler/early-assem")
+ ("src/compiler/early-assem" :arm-bootstrap)
 
  ;; This has the BARRIER stuff that the threading support needs.
- ("src/code/barrier")
+ ("src/code/barrier" :arm-bootstrap)
 
  ;; core.lisp contains DEFSTRUCT CORE-OBJECT, and "compiler/main.lisp"
  ;; does lots of (TYPEP FOO 'CORE-OBJECT), so it's nice to compile this
  ;; before "compiler/main.lisp" so that those can be coded efficiently
  ;; (and so that they don't cause lots of annoying compiler warnings
  ;; about undefined types).
- ("src/compiler/generic/core")
- ("src/code/thread")
- ("src/code/load")
+ ("src/compiler/generic/core" :arm-bootstrap)
+ ("src/code/thread" :arm-bootstrap)
+ ("src/code/load" :arm-bootstrap)
 
- #!+linkage-table ("src/code/linkage-table" :not-host)
- #!+os-provides-dlopen ("src/code/foreign-load" :not-host)
- #!+(and os-provides-dlopen (not win32)) ("src/code/unix-foreign-load" :not-host)
- #!+(and os-provides-dlopen win32) ("src/code/win32-foreign-load" :not-host)
- ("src/code/foreign")
+ #!+linkage-table ("src/code/linkage-table" :not-host :arm-bootstrap)
+ #!+os-provides-dlopen ("src/code/foreign-load" :not-host :arm-bootstrap)
+ #!+(and os-provides-dlopen (not win32)) ("src/code/unix-foreign-load" :not-host :arm-bootstrap)
+ #!+(and os-provides-dlopen win32) ("src/code/win32-foreign-load" :not-host :arm-bootstrap)
+ ("src/code/foreign" :arm-bootstrap)
 
- ("src/code/fop") ; needs macros from code/load.lisp
+ ("src/code/fop" :arm-bootstrap) ; needs macros from code/load.lisp
 
- ("src/compiler/ctype")
- ("src/compiler/disassem")
- ("src/compiler/assem")
+ ("src/compiler/ctype" :arm-bootstrap)
+ ("src/compiler/disassem" :arm-bootstrap)
+ ("src/compiler/assem" :arm-bootstrap)
 
- ("src/compiler/trace-table") ; needs EMIT-LABEL macro from compiler/assem.lisp
+ ("src/compiler/trace-table" :arm-bootstrap) ; needs EMIT-LABEL macro from compiler/assem.lisp
 
- ("src/code/debug-info")
+ ("src/code/debug-info" :arm-bootstrap)
  ;; Compiling this requires fop definitions from code/fop.lisp and
  ;; trace table definitions from compiler/trace-table.lisp.
- ("src/compiler/dump")
+ ("src/compiler/dump" :arm-bootstrap)
 
- ("src/compiler/main") ; needs DEFSTRUCT FASL-OUTPUT from dump.lisp
- ("src/compiler/xref")
- ("src/code/source-location")
- ("src/compiler/target-main" :not-host)
- ("src/compiler/ir1tran")
- ("src/compiler/ir1tran-lambda")
- ("src/compiler/ir1-translators")
- ("src/compiler/ir1util")
- ("src/compiler/ir1report")
- ("src/compiler/ir1opt")
- ("src/compiler/loop")
+ ("src/compiler/main" :arm-bootstrap) ; needs DEFSTRUCT FASL-OUTPUT from dump.lisp
+ ("src/compiler/xref" :arm-bootstrap)
+ ("src/code/source-location" :arm-bootstrap)
+ ("src/compiler/target-main" :not-host :arm-bootstrap)
+ ("src/compiler/ir1tran" :arm-bootstrap)
+ ("src/compiler/ir1tran-lambda" :arm-bootstrap)
+ ("src/compiler/ir1-translators" :arm-bootstrap)
+ ("src/compiler/ir1util" :arm-bootstrap)
+ ("src/compiler/ir1report" :arm-bootstrap)
+ ("src/compiler/ir1opt" :arm-bootstrap)
+ ("src/compiler/loop" :arm-bootstrap)
 
- ("src/compiler/ir1final")
- ("src/compiler/array-tran")
- ("src/compiler/seqtran")
- ("src/compiler/typetran")
- ("src/compiler/generic/vm-typetran")
- #!-arm ("src/compiler/float-tran")
- ("src/compiler/saptran")
- ("src/compiler/srctran")
- ("src/compiler/bitops-derive-type")
- ("src/compiler/generic/vm-tran")
- ("src/compiler/locall")
- ("src/compiler/dfo")
- ("src/compiler/checkgen")
- ("src/compiler/constraint")
- ("src/compiler/physenvanal")
+ ("src/compiler/ir1final" :arm-bootstrap)
+ ("src/compiler/array-tran" :arm-bootstrap)
+ ("src/compiler/seqtran" :arm-bootstrap)
+ ("src/compiler/typetran" :arm-bootstrap)
+ ("src/compiler/generic/vm-typetran" :arm-bootstrap)
+ #!-arm ("src/compiler/float-tran" :arm-bootstrap)
+ ("src/compiler/saptran" :arm-bootstrap)
+ ("src/compiler/srctran" :arm-bootstrap)
+ ("src/compiler/bitops-derive-type" :arm-bootstrap)
+ ("src/compiler/generic/vm-tran" :arm-bootstrap)
+ ("src/compiler/locall" :arm-bootstrap)
+ ("src/compiler/dfo" :arm-bootstrap)
+ ("src/compiler/checkgen" :arm-bootstrap)
+ ("src/compiler/constraint" :arm-bootstrap)
+ ("src/compiler/physenvanal" :arm-bootstrap)
 
- ("src/compiler/tn")
- ("src/compiler/life")
+ ("src/compiler/tn" :arm-bootstrap)
+ ("src/compiler/life" :arm-bootstrap)
 
- ("src/compiler/debug-dump")
- ("src/compiler/generic/utils")
- ("src/compiler/fopcompile")
+ ("src/compiler/debug-dump" :arm-bootstrap)
+ ("src/compiler/generic/utils" :arm-bootstrap)
+ ("src/compiler/fopcompile" :arm-bootstrap)
 
- ("src/assembly/assemfile")
+ ("src/assembly/assemfile" :arm-bootstrap)
 
  ;; Compiling this file requires the macros SB!ASSEM:EMIT-LABEL and
  ;; SB!ASSEM:EMIT-POST-IT, defined in assem.lisp, and also possibly
  ;; the definition of the LOCATION-INFO structure (if structures in
  ;; the host lisp have setf expanders rather than setf functions).
- ("src/compiler/late-vmdef")
+ ("src/compiler/late-vmdef" :arm-bootstrap)
 
- ("src/compiler/fixup") ; for DEFSTRUCT FIXUP, used by insts.lisp
+ ("src/compiler/fixup" :arm-bootstrap) ; for DEFSTRUCT FIXUP, used by insts.lisp
 
- ("src/compiler/target/insts")
- ("src/compiler/target/macros")
- ("src/compiler/generic/early-type-vops")
+ ("src/compiler/target/insts" :arm-bootstrap)
+ ("src/compiler/target/macros" :arm-bootstrap)
+ ("src/compiler/generic/early-type-vops" :arm-bootstrap)
 
- ("src/assembly/target/support")
+ ("src/assembly/target/support" :arm-bootstrap)
 
- ("src/compiler/target/move")
- ("src/compiler/target/float")
+ ("src/compiler/target/move" :arm-bootstrap)
+ ("src/compiler/target/float" :arm-bootstrap)
  #!+sb-simd-pack
  ("src/compiler/target/simd-pack")
- ("src/compiler/target/sap")
- ("src/compiler/target/system")
- ("src/compiler/target/char")
- ("src/compiler/target/memory")
- ("src/compiler/target/static-fn")
- ("src/compiler/target/arith"
+ ("src/compiler/target/sap" :arm-bootstrap)
+ ("src/compiler/target/system" :arm-bootstrap)
+ ("src/compiler/target/char" :arm-bootstrap)
+ ("src/compiler/target/memory" :arm-bootstrap)
+ ("src/compiler/target/static-fn" :arm-bootstrap)
+ ("src/compiler/target/arith" :arm-bootstrap
   ;; KLUDGE: for ppc and sparc this appears to be necessary, as it
   ;; used to be for array VOPs for X86 until ca. 0.8.5.24 when CSR's
   ;; patch for that architecture was finally committed
@@ -584,167 +587,167 @@
   #!+(or ppc) :ignore-failure-p)
  ("src/code/cross-modular"  :not-target)
 
- ("src/compiler/target/type-vops")
+ ("src/compiler/target/type-vops" :arm-bootstrap)
 
- ("src/compiler/target/subprim")
- ("src/compiler/target/debug")
+ ("src/compiler/target/subprim" :arm-bootstrap)
+ ("src/compiler/target/debug" :arm-bootstrap)
  ;; src/compiler/sparc/c-call contains a deftransform for
  ;; %ALIEN-FUNCALL -- CSR
- ("src/compiler/early-aliencomp")
- ("src/compiler/target/c-call")
- ("src/compiler/target/cell")
- ("src/compiler/target/values")
- ("src/compiler/target/alloc")
- ("src/compiler/target/call")
- ("src/compiler/target/nlx")
- ("src/compiler/generic/late-nlx")
- ("src/compiler/target/show")
- ("src/compiler/target/array")
- ("src/compiler/generic/type-error")
- ("src/compiler/target/pred")
+ ("src/compiler/early-aliencomp" :arm-bootstrap)
+ ("src/compiler/target/c-call" :arm-bootstrap)
+ ("src/compiler/target/cell" :arm-bootstrap)
+ ("src/compiler/target/values" :arm-bootstrap)
+ ("src/compiler/target/alloc" :arm-bootstrap)
+ ("src/compiler/target/call" :arm-bootstrap)
+ ("src/compiler/target/nlx" :arm-bootstrap)
+ ("src/compiler/generic/late-nlx" :arm-bootstrap)
+ ("src/compiler/target/show" :arm-bootstrap)
+ ("src/compiler/target/array" :arm-bootstrap)
+ ("src/compiler/generic/type-error" :arm-bootstrap)
+ ("src/compiler/target/pred" :arm-bootstrap)
 
- ("src/compiler/generic/late-type-vops")
+ ("src/compiler/generic/late-type-vops" :arm-bootstrap)
 
  ;; KLUDGE: The assembly files need to be compiled twice: once as
  ;; normal lisp files, and once by sb-c:assemble-file.  We use a
  ;; different suffix / "file type" for the :assem versions to make
  ;; sure we don't scribble over anything we shouldn't.
 
- ("src/assembly/target/assem-rtns")
- ("src/assembly/target/array")
- ("src/assembly/target/arith")
- ("src/assembly/target/alloc")
+ ("src/assembly/target/assem-rtns" :arm-bootstrap)
+ ("src/assembly/target/array" :arm-bootstrap)
+ ("src/assembly/target/arith" :arm-bootstrap)
+ ("src/assembly/target/alloc" :arm-bootstrap)
  ("src/assembly/target/assem-rtns" :assem :not-host :arm-bootstrap)
  ("src/assembly/target/array"      :assem :not-host :arm-bootstrap)
  ("src/assembly/target/arith"      :assem :not-host :arm-bootstrap)
  ("src/assembly/target/alloc"      :assem :not-host :arm-bootstrap)
 
- ("src/compiler/pseudo-vops")
+ ("src/compiler/pseudo-vops" :arm-bootstrap)
 
- ("src/compiler/aliencomp")
+ ("src/compiler/aliencomp" :arm-bootstrap)
 
- ("src/compiler/ltv")
- ("src/compiler/gtn")
- ("src/compiler/ltn")
- ("src/compiler/stack")
- ("src/compiler/control")
- ("src/compiler/entry")
- ("src/compiler/ir2tran")
+ ("src/compiler/ltv" :arm-bootstrap)
+ ("src/compiler/gtn" :arm-bootstrap)
+ ("src/compiler/ltn" :arm-bootstrap)
+ ("src/compiler/stack" :arm-bootstrap)
+ ("src/compiler/control" :arm-bootstrap)
+ ("src/compiler/entry" :arm-bootstrap)
+ ("src/compiler/ir2tran" :arm-bootstrap)
 
- ("src/compiler/generic/vm-ir2tran")
+ ("src/compiler/generic/vm-ir2tran" :arm-bootstrap)
 
- ("src/compiler/copyprop")
- ("src/compiler/represent")
- ("src/compiler/ir2opt")
- ("src/compiler/pack")
- ("src/compiler/pack-iterative")
- ("src/compiler/codegen")
- ("src/compiler/debug")
+ ("src/compiler/copyprop" :arm-bootstrap)
+ ("src/compiler/represent" :arm-bootstrap)
+ ("src/compiler/ir2opt" :arm-bootstrap)
+ ("src/compiler/pack" :arm-bootstrap)
+ ("src/compiler/pack-iterative" :arm-bootstrap)
+ ("src/compiler/codegen" :arm-bootstrap)
+ ("src/compiler/debug" :arm-bootstrap)
 
- #!+sb-dyncount ("src/compiler/dyncount")
- #!+sb-dyncount ("src/code/dyncount")
+ #!+sb-dyncount ("src/compiler/dyncount" :arm-bootstrap)
+ #!+sb-dyncount ("src/code/dyncount" :arm-bootstrap)
 
  ;; needed by OPEN-FASL-OUTPUT, which is called by COMPILE-FILE
- ("src/code/format-time")
+ ("src/code/format-time" :arm-bootstrap)
 
  ;; needed by various unhappy-path cases in the cross-compiler
- ("src/code/error")
+ ("src/code/error" :arm-bootstrap)
 
  ;; This wasn't in classic CMU CL "comcom.lisp", but it has some stuff
  ;; that Python-as-cross-compiler has turned out to need.
- ("src/code/macroexpand")
+ ("src/code/macroexpand" :arm-bootstrap)
 
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
  ;; files which depend in some way (directly or indirectly) on stuff
  ;; compiled as part of the compiler
 
- ("src/code/late-extensions") ; needs condition system
- ("src/compiler/generic/target-core" :not-host) ; uses stuff from
+ ("src/code/late-extensions" :arm-bootstrap) ; needs condition system
+ ("src/compiler/generic/target-core" :not-host :arm-bootstrap) ; uses stuff from
                                                 ;   "compiler/generic/core"
 
- ("src/code/eval"              :not-host) ; uses INFO, wants compiler macro
- ("src/code/target-sap"        :not-host) ; uses SAP-INT type
- ("src/code/target-package"    :not-host) ; needs "code/package"
- ("src/code/target-random"     :not-host) ; needs "code/random"
- ("src/code/bignum-random"     :not-host) ; needs "code/random" and
+ ("src/code/eval"              :not-host :arm-bootstrap) ; uses INFO, wants compiler macro
+ ("src/code/target-sap"        :not-host :arm-bootstrap) ; uses SAP-INT type
+ ("src/code/target-package"    :not-host :arm-bootstrap) ; needs "code/package"
+ ("src/code/target-random"     :not-host :arm-bootstrap) ; needs "code/random"
+ ("src/code/bignum-random"     :not-host :arm-bootstrap) ; needs "code/random" and
                                           ;   "code/bignum"
- ("src/code/target-hash-table" :not-host) ; needs "code/hash-table"
- ("src/code/reader"            :not-host) ; needs "code/readtable"
- ("src/code/target-stream"     :not-host) ; needs WHITESPACEP from "code/reader"
- ("src/code/target-pathname"   :not-host) ; needs "code/pathname"
+ ("src/code/target-hash-table" :not-host :arm-bootstrap) ; needs "code/hash-table"
+ ("src/code/reader"            :not-host :arm-bootstrap) ; needs "code/readtable"
+ ("src/code/target-stream"     :not-host :arm-bootstrap) ; needs WHITESPACEP from "code/reader"
+ ("src/code/target-pathname"   :not-host :arm-bootstrap) ; needs "code/pathname"
  #!-win32
- ("src/code/unix-pathname"     :not-host)
+ ("src/code/unix-pathname"     :not-host :arm-bootstrap)
  #!+win32
  ("src/code/win32-pathname"    :not-host)
- ("src/code/filesys"           :not-host) ; needs HOST from "code/pathname"
+ ("src/code/filesys"           :not-host :arm-bootstrap) ; needs HOST from "code/pathname"
 
- ("src/code/save"              :not-host) ; uses the definition of PATHNAME
+ ("src/code/save"              :not-host :arm-bootstrap) ; uses the definition of PATHNAME
                                           ;   from "code/pathname"
- ("src/code/sharpm"            :not-host) ; uses stuff from "code/reader"
- ("src/code/alloc"             :not-host)
+ ("src/code/sharpm"            :not-host :arm-bootstrap) ; uses stuff from "code/reader"
+ ("src/code/alloc"             :not-host :arm-bootstrap)
 
- ("src/code/early-step")                  ; target-thread needs *STEP-OUT*
+ ("src/code/early-step" :arm-bootstrap)                  ; target-thread needs *STEP-OUT*
 
- ("src/code/target-thread"     :not-host)
+ ("src/code/target-thread"     :not-host :arm-bootstrap)
 
  ;; defines SB!DI:DO-DEBUG-FUN-BLOCKS, needed by target-disassem.lisp
- ("src/code/gc"     :not-host)
- ("src/code/purify" :not-host)
- ("src/code/debug-int" :not-host)
+ ("src/code/gc"     :not-host :arm-bootstrap)
+ ("src/code/purify" :not-host :arm-bootstrap)
+ ("src/code/debug-int" :not-host :arm-bootstrap)
 
  ;; target-only assemblerish stuff
- ("src/compiler/target-disassem"     :not-host)
- ("src/compiler/target/target-insts" :not-host)
+ ("src/compiler/target-disassem"     :not-host :arm-bootstrap)
+ ("src/compiler/target/target-insts" :not-host :arm-bootstrap)
 
- ("src/code/debug" :not-host)
+ ("src/code/debug" :not-host :arm-bootstrap)
 
- ("src/code/octets" :not-host)
- ("src/code/external-formats/enc-basic" :not-host)
- ("src/code/external-formats/enc-ebcdic" :not-host)
+ ("src/code/octets" :not-host :arm-bootstrap)
+ ("src/code/external-formats/enc-basic" :not-host :arm-bootstrap)
+ ("src/code/external-formats/enc-ebcdic" :not-host :arm-bootstrap)
  #!+sb-unicode
- ("src/code/external-formats/enc-cyr" :not-host)
+ ("src/code/external-formats/enc-cyr" :not-host :arm-bootstrap)
  #!+sb-unicode
- ("src/code/external-formats/enc-dos" :not-host)
+ ("src/code/external-formats/enc-dos" :not-host :arm-bootstrap)
  #!+sb-unicode
- ("src/code/external-formats/enc-iso" :not-host)
+ ("src/code/external-formats/enc-iso" :not-host :arm-bootstrap)
  #!+sb-unicode
- ("src/code/external-formats/enc-win" :not-host)
+ ("src/code/external-formats/enc-win" :not-host :arm-bootstrap)
  #!+sb-unicode
  ("src/code/external-formats/enc-mac" :not-host)
  #!+sb-unicode
- ("src/code/external-formats/mb-util" :not-host)
+ ("src/code/external-formats/mb-util" :not-host :arm-bootstrap)
  #!+sb-unicode
- ("src/code/external-formats/enc-cn-tbl" :not-host)
+ ("src/code/external-formats/enc-cn-tbl" :not-host :arm-bootstrap)
  #!+sb-unicode
- ("src/code/external-formats/enc-cn" :not-host)
+ ("src/code/external-formats/enc-cn" :not-host :arm-bootstrap)
  #!+sb-unicode
- ("src/code/external-formats/enc-jpn-tbl" :not-host)
+ ("src/code/external-formats/enc-jpn-tbl" :not-host :arm-bootstrap)
  #!+sb-unicode
- ("src/code/external-formats/enc-jpn" :not-host)
+ ("src/code/external-formats/enc-jpn" :not-host :arm-bootstrap)
  #!+sb-unicode
- ("src/code/external-formats/enc-ucs" :not-host)
+ ("src/code/external-formats/enc-ucs" :not-host :arm-bootstrap)
  #!+sb-unicode
- ("src/code/external-formats/enc-utf" :not-host)
+ ("src/code/external-formats/enc-utf" :not-host :arm-bootstrap)
 
  ;; The code here can't be compiled until CONDITION and
  ;; DEFINE-CONDITION are defined and SB!DEBUG:*STACK-TOP-HINT* is
  ;; declared special.
- ("src/code/parse-defmacro-errors")
+ ("src/code/parse-defmacro-errors" :arm-bootstrap)
 
  #!+sb-eval
- ("src/code/full-eval"   :not-host) ; uses INFO, ARG-COUNT-ERROR
+ ("src/code/full-eval"   :not-host :arm-bootstrap) ; uses INFO, ARG-COUNT-ERROR
 
- ("src/code/bit-bash"    :not-host) ; needs %NEGATE from assembly/target/arith
+ ("src/code/bit-bash"    :not-host :arm-bootstrap) ; needs %NEGATE from assembly/target/arith
 
- ("src/code/target-load" :not-host) ; needs special vars from code/load.lisp
+ ("src/code/target-load" :not-host :arm-bootstrap) ; needs special vars from code/load.lisp
 
  #!-(or x86 x86-64)
- ("src/compiler/target/sanctify" :not-host)
+ ("src/compiler/target/sanctify" :not-host :arm-bootstrap)
 
  ;; FIXME: Does this really need stuff from compiler/dump.lisp?
- ("src/compiler/target-dump" :not-host) ; needs stuff from compiler/dump.lisp
+ ("src/compiler/target-dump" :not-host :arm-bootstrap) ; needs stuff from compiler/dump.lisp
 
- ("src/code/cold-init" :not-host) ; needs (SETF EXTERN-ALIEN) macroexpansion
+ ("src/code/cold-init" :not-host :arm-bootstrap) ; needs (SETF EXTERN-ALIEN) macroexpansion
 
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
  ;; target macros and DECLAIMs installed at build-the-cross-compiler time
@@ -753,38 +756,38 @@
  ;; we don't have to worry about any of them being bound incorrectly
  ;; when the compiler processes code which appears before the appropriate
  ;; DEFVAR or DEFPARAMETER.
- ("src/code/cl-specials")
+ ("src/code/cl-specials" :arm-bootstrap)
 
  ;; FIXME: here? earlier?  can probably be as late as possible.  Also
  ;; maybe call it FORCE-DELAYED-PROCLAIMS?
- ("src/compiler/late-proclaim")
+ ("src/compiler/late-proclaim" :arm-bootstrap)
 
  ;; fundamental target macros (e.g. CL:DO and CL:DEFUN) and support
  ;; for them
- ("src/code/defboot")
- ("src/code/destructuring-bind")
- ("src/code/early-setf")
- ("src/code/macros")
- ("src/code/loop")
- ("src/code/late-setf")
- ("src/code/cas")
- ("src/code/late-cas")
+ ("src/code/defboot" :arm-bootstrap)
+ ("src/code/destructuring-bind" :arm-bootstrap)
+ ("src/code/early-setf" :arm-bootstrap)
+ ("src/code/macros" :arm-bootstrap)
+ ("src/code/loop" :arm-bootstrap)
+ ("src/code/late-setf" :arm-bootstrap)
+ ("src/code/cas" :arm-bootstrap)
+ ("src/code/late-cas" :arm-bootstrap)
 
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
  ;; other target-code-building stuff which can't be processed until
  ;; machinery like SB!XC:DEFMACRO exists
 
- ("src/code/late-format") ; needs SB!XC:DEFMACRO
- ("src/code/sxhash") ; needs SB!XC:DEFINE-MODIFY-MACRO
- ("src/code/signal")
- ("src/code/late-defbangmethod")
+ ("src/code/late-format" :arm-bootstrap) ; needs SB!XC:DEFMACRO
+ ("src/code/sxhash" :arm-bootstrap) ; needs SB!XC:DEFINE-MODIFY-MACRO
+ ("src/code/signal" :arm-bootstrap)
+ ("src/code/late-defbangmethod" :arm-bootstrap)
 
  ;; This is our arm bootstrapping hack.
- #!+arm ("src/arm-bootstrap" :not-host :arm-bootstrap :trace-file)
+ #!+arm ("src/arm-bootstrap" :not-host :trace-file)
 
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
  ;; PCL-related stuff, which shouldn't need to be done earlier than
  ;; anything else in cold build because after all it used to be
  ;; postponed 'til warm init with no problems.
 
- ("src/pcl/walk"))
+ ("src/pcl/walk" :arm-bootstrap))
