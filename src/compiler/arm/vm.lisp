@@ -229,6 +229,10 @@
 (def!constant lra-save-offset 1)
 (def!constant nfp-save-offset 2)
 
+;;; This is used by the debugger.
+;;; < nyef> Ah, right. So, SINGLE-VALUE-RETURN-BYTE-OFFSET doesn't apply to x86oids or ARM.
+(def!constant single-value-return-byte-offset 0)
+
 
 ;;; A list of TN's describing the register arguments.
 ;;;
