@@ -154,16 +154,20 @@ arch_handle_after_breakpoint(os_context_t *context)
     /* context->sigmask = orig_sigmask; */
     os_flush_icache((os_vm_address_t) os_context_pc_addr(context), sizeof(unsigned int));
 }
+#endif
 
 void
 arch_handle_single_step_trap(os_context_t *context, int trap)
 {
+  /* FIXME-ARM: empty implementation, in order to make the compiler happy. To get the
+     debugger working, this needs a proper implementaiton. */
+#if 0
     unsigned int code = *((u32 *)(*os_context_pc_addr(context)));
     int register_offset = code >> 5 & 0x1f;
     handle_single_step_trap(context, trap, register_offset);
     arch_skip_instruction(context);
-}
 #endif
+}
 
 #if 0
 static void sigill_handler(int signal, siginfo_t *siginfo,

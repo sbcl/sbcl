@@ -57,7 +57,9 @@
   error-trap
   cerror-trap
   breakpoint-trap
-  fun-end-breakpoint-trap)
+  fun-end-breakpoint-trap
+  single-step-around-trap
+  single-step-before-trap)
 
 ;;;; Static symbols.
 

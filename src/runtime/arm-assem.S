@@ -342,4 +342,19 @@ call_into_c:
 	ldr	reg_CODE, [reg_LEXENV, #CLOSURE_FUN_OFFSET]
 	add	reg_PC, reg_CODE, #SIMPLE_FUN_CODE_OFFSET
 
+        @@ FIXME-ARM: The following is random garbage, to make
+        @@ code/debug-int compile. To get the debugger working, this
+        @@ needs to be implemented.
+        .align
+        .global fun_end_breakpoint_guts
+        .type   fun_end_breakpoint_guts, %object
+fun_end_breakpoint_guts:
+	.global	fun_end_breakpoint_trap
+	.type	fun_end_breakpoint_trap, %function
+fun_end_breakpoint_trap:
+        b       fun_end_breakpoint_trap
+        .global fun_end_breakpoint_end
+fun_end_breakpoint_end:
+
 	/* EOF */
+
