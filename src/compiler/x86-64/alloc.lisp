@@ -69,60 +69,83 @@
 ;;;; special-purpose inline allocators
 
 ;;; ALLOCATE-VECTOR
-(define-vop (allocate-vector-on-heap)
-  (:args (type :scs (unsigned-reg))
-         (length :scs (any-reg))
-         (words :scs (any-reg)))
-  (:results (result :scs (descriptor-reg) :from :load))
-  (:arg-types positive-fixnum
-              positive-fixnum
-              positive-fixnum)
-  (:policy :fast-safe)
-  (:generator 100
-    (inst lea result (make-ea :byte :index words
-                              :scale (ash 1 (- word-shift n-fixnum-tag-bits))
-                              :disp (+ lowtag-mask
-                                       (* vector-data-offset n-word-bytes))))
-    (inst and result (lognot lowtag-mask))
-    (pseudo-atomic
-      (allocation result result)
-      (inst lea result (make-ea :byte :base result :disp other-pointer-lowtag))
-      (storew type result 0 other-pointer-lowtag)
-      (storew length result vector-length-slot other-pointer-lowtag))))
+(macrolet ((calc-size-in-bytes (n-words result-tn)
+             `(cond ((sc-is ,n-words immediate)
+                     (pad-data-block (+ (tn-value ,n-words) vector-data-offset)))
+                    (t
+                     (inst lea ,result-tn
+                           (make-ea :byte :index ,n-words
+                                          :scale (ash 1 (- word-shift n-fixnum-tag-bits))
+                                          :disp (+ lowtag-mask
+                                                   (* vector-data-offset n-word-bytes))))
+                     (inst and ,result-tn (lognot lowtag-mask))
+                     ,result-tn)))
+           (put-header (vector-tn type length)
+             `(progn (storew (if (sc-is ,type immediate) (tn-value ,type) ,type)
+                             ,vector-tn 0 other-pointer-lowtag)
+                     (storew (if (sc-is ,length immediate)
+                                 (fixnumize (tn-value ,length))
+                                 ,length)
+                             ,vector-tn vector-length-slot other-pointer-lowtag))))
 
-(define-vop (allocate-vector-on-stack)
-  (:args (type :scs (unsigned-reg) :to :save)
-         (length :scs (any-reg) :to :eval :target zero)
-         (words :scs (any-reg) :target ecx))
-  (:temporary (:sc any-reg :offset ecx-offset :from (:argument 2)) ecx)
-  (:temporary (:sc any-reg :offset eax-offset :from :eval) zero)
-  (:temporary (:sc any-reg :offset edi-offset) res)
-  (:results (result :scs (descriptor-reg) :from :load))
-  (:arg-types positive-fixnum
-              positive-fixnum
-              positive-fixnum)
-  (:translate allocate-vector)
-  (:policy :fast-safe)
-  (:node-var node)
-  (:generator 100
-    (inst lea result (make-ea :byte :index words
-                              :scale (ash 1 (- word-shift n-fixnum-tag-bits))
-                              :disp (+ lowtag-mask
-                                       (* vector-data-offset n-word-bytes))))
-    (inst and result (lognot lowtag-mask))
+  (define-vop (allocate-vector-on-heap)
+    (:args (type :scs (unsigned-reg immediate))
+           (length :scs (any-reg immediate))
+           (words :scs (any-reg immediate)))
+    (:results (result :scs (descriptor-reg) :from :load))
+    (:arg-types positive-fixnum positive-fixnum positive-fixnum)
+    (:policy :fast-safe)
+    (:generator 100
+      ;; The LET generates instructions that needn't be pseudoatomic
+      ;; so don't move it inside.
+      (let ((size (calc-size-in-bytes words result)))
+        (pseudo-atomic
+         (allocation result size nil nil other-pointer-lowtag)
+         (put-header result type length)))))
+
+  (define-vop (allocate-vector-on-stack)
+    (:args (type :scs (unsigned-reg immediate) :to :save)
+           (length :scs (any-reg immediate) :to :eval :target rax)
+           (words :scs (any-reg immediate) :target rcx))
+    (:temporary (:sc any-reg :offset ecx-offset :from (:argument 2)) rcx)
+    (:temporary (:sc any-reg :offset eax-offset :from :eval) rax)
+    (:temporary (:sc any-reg :offset edi-offset) rdi)
+    (:results (result :scs (descriptor-reg) :from :load))
+    (:arg-types positive-fixnum positive-fixnum positive-fixnum)
+    (:translate allocate-vector)
+    (:policy :fast-safe)
+    (:node-var node)
+    (:generator 100
+      (let ((size (calc-size-in-bytes words result)))
+        (allocation result size node t other-pointer-lowtag)
+        (put-header result type length)
     ;; FIXME: It would be good to check for stack overflow here.
-    (move ecx words)
-    (inst shr ecx n-fixnum-tag-bits)
-    (allocation result result node t other-pointer-lowtag)
-    (inst cld)
-    (inst lea res
-          (make-ea :byte :base result :disp (- (* vector-data-offset n-word-bytes)
-                                               other-pointer-lowtag)))
-    (storew type result 0 other-pointer-lowtag)
-    (storew length result vector-length-slot other-pointer-lowtag)
-    (zeroize zero)
-    (inst rep)
-    (inst stos zero)))
+    ;; It would also be good to skip zero-fill of specialized vectors
+    ;; perhaps in a policy-dependent way. At worst you'd see random
+    ;; bits, and CLHS says consequences are undefined.
+        (let ((data-addr
+               (make-ea :qword :base result
+                               :disp (- (* vector-data-offset n-word-bytes)
+                                        other-pointer-lowtag))))
+          (block zero-fill
+            (if (sc-is words immediate)
+                (let ((n (tn-value words)))
+                  (if (> n 6)
+                      (inst mov rcx (tn-value words))
+                      (let ((zero (if (<= n 2) ; do imm-to-mem moves
+                                      0
+                                      (progn (zeroize rax) rax))))
+                        (dotimes (i n (return-from zero-fill))
+                          (inst mov data-addr zero)
+                          (setq data-addr (copy-structure data-addr))
+                          (incf (ea-disp data-addr) n-word-bytes)))))
+                (progn (move rcx words)
+                       (inst shr rcx n-fixnum-tag-bits)))
+            (inst lea rdi data-addr)
+            (inst cld)
+            (zeroize rax)
+            (inst rep)
+            (inst stos rax)))))))
 
 
 (define-vop (make-fdefn)
