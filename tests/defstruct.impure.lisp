@@ -1158,3 +1158,16 @@ redefinition."
   (defstruct defstruct-constant-slot-names t)
   (assert (= 3 (defstruct-constant-slot-names-t
                 (make-defstruct-constant-slot-names :t 3)))))
+
+(with-test (:name (defstruct :bogus-inherited-slot-specs))
+  (defstruct flopsie a b c)
+  (assert
+   (handler-case (macroexpand '(defstruct (mopsie (:include flopsie (a 3) (z 9))) q))
+     (error (c)
+       (search "slot name Z not present" (write-to-string c :escape nil)))
+     (:no-error (x) x nil)))
+  (assert
+   (handler-case (macroexpand '(defstruct (mopsie (:include flopsie (a 3) (a 'a))) q))
+     (error (c)
+       (search "slot name A specified more than once" (write-to-string c :escape nil)))
+     (:no-error (x) x nil))))

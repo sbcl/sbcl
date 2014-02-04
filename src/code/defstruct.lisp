@@ -726,6 +726,9 @@
                 :test #'string=
                 :key (lambda (x) (symbol-name (dsd-name x))))
       (error 'simple-program-error
+             ;; Todo: indicate whether name is a duplicate in the directly
+             ;; specified slots vs. exists in the ancestor and so should
+             ;; be in the (:include ...) clause instead of where it is.
              :format-control "duplicate slot name ~S"
              :format-arguments (list name)))
     (setf (dsd-name slot) name)
@@ -856,6 +859,23 @@
                        (not (eql included-name 'structure-object)))
               (error "can't :INCLUDE class ~S (has alternate metaclass)"
                      included-name)))))
+
+      ;; A few more sanity checks: every allegedly modified slot exists
+      ;; and no name appears more than once.
+      (flet ((included-slot-name (slot-desc)
+               (if (atom slot-desc) slot-desc (car slot-desc))))
+        (mapl (lambda (slots &aux (name (included-slot-name (car slots))))
+                (unless (find name (dd-slots included-structure)
+                              :test #'string= :key #'dsd-name)
+                  (error 'simple-program-error
+                         :format-control "slot name ~S not present in included structure"
+                         :format-arguments (list name)))
+                (when (find name (cdr slots)
+                            :test #'string= :key #'included-slot-name)
+                  (error 'simple-program-error
+                         :format-control "included slot name ~S specified more than once"
+                         :format-arguments (list name))))
+              modified-slots))
 
       (incf (dd-length dd) (dd-length included-structure))
       (when (dd-class-p dd)
