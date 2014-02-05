@@ -27,7 +27,7 @@ case "$SBCL_MACHINE_TYPE" in
   (assert (> (sb-kernel:dynamic-usage) (length x)))
   ;; prevent compiler from getting too smart...
   (eval x)
-  (sb-ext:quit :unix-status $EXIT_LISP_WIN))
+  (sb-ext:exit :code $EXIT_LISP_WIN))
 EOF
         run_sbcl_with_args --dynamic-space-size 5GB $SBCL_ARGS --load $tmpscript
         check_status_maybe_lose "bug 881445" $?
