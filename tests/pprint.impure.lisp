@@ -153,22 +153,24 @@
 ;;; since the magical symbols are accessible though (car '`(,foo)) and
 ;;; friends.  HATE HATE HATE.  -- CSR, 2004-06-10
 (with-test (:name :pprint-more-backquote-brokeness)
-  (assert (equal
-           (with-output-to-string (s)
-             (write '``(foo ,@',@bar) :stream s :pretty t))
-           "``(FOO ,@',@BAR)"))
-  (assert (equal
-           (with-output-to-string (s)
-             (write '``(,,foo ,',foo foo) :stream s :pretty t))
-           "``(,,FOO ,',FOO FOO)"))
-  (assert (equal
-           (with-output-to-string (s)
-             (write '``(((,,foo) ,',foo) foo) :stream s :pretty t))
-           "``(((,,FOO) ,',FOO) FOO)"))
-  (assert (equal
-           (with-output-to-string (s)
-             (write '(let ((foo (x))) `(let (,foo) (setq ,foo (y)) (baz ,foo)))
-                    :stream s :pretty t))
+  (flet ((try (input expect)
+           (assert (equalp (read-from-string expect) input))
+           (let ((actual (write-to-string input :pretty t)))
+             (unless (equal actual expect)
+             (error "Failed test for ~S. Got ~S~%"
+                    expect actual)))))
+    (try '``(foo ,@',@bar) "``(FOO ,@',@BAR)")
+    (try '``(,,foo ,',foo foo) "``(,,FOO ,',FOO FOO)")
+    (try '``(((,,foo) ,',foo) foo) "``(((,,FOO) ,',FOO) FOO)")
+    (try '`#() "`#()")
+    (try '`#(,bar) "`#(,BAR)")
+    (try '`#(,(bar)) "`#(,(BAR))")
+    (try '`#(,@bar) "`#(,@BAR)")
+    (try '`#(,@(bar)) "`#(,@(BAR))")
+    (try '`#(a ,b c) "`#(A ,B C)")
+    (try '`#(,@A ,b c) "`#(,@A ,B C)")
+    (try '`(,a . #(foo #() #(,bar) ,bar)) "`(,A . #(FOO #() #(,BAR) ,BAR))")
+    (try '(let ((foo (x))) `(let (,foo) (setq ,foo (y)) (baz ,foo)))
            ;; PPRINT-LET emits a mandatory newline after the bindings,
            ;; otherwise this'd fit on one line given an adequate right margin.
            "(LET ((FOO (X)))

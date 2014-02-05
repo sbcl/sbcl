@@ -66,7 +66,10 @@
        (cons (backq-unparse (cadr form) nil)
              (backq-unparse (caddr form) t)))
       (backq-vector
-       (coerce (backq-unparse (cadr form)) 'vector))
+       ;; The special-case of empty vector isn't technically necessary,
+       ;; but avoids the valid though ugly result "`#(,@NIL)"
+       (acond ((cadr form) (coerce (backq-unparse it t) 'vector))
+              (t #())))
       (quote
        ;; FIXME: This naively assumes that the form is exactly (QUOTE x).
        ;; Therefore (QUOTE . x) and (QUOTE x y z*) will lose.
