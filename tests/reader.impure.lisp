@@ -175,4 +175,21 @@
       (assert (eq t (set-dispatch-macro-character #\# #\~ fun nil)))
       (assert (eq fun (get-dispatch-macro-character #\# #\~ nil))))))
 
+(defun cl-user::esoteric-load-thing ()
+  ;; This LOAD-AS-SOURCE will fail if PRINT1 reads as the keyword :PRIN1
+  (let ((s (make-string-input-stream
+            "(cl:in-package :cl-user) (prin1 'okey-dokey)")))
+    (let ((*package* *package*))
+      (sb-impl::load-as-source s :print t :verbose t))))
+
+(with-test (:name :reader-package-in-conditional)
+  ;; Sharp-plus binds *package* but not *reader-package* so that if,
+  ;; while reading the conditional expression itself, a read-time eval occurs
+  ;; expressly changing *package*, it should do whan you mean,
+  ;; though such usage is a little insane.
+  (let ((value
+         (read-from-string
+          "(#+#.(cl:progn (cl-user::esoteric-load-thing) 'sbcl) hiyya hoho)")))
+    (assert (equal value '(hiyya hoho)))))
+
 ;;; success
