@@ -82,6 +82,7 @@ enum {
 boolean enable_page_protection = 1;
 
 /* the minimum size (in bytes) for a large object*/
+/* NB this logic is unfortunately copied in 'compiler/x86-64/macros.lisp' */
 #if (GENCGC_ALLOC_GRANULARITY >= PAGE_BYTES) && (GENCGC_ALLOC_GRANULARITY >= GENCGC_CARD_BYTES)
 os_vm_size_t large_object_size = 4 * GENCGC_ALLOC_GRANULARITY;
 #elif (GENCGC_CARD_BYTES >= PAGE_BYTES) && (GENCGC_CARD_BYTES >= GENCGC_ALLOC_GRANULARITY)

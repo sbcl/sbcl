@@ -215,7 +215,15 @@
          (make-ea :qword
                   :scale 1 :disp
                   (make-fixup "boxed_region" :foreign 8))))
-    (cond (in-elsewhere
+    (cond ((or in-elsewhere
+               #!+gencgc
+               ;; large objects will never be made in a per-thread region
+               (and (integerp size)
+                    ;; Kludge: this is supposed to be
+                    ;;  (>= size (extern-alien "large_object_size" long))
+                    ;; but that won't cross-compile. So, a little OAOOM...
+                    (>= size (* 4 (max *backend-page-bytes* gencgc-card-bytes
+                                       gencgc-alloc-granularity)))))
            (allocation-tramp alloc-tn size lowtag))
           (t
            (inst mov temp-reg-tn free-pointer)
@@ -224,10 +232,6 @@
                       (inst add alloc-tn temp-reg-tn)
                       (inst lea alloc-tn
                             (make-ea :qword :base temp-reg-tn :index size))))
-                 ;; TODO: fixed size exceeding *backend-page-bytes* should jump
-                 ;; directly to the allocation_tramp. This seems to have been
-                 ;; undetectable previously, because vector allocation
-                 ;; always passed in non-constant TNs.
                  ((typep size '(signed-byte 31))
                   (inst lea alloc-tn
                         (make-ea :qword :base temp-reg-tn :disp size)))
