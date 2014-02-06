@@ -74,7 +74,7 @@
                 sb!xc:packagep functionp compiled-function-p not)
   (t) boolean (movable foldable flushable))
 
-(defknown (eq eql) (t t) boolean (movable foldable flushable))
+(defknown (eq eql) (t t) boolean (movable foldable flushable commutative))
 (defknown (equal equalp) (t t) boolean (foldable flushable recursive))
 
 #!+(or x86 x86-64)
@@ -222,18 +222,18 @@
   (movable foldable flushable explicit-check))
 (defknown (oddp evenp) (integer) boolean
   (movable foldable flushable explicit-check))
-(defknown (= /=) (number &rest number) boolean
+(defknown (=) (number &rest number) boolean
+  (movable foldable flushable explicit-check commutative))
+(defknown (/=) (number &rest number) boolean
   (movable foldable flushable explicit-check))
 (defknown (< > <= >=) (real &rest real) boolean
   (movable foldable flushable explicit-check))
 (defknown (max min) (real &rest real) real
   (movable foldable flushable explicit-check))
 
-(defknown + (&rest number) number
-  (movable foldable flushable explicit-check))
+(defknown (+ *) (&rest number) number
+  (movable foldable flushable explicit-check commutative))
 (defknown - (number &rest number) number
-  (movable foldable flushable explicit-check))
-(defknown * (&rest number) number
   (movable foldable flushable explicit-check))
 (defknown / (number &rest number) number
   (movable foldable unsafely-flushable explicit-check))
@@ -361,7 +361,7 @@
 (defknown (realpart imagpart) (number) real (movable foldable flushable))
 
 (defknown (logior logxor logand logeqv) (&rest integer) integer
-  (movable foldable flushable explicit-check))
+  (movable foldable flushable explicit-check commutative))
 
 (defknown (lognand lognor logandc1 logandc2 logorc1 logorc2)
           (integer integer) integer
@@ -371,7 +371,7 @@
   (movable foldable flushable))
 
 (defknown lognot (integer) integer (movable foldable flushable explicit-check))
-(defknown logtest (integer integer) boolean (movable foldable flushable))
+(defknown logtest (integer integer) boolean (movable foldable flushable commutative))
 (defknown logbitp (unsigned-byte integer) boolean (movable foldable flushable))
 (defknown ash (integer integer) integer
   (movable foldable flushable explicit-check))
@@ -390,10 +390,10 @@
   (movable foldable flushable))
 (defknown (byte-size byte-position) (byte-specifier) bit-index
   (movable foldable flushable))
-(defknown ldb (byte-specifier integer) integer (movable foldable flushable))
+(defknown ldb (byte-specifier integer) unsigned-byte (movable foldable flushable))
 (defknown ldb-test (byte-specifier integer) boolean
   (movable foldable flushable))
-(defknown mask-field (byte-specifier integer) integer
+(defknown mask-field (byte-specifier integer) unsigned-byte
   (movable foldable flushable))
 (defknown dpb (integer byte-specifier integer) integer
   (movable foldable flushable))
@@ -417,12 +417,17 @@
 (defknown digit-char-p (character &optional (integer 2 36))
   (or (integer 0 35) null) (movable foldable flushable))
 
-(defknown (char= char/= char< char> char<= char>= char-equal char-not-equal
+(defknown (char=)
+  (character &rest character) boolean (movable foldable flushable commutative))
+
+(defknown (char/= char< char> char<= char>= char-equal char-not-equal
                  char-lessp char-greaterp char-not-greaterp char-not-lessp)
   (character &rest character) boolean (movable foldable flushable))
 
-(defknown (two-arg-char-equal
-           two-arg-char-not-equal
+(defknown (two-arg-char-equal)
+    (character character) boolean (movable foldable flushable commutative))
+
+(defknown (two-arg-char-not-equal
            two-arg-char-lessp
            two-arg-char-not-lessp
            two-arg-char-greaterp

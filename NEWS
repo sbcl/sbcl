@@ -9,6 +9,8 @@ changes relative to sbcl-1.1.15:
     registers. (reported by Eric Marsden)
   * bug fix: the disassembler outputs source annotations in the right place
     and no longer randomly drops some of them. (lp#1249205)
+  * bug fix: fix commutative-arg-swap from introducing undumpable structures
+    into code, prevent code with errors from being compiled. (lp#1276282)
 
 changes in sbcl-1.1.15 relative to sbcl-1.1.14:
   * new feature: the iterative spilling/coloring register allocator developed

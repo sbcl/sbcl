@@ -95,7 +95,10 @@
   ;; should never be converted into a full call).  This is used strictly
   ;; as a consistency checking mechanism inside the compiler during IR2
   ;; transformation.
-  always-translatable)
+  always-translatable
+  ;; If a function is called with two arguments and the first one is a
+  ;; constant, then the arguments will be swapped.
+  commutative)
 
 (defstruct (fun-info #-sb-xc-host (:pure t))
   ;; boolean attributes of this function.

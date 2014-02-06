@@ -922,8 +922,12 @@
                     (every #'constant-lvar-p args)
                     (node-lvar node))
            (constant-fold-call node)
-           (return-from ir1-optimize-combination)))
-
+           (return-from ir1-optimize-combination))
+         (when (and (ir1-attributep attr commutative)
+                    (= (length args) 2)
+                    (constant-lvar-p (first args))
+                    (not (constant-lvar-p (second args))))
+           (setf (basic-combination-args node) (nreverse args))))
        (let ((fun (fun-info-derive-type info)))
          (when fun
            (let ((res (funcall fun node)))

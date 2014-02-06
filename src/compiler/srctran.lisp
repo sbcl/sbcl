@@ -3180,21 +3180,6 @@
                 nil) ; After fixing above, replace with T
               )))))))
 
-;;; miscellanous numeric transforms
-
-;;; If a constant appears as the first arg, swap the args.
-(deftransform commutative-arg-swap ((x y) * * :defun-only t :node node)
-  (if (and (constant-lvar-p x)
-           (not (constant-lvar-p y)))
-      `(,(lvar-fun-name (basic-combination-fun node))
-        (truly-the ,(lvar-type y) y)
-        ,(lvar-value x))
-      (give-up-ir1-transform)))
-
-(dolist (x '(= char= two-arg-char-equal + * logior logand logxor logtest))
-  (%deftransform x '(function * *) #'commutative-arg-swap
-                 "place constant arg last"))
-
 ;;; Handle the case of a constant BOOLE-CODE.
 (deftransform boole ((op x y) * *)
   "convert to inline logical operations"
@@ -3785,13 +3770,14 @@
   (cond
     ((same-leaf-ref-p x y) t)
     ((not (types-equal-or-intersect (lvar-type x) (lvar-type y)))
-         nil)
+     nil)
     (t (give-up-ir1-transform))))
 
 (macrolet ((def (x)
              `(%deftransform ',x '(function * *) #'simple-equality-transform)))
   (def eq)
-  (def char=))
+  (def char=)
+  (def two-arg-char-equal))
 
 ;;; This is similar to SIMPLE-EQUALITY-TRANSFORM, except that we also
 ;;; try to convert to a type-specific predicate or EQ:
@@ -3813,26 +3799,17 @@
   (let ((x-type (lvar-type x))
         (y-type (lvar-type y))
         (char-type (specifier-type 'character)))
-    (flet ((fixnum-type-p (type)
-             (csubtypep type (specifier-type 'fixnum))))
-      (cond
-        ((same-leaf-ref-p x y) t)
-        ((not (types-equal-or-intersect x-type y-type))
-         nil)
-        ((and (csubtypep x-type char-type)
-              (csubtypep y-type char-type))
-         '(char= x y))
-        ((or (eq-comparable-type-p x-type) (eq-comparable-type-p y-type))
-         (if (and (constant-lvar-p x) (not (constant-lvar-p y)))
-             '(eq y x)
-             '(eq x y)))
-        ((and (not (constant-lvar-p y))
-              (or (constant-lvar-p x)
-                  (and (csubtypep x-type y-type)
-                       (not (csubtypep y-type x-type)))))
-         '(eql y x))
-        (t
-         (give-up-ir1-transform))))))
+    (cond
+      ((same-leaf-ref-p x y) t)
+      ((not (types-equal-or-intersect x-type y-type))
+       nil)
+      ((and (csubtypep x-type char-type)
+            (csubtypep y-type char-type))
+       '(char= x y))
+      ((or (eq-comparable-type-p x-type) (eq-comparable-type-p y-type))
+       '(eq y x))
+      (t
+       (give-up-ir1-transform)))))
 
 ;;; similarly to the EQL transform above, we attempt to constant-fold
 ;;; or convert to a simpler predicate: mostly we have to be careful

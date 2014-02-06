@@ -179,3 +179,5 @@
                                           (equalp ,array
                                                   ,make-array)))))))
     (make-tests)))
+
+(lambda () (the string (+ 1 x)))
