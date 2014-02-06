@@ -944,7 +944,8 @@ necessary, since type inference may take arbitrarily long to converge.")
 ;;; LOAD when loading from a FILE-STREAM associated with a source
 ;;; file.  ON-ERROR is the name of a condition class that should
 ;;; be signaled if anything goes wrong during a READ.
-(defmacro do-forms-from-info (((form &rest keys) info on-error)
+(defmacro do-forms-from-info (((form &rest keys) info
+                               &optional (on-error ''input-error-in-load))
                               &body body)
   (aver (symbolp form))
   (once-only ((info info))
