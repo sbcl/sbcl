@@ -362,6 +362,8 @@
                        (sb!fasl::dump-fop 'sb!fasl::fop-package
                                           *compile-object*))
                       (t
+                       (when (eq (info :function :where-from operator) :assumed)
+                         (note-undefined-reference operator :function))
                        (fopcompile-constant operator t)
                        (dolist (arg args)
                          (fopcompile arg path t))

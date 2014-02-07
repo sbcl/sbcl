@@ -93,27 +93,3 @@
   (let* ((x (bar (foo)))
          (y (bar (x foo))))
     (bar (y x foo))))
-
-;; Check that ':load print' on a fasl has some non-null effect
-(defvar *file* #p"compile-temp.lisp")
-(with-test (:name (:fasloader :load-print))
-  (with-open-file (stream *file* :direction :output :if-exists :supersede)
-    (dolist (form '((defmacro some-fancy-macro (x) `(car ,x))
-                    (defvar *some-var* () nil)
-                    (deftype my-favorite-type () '(integer -1 8))
-                    (defun fred (x) (- x))
-                    (push (some-fancy-macro '(a . b)) *some-var*)))
-      (write form :stream stream)))
-  (let* ((s (make-string-output-stream))
-         (output (compile-file *file*)))
-    (let ((*standard-output* s))
-      (load output :print t))
-    (delete-file output)
-    (assert (string= (get-output-stream-string s)
-";; SOME-FANCY-MACRO
-;; *SOME-VAR*
-;; MY-FAVORITE-TYPE
-;; NIL
-;; FRED
-;; (A)"))))
-(when (probe-file *file*) (delete-file *file*))

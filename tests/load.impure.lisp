@@ -417,6 +417,30 @@
       (when tmp-fasl (delete-file tmp-fasl))
       (delete-file *tmp-filename*))))
 
+;; Check that ':load print' on a fasl has some non-null effect
+(with-test (:name :fasloader-print)
+  (with-open-file (stream *tmp-filename*
+                          :direction :output :if-exists :supersede)
+    (dolist (form '((defmacro some-fancy-macro (x) `(car ,x))
+                    (defvar *some-var* () nil)
+                    (deftype my-favorite-type () '(integer -1 8))
+                    (defun fred (x) (- x))
+                    (push (some-fancy-macro '(a . b)) *some-var*)))
+      (write form :stream stream)))
+  (let* ((s (make-string-output-stream))
+         (output (compile-file *tmp-filename*)))
+    (let ((*standard-output* s))
+      (load output :print t))
+    (delete-file output)
+    (assert (string= (get-output-stream-string s)
+";; SOME-FANCY-MACRO
+;; *SOME-VAR*
+;; MY-FAVORITE-TYPE
+;; NIL
+;; FRED
+;; (A)"))
+     (delete-file *tmp-filename*)))
+
 (with-test (:name :load-reader-error)
   (unwind-protect
        (block result
