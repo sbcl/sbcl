@@ -3905,6 +3905,21 @@
                    nil
                    '((:ordinary . ordinary-lambda-list))))))
 
+;; This test failed formerly because the source transform of TYPEP would be
+;; disabled when storing coverage data, thus giving no semantics to
+;; expressions such as (TYPEP x 'INTEGER). The compiler could therefore not
+;; prove that the else clause of the IF is unreachable - which it must be
+;; since X is asserted to be fixnum. The conflicting requirement on X
+;; that it be acceptable to LENGTH signaled a full warning.
+;; Nobody on sbcl-devel could remember why the source transform was disabled,
+;; but nobody disagreed with undoing the disabling.
+(with-test (:name :sb-cover-and-typep)
+  (multiple-value-bind (fun warnings-p failure-p)
+      (compile nil '(lambda (x)
+                     (declare (fixnum x) (optimize sb-c:store-coverage-data))
+                     (if (typep x 'integer) x (length x))))
+    (assert (and fun (not warnings-p) (not failure-p)))))
+
 (with-test (:name :member-on-long-constant-list)
   ;; This used to blow stack with a sufficiently long list.
   (let ((cycle (list t)))

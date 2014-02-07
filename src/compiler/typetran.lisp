@@ -675,9 +675,7 @@
   ;; weird roundabout way. -- WHN 2001-03-18
   (if (and (not env)
            (consp spec)
-           (eq (car spec) 'quote)
-           (or (not *allow-instrumenting*)
-               (policy *lexenv* (= store-coverage-data 0))))
+           (eq (car spec) 'quote))
       (source-transform-typep object (cadr spec))
       (values nil t)))
 
