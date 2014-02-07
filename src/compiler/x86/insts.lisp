@@ -1243,6 +1243,15 @@
      (emit-byte segment (if (eq size :byte) #b10110000 #b10110001))
      (emit-ea segment dst (reg-tn-encoding src)))))
 
+(define-instruction cmpxchg8b (segment mem &optional prefix)
+  (:printer ext-reg-reg/mem-no-width ((op #xC7)) '(:name :tab reg/mem))
+  (:emitter
+   (aver (not (register-p mem)))
+   (emit-prefix segment prefix)
+   (emit-byte segment #x0F)
+   (emit-byte segment #xC7)
+   (emit-ea segment mem 1)))
+
 (define-instruction pause (segment)
   (:printer two-bytes ((op '(#xf3 #x90))))
   (:emitter

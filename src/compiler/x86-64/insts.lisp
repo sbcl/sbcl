@@ -1995,6 +1995,16 @@
      (emit-byte segment (if (eq size :byte) #b10110000 #b10110001))
      (emit-ea segment dst (reg-tn-encoding src)))))
 
+(define-instruction cmpxchg16b (segment mem &optional prefix)
+  (:printer ext-reg-reg/mem-no-width ((op #xC7)) '(:name :tab reg/mem))
+  (:emitter
+   (aver (not (register-p mem)))
+   (emit-prefix segment prefix)
+   (maybe-emit-rex-for-ea segment mem nil :operand-size :qword)
+   (emit-byte segment #x0F)
+   (emit-byte segment #xC7)
+   (emit-ea segment mem 1))) ; operand extension
+
 
 ;;;; flag control instructions
 
