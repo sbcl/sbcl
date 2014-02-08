@@ -9,6 +9,8 @@ changes relative to sbcl-1.1.15:
     ** it was misencoded when used with RAX, R8-R15 registers. (reported by
        Eric Marsden)
     ** it was misencoded when used to exchange EAX with itself.
+    ** the disassembler wrongly printed XCHG RAX, R8 and the corresponding
+       32- and 16-bit variations as NOP.
   * bug fix: the disassembler outputs source annotations in the right place
     and no longer randomly drops some of them. (lp#1249205)
   * bug fix: fix commutative-arg-swap from introducing undumpable structures

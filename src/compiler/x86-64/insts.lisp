@@ -238,6 +238,21 @@
     (sb!disassem:dstate-put-inst-prop dstate 'rex-b))
   value)
 
+;;; The two following prefilters are used instead of prefilter-wrxb when
+;;; the bits of the REX prefix need to be treated individually. They are
+;;; always used together, so only the first one sets the REX property.
+(defun prefilter-rex-w (value dstate)
+  (declare (type bit value)
+           (type sb!disassem:disassem-state dstate))
+  (sb!disassem:dstate-put-inst-prop dstate 'rex)
+  (when (plusp value)
+    (sb!disassem:dstate-put-inst-prop dstate 'rex-w)))
+(defun prefilter-rex-b (value dstate)
+  (declare (type bit value)
+           (type sb!disassem:disassem-state dstate))
+  (when (plusp value)
+    (sb!disassem:dstate-put-inst-prop dstate 'rex-b)))
+
 ;;; This prefilter is used solely for its side effect, namely to put
 ;;; the property OPERAND-SIZE-8 into the DSTATE if VALUE is 0.
 (defun prefilter-width (value dstate)
@@ -350,9 +365,14 @@
 
 ;;;; disassembler argument types
 
-;;; Used to capture the lower four bits of the REX prefix.
+;;; Used to capture the lower four bits of the REX prefix all at once ...
 (sb!disassem:define-arg-type wrxb
   :prefilter #'prefilter-wrxb)
+;;; ... or individually (not needed for REX.R and REX.X).
+(sb!disassem:define-arg-type rex-w
+  :prefilter #'prefilter-rex-w)
+(sb!disassem:define-arg-type rex-b
+  :prefilter #'prefilter-rex-b)
 
 (sb!disassem:define-arg-type width
   :prefilter #'prefilter-width
@@ -617,6 +637,19 @@
   ;; optional fields
   (accum :type 'accum)
   (imm))
+
+;;; This is reg-no-width with a mandatory REX prefix and accum field,
+;;; with the ability to match against REX.W and REX.B individually.
+;;; REX.R and REX.X are ignored.
+(sb!disassem:define-instruction-format (rex-accum-reg 16
+                                       :default-printer
+                                       '(:name :tab accum ", " reg))
+  (rex   :field (byte 4 4) :value #b0100)
+  (rex-w :field (byte 1 3) :type 'rex-w)
+  (rex-b :field (byte 1 0) :type 'rex-b)
+  (op    :field (byte 5 11))
+  (reg   :field (byte 3 8) :type 'reg-b)
+  (accum :type 'accum))
 
 ;;; Same as reg-no-width, but with a default operand size of :qword.
 (sb!disassem:define-instruction-format (reg-no-width-default-qword 8
@@ -1940,7 +1973,36 @@
             (emit-byte segment #b10001111)
             (emit-ea segment dst #b000))))))
 
+;;; Compared to x86 we need to take two particularities into account
+;;; here:
+;;; * XCHG EAX, EAX can't be encoded as #x90 as the processor interprets
+;;;   that opcode as NOP while XCHG EAX, EAX is specified to clear the
+;;;   upper half of RAX. We need to use the long form #x87 #xC0 instead.
+;;; * The opcode #x90 is not only used for NOP and XCHG RAX, RAX and
+;;;   XCHG AX, AX, but also for XCHG RAX, R8 (and the corresponding 32-
+;;;   and 16-bit versions). The printer for the NOP instruction (further
+;;;   below) matches all these encodings so needs to be overridden here
+;;;   for the cases that need to print as XCHG.
+;;; Assembler and disassembler chained then map these special cases as
+;;; follows:
+;;;   (INST NOP)                 ->  90      ->  NOP
+;;;   (INST XCHG RAX-TN RAX-TN)  ->  4890    ->  NOP
+;;;   (INST XCHG EAX-TN EAX-TN)  ->  87C0    ->  XCHG EAX, EAX
+;;;   (INST XCHG AX-TN AX-TN)    ->  6690    ->  NOP
+;;;   (INST XCHG RAX-TN R8-TN)   ->  4990    ->  XCHG RAX, R8
+;;;   (INST XCHG EAX-TN R8D-TN)  ->  4190    ->  XCHG EAX, R8D
+;;;   (INST XCHG AX-TN R8W-TN)   ->  664190  ->  XCHG AX, R8W
+;;; The disassembler additionally correctly matches encoding variants
+;;; that the assembler doesn't generate, for example 4E90 prints as NOP
+;;; and 4F90 as XCHG RAX, R8 (both because REX.R and REX.X are ignored).
 (define-instruction xchg (segment operand1 operand2)
+  ;; This printer matches all patterns that encode exchanging RAX with
+  ;; R8, EAX with R8D, or AX with R8W. These consist of the opcode #x90
+  ;; with a REX prefix with REX.B = 1, and possibly the #x66 prefix.
+  ;; We rely on the prefix automatism for the #x66 prefix, but
+  ;; explicitly match the REX prefix as we need to provide a value for
+  ;; REX.B, and to override the NOP printer by virtue of a longer match.
+  (:printer rex-accum-reg ((rex-b 1) (op #b10010) (reg #b000)))
   ;; Register with accumulator.
   (:printer reg-no-width ((op #b10010)) '(:name :tab accum ", " reg))
   ;; Register/Memory with Register.
@@ -1951,10 +2013,7 @@
      (labels ((xchg-acc-with-something (acc something)
                 (if (and (not (eq size :byte))
                          (register-p something)
-                         ;; Don't use the short encoding for XCHG EAX, EAX
-                         ;; as the processor interprets that as NOP while
-                         ;; XCHG EAX, EAX is specified to clear the upper
-                         ;; half of RAX.
+                         ;; Don't use the short encoding for XCHG EAX, EAX:
                          (not (and (= (tn-offset something) eax-offset)
                                    (eq size :dword))))
                     (progn
