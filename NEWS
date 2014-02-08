@@ -5,8 +5,10 @@ changes relative to sbcl-1.1.15:
     the name of the symbol in the error message.
   * bug fix: problems when redefining classes and doing TYPEP on classes
     concurrently. (lp#1272742)
-  * bug fix: x86-64 XCHG instruction was misencoded when used with RAX, R8-R15
-    registers. (reported by Eric Marsden)
+  * bug fixes to the x86-64 XCHG instruction:
+    ** it was misencoded when used with RAX, R8-R15 registers. (reported by
+       Eric Marsden)
+    ** it was misencoded when used to exchange EAX with itself.
   * bug fix: the disassembler outputs source annotations in the right place
     and no longer randomly drops some of them. (lp#1249205)
   * bug fix: fix commutative-arg-swap from introducing undumpable structures

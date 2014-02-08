@@ -1949,7 +1949,14 @@
    (let ((size (matching-operand-size operand1 operand2)))
      (maybe-emit-operand-size-prefix segment size)
      (labels ((xchg-acc-with-something (acc something)
-                (if (and (not (eq size :byte)) (register-p something))
+                (if (and (not (eq size :byte))
+                         (register-p something)
+                         ;; Don't use the short encoding for XCHG EAX, EAX
+                         ;; as the processor interprets that as NOP while
+                         ;; XCHG EAX, EAX is specified to clear the upper
+                         ;; half of RAX.
+                         (not (and (= (tn-offset something) eax-offset)
+                                   (eq size :dword))))
                     (progn
                       (maybe-emit-rex-for-ea segment something acc)
                       (emit-byte-with-reg segment
