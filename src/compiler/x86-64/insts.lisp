@@ -397,7 +397,7 @@
 
 ;;; Normally, immediate values for an operand size of :qword are of size
 ;;; :dword and are sign-extended to 64 bits. For an exception, see the
-;;; argument type definition following this one.
+;;; argument type definition of SIGNED-IMM-DATA-UPTO-QWORD below.
 (sb!disassem:define-arg-type signed-imm-data
   :prefilter (lambda (value dstate)
                (declare (ignore value)) ; always nil anyway
@@ -647,10 +647,6 @@
   ;; optional fields
   (accum   :type 'accum)
   (imm))
-
-(sb!disassem:define-instruction-format (two-bytes 16
-                                        :default-printer '(:name))
-  (op :fields (list (byte 8 0) (byte 8 8))))
 
 (sb!disassem:define-instruction-format (reg-reg/mem 16
                                         :default-printer
@@ -1758,7 +1754,8 @@
   ;; immediate to register
   (:printer reg ((op #b1011) (imm nil :type 'signed-imm-data/asm-routine))
             '(:name :tab reg ", " imm))
-  (:printer rex-reg ((op #b1011) (imm nil :type 'signed-imm-data-upto-qword/asm-routine))
+  (:printer rex-reg ((op #b1011)
+                     (imm nil :type 'signed-imm-data-upto-qword/asm-routine))
             '(:name :tab reg ", " imm))
   ;; absolute mem to/from accumulator
   (:printer simple-dir ((op #b101000) (imm nil :type 'imm-addr))
@@ -1796,7 +1793,8 @@
                               (if (eq size :byte)
                                   #b10001010
                                   #b10001011))
-                   (emit-ea segment src (reg-tn-encoding dst) :allow-constants t))))
+                   (emit-ea segment src (reg-tn-encoding dst)
+                            :allow-constants t))))
            ((integerp src)
             ;; C7 only deals with 32 bit immediates even if the
             ;; destination is a 64-bit location. The value is
@@ -2107,14 +2105,16 @@
                  (dpb opcode
                       (byte 3 3)
                       (if (eq size :byte) #b00000000 #b00000001)))
-      (emit-ea segment dst (reg-tn-encoding src) :allow-constants allow-constants))
+      (emit-ea segment dst (reg-tn-encoding src)
+               :allow-constants allow-constants))
      ((register-p dst)
       (maybe-emit-rex-for-ea segment src dst)
       (emit-byte segment
                  (dpb opcode
                       (byte 3 3)
                       (if (eq size :byte) #b00000010 #b00000011)))
-      (emit-ea segment src (reg-tn-encoding dst) :allow-constants allow-constants))
+      (emit-ea segment src (reg-tn-encoding dst)
+               :allow-constants allow-constants))
      (t
       (error "bogus operands to ~A" name)))))
 
@@ -2854,10 +2854,10 @@
 
 (define-instruction break (segment code)
   (:declare (type (unsigned-byte 8) code))
-  #!-ud2-breakpoints (:printer byte-imm ((op #b11001100)) '(:name :tab code)
-                               :control #'break-control)
-  #!+ud2-breakpoints (:printer word-imm ((op #b0000101100001111)) '(:name :tab code)
-                               :control #'break-control)
+  #!-ud2-breakpoints (:printer byte-imm ((op #b11001100))
+                               '(:name :tab code) :control #'break-control)
+  #!+ud2-breakpoints (:printer word-imm ((op #b0000101100001111))
+                               '(:name :tab code) :control #'break-control)
   (:emitter
    #!-ud2-breakpoints (emit-byte segment #b11001100)
    ;; On darwin, trap handling via SIGTRAP is unreliable, therefore we
@@ -3391,7 +3391,8 @@
           (aver (xmm-register-p src))
           (emit-sse-inst segment src dst #x66 #x7e)))))
 
-(macrolet ((define-extract-sse-instruction (name prefix op1 op2 &key explicit-qword)
+(macrolet ((define-extract-sse-instruction (name prefix op1 op2
+                                            &key explicit-qword)
              `(define-instruction ,name (segment dst src imm)
                 (:printer
                  ,(if op2 (if explicit-qword
@@ -3526,15 +3527,18 @@
 (macrolet ((regular-2byte-sse-inst (name prefix op1 op2)
              `(define-instruction ,name (segment dst src)
                 (:printer-list
-                 ',(2byte-sse-inst-printer-list '2byte-xmm-xmm/mem prefix op1 op2))
+                 ',(2byte-sse-inst-printer-list '2byte-xmm-xmm/mem prefix
+                                                op1 op2))
                 (:emitter
-                 (emit-regular-2byte-sse-inst segment dst src ,prefix ,op1 ,op2))))
+                 (emit-regular-2byte-sse-inst segment dst src ,prefix
+                                              ,op1 ,op2))))
            (regular-2byte-sse-inst-imm (name prefix op1 op2)
              `(define-instruction ,name (segment dst src imm)
                 (:printer-list
-                 ',(2byte-sse-inst-printer-list '2byte-xmm-xmm/mem prefix op1 op2
-                                                :more-fields '((imm nil :type imm-byte))
-                                                :printer `(:name :tab reg ", " reg/mem ", " imm)))
+                 ',(2byte-sse-inst-printer-list
+                    '2byte-xmm-xmm/mem prefix op1 op2
+                    :more-fields '((imm nil :type imm-byte))
+                    :printer `(:name :tab reg ", " reg/mem ", " imm)))
                 (:emitter
                  (aver (typep imm '(unsigned-byte 8)))
                  (emit-regular-2byte-sse-inst segment dst src ,prefix ,op1 ,op2
@@ -3628,7 +3632,8 @@
                 (:emitter
                  (aver (xmm-register-p dst))
                  (aver (and (xmm-register-p mask) (= (tn-offset mask) 0)))
-                 (emit-regular-2byte-sse-inst segment dst src ,prefix ,op1 ,op2)))))
+                 (emit-regular-2byte-sse-inst segment dst src ,prefix
+                                              ,op1 ,op2)))))
 
   (define-sse-inst-implicit-mask pblendvb #x66 #x38 #x10)
   (define-sse-inst-implicit-mask blendvps #x66 #x38 #x14)

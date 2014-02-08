@@ -481,10 +481,6 @@
   (op  :field (byte 3 5))
   (dir :field (byte 1 4)))
 
-(sb!disassem:define-instruction-format (two-bytes 16
-                                        :default-printer '(:name))
-  (op :fields (list (byte 8 0) (byte 8 8))))
-
 (sb!disassem:define-instruction-format (reg-reg/mem 16
                                         :default-printer
                                         `(:name :tab reg ", " reg/mem))
@@ -2140,10 +2136,10 @@
 
 (define-instruction break (segment code)
   (:declare (type (unsigned-byte 8) code))
-  #!-ud2-breakpoints (:printer byte-imm ((op #b11001100)) '(:name :tab code)
-                               :control #'break-control)
-  #!+ud2-breakpoints (:printer word-imm ((op #b0000101100001111)) '(:name :tab code)
-                               :control #'break-control)
+  #!-ud2-breakpoints (:printer byte-imm ((op #b11001100))
+                               '(:name :tab code) :control #'break-control)
+  #!+ud2-breakpoints (:printer word-imm ((op #b0000101100001111))
+                               '(:name :tab code) :control #'break-control)
   (:emitter
    #!-ud2-breakpoints (emit-byte segment #b11001100)
    ;; On darwin, trap handling via SIGTRAP is unreliable, therefore we
