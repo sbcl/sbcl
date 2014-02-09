@@ -344,7 +344,7 @@ is true, all generations are collected. If GEN is provided, it can be
 used to specify the oldest generation guaranteed to be collected.
 
 On CheneyGC platforms arguments FULL and GEN take no effect: a full
-collection is always preformed."
+collection is always performed."
   #!+(and sb-doc (not gencgc))
   "Initiate a garbage collection.
 
