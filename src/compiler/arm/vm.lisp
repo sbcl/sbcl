@@ -18,16 +18,16 @@
   (defvar *register-names* (make-array 16 :initial-element nil)))
 
 (macrolet ((defreg (name offset)
-               (let ((offset-sym (symbolicate name "-OFFSET")))
-                 `(eval-when (:compile-toplevel :load-toplevel :execute)
-                   (def!constant ,offset-sym ,offset)
-                   (setf (svref *register-names* ,offset-sym) ,(symbol-name name)))))
+             (let ((offset-sym (symbolicate name "-OFFSET")))
+               `(eval-when (:compile-toplevel :load-toplevel :execute)
+                  (def!constant ,offset-sym ,offset)
+                  (setf (svref *register-names* ,offset-sym) ,(symbol-name name)))))
 
            (defregset (name &rest regs)
-               `(eval-when (:compile-toplevel :load-toplevel :execute)
-                 (defparameter ,name
-                   (list ,@(mapcar #'(lambda (name)
-                                       (symbolicate name "-OFFSET")) regs))))))
+             `(eval-when (:compile-toplevel :load-toplevel :execute)
+                (defparameter ,name
+                  (list ,@(mapcar #'(lambda (name)
+                                      (symbolicate name "-OFFSET")) regs))))))
 
   (defreg r0 0)
   (defreg r1 1)
@@ -71,6 +71,8 @@
 (define-storage-base non-descriptor-stack :unbounded :size 0)
 (define-storage-base constant :non-packed)
 (define-storage-base immediate-constant :non-packed)
+(define-storage-base single-registers :finite :size 32)
+(define-storage-base double-registers :finite :size 16)
 
 ;;;
 ;;; Handy macro so we don't have to keep changing all the numbers whenever
@@ -137,7 +139,11 @@
   (unsigned-stack non-descriptor-stack) ; (unsigned-byte 32)
   (character-stack non-descriptor-stack) ; non-descriptor characters.
   (sap-stack non-descriptor-stack) ; System area pointers.
-
+  (single-stack non-descriptor-stack) ; single-floats
+  (double-stack non-descriptor-stack
+                :element-size 2 :alignment 2) ; double floats.
+  (complex-single-stack non-descriptor-stack :element-size 2)
+  (complex-double-stack non-descriptor-stack :element-size 4 :alignment 2)
 
   ;; **** Things that can go in the integer registers.
 
@@ -174,6 +180,40 @@
   ;; Pointers to the interior of objects.  Used only as a temporary.
   (interior-reg registers
    :locations (#.lr-offset))
+
+  ;; **** Things that can go in the floating point registers.
+
+  ;; Non-Descriptor single-floats.
+  (single-reg single-registers
+   :locations #.(loop for i below 32 collect i)
+   ;; ### Note: We really should have every location listed, but then we
+   ;; would have to make load-tns work with element-sizes other than 1.
+   :constant-scs ()
+   :save-p t
+   :alternate-scs (single-stack))
+
+  ;; Non-Descriptor double-floats.
+  (double-reg double-registers
+   :locations #.(loop for i below 16 collect i)
+   ;; ### Note: load-tns don't work with an element-size other than 1.
+   ;; :element-size 2 :alignment 2
+   :constant-scs ()
+   :save-p t
+   :alternate-scs (double-stack))
+
+  (complex-single-reg single-registers
+   :locations #.(loop for i from 0 to 30 by 2 collect i)
+   :element-size 2
+   :constant-scs ()
+   :save-p t
+   :alternate-scs (complex-single-stack))
+
+  (complex-double-reg double-registers
+   :locations #.(loop for i from 0 to 14 by 2 collect i)
+   :element-size 2
+   :constant-scs ()
+   :save-p t
+   :alternate-scs (complex-double-stack))
 
   ;; A catch or unwind block.
   (catch-block control-stack
@@ -255,7 +295,9 @@
       (control-stack (format nil "CS~D" offset))
       (non-descriptor-stack (format nil "NS~D" offset))
       (constant (format nil "Const~D" offset))
-      (immediate-constant "Immed"))))
+      (immediate-constant "Immed")
+      (single-registers (format nil "S~D" offset))
+      (double-registers (format nil "D~D" offset)))))
 
 (defun combination-implementation-style (node)
   (declare (type sb!c::combination node) (ignore node))

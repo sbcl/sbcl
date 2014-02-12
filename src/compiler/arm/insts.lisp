@@ -976,3 +976,312 @@
         segment 8 2
         #'two-instruction-maybe-shrink
         #'two-instruction-emitter)))))
+
+;; data processing floating point instructions
+(define-bitfield-emitter emit-fp-dp-instruction 32
+  (byte 4 28) ; cond
+  (byte 4 24) ; #b1110
+  (byte 1 23) ; p
+  (byte 1 22) ; D
+  (byte 1 21) ; q
+  (byte 1 20) ; r
+  (byte 4 16) ; Fn || extension op
+  (byte 4 12) ; Fd
+  (byte 3 9) ; #b101
+  (byte 1 8) ; double/single precission
+  (byte 1 7) ; N || extension op
+  (byte 1 6) ; s
+  (byte 1 5) ; M
+  (byte 1 4) ; #b0
+  (byte 4 0)) ; Fm
+
+(defun low-bit-float-reg (reg-tn precision)
+  (ecase precision
+    (:single (ldb (byte 0 1) (tn-offset reg-tn)))
+    (:double 0)))
+
+(defun high-bits-float-reg (reg-tn precision)
+  (ecase precision
+    (:single (/ (tn-offset reg-tn) 2))
+    (:double (tn-offset reg-tn))))
+
+(defmacro define-binary-fp-data-processing-instruction (name precision p q r s)
+  (let ((precision-flag (ecase precision
+                          (:single 0)
+                          (:double 1))))
+    `(define-instruction ,name (segment &rest args)
+       (:emitter
+        (with-condition-defaulted (args (condition dest op-n op-m))
+          (emit-fp-dp-instruction segment
+                                  condition
+                                  #b1110
+                                  ,p
+                                  (low-bit-float-reg dest ,precision)
+                                  ,q
+                                  ,r
+                                  (high-bits-float-reg op-n ,precision)
+                                  (high-bits-float-reg dest ,precision)
+                                  #b101
+                                  ,precision-flag
+                                  (low-bit-float-reg op-n ,precision)
+                                  ,s
+                                  (low-bit-float-reg op-m ,precision)
+                                  #b0
+                                  (high-bits-float-reg op-m ,precision)))))))
+
+(defmacro define-binary-fp-data-processing-instructions (root p q r s)
+  `(progn
+     (define-binary-fp-data-processing-instruction ,(symbolicate root 's) :single ,p ,q ,r ,s)
+     (define-binary-fp-data-processing-instruction ,(symbolicate root 'd) :double ,p ,q ,r ,s)))
+
+(define-binary-fp-data-processing-instructions fmac  0 0 0 0)
+(define-binary-fp-data-processing-instructions fnmac 0 0 0 1)
+(define-binary-fp-data-processing-instructions fmsc  0 0 1 0)
+(define-binary-fp-data-processing-instructions fnmsc 0 0 1 1)
+(define-binary-fp-data-processing-instructions fmul  0 1 0 0)
+(define-binary-fp-data-processing-instructions fnmul 0 1 0 1)
+(define-binary-fp-data-processing-instructions fadd  0 1 1 0)
+(define-binary-fp-data-processing-instructions fsub  0 1 1 1)
+(define-binary-fp-data-processing-instructions fdiv  1 0 0 0)
+
+(defmacro define-unary-fp-data-processing-instruction (name precision fn n)
+  (let ((precision-flag (ecase precision
+                          (:single 0)
+                          (:double 1))))
+    `(define-instruction ,name (segment &rest args)
+       (:emitter
+        (with-condition-defaulted (args (condition dest op-m))
+          (emit-fp-dp-instruction segment
+                                  condition
+                                  #b1110
+                                  #b1
+                                  (low-bit-float-reg dest ,precision)
+                                  #b1
+                                  #b1
+                                  ,fn
+                                  (high-bits-float-reg dest ,precision)
+                                  #b101
+                                  ,precision-flag
+                                  ,n
+                                  #b1
+                                  (low-bit-float-reg op-m ,precision)
+                                  #b0
+                                  (high-bits-float-reg op-m ,precision)))))))
+
+(defmacro define-unary-fp-data-processing-instructions (root fn n)
+  `(progn
+     (define-unary-fp-data-processing-instruction ,(symbolicate root 's) :single ,fn ,n)
+     (define-unary-fp-data-processing-instruction ,(symbolicate root 'd) :double ,fn ,n)))
+
+(define-unary-fp-data-processing-instructions fcpy   #b0000 0)
+(define-unary-fp-data-processing-instructions fabs   #b0000 1)
+(define-unary-fp-data-processing-instructions fneg   #b0001 0)
+(define-unary-fp-data-processing-instructions fsqrt  #b0001 1)
+(define-unary-fp-data-processing-instructions fcmp   #b0100 0)
+(define-unary-fp-data-processing-instructions fcmpe  #b0100 1)
+(define-unary-fp-data-processing-instructions fcmpz  #b0101 0)
+(define-unary-fp-data-processing-instructions fcmpez #b0101 1)
+(define-unary-fp-data-processing-instructions fuito  #b1000 0)
+(define-unary-fp-data-processing-instructions fsito  #b1000 1)
+(define-unary-fp-data-processing-instructions ftoui  #b1100 0)
+(define-unary-fp-data-processing-instructions ftouiz #b1100 1)
+(define-unary-fp-data-processing-instructions ftosi  #b1101 0)
+(define-unary-fp-data-processing-instructions ftosiz #b1101 1)
+
+(define-unary-fp-data-processing-instruction fcvtds :single #b0111 1)
+(define-unary-fp-data-processing-instruction fcvtsd :double #b0111 1)
+
+;;; Load/Store Float Instructions
+
+(define-bitfield-emitter emit-fp-ls-instruction 32
+  (byte 4 28) ; cond
+  (byte 3 25) ; #b110
+  (byte 1 24) ; P
+  (byte 1 23) ; U
+  (byte 1 22) ; D
+  (byte 1 21) ; W
+  (byte 1 20) ; L
+  (byte 4 16) ; Rn
+  (byte 4 12) ; Fd
+  (byte 3 9) ; #b101
+  (byte 1 8) ; double/single precission
+  (byte 8 0)) ; offset
+
+;; Define a load/store multiple floating point instruction. PRECISION is
+;; :SINGLE for single precision values and :DOUBLE for double precision values.
+;; DIRECTION has to be either :LOAD or :STORE.
+;; If INC-OFFSET is true, the offset part of the instruction will be incremented by 1
+;; indicating in the double case a load/store unknown instruction.
+(defmacro define-load-store-multiple-fp-instruction (name precision direction &optional inc-offset)
+  (let ((precision-flag (ecase precision
+                          (:single 0)
+                          (:double 1)))
+        (direction-flag (ecase direction
+                          (:load 1)
+                          (:store 0))))
+    `(define-instruction ,name (segment &rest args)
+       (:emitter
+        (with-condition-defaulted (args (condition address base-reg reg-count))
+          (let* ((mode (cond
+                         ((consp address)
+                          (cdr address))
+                         (t :unindexed)))
+                 (p (ecase mode
+                      ((:unindexed :increment) 0)
+                      ((:decrement) 1)))
+                 (u (ecase mode
+                      ((:unindexed :increment) 1)
+                      ((:decrement) 0)))
+                 (w (ecase mode
+                      ((:unindexed) 0)
+                      ((:increment :decrement) 1))))
+            (emit-fp-ls-instruction segment
+                                    condition
+                                    #b110
+                                    p
+                                    u
+                                    (low-bit-float-reg base-reg ,precision)
+                                    w
+                                    ,direction-flag
+                                    (tn-offset address)
+                                    (high-bits-float-reg base-reg ,precision)
+                                    #b101
+                                    ,precision-flag
+                                    ,(ecase precision
+                                       (:single 'reg-count)
+                                       (:double `(+ (* 2 reg-count)
+                                                    ,(if inc-offset 1 0)))))))))))
+
+;; multiple single precision
+(define-load-store-multiple-fp-instruction fstms :single :store)
+(define-load-store-multiple-fp-instruction fldms :single :load)
+;; multiple double precision
+(define-load-store-multiple-fp-instruction fstmd :double :store)
+(define-load-store-multiple-fp-instruction fldmd :double :load)
+;; multiple double precision registers of unknown content (needs up to 2 * reg-count + 1 words of space)
+(define-load-store-multiple-fp-instruction fstmx :double :store t)
+(define-load-store-multiple-fp-instruction fldmx :double :load t)
+
+;; Define a load/store one floating point instruction. PRECISION is
+;; :SINGLE for single precision values and :DOUBLE for double precision values.
+;; DIRECTION has to be either :LOAD or :STORE.
+(defmacro define-load-store-one-fp-instruction (name precision direction)
+  (let ((precision-flag (ecase precision
+                          (:single 0)
+                          (:double 1)))
+        (direction-flag (ecase direction
+                          (:load 1)
+                          (:store 0))))
+    `(define-instruction ,name (segment &rest args)
+       (:emitter
+        (with-condition-defaulted (args (condition address float-reg word-offset))
+          (let ((u (if (> word-offset 0) 1 0))
+                (abs-offset (abs word-offset)))
+            (emit-fp-ls-instruction segment
+                                    condition
+                                    #b110
+                                    1
+                                    u
+                                    (low-bit-float-reg float-reg ,precision)
+                                    0
+                                    ,direction-flag
+                                    (tn-offset address)
+                                    (high-bits-float-reg float-reg ,precision)
+                                    #b101
+                                    ,precision-flag
+                                    abs-offset)))))))
+
+(define-load-store-one-fp-instruction fsts :single :store)
+(define-load-store-one-fp-instruction flds :single :load)
+(define-load-store-one-fp-instruction fstd :double :store)
+(define-load-store-one-fp-instruction fldd :double :load)
+
+
+;; single register transfer instructions
+
+(define-bitfield-emitter emit-fp-srt-instruction 32
+  (byte 4 28) ; cond
+  (byte 4 24) ; #b1110
+  (byte 3 21) ; opc
+  (byte 1 20) ; L
+
+  (byte 4 16) ; Fn
+  (byte 4 12) ; Rd
+  (byte 3 9) ; #b101
+  (byte 1 8) ; precision
+
+  (byte 1 7) ; N
+  (byte 7 0)) ; #b0010000
+
+(defmacro define-single-reg-transfer-fp-instruction (name precision direction opcode)
+  (let ((precision-flag (ecase precision
+                          (:single 0)
+                          (:double 1)))
+        (direction-flag (ecase direction
+                          (:to-arm 1)
+                          (:from-arm 0))))
+    `(define-instruction ,name (segment &rest args)
+       (:emitter
+        (with-condition-defaulted (args (condition float-reg arm-reg))
+          (emit-fp-srt-instruction segment
+                                   condition
+                                   #b1110
+                                   ,opcode
+                                   ,direction-flag
+                                   (high-bits-float-reg float-reg ,precision)
+                                   (tn-offset arm-reg)
+                                   #b101
+                                   ,precision-flag
+                                   (low-bit-float-reg float-reg ,precision)
+                                   #b0010000))))))
+
+(define-single-reg-transfer-fp-instruction fmsr :single :from-arm #b000)
+(define-single-reg-transfer-fp-instruction fmrs :single :to-arm #b000)
+(define-single-reg-transfer-fp-instruction fmdlr :double :from-arm #b000)
+(define-single-reg-transfer-fp-instruction fmrdl :double :to-arm #b000)
+(define-single-reg-transfer-fp-instruction fmdhr :double :from-arm #b001)
+(define-single-reg-transfer-fp-instruction fmrdh :double :to-arm #b001)
+;; for special registers fpsid (~s0), fpscr (~s2), fpexc (~s16):
+(define-single-reg-transfer-fp-instruction fmxr :single :from-arm #b111)
+(define-single-reg-transfer-fp-instruction fmrx :single :to-arm #b111)
+
+(define-bitfield-emitter emit-fp-trt-instruction 32
+  (byte 4 28) ; cond
+  (byte 7 21) ; #b1100010
+  (byte 1 20) ; L
+  (byte 4 16) ; Rn
+  (byte 4 12) ; Rd
+  (byte 3 9) ; #b101
+  (byte 1 8) ; precision
+  (byte 2 6) ; #b00
+  (byte 1 5) ; M
+  (byte 1 4) ; #b1
+  (byte 4 0)) ; Fm
+
+(defmacro define-two-reg-transfer-fp-instruction (name precision direction)
+  (let ((precision-flag (ecase precision
+                          (:single 0)
+                          (:double 1)))
+        (direction-flag (ecase direction
+                          (:to-arm 1)
+                          (:from-arm 0))))
+    `(define-instruction ,name (segment &rest args)
+       (:emitter
+        (with-condition-defaulted (args (condition float-reg arm-reg-1 arm-reg-2))
+          (emit-fp-trt-instruction segment
+                                   condition
+                                   #b1110010
+                                   ,direction-flag
+                                   (tn-offset arm-reg-2)
+                                   (tn-offset arm-reg-1)
+                                   #b101
+                                   ,precision-flag
+                                   #b00
+                                   (low-bit-float-reg float-reg ,precision)
+                                   #b1
+                                   (high-bits-float-reg float-reg ,precision)))))))
+
+(define-two-reg-transfer-fp-instruction fmsrr :single :from-arm)
+(define-two-reg-transfer-fp-instruction fmrrs :single :to-arm)
+(define-two-reg-transfer-fp-instruction fmdrr :double :from-arm)
+(define-two-reg-transfer-fp-instruction fmrrd :double :to-arm)
