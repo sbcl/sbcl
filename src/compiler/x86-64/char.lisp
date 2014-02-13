@@ -28,9 +28,9 @@
   (:note "character untagging")
   (:generator 1
     (cond ((and (sc-is y character-reg) (sc-is x any-reg descriptor-reg))
-           (let ((y-dword (make-dword-tn y)))
+           (let ((y-dword (reg-in-size y :dword)))
              (unless (location= x y)
-               (inst mov y-dword (make-dword-tn x)))
+               (inst mov y-dword (reg-in-size x :dword)))
              (inst shr y-dword n-widetag-bits)))
           (t
            (move y x)
@@ -59,9 +59,9 @@
   (:results (y :scs (any-reg descriptor-reg)))
   (:note "character tagging")
   (:generator 1
-    (let ((y-dword (make-dword-tn y)))
+    (let ((y-dword (reg-in-size y :dword)))
       (unless (location= x y)
-        (inst mov y-dword (make-dword-tn x)))
+        (inst mov y-dword (reg-in-size x :dword)))
       (inst shl y-dword n-widetag-bits)
       (inst or y-dword character-widetag))))
 #!-sb-unicode

@@ -18,14 +18,14 @@
 (defun move-qword-to-eax (value)
   (if (and (sc-is value any-reg descriptor-reg)
            (< (tn-offset value) r8-offset))
-      (move eax-tn (make-dword-tn value))
+      (move eax-tn (reg-in-size value :dword))
       (move rax-tn value)))
 
 (defun generate-fixnum-test (value)
   "zero flag set if VALUE is fixnum"
   (inst test
         (cond ((sc-is value any-reg descriptor-reg)
-               (make-byte-tn value))
+               (reg-in-size value :byte))
               ((sc-is value control-stack)
                (make-ea :byte :base rbp-tn
                         :disp (frame-byte-offset (tn-offset value))))
@@ -61,7 +61,7 @@
                         &optional (drop-through (gen-label)))
   ;; Code a single instruction byte test if possible.
   (cond ((sc-is value any-reg descriptor-reg)
-         (inst cmp (make-byte-tn value) immediate))
+         (inst cmp (reg-in-size value :byte) immediate))
         (t
          (move rax-tn value)
          (inst cmp al-tn immediate)))
@@ -72,7 +72,7 @@
                                     &optional (drop-through (gen-label)))
   ;; Code a single instruction byte test if possible.
   (cond ((sc-is value any-reg descriptor-reg)
-         (inst cmp (make-byte-tn value) immediate))
+         (inst cmp (reg-in-size value :byte) immediate))
         (t
          (move rax-tn value)
          (inst cmp al-tn immediate)))

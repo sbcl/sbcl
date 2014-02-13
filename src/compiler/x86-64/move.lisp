@@ -11,19 +11,6 @@
 
 (in-package "SB!VM")
 
-(defun make-byte-tn (tn)
-  (aver (sc-is tn any-reg descriptor-reg unsigned-reg signed-reg))
-  (make-random-tn :kind :normal
-                  :sc (sc-or-lose 'byte-reg)
-                  :offset (tn-offset tn)))
-
-(defun make-dword-tn (tn)
-  (aver (sc-is tn any-reg descriptor-reg character-reg
-               unsigned-reg signed-reg))
-  (make-random-tn :kind :normal
-                  :sc (sc-or-lose 'dword-reg)
-                  :offset (tn-offset tn)))
-
 (defun zeroize (tn)
   (let ((offset (tn-offset tn)))
     ;; Using the 32-bit instruction accomplishes the same thing and is
