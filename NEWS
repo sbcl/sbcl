@@ -1,5 +1,8 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 changes relative to sbcl-1.1.15:
+  * minor incompatible change: improve read/print consistency for pathnames on
+    Win32, by using the circumflex character #\^ as the escape character.
+    (lp#673625)
   * enhancement: SB-EXT:DEFINE-LOAD-TIME-GLOBAL. (lp#1253688)
   * enhancement: Loading fasls with symbols from an undefined package includes
     the name of the symbol in the error message.

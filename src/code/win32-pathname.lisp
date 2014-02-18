@@ -19,7 +19,7 @@
                        (unparse #'unparse-win32-namestring)
                        (unparse-native #'unparse-native-win32-namestring)
                        (unparse-host #'unparse-win32-host)
-                       (unparse-directory #'unparse-physical-directory)
+                       (unparse-directory #'unparse-win32-directory)
                        (unparse-file #'unparse-win32-file)
                        (unparse-enough #'unparse-win32-enough)
                        (unparse-directory-separator "\\")
@@ -89,7 +89,7 @@
                  (tail-end (cdr tail)))
             (unless (= tail-start tail-end)
               (setf pieces (butlast pieces))
-              (extract-name-type-and-version namestring tail-start tail-end)))
+              (extract-name-type-and-version namestring tail-start tail-end #\^)))
 
         (when (stringp name)
           (let ((position (position-if (lambda (char)
@@ -136,7 +136,8 @@
                                 (t
                                  (dirs (maybe-make-pattern namestring
                                                            piece-start
-                                                           piece-end)))))))
+                                                           piece-end
+                                                           #\^)))))))
                     (cond (absolute
                            (if home
                                (list* :absolute home (dirs))
@@ -222,6 +223,9 @@
                (concatenate 'simple-string "\\\\" device)
                (concatenate 'simple-string "//" device))))))
 
+(defun unparse-win32-directory (pathname)
+  (unparse-physical-directory pathname #\^))
+
 (defun unparse-win32-file (pathname)
   (declare (type pathname pathname))
   (collect ((strings))
@@ -240,7 +244,7 @@
         (when (and (typep name 'string)
                    (string= name ""))
           (error "name is of length 0: ~S" pathname))
-        (strings (unparse-physical-piece name)))
+        (strings (unparse-physical-piece name #\^)))
       (when type-supplied
         (unless name
           (error "cannot specify the type without a file: ~S" pathname))
@@ -248,14 +252,14 @@
           (when (position #\. type)
             (error "type component can't have a #\. inside: ~S" pathname)))
         (strings ".")
-        (strings (unparse-physical-piece type))))
+        (strings (unparse-physical-piece type #\^))))
     (apply #'concatenate 'simple-string (strings))))
 
 (defun unparse-win32-namestring (pathname)
   (declare (type pathname pathname))
   (concatenate 'simple-string
                (unparse-win32-device pathname)
-               (unparse-physical-directory pathname)
+               (unparse-physical-directory pathname #\^)
                (unparse-win32-file pathname)))
 
 (defun unparse-native-win32-namestring (pathname as-file)
@@ -378,7 +382,7 @@
                      pathname-directory)
                     (t
                      (bug "Bad fallthrough in ~S" 'unparse-unix-enough)))))
-        (strings (unparse-physical-directory-list result-directory)))
+        (strings (unparse-physical-directory-list result-directory #\^)))
       (let* ((pathname-type (%pathname-type pathname))
              (type-needed (and pathname-type
                                (not (eq pathname-type :unspecific))))
@@ -394,7 +398,7 @@
                      (typep pathname-name 'simple-string)
                      (position #\. pathname-name :start 1))
             (error "too many dots in the name: ~S" pathname))
-          (strings (unparse-physical-piece pathname-name)))
+          (strings (unparse-physical-piece pathname-name #\^)))
         (when type-needed
           (when (or (null pathname-type) (eq pathname-type :unspecific))
             (lose))
@@ -402,7 +406,7 @@
             (when (position #\. pathname-type)
               (error "type component can't have a #\. inside: ~S" pathname)))
           (strings ".")
-          (strings (unparse-physical-piece pathname-type))))
+          (strings (unparse-physical-piece pathname-type #\^))))
       (apply #'concatenate 'simple-string (strings)))))
 
 ;; FIXME: This has been converted rather blindly from the Unix

@@ -19,7 +19,7 @@
                        (unparse #'unparse-unix-namestring)
                        (unparse-native #'unparse-native-unix-namestring)
                        (unparse-host #'unparse-unix-host)
-                       (unparse-directory #'unparse-physical-directory)
+                       (unparse-directory #'unparse-unix-directory)
                        (unparse-file #'unparse-unix-file)
                        (unparse-enough #'unparse-unix-enough)
                        (unparse-directory-separator "/")
@@ -60,7 +60,7 @@
                (tail-end (cdr tail)))
           (unless (= tail-start tail-end)
             (setf pieces (butlast pieces))
-            (extract-name-type-and-version namestring tail-start tail-end)))
+            (extract-name-type-and-version namestring tail-start tail-end #\\)))
 
       (when (stringp name)
         (let ((position (position-if (lambda (char)
@@ -107,7 +107,8 @@
                               (t
                                (dirs (maybe-make-pattern namestring
                                                          piece-start
-                                                         piece-end)))))))
+                                                         piece-end
+                                                         #\\)))))))
                   (cond (absolute
                          (if home
                              (list* :absolute home (dirs))
@@ -167,6 +168,9 @@
   ;; 2002-05-09
   "")
 
+(defun unparse-unix-directory (pathname)
+  (unparse-physical-directory pathname #\\))
+
 (defun unparse-unix-file (pathname)
   (declare (type pathname pathname))
   (collect ((strings))
@@ -185,7 +189,7 @@
         (when (and (typep name 'string)
                    (string= name ""))
           (error "name is of length 0: ~S" pathname))
-        (strings (unparse-physical-piece name)))
+        (strings (unparse-physical-piece name #\\)))
       (when type-supplied
         (unless name
           (error "cannot specify the type without a file: ~S" pathname))
@@ -193,7 +197,7 @@
           (when (position #\. type)
             (error "type component can't have a #\. inside: ~S" pathname)))
         (strings ".")
-        (strings (unparse-physical-piece type))))
+        (strings (unparse-physical-piece type #\\))))
     (apply #'concatenate 'simple-string (strings))))
 
 (/show0 "filesys.lisp 406")
@@ -201,7 +205,7 @@
 (defun unparse-unix-namestring (pathname)
   (declare (type pathname pathname))
   (concatenate 'simple-string
-               (unparse-physical-directory pathname)
+               (unparse-unix-directory pathname)
                (unparse-unix-file pathname)))
 
 (defun unparse-native-unix-namestring (pathname as-file)
@@ -288,7 +292,7 @@
                      pathname-directory)
                     (t
                      (bug "Bad fallthrough in ~S" 'unparse-unix-enough)))))
-        (strings (unparse-physical-directory-list result-directory)))
+        (strings (unparse-physical-directory-list result-directory #\\)))
       (let* ((pathname-type (%pathname-type pathname))
              (type-needed (and pathname-type
                                (not (eq pathname-type :unspecific))))
@@ -304,7 +308,7 @@
                      (typep pathname-name 'simple-string)
                      (position #\. pathname-name :start 1))
             (error "too many dots in the name: ~S" pathname))
-          (strings (unparse-physical-piece pathname-name)))
+          (strings (unparse-physical-piece pathname-name #\\)))
         (when type-needed
           (when (or (null pathname-type) (eq pathname-type :unspecific))
             (lose))
@@ -312,7 +316,7 @@
             (when (position #\. pathname-type)
               (error "type component can't have a #\. inside: ~S" pathname)))
           (strings ".")
-          (strings (unparse-physical-piece pathname-type))))
+          (strings (unparse-physical-piece pathname-type #\\))))
       (apply #'concatenate 'simple-string (strings)))))
 
 (defun simplify-unix-namestring (src)

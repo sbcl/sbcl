@@ -49,12 +49,13 @@
 ;;; {str1,str2,...,strn} - matches any of str1, str2, ..., or strn.
 ;;;   (FIXME: no it doesn't)
 ;;;
-;;; Any of these special characters can be preceded by a backslash to
-;;; cause it to be treated as a regular character.
-(defun remove-backslashes (namestr start end)
+;;; Any of these special characters can be preceded by an escape
+;;; character to cause it to be treated as a regular character.
+(defun remove-escape-characters (namestr start end escape-char)
   #!+sb-doc
-  "Remove any occurrences of #\\ from the string because we've already
-   checked for whatever they may have protected."
+  "Remove any occurrences of escape characters from the string
+   because we've already checked for whatever they may have
+   protected."
   (declare (type simple-string namestr)
            (type index start end))
   (let* ((result (make-string (- end start) :element-type 'character))
@@ -68,21 +69,22 @@
              (incf dst))
             (t
              (let ((char (schar namestr src)))
-               (cond ((char= char #\\)
+               (cond ((char= char escape-char)
                       (setq quoted t))
                      (t
                       (setf (schar result dst) char)
                       (incf dst)))))))
     (when quoted
       (error 'namestring-parse-error
-             :complaint "backslash in a bad place"
+             :complaint "escape char in a bad place"
              :namestring namestr
              :offset (1- end)))
     (%shrink-vector result dst)))
 
-(defun maybe-make-pattern (namestr start end)
+(defun maybe-make-pattern (namestr start end escape-char)
   (declare (type simple-string namestr)
-           (type index start end))
+           (type index start end)
+           (type character escape-char))
   (collect ((pattern))
     (let ((quoted nil)
           (any-quotes nil)
@@ -91,9 +93,9 @@
       (flet ((flush-pending-regulars ()
                (when last-regular-char
                  (pattern (if any-quotes
-                              (remove-backslashes namestr
-                                                  last-regular-char
-                                                  index)
+                              (remove-escape-characters
+                               namestr last-regular-char
+                               index escape-char)
                               (subseq namestr last-regular-char index)))
                  (setf any-quotes nil)
                  (setf last-regular-char nil))))
@@ -104,7 +106,7 @@
             (cond (quoted
                    (incf index)
                    (setf quoted nil))
-                  ((char= char #\\)
+                  ((char= char escape-char)
                    (setf quoted t)
                    (setf any-quotes t)
                    (unless last-regular-char
@@ -149,24 +151,30 @@
           (t
            (make-pattern (pattern))))))
 
-(defun unparse-physical-piece (thing)
+(defun unparse-physical-piece (thing escape-char)
   (etypecase thing
     ((member :wild) "*")
     (simple-string
      (let* ((srclen (length thing))
             (dstlen srclen))
        (dotimes (i srclen)
-         (case (schar thing i)
-           ((#\* #\? #\[)
-            (incf dstlen))))
+         (let ((char (schar thing i)))
+           (case char
+             ((#\* #\? #\[)
+              (incf dstlen))
+             (t (when (char= char escape-char)
+                  (incf dstlen))))))
        (let ((result (make-string dstlen))
              (dst 0))
          (dotimes (src srclen)
            (let ((char (schar thing src)))
              (case char
                ((#\* #\? #\[)
-                (setf (schar result dst) #\\)
-                (incf dst)))
+                (setf (schar result dst) escape-char)
+                (incf dst))
+               (t (when (char= char escape-char)
+                    (setf (schar result dst) escape-char)
+                    (incf dst))))
              (setf (schar result dst) char)
              (incf dst)))
          result)))
@@ -204,18 +212,18 @@
 
 (/show0 "filesys.lisp 160")
 
-(defun extract-name-type-and-version (namestr start end)
+(defun extract-name-type-and-version (namestr start end escape-char)
   (declare (type simple-string namestr)
            (type index start end))
   (let* ((last-dot (position #\. namestr :start (1+ start) :end end
                              :from-end t)))
     (cond
       (last-dot
-       (values (maybe-make-pattern namestr start last-dot)
-               (maybe-make-pattern namestr (1+ last-dot) end)
+       (values (maybe-make-pattern namestr start last-dot escape-char)
+               (maybe-make-pattern namestr (1+ last-dot) end escape-char)
                :newest))
       (t
-       (values (maybe-make-pattern namestr start end)
+       (values (maybe-make-pattern namestr start end escape-char)
                nil
                :newest)))))
 
