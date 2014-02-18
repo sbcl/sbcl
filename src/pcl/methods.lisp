@@ -1642,11 +1642,11 @@
   (reinitialize-instance gf))
 (defun sb-impl::encapsulated-generic-function-p (gf type)
   (position type (generic-function-encapsulations gf) :key #'car))
-(defun standard-compute-discriminating-function-with-encapsulations (gf encs)
+(defun maybe-encapsulate-discriminating-function (gf encs std)
   (if (null encs)
-      (standard-compute-discriminating-function gf)
-      (let ((inner (standard-compute-discriminating-function-with-encapsulations
-                    gf (cdr encs)))
+      std
+      (let ((inner (maybe-encapsulate-discriminating-function
+                    gf (cdr encs) std))
             (body (cdar encs)))
         (lambda (&rest args)
           (let ((sb-int:arg-list args)
@@ -1654,8 +1654,10 @@
             (declare (special sb-int:arg-list sb-int:basic-definition))
             (eval body))))))
 (defmethod compute-discriminating-function ((gf standard-generic-function))
-  (standard-compute-discriminating-function-with-encapsulations
-   gf (generic-function-encapsulations gf)))
+  (standard-compute-discriminating-function gf))
+(defmethod compute-discriminating-function :around ((gf standard-generic-function))
+  (maybe-encapsulate-discriminating-function
+   gf (generic-function-encapsulations gf) (call-next-method)))
 
 (defmethod (setf class-name) (new-value class)
   (let ((classoid (wrapper-classoid (class-wrapper class))))
