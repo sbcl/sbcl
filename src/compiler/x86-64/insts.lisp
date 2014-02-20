@@ -156,7 +156,7 @@
            (type sb!disassem:disassem-state dstate))
   (if (typep value 'full-reg)
       (print-reg-with-width value width stream dstate)
-      (print-mem-access value width sized-p stream dstate)))
+      (print-mem-ref (if sized-p :sized-ref :ref) value width stream dstate)))
 
 ;;; Print a register or a memory reference. The width is determined by
 ;;; calling INST-OPERAND-SIZE.
@@ -219,7 +219,7 @@
            (type sb!disassem:disassem-state dstate))
   (if (typep value 'xmmreg)
       (print-xmmreg value stream dstate)
-    (print-mem-access value nil nil stream dstate)))
+      (print-mem-ref :ref value nil stream dstate)))
 
 ;;; This prefilter is used solely for its side effects, namely to put
 ;;; the bits found in the REX prefix into the DSTATE for use by other
@@ -2037,8 +2037,21 @@
              (t
               (error "bogus args to XCHG: ~S ~S" operand1 operand2)))))))
 
+;; The printer for LEA's r/m field indicates to PRINT-MEM-REF that this is an
+;; EA calculation, not a memory access. The ELSE branch should never execute,
+;; but is robust in allowing display of invalid instructions like LEA RAX,RBX.
+;; A further improvement would use a labeller so that entry points
+;; to local functions get labeled.
 (define-instruction lea (segment dst src)
-  (:printer reg-reg/mem ((op #b1000110) (width 1)))
+  (:printer reg-reg/mem
+            ((op #b1000110) (width 1)
+             (reg/mem nil
+              :printer
+              (lambda (value stream dstate)
+                (let ((width (inst-operand-size dstate)))
+                  (if (listp value)
+                      (print-mem-ref :compute value width stream dstate)
+                      (print-reg-with-width value width stream dstate)))))))
   (:emitter
    (aver (or (dword-reg-p dst) (qword-reg-p dst)))
    (maybe-emit-rex-for-ea segment src dst

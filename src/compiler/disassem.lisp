@@ -40,8 +40,11 @@
 (defvar *disassem-inst-alignment-bytes* sb!vm:n-word-bytes)
 (declaim (type alignment *disassem-inst-alignment-bytes*))
 
+;; How many columns of output to allow for the address preceding each line.
+;; If NIL, use the minimum possible width for the disassembly range.
+;; If 0, do not print addresses.
 (defvar *disassem-location-column-width* 8)
-(declaim (type text-width *disassem-location-column-width*))
+(declaim (type (or null text-width) *disassem-location-column-width*))
 
 ;;; the width of the column in which instruction-names are printed. A
 ;;; value of zero gives the effect of not aligning the arguments at

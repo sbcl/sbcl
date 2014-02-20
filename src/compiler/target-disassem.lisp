@@ -261,9 +261,17 @@
                     (:copier nil))
   (sap-maker (missing-arg)
              :type (function () sb!sys:system-area-pointer))
+  ;; Length in bytes of the range of memory covered by this segment.
   (length 0 :type disassem-length)
+  ;; Length of the memory range excluding any trailing untagged data.
+  ;; Defaults to 'length' but could be shorter.
+  (opcodes-length 0 :type disassem-length)
   (virtual-location 0 :type address)
   (storage-info nil :type (or null storage-info))
+  ;; For backends which support unboxed constants within the segment,
+  ;; they are collected into unboxed-refs so that they can be shown
+  ;; in their correct size according to the referencing instruction.
+  (unboxed-refs nil :type list) ; alist of (offset . size)
   (code nil :type (or null sb!kernel:code-component))
   (hooks nil :type list))
 (def!method print-object ((seg segment) stream)
@@ -522,7 +530,7 @@
 
     (loop
       (when (>= (dstate-cur-offs dstate)
-                (seg-length (dstate-segment dstate)))
+                (seg-opcodes-length (dstate-segment dstate)))
         ;; done!
         (when (and stream (> prefix-len 0))
           (pad-inst-column stream prefix-len)
@@ -701,7 +709,7 @@
   (push function (dstate-fun-hooks dstate)))
 
 (defun set-location-printing-range (dstate from length)
-  (setf (dstate-addr-print-len dstate)
+  (setf (dstate-addr-print-len dstate) ; in characters
         ;; 4 bits per hex digit
         (ceiling (integer-length (logxor from (+ from length))) 4)))
 
@@ -714,25 +722,40 @@
           (+ (seg-virtual-location (dstate-segment dstate))
              (dstate-cur-offs dstate)))
          (location-column-width *disassem-location-column-width*)
-         (plen (dstate-addr-print-len dstate)))
+         (plen ; the number of rightmost hex chars of this address to print
+          (or (dstate-addr-print-len dstate)
+              ;; Usually we've already set the width, but in case not...
+              (let ((seg (dstate-segment dstate)))
+                (set-location-printing-range
+                 dstate (seg-virtual-location seg) (seg-length seg))))))
 
-    (when (null plen)
-      (setf plen location-column-width)
-      (let ((seg (dstate-segment dstate)))
-        (set-location-printing-range dstate
-                                     (seg-virtual-location seg)
-                                     (seg-length seg))))
-    (when (eq (dstate-output-state dstate) :beginning)
-      (setf plen location-column-width))
+    (if (eq (dstate-output-state dstate) :beginning) ; on the first line
+        (if location-column-width
+            ;; If there's a user-specified width, force that number of hex chars
+            ;; regardless of whether it's greater or smaller than PLEN.
+            (setq plen location-column-width)
+            ;; No specified width. The PLEN of this line becomes the width.
+            ;; Adjust the DSTATE's argument column for it.
+            (incf (dstate-argument-column dstate)
+                  (setq location-column-width plen)))
+        ;; not the first line
+        (if location-column-width
+            ;; A specified width smaller than that required clips significant
+            ;; digits, but larger should not cause leading zeros to appear.
+            (setq plen (min plen location-column-width))
+            ;; Otherwise use the previously computed addr-print-len
+            (setq location-column-width plen)))
 
+    (incf location-column-width 2) ; account for leading "; "
     (fresh-line stream)
-
-    (setf location-column-width (+ 2 location-column-width))
     (princ "; " stream)
 
     ;; print the location
     ;; [this is equivalent to (format stream "~V,'0x:" plen printed-value), but
     ;;  usually avoids any consing]
+    ;; FIXME: if this cruft is actually a speed win, the format-string compiler
+    ;; should be improved to obviate the obfuscation. If it is not a win,
+    ;; we should just replace it with the above format string already.
     (tab0 (- location-column-width plen) stream)
     (let* ((printed-bits (* 4 plen))
            (printed-value (ldb (byte printed-bits 0) location))
@@ -742,7 +765,8 @@
         (write-char #\0 stream))
       (unless (zerop printed-value)
         (write printed-value :stream stream :base 16 :radix nil))
-      (write-char #\: stream))
+      (unless (zerop plen)
+        (write-char #\: stream)))
 
     ;; print any labels
     (loop
@@ -841,8 +865,8 @@
 (defun make-dstate (&optional (fun-hooks *default-dstate-hooks*))
   (let ((alignment *disassem-inst-alignment-bytes*)
         (arg-column
-         (+ 2
-            *disassem-location-column-width*
+         (+ 2 ; for the leading "; " on each line
+            (or *disassem-location-column-width* 0)
             1
             label-column-width
             *disassem-inst-column-width*
@@ -927,6 +951,7 @@
           (%make-segment
            :sap-maker sap-maker
            :length length
+           :opcodes-length length
            :virtual-location (or virtual-location
                                  (sb!sys:sap-int (funcall sap-maker)))
            :hooks hooks
@@ -1402,7 +1427,14 @@
            (funcall printer chunk inst stream dstate))))
      segment
      dstate
-     stream)))
+     stream)
+    ;; "unboxed data" are more general than just large constants,
+    ;; but presently are comprised only of those. It would have made
+    ;; sense to featurize this on inline-constants, however it turned
+    ;; out to be difficult to get x86 (-32) to work, which as it happens
+    ;; is the only other backend that has the inline-constants feature.
+    #!+x86-64
+    (disassemble-unboxed-data segment stream dstate)))
 
 ;;; Disassemble the machine code instructions in each memory segment
 ;;; in SEGMENTS in turn to STREAM.
@@ -1411,18 +1443,33 @@
            (type stream stream)
            (type disassem-state dstate))
   (unless (null segments)
-    (format stream "~&; Size: ~a bytes"
-            (reduce #'+ segments :key #'seg-length))
-    (let ((first (car segments))
+    (let ((n-segments (length segments))
+          (first (car segments))
           (last (car (last segments))))
+      ;; One origin per segment is printed. As with the per-line display,
+      ;; the segment is thought of as immovable for rendering of addresses,
+      ;; though in fact the disassembler transiently allows movement.
+      (format stream "~&; Size: ~a bytes. Origin: #x~x~@[ (segment 1 of ~D)~]"
+              (reduce #'+ segments :key #'seg-length)
+              (seg-virtual-location first)
+              (if (> n-segments 1) n-segments))
       (set-location-printing-range dstate
                                    (seg-virtual-location first)
                                    (- (+ (seg-virtual-location last)
                                          (seg-length last))
                                       (seg-virtual-location first)))
       (setf (dstate-output-state dstate) :beginning)
-      (dolist (seg segments)
-        (disassemble-segment seg stream dstate)))))
+      (let ((i 0))
+        (dolist (seg segments)
+          (when (> (incf i) 1)
+            (format stream "~&; Origin #x~x (segment ~D of ~D)"
+                    (seg-virtual-location seg) i n-segments))
+          (disassemble-segment seg stream dstate))))))
+
+#!-x86-64
+(defun determine-opcode-bounds (seglist dstate)
+  (declare (ignore seglist dstate)))
+
 
 ;;;; top level functions
 
@@ -1435,6 +1482,7 @@
            (type (member t nil) use-labels))
   (let* ((dstate (make-dstate))
          (segments (get-fun-segments fun)))
+    (determine-opcode-bounds segments dstate)
     (when use-labels
       (label-segments segments dstate))
     (disassemble-segments segments stream dstate)))
@@ -1539,6 +1587,7 @@
               code-component))
          (dstate (make-dstate))
          (segments (get-code-segments code-component)))
+    (determine-opcode-bounds segments dstate)
     (when use-labels
       (label-segments segments dstate))
     (disassemble-segments segments stream dstate)))
@@ -1552,12 +1601,16 @@
 
 ;;; Disassemble the machine code instructions associated with
 ;;; ASSEM-SEGMENT (of type assem:segment).
+;;; The logic to determine opcode bounds is the same as for the above cases,
+;;; which is unfortunately Rube-Goldberg-esque here, as the assembler knows the
+;;; bounds, but has already combined multiple segments. This could be improved.
 (defun disassemble-assem-segment (assem-segment stream)
   (declare (type sb!assem:segment assem-segment)
            (type stream stream))
   (let ((dstate (make-dstate))
         (disassem-segments
          (list (assem-segment-to-disassem-segment assem-segment))))
+    (determine-opcode-bounds disassem-segments dstate)
     (label-segments disassem-segments dstate)
     (disassemble-segments disassem-segments stream dstate)))
 
