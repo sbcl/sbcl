@@ -665,11 +665,23 @@
   :derive-type (sequence-result-nth-arg 1)
   :destroyed-constant-args (nth-constant-nonempty-sequence-args 1))
 (defknown sb!impl::stable-sort-list (list function function) list
-  (call important-result)
+  (call important-result explicit-check)
   :destroyed-constant-args (nth-constant-nonempty-sequence-args 1))
 (defknown sb!impl::sort-vector (vector index index function (or function null))
   * ; SORT-VECTOR works through side-effect
   (call)
+  :destroyed-constant-args (nth-constant-nonempty-sequence-args 1))
+
+(defknown sb!impl::stable-sort-vector
+  (vector function (or function null))
+  vector
+  (call explicit-check)
+  :destroyed-constant-args (nth-constant-nonempty-sequence-args 1))
+
+(defknown sb!impl::stable-sort-simple-vector
+  (simple-vector function (or function null))
+  simple-vector
+  (call explicit-check)
   :destroyed-constant-args (nth-constant-nonempty-sequence-args 1))
 
 (defknown merge (type-specifier sequence sequence callable

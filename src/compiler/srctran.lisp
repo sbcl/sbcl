@@ -4821,6 +4821,28 @@
         (locally
           (declare (optimize (speed 2) (space 2) (inhibit-warnings 3)))
           (%sort-vector (or ,key #'identity))))))
+
+(deftransform sort ((list predicate &key key)
+                    (list * &rest t) *)
+  `(sb!impl::stable-sort-list list
+                              (%coerce-callable-to-fun predicate)
+                              (if key (%coerce-callable-to-fun key) #'identity)))
+
+(deftransform stable-sort ((sequence predicate &key key)
+                           ((or vector list) *))
+  (let ((sequence-type (lvar-type sequence)))
+    (cond ((csubtypep sequence-type (specifier-type 'list))
+           `(sb!impl::stable-sort-list sequence
+                                       (%coerce-callable-to-fun predicate)
+                                       (if key (%coerce-callable-to-fun key) #'identity)))
+          ((csubtypep sequence-type (specifier-type 'simple-vector))
+           `(sb!impl::stable-sort-simple-vector sequence
+                                                (%coerce-callable-to-fun predicate)
+                                                (and key (%coerce-callable-to-fun key))))
+          (t
+           `(sb!impl::stable-sort-vector sequence
+                                         (%coerce-callable-to-fun predicate)
+                                         (and key (%coerce-callable-to-fun key)))))))
 
 ;;;; debuggers' little helpers
 
