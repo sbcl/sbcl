@@ -624,4 +624,7 @@
   (assert (string= (sb-int:simplify-namestring "./a/b/../c/")
                    "a/c/")))
 
+(with-test (:name :back-and-truename)
+  (probe-file (make-pathname :directory '(:absolute "a" "b" :back))))
+
 ;;;; success

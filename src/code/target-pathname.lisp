@@ -425,8 +425,8 @@ the operating system native pathname conventions."
         (flet ((add (dir)
                  (if (and (eq dir :back)
                           results
-                          (not (member (car results)
-                                       '(:back :wild-inferiors :relative :absolute))))
+                          (typep (car results) '(or string pattern
+                                                 (member :wild :wild-inferiors))))
                      (pop results)
                      (push dir results))))
           (dolist (dir (maybe-diddle-case dir2 diddle-case))
@@ -484,29 +484,35 @@ the operating system native pathname conventions."
     ((member :wild) '(:absolute :wild-inferiors))
     ((member :unspecific) '(:relative))
     (list
-     (collect ((results))
-       (let ((root (pop directory)))
-         (if (member root '(:relative :absolute))
-             (results root)
-             (error "List of directory components must start with ~S or ~S."
-                    :absolute :relative)))
+     (let ((root (pop directory))
+           results)
+       (if (member root '(:relative :absolute))
+           (push root results)
+           (error "List of directory components must start with ~S or ~S."
+                  :absolute :relative))
        (when directory
-         (let ((next (pop directory)))
-           (if (or (eq :home next)
-                   (typep next '(cons (eql :home) (cons string null))))
-               (results next)
-               (push next directory)))
+         (let ((next (car directory)))
+           (when (or (eq :home next)
+                     (typep next '(cons (eql :home) (cons string null))))
+             (push (pop directory) results)))
          (dolist (piece directory)
-           (cond ((member piece '(:wild :wild-inferiors :up :back))
-                  (results piece))
-                 ((or (simple-string-p piece) (pattern-p piece))
-                  (results (maybe-diddle-case piece diddle-case)))
-                 ((stringp piece)
-                  (results (maybe-diddle-case (coerce piece 'simple-string)
-                                              diddle-case)))
-                 (t
-                  (error "~S is not allowed as a directory component." piece)))))
-       (results)))
+           (typecase piece
+             ((member :wild :wild-inferiors :up)
+              (push piece results))
+             ((member :back)
+              (if (typep (car results) '(or string pattern
+                                         (member :wild :wild-inferiors)))
+                  (pop results)
+                  (push piece results)))
+             ((or simple-string pattern)
+              (push (maybe-diddle-case piece diddle-case) results))
+             (string
+              (push (maybe-diddle-case (coerce piece 'simple-string)
+                                       diddle-case) results))
+
+             (t
+              (error "~S is not allowed as a directory component." piece)))))
+       (nreverse results)))
     (simple-string
      `(:absolute ,(maybe-diddle-case directory diddle-case)))
     (string

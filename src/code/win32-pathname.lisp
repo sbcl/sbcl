@@ -302,7 +302,7 @@
                      (let ((where (user-homedir-pathname (second next))))
                        (if where
                            (write-string (native-namestring where) s)
-                           (error "User homedir unknown for: ~S"
+                           (error "User homedir unknown for: ~S."
                                   (second next)))))
                     ;; namestring of user-homedir-pathname already has
                     ;; // at the end
@@ -314,9 +314,9 @@
            (:relative)))
        (loop for (piece . subdirs) on directory
              do (typecase piece
-                  ((member :up) (write-string ".." s))
+                  ((member :up :back) (write-string ".." s))
                   (string (write-string piece s))
-                  (t (error "ungood directory segment in NATIVE-NAMESTRING: ~S"
+                  (t (error "Bad directory segment in NATIVE-NAMESTRING: ~S."
                             piece)))
              if (or subdirs (stringp name))
              do (write-char #\\ s)
@@ -326,16 +326,16 @@
        (if name-present-p
            (progn
              (unless (stringp name-string) ;some kind of wild field
-               (error "ungood name component in NATIVE-NAMESTRING: ~S" name))
+               (error "Bad name component in NATIVE-NAMESTRING: ~S." name))
              (write-string name-string s)
              (when type-present-p
                (unless (stringp type-string) ;some kind of wild field
-                 (error "ungood type component in NATIVE-NAMESTRING: ~S" type))
+                 (error "Bad type component in NATIVE-NAMESTRING: ~S." type))
                (write-char #\. s)
                (write-string type-string s)))
            (when type-present-p
              (error
-              "type component without a name component in NATIVE-NAMESTRING: ~S"
+              "Type component without a name component in NATIVE-NAMESTRING: ~S."
               type)))
        (when absolutep
          (let ((string (get-output-stream-string s)))
