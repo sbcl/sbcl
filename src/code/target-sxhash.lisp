@@ -175,34 +175,43 @@
                ;; answer.  -- CSR, 2004-07-14
                (list
                 (if (null x)
-                    (sxhash x) ; through DEFTRANSFORM
+                    (sxhash x)          ; through DEFTRANSFORM
                     (if (plusp depthoid)
                         (mix (sxhash-recurse (car x) (1- depthoid))
                              (sxhash-recurse (cdr x) (1- depthoid)))
                         261835505)))
                (instance
-                (if (pathnamep x)
-                    ;; Pathnames are EQUAL if all the components are EQUAL, so
-                    ;; we hash all of the components of a pathname together.
-                    (let ((hash (sxhash-recurse (pathname-host x) depthoid)))
-                      (mixf hash (sxhash-recurse (pathname-device x) depthoid))
-                      (mixf hash (sxhash-recurse (pathname-directory x) depthoid))
-                      (mixf hash (sxhash-recurse (pathname-name x) depthoid))
-                      (mixf hash (sxhash-recurse (pathname-type x) depthoid))
-                      ;; Hash :NEWEST the same as NIL because EQUAL for
-                      ;; pathnames assumes that :newest and nil are equal.
-                      (let ((version (%pathname-version x)))
-                        (mixf hash (sxhash-recurse (if (eq version :newest)
-                                                       nil
-                                                       version)
-                                                   depthoid))))
-                    (if (or (typep x 'structure-object) (typep x 'condition))
-                        (logxor 422371266
-                                (sxhash ; through DEFTRANSFORM
-                                 (classoid-name
-                                  (layout-classoid (%instance-layout x)))))
-                        (sxhash-instance x))))
-               (symbol (sxhash x)) ; through DEFTRANSFORM
+                (typecase x
+                  (pathname
+                   ;; Pathnames are EQUAL if all the components are EQUAL, so
+                   ;; we hash all of the components of a pathname together.
+                   (let ((hash (sxhash-recurse (pathname-host x) depthoid)))
+                     (mixf hash (sxhash-recurse (pathname-device x) depthoid))
+                     (mixf hash (sxhash-recurse (pathname-directory x) depthoid))
+                     (mixf hash (sxhash-recurse (pathname-name x) depthoid))
+                     (mixf hash (sxhash-recurse (pathname-type x) depthoid))
+                     ;; Hash :NEWEST the same as NIL because EQUAL for
+                     ;; pathnames assumes that :newest and nil are equal.
+                     (let ((version (%pathname-version x)))
+                       (mixf hash (sxhash-recurse (if (eq version :newest)
+                                                      nil
+                                                      version)
+                                                  depthoid)))))
+                  (layout
+                   ;; LAYOUTs have an easily-accesible hash value: we
+                   ;; might as well use it.  It's not actually uniform
+                   ;; over the space of hash values (it excludes 0 and
+                   ;; some of the larger numbers) but it's better than
+                   ;; simply returning the same value for all LAYOUT
+                   ;; objects, as the next branch would do.
+                   (layout-clos-hash x))
+                  ((or structure-object condition)
+                   (logxor 422371266
+                           (sxhash      ; through DEFTRANSFORM
+                            (classoid-name
+                             (layout-classoid (%instance-layout x))))))
+                  (t (sxhash-instance x))))
+               (symbol (sxhash x))      ; through DEFTRANSFORM
                (array
                 (typecase x
                   (simple-string (sxhash x)) ; through DEFTRANSFORM
