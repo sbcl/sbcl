@@ -2407,56 +2407,25 @@
       (when immed
         (emit-byte segment amount)))))
 
-(eval-when (:compile-toplevel :execute)
-  (defun shift-inst-printer-list (subop)
-    `((reg/mem ((op (#b1101000 ,subop)))
-               (:name :tab reg/mem ", 1"))
-      (reg/mem ((op (#b1101001 ,subop)))
-               (:name :tab reg/mem ", " 'cl))
-      (reg/mem-imm ((op (#b1100000 ,subop))
-                    (imm nil :type imm-byte))))))
+(sb!disassem:define-instruction-format
+    (shift-inst 16 :include 'reg/mem
+     :default-printer '(:name :tab reg/mem ", " (:if (varying :positive) 'cl 1)))
+  (op :fields (list (byte 6 2) (byte 3 11)))
+  (varying :field (byte 1 1)))
 
-(define-instruction rol (segment dst amount)
-  (:printer-list
-   (shift-inst-printer-list #b000))
-  (:emitter
-   (emit-shift-inst segment dst amount #b000)))
-
-(define-instruction ror (segment dst amount)
-  (:printer-list
-   (shift-inst-printer-list #b001))
-  (:emitter
-   (emit-shift-inst segment dst amount #b001)))
-
-(define-instruction rcl (segment dst amount)
-  (:printer-list
-   (shift-inst-printer-list #b010))
-  (:emitter
-   (emit-shift-inst segment dst amount #b010)))
-
-(define-instruction rcr (segment dst amount)
-  (:printer-list
-   (shift-inst-printer-list #b011))
-  (:emitter
-   (emit-shift-inst segment dst amount #b011)))
-
-(define-instruction shl (segment dst amount)
-  (:printer-list
-   (shift-inst-printer-list #b100))
-  (:emitter
-   (emit-shift-inst segment dst amount #b100)))
-
-(define-instruction shr (segment dst amount)
-  (:printer-list
-   (shift-inst-printer-list #b101))
-  (:emitter
-   (emit-shift-inst segment dst amount #b101)))
-
-(define-instruction sar (segment dst amount)
-  (:printer-list
-   (shift-inst-printer-list #b111))
-  (:emitter
-   (emit-shift-inst segment dst amount #b111)))
+(macrolet ((define (name subop)
+             `(define-instruction ,name (segment dst amount)
+                (:printer shift-inst ((op '(#b110100 ,subop)))) ; shift by CL or 1
+                (:printer reg/mem-imm ((op '(#b1100000 ,subop))
+                                       (imm nil :type 'imm-byte)))
+                (:emitter (emit-shift-inst segment dst amount ,subop)))))
+  (define rol #b000)
+  (define ror #b001)
+  (define rcl #b010)
+  (define rcr #b011)
+  (define shl #b100)
+  (define shr #b101)
+  (define sar #b111))
 
 (defun emit-double-shift (segment opcode dst src amt)
   (let ((size (matching-operand-size dst src)))
