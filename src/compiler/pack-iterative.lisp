@@ -84,8 +84,8 @@
   ;; type of packing necessary. We should only have to determine
   ;; colors for :normal TNs/vertices
   (pack-type nil :type (member :normal :wired :restricted))
-  ;; color = (cons offset sc)
-  (color nil :type (or cons null))
+  ;; color offset
+  (color nil :type (or fixnum null))
   ;; current status, removed from the interference graph or not (on
   ;; stack or not)
   (invisible nil :type t)
@@ -268,7 +268,6 @@
           for vertex in vertices
           do (let* ((tn (vertex-tn vertex))
                     (offset (tn-offset tn))
-                    (sc (tn-sc tn))
                     (locs (if offset
                               (list offset)
                               (restricted-tn-locations tn))))
@@ -277,8 +276,7 @@
                      (vertex-incidence vertex) (make-ordered-set)
                      (vertex-initial-domain vertex) locs
                      (vertex-initial-domain-size vertex) (length locs)
-                     (vertex-color vertex) (and offset
-                                                (cons offset sc))
+                     (vertex-color vertex) offset
                      (vertex-invisible vertex) nil
                      (vertex-spill-cost vertex) (tn-cost tn)
                      (gethash tn tn-vertex) vertex)
@@ -325,8 +323,7 @@
        :tn-vertex tn-vertex
        :tn-vertex-mapping (lambda (tn)
                             (awhen (gethash tn tn-vertex)
-                              (values (car (vertex-color it))
-                                      it)))))))
+                              (values (vertex-color it) it)))))))
 
 ;; &key reset: whether coloring/invisibility information should be
 ;; removed from all the remaining vertices
@@ -353,16 +350,14 @@
            (type vertex vertex)
            (optimize speed (safety 0)))
   (let ((color+size (+ color (sc-element-size (vertex-sc vertex)))))
-    (flet ((intervals-intersect-p (color2 sc2)
+    (flet ((intervals-intersect-p (color2 vertex2)
              (declare (fixnum color2))
              (if (< color2 color)
-                 (< color (+ color2 (sc-element-size sc2)))
+                 (< color (+ color2 (sc-element-size (vertex-sc vertex2))))
                  (< color2 color+size))))
       (do-oset-elements (neighbor (vertex-incidence vertex) t)
         (cond ((vertex-invisible neighbor))
-              ((let ((neighbor-color (vertex-color neighbor)))
-                 (intervals-intersect-p
-                  (car neighbor-color) (cdr neighbor-color)))
+              ((intervals-intersect-p (vertex-color neighbor) neighbor)
                (return nil)))))))
 
 ;; Assumes that VERTEX pack-type is :WIRED.
@@ -370,7 +365,7 @@
   (declare (type fixnum color) (type vertex vertex))
   (and (or (and (neq (vertex-pack-type vertex) :wired)
                 (not (tn-offset (vertex-tn vertex))))
-           (= color (the fixnum (car (vertex-color vertex)))))
+           (= color (the fixnum (vertex-color vertex))))
        (member color (vertex-initial-domain vertex))
        (color-no-conflicts-p color vertex)))
 
@@ -445,14 +440,14 @@
               (values (first it) nil))
         (aver color)
         (dolist (target recolor-vertices)
-          (aver (car (vertex-color target)))
-          (unless (eql color (car (vertex-color target)))
+          (aver (vertex-color target))
+          (unless (eql color (vertex-color target))
             (aver (eq sb (sc-sb (vertex-sc target))))
             (aver (not (tn-offset (vertex-tn target))))
             #+nil ; this check is slow
             (aver (vertex-color-possible-p target color))
-            (setf (car (vertex-color target)) color)))
-        (cons color sc)))))
+            (setf (vertex-color target) color)))
+        color))))
 
 ;; Partition vertices into those that are likely to be colored and
 ;; those that are likely to be spilled.  Assumes that the interference
@@ -515,7 +510,7 @@
   (let ((colors '()))
     (do-oset-elements (neighbor (vertex-incidence vertex))
       (when (eql :normal (vertex-pack-type neighbor))
-        (let* ((color (car (vertex-color neighbor)))
+        (let* ((color (vertex-color neighbor))
                (cell (assoc color colors))
                (cost-neighbor (tn-spill-cost (vertex-tn neighbor))))
           (cond (cell
@@ -566,12 +561,11 @@
 (defun pack-colored (colored-vertices optimize)
   (dolist (vertex colored-vertices)
     (let* ((color (vertex-color vertex))
-           (offset (car color))
            (tn (vertex-tn vertex)))
       (cond ((tn-offset tn))
-            (offset
-             (aver (not (conflicts-in-sc tn (tn-sc tn) offset)))
-             (setf (tn-offset tn) offset)
+            (color
+             (aver (not (conflicts-in-sc tn (tn-sc tn) color)))
+             (setf (tn-offset tn) color)
              (pack-wired-tn (vertex-tn vertex) optimize))
             (t
              ;; we better not have a :restricted TN not packed in its
