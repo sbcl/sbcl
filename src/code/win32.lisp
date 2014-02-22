@@ -1107,6 +1107,16 @@ absense."
                  (logand (1- (ash 1 (alien-size dword))) identity))))
     (and (/= handle invalid-handle)
          (not (zerop handle))
+         ;;When a gui process is launched in windows (subsystem WINDOWS)
+         ;;it inherits the parent process' handles, which may very well be
+         ;;invalid unless properly orchestrated by the parent process.
+         ;;Win32 io will fail on these handles and there is no meaningful
+         ;;way to make use of them.
+         ;;So we can call GetFileType to verify the validity of the std handle
+         ;;which returns FILE_TYPE_UNKNOWN if the handle is invalid
+         ;;Technically it also returns FILE_TYPE_UNKNOWN if the function fails
+         ;;but I can't think of a reason we'd care, nor what to do about it
+         (not (zerop (get-file-type handle)))
          handle)))
 
 (defun get-std-handles ()
