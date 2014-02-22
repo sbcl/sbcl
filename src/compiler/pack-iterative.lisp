@@ -346,38 +346,33 @@
 
 ;;; Support code
 
-;; Return non-nil if COLOR conflicts with any of NEIGHBOR-COLORS.
+;; Return nil if COLOR conflicts with any of NEIGHBOR-COLORS.
 ;; Take into account element sizes of the respective SCs.
-(defun color-conflict-p (color neighbor-colors)
-  (declare (type (cons integer sc) color))
-  (flet ((intervals-intersect-p (x x-width y y-width)
-           (when (< y x)
-             (rotatef x y)
-             (rotatef x-width y-width))
-           ;; x <= y. [x, x+x-width] and [y, y+y-width) intersect iff
-           ;; y \in [x, x+x-width).
-            (< y (+ x x-width))))
-    (destructuring-bind (offset . sc) color
-      (let ((element-size (sc-element-size sc)))
-        (loop for (neighbor-offset . neighbor-sc) in neighbor-colors
-              thereis (intervals-intersect-p
-                       offset element-size
-                       neighbor-offset (sc-element-size neighbor-sc)))))))
+(defun color-no-conflicts-p (color vertex)
+  (declare (type fixnum color)
+           (type vertex vertex)
+           (optimize speed (safety 0)))
+  (let ((color+size (+ color (sc-element-size (vertex-sc vertex)))))
+    (flet ((intervals-intersect-p (color2 sc2)
+             (declare (fixnum color2))
+             (if (< color2 color)
+                 (< color (+ color2 (sc-element-size sc2)))
+                 (< color2 color+size))))
+      (do-oset-elements (neighbor (vertex-incidence vertex) t)
+        (cond ((vertex-invisible neighbor))
+              ((let ((neighbor-color (vertex-color neighbor)))
+                 (intervals-intersect-p
+                  (car neighbor-color) (cdr neighbor-color)))
+               (return nil)))))))
 
 ;; Assumes that VERTEX pack-type is :WIRED.
 (defun vertex-color-possible-p (vertex color)
-  (declare (type integer color) (type vertex vertex))
+  (declare (type fixnum color) (type vertex vertex))
   (and (or (and (neq (vertex-pack-type vertex) :wired)
                 (not (tn-offset (vertex-tn vertex))))
-           (= color (car (vertex-color vertex))))
-       (memq color (vertex-initial-domain vertex))
-       (not (color-conflict-p
-             (cons color (vertex-sc vertex))
-             (collect ((colors))
-               (do-oset-elements (neighbor (vertex-incidence vertex)
-                                           (colors))
-                 (unless (vertex-invisible neighbor)
-                   (colors (vertex-color neighbor)))))))))
+           (= color (the fixnum (car (vertex-color vertex)))))
+       (member color (vertex-initial-domain vertex))
+       (color-no-conflicts-p color vertex)))
 
 ;; Sorted list of all possible locations for vertex in its preferred
 ;; SC: more heavily loaded (i.e that should be tried first) locations
