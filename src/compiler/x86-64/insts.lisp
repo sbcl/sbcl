@@ -298,27 +298,22 @@
 (defun prefilter-reg/mem (value dstate)
   (declare (type list value)
            (type sb!disassem:disassem-state dstate))
-  (let ((mod (first value))
-        (r/m (second value)))
-    (declare (type (unsigned-byte 2) mod)
-             (type (unsigned-byte 3) r/m))
-    (let ((full-reg (if (sb!disassem:dstate-get-inst-prop dstate 'rex-b)
-                        (+ r/m 8)
-                        r/m)))
-      (declare (type full-reg full-reg))
+  (flet ((extend (bit-name reg)
+           (logior (if (sb!disassem:dstate-get-inst-prop dstate bit-name) 8 0)
+                   reg)))
+    (declare (inline extend))
+    (let* ((mod (the (unsigned-byte 2) (first value)))
+           (r/m (the (unsigned-byte 3) (second value)))
+           (full-reg (extend 'rex-b r/m)))
       (cond ((= mod #b11)
              ;; registers
              full-reg)
-            ((= r/m #b100)
-             ;; sib byte
-             (let ((sib (sb!disassem:read-suffix 8 dstate)))
-               (declare (type (unsigned-byte 8) sib))
-               (let ((base-reg (ldb (byte 3 0) sib))
-                     (index-reg (ldb (byte 3 3) sib))
-                     (index-scale (ldb (byte 2 6) sib)))
-                 (declare (type (unsigned-byte 3) base-reg index-reg)
-                          (type (unsigned-byte 2) index-scale))
-                 (let* ((offset
+            ((= r/m #b100) ; SIB byte - rex.b is "don't care"
+             (let* ((sib (the (unsigned-byte 8)
+                              (sb!disassem:read-suffix 8 dstate)))
+                    (base-reg (ldb (byte 3 0) sib))
+                    (index-reg (extend 'rex-x (ldb (byte 3 3) sib)))
+                    (offset
                          (case mod
                                (#b00
                                 (if (= base-reg #b101)
@@ -328,24 +323,20 @@
                                 (sb!disassem:read-signed-suffix 8 dstate))
                                (#b10
                                 (sb!disassem:read-signed-suffix 32 dstate)))))
-                   (list (unless (and (= mod #b00) (= base-reg #b101))
-                           (if (sb!disassem:dstate-get-inst-prop dstate 'rex-b)
-                               (+ base-reg 8)
-                               base-reg))
-                         offset
-                         (unless (= index-reg #b100)
-                           (if (sb!disassem:dstate-get-inst-prop dstate 'rex-x)
-                               (+ index-reg 8)
-                               index-reg))
-                         (ash 1 index-scale))))))
+               (list (unless (and (= mod #b00) (= base-reg #b101))
+                       (extend 'rex-b base-reg))
+                     offset
+                     (unless (= index-reg #b100) index-reg) ; index can't be RSP
+                     (ash 1 (ldb (byte 2 6) sib)))))
+            ;; rex.b is not decoded in determining RIP-relative mode
             ((and (= mod #b00) (= r/m #b101))
              (list 'rip (sb!disassem:read-signed-suffix 32 dstate)))
             ((= mod #b00)
              (list full-reg))
             ((= mod #b01)
-           (list full-reg (sb!disassem:read-signed-suffix 8 dstate)))
-          (t                            ; (= mod #b10)
-           (list full-reg (sb!disassem:read-signed-suffix 32 dstate)))))))
+             (list full-reg (sb!disassem:read-signed-suffix 8 dstate)))
+            (t                            ; (= mod #b10)
+             (list full-reg (sb!disassem:read-signed-suffix 32 dstate)))))))
 
 (defun read-address (value dstate)
   (declare (ignore value))              ; always nil anyway
@@ -1439,10 +1430,9 @@
          (let ((ss (1- (integer-length scale)))
                (index (if (null index)
                           #b100
-                          (let ((index (reg-tn-encoding index)))
-                            (if (= index #b100)
-                                (error "can't index off of ESP")
-                                index))))
+                          (if (location= index rsp-tn)
+                              (error "can't index off of RSP")
+                              (reg-tn-encoding index))))
                (base (if (null base)
                          #b101
                          (reg-tn-encoding base))))
