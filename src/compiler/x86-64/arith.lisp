@@ -1921,17 +1921,17 @@ constant shift greater than word length")))
   (:info mask)
   (:result-types unsigned-num)
   (:generator 4
-    (let ((mask (constantize mask)))
-      (cond ((or (integerp mask)
-                 (location= x r))
-             (loadw r x bignum-digits-offset other-pointer-lowtag)
-             (unless (eql mask -1)
-               (inst and r mask)))
-            (t
-             (inst mov r mask)
-             (inst and r (make-ea-for-object-slot x
-                                                  bignum-digits-offset
-                                                  other-pointer-lowtag)))))))
+     (cond ((or (immediate32-p mask)
+                (location= x r))
+            (loadw r x bignum-digits-offset other-pointer-lowtag)
+            (unless (or (eql mask -1)
+                        (eql mask (ldb (byte n-word-bits 0) -1)))
+              (inst and r (constantize mask))))
+           (t
+            (inst mov r mask)
+            (inst and r (make-ea-for-object-slot x
+                                                 bignum-digits-offset
+                                                 other-pointer-lowtag))))))
 
 ;; Specialised mask-signed-field VOPs.
 (define-vop (mask-signed-field-word/c)
