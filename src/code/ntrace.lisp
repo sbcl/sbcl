@@ -411,7 +411,8 @@
            (unless named
              (error "can't use encapsulation to trace anonymous function ~S"
                     fun))
-           (encapsulate function-or-name 'trace `(trace-call ',info)))
+           (encapsulate function-or-name 'trace
+                        (lambda () (trace-call info))))
           (t
            (multiple-value-bind (start-fun cookie-fun)
                (trace-start-breakpoint-fun info)

@@ -1632,9 +1632,10 @@
 ;;; identity of the function bound to a name, which breaks anything
 ;;; class-based, so we implement the encapsulation ourselves in the
 ;;; discriminating function.
-(defun sb-impl::encapsulate-generic-function (gf type body)
-  (push (cons type body) (generic-function-encapsulations gf))
+(defun sb-impl::encapsulate-generic-function (gf type function)
+  (push (cons type function) (generic-function-encapsulations gf))
   (reinitialize-instance gf))
+
 (defun sb-impl::unencapsulate-generic-function (gf type)
   (setf (generic-function-encapsulations gf)
         (remove type (generic-function-encapsulations gf)
@@ -1647,12 +1648,12 @@
       std
       (let ((inner (maybe-encapsulate-discriminating-function
                     gf (cdr encs) std))
-            (body (cdar encs)))
+            (function (cdar encs)))
         (lambda (&rest args)
           (let ((sb-int:arg-list args)
                 (sb-int:basic-definition inner))
             (declare (special sb-int:arg-list sb-int:basic-definition))
-            (eval body))))))
+            (funcall function))))))
 (defmethod compute-discriminating-function ((gf standard-generic-function))
   (standard-compute-discriminating-function gf))
 (defmethod compute-discriminating-function :around ((gf standard-generic-function))

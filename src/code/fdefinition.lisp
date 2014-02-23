@@ -98,17 +98,17 @@
 
 ;;; Replace the definition of NAME with a function that binds NAME's
 ;;; arguments to a variable named ARG-LIST, binds name's definition
-;;; to a variable named BASIC-DEFINITION, and evaluates BODY in that
+;;; to a variable named BASIC-DEFINITION, and calls FUNCTION in that
 ;;; context. TYPE is whatever you would like to associate with this
 ;;; encapsulation for identification in case you need multiple
 ;;; encapsulations of the same name.
-(defun encapsulate (name type body)
+(defun encapsulate (name type function)
   (let ((fdefn (fdefinition-object name nil)))
     (unless (and fdefn (fdefn-fun fdefn))
       (error 'undefined-function :name name))
     (when (typep (fdefn-fun fdefn) 'generic-function)
       (return-from encapsulate
-        (encapsulate-generic-function (fdefn-fun fdefn) type body)))
+        (encapsulate-generic-function (fdefn-fun fdefn) type function)))
     ;; We must bind and close over INFO. Consider the case where we
     ;; encapsulate (the second) an encapsulated (the first)
     ;; definition, and later someone unencapsulates the encapsulated
@@ -124,7 +124,7 @@
               (declare (special arg-list))
               (let ((basic-definition (encapsulation-info-definition info)))
                 (declare (special basic-definition))
-                (eval body)))))))
+                (funcall function)))))))
 
 ;;; This is like FIND-IF, except that we do it on a compiled closure's
 ;;; environment.
