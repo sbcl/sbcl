@@ -20,6 +20,8 @@ changes relative to sbcl-1.1.15:
     into code, prevent code with errors from being compiled. (lp#1276282)
   * bug fix: pathnames with :back in their directory component are succeffully
     resolved.
+  * bug fix: the deterministic profiler now uses ENCAPSULATE functionality to
+    wrap functions around. (lp#309086)
 
 changes in sbcl-1.1.15 relative to sbcl-1.1.14:
   * new feature: the iterative spilling/coloring register allocator developed

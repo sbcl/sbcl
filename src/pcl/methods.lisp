@@ -1649,9 +1649,9 @@
       (let ((inner (maybe-encapsulate-discriminating-function
                     gf (cdr encs) std))
             (function (cdar encs)))
-        (lambda (&rest args)
-          (let ((sb-int:arg-list args)
-                (sb-int:basic-definition inner))
+        (lambda (&rest sb-int:arg-list)
+          (declare (special sb-int:arg-list))
+          (let ((sb-int:basic-definition inner))
             (declare (special sb-int:arg-list sb-int:basic-definition))
             (funcall function))))))
 (defmethod compute-discriminating-function ((gf standard-generic-function))

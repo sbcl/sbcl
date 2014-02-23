@@ -153,8 +153,7 @@
 ;;; (The reason for implementing this as coupled closures, with the
 ;;; counts built into the lexical environment, is that we hope this
 ;;; will minimize profiling overhead.)
-(defun profile-encapsulation-lambdas (encapsulated-fun)
-  (declare (type function encapsulated-fun))
+(defun profile-encapsulation-lambdas ()
   (let* ((count (make-counter))
          (ticks (make-counter))
          (consing (make-counter))
@@ -163,8 +162,9 @@
     (declare (counter count ticks consing profiles gc-run-time))
     (values
      ;; ENCAPSULATION-FUN
-     (lambda (&more arg-context arg-count)
-       (declare (optimize speed safety))
+     (lambda ()
+       (declare (optimize speed safety)
+                (special sb-int:basic-definition))
        ;; Make sure that we're not recursing infinitely.
        (when (boundp '*computing-profiling-data-for*)
          (unprofile-all) ; to avoid further recursion
@@ -173,14 +173,15 @@
                     functions have been unprofiled. (Since the profiling system evidently ~
                     uses ~S in its computations, it looks as though it's a bad idea to ~
                     profile it.)~:@>"
-                *computing-profiling-data-for* encapsulated-fun
-                encapsulated-fun))
+                *computing-profiling-data-for* sb-int:basic-definition sb-int:basic-definition))
        (incf-counter count 1)
-       (let ((dticks 0)
+       (let ((encapsulated-fun sb-int:basic-definition)
+             (dticks 0)
              (dconsing 0)
              (inner-enclosed-profiles 0)
              (dgc-run-time 0))
-         (declare (truly-dynamic-extent dticks dconsing inner-enclosed-profiles))
+         (declare (function encapsulated-fun)
+                  (truly-dynamic-extent dticks dconsing inner-enclosed-profiles))
          (unwind-protect
              (let* ((start-ticks (get-internal-ticks))
                     (start-gc-run-time *gc-run-time*)
@@ -190,12 +191,18 @@
                     (nbf0 *n-bytes-freed-or-purified*)
                     (dynamic-usage-0 (sb-kernel:dynamic-usage))
                     (*enclosed-gc-run-time* (make-counter)))
-               (declare (dynamic-extent *enclosed-ticks* *enclosed-consing* *enclosed-profiles* *enclosed-gc-run-time*))
+               (declare (dynamic-extent *enclosed-ticks* *enclosed-consing*
+                                        *enclosed-profiles* *enclosed-gc-run-time*)
+                        (special sb-int:arg-list))
                (unwind-protect
-                   (multiple-value-call encapsulated-fun
-                                        (sb-c:%more-arg-values arg-context
-                                                               0
-                                                               arg-count))
+                    ;; It used to use &more to call the original function, but
+                    ;; with transition to ENCAPSULATE it has to use a list,
+                    ;; until ENCAPSULATE has a better mechanism.
+                    ;; (multiple-value-call encapsulated-fun
+                    ;;   (sb-c:%more-arg-values arg-context
+                    ;;                          0
+                    ;;                          arg-count))
+                    (apply encapsulated-fun arg-list)
                  (let ((*computing-profiling-data-for* encapsulated-fun)
                        (dynamic-usage-1 (sb-kernel:dynamic-usage)))
                    (setf dticks (- (get-internal-ticks) start-ticks)
@@ -260,10 +267,9 @@
 (defun profile-1-unprofiled-fun (name)
   (let ((encapsulated-fun (fdefinition name)))
     (multiple-value-bind (encapsulation-fun read-stats-fun clear-stats-fun)
-        (profile-encapsulation-lambdas encapsulated-fun)
+        (profile-encapsulation-lambdas)
       (without-package-locks
-       (setf (fdefinition name)
-             encapsulation-fun))
+        (encapsulate name 'profile encapsulation-fun))
       (setf (gethash name *profiled-fun-name->info*)
             (make-profile-info :name name
                                :encapsulated-fun encapsulated-fun
@@ -288,11 +294,8 @@
   (let ((pinfo (gethash name *profiled-fun-name->info*)))
     (cond (pinfo
            (remhash name *profiled-fun-name->info*)
-           (if (eq (fdefinition name) (profile-info-encapsulation-fun pinfo))
-               (without-package-locks
-                (setf (fdefinition name) (profile-info-encapsulated-fun pinfo)))
-               (warn "preserving current definition of redefined function ~S"
-                     name)))
+           (without-package-locks
+             (unencapsulate name 'profile)))
           (t
            (warn "~S is not a profiled function." name))))
   (values))
