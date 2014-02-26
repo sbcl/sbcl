@@ -59,6 +59,7 @@
       ;; here, not socket-type-not-supported-error or
       ;; protocol-not-supported-error.
       ((or #+darwin socket-error
+        operation-not-supported-error
         socket-type-not-supported-error
         protocol-not-supported-error)
           (c)
@@ -75,6 +76,7 @@
       ;; protocol-not-supported-error.
       ((or
         #+darwin socket-error
+        operation-not-supported-error
         protocol-not-supported-error
         socket-type-not-supported-error)
           (c)
