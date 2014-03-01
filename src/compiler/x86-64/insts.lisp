@@ -1885,18 +1885,22 @@
             (emitter dst-size
                      (if signed-p #x63 #x8b))))))))) ; movsxd or straight mov
 
+;; MOV[SZ]X - #x66 or REX selects the destination REG size, wherein :byte isn't
+;; a possibility.  The 'width' bit selects a source r/m size of :byte or :word.
+(sb!disassem:define-instruction-format
+    (move-with-extension 24 :include ext-reg-reg/mem
+     :default-printer
+     '(:name :tab reg ", "
+       (:cond ((width :constant 0) (:using #'print-sized-byte-reg/mem reg/mem))
+              (t (:using #'print-sized-word-reg/mem reg/mem)))))
+  (width :prefilter nil)) ; doesn't affect DSTATE
+
 (define-instruction movsx (segment dst src)
-  (:printer ext-reg-reg/mem-no-width
-            ((op #b10111110) (reg/mem nil :type 'sized-byte-reg/mem)))
-  (:printer ext-reg-reg/mem-no-width
-            ((op #b10111111) (reg/mem nil :type 'sized-word-reg/mem)))
+  (:printer move-with-extension ((op #b1011111)))
   (:emitter (emit-move-with-extension segment dst src :signed)))
 
 (define-instruction movzx (segment dst src)
-  (:printer ext-reg-reg/mem-no-width
-            ((op #b10110110) (reg/mem nil :type 'sized-byte-reg/mem)))
-  (:printer ext-reg-reg/mem-no-width
-            ((op #b10110111) (reg/mem nil :type 'sized-word-reg/mem)))
+  (:printer move-with-extension ((op #b1011011)))
   (:emitter (emit-move-with-extension segment dst src nil)))
 
 ;;; The regular use of MOVSXD is with an operand size of :qword. This

@@ -117,7 +117,10 @@
 ;;;; If performance: *Really*? How fast does disassembly need to be??
 ;;;; So: Could we just punt this?
 
-(defstruct (fun-cache (:copier nil))
+(defstruct (fun-cache (:copier nil)
+                      (:print-object (lambda (self stream)
+                                       (print-unreadable-object
+                                         (self stream :type t :identity t)))))
   (printers nil :type list)
   (labellers nil :type list)
   (prefilters nil :type list))
@@ -1316,7 +1319,7 @@
                           (eq (caadr source) 'function)))
            (pd-error "The first arg to :USING must be a string or #'function."))
          (compile-print (caddr source) funstate
-                        (cons (eval (cadr source)) (cadr source))))
+                        (make-valsrc (eval (cadr source)) (cadr source))))
         ((eq (car source) :plus-integer)
          ;; prints the given field proceed with a + or a -
          (let ((form
