@@ -162,62 +162,59 @@
     (declare (counter count ticks consing profiles gc-run-time))
     (values
      ;; ENCAPSULATION-FUN
-     (lambda ()
+     (lambda (function &rest args)
        (declare (optimize speed safety)
-                (special sb-int:basic-definition))
+                (function function))
        ;; Make sure that we're not recursing infinitely.
        (when (boundp '*computing-profiling-data-for*)
-         (unprofile-all) ; to avoid further recursion
+         (unprofile-all)                ; to avoid further recursion
          (error "~@<When computing profiling data for ~S, the profiled ~
                     function ~S was called. To get out of this infinite recursion, all ~
                     functions have been unprofiled. (Since the profiling system evidently ~
                     uses ~S in its computations, it looks as though it's a bad idea to ~
                     profile it.)~:@>"
-                *computing-profiling-data-for* sb-int:basic-definition sb-int:basic-definition))
+                *computing-profiling-data-for* function function))
        (incf-counter count 1)
-       (let ((encapsulated-fun sb-int:basic-definition)
-             (dticks 0)
+       (let ((dticks 0)
              (dconsing 0)
              (inner-enclosed-profiles 0)
              (dgc-run-time 0))
-         (declare (function encapsulated-fun)
-                  (truly-dynamic-extent dticks dconsing inner-enclosed-profiles))
+         (declare (truly-dynamic-extent dticks dconsing inner-enclosed-profiles))
          (unwind-protect
-             (let* ((start-ticks (get-internal-ticks))
-                    (start-gc-run-time *gc-run-time*)
-                    (*enclosed-ticks* (make-counter))
-                    (*enclosed-consing* (make-counter))
-                    (*enclosed-profiles* (make-counter))
-                    (nbf0 *n-bytes-freed-or-purified*)
-                    (dynamic-usage-0 (sb-kernel:dynamic-usage))
-                    (*enclosed-gc-run-time* (make-counter)))
-               (declare (dynamic-extent *enclosed-ticks* *enclosed-consing*
-                                        *enclosed-profiles* *enclosed-gc-run-time*)
-                        (special sb-int:arg-list))
-               (unwind-protect
-                    ;; It used to use &more to call the original function, but
-                    ;; with transition to ENCAPSULATE it has to use a list,
-                    ;; until ENCAPSULATE has a better mechanism.
-                    ;; (multiple-value-call encapsulated-fun
-                    ;;   (sb-c:%more-arg-values arg-context
-                    ;;                          0
-                    ;;                          arg-count))
-                    (apply encapsulated-fun arg-list)
-                 (let ((*computing-profiling-data-for* encapsulated-fun)
-                       (dynamic-usage-1 (sb-kernel:dynamic-usage)))
-                   (setf dticks (- (get-internal-ticks) start-ticks)
-                         dconsing (if (eql *n-bytes-freed-or-purified* nbf0)
-                                      ;; common special case where we can avoid
-                                      ;; bignum arithmetic
-                                      (- dynamic-usage-1 dynamic-usage-0)
-                                      ;; general case
-                                      (- (get-bytes-consed) nbf0 dynamic-usage-0))
-                         inner-enclosed-profiles (counter-count *enclosed-profiles*)
-                         dgc-run-time (- *gc-run-time* start-gc-run-time))
-                   (incf-counter ticks (- dticks (counter-count *enclosed-ticks*)))
-                   (incf-counter gc-run-time (- dgc-run-time (counter-count *enclosed-gc-run-time*)))
-                   (incf-counter consing (- dconsing (counter-count *enclosed-consing*)))
-                   (incf-counter profiles inner-enclosed-profiles))))
+              (let* ((start-ticks (get-internal-ticks))
+                     (start-gc-run-time *gc-run-time*)
+                     (*enclosed-ticks* (make-counter))
+                     (*enclosed-consing* (make-counter))
+                     (*enclosed-profiles* (make-counter))
+                     (nbf0 *n-bytes-freed-or-purified*)
+                     (dynamic-usage-0 (sb-kernel:dynamic-usage))
+                     (*enclosed-gc-run-time* (make-counter)))
+                (declare (dynamic-extent *enclosed-ticks* *enclosed-consing*
+                                         *enclosed-profiles* *enclosed-gc-run-time*))
+                (unwind-protect
+                     ;; It used to use &more to call the original function, but
+                     ;; with transition to ENCAPSULATE it has to use a list,
+                     ;; until ENCAPSULATE has a better mechanism.
+                     ;; (multiple-value-call encapsulated-fun
+                     ;;   (sb-c:%more-arg-values arg-context
+                     ;;                          0
+                     ;;                          arg-count))
+                     (apply function args)
+                  (let ((*computing-profiling-data-for* function)
+                        (dynamic-usage-1 (sb-kernel:dynamic-usage)))
+                    (setf dticks (- (get-internal-ticks) start-ticks)
+                          dconsing (if (eql *n-bytes-freed-or-purified* nbf0)
+                                       ;; common special case where we can avoid
+                                       ;; bignum arithmetic
+                                       (- dynamic-usage-1 dynamic-usage-0)
+                                       ;; general case
+                                       (- (get-bytes-consed) nbf0 dynamic-usage-0))
+                          inner-enclosed-profiles (counter-count *enclosed-profiles*)
+                          dgc-run-time (- *gc-run-time* start-gc-run-time))
+                    (incf-counter ticks (- dticks (counter-count *enclosed-ticks*)))
+                    (incf-counter gc-run-time (- dgc-run-time (counter-count *enclosed-gc-run-time*)))
+                    (incf-counter consing (- dconsing (counter-count *enclosed-consing*)))
+                    (incf-counter profiles inner-enclosed-profiles))))
            (when (boundp '*enclosed-ticks*)
              (incf-counter *enclosed-ticks* dticks)
              (incf-counter *enclosed-consing* dconsing)

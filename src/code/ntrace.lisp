@@ -255,8 +255,7 @@
 (defun trace-start-breakpoint-fun (info)
   (let (conditionp)
     (values
-
-     (lambda (frame bpt)
+     (lambda (frame bpt &rest args)
        (declare (ignore bpt))
        (discard-invalid-entries frame)
        (let ((condition (trace-info-condition info))
@@ -274,13 +273,8 @@
            (fresh-line)
            (print-trace-indentation)
            (if (trace-info-encapsulated info)
-               ;; FIXME: These special variables should be given
-               ;; *FOO*-style names, and probably declared globally
-               ;; with DEFVAR.
-               (locally
-                 (declare (special basic-definition arg-list))
-                 (prin1 `(,(trace-info-what info)
-                          ,@(mapcar #'ensure-printable-object arg-list))))
+               (prin1 `(,(trace-info-what info)
+                        ,@(mapcar #'ensure-printable-object args)))
                (print-frame-call frame *standard-output*))
            (terpri)
            (trace-print frame (trace-info-print info))
@@ -288,7 +282,6 @@
                            *trace-output*)
            (finish-output *trace-output*))
          (trace-maybe-break info (trace-info-break info) "before" frame)))
-
      (lambda (frame cookie)
        (declare (ignore frame))
        (push (cons cookie conditionp) *traced-entries*)))))
@@ -338,17 +331,14 @@
 ;;; This function is called by the trace encapsulation. It calls the
 ;;; breakpoint hook functions with NIL for the breakpoint and cookie,
 ;;; which we have cleverly contrived to work for our hook functions.
-(defun trace-call (info)
+(defun trace-call (info function &rest args)
   (multiple-value-bind (start cookie) (trace-start-breakpoint-fun info)
     (declare (type function start cookie))
     (let ((frame (sb-di:frame-down (sb-di:top-frame))))
-      (funcall start frame nil)
+      (apply #'funcall start frame nil args)
       (let ((*traced-entries* *traced-entries*))
-        (declare (special basic-definition arg-list))
         (funcall cookie frame nil)
-        (let ((vals
-               (multiple-value-list
-                (apply basic-definition arg-list))))
+        (let ((vals (multiple-value-list (apply function args))))
           (funcall (trace-end-breakpoint-fun info) frame nil vals nil)
           (values-list vals))))))
 
@@ -412,7 +402,8 @@
              (error "can't use encapsulation to trace anonymous function ~S"
                     fun))
            (encapsulate function-or-name 'trace
-                        (lambda () (trace-call info))))
+                        (lambda (function &rest args)
+                          (apply #'trace-call info function args))))
           (t
            (multiple-value-bind (start-fun cookie-fun)
                (trace-start-breakpoint-fun info)

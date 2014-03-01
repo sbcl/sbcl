@@ -96,10 +96,9 @@
   ;; replaced by an encapsulation of type TYPE.
   (definition nil :type function))
 
-;;; Replace the definition of NAME with a function that binds NAME's
-;;; arguments to a variable named ARG-LIST, binds name's definition
-;;; to a variable named BASIC-DEFINITION, and calls FUNCTION in that
-;;; context. TYPE is whatever you would like to associate with this
+;;; Replace the definition of NAME with a function that calls FUNCTION
+;;; with the original function and its arguments.
+;;; TYPE is whatever you would like to associate with this
 ;;; encapsulation for identification in case you need multiple
 ;;; encapsulations of the same name.
 (defun encapsulate (name type function)
@@ -120,12 +119,9 @@
     ;; an encapsulation that no longer exists.
     (let ((info (make-encapsulation-info type (fdefn-fun fdefn))))
       (setf (fdefn-fun fdefn)
-            (named-lambda encapsulation (&rest arg-list)
-              (declare (special arg-list)
-                       (dynamic-extent arg-list))
-              (let ((basic-definition (encapsulation-info-definition info)))
-                (declare (special basic-definition))
-                (funcall function)))))))
+            (named-lambda encapsulation (&rest args)
+              (apply function (encapsulation-info-definition info)
+                     args))))))
 
 ;;; This is like FIND-IF, except that we do it on a compiled closure's
 ;;; environment.
