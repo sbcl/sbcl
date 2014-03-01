@@ -119,7 +119,7 @@
     'double-float))
 
 ;;; More out of line functions (%COS, %SIN, %TAN) for constant folding,
-;;; reported by Mika Pihlajam‰ki
+;;; reported by Mika Pihlajam√§ki
 (funcall (compile nil '(lambda () (cos (tan (round 0))))))
 (funcall (compile nil '(lambda () (sin (tan (round 0))))))
 (funcall (compile nil '(lambda () (tan (tan (round 0))))))
@@ -391,3 +391,19 @@
 (with-test (:name :scaled-%hypot)
   (assert (<= (abs (complex most-positive-double-float 1d0))
               (1+ most-positive-double-float))))
+
+;; On x86-64, MAKE-SINGLE-FLOAT with a negative argument used to set
+;; bits 32-63 of the XMM register to 1, breaking the invariant that
+;; unused parts of XMM registers are always zero. This could become
+;; visible as a QNaN in the imaginary part when next using the register
+;; in a (COMPLEX SINGLE-FLOAT) operation.
+(with-test (:name :make-single-float-clear-imagpart)
+  (let ((f (compile nil
+                    '(lambda (x)
+                       (declare (optimize speed))
+                       (= #c(1.0f0 2.0f0)
+                          (+ #c(3.0f0 2.0f0)
+                             (sb-kernel:make-single-float x))))))
+        (bits (sb-kernel:single-float-bits -2.0f0)))
+    (assert (< bits 0))         ; Make sure the test is fit for purpose.
+    (assert (funcall f bits))))

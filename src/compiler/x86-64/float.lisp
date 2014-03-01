@@ -1,4 +1,4 @@
-;;;; floating point support for the x86
+;;;; floating point support for x86-64
 
 ;;;; This software is part of the SBCL system. See the README file for
 ;;;; more information.
@@ -167,7 +167,7 @@
   (:results (y :scs (descriptor-reg)))
   (:note "float to pointer coercion")
   (:generator 4
-    (inst movd y x)
+    (inst movd (reg-in-size y :dword) x)
     (inst shl y 32)
     (inst or y single-float-widetag)))
 
@@ -200,7 +200,7 @@
        (descriptor-reg
         (move tmp x)
         (inst shr tmp 32)
-        (inst movd y tmp))
+        (inst movd y (reg-in-size tmp :dword)))
        (control-stack
         ;; When the single-float descriptor is in memory, the untagging
         ;; is done in the target XMM register. This is faster than going
@@ -1163,9 +1163,11 @@
        (single-reg
         (sc-case bits
           (signed-reg
-           (inst movd res bits))
+           (inst movd res (reg-in-size bits :dword)))
           (signed-stack
-           (inst movd res bits)))))))
+           (inst movss res
+                 (make-ea :dword :base rbp-tn
+                          :disp (frame-byte-offset (tn-offset bits))))))))))
 
 (define-vop (make-single-float-c)
   (:results (res :scs (single-reg single-stack descriptor-reg)))
@@ -1223,8 +1225,9 @@
   (:generator 4
      (sc-case float
        (single-reg
-        (inst movd bits float)
-        (inst movsxd bits (reg-in-size bits :dword)))
+        (let ((dword-bits (reg-in-size bits :dword)))
+          (inst movd dword-bits float)
+          (inst movsxd bits dword-bits)))
        (single-stack
         (inst movsxd bits (make-ea :dword ; c.f. ea-for-sf-stack
                                    :base rbp-tn
