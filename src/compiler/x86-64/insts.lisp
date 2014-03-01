@@ -609,14 +609,14 @@
   (imm))
 
 ;;; Same as simple, but with direction bit
-(sb!disassem:define-instruction-format (simple-dir 8 :include 'simple)
+(sb!disassem:define-instruction-format (simple-dir 8 :include simple)
   (op :field (byte 6 2))
   (dir :field (byte 1 1)))
 
 ;;; Same as simple, but with the immediate value occurring by default,
 ;;; and with an appropiate printer.
 (sb!disassem:define-instruction-format (accum-imm 8
-                                     :include 'simple
+                                     :include simple
                                      :default-printer '(:name
                                                         :tab accum ", " imm))
   (imm :type 'signed-imm-data))
@@ -644,12 +644,12 @@
 
 ;;; Same as reg-no-width, but with a default operand size of :qword.
 (sb!disassem:define-instruction-format (reg-no-width-default-qword 8
-                                        :include 'reg-no-width
+                                        :include reg-no-width
                                         :default-printer '(:name :tab reg))
   (reg   :type 'reg-b-default-qword))
 
 ;;; Adds a width field to reg-no-width. Note that we can't use
-;;; :INCLUDE 'REG-NO-WIDTH here to save typing because that would put
+;;; :INCLUDE REG-NO-WIDTH here to save typing because that would put
 ;;; the WIDTH field last, but the prefilter for WIDTH must run before
 ;;; the one for IMM to be able to determine the correct size of IMM.
 (sb!disassem:define-instruction-format (reg 8
@@ -685,7 +685,7 @@
 
 ;;; same as reg-reg/mem, but with direction bit
 (sb!disassem:define-instruction-format (reg-reg/mem-dir 16
-                                        :include 'reg-reg/mem
+                                        :include reg-reg/mem
                                         :default-printer
                                         `(:name
                                           :tab
@@ -714,14 +714,14 @@
 ;;; Same as reg/mem, but with the immediate value occurring by default,
 ;;; and with an appropiate printer.
 (sb!disassem:define-instruction-format (reg/mem-imm 16
-                                        :include 'reg/mem
+                                        :include reg/mem
                                         :default-printer
                                         '(:name :tab reg/mem ", " imm))
   (reg/mem :type 'sized-reg/mem)
   (imm     :type 'signed-imm-data))
 
 (sb!disassem:define-instruction-format (reg/mem-imm/asm-routine 16
-                                        :include 'reg/mem-imm
+                                        :include reg/mem-imm
                                         :default-printer
                                         '(:name :tab reg/mem ", " imm))
   (reg/mem :type 'sized-reg/mem)
@@ -730,7 +730,7 @@
 ;;; Same as reg/mem, but with using the accumulator in the default printer
 (sb!disassem:define-instruction-format
     (accum-reg/mem 16
-     :include 'reg/mem :default-printer '(:name :tab accum ", " reg/mem))
+     :include reg/mem :default-printer '(:name :tab accum ", " reg/mem))
   (reg/mem :type 'reg/mem)              ; don't need a size
   (accum :type 'accum))
 
@@ -785,13 +785,13 @@
   (imm))
 
 (sb!disassem:define-instruction-format (ext-reg/mem-imm 24
-                                        :include 'ext-reg/mem
+                                        :include ext-reg/mem
                                         :default-printer
                                         '(:name :tab reg/mem ", " imm))
   (imm :type 'signed-imm-data))
 
 (sb!disassem:define-instruction-format (ext-reg/mem-no-width+imm8 24
-                                        :include 'ext-reg/mem-no-width
+                                        :include ext-reg/mem-no-width
                                         :default-printer
                                         '(:name :tab reg/mem ", " imm))
   (imm :type 'imm-byte))
@@ -868,7 +868,7 @@
 ;;; Same as xmm-xmm/mem etc., but with direction bit.
 
 (sb!disassem:define-instruction-format (ext-xmm-xmm/mem-dir 32
-                                        :include 'ext-xmm-xmm/mem
+                                        :include ext-xmm-xmm/mem
                                         :default-printer
                                         `(:name
                                           :tab
@@ -877,7 +877,7 @@
   (dir     :field (byte 1 16)))
 
 (sb!disassem:define-instruction-format (ext-rex-xmm-xmm/mem-dir 40
-                                        :include 'ext-rex-xmm-xmm/mem
+                                        :include ext-rex-xmm-xmm/mem
                                         :default-printer
                                         `(:name
                                           :tab
@@ -1108,7 +1108,7 @@
   :printer *sse-conditions*)
 
 (sb!disassem:define-instruction-format (string-op 8
-                                     :include 'simple
+                                     :include simple
                                      :default-printer '(:name width)))
 
 (sb!disassem:define-instruction-format (short-cond-jump 16)
@@ -1175,14 +1175,14 @@
 (sb!disassem:define-instruction-format (byte-imm 16
                                      :default-printer '(:name :tab code))
  (op :field (byte 8 0))
- (code :field (byte 8 8)))
+ (code :field (byte 8 8) :reader byte-imm-code))
 
 ;;; Two byte instruction with an immediate byte argument.
 ;;;
 (sb!disassem:define-instruction-format (word-imm 24
                                      :default-printer '(:name :tab code))
   (op :field (byte 16 0))
-  (code :field (byte 8 16)))
+  (code :field (byte 8 16) :reader word-imm-code))
 
 ;;; F3 escape map - Needs a ton more work.
 
@@ -1201,14 +1201,14 @@
   (op      :field (byte 8 24)))
 
 (sb!disassem:define-instruction-format (F3-escape-reg-reg/mem 32
-                                        :include 'F3-escape
+                                        :include F3-escape
                                         :default-printer
                                         '(:name :tab reg "," reg/mem))
   (reg/mem :fields (list (byte 2 30) (byte 3 24)) :type 'sized-reg/mem)
   (reg     :field  (byte 3 27) :type 'reg))
 
 (sb!disassem:define-instruction-format (rex-F3-escape-reg-reg/mem 40
-                                        :include 'rex-F3-escape
+                                        :include rex-F3-escape
                                         :default-printer
                                         '(:name :tab reg "," reg/mem))
   (reg/mem :fields (list (byte 2 38) (byte 3 32)) :type 'sized-reg/mem)
@@ -2398,7 +2398,7 @@
         (emit-byte segment amount)))))
 
 (sb!disassem:define-instruction-format
-    (shift-inst 16 :include 'reg/mem
+    (shift-inst 16 :include reg/mem
      :default-printer '(:name :tab reg/mem ", " (:if (varying :positive) 'cl 1)))
   (op :fields (list (byte 6 2) (byte 3 11)))
   (varying :field (byte 1 1)))
@@ -2864,11 +2864,6 @@
 (defun break-control (chunk inst stream dstate)
   (declare (ignore inst))
   (flet ((nt (x) (if stream (sb!disassem:note x dstate))))
-    ;; XXX: {BYTE,WORD}-IMM-CODE below is a macro defined by the
-    ;; DEFINE-INSTRUCTION-FORMAT for {BYTE,WORD}-IMM above.  Due to
-    ;; the spectacular design for DEFINE-INSTRUCTION-FORMAT (involving
-    ;; a call to EVAL in order to define the macros at compile-time
-    ;; only) they do not even show up as symbols in the target core.
     (case #!-ud2-breakpoints (byte-imm-code chunk dstate)
           #!+ud2-breakpoints (word-imm-code chunk dstate)
       (#.error-trap

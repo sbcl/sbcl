@@ -485,7 +485,7 @@ about function addresses and register values.")
   (op     :field (byte 2 30) :value 0)
   (ignore :field (byte 5 25) :value 0)
   (op2    :field (byte 3 22) :value 0)
-  (data   :field (byte 22 0)))
+  (data   :field (byte 22 0) :reader format-2-unimp-data))
 
 (defconstant-eqx f3-printer
   '(:name :tab

@@ -417,7 +417,7 @@
   (op1  :field (byte 6 26) :value 0)
   (im13 :field (byte 13 13))
   (q2   :field (byte 8 5) :value 0)
-  (im5  :field (byte 5 0)))
+  (im5  :field (byte 5 0) :reader break-im5))
 
 (defun snarf-error-junk (sap offset &optional length-only)
   (let* ((length (sb!sys:sap-ref-8 sap offset))

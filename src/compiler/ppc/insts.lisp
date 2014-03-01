@@ -389,7 +389,7 @@
 
 (sb!disassem:define-instruction-format (xinstr 32 :default-printer '(:name :tab data))
   (op-to-a :field (byte 16 16))
-  (data :field (byte 16 0)))
+  (data :field (byte 16 0) :reader xinstr-data))
 
 (sb!disassem:define-instruction-format (sc 32 :default-printer '(:name :tab rest))
   (op :field (byte 6 26))

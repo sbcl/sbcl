@@ -224,8 +224,8 @@
     (break 32 :default-printer
            '(:name :tab code (:unless (:constant 0) ", " subcode)))
   (op :field (byte 6 26) :value special-op)
-  (code :field (byte 10 16))
-  (subcode :field (byte 10 6))
+  (code :field (byte 10 16) :reader break-code)
+  (subcode :field (byte 10 6) :reader break-subcode)
   (funct :field (byte 6 0) :value #b001101))
 
 (sb!disassem:define-instruction-format
@@ -271,7 +271,7 @@
 
 (sb!disassem:define-instruction-format
     (float-op 32
-              :include 'float
+              :include float
               :default-printer
                 '('f funct "." format
                   :tab

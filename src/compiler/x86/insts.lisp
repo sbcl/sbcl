@@ -445,14 +445,14 @@
   (op :fields (list (byte 8 0) (byte 8 8))))
 
 ;;; Same as simple, but with direction bit
-(sb!disassem:define-instruction-format (simple-dir 8 :include 'simple)
+(sb!disassem:define-instruction-format (simple-dir 8 :include simple)
   (op :field (byte 6 2))
   (dir :field (byte 1 1)))
 
 ;;; Same as simple, but with the immediate value occurring by default,
 ;;; and with an appropiate printer.
 (sb!disassem:define-instruction-format (accum-imm 8
-                                     :include 'simple
+                                     :include simple
                                      :default-printer '(:name
                                                         :tab accum ", " imm))
   (imm :type 'imm-data))
@@ -477,7 +477,7 @@
   )
 
 ;;; Same as reg, but with direction bit
-(sb!disassem:define-instruction-format (reg-dir 8 :include 'reg)
+(sb!disassem:define-instruction-format (reg-dir 8 :include reg)
   (op  :field (byte 3 5))
   (dir :field (byte 1 4)))
 
@@ -494,7 +494,7 @@
 
 ;;; same as reg-reg/mem, but with direction bit
 (sb!disassem:define-instruction-format (reg-reg/mem-dir 16
-                                        :include 'reg-reg/mem
+                                        :include reg-reg/mem
                                         :default-printer
                                         `(:name
                                           :tab
@@ -515,7 +515,7 @@
 ;;; Same as reg/mem, but with the immediate value occurring by default,
 ;;; and with an appropiate printer.
 (sb!disassem:define-instruction-format (reg/mem-imm 16
-                                        :include 'reg/mem
+                                        :include reg/mem
                                         :default-printer
                                         '(:name :tab reg/mem ", " imm))
   (reg/mem :type 'sized-reg/mem)
@@ -524,7 +524,7 @@
 ;;; Same as reg/mem, but with using the accumulator in the default printer
 (sb!disassem:define-instruction-format
     (accum-reg/mem 16
-     :include 'reg/mem :default-printer '(:name :tab accum ", " reg/mem))
+     :include reg/mem :default-printer '(:name :tab accum ", " reg/mem))
   (reg/mem :type 'reg/mem)              ; don't need a size
   (accum :type 'accum))
 
@@ -579,13 +579,13 @@
   (imm))
 
 (sb!disassem:define-instruction-format (ext-reg/mem-imm 24
-                                        :include 'ext-reg/mem
+                                        :include ext-reg/mem
                                         :default-printer
                                         '(:name :tab reg/mem ", " imm))
   (imm :type 'imm-data))
 
 (sb!disassem:define-instruction-format (ext-reg/mem-no-width+imm8 24
-                                        :include 'ext-reg/mem-no-width
+                                        :include ext-reg/mem-no-width
                                         :default-printer
                                         '(:name :tab reg/mem ", " imm))
   (imm :type 'imm-byte))
@@ -646,7 +646,7 @@
   (op     :field (byte 5  8)))
 
 (sb!disassem:define-instruction-format (string-op 8
-                                     :include 'simple
+                                     :include simple
                                      :default-printer '(:name width)))
 
 (sb!disassem:define-instruction-format (short-cond-jump 16)
@@ -721,14 +721,14 @@
 (sb!disassem:define-instruction-format (byte-imm 16
                                      :default-printer '(:name :tab code))
  (op :field (byte 8 0))
- (code :field (byte 8 8)))
+ (code :field (byte 8 8) :reader byte-imm-code))
 
 ;;; Two byte instruction with an immediate byte argument.
 ;;;
 (sb!disassem:define-instruction-format (word-imm 24
                                      :default-printer '(:name :tab code))
   (op :field (byte 16 0))
-  (code :field (byte 8 16)))
+  (code :field (byte 8 16) :reader word-imm-code))
 
 
 ;;;; primitive emitters
@@ -1589,7 +1589,7 @@
         (emit-byte segment amount)))))
 
 (sb!disassem:define-instruction-format
-    (shift-inst 16 :include 'reg/mem
+    (shift-inst 16 :include reg/mem
      :default-printer '(:name :tab reg/mem ", " (:if (varying :positive) 'cl 1)))
   (op :fields (list (byte 6 2) (byte 3 11)))
   (varying :field (byte 1 1)))
@@ -2081,11 +2081,6 @@
 (defun break-control (chunk inst stream dstate)
   (declare (ignore inst))
   (flet ((nt (x) (if stream (sb!disassem:note x dstate))))
-    ;; FIXME: Make sure that BYTE-IMM-CODE is defined. The genesis
-    ;; map has it undefined; and it should be easier to look in the target
-    ;; Lisp (with (DESCRIBE 'BYTE-IMM-CODE)) than to definitively deduce
-    ;; from first principles whether it's defined in some way that genesis
-    ;; can't grok.
     (case #!-ud2-breakpoints (byte-imm-code chunk dstate)
           #!+ud2-breakpoints (word-imm-code chunk dstate)
       (#.error-trap
