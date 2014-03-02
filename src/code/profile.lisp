@@ -181,24 +181,17 @@
              (dgc-run-time 0))
          (declare (truly-dynamic-extent dticks dconsing inner-enclosed-profiles))
          (unwind-protect
-              (let* ((start-ticks (get-internal-ticks))
-                     (start-gc-run-time *gc-run-time*)
-                     (*enclosed-ticks* (make-counter))
-                     (*enclosed-consing* (make-counter))
-                     (*enclosed-profiles* (make-counter))
-                     (nbf0 *n-bytes-freed-or-purified*)
-                     (dynamic-usage-0 (sb-kernel:dynamic-usage))
-                     (*enclosed-gc-run-time* (make-counter)))
+              (let ((start-ticks (get-internal-ticks))
+                    (start-gc-run-time *gc-run-time*)
+                    (*enclosed-ticks* (make-counter))
+                    (*enclosed-consing* (make-counter))
+                    (*enclosed-profiles* (make-counter))
+                    (nbf0 *n-bytes-freed-or-purified*)
+                    (dynamic-usage-0 (sb-kernel:dynamic-usage))
+                    (*enclosed-gc-run-time* (make-counter)))
                 (declare (dynamic-extent *enclosed-ticks* *enclosed-consing*
                                          *enclosed-profiles* *enclosed-gc-run-time*))
                 (unwind-protect
-                     ;; It used to use &more to call the original function, but
-                     ;; with transition to ENCAPSULATE it has to use a list,
-                     ;; until ENCAPSULATE has a better mechanism.
-                     ;; (multiple-value-call encapsulated-fun
-                     ;;   (sb-c:%more-arg-values arg-context
-                     ;;                          0
-                     ;;                          arg-count))
                      (apply function args)
                   (let ((*computing-profiling-data-for* function)
                         (dynamic-usage-1 (sb-kernel:dynamic-usage)))
