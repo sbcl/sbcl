@@ -341,14 +341,18 @@
                  (lambda (self stream)
                    (if *print-readably*
                        (call-next-method)
-                       (with-slots (position name sign-extend-p fields value
-                                    prefilter printer use-label) self
-                         (print-unreadable-object (self stream :type t)
-                           (format stream
-                                   "~D:~A ~:[~;+~]~:S~@[=~S~]~@[ filt=~S~]~
+                       (print-unreadable-object (self stream :type t)
+                         (format stream
+                                 "~D:~A ~:[~;+~]~:S~@[=~S~]~@[ filt=~S~]~
 ~@[ lbl=~S~]~@[ prt=~S~]"
-                                   position name sign-extend-p fields value
-                                   prefilter use-label printer)))))))
+                                 (arg-position self)
+                                 (arg-name self)
+                                 (arg-sign-extend-p self)
+                                 (arg-fields self)
+                                 (arg-value self)
+                                 (arg-prefilter self)
+                                 (arg-use-label self)
+                                 (arg-printer self)))))))
   (name nil :type symbol)
   (fields nil :type list)
 
