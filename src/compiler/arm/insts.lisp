@@ -879,20 +879,20 @@
               (let* ((delta (compute-delta position))
                      (absolute-delta (abs delta)))
                 (load-chunk segment delta
-                            lip pc-tn (ldb (byte 8 16) absolute-delta))
+                            lip pc-tn (mask-field (byte 8 16) absolute-delta))
                 (load-chunk segment delta
-                            lip lip (ldb (byte 8 8) absolute-delta))
+                            lip lip (mask-field (byte 8 8) absolute-delta))
                 (load-chunk segment delta
-                            dest lip (ldb (byte 8 0) absolute-delta))))
+                            dest lip (mask-field (byte 8 0) absolute-delta))))
 
             (two-instruction-emitter (segment position)
               (let* ((delta (compute-delta position))
                      (absolute-delta (abs delta)))
                 (assemble (segment vop)
                   (load-chunk segment delta
-                              lip pc-tn (ldb (byte 8 8) absolute-delta))
+                              lip pc-tn (mask-field (byte 8 8) absolute-delta))
                   (load-chunk segment delta
-                              dest lip (ldb (byte 8 0) absolute-delta)))))
+                              dest lip (mask-field (byte 8 0) absolute-delta)))))
 
             (one-instruction-emitter (segment position)
               (let* ((delta (compute-delta position))
@@ -955,8 +955,8 @@
                        (absolute-delta (abs delta)))
                   (assemble (segment vop)
                     (load-chunk segment delta
-                                lip pc-tn (ldb (byte 8 12) absolute-delta))
-                    (inst ldr condition dest (@ lip (ldb (byte 12 0) delta))))))
+                                lip pc-tn (mask-field (byte 8 12) absolute-delta))
+                    (inst ldr condition dest (@ lip (mask-field (byte 12 0) delta))))))
 
               (one-instruction-emitter (segment position)
                 (let* ((delta (compute-delta position)))
