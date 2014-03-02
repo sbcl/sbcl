@@ -1013,7 +1013,7 @@
        (:emitter
         (with-condition-defaulted (args (condition dest op-n op-m))
           (emit-fp-dp-instruction segment
-                                  condition
+                                  (conditional-opcode condition)
                                   #b1110
                                   ,p
                                   (low-bit-float-reg dest ,precision)
@@ -1052,7 +1052,7 @@
        (:emitter
         (with-condition-defaulted (args (condition dest op-m))
           (emit-fp-dp-instruction segment
-                                  condition
+                                  (conditional-opcode condition)
                                   #b1110
                                   #b1
                                   (low-bit-float-reg dest ,precision)
@@ -1136,7 +1136,7 @@
                       ((:unindexed) 0)
                       ((:increment :decrement) 1))))
             (emit-fp-ls-instruction segment
-                                    condition
+                                    (conditional-opcode condition)
                                     #b110
                                     p
                                     u
@@ -1178,7 +1178,7 @@
           (let ((u (if (> word-offset 0) 1 0))
                 (abs-offset (abs word-offset)))
             (emit-fp-ls-instruction segment
-                                    condition
+                                    (conditional-opcode condition)
                                     #b110
                                     1
                                     u
@@ -1224,7 +1224,7 @@
        (:emitter
         (with-condition-defaulted (args (condition float-reg arm-reg))
           (emit-fp-srt-instruction segment
-                                   condition
+                                   (conditional-opcode condition)
                                    #b1110
                                    ,opcode
                                    ,direction-flag
@@ -1269,7 +1269,7 @@
        (:emitter
         (with-condition-defaulted (args (condition float-reg arm-reg-1 arm-reg-2))
           (emit-fp-trt-instruction segment
-                                   condition
+                                   (conditional-opcode condition)
                                    #b1110010
                                    ,direction-flag
                                    (tn-offset arm-reg-2)
