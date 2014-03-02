@@ -737,8 +737,7 @@
   (when fields-p
     (setf (arg-fields arg)
           (mapcar (lambda (bytespec)
-                    (when (> (+ (byte-position bytespec)
-                                (byte-size bytespec))
+                    (when (> (+ (byte-position bytespec) (byte-size bytespec))
                              format-length)
                       (error "~@<in arg ~S: ~3I~:_~
                                    The field ~S doesn't fit in an ~
@@ -879,20 +878,14 @@
 (defmacro define-arg-type (name &rest args
                            &key sign-extend type prefilter printer use-label)
   (declare (ignore sign-extend type prefilter printer use-label))
-  (gen-arg-type-def-form name args))
-
-;;; Generate a form to define a disassembler argument type. See
-;;; DEFINE-ARG-TYPE for more information.
-;;; FIXME: this has surprising behavior if executed more than once,
-;;; merging the new properties into the old as if through inheritance.
-;;; It should instead replace any existing definition of this arg type name.
-(defun gen-arg-type-def-form (name args &optional (evalp t))
   (multiple-value-bind (args wrapper-defs)
-      (munge-fun-refs args evalp t name)
+      (munge-fun-refs args t t name)
     `(progn
        ,@wrapper-defs
        (eval-when (:compile-toplevel :execute)
-         ,(update-args-form '*disassem-arg-types* `',name args evalp))
+         (setq *disassem-arg-types*
+               (delete ',name *disassem-arg-types* :key #'arg-name))
+         (push (modify-arg (%make-arg ',name) nil ,@args) *disassem-arg-types*))
        ',name)))
 
 (defmacro def-arg-form-kind ((&rest names) &rest inits)
