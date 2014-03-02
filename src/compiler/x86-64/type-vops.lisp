@@ -229,7 +229,7 @@
   (:args (value :scs (signed-reg)))
   (:info)
   (:conditional :z)
-  (:temporary (:sc unsigned-reg :offset eax-offset) eax)
+  (:temporary (:sc unsigned-reg) temp)
   (:arg-types signed-num)
   (:translate fixnump)
   (:generator 5
@@ -237,9 +237,9 @@
     ;;    a <= x <= a + 2^n - 1
     ;; is equivalent to unsigned
     ;;    ((x-a) >> n) = 0
-    (inst mov rax-tn #.(- sb!xc:most-negative-fixnum))
-    (inst add rax-tn value)
-    (inst shr rax-tn n-fixnum-bits)))
+    (inst mov temp #.(- sb!xc:most-negative-fixnum))
+    (inst add temp value)
+    (inst shr temp n-fixnum-bits)))
 
 #+#.(cl:if (cl:= sb!vm:n-fixnum-tag-bits 1) '(:and) '(:or))
 (define-vop (fixnump/signed-byte-64 simple-type-predicate)
