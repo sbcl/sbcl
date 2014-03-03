@@ -678,7 +678,7 @@
   (op      :field (byte 7 1))
   (width   :field (byte 1 0)    :type 'width)
   (reg/mem :fields (list (byte 2 14) (byte 3 8))
-                                :type 'reg/mem)
+           :type 'reg/mem :reader reg-r/m-inst-r/m-arg)
   (reg     :field (byte 3 11)   :type 'reg)
   ;; optional fields
   (imm))
@@ -2031,21 +2031,62 @@
              (t
               (error "bogus args to XCHG: ~S ~S" operand1 operand2)))))))
 
-;; The printer for LEA's r/m field indicates to PRINT-MEM-REF that this is an
-;; EA calculation, not a memory access. The ELSE branch should never execute,
-;; but is robust in allowing display of invalid instructions like LEA RAX,RBX.
-;; A further improvement would use a labeller so that entry points
-;; to local functions get labeled.
+;; It's an error to compile instructions without their labeler and printer defined
+;; in the compiler, even though they aren't called.
+;; This stems from compile-time use of (MAKE-VALSRC #'f '#'f)
+(eval-when (#-sb-xc :compile-toplevel :load-toplevel :execute)
+
+;; If the filtered VALUE (R/M field of LEA) should be treated as a label,
+;; return the virtual address, otherwise the value unchanged.
+(defun lea-compute-label (value dstate)
+  (if (eq (first value) 'rip)
+      (+ (sb!disassem:dstate-next-addr dstate) (second value))
+      value))
+
+;; Figure out whether LEA should print its EA with just the stuff in brackets,
+;; or additionally show the EA as either a label or a hex literal.
+(defun lea-print-ea (value stream dstate)
+  (let ((width (inst-operand-size dstate)))
+    (etypecase value
+      (list
+       ;; Indicate to PRINT-MEM-REF that this is not a memory access.
+       (print-mem-ref :compute value width stream dstate)
+       (when (eq (first value) 'rip)
+         (let ((addr (+ (sb!disassem:dstate-next-addr dstate) (second value))))
+           (sb!disassem:note (lambda (s) (format s "= #x~x" addr))
+                             dstate))))
+
+      ;; We're robust in allowing VALUE to be an integer (a register),
+      ;; though LEA Rx,Ry is an illegal instruction.
+      ;; A label should never have memory address of 0 to 15 so this case is
+      ;; unambiguous for the most part, except maybe in a compiler trace file
+      ;; which starts disassembling as if the origin were zero.
+      (full-reg (print-reg-with-width value width stream dstate))
+
+      ;; Unfortunately the "label" case sees either an integer or string,
+      ;; because MAP-SEGMENT-INSTRUCTIONS happens twice (really thrice).
+      ;;  - DETERMINE-OPCODE-BOUNDS in target-insts. Label = integer from prefilter.
+      ;;  - ADD-SEGMENT-LABELS. Never calls instruction printers.
+      ;;  - DISASSEMBLE-SEGMENT. Label = string
+      ;; and we need a different 'arg-form-kind' than the one in VALUE,
+      ;; because :USE-LABEL forces the printing pass to see only a label string.
+      ;; Unlike for JMP and CALL, this isn't reasonable, as no one instruction
+      ;; corresponds to, say, "LEA RAX,L1". We want [RIP+disp] or [mem_absolute]
+      ;; so extract the filtered not-labelized value for PRINT-MEM-REF.
+      ((or string integer)
+       (print-mem-ref :compute
+                      (reg-r/m-inst-r/m-arg sb!disassem::dchunk-zero dstate)
+                      width stream dstate)
+       (when (stringp value) ; Don't note anything during -OPCODE-BOUNDS pass
+         (sb!disassem:note (lambda (s) (format s "= ~A" value)) dstate))))))
+
+) ; EVAL-WHEN
+
 (define-instruction lea (segment dst src)
-  (:printer reg-reg/mem
-            ((op #b1000110) (width 1)
-             (reg/mem nil
-              :printer
-              (lambda (value stream dstate)
-                (let ((width (inst-operand-size dstate)))
-                  (if (listp value)
-                      (print-mem-ref :compute value width stream dstate)
-                      (print-reg-with-width value width stream dstate)))))))
+  (:printer
+   reg-reg/mem
+   ((op #b1000110) (width 1)
+    (reg/mem nil :use-label #'lea-compute-label :printer #'lea-print-ea)))
   (:emitter
    (aver (or (dword-reg-p dst) (qword-reg-p dst)))
    (maybe-emit-rex-for-ea segment src dst

@@ -1458,7 +1458,8 @@
                       `(let ((labels ,labels-form)
                              (addr
                               ,(arg-value-form arg funstate :adjusted nil)))
-                         (if (assoc addr labels :test #'eq)
+                         ;; if labeler didn't return an integer, it isn't a label
+                         (if (or (not (integerp addr)) (assoc addr labels))
                              labels
                              (cons (cons addr nil) labels))))))
             `(defun ,name (chunk labels dstate)
