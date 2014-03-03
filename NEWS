@@ -11,6 +11,8 @@ changes relative to sbcl-1.1.18:
     thanks to Thomas Hlavaty)
   * bug fix: handle --without-xxx options to make.sh more carefully.
     (lp#1246665, thanks to Richard M Kreuter)
+  * bug fix: prevent maybe-delete-exit from doing semantically broken things
+    with local exits. (lp#309099, lp#518099, lp#533930)
 
 changes in sbcl-1.1.18 relative to sbcl-1.1.17:
   * optimization: COERCE is now more effecient for more cases when the type is
