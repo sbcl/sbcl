@@ -1331,13 +1331,16 @@
     (let* (#+sb-xc-host (sb!xc:*gensym-counter* sb!xc:*gensym-counter*)
            (info (type-info-or-lose class type))
            (tin (type-info-number info))
-           (validate (type-info-validate-function info)))
-      (with-unique-names (new check)
-        `(let ((,new ,new-value)
-               ,@(when validate
-                   `((,check (type-info-validate-function (svref *info-types* ,tin))))))
-           ,@(when validate
-               `((funcall ,check ',name ,new)))
+           (check
+            (when (type-info-validate-function info)
+              ;; is (or ... null), but non-null in host implies non-null
+              `(truly-the function
+                (type-info-validate-function
+                 (truly-the type-info (svref *info-types* ,tin)))))))
+      (with-unique-names (new)
+        `(let ((,new ,new-value))
+           ,@(when check
+               `((funcall ,check ,name ,new)))
            (set-info-value ,name
                            ,tin
                            ,new)))))

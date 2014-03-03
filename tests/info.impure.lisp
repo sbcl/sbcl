@@ -58,4 +58,12 @@
             (assert (or (sb-c::definition-source-location-p srcloc)
                         (null srcloc)))))))))
 
+(with-test (:name :recognized-decl-not-also-type)
+  (deftype pear (x) `(cons ,x ,x))
+  (assert (typep (nth-value 1 (ignore-errors (proclaim '(declaration pear))))
+                 'sb-kernel:declaration-type-conflict-error))
+  (proclaim '(declaration nthing))
+  (assert (typep (nth-value 1 (ignore-errors (deftype nthing (x) `(not ,x))))
+                 'sb-kernel:declaration-type-conflict-error)))
+
 ;;; success
