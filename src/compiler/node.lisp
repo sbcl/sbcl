@@ -1340,6 +1340,10 @@
   ;; T
   ;;    A type check is needed.
   (%type-check t :type (member t :external nil))
+  ;; KLUDGE: an indication that this CAST is used for its effect of
+  ;; moving the value of one LVAR to another LVAR and not for any
+  ;; actual type-check behavior.
+  (never-delete nil :type boolean)
   ;; the lvar which is checked
   (value (missing-arg) :type lvar))
 (defprinter (cast :identity t)

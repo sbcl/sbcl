@@ -2131,7 +2131,8 @@
   (declare (type cast cast))
   (let ((value (cast-value cast))
         (atype (cast-asserted-type cast)))
-    (when (not do-not-optimize)
+    (unless (or do-not-optimize
+                (cast-never-delete cast))
       (let ((lvar (node-lvar cast)))
         (when (values-subtypep (lvar-derived-type value)
                                (cast-asserted-type cast))
