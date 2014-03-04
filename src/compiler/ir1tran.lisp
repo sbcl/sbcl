@@ -291,7 +291,7 @@
                    #+sb-xc-host
                    (when (eql (find-symbol (symbol-name name) :cl) name)
                      (multiple-value-bind (xc-value foundp)
-                         (info :variable :xc-constant-value name)
+                         (xc-constant-value name)
                        (cond (foundp
                               (setf value xc-value))
                              ((not (eq value name))

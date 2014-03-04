@@ -163,9 +163,20 @@
   (number (missing-arg) :type type-number)
   ;; a type specifier which info of this type must satisfy
   (type nil :type t)
-  ;; a function called when there is no information of this type
-  (default (lambda () (error "type not defined yet")) :type function)
-  ;; called by (SETF INFO) before calling SET-INFO-VALUE
+  ;; If FUNCTIONP, then a function called when there is no information of
+  ;; this type. If not FUNCTIONP, then any object serving as a default.
+  (default nil)
+  ;; Two functions called by (SETF INFO) before calling SET-INFO-VALUE.
+  ;; Regarding the type specifiers on these slots, I wanted to write them
+  ;; as (SFUNCTION (T) T) for documentation - and it elides the check for
+  ;; multiple values returned - but doing that causes failure building the
+  ;; cross-compiler under CMUCL 20c because it tries to call TYPEP on that,
+  ;; and complains that it can't.
+  ;; 1. A function that type-checks its argument and returns it,
+  ;;    or signals an error.
+  (type-checker #'identity :type function)
+  ;; 2. a function of two arguments, a name and new-value, which performs
+  ;;    any other checks and/or side-effects including signaling an error.
   (validate-function nil :type (or function null)))
 
 ;;; a map from class names to CLASS-INFO structures
@@ -271,22 +282,26 @@
 (defparameter *!reversed-type-info-init-forms* nil)
 
 ;;; Define a new type of global information for CLASS. TYPE is the
-;;; name of the type, DEFAULT is the value for that type when it
-;;; hasn't been set, and TYPE-SPEC is a type specifier which values of
-;;; the type must satisfy. The default expression is evaluated each
-;;; time the information is needed, with NAME bound to the name for
-;;; which the information is being looked up.
+;;; name of the type, DEFAULT is a defaulting expression, and TYPE-SPEC
+;;; is a type specifier which values of the type must satisfy.
+;;; If the defaulting expression's value is a function, it is called with
+;;; the name for which the information is being looked up; otherwise it is
+;;; taken as the default value. The defaulting expression is used each time
+;;; a value is needed when one hasn't been previously set. (The result
+;;; does not automatically become the new value for the piece of info.)
+;;; Should a default value be itself a function, this must be expressed as
+;;;  :DEFAULT (CONSTANTLY #'<a-function-name>) to adhere to the convention
+;;; that default objects satisfying FUNCTIONP will always be funcalled.
 ;;;
 ;;; The main thing we do is determine the type's number. We need to do
 ;;; this at macroexpansion time, since both the COMPILE and LOAD time
 ;;; calls to %DEFINE-INFO-TYPE must use the same type number.
 (#+sb-xc-host defmacro
  #-sb-xc-host sb!xc:defmacro
-    define-info-type (&key (class (missing-arg))
-                           (type (missing-arg))
-                           (type-spec (missing-arg))
-                           (validate-function)
-                           default)
+    define-info-type ((class type)
+                       &key (type-spec (missing-arg))
+                            (validate-function)
+                            default)
   (declare (type keyword class type))
   `(progn
      (eval-when (:compile-toplevel :execute)
@@ -306,26 +321,19 @@
                                    :type ',type-spec)))
              (setf (aref *info-types* new-type-number) new-type-info)
              (push new-type-info (class-info-types class-info)))))
-       ;; Arrange for TYPE-INFO-DEFAULT and
+       ;; Arrange for TYPE-INFO-DEFAULT, TYPE-INFO-TYPE-CHECKER, and
        ;; TYPE-INFO-VALIDATE-FUNCTION to be set at cold load
        ;; time. (They can't very well be set at cross-compile time,
        ;; since they differ between host and target and are
        ;; host-compiled closures.)
        (push `(let ((type-info (type-info-or-lose ,',class ,',type)))
+                ,@',(unless (eq type-spec 't)
+                      ;; avoid re-inventing #'IDENTITY N times over
+                      `((setf (type-info-type-checker type-info)
+                              (lambda (x) (declare (type ,type-spec x)) x))))
                 (setf (type-info-validate-function type-info)
-                      ,',validate-function)
-                (setf (type-info-default type-info)
-                       ;; FIXME: This code is sort of nasty. It would
-                       ;; be cleaner if DEFAULT accepted a real
-                       ;; function, instead of accepting a statement
-                       ;; which will be turned into a lambda assuming
-                       ;; that the argument name is NAME. It might
-                       ;; even be more microefficient, too, since many
-                       ;; DEFAULTs could be implemented as (CONSTANTLY
-                       ;; NIL) instead of full-blown (LAMBDA (X) NIL).
-                       (lambda (name)
-                         (declare (ignorable name))
-                         ,',default)))
+                      ,',validate-function
+                      (type-info-default type-info) ,',default))
              *!reversed-type-info-init-forms*))
      ',type))
 
@@ -741,17 +749,12 @@
   (let ((info (type-info-or-lose class type)))
     (get-info-value name (type-info-number info))))
 
-(defun (setf info)
-    (new-value class type name)
-  (let* ((info (type-info-or-lose class type))
-         (tin (type-info-number info))
-         (validate (type-info-validate-function info)))
-    (when validate
-      (funcall validate name new-value))
-    (set-info-value name
-                    tin
-                    new-value))
-  new-value)
+(defun (setf info) (new-value class type name)
+  (let ((info (type-info-or-lose class type)))
+    (funcall (type-info-type-checker info) new-value)
+    (awhen (type-info-validate-function info)
+      (funcall it name new-value))
+    (set-info-value name (type-info-number info) new-value)))
 
 ;;; Clear the information of the specified TYPE and CLASS for NAME in
 ;;; the current environment, allowing any inherited info to become
@@ -816,11 +819,10 @@
   (let ((name (uncross name0)))
     (flet ((lookup (env-list)
              (dolist (env env-list
-                          (multiple-value-bind (val winp)
-                              (funcall (type-info-default
-                                        (svref *info-types* type))
-                                       name)
-                            (values val winp)))
+                      (values (let ((val (type-info-default
+                                          (svref *info-types* type))))
+                                (if (functionp val) (funcall val name) val))
+                              nil))
                (macrolet ((frob (lookup)
                             `(let ((hash (globaldb-sxhashoid name)))
                                (multiple-value-bind (value winp)
@@ -837,9 +839,7 @@
 
 ;;; the kind of functional object being described. If null, NAME isn't
 ;;; a known functional object.
-(define-info-type
-  :class :function
-  :type :kind
+(define-info-type (:function :kind)
   :type-spec (member nil :function :macro :special-form)
   ;; I'm a little confused what the correct behavior of this default
   ;; is. It's not clear how to generalize the FBOUNDP expression to
@@ -849,28 +849,26 @@
   ;; 19990330
   :default
   #+sb-xc-host nil
-  #-sb-xc-host (if (fboundp name) :function nil))
+  #-sb-xc-host (lambda (name) (if (fboundp name) :function nil)))
 
 ;;; The type specifier for this function.
-(define-info-type
-  :class :function
-  :type :type
+(define-info-type (:function :type)
   :type-spec ctype
   ;; Again (as in DEFINE-INFO-TYPE :CLASS :FUNCTION :TYPE :KIND) it's
   ;; not clear how to generalize the FBOUNDP expression to the
   ;; cross-compiler. -- WHN 19990330
   :default
-  #+sb-xc-host (specifier-type 'function)
-  #-sb-xc-host (if (fboundp name)
-                   (handler-bind ((style-warning #'muffle-warning))
-                     (specifier-type (sb!impl::%fun-type (fdefinition name))))
-                   (specifier-type 'function)))
+  ;; Delay evaluation of (SPECIFIER-TYPE) since it can't work yet
+  #+sb-xc-host (lambda (x) (declare (ignore x)) (specifier-type 'function))
+  #-sb-xc-host (lambda (name)
+                 (if (fboundp name)
+                     (handler-bind ((style-warning #'muffle-warning))
+                       (specifier-type (sb!impl::%fun-type (fdefinition name))))
+                     (specifier-type 'function))))
 
 ;;; the ASSUMED-TYPE for this function, if we have to infer the type
 ;;; due to not having a declaration or definition
-(define-info-type
-  :class :function
-  :type :assumed-type
+(define-info-type (:function :assumed-type)
   ;; FIXME: The type-spec really should be
   ;;   (or approximate-fun-type null)).
   ;; It was changed to T as a hopefully-temporary hack while getting
@@ -888,16 +886,14 @@
 ;;; :DEFINED-METHOD and :DECLARED are useful for ANSIly specializing
 ;;; code which implements the function, or which uses the function's
 ;;; return values.
-(define-info-type
-  :class :function
-  :type :where-from
+(define-info-type (:function :where-from)
   :type-spec (member :declared :defined-method :assumed :defined)
   :default
   ;; Again (as in DEFINE-INFO-TYPE :CLASS :FUNCTION :TYPE :KIND) it's
   ;; not clear how to generalize the FBOUNDP expression to the
   ;; cross-compiler. -- WHN 19990606
   #+sb-xc-host :assumed
-  #-sb-xc-host (if (fboundp name) :defined :assumed))
+  #-sb-xc-host (lambda (name) (if (fboundp name) :defined :assumed)))
 
 ;;; something which can be decoded into the inline expansion of the
 ;;; function, or NIL if there is none
@@ -919,134 +915,70 @@
 ;;;     This twisty way of storing values is supported in order to
 ;;;     allow structure slot accessors, and perhaps later other
 ;;;     stereotyped functions, to be represented compactly.
-(define-info-type
-  :class :function
-  :type :inline-expansion-designator
-  :type-spec (or list function)
-  :default nil)
+(define-info-type (:function :inline-expansion-designator)
+  :type-spec (or list function))
 
 ;;; This specifies whether this function may be expanded inline. If
 ;;; null, we don't care.
-(define-info-type
-  :class :function
-  :type :inlinep
-  :type-spec inlinep
-  :default nil)
+(define-info-type (:function :inlinep) :type-spec inlinep)
 
 ;;; a macro-like function which transforms a call to this function
 ;;; into some other Lisp form. This expansion is inhibited if inline
 ;;; expansion is inhibited
-(define-info-type
-  :class :function
-  :type :source-transform
-  :type-spec (or function null))
+(define-info-type (:function :source-transform) :type-spec (or function null))
 
 ;;; the macroexpansion function for this macro
-(define-info-type
-  :class :function
-  :type :macro-function
-  :type-spec (or function null)
-  :default nil)
+(define-info-type (:function :macro-function) :type-spec (or function null))
 
 ;;; the compiler-macroexpansion function for this macro
-(define-info-type
-  :class :function
-  :type :compiler-macro-function
-  :type-spec (or function null)
-  :default nil)
+(define-info-type (:function :compiler-macro-function)
+  :type-spec (or function null))
 
 ;;; a function which converts this special form into IR1
-(define-info-type
-  :class :function
-  :type :ir1-convert
-  :type-spec (or function null))
+(define-info-type (:function :ir1-convert) :type-spec (or function null))
 
 ;;; If a function is "known" to the compiler, then this is a FUN-INFO
 ;;; structure containing the info used to special-case compilation.
-(define-info-type
-  :class :function
-  :type :info
-  :type-spec (or fun-info null)
-  :default nil)
+(define-info-type (:function :info) :type-spec (or fun-info null))
 
-(define-info-type
-  :class :function
-  :type :definition
-  :type-spec (or fdefn null)
-  :default nil)
-
-(define-info-type
-  :class :function
-  :type :structure-accessor
-  :type-spec (or defstruct-description null)
-  :default nil)
+(define-info-type (:function :definition) :type-spec (or fdefn null))
+(define-info-type (:function :structure-accessor)
+  :type-spec (or defstruct-description null))
 
 ;;;; definitions for other miscellaneous information
 
 (define-info-class :variable)
 
 ;;; the kind of variable-like thing described
-(define-info-type
-  :class :variable
-  :type :kind
+(define-info-type (:variable :kind)
   :type-spec (member :special :constant :macro :global :alien :unknown)
-  :default (if (typep name '(or boolean keyword))
-               :constant
-               :unknown))
+  :default (lambda (name)
+             (if (typep name '(or boolean keyword))
+                 :constant
+                 :unknown)))
 
-(define-info-type
-  :class :variable
-  :type :always-bound
-  :type-spec (member nil :eventually :always-bound)
-  :default nil)
+(define-info-type (:variable :always-bound)
+  :type-spec (member nil :eventually :always-bound))
 
-(define-info-type
-  :class :variable
-  :type :deprecated
-  :type-spec t
-  :default nil)
+(define-info-type (:variable :deprecated) :type-spec t)
 
 ;;; the declared type for this variable
-(define-info-type
-  :class :variable
-  :type :type
+(define-info-type (:variable :type)
   :type-spec ctype
-  :default *universal-type*)
+  ;; Delay evaluation of *UNIVERSAL-TYPE* since it can't work yet
+  :default (lambda (x) (declare (ignore x)) *universal-type*))
 
 ;;; where this type and kind information came from
-(define-info-type
-  :class :variable
-  :type :where-from
-  :type-spec (member :declared :assumed :defined)
-  :default :assumed)
-
-;;; We only need a mechanism different from the
-;;; usual SYMBOL-VALUE for the cross compiler.
-#+sb-xc-host
-(define-info-type
-  :class :variable
-  :type :xc-constant-value
-  :type-spec t
-  :default nil)
+(define-info-type (:variable :where-from)
+  :type-spec (member :declared :assumed :defined) :default :assumed)
 
 ;;; the macro-expansion for symbol-macros
-(define-info-type
-  :class :variable
-  :type :macro-expansion
-  :type-spec t
-  :default nil)
+(define-info-type (:variable :macro-expansion) :type-spec t)
 
-(define-info-type
-  :class :variable
-  :type :alien-info
-  :type-spec (or heap-alien-info null)
-  :default nil)
+(define-info-type (:variable :alien-info)
+  :type-spec (or heap-alien-info null))
 
-(define-info-type
-  :class :variable
-  :type :documentation
-  :type-spec (or string null)
-  :default nil)
+(define-info-type (:variable :documentation) :type-spec (or string null))
 
 (define-info-class :type)
 
@@ -1054,12 +986,9 @@
 ;;; that are implemented as structures. For PCL classes, that have
 ;;; only been compiled, but not loaded yet, we return
 ;;; :FORTHCOMING-DEFCLASS-TYPE.
-(define-info-type
-  :class :type
-  :type :kind
+(define-info-type (:type :kind)
   :type-spec (member :primitive :defined :instance
                      :forthcoming-defclass-type nil)
-  :default nil
   :validate-function (lambda (name new-value)
                        (declare (ignore new-value)
                                 (notinline info))
@@ -1068,23 +997,12 @@
                                 :format-arguments (list name)))))
 
 ;;; the expander function for a defined type
-(define-info-type
-  :class :type
-  :type :expander
-  :type-spec (or function null)
-  :default nil)
+(define-info-type (:type :expander) :type-spec (or function null))
 
-(define-info-type
-  :class :type
-  :type :documentation
-  :type-spec (or string null))
+(define-info-type (:type :documentation) :type-spec (or string null))
 
 ;;; function that parses type specifiers into CTYPE structures
-(define-info-type
-  :class :type
-  :type :translator
-  :type-spec (or function null)
-  :default nil)
+(define-info-type (:type :translator) :type-spec (or function null))
 
 ;;; If true, then the type coresponding to this name. Note that if
 ;;; this is a built-in class with a translation, then this is the
@@ -1092,148 +1010,78 @@
 ;;; various atomic types (NIL etc.) and also serves as a cache to
 ;;; ensure that common standard types (atomic and otherwise) are only
 ;;; consed once.
-(define-info-type
-  :class :type
-  :type :builtin
-  :type-spec (or ctype null)
-  :default nil)
+(define-info-type (:type :builtin) :type-spec (or ctype null))
 
 ;;; layout for this type being used by the compiler
-(define-info-type
-  :class :type
-  :type :compiler-layout
+(define-info-type (:type :compiler-layout)
   :type-spec (or layout null)
-  :default (let ((class (find-classoid name nil)))
-             (when class (classoid-layout class))))
+  :default (lambda (name)
+             (let ((class (find-classoid name nil)))
+               (when class (classoid-layout class)))))
 
 ;;; DEFTYPE lambda-list
-(define-info-type
-   :class :type
-   :type :lambda-list
-   :type-spec list
-   :default nil)
+(define-info-type (:type :lambda-list) :type-spec list)
 
-(define-info-type
-   :class :type
-   :type :source-location
-   :type-spec t
-   :default nil)
+(define-info-type (:type :source-location) :type-spec t)
 
 (define-info-class :typed-structure)
-(define-info-type
-  :class :typed-structure
-  :type :info
-  :type-spec t
-  :default nil)
-(define-info-type
-  :class :typed-structure
-  :type :documentation
-  :type-spec (or string null)
-  :default nil)
+(define-info-type (:typed-structure :info) :type-spec t)
+(define-info-type (:typed-structure :documentation) :type-spec (or string null))
 
+;; CLTL2 offers an API to provide a list of known declarations, but it is
+;; inefficient to iterate over info environments to find all such declarations,
+;; and this is likely to be even slower when info is attached
+;; directly to symbols, as it would entail do-all-symbols or similar.
+;; Therefore maintain a list of recognized declarations. This list makes the
+;; globaldb storage of same redundant, but oh well.
+(defglobal *recognized-declarations* nil)
 (define-info-class :declaration)
-(define-info-type
-  :class :declaration
-  :type :recognized
+(define-info-type (:declaration :recognized)
   :type-spec boolean
+  ;; There's no portable way to unproclaim that a symbol is a declaration,
+  ;; but at the low-level permit new-value to be NIL.
   :validate-function (lambda (name new-value)
-                       (declare (ignore new-value)
+                       (declare (symbol name)
                                 (notinline info))
-                       (when (info :type :kind name)
-                         (error 'declaration-type-conflict-error
-                                :format-arguments (list name)))))
-(define-info-type
-  :class :declaration
-  :type :handler
-  :type-spec (or function null))
+                       (cond (new-value
+                              (when (info :type :kind name)
+                                (error 'declaration-type-conflict-error
+                                       :format-arguments (list name)))
+                              (pushnew name *recognized-declarations*))
+                             (t
+                              (setq *recognized-declarations*
+                                    (delete name *recognized-declarations*))))))
+
+(define-info-type (:declaration :handler) :type-spec (or function null))
 
 (define-info-class :alien-type)
-(define-info-type
-  :class :alien-type
-  :type :kind
+(define-info-type (:alien-type :kind)
   :type-spec (member :primitive :defined :unknown)
   :default :unknown)
-(define-info-type
-  :class :alien-type
-  :type :translator
-  :type-spec (or function null)
-  :default nil)
-(define-info-type
-  :class :alien-type
-  :type :definition
-  :type-spec (or alien-type null)
-  :default nil)
-(define-info-type
-  :class :alien-type
-  :type :struct
-  :type-spec (or alien-type null)
-  :default nil)
-(define-info-type
-  :class :alien-type
-  :type :union
-  :type-spec (or alien-type null)
-  :default nil)
-(define-info-type
-  :class :alien-type
-  :type :enum
-  :type-spec (or alien-type null)
-  :default nil)
+(define-info-type (:alien-type :translator) :type-spec (or function null))
+(define-info-type (:alien-type :definition) :type-spec (or alien-type null))
+(define-info-type (:alien-type :struct) :type-spec (or alien-type null))
+(define-info-type (:alien-type :union) :type-spec (or alien-type null))
+(define-info-type (:alien-type :enum) :type-spec (or alien-type null))
 
 (define-info-class :setf)
 
-(define-info-type
-  :class :setf
-  :type :inverse
-  :type-spec (or symbol null)
-  :default nil)
-
-(define-info-type
-  :class :setf
-  :type :documentation
-  :type-spec (or string null)
-  :default nil)
-
-(define-info-type
-  :class :setf
-  :type :expander
-  :type-spec (or function null)
-  :default nil)
+(define-info-type (:setf :inverse) :type-spec (or symbol null))
+(define-info-type (:setf :documentation) :type-spec (or string null))
+(define-info-type (:setf :expander) :type-spec (or function null))
 
 ;;; This is used for storing miscellaneous documentation types. The
 ;;; stuff is an alist translating documentation kinds to values.
 (define-info-class :random-documentation)
-(define-info-type
-  :class :random-documentation
-  :type :stuff
-  :type-spec list
-  :default ())
+(define-info-type (:random-documentation :stuff) :type-spec list)
 
 ;;; Used to record the source location of definitions.
 (define-info-class :source-location)
 
-(define-info-type
-  :class :source-location
-  :type :variable
-  :type-spec t
-  :default nil)
-
-(define-info-type
-  :class :source-location
-  :type :constant
-  :type-spec t
-  :default nil)
-
-(define-info-type
-  :class :source-location
-  :type :typed-structure
-  :type-spec t
-  :default nil)
-
-(define-info-type
-  :class :source-location
-  :type :symbol-macro
-  :type-spec t
-  :default nil)
+(define-info-type (:source-location :variable) :type-spec t)
+(define-info-type (:source-location :constant) :type-spec t)
+(define-info-type (:source-location :typed-structure) :type-spec t)
+(define-info-type (:source-location :symbol-macro) :type-spec t)
 
 #!-sb-fluid (declaim (freeze-type info-env))
 
@@ -1324,13 +1172,13 @@
       (with-unique-names (value foundp)
         `(multiple-value-bind (,value ,foundp)
              (get-info-value ,name ,(type-info-number info))
-           (declare (type ,(type-info-type info) ,value))
-           (values ,value ,foundp)))))
+           (values (truly-the ,(type-info-type info) ,value) ,foundp)))))
 
   (def (setf info) (new-value class type name)
     (let* (#+sb-xc-host (sb!xc:*gensym-counter* sb!xc:*gensym-counter*)
            (info (type-info-or-lose class type))
            (tin (type-info-number info))
+           (type-spec (type-info-type info))
            (check
             (when (type-info-validate-function info)
               ;; is (or ... null), but non-null in host implies non-null
@@ -1339,11 +1187,12 @@
                  (truly-the type-info (svref *info-types* ,tin)))))))
       (with-unique-names (new)
         `(let ((,new ,new-value))
-           ,@(when check
-               `((funcall ,check ,name ,new)))
-           (set-info-value ,name
-                           ,tin
-                           ,new)))))
+           ;; enforce type-correctness regardless of enclosing policy
+           (let ((,new (locally (declare (optimize (safety 3)))
+                         (the ,type-spec ,new))))
+             ,@(when check
+                 `((funcall ,check ,name ,new)))
+             (set-info-value ,name ,tin ,new))))))
 
   (def clear-info (class type name)
     (let ((info (type-info-or-lose class type)))

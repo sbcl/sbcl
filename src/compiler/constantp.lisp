@@ -50,7 +50,7 @@
     (typecase form
       (symbol
        ;; KLUDGE: superficially, this might look good enough: we grab
-       ;; the value from the info database, and if it isn't there (or
+       ;; the value from FORM's property list, and if it isn't there (or
        ;; is NIL, but hey) we use the host's value.  This works for
        ;; MOST-POSITIVE-FIXNUM and friends, but still fails for
        ;; float-related constants, where there is in fact no guarantee
@@ -59,9 +59,7 @@
        ;; point so that we never try to use a host's value, and then
        ;; make some kind of assertion that we never attempt to take
        ;; a host value of a constant in the CL package.
-       #+sb-xc-host (or (info :variable :xc-constant-value form)
-                        (symbol-value form))
-       #-sb-xc-host (symbol-value form))
+       (or #+sb-xc-host (xc-constant-value form) (symbol-value form)))
       (list
        (if (special-operator-p (car form))
            (constant-special-form-value form environment envp)

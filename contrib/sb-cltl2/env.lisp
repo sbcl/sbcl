@@ -397,15 +397,7 @@ the condition types that have been muffled."
        (car (rassoc 'muffle-warning
                     (sb-c::lexenv-handled-conditions env))))
       (declaration
-       ;; FIXME: This is a bit too deep in the guts of INFO for comfort...
-       (let ((type (sb-c::type-info-number
-                    (sb-c::type-info-or-lose :declaration :recognized)))
-             (ret nil))
-         (dolist (env *info-environment*)
-           (do-info (env :name name :type-number num :value value)
-             (when (and (= num type) value)
-               (push name ret))))
-         ret))
+       (copy-list sb-c::*recognized-declarations*))
       (t (if (info :declaration :handler declaration-name)
              (extra-decl-info declaration-name env)
              (error "Unsupported declaration ~S." declaration-name))))))
