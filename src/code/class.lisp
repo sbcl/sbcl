@@ -672,9 +672,7 @@
 ;;; classes. Non-structure "typed" defstructs are a special case, and
 ;;; don't have a corresponding class.
 (def!struct (structure-classoid (:include classoid)
-                                (:constructor make-structure-classoid))
-  ;; If true, a default keyword constructor for this structure.
-  (constructor nil :type (or function null)))
+                                (:constructor make-structure-classoid)))
 
 ;;;; classoid namespace
 

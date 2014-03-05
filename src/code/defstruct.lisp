@@ -387,11 +387,7 @@
                   ((eq pure :substructure)
                    `((setf (layout-pure (classoid-layout
                                          (find-classoid ',name)))
-                           0)))))
-        ,@(let ((def-con (dd-default-constructor defstruct)))
-            (when (and def-con (not (dd-alternate-metaclass defstruct)))
-              `((setf (structure-classoid-constructor (find-classoid ',name))
-                      #',def-con))))))))
+                           0)))))))))
 
 ;;; shared logic for host macroexpansion for SB!XC:DEFSTRUCT and
 ;;; cross-compiler macroexpansion for CL:DEFSTRUCT
