@@ -263,8 +263,10 @@
 
 ;;; Find a type number not already in use by looking for a null entry
 ;;; in *INFO-TYPES*.
+;;; The zeroth type is reserved as a tombstone to support deletion
+;;; from a compact info environment.
 (defun find-unused-type-number ()
-  (or (position nil *info-types*)
+  (or (position nil *info-types* :start 1)
       (error "no more INFO type numbers available")))
 
 ;;; a list of forms for initializing the DEFAULT slots of TYPE-INFO
@@ -483,27 +485,28 @@
 (def!constant compact-info-entry-type-mask (ldb (byte type-number-bits 0) -1))
 (def!constant compact-info-entry-last (ash 1 type-number-bits))
 
-;;; Return the value of the type corresponding to NUMBER for the
-;;; index INDEX in ENV.
+;;; Return the index of the info-type corresponding to NUMBER starting
+;;; at INDEX in compact ENV and scanning linearly until a match occurs,
+;;; or hitting an entry whose 'last' flag is set.
+;;; Return NIL if no match was found.
 #!-sb-fluid (declaim (inline compact-info-lookup-index))
 (defun compact-info-lookup-index (env number index)
   (declare (type compact-info-env env) (type type-number number))
   (let ((entries-info (compact-info-env-entries-info env)))
-    (if index
-        (do ((index index (1+ index)))
-            (nil)
-          (declare (type index index))
-          (let ((info (aref entries-info index)))
-            (when (= (logand info compact-info-entry-type-mask) number)
-              (return (values (svref (compact-info-env-entries env) index)
-                              t)))
-            (unless (zerop (logand compact-info-entry-last info))
-              (return (values nil nil)))))
-        (values nil nil))))
+    (do ((index index (1+ index)))
+        (nil)
+      (declare (type index index))
+      (let ((info (aref entries-info index)))
+        (when (= (logand info compact-info-entry-type-mask) number)
+          (return index))
+        (when (logtest compact-info-entry-last info)
+          (return nil))))))
 
-;;; Look up NAME in the compact environment ENV. HASH is the
-;;; GLOBALDB-SXHASHOID of NAME.
-(defun compact-info-lookup (env name hash number)
+;;; Look up the key composed of (TYPE-NUMBER,NAME) in the compact ENV.
+;;; HASH is the GLOBALDB-SXHASHOID of NAME.
+;;; If found, return the index into the parallel arrays 'entries-info'
+;;; and 'entries' for that key.
+(defun compact-info-find-key (env type-number name hash)
   (declare (type compact-info-env env)
            (type (integer 0 #.sb!xc:most-positive-fixnum) hash))
   (let* ((table (compact-info-env-table env))
@@ -526,11 +529,34 @@
                       (when (,test entry name)
                         (return (compact-info-lookup-index
                                  env
-                                 number
+                                 type-number
                                  (aref (compact-info-env-index env) probe))))))))
       (if (symbolp name)
           (lookup eq)
           (lookup equal)))))
+
+;; Find and return the value for (TYPE-NUMBER,NAME) in compact ENV
+;; given also the HASH of NAME, and returning as a secondary value
+;; a boolean flag indicating whether the key pair was found.
+#!-sb-fluid (declaim (inline compact-info-lookup))
+(defun compact-info-lookup (env type-number name hash)
+  (let ((index (compact-info-find-key env type-number name hash)))
+    (if index
+        (values (svref (compact-info-env-entries env) index) t)
+        (values nil nil))))
+
+;; Clear the value for (TYPE-NUMBER,NAME) if present in compact ENV,
+;; given also the HASH of NAME. Return true if anything was cleared.
+(defun compact-info-clear (env type-number name hash)
+  (let ((index (compact-info-find-key env type-number name hash)))
+    (when index
+      (let ((entries-info (compact-info-env-entries-info env)))
+        ;; Change the type-number of this entry to 0 and its data to NIL.
+        ;; Preserve the 'last' flag intact.
+        (setf (aref entries-info index) (logand (aref entries-info index)
+                                                compact-info-entry-last)
+              (svref (compact-info-env-entries env) index) nil)
+        t))))
 
 ;;; the exact density (modulo rounding) of the hashtable in a compact
 ;;; info environment in names/bucket
@@ -650,7 +676,7 @@
   (threshold 0 :type index))
 
 ;;; Just like COMPACT-INFO-LOOKUP, only do it on a volatile environment.
-(defun volatile-info-lookup (env name hash number)
+(defun volatile-info-lookup (env type-number name hash)
   (declare (type volatile-info-env env)
            (type (integer 0 #.sb!xc:most-positive-fixnum) hash))
   (let ((table (volatile-info-env-table env)))
@@ -658,7 +684,7 @@
                  `(dolist (entry (svref table (mod hash (length table))) ())
                     (when (,test (car entry) name)
                       (dolist (type (cdr entry))
-                        (when (eql (car type) number)
+                        (when (eql (car type) type-number)
                           (return-from volatile-info-lookup
                             (values (cdr type) t))))
                       (return-from volatile-info-lookup
@@ -757,21 +783,26 @@
     (set-info-value name (type-info-number info) new-value)))
 
 ;;; Clear the information of the specified TYPE and CLASS for NAME in
-;;; the current environment, allowing any inherited info to become
-;;; visible. We return true if there was any info.
+;;; the current environment. Return true if there was any info.
 (defun clear-info (class type name)
   (let ((info (type-info-or-lose class type)))
     (clear-info-value name (type-info-number info))))
 
-(defun clear-info-value (name type)
+(defun clear-info-value (name type &aux anything-cleared-p)
   (declare (type type-number type) (inline assoc))
+  ;; Clear the frontmost environment.
   (with-info-bucket (table index name (get-write-info-env))
     (let ((types (assoc name (svref table index) :test #'equal)))
-      (when (and types
-                 (assoc type (cdr types)))
-        (setf (cdr types)
-              (delete type (cdr types) :key #'car))
-        t))))
+      (when (assoc type (cdr types))
+        (setf (cdr types) (delete type (cdr types) :key #'car)
+              anything-cleared-p t))))
+  ;; Clear the older (compact) environments.
+  (let ((hash (globaldb-sxhashoid name)))
+    (dolist (env (cdr *info-environment*))
+      (aver (compact-info-env-p env))
+      (when (compact-info-clear env type name hash)
+        (setq anything-cleared-p t))))
+  anything-cleared-p)
 
 ;;; the maximum density of the hashtable in a volatile env (in
 ;;; names/bucket)
@@ -804,29 +835,29 @@
 
 ;;;; GET-INFO-VALUE
 
-;;; Return the value of NAME / TYPE from the first environment where
+;;; Return the value of NAME / TYPE-NUMBER from the first environment that
 ;;; has it defined, or return the default if none does. We used to
 ;;; do a lot of complicated caching here, but that was removed for
 ;;; thread-safety reasons.
-(defun get-info-value (name0 type)
-  (declare (type type-number type))
+(defun get-info-value (name0 type-number)
+  (declare (type type-number type-number))
   ;; sanity check: If we have screwed up initialization somehow, then
   ;; *INFO-TYPES* could still be uninitialized at the time we try to
   ;; get an info value, and then we'd be out of luck. (This happened,
   ;; and was confusing to debug, when rewriting EVAL-WHEN in
   ;; sbcl-0.pre7.x.)
-  (aver (aref *info-types* type))
+  (aver (aref *info-types* type-number))
   (let ((name (uncross name0)))
     (flet ((lookup (env-list)
              (dolist (env env-list
                       (values (let ((val (type-info-default
-                                          (svref *info-types* type))))
+                                          (svref *info-types* type-number))))
                                 (if (functionp val) (funcall val name) val))
                               nil))
                (macrolet ((frob (lookup)
                             `(let ((hash (globaldb-sxhashoid name)))
                                (multiple-value-bind (value winp)
-                                   (,lookup env name hash type)
+                                   (,lookup env type-number name hash)
                                  (when winp (return (values value t)))))))
                  (etypecase env
                    (volatile-info-env (frob volatile-info-lookup))
