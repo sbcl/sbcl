@@ -99,12 +99,10 @@
 ;;; the default.
 (defun undefine-fun-name (name)
   (when name
-    (macrolet ((frob (type &optional val)
-                 `(unless (eq (info :function ,type name) ,val)
-                    (setf (info :function ,type name) ,val))))
+    (macrolet ((frob (type) `(clear-info :function ,type name)))
       (frob :info)
-      (frob :type (specifier-type 'function))
-      (frob :where-from :assumed)
+      (frob :type)
+      (frob :where-from)
       (frob :inlinep)
       (frob :kind)
       (frob :macro-function)
@@ -121,7 +119,7 @@
   (when (eq (info :function :where-from name) :assumed)
     (setf (info :function :where-from name) :defined)
     (if (info :function :assumed-type name)
-        (setf (info :function :assumed-type name) nil))))
+        (clear-info :function :assumed-type name))))
 
 ;;; Decode any raw (INFO :FUNCTION :INLINE-EXPANSION-DESIGNATOR FUN-NAME)
 ;;; value into a lambda expression, or return NIL if there is none.

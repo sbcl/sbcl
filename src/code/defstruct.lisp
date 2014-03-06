@@ -1041,7 +1041,7 @@
     (when (defstruct-description-p info)
       (let ((type (dd-name info)))
         (remhash type *typecheckfuns*)
-        (setf (info :type :compiler-layout type) nil)
+        (clear-info :type :compiler-layout type)
         (undefine-fun-name (dd-copier-name info))
         (undefine-fun-name (dd-predicate-name info))
         (dolist (slot (dd-slots info))

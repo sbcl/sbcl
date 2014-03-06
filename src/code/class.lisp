@@ -767,9 +767,9 @@
             (:defined
              (warn "redefining DEFTYPE type to be a class: ~
                     ~/sb-impl::print-symbol-with-prefix/" name)
-                (setf (info :type :expander name) nil
-                      (info :type :lambda-list name) nil
-                      (info :type :source-location name) nil)))
+             (clear-info :type :expander name)
+             (clear-info :type :lambda-list name)
+             (clear-info :type :source-location name)))
 
           (remhash name table)
           (%note-type-defined name)
@@ -815,9 +815,9 @@
          ;; Clear the cell.
          (setf (classoid-cell-classoid cell) nil
                (classoid-cell-pcl-class cell) nil))
-       (setf (info :type :kind name) nil
-             (info :type :documentation name) nil
-             (info :type :compiler-layout name) nil)))))
+       (clear-info :type :kind name)
+       (clear-info :type :documentation name)
+       (clear-info :type :compiler-layout name)))))
 
 ;;; Called when we are about to define NAME as a class meeting some
 ;;; predicate (such as a meta-class type test.) The first result is

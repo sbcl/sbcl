@@ -25,7 +25,7 @@
      (undeclare-structure (find-classoid name) t)
      ;; FIXME: shouldn't this happen only at eval-time?
      (setf (classoid-cell-classoid (find-classoid-cell name :create t)) nil)
-     (setf (info :type :compiler-layout name) nil)
+     (clear-info :type :compiler-layout name)
      (setf (info :type :kind name) :defined))
     (:defined
      ;; Note: It would be nice to warn here when a type is being
