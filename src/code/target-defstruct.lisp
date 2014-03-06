@@ -139,93 +139,18 @@
   (/show0 "leaving PROTECT-CL")
   (values))
 
-(defun make-defstruct-predicate (dd layout)
-  (ecase (dd-type dd)
-    ;; structures with LAYOUTs
-    ((structure funcallable-structure)
-     (/show0 "with-LAYOUT case")
-     #'(lambda (object)
-         (locally ; <- to keep SAFETY 0 from affecting arg count checking
-             (declare (optimize (speed 3) (safety 0)))
-           (/noshow0 "in with-LAYOUT structure predicate closure,")
-           (/noshow0 "  OBJECT,LAYOUT=..")
-           (/nohexstr object)
-           (/nohexstr layout)
-           (typep-to-layout object layout))))
-    ;; structures with no LAYOUT (i.e. :TYPE VECTOR or :TYPE LIST)
-    ;;
-    ;; FIXME: should handle the :NAMED T case in these cases
-    (vector
-     (/show0 ":TYPE VECTOR case")
-     #'vectorp)
-    (list
-     (/show0 ":TYPE LIST case")
-     #'listp)))
-
-(defun make-defstruct-copier (dd layout)
-  (ecase (dd-type dd)
-    (structure
-     #'(lambda (instance)
-         (%check-structure-type-from-layout instance layout)
-         (copy-structure instance)))))
-
 ;;; the part of %DEFSTRUCT which makes sense only on the target SBCL
 ;;;
 ;;; (The "static" in the name is because it needs to be done not only
 ;;; in ordinary toplevel %DEFSTRUCT, but also in cold init as early as
 ;;; possible, to simulate static linking of structure functions as
 ;;; nearly as possible.)
-(defun %target-defstruct (dd layout)
+(defun %target-defstruct (dd)
   (declare (type defstruct-description dd))
-  (declare (type layout layout))
 
   (/show0 "entering %TARGET-DEFSTRUCT")
 
   (remhash (dd-name dd) *typecheckfuns*)
-
-  ;; (Constructors aren't set up here, because constructors are
-  ;; varied enough (possibly parsing any specified argument list)
-  ;; that we can't reasonably implement them as closures, so we
-  ;; implement them with DEFUN instead.)
-
-  ;; Set FDEFINITIONs for slot accessors.
-  (dolist (dsd (dd-slots dd))
-    (/show0 "doing FDEFINITION for slot accessor")
-    (let ((accessor-name (dsd-accessor-name dsd)))
-      ;; We mustn't step on any inherited accessors
-      (unless (accessor-inherited-data accessor-name dd)
-        (/show0 "ACCESSOR-NAME=..")
-        (/hexstr accessor-name)
-        (protect-cl accessor-name)
-        (/hexstr "getting READER-FUN and WRITER-FUN")
-        (multiple-value-bind (reader-fun writer-fun)
-            (slot-accessor-funs dd dsd)
-          (declare (type function reader-fun writer-fun))
-          (/show0 "got READER-FUN and WRITER-FUN=..")
-          (/hexstr reader-fun)
-          (setf (symbol-function accessor-name) reader-fun)
-          (unless (dsd-read-only dsd)
-            (/show0 "setting FDEFINITION for WRITER-FUN=..")
-            (/hexstr writer-fun)
-            (setf (fdefinition `(setf ,accessor-name)) writer-fun))))))
-
-  ;; Set FDEFINITION for copier.
-  (when (dd-copier-name dd)
-    (/show0 "doing FDEFINITION for copier")
-    (protect-cl (dd-copier-name dd))
-    ;; We can't use COPY-STRUCTURE for other kinds of objects, notably
-    ;; funcallable structures, since it returns a STRUCTURE-OBJECT.
-    ;; (And funcallable instances don't need copiers anyway.)
-    (aver (eql (dd-type dd) 'structure))
-    (setf (symbol-function (dd-copier-name dd))
-          (make-defstruct-copier dd layout)))
-
-  ;; Set FDEFINITION for predicate.
-  (when (dd-predicate-name dd)
-    (/show0 "doing FDEFINITION for predicate")
-    (protect-cl (dd-predicate-name dd))
-    (setf (symbol-function (dd-predicate-name dd))
-          (make-defstruct-predicate dd layout)))
 
   (when (dd-doc dd)
     (setf (fdocumentation (dd-name dd) 'structure)
@@ -238,123 +163,6 @@
 
   (/show0 "leaving %TARGET-DEFSTRUCT")
   (values))
-
-;;;; generating out-of-line slot accessor functions
-
-;;; FIXME: Ideally, the presence of the type checks in the functions
-;;; here would be conditional on the optimization policy at the point
-;;; of expansion of DEFSTRUCT. (For now we're just doing the simpler
-;;; thing, putting in the type checks unconditionally.)
-
-;;; KLUDGE: Why use this closure approach at all?  The macrology in
-;;; SLOT-ACCESSOR-FUNS seems to be half stub, half OAOOM to me.  --DFL
-
-;;; Return (VALUES SLOT-READER-FUN SLOT-WRITER-FUN).
-(defun slot-accessor-funs (dd dsd)
-
-  #+sb-xc (/show0 "entering SLOT-ACCESSOR-FUNS")
-
-  ;; various code generators
-  ;;
-  ;; Note: They're only minimally parameterized, and cavalierly grab
-  ;; things like INSTANCE and DSD-INDEX from the namespace they're
-  ;; expanded in.
-  (macrolet (;; code shared between funcallable instance case and the
-             ;; ordinary STRUCTURE-OBJECT case: Handle native
-             ;; structures with LAYOUTs and (possibly) raw slots.
-             (%native-slot-accessor-funs (dd-ref-fun-name)
-               (let ((instance-type-check-form
-                      '(%check-structure-type-from-layout instance layout)))
-                 (/show "macroexpanding %NATIVE-SLOT-ACCESSOR-FUNS" dd-ref-fun-name instance-type-check-form)
-                 `(let ((layout (dd-layout-or-lose dd))
-                        (dsd-raw-type (dsd-raw-type dsd)))
-                    #+sb-xc (/show0 "in %NATIVE-SLOT-ACCESSOR-FUNS macroexpanded code")
-                    ;; Map over all the possible RAW-TYPEs, compiling
-                    ;; a different closure function for each one, so
-                    ;; that once the COND over RAW-TYPEs happens (at
-                    ;; the time closure is allocated) there are no
-                    ;; more decisions to be made and things execute
-                    ;; reasonably efficiently.
-                    (cond
-                     ;; nonraw slot case
-                     ((eql dsd-raw-type t)
-                      #+sb-xc (/show0 "in nonraw slot case")
-                      (%slotplace-accessor-funs
-                       (,dd-ref-fun-name instance dsd-index)
-                       ,instance-type-check-form))
-                     ;; raw slot cases
-                     ,@(mapcar (lambda (rtd)
-                                 (let ((raw-type (raw-slot-data-raw-type rtd))
-                                       (accessor-name
-                                        (raw-slot-data-accessor-name rtd)))
-                                   `((equal dsd-raw-type ',raw-type)
-                                     #+sb-xc (/show0 "in raw slot case")
-                                     (%slotplace-accessor-funs
-                                      (,accessor-name instance dsd-index)
-                                      ,instance-type-check-form))))
-                               *raw-slot-data-list*)
-                     ;; oops
-                     (t
-                      (bug "unexpected DSD-RAW-TYPE ~S" dsd-raw-type))))))
-             ;; code shared between DEFSTRUCT :TYPE LIST and
-             ;; DEFSTRUCT :TYPE VECTOR cases: Handle the "typed
-             ;; structure" case, with no LAYOUTs and no raw slots.
-             (%colontyped-slot-accessor-funs () (error "stub"))
-             ;; the common structure of the raw-slot and not-raw-slot
-             ;; cases, defined in terms of the writable SLOTPLACE. All
-             ;; possible flavors of slot access should be able to pass
-             ;; through here.
-             (%slotplace-accessor-funs (slotplace instance-type-check-form)
-               (/show "macroexpanding %SLOTPLACE-ACCESSOR-FUNS" slotplace instance-type-check-form)
-               `(let ((typecheckfun (typespec-typecheckfun dsd-type)))
-                  (values (if (dsd-safe-p dsd)
-                              (lambda (instance)
-                                (/noshow0 "in %SLOTPLACE-ACCESSOR-FUNS-defined reader")
-                                ,instance-type-check-form
-                                (/noshow0 "back from INSTANCE-TYPE-CHECK-FORM")
-                                ,slotplace)
-                              (lambda (instance)
-                                (/noshow0 "in %SLOTPLACE-ACCESSOR-FUNS-defined reader")
-                                ,instance-type-check-form
-                                (/noshow0 "back from INSTANCE-TYPE-CHECK-FORM")
-                                (let ((value ,slotplace))
-                                  (funcall typecheckfun value)
-                                  value)))
-                          (lambda (new-value instance)
-                            (/noshow0 "in %SLOTPLACE-ACCESSOR-FUNS-defined writer")
-                            ,instance-type-check-form
-                            (/noshow0 "back from INSTANCE-TYPE-CHECK-FORM")
-                            (funcall typecheckfun new-value)
-                            (/noshow0 "back from TYPECHECKFUN")
-                            (setf ,slotplace new-value))))))
-
-    (let ((dsd-index (dsd-index dsd))
-          (dsd-type (dsd-type dsd)))
-
-      #+sb-xc (/show0 "got DSD-TYPE=..")
-      #+sb-xc (/hexstr dsd-type)
-      (ecase (dd-type dd)
-
-        ;; native structures
-        (structure
-         #+sb-xc (/show0 "case of DSD-TYPE = STRUCTURE")
-         (%native-slot-accessor-funs %instance-ref))
-
-        ;; structures with the :TYPE option
-
-        ;; FIXME: Worry about these later..
-        #|
-        ;; In :TYPE LIST and :TYPE VECTOR structures, ANSI specifies the
-        ;; layout completely, so that raw slots are impossible.
-        (list
-         (dd-type-slot-accessor-funs nth-but-with-sane-arg-order
-                                 `(%check-structure-type-from-dd
-                                 :maybe-raw-p nil))
-        (vector
-         (dd-type-slot-accessor-funs aref
-                                 :maybe-raw-p nil)))
-        |#
-        ))))
 
 ;;; Copy any old kind of structure.
 (defun copy-structure (structure)

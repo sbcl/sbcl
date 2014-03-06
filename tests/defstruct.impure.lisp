@@ -823,8 +823,12 @@ redefinition."
 (defun assert-is (predicate instance)
   (assert (funcall predicate instance)))
 
-(defun assert-invalid (predicate instance)
-  (assert (typep (nth-value 1 (ignore-errors (funcall predicate instance)))
+;;; It used to call the predicate function, but out-of-line predicate
+;;; functions now don't signal layout-invalid, just like inlined
+;;; predicates didn't signal it.
+(defun assert-invalid (instance)
+  (declare (notinline typep))
+  (assert (typep (nth-value 1 (ignore-errors (typep instance 'structure-object)))
                  'sb-kernel::layout-invalid)))
 
 ;; Don't try to understand this macro; just look at its expansion.
@@ -880,7 +884,7 @@ redefinition."
 
 ;; Base case: continue (i.e., invalidate instances).
 (with-defstruct-redefinition-test :defstruct/continue
-    (((defstruct ctor pred) :class-name redef-test-2 :slots (a))
+    (((defstruct ctor) :class-name redef-test-2 :slots (a))
      ((defstruct*) :class-name redef-test-2 :slots (a b)))
     ((path1 defstruct)
      (path2 defstruct*))
@@ -888,7 +892,7 @@ redefinition."
   (load path1)
   (let ((instance (funcall ctor)))
     (load path2)
-    (assert-invalid pred instance)))
+    (assert-invalid instance)))
 
 ;; Compiling a file with an incompatible defstruct should emit a
 ;; warning and an error, but the fasl should be loadable.
@@ -917,7 +921,7 @@ redefinition."
 ;; After compiling a file with an incompatible DEFSTRUCT, load the
 ;; fasl and ensure that an old instance has become invalid.
 (with-defstruct-redefinition-test :defstruct/compile-file-continue
-    (((defstruct ctor pred) :class-name redef-test-5 :slots (a))
+    (((defstruct ctor) :class-name redef-test-5 :slots (a))
      ((defstruct*) :class-name redef-test-5 :slots (a b)))
     ((path1 defstruct)
      (path2 defstruct*))
@@ -925,7 +929,7 @@ redefinition."
   (load path1)
   (let ((instance (funcall ctor)))
     (load (compile-file-assert path2))
-    (assert-invalid pred instance)))
+    (assert-invalid instance)))
 
 ;;; Subclasses.
 ;; Ensure that recklessly continuing DT(expected)T to instances of
@@ -948,7 +952,7 @@ redefinition."
 ;; Ensure that continuing invalidates instances of subclasses.
 (with-defstruct-redefinition-test :defstruct/subclass-continue
     (((defstruct) :class-name redef-test-7 :slots (a))
-     ((substruct ctor pred) :class-name redef-test-7-sub
+     ((substruct ctor) :class-name redef-test-7-sub
                             :super-name redef-test-7 :slots (z))
      ((defstruct*) :class-name redef-test-7 :slots (a b)))
     ((path1 defstruct substruct)
@@ -957,7 +961,7 @@ redefinition."
   (load path1)
   (let ((instance (funcall ctor)))
     (load (compile-file-assert path2))
-    (assert-invalid pred instance)))
+    (assert-invalid instance)))
 
 ;; Reclkessly continuing doesn't invalidate instances of subclasses.
 (with-defstruct-redefinition-test :defstruct/subclass-in-other-file-reckless
@@ -981,8 +985,8 @@ redefinition."
 ;; superclass definition leaves the predicates and accessors into the
 ;; subclass in a bad way until the subclass form is evaluated.
 (with-defstruct-redefinition-test :defstruct/subclass-in-other-file-continue
-    (((defstruct ignore pred1) :class-name redef-test-9 :slots (a))
-     ((substruct ctor pred2) :class-name redef-test-9-sub
+    (((defstruct ignore) :class-name redef-test-9 :slots (a))
+     ((substruct ctor) :class-name redef-test-9-sub
                              :super-name redef-test-9 :slots (z))
      ((defstruct*) :class-name redef-test-9 :slots (a b)))
     ((path1 defstruct)
@@ -997,11 +1001,11 @@ redefinition."
     ;; an instance of the superclass or of the subclass, but PRED2's
     ;; predicate will error with "an obsolete structure accessor
     ;; function was called".
-    (assert-invalid pred1 instance)
+    (assert-invalid instance)
     (format t "~&~A~%" (nth-value 1 (ignore-errors (funcall pred2 instance))))
     ;; After loading PATH2, we'll get the desired LAYOUT-INVALID error.
     (load path2)
-    (assert-invalid pred2 instance)))
+    (assert-invalid instance)))
 
 ;; Some other subclass wrinkles have to do with splitting definitions
 ;; accross files and compiling and loading things in a funny order.
@@ -1029,8 +1033,8 @@ redefinition."
     ;; order.
     (load (compile-file-pathname path3))
     (load (compile-file-pathname path2))
-    (assert-invalid pred1 instance)
-    (assert-invalid pred2 instance)))
+    (assert-invalid instance)
+    (assert-invalid instance)))
 
 (with-defstruct-redefinition-test
     :defstruct/subclass-in-other-file-funny-operation-order-continue

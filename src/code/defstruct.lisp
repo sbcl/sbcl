@@ -30,28 +30,14 @@
   (let ((layout (info :type :compiler-layout name)))
     (and layout (typep (layout-info layout) 'defstruct-description))))
 
-(sb!xc:defmacro %make-structure-instance-macro (dd slot-specs &rest slot-vars)
-  (if (compiler-layout-ready-p (dd-name dd))
-      `(truly-the ,(dd-name dd)
-                  (%make-structure-instance ,dd ,slot-specs ,@slot-vars))
-      ;; Non-toplevel defstructs don't have a layout at compile time,
-      ;; so we need to construct the actual function at runtime -- but
-      ;; we cache it at the call site, so that we don't perform quite
-      ;; so horribly.
-      `(let* ((cell (load-time-value (list nil)))
-              (fun (car cell)))
-         (if (functionp fun)
-             (funcall fun ,@slot-vars)
-             (funcall (setf (car cell)
-                            (%make-structure-instance-allocator ,dd ,slot-specs))
-                      ,@slot-vars)))))
-
 (declaim (ftype (sfunction (defstruct-description list) function)
                 %make-structure-instance-allocator))
 (defun %make-structure-instance-allocator (dd slot-specs)
   (let ((vars (make-gensym-list (length slot-specs))))
-    (values (compile nil `(lambda (,@vars)
-                            (%make-structure-instance-macro ,dd ',slot-specs ,@vars))))))
+    (values (compile nil
+                     `(lambda (,@vars)
+                        (truly-the ,(dd-name dd)
+                                   (%make-structure-instance ,dd ',slot-specs ,@vars)))))))
 
 (defun %make-funcallable-structure-instance-allocator (dd slot-specs)
   (when slot-specs
@@ -389,6 +375,14 @@
                                          (find-classoid ',name)))
                            0)))))))))
 
+(sb!xc:defmacro delay-defstruct-functions (name forms)
+  ;; KLUDGE: If DEFSTRUCT is not at the top-level,
+  ;; (typep x 'name) and similar forms can't get optimized
+  ;; and produce style-warnings for unknown types.
+  (if (compiler-layout-ready-p name)
+      forms
+      `(eval ',forms)))
+
 ;;; shared logic for host macroexpansion for SB!XC:DEFSTRUCT and
 ;;; cross-compiler macroexpansion for CL:DEFSTRUCT
 (defmacro !expander-for-defstruct (name-and-options
@@ -397,7 +391,7 @@
   `(let ((name-and-options ,name-and-options)
          (slot-descriptions ,slot-descriptions)
          (expanding-into-code-for-xc-host-p
-          ,expanding-into-code-for-xc-host-p))
+           ,expanding-into-code-for-xc-host-p))
      (let* ((dd (parse-defstruct-name-and-options-and-slot-descriptions
                  name-and-options
                  slot-descriptions))
@@ -420,13 +414,20 @@
                 (%defstruct ',dd ',inherits (sb!c:source-location))
                 (eval-when (:compile-toplevel :load-toplevel :execute)
                   (%compiler-defstruct ',dd ',inherits))
-                ,@(unless expanding-into-code-for-xc-host-p
-                    (append ;; FIXME: We've inherited from CMU CL nonparallel
-                            ;; code for creating copiers for typed and untyped
-                            ;; structures. This should be fixed.
-                            ;(copier-definition dd)
-                            (constructor-definitions dd)
-                            (class-method-definitions dd)))
+                ,(unless expanding-into-code-for-xc-host-p
+                   `(delay-defstruct-functions
+                     ,name
+                     ,(list* 'progn
+                             (copier-definition dd)
+                             (predicate-definition dd)
+                             (append
+                              (constructor-definitions dd)
+                              (accessor-definitions dd)
+                              (class-method-definitions dd)))))
+
+                ;; Various other operations only make sense on the target SBCL.
+                #-sb-xc-host
+                (%target-defstruct ',dd)
                 ',name))
            `(progn
               (with-single-package-locked-error
@@ -443,12 +444,12 @@
                           (constructor-definitions dd)
                           (when (dd-doc dd)
                             `((setf (fdocumentation ',(dd-name dd) 'structure)
-                               ',(dd-doc dd))))))
+                                    ',(dd-doc dd))))))
               ',name)))))
 
 (sb!xc:defmacro defstruct (name-and-options &rest slot-descriptions)
   #!+sb-doc
-  "DEFSTRUCT {Name | (Name Option*)} {Slot | (Slot [Default] {Key Value}*)}
+  "DEFSTRUCT {Name | (Name Option*)} [Documentation] {Slot | (Slot [Default] {Key Value}*)}
    Define the structure type Name. Instances are created by MAKE-<name>,
    which takes &KEY arguments allowing initial slot values to the specified.
    A SETF'able function <name>-<slot> is defined for each slot to read and
@@ -475,7 +476,7 @@
 
    :READ-ONLY {T | NIL}
        If true, no setter function is defined for this slot."
-    (!expander-for-defstruct name-and-options slot-descriptions nil))
+  (!expander-for-defstruct name-and-options slot-descriptions nil))
 #+sb-xc-host
 (defmacro sb!xc:defstruct (name-and-options &rest slot-descriptions)
   #!+sb-doc
@@ -975,13 +976,8 @@
     (setf (find-classoid (dd-name dd)) classoid)
 
     (sb!c:with-source-location (source-location)
-      (setf (layout-source-location layout) source-location))
+      (setf (layout-source-location layout) source-location))))
 
-    ;; Various other operations only make sense on the target SBCL.
-    #-sb-xc-host
-    (%target-defstruct dd layout))
-
-  (values))
 
 ;;; Return a form describing the writable place used for this slot
 ;;; in the instance named INSTANCE-NAME.
@@ -1017,8 +1013,8 @@
                 (once-only ((new-value new-value)
                             (instance instance))
                   `(,(info :setf :inverse accessor-name)
-                     ,@(subst instance 'instance accessor-args)
-                     (the ,dsd-type ,new-value))))))))
+                    ,@(subst instance 'instance accessor-args)
+                    (the ,dsd-type ,new-value))))))))
 
 ;;; Return a LAMBDA form which can be used to set a slot.
 (defun slot-setter-lambda-form (dd dsd)
@@ -1125,7 +1121,6 @@
 ;;; ALTERNATE-LAYOUT) DEFSTRUCT described by DD.
 (defun %compiler-defstruct (dd inherits)
   (declare (type defstruct-description dd))
-
   (%compiler-set-up-layout dd inherits)
 
   (let* ((dtype (dd-declarable-type dd)))
@@ -1456,7 +1451,8 @@
                    values)))
      `(defun ,cons-name ,arglist
         ,@(when decls `((declare ,@decls)))
-        (%make-structure-instance-macro ,dd ',slot-specs ,@(reverse slot-values))))
+        (truly-the ,(dd-name dd)
+                   (%make-structure-instance ,dd ',slot-specs ,@(reverse slot-values)))))
    #!-raw-instance-init-vops
    (let ((instance (gensym "INSTANCE")) slot-values slot-specs raw-slots raw-values)
      (mapc (lambda (dsd value)
@@ -1473,7 +1469,8 @@
      `(defun ,cons-name ,arglist
         ,@(when decls`((declare ,@decls)))
         ,(if raw-slots
-             `(let ((,instance (%make-structure-instance-macro ,dd ',slot-specs ,@slot-values)))
+             `(let ((,instance (truly-the ,(dd-name dd)
+                                          (%make-structure-instance ,dd ',slot-specs ,@slot-values))))
                 ,@(mapcar (lambda (dsd value)
                             ;; (Note that we can't in general use the
                             ;; ordinary named slot setter function here
@@ -1484,7 +1481,8 @@
                           raw-slots
                           raw-values)
                 ,instance)
-             `(%make-structure-instance-macro ,dd ',slot-specs ,@slot-values))))
+             `(truly-the ,(dd-name dd)
+                         (%make-structure-instance ,dd ',slot-specs ,@slot-values)))))
    `(sfunction ,ftype-arglist ,(dd-name dd))))
 
 ;;; Create a default (non-BOA) keyword constructor.
@@ -1686,6 +1684,32 @@
           (res cons)))
 
       (res))))
+
+(defun accessor-definitions (dd)
+  (loop for dsd in (dd-slots dd)
+        for accessor-name = (dsd-accessor-name dsd)
+        for place-form = (%accessor-place-form dd dsd `(the ,(dd-name dd) instance))
+        unless (accessor-inherited-data accessor-name dd)
+        collect
+        `(defun ,accessor-name (instance)
+           ,(if (and (dsd-type dsd)
+                     (dsd-safe-p dsd))
+                `(truly-the ,(dsd-type dsd) ,place-form)
+                place-form))
+        and unless (dsd-read-only dsd)
+        collect `(defun (setf ,accessor-name) (value instance)
+                   (setf ,place-form value))))
+
+(defun copier-definition (dd)
+  (when (dd-copier-name dd)
+    `(defun ,(dd-copier-name dd) (instance)
+       (copy-structure (the ,(dd-name dd) instance)))))
+
+(defun predicate-definition (dd)
+  (when (dd-predicate-name dd)
+    `(defun ,(dd-predicate-name dd) (object)
+       (typep object ',(dd-name dd)))))
+
 
 ;;;; instances with ALTERNATE-METACLASS
 ;;;;
@@ -1833,7 +1857,7 @@
     (multiple-value-bind (raw-maker-form raw-reffer-operator)
         (ecase dd-type
           (structure
-           (values `(%make-structure-instance-macro ,dd nil)
+           (values `(truly-the ,(dd-name dd) (%make-structure-instance ,dd nil))
                    '%instance-ref))
           (funcallable-structure
            (values `(let ((,object-gensym

@@ -1167,8 +1167,9 @@
     (handler-bind ((style-warning (lambda (c)
                                     (push c conds))))
       (eval '(defstruct bug-542807 slot)))
-    (assert (= 1 (length conds)))
-    (assert (typep (car conds) 'sb-kernel::redefinition-with-defun))))
+    (assert (and conds
+                 (every (lambda (x) (typep x 'sb-kernel:redefinition-with-defun))
+                        conds)))))
 
 (with-test (:name :defmacro-not-list-lambda-list)
   (assert (raises-error? (eval `(defmacro ,(gensym) "foo"))

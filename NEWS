@@ -3,6 +3,8 @@ changes relative to sbcl-1.1.16:
   * enhancement: printing backtraces respects
     SB-DEBUG:*DEBUG-PRINT-VARIABLE-ALIST* when printing call arguments
     (lp#1261646)
+  * optimization: defstruct out-of-line accessor are now as fast as inlined.
+    (lp#1264924)
   * bug fix: LOAD is no longer confused when called on a directory.
     (lp#1077996)
 
