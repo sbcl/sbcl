@@ -46,6 +46,10 @@
 
 (in-package "SB-C")
 
+(test-util:with-test (:name :globaldb-sxhashoid-discrimination)
+  (assert (not (eql (globaldb-sxhashoid '(a b c d e))
+                    (globaldb-sxhashoid '(a b c d mumble))))))
+
 (test-util:with-test (:name :bug-458015)
   ;; Make sure layouts have sane source-locations
   (dolist (env *info-environment*)

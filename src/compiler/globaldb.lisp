@@ -31,42 +31,36 @@
 ;;; FIXME: centralize
 (declaim (special *universal-type*))
 
-;;; This is sorta semantically equivalent to SXHASH, but optimized for
-;;; legal function names.
-;;;
-;;; Why optimize? We want to avoid the fully-general TYPECASE in ordinary
-;;; SXHASH, because
-;;;   1. This hash function has to run when we're initializing the globaldb,
-;;;      so it has to run before the type system is initialized, and it's
-;;;      easier to make it do this if we don't try to do a general TYPECASE.
-;;;   2. This function is in a potential bottleneck for the compiler,
-;;;      and avoiding the general TYPECASE lets us improve performance
-;;;      because
-;;;     2a. the general TYPECASE is intrinsically slow, and
-;;;     2b. the general TYPECASE is too big for us to easily afford
-;;;         to inline it, so it brings with it a full function call.
-;;;
-;;; Why not specialize instead of optimize? (I.e. why fall through to
-;;; general SXHASH as a last resort?) Because the INFO database is used
-;;; to hold all manner of things, e.g. (INFO :TYPE :BUILTIN ..)
-;;; which is called on values like (UNSIGNED-BYTE 29). Falling through
-;;; to SXHASH lets us support all manner of things (as long as they
-;;; aren't used too early in cold boot for SXHASH to run).
-#!-sb-fluid (declaim (inline globaldb-sxhashoid))
-(defun globaldb-sxhashoid (x)
-  (logand sb!xc:most-positive-fixnum
-          (cond ((symbolp x) (sxhash x))
-                ((and (listp x)
-                      (eq (first x) 'setf)
-                      (let ((rest (rest x)))
-                        (and (symbolp (car rest))
-                             (null (cdr rest)))))
-                 ;; We need to declare the type of the value we're feeding to
-                 ;; SXHASH so that the DEFTRANSFORM on symbols kicks in.
-                 (let ((symbol (second x)))
-                   (declare (symbol symbol))
-                   (logxor (sxhash symbol) 110680597)))
-                (t (sxhash x)))))
+;;; This is sorta semantically equivalent to SXHASH, but better-behaved for
+;;; legal function names. It performs more work by not cutting off as soon
+;;; in the CDR direction, thereby improving the distribution of method names.
+;;; More work here equates to less work in the global hashtable.
+;;; To wit: (eq (sxhash '(foo a b c bar)) (sxhash '(foo a b c d))) => T
+;;; but the corresponding globaldb-sxhashoids differ.
+;;; This is no longer inline because for the cases where it is needed -
+;;; names which are not just symbols or (SETF F) - an extra call has no impact.
+(defun globaldb-sxhashoid (name)
+  ;; we can't use MIX because it's in 'target-sxhash',
+  ;; so use the host's sxhash, but ensure that the result is a target fixnum.
+  #+sb-xc-host (logand (sxhash name) sb!xc:most-positive-fixnum)
+  #-sb-xc-host
+  (locally
+      (declare (optimize (safety 0))) ; after the argc check
+    ;; TRAVERSE will walk across more cons cells than RECURSE will descend.
+    ;; That's why this isn't just one self-recursive function.
+    (labels ((traverse (accumulator x length-limit)
+             (declare (fixnum length-limit))
+             (cond ((atom x) (sb!int:mix (sxhash x) accumulator))
+                   ((zerop length-limit) accumulator)
+                   (t (traverse (sb!int:mix (recurse (car x) 4) accumulator)
+                                (cdr x) (1- length-limit)))))
+           (recurse (x depthoid) ; depthoid = a blend of level and length
+             (declare (fixnum depthoid))
+             (cond ((atom x) (sxhash x))
+                   ((zerop depthoid) #xdeadbeef)
+                   (t (sb!int:mix (recurse (car x) (1- depthoid))
+                                  (recurse (cdr x) (1- depthoid)))))))
+      (traverse 0 name 10))))
 
 ;;; Given any non-negative integer, return a prime number >= to it.
 ;;;
