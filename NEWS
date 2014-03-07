@@ -8,6 +8,7 @@ changes relative to sbcl-1.1.16:
   * bug fix: INVOKE-RESTART-INTERACTIVELY no longer refuses to invoke RESTART
     instances with a test-function (reported by Vivitron in #sbcl)
   * bug fix: STREAM-ERROR-POSITION-INFO fails in fewer situations (lp#1264902)
+  * bug fix: Change COND error message (lp#1254511)
   * bug fix: LOAD is no longer confused when called on a directory.
     (lp#1077996)
 

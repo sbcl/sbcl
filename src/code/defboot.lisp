@@ -72,7 +72,11 @@
       (let ((clause (first clauses))
             (more (rest clauses)))
         (if (atom clause)
-            (error "COND clause is not a list: ~S" clause)
+            (error 'simple-type-error
+                   :format-control "COND clause is not a ~S: ~S"
+                   :format-arguments (list 'cons clause)
+                   :expected-type 'cons
+                   :datum clause)
             (let ((test (first clause))
                   (forms (rest clause)))
               (if (endp forms)
