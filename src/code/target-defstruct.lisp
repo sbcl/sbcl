@@ -127,18 +127,6 @@
 ;;; classoid, to be called when a defstruct is evaluated.
 (defvar *defstruct-hooks* nil)
 
-;;; Catch attempts to mess up definitions of symbols in the CL package.
-(defun protect-cl (symbol)
-  (/show0 "entering PROTECT-CL, SYMBOL=..")
-  (/hexstr symbol)
-  (when (and *cold-init-complete-p*
-             (eq (symbol-package symbol) *cl-package*))
-    (cerror "Go ahead and patch the system."
-            "attempting to modify a symbol in the COMMON-LISP package: ~S"
-            symbol))
-  (/show0 "leaving PROTECT-CL")
-  (values))
-
 ;;; the part of %DEFSTRUCT which makes sense only on the target SBCL
 ;;;
 ;;; (The "static" in the name is because it needs to be done not only
