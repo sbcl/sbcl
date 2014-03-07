@@ -88,13 +88,121 @@ distinct from the global value. Can also be SETF."
       (:symbol symbol "setting the symbol-function of ~A")
     (setf (%coerce-name-to-fun symbol) new-value)))
 
+;;; Accessors for the dual-purpose info/plist slot
+
+;; A symbol's INFO slot is always in one of three states:
+;;   1. NIL                                    ; the initial state
+;;   2. #(data ....)                           ; globaldb used the slot
+;;   3. (PLIST . NIL) or (PLIST . #(data ...)) ; plist was touched,
+;;      and also possibly globaldb used the slot
+;;
+;; State 1 transitions to state 2 by assigning globaldb data,
+;;         or to state 3 via ({SETF|CAS} SYMBOL-PLIST).
+;;         (SETF INFO) by itself will never cause 1 -> 3 transition.
+;; State 2 transitions to state 3 via ({SETF|CAS} SYMBOL-PLIST).
+;; There are *no* other permissible state transitions.
+
+(defun symbol-info (symbol)
+  (symbol-info symbol))
+
+(eval-when (:compile-toplevel)
+  ;; If we're in state 1 or state 3, we can take (CAR (SYMBOL-INFO S))
+  ;; to get the property list. If we're in state 2, this same access
+  ;; gets the fixnum which is the VECTOR-LENGTH of the info vector.
+  ;; So all we have to do is turn any fixnum to NIL, and we have a plist.
+  ;; Ensure that this pun stays working.
+  (assert (= (- (* sb!vm:n-word-bytes sb!vm:cons-car-slot)
+                sb!vm:list-pointer-lowtag)
+             (- (* sb!vm:n-word-bytes sb!vm:vector-length-slot)
+                sb!vm:other-pointer-lowtag))))
+
 (defun symbol-plist (symbol)
   #!+sb-doc
   "Return SYMBOL's property list."
-  (symbol-plist symbol))
+  #!+symbol-info-vops
+  (symbol-plist symbol) ; VOP translates it
+  #!-symbol-info-vops
+  (let ((list (car (truly-the list (symbol-info symbol))))) ; a white lie
+    ;; Just ensure the result is not a fixnum, and we're done.
+    (if (fixnump list) nil list)))
+
+(declaim (ftype (sfunction (symbol t) cons) %ensure-plist-holder)
+         (inline %ensure-plist-holder))
+
+;; When a plist update (setf or cas) is first performed on a symbol,
+;; a one-time allocation of an extra cons is done which creates two
+;; "slots" from one: a slot for the info-vector and a slot for the plist.
+;; This avoids complications in the implementation of the user-facing
+;; (CAS SYMBOL-PLIST) function, which should not have to be aware of
+;; competition from globaldb mutators even if no other threads attempt
+;; to manipulate the plist per se.
+
+;; Given a SYMBOL and its current INFO of type (OR LIST SIMPLE-VECTOR)
+;; ensure that SYMBOL's current info is a cons, and return that.
+;; If racing with multiple threads, at most one thread will install the cons.
+(defun %ensure-plist-holder (symbol info)
+  ;; Invoked only when SYMBOL is known to be a symbol.
+  (declare (optimize (safety 0)))
+  (if (consp info) ; it's fine to call this with a cell already installed
+      info ; all done
+      (let (newcell)
+        ;; The pointer from the new cons to the old info must be persisted
+        ;; to memory before the symbol's info slot points to the cons.
+        ;; [x86oid doesn't need the barrier, others might]
+        (sb!thread:barrier (:write)
+          (setq newcell (cons nil info)))
+        (loop (let ((old (%compare-and-swap-symbol-info symbol info newcell)))
+                (cond ((eq old info) (return newcell)) ; win
+                      ((consp old) (return old))) ; somebody else made a cons!
+                (setq info old)
+                (sb!thread:barrier (:write) ; Retry using same newcell
+                  (rplacd newcell info)))))))
+
+(declaim (inline %compare-and-swap-symbol-plist
+                 %set-symbol-plist))
+
+(defun %compare-and-swap-symbol-plist (symbol old new)
+  ;; This is the entry point into which (CAS SYMBOL-PLIST) is transformed.
+  ;; If SYMBOL's info cell is a cons, we can do (CAS CAR). Otherwise punt.
+  (declare (symbol symbol) (list old new))
+  (let ((cell (symbol-info symbol)))
+    (if (consp cell)
+        (%compare-and-swap-car cell old new)
+        (%%compare-and-swap-symbol-plist symbol old new))))
+
+(defun %%compare-and-swap-symbol-plist (symbol old new)
+  ;; This is just the second half of a partially-inline function, to avoid
+  ;; code bloat in the exceptional case.  Type assertions should have been
+  ;; done - or not, per policy - by the caller of %COMPARE-AND-SWAP-SYMBOL-PLIST
+  ;; so now use TRULY-THE to avoid further type checking.
+  (%compare-and-swap-car (%ensure-plist-holder (truly-the symbol symbol)
+                                               (symbol-info symbol))
+                         old new))
 
 (defun %set-symbol-plist (symbol new-value)
-  (setf (symbol-plist symbol) new-value))
+  ;; This is the entry point into which (SETF SYMBOL-PLIST) is transformed.
+  ;; If SYMBOL's info cell is a cons, we can do (SETF CAR). Otherwise punt.
+  (declare (symbol symbol) (list new-value))
+  (let ((cell (symbol-info symbol)))
+    (if (consp cell)
+        (setf (car cell) new-value)
+        (%%set-symbol-plist symbol new-value))))
+
+(defun %%set-symbol-plist (symbol new-value)
+  ;; Same considerations as for %%COMPARE-AND-SWAP-SYMBOL-PLIST,
+  ;; with a slight efficiency hack: if the symbol has no plist holder cell
+  ;; and the NEW-VALUE is NIL, try to avoid creating a holder cell.
+  ;; Yet we must write something, because omitting a memory operation
+  ;; could have a subtle effect in the presence of multi-threading.
+  (let ((info (symbol-info (truly-the symbol symbol))))
+    (when (and (not new-value) (atom info)) ; try to treat this as a no-op
+      (let ((old (%compare-and-swap-symbol-info symbol info info)))
+        (if (eq old info) ; good enough
+            (return-from %%set-symbol-plist new-value) ; = nil
+            (setq info old))))
+    (setf (car (%ensure-plist-holder symbol info)) new-value)))
+
+;;; End of Info/Plist slot manipulation
 
 (defun symbol-name (symbol)
   #!+sb-doc

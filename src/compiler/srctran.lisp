@@ -4879,8 +4879,7 @@
 
 (defknown set-info-value (t type-number t) t)
 
-;; An optimizer to help FDEFINITION-OBJECT and other things derive that
-;; SET-INFO-VALUE always returns the type of its NEWVAL argument.
+;; An optimizer to derive that SET-INFO-VALUE always returns NEWVAL's type.
 ;; Using `(TRULY-THE (VALUES ,(TYPE-INFO-TYPE ...))) in the compiler-macro
 ;; for (SETF INFO) would achieve a similar effect, but this is even better.
 (defoptimizer (set-info-value derive-type) ((name type-number newval))

@@ -251,7 +251,7 @@ been defined. (See SB-EXT:CAS for more information.)
   (def %compare-and-swap-car (cons) car)
   (def %compare-and-swap-cdr (cons) cdr)
   (def %compare-and-swap-instance-ref (instance index) %instance-ref %instance-set)
-  (def %compare-and-swap-symbol-plist (symbol) symbol-plist)
+  (def %compare-and-swap-symbol-info (symbol) symbol-info)
   (def %compare-and-swap-symbol-value (symbol) symbol-value)
   (def %compare-and-swap-svref (vector index) svref))
 

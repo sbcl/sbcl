@@ -551,7 +551,7 @@
   (load-code (read-byte-arg) (read-halfword-arg)))
 
 (define-fop (fop-fdefinition 60)
-  (fdefinition-object (pop-stack) t))
+  (find-or-create-fdefinition (pop-stack)))
 
 (define-fop (fop-known-fun 65)
   (%coerce-name-to-fun (pop-stack)))

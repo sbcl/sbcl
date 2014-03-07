@@ -25,6 +25,7 @@
 ;;; FIXME: Are there other tables that need to have entries removed?
 ;;; What about symbols of the form DEF!FOO?
 (defun !unintern-init-only-stuff ()
+  ;; FIXME: I can't see how this wouldn't converge in 1 pass to a fixed point
   (do ((any-changes? nil nil))
       (nil)
     (dolist (package (list-all-packages))
@@ -35,13 +36,6 @@
                          (string= name "*!" :end1 2 :end2 2)))
             (/show0 "uninterning cold-init-only symbol..")
             (/primitive-print name)
-            ;; FIXME: Is this (FIRST (LAST *INFO-ENVIRONMENT*)) really
-            ;; meant to be an idiom to use?  Is there a more obvious
-            ;; name for this? [e.g. (GLOBAL-ENVIRONMENT)?]
-            (do-info ((first (last *info-environment*))
-                            :name entry :class class :type type)
-              (when (eq entry symbol)
-                (clear-info class type entry)))
             (unintern symbol package)
             (setf any-changes? t)))))
     (unless any-changes?

@@ -330,11 +330,10 @@
   ;; care for this reason, as hash values must be fixnums.
   (hash :set-trans %set-symbol-hash)
 
-  (plist :ref-trans symbol-plist
-         :set-trans %set-symbol-plist
-         :cas-trans %compare-and-swap-symbol-plist
-         :type list
-         :init :null)
+  (info :ref-trans symbol-info :ref-known (flushable)
+        :cas-trans %compare-and-swap-symbol-info
+        :type (or simple-vector list)
+        :init :null)
   (name :ref-trans symbol-name :init :arg)
   (package :ref-trans symbol-package
            :set-trans %set-symbol-package

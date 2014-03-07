@@ -324,9 +324,11 @@
     (tai #'cons :heap
          ;; FIXME: This is the canonical GENCGC result. On PPC we sometimes get
          ;; :LARGE T, which doesn't seem right -- but ignore that for now.
+         ;; Also the :write-protected value NIL, indicating that the page
+         ;; has been written, seems ok to me, so ignore that too.
          `(:space :dynamic :generation ,sb-vm:+pseudo-static-generation+
-           :write-protected t :boxed t :pinned nil :large nil)
-         :ignore (list :page #+ppc :large))
+           :boxed t :pinned nil :large nil)
+         :ignore (list :page :write-protected #+ppc :large))
     #-gencgc
     (tai :cons :heap
          ;; FIXME: Figure out what's the right cheney-result. SPARC at least

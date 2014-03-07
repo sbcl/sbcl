@@ -95,6 +95,8 @@
 (defknown %set-symbol-hash (symbol hash)
   t ())
 
+(defknown symbol-info-vector (symbol) (or null simple-vector))
+
 (defknown initialize-vector ((simple-array * (*)) &rest t)
   (simple-array * (*))
   (always-translatable flushable)

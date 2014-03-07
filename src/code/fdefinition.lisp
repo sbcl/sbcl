@@ -52,29 +52,43 @@
 
 ;;; Return the fdefn object for NAME. If it doesn't already exist and
 ;;; CREATE is non-NIL, create a new (unbound) one.
+;;; There is really no need for this function, but I kept it for 2 reasons:
+;;;  1. it's listed in *C-CALLABLE-STATIC-SYMBOLS* in compiler/generic/params
+;;;  2. it's an external symbol, so perhaps people thought they should use it
+;;; However in every use within the system's Lisp code, the second argument
+;;; is constantly T or NIL, and I feel that 'find-or-create-' is a better
+;;; name for what it does when create=T than is 'fdefinition-object'.
 (defun fdefinition-object (name create)
   (declare (values (or fdefn null)))
   (legal-fun-name-or-type-error name)
-  (let ((fdefn (info :function :definition name)))
-    (if (and (null fdefn) create)
-        (setf (info :function :definition name) (make-fdefn name))
-        fdefn)))
+  (if create
+      (find-or-create-fdefinition name)
+      (find-fdefinition name)))
+
+(defun find-or-create-fdefinition (name)
+  ;; Why can't the compiler derive (OR (OR FDEFN NULL) FDEFN) = FDEFN ?
+  (declare (values fdefn))
+  (or (find-fdefinition name)
+      ;; If the name was not legal, FIND-FDEFINITION signals an error,
+      ;; so there is no additional pre-creation check.
+      ;; Also FIXME: slight race. No worse than it was though.
+      (setf (info :function :definition name) (make-fdefn name))))
 
 (defun maybe-clobber-ftype (name)
   (unless (eq :declared (info :function :where-from name))
     (clear-info :function :type name)))
 
-;;; Return the fdefinition of NAME, including any encapsulations.
+;;; Return the fdefn-fun of NAME's fdefinition including any encapsulations.
 ;;; The compiler emits calls to this when someone tries to FUNCALL
 ;;; something. SETFable.
 #!-sb-fluid (declaim (inline %coerce-name-to-fun))
 (defun %coerce-name-to-fun (name)
-  (let ((fdefn (fdefinition-object name nil)))
+  (let ((fdefn (find-fdefinition name)))
     (or (and fdefn (fdefn-fun fdefn))
         (error 'undefined-function :name name))))
 (defun (setf %coerce-name-to-fun) (function name)
   (maybe-clobber-ftype name)
-  (let ((fdefn (fdefinition-object name t)))
+  (let ((fdefn (find-or-create-fdefinition name)))
     (setf (fdefn-fun fdefn) function)))
 
 (defun %coerce-callable-to-fun (callable)
@@ -102,7 +116,7 @@
 ;;; encapsulation for identification in case you need multiple
 ;;; encapsulations of the same name.
 (defun encapsulate (name type function)
-  (let ((fdefn (fdefinition-object name nil)))
+  (let ((fdefn (find-fdefinition name)))
     (unless (and fdefn (fdefn-fun fdefn))
       (error 'undefined-function :name name))
     (when (typep (fdefn-fun fdefn) 'generic-function)
@@ -150,7 +164,7 @@
 (defun unencapsulate (name type)
   #!+sb-doc
   "Removes NAME's most recent encapsulation of the specified TYPE."
-  (let* ((fdefn (fdefinition-object name nil))
+  (let* ((fdefn (find-fdefinition name))
          (encap-info (encapsulation-info (fdefn-fun fdefn))))
     (declare (type (or encapsulation-info null) encap-info))
     (when (and fdefn (typep (fdefn-fun fdefn) 'generic-function))
@@ -181,7 +195,7 @@
 
 ;;; Does NAME have an encapsulation of the given TYPE?
 (defun encapsulated-p (name type)
-  (let ((fdefn (fdefinition-object name nil)))
+  (let ((fdefn (find-fdefinition name)))
     (when (and fdefn (typep (fdefn-fun fdefn) 'generic-function))
       (return-from encapsulated-p
         (encapsulated-generic-function-p (fdefn-fun fdefn) type)))
@@ -262,7 +276,7 @@
 
     ;; FIXME: This is a good hook to have, but we should probably
     ;; reserve it for users.
-    (let ((fdefn (fdefinition-object name t)))
+    (let ((fdefn (find-or-create-fdefinition name)))
       ;; *SETF-FDEFINITION-HOOK* won't be bound when initially running
       ;; top level forms in the kernel core startup.
       (when (boundp '*setf-fdefinition-hook*)
@@ -289,7 +303,7 @@
 (defun fboundp (name)
   #!+sb-doc
   "Return true if name has a global function definition."
-  (let ((fdefn (fdefinition-object name nil)))
+  (let ((fdefn (find-fdefinition name)))
     (and fdefn (fdefn-fun fdefn) t)))
 
 (defun fmakunbound (name)
@@ -297,7 +311,7 @@
   "Make NAME have no global function definition."
   (with-single-package-locked-error
       (:symbol name "removing the function or macro definition of ~A")
-    (let ((fdefn (fdefinition-object name nil)))
+    (let ((fdefn (find-fdefinition name)))
       (when fdefn
         (fdefn-makunbound fdefn)))
     (sb!kernel:undefine-fun-name name)

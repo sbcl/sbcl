@@ -1620,7 +1620,7 @@
 ;;; in a symbol object that we know about
 (defparameter *grokked-symbol-slots*
   (sort (copy-list `((,sb!vm:symbol-value-slot . symbol-value)
-                     (,sb!vm:symbol-plist-slot . symbol-plist)
+                     (,sb!vm:symbol-info-slot . symbol-info)
                      (,sb!vm:symbol-name-slot . symbol-name)
                      (,sb!vm:symbol-package-slot . symbol-package)))
         #'<

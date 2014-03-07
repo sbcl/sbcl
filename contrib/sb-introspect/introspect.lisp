@@ -643,16 +643,44 @@ constant pool."
     (function
      (sb-kernel::%fun-fun functoid))))
 
+;; Call FUNCTION with two args, NAME and VALUE, for each value that is
+;; either the FDEFINITION or MACRO-FUNCTION of some global name.
+;;
+(defun call-with-each-global-functional (function)
+  (macrolet ((maybe-call-function ()
+               `(when (or (and (eq type-number (info-num :definition))
+                               (not (eq (sb-int:info :function :kind name)
+                                        :macro)))
+                          (eq type-number (info-num :macro-function)))
+                  (funcall function name value)))
+             (info-num (type)
+               (sb-c::type-info-number
+                (sb-c::type-info-or-lose :function type))))
+    ;; Pass 1 is for symbols. WITH-PACKAGE-ITERATOR helps avoid the problem
+    ;; of duplicate symbols, since we can compare the fourth value against
+    ;; the symbol's home package.
+    (with-package-iterator (iterate (list-all-packages) :internal :external)
+      (loop
+         (multiple-value-bind (foundp sym access package) (iterate)
+           (declare (ignore access))
+           (cond ((not foundp) (return))
+                 ((eq (symbol-package sym) package)
+                  (sb-c::call-with-each-info (lambda (name type-number value)
+                                               (maybe-call-function))
+                                             sym))))))
+    ;; Pass 2 is over global environments. This is slightly wrong, as newer env
+    ;; structures shadow older ones, but a name/type can be found in several.
+    ;; We should suppress dups somehow. It doesn't matter for fdefinitions,
+    ;; because they are permanently attached to their name in globaldb,
+    ;; but anomalies are possible with macros.
+    (dolist (env sb-c::*info-environment*)
+      (sb-c::do-info (env :type-number type-number :name name :value value)
+        (maybe-call-function)))))
+
 (defun collect-xref (kind-index wanted-name)
   (let ((ret nil))
-    (dolist (env sb-c::*info-environment* ret)
-      ;; Loop through the infodb ...
-      (sb-c::do-info (env :class class :type type :name info-name
-                          :value value)
-        ;; ... looking for function or macro definitions
-        (when (and (eql class :function)
-                   (or (eql type :macro-function)
-                       (eql type :definition)))
+    (call-with-each-global-functional
+     (lambda (info-name value)
           ;; Get a simple-fun for the definition, and an xref array
           ;; from the table if available.
           (let* ((simple-fun (get-simple-fun value))
@@ -672,7 +700,8 @@ constant pool."
                          (setf (definition-source-form-path source-location)
                                xref-path)
                          (push (cons info-name source-location)
-                               ret))))))))))
+                               ret)))))))
+    ret))
 
 (defun who-calls (function-name)
   "Use the xref facility to search for source locations where the

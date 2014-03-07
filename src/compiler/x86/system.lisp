@@ -233,6 +233,43 @@
                                             fun-pointer-lowtag))
     (storew temp function simple-fun-self-slot fun-pointer-lowtag)
     (move result new-self)))
+
+;;;; symbol frobbing
+
+;; only define if the feature is enabled to test building without it
+#!+symbol-info-vops
+(progn
+(define-vop (symbol-info-vector)
+  (:policy :fast-safe)
+  (:translate symbol-info-vector)
+  (:args (x :scs (descriptor-reg)))
+  (:results (res :scs (descriptor-reg)))
+  (:temporary (:sc unsigned-reg :offset eax-offset) eax)
+  (:generator 1
+    (loadw res x symbol-info-slot other-pointer-lowtag)
+    ;; If RES has list-pointer-lowtag, take its CDR. If not, use it as-is.
+    ;; This CMOV safely reads from memory when it does not move, because if
+    ;; there is an info-vector in the slot, it has at least one element.
+    ;; This would compile to almost the same code without a VOP,
+    ;; but using a jmp around a mov instead.
+    (inst lea eax (make-ea :dword :base res :disp (- list-pointer-lowtag)))
+    (emit-optimized-test-inst eax lowtag-mask)
+    (inst cmov :e res
+          (make-ea-for-object-slot res cons-cdr-slot list-pointer-lowtag))))
+(define-vop (symbol-plist)
+  (:policy :fast-safe)
+  (:translate symbol-plist)
+  (:args (x :scs (descriptor-reg)))
+  (:results (res :scs (descriptor-reg)))
+  (:temporary (:sc unsigned-reg) temp)
+  (:generator 1
+    (loadw res x symbol-info-slot other-pointer-lowtag)
+    ;; Instruction pun: (CAR x) is the same as (VECTOR-LENGTH x)
+    ;; so if the info slot holds a vector, this gets a fixnum- it's not a plist.
+    (loadw res res cons-car-slot list-pointer-lowtag)
+    (inst mov temp nil-value)
+    (emit-optimized-test-inst res fixnum-tag-mask)
+    (inst cmov :e res temp))))
 
 ;;;; other miscellaneous VOPs
 

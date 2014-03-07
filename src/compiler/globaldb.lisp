@@ -94,12 +94,6 @@
 ;;;; restart compilation from the very beginning of the bootstrap
 ;;;; process.
 
-;;; At run time, we represent the type of info that we want by a small
-;;; non-negative integer.
-(eval-when (:compile-toplevel :load-toplevel :execute)
-  (def!constant type-number-bits 6))
-(deftype type-number () `(unsigned-byte ,type-number-bits))
-
 ;;; Why do we suppress the :COMPILE-TOPLEVEL situation here when we're
 ;;; running the cross-compiler? The cross-compiler (which was built
 ;;; from these sources) has its version of these data and functions
@@ -343,14 +337,13 @@
 
 ;;;; generic info environments
 
-(defstruct (info-env (:constructor nil)
-                     (:copier nil))
+(defstruct (basic-info-env (:constructor nil) (:copier nil))
   ;; some string describing what is in this environment, for
   ;; printing/debugging purposes only
   (name (missing-arg) :type string))
-(def!method print-object ((x info-env) stream)
+(def!method print-object ((x basic-info-env) stream)
   (print-unreadable-object (x stream :type t)
-    (prin1 (info-env-name x) stream)))
+    (prin1 (basic-info-env-name x) stream)))
 
 ;;;; generic interfaces
 
@@ -462,7 +455,7 @@
 ;;; not allowed, we don't have to worry about deleted entries. We
 ;;; indirect through a parallel vector to find the index in the
 ;;; ENTRIES at which the entries for a given name starts.
-(defstruct (compact-info-env (:include info-env)
+(defstruct (compact-info-env (:include basic-info-env)
                              #-sb-xc-host (:pure :substructure)
                              (:copier nil))
   ;; hashtable of the names in this environment. If a bucket is
@@ -531,9 +524,7 @@
                                  env
                                  type-number
                                  (aref (compact-info-env-index env) probe))))))))
-      (if (symbolp name)
-          (lookup eq)
-          (lookup equal)))))
+          (lookup equal))))
 
 ;; Find and return the value for (TYPE-NUMBER,NAME) in compact ENV
 ;; given also the HASH of NAME, and returning as a secondary value
@@ -564,7 +555,7 @@
 
 ;;; Return a new compact info environment that holds the same
 ;;; information as ENV.
-(defun compact-info-environment (env &key (name (info-env-name env)))
+(defun compact-info-environment (env &key (name (basic-info-env-name env)))
   (let ((name-count 0)
         (prev-name 0)
         (entry-count 0))
@@ -664,7 +655,7 @@
 
 ;;; This is a closed hashtable, with the bucket being computed by
 ;;; taking the GLOBALDB-SXHASHOID of the NAME modulo the table size.
-(defstruct (volatile-info-env (:include info-env)
+(defstruct (volatile-info-env (:include basic-info-env)
                               (:copier nil))
   ;; vector of alists of alists of the form:
   ;;    ((Name . ((Type-Number . Value) ...) ...)
@@ -719,6 +710,102 @@
       (error "cannot modify this environment: ~S" env))
     (the volatile-info-env env)))
 
+(declaim (ftype (function (simple-vector (or symbol (eql 0)) type-number)
+                          (or null index))
+                packed-info-value-index))
+
+;;; Some of this stuff belongs in 'symbol.lisp', but is here
+;;; because 'symbol.lisp' is :NOT-HOST in build-order.
+
+;; Return the globaldb info for SYMBOL. With respect to the state diagram
+;; presented at the definition of SYMBOL-PLIST, if the object in SYMBOL's
+;; info slot is LISTP, it is in state 1 or 3. Either way, take the CDR.
+;; Otherwise, it is in state 2 so return the value as-is.
+;; In terms of this function being named "-vector", implying always a vector,
+;; it is understood that NIL is a proxy for +NIL-PACKED-INFOS+, a vector.
+;;
+#!-symbol-info-vops (declaim (inline symbol-info-vector))
+(defun symbol-info-vector (symbol)
+  (let ((info-holder (symbol-info symbol)))
+    (truly-the (or null simple-vector)
+               (if (listp info-holder) (cdr info-holder) info-holder))))
+
+;; Atomically update SYMBOL's info/plist slot to contain a new info vector.
+;; The vector is computed by calling UPDATE-FN on the old vector,
+;; repeatedly as necessary, until no conflict happens with other updaters.
+
+#+sb-xc-host
+;; In the Host Lisp, there is no such thing as a symbol-info slot,
+;; even if the host is SBCL. Instead, symbol-info is kept in the symbol-plist.
+(macrolet ((get-it () '(get symbol :sb-xc-globaldb-info)))
+  (defun symbol-info (symbol) (get-it))
+  (defun update-symbol-info (symbol update-fn)
+    ;; Never pass NIL to an update-fn. Pass the minimal info-vector instead,
+    ;; a vector describing 0 infos and 0 auxilliary keys.
+    (let ((newval (funcall update-fn (or (get-it) +nil-packed-infos+))))
+      (when newval
+        (setf (get-it) newval))
+      (values))))
+
+#-sb-xc-host
+(defun update-symbol-info (symbol update-fn)
+  (declare (symbol symbol)
+           (type (function (t) t) update-fn))
+  (let* ((info-holder (symbol-info symbol))
+         ;; Do not use SYMBOL-INFO-VECTOR here. We must always refer to the
+         ;; value most recently read from the info slot,
+         ;; because only that way can three states be distinguished.
+         (current-info (if (listp info-holder) (cdr info-holder) info-holder)))
+    (loop
+       ;; KLUDGE: The "#." on +nil-packed-infos+ is due to slightly crippled
+       ;; fops in genesis's fasload. Anonymizing the constant works around the
+       ;; issue, at the expense of an extra copy of the empty info vector.
+       (let ((new-vect (funcall update-fn
+                                (or current-info #.+nil-packed-infos+))))
+         (when (null new-vect) (return)) ; nothing to do
+         (if (consp info-holder) ; State 3: exchange the CDR
+             (let ((old
+                    (%compare-and-swap-cdr info-holder current-info new-vect)))
+               (if (eq old current-info) (return)) ; win
+               (setq current-info old)) ; Don't touch holder- it's still a cons
+             ;; State 1 or 2: info-holder is NIL or a vector.
+             (let ((old ; Exchange the contents of the info slot.
+                    (%compare-and-swap-symbol-info
+                     symbol info-holder new-vect)))
+               (if (eq old info-holder) (return)) ; win
+               ;; Check whether we're in state 2 or 3 now.
+               ;; Impossible to be in state 1: nobody ever puts NIL in the slot.
+               ;; Up above, we bailed out if the update-fn returned NIL.
+               ;; See also ({SETF|CAS} SYMBOL-PLIST) for their invariant.
+               (setq info-holder old
+                     current-info (if (listp old) (cdr old) old)))))))
+  (values))
+
+;; Helper for SET-INFO-VALUE to update packed info vectors.
+;; If NAME is one that supports storage of its infos in a symbol-info cell,
+;; then do the update and return T. Otherwise return NIL.
+;;
+;; If the old info can be updated without unpacking/repacking, then copy it
+;; and do the update; otherwise unpack, grow the vector, and repack.
+;; Truly in-place updates are never permitted due to the very minimal lockfree
+;; protocol. Since info vectors are short, it's ok that the old one is discarded
+;; every time a value is written. A more intricate lockfree protocol would
+;; allow re-use of the vector when changing the value in an existing cell.
+;;
+(declaim (ftype (sfunction (t type-number t) boolean) symbol-set-info-value))
+(defun symbol-set-info-value (name type-number new-value)
+  (with-possibly-compound-name (key1 key2) name
+    (dx-flet ((update (vect) ; VECT is a packed vector, never NIL
+                (declare (simple-vector vect))
+                (let ((index (packed-info-value-index vect key2 type-number)))
+                  (if (not index)
+                      (packed-info-insert vect key2 type-number new-value)
+                      (let ((copy (copy-seq vect)))
+                        (setf (svref copy index) new-value)
+                        copy)))))
+      (update-symbol-info key1 #'update)
+      (return-from symbol-set-info-value t))))
+
 ;;; If Name is already present in the table, then just create or
 ;;; modify the specified type. Otherwise, add the new name and type,
 ;;; checking for rehashing.
@@ -738,9 +825,7 @@
                (declare (type type-number type)
                          (type volatile-info-env env))
                (with-info-bucket (table index name env)
-                 (let ((types (if (symbolp name)
-                                  (assoc name (svref table index) :test #'eq)
-                                  (assoc name (svref table index) :test #'equal))))
+                 (let ((types (assoc name (svref table index) :test #'equal)))
                    (cond
                      (types
                       (let ((value (assoc type (cdr types))))
@@ -762,7 +847,8 @@
                                   (volatile-info-env-table new))
                             (setf (volatile-info-env-threshold env)
                                   (volatile-info-env-threshold new)))))))))))
-      (set-it name type new-value (get-write-info-env)))
+      (or (symbol-set-info-value name type new-value)
+          (set-it name type new-value (get-write-info-env))))
     new-value))
 
 ;;; INFO is the standard way to access the database. It's settable.
@@ -790,6 +876,11 @@
 
 (defun clear-info-value (name type &aux anything-cleared-p)
   (declare (type type-number type) (inline assoc))
+  (with-possibly-compound-name (key1 key2) name
+    (let (new)
+      (dx-flet ((update (old) (setq new (packed-info-remove old key2 type))))
+        (update-symbol-info key1 #'update))
+      (return-from clear-info-value (not (null new)))))
   ;; Clear the frontmost environment.
   (with-info-bucket (table index name (get-write-info-env))
     (let ((types (assoc name (svref table index) :test #'equal)))
@@ -839,34 +930,98 @@
 ;;; has it defined, or return the default if none does. We used to
 ;;; do a lot of complicated caching here, but that was removed for
 ;;; thread-safety reasons.
-(defun get-info-value (name0 type-number)
-  (declare (type type-number type-number))
+(declaim (ftype (sfunction (t type-number) (values t boolean))
+                get-info-value hash-get-info-value))
+(macrolet ((default ()
+             `(let ((val (type-info-default metainfo)))
+                (values (if (functionp val) (funcall val name) val) nil))))
+  (defun hash-get-info-value (name0 type-number)
   ;; sanity check: If we have screwed up initialization somehow, then
   ;; *INFO-TYPES* could still be uninitialized at the time we try to
   ;; get an info value, and then we'd be out of luck. (This happened,
   ;; and was confusing to debug, when rewriting EVAL-WHEN in
   ;; sbcl-0.pre7.x.)
-  (aver (aref *info-types* type-number))
+    (let* ((metainfo (aref *info-types* type-number))
+           (name (uncross name0))
+           (hash (globaldb-sxhashoid name)))
+      (aver metainfo)
+      (dolist (env *info-environment* (default))
+        (multiple-value-bind (value winp)
+            (etypecase env
+              (volatile-info-env
+               (volatile-info-lookup env type-number name hash))
+              (compact-info-env
+               (compact-info-lookup env type-number name hash)))
+          (when winp (return (values value winp)))))))
+
+  (defun get-info-value (name0 type-number) ; general entry point
+    (declare (type type-number type-number))
+    (let ((metainfo (aref *info-types* type-number))
+          (name (uncross name0)))
+      (aver metainfo)
+      (with-possibly-compound-name (key1 key2) name
+        (let ((vector (symbol-info-vector key1)))
+          (when vector
+            (awhen (packed-info-value-index vector key2 type-number)
+              (return-from get-info-value
+                (values (svref vector it) t)))))
+        (return-from get-info-value (default))))
+    (hash-get-info-value name0 type-number)))
+
+;; Return the fdefn object for NAME, or NIL if there is no fdefn.
+;; Signal an error if name isn't valid.
+;; Trying to get this to work properly in file 'fdefinition.lisp'
+;; was an exercise in futility.
+;; Creation of new fdefinitions is still defined there though.
+;; Assume that exists-p implies LEGAL-FUN-NAME-P.
+;;
+(defun find-fdefinition (name0)
+  ;; Maybe we should proclaim VALUES as a declaration in 'cross-foo.lisp' ?
+  #-sb-xc-host(declare (values (or fdefn null)))
+  ;; Since this emulates GET-INFO-VALUE, we have to uncross the name.
   (let ((name (uncross name0)))
-    (flet ((lookup (env-list)
-             (dolist (env env-list
-                      (values (let ((val (type-info-default
-                                          (svref *info-types* type-number))))
-                                (if (functionp val) (funcall val name) val))
-                              nil))
-               (macrolet ((frob (lookup)
-                            `(let ((hash (globaldb-sxhashoid name)))
-                               (multiple-value-bind (value winp)
-                                   (,lookup env type-number name hash)
-                                 (when winp (return (values value t)))))))
-                 (etypecase env
-                   (volatile-info-env (frob volatile-info-lookup))
-                   (compact-info-env (frob compact-info-lookup)))))))
-      (lookup *info-environment*))))
+    (declare (optimize (safety 0)))
+    (when (symbolp name) ; Don't bother with LEGAL-FUN-NAME-P.
+      (return-from find-fdefinition
+        (awhen (symbol-info-vector name)
+          (let ((word (the fixnum (svref it 0))))
+            ;; Require the first type-number to be +fdefn-type-num+
+            ;; and the n-infos field to be nonzero.
+            ;; No info vector has fewer than one element, so this code is safe.
+            (and (eql (mask-field (byte type-number-bits type-number-bits) word)
+                      (ash +fdefn-type-num+ type-number-bits))
+                 (ldb-test (byte type-number-bits 0) word)
+                 (svref it (1- (length it))))))))
+    (with-compound-name (key1 key2) name
+      (awhen (symbol-info-vector key1)
+        (multiple-value-bind (data-idx descriptor-idx field-idx)
+            (info-find-aux-key/packed it key2)
+          (declare (index descriptor-idx)
+                   (type (integer 0 #.+infos-per-word+) field-idx))
+          ;; Secondary names must have at least one info, so if a descriptor
+          ;; exists, there's no need to extract the n-infos field.
+          (when data-idx
+            (when (eql (incf field-idx) +infos-per-word+)
+              (setq field-idx 0 descriptor-idx (1+ descriptor-idx)))
+            (when (eql (packed-info-field it descriptor-idx field-idx)
+                       +fdefn-type-num+)
+              (return-from find-fdefinition
+                (aref it (1- (the index data-idx))))))))
+      (return-from find-fdefinition
+        ;; (SETF SYM) needs no extra test. Otherwise check legality.
+        (if (eq key1 'setf) nil (legal-fun-name-or-type-error name0))))
+    (or (hash-get-info-value name0 +fdefn-type-num+)
+        (legal-fun-name-or-type-error name0))))
+
 
 ;;;; definitions for function information
 
 (define-info-class :function)
+
+;; must be info type number 1
+(define-info-type (:function :definition) :type-spec (or fdefn null))
+(eval-when (:compile-toplevel)
+  (aver (= 1 (type-info-number (type-info-or-lose :function :definition)))))
 
 ;;; the kind of functional object being described. If null, NAME isn't
 ;;; a known functional object.
@@ -972,7 +1127,6 @@
 ;;; structure containing the info used to special-case compilation.
 (define-info-type (:function :info) :type-spec (or fun-info null))
 
-(define-info-type (:function :definition) :type-spec (or fdefn null))
 (define-info-type (:function :structure-accessor)
   :type-spec (or defstruct-description null))
 
@@ -1114,7 +1268,30 @@
 (define-info-type (:source-location :typed-structure) :type-spec t)
 (define-info-type (:source-location :symbol-macro) :type-spec t)
 
-#!-sb-fluid (declaim (freeze-type info-env))
+#!-sb-fluid (declaim (freeze-type basic-info-env))
+
+;; This is for the SB-INTROSPECT contrib module, and debugging.
+(defun call-with-each-info (function symbol)
+  (awhen (symbol-info-vector symbol)
+    (%call-with-each-info function it symbol)))
+
+;; This is for debugging at the REPL.
+(defun show-info (sym)
+  (let ((prev 0))
+    (call-with-each-info
+     (lambda (name type-num val)
+       (unless (eq name prev)
+         (format t "~&~S" (setq prev name)))
+       (let ((type (svref *info-types* type-num)))
+         (format t "~&  ~@[type ~D~]~@[~{~S ~S~}~] ~S = "
+                 (if (not type) type-num)
+                 (if type
+                     (list (class-info-name (type-info-class type))
+                           (type-info-name type)))
+                 name)
+         (write val :level 1)))
+     sym)))
+
 
 ;;; Now that we have finished initializing *INFO-CLASSES* and
 ;;; *INFO-TYPES* (at compile time), generate code to set them at cold
