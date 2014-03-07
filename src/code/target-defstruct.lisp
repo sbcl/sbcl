@@ -138,8 +138,6 @@
 
   (/show0 "entering %TARGET-DEFSTRUCT")
 
-  (remhash (dd-name dd) *typecheckfuns*)
-
   (when (dd-doc dd)
     (setf (fdocumentation (dd-name dd) 'structure)
           (dd-doc dd)))

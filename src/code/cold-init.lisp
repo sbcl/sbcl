@@ -114,7 +114,6 @@
   (show-and-call !eval-cold-init)
   (show-and-call !deadline-cold-init)
   (show-and-call thread-init-or-reinit)
-  (show-and-call !typecheckfuns-cold-init)
 
   ;; Anyone might call RANDOM to initialize a hash value or something;
   ;; and there's nothing which needs to be initialized in order for

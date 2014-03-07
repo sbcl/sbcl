@@ -400,7 +400,6 @@
  ("src/compiler/proclaim")
 
  ("src/code/class-init")
- ("src/code/typecheckfuns")
 
  ;; The DEFSTRUCT machinery needs SB!XC:SUBTYPEP, defined in
  ;; "code/late-type", and SB!XC:TYPEP, defined in "code/cross-type",

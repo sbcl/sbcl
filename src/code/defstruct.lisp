@@ -1036,7 +1036,6 @@
   (let ((info (layout-info (classoid-layout classoid))))
     (when (defstruct-description-p info)
       (let ((type (dd-name info)))
-        (remhash type *typecheckfuns*)
         (clear-info :type :compiler-layout type)
         (undefine-fun-name (dd-copier-name info))
         (undefine-fun-name (dd-predicate-name info))
