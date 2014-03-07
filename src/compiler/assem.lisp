@@ -1572,6 +1572,7 @@
                (setf vop-var (car args))))
           (:printer
            (sb!int:/noshow "uniquifying :PRINTER with" args)
+           #-sb-xc-host
            (push (eval `(list (multiple-value-list
                                ,(sb!disassem:gen-printer-def-forms-def-form
                                  name
@@ -1582,6 +1583,7 @@
           (:printer-list
            ;; same as :PRINTER, but is EVALed first, and is a list of
            ;; printers
+           #-sb-xc-host
            (push
             (eval
              `(eval
