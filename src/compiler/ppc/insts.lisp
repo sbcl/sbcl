@@ -386,10 +386,6 @@
   (op :field (byte 6 26))
   (other :field (byte 26 0)))
 
-(sb!disassem:define-instruction-format (xinstr 32 :default-printer '(:name :tab data))
-  (op-to-a :field (byte 16 16))
-  (data :field (byte 16 0) :reader xinstr-data))
-
 (sb!disassem:define-instruction-format (sc 32 :default-printer '(:name :tab rest))
   (op :field (byte 6 26))
   (rest :field (byte 26 0) :value 2))
@@ -574,6 +570,9 @@
 (def-ppc-iformat (m-sh '(:name :tab ra "," rs "," sh "," mb "," me))
   rs ra sh mb me rc)))
 
+(sb!disassem:define-instruction-format (xinstr 32 :default-printer '(:name :tab data))
+  (op-to-a :field (byte 16 16))
+  (data :field (byte 16 0) :reader xinstr-data))
 
 
 
