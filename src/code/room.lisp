@@ -315,10 +315,7 @@
 
 ;;; Iterate over all the objects allocated in SPACE, calling FUN with
 ;;; the object, the object's type code, and the object's total size in
-;;; bytes, including any header and padding. CAREFUL makes
-;;; MAP-ALLOCATED-OBJECTS slightly more accurate, but a lot slower: it
-;;; is intended for slightly more demanding uses of heap groveling
-;;; then ROOM.
+;;; bytes, including any header and padding.
 #!-sb-fluid (declaim (maybe-inline map-allocated-objects))
 (defun map-allocated-objects (fun space)
   (declare (type function fun)
