@@ -480,7 +480,7 @@
 ;; FDEFINITIONs can be looked up from C runtime given an info-vector,
 ;; so the type-number must be wired. Using genesis machinery to define
 ;; the constant for C would be overkill, as it's the only special case.
-(defconstant +fdefn-type-num+ 1)
+(def!constant +fdefn-type-num+ 1)
 
 ;; Extract a field from a packed info descriptor.
 ;; A field is either a count of type-numbers, or a type-number.

@@ -80,7 +80,9 @@ distinct from the global value. Can also be SETF."
 (defun symbol-function (symbol)
   #!+sb-doc
   "Return SYMBOL's current function definition. Settable with SETF."
-  (%coerce-name-to-fun symbol))
+  (let ((fdefn (symbol-fdefinition symbol)))
+    (or (and fdefn (fdefn-fun (truly-the fdefn fdefn)))
+        (error 'undefined-function :name symbol))))
 
 (defun (setf symbol-function) (new-value symbol)
   (declare (type symbol symbol) (type function new-value))

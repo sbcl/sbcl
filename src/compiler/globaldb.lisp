@@ -975,17 +975,8 @@
   ;; Since this emulates GET-INFO-VALUE, we have to uncross the name.
   (let ((name (uncross name0)))
     (declare (optimize (safety 0)))
-    (when (symbolp name) ; Don't bother with LEGAL-FUN-NAME-P.
-      (return-from find-fdefinition
-        (awhen (symbol-info-vector name)
-          (let ((word (the fixnum (svref it 0))))
-            ;; Require the first type-number to be +fdefn-type-num+
-            ;; and the n-infos field to be nonzero.
-            ;; No info vector has fewer than one element, so this code is safe.
-            (and (eql (mask-field (byte type-number-bits type-number-bits) word)
-                      (ash +fdefn-type-num+ type-number-bits))
-                 (ldb-test (byte type-number-bits 0) word)
-                 (svref it (1- (length it))))))))
+    (when (symbolp name) ; Don't need LEGAL-FUN-NAME-P check
+      (return-from find-fdefinition (sb!impl::symbol-fdefinition name)))
     (with-compound-name (key1 key2) name
       (awhen (symbol-info-vector key1)
         (multiple-value-bind (data-idx descriptor-idx field-idx)
