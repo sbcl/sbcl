@@ -716,6 +716,17 @@
 ;; efficient since the temporary vector is stack-allocated.
 ;;
 (defun packed-info-insert (input aux-key type-number value)
+  (declare (simple-vector input) (type-number type-number))
+  ;; Special case of inserting into an empty vector.
+  ;; Actually I can do better than this - any insertion into a vector
+  ;; with zero aux-keys and one descriptor that has room for at least
+  ;; one more field could be done without too much trouble.
+  ;; (It's when the descriptor is full that we have to think about it)
+  (when (and (eql aux-key +no-auxilliary-key+)
+             (eql (length input) (length +nil-packed-infos+)))
+    (return-from packed-info-insert
+      (vector (logior (ash type-number type-number-bits) 1) ; 1 piece of info
+              value)))
   (let* ((n-extra-elts
           ;; Test if the aux-key has been seen before or needs to be added.
           (if (and (not (eql aux-key +no-auxilliary-key+))
@@ -972,3 +983,49 @@ This is interpreted as
                                ,key1 (car ,rest))
                          (and (symbolp ,key1) (symbolp ,key2) ,rest)))))
          ,@body))))
+
+;; Perform the approximate equivalent operations of retrieving
+;; (INFO :class :type <name>), but if no info is found, invoke CREATION-FORM
+;; to produce an object that becomes the value for that piece of info,
+;; returning it. The entire sequence behaves atomically with the following
+;; proviso: the creation form's result may be discarded, and another object
+;; returned instead (presumably) from another thread's execution
+;; of that same creation form.
+;;
+;; If constructing the object has either non-trivial cost, or deleterious
+;; side-effects from making and discarding its result, do NOT use this macro.
+;; A mutex-guarded table would probably be more appropriate in such cases.
+;;
+;; INFO-CLASS and -TYPE must be keywords, and NAME must evaluate
+;; to a symbol. [Eventually this will accept generalized names]
+;;
+;; FIXME: these does not really seem to belong in SB-C, but that's where
+;; all the other info stuff is. Maybe SB-INT ?
+;;
+(defmacro atomically-get-or-put-symbol-info
+    (info-class info-type name creation-form)
+  (let ((type-num (type-info-number
+                   (type-info-or-lose info-class info-type)))
+        (aux-key +no-auxilliary-key+))
+    (with-unique-names (proc info-vect index result)
+      ;; Concurrent globaldb updates (possibly for unrelated info)
+      ;; can force re-execution of this flet, so try to create an
+      ;; object one time only, and remember that we did that.
+      ;; If CREATION-FORM returns nil - which it shouldn't - the
+      ;; form couldbe repeatedly invoked, because there's no
+      ;; local state variable such as invoked-creation-form-p.
+      `(let (,result)
+         (dx-flet ((,proc (,info-vect)
+                     ;; pre-check
+                     (let ((,index (packed-info-value-index
+                                    ,info-vect ,aux-key ,type-num)))
+                       (cond (,index
+                              (setq ,result (svref ,info-vect ,index))
+                              nil) ; no update to symbol-info-vector
+                             (t
+                              (unless ,result
+                                (setq ,result ,creation-form))
+                              (packed-info-insert
+                               ,info-vect ,aux-key ,type-num ,result))))))
+           (update-symbol-info ,name #',proc)
+           ,result)))))

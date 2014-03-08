@@ -1191,6 +1191,9 @@
 ;;; consed once.
 (define-info-type (:type :builtin) :type-spec (or ctype null))
 
+;;; The classoid-cell for this type
+(define-info-type (:type :classoid-cell) :type-spec t)
+
 ;;; layout for this type being used by the compiler
 (define-info-type (:type :compiler-layout)
   :type-spec (or layout null)

@@ -695,24 +695,18 @@
   ;; PCL class, if any
   (pcl-class nil))
 
-;;; Protected by the hash-table lock, used only in FIND-CLASSOID-CELL.
-(defvar *classoid-cells*)
-(!cold-init-forms
-  (setq *classoid-cells* (make-hash-table :test 'eq)))
-
 (defun find-classoid-cell (name &key create errorp)
-  (let ((table *classoid-cells*)
-        (real-name (uncross name)))
-    (or (with-locked-system-table (table)
-          (or (gethash real-name table)
-              (when create
-                (setf (gethash real-name table) (make-classoid-cell real-name)))))
-        (when errorp
-          (error 'simple-type-error
-                 :datum nil
-                 :expected-type 'class
-                 :format-control "Class not yet defined: ~S"
-                 :format-arguments (list name))))))
+  (let ((real-name (uncross name)))
+    (cond ((info :type :classoid-cell real-name))
+          (create
+           (sb!c::atomically-get-or-put-symbol-info
+            :type :classoid-cell real-name (make-classoid-cell real-name)))
+          (errorp
+           (error 'simple-type-error
+                  :datum nil
+                  :expected-type 'class
+                  :format-control "Class not yet defined: ~S"
+                  :format-arguments (list name))))))
 
 (eval-when (#-sb-xc :compile-toplevel :load-toplevel :execute)
 

@@ -335,4 +335,95 @@
   (test-util:with-test (:name :lockfree-hash-concurrent-consing)
     (test-concurrent-consing)))
 
+;; classoid cells
+
+(in-package "SB-IMPL")
+
+(defglobal *make-classoid-cell-callcount* (make-array 1 :element-type 'sb-ext:word))
+(defglobal *really-make-classoid-cell* #'sb-kernel::make-classoid-cell)
+(without-package-locks
+  (defun sb-kernel::make-classoid-cell (name &optional classoid)
+    (sb-ext:atomic-incf (aref *make-classoid-cell-callcount* 0))
+    (funcall *really-make-classoid-cell* name classoid)))
+
+;; Return a set of symbols to play around with
+(defun classoid-cell-test-get-lotsa-symbols ()
+  (remove-if-not
+   #'symbolp
+   (package-hashtable-table
+    (package-internal-symbols (find-package "SB-C")))))
+
+;; Make every symbol in the test set have a classoid-cell
+(defun be-a-classoid-cell-writer ()
+  (let* ((symbols (classoid-cell-test-get-lotsa-symbols))
+         (result (make-array (length symbols) :initial-element nil)))
+    (loop for s across symbols
+          for i from 0
+          do (setf (aref result i) (find-classoid-cell s :create t)))
+    result))
+
+;; Get the classoid-cells
+(defun be-a-classoid-cell-reader ()
+  (let* ((symbols (classoid-cell-test-get-lotsa-symbols))
+         (result (make-array (length symbols) :initial-element nil)))
+    (dotimes (iter 3)
+      (loop for i below (length symbols)
+            do (pushnew (find-classoid-cell (svref symbols i))
+                        (svref result i))))
+    ;; The thread shall have observed at most two different values
+    ;; for FIND-CLASSOID-CELL - nil and/or a CLASSOID-CELL.
+    ;; For each symbol, if the thread observed a classoid cell, store that.
+    (loop for list across result
+          for i from 0
+          do (let ((observed-value (remove nil list)))
+               (if (cdr observed-value)
+                   (error "Should not happen: find-classoid-cell => ~S" list)
+                   (setf (svref result i) (car observed-value)))))
+    result))
+
+;; Perform some silly updates to plists, because they mess with
+;; the symbol-info slot alongside globaldb writers.
+(defun be-a-plist-writer ()
+  (loop for s across (classoid-cell-test-get-lotsa-symbols)
+        do
+       (loop (let ((old (symbol-plist s)))
+               (when (or (member 'foo old)
+                         (eq (cas (symbol-plist s) old (list* 'foo s old)) old))
+                 (return))))))
+
+#+sb-thread
+(test-util:with-test (:name :info-vector-classoid-cell)
+  (let (readers writers more-threads results)
+    (dotimes (i 5)
+      (push (sb-thread:make-thread #'be-a-classoid-cell-writer) writers))
+    (dotimes (i 5)
+      (push (sb-thread:make-thread #'be-a-classoid-cell-reader) readers)
+      (push (sb-thread:make-thread #'be-a-plist-writer) more-threads))
+    (mapc #'sb-thread:join-thread more-threads)
+    (dolist (thread (append readers writers))
+      (push (sb-thread:join-thread thread) results))
+    (let ((result-vect (make-array 10)))
+      (loop for i below (length (first results))
+            do
+           (dotimes (thread-num 10)
+             (setf (aref result-vect thread-num)
+                   (aref (nth thread-num results) i)))
+           ;; some thread should have observed a classoid-cell
+           (let ((representative (find-if-not #'null result-vect)))
+             ;; For each thread which observed a classoid-cell,
+             ;; assert that the cell is EQ to the representative.
+             (dotimes (thread-num 10)
+               (let ((cell (aref result-vect thread-num)))
+                 (if cell
+                     (assert (eq cell representative))))))))
+    ;; and make sure the property list updates also weren't lost
+    (let ((symbols (classoid-cell-test-get-lotsa-symbols)))
+      (loop for s across symbols
+         do (assert (eq (get s 'foo) s)))
+      ;; a statistic of no real merit, but verifies that
+      ;; the lockfree logic does discard some created objects.
+      (format t "Consed ~D classoid-cells (~D symbols)~%"
+              (aref *make-classoid-cell-callcount* 0)
+              (length symbols)))))
+
 ;;; success

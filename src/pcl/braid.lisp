@@ -683,7 +683,13 @@
 (!bootstrap-class-predicates nil)
 (!bootstrap-built-in-classes)
 
-(dohash ((name x) sb-kernel::*classoid-cells*)
+(loop for (name . x)
+      in (let (classoid-cells)
+           (do-all-symbols (s classoid-cells)
+             (let ((cell (sb-int:info :type :classoid-cell s)))
+               (when cell
+                 (push (cons s cell) classoid-cells)))))
+      do
   (when (classoid-cell-pcl-class x)
     (let* ((class (find-class-from-cell name x))
            (layout (class-wrapper class))
