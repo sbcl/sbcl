@@ -3849,16 +3849,22 @@
     (typecase first
       (single-float (setf constant (list :single-float first)))
       (double-float (setf constant (list :double-float first)))
-      ((complex single-float)
-         (setf constant (list :complex-single-float first)))
-      ((complex double-float)
-         (setf constant (list :complex-double-float first)))
-      #!+sb-simd-pack
-      (#+sb-xc-host nil
-       #-sb-xc-host simd-pack
-         (setf constant (list :sse (logior (%simd-pack-low first)
-                                           (ash (%simd-pack-high first)
-                                                64)))))))
+      .
+      #+sb-xc-host
+      ((complex
+        ;; It's an error (perhaps) on the host to use simd-pack type.
+        ;; [and btw it's disconcerting that this isn't an ETYPECASE.]
+        (error "xc-host can't reference complex float")))
+      #-sb-xc-host
+      (((complex single-float)
+        (setf constant (list :complex-single-float first)))
+       ((complex double-float)
+        (setf constant (list :complex-double-float first)))
+       #!+sb-simd-pack
+       (simd-pack
+        (setq constant
+              (list :sse (logior (%simd-pack-low first)
+                                 (ash (%simd-pack-high first) 64))))))))
   (destructuring-bind (type value) constant
     (ecase type
       ((:byte :word :dword :qword)
