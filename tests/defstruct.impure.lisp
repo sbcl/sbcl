@@ -1188,3 +1188,9 @@ redefinition."
    (defstruct bogus-aux.3 (:constructor make-bogus-aux.3 (&aux (1 b)))))
   (raises-error?
    (defstruct bogus-aux.4 (:constructor make-bogus-aux.4 (&aux 1)))))
+
+(with-test (:name (:defstruct :lexical-default))
+  (let ((x 0)) (defstruct lexical-default (a (incf x)))
+    (assert (= (lexical-default-a (make-lexical-default))
+               x
+               1))))

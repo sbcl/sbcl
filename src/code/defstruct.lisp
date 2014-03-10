@@ -30,14 +30,29 @@
   (let ((layout (info :type :compiler-layout name)))
     (and layout (typep (layout-info layout) 'defstruct-description))))
 
+(sb!xc:defmacro %make-structure-instance-macro (dd slot-specs &rest slot-vars)
+  (if (compiler-layout-ready-p (dd-name dd))
+      `(truly-the ,(dd-name dd)
+                  (%make-structure-instance ,dd ,slot-specs ,@slot-vars))
+      ;; Non-toplevel defstructs don't have a layout at compile time,
+      ;; so we need to construct the actual function at runtime -- but
+      ;; we cache it at the call site, so that we don't perform quite
+      ;; so horribly.
+      `(let* ((cell (load-time-value (list nil)))
+              (fun (car cell)))
+         (if (functionp fun)
+             (funcall fun ,@slot-vars)
+             (funcall (setf (car cell)
+                            (%make-structure-instance-allocator ,dd ,slot-specs))
+                      ,@slot-vars)))))
+
 (declaim (ftype (sfunction (defstruct-description list) function)
                 %make-structure-instance-allocator))
 (defun %make-structure-instance-allocator (dd slot-specs)
   (let ((vars (make-gensym-list (length slot-specs))))
     (values (compile nil
                      `(lambda (,@vars)
-                        (truly-the ,(dd-name dd)
-                                   (%make-structure-instance ,dd ',slot-specs ,@vars)))))))
+                        (%make-structure-instance-macro ,dd ',slot-specs ,@vars))))))
 
 (defun %make-funcallable-structure-instance-allocator (dd slot-specs)
   (when slot-specs
@@ -420,10 +435,12 @@
                      ,(list* 'progn
                              (copier-definition dd)
                              (predicate-definition dd)
-                             (append
-                              (constructor-definitions dd)
-                              (accessor-definitions dd)
-                              (class-method-definitions dd)))))
+                             (accessor-definitions dd))))
+                ;; This must be in the same lexical environment
+                ,@(unless expanding-into-code-for-xc-host-p
+                      (append
+                       (constructor-definitions dd)
+                       (class-method-definitions dd)))
 
                 ;; Various other operations only make sense on the target SBCL.
                 #-sb-xc-host
@@ -1467,8 +1484,7 @@
                    values)))
      `(defun ,cons-name ,arglist
         ,@(when decls `((declare ,@decls)))
-        (truly-the ,(dd-name dd)
-                   (%make-structure-instance ,dd ',slot-specs ,@(reverse slot-values)))))
+        (%make-structure-instance-macro ,dd ',slot-specs ,@(reverse slot-values))))
    #!-raw-instance-init-vops
    (let ((instance (gensym "INSTANCE")) slot-values slot-specs raw-slots raw-values)
      (mapc (lambda (dsd value)
@@ -1485,8 +1501,7 @@
      `(defun ,cons-name ,arglist
         ,@(when decls`((declare ,@decls)))
         ,(if raw-slots
-             `(let ((,instance (truly-the ,(dd-name dd)
-                                          (%make-structure-instance ,dd ',slot-specs ,@slot-values))))
+             `(let ((,instance (%make-structure-instance-macro ,dd ',slot-specs ,@slot-values)))
                 ,@(mapcar (lambda (dsd value)
                             ;; (Note that we can't in general use the
                             ;; ordinary named slot setter function here
@@ -1497,8 +1512,7 @@
                           raw-slots
                           raw-values)
                 ,instance)
-             `(truly-the ,(dd-name dd)
-                         (%make-structure-instance ,dd ',slot-specs ,@slot-values)))))
+             `(%make-structure-instance-macro ,dd ',slot-specs ,@slot-values))))
    `(sfunction ,ftype-arglist ,(dd-name dd))))
 
 ;;; Create a default (non-BOA) keyword constructor.
@@ -1881,7 +1895,7 @@
     (multiple-value-bind (raw-maker-form raw-reffer-operator)
         (ecase dd-type
           (structure
-           (values `(truly-the ,(dd-name dd) (%make-structure-instance ,dd nil))
+           (values `(%make-structure-instance-macro ,dd nil)
                    '%instance-ref))
           (funcallable-structure
            (values `(let ((,object-gensym
