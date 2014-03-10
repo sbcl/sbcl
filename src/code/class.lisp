@@ -251,6 +251,9 @@
 ;;; function in a MAKE-LOAD-FORM expression) that functionality has
 ;;; been split off into INIT-OR-CHECK-LAYOUT.
 (declaim (ftype (sfunction (symbol) layout) find-layout))
+;; The comment "This seems ..." is misleading but I don't have a better one.
+;; FIND-LAYOUT is used by FIND-AND-INIT-OR-CHECK-LAYOUT which is used
+;; by FOP-LAYOUT, so clearly it's used when reading fasl files.
 (defun find-layout (name)
   ;; This seems to be currently used only from the compiler, but make
   ;; it thread-safe all the same. We need to lock *F-R-L* before doing
