@@ -107,6 +107,43 @@ distinct from the global value. Can also be SETF."
 (defun symbol-info (symbol)
   (symbol-info symbol))
 
+;; Atomically update SYMBOL's info/plist slot to contain a new info vector.
+;; The vector is computed by calling UPDATE-FN on the old vector,
+;; repeatedly as necessary, until no conflict happens with other updaters.
+;; The function may choose to abort the update by returning NIL.
+(defun update-symbol-info (symbol update-fn)
+  (declare (symbol symbol)
+           (type (function (t) t) update-fn))
+  (prog ((info-holder (symbol-info symbol))
+         (current-vect))
+   outer-restart
+    ;; Do not use SYMBOL-INFO-VECTOR - this must not perform a slot read again.
+    (setq current-vect (if (listp info-holder) (cdr info-holder) info-holder))
+   inner-restart
+    ;; KLUDGE: The "#." on +nil-packed-infos+ is due to slightly crippled
+    ;; fops in genesis's fasload. Anonymizing the constant works around the
+    ;; issue, at the expense of an extra copy of the empty info vector.
+    (let ((new-vect (funcall update-fn
+                             (or current-vect #.sb!c::+nil-packed-infos+))))
+      (unless (simple-vector-p new-vect)
+        (aver (null new-vect))
+        (return)) ; nothing to do
+      (if (consp info-holder) ; State 3: exchange the CDR
+          (let ((old (%compare-and-swap-cdr info-holder current-vect new-vect)))
+            (when (eq old current-vect) (return t)) ; win
+            (setq current-vect old) ; Don't touch holder- it's still a cons
+            (go inner-restart)))
+      ;; State 1 or 2: info-holder is NIL or a vector.
+      ;; Exchange the contents of the info slot. Type-inference derives
+      ;; SIMPLE-VECTOR-P on the args to CAS, so no extra checking.
+      (let ((old (%compare-and-swap-symbol-info symbol info-holder new-vect)))
+        (when (eq old info-holder) (return t)) ; win
+        ;; Check whether we're in state 2 or 3 now.
+        ;; Impossible to be in state 1: nobody ever puts NIL in the slot.
+        ;; Up above, we bailed out if the update-fn returned NIL.
+        (setq info-holder old)
+        (go outer-restart)))))
+
 (eval-when (:compile-toplevel)
   ;; If we're in state 1 or state 3, we can take (CAR (SYMBOL-INFO S))
   ;; to get the property list. If we're in state 2, this same access

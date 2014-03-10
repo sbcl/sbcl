@@ -724,12 +724,10 @@
     (truly-the (or null simple-vector)
                (if (listp info-holder) (cdr info-holder) info-holder))))
 
-;; Atomically update SYMBOL's info/plist slot to contain a new info vector.
-;; The vector is computed by calling UPDATE-FN on the old vector,
-;; repeatedly as necessary, until no conflict happens with other updaters.
-
 #+sb-xc-host
-;; In the Host Lisp, there is no such thing as a symbol-info slot,
+;; SYMBOL-INFO is a primitive object accessor defined in 'objdef.lisp'
+;; and UPDATE-SYMBOL-INFO is defined in 'symbol.lisp'.
+;; But in the host Lisp, there is no such thing as a symbol-info slot,
 ;; even if the host is SBCL. Instead, symbol-info is kept in the symbol-plist.
 (macrolet ((get-it () '(get symbol :sb-xc-globaldb-info)))
   (defun symbol-info (symbol) (get-it))
@@ -740,40 +738,6 @@
       (when newval
         (setf (get-it) newval))
       (values))))
-
-#-sb-xc-host
-(defun update-symbol-info (symbol update-fn)
-  (declare (symbol symbol)
-           (type (function (t) t) update-fn))
-  (let* ((info-holder (symbol-info symbol))
-         ;; Do not use SYMBOL-INFO-VECTOR here. We must always refer to the
-         ;; value most recently read from the info slot,
-         ;; because only that way can three states be distinguished.
-         (current-info (if (listp info-holder) (cdr info-holder) info-holder)))
-    (loop
-       ;; KLUDGE: The "#." on +nil-packed-infos+ is due to slightly crippled
-       ;; fops in genesis's fasload. Anonymizing the constant works around the
-       ;; issue, at the expense of an extra copy of the empty info vector.
-       (let ((new-vect (funcall update-fn
-                                (or current-info #.+nil-packed-infos+))))
-         (when (null new-vect) (return)) ; nothing to do
-         (if (consp info-holder) ; State 3: exchange the CDR
-             (let ((old
-                    (%compare-and-swap-cdr info-holder current-info new-vect)))
-               (if (eq old current-info) (return)) ; win
-               (setq current-info old)) ; Don't touch holder- it's still a cons
-             ;; State 1 or 2: info-holder is NIL or a vector.
-             (let ((old ; Exchange the contents of the info slot.
-                    (%compare-and-swap-symbol-info
-                     symbol info-holder new-vect)))
-               (if (eq old info-holder) (return)) ; win
-               ;; Check whether we're in state 2 or 3 now.
-               ;; Impossible to be in state 1: nobody ever puts NIL in the slot.
-               ;; Up above, we bailed out if the update-fn returned NIL.
-               ;; See also ({SETF|CAS} SYMBOL-PLIST) for their invariant.
-               (setq info-holder old
-                     current-info (if (listp old) (cdr old) old)))))))
-  (values))
 
 ;; Helper for SET-INFO-VALUE to update packed info vectors.
 ;; If NAME is one that supports storage of its infos in a symbol-info cell,

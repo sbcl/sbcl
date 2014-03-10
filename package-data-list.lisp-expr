@@ -951,6 +951,7 @@ possibly temporarily, because it might be used internally."
                "DEFINE-INFO-CLASS" "DEFINE-INFO-TYPE"
                "DO-INFO"
                "INFO"
+               "UPDATE-SYMBOL-INFO"
                "MAKE-INFO-ENVIRONMENT"
                "FIND-FDEFINITION"
 
