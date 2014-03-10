@@ -272,15 +272,9 @@
 ;;; through here.
 (declaim (ftype (sfunction (t) fun-info) fun-info-or-lose))
 (defun fun-info-or-lose (name)
-  (let (;; FIXME: Do we need this rebinding here? It's a literal
-        ;; translation of the old CMU CL rebinding to
-        ;; (OR *BACKEND-INFO-ENVIRONMENT* *INFO-ENVIRONMENT*),
-        ;; and it's not obvious whether the rebinding to itself is
-        ;; needed that SBCL doesn't need *BACKEND-INFO-ENVIRONMENT*.
-        (*info-environment* *info-environment*))
     (let ((old (info :function :info name)))
       (unless old (error "~S is not a known function." name))
-      (setf (info :function :info name) (copy-fun-info old)))))
+      (setf (info :function :info name) (copy-fun-info old))))
 
 ;;;; generic type inference methods
 
