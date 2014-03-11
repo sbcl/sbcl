@@ -443,8 +443,8 @@
                        (class-method-definitions dd)))
 
                 ;; Various other operations only make sense on the target SBCL.
-                #-sb-xc-host
-                (%target-defstruct ',dd)
+                ,(unless expanding-into-code-for-xc-host-p
+                   `(%target-defstruct ',dd))
                 ',name))
            `(progn
               (with-single-package-locked-error

@@ -68,6 +68,9 @@ Example:
   (epoch (list t) :type cons)
   (name nil))
 
+(setf (documentation 'frlock-name 'function)
+      "Name of an FRLOCK. SETFable.")
+
 (declaim (inline make-frlock))
 (defun make-frlock (&key name)
   "Returns a new FRLOCK with NAME."
