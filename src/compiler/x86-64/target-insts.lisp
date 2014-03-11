@@ -147,9 +147,9 @@
   (setf (dstate-get-prop dstate :rip-relative-mem-ref-hook) nil))
 
 (defun disassemble-unboxed-data (segment stream dstate)
-  (aver (= (dstate-cur-offs dstate) (seg-opcodes-length segment)))
   (unless (< (dstate-cur-offs dstate) (seg-length segment))
     (return-from disassemble-unboxed-data))
+  (aver (= (dstate-cur-offs dstate) (seg-opcodes-length segment)))
   ;; Remove refs at addresses outside this segment and sort whatever remains.
   (let ((refs (sort (remove-if (lambda (x) (< (car x) (dstate-cur-offs dstate)))
                                (seg-unboxed-refs segment))
