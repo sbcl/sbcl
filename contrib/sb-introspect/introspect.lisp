@@ -234,11 +234,11 @@ If an unsupported TYPE is requested, the function will return NIL.
        ((:method)
         (when (fboundp name)
           (let ((fun (real-fdefinition name)))
-           (when (typep fun 'generic-function)
-             (loop for method in (sb-mop::generic-function-methods
-                                  fun)
-                for source = (find-definition-source method)
-                when source collect source)))))
+            (when (typep fun 'generic-function)
+              (loop for method in (sb-mop::generic-function-methods
+                                   fun)
+                    for source = (find-definition-source method)
+                    when source collect source)))))
        ((:setf-expander)
         (when (and (consp name)
                    (eq (car name) 'setf))
@@ -266,12 +266,12 @@ If an unsupported TYPE is requested, the function will return NIL.
               (find-definition-source class)))))
        ((:method-combination)
         (let ((combination-fun
-               (find-method #'sb-mop:find-method-combination
-                            nil
-                            (list (find-class 'generic-function)
-                                  (list 'eql name)
-                                  t)
-                            nil)))
+                (find-method #'sb-mop:find-method-combination
+                             nil
+                             (list (find-class 'generic-function)
+                                   (list 'eql name)
+                                   t)
+                             nil)))
           (when combination-fun
             (find-definition-source combination-fun))))
        ((:package)
@@ -316,10 +316,18 @@ If an unsupported TYPE is requested, the function will return NIL.
         (when (symbolp name)
           (find-vop-source name)))
        ((:source-transform)
-        (when (symbolp name)
-          (let ((transform-fun (sb-int:info :function :source-transform name)))
-            (when transform-fun
-              (find-definition-source transform-fun)))))
+        (let ((transform-fun (sb-int:info :function :source-transform name))
+              (accessor (sb-int:info :function :structure-accessor
+                                     (if (typep name '(cons (eql setf)
+                                                       (cons symbol null)))
+                                         (second name)
+                                         name))))
+          ;; Structure accessors have source transforms, but the
+          ;; returned locations will neither show the actual place
+          ;; where it's defined, nor is really interesting.
+          (when (and transform-fun
+                     (not accessor))
+            (find-definition-source transform-fun))))
        (t
         nil)))))
 
