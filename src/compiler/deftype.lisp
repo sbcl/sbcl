@@ -49,6 +49,5 @@
                             ,expander-form
                             ,doc
                             ,source-location-form))
-       (eval-when (:load-toplevel :execute)
-         (%deftype ',name))
+       (%deftype ',name)
        ',name)))

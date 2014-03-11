@@ -564,22 +564,21 @@
          (eval-when (:compile-toplevel)
            (%compiler-define-condition ',name ',parent-types ',layout
                                        ',(all-readers) ',(all-writers)))
-         (eval-when (:load-toplevel :execute)
-           (%define-condition ',name
-                              ',parent-types
-                              ',layout
-                              (list ,@(slots))
-                              ,documentation
-                              (list ,@direct-default-initargs)
-                              ',(all-readers)
-                              ',(all-writers)
-                              (sb!c:source-location))
-           ;; This needs to be after %DEFINE-CONDITION in case :REPORT
-           ;; is a lambda referring to condition slot accessors:
-           ;; they're not proclaimed as functions before it has run if
-           ;; we're under EVAL or loaded as source.
-           (%set-condition-report ',name ,report)
-           ',name)))))
+         (%define-condition ',name
+                            ',parent-types
+                            ',layout
+                            (list ,@(slots))
+                            ,documentation
+                            (list ,@direct-default-initargs)
+                            ',(all-readers)
+                            ',(all-writers)
+                            (sb!c:source-location))
+         ;; This needs to be after %DEFINE-CONDITION in case :REPORT
+         ;; is a lambda referring to condition slot accessors:
+         ;; they're not proclaimed as functions before it has run if
+         ;; we're under EVAL or loaded as source.
+         (%set-condition-report ',name ,report)
+         ',name))))
 
 ;;;; various CONDITIONs specified by ANSI
 

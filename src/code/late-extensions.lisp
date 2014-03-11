@@ -238,10 +238,9 @@ See also the declarations SB-EXT:GLOBAL and SB-EXT:ALWAYS-BOUND."
          (let ((,boundp (boundp ',name)))
            (%compiler-defglobal ',name :always-bound
                                 (unless ,boundp ,value) (not ,boundp))))
-       (eval-when (:load-toplevel :execute)
-         (let ((,boundp (boundp ',name)))
-           (%defglobal ',name (unless ,boundp ,value) ,boundp ',doc ,docp
-                       (sb!c:source-location)))))))
+       (let ((,boundp (boundp ',name)))
+         (%defglobal ',name (unless ,boundp ,value) ,boundp ',doc ,docp
+                     (sb!c:source-location))))))
 
 (defmacro-mundanely define-load-time-global (name value &optional (doc nil docp))
   #!+sb-doc
@@ -256,10 +255,9 @@ See also DEFGLOBAL which assigns the VALUE at compile-time too."
     `(progn
        (eval-when (:compile-toplevel)
          (%compiler-defglobal ',name :eventually nil nil))
-       (eval-when (:load-toplevel :execute)
-         (let ((,boundp (boundp ',name)))
-           (%defglobal ',name (unless ,boundp ,value) ,boundp ',doc ,docp
-                       (sb!c:source-location)))))))
+       (let ((,boundp (boundp ',name)))
+         (%defglobal ',name (unless ,boundp ,value) ,boundp ',doc ,docp
+                     (sb!c:source-location))))))
 
 (defun %compiler-defglobal (name always-boundp value assign-it-p)
   (sb!xc:proclaim `(global ,name))

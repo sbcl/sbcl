@@ -451,9 +451,8 @@
                   (:symbol ',name "defining ~A as a structure"))
               (eval-when (:compile-toplevel :load-toplevel :execute)
                 (setf (info :typed-structure :info ',name) ',dd))
-              (eval-when (:load-toplevel :execute)
-                (setf (info :source-location :typed-structure ',name)
-                      (sb!c:source-location)))
+              (setf (info :source-location :typed-structure ',name)
+                    (sb!c:source-location))
               ,@(unless expanding-into-code-for-xc-host-p
                   (append (typed-accessor-definitions dd)
                           (typed-predicate-definitions dd)

@@ -115,8 +115,7 @@
                                      ',*readers-for-this-defclass*
                                      ',*writers-for-this-defclass*
                                      ',*slot-names-for-this-defclass*))
-               (eval-when (:load-toplevel :execute)
-                 ,defclass-form))))))))
+               ,defclass-form)))))))
 
 (defun canonize-defclass-options (class-name options)
   (maplist (lambda (sublist)

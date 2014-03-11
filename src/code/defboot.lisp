@@ -209,17 +209,16 @@ evaluated as a PROGN."
 
          (eval-when (:compile-toplevel)
            (sb!c:%compiler-defun ',name ',inline-lambda t))
-         (eval-when (:load-toplevel :execute)
-           (%defun ',name
-                   ;; In normal compilation (not for cold load) this is
-                   ;; where the compiled LAMBDA first appears. In
-                   ;; cross-compilation, we manipulate the
-                   ;; previously-statically-linked LAMBDA here.
-                   #-sb-xc-host ,named-lambda
-                   #+sb-xc-host (fdefinition ',name)
-                   ,doc
-                   ',inline-lambda
-                   (sb!c:source-location)))))))
+         (%defun ',name
+                 ;; In normal compilation (not for cold load) this is
+                 ;; where the compiled LAMBDA first appears. In
+                 ;; cross-compilation, we manipulate the
+                 ;; previously-statically-linked LAMBDA here.
+                 #-sb-xc-host ,named-lambda
+                 #+sb-xc-host (fdefinition ',name)
+                 ,doc
+                 ',inline-lambda
+                 (sb!c:source-location))))))
 
 #-sb-xc-host
 (defun %defun (name def doc inline-lambda source-location)
@@ -258,10 +257,9 @@ evaluated as a PROGN."
   `(progn
      (eval-when (:compile-toplevel)
        (%compiler-defvar ',var))
-     (eval-when (:load-toplevel :execute)
-       (%defvar ',var (unless (boundp ',var) ,val)
-                ',valp ,doc ',docp
-                (sb!c:source-location)))))
+     (%defvar ',var (unless (boundp ',var) ,val)
+              ',valp ,doc ',docp
+              (sb!c:source-location))))
 
 (defmacro-mundanely defparameter (var val &optional (doc nil docp))
   #!+sb-doc
@@ -273,8 +271,7 @@ evaluated as a PROGN."
   `(progn
      (eval-when (:compile-toplevel)
        (%compiler-defvar ',var))
-     (eval-when (:load-toplevel :execute)
-       (%defparameter ',var ,val ,doc ',docp (sb!c:source-location)))))
+     (%defparameter ',var ,val ,doc ',docp (sb!c:source-location))))
 
 (defun %compiler-defvar (var)
   (sb!xc:proclaim `(special ,var)))

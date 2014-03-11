@@ -394,8 +394,7 @@
 
 (defmacro define-walker-template (name
                                   &optional (template '(nil repeat (eval))))
-  `(eval-when (:load-toplevel :execute)
-     (setf (get-walker-template-internal ',name) ',template)))
+  `(setf (get-walker-template-internal ',name) ',template))
 
 (defun get-walker-template (x context)
   (cond ((symbolp x)
