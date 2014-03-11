@@ -556,6 +556,7 @@
 (define-fop (fop-known-fun 65)
   (%coerce-name-to-fun (pop-stack)))
 
+#!-(or x86 x86-64)
 (define-fop (fop-sanctify-for-execution 61)
   (let ((component (pop-stack)))
     (sb!vm:sanctify-for-execution component)

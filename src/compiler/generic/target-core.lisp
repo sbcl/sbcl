@@ -76,6 +76,7 @@
       (dolist (entry (ir2-component-entries 2comp))
         (make-fun-entry entry code-obj object))
 
+      #!-(or x86 x86-64)
       (sb!vm:sanctify-for-execution code-obj)
 
       (let ((info (debug-info-for-component component)))

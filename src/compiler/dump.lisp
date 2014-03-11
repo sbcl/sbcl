@@ -1093,6 +1093,7 @@
       ;; FOP-CODE/FOP-SMALL-CODE fop.
       (dump-fixups fixups fasl-output)
 
+      #!-(or x86 x86-64)
       (dump-fop 'fop-sanctify-for-execution fasl-output)
 
       (let ((handle (dump-pop fasl-output)))
@@ -1111,6 +1112,7 @@
     (dump-fop 'fop-assembler-routine file)
     (dump-word (label-position (cdr routine)) file))
   (dump-fixups fixups file)
+  #!-(or x86 x86-64)
   (dump-fop 'fop-sanctify-for-execution file)
   (dump-pop file))
 

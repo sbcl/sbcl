@@ -3241,6 +3241,7 @@ register."
      (setf (code-header-ref code-object known-return-p-slot)
            known-return-p)
      (system-area-ub8-copy src-start 0 dst-start 0 length)
+     #!-(or x86 x86-64)
      (sb!vm:sanctify-for-execution code-object)
      #!+(or x86 x86-64)
      (values dst-start code-object (sap- trap-loc src-start))
