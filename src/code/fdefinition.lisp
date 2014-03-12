@@ -96,20 +96,7 @@
 ;; have been verified to be a symbol by the caller.
 (defun symbol-fdefinition (symbol)
   (declare (optimize (safety 0)))
-  (let ((vect (symbol-info-vector (uncross symbol))))
-    (when vect
-      (let ((word (the fixnum (svref vect 0))))
-        ;; Require the first type-number to be +fdefn-type-num+
-        ;; and the n-infos field to be nonzero. Info-Vector invariant
-        ;; requires that it have length >= 1, so this code is safe.
-        (when (and (eql (mask-field (byte sb!c::type-number-bits
-                                          sb!c::type-number-bits) word)
-                        (ash sb!c::+fdefn-type-num+ sb!c::type-number-bits))
-                   (ldb-test (byte sb!c::type-number-bits 0) word))
-          ;; DATA-REF-WITH-OFFSET doesn't know the info-vector length invariant,
-          ;; so depite (safety 0) eliding bounds check, FOLD-INDEX-ADDRESSING
-          ;; wasn't kicking in without (TRULY-THE (INTEGER 1 *)).
-          (aref vect (1- (truly-the (integer 1 *) (length vect)))))))))
+  (sb!c::info-vector-fdefinition (symbol-info-vector (uncross symbol))))
 
 ;; CALLABLE is a function-designator, not an extended-function-designator,
 ;; i.e. it is a function or symbol, and not a generalized function name.

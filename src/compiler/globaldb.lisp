@@ -752,15 +752,16 @@
 ;;
 (declaim (ftype (sfunction (t type-number t) boolean) symbol-set-info-value))
 (defun symbol-set-info-value (name type-number new-value)
+  (declare (inline packed-info-insert))
   (with-possibly-compound-name (key1 key2) name
     (dx-flet ((update (vect) ; VECT is a packed vector, never NIL
                 (declare (simple-vector vect))
                 (let ((index (packed-info-value-index vect key2 type-number)))
-                  (if (not index)
-                      (packed-info-insert vect key2 type-number new-value)
+                  (if index
                       (let ((copy (copy-seq vect)))
                         (setf (svref copy index) new-value)
-                        copy)))))
+                        copy)
+                      (packed-info-insert vect key2 type-number new-value)))))
       (update-symbol-info key1 #'update)
       (return-from symbol-set-info-value t))))
 
@@ -933,15 +934,17 @@
 ;; Creation of new fdefinitions is still defined there though.
 ;; Assume that exists-p implies LEGAL-FUN-NAME-P.
 ;;
+(declaim (ftype (sfunction ((or symbol list)) (or fdefn null))
+                find-fdefinition))
 (defun find-fdefinition (name0)
-  ;; Maybe we should proclaim VALUES as a declaration in 'cross-foo.lisp' ?
-  #-sb-xc-host(declare (values (or fdefn null)))
   ;; Since this emulates GET-INFO-VALUE, we have to uncross the name.
   (let ((name (uncross name0)))
     (declare (optimize (safety 0)))
     (when (symbolp name) ; Don't need LEGAL-FUN-NAME-P check
       (return-from find-fdefinition (sb!impl::symbol-fdefinition name)))
-    (with-compound-name (key1 key2) name
+    ;; Technically the ALLOW-ATOM argument of NIL isn't needed, but
+    ;; the compiler isn't figuring out not to test SYMBOLP twice in a row.
+    (with-possibly-compound-name (key1 key2 nil) name
       (awhen (symbol-info-vector key1)
         (multiple-value-bind (data-idx descriptor-idx field-idx)
             (info-find-aux-key/packed it key2)

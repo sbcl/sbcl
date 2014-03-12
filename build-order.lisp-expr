@@ -185,10 +185,10 @@
  ("src/code/kernel"      :not-host)
  ("src/code/toplevel"    :not-host)
  ("src/code/cold-error"  :not-host)
+ ;; 'info-vector' is needed at least as early as 'fdefinition' so that the
+ ;; inlined INFO-VECTOR-FDEFINITION is available to %COERCE-CALLABLE-TO-FUN.
+ ("src/compiler/info-vector")
  ("src/code/fdefinition" :not-host)
- ;; FIXME: Figure out some way to make the compiler macro for INFO
- ;; available for compilation of "code/fdefinition". [Not hugely important
- ;; now that fdefinition-object is special-cased]
 
  ;; In classic CMU CL, code/type was here. I've since split that into
  ;; lots of smaller pieces, some of which are here and some of which
@@ -334,7 +334,6 @@
  ("src/compiler/target/backend-parms")
 
  ;; for INFO and SB!XC:MACRO-FUNCTION, needed by defmacro.lisp
- ("src/compiler/info-vector")
  ("src/compiler/globaldb")
  ("src/compiler/info-functions")
 

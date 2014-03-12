@@ -480,7 +480,7 @@
 ;; FDEFINITIONs can be looked up from C runtime given an info-vector,
 ;; so the type-number must be wired. Using genesis machinery to define
 ;; the constant for C would be overkill, as it's the only special case.
-(def!constant +fdefn-type-num+ 1)
+(defconstant +fdefn-type-num+ 1)
 
 ;; Extract a field from a packed info descriptor.
 ;; A field is either a count of type-numbers, or a type-number.
@@ -517,6 +517,20 @@
            ;; in terms of data cells used, but correct for packed fields.
            (return (+ (ceiling n-fields +infos-per-word+) (1- n-fields))))))))
 
+;; MAKE-INFO-DESCRIPTOR is basically ASH-LEFT-MODFX, shifting VAL by SHIFT.
+;; It is important that info descriptors be target fixnums, but 'cross-modular'
+;; isn't loaded early enough to just use that.
+;; It's not needed on 64-bit host/target combination because 10 fields (60 bits)
+;; never touch the sign bit.
+(defmacro make-info-descriptor (val shift)
+  (if (> sb!vm:n-fixnum-bits 30)
+      `(ash ,val ,shift)
+      #-sb-xc-host
+      `(sb!vm::ash-left-modfx ,val ,shift)
+      #+sb-xc-host
+      `(logior (if (logbitp (- 29 ,shift) ,val) sb!xc:most-negative-fixnum 0)
+               (ash ,val ,shift))))
+
 ;; Convert unpacked vector to packed vector.
 ;; 'pack-infos' would be a hypothetical accessor for the 'infos' of a 'pack'
 ;; (whatever that is ...) so verbifying as such makes it more mnemonic to me.
@@ -533,25 +547,9 @@
              (type (mod #.(1+ (* (1- +infos-per-word+) type-number-bits)))
                    field-shift)
              (info-descriptor word))
-    ;; XXX: cross-modular isn't loaded early enough to get 'mask-signed-field'
-    ;; which is important to keep descriptors as target fixnums.
-    ;; Either (1) define mask-signed-field sooner, or (2) use the "host"
-    ;; expression that always works but is ugly to me.
-    ;; Mask-signed-field is only needed for 30-bit fixnums which use bit
-    ;; index 29 as just another bit - the highest bit of the highest field.
     (flet ((put-field (val) ; insert VAL into the current packed descriptor
              (declare (type-number val))
-             (setq word ; shift into position
-                   (logior
-                    word
-                    (if (> sb!vm:n-fixnum-bits 30)
-                        (ash val field-shift) ; never touches a sign-bit
-                        #+sb-xc-host
-                        (logior (if (and (logbitp 5 val) (= field-shift 24))
-                                    sb!xc:most-negative-fixnum 0)
-                                (ash val field-shift))
-                        #-sb-xc-host
-                        (mask-signed-field 30 (ash val field-shift)))))
+             (setq word (logior (make-info-descriptor val field-shift) word))
              (if (< field-shift (* (1- +infos-per-word+) type-number-bits))
                  (incf field-shift type-number-bits)
                  (setf (svref output (incf j)) word field-shift 0 word 0))))
@@ -715,18 +713,8 @@
 ;; This is done by unpacking/repacking - it's easy enough and fairly
 ;; efficient since the temporary vector is stack-allocated.
 ;;
-(defun packed-info-insert (input aux-key type-number value)
+(defun %packed-info-insert (input aux-key type-number value)
   (declare (simple-vector input) (type-number type-number))
-  ;; Special case of inserting into an empty vector.
-  ;; Actually I can do better than this - any insertion into a vector
-  ;; with zero aux-keys and one descriptor that has room for at least
-  ;; one more field could be done without too much trouble.
-  ;; (It's when the descriptor is full that we have to think about it)
-  (when (and (eql aux-key +no-auxilliary-key+)
-             (eql (length input) (length +nil-packed-infos+)))
-    (return-from packed-info-insert
-      (vector (logior (ash type-number type-number-bits) 1) ; 1 piece of info
-              value)))
   (let* ((n-extra-elts
           ;; Test if the aux-key has been seen before or needs to be added.
           (if (and (not (eql aux-key +no-auxilliary-key+))
@@ -767,6 +755,62 @@
                (aver (typep (ash (incf (svref new data-start) 2) -1)
                             'type-number))))))
     (packify-infos new)))
+
+;; Return T if INFO-VECTOR admits quicker insertion logic - it must have
+;; exactly one descriptor for the root name, space for >= 1 more field,
+;; and no aux-keys.
+(declaim (inline info-quickly-insertable-p))
+(defun info-quickly-insertable-p (input)
+  (let ((n-infos (packed-info-field input 0 0)))
+    ;; We can easily determine if the no-aux-keys constraint is satisfied,
+    ;; because a secondary name's info occupies at least two cells,
+    ;; one for its aux-key and >= 1 for info values.
+    (and (< n-infos (1- +infos-per-word+))
+         (eql n-infos (1- (length input))))))
+
+;; Take a packed info-vector INPUT and return a new one with TYPE-NUMBER/VALUE
+;; added for the root name. The vector must satisfy INFO-QUICKLY-INSERTABLE-P.
+;; This code is separate from PACKED-INFO-INSERT to facilitate writing
+;; a unit test of this logic against the complete logic.
+;;
+(defun quick-packed-info-insert (input type-number value)
+  ;; Because INPUT contains 1 descriptor and its corresponding values,
+  ;; the current length is exactly NEW-N, the new number of fields.
+  (let* ((descriptor (svref input 0))
+         (new-n (truly-the type-number (length input)))
+         (new-vect (make-array (1+ new-n))))
+    ;; Two cases: we're either inserting info for the fdefn, or not.
+    (cond ((eq type-number +fdefn-type-num+)
+           ;; fdefn, if present, must remain the first packed field.
+           ;; Replace the lowest field (the count) with +fdefn-type-num+,
+           ;; shift everything left 6 bits, then OR in the new count.
+           (setf (svref new-vect 0)
+                 (logior (make-info-descriptor
+                          (dpb +fdefn-type-num+ (byte type-number-bits 0)
+                               descriptor) type-number-bits) new-n)
+                 ;; Packed vectors are indexed "backwards". The first
+                 ;; field's info is in the highest numbered cell.
+                 (svref new-vect new-n) value)
+           (loop for i from 1 below new-n
+                 do (setf (svref new-vect i) (svref input i))))
+          (t
+           ;; Add a field on the high end and increment the count.
+           (setf (svref new-vect 0)
+                 (logior (make-info-descriptor
+                          type-number (* type-number-bits new-n))
+                         (1+ descriptor))
+                 (svref new-vect 1) value)
+           ;; Slide the old data up 1 cell.
+           (loop for i from 2 to new-n
+                 do (setf (svref new-vect i) (svref input (1- i))))))
+    new-vect))
+
+(declaim (sb!ext:maybe-inline packed-info-insert))
+(defun packed-info-insert (vector aux-key type-number newval)
+  (if (and (eql aux-key +no-auxilliary-key+)
+           (info-quickly-insertable-p vector))
+      (quick-packed-info-insert vector type-number newval)
+      (%packed-info-insert vector aux-key type-number newval)))
 
 ;; Search packed VECTOR for AUX-KEY and TYPE-NUMBER, returning
 ;; the index of the data if found, or NIL if not found.
@@ -943,8 +987,8 @@ This is interpreted as
 
 ;; If NAME matches the pattern (<SYMBOL2> <SYMBOL1>), then bind KEY1 and KEY2
 ;; to those symbols and execute the body; otherwise skip the body.
-;; It's preferable that a name of NIL already be ruled out by a prior
-;; test for (SYMBOLP NAME) though it's not strictly necessary.
+;; If ALLOW-ATOM is T [the default], then NAME can be just a symbol
+;; in which case KEY1 is bound to NAME and KEY2 to +NO-AUXILLIARY-KEY+.
 ;;
 ;; It's conceivable that we extend this to allow KEY2 to be a list,
 ;; and have INFO-FIND-AUX-KEY/PACKED use EQUALP in that case.
@@ -955,27 +999,11 @@ This is interpreted as
 ;; in PCL metaobjects, and have a hook whereby NAME-FDEFINITION understands
 ;; that certain kinds of names have a custom lookup technique.
 ;;
-(defmacro with-compound-name ((key1 key2) name &body body)
-  (with-unique-names (pair rest)
-    `(let ((,pair ,name))
-       (if (listp ,pair)
-           (let ((,rest (cdr ,pair)))
-             ;; Lists of length >= 2 are common, so optimistically assume that
-             ;; (LISTP rest) implies (CONSP rest) but fail if length >= 3.
-             (if (and (listp ,rest) (not (cdr ,rest)))
-                 (let ((,key2 (car ,pair)) (,key1 (car ,rest)))
-                   ;; Check for 2 symbols, and finally verify that list wasn't a
-                   ;; singleton which accidentally matched.
-                   (if (and (symbolp ,key1) (symbolp ,key2) ,rest)
-                       (progn ,@body)))))))))
-
-;; Do the same as WITH-COMPOUND-NAME but also accept a symbol by itself,
-;; in which case KEY2 becomes +NO-AUXILLIARY-KEY+.
-;;
-(defmacro with-possibly-compound-name ((key1 key2) name &body body)
+(defmacro with-possibly-compound-name ((key1 key2 &optional (allow-atom t))
+                                       name &body body)
   (with-unique-names (rest)
     `(let ((,key1 ,name) (,key2 +NO-AUXILLIARY-KEY+))
-       (when (or (symbolp ,key1)
+       (when (or ,@(if allow-atom `((symbolp ,key1)))
                  (if (listp ,key1)
                      (let ((,rest (cdr ,key1)))
                        (when (and (listp ,rest) (not (cdr ,rest)))
@@ -1029,3 +1057,20 @@ This is interpreted as
                                ,info-vect ,aux-key ,type-num ,result))))))
            (update-symbol-info ,name #',proc)
            ,result)))))
+
+;; Given Info-Vector VECT, return the fdefn that it contains for its root name,
+;; or nil if there is no value. NIL input is acceptable and will return NIL.
+(declaim (inline info-vector-fdefinition))
+(defun info-vector-fdefinition (vect)
+  (when vect
+    (let ((word (the fixnum (svref vect 0))))
+      ;; Require the first type-number to be +fdefn-type-num+
+      ;; and the n-infos field to be nonzero. Info-Vector invariant
+      ;; requires that it have length >= 1, so this code is safe.
+      (when (and (eql (mask-field (byte type-number-bits type-number-bits) word)
+                      (ash +fdefn-type-num+ type-number-bits))
+                 (ldb-test (byte type-number-bits 0) word))
+        ;; DATA-REF-WITH-OFFSET doesn't know the info-vector length invariant,
+        ;; so depite (safety 0) eliding bounds check, FOLD-INDEX-ADDRESSING
+        ;; wasn't kicking in without (TRULY-THE (INTEGER 1 *)).
+        (aref vect (1- (truly-the (integer 1 *) (length vect))))))))

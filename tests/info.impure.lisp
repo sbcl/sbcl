@@ -160,6 +160,28 @@
         do (rotatef (aref vector chosen) (aref vector lim)))
   vector)
 
+(test-util:with-test (:name :quick-packed-info-insert)
+  ;; Exercise some bit patterns that touch the sign bit on 32-bit machines.
+  (loop repeat 10
+        do
+    (let ((iv1 +nil-packed-infos+)
+          (iv2 +nil-packed-infos+)
+          (type-nums
+           (cons 1 (subseq '(#b100000 #b110000 #b010000 #b011000
+                             #b000100 #b000010 #b000011 #b000001)
+                           0 (- +infos-per-word+ 2)))))
+      ;; Randomize because maybe there's an ordering constraint more
+      ;; complicated that that fdefn always gets to be first.
+      ;; (there isn't, but could be)
+      (dolist (num (coerce (shuffle (coerce type-nums 'vector)) 'list))
+        (let ((val (format nil "value for ~D" num)))
+          (setq iv1 (quick-packed-info-insert iv1 num val)
+                iv2 (%packed-info-insert ; not PACKED-INFO-INSERT
+                     iv2 +no-auxilliary-key+ num val))
+          (assert (equalp iv1 iv2))))
+      ;; the first and only info descriptor should be full
+      (assert (not (info-quickly-insertable-p iv1))))))
+
 (defun crossprod (a b)
   (mapcan (lambda (x) (mapcar (lambda (y) (cons x y)) b))
           a))
