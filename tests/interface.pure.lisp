@@ -153,6 +153,14 @@
                  (= (the (complex single-float) x)
                     (the (complex single-float) y)))))
 
+#+x86-64
+;; The labeler for LEA would choke on an illegal encoding
+;; instead of showing what it illegally encodes, such as LEA RAX, RSP
+(with-test (:name :x86-lea-disassemble-illegal-op)
+  (let ((a (coerce '(#x48 #x8D #xC4) '(array (unsigned-byte 8) (3)))))
+    (sb-sys:with-pinned-objects (a)
+      (sb-disassem::disassemble-memory (sb-sys:sap-int (sb-sys:vector-sap a)) 3))))
+
 ;; Assert that disassemblies of identically-acting functions are identical
 ;; if address printing is turned off. Should work on any backend, I think.
 (with-test (:name :disassemble-without-addresses)

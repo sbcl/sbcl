@@ -2039,7 +2039,7 @@
 ;; If the filtered VALUE (R/M field of LEA) should be treated as a label,
 ;; return the virtual address, otherwise the value unchanged.
 (defun lea-compute-label (value dstate)
-  (if (eq (first value) 'rip)
+  (if (and (listp value) (eq (first value) 'rip))
       (+ (sb!disassem:dstate-next-addr dstate) (second value))
       value))
 
