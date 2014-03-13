@@ -171,7 +171,7 @@
                              #b000100 #b000010 #b000011 #b000001)
                            0 (- +infos-per-word+ 2)))))
       ;; Randomize because maybe there's an ordering constraint more
-      ;; complicated that that fdefn always gets to be first.
+      ;; complicated than fdefn always getting to be first.
       ;; (there isn't, but could be)
       (dolist (num (coerce (shuffle (coerce type-nums 'vector)) 'list))
         (let ((val (format nil "value for ~D" num)))

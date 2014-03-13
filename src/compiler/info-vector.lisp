@@ -93,6 +93,18 @@
     (format stream "~D/~D entr~:@P" (info-env-count self)
             (info-storage-capacity (info-env-storage self)))))
 
+;; We can't assume that the host lisp supports a CAS operation for info-gethash
+;; or info-puthash, but that's fine because there's only one thread.
+(defmacro info-cas (storage index oldval newval)
+  #+sb-xc-host
+  `(let ((actual-old (svref ,storage ,index)))
+     (if (eq actual-old ,oldval)
+         (progn (setf (svref ,storage ,index) ,newval) actual-old)
+         (error "xc bug. CAS expected ~S got ~S" actual-old ,oldval)))
+  #-sb-xc-host
+  `(cas (svref ,storage ,index) ,oldval ,newval))
+
+;; Similarly we need a way to atomically adjust the hashtable count.
 ;; FIXME: ATOMIC-INCF and ATOMIC-DECF would do just fine, but the structure
 ;; slot for INFO-ENV-COUNT can't be declared as an untagged. It occurs too soon
 ;; in the build order, prior to *RAW-SLOT-DATA-LIST* being set up.
@@ -103,9 +115,14 @@
 ;; raw-slot data earlier.
 
 (declaim (inline stupid-atomic-bump))
-(defun stupid-atomic-bump-count (table delta) ; using CAS instead of ATOMIC-INCF
-  (declare (optimize (safety 0)) (type (member +1 -1) delta))
+(defun stupid-atomic-bump-count (table delta)
+  #+sb-xc-host
+  (prog1 (info-env-count table) (incf (info-env-count table) delta))
+  #-sb-xc-host
+  ;; Use CAS instead of ATOMIC-INCF, for the time being until
+  ;; raw slots can be made to work sooner during cross-compilation.
   (let ((old (info-env-count table)))
+    (declare (optimize (safety 0)) (type (member +1 -1) delta))
     (loop (let* ((new (the fixnum (+ (the fixnum old) delta)))
                  (actual-old (cas (info-env-count table) old new)))
             (if (eq old actual-old)
@@ -121,9 +138,9 @@
 
 ;; Concurrent access relies on a forwarding pointer being placed into
 ;; transported value cells. Since this is not a fully general hashtable,
-;; we could use fixnums as forwarding pointers, as they're otherwise
+;; we can use fixnums as forwarding pointers, as they're otherwise
 ;; never present as a value.
-#+nil
+#+sb-xc-host
 (progn
   (defun make-info-forwarding-pointer (index) index)
   (defun info-forwarding-pointer-target (pointer) pointer)
@@ -131,6 +148,7 @@
 
 ;; However, here is a forwarding-pointer representation that allows fixnums
 ;; as legal values in the table, so, since it's more general, ... why not?
+#-sb-xc-host
 (progn
   (defun make-info-forwarding-pointer (index)
     (declare (info-cell-index index) (optimize (safety 0)))
@@ -242,59 +260,54 @@
 ;;
 (defun info-puthash (env key update-proc)
   (assert (not (member key '(0 -1))))
-  (labels ((update (array value-index current-val)
-             ;; Loop invariant: CURRENT-VAL is not a forwarding pointer.
-             (let ((oldval) (newval (funcall update-proc current-val)))
-               ;; On any try, either the proc wants to quit without updating
-               ;; or it wants to change the value atomically.
-               (cond ((or (eq newval current-val) ; no change
-                          (eq (setq oldval (cas (svref array value-index)
-                                                current-val newval))
-                              current-val)) ; successful swap
-                      newval)
-                     ((info-value-moved-p oldval) ; cell became forwarded
-                      ;; Usually only a forced random delay can induce this.
-                      (update-forwarded array oldval))
-                     (t ; collision. Decide again what newval should be
-                      (update array value-index oldval)))))
-           (update-forwarded (array forwarding-marker)
-             ;; Another forwarding can happen if rehash finished and table
-             ;; overflowed yet again before we got here.
-             (update-index (info-storage-next array)
-                           (info-forwarding-pointer-target forwarding-marker)))
-           (update-index (array value-index)
-             (let ((current-val (svref array value-index)))
-               (if (info-value-moved-p current-val)
-                   (update-forwarded array current-val)
-                   (update array value-index current-val)))))
-    (named-let retry ((hashval (globaldb-sxhashoid key))
+  (labels ((follow/update (array value-index)
+             (let ((value (svref array value-index)))
+               (if (info-value-moved-p value)
+                   (follow/update (info-storage-next array)
+                                  (info-forwarding-pointer-target value))
+                   (update array value-index value))))
+           (update (array index oldval)
+             ;; invariant: OLDVAL is not a forwarding pointer.
+             (let ((newval (funcall update-proc oldval)))
+               (if (eq newval oldval)
+                   oldval ; forgo update
+                   (named-let put ((array array) (index index))
+                     (let ((actual-old (info-cas array index oldval newval)))
+                       (cond ((eq oldval actual-old) newval) ; win
+                             ((info-value-moved-p actual-old) ; forwarded
+                              (put (info-storage-next array)
+                                   (info-forwarding-pointer-target actual-old)))
+                             (t ; collision with another writer
+                              (update array index actual-old)))))))))
+    (named-let probe ((hashval (globaldb-sxhashoid key))
                       (storage (info-env-storage env)))
       (do-probe-sequence (storage key hashval)
-       :hit (update-index storage (value-index))
+       :hit (follow/update storage (value-index))
        :miss
        (progn
         (let ((old-count (stupid-atomic-bump-count env 1)))
           (declare (info-cell-index old-count))
           (when (>= old-count (info-storage-threshold storage))
             (sb!thread:with-mutex ((info-env-mutex env))
-              (when (eq (info-env-storage env) storage) ; any thread can do it
+              ;; any thread could have beaten us to rehashing
+              (when (eq (info-env-storage env) storage)
                 (info-env-rehash env)))
             (stupid-atomic-bump-count env -1) ; prepare to retry
-            (return-from retry (retry hashval (info-env-storage env)))))
+            (return-from probe (probe hashval (info-env-storage env)))))
         ;; Attempt to claim KEY-INDEX
-        (let ((oldkey (cas (svref storage (key-index)) +empty-key+ key)))
+        (let ((oldkey (info-cas storage (key-index) +empty-key+ key)))
           (when (eql oldkey +empty-key+) ; successful claim
             ;; Optimistically assume that nobody else rewrote the value
-            (return-from retry (update storage (value-index) nil)))
+            (return-from probe (update storage (value-index) nil)))
           (stupid-atomic-bump-count env -1) ; failed
           ;; The fallthrough branch of this COND is ordinary CAS failure where
           ;; somebody else wanted this slot, and won. Looping tries again.
           (cond ((equal oldkey key) ; pure coincidence
-                 (return-from retry (update-index storage (value-index))))
+                 (return-from probe (follow/update storage (value-index))))
                 ((eql oldkey +unavailable-key+) ; Highly unlikely
                  ;; as preemptive check up above ensured no rehash needed.
-                 (return-from retry
-                   (retry hashval (%wait-for-rehash env storage)))))))))))
+                 (return-from probe
+                   (probe hashval (%wait-for-rehash env storage)))))))))))
 
 ;; Rehash ENV to a larger storage. When writing a key into new storage,
 ;; key cells are uniquely owned by this thread without contention.
@@ -322,8 +335,8 @@
        ;; determines whether to continue transporting the cell's value.
           for key = (let ((key (svref old-storage old-key-index)))
                       (if (eql key +empty-key+)
-                          (cas (svref old-storage old-key-index)
-                               +empty-key+ +unavailable-key+)
+                          (info-cas old-storage old-key-index
+                                    +empty-key+ +unavailable-key+)
                           key))
           unless (eql key +empty-key+)
           do (let* ((new-key-index
@@ -332,24 +345,30 @@
                           :hit (bug "Globaldb rehash failure. Mutated key?")
                           :miss (return (key-index)))))
                     (old-value-index (+ old-key-index old-capacity))
-                    (new-value-index (+ new-key-index new-capacity)))
+                    (new-value-index (+ new-key-index new-capacity))
+                    (value (svref old-storage old-value-index)))
                (setf (svref new-storage new-key-index) key) ; Q: barrier needed?
                ;; Copy the current value into the new storage,
                ;; and CAS in a forwarding pointer. Repeat until successful.
-               (loop (let ((value (svref old-storage old-value-index)))
-                       ;; Force to memory before publishing relocated status
-                       (sb!thread:barrier (:write)
-                         (setf (svref new-storage new-value-index) value))
-                       (when (eq (cas (svref old-storage old-value-index)
-                                      value (make-info-forwarding-pointer
-                                             new-value-index)) value)
-                         (return))))))
+               (loop
+                 ;; Force to memory before publishing relocated status
+                 (sb!thread:barrier (:write)
+                   (setf (svref new-storage new-value-index) value))
+                 (let ((actual-old
+                        (info-cas
+                         old-storage old-value-index value
+                         (make-info-forwarding-pointer new-value-index))))
+                   (if (eq value actual-old)
+                       (return)
+                       (setq value actual-old))))))
 
+    ;; Typical of most lockfree algorithms, we've no idea when
+    ;; the old storage can be freed. GC will figure it out.
     ;; No write barrier needed. Threads still looking at old storage
     ;; will eventually find all cells unavailable or forwarded.
     (setf (info-env-storage env) new-storage)))
 
-;; This maphash is for debugging purposes, and not threadsafe.
+;; This maphash implementation is not threadsafe.
 ;; It can be made threadsafe by following forwarded values
 ;; and skipping over unavailable keys.
 ;;
@@ -371,7 +390,7 @@
 ;;
 (defun (setf info-gethash) (newval key env)
   (dx-flet ((update (old) (declare (ignore old)) newval))
-    (info-puthash key env #'update)))
+    (info-puthash env key #'update)))
 
 (defun show-info-env (env)
   (info-maphash (lambda (k v) (format t "~S -> ~S~%" k v)) env))
@@ -380,8 +399,8 @@
 ;;;; ============
 
 ;;; Info for a Name (an arbitrary object) is stored in an Info-Vector,
-;;; which like is a 2-level association list. Info-Vectors are stored in symbols
-;;; for most names, or in the global hashtable for "complicated" names.
+;;; which is like is a 2-level association list. Info-Vectors are stored in
+;;; symbols for most names, or in the global hashtable for "complicated" names.
 
 ;;; Such vectors exists in two variations: packed and unpacked.
 ;;; The representations are nearly equivalent for lookup, but the packed format
