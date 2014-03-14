@@ -2068,8 +2068,11 @@ core and return a descriptor to it."
             (+ sb!vm:instance-slots-offset
                (target-layout-index 'n-untagged-slots)))))
          (ntagged (- size nuntagged)))
+    ;; An instance's header word should always indicate that it has an *odd*
+    ;; number of words after the header so that the total with header is even.
     (write-memory result (make-other-immediate-descriptor
-                          size sb!vm:instance-header-widetag))
+                          (+ size (logandc1 size 1))
+                          sb!vm:instance-header-widetag))
     (write-wordindexed result sb!vm:instance-slots-offset layout)
     (do ((index 1 (1+ index)))
         ((eql index size))
