@@ -506,8 +506,12 @@
 (declaim (inline packed-info-field))
 (defun packed-info-field (vector desc-index field-index)
   ;; Should not need (THE TYPE-NUMBER) however type inference
-  ;; is borked during cross-compilation due to the shadowed LDB
+  ;; seems borked during cross-compilation due to the shadowed LDB
   ;; (see "don't watch:" in cold/defun-load-or-cload-xcompiler)
+  ;; and in particular it sees especially weird that this message appears
+  ;;    note: type assertion too complex to check:
+  ;;    (VALUES (UNSIGNED-BYTE 6) &REST T).
+  ;; because nothing here should be possibly-multiple-value-producing.
   (the type-number
     (ldb (byte type-number-bits
                (* (the (mod #.+infos-per-word+) field-index) type-number-bits))
@@ -839,9 +843,7 @@
                 packed-info-value-index))
 
 (defun packed-info-value-index (vector aux-key type-num)
-  (declare (simple-vector vector) (type (or (eql 0) symbol) aux-key)
-           (type-number type-num)
-           (optimize (safety 0))) ; bounds are AVERed
+  (declare (optimize (safety 0))) ; vector bounds are AVERed
   (let ((data-idx (length vector)) (descriptor-idx 0) (field-idx 0))
     (declare (index descriptor-idx)
              (type (mod #.+infos-per-word+) field-idx))
@@ -1093,3 +1095,60 @@ This is interpreted as
         ;; so depite (safety 0) eliding bounds check, FOLD-INDEX-ADDRESSING
         ;; wasn't kicking in without (TRULY-THE (INTEGER 1 *)).
         (aref vect (1- (truly-the (integer 1 *) (length vect))))))))
+
+;;; Some of this stuff might belong in 'symbol.lisp', but can't be,
+;;; because 'symbol.lisp' is :NOT-HOST in build-order.
+
+#+sb-xc-host
+;; SYMBOL-INFO is a primitive object accessor defined in 'objdef.lisp'
+;; and UPDATE-SYMBOL-INFO is defined in 'symbol.lisp'.
+;; But in the host Lisp, there is no such thing as a symbol-info slot,
+;; even if the host is SBCL. Instead, symbol-info is kept in the symbol-plist.
+(macrolet ((get-it () '(get symbol :sb-xc-globaldb-info)))
+  (defun symbol-info (symbol) (get-it))
+  (defun update-symbol-info (symbol update-fn)
+    ;; Never pass NIL to an update-fn. Pass the minimal info-vector instead,
+    ;; a vector describing 0 infos and 0 auxilliary keys.
+    (let ((newval (funcall update-fn (or (get-it) +nil-packed-infos+))))
+      (when newval
+        (setf (get-it) newval))
+      (values))))
+
+;; Return the globaldb info for SYMBOL. With respect to the state diagram
+;; presented at the definition of SYMBOL-PLIST, if the object in SYMBOL's
+;; info slot is LISTP, it is in state 1 or 3. Either way, take the CDR.
+;; Otherwise, it is in state 2 so return the value as-is.
+;; In terms of this function being named "-vector", implying always a vector,
+;; it is understood that NIL is a proxy for +NIL-PACKED-INFOS+, a vector.
+;;
+#!-symbol-info-vops (declaim (inline symbol-info-vector))
+(defun symbol-info-vector (symbol)
+  (let ((info-holder (symbol-info symbol)))
+    (truly-the (or null simple-vector)
+               (if (listp info-holder) (cdr info-holder) info-holder))))
+
+;; Helper for SET-INFO-VALUE to update packed info vectors.
+;; If NAME is one that supports storage of its infos in a symbol-info cell,
+;; then do the update and return T. Otherwise return NIL.
+;;
+;; If the old info can be updated without unpacking/repacking, then copy it
+;; and do the update; otherwise unpack, grow the vector, and repack.
+;; Truly in-place updates are never permitted due to the very minimal lockfree
+;; protocol. Since info vectors are short, it's ok that the old one is discarded
+;; every time a value is written. A more intricate lockfree protocol would
+;; allow re-use of the vector when changing the value in an existing cell.
+;;
+(declaim (ftype (sfunction (t type-number t) boolean) symbol-set-info-value))
+(defun symbol-set-info-value (name type-number new-value)
+  (declare (inline packed-info-insert))
+  (with-possibly-compound-name (key1 key2) name
+    (dx-flet ((update (vect) ; VECT is a packed vector, never NIL
+                (declare (simple-vector vect))
+                (let ((index (packed-info-value-index vect key2 type-number)))
+                  (if index
+                      (let ((copy (copy-seq vect)))
+                        (setf (svref copy index) new-value)
+                        copy)
+                      (packed-info-insert vect key2 type-number new-value)))))
+      (update-symbol-info key1 #'update)
+      (return-from symbol-set-info-value t))))

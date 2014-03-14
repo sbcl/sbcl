@@ -6,12 +6,21 @@
 ;;;; the information may well have several representations.
 ;;;;
 ;;;; The database contains arbitrary Lisp values, addressed by a
-;;;; combination of Name, Class and Type. The Name is a EQUAL-thing
+;;;; combination of Name, Class and Type. The Name is an EQUAL-thing
 ;;;; which is the name of the thing we are recording information
 ;;;; about. Class is the kind of object involved. Typical classes are
 ;;;; :FUNCTION, :VARIABLE, :TYPE, ... A Type names a particular piece
 ;;;; of information within a given class. Class and Type are keywords,
 ;;;; and are compared with EQ.
+
+;;;; The relation between this file and 'info-vectors' is that the
+;;;; latter provides a fundamental mechanism to create property-list-like
+;;;; things whose "indicators" are restricted to small integers
+;;;; and whose values are anything; whereas the globaldb provides the
+;;;; facility of looking up the properties by keyword, a/k/a Class+Type.
+;;;; The keyword regime is somewhat arbitrary because ultimately the
+;;;; pair of keywords just translates to a small integer, usually
+;;;; resolvable at compile-time for the most part.
 
 ;;;; This software is part of the SBCL system. See the README file for
 ;;;; more information.
@@ -101,18 +110,6 @@
 ;;; would make the cross-compiler very confused.)
 (eval-when (#-sb-xc :compile-toplevel :load-toplevel :execute)
 
-(defstruct (class-info
-            (:constructor make-class-info (name))
-            #-no-ansi-print-object
-            (:print-object (lambda (x s)
-                             (print-unreadable-object (x s :type t)
-                               (prin1 (class-info-name x) s))))
-            (:copier nil))
-  ;; name of this class
-  (name nil :type keyword :read-only t)
-  ;; list of Type-Info structures for each type in this class
-  (types () :type list))
-
 ;;; a map from type numbers to TYPE-INFO objects. There is one type
 ;;; number for each defined CLASS/TYPE pair.
 ;;;
@@ -126,12 +123,8 @@
 ;;; practice because the cross-compiler is as close to the target
 ;;; compiler as we can make it, i.e. identical in most ways, including
 ;;; this one. -- WHN 2001-08-19
-(defvar *info-types*)
-(declaim (type simple-vector *info-types*))
-#-sb-xc ; as per KLUDGE note above
-(eval-when (:compile-toplevel :execute)
-  (setf *info-types*
-        (make-array (ash 1 type-number-bits) :initial-element nil)))
+(declaim (type (simple-vector #.(ash 1 type-number-bits)) *info-types*))
+(defglobal *info-types* (make-array (ash 1 type-number-bits) :initial-element nil))
 
 (defstruct (type-info
             #-no-ansi-print-object
@@ -139,18 +132,20 @@
                              (print-unreadable-object (x s)
                                (format s
                                        "~S ~S, Number = ~W"
-                                       (class-info-name (type-info-class x))
+                                       (type-info-class x)
                                        (type-info-name x)
                                        (type-info-number x)))))
+            (:constructor
+             make-globaldb-info-metadata (number class name type-spec))
             (:copier nil))
   ;; the name of this type
-  (name (missing-arg) :type keyword)
+  (name nil :type keyword)
   ;; this type's class
-  (class (missing-arg) :type class-info)
+  (class nil :type keyword)
   ;; a number that uniquely identifies this type (and implicitly its class)
-  (number (missing-arg) :type type-number)
+  (number nil :type type-number)
   ;; a type specifier which info of this type must satisfy
-  (type nil :type t)
+  (type-spec nil :type t)
   ;; If FUNCTIONP, then a function called when there is no information of
   ;; this type. If not FUNCTIONP, then any object serving as a default.
   (default nil)
@@ -166,54 +161,69 @@
   ;; 2. a function of two arguments, a name and new-value, which performs
   ;;    any other checks and/or side-effects including signaling an error.
   (validate-function nil :type (or function null)))
+(declaim (freeze-type type-info))
 
-;;; a map from class names to CLASS-INFO structures
-;;;
-;;; We build the value for this at compile time (with calls to
-;;; DEFINE-INFO-CLASS), then generate code to recreate the compile time
-;;; value, and arrange for that code to be called in cold load.
-;;; KLUDGE: Just as for *INFO-TYPES*, we don't try to rebuild this
-;;; when cross-compiling, but instead just reuse the cross-compiler's
-;;; version for the target compiler. -- WHN 2001-08-19
-(defvar *info-classes*)
-(declaim (hash-table *info-classes*))
-#-sb-xc ; as per KLUDGE note above
-(eval-when (:compile-toplevel :execute)
-  (setf *info-classes* (make-hash-table :test #'eq)))
+(defconstant +info-metainfo-type-num+ 63)
 
-;;; If NAME is the name of a type in CLASS, then return the TYPE-INFO,
-;;; otherwise NIL.
-(defun find-type-info (name class)
-  (declare (type keyword name) (type class-info class))
-  (dolist (type (class-info-types class) nil)
-    (when (eq (type-info-name type) name)
-      (return type))))
+;; GET-INFO-VALUE can't be used, so hand-roll it for the next two functions.
+(macrolet ((get-type-info-metadata (sym)
+             `(let* ((info-vector (symbol-info-vector ,sym))
+                     (index (if info-vector
+                                (packed-info-value-index
+                                 info-vector +no-auxilliary-key+
+                                 +info-metainfo-type-num+))))
+                (if index (svref info-vector index)))))
+  ;; Find or create a TYPE-INFO object designated by CLASS- and TYPE-KEYWORD.
+  ;; If not found, the specified TYPE-NUM and TYPE-SPEC are used to
+  ;; initialize it. Return the new type-num.
+  (defun register-info-metadata (type-num class-keyword type-keyword type-spec)
+    (let ((metainfo (find-type-info class-keyword type-keyword)))
+      (cond (metainfo) ; Do absolutely positively nothing.
+            (t
+             (when (eql type-num -1)
+               ;; The zeroth type is reserved as a tombstone to allow deletion
+               ;; from a compact info environment, and 63 is reserved to support
+               ;; the implementation of INFO itself without DEFINE-INFO-TYPE
+               ;; having claimed a type-num for the machinery's private use.
+               (setq type-num
+                     (or (position nil *info-types*
+                                   :start 1 :end +info-metainfo-type-num+)
+                         (error "no more INFO type numbers available"))))
+             (setf metainfo (make-globaldb-info-metadata
+                             type-num class-keyword type-keyword type-spec)
+                   (aref *info-types* type-num) metainfo)
+             (let ((list (get-type-info-metadata type-keyword)))
+               (symbol-set-info-value
+                type-keyword +info-metainfo-type-num+
+                (cond ((not list) metainfo) ; unique, just store it
+                      ((listp list) (cons metainfo list)) ; prepend to the list
+                      (t (list metainfo list))))))) ; convert atom to a list
+      (type-info-number metainfo)))
 
-;;; Return the info structure for an info class or type, or die trying.
-(declaim (ftype (function (keyword) class-info) class-info-or-lose))
-(defun class-info-or-lose (class)
-  (declare (type keyword class))
-  #+sb-xc (/noshow0 "entering CLASS-INFO-OR-LOSE, CLASS=..")
-  #+sb-xc (/nohexstr class)
-  (prog1
-      (flet ((lookup (class)
-               (or (gethash class *info-classes*)
-                   (error "~S is not a defined info class." class))))
-        (if (symbolp class)
-            (or (get class 'class-info-or-lose-cache)
-                (setf (get class 'class-info-or-lose-cache)
-                      (lookup class)))
-            (lookup class)))
-    #+sb-xc (/noshow0 "returning from CLASS-INFO-OR-LOSE")))
+  ;; If CLASS-KEYWORD/TYPE-KEYWORD designate an info-type,
+  ;; return the corresponding TYPE-INFO object, otherwise NIL.
+  (defun find-type-info (class-keyword type-keyword)
+    (declare (type keyword class-keyword type-keyword))
+    (let ((metadata (get-type-info-metadata type-keyword)))
+      ;; Most TYPE-KEYWORDs uniquely designate an object, so we store only that.
+      ;; Otherwise we store a list which has a small handful of (<= 4) items.
+      (cond ((listp metadata)
+             ;; Can we *please* make (FIND ...) not call GENERIC+
+             ;; so that I don't feel compelled to express this as a DOLIST ?
+             (dolist (info metadata nil)
+               (when (eq (type-info-class (truly-the type-info info))
+                         class-keyword)
+                 (return info))))
+            ((eq (type-info-class (truly-the type-info metadata)) class-keyword)
+             metadata)))))
+
 (declaim (ftype (function (keyword keyword) type-info) type-info-or-lose))
 (defun type-info-or-lose (class type)
   #+sb-xc (/noshow0 "entering TYPE-INFO-OR-LOSE, CLASS,TYPE=..")
   #+sb-xc (/nohexstr class)
   #+sb-xc (/nohexstr type)
-  (prog1
-      (or (find-type-info type (class-info-or-lose class))
-          (error "~S is not a defined info type." type))
-    #+sb-xc (/noshow0 "returning from TYPE-INFO-OR-LOSE")))
+  (or (find-type-info class type)
+      (error "(~S ~S) is not a defined info type." class type)))
 
 ) ; EVAL-WHEN
 
@@ -227,35 +237,11 @@
 (eval-when (:compile-toplevel :execute)
 
 ;;; Set up the data structures to support an info class.
-;;;
-;;; comment from CMU CL:
-;;;   We make sure that the class exists at compile time so that
-;;;   macros can use it, but we don't actually store the init function
-;;;   until load time so that we don't break the running compiler.
-;;; KLUDGE: I don't think that's the way it is any more, but I haven't
-;;; looked into it enough to write a better comment. -- WHN 2001-03-06
+
 (#+sb-xc-host defmacro
  #-sb-xc-host sb!xc:defmacro
      define-info-class (class)
-  (declare (type keyword class))
-  `(progn
-     ;; (We don't need to evaluate this at load time, compile time is
-     ;; enough. There's special logic elsewhere which deals with cold
-     ;; load initialization by inspecting the info class data
-     ;; structures at compile time and generating code to recreate
-     ;; those data structures.)
-     (eval-when (:compile-toplevel :execute)
-       (unless (gethash ,class *info-classes*)
-         (setf (gethash ,class *info-classes*) (make-class-info ,class))))
-     ,class))
-
-;;; Find a type number not already in use by looking for a null entry
-;;; in *INFO-TYPES*.
-;;; The zeroth type is reserved as a tombstone to support deletion
-;;; from a compact info environment.
-(defun find-unused-type-number ()
-  (or (position nil *info-types* :start 1)
-      (error "no more INFO type numbers available")))
+  `(progn ',class)) ; FIXME: remove this do-nothing macro
 
 ;;; a list of forms for initializing the DEFAULT slots of TYPE-INFO
 ;;; objects, accumulated during compilation and eventually converted
@@ -300,23 +286,16 @@
        ;; that's not handled here; it's handled by later code which
        ;; looks at the compile time state and generates code to
        ;; replicate it at cold load time.
-       (let* ((class-info (class-info-or-lose ',class))
-              (old-type-info (find-type-info ',type class-info)))
-         (unless old-type-info
-           (let* ((new-type-number (find-unused-type-number))
-                  (new-type-info
-                   (make-type-info :name ',type
-                                   :class class-info
-                                   :number new-type-number
-                                   :type ',type-spec)))
-             (setf (aref *info-types* new-type-number) new-type-info)
-             (push new-type-info (class-info-types class-info)))))
+       (let ((num (register-info-metadata -1 ,class ,type ',type-spec)))
        ;; Arrange for TYPE-INFO-DEFAULT, TYPE-INFO-TYPE-CHECKER, and
        ;; TYPE-INFO-VALIDATE-FUNCTION to be set at cold load
        ;; time. (They can't very well be set at cross-compile time,
        ;; since they differ between host and target and are
        ;; host-compiled closures.)
-       (push `(let ((type-info (type-info-or-lose ,',class ,',type)))
+         (push `(let ((type-info (aref *info-types* ,num)))
+                  ;; cold-init can't actually AVER without crashing hard,
+                  ;; but what the heck, let's do it.
+                  (aver type-info)
                 ,@',(unless (eq type-spec 't)
                       ;; avoid re-inventing #'IDENTITY N times over
                       `((setf (type-info-type-checker type-info)
@@ -324,7 +303,7 @@
                 (setf (type-info-validate-function type-info)
                       ,',validate-function
                       (type-info-default type-info) ,',default))
-             *!reversed-type-info-init-forms*))
+             *!reversed-type-info-init-forms*)))
      ',type))
 
 ) ; EVAL-WHEN
@@ -386,8 +365,7 @@
                                      `(svref ,n-info-types
                                              ,type-number-var)))
                           `(let ((,type-var (type-info-name ,n-type-info))
-                                 (,class-var (class-info-name
-                                              (type-info-class ,n-type-info)))
+                                 (,class-var (type-info-class ,n-type-info))
                                  (,value-var (svref ,n-entries ,n-type)))
                              (declare (ignorable ,type-var ,class-var
                                                  ,value-var))
@@ -415,8 +393,7 @@
                  ,(once-only ((n-type `(svref ,n-info-types
                                               ,type-number-var)))
                     `(let ((,type-var (type-info-name ,n-type))
-                           (,class-var (class-info-name
-                                        (type-info-class ,n-type)))
+                           (,class-var (type-info-class ,n-type))
                            (,value-var (cdar ,n-types)))
                        (declare (ignorable ,type-var ,class-var ,value-var))
                        ,@body))))))))))
@@ -704,67 +681,6 @@
       (error "cannot modify this environment: ~S" env))
     (the volatile-info-env env)))
 
-(declaim (ftype (function (simple-vector (or symbol (eql 0)) type-number)
-                          (or null index))
-                packed-info-value-index))
-
-;;; Some of this stuff belongs in 'symbol.lisp', but is here
-;;; because 'symbol.lisp' is :NOT-HOST in build-order.
-
-;; Return the globaldb info for SYMBOL. With respect to the state diagram
-;; presented at the definition of SYMBOL-PLIST, if the object in SYMBOL's
-;; info slot is LISTP, it is in state 1 or 3. Either way, take the CDR.
-;; Otherwise, it is in state 2 so return the value as-is.
-;; In terms of this function being named "-vector", implying always a vector,
-;; it is understood that NIL is a proxy for +NIL-PACKED-INFOS+, a vector.
-;;
-#!-symbol-info-vops (declaim (inline symbol-info-vector))
-(defun symbol-info-vector (symbol)
-  (let ((info-holder (symbol-info symbol)))
-    (truly-the (or null simple-vector)
-               (if (listp info-holder) (cdr info-holder) info-holder))))
-
-#+sb-xc-host
-;; SYMBOL-INFO is a primitive object accessor defined in 'objdef.lisp'
-;; and UPDATE-SYMBOL-INFO is defined in 'symbol.lisp'.
-;; But in the host Lisp, there is no such thing as a symbol-info slot,
-;; even if the host is SBCL. Instead, symbol-info is kept in the symbol-plist.
-(macrolet ((get-it () '(get symbol :sb-xc-globaldb-info)))
-  (defun symbol-info (symbol) (get-it))
-  (defun update-symbol-info (symbol update-fn)
-    ;; Never pass NIL to an update-fn. Pass the minimal info-vector instead,
-    ;; a vector describing 0 infos and 0 auxilliary keys.
-    (let ((newval (funcall update-fn (or (get-it) +nil-packed-infos+))))
-      (when newval
-        (setf (get-it) newval))
-      (values))))
-
-;; Helper for SET-INFO-VALUE to update packed info vectors.
-;; If NAME is one that supports storage of its infos in a symbol-info cell,
-;; then do the update and return T. Otherwise return NIL.
-;;
-;; If the old info can be updated without unpacking/repacking, then copy it
-;; and do the update; otherwise unpack, grow the vector, and repack.
-;; Truly in-place updates are never permitted due to the very minimal lockfree
-;; protocol. Since info vectors are short, it's ok that the old one is discarded
-;; every time a value is written. A more intricate lockfree protocol would
-;; allow re-use of the vector when changing the value in an existing cell.
-;;
-(declaim (ftype (sfunction (t type-number t) boolean) symbol-set-info-value))
-(defun symbol-set-info-value (name type-number new-value)
-  (declare (inline packed-info-insert))
-  (with-possibly-compound-name (key1 key2) name
-    (dx-flet ((update (vect) ; VECT is a packed vector, never NIL
-                (declare (simple-vector vect))
-                (let ((index (packed-info-value-index vect key2 type-number)))
-                  (if index
-                      (let ((copy (copy-seq vect)))
-                        (setf (svref copy index) new-value)
-                        copy)
-                      (packed-info-insert vect key2 type-number new-value)))))
-      (update-symbol-info key1 #'update)
-      (return-from symbol-set-info-value t))))
-
 ;;; If Name is already present in the table, then just create or
 ;;; modify the specified type. Otherwise, add the new name and type,
 ;;; checking for rehashing.
@@ -934,6 +850,7 @@
 ;; Creation of new fdefinitions is still defined there though.
 ;; Assume that exists-p implies LEGAL-FUN-NAME-P.
 ;;
+#-sb-xc-host
 (declaim (ftype (sfunction ((or symbol list)) (or fdefn null))
                 find-fdefinition))
 (defun find-fdefinition (name0)
@@ -1241,52 +1158,27 @@
          (format t "~&  ~@[type ~D~]~@[~{~S ~S~}~] ~S = "
                  (if (not type) type-num)
                  (if type
-                     (list (class-info-name (type-info-class type))
-                           (type-info-name type)))
+                     (list (type-info-class type) (type-info-name type)))
                  name)
          (write val :level 1)))
      sym)))
 
 
-;;; Now that we have finished initializing *INFO-CLASSES* and
+;;; Now that we have finished initializing
 ;;; *INFO-TYPES* (at compile time), generate code to set them at cold
 ;;; load time to the same state they have currently.
 (!cold-init-forms
-  (/show0 "beginning *INFO-CLASSES* init, calling MAKE-HASH-TABLE")
-  (setf *info-classes*
-        (make-hash-table :test 'eq :size #.(* 2 (hash-table-count *info-classes*))))
-  (/show0 "done with MAKE-HASH-TABLE in *INFO-CLASSES* init")
-  (dolist (class-info-name '#.(let ((result nil))
-                                (maphash (lambda (key value)
-                                           (declare (ignore value))
-                                           (push key result))
-                                         *info-classes*)
-                                (sort result #'string<)))
-    (let ((class-info (make-class-info class-info-name)))
-      (setf (gethash class-info-name *info-classes*)
-            class-info)))
-  (/show0 "done with *INFO-CLASSES* initialization")
   (/show0 "beginning *INFO-TYPES* initialization")
-  (setf *info-types*
-        (map 'vector
-             (lambda (x)
-               (/show0 "in LAMBDA (X), X=..")
-               (/hexstr x)
-               (when x
-                 (let* ((class-info (class-info-or-lose (second x)))
-                        (type-info (make-type-info :name (first x)
-                                                   :class class-info
-                                                   :number (third x)
-                                                   :type (fourth x))))
-                   (/show0 "got CLASS-INFO in LAMBDA (X)")
-                   (push type-info (class-info-types class-info))
-                   type-info)))
-             '#.(map 'list
-                     (lambda (info-type)
-                       (when info-type
-                         (list (type-info-name info-type)
-                               (class-info-name (type-info-class info-type))
-                               (type-info-number info-type)
+  #-sb-xc-host
+  ;; Host already has this array, do not clobber it
+  (setq *info-types* (make-array (ash 1 type-number-bits) :initial-element nil))
+  (mapc (lambda (x)
+          (register-info-metadata (first x) (second x) (third x) (fourth x)))
+        '#.(loop for info-type across *info-types*
+                  when info-type
+                 collect (list (type-info-number info-type)
+                               (type-info-class info-type)
+                               (type-info-name info-type)
                                ;; KLUDGE: for repeatable xc fasls, to
                                ;; avoid different cross-compiler
                                ;; treatment of equal constants here we
@@ -1294,14 +1186,15 @@
                                ;; valid identity transformation
                                ;; [e.g. on (EQL (FOO))] but is OK for
                                ;; all the types we use here.
-                               (copy-tree (type-info-type info-type)))))
-                     *info-types*)))
+                               (copy-tree (type-info-type-spec info-type)))))
   (/show0 "done with *INFO-TYPES* initialization"))
 
 ;;; At cold load time, after the INFO-TYPE objects have been created,
 ;;; we can set their DEFAULT and TYPE slots.
 (macrolet ((frob ()
              `(!cold-init-forms
+               ;; I [dpk] really think reversal now is a red herring.
+               ;; I see nothing that would fail here regardless of order.
                 ,@(reverse *!reversed-type-info-init-forms*))))
   (frob))
 
@@ -1335,13 +1228,13 @@
       (with-unique-names (value foundp)
         `(multiple-value-bind (,value ,foundp)
              (get-info-value ,name ,(type-info-number info))
-           (values (truly-the ,(type-info-type info) ,value) ,foundp)))))
+           (values (truly-the ,(type-info-type-spec info) ,value) ,foundp)))))
 
   (def (setf info) (new-value class type name)
     (let* (#+sb-xc-host (sb!xc:*gensym-counter* sb!xc:*gensym-counter*)
            (info (type-info-or-lose class type))
            (tin (type-info-number info))
-           (type-spec (type-info-type info))
+           (type-spec (type-info-type-spec info))
            (check
             (when (type-info-validate-function info)
               ;; is (or ... null), but non-null in host implies non-null

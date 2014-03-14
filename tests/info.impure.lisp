@@ -66,9 +66,9 @@
 
 (test-util:with-test (:name :set-info-value-type-check)
   (loop for type-info across *info-types*
-        when (and type-info (not (eq (type-info-type type-info) 't)))
+        when (and type-info (not (eq (type-info-type-spec type-info) 't)))
         do
-        (let ((key1 (class-info-name (type-info-class type-info)))
+        (let ((key1 (type-info-class type-info))
               (key2 (type-info-name type-info))
               (sillyval (make-string-output-stream))) ; nothing should be this
           ;; check the type-checker function
