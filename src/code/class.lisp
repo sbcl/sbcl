@@ -192,6 +192,8 @@
   (pure nil :type (member t nil 0))
   ;; Number of raw words at the end.
   ;; This slot is known to the C runtime support code.
+  ;; It counts the number of untagged cells, not user-visible slots.
+  ;; e.g. on 32-bit machines, each (COMPLEX DOUBLE-FLOAT) counts as 4.
   (n-untagged-slots 0 :type index)
   ;; Definition location
   (source-location nil)

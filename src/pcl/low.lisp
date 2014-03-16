@@ -74,8 +74,8 @@
 
 ;;; Note that for SBCL, as for CMU CL, the WRAPPER of a built-in or
 ;;; structure class will be some other kind of SB-KERNEL:LAYOUT, but
-;;; this shouldn't matter, since the only two slots that WRAPPER adds
-;;; are meaningless in those cases.
+;;; this shouldn't matter, since the slot that WRAPPER adds
+;;; is meaningless in those cases.
 (defstruct (wrapper
             (:include layout
                       ;; KLUDGE: In CMU CL, the initialization default
