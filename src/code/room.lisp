@@ -834,7 +834,8 @@
                     (eq (cdr obj) object))
             (maybe-call fun obj)))
          (instance
-          (dotimes (i (%instance-length obj))
+          (dotimes (i (- (%instance-length obj)
+                         (layout-n-untagged-slots (%instance-layout obj))))
             (when (eq (%instance-ref obj i) object)
               (maybe-call fun obj)
               (return))))
@@ -853,7 +854,7 @@
          (symbol
           (when (or (eq (symbol-name obj) object)
                     (eq (symbol-package obj) object)
-                    (eq (symbol-plist obj) object)
+                    (eq (symbol-info obj) object)
                     (and (boundp obj)
                          (eq (symbol-value obj) object)))
             (maybe-call fun obj)))))
