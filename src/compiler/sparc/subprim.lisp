@@ -27,7 +27,7 @@
   (:generator 50
     (let ((done (gen-label))
           (loop (gen-label))
-          (not-list (generate-cerror-code vop object-not-list-error object)))
+          (not-list (generate-error-code vop object-not-list-error object)))
       (move ptr object)
       (move count zero-tn)
 
@@ -46,7 +46,7 @@
       (inst add count count (fixnumize 1))
       (test-type ptr loop nil (list-pointer-lowtag) :temp temp)
 
-      (cerror-call vop done object-not-list-error ptr)
+      (error-call vop object-not-list-error ptr)
 
       (emit-label done)
       (move result count))))
