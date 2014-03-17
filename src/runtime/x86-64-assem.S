@@ -82,10 +82,8 @@
 #if defined(LISP_FEATURE_DARWIN)
 /* global symbol x86-64 sym(%rip) hack:*/
 #define GSYM(name) name(%rip)
-#define END()
 #else
 #define GSYM(name) $name
-#define END() .end
 #endif
 
         
@@ -618,5 +616,3 @@ ascs_check_loop:
 ascs_finished:
 	ret
 	SIZE(GNAME(arch_scrub_control_stack))
-
-        END()

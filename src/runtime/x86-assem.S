@@ -168,10 +168,8 @@
  * advance the EIP by two bytes to skip over ud2 instruction and
  * call sigtrap_handler. */
 #if defined(LISP_FEATURE_UD2_BREAKPOINTS)
-#define END()
 #define TRAP ud2
 #else
-#define END() .end
 #define TRAP int3
 #endif
 
@@ -1138,5 +1136,3 @@ ascs_check_loop:
 ascs_finished:
 	ret
 	SIZE(GNAME(arch_scrub_control_stack))
-
-        END()

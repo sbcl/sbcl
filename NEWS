@@ -13,6 +13,7 @@ changes relative to sbcl-1.1.16:
     (lp#1077996)
   * bug fix: MAKE-CONDITION reports names of missing condition classes
     properly (lp#1199223)
+  * bug fix: restore building with clang. (lp#1293643) 
 
 changes in sbcl-1.1.16 relative to sbcl-1.1.15:
   * minor incompatible change: improve read/print consistency for pathnames on
