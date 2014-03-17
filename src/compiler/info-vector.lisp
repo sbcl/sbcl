@@ -542,15 +542,15 @@
 
 ;; MAKE-INFO-DESCRIPTOR is basically ASH-LEFT-MODFX, shifting VAL by SHIFT.
 ;; It is important that info descriptors be target fixnums, but 'cross-modular'
-;; isn't loaded early enough to just use that.
+;; isn't loaded early enough to use 'mask-signed-field'.
 ;; It's not needed on 64-bit host/target combination because 10 fields (60 bits)
 ;; never touch the sign bit.
+;; FIXME: figure out why the definition of ash-left-modfx is
+;; conditionalized out for platforms other than x86[-64].
+;; It looks like it ought to work whether or not there are vops.
 (defmacro make-info-descriptor (val shift)
   (if (> sb!vm:n-fixnum-bits 30)
       `(ash ,val ,shift)
-      #-sb-xc-host
-      `(sb!vm::ash-left-modfx ,val ,shift)
-      #+sb-xc-host
       `(logior (if (logbitp (- 29 ,shift) ,val) sb!xc:most-negative-fixnum 0)
                (ash ,val ,shift))))
 
