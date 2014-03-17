@@ -130,7 +130,7 @@
       (inst add csp-tn csp-tn n-word-bytes)
       (storew temp csp-tn -1)
       (test-type list loop nil (list-pointer-lowtag) :temp ndescr)
-      (error-call vop bogus-arg-to-values-list-error list)
+      (error-call vop 'bogus-arg-to-values-list-error list)
 
       (emit-label done)
       (inst sub count csp-tn start))))

@@ -161,7 +161,7 @@
            `((define-vop (,check-name check-type)
                (:generator ,cost
                  (let ((err-lab
-                        (generate-error-code vop ,error-code value)))
+                        (generate-error-code vop ',error-code value)))
                    (test-type value err-lab t (,@type-codes)
                               :temp temp)
                    (move result value))))))
@@ -195,7 +195,7 @@
 
 (define-vop (check-signed-byte-32 check-type)
   (:generator 45
-              (let ((nope (generate-error-code vop object-not-signed-byte-32-error value))
+              (let ((nope (generate-error-code vop 'object-not-signed-byte-32-error value))
                     (yep (gen-label)))
                 (inst andcc temp value fixnum-tag-mask)
                 (inst b :eq yep)
@@ -265,7 +265,7 @@
 (define-vop (check-unsigned-byte-32 check-type)
   (:generator 45
               (let ((nope
-                     (generate-error-code vop object-not-unsigned-byte-32-error value))
+                     (generate-error-code vop 'object-not-unsigned-byte-32-error value))
                     (yep (gen-label))
                     (fixnum (gen-label))
                     (single-word (gen-label)))
@@ -326,7 +326,7 @@
 (define-vop (check-symbol check-type)
   (:generator 12
               (let ((drop-thru (gen-label))
-                    (error (generate-error-code vop object-not-symbol-error value)))
+                    (error (generate-error-code vop 'object-not-symbol-error value)))
                 (inst cmp value null-tn)
                 (inst b :eq drop-thru)
                 (test-type value error t (symbol-header-widetag) :temp temp)
@@ -345,7 +345,7 @@
 
 (define-vop (check-cons check-type)
   (:generator 8
-              (let ((error (generate-error-code vop object-not-cons-error value)))
+              (let ((error (generate-error-code vop 'object-not-cons-error value)))
                 (inst cmp value null-tn)
                 (inst b :eq error)
                 (test-type value error t (list-pointer-lowtag) :temp temp)

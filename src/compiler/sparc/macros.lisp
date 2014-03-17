@@ -293,7 +293,7 @@
             (note-this-location vop :internal-error)))
         (inst unimp ,kind)
         (with-adjustable-vector (,vector)
-          (write-var-integer (error-number-or-lose ',code) ,vector)
+          (write-var-integer (error-number-or-lose ,code) ,vector)
           ,@(mapcar #'(lambda (tn)
                         `(let ((tn ,tn))
                            (write-var-integer (make-sc-offset (sc-number

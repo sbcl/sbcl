@@ -1213,7 +1213,7 @@ default-value-8
   (:save-p :compute-only)
   (:generator 3
     (let ((err-lab
-           (generate-error-code vop invalid-arg-count-error nargs)))
+           (generate-error-code vop 'invalid-arg-count-error nargs)))
       (inst cmp nargs (fixnumize count))
       (if (member :sparc-v9 *backend-subfeatures*)
           ;; Assume we don't take the branch
@@ -1233,7 +1233,7 @@ default-value-8
                 (:vop-var vop)
                 (:save-p :compute-only)
                 (:generator 1000
-                  (error-call vop ,error ,@args)))))
+                  (error-call vop ',error ,@args)))))
   (frob arg-count-error invalid-arg-count-error
     sb!c::%arg-count-error nargs)
   (frob type-check-error object-not-type-error sb!c::%type-check-error

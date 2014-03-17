@@ -146,7 +146,7 @@
   (:vop-var vop)
   (:save-p :compute-only)
   (:generator 666
-    (error-call vop object-not-type-error x type)))
+    (error-call vop 'object-not-type-error x type)))
 
 ;;;; moves and coercions:
 

@@ -174,7 +174,7 @@
                           (:temp target-uwp any-reg nl2-offset))
   (declare (ignore start count))
 
-  (let ((error (generate-error-code nil invalid-unwind-error)))
+  (let ((error (generate-error-code nil 'invalid-unwind-error)))
     (inst cmp block)
     (inst b :eq error))
 
@@ -215,7 +215,7 @@
 
   loop
 
-  (let ((error (generate-error-code nil unseen-throw-tag-error target)))
+  (let ((error (generate-error-code nil 'unseen-throw-tag-error target)))
     (inst cmp catch)
     (inst b :eq error)
     (inst nop))
