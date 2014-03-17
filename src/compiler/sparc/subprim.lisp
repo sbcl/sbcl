@@ -27,26 +27,22 @@
   (:generator 50
     (let ((done (gen-label))
           (loop (gen-label))
-          (not-list (generate-error-code vop 'object-not-list-error object)))
+          (not-list (generate-error-code vop 'object-not-list-error ptr)))
       (move ptr object)
+
+      (inst cmp ptr null-tn)
+      (inst b :eq done)
       (move count zero-tn)
 
       (emit-label loop)
 
-      (inst cmp ptr null-tn)
-      (inst b :eq done)
-      (inst nop)
-
-      ;; FIXME: Maybe rewrite this to remove this TEST-TYPE (and the
-      ;; one below) to put it in line with all other architectures
-      ;; (apart from PPC)?
       (test-type ptr not-list t (list-pointer-lowtag) :temp temp)
 
       (loadw ptr ptr cons-cdr-slot list-pointer-lowtag)
-      (inst add count count (fixnumize 1))
-      (test-type ptr loop nil (list-pointer-lowtag) :temp temp)
 
-      (error-call vop 'object-not-list-error ptr)
+      (inst cmp ptr null-tn)
+      (inst b :ne loop)
+      (inst add count count (fixnumize 1))
 
       (emit-label done)
       (move result count))))
