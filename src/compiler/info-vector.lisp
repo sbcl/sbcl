@@ -151,7 +151,7 @@
 #-sb-xc-host
 (progn
   (defun make-info-forwarding-pointer (index)
-    (declare (info-cell-index index) (optimize (safety 0)))
+    (declare (type info-cell-index index) (optimize (safety 0)))
     (sb!kernel:%make-lisp-obj (+ (ash index 8) sb!vm:unbound-marker-widetag)))
   (defun info-forwarding-pointer-target (marker)
     (ash (sb!kernel:get-lisp-obj-address marker) -8))
@@ -193,7 +193,7 @@
          (let* ((,len (info-storage-capacity ,storage))
                 (,key-index (+ (rem ,hashval ,len) +info-keys-offset+))
                 (,step 0))
-           (declare (info-cell-index ,key-index ,step))
+           (declare (type info-cell-index ,key-index ,step))
            (dx-flet ((,miss-fn () ,miss))
              (tagbody
                 (,test)
@@ -286,7 +286,7 @@
        :miss
        (progn
         (let ((old-count (stupid-atomic-bump-count env 1)))
-          (declare (info-cell-index old-count))
+          (declare (type info-cell-index old-count))
           (when (>= old-count (info-storage-threshold storage))
             (sb!thread:with-mutex ((info-env-mutex env))
               ;; any thread could have beaten us to rehashing
@@ -525,7 +525,7 @@
   (declare (simple-vector vector)) ; unpacked format
   (let ((index 0) ; index into the unpacked input vector
         (n-fields 0)) ; will be the total number of packed fields
-    (declare (index index end n-fields))
+    (declare (type index index end n-fields))
     (loop
        ;; 'length' is the number of vector elements in this info group,
        ;; including itself but not including its auxilliary key.
@@ -566,12 +566,12 @@
          (k (length output)) ; data index: pre-decrement to write
          (field-shift 0)
          (word 0))
-    (declare (index-or-minus-1 i j k end)
+    (declare (type index-or-minus-1 i j k end)
              (type (mod #.(1+ (* (1- +infos-per-word+) type-number-bits)))
                    field-shift)
-             (info-descriptor word))
+             (type info-descriptor word))
     (flet ((put-field (val) ; insert VAL into the current packed descriptor
-             (declare (type-number val))
+             (declare (type type-number val))
              (setq word (logior (make-info-descriptor val field-shift) word))
              (if (< field-shift (* (1- +infos-per-word+) type-number-bits))
                  (incf field-shift type-number-bits)
@@ -603,7 +603,7 @@
             (,descriptor-index -1)
             (,count 0)
             (,word 0))
-       (declare (info-descriptor ,word)
+       (declare (type info-descriptor ,word)
                 (fixnum ,count)
                 (type index-or-minus-1 ,descriptor-index))
        (flet ((,generator ()
@@ -628,7 +628,7 @@
         (descriptor-idx 0)
         (field-idx 0)
         (total-n-fields 0))
-    (declare (index end descriptor-idx total-n-fields)
+    (declare (type index end descriptor-idx total-n-fields)
              (type (mod #.+infos-per-word+) field-idx))
     ;; Loop through the descriptors in random-access fashion.
     ;; Skip 1+ n-infos each time, because the 'n-infos' is itself a field
@@ -652,7 +652,7 @@
   (unless output-supplied-p
     (setq output (make-array (compute-unpackified-info-size input))))
   (let ((i (length input)) (j -1))  ; input index and output index respectively
-    (declare (index-or-minus-1 i j))
+    (declare (type index-or-minus-1 i j))
     (with-packed-info-iterator (next-field input :descriptor-index desc-idx)
       (loop ; over name
          (let ((n-infos (next-field)))
@@ -670,11 +670,11 @@
 ;; or NIL if not found.
 ;;
 (defun info-find-aux-key/unpacked (key vector end)
-  (declare (index end))
+  (declare (type index end))
   (if (eql key +no-auxilliary-key+)
       0 ; the first group's length (= end) is stored here always
       (let ((index 0))
-        (declare (index index))
+        (declare (type index index))
         (loop
            ;; skip 'length' cells plus the next aux-key
            (incf index (1+ (the index (svref vector index))))
@@ -698,7 +698,7 @@
         ;; On each iteration DATA-IDX points to an aux-key cell
         ;; The first group's imaginary aux-key cell is past the end.
         (data-idx (length (the simple-vector vector))))
-    (declare (index descriptor-idx data-idx)
+    (declare (type index descriptor-idx data-idx)
              (fixnum field-idx)) ; can briefly exceed +infos-per-word+
     ;; Efficiently skip past N-INFOS infos. If decrementing the data index
     ;; hits the descriptor index, we're done. Otherwise increment the field
@@ -737,7 +737,7 @@
 ;; efficient since the temporary vector is stack-allocated.
 ;;
 (defun %packed-info-insert (input aux-key type-number value)
-  (declare (simple-vector input) (type-number type-number))
+  (declare (simple-vector input) (type type-number type-number))
   (let* ((n-extra-elts
           ;; Test if the aux-key has been seen before or needs to be added.
           (if (and (not (eql aux-key +no-auxilliary-key+))
@@ -747,7 +747,7 @@
          (old-size (compute-unpackified-info-size input))
          (new-size (+ old-size n-extra-elts))
          (new (make-array new-size)))
-    (declare (index old-size new-size)
+    (declare (type index old-size new-size)
              (truly-dynamic-extent new))
     (unpackify-infos input new)
     (flet ((insert-at (point v0 v1)
@@ -845,7 +845,7 @@
 (defun packed-info-value-index (vector aux-key type-num)
   (declare (optimize (safety 0))) ; vector bounds are AVERed
   (let ((data-idx (length vector)) (descriptor-idx 0) (field-idx 0))
-    (declare (index descriptor-idx)
+    (declare (type index descriptor-idx)
              (type (mod #.+infos-per-word+) field-idx))
     (unless (eql aux-key +no-auxilliary-key+)
       (multiple-value-setq (data-idx descriptor-idx field-idx)
@@ -860,9 +860,9 @@
            ;; if starting index = 2, there's space for 7 more fields in 60 bits.
            (swath (min (- +infos-per-word+ field-idx 1) n-infos)))
       ;; Type inference on n-infos deems it to have no lower bound due to DECF.
-      (declare (info-descriptor descriptor)
+      (declare (type info-descriptor descriptor)
                (type (unsigned-byte #.type-number-bits) n-infos)
-               (index data-idx))
+               (type index data-idx))
       ;; Repeatedly shift and mask, which is quicker than extracting a field at
       ;; varying positions. Start by shifting out the n-infos field.
       (setq descriptor (ash descriptor (- type-number-bits)))
@@ -898,7 +898,7 @@
   (let* ((end (compute-unpackified-info-size input))
          (new (make-array end))
          (data-start 0))
-    (declare (truly-dynamic-extent new) (index end data-start))
+    (declare (truly-dynamic-extent new) (type index end data-start))
     (unpackify-infos input new)
     (let ((start (info-find-aux-key/unpacked key2 new end)))
       (aver start) ; must be found - it was in the packed vector
@@ -939,7 +939,7 @@
 (defun %call-with-each-info (function vect root-symbol)
   (let ((name root-symbol)
         (data-idx (length vect)))
-    (declare (index data-idx))
+    (declare (type index data-idx))
     (with-packed-info-iterator (next-field vect :descriptor-index desc-idx)
       (loop ; over name
          (dotimes (i (next-field)) ; number of infos for this name

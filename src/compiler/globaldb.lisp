@@ -865,7 +865,7 @@
       (awhen (symbol-info-vector key1)
         (multiple-value-bind (data-idx descriptor-idx field-idx)
             (info-find-aux-key/packed it key2)
-          (declare (index descriptor-idx)
+          (declare (type index descriptor-idx)
                    (type (integer 0 #.+infos-per-word+) field-idx))
           ;; Secondary names must have at least one info, so if a descriptor
           ;; exists, there's no need to extract the n-infos field.
