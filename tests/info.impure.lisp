@@ -64,6 +64,17 @@
             (assert (or (definition-source-location-p srcloc)
                         (null srcloc)))))))))
 
+(test-util:with-test (:name :find-classoid-signal-error)
+  ;; (EVAL ''SILLY) dumbs down the compiler for this test.
+  ;; FIND-CLASSOID on a constant symbol becomes
+  ;;  `(CLASSOID-CELL-CLASSOID ',(FIND-CLASSOID-CELL name :create t))
+  ;; and I want just the primitive operations without muddying the water.
+  (let ((name (eval ''silly)))
+    (assert (not (find-classoid name nil)))
+    (assert (typep (handler-case (find-classoid name) (error (e) e)) 'error))
+    (find-classoid-cell name :create t) ; After this, have cell but no classoid
+    (assert (typep (handler-case (find-classoid name) (error (e) e)) 'error))))
+
 (test-util:with-test (:name :set-info-value-type-check)
   (loop for type-info across *info-types*
         when (and type-info (not (eq (type-info-type-spec type-info) 't)))

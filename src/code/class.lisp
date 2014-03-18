@@ -700,18 +700,12 @@
   ;; PCL class, if any
   (pcl-class nil))
 
-(defun find-classoid-cell (name &key create errorp)
+(defun find-classoid-cell (name &key create)
   (let ((real-name (uncross name)))
     (cond ((info :type :classoid-cell real-name))
           (create
            (sb!c::atomically-get-or-put-symbol-info
-            :type :classoid-cell real-name (make-classoid-cell real-name)))
-          (errorp
-           (error 'simple-type-error
-                  :datum nil
-                  :expected-type 'class
-                  :format-control "Class not yet defined: ~S"
-                  :format-arguments (list name))))))
+            :type :classoid-cell real-name (make-classoid-cell real-name))))))
 
 (eval-when (#-sb-xc :compile-toplevel :load-toplevel :execute)
 
@@ -719,8 +713,14 @@
   ;; then NIL is returned when no such class exists."
   (defun find-classoid (name &optional (errorp t))
     (declare (type symbol name))
-    (let ((cell (find-classoid-cell name :errorp errorp)))
-      (when cell (classoid-cell-classoid cell))))
+    (let ((cell (find-classoid-cell name)))
+      (cond ((and cell (classoid-cell-classoid cell)))
+            (errorp
+             (error 'simple-type-error
+                    :datum nil
+                    :expected-type 'class
+                    :format-control "Class not yet defined: ~S"
+                    :format-arguments (list name))))))
 
   (defun (setf find-classoid) (new-value name)
     #-sb-xc (declare (type (or null classoid) new-value))
