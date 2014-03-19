@@ -66,33 +66,6 @@
            (setf ,drops (random-fixnum)
                  ,drop-pos sb-vm:n-fixnum-bits))))))
 
-;;;; early definition of WRAPPER
-;;;;
-;;;; Most WRAPPER stuff is defined later, but the DEFSTRUCT itself
-;;;; is here early so that things like (TYPEP .. 'WRAPPER) can be
-;;;; compiled efficiently.
-
-;;; Note that for SBCL, as for CMU CL, the WRAPPER of a built-in or
-;;; structure class will be some other kind of SB-KERNEL:LAYOUT, but
-;;; this shouldn't matter, since the slot that WRAPPER adds
-;;; is meaningless in those cases.
-(defstruct (wrapper
-            (:include layout
-                      ;; KLUDGE: In CMU CL, the initialization default
-                      ;; for LAYOUT-INVALID was NIL. In SBCL, that has
-                      ;; changed to :UNINITIALIZED, but PCL code might
-                      ;; still expect NIL for the initialization
-                      ;; default of WRAPPER-INVALID. Instead of trying
-                      ;; to find out, I just overrode the LAYOUT
-                      ;; default here. -- WHN 19991204
-                      (invalid nil)
-                      ;; This allows quick testing of wrapperness.
-                      (for-std-class-p t))
-            (:constructor make-wrapper-internal)
-            (:copier nil))
-  (slots () :type list))
-#-sb-fluid (declaim (sb-ext:freeze-type wrapper))
-
 ;;;; PCL's view of funcallable instances
 
 (!defstruct-with-alternate-metaclass standard-funcallable-instance
@@ -239,9 +212,11 @@ comparison.")
      (precompile-dfun-constructors ,system)
      (precompile-ctors)))
 
+;;; Return true of any object which is either a funcallable-instance,
+;;; or an ordinary instance that is not a structure-object.
 ;;; This definition is for interpreted code.
 (defun pcl-instance-p (x)
-  (typep (layout-of x) 'wrapper))
+  (layout-for-std-class-p (layout-of x)))
 
 ;;; CMU CL comment:
 ;;;   We define this as STANDARD-INSTANCE, since we're going to
@@ -294,9 +269,9 @@ comparison.")
     (get-slots instance)))
 
 (defmacro get-wrapper (inst)
-  (once-only ((wrapper `(wrapper-of ,inst)))
+  (once-only ((wrapper `(layout-of ,inst)))
     `(progn
-       (aver (typep ,wrapper 'wrapper))
+       (aver (layout-for-std-class-p ,wrapper))
        ,wrapper)))
 
 ;;;; support for useful hashing of PCL instances

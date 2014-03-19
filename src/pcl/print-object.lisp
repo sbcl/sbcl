@@ -139,10 +139,6 @@
               max-depth
               depth-limit))))
 
-(defmethod print-object ((wrapper wrapper) stream)
-  (print-unreadable-object (wrapper stream :type t :identity t)
-    (prin1 (wrapper-class wrapper) stream)))
-
 (defmethod print-object ((dfun-info dfun-info) stream)
   (declare (type stream stream))
   (print-unreadable-object (dfun-info stream :type t :identity t)))

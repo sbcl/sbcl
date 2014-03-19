@@ -129,6 +129,8 @@
                           (find-class ',class) ,class)))
                classes)))
 
+(defun !wrapper-p (x) (and (sb-kernel::layout-p x) (layout-for-std-class-p x)))
+
 (defun !bootstrap-meta-braid ()
   (let* ((*create-classes-from-internal-structure-definitions-p* nil)
          standard-class-wrapper standard-class
@@ -208,8 +210,8 @@
                   (error "Slot allocation ~S is not supported in bootstrap."
                          (getf slot :allocation))))
 
-              (when (wrapper-p wrapper)
-                (setf (wrapper-slots wrapper) slots))
+              (when (!wrapper-p wrapper)
+                (setf (layout-slot-list wrapper) slots))
 
               (setq proto (if (eq meta 'funcallable-standard-class)
                               (allocate-standard-funcallable-instance wrapper)
@@ -225,8 +227,8 @@
                      standard-effective-slot-definition-wrapper t))
 
               (setf (layout-slot-table wrapper) (make-slot-table class slots t))
-              (when (wrapper-p wrapper)
-                (setf (wrapper-slots wrapper) slots))
+              (when (!wrapper-p wrapper)
+                (setf (layout-slot-list wrapper) slots))
 
               (case meta
                 ((standard-class funcallable-standard-class)
@@ -328,8 +330,8 @@
             (make-slot-table class slots
                              (member metaclass-name
                                      '(standard-class funcallable-standard-class))))
-      (when (wrapper-p wrapper)
-        (setf (wrapper-slots wrapper) slots)))
+      (when (!wrapper-p wrapper)
+        (setf (layout-slot-list wrapper) slots)))
 
     ;; For all direct superclasses SUPER of CLASS, make sure CLASS is
     ;; a direct subclass of SUPER.  Note that METACLASS-NAME doesn't
@@ -545,7 +547,7 @@
                                        wrapper prototype))))))
 
 (defun class-of (x)
-  (wrapper-class* (wrapper-of x)))
+  (wrapper-class* (layout-of x)))
 
 (defun eval-form (form)
   (lambda () (eval form)))

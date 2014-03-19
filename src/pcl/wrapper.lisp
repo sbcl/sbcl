@@ -31,6 +31,11 @@
 (defmacro wrapper-no-of-instance-slots (wrapper)
   `(layout-length ,wrapper))
 
+(declaim (inline make-wrapper-internal))
+(defun make-wrapper-internal (&key length classoid)
+  (make-layout :length length :classoid classoid :invalid nil
+               :%for-std-class-b 1))
+
 ;;; This is called in BRAID when we are making wrappers for classes
 ;;; whose slots are not initialized yet, and which may be built-in
 ;;; classes. We pass in the class name in addition to the class.
@@ -121,10 +126,6 @@
 (defun invalid-wrapper-p (wrapper)
   (not (null (layout-invalid wrapper))))
 
-(declaim (inline wrapper-of))
-(defun wrapper-of (x)
-  (layout-of x))
-
 ;;; We only use this inside INVALIDATE-WRAPPER.
 (defvar *previous-nwrappers* (make-hash-table))
 
@@ -162,7 +163,7 @@
 ;;; (or the names of our callees.)
 (defun check-wrapper-validity (instance)
   (with-world-lock ()
-    (let* ((owrapper (wrapper-of instance))
+    (let* ((owrapper (layout-of instance))
            (state (layout-invalid owrapper)))
       (aver (not (eq state :uninitialized)))
       (cond ((not state)
@@ -190,7 +191,7 @@
                ;; Error message here is trying to figure out a bit more about the
                ;; situation, since we don't have anything approaching a test-case
                ;; for the bug.
-               (let ((new-state (layout-invalid (wrapper-of instance))))
+               (let ((new-state (layout-invalid (layout-of instance))))
                  (unless (neq t new-state)
                    (cerror "Nevermind and recurse." 'bug
                            :format-control "~@<~4IProblem forcing cache flushes. Please report ~
@@ -201,7 +202,7 @@
                            :format-arguments (mapcar (lambda (x)
                                                        (cons x (layout-invalid x)))
                                                      (list owrapper
-                                                           (wrapper-of instance)
+                                                           (layout-of instance)
                                                            (class-wrapper class)))))))
              (check-wrapper-validity instance))
             ((consp state)
@@ -225,7 +226,7 @@
     (check-wrapper-validity instance)))
 
 (defun valid-wrapper-of (instance)
-  (let ((wrapper (wrapper-of instance)))
+  (let ((wrapper (layout-of instance)))
     (if (invalid-wrapper-p wrapper)
         (check-wrapper-validity instance)
         wrapper)))
@@ -315,7 +316,7 @@
                   `((class *the-class-t*)
                     (type t))))
          (unless (eq mt t)
-           (setq wrapper (wrapper-of arg))
+           (setq wrapper (layout-of arg))
            (when (invalid-wrapper-p wrapper)
              (setq ,invalid-wrapper-p t)
              (setq wrapper (check-wrapper-validity arg)))

@@ -197,18 +197,27 @@
   (n-untagged-slots 0 :type index)
   ;; Definition location
   (source-location nil)
+  ;; If this layout is for an object of metatype STANDARD-CLASS,
+  ;; these are the EFFECTIVE-SLOT-DEFINITION metaobjects.
+  (slot-list nil :type list)
   ;; Information about slots in the class to PCL: this provides fast
   ;; access to slot-definitions and locations by name, etc.
   (slot-table #(nil) :type simple-vector)
   ;; True IFF the layout belongs to a standand-instance or a
-  ;; standard-funcallable-instance -- that is, true only if the layout
-  ;; is really a wrapper.
-  ;;
-  ;; FIXME: If we unify wrappers and layouts this can go away, since
-  ;; it is only used in SB-PCL::EMIT-FETCH-WRAPPERS, which can then
-  ;; use INSTANCE-SLOTS-LAYOUT instead (if there is are no slot
-  ;; layouts, there are no slots for it to pull.)
-  (for-std-class-p nil :type boolean :read-only t))
+  ;; standard-funcallable-instance.
+  ;; Old comment was:
+  ;;   FIXME: If we unify wrappers and layouts this can go away, since
+  ;;   it is only used in SB-PCL::EMIT-FETCH-WRAPPERS, which can then
+  ;;   use INSTANCE-SLOTS-LAYOUT instead (if there is are no slot
+  ;;   layouts, there are no slots for it to pull.)
+  ;; But while that's conceivable, it still seems advantageous to have
+  ;; a single bit that decides whether something is STANDARD-OBJECT.
+  (%for-std-class-b 0 :type bit :read-only t))
+
+(declaim (freeze-type layout)) ; Good luck hot-patching new subtypes of LAYOUT
+
+(declaim (inline layout-for-std-class-p))
+(defun layout-for-std-class-p (x) (not (zerop (layout-%for-std-class-b x))))
 
 (def!method print-object ((layout layout) stream)
   (print-unreadable-object (layout stream :type t :identity t)

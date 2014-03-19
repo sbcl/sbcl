@@ -391,7 +391,7 @@
      (when slot
        (bug "SLOT requested for metatype ~S, but it isnt' going to happen."
             metatype))
-     `(wrapper-of ,argument))
+     `(layout-of ,argument))
     ;; a metatype of NIL should never be seen here, as NIL is only in
     ;; the metatypes before a generic function is fully initialized.
     ;; T should never be seen because we never need to get a wrapper

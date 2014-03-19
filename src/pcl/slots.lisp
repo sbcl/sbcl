@@ -477,7 +477,7 @@
        ;; In the vast majority of cases location corresponds to the position
        ;; in list. The only exceptions are when there are non-local slots
        ;; before the one we want.
-       (let* ((slots (wrapper-slots (wrapper-of instance)))
+       (let* ((slots (layout-slot-list (layout-of instance)))
               (guess (nth position slots)))
          (if (eql position (slot-definition-location guess))
              (slot-definition-name guess)

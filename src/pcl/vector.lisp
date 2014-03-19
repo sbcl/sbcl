@@ -104,7 +104,7 @@
     (dolist (slot-names slot-name-lists)
       (when slot-names
         (let* ((wrapper (pop wrappers))
-               (std-p (typep wrapper 'wrapper))
+               (std-p (layout-for-std-class-p wrapper))
                (class (wrapper-class* wrapper)))
           (dolist (slot-name (cdr slot-names))
             (let ((cell
