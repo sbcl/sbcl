@@ -116,8 +116,8 @@
          ;; FIND-CLASSOID caused suboptimal register allocation in PCL
          ;; dfuns. So instead we now use a special variable which is
          ;; initialized during cold init. -- JES, 2006-07-04
-         *null-classoid-layout*)
-        (t (svref *built-in-class-codes* (widetag-of x)))))
+         **null-classoid-layout**)
+        (t (svref **built-in-class-codes** (widetag-of x)))))
 
 #!-sb-fluid (declaim (inline classoid-of))
 (defun classoid-of (object)

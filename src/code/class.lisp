@@ -1556,7 +1556,7 @@
 
 (!cold-init-forms
   #-sb-xc-host (/show0 "about to set *BUILT-IN-CLASS-CODES*")
-  (setq *built-in-class-codes*
+  (setq **built-in-class-codes**
         (let* ((initial-element
                 (locally
                   ;; KLUDGE: There's a FIND-CLASSOID DEFTRANSFORM for
@@ -1573,7 +1573,7 @@
               (let ((layout (classoid-layout (find-classoid name))))
                 (dolist (code codes)
                   (setf (svref res code) layout)))))))
-  (setq *null-classoid-layout*
+  (setq **null-classoid-layout**
         ;; KLUDGE: we use (LET () ...) instead of a LOCALLY here to
         ;; work around a bug in the LOCALLY handling in the fopcompiler
         ;; (present in 0.9.13-0.9.14.18). -- JES, 2006-07-16
