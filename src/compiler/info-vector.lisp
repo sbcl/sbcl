@@ -83,6 +83,8 @@
 
 (defstruct (info-hashtable (:conc-name info-env-))
   (storage (make-info-storage 30) :type simple-vector)
+  (comparator #'equal :type function)
+  (hash-function #'globaldb-sxhashoid :type function)
   (mutex (sb!thread:make-mutex))
   ;; COUNT is always at *least* as large as the key count.
   ;; If no insertions are in progress, it is exactly right.
@@ -174,10 +176,12 @@
 ;; from scanning physically forward, preferably within a cache line,
 ;; but for practical purposes linear probing is worse.]
 ;;
-(defmacro do-probe-sequence ((storage key &optional hash) &key probe hit miss)
+(defmacro do-probe-sequence ((storage key table &optional hash)
+                             &key probe hit miss)
   (with-unique-names (test miss-fn len key-index step)
-    (once-only ((storage storage) (key key)
-                (hashval (or hash `(globaldb-sxhashoid ,key))))
+    (once-only ((storage storage) (key key) (table table)
+                (hashval (or hash
+                             `(funcall (info-env-hash-function ,table) ,key))))
       `(macrolet ((key-index () ; expose key+value indices to invoking code
                     ',key-index)
                   (value-index ()
@@ -186,7 +190,9 @@
                     `(let ((probed-key (svref ,',storage ,',key-index)))
                        ,',probe ; could keep a tally of the probes
                        ;; Optimistically test for hit first, then markers
-                       (cond ((equal probed-key ,',key) (go :hit))
+                       (cond ((funcall (info-env-comparator ,',table)
+                                       probed-key ,',key)
+                              (go :hit))
                              ((or (eql probed-key +unavailable-key+)
                                   (eql probed-key +empty-key+))
                               (,',miss-fn))))))
@@ -236,10 +242,21 @@
 ;; or started all over again before the reader got a chance to chase one time.
 ;;
 (defun info-gethash (key env &aux (storage (info-env-storage env)))
-  (do-probe-sequence (storage key)
+  (do-probe-sequence (storage key env)
     :miss (return-from info-gethash nil)
+    ;; With 99% certainty the :READ barrier is needed for non-x86, and if not,
+    ;; it can't hurt. 'info-storage-next' can be empty until at least one cell
+    ;; has been forwarded, but in general an unsynchronized read might be
+    ;; perceived as executing before a conditional that guards whether the
+    ;; read should happen at all. 'storage-next' has the deceptive look of a
+    ;; data dependency but it's not - it's a control dependency which as per
+    ;; the 'memory-barriers.txt' document at kernel.org, demands a barrier.
+    ;; The subsequent ref to storage (if the loop iterates) has a
+    ;; data-dependency, and will never be reordered except on an Alpha :-(
+    ;; so we _don't_ need a barrier after resetting 'storage' and 'index'.
     :hit (let ((index (value-index)))
-           (loop (let ((value (svref storage index)))
+           (loop (let ((value
+                        (sb!thread:barrier (:read) (svref storage index))))
                    (if (info-value-moved-p value)
                        (setq storage (info-storage-next storage)
                              index (info-forwarding-pointer-target value))
@@ -259,9 +276,10 @@
 ;; look in an Info-Vector [q.v.] anyway to get the whole picture.
 ;;
 (defun info-puthash (env key update-proc)
-  (assert (not (member key '(0 -1))))
+  (aver (not (member key '(0 -1))))
   (labels ((follow/update (array value-index)
-             (let ((value (svref array value-index)))
+             (let ((value ; see INFO-GETHASH for this barrier's rationale
+                    (sb!thread:barrier (:read) (svref array value-index))))
                (if (info-value-moved-p value)
                    (follow/update (info-storage-next array)
                                   (info-forwarding-pointer-target value))
@@ -273,15 +291,19 @@
                    oldval ; forgo update
                    (named-let put ((array array) (index index))
                      (let ((actual-old (info-cas array index oldval newval)))
+                       ;; Unlike above, this read of storage-next can not
+                       ;; be perceived as having occurred prior to CAS.
+                       ;; x86 synchronizes at every locked instruction, and our
+                       ;; PPC CAS vops sync as a nececessity of performing CAS.
                        (cond ((eq oldval actual-old) newval) ; win
                              ((info-value-moved-p actual-old) ; forwarded
                               (put (info-storage-next array)
                                    (info-forwarding-pointer-target actual-old)))
                              (t ; collision with another writer
                               (update array index actual-old)))))))))
-    (named-let probe ((hashval (globaldb-sxhashoid key))
+    (named-let probe ((hashval (funcall (info-env-hash-function env) key))
                       (storage (info-env-storage env)))
-      (do-probe-sequence (storage key hashval)
+      (do-probe-sequence (storage key env hashval)
        :hit (follow/update storage (value-index))
        :miss
        (progn
@@ -302,7 +324,7 @@
           (stupid-atomic-bump-count env -1) ; failed
           ;; The fallthrough branch of this COND is ordinary CAS failure where
           ;; somebody else wanted this slot, and won. Looping tries again.
-          (cond ((equal oldkey key) ; pure coincidence
+          (cond ((funcall (info-env-comparator env) oldkey key) ; coincidence
                  (return-from probe (follow/update storage (value-index))))
                 ((eql oldkey +unavailable-key+) ; Highly unlikely
                  ;; as preemptive check up above ensured no rehash needed.
@@ -341,7 +363,7 @@
           unless (eql key +empty-key+)
           do (let* ((new-key-index
                       (block nil
-                        (do-probe-sequence (new-storage key)
+                        (do-probe-sequence (new-storage key env)
                           :hit (bug "Globaldb rehash failure. Mutated key?")
                           :miss (return (key-index)))))
                     (old-value-index (+ old-key-index old-capacity))
@@ -351,7 +373,7 @@
                ;; Copy the current value into the new storage,
                ;; and CAS in a forwarding pointer. Repeat until successful.
                (loop
-                 ;; Force to memory before publishing relocated status
+                 ;; Force VALUE to memory before publishing relocated status
                  (sb!thread:barrier (:write)
                    (setf (svref new-storage new-value-index) value))
                  (let ((actual-old
