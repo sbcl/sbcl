@@ -662,7 +662,7 @@
                ;; Done when the ascending index and descending index meet
                (unless (< ,descriptor-idx ,data-index)
                  (return ,result-form))
-               ,step-form)))))
+               ,@(if step-form (list step-form)))))))
 
 ;; Compute the number of elements needed to hold packed VECTOR after unpacking.
 ;; The unpacked size is the number of auxilliary keys plus the number of entries
