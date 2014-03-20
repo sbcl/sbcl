@@ -10,10 +10,7 @@
 (in-package "SB!C")
 
 ;;;; This file implements abstract types which map globaldb Type-Number/Name
-;;;; pairs to data values compatibly with the volatile and compact environment
-;;;; structures defined in 'globaldb.lisp'.
-;;;; Some bootstrapping glitches prevent the legacy environment storage
-;;;; containers from being totally supplanted by the new ones unfortunately.
+;;;; pairs to data values. The database itself is defined in 'globaldb'.
 
 ;;; Quasi-lockfree concurrent hashtable
 ;;; ===================================
@@ -22,8 +19,7 @@
 ;;  http://trac.clozure.com/ccl/wiki/Internals/LockFreeHashTables
 ;;  https://github.com/boundary/high-scale-lib/blob/master/src/main/java/org/cliffc/high_scale_lib/NonBlockingHashMap.java
 
-;; The basic hashable is a very lightweight one that shares much in common
-;; with the COMPACT-INFO-ENVIRONMENT table: prime number sizing strategy,
+;; The basic hashable is a lightweight one using prime number sizing strategy,
 ;; and a secondary hash for re-probing that is not necessarily co-prime with
 ;; the table size (as it would be, ideally), and no support for deletion.
 
@@ -1039,23 +1035,14 @@ This is interpreted as
                                   (rest lists))))
              'vector))))
 
-;;; Helper macros for extracting parts of a Name in globaldb.
-;;; Names that satisfy the type specifier (CONS SYMBOL (CONS SYMBOL NULL))
-;;; are treated in a more efficient way than general names.
-
-;; If NAME matches the pattern (<SYMBOL2> <SYMBOL1>), then bind KEY1 and KEY2
-;; to those symbols and execute the body; otherwise skip the body.
-;; If ALLOW-ATOM is T [the default], then NAME can be just a symbol
-;; in which case KEY1 is bound to NAME and KEY2 to +NO-AUXILLIARY-KEY+.
+;; Given a NAME naming a globaldb object, decide whether the NAME has
+;; an efficient or "simple" form, versus a general or "hairy" form.
+;; The efficient form is either a symbol or a (CONS SYMBOL (CONS SYMBOL NULL)).
 ;;
-;; It's conceivable that we extend this to allow KEY2 to be a list,
-;; and have INFO-FIND-AUX-KEY/PACKED use EQUALP in that case.
-;; Or we could do something ad-hoc for
-;;  (PCL::SLOT-ACCESSOR :GLOBAL SB-PCL::some-name SB-PCL::READER)
-;; without supporting lists of length N in a fully general way.
-;; But for PCL methods it might make sense that fdefinition be stored
-;; in PCL metaobjects, and have a hook whereby NAME-FDEFINITION understands
-;; that certain kinds of names have a custom lookup technique.
+;; If NAME is a 2-list of symbols, bind KEY2 and KEY1 to the elements
+;; in that order, and execute the SIMPLE code, otherwise execute the HAIRY code.
+;; If ALLOW-ATOM is T - the default - then NAME can be just a symbol
+;; in which case its second component is +NO-AUXILLIARY-KEY+.
 ;;
 (defmacro with-globaldb-name ((key1 key2 &optional (allow-atom t))
                               name &key simple hairy)
@@ -1069,6 +1056,7 @@ This is interpreted as
                              ,key1 (car ,rest))
                        (and (symbolp ,key1) (symbolp ,key2) ,rest)))))
            ,simple
+           ;; The KEYs remain bound, but they should not be used for anything.
            ,hairy))))
 
 ;; Perform the approximate equivalent operations of retrieving
@@ -1122,10 +1110,19 @@ This is interpreted as
 (declaim (inline info-vector-fdefinition))
 (defun info-vector-fdefinition (vect)
   (when vect
+    ;; This is safe: Info-Vector invariant requires that it have length >= 1.
     (let ((word (the fixnum (svref vect 0))))
-      ;; Require the first type-number to be +fdefn-type-num+
-      ;; and the n-infos field to be nonzero. Info-Vector invariant
-      ;; requires that it have length >= 1, so this code is safe.
+      ;; Test that the first type-number is +fdefn-type-num+ and its n-infos
+      ;; field is nonzero. Type-num is the better discriminator because it
+      ;; can fail immediately, whereas the 'n-infos' is almost always nonzero,
+      ;; so does not inform the test. The degenerate vector +nil-packed-infos+
+      ;; can only occur from deletions, which are rare. But consider this:
+      ;;  * (DEFINE-COMPILER-MACRO (SETF ZOOK) (A) `(CAR ,A))
+      ;;  * (WRITE (SYMBOL-INFO-VECTOR 'ZOOK) :BASE 8)
+      ;;     #(120100 #<FUNCTION (COMPILER-MACRO-FUNCTION #) {100367911B}> SETF)
+      ;;         --
+      ;; The underlined packed field = +fdefn-type-num+ but it isn't an fdefn.
+      ;; It's the 'n-infos' for a secondary name. The primary name has N=0.
       (when (and (eql (mask-field (byte type-number-bits type-number-bits) word)
                       (ash +fdefn-type-num+ type-number-bits))
                  (ldb-test (byte type-number-bits 0) word))
