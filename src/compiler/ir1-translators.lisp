@@ -142,7 +142,6 @@ extent of the block."
   ;; BLOCK-HOME-LAMBDA-OR-NULL) more obscure, and it might be better
   ;; to get rid of it, perhaps using a special placeholder value
   ;; to indicate the orphanedness of the code.
-  (declare (ignore result))
   (ctran-starts-block next)
   (let* ((found (or (lexenv-find name blocks)
                     (compiler-error "return for unknown block: ~S" name)))
