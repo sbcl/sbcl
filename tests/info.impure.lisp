@@ -52,11 +52,9 @@
 
 (test-util:with-test (:name :bug-458015)
   ;; Make sure layouts have sane source-locations
-  (dolist (env *info-environment*)
-    (do-info (env :class class :type type :name info-name :value value)
-      (when (and (symbolp info-name)
-                 (eql class :type)
-                 (eql type :kind))
+  (sb-c::call-with-each-globaldb-name
+   (lambda (info-name)
+     (when (and (symbolp info-name) (info :type :kind info-name))
         (let* ((classoid (find-classoid info-name nil))
                (layout (and classoid (classoid-layout classoid)))
                (srcloc (and layout (sb-kernel::layout-source-location layout))))

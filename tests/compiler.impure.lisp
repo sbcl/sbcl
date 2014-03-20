@@ -1513,16 +1513,18 @@
                  function)
          (return nil))
         (t t)))))
-(defun identify-suspect-vops (&optional (env (first
-                                              (last *info-environment*))))
-  (do-info (env :class class :type type :name name :value value)
-    (when (and (eq class :function) (eq type :type))
+(defun identify-suspect-vops ()
+  (sb-c::call-with-each-globaldb-name
+   (lambda (name)
+     ;; LEGAL-FUN-NAME-P test is necessary, since (INFO :FUNCTION :TYPE)
+     ;; has a defaulting expression that involves calling FDEFINITION.
+     (when (and (legal-fun-name-p name) (info :function :type name))
       ;; OK, so we have an entry in the INFO database. Now, if ...
       (let* ((info (info :function :info name))
              (templates (and info (fun-info-templates info))))
         (when templates
           ;; ... it has translators
-          (grovel-results name))))))
+          (grovel-results name)))))))
 (identify-suspect-vops)
 
 ;;;; bug 305: INLINE/NOTINLINE causing local ftype to be lost

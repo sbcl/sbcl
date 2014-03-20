@@ -638,6 +638,33 @@
                   (decf ,count))))
          ,@body))))
 
+;; Iterate over VECTOR, binding DATA-INDEX to the index of each aux-key in turn.
+;; TOTAL-N-FIELDS is deliberately exposed to invoking code.
+;;
+(defmacro do-packed-info-vector-aux-key ((vector &optional (data-index (gensym)))
+                                         step-form &optional result-form)
+  (with-unique-names (descriptor-idx field-idx)
+    (once-only ((vector vector))
+      `(let ((,data-index (length ,vector))
+             (,descriptor-idx 0)
+             (,field-idx 0)
+             (total-n-fields 0))
+         (declare (type index ,data-index ,descriptor-idx total-n-fields)
+                  (type (mod #.+infos-per-word+) ,field-idx))
+         ;; Loop through the descriptors in random-access fashion.
+         ;; Skip 1+ n-infos each time, because the 'n-infos' is itself a field
+         ;; that is not accounted for in its own value.
+         (loop (let ((n (1+ (packed-info-field ,vector
+                                               ,descriptor-idx ,field-idx))))
+                 (incf total-n-fields n)
+                 (multiple-value-setq (,descriptor-idx ,field-idx)
+                   (floor total-n-fields +infos-per-word+))
+                 (decf ,data-index n))
+               ;; Done when the ascending index and descending index meet
+               (unless (< ,descriptor-idx ,data-index)
+                 (return ,result-form))
+               ,step-form)))))
+
 ;; Compute the number of elements needed to hold packed VECTOR after unpacking.
 ;; The unpacked size is the number of auxilliary keys plus the number of entries
 ;; @ 2 cells per entry, plus the number of length cells which indicate the
@@ -646,24 +673,9 @@
 ;;
 (defun compute-unpackified-info-size (vector)
   (declare (simple-vector vector))
-  (let ((end (length vector))
-        (descriptor-idx 0)
-        (field-idx 0)
-        (total-n-fields 0))
-    (declare (type index end descriptor-idx total-n-fields)
-             (type (mod #.+infos-per-word+) field-idx))
-    ;; Loop through the descriptors in random-access fashion.
-    ;; Skip 1+ n-infos each time, because the 'n-infos' is itself a field
-    ;; that is not accounted for in its own value.
-    (loop (let ((n (1+ (packed-info-field vector descriptor-idx field-idx))))
-            (incf total-n-fields n)
-            (multiple-value-setq (descriptor-idx field-idx)
-              (floor total-n-fields +infos-per-word+))
-            (decf end n))
-          ;; Done when the ascending index and descending index meet
-          (unless (< descriptor-idx end)
-            ;; off-by-one: the first info group's auxilliary key is imaginary
-            (return (1- (truly-the fixnum (ash total-n-fields 1))))))))
+  (do-packed-info-vector-aux-key (vector) ()
+    ;; off-by-one: the first info group's auxilliary key is imaginary
+    (1- (truly-the fixnum (ash total-n-fields 1)))))
 
 ;; Convert packed INPUT vector to unpacked.
 ;; If optional OUTPUT is supplied, it is used, otherwise output is allocated.

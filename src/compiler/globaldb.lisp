@@ -882,6 +882,36 @@
     (or (hash-get-info-value name0 +fdefn-type-num+)
         (legal-fun-name-or-type-error name0))))
 
+;; Call FUNCTION once for each Name in globaldb that has information associated
+;; with it, passing the function the Name as its only argument.
+;;
+(defun call-with-each-globaldb-name (function)
+  (let ((name (list nil nil)) ; preallocate just one, and mutate as we go
+        (function (%coerce-callable-to-fun function)))
+    (dolist (package (list-all-packages))
+      (do-symbols (symbol package)
+        (when (eq (symbol-package symbol) package)
+          (let ((vector (symbol-info-vector symbol)))
+            (when vector
+              ;; Check whether SYMBOL has info for itself
+              (when (plusp (packed-info-field vector 0 0))
+                (funcall function symbol))
+              ;; Now deal with (<othersym> SYMBOL) names
+              (do-packed-info-vector-aux-key (vector key-index)
+                (progn (setf (first name) (svref vector key-index)
+                             (second name) symbol)
+                       (funcall function name))))))))
+    (dolist (env *info-environment*)
+      (typecase env
+        (volatile-info-env
+         (loop for cell across (volatile-info-env-table env)
+               do (dolist (subcell cell)
+                    (funcall function (car subcell)))))
+        (compact-info-env
+         (loop for name across (compact-info-env-table env)
+               unless (eql name 0)
+                 do (funcall function name)))))))
+
 
 ;;;; definitions for function information
 

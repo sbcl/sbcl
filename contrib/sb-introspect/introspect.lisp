@@ -654,40 +654,20 @@ constant pool."
 ;; Call FUNCTION with two args, NAME and VALUE, for each value that is
 ;; either the FDEFINITION or MACRO-FUNCTION of some global name.
 ;;
-(defun call-with-each-global-functional (function)
-  (macrolet ((maybe-call-function ()
-               `(when (or (and (eq type-number (info-num :definition))
-                               (not (eq (sb-int:info :function :kind name)
-                                        :macro)))
-                          (eq type-number (info-num :macro-function)))
-                  (funcall function name value)))
-             (info-num (type)
-               (sb-c::type-info-number
-                (sb-c::type-info-or-lose :function type))))
-    ;; Pass 1 is for symbols. WITH-PACKAGE-ITERATOR helps avoid the problem
-    ;; of duplicate symbols, since we can compare the fourth value against
-    ;; the symbol's home package.
-    (with-package-iterator (iterate (list-all-packages) :internal :external)
-      (loop
-         (multiple-value-bind (foundp sym access package) (iterate)
-           (declare (ignore access))
-           (cond ((not foundp) (return))
-                 ((eq (symbol-package sym) package)
-                  (sb-c::call-with-each-info (lambda (name type-number value)
-                                               (maybe-call-function))
-                                             sym))))))
-    ;; Pass 2 is over global environments. This is slightly wrong, as newer env
-    ;; structures shadow older ones, but a name/type can be found in several.
-    ;; We should suppress dups somehow. It doesn't matter for fdefinitions,
-    ;; because they are permanently attached to their name in globaldb,
-    ;; but anomalies are possible with macros.
-    (dolist (env sb-c::*info-environment*)
-      (sb-c::do-info (env :type-number type-number :name name :value value)
-        (maybe-call-function)))))
+(defun call-with-each-global-functoid (function)
+  (sb-c::call-with-each-globaldb-name
+   (lambda (name)
+     ;; In general it might be unsafe to call INFO with a NAME that is not
+     ;; valid for the kind of info being retrieved, as when the defaulting
+     ;; function tries to perform a sanity-check. But here it's safe.
+     (let ((functoid (or (sb-int:info :function :macro-function name)
+                         (sb-int:info :function :definition name))))
+             (if functoid
+                 (funcall function name functoid))))))
 
 (defun collect-xref (kind-index wanted-name)
   (let ((ret nil))
-    (call-with-each-global-functional
+    (call-with-each-global-functoid
      (lambda (info-name value)
           ;; Get a simple-fun for the definition, and an xref array
           ;; from the table if available.
