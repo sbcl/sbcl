@@ -104,7 +104,6 @@
 (defvar *failure-p*)
 (defvar *fixup-notes*)
 (defvar *in-pack*)
-(defvar *info-environment*)
 #!+inline-constants
 (progn
   (defvar *constant-segment*)

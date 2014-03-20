@@ -43,7 +43,6 @@
 ;; feature that rehashing work is parceling out fairly to threads,
 ;; whereas we avoid that by having one rehasher transport all cells.
 
-(defparameter *info-env-load-limit* .74)
 ;; A marker for cells that may be claimed by a writer
 (defconstant +empty-key+ 0)
 ;; A marker for cells that may NOT be claimed by a writer.
@@ -70,12 +69,15 @@
   ;; keys ... data ...
   )
 
-(defun make-info-storage (n-cells-min)
-  (let* ((n-cells (primify n-cells-min))
+(defun make-info-storage (n-cells-min &optional (load-factor .7))
+  ;; If you ask for 40 entries at 50% load, you get (PRIMIFY 80) entries.
+  (let* ((n-cells (primify (ceiling n-cells-min load-factor)))
          (a (make-array (+ +info-keys-offset+ (* 2 n-cells))))
          (end (+ +info-keys-offset+ n-cells)))
     (setf (info-storage-capacity a) n-cells
-          (info-storage-threshold a) (ceiling (* *info-env-load-limit* n-cells))
+          ;; The threshold should be approximately the same as
+          ;; the number you asked for in the first place.
+          (info-storage-threshold a) (floor (* n-cells load-factor))
           (info-storage-next a) #()) ; type-correct initial value
     (fill a +empty-key+ :start +info-keys-offset+ :end end)
     (fill a nil :start end)
@@ -115,9 +117,10 @@
 ;; in the cold core which use untagged slots, and those that do are after
 ;; 'target-defstruct'.  I have to either move this file later or move the
 ;; raw-slot data earlier.
-
-(declaim (inline stupid-atomic-bump))
-(defun stupid-atomic-bump-count (table delta)
+;; Also, we can't assume that the xc-host can do any atomic operations,
+;; so just use INCF.
+(declaim (inline info-env-adjust-count))
+(defun info-env-adjust-count (table delta)
   #+sb-xc-host
   (prog1 (info-env-count table) (incf (info-env-count table) delta))
   #-sb-xc-host
@@ -307,21 +310,21 @@
        :hit (follow/update storage (value-index))
        :miss
        (progn
-        (let ((old-count (stupid-atomic-bump-count env 1)))
+        (let ((old-count (info-env-adjust-count env 1)))
           (declare (type info-cell-index old-count))
           (when (>= old-count (info-storage-threshold storage))
             (sb!thread:with-mutex ((info-env-mutex env))
               ;; any thread could have beaten us to rehashing
               (when (eq (info-env-storage env) storage)
                 (info-env-rehash env)))
-            (stupid-atomic-bump-count env -1) ; prepare to retry
+            (info-env-adjust-count env -1) ; prepare to retry
             (return-from probe (probe hashval (info-env-storage env)))))
         ;; Attempt to claim KEY-INDEX
         (let ((oldkey (info-cas storage (key-index) +empty-key+ key)))
           (when (eql oldkey +empty-key+) ; successful claim
             ;; Optimistically assume that nobody else rewrote the value
             (return-from probe (update storage (value-index) nil)))
-          (stupid-atomic-bump-count env -1) ; failed
+          (info-env-adjust-count env -1) ; failed
           ;; The fallthrough branch of this COND is ordinary CAS failure where
           ;; somebody else wanted this slot, and won. Looping tries again.
           (cond ((funcall (info-env-comparator env) oldkey key) ; coincidence
@@ -1054,18 +1057,19 @@ This is interpreted as
 ;; in PCL metaobjects, and have a hook whereby NAME-FDEFINITION understands
 ;; that certain kinds of names have a custom lookup technique.
 ;;
-(defmacro with-possibly-compound-name ((key1 key2 &optional (allow-atom t))
-                                       name &body body)
+(defmacro with-globaldb-name ((key1 key2 &optional (allow-atom t))
+                              name &key simple hairy)
   (with-unique-names (rest)
     `(let ((,key1 ,name) (,key2 +NO-AUXILLIARY-KEY+))
-       (when (or ,@(if allow-atom `((symbolp ,key1)))
-                 (if (listp ,key1)
-                     (let ((,rest (cdr ,key1)))
-                       (when (and (listp ,rest) (not (cdr ,rest)))
-                         (setq ,key2 (car ,key1)
-                               ,key1 (car ,rest))
-                         (and (symbolp ,key1) (symbolp ,key2) ,rest)))))
-         ,@body))))
+       (if (or ,@(if allow-atom `((symbolp ,key1)))
+               (if (listp ,key1)
+                   (let ((,rest (cdr ,key1)))
+                     (when (and (listp ,rest) (not (cdr ,rest)))
+                       (setq ,key2 (car ,key1)
+                             ,key1 (car ,rest))
+                       (and (symbolp ,key1) (symbolp ,key2) ,rest)))))
+           ,simple
+           ,hairy))))
 
 ;; Perform the approximate equivalent operations of retrieving
 ;; (INFO :class :type <name>), but if no info is found, invoke CREATION-FORM
@@ -1161,28 +1165,58 @@ This is interpreted as
     (truly-the (or null simple-vector)
                (if (listp info-holder) (cdr info-holder) info-holder))))
 
-;; Helper for SET-INFO-VALUE to update packed info vectors.
-;; If NAME is one that supports storage of its infos in a symbol-info cell,
-;; then do the update and return T. Otherwise return NIL.
-;;
-;; If the old info can be updated without unpacking/repacking, then copy it
-;; and do the update; otherwise unpack, grow the vector, and repack.
-;; Truly in-place updates are never permitted due to the very minimal lockfree
-;; protocol. Since info vectors are short, it's ok that the old one is discarded
-;; every time a value is written. A more intricate lockfree protocol would
-;; allow re-use of the vector when changing the value in an existing cell.
-;;
-(declaim (ftype (sfunction (t type-number t) boolean) symbol-set-info-value))
-(defun symbol-set-info-value (name type-number new-value)
-  (declare (inline packed-info-insert))
-  (with-possibly-compound-name (key1 key2) name
-    (dx-flet ((update (vect) ; VECT is a packed vector, never NIL
+;;; The current *INFO-ENVIRONMENT*, a structure of type INFO-HASHTABLE.
+(declaim (type info-hashtable *info-environment*))
+(defvar *info-environment*)
+
+;;; Update the info TYPE-NUMBER for NAME in the global environment,
+;;; setting it to NEW-VALUE. This is thread-safe in the presence
+;;; of multiple readers/writers. Threads simultaneously writing data
+;;; for the same NAME will succeed if the info type numbers differ,
+;;; and the winner is indeterminate if the type numbers are the same.
+;;;
+;;; It is not usually a good idea to think of globaldb as an arbitrary
+;;; key-to-value map supporting rapid or frequent update for a key.
+;;; This is because each update must shallow-copy any data that existed
+;;; for NAME, as a consequence of the very minimal lockfree protocol.
+;;;
+;;; If, for example, you wanted to track how many times a full-call to
+;;; each global function was emitted during compilation, you could create
+;;; an info-type (:function :full-calls) and the value of that info-type
+;;; could be a cons cell holding an integer. In this way incrementing
+;;; the cell contents does not affecting the globaldb. In contrast,
+;;; (INCF (INFO :function :full-calls myname)) would perform poorly.
+;;;
+;;; See also ATOMICALLY-GET-OR-PUT-SYMBOL-INFO for atomic
+;;; read/modify/write operations.
+;;;
+;;; Return the new value so that this can be conveniently used in a
+;;; SETF function.
+(defun set-info-value (name type-number new-value)
+  (when (typep name 'fixnum)
+    (error "~D is not a legal INFO name." name))
+  (let ((name (uncross name)))
+    ;; If the TYPE-NUMBER already exists in VECT, then copy it and
+    ;; alter one cell; otherwise unpack it, grow the vector, and repack.
+    (dx-flet ((augment (vect aux-key) ; VECT is a packed vector, never NIL
                 (declare (simple-vector vect))
-                (let ((index (packed-info-value-index vect key2 type-number)))
-                  (if index
+                (let ((index
+                       (packed-info-value-index vect aux-key type-number)))
+                  (if (not index)
+                      (packed-info-insert vect aux-key type-number new-value)
                       (let ((copy (copy-seq vect)))
                         (setf (svref copy index) new-value)
-                        copy)
-                      (packed-info-insert vect key2 type-number new-value)))))
-      (update-symbol-info key1 #'update)
-      (return-from symbol-set-info-value t))))
+                        copy)))))
+      (with-globaldb-name (key1 key2) name
+        :simple
+        ;; UPDATE-SYMBOL-INFO never supplies OLD-INFO as NIL.
+        (dx-flet ((update-simple-name (old-info)
+                    (augment old-info key2)))
+          (update-symbol-info key1 #'update-simple-name))
+        :hairy
+        ;; INFO-PUTHASH supplies NIL for OLD-INFO if NAME was absent.
+        (dx-flet ((update-hairy-name (old-info)
+                    (augment (or old-info +nil-packed-infos+)
+                             +no-auxilliary-key+)))
+          (info-puthash *info-environment* name #'update-hairy-name)))))
+  new-value)

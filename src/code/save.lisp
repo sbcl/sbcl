@@ -203,9 +203,6 @@ sufficiently motivated to do lengthy fixes."
                    :environment-name environment-name)
            (save-core nil))
           (t
-           ;; Compact the environment even though we're skipping the
-           ;; other purification stages.
-           (sb!kernel::compact-environment-aux "Auxiliary" 200)
            (save-core t)))
     ;; Something went very wrong -- reinitialize to have a prayer
     ;; of being able to report the error.

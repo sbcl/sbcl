@@ -13,24 +13,7 @@
   (static-roots sb!alien:unsigned-long)
   (read-only-roots sb!alien:unsigned-long))
 
-;;; Compact the info environment. This is written with gratuitous
-;;; recursion to make sure that our (and compact-info-environment's)
-;;; local variables are above the stack top when purify runs.
-(defun compact-environment-aux (name n)
-  (cond
-   ((zerop n)
-    (let ((old-ie (car *info-environment*)))
-      (setq *info-environment*
-            (list* (make-info-environment :name "Working")
-                   (compact-info-environment (first *info-environment*)
-                                             :name name)
-                   (rest *info-environment*)))
-      (%shrink-vector (sb!c::volatile-info-env-table old-ie) 0)))
-   (t
-    (compact-environment-aux name (1- n))
-    n)))
-
-(defun purify (&key root-structures (environment-name "Auxiliary"))
+(defun purify (&key root-structures environment-name)
   ;; #!+sb-doc
   "This function optimizes garbage collection by moving all currently live
    objects into non-collected storage. ROOT-STRUCTURES is an optional list of
@@ -40,17 +23,13 @@
    read-only storage, further reducing GC cost. List and vector slots of pure
    structures are also moved into read-only storage.
 
-   ENVIRONMENT-NAME is gratuitous documentation for compacted version of the
-   current global environment (as seen in SB!C::*INFO-ENVIRONMENT*.) If NIL is
-   supplied, then environment compaction is inhibited.
+   ENVIRONMENT-NAME is unused.
 
    This function is a no-op on platforms using the generational garbage
    collector (x86, x86-64, ppc)."
+  (declare (ignore environment-name))
   #!+gencgc
-  (declare (ignore root-structures environment-name))
+  (declare (ignore root-structures))
   #!-gencgc
-  (progn
-    (when environment-name
-      (compact-environment-aux environment-name 200))
-    (%purify (get-lisp-obj-address root-structures)
-             (get-lisp-obj-address nil))))
+  (%purify (get-lisp-obj-address root-structures)
+           (get-lisp-obj-address nil)))

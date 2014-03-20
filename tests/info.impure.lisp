@@ -117,35 +117,19 @@
                  'declaration-type-conflict-error)))
 
 (test-util:with-test (:name :info-env-clear)
-  (let ((e (make-info-environment :name "Ben")))
-    (setf (info :variable :kind 'beefsupreme) :special)
-    (let ((*info-environment* (cons e *info-environment*)))
-      ;; ordinarily there will not be two volatile info environments
-      ;; in the list of environments, but make sure it works ok.
-      (assert (eq (info :variable :kind 'beefsupreme) :special))
-      (setf (info :variable :kind 'fruitbaskets) :macro
-            (info :variable :macro-expansion 'fruitbaskets) 32))
-    (let ((ce (compact-info-environment e))) ; compactify E
-      ;; Now stick an empty volatile env in front of the compact env.
-      ;; This is realistic in that it mimics an image restarted
-      ;; from (save-lisp-and-die) built on top of the base core image.
-      (let ((*info-environment* (list* (make-info-environment)
-                                       ce (cdr *info-environment*))))
-        (assert (eq (info :variable :kind 'fruitbaskets) :macro))
-        (assert (eq (info :variable :macro-expansion 'fruitbaskets) 32))
-        (setf (info :variable :kind 'fruitbaskets) :constant)
-        (clear-info :variable :kind 'fruitbaskets)
-        (multiple-value-bind (data foundp)
-            (info :variable :kind 'fruitbaskets)
-          (assert (and (eq data :unknown) (not foundp))))
-        (multiple-value-bind (data foundp)
-            (info :variable :macro-expansion 'fruitbaskets)
-          (assert (and foundp (eql data 32))))
-        (clear-info :variable :macro-expansion 'fruitbaskets)
-        (multiple-value-bind (data foundp)
-            (info :variable :macro-expansion 'fruitbaskets)
-          (assert (and (not foundp) (not data))))
-        (assert (every #'null (compact-info-env-entries ce)))))))
+  (setf (info :variable :kind 'fruitbaskets) :macro
+        (info :variable :macro-expansion 'fruitbaskets) 32)
+  (clear-info :variable :kind 'fruitbaskets)
+  (multiple-value-bind (data foundp)
+      (info :variable :kind 'fruitbaskets)
+    (assert (and (eq data :unknown) (not foundp))))
+  (multiple-value-bind (data foundp)
+      (info :variable :macro-expansion 'fruitbaskets)
+    (assert (and foundp (eql data 32))))
+  (clear-info :variable :macro-expansion 'fruitbaskets)
+  (multiple-value-bind (data foundp)
+      (info :variable :macro-expansion 'fruitbaskets)
+    (assert (and (not foundp) (not data)))))
 
 ;; packed info vector tests
 
