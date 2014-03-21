@@ -18,7 +18,16 @@ echo //entering make-target-contrib.sh
 
 LANG=C
 LC_ALL=C
-CC=${CC:-gcc}
+
+# Just doing CC=${CC:-cc} may be enough, but it needs to be checked
+# that cc is available on all platforms.
+if [ -z $CC ]; then
+    if [ -x "`which cc`" ]; then
+        CC=cc
+    else
+        CC=gcc
+    fi
+fi
 export CC LANG LC_ALL
 
 # Load our build configuration
