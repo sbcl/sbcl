@@ -86,7 +86,7 @@
   (mutex (sb!thread:make-mutex))
   ;; COUNT is always at *least* as large as the key count.
   ;; If no insertions are in progress, it is exactly right.
-  (count 0 #|:type sb!ext:word|#)) ; should be a raw slot, can't be :-(
+  (count 0 :type word))
 (def!method print-object ((self info-hashtable) stream)
   (declare (stream stream))
   (print-unreadable-object (self stream :type t :identity t)
@@ -105,30 +105,14 @@
   `(cas (svref ,storage ,index) ,oldval ,newval))
 
 ;; Similarly we need a way to atomically adjust the hashtable count.
-;; FIXME: ATOMIC-INCF and ATOMIC-DECF would do just fine, but the structure
-;; slot for INFO-ENV-COUNT can't be declared as an untagged. It occurs too soon
-;; in the build order, prior to *RAW-SLOT-DATA-LIST* being set up.
-;; Cold init drops into ldb when %COMPILER-DEFSTRUCT tries to define the
-;; stereotyped out-of-line accessor functions. We don't have a lot of structures
-;; in the cold core which use untagged slots, and those that do are after
-;; 'target-defstruct'.  I have to either move this file later or move the
-;; raw-slot data earlier.
-;; Also, we can't assume that the xc-host can do any atomic operations,
-;; so just use INCF.
 (declaim (inline info-env-adjust-count))
 (defun info-env-adjust-count (table delta)
   #+sb-xc-host
   (prog1 (info-env-count table) (incf (info-env-count table) delta))
   #-sb-xc-host
-  ;; Use CAS instead of ATOMIC-INCF, for the time being until
-  ;; raw slots can be made to work sooner during cross-compilation.
-  (let ((old (info-env-count table)))
-    (declare (optimize (safety 0)) (type (member +1 -1) delta))
-    (loop (let* ((new (the fixnum (+ (the fixnum old) delta)))
-                 (actual-old (cas (info-env-count table) old new)))
-            (if (eq old actual-old)
-                (return old)
-                (setq old actual-old))))))
+  ;; Inform the compiler that this is not possibly a bignum,
+  ;; since it's true upper bound is the info storage threshold.
+  (truly-the info-cell-index (atomic-incf (info-env-count table) delta)))
 
 (declaim (inline make-info-forwarding-pointer
                  info-forwarding-pointer-target

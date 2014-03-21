@@ -146,6 +146,7 @@
  ("src/code/early-package" :not-host)
 
  ("src/code/early-defstructs" :not-host) ; gotta-be-first DEFSTRUCTs
+ ("src/code/early-raw-slots")
 
  ("src/code/defbangstruct")
 

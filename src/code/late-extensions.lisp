@@ -156,7 +156,7 @@
                                         ,old))))
              (invalid-place))))))))
 
-(defmacro atomic-incf (place &optional (diff 1))
+(def!macro atomic-incf (place &optional (diff 1))
   #!+sb-doc
   "Atomically increments PLACE by DIFF, and returns the value of PLACE before
 the increment.

@@ -14,12 +14,6 @@
 
 (in-package "SB!KERNEL")
 
-;;;; FIXME: I'm not sure where to put this. -- WHN 19990817
-
-(def!type sb!vm:word () `(unsigned-byte ,sb!vm:n-word-bits))
-(def!type sb!vm:signed-word () `(signed-byte ,sb!vm:n-word-bits))
-
-
 ;;;; implementation-dependent DEFTYPEs
 
 ;;; Make DOUBLE-FLOAT a synonym for LONG-FLOAT, SINGLE-FLOAT for
