@@ -1604,28 +1604,6 @@
   (def single-float ())
   (def double-float (single-float)))
 
-(deftransform floor ((number &optional divisor)
-                     (float &optional (or integer float)))
-  (let ((defaulted-divisor (if divisor 'divisor 1)))
-    `(multiple-value-bind (tru rem) (truncate number ,defaulted-divisor)
-       (if (and (not (zerop rem))
-                (if (minusp ,defaulted-divisor)
-                    (plusp number)
-                    (minusp number)))
-           (values (1- tru) (+ rem ,defaulted-divisor))
-           (values tru rem)))))
-
-(deftransform ceiling ((number &optional divisor)
-                       (float &optional (or integer float)))
-  (let ((defaulted-divisor (if divisor 'divisor 1)))
-    `(multiple-value-bind (tru rem) (truncate number ,defaulted-divisor)
-       (if (and (not (zerop rem))
-                (if (minusp ,defaulted-divisor)
-                    (minusp number)
-                    (plusp number)))
-           (values (1+ tru) (- rem ,defaulted-divisor))
-           (values tru rem)))))
-
 (defknown %unary-ftruncate (real) float (movable foldable flushable))
 (defknown %unary-ftruncate/single (single-float) single-float
   (movable foldable flushable))
