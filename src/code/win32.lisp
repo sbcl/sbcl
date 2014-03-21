@@ -596,7 +596,7 @@
 ;; 100-nanosecond intervals since January 1, 1601 (UTC).
 ;;
 ;; http://msdn.microsoft.com/library/en-us/sysinfo/base/filetime_str.asp?
-(define-alien-type FILETIME (sb!alien:unsigned 64))
+(define-alien-type FILETIME (unsigned 64))
 
 ;; FILETIME definition above is almost correct (on little-endian systems),
 ;; except for the wrong alignment if used in another structure: the real

@@ -226,7 +226,7 @@
   #!-(and win32 (not sb-thread))
   (show-and-call signal-cold-init-or-reinit)
   (/show0 "enabling internal errors")
-  (setf (sb!alien:extern-alien "internal_errors_enabled" boolean) t)
+  (setf (extern-alien "internal_errors_enabled" boolean) t)
 
   (show-and-call float-cold-init-or-reinit)
 
@@ -254,7 +254,7 @@
   (setf *cold-init-complete-p* t)
 
   ; hppa heap is segmented, lisp and c uses a stub to call eachother
-  #!+hpux (sb!sys:%primitive sb!vm::setup-return-from-lisp-stub)
+  #!+hpux (%primitive sb!vm::setup-return-from-lisp-stub)
   ;; The system is finally ready for GC.
   (/show0 "enabling GC")
   (setq *gc-inhibit* nil)
@@ -348,7 +348,7 @@ process to continue normally."
     (thread-init-or-reinit)
     #!-(and win32 (not sb-thread))
     (signal-cold-init-or-reinit)
-    (setf (sb!alien:extern-alien "internal_errors_enabled" boolean) t)
+    (setf (extern-alien "internal_errors_enabled" boolean) t)
     (float-cold-init-or-reinit))
   (gc-reinit)
   (foreign-reinit)
@@ -389,18 +389,18 @@ process to continue normally."
 (defun cold-print (x)
   (labels ((%cold-print (obj depthoid)
              (if (> depthoid 4)
-                 (sb!sys:%primitive print "...")
+                 (%primitive print "...")
                  (typecase obj
                    (simple-string
-                    (sb!sys:%primitive print obj))
+                    (%primitive print obj))
                    (symbol
-                    (sb!sys:%primitive print (symbol-name obj)))
+                    (%primitive print (symbol-name obj)))
                    (cons
-                    (sb!sys:%primitive print "cons:")
+                    (%primitive print "cons:")
                     (let ((d (1+ depthoid)))
                       (%cold-print (car obj) d)
                       (%cold-print (cdr obj) d)))
                    (t
-                    (sb!sys:%primitive print (hexstr obj)))))))
+                    (%primitive print (hexstr obj)))))))
     (%cold-print x 0))
   (values))

@@ -12,7 +12,7 @@
 
 (defparameter *immediate-types*
   (list* unbound-marker-widetag character-widetag
-         (when (= sb!vm::n-word-bits 64)
+         (when (= n-word-bits 64)
            (list single-float-widetag))))
 
 (defparameter *fun-header-widetags*
@@ -73,14 +73,14 @@
        (when function-p
          (error "can't mix fixnum testing with function subtype testing"))
        (cond
-         ((and (= sb!vm:n-word-bits 64) immediates headers)
+         ((and (= n-word-bits 64) immediates headers)
           `(%test-fixnum-immediate-and-headers ,value ,target ,not-p
                                                ,(car immediates)
                                                ',(canonicalize-headers
                                                   headers)
                                                ,@other-args))
          (immediates
-          (if (= sb!vm:n-word-bits 64)
+          (if (= n-word-bits 64)
               `(%test-fixnum-and-immediate ,value ,target ,not-p
                                            ,(car immediates)
                                            ,@other-args)
@@ -95,7 +95,7 @@
       (immediates
        (cond
          (headers
-          (if (= sb!vm:n-word-bits 64)
+          (if (= n-word-bits 64)
               `(%test-immediate-and-headers ,value ,target ,not-p
                                             ,(car immediates)
                                             ',(canonicalize-headers headers)

@@ -9,9 +9,9 @@
 
 (in-package "SB!KERNEL")
 
-(sb!alien:define-alien-routine ("purify" %purify) sb!alien:void
-  (static-roots sb!alien:unsigned-long)
-  (read-only-roots sb!alien:unsigned-long))
+(define-alien-routine ("purify" %purify) void
+  (static-roots unsigned-long)
+  (read-only-roots unsigned-long))
 
 (defun purify (&key root-structures environment-name)
   ;; #!+sb-doc

@@ -295,7 +295,7 @@
     ((complex single-float)
      (truly-the single-float (realpart number)))
     ((complex rational)
-     (sb!kernel:%realpart number))
+     (%realpart number))
     (number
      number)))
 
@@ -311,7 +311,7 @@
     ((complex single-float)
      (truly-the single-float (imagpart number)))
     ((complex rational)
-     (sb!kernel:%imagpart number))
+     (%imagpart number))
     (float
      (* 0 number))
     (number

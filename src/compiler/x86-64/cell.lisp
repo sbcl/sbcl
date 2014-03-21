@@ -546,7 +546,7 @@
   (:translate %raw-instance-ref/word)
   (:policy :fast-safe)
   (:args (object :scs (descriptor-reg)))
-  (:arg-types * (:constant (load/store-index #.sb!vm:n-word-bytes
+  (:arg-types * (:constant (load/store-index #.n-word-bytes
                                              #.instance-pointer-lowtag
                                              #.instance-slots-offset)))
   (:info index)
@@ -581,7 +581,7 @@
   (:policy :fast-safe)
   (:args (object :scs (descriptor-reg))
          (value :scs (unsigned-reg) :target result))
-  (:arg-types * (:constant (load/store-index #.sb!vm:n-word-bytes
+  (:arg-types * (:constant (load/store-index #.n-word-bytes
                                              #.instance-pointer-lowtag
                                              #.instance-slots-offset))
               unsigned-num)
@@ -642,7 +642,7 @@
   (:translate %raw-instance-ref/single)
   (:policy :fast-safe)
   (:args (object :scs (descriptor-reg)))
-  (:arg-types * (:constant (load/store-index #.sb!vm:n-word-bytes
+  (:arg-types * (:constant (load/store-index #.n-word-bytes
                                              #.instance-pointer-lowtag
                                              #.instance-slots-offset)))
   (:info index)
@@ -677,7 +677,7 @@
   (:policy :fast-safe)
   (:args (object :scs (descriptor-reg))
          (value :scs (single-reg) :target result))
-  (:arg-types * (:constant (load/store-index #.sb!vm:n-word-bytes
+  (:arg-types * (:constant (load/store-index #.n-word-bytes
                                              #.instance-pointer-lowtag
                                              #.instance-slots-offset))
               single-float)
@@ -719,7 +719,7 @@
   (:translate %raw-instance-ref/double)
   (:policy :fast-safe)
   (:args (object :scs (descriptor-reg)))
-  (:arg-types * (:constant (load/store-index #.sb!vm:n-word-bytes
+  (:arg-types * (:constant (load/store-index #.n-word-bytes
                                              #.instance-pointer-lowtag
                                              #.instance-slots-offset)))
   (:info index)
@@ -754,7 +754,7 @@
   (:policy :fast-safe)
   (:args (object :scs (descriptor-reg))
          (value :scs (double-reg) :target result))
-  (:arg-types * (:constant (load/store-index #.sb!vm:n-word-bytes
+  (:arg-types * (:constant (load/store-index #.n-word-bytes
                                              #.instance-pointer-lowtag
                                              #.instance-slots-offset))
               double-float)
@@ -796,7 +796,7 @@
   (:translate %raw-instance-ref/complex-single)
   (:policy :fast-safe)
   (:args (object :scs (descriptor-reg)))
-  (:arg-types * (:constant (load/store-index #.sb!vm:n-word-bytes
+  (:arg-types * (:constant (load/store-index #.n-word-bytes
                                              #.instance-pointer-lowtag
                                              #.instance-slots-offset)))
   (:info index)
@@ -831,7 +831,7 @@
   (:policy :fast-safe)
   (:args (object :scs (descriptor-reg))
          (value :scs (complex-single-reg) :target result))
-  (:arg-types * (:constant (load/store-index #.sb!vm:n-word-bytes
+  (:arg-types * (:constant (load/store-index #.n-word-bytes
                                              #.instance-pointer-lowtag
                                              #.instance-slots-offset))
               complex-single-float)
@@ -873,7 +873,7 @@
   (:translate %raw-instance-ref/complex-double)
   (:policy :fast-safe)
   (:args (object :scs (descriptor-reg)))
-  (:arg-types * (:constant (load/store-index #.sb!vm:n-word-bytes
+  (:arg-types * (:constant (load/store-index #.n-word-bytes
                                              #.instance-pointer-lowtag
                                              #.instance-slots-offset)))
   (:info index)
@@ -908,7 +908,7 @@
   (:policy :fast-safe)
   (:args (object :scs (descriptor-reg))
          (value :scs (complex-double-reg) :target result))
-  (:arg-types * (:constant (load/store-index #.sb!vm:n-word-bytes
+  (:arg-types * (:constant (load/store-index #.n-word-bytes
                                              #.instance-pointer-lowtag
                                              #.instance-slots-offset))
               complex-double-float)

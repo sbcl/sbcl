@@ -23,7 +23,7 @@
 (defun fixup-code-object (code offset value kind)
   (unless (zerop (rem offset n-word-bytes))
     (error "Unaligned instruction?  offset=#x~X." offset))
-  (sb!sys:without-gcing
+  (without-gcing
    (let ((sap (%primitive code-instructions code)))
      (ecase kind
        (:jmp-hint
@@ -119,17 +119,17 @@
 ;;; -dan 2001.02.06
 
 (define-alien-routine
-    ("arch_get_fp_control" floating-point-modes) (sb!alien:unsigned 64))
+    ("arch_get_fp_control" floating-point-modes) (unsigned 64))
 
 (define-alien-routine
-    ("arch_set_fp_control" %floating-point-modes-setter) void (fp (sb!alien:unsigned 64)))
+    ("arch_set_fp_control" %floating-point-modes-setter) void (fp (unsigned 64)))
 
 (defun (setf floating-point-modes) (val) (%floating-point-modes-setter val))
 
 ;;; Given a signal context, return the floating point modes word in
 ;;; the same format as returned by FLOATING-POINT-MODES.
 (define-alien-routine ("os_context_fp_control" context-floating-point-modes)
-    (sb!alien:unsigned 64) (context (* os-context-t)))
+    (unsigned 64) (context (* os-context-t)))
 
 
 ;;;; INTERNAL-ERROR-ARGS

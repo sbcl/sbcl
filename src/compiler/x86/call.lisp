@@ -350,7 +350,7 @@
       ((<= nvals 1)
        (note-this-location vop :single-value-return)
        (cond
-         ((<= (sb!kernel:values-type-max-value-count type)
+         ((<= (values-type-max-value-count type)
               register-arg-count)
           (when (and (named-type-p type)
                      (eq nil (named-type-name type)))
@@ -358,7 +358,7 @@
             ;; ends right here leavig the :SINGLE-VALUE-RETURN note
             ;; dangling. Let's emit a NOP.
             (inst nop)))
-         ((not (sb!kernel:values-type-may-be-single-value-p type))
+         ((not (values-type-may-be-single-value-p type))
           (inst mov esp-tn ebx-tn))
          ((member :cmov *backend-subfeatures*)
           (inst cmov :c esp-tn ebx-tn))
@@ -369,7 +369,7 @@
             (emit-label single-value)))))
       ((<= nvals register-arg-count)
        (note-this-location vop :unknown-return)
-       (when (sb!kernel:values-type-may-be-single-value-p type)
+       (when (values-type-may-be-single-value-p type)
          (let ((regs-defaulted (gen-label)))
            (inst jmp :c regs-defaulted)
            ;; Default the unsupplied registers.
@@ -385,7 +385,7 @@
            (inst mov ebx-tn esp-tn)
            (emit-label regs-defaulted)))
        (when (< register-arg-count
-                (sb!kernel:values-type-max-value-count type))
+                (values-type-max-value-count type))
          (inst mov esp-tn ebx-tn)))
       ((<= nvals 7)
        ;; The number of bytes depends on the relative jump instructions.
@@ -558,7 +558,7 @@
         (variable-values (gen-label))
         (stack-values (gen-label))
         (done (gen-label)))
-    (when (sb!kernel:values-type-may-be-single-value-p type)
+    (when (values-type-may-be-single-value-p type)
       (inst jmp :c variable-values)
       (cond ((location= start (first *register-arg-tns*))
              (inst push (first *register-arg-tns*))
@@ -570,7 +570,7 @@
       (emit-label variable-values))
     ;; The stack frame is burnt and RETurned from if there are no
     ;; stack values. In this case quickly reallocate sufficient space.
-    (when (<= (sb!kernel:values-type-min-value-count type)
+    (when (<= (values-type-min-value-count type)
               register-arg-count)
       (inst cmp nargs (fixnumize register-arg-count))
       (inst jmp :g stack-values)
@@ -582,7 +582,7 @@
     (loop
       for arg in *register-arg-tns*
       for i downfrom -1
-      for j below (sb!kernel:values-type-max-value-count type)
+      for j below (values-type-max-value-count type)
       do (storew arg args i))
     (move start args)
     (move count nargs)

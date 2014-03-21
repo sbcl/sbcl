@@ -1593,7 +1593,7 @@ variable: an unreadable object representing the error is printed instead.")
                                    ;; little unfortunate.)
                                    (load-time-value
                                     #!-long-float
-                                    (sb!kernel:make-double-float 1070810131 1352628735)
+                                    (make-double-float 1070810131 1352628735)
                                     #!+long-float
                                     (error "(log 2 10) not computed")))))))
                  (x (if (minusp ex)

@@ -17,8 +17,8 @@
   (declare (type index offset))
   (unless (zerop (rem offset n-word-bytes))
     (error "Unaligned instruction?  offset=#x~X." offset))
-  (sb!sys:without-gcing
-   (let ((sap (%primitive sb!kernel::code-instructions code)))
+  (without-gcing
+   (let ((sap (%primitive code-instructions code)))
      (ecase kind
        (:b
         (error "Can't deal with CALL fixups, yet."))
@@ -99,7 +99,7 @@
 ;;; under NetBSD?
 #!+linux
 (define-alien-routine ("os_context_fp_control" context-floating-point-modes)
-    (sb!alien:unsigned 32)
+    (unsigned 32)
   (context (* os-context-t)))
 
 
@@ -128,11 +128,11 @@
              (if (and (= (ldb (byte 6 26) prev) 3)
                       (= (ldb (byte 5 21) prev) 0))
                  (values (ldb (byte 16 0) prev)
-                         (list (sb!c::make-sc-offset sb!vm:any-reg-sc-number
-                                                     (ldb (byte 5 16) prev))))
-                 (values #.(sb!kernel:error-number-or-lose
-                            'sb!kernel:invalid-arg-count-error)
-                         (list (sb!c::make-sc-offset sb!vm:any-reg-sc-number regnum))))))
+                         (list (make-sc-offset any-reg-sc-number
+                                               (ldb (byte 5 16) prev))))
+                 (values #.(error-number-or-lose
+                            'invalid-arg-count-error)
+                         (list (make-sc-offset any-reg-sc-number regnum))))))
 
           (t
            (values #.(error-number-or-lose 'unknown-error) nil)))))
@@ -147,11 +147,11 @@
              (type (simple-array (unsigned-byte 8) (*)) vector))
     (copy-ub8-from-system-area pc 5 vector 0 length)
     (let* ((index 0)
-           (error-number (sb!c:read-var-integer vector index)))
+           (error-number (read-var-integer vector index)))
       (collect ((sc-offsets))
                (loop
                 (when (>= index length)
                   (return))
-                (sc-offsets (sb!c:read-var-integer vector index)))
+                (sc-offsets (read-var-integer vector index)))
                (values error-number (sc-offsets))))))
 

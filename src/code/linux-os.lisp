@@ -30,8 +30,8 @@
       (setf *software-version*
             (string-trim '(#\newline)
                          (with-output-to-string (stream)
-                           (sb!ext:run-program "/bin/uname" `("-r")
-                                               :output stream))))))
+                           (run-program "/bin/uname" `("-r")
+                                        :output stream))))))
 
 ;;; Return user time, system time, and number of page faults.
 (defun get-system-info ()

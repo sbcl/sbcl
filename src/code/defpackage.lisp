@@ -298,9 +298,9 @@ specifies to signal a warning if SWANK package is in variance, and an error othe
                          :warn))))
         (ecase what
           (:error
-           (apply #'error 'sb!kernel::package-at-variance-error args))
+           (apply #'error 'package-at-variance-error args))
           (:warn
-           (apply #'warn 'sb!kernel::package-at-variance args)))))))
+           (apply #'warn 'package-at-variance args)))))))
 
 (defun update-package-with-variance (package name nicknames source-location
                                      shadows shadowing-imports

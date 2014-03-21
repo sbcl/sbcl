@@ -56,9 +56,9 @@
                ;; we can't do this yet, because CLOS macros expand
                ;; into code containing INHIBIT-WARNINGS.
                #+nil
-               (when (eql quality 'sb!ext:inhibit-warnings)
+               (when (eql quality 'inhibit-warnings)
                  (compiler-style-warn "~S is deprecated: use ~S instead"
-                                      quality 'sb!ext:muffle-conditions))
+                                      quality 'muffle-conditions))
                (push (cons quality raw-value)
                      result)))))
     ;; Add any nonredundant entries from old POLICY.

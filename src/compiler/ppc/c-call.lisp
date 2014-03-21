@@ -249,7 +249,7 @@
                        (new-args 0)
                        (new-arg-types (parse-alien-type
                                        '(unsigned 32)
-                                       (sb!kernel:make-null-lexenv))))
+                                       (make-null-lexenv))))
                      (if (< gprs 8)
                          (incf gprs 2)
                          (incf stack 2))
@@ -258,13 +258,13 @@
                      (if (alien-integer-type-signed type)
                          (new-arg-types (parse-alien-type
                                          '(signed 32)
-                                         (sb!kernel:make-null-lexenv)))
+                                         (make-null-lexenv)))
                          (new-arg-types (parse-alien-type
                                          '(unsigned 32)
-                                         (sb!kernel:make-null-lexenv))))
+                                         (make-null-lexenv))))
                      (new-arg-types (parse-alien-type
                                      '(unsigned 32)
-                                     (sb!kernel:make-null-lexenv))))
+                                     (make-null-lexenv))))
                     ((alien-single-float-type-p type)
                      (if (< fprs 8)
                          (incf fprs)
@@ -293,7 +293,7 @@
                                   (if (alien-integer-type-signed result-type)
                                       '(values (signed 32) (unsigned 32))
                                       '(values (unsigned 32) (unsigned 32)))
-                                  (sb!kernel:make-null-lexenv)))))
+                                  (make-null-lexenv)))))
                           `(lambda (function type ,@(lambda-vars))
                             (declare (ignore type))
                             (multiple-value-bind (high low)
@@ -340,9 +340,9 @@
                             (new-args `(ash ,arg -32))
                             (new-args `(logand ,arg #xffffffff))
                             (if (alien-integer-type-signed type)
-                                (new-arg-types (parse-alien-type '(signed 32) (sb!kernel:make-null-lexenv)))
-                                (new-arg-types (parse-alien-type '(unsigned 32) (sb!kernel:make-null-lexenv))))
-                            (new-arg-types (parse-alien-type '(unsigned 32) (sb!kernel:make-null-lexenv))))
+                                (new-arg-types (parse-alien-type '(signed 32) (make-null-lexenv)))
+                                (new-arg-types (parse-alien-type '(unsigned 32) (make-null-lexenv))))
+                            (new-arg-types (parse-alien-type '(unsigned 32) (make-null-lexenv))))
                            (t
                             (new-args arg)
                             (new-arg-types type)))))
@@ -354,7 +354,7 @@
                                   (if (alien-integer-type-signed result-type)
                                       '(values (signed 32) (unsigned 32))
                                       '(values (unsigned 32) (unsigned 32)))
-                                  (sb!kernel:make-null-lexenv)))))
+                                  (make-null-lexenv)))))
                           `(lambda (function type ,@(lambda-vars))
                             (declare (ignore type))
                             (multiple-value-bind (high low)
@@ -463,7 +463,7 @@
 (progn
   (defun alien-callback-accessor-form (type sap offset)
     (let ((parsed-type
-           (sb!alien::parse-alien-type type (sb!kernel:make-null-lexenv))))
+           (sb!alien::parse-alien-type type (make-null-lexenv))))
       (cond ((sb!alien::alien-integer-type-p parsed-type)
              ;; Unaligned access is slower, but possible, so this is nice and
              ;; simple. Also, we're a big-endian machine, so we need to get
@@ -526,11 +526,11 @@
                               (+ arg-store-size
                                  n-return-area-bytes
                                  args-size
-                                 SB!VM::NUMBER-STACK-DISPLACEMENT
+                                 number-stack-displacement
                                  +stack-alignment-bytes+)
                               +stack-alignment-bytes+))
                  (return-area-pos (- frame-size
-                                     SB!VM::NUMBER-STACK-DISPLACEMENT
+                                     number-stack-displacement
                                      args-size))
                  (arg-store-pos (- return-area-pos
                                    n-return-area-bytes))
@@ -702,9 +702,9 @@
                (vector (make-static-vector (length buffer)
                                            :element-type '(unsigned-byte 8)
                                            :initial-contents buffer))
-               (sap (sb!sys:vector-sap vector)))
-          (sb!alien:alien-funcall
-           (sb!alien:extern-alien "ppc_flush_icache"
+               (sap (vector-sap vector)))
+          (alien-funcall
+           (extern-alien "ppc_flush_icache"
                                   (function void
                                             system-area-pointer
                                             unsigned-long))
@@ -863,11 +863,11 @@
                (vector (make-static-vector (length buffer)
                                            :element-type '(unsigned-byte 8)
                                            :initial-contents buffer))
-               (sap (sb!sys:vector-sap vector)))
-          (sb!alien:alien-funcall
-           (sb!alien:extern-alien "ppc_flush_icache"
-                                  (function void
-                                            system-area-pointer
-                                            unsigned-long))
+               (sap (vector-sap vector)))
+          (alien-funcall
+           (extern-alien "ppc_flush_icache"
+                         (function void
+                                   system-area-pointer
+                                   unsigned-long))
            sap (length buffer))
           vector)))))

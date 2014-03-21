@@ -336,12 +336,12 @@ one-past-the-end"
       ;; doesn't seem very sensible.
       #!-sb-unicode
       (setf *default-external-format* :latin-1)
-      (let ((external-format #!-win32 (intern (or (sb!alien:alien-funcall
-                                                    (extern-alien
-                                                      "nl_langinfo"
-                                                      (function (c-string :external-format :latin-1)
-                                                                int))
-                                                    sb!unix:codeset)
+      (let ((external-format #!-win32 (intern (or (alien-funcall
+                                                   (extern-alien
+                                                    "nl_langinfo"
+                                                    (function (c-string :external-format :latin-1)
+                                                              int))
+                                                   sb!unix:codeset)
                                                   "LATIN-1")
                                               "KEYWORD")
                              #!+win32 (sb!win32::ansi-codepage)))
@@ -349,7 +349,7 @@ one-past-the-end"
         #!+sb-show
         (cold-print external-format)
         (/show0 "matching to known aliases")
-        (let ((entry (sb!impl::get-external-format external-format)))
+        (let ((entry (get-external-format external-format)))
           (cond
             (entry
              (/show0 "matched"))
@@ -374,9 +374,9 @@ one-past-the-end"
 ;;;; public interface
 
 (defun maybe-defaulted-external-format (external-format)
-  (sb!impl::get-external-format-or-lose (if (eq external-format :default)
-                                            (default-external-format)
-                                            external-format)))
+  (get-external-format-or-lose (if (eq external-format :default)
+                                   (default-external-format)
+                                   external-format)))
 
 (defun octets-to-string (vector &key (external-format :default) (start 0) end)
   (declare (type (vector (unsigned-byte 8)) vector))
@@ -386,7 +386,7 @@ one-past-the-end"
                     :check-fill-pointer t)
     (declare (type (simple-array (unsigned-byte 8) (*)) vector))
     (let ((ef (maybe-defaulted-external-format external-format)))
-      (funcall (sb!impl::ef-octets-to-string-fun ef) vector start end))))
+      (funcall (ef-octets-to-string-fun ef) vector start end))))
 
 (defun string-to-octets (string &key (external-format :default)
                          (start 0) end null-terminate)
@@ -397,7 +397,7 @@ one-past-the-end"
                     :check-fill-pointer t)
     (declare (type simple-string string))
     (let ((ef (maybe-defaulted-external-format external-format)))
-      (funcall (sb!impl::ef-string-to-octets-fun ef) string start end
+      (funcall (ef-string-to-octets-fun ef) string start end
                (if null-terminate 1 0)))))
 
 #!+sb-unicode

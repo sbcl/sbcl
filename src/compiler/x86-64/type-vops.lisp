@@ -31,7 +31,7 @@
                         :disp (frame-byte-offset (tn-offset value))))
               (t
                value))
-        sb!vm::fixnum-tag-mask))
+        fixnum-tag-mask))
 
 (defun %test-fixnum (value target not-p)
   (generate-fixnum-test value)

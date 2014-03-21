@@ -57,9 +57,9 @@
 ;;; CL:STREAM.
 (deftype ansi-stream () 'stream)
 
-(deftype sb!kernel:instance ()
+(deftype instance ()
   '(or condition structure-object standard-object))
-(deftype sb!kernel:funcallable-instance ()
+(deftype funcallable-instance ()
   (error "not clear how to represent FUNCALLABLE-INSTANCE type"))
 
 ;;; In the target SBCL, the INSTANCE type refers to a base
@@ -86,7 +86,7 @@
 
 ;;; This seems to be the portable Common Lisp type test which
 ;;; corresponds to the effect of the target SBCL implementation test...
-(defun sb!kernel:array-header-p (x)
+(defun array-header-p (x)
   (and (typep x 'array)
        (or (not (typep x 'simple-array))
            (/= (array-rank x) 1))))
@@ -148,35 +148,35 @@
       (incf sb!xc:*gensym-counter*))))
 
 ;;; These functions are needed for constant-folding.
-(defun sb!kernel:simple-array-nil-p (object)
+(defun simple-array-nil-p (object)
   (when (typep object 'array)
     (assert (not (eq (array-element-type object) nil))))
   nil)
 
-(defun sb!kernel:%negate (number)
+(defun %negate (number)
   (- number))
 
-(defun sb!kernel:%single-float (number)
+(defun %single-float (number)
   (coerce number 'single-float))
 
-(defun sb!kernel:%double-float (number)
+(defun %double-float (number)
   (coerce number 'double-float))
 
-(defun sb!kernel:%ldb (size posn integer)
+(defun %ldb (size posn integer)
   (ldb (byte size posn) integer))
 
-(defun sb!kernel:%dpb (newbyte size posn integer)
+(defun %dpb (newbyte size posn integer)
   (dpb newbyte (byte size posn) integer))
 
-(defun sb!kernel:%with-array-data (array start end)
+(defun %with-array-data (array start end)
   (assert (typep array '(simple-array * (*))))
   (values array start end 0))
 
-(defun sb!kernel:%with-array-data/fp (array start end)
+(defun %with-array-data/fp (array start end)
   (assert (typep array '(simple-array * (*))))
   (values array start end 0))
 
-(defun sb!kernel:signed-byte-32-p (number)
+(defun signed-byte-32-p (number)
   (typep number '(signed-byte 32)))
 
 ;;; package locking nops for the cross-compiler
@@ -205,6 +205,6 @@
 
 ;;; printing structures
 
-(defun sb!kernel::default-structure-print (structure stream depth)
+(defun default-structure-print (structure stream depth)
   (declare (ignore depth))
   (write structure :stream stream :circle t))

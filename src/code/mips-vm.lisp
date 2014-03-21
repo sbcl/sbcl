@@ -19,7 +19,7 @@
   (declare (type index offset))
   (unless (zerop (rem offset n-word-bytes))
     (error "Unaligned instruction?  offset=#x~X." offset))
-  (sb!sys:without-gcing
+  (without-gcing
    (let ((sap (%primitive sb!c::code-instructions code)))
      (ecase kind
        (:jump

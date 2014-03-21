@@ -28,9 +28,9 @@
  (id int)
  (handle int))
 
-(sb!alien:define-alien-routine ("GetStdHandle" get-std-handle)
-   sb!alien:int
- (id sb!alien:int))
+(define-alien-routine ("GetStdHandle" get-std-handle)
+  int
+ (id int))
 
 (define-alien-routine ("GetModuleHandleW" get-module-handle)
     hinstance

@@ -16,4 +16,4 @@
 
 (defun sanctify-for-execution (component)
   (declare (ignore component))
-  (sb!sys:%primitive istream-memory-barrier))
+  (%primitive istream-memory-barrier))

@@ -2075,16 +2075,16 @@ register."
                   ,@body)
                #!-(or x86 x86-64)
                `(let ((,var (if escaped
-                                (sb!sys:int-sap
+                                (int-sap
                                  (sb!vm:context-register escaped
                                                          sb!vm::nfp-offset))
                                 #!-alpha
-                                (sb!sys:sap-ref-sap fp (* nfp-save-offset
-                                                          sb!vm:n-word-bytes))
+                                (sap-ref-sap fp (* nfp-save-offset
+                                                   sb!vm:n-word-bytes))
                                 #!+alpha
                                 (sb!vm::make-number-stack-pointer
-                                 (sb!sys:sap-ref-32 fp (* nfp-save-offset
-                                                          sb!vm:n-word-bytes))))))
+                                 (sap-ref-32 fp (* nfp-save-offset
+                                                   sb!vm:n-word-bytes))))))
                   ,@body))
              (stack-frame-offset (data-width offset)
                #!+(or x86 x86-64)
@@ -2108,7 +2108,7 @@ register."
          (code-char val)))
       (#.sb!vm:sap-reg-sc-number
        (with-escaped-value (val)
-         (sb!sys:int-sap val)))
+         (int-sap val)))
       (#.sb!vm:signed-reg-sc-number
        (with-escaped-value (val)
          (if (logbitp (1- sb!vm:n-word-bits) val)
@@ -2141,47 +2141,47 @@ register."
                                     #!-(or sparc x86 x86-64) 0))
       (#.sb!vm:single-stack-sc-number
        (with-nfp (nfp)
-         (sb!sys:sap-ref-single nfp (stack-frame-offset 1 0))))
+         (sap-ref-single nfp (stack-frame-offset 1 0))))
       (#.sb!vm:double-stack-sc-number
        (with-nfp (nfp)
-         (sb!sys:sap-ref-double nfp (stack-frame-offset 2 0))))
+         (sap-ref-double nfp (stack-frame-offset 2 0))))
       #!+long-float
       (#.sb!vm:long-stack-sc-number
        (with-nfp (nfp)
-         (sb!sys:sap-ref-long nfp (stack-frame-offset 3 0))))
+         (sap-ref-long nfp (stack-frame-offset 3 0))))
       (#.sb!vm:complex-single-stack-sc-number
        (with-nfp (nfp)
          (complex
-          (sb!sys:sap-ref-single nfp (stack-frame-offset 1 0))
-          (sb!sys:sap-ref-single nfp (stack-frame-offset 1 1)))))
+          (sap-ref-single nfp (stack-frame-offset 1 0))
+          (sap-ref-single nfp (stack-frame-offset 1 1)))))
       (#.sb!vm:complex-double-stack-sc-number
        (with-nfp (nfp)
          (complex
-          (sb!sys:sap-ref-double nfp (stack-frame-offset 2 0))
-          (sb!sys:sap-ref-double nfp (stack-frame-offset 2 2)))))
+          (sap-ref-double nfp (stack-frame-offset 2 0))
+          (sap-ref-double nfp (stack-frame-offset 2 2)))))
       #!+long-float
       (#.sb!vm:complex-long-stack-sc-number
        (with-nfp (nfp)
          (complex
-          (sb!sys:sap-ref-long nfp (stack-frame-offset 3 0))
-          (sb!sys:sap-ref-long nfp
-                               (stack-frame-offset 3 #!+sparc 4
-                                                   #!+(or x86 x86-64) 3
-                                                   #!-(or sparc x86 x86-64) 0)))))
+          (sap-ref-long nfp (stack-frame-offset 3 0))
+          (sap-ref-long nfp
+                        (stack-frame-offset 3 #!+sparc 4
+                                              #!+(or x86 x86-64) 3
+                                              #!-(or sparc x86 x86-64) 0)))))
       (#.sb!vm:control-stack-sc-number
        (stack-ref fp (sb!c:sc-offset-offset sc-offset)))
       (#.sb!vm:character-stack-sc-number
        (with-nfp (nfp)
-         (code-char (sb!sys:sap-ref-word nfp (stack-frame-offset 1 0)))))
+         (code-char (sap-ref-word nfp (stack-frame-offset 1 0)))))
       (#.sb!vm:unsigned-stack-sc-number
        (with-nfp (nfp)
-         (sb!sys:sap-ref-word nfp (stack-frame-offset 1 0))))
+         (sap-ref-word nfp (stack-frame-offset 1 0))))
       (#.sb!vm:signed-stack-sc-number
        (with-nfp (nfp)
-         (sb!sys:signed-sap-ref-word nfp (stack-frame-offset 1 0))))
+         (signed-sap-ref-word nfp (stack-frame-offset 1 0))))
       (#.sb!vm:sap-stack-sc-number
        (with-nfp (nfp)
-         (sb!sys:sap-ref-sap nfp (stack-frame-offset 1 0)))))))
+         (sap-ref-sap nfp (stack-frame-offset 1 0)))))))
 
 ;;; This stores value as the value of DEBUG-VAR in FRAME. In the
 ;;; COMPILED-DEBUG-VAR case, access the current value to determine if

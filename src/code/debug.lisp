@@ -753,7 +753,7 @@ the current thread are replaced with dummy objects which can safely escape."
                 ;;     debugging failures in PRINT-OBJECT logic.
                 ;; We try to address all these issues with explicit
                 ;; rebindings here.
-                (sb!kernel:*current-level-in-print* 0)
+                (*current-level-in-print* 0)
                 (*package* original-package)
                 (*print-pretty* original-print-pretty)
                 ;; Clear the circularity machinery to try to to reduce the

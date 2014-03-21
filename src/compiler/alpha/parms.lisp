@@ -175,25 +175,25 @@
 
 (defparameter *static-funs*
   '(length
-    sb!kernel:two-arg-+
-    sb!kernel:two-arg--
-    sb!kernel:two-arg-*
-    sb!kernel:two-arg-/
-    sb!kernel:two-arg-<
-    sb!kernel:two-arg->
-    sb!kernel:two-arg-=
+    two-arg-+
+    two-arg--
+    two-arg-*
+    two-arg-/
+    two-arg-<
+    two-arg->
+    two-arg-=
     ;; FIXME: Is this
     ;;     probably need the following as they are defined in
     ;;     arith.lisp: two-arg-<= two-arg->= two-arg-/=
     ;; a comment from old CMU CL or old old CMU CL or
     ;; the SBCL alpha port or what? Do we need to worry about it,
     ;; or can we delete it?
-    sb!kernel:two-arg-/=
+    two-arg-/=
     eql
-    sb!kernel:%negate
-    sb!kernel:two-arg-and
-    sb!kernel:two-arg-ior
-    sb!kernel:two-arg-xor
-    sb!kernel:two-arg-eqv
-    sb!kernel:two-arg-gcd
-    sb!kernel:two-arg-lcm))
+    %negate
+    two-arg-and
+    two-arg-ior
+    two-arg-xor
+    two-arg-eqv
+    two-arg-gcd
+    two-arg-lcm))

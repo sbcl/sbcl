@@ -56,7 +56,7 @@ distinct from the global value. Can also be SETF."
 
 (defun set-symbol-global-value (symbol new-value)
   (about-to-modify-symbol-value symbol 'set new-value)
-  (sb!kernel:%set-symbol-global-value symbol new-value))
+  (%set-symbol-global-value symbol new-value))
 
 (declaim (inline %makunbound))
 (defun %makunbound (symbol)

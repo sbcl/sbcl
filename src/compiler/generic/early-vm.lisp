@@ -20,7 +20,7 @@
 (def!constant lowtag-limit (ash 1 n-lowtag-bits))
 ;;; the number of tag bits used for a fixnum
 (def!constant n-fixnum-tag-bits
-    (if (= 64 sb!vm:n-word-bits)
+    (if (= 64 n-word-bits)
         ;; On 64-bit targets, this may be as low as 1 (for 63-bit
         ;; fixnums) and as high as 3 (for 61-bit fixnums).  The
         ;; constraint on the low end is that we need at least one bit

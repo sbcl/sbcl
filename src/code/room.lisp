@@ -693,7 +693,7 @@
     (let* ((space-start (sap-int start-sap))
            (space-end (sap-int end-sap))
            (space-size (- space-end space-start))
-           (pagesize (sb!sys:get-page-size))
+           (pagesize (get-page-size))
            (start (+ space-start (round (* space-size percent) 100)))
            (printed-conses (make-hash-table :test 'eq))
            (pages-so-far 0)

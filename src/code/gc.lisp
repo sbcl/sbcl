@@ -19,17 +19,17 @@
 (defun current-dynamic-space-start () sb!vm:dynamic-space-start)
 #!-gencgc
 (defun current-dynamic-space-start ()
-  (sb!alien:extern-alien "current_dynamic_space" sb!alien:unsigned-long))
+  (extern-alien "current_dynamic_space" unsigned-long))
 
 #!-sb-fluid
 (declaim (inline dynamic-usage))
 #!+gencgc
 (defun dynamic-usage ()
-  (sb!alien:extern-alien "bytes_allocated" os-vm-size-t))
+  (extern-alien "bytes_allocated" os-vm-size-t))
 #!-gencgc
 (defun dynamic-usage ()
   (the (unsigned-byte 32)
-       (- (sb!sys:sap-int (sb!c::dynamic-space-free-pointer))
+       (- (sap-int (sb!c::dynamic-space-free-pointer))
           (current-dynamic-space-start))))
 
 (defun static-space-usage ()
@@ -42,15 +42,15 @@
 
 (defun control-stack-usage ()
   #!-stack-grows-downward-not-upward
-  (- (sb!sys:sap-int (sb!c::control-stack-pointer-sap))
-     (sb!sys:sap-int (sb!di::descriptor-sap sb!vm:*control-stack-start*)))
+  (- (sap-int (sb!c::control-stack-pointer-sap))
+     (sap-int (sb!di::descriptor-sap sb!vm:*control-stack-start*)))
   #!+stack-grows-downward-not-upward
-  (- (sb!sys:sap-int (sb!di::descriptor-sap sb!vm:*control-stack-end*))
-     (sb!sys:sap-int (sb!c::control-stack-pointer-sap))))
+  (- (sap-int (sb!di::descriptor-sap sb!vm:*control-stack-end*))
+     (sap-int (sb!c::control-stack-pointer-sap))))
 
 (defun binding-stack-usage ()
-  (- (sb!sys:sap-int (sb!c::binding-stack-pointer-sap))
-     (sb!sys:sap-int (sb!di::descriptor-sap sb!vm:*binding-stack-start*))))
+  (- (sap-int (sb!c::binding-stack-pointer-sap))
+     (sap-int (sb!di::descriptor-sap sb!vm:*binding-stack-start*))))
 
 ;;;; ROOM
 
@@ -141,13 +141,13 @@ run in any thread.")
 
 ;;;; internal GC
 
-(sb!alien:define-alien-routine collect-garbage sb!alien:int
-  (#!+gencgc last-gen #!-gencgc ignore sb!alien:int))
+(define-alien-routine collect-garbage int
+  (#!+gencgc last-gen #!-gencgc ignore int))
 
 #!+sb-thread
 (progn
-  (sb!alien:define-alien-routine gc-stop-the-world sb!alien:void)
-  (sb!alien:define-alien-routine gc-start-the-world sb!alien:void))
+  (define-alien-routine gc-stop-the-world void)
+  (define-alien-routine gc-start-the-world void))
 #!-sb-thread
 (progn
   (defun gc-stop-the-world ())
@@ -155,16 +155,16 @@ run in any thread.")
 
 #!+gencgc
 (progn
-  (sb!alien:define-alien-variable ("gc_logfile" %gc-logfile) (* char))
+  (define-alien-variable ("gc_logfile" %gc-logfile) (* char))
   (defun (setf gc-logfile) (pathname)
     (let ((new (when pathname
-                 (sb!alien:make-alien-string
+                 (make-alien-string
                   (native-namestring (translate-logical-pathname pathname)
                                      :as-file t))))
           (old %gc-logfile))
       (setf %gc-logfile new)
       (when old
-        (sb!alien:free-alien old))
+        (free-alien old))
       pathname))
   (defun gc-logfile ()
     #!+sb-doc
@@ -178,7 +178,7 @@ statistics are appended to it."
   (declaim (inline dynamic-space-size))
   (defun dynamic-space-size ()
     "Size of the dynamic space in bytes."
-    (sb!alien:extern-alien "dynamic_space_size" os-vm-size-t)))
+    (extern-alien "dynamic_space_size" os-vm-size-t)))
 
 ;;;; SUB-GC
 
@@ -361,7 +361,7 @@ guaranteed to be collected."
     (when (eq t (sub-gc :gen gen))
       (post-gc))))
 
-(define-alien-routine scrub-control-stack sb!alien:void)
+(define-alien-routine scrub-control-stack void)
 
 (defun unsafe-clear-roots (gen)
   #!-gencgc (declare (ignore gen))
@@ -393,11 +393,11 @@ On GENCGC platforms this is the nursery size, and defaults to 5% of dynamic
 space size.
 
 Note: currently changes to this value are lost when saving core."
-  (sb!alien:extern-alien "bytes_consed_between_gcs" os-vm-size-t))
+  (extern-alien "bytes_consed_between_gcs" os-vm-size-t))
 
 (defun (setf bytes-consed-between-gcs) (val)
   (declare (type index val))
-  (setf (sb!alien:extern-alien "bytes_consed_between_gcs" os-vm-size-t)
+  (setf (extern-alien "bytes_consed_between_gcs" os-vm-size-t)
         val))
 
 (declaim (inline maybe-handle-pending-gc))

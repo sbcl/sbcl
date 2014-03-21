@@ -163,7 +163,7 @@
 (deftransform %alien-funcall ((function type &rest args))
   (aver (sb!c::constant-lvar-p type))
   (let* ((type (sb!c::lvar-value type))
-         (env (sb!kernel:make-null-lexenv))
+         (env (make-null-lexenv))
          (arg-types (alien-fun-type-arg-types type))
          (result-type (alien-fun-type-result-type type)))
     (aver (= (length arg-types) (length args)))

@@ -69,7 +69,7 @@
 #include "gc.h"
 
 #define DEFTYPE(lispname,cname) { cname foo; \
-    printf("(define-alien-type " lispname " (%s %d))\n", (((foo=-1)<0) ? "sb!alien:signed" : "unsigned"), (8 * (sizeof foo))); }
+    printf("(define-alien-type " lispname " (%s %d))\n", (((foo=-1)<0) ? "signed" : "unsigned"), (8 * (sizeof foo))); }
 
 #define DEFSTRUCT(lispname,cname,body) { cname bar; \
     printf("(define-alien-type nil\n  (struct %s", #lispname); \
@@ -78,7 +78,7 @@
 #define DEFSLOT(lispname,cname) \
     printf("\n          (%s (%s %d))", \
            #lispname, \
-           (((bar.cname=-1)<0) ? "sb!alien:signed" : "unsigned"), \
+           (((bar.cname=-1)<0) ? "signed" : "unsigned"), \
            (8 * (sizeof bar.cname)))
 
 void

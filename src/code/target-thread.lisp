@@ -1734,10 +1734,10 @@ assume that unknown code can safely be terminated using TERMINATE-THREAD."
     ;; area...
     (with-all-threads-lock
       (if (thread-alive-p thread)
-          (let* ((offset (sb!kernel:get-lisp-obj-address
+          (let* ((offset (get-lisp-obj-address
                           (sb!vm::symbol-tls-index symbol)))
                  (obj (sap-ref-lispobj (%thread-sap thread) offset))
-                 (tl-val (sb!kernel:get-lisp-obj-address obj)))
+                 (tl-val (get-lisp-obj-address obj)))
             (cond ((zerop offset)
                    (values nil :no-tls-value))
                   ((or (eql tl-val sb!vm:no-tls-value-marker-widetag)
@@ -1753,7 +1753,7 @@ assume that unknown code can safely be terminated using TERMINATE-THREAD."
       ;; area...
       (with-all-threads-lock
         (if (thread-alive-p thread)
-            (let ((offset (sb!kernel:get-lisp-obj-address
+            (let ((offset (get-lisp-obj-address
                            (sb!vm::symbol-tls-index symbol))))
               (cond ((zerop offset)
                      (values nil :no-tls-value))
@@ -1772,7 +1772,7 @@ assume that unknown code can safely be terminated using TERMINATE-THREAD."
         (loop for index from tls-index-start
                 below (symbol-value 'sb!vm::*free-tls-index*)
               for value = (sap-ref-word sap (* sb!vm:n-word-bytes index))
-              for (obj ok) = (multiple-value-list (sb!kernel:make-lisp-obj value nil))
+              for (obj ok) = (multiple-value-list (make-lisp-obj value nil))
               unless (or (not ok)
                          (typep obj '(or fixnum character))
                          (member value

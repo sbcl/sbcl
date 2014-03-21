@@ -46,8 +46,8 @@
   ;; AREF) was previously treated as a function" during compilation of
   ;; defsetfs.lisp
   ;;
-  ;; #-sb-xc-host (sb!sys:%primitive print
-  ;;                              (concatenate 'simple-string "/can't /SHOW:" string))
+  ;; #-sb-xc-host (%primitive print
+  ;;                          (concatenate 'simple-string "/can't /SHOW:" string))
   ;;
   ;; because the CONCATENATE is transformed to an expression involving
   ;; (SETF AREF). Not declaring the argument as a SIMPLE-STRING (or
@@ -55,8 +55,8 @@
   ;; help, but full calls to CONCATENATE don't work this early in
   ;; cold-init, because they now need the full assistance of the type
   ;; system. So (KLUDGE):
-  #-sb-xc-host (sb!sys:%primitive print "/can't /SHOW:")
-  #-sb-xc-host (sb!sys:%primitive print string)
+  #-sb-xc-host (%primitive print "/can't /SHOW:")
+  #-sb-xc-host (%primitive print string)
   (values))
 
 ;;; Should /SHOW output be suppressed at this point?
@@ -165,8 +165,8 @@
     #+sb-xc-host `(/show ,s)
     #-sb-xc-host `(progn
                     #!+sb-show
-                    (sb!sys:%primitive print
-                                       ,(concatenate 'simple-string "/" s)))))
+                    (%primitive print
+                                ,(concatenate 'simple-string "/" s)))))
 (defmacro /noshow0 (&rest rest)
   (declare (ignore rest)))
 
@@ -176,7 +176,7 @@
   #!+sb-show
   (progn
     #+sb-xc-host `(/show "(/primitive-print)" ,thing)
-    #-sb-xc-host `(sb!sys:%primitive print (the simple-string ,thing))))
+    #-sb-xc-host `(%primitive print (the simple-string ,thing))))
 
 ;;; low-level display of a system word, works even early in cold init
 (defmacro /hexstr (thing)
@@ -184,7 +184,7 @@
   #!+sb-show
   (progn
     #+sb-xc-host `(/show "(/hexstr)" ,thing)
-    #-sb-xc-host `(sb!sys:%primitive print (hexstr ,thing))))
+    #-sb-xc-host `(%primitive print (hexstr ,thing))))
 
 (defmacro /nohexstr (thing)
   (declare (ignore thing)))

@@ -42,12 +42,12 @@
 ;;; element type), this is going to be faster.
 (declaim (inline %other-pointer-widetag))
 (defun %other-pointer-widetag (x)
-  (sb!sys:sap-ref-8 (int-sap (get-lisp-obj-address x))
-                    #.(ecase sb!c:*backend-byte-order*
-                        (:little-endian
-                         (- sb!vm:other-pointer-lowtag))
-                        (:big-endian
-                         (- (1- sb!vm:n-word-bytes) sb!vm:other-pointer-lowtag)))))
+  (sap-ref-8 (int-sap (get-lisp-obj-address x))
+             #.(ecase sb!c:*backend-byte-order*
+                 (:little-endian
+                  (- sb!vm:other-pointer-lowtag))
+                 (:big-endian
+                  (- (1- sb!vm:n-word-bytes) sb!vm:other-pointer-lowtag)))))
 
 ;;; Return a System-Area-Pointer pointing to the data for the vector
 ;;; X, which must be simple.
@@ -214,12 +214,12 @@
 
 (defun %vector-raw-bits (object offset)
   (declare (type index offset))
-  (sb!kernel:%vector-raw-bits object offset))
+  (%vector-raw-bits object offset))
 
 (defun %set-vector-raw-bits (object offset value)
   (declare (type index offset))
-  (declare (type sb!vm:word value))
-  (setf (sb!kernel:%vector-raw-bits object offset) value))
+  (declare (type word value))
+  (setf (%vector-raw-bits object offset) value))
 
 (defun make-single-float (x) (make-single-float x))
 (defun make-double-float (hi lo) (make-double-float hi lo))

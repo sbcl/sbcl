@@ -87,6 +87,7 @@
   ;; COUNT is always at *least* as large as the key count.
   ;; If no insertions are in progress, it is exactly right.
   (count 0 :type word))
+
 (def!method print-object ((self info-hashtable) stream)
   (declare (stream stream))
   (print-unreadable-object (self stream :type t :identity t)
@@ -137,11 +138,11 @@
 (progn
   (defun make-info-forwarding-pointer (index)
     (declare (type info-cell-index index) (optimize (safety 0)))
-    (sb!kernel:%make-lisp-obj (+ (ash index 8) sb!vm:unbound-marker-widetag)))
+    (%make-lisp-obj (+ (ash index 8) sb!vm:unbound-marker-widetag)))
   (defun info-forwarding-pointer-target (marker)
-    (ash (sb!kernel:get-lisp-obj-address marker) -8))
+    (ash (get-lisp-obj-address marker) -8))
   (defun info-value-moved-p (x)
-    (eq (logand (sb!kernel:get-lisp-obj-address x) #xff)
+    (eq (logand (get-lisp-obj-address x) #xff)
         sb!vm:unbound-marker-widetag)))
 
 ;; The common skeleton of {Get, Put, Rehash} operations. Probe key cells until
@@ -845,7 +846,7 @@
                  do (setf (svref new-vect i) (svref input (1- i))))))
     new-vect))
 
-(declaim (sb!ext:maybe-inline packed-info-insert))
+(declaim (maybe-inline packed-info-insert))
 (defun packed-info-insert (vector aux-key type-number newval)
   (if (and (eql aux-key +no-auxilliary-key+)
            (info-quickly-insertable-p vector))

@@ -500,7 +500,7 @@ any non-negative real number."
 
     ;; Disable debugger before processing initialization files & co.
     (when disable-debugger
-      (sb!ext:disable-debugger))
+      (disable-debugger))
 
     ;; Handle initialization files.
     (/show0 "handling initialization files in TOPLEVEL-INIT")

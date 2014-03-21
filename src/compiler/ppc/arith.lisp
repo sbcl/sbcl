@@ -668,7 +668,7 @@
 
 ;;; only for constant folding within the compiler
 (defun %%ldb (integer size posn)
-  (sb!kernel::%ldb size posn integer))
+  (%ldb size posn integer))
 
 (define-vop (ldb-c/fixnum)
   (:translate %%ldb)
@@ -1167,7 +1167,7 @@
 
 #!+multiply-high-vops
 (define-vop (mulhi)
-  (:translate sb!kernel:%multiply-high)
+  (:translate %multiply-high)
   (:policy :fast-safe)
   (:args (x :scs (unsigned-reg))
          (y :scs (unsigned-reg)))
@@ -1179,7 +1179,7 @@
 
 #!+multiply-high-vops
 (define-vop (mulhi/fx)
-  (:translate sb!kernel:%multiply-high)
+  (:translate %multiply-high)
   (:policy :fast-safe)
   (:args (x :scs (any-reg))
          (y :scs (unsigned-reg)))

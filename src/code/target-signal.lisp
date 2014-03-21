@@ -72,16 +72,16 @@
 ;;; Send the signal SIGNAL to the process with process id PID. SIGNAL
 ;;; should be a valid signal number
 #!-sb-fluid (declaim (inline real-unix-kill))
-(sb!alien:define-alien-routine ("kill" unix-kill) sb!alien:int
-  (pid sb!alien:int)
-  (signal sb!alien:int))
+(define-alien-routine ("kill" unix-kill) int
+  (pid int)
+  (signal int))
 
 ;;; Send the signal SIGNAL to the all the process in process group
 ;;; PGRP. SIGNAL should be a valid signal number
 #!-sb-fluid (declaim (inline real-unix-killpg))
-(sb!alien:define-alien-routine ("killpg" unix-killpg) sb!alien:int
-  (pgrp sb!alien:int)
-  (signal sb!alien:int))
+(define-alien-routine ("killpg" unix-killpg) int
+  (pgrp int)
+  (signal int))
 
 ;;; Reset the current set of masked signals (those being blocked from
 ;;; delivery).
@@ -94,16 +94,16 @@
 ;;; down to C wrapper functions.)
 
 (declaim (inline %unblock-deferrable-signals %unblock-gc-signals))
-(sb!alien:define-alien-routine ("unblock_deferrable_signals"
-                                %unblock-deferrable-signals)
-    sb!alien:void
-  (where sb!alien:unsigned-long)
-  (old sb!alien:unsigned-long))
+(define-alien-routine ("unblock_deferrable_signals"
+                       %unblock-deferrable-signals)
+  void
+  (where unsigned-long)
+  (old unsigned-long))
 #!-sb-safepoint
-(sb!alien:define-alien-routine ("unblock_gc_signals" %unblock-gc-signals)
-    sb!alien:void
-  (where sb!alien:unsigned-long)
-  (old sb!alien:unsigned-long))
+(define-alien-routine ("unblock_gc_signals" %unblock-gc-signals)
+    void
+  (where unsigned-long)
+  (old unsigned-long))
 
 (defun unblock-deferrable-signals ()
   (%unblock-deferrable-signals 0 0))
@@ -114,10 +114,10 @@
 
 
 ;;;; C routines that actually do all the work of establishing signal handlers
-(sb!alien:define-alien-routine ("install_handler" install-handler)
-                               sb!alien:unsigned-long
-  (signal sb!alien:int)
-  (handler sb!alien:unsigned-long)
+(define-alien-routine ("install_handler" install-handler)
+  unsigned-long
+  (signal int)
+  (handler unsigned-long)
   (synchronous boolean))
 
 ;;;; interface to enabling and disabling signal handlers
@@ -176,8 +176,8 @@
    (sb!thread::make-signal-handling-thread :name "signal handler"
                                            :signal-number signal)
    nil (lambda ()
-         (let* ((info (sb!sys:sap-ref-sap args 0))
-                (context (sb!sys:sap-ref-sap args sb!vm:n-word-bytes)))
+         (let* ((info (sap-ref-sap args 0))
+                (context (sap-ref-sap args sb!vm:n-word-bytes)))
            (funcall run-handler signal info context)))
    nil nil nil nil))
 
@@ -259,7 +259,7 @@
 
 (defun sigterm-handler (signal code context)
   (declare (ignore signal code context))
-  (sb!ext:exit))
+  (exit))
 
 #!-sb-thruption
 ;;; SIGPIPE is not used in SBCL for its original purpose, instead it's
@@ -301,7 +301,7 @@
 ;;;; etc.
 
 ;;; extract si_code from siginfo_t
-(sb!alien:define-alien-routine ("siginfo_code" siginfo-code) sb!alien:int
+(define-alien-routine ("siginfo_code" siginfo-code) int
   (info system-area-pointer))
 
 ;;; CMU CL comment:

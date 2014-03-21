@@ -11,11 +11,11 @@
 
 (in-package "SB!KERNEL")
 
-(sb!alien:define-alien-routine ("os_allocate" allocate-system-memory)
-                               system-area-pointer
-  (bytes sb!alien:unsigned))
+(define-alien-routine ("os_allocate" allocate-system-memory)
+  system-area-pointer
+  (bytes unsigned))
 
-(sb!alien:define-alien-routine ("os_deallocate" deallocate-system-memory)
-                               sb!alien:void
+(define-alien-routine ("os_deallocate" deallocate-system-memory)
+  void
   (addr system-area-pointer)
-  (bytes sb!alien:unsigned))
+  (bytes unsigned))

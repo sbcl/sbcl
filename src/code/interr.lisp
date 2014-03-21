@@ -440,7 +440,7 @@
    (/show0 "about to bind ALIEN-CONTEXT")
    (let* ((alien-context (locally
                              (declare (optimize (inhibit-warnings 3)))
-                           (sb!alien:sap-alien context (* os-context-t))))
+                           (sap-alien context (* os-context-t))))
           #!+c-stack-is-control-stack
           (*saved-fp-and-pcs*
            (cons (cons (%make-lisp-obj (sb!vm:context-register

@@ -447,9 +447,9 @@ triggers."
         (run-timers)))))
 
 (defun timeout-cerror ()
-  (cerror "Continue" 'sb!ext::timeout))
+  (cerror "Continue" 'timeout))
 
-(defmacro sb!ext:with-timeout (expires &body body)
+(defmacro with-timeout (expires &body body)
   #!+sb-doc
   "Execute the body, asynchronously interrupting it and signalling a TIMEOUT
 condition after at least EXPIRES seconds have passed.

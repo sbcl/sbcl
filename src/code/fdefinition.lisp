@@ -330,5 +330,5 @@
     (let ((fdefn (find-fdefinition name)))
       (when fdefn
         (fdefn-makunbound fdefn)))
-    (sb!kernel:undefine-fun-name name)
+    (undefine-fun-name name)
     name))

@@ -203,7 +203,7 @@
                                              &environment env)
        "Automagically generated boolean attribute setter. See
  !DEF-BOOLEAN-ATTRIBUTE."
-       #-sb-xc-host (declare (type sb!c::lexenv env))
+       #-sb-xc-host (declare (type lexenv env))
        ;; FIXME: It would be better if &ENVIRONMENT arguments were
        ;; automatically declared to have type LEXENV by the
        ;; hairy-argument-handling code.
@@ -532,7 +532,7 @@
               ,(parse-deftransform lambda-list body n-args
                                    `(return-from ,name nil))))
           ,@(when (consp what)
-              `((setf (,(let ((*package* (symbol-package 'sb!c::fun-info)))
+              `((setf (,(let ((*package* (symbol-package 'fun-info)))
                           (symbolicate "FUN-INFO-" (second what)))
                        (fun-info-or-lose ',(first what)))
                       #',name))))))))

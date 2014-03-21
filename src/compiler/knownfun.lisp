@@ -214,7 +214,7 @@
                               (eq (transform-important x) important)))
                        (fun-info-transforms info))))
     (cond (old
-           (style-warn 'sb!kernel:redefinition-with-deftransform
+           (style-warn 'redefinition-with-deftransform
                        :transform old)
            (setf (transform-function old) fun
                  (transform-note old) note))

@@ -917,25 +917,25 @@
                     (mask (ash #.(1- (ash 1 sb!vm:n-word-bits))
                                (* (- extra ,n-elems-per-word)
                                   ,n-bits-per-elem))))
-               (setf (sb!kernel:%vector-raw-bits dst end)
+               (setf (%vector-raw-bits dst end)
                      (logior
-                      (logandc2 (sb!kernel:%vector-raw-bits dst end)
+                      (logandc2 (%vector-raw-bits dst end)
                                 (ash mask
-                                     ,(ecase sb!c:*backend-byte-order*
-                                             (:little-endian 0)
-                                             (:big-endian `(* (- ,n-elems-per-word extra)
-                                                              ,n-bits-per-elem)))))
-                      (logand (sb!kernel:%vector-raw-bits src end)
+                                     ,(ecase *backend-byte-order*
+                                        (:little-endian 0)
+                                        (:big-endian `(* (- ,n-elems-per-word extra)
+                                                         ,n-bits-per-elem)))))
+                      (logand (%vector-raw-bits src end)
                               (ash mask
-                                   ,(ecase sb!c:*backend-byte-order*
-                                           (:little-endian 0)
-                                           (:big-endian `(* (- ,n-elems-per-word extra)
-                                                            ,n-bits-per-elem)))))))))
+                                   ,(ecase *backend-byte-order*
+                                      (:little-endian 0)
+                                      (:big-endian `(* (- ,n-elems-per-word extra)
+                                                       ,n-bits-per-elem)))))))))
            ;; Copy from the end to save a register.
            (do ((i end (1- i)))
                ((<= i ,src-word))
-             (setf (sb!kernel:%vector-raw-bits dst (1- i))
-                   (sb!kernel:%vector-raw-bits src (1- i))))
+             (setf (%vector-raw-bits dst (1- i))
+                   (%vector-raw-bits src (1- i))))
            (values))))))
 
 #.(loop for i = 1 then (* i 2)

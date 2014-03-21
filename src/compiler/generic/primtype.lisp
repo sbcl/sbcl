@@ -40,7 +40,7 @@
 (!def-primitive-type unsigned-byte-64 (unsigned-reg descriptor-reg)
   :type (unsigned-byte 64))
 (!def-primitive-type fixnum (any-reg signed-reg)
-  :type (signed-byte #.(1+ sb!vm:n-positive-fixnum-bits)))
+  :type (signed-byte #.(1+ n-positive-fixnum-bits)))
 #!+#.(cl:if (cl:= sb!vm::n-machine-word-bits 32) '(and) '(or))
 (!def-primitive-type signed-byte-32 (signed-reg descriptor-reg)
   :type (signed-byte 32))
@@ -175,44 +175,44 @@
                  (positive-fixnum
                   (if (or (eq t2-name 'fixnum)
                           (eq t2-name
-                              (ecase sb!vm::n-machine-word-bits
+                              (ecase n-machine-word-bits
                                 (32 'signed-byte-32)
                                 (64 'signed-byte-64)))
                           (eq t2-name
-                              (ecase sb!vm::n-machine-word-bits
+                              (ecase n-machine-word-bits
                                 (32 'unsigned-byte-31)
                                 (64 'unsigned-byte-63)))
                           (eq t2-name
-                              (ecase sb!vm::n-machine-word-bits
+                              (ecase n-machine-word-bits
                                 (32 'unsigned-byte-32)
                                 (64 'unsigned-byte-64))))
                       t2))
                  (fixnum
                   (case t2-name
-                    (#.(ecase sb!vm::n-machine-word-bits
+                    (#.(ecase n-machine-word-bits
                          (32 'signed-byte-32)
                          (64 'signed-byte-64))
                        t2)
-                    (#.(ecase sb!vm::n-machine-word-bits
+                    (#.(ecase n-machine-word-bits
                          (32 'unsigned-byte-31)
                          (64 'unsigned-byte-63))
                        (primitive-type-or-lose
-                        (ecase sb!vm::n-machine-word-bits
+                        (ecase n-machine-word-bits
                           (32 'signed-byte-32)
                           (64 'signed-byte-64))))))
-                 (#.(ecase sb!vm::n-machine-word-bits
+                 (#.(ecase n-machine-word-bits
                       (32 'signed-byte-32)
                       (64 'signed-byte-64))
                   (if (eq t2-name
-                          (ecase sb!vm::n-machine-word-bits
+                          (ecase n-machine-word-bits
                             (32 'unsigned-byte-31)
                             (64 'unsigned-byte-63)))
                       t1))
-                 (#.(ecase sb!vm::n-machine-word-bits
+                 (#.(ecase n-machine-word-bits
                       (32 'unsigned-byte-31)
                       (64 'unsigned-byte-63))
                     (if (eq t2-name
-                            (ecase sb!vm::n-machine-word-bits
+                            (ecase n-machine-word-bits
                               (32 'unsigned-byte-32)
                               (64 'unsigned-byte-64)))
                         t2))))))
@@ -227,7 +227,7 @@
                  (cond ((and hi lo)
                         (dolist (spec
                                   `((positive-fixnum 0 ,sb!xc:most-positive-fixnum)
-                                    ,@(ecase sb!vm::n-machine-word-bits
+                                    ,@(ecase n-machine-word-bits
                                         (32
                                          `((unsigned-byte-31
                                             0 ,(1- (ash 1 31)))
@@ -240,7 +240,7 @@
                                             0 ,(1- (ash 1 64))))))
                                     (fixnum ,sb!xc:most-negative-fixnum
                                             ,sb!xc:most-positive-fixnum)
-                                    ,(ecase sb!vm::n-machine-word-bits
+                                    ,(ecase n-machine-word-bits
                                        (32
                                         `(signed-byte-32 ,(ash -1 31)
                                                          ,(1- (ash 1 31))))

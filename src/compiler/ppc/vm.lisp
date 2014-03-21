@@ -380,7 +380,7 @@
                                (%logbitp integer index))))
          (t (values :default nil))))
       ;; FIXME: can handle MIN and MAX here
-      (sb!kernel:%ldb
+      (%ldb
        (flet ((validp (type width)
                 (and (valid-funtype `((constant-arg (integer 1 29))
                                       (constant-arg (mod ,width))

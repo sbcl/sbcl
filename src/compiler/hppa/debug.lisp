@@ -17,7 +17,7 @@
     (move cfp-tn res)))
 
 (define-vop (read-control-stack)
-  (:translate sb!kernel:stack-ref)
+  (:translate stack-ref)
   (:policy :fast-safe)
   (:args (object :scs (sap-reg))
          (offset :scs (any-reg)))
@@ -27,7 +27,7 @@
   (:generator 5
     (inst ldwx offset object result)))
 (define-vop (read-control-stack-c)
-  (:translate sb!kernel:stack-ref)
+  (:translate stack-ref)
   (:policy :fast-safe)
   (:args (object :scs (sap-reg)))
   (:info offset)
@@ -39,7 +39,7 @@
     (inst ldw (* offset n-word-bytes) object result)))
 
 (define-vop (write-control-stack)
-  (:translate sb!kernel:%set-stack-ref)
+  (:translate %set-stack-ref)
   (:policy :fast-safe)
   (:args (object :scs (sap-reg) :target sap)
          (offset :scs (any-reg))

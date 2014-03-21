@@ -23,8 +23,8 @@
   (declare (type index offset))
   (unless (zerop (rem offset n-word-bytes))
     (error "Unaligned instruction?  offset=#x~X." offset))
-  (sb!sys:without-gcing
-   (let ((sap (%primitive sb!kernel::code-instructions code)))
+  (without-gcing
+   (let ((sap (%primitive code-instructions code)))
      (ecase kind
        (:call
         (error "Can't deal with CALL fixups, yet."))
@@ -89,7 +89,7 @@
 ;;; Under SunOS, we have a straightforward implementation in C:
 #!+sunos
 (define-alien-routine ("os_context_fp_control" context-floating-point-modes)
-    (sb!alien:unsigned 32)
+    (unsigned 32)
   (context (* os-context-t)))
 
 ;;; Under Linux, we have to contend with utterly broken signal handling.
@@ -146,11 +146,11 @@
 (defun args-for-tagged-add-inst (context bad-inst)
   (declare (type (alien (* os-context-t)) context))
   (let* ((rs1 (ldb (byte 5 14) bad-inst))
-         (op1 (sb!kernel:make-lisp-obj (context-register context rs1))))
+         (op1 (make-lisp-obj (context-register context rs1))))
     (if (fixnump op1)
         (if (zerop (ldb (byte 1 13) bad-inst))
             (let* ((rs2 (ldb (byte 5 0) bad-inst))
-                   (op2 (sb!kernel:make-lisp-obj (context-register context rs2))))
+                   (op2 (make-lisp-obj (context-register context rs2))))
               (if (fixnump op2)
                   (values #.(error-number-or-lose 'unknown-error) nil)
                   (values #.(error-number-or-lose 'object-not-fixnum-error)

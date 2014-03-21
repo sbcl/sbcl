@@ -105,7 +105,7 @@
 #-sb-xc-host (defsetf char %charset)
 #-sb-xc-host (defsetf schar %scharset)
 (defsetf %array-dimension %set-array-dimension)
-(defsetf sb!kernel:%vector-raw-bits sb!kernel:%set-vector-raw-bits)
+(defsetf %vector-raw-bits %set-vector-raw-bits)
 #-sb-xc-host (defsetf symbol-value set)
 #-sb-xc-host (defsetf symbol-global-value set-symbol-global-value)
 #-sb-xc-host (defsetf symbol-plist %set-symbol-plist)

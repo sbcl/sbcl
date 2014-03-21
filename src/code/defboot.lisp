@@ -228,7 +228,7 @@ evaluated as a PROGN."
   (sb!c:%compiler-defun name inline-lambda nil)
   (when (fboundp name)
     (/show0 "redefining NAME in %DEFUN")
-    (warn 'sb!kernel::redefinition-with-defun
+    (warn 'redefinition-with-defun
           :name name
           :new-function def
           :new-location source-location))

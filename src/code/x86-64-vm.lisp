@@ -47,9 +47,9 @@
 ;;; with things (like code instructions) that have to refer to them.
 (defun fixup-code-object (code offset fixup kind)
   (declare (type index offset))
-  (sb!sys:without-gcing
+  (without-gcing
     (let ((sap (truly-the system-area-pointer
-                          (sb!kernel:code-instructions code))))
+                          (code-instructions code))))
       (unless (member kind '(:absolute :absolute64 :relative))
         (error "Unknown code-object-fixup kind ~S." kind))
       (ecase kind
@@ -151,14 +151,14 @@
   0)
 #!+linux
 (define-alien-routine ("os_context_fp_control" context-floating-point-modes)
-    (sb!alien:unsigned 32)
+    (unsigned 32)
   (context (* os-context-t)))
 
 (define-alien-routine
-    ("arch_get_fp_modes" floating-point-modes) (sb!alien:unsigned 32))
+    ("arch_get_fp_modes" floating-point-modes) (unsigned 32))
 
 (define-alien-routine
-    ("arch_set_fp_modes" %floating-point-modes-setter) void (fp (sb!alien:unsigned 32)))
+    ("arch_set_fp_modes" %floating-point-modes-setter) void (fp (unsigned 32)))
 
 (defun (setf floating-point-modes) (val) (%floating-point-modes-setter val))
 

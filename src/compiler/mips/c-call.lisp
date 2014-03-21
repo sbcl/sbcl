@@ -146,7 +146,7 @@
 (deftransform %alien-funcall ((function type &rest args))
   (aver (sb!c::constant-lvar-p type))
   (let* ((type (sb!c::lvar-value type))
-         (env (sb!kernel:make-null-lexenv))
+         (env (make-null-lexenv))
          (arg-types (alien-fun-type-arg-types type))
          (result-type (alien-fun-type-result-type type)))
     (aver (= (length arg-types) (length args)))
@@ -456,11 +456,11 @@ and a pointer to the arguments."
              (vector (make-static-vector (length buffer)
                                          :element-type '(unsigned-byte 8)
                                          :initial-contents buffer))
-             (sap (sb!sys:vector-sap vector)))
-        (sb!alien:alien-funcall
-         (sb!alien:extern-alien "os_flush_icache"
-                                (function void
-                                          system-area-pointer
-                                          unsigned-long))
+             (sap (vector-sap vector)))
+        (alien-funcall
+         (extern-alien "os_flush_icache"
+                       (function void
+                                 system-area-pointer
+                                 unsigned-long))
          sap (length buffer))
         vector))))

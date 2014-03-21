@@ -151,7 +151,7 @@
   ;; would be wrong. But we still have to make an entry so we can tell
   ;; functions from macros -- same for telling variables apart from
   ;; symbol macros.
-  (let ((lexenv (sb!kernel::coerce-to-lexenv env)))
+  (let ((lexenv (sb!kernel:coerce-to-lexenv env)))
     (sb!c::make-lexenv
      :default lexenv
      :vars (when (eql (caar macros) *key-to-walker-environment*)
@@ -443,10 +443,10 @@
 (define-walker-template unwind-protect       (nil return repeat (eval)))
 
 ;;; SBCL-only special forms
-(define-walker-template sb!ext:truly-the     (nil quote eval))
+(define-walker-template truly-the (nil quote eval))
 ;;; FIXME: maybe we don't need this one any more, given that
 ;;; NAMED-LAMBDA now expands into (FUNCTION (NAMED-LAMBDA ...))?
-(define-walker-template named-lambda         walk-named-lambda)
+(define-walker-template named-lambda walk-named-lambda)
 
 (defvar *walk-form-expand-macros-p* nil)
 

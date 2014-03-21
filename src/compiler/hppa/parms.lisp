@@ -120,21 +120,21 @@
 
 (defparameter *static-funs*
   '(length
-    sb!kernel:two-arg-+
-    sb!kernel:two-arg--
-    sb!kernel:two-arg-*
-    sb!kernel:two-arg-/
-    sb!kernel:two-arg-<
-    sb!kernel:two-arg->
-    sb!kernel:two-arg-=
-    sb!kernel:two-arg-<=
-    sb!kernel:two-arg->=
-    sb!kernel:two-arg-/=
+    two-arg-+
+    two-arg--
+    two-arg-*
+    two-arg-/
+    two-arg-<
+    two-arg->
+    two-arg-=
+    two-arg-<=
+    two-arg->=
+    two-arg-/=
     eql
-    sb!kernel:%negate
-    sb!kernel:two-arg-and
-    sb!kernel:two-arg-ior
-    sb!kernel:two-arg-xor
-    sb!kernel:two-arg-gcd
-    sb!kernel:two-arg-lcm))
+    %negate
+    two-arg-and
+    two-arg-ior
+    two-arg-xor
+    two-arg-gcd
+    two-arg-lcm))
 

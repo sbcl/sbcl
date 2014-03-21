@@ -1224,7 +1224,7 @@ core and return a descriptor to it."
   ;; allocation sequences that expect it to be zero upon entrance
   ;; actually find it to be so.
   #!+(or x86-64 x86)
-  (let ((p-a-a-symbol (cold-intern 'sb!kernel:*pseudo-atomic-bits*
+  (let ((p-a-a-symbol (cold-intern '*pseudo-atomic-bits*
                                    :gspace *static*)))
     (cold-set p-a-a-symbol (make-fixnum-descriptor 0))))
 
@@ -1969,7 +1969,7 @@ core and return a descriptor to it."
         (cold-push (cold-cons (base-string-to-core (car symbol))
                               (number-to-core (cdr symbol)))
                    result)))
-    (cold-set (cold-intern 'sb!kernel:*!initial-foreign-symbols*) result)
+    (cold-set (cold-intern '*!initial-foreign-symbols*) result)
     #!+sb-dynamic-core
     (let ((runtime-linking-list *nil-descriptor*))
       (dolist (symbol *dyncore-linkage-keys*)
@@ -3475,7 +3475,7 @@ initially undefined function references:~2%")
           (out-to
            (string-downcase (string class))
            (write-structure-object
-            (sb!kernel:layout-info (sb!kernel:find-layout class)))))
+            (layout-info (find-layout class)))))
         (out-to "static-symbols" (write-static-symbols))
 
         (let ((fn (format nil "~A/Makefile.features" c-header-dir-name)))

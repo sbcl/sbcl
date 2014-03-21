@@ -546,9 +546,9 @@
            (declare (type ,offset src-offset dst-offset length))
            (locally (declare (optimize (speed 3) (safety 1)))
              (multiple-value-bind (src src-offset) (,fix-sap-and-offset-name src src-offset)
-               (declare (type sb!sys:system-area-pointer src))
+               (declare (type system-area-pointer src))
                (multiple-value-bind (dst dst-offset) (,fix-sap-and-offset-name dst dst-offset)
-                 (declare (type sb!sys:system-area-pointer dst))
+                 (declare (type system-area-pointer dst))
                  (,unary-bash-name src src-offset dst dst-offset length
                                    #'word-sap-ref #'%set-word-sap-ref
                                    #'word-sap-ref)))))

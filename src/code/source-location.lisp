@@ -12,7 +12,7 @@
 (in-package "SB!C")
 
 (def!struct (definition-source-location
-             (:make-load-form-fun sb!kernel:just-dump-it-normally))
+             (:make-load-form-fun just-dump-it-normally))
   ;; Namestring of the source file that the definition was compiled from.
   ;; This is null if the definition was not compiled from a file.
   (namestring

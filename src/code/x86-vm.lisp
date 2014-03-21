@@ -84,16 +84,15 @@
                            1
                            :element-type '(unsigned-byte 32)
                            :initial-element offset)))))))
-    (sb!sys:without-gcing
+    (without-gcing
      (let* ((sap (truly-the system-area-pointer
-                            (sb!kernel:code-instructions code)))
-            (obj-start-addr (logand (sb!kernel:get-lisp-obj-address code)
+                            (code-instructions code)))
+            (obj-start-addr (logand (get-lisp-obj-address code)
                                     #xfffffff8))
             ;; FIXME: what is this 5?
             #+nil (const-start-addr (+ obj-start-addr (* 5 n-word-bytes)))
-            (code-start-addr (sb!sys:sap-int (sb!kernel:code-instructions
-                                              code)))
-            (ncode-words (sb!kernel:code-header-ref code 1))
+            (code-start-addr (sap-int (code-instructions code)))
+            (ncode-words (code-header-ref code 1))
             (code-end-addr (+ code-start-addr (* ncode-words n-word-bytes))))
        (unless (member kind '(:absolute :relative))
          (error "Unknown code-object-fixup kind ~S." kind))

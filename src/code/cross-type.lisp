@@ -140,7 +140,7 @@
              ;; ever change, ugh!
              (if (consp target-type)
                  (member (car target-type)
-                         '(sb!alien:alien))
+                         '(alien))
                  (member target-type
                          '(system-area-pointer
                            sb!alien-internals:alien-value)))
@@ -156,7 +156,7 @@
              (values nil t))
             ((and (symbolp target-type)
                   (find-class target-type nil)
-                  (subtypep target-type 'sb!kernel::structure!object))
+                  (subtypep target-type 'structure!object))
              (values (typep host-object target-type) t))
             (;; easy cases of arrays and vectors
              (target-type-is-in

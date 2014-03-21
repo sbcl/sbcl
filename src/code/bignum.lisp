@@ -450,8 +450,8 @@
       (declare (type bignum-element-type high low))
       (if (and (zerop high)
                (%digit-0-or-plusp low))
-          (let ((low (sb!ext:truly-the (unsigned-byte #.(1- sb!vm:n-word-bits))
-                                       (%fixnum-digit-with-correct-sign low))))
+          (let ((low (truly-the (unsigned-byte #.(1- sb!vm:n-word-bits))
+                                (%fixnum-digit-with-correct-sign low))))
             (if (eq a-minusp b-minusp)
                 low
                 (- low)))
@@ -1168,7 +1168,7 @@
 ;;; exponent and sign.
 (defun single-float-from-bits (bits exp plusp)
   (declare (fixnum exp))
-  (declare (optimize #-sb-xc-host (sb!ext:inhibit-warnings 3)))
+  (declare (optimize #-sb-xc-host (inhibit-warnings 3)))
   (let ((res (dpb exp
                   sb!vm:single-float-exponent-byte
                   (logandc2 (logand #xffffffff
@@ -1180,7 +1180,7 @@
          (logior res (ash -1 sb!vm:float-sign-shift))))))
 (defun double-float-from-bits (bits exp plusp)
   (declare (fixnum exp))
-  (declare (optimize #-sb-xc-host (sb!ext:inhibit-warnings 3)))
+  (declare (optimize #-sb-xc-host (inhibit-warnings 3)))
   (let ((hi (dpb exp
                  sb!vm:double-float-exponent-byte
                  (logandc2 (ecase sb!vm::n-word-bits
@@ -1195,7 +1195,7 @@
 #!+(and long-float x86)
 (defun long-float-from-bits (bits exp plusp)
   (declare (fixnum exp))
-  (declare (optimize #-sb-xc-host (sb!ext:inhibit-warnings 3)))
+  (declare (optimize #-sb-xc-host (inhibit-warnings 3)))
   (make-long-float
    (if plusp
        exp
@@ -1871,7 +1871,7 @@
 ;;; incoming data, such as in-place shifting. This is basically the same as
 ;;; the first form in %NORMALIZE-BIGNUM, but we return the length of the buffer
 ;;; instead of shrinking the bignum.
-#!-sb-fluid (declaim (sb!ext:maybe-inline %normalize-bignum-buffer))
+#!-sb-fluid (declaim (maybe-inline %normalize-bignum-buffer))
 (defun %normalize-bignum-buffer (result len)
   (declare (type bignum-type result)
            (type bignum-index len))

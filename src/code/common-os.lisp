@@ -48,7 +48,7 @@
    :default "")
   (/show0 "setting *POSIX-ARGV*")
   (init-var-ignoring-errors
-   sb!ext:*posix-argv*
+   *posix-argv*
    (loop for i from 0
          for arg = (sb!alien:deref *native-posix-argv* i)
          until (sb!alien:null-alien arg)

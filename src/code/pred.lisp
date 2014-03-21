@@ -181,7 +181,7 @@
     (extended-char 'extended-char)
     ((member t) 'boolean)
     (keyword 'keyword)
-    ((or array complex #!+sb-simd-pack sb!kernel:simd-pack)
+    ((or array complex #!+sb-simd-pack simd-pack)
      (type-specifier (ctype-of object)))
     (t
      (let* ((classoid (layout-classoid (layout-of object)))
@@ -189,7 +189,7 @@
        (if (%instancep object)
            (case name
              (sb!alien-internals:alien-value
-              `(sb!alien:alien
+              `(alien
                 ,(sb!alien-internals:unparse-alien-type
                   (sb!alien-internals:alien-value-type object))))
              (t

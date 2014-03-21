@@ -110,7 +110,7 @@
 (defparameter *c-callable-static-symbols*
   '(sub-gc
     sb!kernel::post-gc
-    sb!kernel::internal-error
+    internal-error
     sb!kernel::control-stack-exhausted-error
     sb!kernel::binding-stack-exhausted-error
     sb!kernel::alien-stack-exhausted-error

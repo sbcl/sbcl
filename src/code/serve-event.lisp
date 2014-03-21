@@ -263,8 +263,8 @@ happens. Server returns T if something happened and NIL otherwise. Timeout
 ;;; Handles the work of the above, except for periodic polling. Returns
 ;;; true if something of interest happened.
 (defun sub-sub-serve-event (to-sec to-usec)
-  (sb!alien:with-alien ((read-fds (sb!alien:struct sb!unix:fd-set))
-                        (write-fds (sb!alien:struct sb!unix:fd-set)))
+  (with-alien ((read-fds (struct sb!unix:fd-set))
+                        (write-fds (struct sb!unix:fd-set)))
     (sb!unix:fd-zero read-fds)
     (sb!unix:fd-zero write-fds)
     (let ((count 0))
@@ -288,8 +288,8 @@ happens. Server returns T if something happened and NIL otherwise. Timeout
       ;; Next, wait for something to happen.
       (multiple-value-bind (value err)
           (sb!unix:unix-fast-select count
-                                    (sb!alien:addr read-fds)
-                                    (sb!alien:addr write-fds)
+                                    (addr read-fds)
+                                    (addr write-fds)
                                     nil to-sec to-usec)
         #!+win32
         (declare (ignore err))

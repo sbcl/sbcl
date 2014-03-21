@@ -97,7 +97,7 @@ SYSCALL-FORM. Repeat evaluation of SYSCALL-FORM if it is interrupted."
   `(let (,value ,errno)
      (loop (multiple-value-setq (,value ,errno)
              ,syscall-form)
-        (unless #!-win32 (eql ,errno sb!unix:eintr) #!+win32 nil
+        (unless #!-win32 (eql ,errno eintr) #!+win32 nil
           (return (values ,value ,errno))))
      ,@body))
 
@@ -764,17 +764,17 @@ avoiding atexit(3) hooks, etc. Otherwise exit(2) is called."
           (values nil nil)
           (multiple-value-bind (to-sec to-msec2) (truncate to-msec 1000)
             (values to-sec (* to-msec2 1000))))
-    (sb!unix:with-restarted-syscall (count errno)
-      (sb!alien:with-alien ((fds (sb!alien:struct sb!unix:fd-set)))
-        (sb!unix:fd-zero fds)
-        (sb!unix:fd-set fd fds)
+    (with-restarted-syscall (count errno)
+      (with-alien ((fds (struct fd-set)))
+        (fd-zero fds)
+        (fd-set fd fds)
         (multiple-value-bind (read-fds write-fds)
             (ecase direction
               (:input
                (values (addr fds) nil))
               (:output
                (values nil (addr fds))))
-          (sb!unix:unix-fast-select (1+ fd)
+          (unix-fast-select (1+ fd)
                                     read-fds write-fds nil
                                     to-sec to-usec)))
       (case count
@@ -883,23 +883,23 @@ avoiding atexit(3) hooks, etc. Otherwise exit(2) is called."
 (defun fd-type (fd)
   (declare (type unix-fd fd))
   (let ((fmt (logand
-              sb!unix:s-ifmt
+              s-ifmt
               (or (with-alien ((buf (struct wrapped_stat)))
                     (syscall ("fstat_wrapper" int (* (struct wrapped_stat)))
                              (slot buf 'st-mode)
                              fd (addr buf)))
                   0))))
-    (cond ((logtest sb!unix:s-ififo fmt)
+    (cond ((logtest s-ififo fmt)
            :fifo)
-          ((logtest sb!unix:s-ifchr fmt)
+          ((logtest s-ifchr fmt)
            :character)
-          ((logtest sb!unix:s-ifdir fmt)
+          ((logtest s-ifdir fmt)
            :directory)
-          ((logtest sb!unix:s-ifblk fmt)
+          ((logtest s-ifblk fmt)
            :block)
-          ((logtest sb!unix:s-ifreg fmt)
+          ((logtest s-ifreg fmt)
            :regular)
-          ((logtest sb!unix:s-ifsock fmt)
+          ((logtest s-ifsock fmt)
            :socket)
           (t
            :unknown))))
@@ -932,10 +932,10 @@ avoiding atexit(3) hooks, etc. Otherwise exit(2) is called."
                (rem (struct timespec)))
     (setf (slot req 'tv-sec) secs
           (slot req 'tv-nsec) nsecs)
-    (loop while (and (eql sb!unix:eintr
+    (loop while (and (eql eintr
                           (nth-value 1
                                      (int-syscall ("sb_nanosleep" (* (struct timespec))
-                                                               (* (struct timespec)))
+                                                                  (* (struct timespec)))
                                                   (addr req) (addr rem))))
                      ;; KLUDGE: On Darwin, if an interrupt cases nanosleep to
                      ;; take longer than the requested time, the call will

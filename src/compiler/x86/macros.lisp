@@ -404,7 +404,7 @@
 
 #!+sb-safepoint
 (defun emit-safepoint ()
-  (inst test eax-tn (make-ea :dword :disp sb!vm::gc-safepoint-page-addr)))
+  (inst test eax-tn (make-ea :dword :disp gc-safepoint-page-addr)))
 
 #!+sb-thread
 (defmacro pseudo-atomic (&rest forms)
@@ -517,7 +517,7 @@
        (:args (object :scs (descriptor-reg))
               (index :scs (any-reg immediate unsigned-reg)))
        (:arg-types ,type tagged-num
-                   (:constant (constant-displacement ,lowtag sb!vm:n-word-bytes ,offset)))
+                   (:constant (constant-displacement ,lowtag n-word-bytes ,offset)))
        (:info offset)
        (:results (value :scs ,scs))
        (:result-types ,el-type)
@@ -578,7 +578,7 @@
               (value :scs ,scs :target result))
        (:info offset)
        (:arg-types ,type tagged-num
-                   (:constant (constant-displacement ,lowtag sb!vm:n-word-bytes ,offset)) ,el-type)
+                   (:constant (constant-displacement ,lowtag n-word-bytes ,offset)) ,el-type)
        (:results (result :scs ,scs))
        (:result-types ,el-type)
        (:generator 4                    ; was 5

@@ -28,7 +28,7 @@
 
 (defconstant default-line-length 80)
 
-(defstruct (pretty-stream (:include sb!kernel:ansi-stream
+(defstruct (pretty-stream (:include ansi-stream
                                     (out #'pretty-out)
                                     (sout #'pretty-sout)
                                     (misc #'pretty-misc))

@@ -245,11 +245,11 @@
                (let ((x (coerce x 'double-float))
                      (y (coerce y 'double-float)))
                  (declare (double-float x y))
-                 (let* ((x-hi (sb!kernel:double-float-high-bits x))
-                        (x-lo (sb!kernel:double-float-low-bits x))
+                 (let* ((x-hi (double-float-high-bits x))
+                        (x-lo (double-float-low-bits x))
                         (x-ihi (logand x-hi #x7fffffff))
-                        (y-hi (sb!kernel:double-float-high-bits y))
-                        (y-lo (sb!kernel:double-float-low-bits y))
+                        (y-hi (double-float-high-bits y))
+                        (y-lo (double-float-low-bits y))
                         (y-ihi (logand y-hi #x7fffffff)))
                    (declare (type (signed-byte 32) x-hi y-hi)
                             (type (unsigned-byte 31) x-ihi y-ihi)
@@ -311,9 +311,9 @@
 
                        (if (>= x-hi 0)
                            ;; x>0
-                           (coerce (sb!kernel::%pow x y) rtype)
+                           (coerce (%pow x y) rtype)
                            ;; x<0
-                           (let ((pow (sb!kernel::%pow abs-x y)))
+                           (let ((pow (%pow abs-x y)))
                              (declare (double-float pow))
                              (case yisint
                                (1 ; odd
@@ -857,7 +857,7 @@
                     ;; (/ least-positive-double-float double-float-epsilon)
                     (load-time-value
                      #!-long-float
-                     (sb!kernel:make-double-float #x1fffff #xfffffffe)
+                     (make-double-float #x1fffff #xfffffffe)
                      #!+long-float
                      (error "(/ least-positive-long-float long-float-epsilon)")))
                    (traps (ldb sb!vm::float-sticky-bits
@@ -938,7 +938,7 @@
   ;; implementation of log1p.
   (let ((t0 (load-time-value
              #!-long-float
-             (sb!kernel:make-double-float #x3fe6a09e #x667f3bcd)
+             (make-double-float #x3fe6a09e #x667f3bcd)
              #!+long-float
              (error "(/ (sqrt 2l0))")))
         ;; KLUDGE: if repeatable fasls start failing under some weird
@@ -949,7 +949,7 @@
         (t2 3d0)
         (ln2 (load-time-value
               #!-long-float
-              (sb!kernel:make-double-float #x3fe62e42 #xfefa39ef)
+              (make-double-float #x3fe62e42 #xfefa39ef)
               #!+long-float
               (error "(log 2l0)")))
         (x (float (realpart z) 1.0d0))
@@ -1051,7 +1051,7 @@
     (cond ((> (abs x)
               (load-time-value
                #!-long-float
-               (sb!kernel:make-double-float #x406633ce #x8fb9f87e)
+               (make-double-float #x406633ce #x8fb9f87e)
                #!+long-float
                (error "(/ (+ (log 2l0) (log most-positive-long-float)) 4l0)")))
            (coerce-to-complex-type (float-sign x)

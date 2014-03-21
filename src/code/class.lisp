@@ -1073,13 +1073,13 @@
              :prototype-form '#:mu)
 
      (system-area-pointer :codes (#.sb!vm:sap-widetag)
-                          :prototype-form (sb!sys:int-sap 42))
+                          :prototype-form (int-sap 42))
      (weak-pointer :codes (#.sb!vm:weak-pointer-widetag)
-      :prototype-form (sb!ext:make-weak-pointer (find-package "CL")))
+      :prototype-form (make-weak-pointer (find-package "CL")))
      (code-component :codes (#.sb!vm:code-header-widetag))
      (lra :codes (#.sb!vm:return-pc-header-widetag))
      (fdefn :codes (#.sb!vm:fdefn-widetag)
-            :prototype-form (sb!kernel:make-fdefn "42"))
+            :prototype-form (make-fdefn "42"))
      (random-class) ; used for unknown type codes
 
      (function

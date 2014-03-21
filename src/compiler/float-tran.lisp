@@ -866,66 +866,66 @@
 
 ;;; Handle the case when x >= 1.
 (defun interval-expt-> (x y)
-  (case (sb!c::interval-range-info y 0d0)
+  (case (interval-range-info y 0d0)
     (+
      ;; Y is positive and log X >= 0. The range of exp(y * log(x)) is
      ;; obviously non-negative. We just have to be careful for
      ;; infinite bounds (given by nil).
-     (let ((lo (safe-expt (type-bound-number (sb!c::interval-low x))
-                          (type-bound-number (sb!c::interval-low y))))
-           (hi (safe-expt (type-bound-number (sb!c::interval-high x))
-                          (type-bound-number (sb!c::interval-high y)))))
-       (list (sb!c::make-interval :low (or lo 1) :high hi))))
+     (let ((lo (safe-expt (type-bound-number (interval-low x))
+                          (type-bound-number (interval-low y))))
+           (hi (safe-expt (type-bound-number (interval-high x))
+                          (type-bound-number (interval-high y)))))
+       (list (make-interval :low (or lo 1) :high hi))))
     (-
      ;; Y is negative and log x >= 0. The range of exp(y * log(x)) is
      ;; obviously [0, 1]. However, underflow (nil) means 0 is the
      ;; result.
-     (let ((lo (safe-expt (type-bound-number (sb!c::interval-high x))
-                          (type-bound-number (sb!c::interval-low y))))
-           (hi (safe-expt (type-bound-number (sb!c::interval-low x))
-                          (type-bound-number (sb!c::interval-high y)))))
-       (list (sb!c::make-interval :low (or lo 0) :high (or hi 1)))))
+     (let ((lo (safe-expt (type-bound-number (interval-high x))
+                          (type-bound-number (interval-low y))))
+           (hi (safe-expt (type-bound-number (interval-low x))
+                          (type-bound-number (interval-high y)))))
+       (list (make-interval :low (or lo 0) :high (or hi 1)))))
     (t
      ;; Split the interval in half.
      (destructuring-bind (y- y+)
-         (sb!c::interval-split 0 y t)
+         (interval-split 0 y t)
        (list (interval-expt-> x y-)
              (interval-expt-> x y+))))))
 
 ;;; Handle the case when x <= 1
 (defun interval-expt-< (x y)
-  (case (sb!c::interval-range-info x 0d0)
+  (case (interval-range-info x 0d0)
     (+
      ;; The case of 0 <= x <= 1 is easy
-     (case (sb!c::interval-range-info y)
+     (case (interval-range-info y)
        (+
         ;; Y is positive and log X <= 0. The range of exp(y * log(x)) is
         ;; obviously [0, 1]. We just have to be careful for infinite bounds
         ;; (given by nil).
-        (let ((lo (safe-expt (type-bound-number (sb!c::interval-low x))
-                             (type-bound-number (sb!c::interval-high y))))
-              (hi (safe-expt (type-bound-number (sb!c::interval-high x))
-                             (type-bound-number (sb!c::interval-low y)))))
-          (list (sb!c::make-interval :low (or lo 0) :high (or hi 1)))))
+        (let ((lo (safe-expt (type-bound-number (interval-low x))
+                             (type-bound-number (interval-high y))))
+              (hi (safe-expt (type-bound-number (interval-high x))
+                             (type-bound-number (interval-low y)))))
+          (list (make-interval :low (or lo 0) :high (or hi 1)))))
        (-
         ;; Y is negative and log x <= 0. The range of exp(y * log(x)) is
         ;; obviously [1, inf].
-        (let ((hi (safe-expt (type-bound-number (sb!c::interval-low x))
-                             (type-bound-number (sb!c::interval-low y))))
-              (lo (safe-expt (type-bound-number (sb!c::interval-high x))
-                             (type-bound-number (sb!c::interval-high y)))))
-          (list (sb!c::make-interval :low (or lo 1) :high hi))))
+        (let ((hi (safe-expt (type-bound-number (interval-low x))
+                             (type-bound-number (interval-low y))))
+              (lo (safe-expt (type-bound-number (interval-high x))
+                             (type-bound-number (interval-high y)))))
+          (list (make-interval :low (or lo 1) :high hi))))
        (t
         ;; Split the interval in half
         (destructuring-bind (y- y+)
-            (sb!c::interval-split 0 y t)
+            (interval-split 0 y t)
           (list (interval-expt-< x y-)
                 (interval-expt-< x y+))))))
     (-
      ;; The case where x <= 0. Y MUST be an INTEGER for this to work!
      ;; The calling function must insure this! For now we'll just
      ;; return the appropriate unbounded float type.
-     (list (sb!c::make-interval :low nil :high nil)))
+     (list (make-interval :low nil :high nil)))
     (t
      (destructuring-bind (neg pos)
          (interval-split 0 x t t)
@@ -1203,9 +1203,9 @@
 ) ; PROGN
 
 (deftransform realpart ((x) ((complex rational)) *)
-  '(sb!kernel:%realpart x))
+  '(%realpart x))
 (deftransform imagpart ((x) ((complex rational)) *)
-  '(sb!kernel:%imagpart x))
+  '(%imagpart x))
 
 ;;; Make REALPART and IMAGPART return the appropriate types. This
 ;;; should help a lot in optimized code.
@@ -1539,7 +1539,7 @@
 (defoptimizer (cis derive-type) ((num))
   (one-arg-derive-type num
     (lambda (arg)
-      (sb!c::specifier-type
+      (specifier-type
        `(complex ,(or (numeric-type-format arg) 'float))))
     #'cis))
 

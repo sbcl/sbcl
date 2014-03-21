@@ -135,11 +135,11 @@
                ,@cleanup-froms))))))
 
   (declaim (inline %unblock-deferrable-signals))
-  (sb!alien:define-alien-routine ("unblock_deferrable_signals"
-                                  %unblock-deferrable-signals)
-      sb!alien:void
-    (where sb!alien:unsigned)
-    (old sb!alien:unsigned))
+  (define-alien-routine ("unblock_deferrable_signals"
+                         %unblock-deferrable-signals)
+    void
+    (where unsigned)
+    (old unsigned))
 
   (defun block-deferrable-signals ()
     (%block-deferrable-signals 0 0))
@@ -148,13 +148,13 @@
     (%unblock-deferrable-signals 0 0))
 
   (declaim (inline %block-deferrables-and-return-mask %apply-sigmask))
-  (sb!alien:define-alien-routine ("block_deferrables_and_return_mask"
-                                  %block-deferrables-and-return-mask)
-      sb!alien:unsigned)
-  (sb!alien:define-alien-routine ("apply_sigmask"
-                                  %apply-sigmask)
-      sb!alien:void
-    (mask sb!alien:unsigned))
+  (define-alien-routine ("block_deferrables_and_return_mask"
+                         %block-deferrables-and-return-mask)
+    unsigned)
+  (define-alien-routine ("apply_sigmask"
+                         %apply-sigmask)
+    void
+    (mask unsigned))
 
   (defmacro without-interrupts/with-deferrables-blocked (&body body)
     (let ((mask-var (gensym)))
@@ -172,7 +172,7 @@
       ;; mechanism there are no extra frames on the stack from a
       ;; previous signal handler when the next signal is delivered
       ;; provided there is no WITH-INTERRUPTS.
-      (let ((sb!unix::*unblock-deferrables-on-enabling-interrupts-p* t))
+      (let ((*unblock-deferrables-on-enabling-interrupts-p* t))
         (with-interrupt-bindings
           (let ((sb!debug:*stack-top-hint*
                  (nth-value 1 (sb!kernel:find-interrupted-name-and-frame))))
@@ -185,7 +185,7 @@
                ;; in the interrupted context is restored.
                ;; However, if we do an nlx the operating
                ;; system will not restore it for us.
-               (when sb!unix::*unblock-deferrables-on-enabling-interrupts-p*
+               (when *unblock-deferrables-on-enabling-interrupts-p*
                  ;; This means that storms of interrupts
                  ;; doing an nlx can still run out of stack.
                  (unblock-deferrable-signals)))))))))

@@ -44,12 +44,12 @@
 (defmacro program-destructuring-bind (lambda-list arg-list &body body)
   (let ((arg-list-name (gensym "ARG-LIST-")))
     (multiple-value-bind (body local-decls)
-        (sb!kernel:parse-defmacro lambda-list arg-list-name body nil
-                                  'program-destructuring-bind
-                                  :anonymousp t
-                                  :doc-string-allowed nil
-                                  :wrap-block nil
-                                  :error-fun 'arg-count-program-error)
+        (parse-defmacro lambda-list arg-list-name body nil
+                        'program-destructuring-bind
+                        :anonymousp t
+                        :doc-string-allowed nil
+                        :wrap-block nil
+                        :error-fun 'arg-count-program-error)
       `(let ((,arg-list-name ,arg-list))
          ,@local-decls
          ,body))))
@@ -125,17 +125,17 @@
                    (warn "ignoring unknown optimization quality ~
                                       ~S in ~S" quality
                                       (cons 'declare declarations))))))
-          (sb!ext:muffle-conditions
+          (muffle-conditions
            (setf (sb!c::lexenv-handled-conditions lexenv)
                  (sb!c::process-muffle-conditions-decl
                   declaration
                   (sb!c::lexenv-handled-conditions lexenv))))
-          (sb!ext:unmuffle-conditions
+          (unmuffle-conditions
            (setf (sb!c::lexenv-handled-conditions lexenv)
                  (sb!c::process-unmuffle-conditions-decl
                   declaration
                   (sb!c::lexenv-handled-conditions lexenv))))
-          ((sb!ext:disable-package-locks sb!ext:enable-package-locks)
+          ((disable-package-locks sb!ext:enable-package-locks)
            (setf (sb!c::lexenv-disabled-package-locks lexenv)
                  (sb!c::process-package-lock-decl
                   declaration
@@ -502,7 +502,7 @@
           (t
            (let ((type (sb!c::info :variable :type symbol)))
              (when type
-               (let ((type-specifier (sb!kernel:type-specifier type)))
+               (let ((type-specifier (type-specifier type)))
                  (unless (typep value type-specifier)
                    (error 'type-error
                           :datum value
@@ -1040,7 +1040,7 @@
        ((throw)                (eval-throw (cdr exp) env))
        ((unwind-protect)       (eval-unwind-protect (cdr exp) env))
        ;; SBCL-specific:
-       ((sb!ext:truly-the)     (eval-the (cdr exp) env))
+       ((truly-the)            (eval-the (cdr exp) env))
        ;; Not a special form, but a macro whose expansion wouldn't be
        ;; handled correctly by the evaluator.
        ((sb!sys:with-pinned-objects) (eval-with-pinned-objects (cdr exp) env))
@@ -1196,6 +1196,6 @@
             (%eval form env))
         (compiler-environment-too-complex-error (condition)
           (declare (ignore condition))
-          (sb!int:style-warn 'sb!kernel:lexical-environment-too-complex
+          (sb!int:style-warn 'lexical-environment-too-complex
                              :form form :lexenv lexenv)
           (sb!int:simple-eval-in-lexenv form lexenv))))))

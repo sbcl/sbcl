@@ -11,4 +11,4 @@
 ;;;; files for more information.
 
 (in-package "SB!KERNEL")
-(define-alien-routine reset-control-stack-guard-page sb!alien:void)
+(define-alien-routine reset-control-stack-guard-page void)

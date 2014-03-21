@@ -100,10 +100,10 @@
        ;; instead of rewriting another version of it.
        ,(if #!+sb-unicode t
             #!-sb-unicode (c-string-needs-conversion-p type)
-            `(sb!alien::c-string-to-string ,alien
-                                           (c-string-external-format ,type)
-                                           (alien-c-string-type-element-type
-                                            ,type))
+            `(c-string-to-string ,alien
+                                 (c-string-external-format ,type)
+                                 (alien-c-string-type-element-type
+                                  ,type))
             `(%naturalize-c-string ,alien))))
 
 (define-alien-type-method (c-string :deport-gen) (type value)

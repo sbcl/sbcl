@@ -132,7 +132,7 @@
 ;;; However, the CL:CLASS type is only defined once PCL is loaded,
 ;;; which is before this is evaluated.  Once PCL is moved into cold
 ;;; init, this might be fixable.
-(def!type type-specifier () '(or list symbol sb!kernel:instance))
+(def!type type-specifier () '(or list symbol instance))
 
 ;;; the default value used for initializing character data. The ANSI
 ;;; spec says this is arbitrary, so we use the value that falls
@@ -731,7 +731,7 @@
 ;;; you generally do want to signal an error instead of proceeding.)
 (defun %find-package-or-lose (package-designator)
   (or (find-package package-designator)
-      (error 'sb!kernel:simple-package-error
+      (error 'simple-package-error
              :package package-designator
              :format-control "The name ~S does not designate any package."
              :format-arguments (list package-designator))))
@@ -743,7 +743,7 @@
   (let ((maybe-result (%find-package-or-lose package-designator)))
     (if (package-name maybe-result)     ; if not deleted
         maybe-result
-        (error 'sb!kernel:simple-package-error
+        (error 'simple-package-error
                :package maybe-result
                :format-control "The package ~S has been deleted."
                :format-arguments (list maybe-result)))))

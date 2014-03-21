@@ -1384,9 +1384,9 @@ handled by any other handler, it will be muffled.")
     (return-from function-file-namestring
       (sb!c:definition-source-location-namestring
           (sb!eval:interpreted-function-source-location function))))
-  (let* ((fun (sb!kernel:%fun-fun function))
-         (code (sb!kernel:fun-code-header fun))
-         (debug-info (sb!kernel:%code-debug-info code))
+  (let* ((fun (%fun-fun function))
+         (code (fun-code-header fun))
+         (debug-info (%code-debug-info code))
          (debug-source (when debug-info
                          (sb!c::debug-info-source debug-info)))
          (namestring (when debug-source
@@ -1418,7 +1418,7 @@ handled by any other handler, it will be muffled.")
   (and
    ;; There's garbage in various places when the first DEFUN runs in
    ;; cold-init.
-   sb!kernel::*cold-init-complete-p*
+   *cold-init-complete-p*
    (typep warning 'redefinition-with-defun)
    ;; Shared logic.
    (let ((name (redefinition-warning-name warning)))

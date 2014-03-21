@@ -82,7 +82,7 @@
                   ;; being incompatibly redefined. Doing this right
                   ;; will involve finding the old macro lambda-list
                   ;; and comparing it with the new one.
-                  (warn 'sb!kernel::redefinition-with-defmacro
+                  (warn 'redefinition-with-defmacro
                         :name name
                         :new-function definition
                         :new-location source-location))

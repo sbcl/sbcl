@@ -1781,7 +1781,7 @@ constant shift greater than word length")))
 
 #!+multiply-high-vops
 (define-vop (mulhi)
-  (:translate sb!kernel:%multiply-high)
+  (:translate %multiply-high)
   (:policy :fast-safe)
   (:args (x :scs (unsigned-reg) :target eax)
          (y :scs (unsigned-reg unsigned-stack)))
@@ -1799,7 +1799,7 @@ constant shift greater than word length")))
 
 #!+multiply-high-vops
 (define-vop (mulhi/fx)
-  (:translate sb!kernel:%multiply-high)
+  (:translate %multiply-high)
   (:policy :fast-safe)
   (:args (x :scs (any-reg) :target eax)
          (y :scs (unsigned-reg unsigned-stack)))
