@@ -238,3 +238,46 @@
   (find-class 'some-structure nil))
 (eval-when (:load-toplevel)
   (assert (typep (find-class 'some-structure) 'class)))
+
+;; It's possible for an instance to refer to a LAYOUT that has no classoid.
+;; This can arise from one file compiling a defstruct and another file compiling
+;; a function that refers to an instance of it as a literal either from
+;; LOAD-TIME-VALUE or MAKE-LOAD-FORM. Then you restart lisp and load the second
+;; but not the first file.  A function to recreate the instance was correctly
+;; dumped, but everything including the disassembler would crash trying to view
+;; the resultant object.
+
+(eval-when (:compile-toplevel)
+  (declaim (inline make-my-awesome-struct))
+  (defstruct (my-awesome-struct (:predicate nil) (:copier nil)) a b c)
+  (defmethod make-load-form ((self my-awesome-struct) &optional env)
+    (declare (ignore env))
+    ;; Can't use MAKE-LOAD-FORM-SAVING-SLOTS
+    ;; because that goes (ALLOCATE-INSTANCE (FIND-CLASS 'MY-AWESOME-STRUCT).
+    ;; Our named constructor is inlined and doesn't need the class.
+    (with-slots (a b c) self `(make-my-awesome-struct :a ',a :b ',b :c ',c)))
+  (defvar *my-awesome-instance*
+    (make-my-awesome-struct :a 1 :b '(foo . #*101) :c #(4 5 3))))
+
+(defun trythis (x)
+  ;; use a macro to return the object itself, not the symbol naming it.
+  (macrolet ((it () *my-awesome-instance*))
+    (list x (it))))
+
+(defun get-foo-val (x) (my-awesome-struct-b x))
+
+;; This approximates the test case - no class's proper name is MY-AWESOME-STRUCT.
+;; The old metaobjects are detritus in the object hierarchy but don't affect
+;; corectness of the test.
+(eval-when (:compile-toplevel)
+  (dolist (sym '("MY-AWESOME-STRUCT" "MY-AWESOME-STRUCT-A"
+                 "MY-AWESOME-STRUCT-B" "MY-AWESOME-STRUCT-C"))
+    (unintern (find-symbol sym))))
+
+(assert (not (find-class 'my-awesome-struct nil)))
+
+(let ((x (trythis 9))
+      (*print-pretty* nil))
+  (format t "~&Hi! ~S~%" x)
+  (assert (search "UNPRINTABLE" (write-to-string x)))
+  (assert (equal (get-foo-val (second x)) '(foo . #*101))))
