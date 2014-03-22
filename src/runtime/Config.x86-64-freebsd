@@ -17,7 +17,7 @@ ASSEM_SRC += ldso-stubs.S
 # worked fine for most things, but LOAD-FOREIGN & friends require
 # dlopen() etc., which in turn depend on dynamic linking of the
 # runtime.
-LINKFLAGS += -dynamic -export-dynamic
+OS_LIBS += -lutil
 
 # use libthr (1:1 threading).  libpthread (m:n threading) does not work.
 ifdef LISP_FEATURE_SB_THREAD

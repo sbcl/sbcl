@@ -538,6 +538,8 @@ main(int argc, char *argv[])
     defconstant("kern-osrelease", KERN_OSRELEASE);
     defconstant("hw-model", HW_MODEL);
     defconstant("hw-pagesize", HW_PAGESIZE);
+
+    defconstant("path-max", PATH_MAX);
     printf("\n");
 #endif
 
