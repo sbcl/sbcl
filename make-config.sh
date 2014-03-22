@@ -447,11 +447,8 @@ case "$sbcl_os" in
 		;;
         esac
 
-        if [ $sbcl_arch = "x86-64" ]; then
-            link_or_copy Config.x86_64-linux Config
-        else
-            link_or_copy Config.$sbcl_arch-linux Config
-        fi
+
+        link_or_copy Config.$sbcl_arch-linux Config
         link_or_copy $sbcl_arch-linux-os.h target-arch-os.h
         link_or_copy linux-os.h target-os.h
         ;;
