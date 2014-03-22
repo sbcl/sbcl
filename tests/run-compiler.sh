@@ -2,9 +2,12 @@
 
 platform="${SBCL_SOFTWARE_TYPE}-${SBCL_MACHINE_TYPE}"
 
-if [ -z "$CC" ]
-then
-    CC=gcc
+if [ -z $CC ]; then
+    if [ -x "`which cc`" ]; then
+        CC=cc
+    else
+        CC=gcc
+    fi
 fi
 
 args=
