@@ -13,6 +13,8 @@
 ASSEM_SRC = x86-assem.S 
 ARCH_SRC = x86-arch.c
 
+LINKFLAGS += -Wl,--export-dynamic
+
 OS_SRC = bsd-os.c x86-bsd-os.c
 OS_LIBS = # -ldl
 ifdef LISP_FEATURE_SB_CORE_COMPRESSION

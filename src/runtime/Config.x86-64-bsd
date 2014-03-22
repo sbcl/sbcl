@@ -20,6 +20,7 @@ ifdef LISP_FEATURE_SB_CORE_COMPRESSION
 endif
 
 CFLAGS += -fno-omit-frame-pointer
+LINKFLAGS += -Wl,--export-dynamic
 
 GC_SRC = gencgc.c
 
