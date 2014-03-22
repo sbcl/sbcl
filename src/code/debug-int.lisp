@@ -848,21 +848,18 @@
                           #!+alpha (* 2 n)))
                       (* os-context-t)))
 
-;;;; Perform the lookup which FOREIGN-SYMBOL-ADDRESS would do if the
-;;;; linkage table were disabled, i.e. always return the actual symbol
-;;;; address, not the linkage table trampoline, even if the symbol would
-;;;; ordinarily go through the linkage table.  Important when
-;;;; SB-DYNAMIC-CORE is enabled and our caller assumes `name' to be a
-;;;; "static" symbol; a concept which doesn't exist in such builds.
-(defun true-foreign-symbol-address (name)
-  #!+linkage-table  ;we have dlsym -- let's use it.
+;;; On SB-DYNAMIC-CORE symbols which come from the runtime go through
+;;; an indirection table, but the debugger needs to know the actual
+;;; address.
+(defun static-foreign-symbol-address (name)
+  #!+sb-dynamic-core
   (find-dynamic-foreign-symbol-address name)
-  #!-linkage-table  ;possibly no dlsym, but hence no indirection anyway.
-  (foreign-symbol-address))
+  #!-sb-dynamic-core
+  (foreign-symbol-address name))
 
 ;;;; See above.
-(defun true-foreign-symbol-sap (name)
-  (int-sap (true-foreign-symbol-address name)))
+(defun static-foreign-symbol-sap (name)
+  (int-sap (static-foreign-symbol-address name)))
 
 #!+(or x86 x86-64)
 (defun find-escaped-frame (frame-pointer)
@@ -886,10 +883,10 @@
               ;; KLUDGE: Detect undefined functions by a range-check
               ;; against the trampoline address and the following
               ;; function in the runtime.
-              (if (< (true-foreign-symbol-address "undefined_tramp")
+              (if (< (static-foreign-symbol-address "undefined_tramp")
                      (sap-int (sb!vm:context-pc context))
-                     (true-foreign-symbol-address #!+x86 "closure_tramp"
-                                                    #!+x86-64 "alloc_tramp"))
+                     (static-foreign-symbol-address #!+x86 "closure_tramp"
+                                                  #!+x86-64 "alloc_tramp"))
                   (return (values :undefined-function 0 context))
                   (return (values code 0 context))))
             (let* ((code-header-len (* (get-header-data code)
@@ -3219,9 +3216,9 @@ register."
   (without-gcing
    ;; These are really code labels, not variables: but this way we get
    ;; their addresses.
-   (let* ((src-start (true-foreign-symbol-sap "fun_end_breakpoint_guts"))
-          (src-end (true-foreign-symbol-sap "fun_end_breakpoint_end"))
-          (trap-loc (true-foreign-symbol-sap "fun_end_breakpoint_trap"))
+   (let* ((src-start (static-foreign-symbol-sap "fun_end_breakpoint_guts"))
+          (src-end (static-foreign-symbol-sap "fun_end_breakpoint_end"))
+          (trap-loc (static-foreign-symbol-sap "fun_end_breakpoint_trap"))
           (length (sap- src-end src-start))
           (code-object
            (sb!c:allocate-code-object (1+ bogus-lra-constants) length))

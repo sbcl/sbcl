@@ -25,9 +25,8 @@
   "~S is unsupported as of SBCL 0.8.13. Please use LOAD-SHARED-OBJECT."
   (load-1-foreign))
 
-(progn
-  (define-alien-variable undefined-alien-address unsigned)
-  (defvar *runtime-dlhandle*))
+(define-alien-variable undefined-alien-address unsigned)
+(defvar *runtime-dlhandle*)
 
 (defvar *shared-objects*)
 

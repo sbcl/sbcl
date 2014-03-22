@@ -47,7 +47,7 @@ LD = ld
 NM = nm
 
 ifneq ($(findstring cygwin,$(shell $(CC) -dumpmachine)),)
-OS_LINK_FLAGS := $(OS_LINK_FLAGS) -Wl,-mno-cygwin
+LINK_FLAGS := $(LINK_FLAGS) -Wl,-mno-cygwin
 OS_LIBS := $(OS_LIBS) -mno-cygwin
 CFLAGS := $(CFLAGS) -mno-cygwin
 endif
