@@ -56,20 +56,16 @@
      (let* ((name (fun-name fun))
             (fun (%simple-fun-self (%fun-fun fun)))
             (code (sb-di::fun-code-header fun))
-            (info (sb-kernel:%code-debug-info code)))
-       (if info
-           (let ((source (sb-c::debug-info-source info)))
-             (cond ((and (sb-c::debug-source-form source)
-                         (eq (sb-c::debug-source-function source) fun))
-                    (values (sb-c::debug-source-form source)
-                            nil
-                            name))
-                   ((legal-fun-name-p name)
-                    (let ((exp (fun-name-inline-expansion name)))
-                      (values exp (not exp) name)))
-                   (t
-                    (values nil t name))))
-           (values nil t name))))))
+            (info (sb-kernel:%code-debug-info code))
+            (source (if info (sb-c::debug-info-source info))))
+       (cond ((and source (sb-c::debug-source-form source)
+                   (eq (sb-c::debug-source-function source) fun))
+              (values (sb-c::debug-source-form source) nil name))
+             ((legal-fun-name-p name)
+              (let ((exp (fun-name-inline-expansion name)))
+                (values exp (not exp) name)))
+             (t
+              (values nil t name)))))))
 
 ;;; Prints X on a single line, limiting output length by *PRINT-RIGHT-MARGIN*
 ;;; -- good for printing object parts, etc.

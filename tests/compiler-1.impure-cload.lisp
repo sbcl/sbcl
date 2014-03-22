@@ -239,6 +239,14 @@
 (eval-when (:load-toplevel)
   (assert (typep (find-class 'some-structure) 'class)))
 
+;; When loading from fasl, if a form in that file tried referencing
+;; compiled-debug-info for a function provided earlier in that same file,
+;; it wouldn't work because the earlier function's #<code> component is
+;; present but without its debug-info-source, which is dumped later.
+(defun f1 (x) (+ x 3))
+;; There's nothing to assert other than that this works.
+(print (multiple-value-list (function-lambda-expression #'f1)))
+
 ;; It's possible for an instance to refer to a LAYOUT that has no classoid.
 ;; This can arise from one file compiling a defstruct and another file compiling
 ;; a function that refers to an instance of it as a literal either from
