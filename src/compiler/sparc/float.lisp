@@ -864,7 +864,7 @@
                            (signed-reg
                             (inst st x
                                   (current-nfp-tn vop)
-                                  (* (tn-offset temp) n-word-bytes))
+                                  (* (tn-offset stack-temp) n-word-bytes))
                             stack-temp)
                            (signed-stack
                             x))))
