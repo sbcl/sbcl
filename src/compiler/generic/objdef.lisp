@@ -331,6 +331,8 @@
   (hash :set-trans %set-symbol-hash)
 
   (info :ref-trans symbol-info :ref-known (flushable)
+        :set-trans (setf symbol-info)
+        :set-known ()
         :cas-trans %compare-and-swap-symbol-info
         :type (or simple-vector list)
         :init :null)

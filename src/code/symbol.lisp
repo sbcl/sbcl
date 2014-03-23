@@ -107,6 +107,11 @@ distinct from the global value. Can also be SETF."
 (defun symbol-info (symbol)
   (symbol-info symbol))
 
+;; An "interpreter stub" for an operation that is only implemented for
+;; the benefit of platforms without compare-and-swap-vops.
+(defun (setf symbol-info) (new-info symbol)
+  (setf (symbol-info symbol) new-info))
+
 ;; Atomically update SYMBOL's info/plist slot to contain a new info vector.
 ;; The vector is computed by calling UPDATE-FN on the old vector,
 ;; repeatedly as necessary, until no conflict happens with other updaters.
