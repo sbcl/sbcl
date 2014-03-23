@@ -165,18 +165,21 @@
 
 (defconstant +info-metainfo-type-num+ 63)
 
-;; GET-INFO-VALUE can't be used, so hand-roll it for the next two functions.
-(macrolet ((get-type-info-metadata (sym)
-             `(let* ((info-vector (symbol-info-vector ,sym))
-                     (index (if info-vector
-                                (packed-info-value-index
-                                 info-vector +no-auxilliary-key+
-                                 +info-metainfo-type-num+))))
-                (if index (svref info-vector index)))))
-  ;; Find or create a TYPE-INFO object designated by CLASS- and TYPE-KEYWORD.
-  ;; If not found, the specified TYPE-NUM and TYPE-SPEC are used to
-  ;; initialize it. Return the new type-num.
-  (defun register-info-metadata (type-num class-keyword type-keyword type-spec)
+;; Perform the equivalent of (GET-INFO-VALUE sym +INFO-METAINFO-TYPE-NUM+)
+;; but without the AVER that metadata already exists, and bypassing the
+;; defaulting logic.
+(defun %get-type-info-metadata (sym)
+  (let* ((info-vector (symbol-info-vector sym))
+         (index (if info-vector
+                    (packed-info-value-index info-vector +no-auxilliary-key+
+                                             +info-metainfo-type-num+))))
+    (if index (svref info-vector index))))
+
+;; Find or create a TYPE-INFO object designated by CLASS- and TYPE-KEYWORD.
+;; If not found, the specified TYPE-NUM and TYPE-SPEC are used to
+;; initialize it. If TYPE-NUM is -1, the next available number is assigned.
+;; Return the new type-num.
+(defun register-info-metadata (type-num class-keyword type-keyword type-spec)
     (let ((metainfo (find-type-info class-keyword type-keyword)))
       (cond (metainfo) ; Do absolutely positively nothing.
             (t
@@ -192,7 +195,7 @@
              (setf metainfo (make-globaldb-info-metadata
                              type-num class-keyword type-keyword type-spec)
                    (aref *info-types* type-num) metainfo)
-             (let ((list (get-type-info-metadata type-keyword)))
+             (let ((list (%get-type-info-metadata type-keyword)))
                (set-info-value
                 type-keyword +info-metainfo-type-num+
                 (cond ((not list) metainfo) ; unique, just store it
@@ -200,11 +203,11 @@
                       (t (list metainfo list))))))) ; convert atom to a list
       (type-info-number metainfo)))
 
-  ;; If CLASS-KEYWORD/TYPE-KEYWORD designate an info-type,
-  ;; return the corresponding TYPE-INFO object, otherwise NIL.
-  (defun find-type-info (class-keyword type-keyword)
+;; If CLASS-KEYWORD/TYPE-KEYWORD designate an info-type,
+;; return the corresponding TYPE-INFO object, otherwise NIL.
+(defun find-type-info (class-keyword type-keyword)
     (declare (type keyword class-keyword type-keyword))
-    (let ((metadata (get-type-info-metadata type-keyword)))
+    (let ((metadata (%get-type-info-metadata type-keyword)))
       ;; Most TYPE-KEYWORDs uniquely designate an object, so we store only that.
       ;; Otherwise we store a list which has a small handful of (<= 4) items.
       (cond ((listp metadata)
@@ -215,7 +218,7 @@
                          class-keyword)
                  (return info))))
             ((eq (type-info-class (truly-the type-info metadata)) class-keyword)
-             metadata)))))
+             metadata))))
 
 (declaim (ftype (function (keyword keyword) type-info) type-info-or-lose))
 (defun type-info-or-lose (class type)
