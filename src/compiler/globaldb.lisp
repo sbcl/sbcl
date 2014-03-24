@@ -230,21 +230,10 @@
 
 ) ; EVAL-WHEN
 
-;;;; info classes, info types, and type numbers, part II: what's
+;;;; info types, and type numbers, part II: what's
 ;;;; needed only at compile time, not at run time
 
-;;; FIXME: Perhaps this stuff (the definition of DEFINE-INFO-CLASS
-;;; and the calls to it) could/should go in a separate file,
-;;; perhaps info-classes.lisp?
-
 (eval-when (:compile-toplevel :execute)
-
-;;; Set up the data structures to support an info class.
-
-(#+sb-xc-host defmacro
- #-sb-xc-host sb!xc:defmacro
-     define-info-class (class)
-  `(progn ',class)) ; FIXME: remove this do-nothing macro
 
 ;;; a list of forms for initializing the DEFAULT slots of TYPE-INFO
 ;;; objects, accumulated during compilation and eventually converted
@@ -260,9 +249,13 @@
 ;;; cold load time.
 (defparameter *!reversed-type-info-init-forms* nil)
 
-;;; Define a new type of global information for CLASS. TYPE is the
-;;; name of the type, DEFAULT is a defaulting expression, and TYPE-SPEC
+;;; Define a new type of global information.
+;;; CLASS/TYPE form a two-piece name for the kind of information,
+;;; DEFAULT is a defaulting expression, and TYPE-SPEC
 ;;; is a type specifier which values of the type must satisfy.
+;;; Roughly speaking there is a hierarchy to the two-piece names
+;;; but this is a fiction that is not maintained anywhere in the internals.
+;;;
 ;;; If the defaulting expression's value is a function, it is called with
 ;;; the name for which the information is being looked up; otherwise it is
 ;;; taken as the default value. The defaulting expression is used each time
@@ -467,9 +460,7 @@
                     (funcall function name))
                   *info-environment*)))
 
-;;;; definitions for function information
-
-(define-info-class :function)
+;;;; ":FUNCTION" subsection - Data pertaining to globally known functions.
 
 ;; must be info type number 1
 (define-info-type (:function :definition) :type-spec (or fdefn null))
@@ -583,9 +574,7 @@
 (define-info-type (:function :structure-accessor)
   :type-spec (or defstruct-description null))
 
-;;;; definitions for other miscellaneous information
-
-(define-info-class :variable)
+;;;; ":VARIABLE" subsection - Data pertaining to globally known variables.
 
 ;;; the kind of variable-like thing described
 (define-info-type (:variable :kind)
@@ -618,7 +607,7 @@
 
 (define-info-type (:variable :documentation) :type-spec (or string null))
 
-(define-info-class :type)
+;;;; ":TYPE" subsection - Data pertaining to globally known types.
 
 ;;; the kind of type described. We return :INSTANCE for standard types
 ;;; that are implemented as structures. For PCL classes, that have
@@ -665,10 +654,12 @@
 
 (define-info-type (:type :source-location) :type-spec t)
 
-(define-info-class :typed-structure)
+;;;; ":TYPED-STRUCTURE" subsection.
+;;;; Data pertaining to structures that used DEFSTRUCT's :TYPE option.
 (define-info-type (:typed-structure :info) :type-spec t)
 (define-info-type (:typed-structure :documentation) :type-spec (or string null))
 
+;;;; ":DECLARATION" subsection - Data pertaining to user-defined declarations.
 ;; CLTL2 offers an API to provide a list of known declarations, but it is
 ;; inefficient to iterate over info environments to find all such declarations,
 ;; and this is likely to be even slower when info is attached
@@ -676,7 +667,6 @@
 ;; Therefore maintain a list of recognized declarations. This list makes the
 ;; globaldb storage of same redundant, but oh well.
 (defglobal *recognized-declarations* nil)
-(define-info-class :declaration)
 (define-info-type (:declaration :recognized)
   :type-spec boolean
   ;; There's no portable way to unproclaim that a symbol is a declaration,
@@ -695,7 +685,7 @@
 
 (define-info-type (:declaration :handler) :type-spec (or function null))
 
-(define-info-class :alien-type)
+;;;; ":ALIEN-TYPE" subsection - Data pertaining to globally known alien-types.
 (define-info-type (:alien-type :kind)
   :type-spec (member :primitive :defined :unknown)
   :default :unknown)
@@ -705,19 +695,24 @@
 (define-info-type (:alien-type :union) :type-spec (or alien-type null))
 (define-info-type (:alien-type :enum) :type-spec (or alien-type null))
 
-(define-info-class :setf)
-
+;;;; ":SETF" subsection - Data pertaining to expansion of the omnipotent macro.
 (define-info-type (:setf :inverse) :type-spec (or symbol null))
 (define-info-type (:setf :documentation) :type-spec (or string null))
 (define-info-type (:setf :expander) :type-spec (or function null))
 
+;;;; ":RANDOM-DOCUMENTATION" subsection.
 ;;; This is used for storing miscellaneous documentation types. The
 ;;; stuff is an alist translating documentation kinds to values.
-(define-info-class :random-documentation)
 (define-info-type (:random-documentation :stuff) :type-spec list)
 
-;;; Used to record the source location of definitions.
-(define-info-class :source-location)
+;;;; ":SOURCE-LOCATION" subsection.
+;;; This is kind of the opposite of what I'd have thought more logical,
+;;; where each of the above subsections - also called "info classes" -
+;;; has one of its kinds of information being :SOURCE-LOCATION.  And in fact
+;;; that *is* how :TYPE was handled. However, many global entities
+;;; store their source-location hanging off some other hook, avoiding the
+;;; globaldb entirely, such as functions using a #<code-component>.
+;;; So either way is basically a hodgepodge.
 
 (define-info-type (:source-location :variable) :type-spec t)
 (define-info-type (:source-location :constant) :type-spec t)
