@@ -524,7 +524,7 @@ static void print_slots(char **slots, int count, lispobj *ptr)
  * perhaps be generated automatically by GENESIS as part of
  * sbcl.h). */
 static char *symbol_slots[] = {"value: ", "hash: ",
-    "plist: ", "name: ", "package: ",
+    "info: ", "name: ", "package: ",
 #ifdef LISP_FEATURE_SB_THREAD
     "tls-index: " ,
 #endif
