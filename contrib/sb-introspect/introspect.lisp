@@ -377,17 +377,7 @@ If an unsupported TYPE is requested, the function will return NIL.
                     (sb-eval:interpreted-function-source-location object))))
        source))
     (function
-     (cond ((struct-accessor-p object)
-            (find-definition-source
-             (struct-accessor-structure-class object)))
-           ((struct-predicate-p object)
-            (find-definition-source
-             (struct-predicate-structure-class object)))
-           ((struct-copier-p object)
-            (find-definition-source
-             (struct-copier-structure-class object)))
-           (t
-            (find-function-definition-source object))))
+     (find-function-definition-source object))
     ((or condition standard-object structure-object)
      (find-definition-source (class-of object)))
     (t
@@ -431,70 +421,6 @@ If an unsupported TYPE is requested, the function will return NIL.
            (list number)))
        :plist (sb-c:definition-source-location-plist location))
       (make-definition-source)))
-
-;; Structure accessors, predicates, and copiers were formerly closures,
-;; and this code checked whether the closure was over the "expected" underlying
-;; simple function. Now those auto-defined things are more-or-less ordinary
-;; functions (plus some compile-time efficiencies) making them almost
-;; indistinguishable in every regard from a user-defined function that does
-;; the same thing. These inquiry functions are heuristics that mostly work.
-
-;; Return T if FUNCTION is *supposed* to be a structure accessor.
-;; If somebody redefines a slot accessor by hand, this will still return T
-;; because the information about the fact that it was in the past an accessor
-;; is not purged from the globaldb. Perhaps it should be?
-;; What should be returned for a structure that used :TYPE ?
-;; We could look at the inline-expansion-designator (if any) for this
-;; name and see if matches the known template. That's *very* brittle.
-(defun struct-accessor-p (function)
-  (let ((name (sb-kernel:%fun-name function)))
-    (nth-value 1 ; just the WINP value from INFO is good enough
-     (sb-int:info :function :structure-accessor
-      ;; The SETFer doesn't get :STRUCTURE-ACCESSOR info.
-      ;; Maybe we should check whether it has a source transform?
-      (cond ((listp name) (if (eq (car name) 'setf) (second name)))
-            (t name))))))
-
-;; If FUNCTION is a function which accepts an object that is a structure,
-;; we can relate that back to the DD for that structure and decide
-;; whether this *ought* to be its copier, not whether it actually is.
-;; Maybe somebody redefined it. Same issue as above.
-(defun struct-copier-p (function)
-  (let* ((name (sb-kernel:%fun-name function))
-         (ftype (if (sb-int:legal-fun-name-p name)
-                    (sb-int:info :function :type name)))
-         (arg-type (and ftype
-                        (endp (cdr (sb-kernel:fun-type-required ftype)))
-                        (first (sb-kernel:fun-type-required ftype)))))
-    (when (typep arg-type 'sb-kernel:structure-classoid)
-      (let* ((layout (sb-kernel:classoid-layout arg-type))
-             (dd (sb-kernel:layout-info layout)))
-        (and dd (eq (sb-kernel::dd-copier-name dd) name))))))
-
-;; With predicates we've got some trouble.
-;; One approach is to see if the name matches "FOO-P" and check for a structure
-;; class named FOO and whether its dd-predicate is FOO-P. But the whole point
-;; of naming the predicate as you wish is that it isn't necessarily FOO-P.
-(defun struct-predicate-p (function)
-  (let* (body expr test type
-         (name (sb-kernel:%fun-name function))
-         (expansion (sb-c::info :function :inline-expansion-designator name)))
-    (when (and (listp expansion)
-               (sb-int:proper-list-of-length-p expansion 6)
-               (eq (first expansion) 'sb-c:lambda-with-lexenv)
-               (equal (fifth expansion) '(sb-kernel::object))
-               (sb-int:proper-list-of-length-p (setq body (sixth expansion)) 3)
-               (eq (first body) 'block)
-               (sb-int:proper-list-of-length-p (setq expr (third body)) 3)
-               (eq (first expr) 'typep)
-               (eq (second expr) 'sb-kernel::object)
-               (sb-int:proper-list-of-length-p (setq test (third expr)) 2)
-               (eq (first test) 'quote)
-               (symbolp (setq type (second test))))
-      (let* ((classoid (sb-kernel:find-classoid type))
-             (layout (and classoid (sb-kernel:classoid-layout classoid)))
-             (dd (and layout (sb-kernel:layout-info layout))))
-        (and dd (eq (sb-kernel:dd-predicate-name dd) name))))))
 
 (sb-int:define-deprecated-function :late "1.0.24.5" function-arglist function-lambda-list
     (function)
@@ -561,31 +487,6 @@ value."
          (if type
              type
              (sb-impl::%fun-type function-designator)))))))
-
-;; Caution: This assumes that STRUCT-ACCESSOR-P returned T
-;; so we need no further sanity checks.
-(defun struct-accessor-structure-class (function)
-  (let* ((name (sb-kernel:%fun-name function))
-         (reader-name
-          (cond ((symbolp name) name)
-                ((and (listp name) (eq (car name) 'setf)) (second name))))
-         (dd (sb-int:info :function :structure-accessor reader-name)))
-    (find-class (sb-kernel:dd-name dd))))
-
-;; Caution: This assumes that STRUCT-COPIER-P returned T.
-(defun struct-copier-structure-class (function)
-  (sb-kernel:classoid-pcl-class
-   (first (sb-kernel:fun-type-required
-           (sb-int:info :function :type (sb-kernel:%fun-name function))))))
-
-;; Caution: This assumes that STRUCT-PREDICATE-P returned T.
-(defun struct-predicate-structure-class (function)
-  (let ((a-layout
-         (sb-kernel:code-header-ref (sb-kernel:fun-code-header function)
-                                    sb-vm::code-constants-offset)))
-    (and (typep a-layout 'sb-kernel:layout)
-         (let ((classoid (sb-kernel:layout-classoid a-layout)))
-           (and classoid (sb-kernel:classoid-pcl-class classoid))))))
 
 ;;;; find callers/callees, liberated from Helmut Eller's code in SLIME
 

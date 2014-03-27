@@ -478,38 +478,6 @@
             (type-equal (function-type 'mars) '(function (t t) *)))
   t t)
 
-;; DEFSTRUCT created functions
-
-(defstruct (whatsit (:predicate is-it-a-whatsit)
-                    (:copier please-copy-my-obj)
-                    (:conc-name wtf-))
-  a (b nil :read-only t) c)
-
-(deftest defstruct-predicate-p.1
-    (sb-introspect::struct-predicate-p #'is-it-a-whatsit) t)
-(deftest defstruct-predicate-p.2
-    (eq (sb-introspect::struct-predicate-structure-class #'is-it-a-whatsit)
-        (find-class 'whatsit))
-  t)
-
-(deftest defstruct-accessor-p.1
-    (values (sb-introspect::struct-accessor-p #'wtf-a)
-            (sb-introspect::struct-accessor-p #'(setf wtf-a)))
-  t t)
-(deftest defstruct-accessor-p.2
-    (values (eq (sb-introspect::struct-accessor-structure-class #'wtf-a)
-                (find-class 'whatsit))
-            (eq (sb-introspect::struct-accessor-structure-class #'(setf wtf-a))
-                (find-class 'whatsit)))
-  t t)
-
-(deftest defstruct-copier-p.1
-    (sb-introspect::struct-copier-p #'please-copy-my-obj) t)
-(deftest defstruct-copier-p.2
-    (eq (sb-introspect::struct-copier-structure-class #'please-copy-my-obj)
-        (find-class 'whatsit))
-  t)
-
 (progn
 
   (defstruct (struct (:predicate our-struct-p)
@@ -521,6 +489,9 @@
   ;; of (FUNCTION (T) (VALUES FIXNUM &OPTIONAL)). This can easily be fixed
   ;; by deleting (THE <struct> INSTANCE) from the access form
   ;; and correspondingly adding a declaration on the type of INSTANCE.
+  ;;
+  ;; Yes, it can be fixed, but it is done this way because it produces
+  ;; smaller code.
   #+nil
   (deftest function-type+defstruct.1
       (values (type-equal (function-type 'struct-a)
