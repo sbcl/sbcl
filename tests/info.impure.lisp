@@ -343,7 +343,7 @@
                  (* 1/2 n-threads n-inserts)))))
   table)
 
-#+sb-thread
+#+(and sb-thread (not ppc))
 (progn
   (test-util:with-test (:name :lockfree-hash-concurrent-twiddling)
     (test-concurrent-incf))
