@@ -461,16 +461,15 @@
                 (:vop-var vop)
                 (:save-p :compute-only)
                 (:generator 5
-                  (let* ((stack-offset (* (tn-offset temp) n-word-bytes))
-                         (nfp-tn (current-nfp-tn vop))
-                         (temp-offset-high (* stack-offset n-word-bytes))
-                         (temp-offset-low (* (1+ stack-offset) n-word-bytes)))
-                    (inst lis rtemp #x4330)   ; High word of magic constant
+                  (let* ((nfp-tn (current-nfp-tn vop))
+                         (temp-offset-high (* (tn-offset temp) n-word-bytes))
+                         (temp-offset-low (+ temp-offset-high n-word-bytes)))
+                    (inst lis rtemp #x4330) ; High word of magic constant
                     (inst stw rtemp nfp-tn temp-offset-high)
                     (inst lis rtemp #x8000)
                     (inst stw rtemp nfp-tn temp-offset-low)
                     (inst lfd fmagic nfp-tn temp-offset-high)
-                    (inst xor rtemp rtemp x)          ; invert sign bit of x : rtemp had #x80000000
+                    (inst xor rtemp rtemp x) ; invert sign bit of x : rtemp had #x80000000
                     (inst stw rtemp nfp-tn temp-offset-low)
                     (inst lfd y nfp-tn temp-offset-high)
                     (note-this-location vop :internal-error)
@@ -493,10 +492,9 @@
                (:vop-var vop)
                (:save-p :compute-only)
                (:generator 5
-                 (let* ((stack-offset (* (tn-offset temp) n-word-bytes))
-                         (nfp-tn (current-nfp-tn vop))
-                         (temp-offset-high (* stack-offset n-word-bytes))
-                         (temp-offset-low (* (1+ stack-offset) n-word-bytes)))
+                 (let* ((nfp-tn (current-nfp-tn vop))
+                        (temp-offset-high (* (tn-offset temp) n-word-bytes))
+                        (temp-offset-low (+ temp-offset-high n-word-bytes)))
                     (inst lis rtemp #x4330)   ; High word of magic constant
                     (inst stw rtemp nfp-tn temp-offset-high)
                     (inst stw zero-tn nfp-tn temp-offset-low)
