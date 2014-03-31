@@ -178,6 +178,9 @@
                                      :widetag simple-fun-header-widetag)
   #!-(or x86 x86-64) (self :ref-trans %simple-fun-self
                :set-trans (setf %simple-fun-self))
+  ;; FIXME: we don't currently detect/prevent at compile-time the bad
+  ;; scenario this comment claims to disallow, as determined by re-enabling
+  ;; these SET- and REF- specifiers, which led to a cold-init crash.
   #!+(or x86 x86-64) (self
           ;; KLUDGE: There's no :SET-KNOWN, :SET-TRANS, :REF-KNOWN, or
           ;; :REF-TRANS here in this case. Instead, there's separate
@@ -232,7 +235,12 @@
 
 (define-primitive-object (closure :lowtag fun-pointer-lowtag
                                   :widetag closure-header-widetag)
-  (fun :init :arg :ref-trans %closure-fun)
+  ;; %CLOSURE-FUN should never be invoked on x86[-64].
+  ;; The above remark at %SIMPLE-FUN-SELF is relevant in its sentiment,
+  ;; but actually no longer true - the confusing situation is not caught
+  ;; until too late. But at least this one was nonfatal.
+  #!-(or x86 x86-64) (fun :init :arg :ref-trans %closure-fun)
+  #!+(or x86 x86-64) (fun :init :arg)
   (info :rest-p t))
 
 (define-primitive-object (funcallable-instance
