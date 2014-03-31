@@ -441,4 +441,111 @@
               (aref *make-classoid-cell-callcount* 0)
               (length symbols)))))
 
+;;; test %GET-INFO-VALUE-INITIALIZING using generalized function names
+
+(defun be-an-fdefn-reader (names)
+  (declare (simple-vector names))
+  (let ((result (make-array (length names) :initial-element nil)))
+    (dotimes (iter 3)
+      (loop for i below (length names)
+            do (pushnew (find-fdefinition (aref names i)) (aref result i))))
+    ;; The thread shall observe either nil or an fdefn, and at most one fdefn.
+    (loop for list across result
+          for i from 0
+          do (let ((observed-value (remove nil list)))
+               (if (cdr observed-value)
+                   (error "Should not happen: fdefn => ~S" list)
+                   (setf (aref result i) (car observed-value)))))
+    result))
+
+(defun be-an-fdefn-writer (names)
+  (declare (simple-vector names))
+  (let ((fdefn-result (make-array (length names) :initial-element nil))
+        (random-result (make-array (length names) :initial-element nil))
+        (n-created 0)
+        (highest-type-num
+         (position-if #'identity sb-c::*info-types* :from-end t)))
+    (loop for name across names
+          for i from 0
+          do (setf (aref fdefn-result i)
+                   (get-info-value-initializing
+                    :function :definition name
+                    (progn (incf n-created) (make-fdefn name))))
+             (dotimes (i (random 3))
+               ;; Set random info for other names to cause CAS failures.
+               ;; Pick an info-type number and give it a random value.
+               ;; Store the random value so that we can assert on it later.
+               ;; Never touch reserved type numbers 0 or 1.
+               (let ((random-name-index (random (length names)))
+                     (random-type (+ (random (1- highest-type-num)) 2))
+                     (random-value (random most-positive-fixnum)))
+                 (push (cons random-type random-value)
+                       (aref random-result random-name-index))
+                 (sb-c::set-info-value (aref names random-name-index)
+                                       random-type random-value))))
+    (values n-created fdefn-result random-result)))
+
+(test-util:with-test (:name :get-info-value-initializing
+                      :skipped-on (not :sb-thread))
+  ;; Precompute random generalized function names for testing, some of which
+  ;; are "simple" (per the taxonomy of globaldb) and some hairy.
+  (let ((work (coerce (loop repeat 10000
+                            nconc (list `(sb-pcl::ctor ,(gensym) ,(gensym))
+                                        `(defmacro ,(gensym)) ; simple name
+                                         (gensym))) ; very simple name
+                      'vector))
+        (n-threads 10) readers writers fdefn-results random-results)
+    (dotimes (i (ash n-threads -1))
+      (push (sb-thread:make-thread
+             #'be-an-fdefn-writer :arguments (list work)
+                                  :name (write-to-string i)) writers))
+    (dotimes (i (ash n-threads -1))
+      (push (sb-thread:make-thread #'be-an-fdefn-reader :arguments (list work))
+            readers))
+    (dolist (thread readers)
+      (push (sb-thread:join-thread thread) fdefn-results))
+    (let ((tot 0))
+      (dolist (thread writers)
+        (multiple-value-bind (n-created fdefn-result random-result)
+            (sb-thread:join-thread thread)
+          (incf tot n-created)
+          (format t "~5D fdefns from ~A~%" n-created
+                  (sb-thread:thread-name thread))
+          (push fdefn-result fdefn-results)
+          (push random-result random-results)))
+      (format t "~5D total~%" tot))
+    (let ((aggregate (make-array n-threads)))
+      (dotimes (name-index (length work))
+        (dotimes (thread-num n-threads)
+          (setf (aref aggregate thread-num)
+                (aref (nth thread-num fdefn-results) name-index)))
+        ;; some thread should have observed an fdefn
+        (let ((representative (find-if-not #'null aggregate)))
+          ;; For each thread which observed an fdefn,
+          ;; assert that the cell is EQ to the representative.
+          (dotimes (thread-num n-threads)
+            (awhen (aref aggregate thread-num)
+              (assert (eq it representative)))))))
+    ;; For each name and each info type number that some thread inserted,
+    ;; verify that the info-value is among the set of random values.
+    (dotimes (name-index (length work))
+      (dotimes (type-num 64)
+        ;; some thread says that TYPE-NUM exists for NAME-INDEX
+        (when (some (lambda (output)
+                      (assoc type-num (aref output name-index)))
+                    random-results)
+          (let ((actual (sb-c::get-info-value (aref work name-index)
+                                              type-num)))
+            (unless (some (lambda (output)
+                            (some (lambda (cell)
+                                    (and (eq (car cell) type-num)
+                                         (eql (cdr cell) actual)))
+                                  (aref output name-index)))
+                          random-results)
+              (error "Fail ~S ~S => ~S.~%Choices are ~S"
+                     (aref work name-index) type-num actual
+                     (mapcar (lambda (output)
+                               (aref output name-index))
+                             random-results)))))))))
+
 ;;; success

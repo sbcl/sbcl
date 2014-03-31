@@ -163,7 +163,7 @@
   (validate-function nil :type (or function null)))
 (declaim (freeze-type type-info))
 
-(defconstant +info-metainfo-type-num+ 63)
+(defconstant +info-metainfo-type-num+ 0)
 
 ;; Perform the equivalent of (GET-INFO-VALUE sym +INFO-METAINFO-TYPE-NUM+)
 ;; but without the AVER that metadata already exists, and bypassing the
@@ -183,14 +183,10 @@
     (let ((metainfo (find-type-info class-keyword type-keyword)))
       (cond (metainfo) ; Do absolutely positively nothing.
             (t
-             (when (eql type-num -1)
-               ;; The zeroth type is reserved as a tombstone to allow deletion
-               ;; from a compact info environment, and 63 is reserved to support
-               ;; the implementation of INFO itself without DEFINE-INFO-TYPE
-               ;; having claimed a type-num for the machinery's private use.
+             (when (eql type-num -1) ; pick a new type-num
+               ;; The zeroth type-num is reserved for INFO's own private use.
                (setq type-num
-                     (or (position nil *info-types*
-                                   :start 1 :end +info-metainfo-type-num+)
+                     (or (position nil *info-types* :start 1)
                          (error "no more INFO type numbers available"))))
              (setf metainfo (make-globaldb-info-metadata
                              type-num class-keyword type-keyword type-spec)
@@ -391,6 +387,26 @@
             (return-from get-info-value (values (svref vector index) t))))))
     (let ((val (type-info-default metainfo)))
       (values (if (functionp val) (funcall val name) val) nil))))
+
+;; Perform the approximate equivalent operations of retrieving
+;; (INFO :CLASS :TYPE NAME), but if no info is found, invoke CREATION-FORM
+;; to produce an object that becomes the value for that piece of info, storing
+;; and returning it. The entire sequence behaves atomically but with a proviso:
+;; the creation form's result may be discarded, and another object returned
+;; instead (presumably) from another thread's execution of the creation form.
+;; If constructing the object has either non-trivial cost, or deleterious
+;; side-effects from making and discarding its result, do NOT use this macro.
+;; A mutex-guarded table would probably be more appropriate in such cases.
+;;
+(def!macro get-info-value-initializing (info-class info-type name creation-form)
+  (with-unique-names (type-number proc)
+    `(let ((,type-number
+            ,(if (and (keywordp info-type) (keywordp info-class))
+                 (type-info-number (type-info-or-lose info-class info-type))
+                 `(type-info-number
+                   (type-info-or-lose ,info-class ,info-type)))))
+       (dx-flet ((,proc () ,creation-form))
+         (%get-info-value-initializing ,name ,type-number #',proc)))))
 
 ;; Return the fdefn object for NAME, or NIL if there is no fdefn.
 ;; Signal an error if name isn't valid.

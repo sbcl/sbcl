@@ -65,14 +65,14 @@
       (find-or-create-fdefinition name)
       (find-fdefinition name)))
 
+(declaim (ftype (sfunction (t) fdefn) find-or-create-fdefinition))
 (defun find-or-create-fdefinition (name)
-  ;; Why can't the compiler derive (OR (OR FDEFN NULL) FDEFN) = FDEFN ?
-  (declare (values fdefn))
   (or (find-fdefinition name)
       ;; If the name was not legal, FIND-FDEFINITION signals an error,
       ;; so there is no additional pre-creation check.
-      ;; Also FIXME: slight race. No worse than it was though.
-      (setf (info :function :definition name) (make-fdefn name))))
+      (let ((name (uncross name)))
+        (get-info-value-initializing :function :definition name
+                                     (make-fdefn name)))))
 
 (defun maybe-clobber-ftype (name)
   (unless (eq :declared (info :function :where-from name))

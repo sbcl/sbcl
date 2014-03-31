@@ -1044,52 +1044,6 @@ This is interpreted as
            ;; The KEYs remain bound, but they should not be used for anything.
            ,hairy))))
 
-;; Perform the approximate equivalent operations of retrieving
-;; (INFO :class :type <name>), but if no info is found, invoke CREATION-FORM
-;; to produce an object that becomes the value for that piece of info,
-;; returning it. The entire sequence behaves atomically with the following
-;; proviso: the creation form's result may be discarded, and another object
-;; returned instead (presumably) from another thread's execution
-;; of that same creation form.
-;;
-;; If constructing the object has either non-trivial cost, or deleterious
-;; side-effects from making and discarding its result, do NOT use this macro.
-;; A mutex-guarded table would probably be more appropriate in such cases.
-;;
-;; INFO-CLASS and -TYPE must be keywords, and NAME must evaluate
-;; to a symbol. [Eventually this will accept generalized names]
-;;
-;; FIXME: these does not really seem to belong in SB-C, but that's where
-;; all the other info stuff is. Maybe SB-INT ?
-;;
-(defmacro atomically-get-or-put-symbol-info
-    (info-class info-type name creation-form)
-  (let ((type-num (type-info-number
-                   (type-info-or-lose info-class info-type)))
-        (aux-key +no-auxilliary-key+))
-    (with-unique-names (proc info-vect index result)
-      ;; Concurrent globaldb updates (possibly for unrelated info)
-      ;; can force re-execution of this flet, so try to create an
-      ;; object one time only, and remember that we did that.
-      ;; If CREATION-FORM returns nil - which it shouldn't - the
-      ;; form couldbe repeatedly invoked, because there's no
-      ;; local state variable such as invoked-creation-form-p.
-      `(let (,result)
-         (dx-flet ((,proc (,info-vect)
-                     ;; pre-check
-                     (let ((,index (packed-info-value-index
-                                    ,info-vect ,aux-key ,type-num)))
-                       (cond (,index
-                              (setq ,result (svref ,info-vect ,index))
-                              nil) ; no update to symbol-info-vector
-                             (t
-                              (unless ,result
-                                (setq ,result ,creation-form))
-                              (packed-info-insert
-                               ,info-vect ,aux-key ,type-num ,result))))))
-           (update-symbol-info ,name #',proc)
-           ,result)))))
-
 ;; Given Info-Vector VECT, return the fdefn that it contains for its root name,
 ;; or nil if there is no value. NIL input is acceptable and will return NIL.
 (declaim (inline info-vector-fdefinition))
@@ -1192,13 +1146,56 @@ This is interpreted as
       (with-globaldb-name (key1 key2) name
         :simple
         ;; UPDATE-SYMBOL-INFO never supplies OLD-INFO as NIL.
-        (dx-flet ((update-simple-name (old-info)
-                    (augment old-info key2)))
-          (update-symbol-info key1 #'update-simple-name))
+        (dx-flet ((simple-name (old-info) (augment old-info key2)))
+          (update-symbol-info key1 #'simple-name))
         :hairy
         ;; INFO-PUTHASH supplies NIL for OLD-INFO if NAME was absent.
-        (dx-flet ((update-hairy-name (old-info)
+        (dx-flet ((hairy-name (old-info)
                     (augment (or old-info +nil-packed-infos+)
                              +no-auxilliary-key+)))
-          (info-puthash *info-environment* name #'update-hairy-name)))))
+          (info-puthash *info-environment* name #'hairy-name)))))
   new-value)
+
+;; %GET-INFO-VALUE-INITIALIZING is provided as a low-level operation similar
+;; to the above because it does not require info metadata for defaulting,
+;; nor deal with the keyword-based info type designators at all.
+;; In contrast, GET-INFO-VALUE requires metadata.
+;; For this operation to make sense, the objects produced should be permanently
+;; assigned to their name, such as are fdefns and classoid-cells.
+;; Note also that we do not do an initial attempt to read once with INFO,
+;; followed up by a double-checking get-or-set operation. It is assumed that
+;; the user of this already did an initial check, if such is warranted.
+(defun %get-info-value-initializing (name type-number creation-thunk)
+  (when (typep name 'fixnum)
+    (error "~D is not a legal INFO name." name))
+  (let ((name (uncross name))
+        result)
+    (dx-flet ((get-or-set (info-vect aux-key)
+                (let ((index
+                       (packed-info-value-index info-vect aux-key type-number)))
+                  (cond (index
+                         (setq result (svref info-vect index))
+                         nil) ; no update to info-vector
+                        (t
+                         ;; Update conflicts possibly for unrelated type-number
+                         ;; can force re-execution. (UNLESS result ...) tries
+                         ;; to avoid calling the thunk more than once.
+                         (unless result
+                           (setq result (funcall creation-thunk)))
+                         (packed-info-insert info-vect aux-key type-number
+                                             result))))))
+      (with-globaldb-name (key1 key2) name
+        :simple
+        ;; UPDATE-SYMBOL-INFO never supplies OLD-INFO as NIL.
+        (dx-flet ((simple-name (old-info) (get-or-set old-info key2)))
+          (update-symbol-info key1 #'simple-name))
+        :hairy
+        ;; INFO-PUTHASH supplies NIL for OLD-INFO if NAME was absent.
+        (dx-flet ((hairy-name (old-info)
+                    (or (get-or-set (or old-info +nil-packed-infos+)
+                                    +no-auxilliary-key+)
+                        ;; Return OLD-INFO to elide writeback. Unlike for
+                        ;; UPDATE-SYMBOL-INFO, NIL is not a no-op marker.
+                        old-info)))
+          (info-puthash *info-environment* name #'hairy-name))))
+    result))

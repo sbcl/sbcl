@@ -713,8 +713,8 @@
   (let ((real-name (uncross name)))
     (cond ((info :type :classoid-cell real-name))
           (create
-           (sb!c::atomically-get-or-put-symbol-info
-            :type :classoid-cell real-name (make-classoid-cell real-name))))))
+           (get-info-value-initializing :type :classoid-cell real-name
+                                        (make-classoid-cell real-name))))))
 
 (eval-when (#-sb-xc :compile-toplevel :load-toplevel :execute)
 
