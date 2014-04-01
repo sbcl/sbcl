@@ -316,5 +316,8 @@
     (equal (format nil "~a" '(setf . a))
            "(SETF . A)")))
 
+(with-test (:name :literal-fun-nested-lists)
+  (assert (search "EQUALP" (format nil "~:w" `((((((,#'equalp)))))))
+                  :test #'char-equal)))
 
 ;;; success
