@@ -96,44 +96,63 @@
 
 (with-test (:name :bug-309072)
   ;; original reported test cases
-  (raises-error? (make-instance 'sb-mop:slot-definition))
-  (raises-error? (make-instance 'sb-mop:slot-definition :name 'pi))
-  (raises-error? (make-instance 'sb-mop:slot-definition :name 3))
+  (assert (raises-error? (make-instance 'sb-mop:slot-definition)
+                         sb-pcl::slotd-initialization-error))
+  (assert (raises-error? (make-instance 'sb-mop:slot-definition :name 'pi)
+                         sb-pcl::slotd-initialization-error))
+  (assert (raises-error? (make-instance 'sb-mop:slot-definition :name 3)
+                         sb-pcl::slotd-initialization-type-error))
   ;; extra cases from the MOP dictionary
-  (raises-error? (make-instance 'sb-mop:slot-definition :name 'x
-                                :initform nil))
-  (raises-error? (make-instance 'sb-mop:slot-definition :name 'x
-                                :initfunction (lambda () nil)))
-  (raises-error? (make-instance 'sb-mop:slot-definition :name 'x
-                                :initfunction (lambda () nil)))
-  (raises-error? (make-instance 'sb-mop:slot-definition :name 'x
-                                :allocation ""))
-  (raises-error? (make-instance 'sb-mop:slot-definition :name 'x
-                                :initargs ""))
-  (raises-error? (make-instance 'sb-mop:slot-definition :name 'x
-                                :initargs '(foo . bar)))
-  (raises-error? (make-instance 'sb-mop:slot-definition :name 'x
-                                :initargs '(foo bar 3)))
-  (raises-error? (make-instance 'sb-mop:slot-definition :name 'x
-                                :documentation '(())))
+  (assert (raises-error? (make-instance 'sb-mop:slot-definition :name 'x
+                                                                :initform nil)
+                         sb-pcl::slotd-initialization-error))
+  (assert (raises-error? (make-instance 'sb-mop:slot-definition :name 'x
+                                                                :initfunction (lambda () nil))
+                         sb-pcl::slotd-initialization-error))
+  (assert (raises-error? (make-instance 'sb-mop:slot-definition :name 'x
+                                                                :initfunction (lambda () nil))
+                         sb-pcl::slotd-initialization-error))
+  (assert (raises-error? (make-instance 'sb-mop:slot-definition :name 'x
+                                                                :allocation "")
+                         sb-pcl::slotd-initialization-error))
+  (assert (raises-error? (make-instance 'sb-mop:slot-definition :name 'x
+                                                                :initargs "")
+                         sb-pcl::slotd-initialization-error))
+  (assert (raises-error? (make-instance 'sb-mop:slot-definition :name 'x
+                                                                :initargs '(foo . bar))
+                         sb-pcl::slotd-initialization-error))
+  (assert (raises-error? (make-instance 'sb-mop:slot-definition :name 'x
+                                                                :initargs '(foo bar 3))
+                         sb-pcl::slotd-initialization-error))
+  (assert (raises-error? (make-instance 'sb-mop:slot-definition :name 'x
+                                                                :documentation '(()))
+                         sb-pcl::slotd-initialization-error))
   ;; distinction between DIRECT- and EFFECTIVE- slot definitions
-  (raises-error? (make-instance 'sb-mop:effective-slot-definition
-                                :name 'x :readers '(foo)))
-  (raises-error? (make-instance 'sb-mop:effective-slot-definition
-                                :name 'x :writers '(foo)))
+  (assert (raises-error? (make-instance 'sb-mop:effective-slot-definition
+                                        :name 'x :readers '(foo))
+                         sb-pcl::initarg-error))
+  (assert (raises-error? (make-instance 'sb-mop:effective-slot-definition
+                                        :name 'x :writers '(foo))
+                         sb-pcl::initarg-error))
   (make-instance 'sb-mop:direct-slot-definition
                  :name 'x :readers '(foo))
   (make-instance 'sb-mop:direct-slot-definition
                  :name 'x :writers '(foo))
-  (raises-error? (make-instance 'sb-mop:direct-slot-definition
-                                :name 'x :readers ""))
-  (raises-error? (make-instance 'sb-mop:direct-slot-definition
-                                :name 'x :readers '(3)))
-  (raises-error? (make-instance 'sb-mop:direct-slot-definition
-                                :name 'x :readers '(foo . bar)))
-  (raises-error? (make-instance 'sb-mop:direct-slot-definition
-                                :name 'x :writers ""))
-  (raises-error? (make-instance 'sb-mop:direct-slot-definition
-                                :name 'x :writers '(3)))
-  (raises-error? (make-instance 'sb-mop:direct-slot-definition
-                                :name 'x :writers '(foo . bar))))
+  (assert (raises-error? (make-instance 'sb-mop:direct-slot-definition
+                                        :name 'x :readers "")
+                         sb-pcl::slotd-initialization-error))
+  (assert (raises-error? (make-instance 'sb-mop:direct-slot-definition
+                                        :name 'x :readers '(3))
+                         sb-pcl::slotd-initialization-error))
+  (assert (raises-error? (make-instance 'sb-mop:direct-slot-definition
+                                        :name 'x :readers '(foo . bar))
+                         sb-pcl::slotd-initialization-error))
+  (assert (raises-error? (make-instance 'sb-mop:direct-slot-definition
+                                        :name 'x :writers "")
+                         sb-pcl::slotd-initialization-error))
+  (assert (raises-error? (make-instance 'sb-mop:direct-slot-definition
+                                        :name 'x :writers '(3))
+                         sb-pcl::slotd-initialization-error))
+  (assert (raises-error? (make-instance 'sb-mop:direct-slot-definition
+                                        :name 'x :writers '(foo . bar))
+                         sb-pcl::slotd-initialization-error)))

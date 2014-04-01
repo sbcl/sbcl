@@ -1,4 +1,6 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
+changes relative to sbcl-1.1.17:
+  * bug fix: correctly inherit condition initforms. (lp#1300904)
 changes in sbcl-1.1.17 relative to sbcl-1.1.16:
   * enhancement: printing backtraces respects
     SB-DEBUG:*DEBUG-PRINT-VARIABLE-ALIST* when printing call arguments
