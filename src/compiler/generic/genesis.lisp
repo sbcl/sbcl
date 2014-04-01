@@ -577,18 +577,18 @@
   #!+sb-doc
   "Write VALUE displaced INDEX words from ADDRESS."
   ;; If we're passed a symbol as a value then it needs to be interned.
-  (when (symbolp value) (setf value (cold-intern value)))
-  (if (eql (descriptor-gspace value) :load-time-value)
-    (note-load-time-value-reference address
-                                    (- (ash index sb!vm:word-shift)
-                                       (logand (descriptor-bits address)
-                                               sb!vm:lowtag-mask))
-                                    value)
-    (let* ((bytes (gspace-bytes (descriptor-intuit-gspace address)))
-           (byte-index (ash (+ index (descriptor-word-offset address))
-                               sb!vm:word-shift)))
-      (setf (bvref-word bytes byte-index)
-            (descriptor-bits value)))))
+  (let ((value (cond ((symbolp value) (cold-intern value))
+                     (t value))))
+    (if (eql (descriptor-gspace value) :load-time-value)
+        (note-load-time-value-reference address
+                                        (- (ash index sb!vm:word-shift)
+                                           (logand (descriptor-bits address)
+                                                   sb!vm:lowtag-mask))
+                                        value)
+        (let* ((bytes (gspace-bytes (descriptor-intuit-gspace address)))
+               (byte-index (ash (+ index (descriptor-word-offset address))
+                                sb!vm:word-shift)))
+          (setf (bvref-word bytes byte-index) (descriptor-bits value))))))
 
 (declaim (ftype (function (descriptor (or symbol descriptor))) write-memory))
 (defun write-memory (address value)
