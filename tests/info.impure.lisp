@@ -486,7 +486,7 @@
     (values n-created fdefn-result random-result)))
 
 (test-util:with-test (:name :get-info-value-initializing
-                      :skipped-on (not :sb-thread))
+                      :skipped-on '(not :sb-thread))
   ;; Precompute random generalized function names for testing, some of which
   ;; are "simple" (per the taxonomy of globaldb) and some hairy.
   (let ((work (coerce (loop repeat 10000
