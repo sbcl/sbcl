@@ -300,9 +300,9 @@ static void brief_fixnum(lispobj obj)
     if (!fixnump(obj)) return print_unknown(obj);
 
 #ifndef LISP_FEATURE_ALPHA
-    printf("%ld", ((long)obj)>>2);
+    printf("%ld", ((long)obj)>>N_FIXNUM_TAG_BITS);
 #else
-    printf("%d", ((s32)obj)>>2);
+    printf("%d", ((s32)obj)>>N_FIXNUM_TAG_BITS);
 #endif
 }
 
@@ -314,9 +314,9 @@ static void print_fixnum(lispobj obj)
     if (!fixnump(obj)) return print_unknown(obj);
 
 #ifndef LISP_FEATURE_ALPHA
-    printf(": %ld", ((long)obj)>>2);
+    printf(": %ld", ((long)obj)>>N_FIXNUM_TAG_BITS);
 #else
-    printf(": %d", ((s32)obj)>>2);
+    printf(": %d", ((s32)obj)>>N_FIXNUM_TAG_BITS);
 #endif
 }
 
