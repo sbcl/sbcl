@@ -45,11 +45,6 @@ extensions have proper documentation yet.
 definition tool by Daniel Barlow. @inforef{Top,the asdf manual,asdf}, for
 more information.
 
-@item Third-party Extension Installation Tool
-@code{asdf-install} is a tool that can be used to download and install
-third-party libraries and applications, automatically handling
-dependencies, etc.
-
 @item Foreign Function Interface
 @code{sb-alien} package allows interfacing with C-code, loading shared
 object files, etc. @xref{Foreign Function Interface}.
