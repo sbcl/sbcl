@@ -23,6 +23,11 @@
 (!cold-init-forms
   (setf *ignored-package-locks* :invalid))
 
+;; This proclamation avoids a ton of style warnings due to so many calls
+;; that get cross-compiled prior to compiling "target-package.lisp"
+(declaim (ftype (sfunction (t &optional t &rest t) t)
+                assert-symbol-home-package-unlocked))
+
 (defmacro with-single-package-locked-error ((&optional kind thing &rest format)
                                             &body body)
   #!-sb-package-locks (declare (ignore kind thing format))
