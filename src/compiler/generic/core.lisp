@@ -67,7 +67,10 @@
                     #!+(or x86 x86-64)
                     (:code-object
                      (aver (null name))
-                     (values (get-lisp-obj-address code) t)))))
+                     (values (get-lisp-obj-address code) t))
+                    (:symbol-tls-index
+                     (aver (symbolp name))
+                     (ensure-symbol-tls-index name)))))
       (sb!vm:fixup-code-object code position value kind))))
 
 ;;; Stick a reference to the function FUN in CODE-OBJECT at index I. If the

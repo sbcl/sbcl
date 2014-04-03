@@ -246,6 +246,9 @@
                                       control-stack-pointer-sap)  ()
   system-area-pointer
   (flushable))
+
+(defknown ensure-symbol-tls-index (symbol) fixnum)
+
 
 ;;;; debugger support
 

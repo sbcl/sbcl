@@ -1543,8 +1543,15 @@
 ;;; implementation.
 (defoptimizer (%special-bind ir2-convert) ((var value) node block)
   (let ((name (leaf-source-name (lvar-value var))))
-    (vop bind node block (lvar-tn node block value)
-         (emit-constant name))))
+    #!-(and sb-thread x86-64)
+    (vop bind node block (lvar-tn node block value) (emit-constant name))
+    #!+(and sb-thread x86-64)
+    (progn
+      ;; GC must understand that the symbol is implicitly live even though
+      ;; binding makes no references to the object.
+      (emit-constant name)
+      (vop sb!vm::bind/let node block (lvar-tn node block value) name))))
+
 (defoptimizer (%special-unbind ir2-convert) ((var) node block)
   (vop unbind node block))
 

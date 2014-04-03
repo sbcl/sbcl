@@ -351,6 +351,12 @@
 
 (defun print-imm/asm-routine (value stream dstate)
   (sb!disassem:maybe-note-assembler-routine value nil dstate)
+  ;; also note a possible use of a static symbol.
+  ;; Do we want to push this logic into MAYBE-NOTE-ASSEMBLER-ROUTINE?
+  (dolist (symbol *static-symbols*)
+    (when (= (get-lisp-obj-address symbol) value)
+      (return (sb!disassem:note (lambda (s) (format s "possibly ~S" symbol))
+                                dstate))))
   (princ value stream))
 ) ; EVAL-WHEN
 
@@ -1837,8 +1843,8 @@
             ;; the runtime asm, since other foreign calls go through the
             ;; the linkage table) and for linkage table references, since
             ;; these should always end up in low memory.
-            (aver (or (eq (fixup-flavor src) :foreign)
-                      (eq (fixup-flavor src) :foreign-dataref)
+            (aver (or (member (fixup-flavor src)
+                              '(:foreign :foreign-dataref :symbol-tls-index))
                       (eq (ea-size dst) :dword)))
             (maybe-emit-rex-for-ea segment dst nil)
             (emit-byte segment #b11000111)

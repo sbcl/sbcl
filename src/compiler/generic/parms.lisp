@@ -197,6 +197,10 @@
 ;;; Number of entries in the thread local storage. Limits the number
 ;;; of symbols with thread local bindings.
 (def!constant tls-size 4096)
+;;; Refer to the lengthy comment in 'src/runtime/interrupt.h' about
+;;; the choice of this number. Rather than have to two copies
+;;; of the comment, please see that file before adjusting this.
+(def!constant max-interrupts 1024)
 
 #!+gencgc
 (progn

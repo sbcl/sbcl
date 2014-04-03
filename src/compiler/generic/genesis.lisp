@@ -825,6 +825,27 @@ core and return a descriptor to it."
 
 ;;;; symbol magic
 
+;; A table of special variable names mapped onto 'struct thread'.
+;; All symbols other than these will get their TLS indices assigned
+;; by the fasloader on demand.
+(defvar *thread-slots-as-specials*
+  (let ((ht (make-hash-table :test #'equal)))
+    (dolist (slot (sb!vm::primitive-object-slots
+                    (find 'sb!vm::thread sb!vm:*primitive-objects*
+                          :key #'sb!vm::primitive-object-name)) ht)
+      ;; It sure seems like *STEPPING* is supposed to be tied to a thread slot
+      ;; because x86-64 code goes to some trouble to use the thread slot instead
+      ;; of *STEPPING* whereas x86 uses *STEPPING* instead of the slot.
+      ;; Out of paranoia, I'm _not_ wiring *STEPPING*'s tls index,
+      ;; exactly like the code in 'thread.c' didn't do.
+      (let ((slot-name (sb!vm::slot-name slot)))
+        (unless (string= slot-name "STEPPING")
+          (let ((sym (if (string= slot-name "ALIEN-STACK-POINTER")
+                         "*ALIEN-STACK*" ; FIXME: should be unexceptional
+                         (concatenate 'string "*" (string slot-name) "*"))))
+            (setf (gethash sym ht)
+                  (ash (sb!vm::slot-offset slot) sb!vm:word-shift))))))))
+
 ;;; Allocate (and initialize) a symbol.
 (defun allocate-symbol (name &key (gspace *dynamic*))
   (declare (simple-string name))
@@ -840,6 +861,10 @@ core and return a descriptor to it."
     (write-wordindexed symbol sb!vm:symbol-name-slot
                        (base-string-to-core name *dynamic*))
     (write-wordindexed symbol sb!vm:symbol-package-slot *nil-descriptor*)
+    #!+sb-thread
+    (awhen (gethash name *thread-slots-as-specials*)
+      (write-wordindexed symbol sb!vm:symbol-tls-index-slot
+                         (make-random-descriptor it)))
     symbol))
 
 ;;; Set the cold symbol value of SYMBOL-OR-SYMBOL-DES, which can be either a
@@ -1247,6 +1272,30 @@ core and return a descriptor to it."
       (cold-push (cold-cons (cold-intern (car layout)) (cdr layout))
                  result))))
 
+;; Simulate *FREE-TLS-INDEX*. This is a count, not a displacement.
+;; In C, sizeof counts 1 word for the variable-length interrupt_contexts[]
+;; but primitive-object-size counts 0, so add 1, though in fact the C code
+;; implies that it might have overcounted by 1. Hmm. Also: we could make
+;; this agnostic of MAX-INTERRUPTS by moving the thread base register up
+;; by TLS-SIZE words and using negative offsets for all dynamically assigned
+;; indices. I didn't want to break too much at once though.
+(defvar *genesis-tls-counter*
+  (+ 1 sb!vm::max-interrupts
+     (sb!vm::primitive-object-size
+      (find 'sb!vm::thread sb!vm:*primitive-objects*
+            :key #'sb!vm::primitive-object-name))))
+
+#!+sb-thread
+;; Assign SYMBOL a tls-index and write it into the target core.
+(defun ensure-symbol-tls-index (symbol)
+  (let* ((cold-sym (cold-intern symbol))
+         (tls-index (read-wordindexed cold-sym sb!vm:symbol-tls-index-slot)))
+    (unless (plusp (descriptor-bits tls-index))
+      (let ((next (prog1 *genesis-tls-counter* (incf *genesis-tls-counter*))))
+        (setq tls-index (make-random-descriptor (ash next sb!vm:word-shift)))
+        (write-wordindexed cold-sym sb!vm:symbol-tls-index-slot tls-index)))
+    (descriptor-bits tls-index)))
+
 ;;; Establish initial values for magic symbols.
 ;;;
 ;;; Scan over all the symbols referenced in each package in
@@ -1275,6 +1324,13 @@ core and return a descriptor to it."
   (cold-set '*free-interrupt-context-index* (make-fixnum-descriptor 0))
 
   (cold-set '*!initial-layouts* (cold-list-all-layouts))
+
+  #!+sb-thread
+  (progn
+    (cold-set 'sb!vm::*free-tls-index*
+              (make-random-descriptor (ash *genesis-tls-counter*
+                                           sb!vm:word-shift)))
+    (cold-set 'sb!vm::*tls-index-lock* (make-fixnum-descriptor 0)))
 
   (/show "dumping packages" (mapcar #'car *cold-package-symbols*))
   (let ((initial-symbols *nil-descriptor*))
@@ -2587,6 +2643,14 @@ core and return a descriptor to it."
     (write-wordindexed fn sb!vm::simple-fun-info-slot info)
     fn))
 
+(define-cold-fop (fop-symbol-tls-fixup)
+  (let* ((symbol (pop-stack))
+         (kind (pop-stack))
+         (code-object (pop-stack)))
+    (do-cold-fixup code-object (read-word-arg) (ensure-symbol-tls-index symbol)
+                   kind)
+    code-object))
+
 (define-cold-fop (fop-foreign-fixup)
   (let* ((kind (pop-stack))
          (code-object (pop-stack))
@@ -2820,7 +2884,7 @@ core and return a descriptor to it."
               (maybe-record-with-munged-name "-TRAP" "trap_" 3)
               (maybe-record-with-munged-name "-SUBTYPE" "subtype_" 4)
               (maybe-record-with-munged-name "-SC-NUMBER" "sc_" 5)
-              (maybe-record-with-translated-name '("-SIZE") 6)
+              (maybe-record-with-translated-name '("-SIZE" "-INTERRUPTS") 6)
               (maybe-record-with-translated-name '("-START" "-END" "-PAGE-BYTES"
                                                    "-CARD-BYTES" "-GRANULARITY")
                                                  7 :large t)

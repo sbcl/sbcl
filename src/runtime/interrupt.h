@@ -97,7 +97,10 @@ extern void maybe_save_gc_mask_and_block_deferrables(sigset_t *sigset);
  *
  * -- NS 2007-01-29
  */
-#define MAX_INTERRUPTS 1024
+/* No longer defined here, but in 'compiler/generic/parms.lisp' due to
+   requirement that Lisp skip this many words when assigning thread-local
+   storage indices */
+// #define MAX_INTERRUPTS 1024
 
 union interrupt_handler {
     lispobj lisp;

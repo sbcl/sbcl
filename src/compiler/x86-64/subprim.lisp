@@ -80,3 +80,45 @@
 (define-static-fun length (object) :translate length)
 (define-static-fun %coerce-callable-to-fun (callable)
   :translate %coerce-callable-to-fun)
+
+(defun subprimitive-tls-allocator (tn)
+  (make-fixup (ecase (tn-offset tn)
+                (#.rax-offset 'alloc-tls-index-in-rax)
+                (#.rcx-offset 'alloc-tls-index-in-rcx)
+                (#.rdx-offset 'alloc-tls-index-in-rdx)
+                (#.rbx-offset 'alloc-tls-index-in-rbx)
+                (#.rsi-offset 'alloc-tls-index-in-rsi)
+                (#.rdi-offset 'alloc-tls-index-in-rdi)
+                (#.r8-offset  'alloc-tls-index-in-r8)
+                (#.r9-offset  'alloc-tls-index-in-r9)
+                (#.r10-offset 'alloc-tls-index-in-r10)
+                (#.r12-offset 'alloc-tls-index-in-r12)
+                (#.r13-offset 'alloc-tls-index-in-r13)
+                (#.r14-offset 'alloc-tls-index-in-r14)
+                (#.r15-offset 'alloc-tls-index-in-r15))
+              :assembly-routine))
+
+;; Make sure that SYMBOL has a TLS-INDEX, and return that.
+;; It would be nice to have GC help recycle TLS indices.
+;; We can use the TLS area itself as a linked list of free cells, each
+;; storing the index of the next free cell. GC can push back into
+;; the so-represented list when it trashes a symbol.
+;; In addition to the GC complication, PROGV would need to be both
+;; cas-lock-protected and pseudo-atomic most likely.
+;;
+#!+sb-thread ; no SYMBOL-TLS-INDEX-SLOT without threads
+(define-vop (ensure-symbol-tls-index)
+  (:translate ensure-symbol-tls-index)
+  (:args (symbol :scs (descriptor-reg) :to (:result 1)))
+  (:results (tls-index :scs (descriptor-reg any-reg)))
+  (:temporary (:sc unsigned-reg) tmp)
+  (:policy :fast-safe)
+  (:generator 10
+    (loadw tls-index symbol symbol-tls-index-slot other-pointer-lowtag)
+    (inst test tls-index tls-index)
+    (inst jmp :ne TLS-INDEX-VALID)
+    (move tls-index symbol)
+    (inst mov tmp (subprimitive-tls-allocator tls-index))
+    (inst call tmp)
+    TLS-INDEX-VALID
+    (inst shl tls-index n-fixnum-tag-bits)))

@@ -985,7 +985,11 @@
              (dump-byte (char-code (schar name i)) fasl-output))))
         (:code-object
          (aver (null name))
-         (dump-fop 'fop-code-object-fixup fasl-output)))
+         (dump-fop 'fop-code-object-fixup fasl-output))
+        (:symbol-tls-index
+         (aver (symbolp name))
+         (dump-non-immediate-object name fasl-output)
+         (dump-fop 'fop-symbol-tls-fixup fasl-output)))
       ;; No matter what the flavor, we'll always dump the position
       (dump-word position fasl-output)))
   (values))

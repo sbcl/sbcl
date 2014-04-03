@@ -417,6 +417,8 @@
   (control-stack-start :c-type "lispobj *" :length #!+alpha 2 #!-alpha 1)
   (control-stack-end :c-type "lispobj *" :length #!+alpha 2 #!-alpha 1)
   (control-stack-guard-page-protected)
+  ;; TODO: Placing these adjacent to binding-stack would make them addressable
+  ;;       with a 1-byte displacement on x86-64.
   (alien-stack-start :c-type "lispobj *" :length #!+alpha 2 #!-alpha 1)
   (alien-stack-pointer :c-type "lispobj *" :length #!+alpha 2 #!-alpha 1)
   #!+win32 (private-events :c-type "struct private_events" :length 2)

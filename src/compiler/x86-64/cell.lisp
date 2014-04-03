@@ -311,28 +311,49 @@
     (inst test tls-index tls-index)
     (inst jmp :ne TLS-INDEX-VALID)
     (inst mov tls-index symbol)
-    (inst mov tmp
-          (make-fixup (ecase (tn-offset tls-index)
-                        (#.rax-offset 'alloc-tls-index-in-rax)
-                        (#.rcx-offset 'alloc-tls-index-in-rcx)
-                        (#.rdx-offset 'alloc-tls-index-in-rdx)
-                        (#.rbx-offset 'alloc-tls-index-in-rbx)
-                        (#.rsi-offset 'alloc-tls-index-in-rsi)
-                        (#.rdi-offset 'alloc-tls-index-in-rdi)
-                        (#.r8-offset  'alloc-tls-index-in-r8)
-                        (#.r9-offset  'alloc-tls-index-in-r9)
-                        (#.r10-offset 'alloc-tls-index-in-r10)
-                        (#.r12-offset 'alloc-tls-index-in-r12)
-                        (#.r13-offset 'alloc-tls-index-in-r13)
-                        (#.r14-offset 'alloc-tls-index-in-r14)
-                        (#.r15-offset 'alloc-tls-index-in-r15))
-                      :assembly-routine))
+    (inst mov tmp (subprimitive-tls-allocator tls-index))
     (inst call tmp)
     TLS-INDEX-VALID
     (inst mov tmp (make-ea :qword :base thread-base-tn :index tls-index))
     (storew tmp bsp (- binding-value-slot binding-size))
     (storew tls-index bsp (- binding-symbol-slot binding-size))
     (inst mov (make-ea :qword :base thread-base-tn :index tls-index) val)))
+
+#!+sb-thread
+;; Nikodemus hypothetically terms the above VOP DYNBIND (in x86/cell.lisp)
+;; with this "new" one being BIND, but to re-purpose concepts in that way
+;; - though it be rational - is fraught with peril.
+;; So BIND/LET is for (LET ((*a-special* ...)))
+;;
+(define-vop (bind/let)
+  (:args (val :scs (any-reg descriptor-reg)))
+  (:temporary (:sc unsigned-reg) bsp tmp)
+  (:info symbol)
+  (:generator 10
+    (inst mov bsp (* binding-size n-word-bytes))
+    (inst xadd
+          (make-ea :qword :base thread-base-tn
+                   :disp (ash thread-binding-stack-pointer-slot word-shift))
+          bsp)
+    (let* ((tls-index (make-fixup symbol :symbol-tls-index))
+           (tls-cell (make-ea :qword :base thread-base-tn :disp tls-index)))
+      ;; Too bad we can't use "XCHG [r12+disp], val" to write the new value
+      ;; and read the old value in one step. It will violate the constraints
+      ;; prescribed in the internal documentation on special binding.
+      (inst mov tmp tls-cell)
+      (storew tmp bsp binding-value-slot)
+      ;; Indices are small enough to be written as :DWORDs which avoids
+      ;; a REX prefix if 'bsp' happens to be any of the low 8 registers.
+      (inst mov (make-ea :dword :base bsp
+                         :disp (ash binding-symbol-slot word-shift)) tls-index)
+      (inst mov tls-cell val))
+    ;; Emission of this VOP informs the compiler that later SYMBOL-VALUE calls
+    ;; might want to use a load-time fixup instead of reading from the symbol's
+    ;; tls-index, admitting a possible optimization (NOT DONE):
+    ;;  MOV RES,[R12+N] ; CMP RES,NO_TLS_VALUE ; CMOV :NE RES,GLOBAL-VALUE
+    ;; In contrast, if the symbol is not known to ever have been thread-locally
+    ;; bound, reading it should not force the loader to assign a TLS index.
+    (setf (info :variable :wired-tls-index symbol) t)))
 
 #!-sb-thread
 (define-vop (bind)
@@ -929,3 +950,50 @@
   (:info instance-length index)
   (:generator 4
     (inst movdqu (make-ea-for-raw-slot object instance-length :index index :adjustment -8) value)))
+
+#|
+For lack of a better location for these comments about the manipulation
+of static symbols, note that we now have unfortunately three ways of doing it.
+The following code rebinds *ALIEN-STACK* to itself then subtracts 16 bytes.
+
+* (disassemble '(lambda () (with-alien ((x (array char 16))) (print x))))
+
+1) Load the symbol into a register, load the tls-index from the symbol,
+   and access [thread_base+index]. This is an ordinary SYMBOL-VALUE call.
+
+;       B80F0B1020       MOV EAX, 537922319
+;       488B5021         MOV RDX, [RAX+33]
+;       498B1414         MOV RDX, [R12+RDX]
+;       4883FA61         CMP RDX, 97
+;       7504             JNE L0
+;       488B50F9         MOV RDX, [RAX-7]
+; L0:   4883FA51         CMP RDX, 81
+;       0F84EC000000     JEQ L3
+
+2) Use a constant offset from the thread-base. This is the BIND/LET VOP.
+
+;       498B8C24A8000000 MOV RCX, [R12+168]
+;       488908           MOV [RAX], RCX
+;       C74008A8000000   MOV DWORD PTR [RAX+8], 168
+;       49899424A8000000 MOV [R12+168], RDX
+
+3) Load the tls-index from its known fixed address in ALLOC-ALIEN-STACK-SPACE.
+
+;       488B0425300B1020 MOV RAX, [#x20100B30]
+;       49832C0410       SUB QWORD PTR [R12+RAX], 16
+;       488B0C25300B1020 MOV RCX, [#x20100B30]
+;       498B0C0C         MOV RCX, [R12+RCX]
+;       488D5C24F0       LEA RBX, [RSP-16]
+;       4883EC18         SUB RSP, 24
+;       49896C2440       MOV [R12+64], RBP
+
+We could benefit from additional INFO for special variables:
+ - an indicator of whether to prefer that SYMBOL-VALUE use a known tls-index.
+   This would be the same load-time mechanism as for BIND/LET. It is bad
+   to force the loader to assign a tls-index for all reads of a symbol in
+   general. Many symbols are never dynamically bound, and the potential number
+   of globals (not DEFGLOBAL necessarily) in use by some applications
+   could quickly exhaust the TLS.
+ - an indicator of whether the symbol will definitely have a thread-local
+   binding whenever it is read, such as for *ALIEN-STACK*.
+|#

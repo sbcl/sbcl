@@ -89,7 +89,53 @@
                                                              dstate))))
             (t
              (princ offset stream)))))))
-  (write-char #\] stream))
+  (write-char #\] stream)
+  #!+sb-thread
+  (let ((disp (second value)))
+    (when (and (eql (first value) #.(ash (tn-offset thread-base-tn) -1))
+               (not (third value)) ; no index
+               (typep disp '(integer 0 *)) ; positive displacement
+               (sb!disassem::seg-code (sb!disassem:dstate-segment dstate)))
+      ;; Try to reverse-engineer which thread-local binding this is
+      (let* ((code (sb!disassem::seg-code (sb!disassem:dstate-segment dstate)))
+             (header-n-words
+              (ash (sap-ref-word (int-sap (get-lisp-obj-address code))
+                                 (- other-pointer-lowtag)) -8))
+             (tls-index (ash disp (- n-fixnum-tag-bits))))
+        (loop for word-num from code-constants-offset below header-n-words
+              for obj = (code-header-ref code word-num)
+              when (and (symbolp obj) (= (symbol-tls-index obj) tls-index))
+              do (return-from print-mem-ref
+                   (sb!disassem:note
+                    (lambda (stream) (format stream "tls: ~S" obj))
+                    dstate))))
+      ;; Or maybe we're looking at the 'struct thread' itself
+      (when (< disp max-interrupts)
+        (let* ((thread-slots (primitive-object-slots
+                              (find 'thread *primitive-objects*
+                                    :key #'primitive-object-name)))
+               (slot (find (ash disp (- word-shift)) thread-slots
+                           :key #'slot-offset)))
+          (when slot
+            (return-from print-mem-ref
+              (sb!disassem:note
+               (lambda (stream)
+                 (format stream "thread.~(~A~)" (slot-name slot)))
+               dstate))))))
+    ;; One last thing to try ...
+    ;; The TLS slot of static symbols is referenced in memory absolute mode.
+    ;; [FIXME: this is of course pointless! Genesis should pick/wire the indices
+    ;; of all static symbols]
+    (when (and (not (first value)) (not (third value)) ; no base, index
+               (typep disp '(integer 0 *)) ; positive displacement
+               (<= static-space-start disp static-space-end))
+      (dolist (symbol *static-symbols*)
+        (when (= (+ (get-lisp-obj-address symbol) (- other-pointer-lowtag)
+                    (ash symbol-tls-index-slot word-shift))
+                 disp)
+          (sb!disassem:note
+           (lambda (stream) (format stream "~A.tls-index" symbol))
+           dstate))))))
 
 (in-package "SB!DISASSEM")
 

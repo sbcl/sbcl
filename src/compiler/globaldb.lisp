@@ -623,6 +623,9 @@
 
 (define-info-type (:variable :documentation) :type-spec (or string null))
 
+;; See 'compiler/x86-64/cell' for explanation.
+(define-info-type (:variable :wired-tls-index) :type-spec boolean)
+
 ;;;; ":TYPE" subsection - Data pertaining to globally known types.
 
 ;;; the kind of type described. We return :INSTANCE for standard types
