@@ -215,15 +215,13 @@
 ;;; Define synonyms for the lisp functions we use, so that by using
 ;;; them, the backquoted material will be recognizable to the
 ;;; pretty-printer.
+;;; These pass-through functions all have IR1 transforms whose signatures
+;;; are more restrictive than &REST, so it's kind of weird to write
+;;;   (DEFUN BACKQ-CONS (&REST REST) (APPLY #'CONS REST))
+;;; as was previously done.
+;;; Better to say that pairs of symbols share functional bindings.
 (macrolet ((def (b-name name)
-               ;; FIXME: This function should be INLINE so that the lists
-               ;; aren't consed twice, but I ran into an optimizer bug the
-               ;; first time I tried to make this work for BACKQ-LIST. See
-               ;; whether there's still an optimizer bug, and fix it if so, and
-               ;; then make these INLINE.
-               `(defun ,b-name (&rest rest)
-                  (declare (truly-dynamic-extent rest))
-                  (apply #',name rest))))
+             `(setf (symbol-function ',b-name) #',name)))
   (def backq-list list)
   (def backq-list* list*)
   (def backq-append append)
