@@ -25,7 +25,7 @@
                   sb!vm:*static-space-free-pointer*
                   sb!vm::*current-catch-block*
                   sb!vm::*current-unwind-protect-block*
-                  sb!vm::*alien-stack*
+                  sb!vm::*alien-stack-pointer*
                   sb!vm::*control-stack-start*
                   sb!vm::*control-stack-end*
                   sb!vm::*binding-stack-start*

@@ -954,7 +954,8 @@
 #|
 For lack of a better location for these comments about the manipulation
 of static symbols, note that we now have unfortunately three ways of doing it.
-The following code rebinds *ALIEN-STACK* to itself then subtracts 16 bytes.
+The following code rebinds *ALIEN-STACK-POINTER* to itself,
+then subtracts 16 bytes.
 
 * (disassemble '(lambda () (with-alien ((x (array char 16))) (print x))))
 
@@ -995,5 +996,5 @@ We could benefit from additional INFO for special variables:
    of globals (not DEFGLOBAL necessarily) in use by some applications
    could quickly exhaust the TLS.
  - an indicator of whether the symbol will definitely have a thread-local
-   binding whenever it is read, such as for *ALIEN-STACK*.
+   binding whenever it is read, such as for *ALIEN-STACK-POINTER*.
 |#

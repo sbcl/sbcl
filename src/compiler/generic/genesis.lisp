@@ -840,9 +840,7 @@ core and return a descriptor to it."
       ;; exactly like the code in 'thread.c' didn't do.
       (let ((slot-name (sb!vm::slot-name slot)))
         (unless (string= slot-name "STEPPING")
-          (let ((sym (if (string= slot-name "ALIEN-STACK-POINTER")
-                         "*ALIEN-STACK*" ; FIXME: should be unexceptional
-                         (concatenate 'string "*" (string slot-name) "*"))))
+          (let ((sym (concatenate 'string "*" (string slot-name) "*")))
             (setf (gethash sym ht)
                   (ash (sb!vm::slot-offset slot) sb!vm:word-shift))))))))
 

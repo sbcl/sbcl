@@ -359,12 +359,12 @@
         (inst mov temp
               (make-ea :qword
                        :disp (+ nil-value
-                                (static-symbol-offset '*alien-stack*)
+                                (static-symbol-offset '*alien-stack-pointer*)
                                 (ash symbol-tls-index-slot word-shift)
                                 (- other-pointer-lowtag))))
         (inst sub (make-ea :qword :base thread-base-tn
                            :scale 1 :index temp) delta)))
-    (load-tl-symbol-value result *alien-stack*))
+    (load-tl-symbol-value result *alien-stack-pointer*))
   #!-sb-thread
   (:generator 0
     (aver (not (location= result rsp-tn)))
@@ -372,11 +372,11 @@
       (let ((delta (logandc2 (+ amount 7) 7)))
         (inst sub (make-ea :qword
                            :disp (+ nil-value
-                                    (static-symbol-offset '*alien-stack*)
+                                    (static-symbol-offset '*alien-stack-pointer*)
                                     (ash symbol-value-slot word-shift)
                                     (- other-pointer-lowtag)))
               delta)))
-    (load-symbol-value result *alien-stack*)))
+    (load-symbol-value result *alien-stack-pointer*)))
 
 (define-vop (dealloc-alien-stack-space)
   (:info amount)
@@ -388,7 +388,7 @@
         (inst mov temp
               (make-ea :qword
                        :disp (+ nil-value
-                                (static-symbol-offset '*alien-stack*)
+                                (static-symbol-offset '*alien-stack-pointer*)
                                 (ash symbol-tls-index-slot word-shift)
                                 (- other-pointer-lowtag))))
         (inst add (make-ea :qword :base thread-base-tn :scale 1 :index temp)
@@ -399,7 +399,7 @@
       (let ((delta (logandc2 (+ amount 7) 7)))
         (inst add (make-ea :qword
                            :disp (+ nil-value
-                                    (static-symbol-offset '*alien-stack*)
+                                    (static-symbol-offset '*alien-stack-pointer*)
                                     (ash symbol-value-slot word-shift)
                                     (- other-pointer-lowtag)))
               delta)))))

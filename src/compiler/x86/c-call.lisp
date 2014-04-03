@@ -377,17 +377,17 @@
       (let ((delta (logandc2 (+ amount 3) 3)))
         (with-tls-ea (EA :base temp
                          :disp-type :index
-                         :disp (make-ea-for-symbol-tls-index *alien-stack*))
+                         :disp (make-ea-for-symbol-tls-index *alien-stack-pointer*))
           (inst sub EA delta :maybe-fs))))
-    (load-tl-symbol-value result *alien-stack*))
+    (load-tl-symbol-value result *alien-stack-pointer*))
   #!-sb-thread
   (:generator 0
     (aver (not (location= result esp-tn)))
     (unless (zerop amount)
       (let ((delta (logandc2 (+ amount 3) 3)))
-        (inst sub (make-ea-for-symbol-value *alien-stack*)
+        (inst sub (make-ea-for-symbol-value *alien-stack-pointer*)
               delta)))
-    (load-symbol-value result *alien-stack*)))
+    (load-symbol-value result *alien-stack-pointer*)))
 
 (define-vop (dealloc-alien-stack-space)
   (:info amount)
@@ -398,13 +398,13 @@
       (let ((delta (logandc2 (+ amount 3) 3)))
         (with-tls-ea (EA :base temp
                          :disp-type :index
-                         :disp (make-ea-for-symbol-tls-index *alien-stack*))
+                         :disp (make-ea-for-symbol-tls-index *alien-stack-pointer*))
           (inst add EA delta :maybe-fs)))))
   #!-sb-thread
   (:generator 0
     (unless (zerop amount)
       (let ((delta (logandc2 (+ amount 3) 3)))
-        (inst add (make-ea-for-symbol-value *alien-stack*)
+        (inst add (make-ea-for-symbol-value *alien-stack-pointer*)
               delta)))))
 
 ;;; not strictly part of the c-call convention, but needed for the

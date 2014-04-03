@@ -200,4 +200,4 @@
 
 
 ;;; the current alien stack pointer; saved/restored for non-local exits
-(defvar *alien-stack*)
+(defvar *alien-stack-pointer*)

@@ -196,7 +196,7 @@ This is SETFable."
                         ,(append *new-auxiliary-types*
                                  (auxiliary-type-definitions env))))
        #!+(or x86 x86-64)
-       (let ((sb!vm::*alien-stack* sb!vm::*alien-stack*))
+       (let ((sb!vm::*alien-stack-pointer* sb!vm::*alien-stack-pointer*))
          ,@body)
        #!-(or x86 x86-64)
        ,@body)))

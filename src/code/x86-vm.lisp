@@ -267,7 +267,7 @@
 (defvar *fp-constant-ln2*)
 
 ;;; the current alien stack pointer; saved/restored for non-local exits
-(defvar *alien-stack*)
+(defvar *alien-stack-pointer*)
 
 ;;; Support for the MT19937 random number generator. The update
 ;;; function is implemented as an assembly routine. This definition is

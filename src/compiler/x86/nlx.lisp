@@ -45,7 +45,7 @@
             (alien-stack :scs (descriptor-reg)))
   (:generator 13
     (load-tl-symbol-value catch *current-catch-block*)
-    (load-tl-symbol-value alien-stack *alien-stack*)))
+    (load-tl-symbol-value alien-stack *alien-stack-pointer*)))
 
 (define-vop (restore-dynamic-state)
   (:args (catch :scs (descriptor-reg))
@@ -53,7 +53,7 @@
   #!+sb-thread (:temporary (:sc unsigned-reg) temp)
   (:generator 10
     (store-tl-symbol-value catch *current-catch-block* temp)
-    (store-tl-symbol-value alien-stack *alien-stack* temp)))
+    (store-tl-symbol-value alien-stack *alien-stack-pointer* temp)))
 
 (define-vop (current-stack-pointer)
   (:results (res :scs (any-reg control-stack)))
