@@ -660,7 +660,7 @@ zero_pages(page_index_t start, page_index_t end) {
     if (start > end)
       return;
 
-#if defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64)
+#if defined(LISP_FEATURE_X86)
     fast_bzero(page_address(start), npage_bytes(1+end-start));
 #else
     bzero(page_address(start), npage_bytes(1+end-start));

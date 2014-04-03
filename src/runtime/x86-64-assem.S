@@ -493,57 +493,6 @@ GNAME(post_signal_tramp):
 	ret
 	SIZE(GNAME(post_signal_tramp))
 
-	.text
-	.align	align_16byte,0x90
-	.globl  GNAME(fast_bzero)
-	TYPE(GNAME(fast_bzero))
-
-	#ifdef LISP_FEATURE_WIN32
-	#define xmmreg xmm7
-	#define redsave(reg,off) movups reg,-off(%rsp)
-	#define redrestore(reg,off) movups -off(%rsp),reg
-	#else
-	#define xmmreg xmm0
-	#define redsave(reg,off)
-	#define redrestore(reg,off)
-	#endif
-
-GNAME(fast_bzero):
-        /* A fast routine for zero-filling blocks of memory that are
-         * guaranteed to start and end at a 4096-byte aligned address.
-         */
-        shr $6, %rsi              /* Amount of 64-byte blocks to copy */
-        jz Lend                   /* If none, stop */
-        mov %rsi, %rcx            /* Save start address */
-	redsave(%xmmreg,16)
-        xorps  %xmmreg, %xmmreg       /* Zero the XMM register */
-        jmp Lloop
-        .align align_16byte
-Lloop:
-
-        /* Copy the 16 zeroes from xmm7 to memory, 4 times. MOVNTDQ is the
-         * non-caching double-quadword moving variant, i.e. the memory areas
-         * we're touching are not fetched into the L1 cache, since we're just
-         * going to overwrite the memory soon anyway.
-         */
-        movntdq %xmmreg, 0(%rdi)
-        movntdq %xmmreg, 16(%rdi)
-        movntdq %xmmreg, 32(%rdi)
-        movntdq %xmmreg, 48(%rdi)
-
-        add $64, %rdi  /* Advance pointer */
-        dec %rsi       /* Decrement 64-byte block count */
-        jnz Lloop
-        mfence         /* Ensure that the writes are globally visible, since
-                        * MOVNTDQ is weakly ordered */
-	redrestore(%xmmreg,16)
-        prefetcht0 0(%rcx)      /* Prefetch the start of the block into cache,
-                                 * since it's likely to be used immediately. */
-Lend:        
-	ret
-	SIZE(GNAME(fast_bzero))
-
-
 /* When LISP_FEATURE_C_STACK_IS_CONTROL_STACK, we cannot safely scrub
  * the control stack from C, largely due to not knowing where the
  * active stack frame ends.  On such platforms, we reimplement the

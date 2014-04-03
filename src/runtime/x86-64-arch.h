@@ -72,6 +72,4 @@ swap_lispobjs(volatile lispobj *dest, lispobj value)
     return old_value;
 }
 
-extern void AMD64_SYSV_ABI fast_bzero(void *, size_t);
-
 #endif /* _X86_64_ARCH_H */
