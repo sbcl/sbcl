@@ -50,10 +50,9 @@
 (define-vop (restore-dynamic-state)
   (:args (catch :scs (descriptor-reg))
          (alien-stack :scs (descriptor-reg)))
-  #!+sb-thread (:temporary (:sc unsigned-reg) temp)
   (:generator 10
-    (store-tl-symbol-value catch *current-catch-block* temp)
-    (store-tl-symbol-value alien-stack *alien-stack-pointer* temp)))
+    (store-tl-symbol-value catch *current-catch-block*)
+    (store-tl-symbol-value alien-stack *alien-stack-pointer*)))
 
 (define-vop (current-stack-pointer)
   (:results (res :scs (any-reg control-stack)))
@@ -100,34 +99,34 @@
     (storew tag block catch-block-tag-slot)
     (load-tl-symbol-value temp *current-catch-block*)
     (storew temp block catch-block-previous-catch-slot)
-    (store-tl-symbol-value block *current-catch-block* temp)))
+    (store-tl-symbol-value block *current-catch-block*)))
 
 ;;; Just set the current unwind-protect to TN's address. This instantiates an
 ;;; unwind block as an unwind-protect.
 (define-vop (set-unwind-protect)
   (:args (tn))
-  (:temporary (:sc unsigned-reg) new-uwp #!+sb-thread tls)
+  (:temporary (:sc unsigned-reg) new-uwp)
   (:generator 7
     (inst lea new-uwp (catch-block-ea tn))
-    (store-tl-symbol-value new-uwp *current-unwind-protect-block* tls)))
+    (store-tl-symbol-value new-uwp *current-unwind-protect-block*)))
 
 (define-vop (unlink-catch-block)
-  (:temporary (:sc unsigned-reg) #!+sb-thread tls block)
+  (:temporary (:sc unsigned-reg) block)
   (:policy :fast-safe)
   (:translate %catch-breakup)
   (:generator 17
     (load-tl-symbol-value block *current-catch-block*)
     (loadw block block catch-block-previous-catch-slot)
-    (store-tl-symbol-value block *current-catch-block* tls)))
+    (store-tl-symbol-value block *current-catch-block*)))
 
 (define-vop (unlink-unwind-protect)
-    (:temporary (:sc unsigned-reg) block #!+sb-thread tls)
+    (:temporary (:sc unsigned-reg) block)
   (:policy :fast-safe)
   (:translate %unwind-protect-breakup)
   (:generator 17
     (load-tl-symbol-value block *current-unwind-protect-block*)
     (loadw block block unwind-block-current-uwp-slot)
-    (store-tl-symbol-value block *current-unwind-protect-block* tls)))
+    (store-tl-symbol-value block *current-unwind-protect-block*)))
 
 ;;;; NLX entry VOPs
 (define-vop (nlx-entry)

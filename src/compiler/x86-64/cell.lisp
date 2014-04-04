@@ -335,7 +335,8 @@
           (make-ea :qword :base thread-base-tn
                    :disp (ash thread-binding-stack-pointer-slot word-shift))
           bsp)
-    (let* ((tls-index (make-fixup symbol :symbol-tls-index))
+    (let* ((tls-index (or (symbol-known-tls-index symbol)
+                          (make-fixup symbol :symbol-tls-index)))
            (tls-cell (make-ea :qword :base thread-base-tn :disp tls-index)))
       ;; Too bad we can't use "XCHG [r12+disp], val" to write the new value
       ;; and read the old value in one step. It will violate the constraints
@@ -350,7 +351,7 @@
     ;; Emission of this VOP informs the compiler that later SYMBOL-VALUE calls
     ;; might want to use a load-time fixup instead of reading from the symbol's
     ;; tls-index, admitting a possible optimization (NOT DONE):
-    ;;  MOV RES,[R12+N] ; CMP RES,NO_TLS_VALUE ; CMOV :NE RES,GLOBAL-VALUE
+    ;;  MOV RES,[R12+N] ; CMP RES,NO_TLS_VALUE ; CMOV :E RES,GLOBAL-VALUE
     ;; In contrast, if the symbol is not known to ever have been thread-locally
     ;; bound, reading it should not force the loader to assign a TLS index.
     (setf (info :variable :wired-tls-index symbol) t)))

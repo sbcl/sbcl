@@ -395,13 +395,26 @@
   ;; Kept here so that when the thread dies we can release the whole
   ;; memory we reserved.
   (os-address :c-type "void *" :length #!+alpha 2 #!-alpha 1)
-  ;; Keep these next four slots close to the beginning of the structure.
-  ;; Doing so reduces code size for x86-64 allocation sequences and
-  ;; special variable manipulations.
+
+  ;; Keep these next six slots (alloc-region being figured in as 1 slot)
+  ;; near the beginning of the structure so that x86[-64] assembly code
+  ;; can use single-byte displacements from thread-base-tn.
+  ;; Doing so reduces code size for allocation sequences and special variable
+  ;; manipulations by fixing their TLS offsets to be < 2^8, the largest
+  ;; aligned displacement fitting in a signed byte.
   #!+gencgc (alloc-region :c-type "struct alloc_region" :length 5)
   #!+(or x86 x86-64 sb-thread) (pseudo-atomic-bits)
-  (binding-stack-start :c-type "lispobj *" :length #!+alpha 2 #!-alpha 1)
+  ;; next two not used in C, but this wires the TLS offsets to small values
+  #!+(and x86-64 sb-thread) (current-catch-block)
+  #!+(and x86-64 sb-thread) (current-unwind-protect-block)
+  (alien-stack-pointer :c-type "lispobj *" :length #!+alpha 2 #!-alpha 1)
   (binding-stack-pointer :c-type "lispobj *" :length #!+alpha 2 #!-alpha 1)
+  ;; END of slots to keep near the beginning.
+
+  ;; These aren't accessed (much) from Lisp, so don't really care
+  ;; if it takes a 4-byte displacement.
+  (alien-stack-start :c-type "lispobj *" :length #!+alpha 2 #!-alpha 1)
+  (binding-stack-start :c-type "lispobj *" :length #!+alpha 2 #!-alpha 1)
   #!+sb-thread
   (os-attr :c-type "pthread_attr_t *" :length #!+alpha 2 #!-alpha 1)
   #!+sb-thread
@@ -417,10 +430,6 @@
   (control-stack-start :c-type "lispobj *" :length #!+alpha 2 #!-alpha 1)
   (control-stack-end :c-type "lispobj *" :length #!+alpha 2 #!-alpha 1)
   (control-stack-guard-page-protected)
-  ;; TODO: Placing these adjacent to binding-stack would make them addressable
-  ;;       with a 1-byte displacement on x86-64.
-  (alien-stack-start :c-type "lispobj *" :length #!+alpha 2 #!-alpha 1)
-  (alien-stack-pointer :c-type "lispobj *" :length #!+alpha 2 #!-alpha 1)
   #!+win32 (private-events :c-type "struct private_events" :length 2)
   (this :c-type "struct thread *" :length #!+alpha 2 #!-alpha 1)
   (prev :c-type "struct thread *" :length #!+alpha 2 #!-alpha 1)

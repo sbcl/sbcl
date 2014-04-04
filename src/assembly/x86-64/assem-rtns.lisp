@@ -292,9 +292,7 @@
   (move block uwp)
   ;; Set next unwind protect context.
   (loadw uwp uwp unwind-block-current-uwp-slot)
-  ;; we're about to reload ebp anyway, so let's borrow it here as a
-  ;; temporary.  Hope this works
-  (store-tl-symbol-value uwp *current-unwind-protect-block* rbp-tn)
+  (store-tl-symbol-value uwp *current-unwind-protect-block*)
 
   DO-EXIT
 

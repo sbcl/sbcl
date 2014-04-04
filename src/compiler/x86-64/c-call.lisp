@@ -346,63 +346,25 @@
       (let ((delta (logandc2 (+ amount 7) 7)))
         (inst add rsp-tn delta)))))
 
-(define-vop (alloc-alien-stack-space)
-  (:info amount)
-  #!+sb-thread (:temporary (:sc unsigned-reg) temp)
-  (:results (result :scs (sap-reg any-reg)))
-  (:result-types system-area-pointer)
-  #!+sb-thread
-  (:generator 0
-    (aver (not (location= result rsp-tn)))
-    (unless (zerop amount)
-      (let ((delta (logandc2 (+ amount 7) 7)))
-        (inst mov temp
-              (make-ea :qword
-                       :disp (+ nil-value
-                                (static-symbol-offset '*alien-stack-pointer*)
-                                (ash symbol-tls-index-slot word-shift)
-                                (- other-pointer-lowtag))))
-        (inst sub (make-ea :qword :base thread-base-tn
-                           :scale 1 :index temp) delta)))
-    (load-tl-symbol-value result *alien-stack-pointer*))
-  #!-sb-thread
-  (:generator 0
-    (aver (not (location= result rsp-tn)))
-    (unless (zerop amount)
-      (let ((delta (logandc2 (+ amount 7) 7)))
-        (inst sub (make-ea :qword
-                           :disp (+ nil-value
-                                    (static-symbol-offset '*alien-stack-pointer*)
-                                    (ash symbol-value-slot word-shift)
-                                    (- other-pointer-lowtag)))
-              delta)))
-    (load-symbol-value result *alien-stack-pointer*)))
-
-(define-vop (dealloc-alien-stack-space)
-  (:info amount)
-  #!+sb-thread (:temporary (:sc unsigned-reg) temp)
-  #!+sb-thread
-  (:generator 0
-    (unless (zerop amount)
-      (let ((delta (logandc2 (+ amount 7) 7)))
-        (inst mov temp
-              (make-ea :qword
-                       :disp (+ nil-value
-                                (static-symbol-offset '*alien-stack-pointer*)
-                                (ash symbol-tls-index-slot word-shift)
-                                (- other-pointer-lowtag))))
-        (inst add (make-ea :qword :base thread-base-tn :scale 1 :index temp)
-              delta))))
-  #!-sb-thread
-  (:generator 0
-    (unless (zerop amount)
-      (let ((delta (logandc2 (+ amount 7) 7)))
-        (inst add (make-ea :qword
-                           :disp (+ nil-value
-                                    (static-symbol-offset '*alien-stack-pointer*)
-                                    (ash symbol-value-slot word-shift)
-                                    (- other-pointer-lowtag)))
-              delta)))))
+(macrolet ((alien-stack-ptr ()
+             #!+sb-thread '(symbol-known-tls-cell '*alien-stack-pointer*)
+             #!-sb-thread '(static-symbol-value-ea '*alien-stack-pointer*)))
+  (define-vop (alloc-alien-stack-space)
+    (:info amount)
+    (:results (result :scs (sap-reg any-reg)))
+    (:result-types system-area-pointer)
+    (:generator 0
+      (aver (not (location= result rsp-tn)))
+      (unless (zerop amount)
+        (let ((delta (logandc2 (+ amount 7) 7)))
+          (inst sub (alien-stack-ptr) delta)))
+      (inst mov result (alien-stack-ptr))))
+  (define-vop (dealloc-alien-stack-space)
+    (:info amount)
+    (:generator 0
+      (unless (zerop amount)
+        (let ((delta (logandc2 (+ amount 7) 7)))
+          (inst add (alien-stack-ptr) delta))))))
 
 ;;; not strictly part of the c-call convention, but needed for the
 ;;; WITH-PINNED-OBJECTS macro used for "locking down" lisp objects so

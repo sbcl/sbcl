@@ -88,46 +88,62 @@
 (defmacro store-symbol-value (reg symbol)
   `(inst mov (make-ea-for-symbol-value ,symbol) ,reg))
 
-#!+sb-thread
-(defmacro make-ea-for-symbol-tls-index (symbol)
-  `(make-ea :qword
-    :disp (+ nil-value
-           (static-symbol-offset ',symbol)
-           (ash symbol-tls-index-slot word-shift)
-           (- other-pointer-lowtag))))
+;; Return the effective address of the value slot of static SYMBOL.
+#!-sb-thread
+(defun static-symbol-value-ea (symbol)
+   (make-ea :qword
+            :disp (+ nil-value
+                     (static-symbol-offset symbol)
+                     (ash symbol-value-slot word-shift)
+                     (- other-pointer-lowtag))))
 
 #!+sb-thread
-(defmacro load-tl-symbol-value (reg symbol)
-  `(progn
-    (inst mov ,reg (make-ea-for-symbol-tls-index ,symbol))
-    (inst mov ,reg (make-ea :qword :base thread-base-tn :scale 1 :index ,reg))))
-#!-sb-thread
-(defmacro load-tl-symbol-value (reg symbol) `(load-symbol-value ,reg ,symbol))
+(progn
+  ;; Return the index of SYMBOL in thread-local storage.
+  ;; SYMBOL must map directly onto one the slots of a thread as defined
+  ;; in generic/objdef. It does not have to be in static space.
+  ;; If SYMBOL does not have a known TLS index, return NIL.
+  (defun symbol-known-tls-index (symbol)
+    (when (looks-like-name-of-special-var-p symbol)
+      (let* ((name (symbol-name symbol))
+             (name-len-less-1 (- (length name) 1))
+             (name-len-sans-earmuffs (- (length name) 2)))
+        (awhen (find-if (lambda (slot)
+                          (let ((slot-name (symbol-name (slot-name slot))))
+                            (and (= (length slot-name) name-len-sans-earmuffs)
+                                 (string= name slot-name
+                                          :start1 1 :end1 name-len-less-1))))
+                        (primitive-object-slots
+                         (find 'thread *primitive-objects*
+                               :key #'primitive-object-name)))
+          (ash (slot-offset it) word-shift)))))
 
-#!+sb-thread
-(defmacro store-tl-symbol-value (reg symbol temp)
-  `(progn
-    (inst mov ,temp (make-ea-for-symbol-tls-index ,symbol))
-    (inst mov (make-ea :qword :base thread-base-tn :scale 1 :index ,temp) ,reg)))
+  ;; Return an EA for the TLS of SYMBOL, or die.
+  (defun symbol-known-tls-cell (symbol)
+    (let ((index (symbol-known-tls-index symbol)))
+      (aver index)
+      (make-ea :qword :base thread-base-tn :disp index)))
+
+  (defmacro load-tl-symbol-value (reg symbol)
+    `(inst mov ,reg (symbol-known-tls-cell ',symbol)))
+
+  (defmacro store-tl-symbol-value (reg symbol)
+    `(inst mov (symbol-known-tls-cell ',symbol) ,reg)))
+
 #!-sb-thread
-(defmacro store-tl-symbol-value (reg symbol temp)
-  (declare (ignore temp))
-  `(store-symbol-value ,reg ,symbol))
+(progn
+  (defmacro load-tl-symbol-value (reg symbol)
+    `(load-symbol-value ,reg ,symbol))
+  (defmacro store-tl-symbol-value (reg symbol)
+    `(store-symbol-value ,reg ,symbol)))
 
 (defmacro load-binding-stack-pointer (reg)
-  #!+sb-thread
-  `(inst mov ,reg (make-ea :qword :base thread-base-tn
-                   :disp (* n-word-bytes thread-binding-stack-pointer-slot)))
-  #!-sb-thread
-  `(load-symbol-value ,reg *binding-stack-pointer*))
+  #!+sb-thread `(inst mov ,reg (symbol-known-tls-cell '*binding-stack-pointer*))
+  #!-sb-thread `(load-symbol-value ,reg *binding-stack-pointer*))
 
 (defmacro store-binding-stack-pointer (reg)
-  #!+sb-thread
-  `(inst mov (make-ea :qword :base thread-base-tn
-              :disp (* n-word-bytes thread-binding-stack-pointer-slot))
-    ,reg)
-  #!-sb-thread
-  `(store-symbol-value ,reg *binding-stack-pointer*))
+  #!+sb-thread `(inst mov (symbol-known-tls-cell '*binding-stack-pointer*) ,reg)
+  #!-sb-thread `(store-symbol-value ,reg *binding-stack-pointer*))
 
 (defmacro load-type (target source &optional (offset 0))
   #!+sb-doc
