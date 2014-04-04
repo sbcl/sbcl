@@ -737,7 +737,7 @@ create_thread_struct(lispobj initial_function) {
     SetSymbolValue(CONTROL_STACK_START,(lispobj)th->control_stack_start,th);
     SetSymbolValue(CONTROL_STACK_END,(lispobj)th->control_stack_end,th);
 #if defined(LISP_FEATURE_X86) || defined (LISP_FEATURE_X86_64)
-    SetSymbolValue(ALIEN_STACK,(lispobj)th->alien_stack_pointer,th);
+    SetSymbolValue(ALIEN_STACK_POINTER,(lispobj)th->alien_stack_pointer,th);
     SetSymbolValue(PSEUDO_ATOMIC_BITS,(lispobj)th->pseudo_atomic_bits,th);
 #endif
 #endif
