@@ -832,7 +832,7 @@ core and return a descriptor to it."
   (let ((ht (make-hash-table :test #'equal)))
     (dolist (slot (sb!vm::primitive-object-slots
                     (find 'sb!vm::thread sb!vm:*primitive-objects*
-                          :key #'sb!vm::primitive-object-name)) ht)
+                          :key #'sb!vm:primitive-object-name)) ht)
       ;; It sure seems like *STEPPING* is supposed to be tied to a thread slot
       ;; because x86-64 code goes to some trouble to use the thread slot instead
       ;; of *STEPPING* whereas x86 uses *STEPPING* instead of the slot.
@@ -1279,9 +1279,9 @@ core and return a descriptor to it."
 ;; indices. I didn't want to break too much at once though.
 (defvar *genesis-tls-counter*
   (+ 1 sb!vm::max-interrupts
-     (sb!vm::primitive-object-size
+     (sb!vm:primitive-object-size
       (find 'sb!vm::thread sb!vm:*primitive-objects*
-            :key #'sb!vm::primitive-object-name))))
+            :key #'sb!vm:primitive-object-name))))
 
 #!+sb-thread
 ;; Assign SYMBOL a tls-index and write it into the target core.
