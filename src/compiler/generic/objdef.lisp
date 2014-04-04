@@ -400,7 +400,7 @@
   ;; near the beginning of the structure so that x86[-64] assembly code
   ;; can use single-byte displacements from thread-base-tn.
   ;; Doing so reduces code size for allocation sequences and special variable
-  ;; manipulations by fixing their TLS offsets to be < 2^8, the largest
+  ;; manipulations by fixing their TLS offsets to be < 2^7, the largest
   ;; aligned displacement fitting in a signed byte.
   #!+gencgc (alloc-region :c-type "struct alloc_region" :length 5)
   #!+(or x86 x86-64 sb-thread) (pseudo-atomic-bits)
