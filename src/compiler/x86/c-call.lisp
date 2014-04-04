@@ -389,24 +389,6 @@
               delta)))
     (load-symbol-value result *alien-stack-pointer*)))
 
-(define-vop (dealloc-alien-stack-space)
-  (:info amount)
-  #!+sb-thread (:temporary (:sc unsigned-reg) temp)
-  #!+sb-thread
-  (:generator 0
-    (unless (zerop amount)
-      (let ((delta (logandc2 (+ amount 3) 3)))
-        (with-tls-ea (EA :base temp
-                         :disp-type :index
-                         :disp (make-ea-for-symbol-tls-index *alien-stack-pointer*))
-          (inst add EA delta :maybe-fs)))))
-  #!-sb-thread
-  (:generator 0
-    (unless (zerop amount)
-      (let ((delta (logandc2 (+ amount 3) 3)))
-        (inst add (make-ea-for-symbol-value *alien-stack-pointer*)
-              delta)))))
-
 ;;; not strictly part of the c-call convention, but needed for the
 ;;; WITH-PINNED-OBJECTS macro used for "locking down" lisp objects so
 ;;; that GC won't move them while foreign functions go to work.

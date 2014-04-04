@@ -358,13 +358,7 @@
       (unless (zerop amount)
         (let ((delta (logandc2 (+ amount 7) 7)))
           (inst sub (alien-stack-ptr) delta)))
-      (inst mov result (alien-stack-ptr))))
-  (define-vop (dealloc-alien-stack-space)
-    (:info amount)
-    (:generator 0
-      (unless (zerop amount)
-        (let ((delta (logandc2 (+ amount 7) 7)))
-          (inst add (alien-stack-ptr) delta))))))
+      (inst mov result (alien-stack-ptr)))))
 
 ;;; not strictly part of the c-call convention, but needed for the
 ;;; WITH-PINNED-OBJECTS macro used for "locking down" lisp objects so

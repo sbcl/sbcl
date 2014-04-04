@@ -429,15 +429,15 @@
         `(%sap-alien var ',(make-alien-pointer-type :to alien-type))
         (error "This shouldn't happen."))))
 
+;; DISPOSE-LOCAL-ALIEN can't happens on x86[-64].
+;; A transform of it is just misdirection.
+#!-(or x86 x86-64)
 (deftransform dispose-local-alien ((info var) * * :important t)
   (alien-info-constant-or-abort info)
   (let* ((info (lvar-value info))
          (alien-type (local-alien-info-type info)))
     (if (local-alien-info-force-to-memory-p info)
-      #!+(or x86 x86-64) `(%primitive dealloc-alien-stack-space
-                          ,(ceiling (alien-type-bits alien-type)
-                                    sb!vm:n-byte-bits))
-      #!-(or x86 x86-64) `(%primitive dealloc-number-stack-space
+        `(%primitive dealloc-number-stack-space
                           ,(ceiling (alien-type-bits alien-type)
                                     sb!vm:n-byte-bits))
       nil)))

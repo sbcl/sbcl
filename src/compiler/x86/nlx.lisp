@@ -31,7 +31,7 @@
 ;;;;
 ;;;; These VOPs are used in the reentered function to restore the
 ;;;; appropriate dynamic environment. Currently we only save the
-;;;; Current-Catch and the alien stack pointer. (Before sbcl-0.7.0,
+;;;; Current-Catch. (Before sbcl-0.7.0,
 ;;;; when there were IR1 and byte interpreters, we had to save
 ;;;; the interpreter "eval stack" too.)
 ;;;;
@@ -41,19 +41,15 @@
 ;;;; We don't need to save the BSP, because that is handled automatically.
 
 (define-vop (save-dynamic-state)
-  (:results (catch :scs (descriptor-reg))
-            (alien-stack :scs (descriptor-reg)))
+  (:results (catch :scs (descriptor-reg)))
   (:generator 13
-    (load-tl-symbol-value catch *current-catch-block*)
-    (load-tl-symbol-value alien-stack *alien-stack-pointer*)))
+    (load-tl-symbol-value catch *current-catch-block*)))
 
 (define-vop (restore-dynamic-state)
-  (:args (catch :scs (descriptor-reg))
-         (alien-stack :scs (descriptor-reg)))
+  (:args (catch :scs (descriptor-reg)))
   #!+sb-thread (:temporary (:sc unsigned-reg) temp)
   (:generator 10
-    (store-tl-symbol-value catch *current-catch-block* temp)
-    (store-tl-symbol-value alien-stack *alien-stack-pointer* temp)))
+    (store-tl-symbol-value catch *current-catch-block* temp)))
 
 (define-vop (current-stack-pointer)
   (:results (res :scs (any-reg control-stack)))
