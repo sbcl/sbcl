@@ -1767,20 +1767,24 @@ assume that unknown code can safely be terminated using TERMINATE-THREAD."
 
   ;; Get values from the TLS area of the current thread.
   (defun %thread-local-references ()
-    (without-gcing
-      (let ((sap (%thread-sap *current-thread*)))
-        (loop for index from tls-index-start
-                below (symbol-value 'sb!vm::*free-tls-index*)
-              for value = (sap-ref-word sap (* sb!vm:n-word-bytes index))
-              for (obj ok) = (multiple-value-list (make-lisp-obj value nil))
-              unless (or (not ok)
-                         (typep obj '(or fixnum character))
-                         (member value
-                                 '(#.sb!vm:no-tls-value-marker-widetag
-                                   #.sb!vm:unbound-marker-widetag))
-                         (member obj seen :test #'eq))
-                collect obj into seen
-              finally (return seen))))))
+    ;; TLS-INDEX-START is a word number relative to thread base.
+    ;; *FREE-TLS-INDEX* - which should only be read by machine code  - is an
+    ;; offset from thread base to the next usable TLS cell as a raw word
+    ;; manifesting in Lisp as a fixnum. Convert it from byte number to word
+    ;; number before using it as the upper bound for the sequential scan.
+    (declare (special sb!vm::*free-tls-index*))
+    (loop for index from tls-index-start
+          below (ash (get-lisp-obj-address sb!vm::*free-tls-index*)
+                     (- sb!vm:word-shift))
+          for obj = (sb!kernel:%make-lisp-obj
+                     (sb!sys:sap-int (sb!vm::current-thread-offset-sap index)))
+          unless (or (member (widetag-of obj)
+                             `(,sb!vm:no-tls-value-marker-widetag
+                               ,sb!vm:unbound-marker-widetag))
+                     (typep obj '(or fixnum character))
+                     (memq obj seen))
+          collect obj into seen
+          finally (return seen))))
 
 (defun symbol-value-in-thread (symbol thread &optional (errorp t))
   "Return the local value of SYMBOL in THREAD, and a secondary value of T

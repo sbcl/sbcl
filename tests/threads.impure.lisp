@@ -893,6 +893,27 @@
            (sleep 4))
       (mapc #'sb-thread:terminate-thread threads))))
 
+(with-test (:name :test-%thread-local-references)
+  (let ((mysym (gensym))
+        (fool1 (cons 1 2))
+        (fool2 (cons 2 3)))
+    (progv (list mysym) '(nil)
+      (let* ((i (get-lisp-obj-address (sb-vm:symbol-tls-index mysym)))
+             (j (+ i sb-vm:n-word-bytes)))
+        (assert (eql (sap-ref-word (current-thread-sap) j)
+                     sb-vm:no-tls-value-marker-widetag))
+        (setf (sap-ref-lispobj (current-thread-sap) i) fool1
+              (sap-ref-lispobj (current-thread-sap) j) fool2)
+        ;; assert that my pointer arithmetic worked as expected
+        (assert (eq (symbol-value mysym) fool1))
+        ;; assert that FOOL1 is found by the TLS scan and that FOOL2 is not.
+        (let ((list (%thread-local-references)))
+          (assert (memq fool1 list))
+          (assert (not (memq fool2 list))))
+        ;; repair the TLS entry that was corrupted by the test
+        (setf (sap-ref-word (current-thread-sap) j)
+              sb-vm:no-tls-value-marker-widetag)))))
+
 (format t "~&binding test done~%")
 
 ;;; HASH TABLES
