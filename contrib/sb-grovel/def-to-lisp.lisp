@@ -210,7 +210,7 @@ code:
                       '("-D_LARGEFILE_SOURCE"
                         "-D_LARGEFILE64_SOURCE"
                         "-D_FILE_OFFSET_BITS=64")
-                      #+(and (or x86 ppc) linux) '("-m32")
+                      #+(and (or x86 ppc) (or linux freebsd)) '("-m32")
                       #+(and x86-64 darwin inode64)
                       '("-arch" "x86_64"
                         "-mmacosx-version-min=10.5"

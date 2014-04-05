@@ -17,7 +17,7 @@ ASSEM_SRC += ldso-stubs.S
 # worked fine for most things, but LOAD-FOREIGN & friends require
 # dlopen() etc., which in turn depend on dynamic linking of the
 # runtime.
-LINKFLAGS += -dynamic -Wl,--export-dynamic
+LINKFLAGS += -dynamic -Wl,--export-dynamic -m32
 
 OS_LIBS += -lutil
 
@@ -27,4 +27,4 @@ ifdef LISP_FEATURE_SB_THREAD
   OS_LIBS += -lthr
 endif
 
-CFLAGS += -fno-omit-frame-pointer
+CFLAGS += -fno-omit-frame-pointer -m32
