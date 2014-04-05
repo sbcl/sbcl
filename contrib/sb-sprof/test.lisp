@@ -24,7 +24,11 @@
 (defun consing-test ()
   ;; 0.0001 chosen so that it breaks rather reliably when sprof does not
   ;; respect pseudo atomic.
-  (sb-sprof:with-profiling (:reset t :sample-interval 0.0001 :report :graph :loop nil)
+  (sb-sprof:with-profiling (:reset t
+                            ;; setitimer with small intervals
+                            ;; is broken on FreeBSD 10.0
+                            #-freebsd :sample-interval #-freebsd 0.0001
+                            :report :graph :loop nil)
     (let ((target (+ (get-universal-time) 15)))
       (princ #\.)
       (force-output)
