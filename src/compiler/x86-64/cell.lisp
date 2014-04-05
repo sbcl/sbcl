@@ -962,7 +962,7 @@
 
 #|
 For lack of a better location for these comments about the manipulation
-of static symbols, note that we now have unfortunately three ways of doing it.
+of static symbols, note that we now have unfortunately two ways of doing it.
 The following code rebinds *ALIEN-STACK-POINTER* to itself,
 then subtracts 16 bytes.
 
@@ -986,16 +986,6 @@ then subtracts 16 bytes.
 ;       488908           MOV [RAX], RCX
 ;       C74008A8000000   MOV DWORD PTR [RAX+8], 168
 ;       49899424A8000000 MOV [R12+168], RDX
-
-3) Load the tls-index from its known fixed address in ALLOC-ALIEN-STACK-SPACE.
-
-;       488B0425300B1020 MOV RAX, [#x20100B30]
-;       49832C0410       SUB QWORD PTR [R12+RAX], 16
-;       488B0C25300B1020 MOV RCX, [#x20100B30]
-;       498B0C0C         MOV RCX, [R12+RCX]
-;       488D5C24F0       LEA RBX, [RSP-16]
-;       4883EC18         SUB RSP, 24
-;       49896C2440       MOV [R12+64], RBP
 
 We could benefit from additional INFO for special variables:
  - an indicator of whether to prefer that SYMBOL-VALUE use a known tls-index.

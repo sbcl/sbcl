@@ -121,21 +121,7 @@
               (sb!disassem:note
                (lambda (stream)
                  (format stream "thread.~(~A~)" (slot-name slot)))
-               dstate))))))
-    ;; One last thing to try ...
-    ;; The TLS slot of static symbols is referenced in memory absolute mode.
-    ;; [FIXME: this is of course pointless! Genesis should pick/wire the indices
-    ;; of all static symbols]
-    (when (and (not (first value)) (not (third value)) ; no base, index
-               (typep disp '(integer 0 *)) ; positive displacement
-               (<= static-space-start disp static-space-end))
-      (dolist (symbol *static-symbols*)
-        (when (= (+ (get-lisp-obj-address symbol) (- other-pointer-lowtag)
-                    (ash symbol-tls-index-slot word-shift))
-                 disp)
-          (sb!disassem:note
-           (lambda (stream) (format stream "~A.tls-index" symbol))
-           dstate))))))
+               dstate))))))))
 
 (in-package "SB!DISASSEM")
 
