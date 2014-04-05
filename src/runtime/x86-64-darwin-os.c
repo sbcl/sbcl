@@ -1,6 +1,4 @@
 #ifdef LISP_FEATURE_SB_THREAD
-#include <architecture/i386/table.h>
-#include <i386/user_ldt.h>
 #include <mach/mach_init.h>
 #endif
 

@@ -43,7 +43,6 @@
 #include <sys/time.h>
 #include <sys/stat.h>
 #include <unistd.h>
-#include <asm/ldt.h>
 #include <linux/unistd.h>
 #include <sys/mman.h>
 #include <linux/version.h>
