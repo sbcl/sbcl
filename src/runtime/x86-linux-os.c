@@ -49,10 +49,9 @@
 #define user_desc  modify_ldt_ldt_s
 #endif
 
-#define modify_ldt sbcl_modify_ldt
-static inline int modify_ldt (int func, void *ptr, unsigned long bytecount)
+static inline int modify_ldt(int func, void *ptr, unsigned long bytecount)
 {
-  return syscall (SYS_modify_ldt, func, ptr, bytecount);
+  return syscall(SYS_modify_ldt, func, ptr, bytecount);
 }
 
 #include "validate.h"

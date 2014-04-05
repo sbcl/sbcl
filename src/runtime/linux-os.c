@@ -101,10 +101,9 @@ futex_wake_op()
     return (futex_private_supported_p ? FUTEX_WAKE_PRIVATE : FUTEX_WAKE);
 }
 
-#define sys_futex sbcl_sys_futex
-static inline int sys_futex (void *futex, int op, int val, struct timespec *rel)
+static inline int sys_futex(void *futex, int op, int val, struct timespec *rel)
 {
-    return syscall (SYS_futex, futex, op, val, rel);
+    return syscall(SYS_futex, futex, op, val, rel);
 }
 
 static void
