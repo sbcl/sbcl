@@ -33,7 +33,9 @@ cd output
             (with-open-file (f "version.txt"
                                :direction :output
                                :if-exists :supersede)
-             (write-line (lisp-implementation-version) f))
+             (format f "~a-~a-windows-binary"
+                       (lisp-implementation-version)
+                       #+x86 "x86" #+x86-64 "x86-64"))
             (exit))'
 
 "$WIX_PATH/candle" sbcl.wxs
