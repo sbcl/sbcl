@@ -1220,39 +1220,6 @@
 
 (format t "mutex finalization test done~%")
 
-;;; Check that INFO is thread-safe, at least when we're just doing reads.
-
-(let* ((symbols (loop repeat 10000 collect (gensym)))
-       (functions (loop for (symbol . rest) on symbols
-                        for next = (car rest)
-                        for fun = (let ((next next))
-                                    (lambda (n)
-                                      (if next
-                                          (funcall next (1- n))
-                                          n)))
-                        do (setf (symbol-function symbol) fun)
-                        collect fun)))
-  (defun infodb-test ()
-    (funcall (car functions) 9999)))
-
-(with-test (:name (:infodb :read))
-  (let* ((ok t)
-         (threads (loop for i from 0 to 10
-                        collect (sb-thread:make-thread
-                                 (lambda ()
-                                   (dotimes (j 100)
-                                     (write-char #\-)
-                                     (finish-output)
-                                     (let ((n (infodb-test)))
-                                       (unless (zerop n)
-                                         (setf ok nil)
-                                         (format t "N != 0 (~A)~%" n)
-                                         (abort-thread)))))))))
-    (wait-for-threads threads)
-    (assert ok)))
-
-(format t "infodb test done~%")
-
 (with-test (:name :backtrace)
   ;; Printing backtraces from several threads at once used to hang the
   ;; whole SBCL process (discovered by accident due to a timer.impure
