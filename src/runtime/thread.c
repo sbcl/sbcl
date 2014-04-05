@@ -628,34 +628,6 @@ create_thread_struct(lispobj initial_function) {
 #ifdef LISP_FEATURE_SB_THREAD
     for(i = 0; i < (dynamic_values_bytes / sizeof(lispobj)); i++)
         per_thread->dynamic_values[i] = NO_TLS_VALUE_MARKER_WIDETAG;
-    if (all_threads == 0) {
-      /* FIXME: Should nobody find it necessary to start a slightly older core
-         than expected by the C runtime (a core in which Lisp did not perform
-         these initializations) we can remove everything in this 'if' block */
-        if(SymbolValue(FREE_TLS_INDEX,0)==UNBOUND_MARKER_WIDETAG) {
-            SetSymbolValue(FREE_TLS_INDEX,tls_index_start << WORD_SHIFT,0);
-            SetSymbolValue(TLS_INDEX_LOCK,make_fixnum(0),0);
-        }
-#define STATIC_TLS_INIT(sym,field) \
-        if (SYMBOL(sym)->tls_index != (THREAD_SLOT_OFFSET_WORDS(field) << WORD_SHIFT)) { \
-          if (SYMBOL(sym)->tls_index == 0) \
-            SYMBOL(sym)->tls_index = (THREAD_SLOT_OFFSET_WORDS(field) << WORD_SHIFT); \
-          else lose(#sym " TLS index is wrong"); }
-
-        STATIC_TLS_INIT(BINDING_STACK_START,binding_stack_start);
-#ifdef BINDING_STACK_POINTER
-        STATIC_TLS_INIT(BINDING_STACK_POINTER,binding_stack_pointer);
-#endif
-        STATIC_TLS_INIT(CONTROL_STACK_START,control_stack_start);
-        STATIC_TLS_INIT(CONTROL_STACK_END,control_stack_end);
-#ifdef ALIEN_STACK_POINTER
-        STATIC_TLS_INIT(ALIEN_STACK_POINTER,alien_stack_pointer);
-#endif
-#if defined(LISP_FEATURE_X86) || defined (LISP_FEATURE_X86_64)
-        STATIC_TLS_INIT(PSEUDO_ATOMIC_BITS,pseudo_atomic_bits);
-#endif
-#undef STATIC_TLS_INIT
-    }
 #endif
 
     th=&per_thread->thread;

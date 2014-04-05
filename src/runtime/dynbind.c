@@ -27,6 +27,9 @@
 #include "genesis/binding.h"
 #include "genesis/static-symbols.h"
 
+/* Specially bind SYMBOL to VALUE. In a multithreaded build, SYMBOL must already
+   have been assigned a thread-local storage index. See *KNOWN-TLS-SYMBOLS* in
+   compiler/generic/genesis for the symbols whose indices are pre-assigned. */
 void bind_variable(lispobj symbol, lispobj value, void *th)
 {
     struct binding *binding;
@@ -36,25 +39,10 @@ void bind_variable(lispobj symbol, lispobj value, void *th)
 #ifdef LISP_FEATURE_SB_THREAD
     {
         struct symbol *sym=(struct symbol *)native_pointer(symbol);
-        if(!sym->tls_index) {
-            lispobj *tls_index_lock=
-                &((struct symbol *)native_pointer(TLS_INDEX_LOCK))->value;
-            FSHOW_SIGNAL((stderr, "entering dynbind tls alloc\n"));
-            set_pseudo_atomic_atomic(thread);
-            get_spinlock(tls_index_lock,(uword_t)th);
-            if(!sym->tls_index) {
-                sym->tls_index=SymbolValue(FREE_TLS_INDEX,0);
-                SetSymbolValue(FREE_TLS_INDEX, sym->tls_index+N_WORD_BYTES, 0);
-                if((sym->tls_index)>=(TLS_SIZE << WORD_SHIFT)) {
-                    lose("Thread local storage exhausted.");
-                }
-            }
-            release_spinlock(tls_index_lock);
-            FSHOW_SIGNAL((stderr, "exiting dynbind tls alloc\n"));
-            clear_pseudo_atomic_atomic(thread);
-            if (get_pseudo_atomic_interrupted(thread))
-                do_pending_interrupt();
-        }
+        // We could provide a c-callable static Lisp function to assign TLS
+        // indices if anyone really needs dynamic binding of dynamic symbols.
+        if(!sym->tls_index)
+            lose("Oops! Static symbol missing from *KNOWN-TLS-SYMBOLS*");
         binding->symbol = sym->tls_index;
         binding->value = SymbolTlValue(symbol, thread);
     }

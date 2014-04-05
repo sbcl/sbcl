@@ -825,11 +825,57 @@ core and return a descriptor to it."
 
 ;;;; symbol magic
 
-;; A table of special variable names mapped onto 'struct thread'.
-;; All symbols other than these will get their TLS indices assigned
+;; Simulate *FREE-TLS-INDEX*. This is a count, not a displacement.
+;; In C, sizeof counts 1 word for the variable-length interrupt_contexts[]
+;; but primitive-object-size counts 0, so add 1, though in fact the C code
+;; implies that it might have overcounted by 1. We could make this agnostic
+;; of MAX-INTERRUPTS by moving the thread base register up by TLS-SIZE words,
+;; using negative offsets for all dynamically assigned indices.
+(defvar *genesis-tls-counter*
+  (+ 1 sb!vm::max-interrupts
+     (sb!vm:primitive-object-size
+      (find 'sb!vm::thread sb!vm:*primitive-objects*
+            :key #'sb!vm:primitive-object-name))))
+
+#!+sb-thread
+;; Assign SYMBOL a tls-index and write it into the target core.
+(defun ensure-symbol-tls-index (symbol)
+  (let* ((cold-sym (cold-intern symbol))
+         (tls-index (read-wordindexed cold-sym sb!vm:symbol-tls-index-slot)))
+    (unless (plusp (descriptor-bits tls-index))
+      (let ((next (prog1 *genesis-tls-counter* (incf *genesis-tls-counter*))))
+        (setq tls-index (make-random-descriptor (ash next sb!vm:word-shift)))
+        (write-wordindexed cold-sym sb!vm:symbol-tls-index-slot tls-index)))
+    (descriptor-bits tls-index)))
+
+;; A table of special variable names (as strings) which get known TLS indices.
+;; Some of them are mapped onto 'struct thread' and have pre-determined offsets.
+;; Others are static symbols used with bind_variable() in the C runtime,
+;; and might not, in the absence of this table, get an index assigned by genesis
+;; depending on whether the cross-compiler used the BIND vop on them.
+;; Indices for those static symbols can be chosen arbitrarily, which is to say
+;; the value doesn't matter but must update the tls-counter correctly.
+;; All symbols other than the ones in this table get the indices assigned
 ;; by the fasloader on demand.
-(defvar *thread-slots-as-specials*
+(defvar *known-tls-symbols*
   (let ((ht (make-hash-table :test #'equal)))
+    ;; FIXME: no mechanism exists to determine which static symbols C code will
+    ;; dynamically bind. TLS is a finite resource, and wasting indices for all
+    ;; static symbols isn't the best idea. This list was hand-made with 'grep'.
+    (dolist (name '("*ALLOC-SIGNAL*"
+                    "*ALLOW-WITH-INTERRUPTS*"
+                    "*CURRENT-CATCH-BLOCK*" "*CURRENT-UNWIND-PROTECT-BLOCK*"
+                    "*FREE-INTERRUPT-CONTEXT-INDEX*"
+                    "*GC-INHIBIT*" "*GC-PENDING*" "*GC-SAFE*"
+                    "*IN-SAFEPOINT*"
+                    "*INTERRUPT-PENDING*" "*INTERRUPTS-ENABLED*"
+                    "*PINNED-OBJECTS*"
+                    "*RESTART-CLUSTERS*"
+                    "*STOP-FOR-GC-PENDING*"
+                    "*THRUPTION-PENDING*"))
+      (setf (gethash name ht) :assign))
+    ;; These take precedence over the above. e.g. -CATCH-BLOCK- on x86[-64]
+    ;; is a slot that gets a low fixed index, not a variable index.
     (dolist (slot (sb!vm::primitive-object-slots
                     (find 'sb!vm::thread sb!vm:*primitive-objects*
                           :key #'sb!vm:primitive-object-name)) ht)
@@ -840,9 +886,8 @@ core and return a descriptor to it."
       ;; exactly like the code in 'thread.c' didn't do.
       (let ((slot-name (sb!vm::slot-name slot)))
         (unless (string= slot-name "STEPPING")
-          (let ((sym (concatenate 'string "*" (string slot-name) "*")))
-            (setf (gethash sym ht)
-                  (ash (sb!vm::slot-offset slot) sb!vm:word-shift))))))))
+          (setf (gethash (concatenate 'string "*" (string slot-name) "*") ht)
+                (sb!vm::slot-offset slot)))))))
 
 ;;; Allocate (and initialize) a symbol.
 (defun allocate-symbol (name &key (gspace *dynamic*))
@@ -860,9 +905,11 @@ core and return a descriptor to it."
                        (base-string-to-core name *dynamic*))
     (write-wordindexed symbol sb!vm:symbol-package-slot *nil-descriptor*)
     #!+sb-thread
-    (awhen (gethash name *thread-slots-as-specials*)
+    (awhen (gethash name *known-tls-symbols*)
+      (if (eq it :assign)
+          (setq it (prog1 *genesis-tls-counter* (incf *genesis-tls-counter*))))
       (write-wordindexed symbol sb!vm:symbol-tls-index-slot
-                         (make-random-descriptor it)))
+                         (make-random-descriptor (ash it sb!vm:word-shift))))
     symbol))
 
 ;;; Set the cold symbol value of SYMBOL-OR-SYMBOL-DES, which can be either a
@@ -1269,30 +1316,6 @@ core and return a descriptor to it."
     (dolist (layout layouts result)
       (cold-push (cold-cons (cold-intern (car layout)) (cdr layout))
                  result))))
-
-;; Simulate *FREE-TLS-INDEX*. This is a count, not a displacement.
-;; In C, sizeof counts 1 word for the variable-length interrupt_contexts[]
-;; but primitive-object-size counts 0, so add 1, though in fact the C code
-;; implies that it might have overcounted by 1. Hmm. Also: we could make
-;; this agnostic of MAX-INTERRUPTS by moving the thread base register up
-;; by TLS-SIZE words and using negative offsets for all dynamically assigned
-;; indices. I didn't want to break too much at once though.
-(defvar *genesis-tls-counter*
-  (+ 1 sb!vm::max-interrupts
-     (sb!vm:primitive-object-size
-      (find 'sb!vm::thread sb!vm:*primitive-objects*
-            :key #'sb!vm:primitive-object-name))))
-
-#!+sb-thread
-;; Assign SYMBOL a tls-index and write it into the target core.
-(defun ensure-symbol-tls-index (symbol)
-  (let* ((cold-sym (cold-intern symbol))
-         (tls-index (read-wordindexed cold-sym sb!vm:symbol-tls-index-slot)))
-    (unless (plusp (descriptor-bits tls-index))
-      (let ((next (prog1 *genesis-tls-counter* (incf *genesis-tls-counter*))))
-        (setq tls-index (make-random-descriptor (ash next sb!vm:word-shift)))
-        (write-wordindexed cold-sym sb!vm:symbol-tls-index-slot tls-index)))
-    (descriptor-bits tls-index)))
 
 ;;; Establish initial values for magic symbols.
 ;;;
