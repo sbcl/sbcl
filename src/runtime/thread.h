@@ -138,16 +138,19 @@ extern int dynamic_values_bytes;
 #ifndef LISP_FEATURE_SB_THREAD
 /* no threads: every symbol's tls_index is statically zero */
 #  define tls_index_of(x) 0
+#  define per_thread_value(sym, thread) sym->value
 #else
 #ifdef LISP_FEATURE_X86_64
 static inline int
-tls_index_of(lispobj obj) // untagged pointer
+tls_index_of(struct symbol *symbol) // untagged pointer
 {
-  return *(lispobj*)obj >> 32;
+  return symbol->header >> 32;
 }
 #else
 #  define tls_index_of(x) (x->tls_index)
 #endif
+#define per_thread_value(sym,th) \
+  ((union per_thread_data *)th)->dynamic_values[tls_index_of(sym)>>WORD_SHIFT]
 #endif
 
 static inline lispobj *
@@ -155,8 +158,7 @@ SymbolValueAddress(u64 tagged_symbol_pointer, void *thread)
 {
     struct symbol *sym= SYMBOL(tagged_symbol_pointer);
     if(thread && tls_index_of(sym)) {
-        lispobj *r = &(((union per_thread_data *)thread)
-                       ->dynamic_values[tls_index_of(sym) >> WORD_SHIFT]);
+        lispobj *r = &per_thread_value(sym, thread);
         if((*r)!=NO_TLS_VALUE_MARKER_WIDETAG) return r;
     }
     return &sym->value;
@@ -167,24 +169,10 @@ SymbolValue(u64 tagged_symbol_pointer, void *thread)
 {
     struct symbol *sym= SYMBOL(tagged_symbol_pointer);
     if(thread && tls_index_of(sym)) {
-        lispobj r=
-            ((union per_thread_data *)thread)
-            ->dynamic_values[tls_index_of(sym) >> WORD_SHIFT];
+        lispobj r = per_thread_value(sym, thread);
         if(r!=NO_TLS_VALUE_MARKER_WIDETAG) return r;
     }
     return sym->value;
-}
-
-static inline lispobj
-SymbolTlValue(u64 tagged_symbol_pointer, void *thread)
-{
-    struct symbol *sym= SYMBOL(tagged_symbol_pointer);
-#ifdef LISP_FEATURE_SB_THREAD
-    return ((union per_thread_data *)thread)
-        ->dynamic_values[tls_index_of(sym) >> WORD_SHIFT];
-#else
-    return sym->value;
-#endif
 }
 
 static inline void
@@ -192,26 +180,27 @@ SetSymbolValue(u64 tagged_symbol_pointer,lispobj val, void *thread)
 {
     struct symbol *sym= SYMBOL(tagged_symbol_pointer);
     if(thread && tls_index_of(sym)) {
-        lispobj *pr= &(((union per_thread_data *)thread)
-                       ->dynamic_values[tls_index_of(sym) >> WORD_SHIFT]);
-        if(*pr!=NO_TLS_VALUE_MARKER_WIDETAG) {
-            *pr=val;
+        if (per_thread_value(sym, thread) != NO_TLS_VALUE_MARKER_WIDETAG) {
+            per_thread_value(sym, thread) = val;
             return;
         }
     }
     sym->value = val;
 }
 
+static inline lispobj
+SymbolTlValue(u64 tagged_symbol_pointer, void *thread)
+{
+    struct symbol *sym= SYMBOL(tagged_symbol_pointer);
+    return per_thread_value(sym, thread);
+}
+
 static inline void
 SetTlSymbolValue(u64 tagged_symbol_pointer,lispobj val, void *thread)
 {
-#ifdef LISP_FEATURE_SB_THREAD
     struct symbol *sym= SYMBOL(tagged_symbol_pointer);
-    ((union per_thread_data *)thread)
-        ->dynamic_values[tls_index_of(sym) >> WORD_SHIFT] = val;
-#else
-    SetSymbolValue(tagged_symbol_pointer,val,thread) ;
-#endif
+    // dynbind asserts that there is a tls_index in multithread runtime
+    per_thread_value(sym, thread) = val;
 }
 
 /* This only works for static symbols. */
