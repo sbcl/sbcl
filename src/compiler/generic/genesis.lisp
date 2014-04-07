@@ -837,16 +837,32 @@ core and return a descriptor to it."
       (find 'sb!vm::thread sb!vm:*primitive-objects*
             :key #'sb!vm:primitive-object-name))))
 
-#!+sb-thread
-;; Assign SYMBOL a tls-index and write it into the target core.
+;; Assign SYMBOL the tls-index INDEX. SYMBOL must be a descriptor.
+;; This is a backend support routine, but the style within this file
+;; is to conditionalize by the target features.
+(defun cold-assign-tls-index (symbol index)
+  #!+x86-64
+  (let ((header-word
+         (logior (ash index 32) (descriptor-bits (read-wordindexed symbol 0)))))
+    (write-wordindexed symbol 0 (make-random-descriptor header-word)))
+  #!-x86-64
+  (write-wordindexed symbol sb!vm:symbol-tls-index-slot
+                     (make-random-descriptor index)))
+
+;; Return SYMBOL's tls-index, choosing a new index if it doesn't have one yet.
 (defun ensure-symbol-tls-index (symbol)
   (let* ((cold-sym (cold-intern symbol))
-         (tls-index (read-wordindexed cold-sym sb!vm:symbol-tls-index-slot)))
-    (unless (plusp (descriptor-bits tls-index))
+         (tls-index
+          #!+x86-64
+          (ldb (byte 32 32) (descriptor-bits (read-wordindexed cold-sym 0)))
+          #!-x86-64
+          (descriptor-bits
+           (read-wordindexed cold-sym sb!vm:symbol-tls-index-slot))))
+    (unless (plusp tls-index)
       (let ((next (prog1 *genesis-tls-counter* (incf *genesis-tls-counter*))))
-        (setq tls-index (make-random-descriptor (ash next sb!vm:word-shift)))
-        (write-wordindexed cold-sym sb!vm:symbol-tls-index-slot tls-index)))
-    (descriptor-bits tls-index)))
+        (setq tls-index (ash next sb!vm:word-shift))
+        (cold-assign-tls-index cold-sym tls-index)))
+    tls-index))
 
 ;; A table of special variable names (as strings) which get known TLS indices.
 ;; Some of them are mapped onto 'struct thread' and have pre-determined offsets.
@@ -908,8 +924,7 @@ core and return a descriptor to it."
     (awhen (gethash name *known-tls-symbols*)
       (if (eq it :assign)
           (setq it (prog1 *genesis-tls-counter* (incf *genesis-tls-counter*))))
-      (write-wordindexed symbol sb!vm:symbol-tls-index-slot
-                         (make-random-descriptor (ash it sb!vm:word-shift))))
+      (cold-assign-tls-index symbol (ash it sb!vm:word-shift)))
     symbol))
 
 ;;; Set the cold symbol value of SYMBOL-OR-SYMBOL-DES, which can be either a

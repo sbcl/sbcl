@@ -549,7 +549,7 @@ static void print_slots(char **slots, int count, lispobj *ptr)
  * sbcl.h). */
 static char *symbol_slots[] = {"value: ", "hash: ",
     "info: ", "name: ", "package: ",
-#ifdef LISP_FEATURE_SB_THREAD
+#if defined (LISP_FEATURE_SB_THREAD) && !defined(LISP_FEATURE_X86_64)
     "tls-index: " ,
 #endif
     NULL};
@@ -617,7 +617,9 @@ static void print_otherptr(lispobj obj)
                 break;
 
             case SYMBOL_HEADER_WIDETAG:
-                print_slots(symbol_slots, count, ptr);
+                // Only 1 byte of a symbol header conveys its size.
+                // The other bytes may be freely used by the backend.
+                print_slots(symbol_slots, count & 0xFF, ptr);
                 break;
 
 #if N_WORD_BITS == 32

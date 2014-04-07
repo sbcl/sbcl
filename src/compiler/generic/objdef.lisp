@@ -349,7 +349,8 @@
            :set-trans %set-symbol-package
            :init :null)
   ;; 0 tls-index means no tls-index is allocated
-  #!+sb-thread
+  ;; x86-64 puts the tls-index in the header word.
+  #!+(and sb-thread (not x86-64))
   (tls-index :ref-known (flushable) :ref-trans symbol-tls-index))
 
 (define-primitive-object (complex-single-float

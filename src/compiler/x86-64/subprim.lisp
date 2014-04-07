@@ -114,7 +114,7 @@
   (:temporary (:sc unsigned-reg) tmp)
   (:policy :fast-safe)
   (:generator 10
-    (loadw tls-index symbol symbol-tls-index-slot other-pointer-lowtag)
+    (inst mov (reg-in-size tls-index :dword) (tls-index-of symbol))
     (inst test tls-index tls-index)
     (inst jmp :ne TLS-INDEX-VALID)
     (move tls-index symbol)

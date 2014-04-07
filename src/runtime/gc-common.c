@@ -683,7 +683,6 @@ trans_boxed(lispobj object)
     return copy_object(object, length);
 }
 
-
 static sword_t
 size_boxed(lispobj *where)
 {
@@ -692,6 +691,34 @@ size_boxed(lispobj *where)
 
     header = *where;
     length = HeaderValue(header) + 1;
+    length = CEILING(length, 2);
+
+    return length;
+}
+
+static lispobj
+trans_small_boxed(lispobj object)
+{
+    lispobj header;
+    uword_t length;
+
+    gc_assert(is_lisp_pointer(object));
+
+    header = *((lispobj *) native_pointer(object));
+    length = (HeaderValue(header) & 0xFF) + 1;
+    length = CEILING(length, 2);
+
+    return copy_object(object, length);
+}
+
+static sword_t
+size_small_boxed(lispobj *where)
+{
+    lispobj header;
+    uword_t length;
+
+    header = *where;
+    length = (HeaderValue(header) & 0xFF) + 1;
     length = CEILING(length, 2);
 
     return length;
@@ -2179,7 +2206,7 @@ gc_init_tables(void)
     transother[CLOSURE_HEADER_WIDETAG] = trans_boxed;
     transother[FUNCALLABLE_INSTANCE_HEADER_WIDETAG] = trans_boxed;
     transother[VALUE_CELL_HEADER_WIDETAG] = trans_boxed;
-    transother[SYMBOL_HEADER_WIDETAG] = trans_boxed;
+    transother[SYMBOL_HEADER_WIDETAG] = trans_small_boxed;
     transother[CHARACTER_WIDETAG] = trans_immediate;
     transother[SAP_WIDETAG] = trans_unboxed;
 #ifdef SIMD_PACK_WIDETAG
@@ -2325,7 +2352,7 @@ gc_init_tables(void)
     sizetab[CLOSURE_HEADER_WIDETAG] = size_boxed;
     sizetab[FUNCALLABLE_INSTANCE_HEADER_WIDETAG] = size_boxed;
     sizetab[VALUE_CELL_HEADER_WIDETAG] = size_boxed;
-    sizetab[SYMBOL_HEADER_WIDETAG] = size_boxed;
+    sizetab[SYMBOL_HEADER_WIDETAG] = size_small_boxed;
     sizetab[CHARACTER_WIDETAG] = size_immediate;
     sizetab[SAP_WIDETAG] = size_unboxed;
 #ifdef SIMD_PACK_WIDETAG

@@ -102,7 +102,7 @@
                (inst pop other)
                ;; Now with the lock held, see if the symbol's tls index has been
                ;; set in the meantime.
-               (loadw target other symbol-tls-index-slot other-pointer-lowtag)
+               (inst mov (reg-in-size target :dword) (tls-index-of other))
                (inst test target target)
                (inst jmp :ne release-tls-index-lock)
                ;; Allocate a new tls-index.
@@ -116,7 +116,7 @@
                  (emit-label not-error))
                (inst add (make-ea-for-symbol-value *free-tls-index*)
                      n-word-bytes)
-               (storew target other symbol-tls-index-slot other-pointer-lowtag)
+               (inst mov (tls-index-of other) (reg-in-size target :dword))
                (emit-label release-tls-index-lock)
                ;; No need for barriers on x86/x86-64 on unlock.
                (store-symbol-value 0 *tls-index-lock*)

@@ -43,6 +43,8 @@
   `(make-ea :qword :base ,ptr :disp (- (* ,slot n-word-bytes) ,lowtag)))
 (defmacro make-ea-for-object-slot-half (ptr slot lowtag)
   `(make-ea :dword :base ,ptr :disp (- (* ,slot n-word-bytes) ,lowtag)))
+(defmacro tls-index-of (sym)
+  `(make-ea :dword :base ,sym :disp (+ 4 (- other-pointer-lowtag))))
 
 (defmacro loadw (value ptr &optional (slot 0) (lowtag 0))
   `(inst mov ,value (make-ea-for-object-slot ,ptr ,slot ,lowtag)))

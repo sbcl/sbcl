@@ -84,9 +84,6 @@
                 (inst cmp (access-value-slot cell :dword) ; TLS reference
                       no-tls-value-marker-widetag)
                 (inst cmov :e cell symbol))) ; now possibly get the symbol
-           (tls-index-of (sym)
-             `(make-ea-for-object-slot-half ,sym symbol-tls-index-slot
-                                            other-pointer-lowtag))
            (access-tls-val (index size)
              `(make-ea ,size :base thread-base-tn :index ,index :scale 1))
            (access-value-slot (sym &optional (size :qword))
@@ -313,7 +310,7 @@
   (:temporary (:sc unsigned-reg) tls-index bsp tmp)
   (:generator 10
     (load-binding-stack-pointer bsp)
-    (loadw tls-index symbol symbol-tls-index-slot other-pointer-lowtag)
+    (inst mov (reg-in-size tls-index :dword) (tls-index-of symbol))
     (inst add bsp (* binding-size n-word-bytes))
     (store-binding-stack-pointer bsp)
     (inst test tls-index tls-index)

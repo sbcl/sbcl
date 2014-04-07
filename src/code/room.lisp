@@ -22,7 +22,7 @@
     (name nil :type symbol)
     ;; kind of type (how to reconstitute an object)
     (kind (missing-arg)
-          :type (member :other :closure :instance :list
+          :type (member :other :small-other :closure :instance :list
                         :code :vector-nil :weak-pointer))))
 
 (defun room-info-type-name (info)
@@ -43,7 +43,9 @@
                (not (eq name 'weak-pointer)))
       (setf (svref *meta-room-info* (symbol-value widetag))
             (make-room-info :name name
-                            :kind :other)))))
+                            :kind (if (eq name 'symbol)
+                                      :small-other
+                                      :other))))))
 
 (dolist (code (list #!+sb-unicode complex-character-string-widetag
                     complex-base-string-widetag simple-array-widetag
@@ -199,12 +201,12 @@
          (widetag (logand header widetag-mask))
          (header-value (ash header (- n-widetag-bits)))
          (info (svref *room-info* widetag)))
-    (symbol-macrolet
-        ((boxed-size (round-to-dualword (ash (1+ header-value) word-shift))))
-      (macrolet
-          ((tagged-object (tag)
-             `(%make-lisp-obj (logior ,tag (get-lisp-obj-address address)))))
-        (cond
+    (macrolet
+        ((boxed-size (header-value)
+           `(round-to-dualword (ash (1+ ,header-value) word-shift)))
+         (tagged-object (tag)
+           `(%make-lisp-obj (logior ,tag (get-lisp-obj-address address)))))
+      (cond
           ;; Pick off arrays, as they're the only plausible cause for
           ;; a non-nil, non-ROOM-INFO object as INFO.
           ((specialized-array-element-type-properties-p info)
@@ -222,17 +224,22 @@
           ((eq (room-info-kind info) :closure)
            (values (tagged-object fun-pointer-lowtag)
                    widetag
-                   boxed-size))
+                   (boxed-size header-value)))
 
           ((eq (room-info-kind info) :instance)
            (values (tagged-object instance-pointer-lowtag)
                    widetag
-                   boxed-size))
+                   (boxed-size header-value)))
 
           ((eq (room-info-kind info) :other)
            (values (tagged-object other-pointer-lowtag)
                    widetag
-                   boxed-size))
+                   (boxed-size header-value)))
+
+          ((eq (room-info-kind info) :small-other)
+           (values (tagged-object other-pointer-lowtag)
+                   widetag
+                   (boxed-size (logand header-value #xff))))
 
           ((eq (room-info-kind info) :vector-nil)
            (values (tagged-object other-pointer-lowtag)
@@ -259,7 +266,7 @@
 
           (t
            (error "Unrecognized room-info-kind ~S in reconstitute-object"
-                  (room-info-kind info))))))))
+                  (room-info-kind info)))))))
 
 ;;; Iterate over all the objects in the contiguous block of memory
 ;;; with the low address at START and the high address just before

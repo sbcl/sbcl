@@ -39,9 +39,9 @@ void bind_variable(lispobj symbol, lispobj value, void *th)
         struct symbol *sym=(struct symbol *)native_pointer(symbol);
         // We could provide a c-callable static Lisp function to assign TLS
         // indices if anyone really needs dynamic binding of dynamic symbols.
-        if(!sym->tls_index)
+        binding->symbol = tls_index_of(sym);
+        if(!binding->symbol)
             lose("Oops! Static symbol missing from *KNOWN-TLS-SYMBOLS*");
-        binding->symbol = sym->tls_index;
         binding->value = SymbolTlValue(symbol, thread);
     }
 #else
