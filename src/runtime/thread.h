@@ -138,8 +138,7 @@ extern int dynamic_values_bytes;
 static inline lispobj *
 SymbolValueAddress(u64 tagged_symbol_pointer, void *thread)
 {
-    struct symbol *sym= (struct symbol *)
-        (pointer_sized_uint_t)(tagged_symbol_pointer-OTHER_POINTER_LOWTAG);
+    struct symbol *sym= SYMBOL(tagged_symbol_pointer);
 #ifdef LISP_FEATURE_SB_THREAD
     if(thread && sym->tls_index) {
         lispobj *r = &(((union per_thread_data *)thread)
@@ -153,8 +152,7 @@ SymbolValueAddress(u64 tagged_symbol_pointer, void *thread)
 static inline lispobj
 SymbolValue(u64 tagged_symbol_pointer, void *thread)
 {
-    struct symbol *sym= (struct symbol *)
-        (pointer_sized_uint_t)(tagged_symbol_pointer-OTHER_POINTER_LOWTAG);
+    struct symbol *sym= SYMBOL(tagged_symbol_pointer);
 #ifdef LISP_FEATURE_SB_THREAD
     if(thread && sym->tls_index) {
         lispobj r=
@@ -169,8 +167,7 @@ SymbolValue(u64 tagged_symbol_pointer, void *thread)
 static inline lispobj
 SymbolTlValue(u64 tagged_symbol_pointer, void *thread)
 {
-    struct symbol *sym= (struct symbol *)
-        (pointer_sized_uint_t)(tagged_symbol_pointer-OTHER_POINTER_LOWTAG);
+    struct symbol *sym= SYMBOL(tagged_symbol_pointer);
 #ifdef LISP_FEATURE_SB_THREAD
     return ((union per_thread_data *)thread)
         ->dynamic_values[(sym->tls_index) >> WORD_SHIFT];
@@ -182,8 +179,7 @@ SymbolTlValue(u64 tagged_symbol_pointer, void *thread)
 static inline void
 SetSymbolValue(u64 tagged_symbol_pointer,lispobj val, void *thread)
 {
-    struct symbol *sym= (struct symbol *)
-        (pointer_sized_uint_t)(tagged_symbol_pointer-OTHER_POINTER_LOWTAG);
+    struct symbol *sym= SYMBOL(tagged_symbol_pointer);
 #ifdef LISP_FEATURE_SB_THREAD
     if(thread && sym->tls_index) {
         lispobj *pr= &(((union per_thread_data *)thread)
@@ -201,11 +197,9 @@ static inline void
 SetTlSymbolValue(u64 tagged_symbol_pointer,lispobj val, void *thread)
 {
 #ifdef LISP_FEATURE_SB_THREAD
-    struct symbol *sym= (struct symbol *)
-        (pointer_sized_uint_t)(tagged_symbol_pointer-OTHER_POINTER_LOWTAG);
+    struct symbol *sym= SYMBOL(tagged_symbol_pointer);
     ((union per_thread_data *)thread)
-        ->dynamic_values[(sym->tls_index) >> WORD_SHIFT]
-        =val;
+        ->dynamic_values[(sym->tls_index) >> WORD_SHIFT] = val;
 #else
     SetSymbolValue(tagged_symbol_pointer,val,thread) ;
 #endif

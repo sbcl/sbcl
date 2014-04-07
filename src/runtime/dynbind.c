@@ -22,10 +22,8 @@
 #include "globals.h"
 #include "dynbind.h"
 #include "thread.h"
-#include "pseudo-atomic.h"
 #include "genesis/symbol.h"
 #include "genesis/binding.h"
-#include "genesis/static-symbols.h"
 
 /* Specially bind SYMBOL to VALUE. In a multithreaded build, SYMBOL must already
    have been assigned a thread-local storage index. See *KNOWN-TLS-SYMBOLS* in
