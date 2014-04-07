@@ -91,12 +91,12 @@ dyndebug_init()
         for (;;) {
             char *token = strtok(ptr, " ");
             if (!token) break;
-            unsigned i;
+            int i;
             if (!strcmp(token, "all"))
                 for (i = 0; i < n_output_flags; i++)
                     *ptrs[i] = 1;
             else {
-                for (i = 0; i < DYNDEBUG_NFLAGS; i++)
+                for (i = 0; i < (int)DYNDEBUG_NFLAGS; i++)
                     if (!strcmp(token, names[i])) {
                         *ptrs[i] = 1;
                         break;
@@ -112,8 +112,8 @@ dyndebug_init()
         if (err) {
             fprintf(stderr, "Valid flags are:\n");
             fprintf(stderr, "  all  ;enables all of the following:\n");
-            unsigned i;
-            for (i = 0; i < DYNDEBUG_NFLAGS; i++) {
+            int i;
+            for (i = 0; i < (int)DYNDEBUG_NFLAGS; i++) {
                 if (i == n_output_flags)
                     fprintf(stderr, "Additional options:\n");
                 fprintf(stderr, "  %s\n", names[i]);
@@ -501,6 +501,30 @@ static void brief_otherptr(lispobj obj)
             }
             putchar('"');
             break;
+
+#ifdef LISP_FEATURE_SB_UNICODE
+        case SIMPLE_CHARACTER_STRING_WIDETAG:
+            vector = (struct vector *)ptr;
+            fputs("u\"", stdout);
+            {
+                int i, ch, len = fixnum_value(vector->length);
+                uint32_t *chars = (uint32_t*)vector->data;
+                for (i=0 ; i<len ; i++) {
+                    ch = chars[i];
+                    if (ch >= 32 && ch < 127) {
+                        if (ch == '"' || ch == '\\')
+                            putchar('\\');
+                        putchar(ch);
+                    } else {
+                      // ambiguous, e.g. #\xaaa is either #\GUJARATI_LETTER_PA
+                      // or #\FEMININE_ORDINAL_INDICATOR + #\a. oh well.
+                      printf("\\x%x", ch);
+                    }
+                }
+            }
+            putchar('"');
+            break;
+#endif
 
         default:
             printf("#<ptr to ");
