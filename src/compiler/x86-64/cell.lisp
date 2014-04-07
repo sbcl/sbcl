@@ -68,6 +68,27 @@
 
 ;;;; symbol hacking VOPs
 
+(define-vop (%set-symbol-global-value cell-set)
+  (:variant symbol-value-slot other-pointer-lowtag))
+
+(define-vop (fast-symbol-global-value cell-ref)
+  (:variant symbol-value-slot other-pointer-lowtag)
+  (:policy :fast)
+  (:translate symbol-global-value))
+
+(define-vop (symbol-global-value)
+  (:policy :fast-safe)
+  (:translate symbol-global-value)
+  (:args (object :scs (descriptor-reg) :to (:result 1)))
+  (:results (value :scs (descriptor-reg any-reg)))
+  (:vop-var vop)
+  (:save-p :compute-only)
+  (:generator 9
+    (let ((err-lab (generate-error-code vop 'unbound-symbol-error object)))
+      (loadw value object symbol-value-slot other-pointer-lowtag)
+      (inst cmp (reg-in-size value :dword) unbound-marker-widetag)
+      (inst jmp :e err-lab))))
+
 (macrolet (;; Logic common to thread-aware SET and CAS. CELL is assigned
            ;; to the location that should be accessed to modify SYMBOL's
            ;; value either in the TLS or the symbol's value slot as follows:
@@ -93,111 +114,102 @@
                (:qword `(make-ea-for-object-slot
                          ,sym symbol-value-slot other-pointer-lowtag)))))
 
-;; FIXME: this incorrectly indentated code results from minimizing a diff.
-;; Attempting to reorder, reimplement, and reindent the #![-+]sb-thread cases
-;; left the code so unintelligible that the author could not parse it.
-(define-vop (%compare-and-swap-symbol-value)
-  (:translate %compare-and-swap-symbol-value)
-  (:args (symbol :scs (descriptor-reg) :to (:result 0))
-         (old :scs (descriptor-reg any-reg) :target rax)
-         (new :scs (descriptor-reg any-reg)))
-  (:temporary (:sc descriptor-reg :offset rax-offset
-               :from (:argument 1) :to (:result 0)) rax)
-  #!+sb-thread
-  (:temporary (:sc descriptor-reg :to (:result 0)) cell)
-  (:results (result :scs (descriptor-reg any-reg)))
-  (:policy :fast-safe)
-  (:vop-var vop)
-  (:generator 15
+  (define-vop (%compare-and-swap-symbol-value)
+    (:translate %compare-and-swap-symbol-value)
+    (:args (symbol :scs (descriptor-reg) :to (:result 0))
+           (old :scs (descriptor-reg any-reg) :target rax)
+           (new :scs (descriptor-reg any-reg)))
+    (:temporary (:sc descriptor-reg :offset rax-offset
+                 :from (:argument 1) :to (:result 0)) rax)
+    #!+sb-thread
+    (:temporary (:sc descriptor-reg :to (:result 0)) cell)
+    (:results (result :scs (descriptor-reg any-reg)))
+    (:policy :fast-safe)
+    (:vop-var vop)
+    (:generator 15
     ;; This code has two pathological cases: NO-TLS-VALUE-MARKER
     ;; or UNBOUND-MARKER as NEW: in either case we would end up
     ;; doing possible damage with CMPXCHG -- so don't do that!
     ;; Even worse: don't supply old=NO-TLS-VALUE with a symbol whose
     ;; tls-index=0, because that would succeed, assigning NEW to each
     ;; symbol in existence having otherwise no thread-local value.
-    (let ((unbound (generate-error-code vop 'unbound-symbol-error symbol)))
-      #!+sb-thread (progn (compute-virtual-symbol)
-                          (move rax old)
-                          (inst cmpxchg (access-value-slot cell) new :lock))
-      #!-sb-thread (progn (move rax old)
-                          ;; is the :LOCK is necessary?
-                          (inst cmpxchg (access-value-slot symbol) new :lock))
-      (inst cmp (reg-in-size rax :dword) unbound-marker-widetag)
-      (inst jmp :e unbound)
-      (move result rax))))
+      (let ((unbound (generate-error-code vop 'unbound-symbol-error symbol)))
+        #!+sb-thread (progn (compute-virtual-symbol)
+                            (move rax old)
+                            (inst cmpxchg (access-value-slot cell) new :lock))
+        #!-sb-thread (progn (move rax old)
+                            ;; is the :LOCK is necessary?
+                            (inst cmpxchg (access-value-slot symbol) new :lock))
+        (inst cmp (reg-in-size rax :dword) unbound-marker-widetag)
+        (inst jmp :e unbound)
+        (move result rax))))
 
-(define-vop (%set-symbol-global-value cell-set)
-  (:variant symbol-value-slot other-pointer-lowtag))
-
-(define-vop (fast-symbol-global-value cell-ref)
-  (:variant symbol-value-slot other-pointer-lowtag)
-  (:policy :fast)
-  (:translate symbol-global-value))
-
-(define-vop (symbol-global-value)
-  (:policy :fast-safe)
-  (:translate symbol-global-value)
-  (:args (object :scs (descriptor-reg) :to (:result 1)))
-  (:results (value :scs (descriptor-reg any-reg)))
-  (:vop-var vop)
-  (:save-p :compute-only)
-  (:generator 9
-    (let ((err-lab (generate-error-code vop 'unbound-symbol-error object)))
-      (loadw value object symbol-value-slot other-pointer-lowtag)
-      (inst cmp (reg-in-size value :dword) unbound-marker-widetag)
-      (inst jmp :e err-lab))))
-
-#!+sb-thread
-(progn
-  (define-vop (set)
-    (:args (symbol :scs (descriptor-reg))
-           (value :scs (descriptor-reg any-reg)))
-    (:temporary (:sc descriptor-reg) cell)
-    (:generator 4
-      ;; Compute the address into which to store. CMOV can only move into
-      ;; a register, so we can't conditionally move into the TLS and
-      ;; conditionally move in the opposite flag sense to the symbol.
-      (compute-virtual-symbol)
-      (inst mov (access-value-slot cell) value)))
+  #!+sb-thread
+  (progn
+    (define-vop (set)
+      (:args (symbol :scs (descriptor-reg))
+             (value :scs (descriptor-reg any-reg)))
+      (:temporary (:sc descriptor-reg) cell)
+      (:generator 4
+        ;; Compute the address into which to store. CMOV can only move into
+        ;; a register, so we can't conditionally move into the TLS and
+        ;; conditionally move in the opposite flag sense to the symbol.
+        (compute-virtual-symbol)
+        (inst mov (access-value-slot cell) value)))
 
   ;; With Symbol-Value, we check that the value isn't the trap object. So
   ;; Symbol-Value of NIL is NIL.
-  (define-vop (symbol-value)
-    (:translate symbol-value)
-    (:policy :fast-safe)
-    (:args (symbol :scs (descriptor-reg)))
-    (:temporary (:sc unsigned-reg) temp)
-    (:results (value :scs (descriptor-reg any-reg)))
-    (:vop-var vop)
-    (:save-p :compute-only)
-    (:generator 9
-      (let ((err-lab (generate-error-code vop 'unbound-symbol-error symbol)))
-        ;; The order of the first two instructions matters- SYMBOL and VALUE
-        ;; might arbitrarily be packed in the same register, or not.
-        (inst mov (reg-in-size temp :dword) (tls-index-of symbol))
-        (inst mov value (access-value-slot symbol))
-        (inst cmp (access-tls-val temp :dword) no-tls-value-marker-widetag)
-        (inst cmov :ne value (access-tls-val temp :qword))
-        (inst cmp (reg-in-size value :dword) unbound-marker-widetag)
-        (inst jmp :e err-lab))))
+    (define-vop (symbol-value)
+      (:translate symbol-value)
+      (:policy :fast-safe)
+      (:args (symbol :scs (descriptor-reg)))
+      (:temporary (:sc unsigned-reg) temp)
+      (:results (value :scs (descriptor-reg any-reg)))
+      (:vop-var vop)
+      (:save-p :compute-only)
+      (:generator 9
+        (let ((err-lab (generate-error-code vop 'unbound-symbol-error symbol)))
+          ;; The order of the first two instructions matters- SYMBOL and VALUE
+          ;; might arbitrarily be packed in the same register, or not.
+          (inst mov (reg-in-size temp :dword) (tls-index-of symbol))
+          (inst mov value (access-value-slot symbol))
+          (inst cmp (access-tls-val temp :dword) no-tls-value-marker-widetag)
+          (inst cmov :ne value (access-tls-val temp :qword))
+          (inst cmp (reg-in-size value :dword) unbound-marker-widetag)
+          (inst jmp :e err-lab))))
 
-  (define-vop (fast-symbol-value symbol-value)
+    (define-vop (fast-symbol-value symbol-value)
     ;; KLUDGE: not really fast, in fact, because we're going to have to
     ;; do a full lookup of the thread-local area anyway.  But half of
     ;; the meaning of FAST-SYMBOL-VALUE is "do not signal an error if
     ;; unbound", which is used in the implementation of COPY-SYMBOL.  --
     ;; CSR, 2003-04-22
-    (:policy :fast)
-    (:args (symbol :scs (descriptor-reg) :target temp))
-    (:temporary (:sc unsigned-reg :from (:argument 0)) temp)
-    (:translate symbol-value)
-    (:generator 8
-      (inst mov value (access-value-slot symbol)) ; prefetch
-      ;; We're going to lose the symbol, because it should be in the same
-      ;; register as TEMP. That's ok, we don't need it for error signaling.
-      (inst mov (reg-in-size temp :dword) (tls-index-of symbol))
-      (inst cmp (access-tls-val temp :dword) no-tls-value-marker-widetag)
-      (inst cmov :ne value (access-tls-val temp :qword)))))
+      (:policy :fast)
+      (:args (symbol :scs (descriptor-reg) :target temp))
+      (:temporary (:sc unsigned-reg :from (:argument 0)) temp)
+      (:translate symbol-value)
+      (:generator 8
+        (inst mov value (access-value-slot symbol)) ; prefetch
+        ;; We're going to lose the symbol, because it should be in the same
+        ;; register as TEMP. That's ok, we don't need it for error signaling.
+        (inst mov (reg-in-size temp :dword) (tls-index-of symbol))
+        (inst cmp (access-tls-val temp :dword) no-tls-value-marker-widetag)
+        (inst cmov :ne value (access-tls-val temp :qword))))
+
+    (define-vop (boundp)
+      (:translate boundp)
+      (:policy :fast-safe)
+      (:args (object :scs (descriptor-reg)))
+      (:conditional :ne)
+      (:temporary (:sc dword-reg) temp)
+      (:generator 9
+        (inst mov temp (tls-index-of object))
+        (inst mov temp (access-tls-val temp :dword))
+        (inst cmp temp no-tls-value-marker-widetag)
+        (inst cmov :e temp (access-value-slot object :dword))
+        (inst cmp temp unbound-marker-widetag))))
+
+) ; END OF MACROLET
 
 #!-sb-thread
 (progn
@@ -205,32 +217,16 @@
     (:translate symbol-value))
   (define-vop (fast-symbol-value fast-symbol-global-value)
     (:translate symbol-value))
-  (define-vop (set %set-symbol-global-value)))
-
-#!+sb-thread
-(define-vop (boundp)
-  (:translate boundp)
-  (:policy :fast-safe)
-  (:args (object :scs (descriptor-reg)))
-  (:conditional :ne)
-  (:temporary (:sc dword-reg) temp)
-  (:generator 9
-    (inst mov temp (tls-index-of object))
-    (inst mov temp (access-tls-val temp :dword))
-    (inst cmp temp no-tls-value-marker-widetag)
-    (inst cmov :e temp (access-value-slot object :dword))
-    (inst cmp temp unbound-marker-widetag)))
-
-#!-sb-thread
-(define-vop (boundp)
-  (:translate boundp)
-  (:policy :fast-safe)
-  (:args (object :scs (descriptor-reg)))
-  (:conditional :ne)
-  (:generator 9
-    (inst cmp (access-value-slot object :dword) unbound-marker-widetag)))
-
-) ; END OF MACROLET
+  (define-vop (set %set-symbol-global-value))
+  (define-vop (boundp)
+    (:translate boundp)
+    (:policy :fast-safe)
+    (:args (symbol :scs (descriptor-reg)))
+    (:conditional :ne)
+    (:generator 9
+      (inst cmp (make-ea-for-object-slot-half
+                 symbol symbol-value-slot other-pointer-lowtag)
+            unbound-marker-widetag))))
 
 (define-vop (symbol-hash)
   (:policy :fast-safe)
