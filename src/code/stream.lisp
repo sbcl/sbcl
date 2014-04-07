@@ -1288,8 +1288,8 @@
   ;; The string we throw stuff in.
   (buffer (missing-arg) :type (simple-array character (*)))
   ;; Chains of buffers to use
-  (prev nil)
-  (next nil)
+  (prev nil :type list)
+  (next nil :type list)
   ;; Index of the next location to use in the current string.
   (pointer 0 :type index)
   ;; Global location in the stream
@@ -1499,7 +1499,7 @@ benefit of the function GET-OUTPUT-STREAM-STRING.")
   (let* ((length (max (string-output-stream-index stream)
                       (string-output-stream-index-cache stream)))
          (element-type (string-output-stream-element-type stream))
-         (prev (string-output-stream-prev stream))
+         (prev (nreverse (string-output-stream-prev stream)))
          (this (string-output-stream-buffer stream))
          (next (string-output-stream-next stream))
          (result
@@ -1531,7 +1531,6 @@ benefit of the function GET-OUTPUT-STREAM-STRING.")
     (flet ((replace-all (fun)
              (let ((start 0))
                (declare (index start))
-               (setf prev (nreverse prev))
                (dolist (buffer prev)
                  (funcall fun buffer start)
                  (incf start (length buffer)))
