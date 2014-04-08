@@ -148,7 +148,6 @@ dump_cmd(char **ptr)
 #else
             u32 *lptr = (u32 *)addr;
 #endif
-            unsigned short *sptr = (unsigned short *)addr;
             unsigned char *cptr = (unsigned char *)addr;
 
 #if N_WORD_BYTES == 8
@@ -159,6 +158,7 @@ dump_cmd(char **ptr)
                    visible(cptr[4]), visible(cptr[5]),
                    visible(cptr[6]), visible(cptr[7]));
 #else
+            unsigned short *sptr = (unsigned short *)addr;
             printf("0x%08lx   0x%04x 0x%04x   "
                    "0x%02x 0x%02x 0x%02x 0x%02x    "
                    "%c%c"

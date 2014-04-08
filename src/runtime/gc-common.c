@@ -1740,7 +1740,7 @@ scav_vector (lispobj *where, lispobj object)
                 "non-fatal corruption caused by concurrent access to a "
                 "hash-table from multiple threads. Any accesses to "
                 "hash-tables shared between threads should be protected "
-                "by locks.\n", (uword_t)&where[2]);
+                "by locks.\n", (void*)&where[2]);
         // We've scavenged three words.
         return 3;
     }
