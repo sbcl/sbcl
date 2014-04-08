@@ -354,6 +354,8 @@ GNAME(alloc_tramp):
 	and	$-32,%rsp
 	sub	$16*16,%rsp
 	map_all_xmm(stkxmmsave)
+	# Doing rax twice is to maintain 16-byte stack alignment.
+	push    %rax
 	push	%rax
 	push	%rcx
 	push	%rdx
@@ -376,6 +378,7 @@ GNAME(alloc_tramp):
 	pop	%rdx
 	pop	%rcx
 	pop	%rax
+	pop	%rax # corresponds to "extra" push
 	map_all_xmm(stkxmmload)
 	mov	%rbp,%rsp
 	pop	%rbp
