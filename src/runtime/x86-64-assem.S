@@ -363,11 +363,10 @@ GNAME(alloc_tramp):
 	push	%r9
 	push	%r10
 	push	%r11
-	push	%r11
+	# r12 through r15 are callee-saved
 	mov	16(%rbp),%rdi
 	call	GNAME(alloc)
 	mov	%rax,16(%rbp)
-	pop	%r11
 	pop	%r11
 	pop	%r10
 	pop	%r9
