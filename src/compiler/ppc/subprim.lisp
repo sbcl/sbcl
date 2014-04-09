@@ -22,23 +22,22 @@
   (:generator 50
     (let ((done (gen-label))
           (loop (gen-label))
-          (not-list (gen-label)))
+          (not-list (generate-error-code vop 'object-not-list-error ptr)))
       (move ptr object)
       (move count zero-tn)
 
-      (emit-label loop)
-
       (inst cmpw ptr null-tn)
       (inst beq done)
+
+      (emit-label loop)
 
       (test-type ptr not-list t (list-pointer-lowtag) :temp temp)
 
       (loadw ptr ptr cons-cdr-slot list-pointer-lowtag)
       (inst addi count count (fixnumize 1))
-      (test-type ptr loop nil (list-pointer-lowtag) :temp temp)
 
-      (emit-label not-list)
-      (error-call vop 'object-not-list-error ptr)
+      (inst cmpw ptr null-tn)
+      (inst bne loop)
 
       (emit-label done)
       (move result count))))
