@@ -100,6 +100,18 @@
   (eql (find-symbol (symbol-name symbol) :cl)
        symbol))
 
+;; Return T if SYMBOL is a predicate acceptable for use in a SATISFIES type
+;; specifier. We assume that anything in CL: is allowed (see explanation at
+;; call point), and beyond that, anything we define has to be expressly listed
+;; here, for fear of later unexpected confusion.
+(defun acceptable-cross-typep-pred (symbol)
+  (and (fboundp symbol)
+       (or (in-cl-package-p symbol)
+           ;; KLUDGE: rather than extensible list of predicates that match
+           ;; in behavior between the host and target lisp, hardcode a few.
+           (memq symbol '(sb!vm:static-symbol-p
+                          sb!vm::wired-tls-symbol-p)))))
+
 ;;; This is like TYPEP, except that it asks whether HOST-OBJECT would
 ;;; be of TARGET-TYPE when instantiated on the target SBCL. Since this
 ;;; is hard to determine in some cases, and since in other cases we
@@ -299,8 +311,7 @@
                  ;; to grok (SATISFIES KEYWORDP).
                  (satisfies
                   (destructuring-bind (predicate-name) rest
-                    (if (and (in-cl-package-p predicate-name)
-                             (fboundp predicate-name))
+                    (if (acceptable-cross-typep-pred predicate-name)
                         ;; Many predicates like KEYWORDP, ODDP, PACKAGEP,
                         ;; and NULL correspond between host and target.
                         ;; But we still need to handle errors, because

@@ -89,6 +89,25 @@
       (inst cmp (reg-in-size value :dword) unbound-marker-widetag)
       (inst jmp :e err-lab))))
 
+;; Return T if SYMBOL will be (at no later than load time) wired to a TLS index.
+;; When a symbol gets a tls index, it is permanently at that index, so it is
+;; by some definition "wired", but here the term specifically means that an
+;; index can/should be encoded into the instruction for reading that symbol's
+;; thread-local value, as contrasted with reading its index from itself.
+;; The BIND vop forces wiring; the BOUNDP vop never does, the SET vop doesn't
+;; but could, and {FAST-}SYMBOL-VALUE vops optimize their output appropriately
+;; based on wiring. Except when a symbol maps into a thread slot, the compiler
+;; doesn't care what the actual index is - that's the loader's purview.
+(defun wired-tls-symbol-p (symbol)
+  (or (symbol-thread-struct-offset symbol)
+      (memq (info :variable :wired-tls symbol)
+            '(:always-has-tls :always-thread-local))))
+
+;; Return the DISP field to use in an EA relative to thread-base-tn
+(defun load-time-tls-offset (symbol)
+  (or (symbol-thread-struct-offset symbol)
+      (make-fixup symbol :symbol-tls-index)))
+
 (macrolet (;; Logic common to thread-aware SET and CAS. CELL is assigned
            ;; to the location that should be accessed to modify SYMBOL's
            ;; value either in the TLS or the symbol's value slot as follows:
@@ -105,9 +124,12 @@
                 (inst cmp (access-value-slot cell :dword) ; TLS reference
                       no-tls-value-marker-widetag)
                 (inst cmov :e cell symbol))) ; now possibly get the symbol
+           (access-wired-tls-val (sym) ; SYM is a symbol
+             `(make-ea :qword :disp (load-time-tls-offset ,sym)
+                       :base thread-base-tn))
            (access-tls-val (index size)
              `(make-ea ,size :base thread-base-tn :index ,index :scale 1))
-           (access-value-slot (sym &optional (size :qword))
+           (access-value-slot (sym &optional (size :qword)) ; SYM is a TN
              (ecase size
                (:dword `(make-ea-for-object-slot-half
                          ,sym symbol-value-slot other-pointer-lowtag))
@@ -146,6 +168,7 @@
 
   #!+sb-thread
   (progn
+    ;; TODO: SET could be shorter for any known wired-tls symbol.
     (define-vop (set)
       (:args (symbol :scs (descriptor-reg))
              (value :scs (descriptor-reg any-reg)))
@@ -162,21 +185,39 @@
     (define-vop (symbol-value)
       (:translate symbol-value)
       (:policy :fast-safe)
-      (:args (symbol :scs (descriptor-reg)))
-      (:temporary (:sc unsigned-reg) temp)
+      (:args (symbol :scs (descriptor-reg constant) :to (:result 1)))
+      (:temporary (:sc unsigned-reg) symbol-reg)
       (:results (value :scs (descriptor-reg any-reg)))
       (:vop-var vop)
       (:save-p :compute-only)
+      (:variant-vars check-boundp)
+      (:variant t)
       (:generator 9
-        (let ((err-lab (generate-error-code vop 'unbound-symbol-error symbol)))
-          ;; The order of the first two instructions matters- SYMBOL and VALUE
-          ;; might arbitrarily be packed in the same register, or not.
-          (inst mov (reg-in-size temp :dword) (tls-index-of symbol))
-          (inst mov value (access-value-slot symbol))
-          (inst cmp (access-tls-val temp :dword) no-tls-value-marker-widetag)
-          (inst cmov :ne value (access-tls-val temp :qword))
+        (cond
+          ((not (sc-is symbol constant)) ; SYMBOL-VALUE of a random symbol
+           ;; These reads are inextricably data-dependent
+           (inst mov (reg-in-size symbol-reg :dword) (tls-index-of symbol))
+           (inst mov value (access-tls-val symbol-reg :qword))
+           (setq symbol-reg symbol))
+          ((wired-tls-symbol-p (tn-value symbol)) ; e.g. CL:*PRINT-BASE*
+           (inst mov symbol-reg symbol) ; = MOV Rxx, [RIP-N]
+           (inst mov value (access-wired-tls-val (tn-value symbol))))
+          (t ; commonest case: constant-tn for the symbol, not wired tls
+           ;; Same data-dependencies as the non-constant-tn case.
+           (inst mov symbol-reg symbol) ; = MOV REG, [RIP-N]
+           (inst mov (reg-in-size value :dword) (tls-index-of symbol-reg))
+           (inst mov value (access-tls-val value :qword))))
+     #| FIXME: should be (typep (info :variable :wired-tls (tn-value symbol))
+                                 '(or (eq :always-thread-local) integer)) |#
+        ;; Thread slots should never access a symbol's global value.
+        (unless (and (sc-is symbol constant)
+                     (symbol-thread-struct-offset (tn-value symbol)))
+          (inst cmp (reg-in-size value :dword) no-tls-value-marker-widetag)
+          (inst cmov :e value (access-value-slot symbol-reg)))
+        (when check-boundp
           (inst cmp (reg-in-size value :dword) unbound-marker-widetag)
-          (inst jmp :e err-lab))))
+          (inst jmp :e (generate-error-code vop 'unbound-symbol-error
+                                            symbol-reg)))))
 
     (define-vop (fast-symbol-value symbol-value)
     ;; KLUDGE: not really fast, in fact, because we're going to have to
@@ -185,17 +226,47 @@
     ;; unbound", which is used in the implementation of COPY-SYMBOL.  --
     ;; CSR, 2003-04-22
       (:policy :fast)
-      (:args (symbol :scs (descriptor-reg) :target temp))
-      (:temporary (:sc unsigned-reg :from (:argument 0)) temp)
-      (:translate symbol-value)
-      (:generator 8
-        (inst mov value (access-value-slot symbol)) ; prefetch
-        ;; We're going to lose the symbol, because it should be in the same
-        ;; register as TEMP. That's ok, we don't need it for error signaling.
-        (inst mov (reg-in-size temp :dword) (tls-index-of symbol))
-        (inst cmp (access-tls-val temp :dword) no-tls-value-marker-widetag)
-        (inst cmov :ne value (access-tls-val temp :qword))))
+      (:variant nil)
+      (:variant-cost 5))
 
+    ;; SYMBOL-VALUE of a static symbol with a wired TLS index does not
+    ;; load the symbol except in the case of error, and uses no temp either.
+    ;; There's no way to express the lack of encumbrances in the general vop.
+    (define-vop (symeval/static-wired)
+      (:translate symbol-value)
+      (:policy :fast-safe)
+      ;; The predicates are orthogonal. Symbols can satisfy one, the other,
+      ;; both, or neither. This vop applies only if both.
+      (:arg-types (:constant (and (satisfies static-symbol-p)
+                                  (satisfies wired-tls-symbol-p))))
+      (:info symbol)
+      (:results (value :scs (descriptor-reg any-reg)))
+      (:vop-var vop)
+      (:save-p :compute-only)
+      (:variant-vars check-boundp)
+      (:variant t)
+      (:generator 5
+        (inst mov value (access-wired-tls-val symbol))
+        (unless (symbol-thread-struct-offset symbol) ; same FIXME as above
+          (inst cmp (reg-in-size value :dword) no-tls-value-marker-widetag)
+          (inst cmov :e value (static-symbol-value-ea symbol)))
+        (when check-boundp
+          (let ((err-label (gen-label)))
+            (assemble (*elsewhere*)
+              (emit-label err-label)
+              (inst mov value (+ nil-value (static-symbol-offset symbol)))
+              (emit-error-break vop error-trap
+                                (error-number-or-lose 'unbound-symbol-error)
+                                (list value)))
+            (inst cmp (reg-in-size value :dword) unbound-marker-widetag)
+            (inst jmp :e err-label)))))
+
+    (define-vop (fast-symeval/static-wired symeval/static-wired)
+      (:policy :fast)
+      (:variant nil)
+      (:variant-cost 3))
+
+    ;; Would it be worthwhile to make a static/wired boundp vop?
     (define-vop (boundp)
       (:translate boundp)
       (:policy :fast-safe)
@@ -299,6 +370,7 @@
 ;;; See the "Chapter 9: Specials" of the SBCL Internals Manual.
 
 #!+sb-thread
+(progn
 (define-vop (bind)
   (:args (val :scs (any-reg descriptor-reg))
          (symbol :scs (descriptor-reg) :target tmp
@@ -320,7 +392,6 @@
     (storew tls-index bsp (- binding-symbol-slot binding-size))
     (inst mov (make-ea :qword :base thread-base-tn :index tls-index) val)))
 
-#!+sb-thread
 ;; Nikodemus hypothetically terms the above VOP DYNBIND (in x86/cell.lisp)
 ;; with this "new" one being BIND, but to re-purpose concepts in that way
 ;; - though it be rational - is fraught with peril.
@@ -336,8 +407,7 @@
           (make-ea :qword :base thread-base-tn
                    :disp (ash thread-binding-stack-pointer-slot word-shift))
           bsp)
-    (let* ((tls-index (or (symbol-known-tls-index symbol)
-                          (make-fixup symbol :symbol-tls-index)))
+    (let* ((tls-index (load-time-tls-offset symbol))
            (tls-cell (make-ea :qword :base thread-base-tn :disp tls-index)))
       ;; Too bad we can't use "XCHG [r12+disp], val" to write the new value
       ;; and read the old value in one step. It will violate the constraints
@@ -350,12 +420,11 @@
                          :disp (ash binding-symbol-slot word-shift)) tls-index)
       (inst mov tls-cell val))
     ;; Emission of this VOP informs the compiler that later SYMBOL-VALUE calls
-    ;; might want to use a load-time fixup instead of reading from the symbol's
-    ;; tls-index, admitting a possible optimization (NOT DONE):
-    ;;  MOV RES,[R12+N] ; CMP RES,NO_TLS_VALUE ; CMOV :E RES,GLOBAL-VALUE
-    ;; In contrast, if the symbol is not known to ever have been thread-locally
-    ;; bound, reading it should not force the loader to assign a TLS index.
-    (setf (info :variable :wired-tls-index symbol) t)))
+    ;; should use a load-time constant displacement to the TLS for this symbol.
+    (unless (info :variable :wired-tls symbol)
+      ;; setting INFO is inefficient when done repeatedly for no reason.
+      ;; (I should fix that)
+      (setf (info :variable :wired-tls symbol) :always-has-tls)))))
 
 #!-sb-thread
 (define-vop (bind)
@@ -952,41 +1021,3 @@
   (:info instance-length index)
   (:generator 4
     (inst movdqu (make-ea-for-raw-slot object instance-length :index index :adjustment -8) value)))
-
-#|
-For lack of a better location for these comments about the manipulation
-of static symbols, note that we now have unfortunately two ways of doing it.
-The following code rebinds *ALIEN-STACK-POINTER* to itself,
-then subtracts 16 bytes.
-
-* (disassemble '(lambda () (with-alien ((x (array char 16))) (print x))))
-
-1) Load the symbol into a register, load the tls-index from the symbol,
-   and access [thread_base+index]. This is an ordinary SYMBOL-VALUE call.
-
-;       B80F0B1020       MOV EAX, 537922319
-;       488B5021         MOV RDX, [RAX+33]
-;       498B1414         MOV RDX, [R12+RDX]
-;       4883FA61         CMP RDX, 97
-;       7504             JNE L0
-;       488B50F9         MOV RDX, [RAX-7]
-; L0:   4883FA51         CMP RDX, 81
-;       0F84EC000000     JEQ L3
-
-2) Use a constant offset from the thread-base. This is the BIND/LET VOP.
-
-;       498B8C24A8000000 MOV RCX, [R12+168]
-;       488908           MOV [RAX], RCX
-;       C74008A8000000   MOV DWORD PTR [RAX+8], 168
-;       49899424A8000000 MOV [R12+168], RDX
-
-We could benefit from additional INFO for special variables:
- - an indicator of whether to prefer that SYMBOL-VALUE use a known tls-index.
-   This would be the same load-time mechanism as for BIND/LET. It is bad
-   to force the loader to assign a tls-index for all reads of a symbol in
-   general. Many symbols are never dynamically bound, and the potential number
-   of globals (not DEFGLOBAL necessarily) in use by some applications
-   could quickly exhaust the TLS.
- - an indicator of whether the symbol will definitely have a thread-local
-   binding whenever it is read, such as for *ALIEN-STACK-POINTER*.
-|#

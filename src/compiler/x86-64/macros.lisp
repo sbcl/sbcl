@@ -91,7 +91,6 @@
   `(inst mov (make-ea-for-symbol-value ,symbol) ,reg))
 
 ;; Return the effective address of the value slot of static SYMBOL.
-#!-sb-thread
 (defun static-symbol-value-ea (symbol)
    (make-ea :qword
             :disp (+ nil-value
@@ -101,11 +100,14 @@
 
 #!+sb-thread
 (progn
-  ;; Return the index of SYMBOL in thread-local storage.
-  ;; SYMBOL must map directly onto one the slots of a thread as defined
-  ;; in generic/objdef. It does not have to be in static space.
-  ;; If SYMBOL does not have a known TLS index, return NIL.
-  (defun symbol-known-tls-index (symbol)
+  ;; Return the index of SYMBOL in thread-local storage if it maps onto a
+  ;; fixed slot of a thread as defined in generic/objdef. It need not be
+  ;; in static space. If SYMBOL does not have a known TLS index, return NIL.
+  ;; FIXME: This is a crummy and slow way to look up this info, as it
+  ;; requires that every use of the SYMBOL-VALUE vop scan all thread
+  ;; slots every time. Instead, (INFO :VARIABLE :WIRED-TLS ...) should
+  ;; be a small integer representing the actual index.
+  (defun symbol-thread-struct-offset (symbol)
     (when (looks-like-name-of-special-var-p symbol)
       (let* ((name (symbol-name symbol))
              (name-len-less-1 (- (length name) 1))
@@ -122,10 +124,12 @@
 
   ;; Return an EA for the TLS of SYMBOL, or die.
   (defun symbol-known-tls-cell (symbol)
-    (let ((index (symbol-known-tls-index symbol)))
+    (let ((index (symbol-thread-struct-offset symbol)))
       (aver index)
       (make-ea :qword :base thread-base-tn :disp index)))
 
+  ;; LOAD/STORE-TL-SYMBOL-VALUE macros are ad-hoc (ugly) emulations
+  ;; of (INFO :VARIABLE :WIRED-TLS) = :ALWAYS-THREAD-LOCAL
   (defmacro load-tl-symbol-value (reg symbol)
     `(inst mov ,reg (symbol-known-tls-cell ',symbol)))
 
