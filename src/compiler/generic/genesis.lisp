@@ -868,7 +868,7 @@ core and return a descriptor to it."
           (cold-assign-tls-index cold-sym tls-index)))
       tls-index)))
 
-;; A table of special variable names (as strings) which get known TLS indices.
+;; A table of special variable names which get known TLS indices.
 ;; Some of them are mapped onto 'struct thread' and have pre-determined offsets.
 ;; Others are static symbols used with bind_variable() in the C runtime,
 ;; and might not, in the absence of this table, get an index assigned by genesis
@@ -877,37 +877,39 @@ core and return a descriptor to it."
 ;; the value doesn't matter but must update the tls-counter correctly.
 ;; All symbols other than the ones in this table get the indices assigned
 ;; by the fasloader on demand.
+#!+sb-thread
 (defvar *known-tls-symbols*
-  (let ((ht (make-hash-table :test #'equal)))
+  (let ((ht (make-hash-table :test #'eq)))
     ;; FIXME: no mechanism exists to determine which static symbols C code will
     ;; dynamically bind. TLS is a finite resource, and wasting indices for all
     ;; static symbols isn't the best idea. This list was hand-made with 'grep'.
-    (dolist (name '("*ALLOC-SIGNAL*"
-                    "*ALLOW-WITH-INTERRUPTS*"
-                    "*CURRENT-CATCH-BLOCK*" "*CURRENT-UNWIND-PROTECT-BLOCK*"
-                    "*FREE-INTERRUPT-CONTEXT-INDEX*"
-                    "*GC-INHIBIT*" "*GC-PENDING*" "*GC-SAFE*"
-                    "*IN-SAFEPOINT*"
-                    "*INTERRUPT-PENDING*" "*INTERRUPTS-ENABLED*"
-                    "*PINNED-OBJECTS*"
-                    "*RESTART-CLUSTERS*"
-                    "*STOP-FOR-GC-PENDING*"
-                    "*THRUPTION-PENDING*"))
+    (dolist (name '(sb!vm:*alloc-signal*
+                    sb!sys:*allow-with-interrupts*
+                    sb!vm:*current-catch-block*
+                    sb!vm::*current-unwind-protect-block*
+                    sb!kernel:*free-interrupt-context-index*
+                    sb!kernel:*gc-inhibit*
+                    sb!kernel:*gc-pending*
+                    sb!impl::*gc-safe*
+                    sb!impl::*in-safepoint*
+                    sb!sys:*interrupt-pending*
+                    sb!sys:*interrupts-enabled*
+                    sb!vm::*pinned-objects*
+                    sb!kernel:*restart-clusters*
+                    sb!kernel:*stop-for-gc-pending*
+                    #!+sb-thruption
+                    sb!sys:*thruption-pending*))
       (setf (gethash name ht) :assign))
     ;; These take precedence over the above. e.g. -CATCH-BLOCK- on x86[-64]
     ;; is a slot that gets a low fixed index, not a variable index.
     (dolist (slot (sb!vm::primitive-object-slots
-                    (find 'sb!vm::thread sb!vm:*primitive-objects*
-                          :key #'sb!vm:primitive-object-name)) ht)
-      ;; It sure seems like *STEPPING* is supposed to be tied to a thread slot
-      ;; because x86-64 code goes to some trouble to use the thread slot instead
-      ;; of *STEPPING* whereas x86 uses *STEPPING* instead of the slot.
-      ;; Out of paranoia, I'm _not_ wiring *STEPPING*'s tls index,
-      ;; exactly like the code in 'thread.c' didn't do.
-      (let ((slot-name (sb!vm::slot-name slot)))
-        (unless (string= slot-name "STEPPING")
-          (setf (gethash (concatenate 'string "*" (string slot-name) "*") ht)
-                (sb!vm::slot-offset slot)))))))
+                   (find 'sb!vm::thread sb!vm:*primitive-objects*
+                         :key #'sb!vm:primitive-object-name)))
+      (let ((slot-special (sb!vm::slot-special slot)))
+        (when slot-special
+          (setf (gethash slot-special ht)
+                (sb!vm::slot-offset slot)))))
+    ht))
 
 ;;; Allocate (and initialize) a symbol.
 (defun allocate-symbol (name &key (gspace *dynamic*))
@@ -924,12 +926,14 @@ core and return a descriptor to it."
     (write-wordindexed symbol sb!vm:symbol-name-slot
                        (base-string-to-core name *dynamic*))
     (write-wordindexed symbol sb!vm:symbol-package-slot *nil-descriptor*)
-    #!+sb-thread
-    (awhen (gethash name *known-tls-symbols*)
-      (if (eq it :assign)
-          (setq it (prog1 *genesis-tls-counter* (incf *genesis-tls-counter*))))
-      (cold-assign-tls-index symbol (ash it sb!vm:word-shift)))
     symbol))
+
+#!+sb-thread
+(defun assign-tls-index (symbol cold-symbol)
+  (awhen (gethash symbol *known-tls-symbols*)
+    (when (eq it :assign)
+      (shiftf it *genesis-tls-counter* (1+ *genesis-tls-counter*)))
+    (cold-assign-tls-index cold-symbol (ash it sb!vm:word-shift))))
 
 ;;; Set the cold symbol value of SYMBOL-OR-SYMBOL-DES, which can be either a
 ;;; descriptor of a cold symbol or (in an abbreviation for the
@@ -1225,6 +1229,8 @@ core and return a descriptor to it."
     (unless cold-intern-info
       (cond ((eq (symbol-package-for-target-symbol symbol) package)
              (let ((handle (allocate-symbol (symbol-name symbol) :gspace gspace)))
+               #!+sb-thread
+               (assign-tls-index symbol handle)
                (setf (gethash (descriptor-bits handle) *cold-symbols*) symbol)
                (when (eq package *keyword-package*)
                  (cold-set handle handle))

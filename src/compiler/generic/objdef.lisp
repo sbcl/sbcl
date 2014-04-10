@@ -404,18 +404,23 @@
   ;; manipulations by fixing their TLS offsets to be < 2^7, the largest
   ;; aligned displacement fitting in a signed byte.
   #!+gencgc (alloc-region :c-type "struct alloc_region" :length 5)
-  #!+(or x86 x86-64 sb-thread) (pseudo-atomic-bits)
+  #!+(or x86 x86-64 sb-thread) (pseudo-atomic-bits :special *pseudo-atomic-bits*)
   ;; next two not used in C, but this wires the TLS offsets to small values
-  #!+(and x86-64 sb-thread) (current-catch-block)
-  #!+(and x86-64 sb-thread) (current-unwind-protect-block)
-  (alien-stack-pointer :c-type "lispobj *" :length #!+alpha 2 #!-alpha 1)
-  (binding-stack-pointer :c-type "lispobj *" :length #!+alpha 2 #!-alpha 1)
+  #!+(and x86-64 sb-thread)
+  (current-catch-block :special *current-catch-block*)
+  #!+(and x86-64 sb-thread)
+  (current-unwind-protect-block :special *current-unwind-protect-block*)
+  (alien-stack-pointer :c-type "lispobj *" :length #!+alpha 2 #!-alpha 1
+                       :special *alien-stack-pointer*)
+  (binding-stack-pointer :c-type "lispobj *" :length #!+alpha 2 #!-alpha 1
+                         :special *binding-stack-pointer*)
   ;; END of slots to keep near the beginning.
 
   ;; These aren't accessed (much) from Lisp, so don't really care
   ;; if it takes a 4-byte displacement.
   (alien-stack-start :c-type "lispobj *" :length #!+alpha 2 #!-alpha 1)
-  (binding-stack-start :c-type "lispobj *" :length #!+alpha 2 #!-alpha 1)
+  (binding-stack-start :c-type "lispobj *" :length #!+alpha 2 #!-alpha 1
+                       :special *binding-stack-start*)
   #!+sb-thread
   (os-attr :c-type "pthread_attr_t *" :length #!+alpha 2 #!-alpha 1)
   #!+sb-thread
@@ -428,8 +433,10 @@
   (state-not-stopped-sem :c-type "os_sem_t *" :length #!+alpha 2 #!-alpha 1)
   #!+sb-thread
   (state-not-stopped-waitcount :c-type "int" :length 1)
-  (control-stack-start :c-type "lispobj *" :length #!+alpha 2 #!-alpha 1)
-  (control-stack-end :c-type "lispobj *" :length #!+alpha 2 #!-alpha 1)
+  (control-stack-start :c-type "lispobj *" :length #!+alpha 2 #!-alpha 1
+                       :special *control-stack-start*)
+  (control-stack-end :c-type "lispobj *" :length #!+alpha 2 #!-alpha 1
+                     :special *control-stack-end*)
   (control-stack-guard-page-protected)
   #!+win32 (private-events :c-type "struct private_events" :length 2)
   (this :c-type "struct thread *" :length #!+alpha 2 #!-alpha 1)

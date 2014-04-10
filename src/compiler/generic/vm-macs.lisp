@@ -33,14 +33,17 @@
                 (remove-keywords (cddr options) keywords)))))
 
 (def!struct (prim-object-slot
-             (:constructor make-slot (name docs rest-p offset options))
+             (:constructor make-slot (name docs rest-p offset special options))
              (:make-load-form-fun just-dump-it-normally)
              (:conc-name slot-))
   (name nil :type symbol)
   (docs nil :type (or null simple-string))
   (rest-p nil :type (member t nil))
   (offset 0 :type fixnum)
-  (options nil :type list))
+  (options nil :type list)
+  ;; On some targets (e.g. x86-64) slots of the thread structure are
+  ;; referenced as special variables, this slot holds the name of that variable.
+  (special nil :type symbol))
 
 (def!struct (primitive-object (:make-load-form-fun just-dump-it-normally))
   (name nil :type symbol)
@@ -64,7 +67,7 @@
 (defmacro define-primitive-object
           ((name &key lowtag widetag alloc-trans (type t))
            &rest slot-specs)
-  (collect ((slots) (exports) (constants) (forms) (inits))
+  (collect ((slots) (specials) (constants) (forms) (inits))
     (let ((offset (if widetag 1 0))
           (variable-length-p nil))
       (dolist (spec slot-specs)
@@ -77,16 +80,18 @@
                        (ref-known nil ref-known-p) ref-trans
                        (set-known nil set-known-p) set-trans
                        cas-trans
+                       special
                        &allow-other-keys)
             (if (atom spec) (list spec) spec)
-          (slots (make-slot slot-name docs rest-p offset
+          (slots (make-slot slot-name docs rest-p offset special
                             (remove-keywords options
                                              '(:docs :rest-p :length))))
           (let ((offset-sym (symbolicate name "-" slot-name
                                          (if rest-p "-OFFSET" "-SLOT"))))
             (constants `(def!constant ,offset-sym ,offset
                           ,@(when docs (list docs))))
-            (exports offset-sym))
+            (when special
+              (specials `(defvar ,special))))
           (when ref-trans
             (when ref-known-p
               (forms `(defknown ,ref-trans (,type) ,slot-type ,ref-known)))
@@ -115,9 +120,7 @@
             (setf variable-length-p t))
           (incf offset length)))
       (unless variable-length-p
-        (let ((size (symbolicate name "-SIZE")))
-          (constants `(def!constant ,size ,offset))
-          (exports size)))
+        (constants `(def!constant ,(symbolicate name "-SIZE") ,offset)))
       (when alloc-trans
         (forms `(def-alloc ,alloc-trans ,offset
                   ,(if variable-length-p :var-alloc :fixed-alloc)
@@ -132,7 +135,8 @@
                                      :slots (slots)
                                      :size offset
                                      :variable-length-p variable-length-p))
-           ,@(constants))
+           ,@(constants)
+           ,@(specials))
          ,@(forms)))))
 
 ;;;; stuff for defining reffers and setters

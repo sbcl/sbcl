@@ -108,19 +108,14 @@
   ;; slots every time. Instead, (INFO :VARIABLE :WIRED-TLS ...) should
   ;; be a small integer representing the actual index.
   (defun symbol-thread-struct-offset (symbol)
-    (when (looks-like-name-of-special-var-p symbol)
-      (let* ((name (symbol-name symbol))
-             (name-len-less-1 (- (length name) 1))
-             (name-len-sans-earmuffs (- (length name) 2)))
-        (awhen (find-if (lambda (slot)
-                          (let ((slot-name (symbol-name (slot-name slot))))
-                            (and (= (length slot-name) name-len-sans-earmuffs)
-                                 (string= name slot-name
-                                          :start1 1 :end1 name-len-less-1))))
-                        (primitive-object-slots
-                         (find 'thread *primitive-objects*
-                               :key #'primitive-object-name)))
-          (ash (slot-offset it) word-shift)))))
+    (awhen (and symbol
+                (find symbol
+                      (primitive-object-slots
+                       (find 'thread *primitive-objects*
+                             :key #'primitive-object-name))
+                      :key #'slot-special
+                      :test #'eq))
+      (ash (slot-offset it) word-shift)))
 
   ;; Return an EA for the TLS of SYMBOL, or die.
   (defun symbol-known-tls-cell (symbol)
