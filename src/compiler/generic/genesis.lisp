@@ -2683,6 +2683,7 @@ core and return a descriptor to it."
     (write-wordindexed fn sb!vm::simple-fun-info-slot info)
     fn))
 
+#!+sb-thread
 (define-cold-fop (fop-symbol-tls-fixup)
   (let* ((symbol (pop-stack))
          (kind (pop-stack))

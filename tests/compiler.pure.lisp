@@ -157,6 +157,17 @@
     (assert (null value))
     (assert (eq (cell-error-name error) 'some-undefined-function))))
 
+(with-test (:name :unbound-variable-error)
+  (let ((foo (gensym)))
+    (assert (eq (handler-case (symbol-value foo)
+                  (unbound-variable (c) (cell-error-name c)))
+                foo))
+    ;; on x86-64 the code for a "known" symbol uses a slightly different path,
+    ;; so test that too
+    (assert (eq (handler-case xyzzy*%state
+                  (unbound-variable (c) (cell-error-name c)))
+                'xyzzy*%state))))
+
 ;;; Non-symbols shouldn't be allowed as VARs in lambda lists. (Where VAR
 ;;; is a variable name, as in section 3.4.1 of the ANSI spec.)
 (assert (null (ignore-errors (eval '(lambda ("foo") 12)))))

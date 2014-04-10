@@ -186,7 +186,7 @@
       (:translate symbol-value)
       (:policy :fast-safe)
       (:args (symbol :scs (descriptor-reg constant) :to (:result 1)))
-      (:temporary (:sc unsigned-reg) symbol-reg)
+      (:temporary (:sc descriptor-reg) symbol-reg)
       (:results (value :scs (descriptor-reg any-reg)))
       (:vop-var vop)
       (:save-p :compute-only)
