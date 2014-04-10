@@ -759,5 +759,95 @@
 
     (test 'subtypep-fwd-testb1 'subtypep-fwd-testb2 nil nil)
     (test 'subtypep-fwd-testb2 'subtypep-fwd-testb1 t t)))
+
+;;; Array type unions have some tricky semantics.
+
+(macrolet
+    ((disunity-test (name type-specifier-1 type-specifier-2)
+       `(with-test (:name ,name)
+          (let ((type1 (sb-kernel:specifier-type ',type-specifier-1))
+                (type2 (sb-kernel:specifier-type ',type-specifier-2)))
+            (assert (null (sb-kernel::%type-union2 type1 type2)))
+            (assert (null (sb-kernel::%type-union2 type2 type1))))))
+     (unity-test (name type-specifier-1 type-specifier-2 result-type-specifier)
+       `(with-test (:name ,name)
+          (let* ((type1 (sb-kernel:specifier-type ',type-specifier-1))
+                 (type2 (sb-kernel:specifier-type ',type-specifier-2))
+                 (rtype (sb-kernel:specifier-type ',result-type-specifier))
+                 (res1 (sb-kernel::%type-union2 type1 type2))
+                 (res2 (sb-kernel::%type-union2 type2 type1)))
+            ;; The (ARRAY :SIMPLE-=) type method doesn't always (or
+            ;; even usually) check the element type, preferring
+            ;; instead to check the upgraded element type.  Therefore,
+            ;; check the element types ourselves.
+            (assert (and (sb-kernel:type= res1 rtype)
+                         (sb-kernel:type=
+                          (sb-kernel:array-type-element-type res1)
+                          (sb-kernel:array-type-element-type rtype))))
+            (assert (and (sb-kernel:type= res2 rtype)
+                         (sb-kernel:type=
+                          (sb-kernel:array-type-element-type res2)
+                          (sb-kernel:array-type-element-type rtype))))))))
+
+  (unity-test (:array-type-union :basic)
+              array
+              array
+              array)
+
+  (unity-test (:array-type-union :dimensional-compatability :wild)
+              (array * *)
+              (array * (* * *))
+              (array * *))
+
+  (disunity-test (:array-type-union :dimensional-compatability :incompatible 1)
+                 (array * (* *))
+                 (array * (* * *)))
+
+  (disunity-test (:array-type-union :dimensional-compatability :incompatible 2)
+                 (array * (* 1 *))
+                 (array * (* 2 *)))
+
+  (disunity-test (:array-type-union :dimensional-unity :only-one-dimension-per-union)
+              (array * (2 *))
+              (array * (* 3)))
+
+  (unity-test (:array-type-union :complexp-unity :moves-towards-maybe)
+              simple-array
+              (and array (not simple-array))
+              array)
+
+  (disunity-test (:array-type-union :complexp-and-dimensions-dont-unite 1)
+                 (simple-array * (* *))
+                 (and (array * (* 3)) (not simple-array)))
+
+  (disunity-test (:array-type-union :complexp-and-dimensions-dont-unite 2)
+              (simple-array * (* *))
+              (array * (* 3)))
+
+  (unity-test (:array-type-union :element-subtypes :unite-within-saetp)
+              (array (integer 15 27))
+              (array (integer 15 26))
+              (array (integer 15 27)))
+
+  (disunity-test (:array-type-union :element-subtypes :dont-unite-across-saetp)
+                 (array (unsigned-byte 7))
+                 (array (unsigned-byte 3)))
+
+  (disunity-test (:array-type-union :disjoint-element-types :dont-unite)
+                 (array (integer 15 27))
+                 (array (integer 17 30)))
+
+  (unity-test (:array-type-union :wild-element-type :unites)
+              array
+              (array (unsigned-byte 8))
+              array)
+
+  (disunity-test (:array-type-union :element-type-and-dimensions-dont-unite)
+                 (array (unsigned-byte 8))
+                 (array * (* *)))
+
+  (disunity-test (:array-type-union :element-type-and-complexp-dont-unite)
+                 (simple-array (unsigned-byte 8))
+                 (and array (not simple-array))))
 
 ;;; success

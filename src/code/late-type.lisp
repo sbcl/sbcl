@@ -2581,35 +2581,126 @@ used for a COMPLEX component.~:@>"
           (t
            (values nil t)))))
 
+(defun unite-array-types-complexp (type1 type2)
+  (let ((complexp1 (array-type-complexp type1))
+        (complexp2 (array-type-complexp type2)))
+    (cond
+      ((eq complexp1 complexp2)
+       ;; both types are the same complexp-ity
+       (values complexp1 t))
+      ((eq complexp1 :maybe)
+       ;; type1 is wild-complexp
+       (values :maybe type1))
+      ((eq complexp2 :maybe)
+       ;; type2 is wild-complexp
+       (values :maybe type2))
+      (t
+       ;; both types partition the complexp-space
+       (values :maybe nil)))))
+
+(defun unite-array-types-dimensions (type1 type2)
+  (let ((dims1 (array-type-dimensions type1))
+        (dims2 (array-type-dimensions type2)))
+    (cond ((equal dims1 dims2)
+           ;; both types are same dimensionality
+           (values dims1 t))
+          ((eq dims1 '*)
+           ;; type1 is wild-dimensions
+           (values '* type1))
+          ((eq dims2 '*)
+           ;; type2 is wild-dimensions
+           (values '* type2))
+          ((not (= (length dims1) (length dims2)))
+           ;; types have different number of dimensions
+           (values :incompatible nil))
+          (t
+           ;; we need to check on a per-dimension basis
+           (let* ((supertype1 t)
+                  (supertype2 t)
+                  (compatible t)
+                  (result (mapcar (lambda (dim1 dim2)
+                                    (cond
+                                      ((equal dim1 dim2)
+                                       dim1)
+                                      ((eq dim1 '*)
+                                       (setf supertype2 nil)
+                                       '*)
+                                      ((eq dim2 '*)
+                                       (setf supertype1 nil)
+                                       '*)
+                                      (t
+                                       (setf compatible nil))))
+                                  dims1 dims2)))
+             (cond
+               ((or (not compatible)
+                    (and (not supertype1)
+                         (not supertype2)))
+                (values :incompatible nil))
+               ((and supertype1 supertype2)
+                (values result supertype1))
+               (t
+                (values result (if supertype1 type1 type2)))))))))
+
+(defun unite-array-types-element-types (type1 type2)
+  ;; FIXME: We'd love to be able to unite the full set of specialized
+  ;; array element types up to *wild-type*, but :simple-union2 is
+  ;; performed pairwise, so we don't have a good hook for it and our
+  ;; representation doesn't allow us to easily detect the situation
+  ;; anyway.
+  (let* ((eltype1 (array-type-element-type type1))
+         (eltype2 (array-type-element-type type2))
+         (stype1 (array-type-specialized-element-type type1))
+         (stype2 (array-type-specialized-element-type type2))
+         (wild1 (eq eltype1 *wild-type*))
+         (wild2 (eq eltype2 *wild-type*)))
+    (cond
+      ((type= eltype1 eltype2)
+       (values eltype1 stype1 t))
+      (wild1
+       (values eltype1 stype1 type1))
+      (wild2
+       (values eltype2 stype2 type2))
+      ((not (type= stype1 stype2))
+       ;; non-wild types that don't share UAET don't unite
+       (values :incompatible nil nil))
+      ((csubtypep eltype1 eltype2)
+       (values eltype2 stype2 type2))
+      ((csubtypep eltype2 eltype1)
+       (values eltype1 stype1 type1))
+      (t
+       (values :incompatible nil nil)))))
+
+(defun unite-array-types-supertypes-compatible-p (&rest supertypes)
+  ;; supertypes are compatible if they are all T, if there is a single
+  ;; NIL and all the rest are T, or if all non-T supertypes are the
+  ;; same and not NIL.
+  (let ((interesting-supertypes
+         (remove t supertypes)))
+    (or (not interesting-supertypes)
+        (equal interesting-supertypes '(nil))
+        ;; supertypes are (OR BOOLEAN ARRAY-TYPE), so...
+        (typep (remove-duplicates interesting-supertypes)
+               '(cons array-type null)))))
+
 (!define-type-method (array :simple-union2) (type1 type2)
-   (let* ((dims1 (array-type-dimensions type1))
-          (dims2 (array-type-dimensions type2))
-          (complexp1 (array-type-complexp type1))
-          (complexp2 (array-type-complexp type2))
-          (eltype1 (array-type-element-type type1))
-          (eltype2 (array-type-element-type type2))
-          (stype1 (array-type-specialized-element-type type1))
-          (stype2 (array-type-specialized-element-type type2))
-          (wild1 (eq eltype1 *wild-type*))
-          (wild2 (eq eltype2 *wild-type*))
-          (e2 nil))
-     (when (or wild1 wild2
-               (and (or (setf e2 (csubtypep eltype1 eltype2))
-                        (csubtypep eltype2 eltype1))
-                    (type= stype1 stype2)))
-       (make-array-type
-        :dimensions (cond ((or (eq dims1 '*) (eq dims2 '*))
-                           '*)
-                          ((equal dims1 dims2)
-                           dims1)
-                          ((= (length dims1) (length dims2))
-                           (mapcar (lambda (x y) (if (eq x y) x '*))
-                                   dims1 dims2))
-                          (t
-                           '*))
-        :complexp (if (eq complexp1 complexp2) complexp1 :maybe)
-        :element-type (if (or wild2 e2) eltype2 eltype1)
-        :specialized-element-type (if wild2 stype2 stype1)))))
+  (multiple-value-bind
+        (result-eltype result-stype eltype-supertype)
+      (unite-array-types-element-types type1 type2)
+    (multiple-value-bind
+          (result-complexp complexp-supertype)
+        (unite-array-types-complexp type1 type2)
+      (multiple-value-bind
+            (result-dimensions dimensions-supertype)
+          (unite-array-types-dimensions type1 type2)
+        (when (and (not (eq result-dimensions :incompatible))
+                   (not (eq result-eltype :incompatible))
+                   (unite-array-types-supertypes-compatible-p
+                    eltype-supertype complexp-supertype dimensions-supertype))
+          (make-array-type
+           :dimensions result-dimensions
+           :complexp result-complexp
+           :element-type result-eltype
+           :specialized-element-type result-stype))))))
 
 (!define-type-method (array :simple-intersection2) (type1 type2)
   (declare (type array-type type1 type2))

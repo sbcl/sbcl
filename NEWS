@@ -3,6 +3,9 @@ changes relative to sbcl-1.1.17:
   * bug fix: correctly inherit condition initforms. (lp#1300904)
   * bug fix: properly pprint literal functions inside nested lists.
     (lp#1300716)
+  * bug fix: more-correctly handle array-type unity (broken for ages,
+causing compilation problems since 1.1.13.x due to smarter TYPEP type
+propagation, reported by jasom in #lisp).
 
 changes in sbcl-1.1.17 relative to sbcl-1.1.16:
   * enhancement: printing backtraces respects
