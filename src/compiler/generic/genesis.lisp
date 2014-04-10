@@ -879,11 +879,10 @@ core and return a descriptor to it."
 ;; by the fasloader on demand.
 #!+sb-thread
 (defvar *known-tls-symbols*
-  (let ((ht (make-hash-table :test #'eq)))
     ;; FIXME: no mechanism exists to determine which static symbols C code will
     ;; dynamically bind. TLS is a finite resource, and wasting indices for all
     ;; static symbols isn't the best idea. This list was hand-made with 'grep'.
-    (dolist (name '(sb!vm:*alloc-signal*
+                  '(sb!vm:*alloc-signal*
                     sb!sys:*allow-with-interrupts*
                     sb!vm:*current-catch-block*
                     sb!vm::*current-unwind-protect-block*
@@ -899,17 +898,6 @@ core and return a descriptor to it."
                     sb!kernel:*stop-for-gc-pending*
                     #!+sb-thruption
                     sb!sys:*thruption-pending*))
-      (setf (gethash name ht) :assign))
-    ;; These take precedence over the above. e.g. -CATCH-BLOCK- on x86[-64]
-    ;; is a slot that gets a low fixed index, not a variable index.
-    (dolist (slot (sb!vm::primitive-object-slots
-                   (find 'sb!vm::thread sb!vm:*primitive-objects*
-                         :key #'sb!vm:primitive-object-name)))
-      (let ((slot-special (sb!vm::slot-special slot)))
-        (when slot-special
-          (setf (gethash slot-special ht)
-                (sb!vm::slot-offset slot)))))
-    ht))
 
 ;;; Allocate (and initialize) a symbol.
 (defun allocate-symbol (name &key (gspace *dynamic*))
@@ -930,10 +918,13 @@ core and return a descriptor to it."
 
 #!+sb-thread
 (defun assign-tls-index (symbol cold-symbol)
-  (awhen (gethash symbol *known-tls-symbols*)
-    (when (eq it :assign)
-      (shiftf it *genesis-tls-counter* (1+ *genesis-tls-counter*)))
-    (cold-assign-tls-index cold-symbol (ash it sb!vm:word-shift))))
+  (let ((index (info :variable :wired-tls symbol)))
+    (cond ((integerp index) ; thread slot
+           (cold-assign-tls-index cold-symbol index))
+          ((memq symbol *known-tls-symbols*)
+           ;; symbols without which the C runtime could not start
+           (shiftf index *genesis-tls-counter* (1+ *genesis-tls-counter*))
+           (cold-assign-tls-index cold-symbol (ash index sb!vm:word-shift))))))
 
 ;;; Set the cold symbol value of SYMBOL-OR-SYMBOL-DES, which can be either a
 ;;; descriptor of a cold symbol or (in an abbreviation for the

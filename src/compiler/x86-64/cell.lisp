@@ -99,14 +99,19 @@
 ;; based on wiring. Except when a symbol maps into a thread slot, the compiler
 ;; doesn't care what the actual index is - that's the loader's purview.
 (defun wired-tls-symbol-p (symbol)
-  (or (symbol-thread-struct-offset symbol)
-      (memq (info :variable :wired-tls symbol)
-            '(:always-has-tls :always-thread-local))))
+  (not (null (info :variable :wired-tls symbol))))
 
 ;; Return the DISP field to use in an EA relative to thread-base-tn
 (defun load-time-tls-offset (symbol)
-  (or (symbol-thread-struct-offset symbol)
-      (make-fixup symbol :symbol-tls-index)))
+  (let ((where (info :variable :wired-tls symbol)))
+    (cond ((integerp where) where)
+          (t (make-fixup symbol :symbol-tls-index)))))
+
+;; Return T if reference to symbol doesn't need to check for no-tls-value.
+;; True of thread struct slots. More generally we could add a declaration.
+(defun symbol-always-thread-local-p (symbol)
+  (let ((where (info :variable :wired-tls symbol)))
+    (or (eq where :ALWAYS-THREAD-LOCAL) (integerp where))))
 
 (macrolet (;; Logic common to thread-aware SET and CAS. CELL is assigned
            ;; to the location that should be accessed to modify SYMBOL's
@@ -207,11 +212,8 @@
            (inst mov symbol-reg symbol) ; = MOV REG, [RIP-N]
            (inst mov (reg-in-size value :dword) (tls-index-of symbol-reg))
            (inst mov value (access-tls-val value :qword))))
-     #| FIXME: should be (typep (info :variable :wired-tls (tn-value symbol))
-                                 '(or (eq :always-thread-local) integer)) |#
-        ;; Thread slots should never access a symbol's global value.
         (unless (and (sc-is symbol constant)
-                     (symbol-thread-struct-offset (tn-value symbol)))
+                     (symbol-always-thread-local-p (tn-value symbol)))
           (inst cmp (reg-in-size value :dword) no-tls-value-marker-widetag)
           (inst cmov :e value (access-value-slot symbol-reg)))
         (when check-boundp
@@ -247,7 +249,7 @@
       (:variant t)
       (:generator 5
         (inst mov value (access-wired-tls-val symbol))
-        (unless (symbol-thread-struct-offset symbol) ; same FIXME as above
+        (unless (symbol-always-thread-local-p symbol)
           (inst cmp (reg-in-size value :dword) no-tls-value-marker-widetag)
           (inst cmov :e value (static-symbol-value-ea symbol)))
         (when check-boundp

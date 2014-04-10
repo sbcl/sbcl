@@ -483,3 +483,10 @@
   #!+alpha
   (padding)
   (interrupt-contexts :c-type "os_context_t *" :rest-p t))
+
+#!+sb-thread
+(dolist (slot (primitive-object-slots
+               (find 'thread *primitive-objects* :key #'primitive-object-name)))
+  (when (slot-special slot)
+    (setf (info :variable :wired-tls (slot-special slot))
+          (ash (slot-offset slot) word-shift))))

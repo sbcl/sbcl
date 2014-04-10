@@ -162,11 +162,16 @@
     (assert (eq (handler-case (symbol-value foo)
                   (unbound-variable (c) (cell-error-name c)))
                 foo))
-    ;; on x86-64 the code for a "known" symbol uses a slightly different path,
+    ;; on x86-64 the code for a literal symbol uses a slightly different path,
     ;; so test that too
     (assert (eq (handler-case xyzzy*%state
                   (unbound-variable (c) (cell-error-name c)))
-                'xyzzy*%state))))
+                'xyzzy*%state))
+    ;; And finally, also on x86-64, there was massive confusion about
+    ;; variable names that looked like names of thread slots.
+    (assert (eq (handler-case *state*
+                  (unbound-variable (c) (cell-error-name c)))
+                '*state*))))
 
 ;;; Non-symbols shouldn't be allowed as VARs in lambda lists. (Where VAR
 ;;; is a variable name, as in section 3.4.1 of the ANSI spec.)

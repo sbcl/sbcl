@@ -100,27 +100,10 @@
 
 #!+sb-thread
 (progn
-  ;; Return the index of SYMBOL in thread-local storage if it maps onto a
-  ;; fixed slot of a thread as defined in generic/objdef. It need not be
-  ;; in static space. If SYMBOL does not have a known TLS index, return NIL.
-  ;; FIXME: This is a crummy and slow way to look up this info, as it
-  ;; requires that every use of the SYMBOL-VALUE vop scan all thread
-  ;; slots every time. Instead, (INFO :VARIABLE :WIRED-TLS ...) should
-  ;; be a small integer representing the actual index.
-  (defun symbol-thread-struct-offset (symbol)
-    (awhen (and symbol
-                (find symbol
-                      (primitive-object-slots
-                       (find 'thread *primitive-objects*
-                             :key #'primitive-object-name))
-                      :key #'slot-special
-                      :test #'eq))
-      (ash (slot-offset it) word-shift)))
-
   ;; Return an EA for the TLS of SYMBOL, or die.
   (defun symbol-known-tls-cell (symbol)
-    (let ((index (symbol-thread-struct-offset symbol)))
-      (aver index)
+    (let ((index (info :variable :wired-tls symbol)))
+      (aver (integerp index))
       (make-ea :qword :base thread-base-tn :disp index)))
 
   ;; LOAD/STORE-TL-SYMBOL-VALUE macros are ad-hoc (ugly) emulations
