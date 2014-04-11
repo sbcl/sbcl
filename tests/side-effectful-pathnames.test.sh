@@ -69,7 +69,7 @@ run_sbcl <<EOF
   (and
    (equalp (ensure-directories-exist abs-name) abs-name)
    (equalp (ensure-directories-exist rel-name) rel-name)
-   (sb-ext:quit :unix-status 52)))
+   (sb-ext:exit :code 52)))
 EOF
 check_status_maybe_lose "ENSURE-DIRECTORIES-EXIST" $?
 if [ ! -d "$testdir/foo/bar" ] ; then
