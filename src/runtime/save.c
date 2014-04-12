@@ -241,10 +241,6 @@ save_to_filehandle(FILE *file, char *filename, lispobj init_function,
     core_start_pos = ftell(file);
     write_lispobj(CORE_MAGIC, file);
 
-    write_lispobj(VERSION_CORE_ENTRY_TYPE_CODE, file);
-    write_lispobj(3, file);
-    write_lispobj(SBCL_CORE_VERSION_INTEGER, file);
-
     write_lispobj(BUILD_ID_CORE_ENTRY_TYPE_CODE, file);
     write_lispobj(/* (We're writing the word count of the entry here, and the 2
           * term is one word for the leading BUILD_ID_CORE_ENTRY_TYPE_CODE

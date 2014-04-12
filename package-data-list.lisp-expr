@@ -573,8 +573,7 @@ like *STACK-TOP-HINT* and unsupported stuff like *TRACED-FUN-LIST*."
                "OPEN-FASL-OUTPUT" "PAGE-TABLE-CORE-ENTRY-TYPE-CODE"
                "READ-ONLY-CORE-SPACE-ID"
                "*!REVERSED-COLD-TOPLEVELS*"
-               "STATIC-CORE-SPACE-ID"
-               "VERSION-CORE-ENTRY-TYPE-CODE"))
+               "STATIC-CORE-SPACE-ID"))
 
    ;; This package is a grab bag for things which used to be internal
    ;; symbols in package COMMON-LISP. Lots of these symbols are accessed

@@ -432,15 +432,6 @@ load_core_file(char *file, os_vm_offset_t file_offset)
             SHOW("END_CORE_ENTRY_TYPE_CODE case");
             break;
 
-        case VERSION_CORE_ENTRY_TYPE_CODE:
-            SHOW("VERSION_CORE_ENTRY_TYPE_CODE case");
-            if (*ptr != SBCL_CORE_VERSION_INTEGER) {
-                lose("core file version (%d) != runtime library version (%d)\n",
-                     *ptr,
-                     SBCL_CORE_VERSION_INTEGER);
-            }
-            break;
-
         case BUILD_ID_CORE_ENTRY_TYPE_CODE:
             SHOW("BUILD_ID_CORE_ENTRY_TYPE_CODE case");
             {

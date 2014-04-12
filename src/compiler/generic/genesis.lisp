@@ -39,30 +39,6 @@
           (ash (sb!xc:char-code #\C) 8)
           (sb!xc:char-code #\L)))
 
-;;; the current version of SBCL core files
-;;;
-;;; FIXME: This is left over from CMU CL, and not well thought out.
-;;; It's good to make sure that the runtime doesn't try to run core
-;;; files from the wrong version, but a single number is not the ideal
-;;; way to do this in high level data like this (as opposed to e.g. in
-;;; IP packets), and in fact the CMU CL version number never ended up
-;;; being incremented past 0. A better approach might be to use a
-;;; string which is set from CVS data. (Though now as of sbcl-0.7.8 or
-;;; so, we have another problem that the core incompatibility
-;;; detection mechanisms are on such a hair trigger -- with even
-;;; different builds from the same sources being considered
-;;; incompatible -- that any coarser-grained versioning mechanisms
-;;; like this are largely irrelevant as long as the hair-triggering
-;;; persists.)
-;;;
-;;; 0: inherited from CMU CL
-;;; 1: rearranged static symbols for sbcl-0.6.8
-;;; 2: eliminated non-ANSI %DEFCONSTANT/%%DEFCONSTANT support,
-;;;    deleted a slot from DEBUG-SOURCE structure
-;;; 3: added build ID to cores to discourage sbcl/.core mismatch
-;;; 4: added gc page table data
-(defconstant sbcl-core-version-integer 4)
-
 (defun round-up (number size)
   #!+sb-doc
   "Round NUMBER up to be an integral multiple of SIZE."
@@ -2852,10 +2828,8 @@ core and return a descriptor to it."
     (format t "#define LISP_FEATURE_~A~%" shebang-feature-name))
   (terpri)
   ;; and miscellaneous constants
-  (format t "#define SBCL_CORE_VERSION_INTEGER ~D~%" sbcl-core-version-integer)
-  (format t
-          "#define SBCL_VERSION_STRING ~S~%"
-          (sb!xc:lisp-implementation-version))
+  (format t "#define SBCL_VERSION_STRING ~S~%"
+            (sb!xc:lisp-implementation-version))
   (format t "#define CORE_MAGIC 0x~X~%" core-magic)
   (format t "#ifndef LANGUAGE_ASSEMBLY~2%")
   (format t "#define LISPOBJ(x) ((lispobj)x)~2%")
@@ -3196,8 +3170,7 @@ initially undefined function references:~2%")
 ;;; all in an easily recognizable range, and displacing the range away from
 ;;; zero seems likely to reduce the chance that random garbage will be
 ;;; misinterpreted as a .core file.)
-(defconstant version-core-entry-type-code 3860)
-(defconstant build-id-core-entry-type-code 3899)
+(defconstant build-id-core-entry-type-code 3860)
 (defconstant new-directory-core-entry-type-code 3861)
 (defconstant initial-fun-core-entry-type-code 3863)
 (defconstant page-table-core-entry-type-code 3880)
@@ -3290,15 +3263,9 @@ initially undefined function references:~2%")
       ;; Write the magic number.
       (write-word core-magic)
 
-      ;; Write the Version entry.
-      (write-word version-core-entry-type-code)
-      (write-word 3)
-      (write-word sbcl-core-version-integer)
-
       ;; Write the build ID.
       (write-word build-id-core-entry-type-code)
-      (let ((build-id (with-open-file (s "output/build-id.tmp"
-                                         :direction :input)
+      (let ((build-id (with-open-file (s "output/build-id.tmp")
                         (read s))))
         (declare (type simple-string build-id))
         (/show build-id (length build-id))
