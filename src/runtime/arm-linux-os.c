@@ -33,6 +33,7 @@
 #include <sys/time.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#include <errno.h>
 
 #include "validate.h"
 size_t os_vm_page_size;
@@ -41,6 +42,17 @@ size_t os_vm_page_size;
 #error "Define threading support functions"
 #else
 int arch_os_thread_init(struct thread *thread) {
+    stack_t sigstack;
+    /* Signal handlers are normally run on the main stack, but we've
+     * swapped stacks, require that the control stack contain only
+     * boxed data, and expands upwards while the C stack expands
+     * downwards. */
+    sigstack.ss_sp=((void *) thread)+dynamic_values_bytes;
+    sigstack.ss_flags=0;
+    sigstack.ss_size = 32*SIGSTKSZ;
+    if(sigaltstack(&sigstack,0)<0)
+        lose("Cannot sigaltstack: %s\n",strerror(errno));
+
     return 1;                   /* success */
 }
 int arch_os_thread_cleanup(struct thread *thread) {

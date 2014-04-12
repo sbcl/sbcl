@@ -1937,7 +1937,7 @@ undoably_install_low_level_interrupt_handler (int signal,
     sigcopyset(&sa.sa_mask, &blockable_sigset);
     sa.sa_flags = SA_SIGINFO | SA_RESTART
         | (sigaction_nodefer_works ? SA_NODEFER : 0);
-#ifdef LISP_FEATURE_C_STACK_IS_CONTROL_STACK
+#if defined(LISP_FEATURE_C_STACK_IS_CONTROL_STACK) || defined(LISP_FEATURE_ARM)
     if(signal==SIG_MEMORY_FAULT) {
         sa.sa_flags |= SA_ONSTACK;
 # ifdef LISP_FEATURE_SB_SAFEPOINT
