@@ -437,34 +437,54 @@
 (define-vop (symbolp type-predicate)
   (:translate symbolp)
   (:generator 12
-    (let ((is-symbol-label (if not-p drop-thru target)))
-      (inst cmp value nil-value)
+    (let ((is-symbol-label (if not-p DROP-THRU target))
+          (widetag-tn (make-ea :byte :base value :disp (- other-pointer-lowtag))))
+      ;; It could have been done with just TEST-TYPE, but using CMP on
+      ;; EAX saves one byte, this basically unrolls TEST-TYPE and
+      ;; inserts a comparison to NIL in the middle.
+      (inst lea eax-tn widetag-tn)
+      (inst cmp eax-tn (- nil-value other-pointer-lowtag))
       (inst jmp :e is-symbol-label)
-      (test-type value target not-p (symbol-header-widetag)))
+      (inst test al-tn other-pointer-lowtag)
+      (inst jmp :nz (if not-p target drop-thru))
+      (inst cmp widetag-tn symbol-header-widetag)
+      (inst jmp (if not-p :ne :e) target))
     DROP-THRU))
 
 (define-vop (check-symbol check-type)
   (:generator 12
-    (let ((error (generate-error-code vop 'object-not-symbol-error value)))
-      (inst cmp value nil-value)
+    (let ((error (generate-error-code vop 'object-not-symbol-error value))
+          (widetag-tn (make-ea :byte :base value :disp (- other-pointer-lowtag))))
+      (inst lea eax-tn widetag-tn)
+      (inst cmp eax-tn (- nil-value other-pointer-lowtag))
       (inst jmp :e drop-thru)
-      (test-type value error t (symbol-header-widetag)))
+      (inst test al-tn other-pointer-lowtag)
+      (inst jmp :nz error)
+      (inst cmp widetag-tn symbol-header-widetag)
+      (inst jmp :ne error))
     DROP-THRU
     (move result value)))
 
 (define-vop (consp type-predicate)
   (:translate consp)
   (:generator 8
-    (let ((is-not-cons-label (if not-p target drop-thru)))
-      (inst cmp value nil-value)
-      (inst jmp :e is-not-cons-label)
-      (test-type value target not-p (list-pointer-lowtag)))
+     (let ((is-not-cons-label (if not-p target drop-thru)))
+       ;; It could have been done with just TEST-TYPE, but using CMP on
+       ;; EAX saves one byte, this basically unrolls TEST-TYPE and
+       ;; inserts a comparison to NIL in the middle.
+       (inst lea eax-tn (make-ea :dword :base value :disp (- list-pointer-lowtag)))
+       (inst cmp eax-tn (- nil-value list-pointer-lowtag))
+       (inst jmp :e is-not-cons-label)
+       (inst test al-tn other-pointer-lowtag)
+       (inst jmp (if not-p :nz :z) target))
     DROP-THRU))
 
 (define-vop (check-cons check-type)
   (:generator 8
     (let ((error (generate-error-code vop 'object-not-cons-error value)))
-      (inst cmp value nil-value)
+      (inst lea eax-tn (make-ea :dword :base value :disp (- list-pointer-lowtag)))
+      (inst cmp eax-tn (- nil-value list-pointer-lowtag))
       (inst jmp :e error)
-      (test-type value error t (list-pointer-lowtag))
+      (inst test al-tn other-pointer-lowtag)
+      (inst jmp :nz error)
       (move result value))))
