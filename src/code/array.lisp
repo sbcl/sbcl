@@ -953,7 +953,7 @@ of specialized arrays is supported."
   (declare (array array))
   (and (array-header-p array) (%array-fill-pointer-p array)))
 
-(defun fill-pointer-error (vector arg)
+(defun fill-pointer-error (vector &optional arg)
   (cond (arg
          (aver (array-has-fill-pointer-p vector))
          (let ((max (%array-available-elements vector)))
@@ -975,7 +975,7 @@ of specialized arrays is supported."
   "Return the FILL-POINTER of the given VECTOR."
   (if (array-has-fill-pointer-p vector)
       (%array-fill-pointer vector)
-      (fill-pointer-error vector nil)))
+      (fill-pointer-error vector)))
 
 (defun %set-fill-pointer (vector new)
   (flet ((oops (x)

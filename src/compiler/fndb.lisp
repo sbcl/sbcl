@@ -944,6 +944,8 @@
   (movable foldable flushable))
 (defknown fill-pointer (complex-vector) index
     (unsafely-flushable explicit-check))
+(defknown sb!impl::fill-pointer-error (t &optional t) nil)
+
 (defknown vector-push (t complex-vector) (or index null)
     (explicit-check)
   :destroyed-constant-args (nth-constant-args 2))
