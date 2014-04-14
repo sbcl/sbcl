@@ -589,3 +589,8 @@
   (:translate sb!bignum:%ashl)
   (:generator 1
     (inst mov result (lsl digit count))))
+
+;;;; Static functions.
+
+(define-static-fun two-arg-< (x y) :translate <)
+(define-static-fun two-arg-> (x y) :translate >)

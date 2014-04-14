@@ -85,7 +85,7 @@
      *pseudo-atomic-interrupted*)))
 
 (defparameter *static-funs*
-  '())
+  '(two-arg-< two-arg->))
 
 
 ;;;; Assembler parameters:
