@@ -664,6 +664,10 @@ elif [ "$sbcl_arch" = "hppa" ]; then
     printf ' :stack-allocatable-lists' >> $ltf
 elif [ "$sbcl_arch" = "arm" ]; then
     printf ' :cheneygc' >> $ltf
+    # As opposed to soft-float or FPA, we support VFP only (and
+    # possibly VFPv2 and higher only), but we'll leave the obvious
+    # hooks in for someone to add the support later.
+    printf ' :arm-vfp :arm-vfpv2' >> $ltf
 else
     # Nothing need be done in this case, but sh syntax wants a placeholder.
     echo > /dev/null

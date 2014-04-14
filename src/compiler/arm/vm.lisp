@@ -71,7 +71,13 @@
 (define-storage-base non-descriptor-stack :unbounded :size 0)
 (define-storage-base constant :non-packed)
 (define-storage-base immediate-constant :non-packed)
+#!+arm-vfp
 (define-storage-base float-registers :finite :size 32)
+;; NOTE: If you fix the following, please to so with its own feature
+;; conditional, and also adjust the definitions of the
+;; {,COMPLEX-}{SINGLE,DOUBLE}-REG SCs below.
+#!-arm-vfp
+(error "Don't know how many float registers for non-VFP systems")
 
 ;;;
 ;;; Handy macro so we don't have to keep changing all the numbers whenever
