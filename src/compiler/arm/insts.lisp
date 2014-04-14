@@ -995,15 +995,11 @@
   (byte 1 4) ; #b0
   (byte 4 0)) ; Fm
 
-(defun low-bit-float-reg (reg-tn precision)
-  (ecase precision
-    (:single (ldb (byte 0 1) (tn-offset reg-tn)))
-    (:double 0)))
+(defun low-bit-float-reg (reg-tn)
+  (logand 1 (tn-offset reg-tn)))
 
-(defun high-bits-float-reg (reg-tn precision)
-  (ecase precision
-    (:single (/ (tn-offset reg-tn) 2))
-    (:double (tn-offset reg-tn))))
+(defun high-bits-float-reg (reg-tn)
+  (ash (tn-offset reg-tn) -1))
 
 (defmacro define-binary-fp-data-processing-instruction (name precision p q r s)
   (let ((precision-flag (ecase precision
@@ -1016,18 +1012,18 @@
                                   (conditional-opcode condition)
                                   #b1110
                                   ,p
-                                  (low-bit-float-reg dest ,precision)
+                                  (low-bit-float-reg dest)
                                   ,q
                                   ,r
-                                  (high-bits-float-reg op-n ,precision)
-                                  (high-bits-float-reg dest ,precision)
+                                  (high-bits-float-reg op-n)
+                                  (high-bits-float-reg dest)
                                   #b101
                                   ,precision-flag
-                                  (low-bit-float-reg op-n ,precision)
+                                  (low-bit-float-reg op-n)
                                   ,s
-                                  (low-bit-float-reg op-m ,precision)
+                                  (low-bit-float-reg op-m)
                                   #b0
-                                  (high-bits-float-reg op-m ,precision)))))))
+                                  (high-bits-float-reg op-m)))))))
 
 (defmacro define-binary-fp-data-processing-instructions (root p q r s)
   `(progn
@@ -1055,18 +1051,18 @@
                                   (conditional-opcode condition)
                                   #b1110
                                   #b1
-                                  (low-bit-float-reg dest ,precision)
+                                  (low-bit-float-reg dest)
                                   #b1
                                   #b1
                                   ,fn
-                                  (high-bits-float-reg dest ,precision)
+                                  (high-bits-float-reg dest)
                                   #b101
                                   ,precision-flag
                                   ,n
                                   #b1
-                                  (low-bit-float-reg op-m ,precision)
+                                  (low-bit-float-reg op-m)
                                   #b0
-                                  (high-bits-float-reg op-m ,precision)))))))
+                                  (high-bits-float-reg op-m)))))))
 
 (defmacro define-unary-fp-data-processing-instructions (root fn n)
   `(progn
@@ -1140,11 +1136,11 @@
                                     #b110
                                     p
                                     u
-                                    (low-bit-float-reg base-reg ,precision)
+                                    (low-bit-float-reg base-reg)
                                     w
                                     ,direction-flag
                                     (tn-offset address)
-                                    (high-bits-float-reg base-reg ,precision)
+                                    (high-bits-float-reg base-reg)
                                     #b101
                                     ,precision-flag
                                     ,(ecase precision
@@ -1182,11 +1178,11 @@
                                     #b110
                                     1
                                     u
-                                    (low-bit-float-reg float-reg ,precision)
+                                    (low-bit-float-reg float-reg)
                                     0
                                     ,direction-flag
                                     (tn-offset address)
-                                    (high-bits-float-reg float-reg ,precision)
+                                    (high-bits-float-reg float-reg)
                                     #b101
                                     ,precision-flag
                                     abs-offset)))))))
@@ -1228,11 +1224,11 @@
                                    #b1110
                                    ,opcode
                                    ,direction-flag
-                                   (high-bits-float-reg float-reg ,precision)
+                                   (high-bits-float-reg float-reg)
                                    (tn-offset arm-reg)
                                    #b101
                                    ,precision-flag
-                                   (low-bit-float-reg float-reg ,precision)
+                                   (low-bit-float-reg float-reg)
                                    #b0010000))))))
 
 (define-single-reg-transfer-fp-instruction fmsr :single :from-arm #b000)
@@ -1277,9 +1273,9 @@
                                    #b101
                                    ,precision-flag
                                    #b00
-                                   (low-bit-float-reg float-reg ,precision)
+                                   (low-bit-float-reg float-reg)
                                    #b1
-                                   (high-bits-float-reg float-reg ,precision)))))))
+                                   (high-bits-float-reg float-reg)))))))
 
 (define-two-reg-transfer-fp-instruction fmsrr :single :from-arm)
 (define-two-reg-transfer-fp-instruction fmrrs :single :to-arm)

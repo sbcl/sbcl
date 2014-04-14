@@ -71,8 +71,7 @@
 (define-storage-base non-descriptor-stack :unbounded :size 0)
 (define-storage-base constant :non-packed)
 (define-storage-base immediate-constant :non-packed)
-(define-storage-base single-registers :finite :size 32)
-(define-storage-base double-registers :finite :size 16)
+(define-storage-base float-registers :finite :size 32)
 
 ;;;
 ;;; Handy macro so we don't have to keep changing all the numbers whenever
@@ -184,33 +183,30 @@
   ;; **** Things that can go in the floating point registers.
 
   ;; Non-Descriptor single-floats.
-  (single-reg single-registers
+  (single-reg float-registers
    :locations #.(loop for i below 32 collect i)
-   ;; ### Note: We really should have every location listed, but then we
-   ;; would have to make load-tns work with element-sizes other than 1.
    :constant-scs ()
    :save-p t
    :alternate-scs (single-stack))
 
   ;; Non-Descriptor double-floats.
-  (double-reg double-registers
-   :locations #.(loop for i below 16 collect i)
-   ;; ### Note: load-tns don't work with an element-size other than 1.
-   ;; :element-size 2 :alignment 2
+  (double-reg float-registers
+   :locations #.(loop for i below 32 by 2 collect i)
+   :element-size 2
    :constant-scs ()
    :save-p t
    :alternate-scs (double-stack))
 
-  (complex-single-reg single-registers
-   :locations #.(loop for i from 0 to 30 by 2 collect i)
+  (complex-single-reg float-registers
+   :locations #.(loop for i from 0 below 32 by 2 collect i)
    :element-size 2
    :constant-scs ()
    :save-p t
    :alternate-scs (complex-single-stack))
 
-  (complex-double-reg double-registers
-   :locations #.(loop for i from 0 to 14 by 2 collect i)
-   :element-size 2
+  (complex-double-reg float-registers
+   :locations #.(loop for i from 0 below 32 by 4 collect i)
+   :element-size 4
    :constant-scs ()
    :save-p t
    :alternate-scs (complex-double-stack))
@@ -296,8 +292,7 @@
       (non-descriptor-stack (format nil "NS~D" offset))
       (constant (format nil "Const~D" offset))
       (immediate-constant "Immed")
-      (single-registers (format nil "S~D" offset))
-      (double-registers (format nil "D~D" offset)))))
+      (float-registers (format nil "F~D" offset)))))
 
 (defun combination-implementation-style (node)
   (declare (type sb!c::combination node) (ignore node))
