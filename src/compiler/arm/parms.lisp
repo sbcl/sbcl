@@ -24,6 +24,62 @@
 ;;; object
 (def!constant n-byte-bits 8)
 
+;;; Floating-point related constants, both format descriptions and FPU
+;;; control register descriptions.  These don't exactly match up with
+;;; what the machine manuals say because the Common Lisp standard
+;;; defines floating-point values somewhat differently than the IEEE
+;;; standard does.
+
+(def!constant float-sign-shift 31)
+
+(def!constant single-float-bias 126)
+(defconstant-eqx single-float-exponent-byte (byte 8 23) #'equalp)
+(defconstant-eqx single-float-significand-byte (byte 23 0) #'equalp)
+(def!constant single-float-normal-exponent-min 1)
+(def!constant single-float-normal-exponent-max 254)
+(def!constant single-float-hidden-bit (ash 1 23))
+(def!constant single-float-trapping-nan-bit (ash 1 22))
+
+(def!constant double-float-bias 1022)
+(defconstant-eqx double-float-exponent-byte (byte 11 20) #'equalp)
+(defconstant-eqx double-float-significand-byte (byte 20 0) #'equalp)
+(def!constant double-float-normal-exponent-min 1)
+(def!constant double-float-normal-exponent-max #x7FE)
+(def!constant double-float-hidden-bit (ash 1 20))
+(def!constant double-float-trapping-nan-bit (ash 1 19))
+
+(def!constant single-float-digits
+  (+ (byte-size single-float-significand-byte) 1))
+
+(def!constant double-float-digits
+  (+ (byte-size double-float-significand-byte) n-word-bits 1))
+
+#!+arm-vfp
+(progn
+  (def!constant float-invalid-trap-bit (ash 1 0))
+  (def!constant float-divide-by-zero-trap-bit (ash 1 1))
+  (def!constant float-overflow-trap-bit (ash 1 2))
+  (def!constant float-underflow-trap-bit (ash 1 3))
+  (def!constant float-inexact-trap-bit (ash 1 4))
+  (def!constant float-input-denormal-trap-bit (ash 1 7))
+
+  (def!constant float-round-to-nearest 0)
+  (def!constant float-round-to-zero 1)
+  (def!constant float-round-to-positive 2)
+  (def!constant float-round-to-negative 3)
+
+  (defconstant-eqx float-rounding-mode (byte 2 22) #'equalp)
+
+  (defconstant-eqx float-sticky-bits (byte 8 0) #'equalp)
+  (defconstant-eqx float-traps-byte (byte 8 8) #'equalp)
+  (defconstant-eqx float-exceptions-byte (byte 8 0) #'equalp)
+
+  (def!constant float-fast-bit (ash 1 24))) ;; Flush-to-zero mode
+;; NOTE: As with the FLOAT-REGISTERS SB in vm.lisp, if you define this
+;; for non-VFP systems, please use a specific positive feature
+;; conditional.
+#!-arm-vfp
+(error "Don't know how to set the FPU control word layout on non-VFP systems")
 
 ;;;; Where to put the different spaces.
 
