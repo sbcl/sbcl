@@ -38,6 +38,31 @@
 #!+gencgc
 (defvar sb!vm::*restart-lisp-function*)
 
+(define-condition save-condition (reference-condition)
+  ()
+  (:default-initargs
+   :references (list '(:sbcl :node "Saving a Core Image"))))
+
+(define-condition save-error (error save-condition)
+  ()
+  (:report "Could not save core."))
+
+(define-condition save-with-multiple-threads-error (save-error)
+  ((interactive-thread :initarg :interactive-threads
+                       :reader save-with-multiple-threads-error-interactive-threads)
+   (other-threads :initarg :other-threads
+                  :reader save-with-multiple-threads-error-other-threads))
+  (:report (lambda (condition stream)
+             (let ((interactive (save-with-multiple-threads-error-interactive-threads condition))
+                   (other (save-with-multiple-threads-error-other-threads condition)))
+               (format stream  "~@<Cannot save core with multiple threads running.~
+                                ~@:_~@:_Interactive thread~P (of current session):~
+                                ~@:_~2@T~<~{~A~^, ~}~:>~
+                                ~@:_~@:_Other thread~P:~
+                                ~@:_~2@T~<~{~A~^, ~}~:>~@:>"
+                       (length interactive) (list interactive)
+                       (length other) (list other))))))
+
 (defun save-lisp-and-die (core-file-name &key
                                          (toplevel #'toplevel-init)
                                          (executable nil)
@@ -207,14 +232,19 @@ sufficiently motivated to do lengthy fixes."
     ;; Something went very wrong -- reinitialize to have a prayer
     ;; of being able to report the error.
     (reinit)
-    (error "Could not save core.")))
+    (error 'save-error)))
 
 (defun deinit ()
   (call-hooks "save" *save-hooks*)
   #!+sb-wtimer
   (itimer-emulation-deinit)
-  (when (rest (sb!thread:list-all-threads))
-    (error "Cannot save core with multiple threads running."))
+  (let ((threads (sb!thread:list-all-threads)))
+    (unless (= 1 (length threads))
+      (let* ((interactive (sb!thread::interactive-threads))
+             (other (set-difference threads interactive)))
+        (error 'save-with-multiple-threads-error
+               :interactive-threads interactive
+               :other-threads other))))
   (float-deinit)
   (profile-deinit)
   (foreign-deinit)

@@ -1,5 +1,7 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 changes relative to sbcl-1.1.18:
+  * enhancement: when SAVE-LISP-AND-DIE fails due multiple threads, the
+    report of the signaled conditions lists currently running threads.
   * enhancement: ported to ARM linux.
   * enhancement: sb-gmp contrib has been updated. (lp#1305266)
   * enhancement: new contrib sb-mpfr by Stephan Frank.
