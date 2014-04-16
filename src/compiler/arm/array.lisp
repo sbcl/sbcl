@@ -28,7 +28,7 @@
     ;; Compute the allocation size.
     (inst add ndescr rank (+ (* (1+ array-dimensions-offset) n-word-bytes)
                              lowtag-mask))
-    (inst bic ndescr ndescr (1- n-lowtag-bits))
+    (inst bic ndescr ndescr lowtag-mask)
     (pseudo-atomic (pa-flag)
       (allocation header ndescr other-pointer-lowtag :flag-tn pa-flag)
       ;; Now that we have the space allocated, compute the header

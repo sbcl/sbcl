@@ -29,7 +29,7 @@
   (pseudo-atomic (pa-flag)
     ;; boxed words == unboxed bytes
     (inst add ndescr words (* (1+ vector-data-offset) n-word-bytes))
-    (inst bic ndescr ndescr (1- n-lowtag-bits))
+    (inst bic ndescr ndescr lowtag-mask)
     (allocation vector ndescr other-pointer-lowtag :flag-tn pa-flag)
     (inst mov ndescr (lsr type word-shift))
     (storew ndescr vector 0 other-pointer-lowtag)
