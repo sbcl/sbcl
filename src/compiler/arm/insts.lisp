@@ -1170,22 +1170,27 @@
                           (:store 0))))
     `(define-instruction ,name (segment &rest args)
        (:emitter
-        (with-condition-defaulted (args (condition address float-reg word-offset))
-          (let ((u (if (> word-offset 0) 1 0))
-                (abs-offset (abs word-offset)))
+        (with-condition-defaulted (args (condition float-reg memory-operand))
+          (let ((base (memory-operand-base memory-operand))
+                (offset (memory-operand-offset memory-operand))
+                (direction (memory-operand-direction memory-operand)))
+            (aver (eq (memory-operand-mode memory-operand) :offset))
+            (aver (zerop (logand offset 3)))
+            ;; FIXME: Should support LABEL bases.
+            (aver (tn-p base))
             (emit-fp-ls-instruction segment
                                     (conditional-opcode condition)
                                     #b110
                                     1
-                                    u
+                                    (if (eq direction :up) 1 0)
                                     (low-bit-float-reg float-reg)
                                     0
                                     ,direction-flag
-                                    (tn-offset address)
+                                    (tn-offset base)
                                     (high-bits-float-reg float-reg)
                                     #b101
                                     ,precision-flag
-                                    abs-offset)))))))
+                                    (ash offset -2))))))))
 
 (define-load-store-one-fp-instruction fsts :single :store)
 (define-load-store-one-fp-instruction flds :single :load)
