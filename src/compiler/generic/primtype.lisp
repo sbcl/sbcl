@@ -85,9 +85,9 @@
 (!def-primitive-type ratio (descriptor-reg))
 (!def-primitive-type complex (descriptor-reg))
 (/show0 "about to !DEF-PRIMITIVE-TYPE SINGLE-FLOAT")
-(!def-primitive-type single-float (#!-arm single-reg descriptor-reg))
+(!def-primitive-type single-float (single-reg descriptor-reg))
 (/show0 "about to !DEF-PRIMITIVE-TYPE DOUBLE-FLOAT")
-(!def-primitive-type double-float (#!-arm double-reg descriptor-reg))
+(!def-primitive-type double-float (double-reg descriptor-reg))
 
 (/show0 "about to !DEF-PRIMITIVE-TYPE COMPLEX-SINGLE-FLOAT")
 (!def-primitive-type complex-single-float (#!-arm complex-single-reg descriptor-reg)
