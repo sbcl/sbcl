@@ -209,9 +209,9 @@
  ("src/compiler/generic/vm-array" :arm-bootstrap)
  ("src/code/array"         :not-host :arm-bootstrap)
  ;; FIXME-ARM: no floating point support yet
- ("src/code/early-float"   :not-host)
+ ("src/code/early-float"   :not-host :arm-bootstrap)
  ;; FIXME-ARM: no floating point support yet
- ("src/code/target-sxhash" :not-host) ; needs most-fooative-foo-float constants
+ ("src/code/target-sxhash" :not-host :arm-bootstrap) ; needs most-fooative-foo-float constants
 
  ("src/code/list"   :not-host :arm-bootstrap)
  ("src/code/seq"    :not-host :arm-bootstrap) ; "code/seq" should come after "code/list".
@@ -264,9 +264,9 @@
  ;; FIXME-ARM: no floating point support yet
  ("src/code/float-trap" :not-host)
  ;; FIXME-ARM: no floating point support yet
- ("src/code/float"      :not-host)
+ ("src/code/float"      :not-host :arm-bootstrap)
  ;; FIXME-ARM: no floating point support yet
- ("src/code/irrat"      :not-host)
+ ("src/code/irrat"      :not-host :arm-bootstrap)
 
  ("src/code/char" :arm-bootstrap)
  ("src/code/huffman" :arm-bootstrap)
@@ -523,7 +523,7 @@
  ("src/compiler/seqtran" :arm-bootstrap)
  ("src/compiler/typetran" :arm-bootstrap)
  ("src/compiler/generic/vm-typetran" :arm-bootstrap)
- #!-arm ("src/compiler/float-tran" :arm-bootstrap)
+ ("src/compiler/float-tran" :arm-bootstrap)
  ("src/compiler/saptran" :arm-bootstrap)
  ("src/compiler/srctran" :arm-bootstrap)
  ("src/compiler/bitops-derive-type" :arm-bootstrap)
