@@ -122,3 +122,52 @@
 (define-move-vop move-arg :move-arg
   (single-reg double-reg #| complex-single-reg complex-double-reg |#)
   (descriptor-reg))
+
+;;;; Comparison:
+
+(define-vop (float-compare)
+  (:args (x) (y))
+  (:conditional)
+  (:info target not-p)
+  (:variant-vars format yep nope is-=)
+  (:policy :fast-safe)
+  (:note "inline float comparison")
+  (:vop-var vop)
+  (:save-p :compute-only)
+  (:generator 3
+    (note-this-location vop :internal-error)
+    (ecase format
+      (:single
+       (if is-=
+           (inst fcmps x y)
+           (inst fcmpes x y)))
+      (:double
+       (if is-=
+           (inst fcmpd x y)
+           (inst fcmped x y))))
+    ;; We'd like to use FMSTAT, but it's not defined.  Or FMRX r15,
+    ;; FPSCR (equivalent encoding), but that's not well defined
+    ;; either.  Hand-encoding the instruction as a WORD.
+    ;(inst fmstat)
+    (inst word #xeef1fa10)
+    (inst b (if not-p nope yep) target)))
+
+(macrolet ((frob (name sc ptype)
+             `(define-vop (,name float-compare)
+                (:args (x :scs (,sc))
+                       (y :scs (,sc)))
+                (:arg-types ,ptype ,ptype))))
+  (frob single-float-compare single-reg single-float)
+  (frob double-float-compare double-reg double-float))
+
+(macrolet ((frob (translate yep nope sname dname is-=)
+             `(progn
+                (define-vop (,sname single-float-compare)
+                  (:translate ,translate)
+                  (:variant :single ,yep ,nope ,is-=))
+                (define-vop (,dname double-float-compare)
+                  (:translate ,translate)
+                  (:variant :double ,yep ,nope ,is-=)))))
+  (frob < :mi :pl </single-float </double-float nil)
+  (frob > :gt :le >/single-float >/double-float nil)
+  (frob = :eq :ne eql/single-float eql/double-float t))
