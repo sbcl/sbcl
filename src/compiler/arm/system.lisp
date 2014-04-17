@@ -120,14 +120,14 @@
          (data :scs (any-reg immediate)))
   (:arg-types * positive-fixnum)
   (:results (res :scs (descriptor-reg)))
-  (:temporary (:scs (non-descriptor-reg)) t1 t2)
+  (:temporary (:scs (non-descriptor-reg)) t1)
   (:generator 6
     ;; FIXME: Using LDRB here would save us an instruction.
     (loadw t1 x 0 other-pointer-lowtag)
     (inst and t1 t1 widetag-mask)
     (sc-case data
       (any-reg
-       (inst orr t1 t2 (lsl data (- n-widetag-bits n-fixnum-tag-bits))))
+       (inst orr t1 t1 (lsl data (- n-widetag-bits n-fixnum-tag-bits))))
       (immediate
        ;; FIXME: This will break if DATA has bits spread over more
        ;; than an eight bit range aligned on an even bit position.
