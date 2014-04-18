@@ -1310,7 +1310,7 @@ benefit of the function GET-OUTPUT-STREAM-STRING.")
 ;;; or allocates a new one.
 (defun string-output-stream-new-buffer (stream size)
   (declare (index size))
-  (/show0 "/string-output-stream-new-buffer")
+  (/noshow0 "/string-output-stream-new-buffer")
   (push (string-output-stream-buffer stream)
         (string-output-stream-prev stream))
   (setf (string-output-stream-buffer stream)
@@ -1323,7 +1323,7 @@ benefit of the function GET-OUTPUT-STREAM-STRING.")
 ;;; Moves to the end of the next segment or the current one if there are
 ;;; no more segments. Returns true as long as there are next segments.
 (defun string-output-stream-next-buffer (stream)
-  (/show0 "/string-output-stream-next-buffer")
+  (/noshow0 "/string-output-stream-next-buffer")
   (let* ((old (string-output-stream-buffer stream))
          (new (pop (string-output-stream-next stream)))
          (old-size (length old))
@@ -1343,7 +1343,7 @@ benefit of the function GET-OUTPUT-STREAM-STRING.")
 ;;; Moves to the start of the previous segment or the current one if there
 ;;; are no more segments. Returns true as long as there are prev segments.
 (defun string-output-stream-prev-buffer (stream)
-  (/show0 "/string-output-stream-prev-buffer")
+  (/noshow0 "/string-output-stream-prev-buffer")
   (let ((old (string-output-stream-buffer stream))
         (new (pop (string-output-stream-prev stream)))
         (skipped (string-output-stream-pointer stream)))
@@ -1359,7 +1359,7 @@ benefit of the function GET-OUTPUT-STREAM-STRING.")
            nil))))
 
 (defun string-ouch (stream character)
-  (/show0 "/string-ouch")
+  (/noshow0 "/string-ouch")
   (let ((pointer (string-output-stream-pointer stream))
         (buffer (string-output-stream-buffer stream))
         (index (string-output-stream-index stream)))
@@ -1463,7 +1463,7 @@ benefit of the function GET-OUTPUT-STREAM-STRING.")
     (:charpos
      ;; Keeping this first is a silly micro-optimization: FRESH-LINE
      ;; makes this the most common one.
-     (/show0 "/string-out-misc charpos")
+     (/noshow0 "/string-out-misc charpos")
      (prog ((pointer (string-output-stream-pointer stream))
             (buffer (string-output-stream-buffer stream))
             (prev (string-output-stream-prev stream))
@@ -1480,15 +1480,15 @@ benefit of the function GET-OUTPUT-STREAM-STRING.")
         (setf base (+ base pointer)
               buffer (pop prev)
               pointer (length buffer))
-        (/show0 "/string-out-misc charpos next")
+        (/noshow0 "/string-out-misc charpos next")
         (go :next))))
     (:file-position
-     (/show0 "/string-out-misc file-position")
+     (/noshow0 "/string-out-misc file-position")
      (when arg1
        (set-string-output-stream-file-position stream arg1))
      (string-output-stream-index stream))
     (:close
-     (/show0 "/string-out-misc close")
+     (/noshow0 "/string-out-misc close")
      (set-closed-flame stream))
     (:element-type (string-output-stream-element-type stream))))
 
