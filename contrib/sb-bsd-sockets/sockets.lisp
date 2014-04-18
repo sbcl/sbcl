@@ -1,4 +1,4 @@
-(in-package "SB-BSD-SOCKETS")
+(in-package :sb-bsd-sockets)
 
 ;;;; Methods, classes, functions for sockets.  Protocol-specific stuff
 ;;;; is deferred to inet.lisp, unix.lisp, etc
@@ -15,7 +15,7 @@
 (defclass socket ()
   ((file-descriptor :initarg :descriptor
                     :reader socket-file-descriptor)
-   (family :initform (error "No socket family")
+   (family :initform (error "No socket family") ; subclasses supply initforms
            :reader socket-family)
    (protocol :initarg :protocol
              :reader socket-protocol
@@ -29,7 +29,9 @@ protocol. Other values are used as-is.")
    #+win32
    (non-blocking-p :type (member t nil) :initform nil)
    (stream))
-  (:documentation "Common base class of all sockets, not meant to be
+  (:default-initargs
+   :type (sb-int:missing-arg))
+  (:documentation "Common superclass of all sockets, not meant to be
 directly instantiated.")))
 
 (defmethod print-object ((object socket) stream)
@@ -64,7 +66,7 @@ directly instantiated.")))
                                     ((:datagram) sockint::sock-dgram)
                                     ((:stream) sockint::sock-stream))
                                   proto-num))))
-      (if (= fd -1) (socket-error "socket"))
+      (when (= fd -1) (socket-error "socket"))
       (setf (slot-value socket 'file-descriptor) fd
             (slot-value socket 'protocol) proto-num
             (slot-value socket 'type) type)
@@ -99,11 +101,11 @@ See also bind(2)"))
 (defmethod socket-bind ((socket socket)
                         &rest address)
   (with-sockaddr-for (socket sockaddr address)
-    (if (= (sockint::bind (socket-file-descriptor socket)
-                          sockaddr
-                          (size-of-sockaddr socket))
-           -1)
-        (socket-error "bind"))))
+    (when (= (sockint::bind (socket-file-descriptor socket)
+                            sockaddr
+                            (size-of-sockaddr socket))
+             -1)
+      (socket-error "bind"))))
 
 
 (defgeneric socket-accept (socket)
@@ -122,14 +124,14 @@ values"))
                       (list sockint::EAGAIN sockint::EINTR)))
          nil)
         ((= fd -1) (socket-error "accept"))
-        (t (apply #'values
-                  (let ((s (make-instance (class-of socket)
-                              :type (socket-type socket)
-                              :protocol (socket-protocol socket)
-                              :descriptor fd)))
-                    (sb-ext:finalize s (lambda () (sockint::close fd))
-                                     :dont-save t))
-                  (multiple-value-list (bits-of-sockaddr socket sockaddr))))))))
+        (t (multiple-value-call #'values
+             (let ((socket (make-instance (class-of socket)
+                                          :type (socket-type socket)
+                                          :protocol (socket-protocol socket)
+                                          :descriptor fd)))
+               (sb-ext:finalize socket (lambda () (sockint::close fd))
+                                :dont-save t))
+             (bits-of-sockaddr socket sockaddr)))))))
 
 (defgeneric socket-connect (socket &rest address)
   (:documentation "Perform the connect(2) call to connect SOCKET to a
@@ -525,13 +527,12 @@ request an input stream and get an output stream in response\)."
 
 #+sbcl
 (defun socket-error (where)
-  ;; FIXME: Our Texinfo documentation extracter need at least his to spit
-  ;; out the signature. Real documentation would be better...
+  ;; FIXME: Our Texinfo documentation extractor needs at least this to
+  ;; spit out the signature. Real documentation would be better...
   ""
   (let* ((errno (socket-errno))
          (condition (condition-for-errno errno)))
     (error condition :errno errno  :syscall where)))
-
 
 (defgeneric bits-of-sockaddr (socket sockaddr)
   (:documentation "Return protocol-dependent bits of parameter

@@ -21,11 +21,16 @@
    (:file "local" :depends-on ("sockets" "split"))
    (:file "name-service" :depends-on ("sockets"))
    (:file "misc" :depends-on ("sockets"))
-   (:static-file "NEWS")
+
+   ;; FIXME at least NEWS and TODO actually exist in the
+   ;; filesystem. However, their all-uppercase names are translated to
+   ;; all-lowercase in logical pathname translation.
+   ;; (:static-file "NEWS")
    ;; (:static-file "INSTALL")
    ;; (:static-file "README")
    ;; (:static-file "index.html")
-   (:static-file "TODO"))
+   ;; (:static-file "TODO")
+   )
   :perform (load-op :after (o c) (provide 'sb-bsd-sockets))
   :perform (test-op (o c) (test-system 'sb-bsd-sockets/tests)))
 

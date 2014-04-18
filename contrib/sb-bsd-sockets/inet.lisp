@@ -14,8 +14,7 @@ Examples:
  (make-instance 'inet-socket :type :datagram :protocol :udp)
 ")))
 
-;;; XXX should we *...* this?
-(defparameter inet-address-any (vector 0 0 0 0))
+(defparameter *inet-address-any* (vector 0 0 0 0))
 
 (defmethod socket-namestring ((socket inet-socket))
   (ignore-errors
@@ -172,10 +171,12 @@ a list of protocol aliases"
 ;;; bits-of-sockaddr
 
 (defmethod make-sockaddr-for ((socket inet-socket) &optional sockaddr &rest address)
+  (check-type address (or null (cons sequence (cons (unsigned-byte 16)))))
   (let ((host (first address))
         (port (second address))
         (sockaddr (or sockaddr (sockint::allocate-sockaddr-in))))
     (when (and host port)
+      (assert (= (length host) 4))
       (let ((in-port (sockint::sockaddr-in-port sockaddr))
             (in-addr (sockint::sockaddr-in-addr sockaddr)))
         (declare (fixnum port))

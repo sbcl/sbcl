@@ -6,7 +6,7 @@
 
 (defpackage "SB-BSD-SOCKETS"
   (:export socket local-socket local-abstract-socket inet-socket
-           make-inet-socket
+           make-inet-socket ; deprecated
            socket-bind socket-accept socket-connect
            socket-send socket-receive
            socket-name socket-peername socket-listen
@@ -56,7 +56,7 @@ arguments to fit Lisp style more closely."))
 ;;; thread-safe on OS X, but they probably can't be any worse than
 ;;; gethostbyname and gethostbyaddr.
 ;;;
-;;; CLH: getaddrinfo seems to be broken is broken on x86-64/darwin
+;;; CLH: getaddrinfo seems to be broken on x86-64/darwin
 #-(or win32 (and x86-64 darwin))
 (let ((addr (sb-alien::find-dynamic-foreign-symbol-address "getaddrinfo")))
   (when addr
