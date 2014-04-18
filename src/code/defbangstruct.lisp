@@ -158,12 +158,12 @@
          (let ((name (type-of x)))
            ;; Don't allow totally random structures, only ones that the
            ;; cross-compiler has been advised will work.
-           (get name :sb-xc-allow-dumping-instances)
-           ;; but we must also have cross-compiled it for real.
-           (and (sb!kernel::compiler-layout-ready-p name)
-                (let ((layout (info :type :compiler-layout name)))
-                  ;; and I don't know anything about raw slots
-                  (zerop (layout-n-untagged-slots layout)))))))
+           (and (get name :sb-xc-allow-dumping-instances)
+                ;; but we must also have cross-compiled it for real.
+                (sb!kernel::compiler-layout-ready-p name)
+                ;; and I don't know anything about raw slots
+                (zerop (layout-n-untagged-slots
+                        (info :type :compiler-layout name)))))))
   (defun %instance-length (instance)
     (aver (or (typep instance 'structure!object)
               (xc-dumpable-structure-instance-p instance)))
