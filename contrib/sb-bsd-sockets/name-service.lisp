@@ -13,9 +13,6 @@
               :documentation "A list of addresses for this host."))
   (:documentation "This class represents the results of an address lookup."))
 
-(defgeneric host-ent-address (host-ent)
-  (:documentation "Returns some valid address for HOST-ENT."))
-
 (defmethod host-ent-address ((host-ent host-ent))
   (car (host-ent-addresses host-ent)))
 

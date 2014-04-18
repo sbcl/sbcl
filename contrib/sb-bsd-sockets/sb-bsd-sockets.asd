@@ -1,6 +1,6 @@
 ;;; -*-  Lisp -*-
 
-(defsystem sb-bsd-sockets
+(defsystem :sb-bsd-sockets
   :version "0.58"
   :defsystem-depends-on (sb-grovel)
   #+sb-building-contrib :pathname
@@ -9,18 +9,23 @@
   ((:file "defpackage")
    (:file "split" :depends-on ("defpackage"))
    (:file "win32-lib" :if-feature :win32)
-   (:sb-grovel-constants-file "constants" :package :sockint
-    :depends-on ("defpackage") :if-feature (:not :win32))
-   (:sb-grovel-constants-file "win32-constants" :package
-    :sockint :depends-on ("defpackage" "win32-lib") :if-feature :win32)
-   (:file "win32-sockets"
-    :depends-on ("win32-constants") :if-feature :win32)
-   (:file "sockets" :depends-on ("constants" "win32-sockets"))
+   (:sb-grovel-constants-file "constants"
+    :package :sockint
+    :depends-on ("defpackage")
+    :if-feature (:not :win32))
+   (:sb-grovel-constants-file "win32-constants"
+    :package :sockint
+    :depends-on ("defpackage" "win32-lib")
+    :if-feature :win32)
+   (:file "protocol" :depends-on ("defpackage"))
+   (:file "win32-sockets" :depends-on ("protocol" "win32-constants")
+    :if-feature :win32)
+   (:file "sockets" :depends-on ("protocol" "constants" "win32-sockets"))
    (:file "sockopt" :depends-on ("sockets"))
-   (:file "inet" :depends-on ("sockets"))
-   (:file "inet4" :depends-on ("sockets"))
-   (:file "local" :depends-on ("sockets"))
-   (:file "name-service" :depends-on ("sockets"))
+   (:file "inet" :depends-on ("protocol" "sockets"))
+   (:file "inet4" :depends-on ("protocol" "sockets"))
+   (:file "local" :depends-on ("protocol" "sockets"))
+   (:file "name-service" :depends-on ("protocol" "sockets"))
    (:file "misc" :depends-on ("sockets"))
 
    ;; FIXME at least NEWS and TODO actually exist in the
@@ -35,7 +40,7 @@
   :perform (load-op :after (o c) (provide 'sb-bsd-sockets))
   :perform (test-op (o c) (test-system 'sb-bsd-sockets/tests)))
 
-(defsystem sb-bsd-sockets/tests
+(defsystem :sb-bsd-sockets/tests
   :depends-on (sb-rt sb-bsd-sockets #-win32 sb-posix)
   :components ((:file "tests"))
   :perform (test-op (o c)

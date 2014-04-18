@@ -9,9 +9,6 @@
 
 ;;; XXX bad (sizeof (int) ==4 ) assumptions
 
-(defgeneric non-blocking-mode (socket)
-  (:documentation "Is SOCKET in non-blocking mode?"))
-
 #-win32
 (defmethod non-blocking-mode ((socket socket))
   (let ((fd (socket-file-descriptor socket)))
@@ -24,9 +21,6 @@
 #+win32
 (defmethod non-blocking-mode ((socket socket))
   (slot-value socket 'non-blocking-p))
-
-(defgeneric (setf non-blocking-mode) (non-blocking-p socket)
-  (:documentation "Put SOCKET in non-blocking mode - or not, according to NON-BLOCKING-P"))
 
 #-win32
 (defmethod (setf non-blocking-mode) (non-blocking-p (socket socket))
