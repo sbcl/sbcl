@@ -472,31 +472,15 @@
          (b :scs (unsigned-reg))
          (c :scs (any-reg)))
   (:arg-types unsigned-num unsigned-num positive-fixnum)
-  (:temporary (:scs (unsigned-reg) :to (:result 0) :target result) res)
-  (:temporary (:scs (non-descriptor-reg)) temp)
+  (:temporary (:scs (unsigned-reg) :to (:result 0) :target result) temp)
   (:results (result :scs (unsigned-reg))
             (carry :scs (unsigned-reg) :from :eval))
   (:result-types unsigned-num positive-fixnum)
   (:generator 3
-    (let ((carry-in (gen-label))
-          (done (gen-label)))
-      (inst add res a b)
-      (inst eor carry carry carry)
-      (inst cmp c 0)
-      (inst b :ne carry-in)
-
-      (inst cmp res b)
-      (inst add :lt carry carry 1)
-      (inst b done)
-
-      (emit-label carry-in)
-      (inst add res res 1)
-      (inst mvn temp a)
-      (inst cmp b temp)
-      (inst add :ge carry carry 1)
-
-      (emit-label done)
-      (move result res))))
+    (inst rsbs temp c 0) ;; Clear carry if c=0, else set.
+    (inst adcs result a b)
+    (inst mov :cs carry 1)
+    (inst mov :cc carry 0)))
 
 (define-vop (sub-w/borrow)
   (:translate sb!bignum:%subtract-with-borrow)
@@ -505,30 +489,15 @@
          (b :scs (unsigned-reg))
          (c :scs (any-reg)))
   (:arg-types unsigned-num unsigned-num positive-fixnum)
-  (:temporary (:scs (unsigned-reg) :to (:result 0) :target result) res)
+  (:temporary (:scs (unsigned-reg) :to (:result 0) :target result) temp)
   (:results (result :scs (unsigned-reg))
             (borrow :scs (unsigned-reg) :from :eval))
   (:result-types unsigned-num positive-fixnum)
   (:generator 4
-    (let ((no-borrow-in (gen-label))
-          (done (gen-label)))
-
-      (inst sub res a b)
-      (inst eor borrow borrow borrow)
-      (inst cmp c 0)
-      (inst b :ne no-borrow-in)
-
-      (inst sub res res 1)
-      (inst cmp a b)
-      (inst add :lt borrow borrow 1)
-      (inst b done)
-
-      (emit-label no-borrow-in)
-      (inst cmp a b)
-      (inst add :ge borrow borrow 1)
-
-      (emit-label done)
-      (move result res))))
+    (inst rsbs temp c 0) ;; Clear carry if c=0, else set.
+    (inst sbcs result a b)
+    (inst mov :cs borrow 1)
+    (inst mov :cc borrow 0)))
 
 (define-vop (bignum-mult)
   (:translate sb!bignum:%multiply)
