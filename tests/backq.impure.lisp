@@ -71,3 +71,7 @@
                   (read-from-string "`(,@1)")
                 (reader-error ()
                   :error)))))
+
+(with-test (:name :verify-dumping-a-comma-instance-worked)
+  (assert (equalp (cons 'sb-vm::foo (sb-impl::unquote '*print-case* 4))
+                  (sb-vm::a-random-comma-object-do-not-use))))

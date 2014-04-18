@@ -153,11 +153,28 @@
 ;;; inner loops.)
 #+sb-xc-host
 (progn
+  (defun xc-dumpable-structure-instance-p (x)
+    (and (typep x 'cl:structure-object)
+         (let ((name (type-of x)))
+           ;; Don't allow totally random structures, only ones that the
+           ;; cross-compiler has been advised will work.
+           (get name :sb-xc-allow-dumping-instances)
+           ;; but we must also have cross-compiled it for real.
+           (and (sb!kernel::compiler-layout-ready-p name)
+                (let ((layout (info :type :compiler-layout name)))
+                  ;; and I don't know anything about raw slots
+                  (zerop (layout-n-untagged-slots layout)))))))
   (defun %instance-length (instance)
-    (aver (typep instance 'structure!object))
+    (aver (or (typep instance 'structure!object)
+              (xc-dumpable-structure-instance-p instance)))
+    ;; This seems strangely incompatible- INSTANCE-LENGTH should return an odd number
+    ;; so that including the header word (not counted), it comes out even.
+    ;; Except that on the xc host you can't access a slot beyond the layout-length,
+    ;; whereas on the target you can if there is a slack word - it reads as NIL.
     (layout-length (classoid-layout (find-classoid (type-of instance)))))
   (defun %instance-ref (instance index)
-    (aver (typep instance 'structure!object))
+    (aver (or (typep instance 'structure!object)
+              (xc-dumpable-structure-instance-p instance)))
     (let* ((class (find-classoid (type-of instance)))
            (layout (classoid-layout class)))
       (if (zerop index)
@@ -167,6 +184,12 @@
                  (accessor-name (dsd-accessor-name dsd)))
             (declare (type symbol accessor-name))
             (funcall accessor-name instance)))))
+  ;; I believe this approach is technically nonportable because CLHS says that
+  ;;  "The mechanism by which defstruct arranges for slot accessors to be usable
+  ;;   with setf is implementation-dependent; for example, it may use setf
+  ;;   functions, setf expanders, or some other implementation-dependent
+  ;;   mechanism ..."
+  ;; As it happens, many implementations provide both functions and expanders.
   (defun %instance-set (instance index new-value)
     (aver (typep instance 'structure!object))
     (let* ((class (find-classoid (type-of instance)))

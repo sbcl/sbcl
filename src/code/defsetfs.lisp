@@ -149,4 +149,10 @@
 (defsetf context-register %set-context-register)
 (defsetf context-float-register %set-context-float-register)
 
+;; A test of the ability of the cross-compiler to dump a function
+;; that references as constant a tree containing a COMMA struct.
+;; Does not really belong here, but ensures that stays working.
+(defun a-random-comma-object-do-not-use ()
+  '(foo . #.(sb!impl::unquote '*print-case* 4)))
+
 (sb!int:/show0 "leaving defsetfs.lisp")

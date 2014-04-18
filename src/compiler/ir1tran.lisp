@@ -365,6 +365,10 @@
                                      #-sb-xc-host (layout-n-untagged-slots
                                                    (%instance-ref value 0))))
                         (grovel (%instance-ref value i)))))
+                   #+sb-xc-host
+                   ((satisfies sb!kernel::xc-dumpable-structure-instance-p)
+                    (dotimes (i (%instance-length value))
+                      (grovel (%instance-ref value i))))
                    (t
                     (compiler-error
                      "Objects of type ~S can't be dumped into fasl files."

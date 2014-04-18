@@ -19,6 +19,7 @@
 
 ;;; MAYBE-INLINE and FREEZE-TYPE declarations can be safely ignored
 ;;; (possibly at some cost in efficiency).
+;;; Shouldn't these be placed near TRULY-DYNAMIC-EXTENT (in 'cross-early')?
 (declaim (declaration freeze-type maybe-inline))
 
 ;;; INHIBIT-WARNINGS declarations can be safely ignored (although we

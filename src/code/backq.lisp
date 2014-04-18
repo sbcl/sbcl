@@ -13,6 +13,23 @@
 
 (/show0 "entering backq.lisp")
 
+;; An unquoting COMMA struct. Not used yet.
+;; Were these slots writable, the out-of-line defuns for setting them would
+;; call #'(SETF %INSTANCE-REF) provoking a warning later that %INSTANCE-REF
+;; gets a SETF macro. The warning is fatal. Read-only is what I want anyway.
+;; This is only an issue for files compiled prior to "defsetfs".
+(defstruct (comma (:constructor unquote (expr bits)))
+ (expr nil :read-only t)
+ (bits nil :read-only t :type (and unsigned-byte fixnum)))
+#+sb-xc (declaim (freeze-type comma))
+#+sb-xc-host
+(progn
+  ;; tell the host how to dump it
+  (defmethod make-load-form ((self comma) &optional environment)
+    (list 'unquote (list 'quote (comma-expr self)) (comma-bits self)))
+  ;; tell the cross-compiler that it can do :just-dump-it-normally
+  (setf (get 'comma :sb-xc-allow-dumping-instances) t))
+
 ;;; The flags passed back by BACKQUOTIFY can be interpreted as follows:
 ;;;
 ;;;   |`,|: [a] => a

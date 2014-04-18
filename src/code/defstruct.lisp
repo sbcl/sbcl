@@ -113,6 +113,11 @@
              (:conc-name dd-)
              (:make-load-form-fun just-dump-it-normally)
              #-sb-xc-host (:pure t)
+             ;; When this gets called directly by !cold-init as opposed to a
+             ;; random toplevel form, the package isn't as expected yet.
+             ;; SYMBOLICATE would create junk symbols for the predicate
+             ;; and copier. NIL is the right value for them.
+             (:constructor !make-defstruct-description-no-functions (name))
              (:constructor make-defstruct-description
                            (name &aux
                                  (conc-name (symbolicate name "-"))
@@ -123,9 +128,9 @@
   ;; documentation on the structure
   (doc nil :type (or string null))
   ;; prefix for slot names. If NIL, none.
-  (conc-name nil :type (or symbol null))
+  (conc-name nil :type symbol)
   ;; the name of the primary standard keyword constructor, or NIL if none
-  (default-constructor nil :type (or symbol null))
+  (default-constructor nil :type symbol)
   ;; all the explicit :CONSTRUCTOR specs, with name defaulted
   (constructors () :type list)
   ;; name of copying function
@@ -175,14 +180,14 @@
   ;; the value of the :PURE option, or :UNSPECIFIED. This is only
   ;; meaningful if DD-CLASS-P = T.
   (pure :unspecified :type (member t nil :substructure :unspecified)))
+#!-sb-fluid (declaim (freeze-type defstruct-description))
 (def!method print-object ((x defstruct-description) stream)
   (print-unreadable-object (x stream :type t)
     (prin1 (dd-name x) stream)))
 
 ;;; Does DD describe a structure with a class?
 (defun dd-class-p (dd)
-  (member (dd-type dd)
-          '(structure funcallable-structure)))
+  (if (member (dd-type dd) '(structure funcallable-structure)) t nil))
 
 ;;; a type name which can be used when declaring things which operate
 ;;; on structure instances
@@ -233,6 +238,7 @@
                             #!+long-float complex-long-float
                             sb!vm:word))
   (read-only nil :type (member t nil)))
+#!-sb-fluid (declaim (freeze-type defstruct-slot-description))
 (def!method print-object ((x defstruct-slot-description) stream)
   (print-unreadable-object (x stream :type t)
     (prin1 (dsd-name x) stream)))
@@ -311,20 +317,20 @@
 
 ;;; shared logic for host macroexpansion for SB!XC:DEFSTRUCT and
 ;;; cross-compiler macroexpansion for CL:DEFSTRUCT
-(defmacro !expander-for-defstruct (name-and-options
-                                   slot-descriptions
-                                   expanding-into-code-for-xc-host-p)
-  `(let ((name-and-options ,name-and-options)
-         (slot-descriptions ,slot-descriptions)
-         (expanding-into-code-for-xc-host-p
-           ,expanding-into-code-for-xc-host-p))
-     (let* ((dd (parse-defstruct-name-and-options-and-slot-descriptions
-                 name-and-options
-                 slot-descriptions))
-            (name (dd-name dd)))
-       (if (dd-class-p dd)
-           (let ((inherits (inherits-for-structure dd)))
-             `(progn
+(defun %expander-for-defstruct (name-and-options slot-descriptions
+                                expanding-into-code-for)
+  ;; The host's version of this allows three choices for 'expanding-into'
+  ;; up until such time as the DEFMACRO is seen (again) for DEFSTRUCT,
+  ;; at which point things are ok because 'early-package' will have been
+  ;; processed. The target has only one possibility.
+  (aver (member expanding-into-code-for '(:target
+                                          #-sb-xc :cold-target
+                                          #-sb-xc :host)))
+  (let* ((dd (parse-defstruct-name-and-options-and-slot-descriptions
+              name-and-options slot-descriptions))
+         (inherits (if (dd-class-p dd) (inherits-for-structure dd)))
+         (name (dd-name dd)))
+    `(progn
                 ;; Note we intentionally enforce package locks and
                 ;; call %DEFSTRUCT first, and especially before
                 ;; %COMPILER-DEFSTRUCT. %DEFSTRUCT has the tests (and
@@ -335,45 +341,43 @@
                 ;; responds to the collision with ABORT, we don't want
                 ;; %COMPILER-DEFSTRUCT to modify the definition of the
                 ;; class.
-                (with-single-package-locked-error
-                    (:symbol ',name "defining ~A as a structure"))
-                (%defstruct ',dd ',inherits (sb!c:source-location))
-                (eval-when (:compile-toplevel :load-toplevel :execute)
-                  (%compiler-defstruct ',dd ',inherits))
-                ,(unless expanding-into-code-for-xc-host-p
-                   `(delay-defstruct-functions
-                     ,name
-                     ,(list* 'progn
-                             (copier-definition dd)
-                             (predicate-definition dd)
-                             (accessor-definitions dd))))
+       ,@(when (eq expanding-into-code-for :target)
+           `((with-single-package-locked-error
+                 (:symbol ',name "defining ~A as a structure"))))
+       ,@(if (dd-class-p dd)
+             `((%defstruct ',dd ',inherits (sb!c:source-location))
+               (eval-when (:compile-toplevel :load-toplevel :execute)
+                 (%compiler-defstruct ',dd ',inherits))
+               ,@(unless (eq expanding-into-code-for :host)
+                   `((delay-defstruct-functions
+                      ,name
+                      (progn ,@(awhen (copier-definition dd) (list it))
+                             ,@(awhen (predicate-definition dd) (list it))
+                             ,@(accessor-definitions dd)))
                 ;; This must be in the same lexical environment
-                ,@(unless expanding-into-code-for-xc-host-p
-                      (append
-                       (constructor-definitions dd)
-                       (class-method-definitions dd)))
-
+                     ,@(constructor-definitions dd)
+                     ,@(class-method-definitions dd)
                 ;; Various other operations only make sense on the target SBCL.
-                ,(unless expanding-into-code-for-xc-host-p
-                   `(%target-defstruct ',dd))
-                ',name))
-           `(progn
-              (with-single-package-locked-error
-                  (:symbol ',name "defining ~A as a structure"))
-              (eval-when (:compile-toplevel :load-toplevel :execute)
+                     (%target-defstruct ',dd))))
+            `((eval-when (:compile-toplevel :load-toplevel :execute)
                 (setf (info :typed-structure :info ',name) ',dd))
               (setf (info :source-location :typed-structure ',name)
                     (sb!c:source-location))
-              ,@(unless expanding-into-code-for-xc-host-p
+              ,@(unless (eq expanding-into-code-for :host)
                   (append (typed-accessor-definitions dd)
                           (typed-predicate-definitions dd)
                           (typed-copier-definitions dd)
                           (constructor-definitions dd)
                           (when (dd-doc dd)
                             `((setf (fdocumentation ',(dd-name dd) 'structure)
-                                    ',(dd-doc dd))))))
-              ',name)))))
+                                    ',(dd-doc dd))))))))
+       ',name)))
 
+#+sb-xc-host
+(sb!xc:defmacro defstruct (name-and-options &rest slot-descriptions)
+  (%expander-for-defstruct name-and-options slot-descriptions :cold-target))
+
+#+sb-xc
 (sb!xc:defmacro defstruct (name-and-options &rest slot-descriptions)
   #!+sb-doc
   "DEFSTRUCT {Name | (Name Option*)} [Documentation] {Slot | (Slot [Default] {Key Value}*)}
@@ -403,13 +407,13 @@
 
    :READ-ONLY {T | NIL}
        If true, no setter function is defined for this slot."
-  (!expander-for-defstruct name-and-options slot-descriptions nil))
+  (%expander-for-defstruct name-and-options slot-descriptions :target))
 #+sb-xc-host
 (defmacro sb!xc:defstruct (name-and-options &rest slot-descriptions)
   #!+sb-doc
   "Cause information about a target structure to be built into the
   cross-compiler."
-  (!expander-for-defstruct name-and-options slot-descriptions t))
+  (%expander-for-defstruct name-and-options slot-descriptions :host))
 
 ;;;; functions to generate code for various parts of DEFSTRUCT definitions
 
@@ -1877,7 +1881,7 @@
 ;;; special enough (and simple enough) that we just build it by hand
 ;;; instead of trying to generalize the ordinary DEFSTRUCT code.
 (defun !set-up-structure-object-class ()
-  (let ((dd (make-defstruct-description 'structure-object)))
+  (let ((dd (!make-defstruct-description-no-functions 'structure-object)))
     (setf
      ;; Note: This has an ALTERNATE-METACLASS only because of blind
      ;; clueless imitation of the CMU CL code -- dunno if or why it's
@@ -1887,7 +1891,7 @@
      (dd-length dd) 1
      (dd-type dd) 'structure)
     (%compiler-set-up-layout dd)))
-(!set-up-structure-object-class)
+#+sb-xc-host(!set-up-structure-object-class)
 
 ;;; early structure predeclarations: Set up DD and LAYOUT for ordinary
 ;;; (non-ALTERNATE-METACLASS) structures which are needed early.

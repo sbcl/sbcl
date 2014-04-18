@@ -154,6 +154,10 @@
 
   (show-and-call !constantp-cold-init)
   (show-and-call !early-proclaim-cold-init)
+  ;; Must be done before toplevel forms are invoked
+  ;; because a toplevel defstruct will need to add itself
+  ;; to the subclasses of STRUCTURE-OBJECT.
+  (show-and-call sb!kernel::!set-up-structure-object-class)
 
   ;; KLUDGE: Why are fixups mixed up with toplevel forms? Couldn't
   ;; fixups be done separately? Wouldn't that be clearer and better?
