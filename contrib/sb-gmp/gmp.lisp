@@ -833,7 +833,8 @@ be (1+ COUNT)."
 
 ;;; installation
 (defmacro with-package-locks-ignored (&body body)
-  `(handler-bind ((sb-ext:package-lock-violation
+  `(handler-bind (#+sb-package-locks
+                  (sb-ext:package-lock-violation
                     (lambda (condition)
                       (declare (ignore condition))
                       (invoke-restart :ignore-all))))

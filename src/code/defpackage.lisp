@@ -358,6 +358,7 @@ specifies to signal a warning if SWANK package is in variance, and an error othe
            (unexport no-longer-exported package))
          (keep-them ()
            :report "Keep exporting them.")))))
+  #!+sb-package-locks
   (let ((old-implements
           (set-difference (package-implements-list package)
                           (mapcar #'find-undeleted-package-or-lose implement))))
