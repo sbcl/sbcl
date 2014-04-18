@@ -459,6 +459,7 @@ bootstrapping.
 (defun make-defmethod-form
     (name qualifiers specializers unspecialized-lambda-list
      method-class-name initargs-form)
+  (declare (sb-ext:muffle-conditions sb-ext:code-deletion-note))
   (let (fn
         fn-lambda)
     (if (and (interned-symbol-p (fun-name-block-name name))
@@ -966,6 +967,7 @@ bootstrapping.
                                      parameters-setqd closurep applyp method-cell))
      &body body
      &environment env)
+  (declare (ignore parameters-setqd))
   (if (not (or call-next-method-p setq-p closurep next-method-p-p applyp))
       `(locally
            ,@body)
@@ -1731,11 +1733,11 @@ bootstrapping.
 
 (defvar *!early-generic-functions* ())
 
-(defun ensure-generic-function (fun-name
-                                &rest all-keys
-                                &key environment definition-source
-                                &allow-other-keys)
-  (declare (ignore environment))
+;; CLHS doesn't specify &allow-other-keys here but I guess the supposition
+;; is that they'll be checked by ENSURE-GENERIC-FUNCTION-USING-CLASS.
+;; Except we don't do that either, so I think the blame, if any, lies there
+;; for not catching errant keywords.
+(defun ensure-generic-function (fun-name &rest all-keys)
   (let ((existing (and (fboundp fun-name)
                        (gdefinition fun-name))))
     (cond ((and existing

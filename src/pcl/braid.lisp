@@ -640,8 +640,7 @@
 ;;; installs the class in the Lisp type system.
 (defun %update-lisp-class-layout (class layout)
   ;; Protected by *world-lock* in callers.
-  (let ((classoid (layout-classoid layout))
-        (olayout (class-wrapper class)))
+  (let ((classoid (layout-classoid layout)))
     (unless (eq (classoid-layout classoid) layout)
       (setf (layout-inherits layout)
             (order-layout-inherits

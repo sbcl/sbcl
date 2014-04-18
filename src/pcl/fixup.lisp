@@ -28,6 +28,7 @@
 (compute-standard-slot-locations)
 (dolist (s '(condition function structure-object))
   (dohash ((k v) (classoid-subclasses (find-classoid s)))
+    (declare (ignore v))
     (find-class (classoid-name k))))
 (setq **boot-state** 'complete)
 

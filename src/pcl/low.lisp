@@ -178,6 +178,7 @@ comparison.")
 ;;; In all cases, SET-FUN-NAME must return the new (or same)
 ;;; function. (Unlike other functions to set stuff, it does not return
 ;;; the new value.)
+(declaim (ftype function class-of))
 (defun set-fun-name (fun new-name)
   #+sb-doc
   "Set the name of a compiled function object. Return the function."
@@ -190,7 +191,7 @@ comparison.")
      (setf (sb-eval:interpreted-function-name fun) new-name))
     (funcallable-instance ;; KLUDGE: probably a generic function...
      (cond ((if (eq **boot-state** 'complete)
-                (typep fun 'generic-function)
+                (typep fun 'generic-function) ; FIXME: inefficient forward-ref
                 (eq (class-of fun) *the-class-standard-generic-function*))
             (setf (%funcallable-instance-info fun 2) new-name))
            (t

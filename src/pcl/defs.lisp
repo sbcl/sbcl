@@ -509,16 +509,12 @@
 ;;; are critical to making SLOT-VALUE-USING-CLASS &co fast: places that need
 ;;; these functions can access the SLOT-INFO directly, avoiding the overhead
 ;;; of accessing a standard-instance.
-(defstruct (slot-info (:constructor make-slot-info
-                                    (&key slotd
-                                          typecheck
-                                          (type t)
-                                          (reader
-                                           (uninitialized-accessor-function :reader slotd))
-                                          (writer
-                                           (uninitialized-accessor-function :writer slotd))
-                                          (boundp
-                                           (uninitialized-accessor-function :boundp slotd)))))
+(defstruct (slot-info
+            (:constructor make-slot-info
+                (&key slotd typecheck
+                 (reader (uninitialized-accessor-function :reader slotd))
+                 (writer (uninitialized-accessor-function :writer slotd))
+                 (boundp (uninitialized-accessor-function :boundp slotd)))))
   (typecheck nil :type (or null function))
   (reader (missing-arg) :type function)
   (writer (missing-arg) :type function)

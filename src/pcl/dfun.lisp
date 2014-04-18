@@ -662,6 +662,7 @@ Except see also BREAK-VICIOUS-METACIRCLE.  -- CSR, 2003-05-28
 
 (declaim (inline make-callable))
 (defun make-callable (gf methods generator method-alist wrappers)
+  (declare (ignore gf))
   (let* ((*applicable-methods* methods)
          (callable (function-funcall generator method-alist wrappers)))
     callable))

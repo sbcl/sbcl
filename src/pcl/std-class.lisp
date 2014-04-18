@@ -73,8 +73,9 @@
 
 (defmethod initialize-internal-slot-functions
     ((slotd effective-slot-definition))
-  (let* ((name (slot-value slotd 'name))
+  (let* ((name (slot-value slotd 'name)) ; flushable? (is it ever unbound?)
          (class (slot-value slotd '%class)))
+    (declare (ignore name))
     (dolist (type '(reader writer boundp))
       (let* ((gf-name (ecase type
                               (reader 'slot-value-using-class)
@@ -87,9 +88,7 @@
         ;; computed this early in class finalization; however, we need
         ;; this bit as early as possible.  -- CSR, 2009-11-05
         (setf (slot-accessor-std-p slotd type)
-              (let* ((std-method (standard-svuc-method type))
-                     (str-method (structure-svuc-method type))
-                     (types1 `((eql ,class) (class-eq ,class) (eql ,slotd)))
+              (let* ((types1 `((eql ,class) (class-eq ,class) (eql ,slotd)))
                      (types (if (eq type 'writer) `(t ,@types1) types1))
                      (methods (compute-applicable-methods-using-types gf types)))
                 (null (cdr methods))))
@@ -126,8 +125,9 @@
 ;;; or some such.
 (defmethod compute-slot-accessor-info ((slotd effective-slot-definition)
                                        type gf)
-  (let* ((name (slot-value slotd 'name))
+  (let* ((name (slot-value slotd 'name)) ; flushable?
          (class (slot-value slotd '%class)))
+    (declare (ignore name))
     (multiple-value-bind (function std-p)
         (if (eq **boot-state** 'complete)
             (get-accessor-method-function gf type class slotd)
@@ -510,7 +510,8 @@
     (with-world-lock ()
       (without-package-locks
         (unless (class-finalized-p class)
-          (let ((name (class-name class)))
+          (let ((name (class-name class))) ; flushable?
+            (declare (ignore name))
             ;; KLUDGE: This is fairly horrible.  We need to make a
             ;; full-fledged CLASSOID here, not just tell the compiler that
             ;; some class is forthcoming, because there are legitimate
@@ -1559,6 +1560,7 @@
          (safe (safe-p new-class)))
     (multiple-value-bind (new-instance-slots new-class-slots)
         (classify-slotds (layout-slot-list new-wrapper))
+      (declare (ignore new-class-slots))
       (multiple-value-bind (old-instance-slots old-class-slots)
           (classify-slotds (layout-slot-list old-wrapper))
 

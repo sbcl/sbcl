@@ -80,6 +80,7 @@
     (invalid-method-initarg method "~@<~S of ~S is neither ~S nor a ~S.~@:>"
                             :documentation doc 'null 'string)))
 (defun check-lambda-list (method ll)
+  (declare (ignore method ll))
   nil)
 
 (defun check-method-function (method fun)
@@ -99,6 +100,7 @@
                                 q :qualifiers qualifiers 'null)))))
 
 (defun check-slot-name (method name)
+  (declare (ignore method))
   (unless (symbolp name)
     (invalid-method-initarg "~@<~S of ~S is not a ~S.~@:>"
                             :slot-name name 'symbol)))
@@ -575,9 +577,10 @@
       ;; it would be bad to unwind and leave the gf in an inconsistent
       ;; state.
       (sb-thread::with-recursive-system-lock (lock)
-        (let* ((specializers (method-specializers method))
+        (let* ((specializers (method-specializers method)) ; flushable?
                (methods (generic-function-methods generic-function))
                (new-methods (remove method methods)))
+          (declare (ignore specializers))
           (setf (method-generic-function method) nil
                 (generic-function-methods generic-function) new-methods)
           (dolist (specializer (method-specializers method))

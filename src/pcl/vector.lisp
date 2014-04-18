@@ -819,10 +819,7 @@
   (let* ((method-function nil)
          (snl (getf plist :slot-name-lists))
          (pv-table (when snl
-                     (intern-pv-table :slot-name-lists snl)))
-         (arg-info (getf plist :arg-info))
-         (nreq (car arg-info))
-         (restp (cdr arg-info)))
+                     (intern-pv-table :slot-name-lists snl))))
     (setq method-function
           (lambda (method-args next-methods)
             (let* ((pv (when pv-table
@@ -848,10 +845,7 @@
 ;;; over the actual PV-CELL in this case.
 (defun method-function-from-fast-method-call (fmc)
   (let* ((fmf (fast-method-call-function fmc))
-         (pv (fast-method-call-pv fmc))
-         (arg-info (fast-method-call-arg-info fmc))
-         (nreq (car arg-info))
-         (restp (cdr arg-info)))
+         (pv (fast-method-call-pv fmc)))
     (lambda (method-args next-methods)
       (let* ((nm (car next-methods))
              (nms (cdr next-methods))

@@ -198,7 +198,10 @@
                           (format t "~&deleted ~S~%" output-truename))))
                  ;; Otherwise: success, just fall through.
                  (t nil))
-           (unless (load output-truename)
+           (unless (handler-bind
+                       ((sb-kernel:redefinition-with-defgeneric
+                         #'muffle-warning))
+                     (load output-truename))
              (error "LOAD of ~S failed." output-truename))
            (sb-int:/show "done loading" output-truename))))))
 

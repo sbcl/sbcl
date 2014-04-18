@@ -137,6 +137,7 @@
                                           (allocation nil allocationp)
                                           (initargs nil initargsp)
                                           (documentation nil docp))
+  (declare (ignore initform initfunction type))
   (unless namep
     (error 'slotd-initialization-error :initarg :name :kind :missing))
   (unless (symbolp name)

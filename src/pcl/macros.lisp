@@ -71,6 +71,7 @@
 
 (defvar *create-classes-from-internal-structure-definitions-p* t)
 
+(declaim (ftype function ensure-non-standard-class))
 (defun find-class-from-cell (symbol cell &optional (errorp t))
   (or (when cell
         (or (classoid-cell-pcl-class cell)
@@ -119,10 +120,12 @@
                        (find-class-from-cell ',symbol ,cell nil))))))
       form))
 
+(declaim (ftype function class-wrapper))
 (declaim (inline class-classoid))
 (defun class-classoid (class)
   (layout-classoid (class-wrapper class)))
 
+(declaim (ftype function %set-class-type-translation update-ctors))
 (defun (setf find-class) (new-value name &optional errorp environment)
   (declare (ignore errorp environment))
   (cond ((legal-class-name-p name)

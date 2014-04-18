@@ -52,6 +52,7 @@
          (policy (lexenv-policy lexenv)))
     (eql (cdr (assoc 'safety policy)) 3)))
 
+(declaim (ftype function sb-pcl::parse-specialized-lambda-list))
 (define-source-context defmethod (name &rest stuff)
   (let ((arg-pos (position-if #'listp stuff)))
     (if arg-pos
@@ -83,6 +84,7 @@
 (define-internal-pcl-function-name-syntax sb-pcl::slow-method (list)
   (valid-function-name-p (cadr list)))
 
+(declaim (ftype function sb-pcl::std-instance-p sb-pcl::fsc-instance-p))
 (define-internal-pcl-function-name-syntax sb-pcl::ctor (list)
   (let ((class-or-name (cadr list)))
     (cond

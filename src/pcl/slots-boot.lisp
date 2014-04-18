@@ -483,7 +483,6 @@
         (find-class class-or-name nil))))
 
 (defun make-std-reader-method-function (class-or-name slot-name)
-  (declare (ignore class-or-name))
   (ecase (slot-access-strategy (maybe-class class-or-name) slot-name 'reader t)
     (:standard
      (let* ((initargs (copy-tree
@@ -544,7 +543,6 @@
         initargs)))))
 
 (defun make-std-boundp-method-function (class-or-name slot-name)
-  (declare (ignore class-or-name))
   (ecase (slot-access-strategy (maybe-class class-or-name) slot-name 'boundp t)
     (:standard
      (let ((initargs (copy-tree
