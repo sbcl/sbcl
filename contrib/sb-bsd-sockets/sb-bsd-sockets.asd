@@ -17,8 +17,9 @@
     :depends-on ("win32-constants") :if-feature :win32)
    (:file "sockets" :depends-on ("constants" "win32-sockets"))
    (:file "sockopt" :depends-on ("sockets"))
-   (:file "inet" :depends-on ("sockets" "split"))
-   (:file "local" :depends-on ("sockets" "split"))
+   (:file "inet" :depends-on ("sockets"))
+   (:file "inet4" :depends-on ("sockets"))
+   (:file "local" :depends-on ("sockets"))
    (:file "name-service" :depends-on ("sockets"))
    (:file "misc" :depends-on ("sockets"))
 
