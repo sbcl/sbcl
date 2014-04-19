@@ -464,7 +464,8 @@
         (random-result (make-array (length names) :initial-element nil))
         (n-created 0)
         (highest-type-num
-         (position-if #'identity sb-c::*info-types* :from-end t)))
+         (position-if #'identity sb-c::*info-types*
+                      :end sb-c::+fdefn-type-num+ :from-end t)))
     (loop for name across names
           for i from 0
           do (setf (aref fdefn-result i)
@@ -475,7 +476,7 @@
                ;; Set random info for other names to cause CAS failures.
                ;; Pick an info-type number and give it a random value.
                ;; Store the random value so that we can assert on it later.
-               ;; Never touch reserved type numbers 0 or 1.
+               ;; Never touch reserved type numbers 0 or 63.
                (let ((random-name-index (random (length names)))
                      (random-type (+ (random (1- highest-type-num)) 2))
                      (random-value (random most-positive-fixnum)))
