@@ -122,9 +122,7 @@
   (:results (res :scs (descriptor-reg)))
   (:temporary (:scs (non-descriptor-reg)) t1)
   (:generator 6
-    ;; FIXME: Using LDRB here would save us an instruction.
-    (loadw t1 x 0 other-pointer-lowtag)
-    (inst and t1 t1 widetag-mask)
+    (load-type t1 x (- other-pointer-lowtag))
     (sc-case data
       (any-reg
        (inst orr t1 t1 (lsl data (- n-widetag-bits n-fixnum-tag-bits))))
