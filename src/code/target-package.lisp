@@ -890,6 +890,7 @@ implementation it is ~S." *default-package-use-list*)
                      (mapcar #'package-name use-list))
                     (dolist (p use-list)
                       (unuse-package package p))))
+                #!+sb-package-locks
                 (dolist (p (package-implements-list package))
                   (remove-implementation-package package p))
                 (with-package-graph ()
