@@ -96,7 +96,7 @@
     ;; it is a fixnum.  The lowtag selection magic that is required to
     ;; ensure this is explained in the comment in objdef.lisp
     (loadw temp symbol symbol-hash-slot other-pointer-lowtag)
-    (inst bic res temp (1- n-fixnum-tag-bits))))
+    (inst bic res temp fixnum-tag-mask)))
 
 ;;; On unithreaded builds these are just copies of the non-global versions.
 (define-vop (%set-symbol-global-value set))
