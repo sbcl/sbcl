@@ -65,7 +65,7 @@
       (:macro
        (error "~S names a macro." object))
       (:special-form
-       (error "~S names a macro." object))
+       (error "~S names a special operator." object))
       (t
        (fdefinition object)))))
 
