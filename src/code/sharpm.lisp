@@ -19,7 +19,7 @@
 ;;;; reading arrays and vectors: the #(, #*, and #A readmacros
 
 (defun sharp-left-paren (stream ignore length)
-  (declare (ignore ignore) (special *backquote-count*))
+  (declare (ignore ignore))
   (let* ((list (read-list stream nil))
          (list-length (handler-case (length list)
                         (type-error ()
@@ -131,7 +131,6 @@
           (if (zerop *backquote-count*)
               *bq-error*
               "Comma inside backquoted structure (not a list or general vector.)"))
-         (*backquote-count* 0)
          (body (if (char= (read-char stream t) #\( )
                   (let ((*backquote-count* 0))
                     (read-list stream nil))
@@ -458,11 +457,11 @@
 
 (defun sharp-dot (stream sub-char numarg)
   (ignore-numarg sub-char numarg)
-  (let ((token (read stream t nil t)))
+  (let ((expr (let ((*backquote-count* 0)) (read stream t nil t))))
     (unless *read-suppress*
       (unless *read-eval*
         (simple-reader-error stream "can't read #. while *READ-EVAL* is NIL"))
-      (eval token))))
+      (eval expr))))
 
 (defun sharp-illegal (stream sub-char ignore)
   (declare (ignore ignore))
