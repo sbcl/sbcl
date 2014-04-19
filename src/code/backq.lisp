@@ -267,10 +267,18 @@
 ;;; redefining backquote in terms of functions which are guaranteed to
 ;;; exist on the target Lisp, we ensure that backquote expansions in
 ;;; code-generating code work properly.)
-(defun !backq-cold-init ()
+
+;; A test of the ability of the cross-compiler to dump a function
+;; that references as constant a tree containing a COMMA struct.
+
+(defun !backq-cold-init (&optional (test t))
   (set-macro-character #\` #'backquote-macro)
-  (set-macro-character #\, #'comma-macro))
-#+sb-xc-host (!backq-cold-init)
+  (set-macro-character #\, #'comma-macro)
+  (when test
+    (assert (equalp (cons 'foo (unquote '*print-case* 4))
+                    (!a-random-comma-object-do-not-use)))))
+
+#+sb-xc-host (!backq-cold-init nil)
 
 ;;; The pretty-printer needs to know about our special tokens
 (defvar *backq-tokens*
