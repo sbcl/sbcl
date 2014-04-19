@@ -327,7 +327,8 @@
   (:save-p :compute-only)
   (:generator 10
     (loadw value object fdefn-fun-slot other-pointer-lowtag)
-    (inst cmp value nil-value)
+    ;; byte comparison works because lowtags of function and nil differ
+    (inst cmp (reg-in-size value :byte) (logand nil-value #xff))
     (let ((err-lab (generate-error-code vop 'undefined-fun-error object)))
       (inst jmp :e err-lab))))
 
