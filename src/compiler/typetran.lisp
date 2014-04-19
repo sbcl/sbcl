@@ -756,6 +756,8 @@
                  (if (typep x ',tval)
                      x
                      (replace (make-array (length x) :element-type 'character) x))))
+          ((eq tval 'character)
+           `(character x))
            ;; Special case VECTOR
            ((eq tval 'vector)
             `(the ,tval
