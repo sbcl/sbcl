@@ -1739,6 +1739,10 @@
     condition
     (explicit-check))
 
+(defknown coerce-symbol-to-fun (symbol)
+  function
+  ())
+
 (defknown sc-number-or-lose (symbol) sc-number
   (foldable))
 

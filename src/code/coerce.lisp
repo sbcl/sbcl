@@ -50,8 +50,6 @@
       (declare (fixnum index))
       (rplacd splice (list (aref object index))))))
 
-(defvar *offending-datum*); FIXME: Remove after debugging COERCE.
-
 ;;; These are used both by the full DEFUN function and by various
 ;;; optimization transforms in the constant-OUTPUT-TYPE-SPEC case.
 ;;;
@@ -60,39 +58,44 @@
 ;;; DEFTRANSFORMs, though.
 (declaim (inline coerce-to-list))
 (declaim (inline coerce-to-vector))
+
+(defun coerce-symbol-to-fun (object)
+  (let ((kind (info :function :kind object)))
+    (case kind
+      (:macro
+       (error "~S names a macro." object))
+      (:special-form
+       (error "~S names a macro." object))
+      (t
+       (fdefinition object)))))
+
 (defun coerce-to-fun (object)
   ;; (Unlike the other COERCE-TO-FOOs, this one isn't inline, because
   ;; it's so big and because optimizing away the outer ETYPECASE
   ;; doesn't seem to buy us that much anyway.)
   (etypecase object
+    (function object)
     (symbol
-     ;; ANSI lets us return ordinary errors (non-TYPE-ERRORs) here.
-     (cond ((macro-function object)
-            (error "~S names a macro." object))
-           ((special-operator-p object)
-            (error "~S is a special operator." object))
-           (t (fdefinition object))))
+     (coerce-symbol-to-fun object))
     (list
      (case (first object)
-       ((setf)
+       (setf
         (fdefinition object))
-       ((lambda)
-        ;; FIXME: If we go to a compiler-only implementation, this can
-        ;; become COMPILE instead of EVAL, which seems nicer to me.
-        (eval `(function ,object)))
+       (lambda
+        (eval object))
        (t
         (error 'simple-type-error
                :datum object
                :expected-type '(or symbol
-                                   ;; KLUDGE: ANSI wants us to
-                                   ;; return a TYPE-ERROR here, and
-                                   ;; a TYPE-ERROR is supposed to
-                                   ;; describe the expected type,
-                                   ;; but it's not obvious how to
-                                   ;; describe the coerceable cons
-                                   ;; types, so we punt and just say
-                                   ;; CONS. -- WHN 20000503
-                                   cons)
+                                ;; KLUDGE: ANSI wants us to
+                                ;; return a TYPE-ERROR here, and
+                                ;; a TYPE-ERROR is supposed to
+                                ;; describe the expected type,
+                                ;; but it's not obvious how to
+                                ;; describe the coerceable cons
+                                ;; types, so we punt and just say
+                                ;; CONS. -- WHN 20000503
+                                cons)
                :format-control "~S can't be coerced to a function."
                :format-arguments (list object)))))))
 
@@ -247,33 +250,7 @@
             (sb!mop:class-prototype class)
             (length object) :initial-contents object)))
         ((csubtypep type (specifier-type 'function))
-         (when (and (legal-fun-name-p object)
-                    (not (fboundp object)))
-           (error 'simple-type-error
-                  :datum object
-                  ;; FIXME: SATISFIES FBOUNDP is a kinda bizarre broken
-                  ;; type specifier, since the set of values it describes
-                  ;; isn't in general constant in time. Maybe we could
-                  ;; find a better way of expressing this error? (Maybe
-                  ;; with the UNDEFINED-FUNCTION condition?)
-                  :expected-type '(satisfies fboundp)
-               :format-control "~S isn't fbound."
-               :format-arguments (list object)))
-         (when (and (symbolp object)
-                    (sb!xc:macro-function object))
-           (error 'simple-type-error
-                  :datum object
-                  :expected-type '(not (satisfies sb!xc:macro-function))
-                  :format-control "~S is a macro."
-                  :format-arguments (list object)))
-         (when (and (symbolp object)
-                    (special-operator-p object))
-           (error 'simple-type-error
-                  :datum object
-                  :expected-type '(not (satisfies special-operator-p))
-                  :format-control "~S is a special operator."
-                  :format-arguments (list object)))
-         (eval `#',object))
+         (coerce-to-fun object))
         (t
          (coerce-error))))))
 

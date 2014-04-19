@@ -791,6 +791,10 @@
                 (give-up-ir1-transform
                  "~@<~S specifies dimensions other than (*) in safe code.~:@>"
                  tval)))
+           ((csubtypep tspec (specifier-type 'function))
+            (if (csubtypep (lvar-type x) (specifier-type 'symbol))
+                `(coerce-symbol-to-fun x)
+                `(coerce-to-fun x)))
            (t
             (give-up-ir1-transform
              "~@<open coding coercion to ~S not implemented.~:@>"
