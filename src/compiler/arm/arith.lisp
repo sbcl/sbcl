@@ -196,27 +196,15 @@
   (:policy :fast-safe)
   (:temporary (:sc non-descriptor-reg) ndesc)
   (:generator 3
-    (let ((positive (gen-label))
-          (done (gen-label)))
-      (inst cmp amount 0)
-      (inst b :ge positive)
-
-      (inst eor ndesc ndesc ndesc)
-      (inst sub ndesc ndesc amount)
-
-      (inst mov result (lsr number ndesc))
-      (inst b done)
-
-      (emit-label positive)
-
-      (inst mov result (lsl number amount))
-
-      (emit-label done))))
+    (inst cmp amount 0)
+    (inst rsb :lt ndesc amount 0)
+    (inst mov :lt result (lsr number ndesc))
+    (inst mov :ge result (lsl number amount))))
 
 (define-vop (fast-ash/signed=>signed)
   (:note "inline ASH")
   (:args (number :scs (signed-reg) :to :save)
-         (amount :scs (signed-reg)))
+         (amount :scs (signed-reg) :to :save))
   (:arg-types signed-num signed-num)
   (:results (result :scs (signed-reg)))
   (:result-types signed-num)
@@ -224,22 +212,10 @@
   (:policy :fast-safe)
   (:temporary (:sc non-descriptor-reg) ndesc)
   (:generator 3
-    (let ((positive (gen-label))
-          (done (gen-label)))
-      (inst cmp amount 0)
-      (inst b :ge positive)
-
-      (inst eor ndesc ndesc ndesc)
-      (inst sub ndesc ndesc amount)
-
-      (inst mov result (asr number ndesc))
-      (inst b done)
-
-      (emit-label positive)
-
-      (inst mov result (lsl number ndesc))
-
-      (emit-label done))))
+    (inst cmp amount 0)
+    (inst rsb :lt ndesc amount 0)
+    (inst mov :lt result (asr number ndesc))
+    (inst mov :ge result (lsl number amount))))
 
 (macrolet ((def (name sc-type type result-type cost)
              `(define-vop (,name)
