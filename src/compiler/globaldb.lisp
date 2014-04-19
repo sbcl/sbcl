@@ -185,8 +185,15 @@
             (t
              (when (eql type-num -1) ; pick a new type-num
                ;; The zeroth type-num is reserved for INFO's own private use.
+               ;; +fdefn-type-num+ is also reserved and must be special-cased.
+               ;; Generalizing DEFINE-INFO-TYPE to optionally pass a type-number
+               ;; would also mean changing the fact that a specified number is
+               ;; used only for restoring *INFO-TYPES* during cold-init.
                (setq type-num
-                     (or (position nil *info-types* :start 1)
+                     (or (if (and (eq class-keyword :function)
+                                  (eq type-keyword :definition))
+                             +fdefn-type-num+
+                             (position nil *info-types* :start 1))
                          (error "no more INFO type numbers available"))))
              (setf metainfo (make-globaldb-info-metadata
                              type-num class-keyword type-keyword type-spec)
@@ -481,7 +488,8 @@
 ;; must be info type number 1
 (define-info-type (:function :definition) :type-spec (or fdefn null))
 (eval-when (:compile-toplevel)
-  (aver (= 1 (type-info-number (type-info-or-lose :function :definition)))))
+  (aver (= (type-info-number (type-info-or-lose :function :definition))
+           +fdefn-type-num+)))
 
 ;;; the kind of functional object being described. If null, NAME isn't
 ;;; a known functional object.

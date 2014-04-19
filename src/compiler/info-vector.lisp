@@ -502,10 +502,10 @@
 ;; An empty info-vector. Its 0th field describes that there are no more fields.
 (defconstant-eqx +nil-packed-infos+ #(0) #'equalp)
 
-;; FDEFINITIONs can be looked up from C runtime given an info-vector,
-;; so the type-number must be wired. Using genesis machinery to define
-;; the constant for C would be overkill, as it's the only special case.
-(defconstant +fdefn-type-num+ 1)
+;; FDEFINITIONs have a type-number that admits slightly clever logic
+;; for INFO-VECTOR-FDEFINITION. Do not change this constant without
+;; careful examination of that function.
+(defconstant +fdefn-type-num+ info-type-mask)
 
 ;; Extract a field from a packed info descriptor.
 ;; A field is either a count of type-numbers, or a type-number.
@@ -786,7 +786,7 @@
                ;; it had better be found - it was in the packed vector
                (aver data-start)
                ;; fdefn must be the first piece of info for any name.
-               ;; This facilitates C runtime determination of SymbolFunction
+               ;; This facilitates implementing SYMBOL-FUNCTION without
                ;; without completely decoding the vector.
                (insert-at (+ data-start (if (eql type-number +fdefn-type-num+)
                                             1 (svref new data-start)))
@@ -1052,19 +1052,12 @@ This is interpreted as
     ;; This is safe: Info-Vector invariant requires that it have length >= 1.
     (let ((word (the fixnum (svref vect 0))))
       ;; Test that the first type-number is +fdefn-type-num+ and its n-infos
-      ;; field is nonzero. Type-num is the better discriminator because it
-      ;; can fail immediately, whereas the 'n-infos' is almost always nonzero,
-      ;; so does not inform the test. The degenerate vector +nil-packed-infos+
-      ;; can only occur from deletions, which are rare. But consider this:
-      ;;  * (DEFINE-COMPILER-MACRO (SETF ZOOK) (A) `(CAR ,A))
-      ;;  * (WRITE (SYMBOL-INFO-VECTOR 'ZOOK) :BASE 8)
-      ;;     #(120100 #<FUNCTION (COMPILER-MACRO-FUNCTION #) {100367911B}> SETF)
-      ;;         --
-      ;; The underlined packed field = +fdefn-type-num+ but it isn't an fdefn.
-      ;; It's the 'n-infos' for a secondary name. The primary name has N=0.
-      (when (and (eql (mask-field (byte type-number-bits type-number-bits) word)
-                      (ash +fdefn-type-num+ type-number-bits))
-                 (ldb-test (byte type-number-bits 0) word))
+      ;; field is nonzero. These conditions can be tested simultaneously
+      ;; using a SIMD-in-a-register idea. The low 6 bits must be nonzero
+      ;; and the next 6 must be exactly #b111111, so considered together
+      ;; as a 12-bit unsigned integer it must be >= #b111111000001
+      (when (>= (ldb (byte (* type-number-bits 2) 0) word)
+                (1+ (ash +fdefn-type-num+ type-number-bits)))
         ;; DATA-REF-WITH-OFFSET doesn't know the info-vector length invariant,
         ;; so depite (safety 0) eliding bounds check, FOLD-INDEX-ADDRESSING
         ;; wasn't kicking in without (TRULY-THE (INTEGER 1 *)).

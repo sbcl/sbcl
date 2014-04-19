@@ -89,28 +89,30 @@
               ((CAS ,s) (3 . "CAS-info#3"))
               ((FROB ,s) (15 . "FROB-info#15"))))
 
-    (iv-put 'cas 1 "CAS-fdefn") ; pretend
+    (iv-put 'cas +fdefn-type-num+ "CAS-fdefn") ; pretend
     ;; fdefinition for (CAS) moves in front of its info type #3
     (verify `((,s (12 . "info#12"))
               ((SETF ,s) (6 . "SETF-info#6"))
-              ((CAS ,s) (1 . "CAS-fdefn") (3 . "CAS-info#3"))
+              ((CAS ,s) (,+fdefn-type-num+ . "CAS-fdefn") (3 . "CAS-info#3"))
               ((FROB ,s) (15 . "FROB-info#15"))))
 
-    (iv-put 'frob 1 "FROB-fdefn")
+    (iv-put 'frob +fdefn-type-num+ "FROB-fdefn")
     (verify `((,s (12 . "info#12"))
               ((SETF ,s) (6 . "SETF-info#6"))
-              ((CAS ,s) (1 . "CAS-fdefn") (3 . "CAS-info#3"))
-              ((FROB ,s) (1 . "FROB-fdefn") (15 . "FROB-info#15"))))
+              ((CAS ,s) (,+fdefn-type-num+ . "CAS-fdefn") (3 . "CAS-info#3"))
+              ((FROB ,s)
+               (,+fdefn-type-num+ . "FROB-fdefn") (15 . "FROB-info#15"))))
 
-    (iv-put 'setf 1 "SETF-fdefn")
+    (iv-put 'setf +fdefn-type-num+ "SETF-fdefn")
     (verify `((,s (12 . "info#12"))
-              ((SETF ,s) (1 . "SETF-fdefn") (6 . "SETF-info#6"))
-              ((CAS ,s) (1 . "CAS-fdefn") (3 . "CAS-info#3"))
-              ((FROB ,s) (1 . "FROB-fdefn") (15 . "FROB-info#15"))))
+              ((SETF ,s) (,+fdefn-type-num+ . "SETF-fdefn") (6 . "SETF-info#6"))
+              ((CAS ,s) (,+fdefn-type-num+ . "CAS-fdefn") (3 . "CAS-info#3"))
+              ((FROB ,s)
+               (,+fdefn-type-num+ . "FROB-fdefn") (15 . "FROB-info#15"))))
 
-    (iv-del 'cas 1)
-    (iv-del 'setf 1)
-    (iv-del 'frob 1)
+    (iv-del 'cas +fdefn-type-num+)
+    (iv-del 'setf +fdefn-type-num+)
+    (iv-del 'frob +fdefn-type-num+)
     (verify `((,s (12 . "info#12"))
               ((SETF ,s) (6 . "SETF-info#6"))
               ((CAS ,s) (3 . "CAS-info#3"))
@@ -121,8 +123,8 @@
     (verify `(((CAS ,s) (3 . "CAS-info#3"))
               ((FROB ,s) (15 . "FROB-info#15"))))
 
-    (iv-put 'setf 1 "fdefn")
-    (verify `(((SETF ,s) (1 . "fdefn"))
+    (iv-put 'setf +fdefn-type-num+ "fdefn")
+    (verify `(((SETF ,s) (,+fdefn-type-num+ . "fdefn"))
               ((CAS ,s) (3 . "CAS-info#3"))
               ((FROB ,s) (15 . "FROB-info#15"))))))
 
