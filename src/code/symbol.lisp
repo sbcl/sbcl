@@ -80,7 +80,7 @@ distinct from the global value. Can also be SETF."
 (defun symbol-function (symbol)
   #!+sb-doc
   "Return SYMBOL's current function definition. Settable with SETF."
-  (!coerce-name-to-fun symbol-fdefinition symbol))
+  (!coerce-name-to-fun symbol-fdefn symbol))
 
 (defun (setf symbol-function) (new-value symbol)
   (declare (type symbol symbol) (type function new-value))

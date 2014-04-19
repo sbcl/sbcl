@@ -136,11 +136,11 @@
 (test-util:with-test (:name :globaldb-info-iterate)
   (show-info '*))
 
-(test-util:with-test (:name :find-fdefinition-agreement)
-  ;; Shows that GET-INFO-VALUE agrees with FIND-FDEFINITION on all symbols,
+(test-util:with-test (:name :find-fdefn-agreement)
+  ;; Shows that GET-INFO-VALUE agrees with FIND-FDEFN on all symbols,
   ;; since they use diffent code. Something would have crashed long before here...
   (flet ((try (x)
-           (assert (eq (find-fdefinition x) (info :function :definition x)))))
+           (assert (eq (find-fdefn x) (info :function :definition x)))))
     (do-all-symbols (s)
       (try s)
       (try `(setf ,s))
@@ -448,7 +448,7 @@
   (let ((result (make-array (length names) :initial-element nil)))
     (dotimes (iter 3)
       (loop for i below (length names)
-            do (pushnew (find-fdefinition (aref names i)) (aref result i))))
+            do (pushnew (find-fdefn (aref names i)) (aref result i))))
     ;; The thread shall observe either nil or an fdefn, and at most one fdefn.
     (loop for list across result
           for i from 0

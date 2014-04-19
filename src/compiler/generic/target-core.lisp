@@ -111,7 +111,7 @@
                 (reference-core-fun code-obj index (cdr const) object))
                (:fdefinition
                 (setf (code-header-ref code-obj index)
-                      (find-or-create-fdefinition (cdr const))))
+                      (find-or-create-fdefn (cdr const))))
                (:known-fun
                 (setf (code-header-ref code-obj index)
                       (%coerce-name-to-fun (cdr const)))))))))))

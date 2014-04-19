@@ -503,7 +503,7 @@
 (defconstant-eqx +nil-packed-infos+ #(0) #'equalp)
 
 ;; FDEFINITIONs have a type-number that admits slightly clever logic
-;; for INFO-VECTOR-FDEFINITION. Do not change this constant without
+;; for INFO-VECTOR-FDEFN. Do not change this constant without
 ;; careful examination of that function.
 (defconstant +fdefn-type-num+ info-type-mask)
 
@@ -1046,8 +1046,8 @@ This is interpreted as
 
 ;; Given Info-Vector VECT, return the fdefn that it contains for its root name,
 ;; or nil if there is no value. NIL input is acceptable and will return NIL.
-(declaim (inline info-vector-fdefinition))
-(defun info-vector-fdefinition (vect)
+(declaim (inline info-vector-fdefn))
+(defun info-vector-fdefn (vect)
   (when vect
     ;; This is safe: Info-Vector invariant requires that it have length >= 1.
     (let ((word (the fixnum (svref vect 0))))

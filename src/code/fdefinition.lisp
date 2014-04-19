@@ -54,22 +54,21 @@
 ;; Signal an error if name isn't valid.
 ;; Assume that exists-p implies LEGAL-FUN-NAME-P.
 ;;
-(declaim (ftype (sfunction ((or symbol list)) (or fdefn null))
-                find-fdefinition))
-(defun find-fdefinition (name0)
+(declaim (ftype (sfunction ((or symbol list)) (or fdefn null)) find-fdefn))
+(defun find-fdefn (name0)
   ;; Since this emulates GET-INFO-VALUE, we have to uncross the name.
   (let ((name (uncross name0)))
     (declare (optimize (safety 0)))
     (when (symbolp name) ; Don't need LEGAL-FUN-NAME-P check
-      (return-from find-fdefinition (sb!impl::symbol-fdefinition name)))
+      (return-from find-fdefn (symbol-fdefn name)))
     ;; Technically the ALLOW-ATOM argument of NIL isn't needed, but
     ;; the compiler isn't figuring out not to test SYMBOLP twice in a row.
     (with-globaldb-name (key1 key2 nil) name
       :hairy
-      ;; INFO-GETHASH returns NIL or a vector. INFO-VECTOR-FDEFINITION accepts
+      ;; INFO-GETHASH returns NIL or a vector. INFO-VECTOR-FDEFN accepts
       ;; either. If fdefn isn't found, fall through to the legality test.
-      (awhen (info-vector-fdefinition (info-gethash name *info-environment*))
-        (return-from find-fdefinition it))
+      (awhen (info-vector-fdefn (info-gethash name *info-environment*))
+        (return-from find-fdefn it))
       :simple
       (progn
         (awhen (symbol-info-vector key1)
@@ -84,17 +83,16 @@
                 (setq field-idx 0 descriptor-idx (1+ descriptor-idx)))
               (when (eql (packed-info-field it descriptor-idx field-idx)
                          +fdefn-type-num+)
-                (return-from find-fdefinition
+                (return-from find-fdefn
                   (aref it (1- (the index data-idx))))))))
         (when (eq key1 'setf) ; bypass the legality test
-          (return-from find-fdefinition nil))))
+          (return-from find-fdefn nil))))
     (legal-fun-name-or-type-error name)))
 
-(declaim (ftype (sfunction (t) fdefn) find-or-create-fdefinition))
-(defun find-or-create-fdefinition (name)
-  (or (find-fdefinition name)
-      ;; If the name was not legal, FIND-FDEFINITION signals an error,
-      ;; so there is no additional pre-creation check.
+(declaim (ftype (sfunction (t) fdefn) find-or-create-fdefn))
+(defun find-or-create-fdefn (name)
+  (or (find-fdefn name)
+      ;; We won't reach here if the name was not legal
       (let ((name (uncross name)))
         (get-info-value-initializing :function :definition name
                                      (make-fdefn name)))))
@@ -115,18 +113,18 @@
 ;;; something. SETFable.
 #!-sb-fluid (declaim (inline %coerce-name-to-fun))
 (defun %coerce-name-to-fun (name)
-  (!coerce-name-to-fun find-fdefinition name))
+  (!coerce-name-to-fun find-fdefn name))
 (defun (setf %coerce-name-to-fun) (function name)
   (maybe-clobber-ftype name)
-  (let ((fdefn (find-or-create-fdefinition name)))
+  (let ((fdefn (find-or-create-fdefn name)))
     (setf (fdefn-fun fdefn) function)))
 
-#!-sb-fluid (declaim (inline symbol-fdefinition))
+#!-sb-fluid (declaim (inline symbol-fdefn))
 ;; Return SYMBOL's fdefinition, if any, or NIL. SYMBOL must already
 ;; have been verified to be a symbol by the caller.
-(defun symbol-fdefinition (symbol)
+(defun symbol-fdefn (symbol)
   (declare (optimize (safety 0)))
-  (sb!c::info-vector-fdefinition (symbol-info-vector (uncross symbol))))
+  (info-vector-fdefn (symbol-info-vector (uncross symbol))))
 
 ;; CALLABLE is a function-designator, not an extended-function-designator,
 ;; i.e. it is a function or symbol, and not a generalized function name.
@@ -136,7 +134,7 @@
 (defun %coerce-callable-to-fun (callable)
   (etypecase callable
     (function callable)
-    (symbol (!coerce-name-to-fun symbol-fdefinition callable))))
+    (symbol (!coerce-name-to-fun symbol-fdefn callable))))
 
 
 ;;;; definition encapsulation
@@ -159,7 +157,7 @@
 ;;; encapsulation for identification in case you need multiple
 ;;; encapsulations of the same name.
 (defun encapsulate (name type function)
-  (let ((fdefn (find-fdefinition name)))
+  (let ((fdefn (find-fdefn name)))
     (unless (and fdefn (fdefn-fun fdefn))
       (error 'undefined-function :name name))
     (when (typep (fdefn-fun fdefn) 'generic-function)
@@ -207,7 +205,7 @@
 (defun unencapsulate (name type)
   #!+sb-doc
   "Removes NAME's most recent encapsulation of the specified TYPE."
-  (let* ((fdefn (find-fdefinition name))
+  (let* ((fdefn (find-fdefn name))
          (encap-info (encapsulation-info (fdefn-fun fdefn))))
     (declare (type (or encapsulation-info null) encap-info))
     (when (and fdefn (typep (fdefn-fun fdefn) 'generic-function))
@@ -238,7 +236,7 @@
 
 ;;; Does NAME have an encapsulation of the given TYPE?
 (defun encapsulated-p (name type)
-  (let ((fdefn (find-fdefinition name)))
+  (let ((fdefn (find-fdefn name)))
     (when (and fdefn (typep (fdefn-fun fdefn) 'generic-function))
       (return-from encapsulated-p
         (encapsulated-generic-function-p (fdefn-fun fdefn) type)))
@@ -319,7 +317,7 @@
 
     ;; FIXME: This is a good hook to have, but we should probably
     ;; reserve it for users.
-    (let ((fdefn (find-or-create-fdefinition name)))
+    (let ((fdefn (find-or-create-fdefn name)))
       ;; *SETF-FDEFINITION-HOOK* won't be bound when initially running
       ;; top level forms in the kernel core startup.
       (when (boundp '*setf-fdefinition-hook*)
@@ -346,7 +344,7 @@
 (defun fboundp (name)
   #!+sb-doc
   "Return true if name has a global function definition."
-  (let ((fdefn (find-fdefinition name)))
+  (let ((fdefn (find-fdefn name)))
     (and fdefn (fdefn-fun fdefn) t)))
 
 (defun fmakunbound (name)
@@ -354,7 +352,7 @@
   "Make NAME have no global function definition."
   (with-single-package-locked-error
       (:symbol name "removing the function or macro definition of ~A")
-    (let ((fdefn (find-fdefinition name)))
+    (let ((fdefn (find-fdefn name)))
       (when fdefn
         (fdefn-makunbound fdefn)))
     (undefine-fun-name name)

@@ -550,8 +550,8 @@
 (define-fop (fop-small-code 59 :stackp nil)
   (load-code (read-byte-arg) (read-halfword-arg)))
 
-(define-fop (fop-fdefinition 60)
-  (find-or-create-fdefinition (pop-stack)))
+(define-fop (fop-fdefinition 60) ; should probably be 'fop-fdefn'
+  (find-or-create-fdefn (pop-stack)))
 
 (define-fop (fop-known-fun 65)
   (%coerce-name-to-fun (pop-stack)))
