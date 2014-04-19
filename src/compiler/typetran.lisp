@@ -730,13 +730,32 @@
           ;; FIXME: #!+long-float (t ,(error "LONG-FLOAT case needed"))
           ((csubtypep tspec (specifier-type 'float))
            `(the ,tval (%single-float x)))
+          ((csubtypep tspec (specifier-type 'complex))
+           (let ((part-type (cond ((numeric-type-p tspec)
+                                   (numeric-type-format tspec))
+                                  ((csubtypep tspec (specifier-type '(complex float)))
+                                   'float)
+                                  (t
+                                   t))))
+             `(cond ,@(and (eq part-type t)
+                           `(((typep x 'rational)
+                              x)))
+                    (t
+                     (the ,tval
+                          (cond ((not (typep x 'complex))
+                                 (complex (coerce x ',part-type)))
+                                ((typep x ',tval)
+                                 x)
+                                (t
+                                 (complex (coerce (realpart x) ',part-type)
+                                          (coerce (imagpart x) ',part-type)))))))))
            ;; Special case STRING and SIMPLE-STRING as they are union types
            ;; in SBCL.
-           ((member tval '(string simple-string))
-            `(the ,tval
-               (if (typep x ',tval)
-                   x
-                   (replace (make-array (length x) :element-type 'character) x))))
+          ((member tval '(string simple-string))
+           `(the ,tval
+                 (if (typep x ',tval)
+                     x
+                     (replace (make-array (length x) :element-type 'character) x))))
            ;; Special case VECTOR
            ((eq tval 'vector)
             `(the ,tval
