@@ -177,7 +177,7 @@
   #!-sb-simd-pack
   unused01-widetag
   #!+sb-simd-pack
-  simd-pack-widetag                          ; 01011110
+  simd-pack-widetag                         ; 01011110
   unused02-widetag                          ; 01100010
   unused03-widetag                          ; 01100110
   unused04-widetag                          ; 01101010
@@ -194,50 +194,56 @@
   #!+#.(cl:if (cl:= 32 sb!vm:n-word-bits) '(and) '(or))
   unused11-widetag                          ; 10000110
 
-  simple-array-unsigned-byte-2-widetag      ; 10001010
-  simple-array-unsigned-byte-4-widetag      ; 10001110
-  simple-array-unsigned-byte-7-widetag      ; 10010010
-  simple-array-unsigned-byte-8-widetag      ; 10010110
-  simple-array-unsigned-byte-15-widetag     ; 10011010
-  simple-array-unsigned-byte-16-widetag     ; 10011110
-  simple-array-nil-widetag                  ; 10100010
-  simple-base-string-widetag                ; 10100110
-  #!+sb-unicode simple-character-string-widetag
-  simple-bit-vector-widetag                 ; 10101010
-  simple-vector-widetag                     ; 10101110
+  simple-array-widetag                      ; 10001010
+  simple-array-unsigned-byte-2-widetag      ; 10001110
+  simple-array-unsigned-byte-4-widetag      ; 10010010
+  simple-array-unsigned-byte-7-widetag      ; 10010110
+  simple-array-unsigned-byte-8-widetag      ; 10011010
+  simple-array-unsigned-byte-15-widetag     ; 10011110
+  simple-array-unsigned-byte-16-widetag     ; 10100010
+
   #!+#.(cl:if (cl:= 32 sb!vm:n-word-bits) '(and) '(or))
-  simple-array-unsigned-fixnum-widetag     ; 10110010
-  simple-array-unsigned-byte-31-widetag     ; 10110110
-  simple-array-unsigned-byte-32-widetag     ; 10111010
+  simple-array-unsigned-fixnum-widetag      ; 10100110
+  simple-array-unsigned-byte-31-widetag     ; 10101010
+  simple-array-unsigned-byte-32-widetag     ; 10101110
   #!+#.(cl:if (cl:= 64 sb!vm:n-word-bits) '(and) '(or))
   simple-array-unsigned-fixnum-widetag
   #!+#.(cl:if (cl:= 64 sb!vm:n-word-bits) '(and) '(or))
   simple-array-unsigned-byte-63-widetag
   #!+#.(cl:if (cl:= 64 sb!vm:n-word-bits) '(and) '(or))
   simple-array-unsigned-byte-64-widetag
-  simple-array-signed-byte-8-widetag        ; 10111110
-  simple-array-signed-byte-16-widetag       ; 11000010
+  simple-array-signed-byte-8-widetag        ; 10110010
+  simple-array-signed-byte-16-widetag       ; 10110110
   #!+#.(cl:if (cl:= 32 sb!vm:n-word-bits) '(and) '(or))
-  simple-array-fixnum-widetag       ; 11000110
-  simple-array-signed-byte-32-widetag       ; 11001010
+  simple-array-fixnum-widetag               ; 10111010
+  simple-array-signed-byte-32-widetag       ; 10111110
   #!+#.(cl:if (cl:= 64 sb!vm:n-word-bits) '(and) '(or))
   simple-array-fixnum-widetag
   #!+#.(cl:if (cl:= 64 sb!vm:n-word-bits) '(and) '(or))
   simple-array-signed-byte-64-widetag
-  simple-array-single-float-widetag         ; 11001110
-  simple-array-double-float-widetag         ; 11010010
-  simple-array-complex-single-float-widetag ; 11010110
-  simple-array-complex-double-float-widetag ; 11011010
-  simple-array-widetag                      ; 11011110
-  complex-vector-nil-widetag                ; 11100010
+  simple-array-single-float-widetag         ; 11000010
+  simple-array-double-float-widetag         ; 11000110
+  simple-array-complex-single-float-widetag ; 11001010
+  simple-array-complex-double-float-widetag ; 11001110
+  simple-bit-vector-widetag                 ; 11010010
+  simple-vector-widetag                     ; 11010110
+
+  ;; Strings
+  simple-array-nil-widetag                  ; 11011010
+  simple-base-string-widetag                ; 11011110
+  #!+sb-unicode
+  simple-character-string-widetag
   complex-base-string-widetag               ; 11100110
-  #!+sb-unicode complex-character-string-widetag
-  complex-bit-vector-widetag                ; 11101010
-  complex-vector-widetag                    ; 11101110
-  complex-array-widetag                     ; 11110010
+  #!+sb-unicode
+  complex-character-string-widetag          ; 11101010
+  complex-vector-nil-widetag                ; 11101110
+
+  complex-bit-vector-widetag                ; 11110010
+  complex-vector-widetag                    ; 11110110
+  complex-array-widetag                     ; 11111010
 
   #!+#.(cl:if (cl:= 32 sb!vm:n-word-bits) '(and) '(or))
-  unused12-widetag                          ; 11110110
+  unused12-widetag                          ; 11111110
   #!+(and #.(cl:if (cl:= 32 sb!vm:n-word-bits) '(and) '(or))
           (not sb-unicode))
   unused13-widetag                          ; 11111010
