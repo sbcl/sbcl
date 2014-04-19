@@ -791,6 +791,8 @@
                 (give-up-ir1-transform
                  "~@<~S specifies dimensions other than (*) in safe code.~:@>"
                  tval)))
+           ((type= tspec (specifier-type 'list))
+            `(coerce-to-list x))
            ((csubtypep tspec (specifier-type 'function))
             (if (csubtypep (lvar-type x) (specifier-type 'symbol))
                 `(coerce-symbol-to-fun x)

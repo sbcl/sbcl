@@ -50,6 +50,15 @@
       (declare (fixnum index))
       (rplacd splice (list (aref object index))))))
 
+(defun sequence-to-list (sequence)
+  (declare (type sequence sequence))
+  (let* ((result (list nil))
+         (splice result))
+    (sb!sequence:dosequence (i sequence)
+      (rplacd splice (list i))
+      (setf splice (cdr splice)))
+    (cdr result)))
+
 ;;; These are used both by the full DEFUN function and by various
 ;;; optimization transforms in the constant-OUTPUT-TYPE-SPEC case.
 ;;;
@@ -100,8 +109,10 @@
                :format-arguments (list object)))))))
 
 (defun coerce-to-list (object)
-  (etypecase object
-    (vector (vector-to-list* object))))
+  (seq-dispatch object
+                object
+                (vector-to-list* object)
+                (sequence-to-list object)))
 
 (defun coerce-to-vector (object output-type-spec)
   (etypecase object

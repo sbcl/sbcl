@@ -1,6 +1,7 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 changes relative to sbcl-1.1.17:
-  * optimization: (coerce x 'complex) is now as efficient as (complex x).
+  * optimization: COERCE is now more effecient for more cases when the type is
+    known at compile-time.
     (lp#1309815)
   * bug fix: correctly inherit condition initforms. (lp#1300904)
   * bug fix: properly pprint literal functions inside nested lists.
