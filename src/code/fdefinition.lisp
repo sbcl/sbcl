@@ -78,14 +78,19 @@
   (unless (eq :declared (info :function :where-from name))
     (clear-info :function :type name)))
 
+(defmacro !coerce-name-to-fun (accessor name)
+  `(let* ((name ,name) (fdefn (,accessor name)))
+     (if fdefn
+         (truly-the function
+                    (values (sb!sys:%primitive sb!c:safe-fdefn-fun fdefn)))
+         (error 'undefined-function :name name))))
+
 ;;; Return the fdefn-fun of NAME's fdefinition including any encapsulations.
 ;;; The compiler emits calls to this when someone tries to FUNCALL
 ;;; something. SETFable.
 #!-sb-fluid (declaim (inline %coerce-name-to-fun))
 (defun %coerce-name-to-fun (name)
-  (let ((fdefn (find-fdefinition name)))
-    (or (and fdefn (fdefn-fun fdefn))
-        (error 'undefined-function :name name))))
+  (!coerce-name-to-fun find-fdefinition name))
 (defun (setf %coerce-name-to-fun) (function name)
   (maybe-clobber-ftype name)
   (let ((fdefn (find-or-create-fdefinition name)))
@@ -106,10 +111,7 @@
 (defun %coerce-callable-to-fun (callable)
   (etypecase callable
     (function callable)
-    (symbol
-     (let ((fdefn (symbol-fdefinition callable)))
-       (or (and fdefn (fdefn-fun (truly-the fdefn fdefn)))
-           (error 'undefined-function :name callable))))))
+    (symbol (!coerce-name-to-fun symbol-fdefinition callable))))
 
 
 ;;;; definition encapsulation
