@@ -415,50 +415,6 @@
        (dx-flet ((,proc () ,creation-form))
          (%get-info-value-initializing ,name ,type-number #',proc)))))
 
-;; Return the fdefn object for NAME, or NIL if there is no fdefn.
-;; Signal an error if name isn't valid.
-;; Trying to get this to work properly in file 'fdefinition.lisp'
-;; was an exercise in futility.
-;; Creation of new fdefinitions is still defined there though.
-;; Assume that exists-p implies LEGAL-FUN-NAME-P.
-;;
-#-sb-xc-host
-(declaim (ftype (sfunction ((or symbol list)) (or fdefn null))
-                find-fdefinition))
-(defun find-fdefinition (name0)
-  ;; Since this emulates GET-INFO-VALUE, we have to uncross the name.
-  (let ((name (uncross name0)))
-    (declare (optimize (safety 0)))
-    (when (symbolp name) ; Don't need LEGAL-FUN-NAME-P check
-      (return-from find-fdefinition (sb!impl::symbol-fdefinition name)))
-    ;; Technically the ALLOW-ATOM argument of NIL isn't needed, but
-    ;; the compiler isn't figuring out not to test SYMBOLP twice in a row.
-    (with-globaldb-name (key1 key2 nil) name
-      :hairy
-      ;; INFO-GETHASH returns NIL or a vector. INFO-VECTOR-FDEFINITION accepts
-      ;; either. If fdefn isn't found, fall through to the legality test.
-      (awhen (info-vector-fdefinition (info-gethash name *info-environment*))
-        (return-from find-fdefinition it))
-      :simple
-      (progn
-        (awhen (symbol-info-vector key1)
-          (multiple-value-bind (data-idx descriptor-idx field-idx)
-              (info-find-aux-key/packed it key2)
-            (declare (type index descriptor-idx)
-                     (type (integer 0 #.+infos-per-word+) field-idx))
-          ;; Secondary names must have at least one info, so if a descriptor
-          ;; exists, there's no need to extract the n-infos field.
-            (when data-idx
-              (when (eql (incf field-idx) +infos-per-word+)
-                (setq field-idx 0 descriptor-idx (1+ descriptor-idx)))
-              (when (eql (packed-info-field it descriptor-idx field-idx)
-                         +fdefn-type-num+)
-                (return-from find-fdefinition
-                  (aref it (1- (the index data-idx))))))))
-        (when (eq key1 'setf) ; bypass the legality test
-          (return-from find-fdefinition nil))))
-    (legal-fun-name-or-type-error name)))
-
 ;; Call FUNCTION once for each Name in globaldb that has information associated
 ;; with it, passing the function the Name as its only argument.
 ;;

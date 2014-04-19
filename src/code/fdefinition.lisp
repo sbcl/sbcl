@@ -50,20 +50,45 @@
   (dolist (fdefn *!initial-fdefn-objects*)
     (setf (info :function :definition (fdefn-name fdefn)) fdefn)))
 
-;;; Return the fdefn object for NAME. If it doesn't already exist and
-;;; CREATE is non-NIL, create a new (unbound) one.
-;;; There is really no need for this function, but I kept it for 2 reasons:
-;;;  1. it's listed in *C-CALLABLE-STATIC-SYMBOLS* in compiler/generic/params
-;;;  2. it's an external symbol, so perhaps people thought they should use it
-;;; However in every use within the system's Lisp code, the second argument
-;;; is constantly T or NIL, and I feel that 'find-or-create-' is a better
-;;; name for what it does when create=T than is 'fdefinition-object'.
-(defun fdefinition-object (name create)
-  (declare (values (or fdefn null)))
-  (legal-fun-name-or-type-error name)
-  (if create
-      (find-or-create-fdefinition name)
-      (find-fdefinition name)))
+;; Return the fdefn object for NAME, or NIL if there is no fdefn.
+;; Signal an error if name isn't valid.
+;; Assume that exists-p implies LEGAL-FUN-NAME-P.
+;;
+(declaim (ftype (sfunction ((or symbol list)) (or fdefn null))
+                find-fdefinition))
+(defun find-fdefinition (name0)
+  ;; Since this emulates GET-INFO-VALUE, we have to uncross the name.
+  (let ((name (uncross name0)))
+    (declare (optimize (safety 0)))
+    (when (symbolp name) ; Don't need LEGAL-FUN-NAME-P check
+      (return-from find-fdefinition (sb!impl::symbol-fdefinition name)))
+    ;; Technically the ALLOW-ATOM argument of NIL isn't needed, but
+    ;; the compiler isn't figuring out not to test SYMBOLP twice in a row.
+    (with-globaldb-name (key1 key2 nil) name
+      :hairy
+      ;; INFO-GETHASH returns NIL or a vector. INFO-VECTOR-FDEFINITION accepts
+      ;; either. If fdefn isn't found, fall through to the legality test.
+      (awhen (info-vector-fdefinition (info-gethash name *info-environment*))
+        (return-from find-fdefinition it))
+      :simple
+      (progn
+        (awhen (symbol-info-vector key1)
+          (multiple-value-bind (data-idx descriptor-idx field-idx)
+              (info-find-aux-key/packed it key2)
+            (declare (type index descriptor-idx)
+                     (type (integer 0 #.+infos-per-word+) field-idx))
+          ;; Secondary names must have at least one info, so if a descriptor
+          ;; exists, there's no need to extract the n-infos field.
+            (when data-idx
+              (when (eql (incf field-idx) +infos-per-word+)
+                (setq field-idx 0 descriptor-idx (1+ descriptor-idx)))
+              (when (eql (packed-info-field it descriptor-idx field-idx)
+                         +fdefn-type-num+)
+                (return-from find-fdefinition
+                  (aref it (1- (the index data-idx))))))))
+        (when (eq key1 'setf) ; bypass the legality test
+          (return-from find-fdefinition nil))))
+    (legal-fun-name-or-type-error name)))
 
 (declaim (ftype (sfunction (t) fdefn) find-or-create-fdefinition))
 (defun find-or-create-fdefinition (name)

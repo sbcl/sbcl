@@ -122,7 +122,6 @@
     #!-x86-64 undefined-alien-fun-error
     sb!di::handle-breakpoint
     sb!di::handle-single-step-trap
-    fdefinition-object
     #!+win32 sb!kernel::handle-win32-exception
     #!+sb-thruption sb!thread::run-interruption
     #!+sb-safepoint sb!thread::enter-foreign-callback
