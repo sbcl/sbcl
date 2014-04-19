@@ -235,7 +235,7 @@
 (define-vop (move-from-unsigned)
   (:args (arg :scs (signed-reg unsigned-reg) :target x))
   (:results (y :scs (any-reg descriptor-reg)))
-  (:temporary (:scs (non-descriptor-reg) :from (:argument 0)) x temp)
+  (:temporary (:scs (non-descriptor-reg) :from (:argument 0)) x)
   (:temporary (:sc non-descriptor-reg :offset ocfp-offset) pa-flag)
   (:note "unsigned word to integer coercion")
   (:generator 20
@@ -255,7 +255,7 @@
       ;; one word, hence the following:
       (inst orrs x x 0)
       (inst sub :pl pa-flag pa-flag #x100)
-      (storew temp y 0 other-pointer-lowtag :pl)
+      (storew pa-flag y 0 other-pointer-lowtag :pl)
       (storew x y bignum-digits-offset other-pointer-lowtag))
     DONE))
 (define-move-vop move-from-unsigned :move
