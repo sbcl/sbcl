@@ -233,9 +233,9 @@
   simple-base-string-widetag                ; 11011110
   #!+sb-unicode
   simple-character-string-widetag
-  complex-base-string-widetag               ; 11100110
   #!+sb-unicode
-  complex-character-string-widetag          ; 11101010
+  complex-character-string-widetag          ; 11100110
+  complex-base-string-widetag               ; 11101010
   complex-vector-nil-widetag                ; 11101110
 
   complex-bit-vector-widetag                ; 11110010
