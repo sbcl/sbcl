@@ -84,10 +84,8 @@
 ;; 2) and for which the restart test returns non-NIL for CONDITION.
 ;; When CALL-TEST-P is non-NIL, all restarts are processed.
 (defun map-restarts (function &optional condition (call-test-p t))
-  ;; FIXME: if MAP-RESTARTS is internal, we could require the FUNCTION
-  ;; argument to be of type FUNCTION.
-  (let ((function (coerce function 'function))
-        (stack *restart-test-stack*))
+  (declare (function function))
+  (let ((stack *restart-test-stack*))
     (dolist (restart-cluster *restart-clusters*)
       (dolist (restart restart-cluster)
         (when (and (or (not condition)
@@ -115,7 +113,7 @@ restarts associated with CONDITION (or with no condition) will be returned."
     (map-restarts (lambda (restart) (result restart)) condition)
     (result)))
 
-(defun %find-restart (identifier &optional condition (call-test-p t))
+(defun %find-restart (identifier condition &optional (call-test-p t))
   (flet ((eq-restart-p (restart)
            (when (eq identifier restart)
              (return-from %find-restart restart)))
