@@ -81,10 +81,11 @@
           when results do (cerror "continue" "~A" results))))
 
 ;;; AMOP says these are the defaults
-(assert (equal (list (find-class 'standard-object))
-               (sb-mop:class-direct-superclasses (make-instance 'standard-class))))
-(assert (equal (list (find-class 'sb-mop:funcallable-standard-object))
-               (sb-mop:class-direct-superclasses (make-instance 'sb-mop:funcallable-standard-class))))
+(with-test (:name :standard-direct-superclasses)
+  (assert (equal (list (find-class 'standard-object))
+                 (sb-mop:class-direct-superclasses (make-instance 'standard-class))))
+  (assert (equal (list (find-class 'sb-mop:funcallable-standard-object))
+                 (sb-mop:class-direct-superclasses (make-instance 'sb-mop:funcallable-standard-class)))))
 
 (with-test (:name :bug-936513)
   ;; This used to fail as ENSURE-GENERIC-FUNCTION wanted a list specifying

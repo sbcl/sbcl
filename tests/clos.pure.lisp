@@ -48,29 +48,33 @@
   (assert (equal result (remove-duplicates result))))
 
 ;;; this one's user-observable
-(assert (typep #'(setf class-name) 'generic-function))
+(with-test (:name :type-of-setf-class-name)
+ (assert (typep #'(setf class-name) 'generic-function)))
 
 ;;; CLHS 1.4.4.5.  We could test for this by defining methods
 ;;; (i.e. portably) but it's much easier using the MOP and
 ;;; MAP-ALL-CLASSES.
-(flet ((standardized-class-p (c)
-         (eq (class-name c) (find-symbol (symbol-name (class-name c)) "CL"))))
-  (let (result)
-    (sb-pcl::map-all-classes
-     (lambda (c) (when (standardized-class-p c)
-                   (let* ((cpl (sb-mop:class-precedence-list c))
-                          (std (position (find-class 'standard-object) cpl))
-                          (str (position (find-class 'structure-object) cpl))
-                          (last (position-if
-                                 #'standardized-class-p (butlast cpl)
-                                 :from-end t)))
-                     (when (and std str)
-                       (push `(:and ,c) result))
-                     (when (and str (< str last))
-                       (push `(:str ,c) result))
-                     (when (and std (< std last))
-                       (push `(:std ,c) result))))))
-    (assert (null result))))
+(with-test (:name :check-standard-superclasses)
+  (flet ((standardized-class-p (c)
+           (and (class-name c)
+                (eq (symbol-package (class-name c))
+                    (find-package :cl)))))
+    (let (result)
+      (sb-pcl::map-all-classes
+       (lambda (c) (when (standardized-class-p c)
+                     (let* ((cpl (sb-mop:class-precedence-list c))
+                            (std (position (find-class 'standard-object) cpl))
+                            (str (position (find-class 'structure-object) cpl))
+                            (last (position-if
+                                   #'standardized-class-p (butlast cpl)
+                                   :from-end t)))
+                       (when (and std str)
+                         (push `(:and ,c) result))
+                       (when (and str (< str last))
+                         (push `(:str ,c) result))
+                       (when (and std (< std last))
+                         (push `(:std ,c) result))))))
+      (assert (null result)))))
 
 ;; No compiler-notes for non-constant slot-names in default policy.
 (handler-case
