@@ -21,6 +21,8 @@
                  offset))
 
 (defstruct arg-state
+  (next-double-register 0)
+  (next-single-register 0)
   (num-register-args 0)
   (stack-frame-size 0))
 
@@ -47,6 +49,31 @@
   (declare (ignore type))
   (int-arg state 'system-area-pointer 'sap-reg 'sap-stack))
 
+(define-alien-type-method (single-float :arg-tn) (type state)
+  (declare (ignore type))
+  (let ((register (arg-state-next-single-register state)))
+    (when (> register 15)
+      (error "Don't know how to handle alien single floats on stack."))
+    (prog1
+        (my-make-wired-tn 'single-float 'single-reg register)
+      (setf (arg-state-next-single-register state)
+            (max (1+ register)
+                 (* 2 (arg-state-next-double-register state))))
+      (setf (arg-state-next-double-register state)
+            (+ (/ (arg-state-next-single-register state) 2)
+               (if (evenp (arg-state-next-single-register state)) 0 1))))))
+
+(define-alien-type-method (double-float :arg-tn) (type state)
+  (declare (ignore type))
+  (let ((register (arg-state-next-double-register state)))
+    (when (> register 7)
+      (error "Don't know how to handle alien double floats on stack."))
+    (prog1
+        (my-make-wired-tn 'double-float 'double-reg register)
+      (incf (arg-state-next-double-register state))
+      (when (evenp (arg-state-next-single-register state))
+        (incf (arg-state-next-single-register state) 2)))))
+
 (define-alien-type-method (integer :result-tn) (type state)
   (declare (ignore state))
   (multiple-value-bind
@@ -59,6 +86,14 @@
 (define-alien-type-method (system-area-pointer :result-tn) (type state)
   (declare (ignore type state))
   (my-make-wired-tn 'system-area-pointer 'sap-reg nargs-offset))
+
+(define-alien-type-method (single-float :result-tn) (type state)
+  (declare (ignore type state))
+  (my-make-wired-tn 'single-float 'single-reg 0))
+
+(define-alien-type-method (double-float :result-tn) (type state)
+  (declare (ignore type state))
+  (my-make-wired-tn 'double-float 'double-reg 0))
 
 (define-alien-type-method (values :result-tn) (type state)
   (let ((values (alien-values-type-values type)))
