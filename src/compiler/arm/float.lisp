@@ -231,7 +231,7 @@
 (macrolet ((frob (name translate inst from-sc from-type to-sc to-type)
             `(define-vop (,name)
                (:args (x :scs (,from-sc)))
-               (:temporary (:scs (signed-reg)) rtemp)
+               (:temporary (:scs (single-reg)) rtemp)
                (:results (y :scs (,to-sc)))
                (:arg-types ,from-type)
                (:result-types ,to-type)
