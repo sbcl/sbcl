@@ -29,6 +29,7 @@
           ((string= arg "--no-color"))
           (t
            (push (truename (parse-namestring arg)) *explicit-test-files*))))
+  (setf *explicit-test-files* (nreverse *explicit-test-files*))
   (pure-runner (pure-load-files) #'load-test)
   (pure-runner (pure-cload-files) #'cload-test)
   (impure-runner (impure-load-files) #'load-test)
