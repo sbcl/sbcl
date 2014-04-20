@@ -1223,7 +1223,9 @@
                           (:from-arm 0))))
     `(define-instruction ,name (segment &rest args)
        (:emitter
-        (with-condition-defaulted (args (condition float-reg arm-reg))
+        (with-condition-defaulted (args (condition ,@(if (eq direction :to-arm)
+                                                         '(arm-reg float-reg)
+                                                         '(float-reg arm-reg))))
           (emit-fp-srt-instruction segment
                                    (conditional-opcode condition)
                                    #b1110
