@@ -64,9 +64,9 @@
   (def!constant float-input-denormal-trap-bit (ash 1 7))
 
   (def!constant float-round-to-nearest 0)
-  (def!constant float-round-to-zero 1)
-  (def!constant float-round-to-positive 2)
-  (def!constant float-round-to-negative 3)
+  (def!constant float-round-to-positive 1)
+  (def!constant float-round-to-negative 2)
+  (def!constant float-round-to-zero 3)
 
   (defconstant-eqx float-rounding-mode (byte 2 22) #'equalp)
 
