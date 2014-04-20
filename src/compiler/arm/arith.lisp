@@ -113,7 +113,7 @@
                         &key cop arg-swap neg-op invert-y invert-r try-single-op)
   (let ((cop (or cop op)))
     `(progn
-       (define-vop (,(symbolicate 'fast translate '/fixnum=>fixnum)
+       (define-vop (,(symbolicate 'fast- translate '/fixnum=>fixnum)
                      fast-fixnum-binop)
          (:translate ,translate)
          (:generator 2
