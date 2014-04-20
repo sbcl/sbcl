@@ -197,6 +197,7 @@
  ;; built. -- WHN 19990620
  ("src/code/target-type" :not-host :arm-bootstrap)
 
+ ;; FIXME-ARM: has float conditionals
  ("src/code/pred" :not-host :arm-bootstrap)
 
  ("src/code/target-alieneval" :not-host :arm-bootstrap)
@@ -206,11 +207,10 @@
  ;; This needs DEFINE-ALIEN-ROUTINE from target-alieneval.
  ("src/code/misc-aliens" :not-host :arm-bootstrap)
 
+ ;; FIXME-ARM: has float conditionals
  ("src/compiler/generic/vm-array" :arm-bootstrap)
  ("src/code/array"         :not-host :arm-bootstrap)
- ;; FIXME-ARM: no floating point support yet
  ("src/code/early-float"   :not-host :arm-bootstrap)
- ;; FIXME-ARM: no floating point support yet
  ("src/code/target-sxhash" :not-host :arm-bootstrap) ; needs most-fooative-foo-float constants
 
  ("src/code/list"   :not-host :arm-bootstrap)
@@ -259,13 +259,13 @@
  #!+win32 ("src/code/target-exception" :not-host)
 
  ("src/code/symbol"     :not-host :arm-bootstrap)
+ ;; FIXME-ARM: has float conditionals
  ("src/code/bignum"     :not-host :arm-bootstrap)
+ ;; FIXME-ARM: has float conditionals
  ("src/code/numbers"    :not-host :arm-bootstrap)
- ;; FIXME-ARM: no floating point support yet
- ("src/code/float-trap" :not-host)
- ;; FIXME-ARM: no floating point support yet
+ ("src/code/float-trap" :not-host :arm-bootstrap)
  ("src/code/float"      :not-host :arm-bootstrap)
- ;; FIXME-ARM: no floating point support yet
+ ;; FIXME-ARM: has float conditionals
  ("src/code/irrat"      :not-host :arm-bootstrap)
 
  ("src/code/char" :arm-bootstrap)
@@ -277,6 +277,7 @@
  ("src/code/room"   :not-host :arm-bootstrap)
 
  ("src/code/stream"        :not-host :arm-bootstrap)
+ ;; FIXME-ARM: has float conditionals
  ("src/code/print"         :not-host :arm-bootstrap)
  ("src/code/pprint"        :not-host :arm-bootstrap)
  ("src/code/early-format" :arm-bootstrap)
@@ -369,6 +370,7 @@
  ;; in class.lisp.
  ("src/code/condition" :not-host :arm-bootstrap)
 
+ ;; FIXME-ARM: has float conditionals
  ("src/compiler/generic/primtype" :arm-bootstrap)
 
  ;; the implementation of the compiler-affecting part of forms like
@@ -393,7 +395,9 @@
  ;;   * the function PARSE-DEFMACRO, defined in parse-defmacro.lisp,
  ;; and because they define
  ;;   * the function SPECIFIER-TYPE, which is used in fndb.lisp.
+ ;; FIXME-ARM: has float conditionals
  ("src/code/late-type" :arm-bootstrap)
+ ;; FIXME-ARM: has float conditionals
  ("src/code/deftypes-for-target" :arm-bootstrap)
 
  ;; defines IR1-ATTRIBUTES macro, needed by proclaim.lisp
@@ -405,6 +409,7 @@
 
  ;; stuff needed by "code/defstruct"
  ("src/code/cross-type" :not-target)
+ ;; FIXME-ARM: has float conditionals
  ("src/compiler/generic/vm-type" :arm-bootstrap)
  ("src/compiler/proclaim" :arm-bootstrap)
 
@@ -414,7 +419,9 @@
  ;; "code/late-type", and SB!XC:TYPEP, defined in "code/cross-type",
  ;; and SPECIALIZE-ARRAY-TYPE, defined in "compiler/generic/vm-type",
  ;; and SB!XC:PROCLAIM, defined in "src/compiler/proclaim"
+ ;; FIXME-ARM: has float conditionals
  ("src/code/defstruct" :arm-bootstrap)
+ ;; FIXME-ARM: has float conditionals
  ("src/code/target-defstruct" :not-host :arm-bootstrap)
 
  ;; ALIEN-VALUE has to be defined as a class (done by DEFSTRUCT
@@ -666,8 +673,10 @@
                                                 ;   "compiler/generic/core"
 
  ("src/code/eval"              :not-host :arm-bootstrap) ; uses INFO, wants compiler macro
+ ;; FIXME-ARM: has float conditionals
  ("src/code/target-sap"        :not-host :arm-bootstrap) ; uses SAP-INT type
  ("src/code/target-package"    :not-host :arm-bootstrap) ; needs "code/package"
+ ;; FIXME-ARM: has float conditionals
  ("src/code/target-random"     :not-host :arm-bootstrap) ; needs "code/random"
  ("src/code/bignum-random"     :not-host :arm-bootstrap) ; needs "code/random" and
                                           ;   "code/bignum"
@@ -693,6 +702,7 @@
  ;; defines SB!DI:DO-DEBUG-FUN-BLOCKS, needed by target-disassem.lisp
  ("src/code/gc"     :not-host :arm-bootstrap)
  ("src/code/purify" :not-host :arm-bootstrap)
+ ;; FIXME-ARM: has float conditionals
  ("src/code/debug-int" :not-host :arm-bootstrap)
 
  ;; target-only assemblerish stuff
