@@ -64,72 +64,76 @@ directly instantiated.")))
 
 
 
-(defmacro with-sockaddr-for ((socket sockaddr &optional sockaddr-args) &body body)
-  `(let ((,sockaddr (apply #'make-sockaddr-for ,socket nil ,sockaddr-args)))
-     (unwind-protect (progn ,@body)
-       (free-sockaddr-for ,socket ,sockaddr))))
+(defun call-with-socket-addr (socket sockaddr-args thunk)
+  (multiple-value-bind (sockaddr size)
+      (apply #'make-sockaddr-for socket nil sockaddr-args)
+    (unless size
+      (setf size (size-of-sockaddr socket)))
+    (unwind-protect (funcall thunk sockaddr size)
+      (free-sockaddr-for socket sockaddr))))
+
+(defmacro with-socket-addr ((sockaddr-var size-of-sockaddr-var
+                            &optional sockaddr-args)
+                            socket &body body)
+  `(call-with-socket-addr ,socket ,sockaddr-args
+                          (lambda (,sockaddr-var ,size-of-sockaddr-var) ; TODO dx-let
+                            ,@body)))
+
+(defmacro with-socket-fd-and-addr ((fd-var sockaddr-var size-of-sockaddr-var
+                                   &optional sockaddr-args)
+                                   socket &body body)
+  (sb-int:once-only ((socket socket))
+    `(let ((,fd-var (socket-file-descriptor ,socket)))
+       (with-socket-addr (,sockaddr-var ,size-of-sockaddr-var ,sockaddr-args)
+           ,socket
+         ,@body))))
+
 
 ;; we deliberately redesign the "bind" interface: instead of passing a
 ;; sockaddr_something as second arg, we pass the elements of one as
 ;; multiple arguments.
 
-(defmethod socket-bind ((socket socket)
-                        &rest address)
-  (with-sockaddr-for (socket sockaddr address)
-    (when (= (sockint::bind (socket-file-descriptor socket)
-                            sockaddr
-                            (size-of-sockaddr socket))
-             -1)
+(defmethod socket-bind ((socket socket) &rest address)
+  (with-socket-fd-and-addr (fd sockaddr size address) socket
+    (when (= (sockint::bind fd sockaddr size) -1)
       (socket-error "bind"))))
 
 
 
 (defmethod socket-accept ((socket socket))
-  (with-sockaddr-for (socket sockaddr)
-    (let ((fd (sockint::accept (socket-file-descriptor socket)
-                               sockaddr
-                               (size-of-sockaddr socket))))
+  (with-socket-fd-and-addr (fd sockaddr size) socket
+    (let ((new-fd (sockint::accept fd sockaddr size)))
       (cond
-        ((and (= fd -1)
+        ((and (= new-fd -1)
               (member (socket-errno)
                       (list sockint::EAGAIN sockint::EINTR)))
          nil)
-        ((= fd -1) (socket-error "accept"))
+        ((= new-fd -1) (socket-error "accept"))
         (t (multiple-value-call #'values
-             (let ((socket (make-instance (class-of socket)
-                                          :type (socket-type socket)
-                                          :protocol (socket-protocol socket)
-                                          :descriptor fd)))
-               (sb-ext:finalize socket (lambda () (sockint::close fd))
-                                :dont-save t))
-             (bits-of-sockaddr socket sockaddr)))))))
+                  (let ((socket (make-instance (class-of socket)
+                                               :type (socket-type socket)
+                                               :protocol (socket-protocol socket)
+                                               :descriptor new-fd)))
+                    (sb-ext:finalize socket (lambda () (sockint::close new-fd))
+                                     :dont-save t))
+                  (bits-of-sockaddr socket sockaddr)))))))
 
 (defmethod socket-connect ((socket socket) &rest peer)
-  (with-sockaddr-for (socket sockaddr peer)
-    (if (= (sockint::connect (socket-file-descriptor socket)
-                             sockaddr
-                             (size-of-sockaddr socket))
-           -1)
-        (socket-error "connect"))))
+  (with-socket-fd-and-addr (fd sockaddr size peer) socket
+    (when (= (sockint::connect fd sockaddr size) -1)
+      (socket-error "connect"))))
 
 (defmethod socket-peername ((socket socket))
-  (with-sockaddr-for (socket sockaddr)
-    (when (= (sockint::getpeername (socket-file-descriptor socket)
-                                    sockaddr
-                                    (size-of-sockaddr socket))
-             -1)
+  (with-socket-fd-and-addr (fd sockaddr size) socket
+    (when (= (sockint::getpeername fd sockaddr size) -1)
       (socket-error "getpeername"))
     (bits-of-sockaddr socket sockaddr)))
 
 (defmethod socket-name ((socket socket))
-  (with-sockaddr-for (socket sockaddr)
-    (when (= (sockint::getsockname (socket-file-descriptor socket)
-                                   sockaddr
-                                   (size-of-sockaddr socket))
-             -1)
+  (with-socket-fd-and-addr (fd sockaddr size) socket
+    (when (= (sockint::getsockname fd sockaddr size) -1)
       (socket-error "getsockname"))
     (bits-of-sockaddr socket sockaddr)))
-
 
 ;;; There are a whole bunch of interesting things you can do with a
 ;;; socket that don't really map onto "do stream io", especially in
@@ -141,7 +145,7 @@ directly instantiated.")))
                            &key
                            oob peek waitall dontwait
                            (element-type 'character))
-  (with-sockaddr-for (socket sockaddr)
+  (with-socket-fd-and-addr (fd sockaddr size) socket
     (let ((flags
            (logior (if oob sockint::MSG-OOB 0)
                    (if peek sockint::MSG-PEEK 0)
@@ -165,14 +169,10 @@ directly instantiated.")))
       ;; types that aren't (unsigned-byte 8).
       (let ((copy-buffer (sb-alien:make-alien (array (sb-alien:unsigned 8) 1) length)))
         (unwind-protect
-            (sb-alien:with-alien ((sa-len sockint::socklen-t (size-of-sockaddr socket)))
+            (sb-alien:with-alien ((sa-len sockint::socklen-t size))
               (let ((len
-                     (sockint::recvfrom (socket-file-descriptor socket)
-                                        copy-buffer
-                                        length
-                                        flags
-                                        sockaddr
-                                        (sb-alien:addr sa-len))))
+                     (sockint::recvfrom fd copy-buffer length
+                                        flags sockaddr (sb-alien:addr sa-len))))
                 (cond
                   ((and (= len -1)
                         (member (socket-errno)
@@ -223,19 +223,12 @@ directly instantiated.")))
                 (unless length
                   (setf length (length buffer)))
                 (if address
-                    (with-sockaddr-for (socket sockaddr address)
-                      (sb-alien:with-alien ((sa-len sockint::socklen-t
-                                                    (size-of-sockaddr socket)))
-                        (sockint::sendto (socket-file-descriptor socket)
-                                         buffer-sap
-                                         length
-                                         flags
-                                         sockaddr
-                                         sa-len)))
+                    (with-socket-fd-and-addr (fd sockaddr size address) socket
+                      (sb-alien:with-alien ((sa-len sockint::socklen-t size))
+                        (sockint::sendto fd buffer-sap length
+                                         flags sockaddr sa-len)))
                     (sockint::send (socket-file-descriptor socket)
-                                   buffer-sap
-                                   length
-                                   flags)))))
+                                   buffer-sap length flags)))))
     (cond
       ((and (= len -1)
             (member (socket-errno)
@@ -246,9 +239,8 @@ directly instantiated.")))
       (t len))))
 
 (defmethod socket-listen ((socket socket) backlog)
-  (let ((r (sockint::listen (socket-file-descriptor socket) backlog)))
-    (if (= r -1)
-        (socket-error "listen"))))
+  (when (= (sockint::listen (socket-file-descriptor socket) backlog) -1)
+    (socket-error "listen")))
 
 (defmethod socket-open-p ((socket socket))
   (if (slot-boundp socket 'stream)

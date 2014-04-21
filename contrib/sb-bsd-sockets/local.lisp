@@ -78,27 +78,3 @@ in the abstract namespace."))
                    (sb-alien:deref (sockint::sockaddr-un-abstract-path sockaddr)
                                    i)))
     path))
-
-(defmethod socket-connect ((socket local-abstract-socket) &rest peer
-                           &aux (path (first peer)))
-  (multiple-value-bind (sockaddr addr-len)
-      (make-sockaddr-for socket nil path)
-    (unwind-protect
-         (if (= (sockint::connect (socket-file-descriptor socket)
-                                  sockaddr
-                                  addr-len)
-                -1)
-             (socket-error "connect"))
-      (free-sockaddr-for socket sockaddr))))
-
-(defmethod socket-bind ((socket local-abstract-socket)
-                        &rest address &aux (path (first address)))
-  (multiple-value-bind (sockaddr addr-len)
-      (make-sockaddr-for socket nil path)
-    (unwind-protect
-         (if (= (sockint::bind (socket-file-descriptor socket)
-                               sockaddr
-                               addr-len)
-                -1)
-             (socket-error "bind"))
-      (free-sockaddr-for socket sockaddr))))
