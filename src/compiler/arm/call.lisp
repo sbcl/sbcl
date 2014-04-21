@@ -701,6 +701,7 @@
           (maybe-load-stack-tn callee-nfp nfp)))
       (maybe-load-stack-tn cfp-tn fp)
       (inst compute-lra lip lip label)
+      (store-stack-tn (callee-return-pc-tn callee) lip)
       (note-this-location vop :call-site)
       (inst b target)
       (emit-return-pc label)
