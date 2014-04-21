@@ -542,8 +542,7 @@
       (inst sub :ge rem rem divisor)
       (inst adcs quo quo quo)
       (unless (= i 32)
-        (inst adc rem rem rem)))
-    (inst mvn quo quo)))
+        (inst adc rem rem rem)))))
 
 (define-vop (digit-ashr)
   (:translate sb!bignum:%ashr)
