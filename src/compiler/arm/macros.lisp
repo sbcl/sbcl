@@ -76,7 +76,7 @@
      ;; flags.
      ,(ecase return-style
              (:single-value '(inst msr (cpsr :f) 0))
-             (:multiple-values '(inst msr (cpsr :f) #xf0))
+             (:multiple-values '(inst msr (cpsr :f) #xf0000000))
              (:known))
      #+(or) ;; Doesn't work, can't have a negative immediate value.
      (inst add pc-tn ,return-pc (- 4 other-pointer-lowtag))
