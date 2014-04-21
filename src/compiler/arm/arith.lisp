@@ -432,6 +432,17 @@
 (define-full-setter bignum-set * bignum-digits-offset other-pointer-lowtag
   (unsigned-reg) unsigned-num sb!bignum:%bignum-set)
 
+(define-vop (digit-0-or-plus)
+  (:translate sb!bignum:%digit-0-or-plusp)
+  (:policy :fast-safe)
+  (:args (digit :scs (unsigned-reg)))
+  (:arg-types unsigned-num)
+  (:conditional)
+  (:info target not-p)
+  (:generator 2
+     (inst cmp digit 0)
+     (inst b (if not-p :lt :ge) target)))
+
 (define-vop (add-w/carry)
   (:translate sb!bignum:%add-with-carry)
   (:policy :fast-safe)
@@ -465,6 +476,38 @@
     (inst sbcs result a b)
     (inst mov :cs borrow 1)
     (inst mov :cc borrow 0)))
+
+(define-vop (bignum-mult-and-add-3-arg)
+  (:translate sb!bignum:%multiply-and-add)
+  (:policy :fast-safe)
+  (:args (x :scs (unsigned-reg) :to :result)
+         (y :scs (unsigned-reg) :to :result)
+         (carry-in :scs (unsigned-reg) :target lo))
+  (:arg-types unsigned-num unsigned-num unsigned-num)
+  (:results (hi :scs (unsigned-reg) :from :eval)
+            (lo :scs (unsigned-reg) :from (:argument 2)))
+  (:result-types unsigned-num unsigned-num)
+  (:generator 2
+    (move lo carry-in)
+    (inst mov hi 0)
+    (inst umlal lo hi x y)))
+
+(define-vop (bignum-mult-and-add-4-arg)
+  (:translate sb!bignum:%multiply-and-add)
+  (:policy :fast-safe)
+  (:args (x :scs (unsigned-reg) :to :result)
+         (y :scs (unsigned-reg) :to :result)
+         (prev :scs (unsigned-reg) :to :eval)
+         (carry-in :scs (unsigned-reg) :to :eval))
+  (:arg-types unsigned-num unsigned-num unsigned-num unsigned-num)
+  (:results (hi :scs (unsigned-reg) :from :eval)
+            (lo :scs (unsigned-reg) :from :eval))
+  (:result-types unsigned-num unsigned-num)
+  (:generator 9
+    (inst adds lo prev carry-in)
+    (inst mov :cs hi 1)
+    (inst mov :cc hi 0)
+    (inst umlal lo hi x y)))
 
 (define-vop (bignum-mult)
   (:translate sb!bignum:%multiply)
