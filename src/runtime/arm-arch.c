@@ -299,9 +299,12 @@ sigtrap_handler(int signal, siginfo_t *siginfo, os_context_t *context)
     u32 trap_instruction = *((u32 *)*os_context_pc_addr(context));
     int condition_bits = (trap_instruction >> 28) & 0x0f;
 
-    /* Make sure that we're looking at an SWI instruction. */
+    /* Make sure that we're looking at an SWI instruction or that one
+     * undefined instruction that the kernel recognizes as an explicit
+     * trap. */
     if ((condition_bits == 15)
-        || ((trap_instruction & 0x0f000000) != 0x0f000000)) {
+        || (((trap_instruction & 0x0f000000) != 0x0f000000)
+            && (trap_instruction != 0xe7f001f0))) {
         lose("Unrecognized trap instruction %08lx in sigtrap_handler()",
              trap_instruction);
     }
