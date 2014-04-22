@@ -421,6 +421,7 @@
                (inst b :eq DONE))
               (t
                (inst subs count nargs-tn (fixnumize fixed))
+               (inst mov :le csp-tn result)
                (inst b :le DONE)
                (inst add csp-tn result count)))
 
