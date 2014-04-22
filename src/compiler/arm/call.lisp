@@ -918,7 +918,8 @@
                                    (mapcar #'(lambda (name)
                                                `(loadw ,name new-fp
                                                        ,(incf index)))
-                                           *register-arg-names*)))
+                                           *register-arg-names*))
+                               (storew cfp-tn new-fp ocfp-save-offset))
                              '((inst mov nargs-pass (fixnumize nargs)))))
                       ,@(if (eq return :tail)
                             '((:load-return-pc
