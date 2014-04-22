@@ -289,9 +289,8 @@ call_into_c:
 	.word	NIL
 	.word	NIL
 
-        @@ The BREAK_POINT syscall.
-        ldr     r7, =0x000f0001
-        swi     #0
+        @@ The magic (undefined) "BREAK_POINT" instruction.
+        .word 0xe7f001f0
 
         @@ Error arguments for an undefined function.
         .byte   trap_Error
