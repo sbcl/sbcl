@@ -539,7 +539,7 @@
     (move quo div-low)
     (dotimes (i 33)
       (inst cmp rem divisor)
-      (inst sub :ge rem rem divisor)
+      (inst sub :hs rem rem divisor)
       (inst adcs quo quo quo)
       (unless (= i 32)
         (inst adc rem rem rem)))))
