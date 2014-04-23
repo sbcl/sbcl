@@ -419,11 +419,9 @@
        (if is-=
            (inst fcmpd x y)
            (inst fcmped x y))))
-    ;; We'd like to use FMSTAT, but it's not defined.  Or FMRX r15,
-    ;; FPSCR (equivalent encoding), but that's not well defined
-    ;; either.  Hand-encoding the instruction as a WORD.
-    ;(inst fmstat)
-    (inst word #xeef1fa10)
+    ;; We'd like to use FMSTAT, but it's not defined.  Sharing the
+    ;; same encoding is "FMRX PC, FPSCR", which we CAN encode.
+    (inst fmrx pc-tn :fpscr)
     (inst b (if not-p nope yep) target)))
 
 (macrolet ((frob (name sc ptype)
