@@ -90,10 +90,10 @@
 (!def-primitive-type double-float (double-reg descriptor-reg))
 
 (/show0 "about to !DEF-PRIMITIVE-TYPE COMPLEX-SINGLE-FLOAT")
-(!def-primitive-type complex-single-float (#!-arm complex-single-reg descriptor-reg)
+(!def-primitive-type complex-single-float (complex-single-reg descriptor-reg)
   :type (complex single-float))
 (/show0 "about to !DEF-PRIMITIVE-TYPE COMPLEX-DOUBLE-FLOAT")
-(!def-primitive-type complex-double-float (#!-arm complex-double-reg descriptor-reg)
+(!def-primitive-type complex-double-float (complex-double-reg descriptor-reg)
   :type (complex double-float))
 #!+sb-simd-pack
 (progn
