@@ -594,40 +594,40 @@ evaluated as a PROGN."
       (values nil t))))
 
 (defmacro-mundanely %handler-bind (bindings form)
-  (let ((member-if (member-if (lambda (x)
-                                (not (proper-list-of-length-p x 2)))
-                              bindings)))
-    (when member-if
-      (error "ill-formed handler binding: ~S" (first member-if))))
-  (let* ((local-funs nil)
-         (mapped-bindings (mapcar (lambda (binding)
-                                    (destructuring-bind (type handler) binding
-                                      (let ((lambda-form handler))
-                                        (if (and (consp handler)
-                                                 (or (eq 'lambda (car handler))
-                                                     (and (eq 'function (car handler))
-                                                          (consp (cdr handler))
-                                                          (let ((x (second handler)))
-                                                            (and (consp x)
-                                                                 (eq 'lambda (car x))
-                                                                 (setf lambda-form x))))))
-                                            (let ((name (sb!xc:gensym "LAMBDA")))
-                                              (push `(,name ,@(cdr lambda-form)) local-funs)
-                                              (list type `(function ,name)))
-                                            binding))))
-                                  bindings)))
-    `(dx-flet (,@(reverse local-funs))
-       (let ((*handler-clusters*
-              (cons (list ,@(mapcar (lambda (x) `(cons ',(car x) ,(cadr x)))
-                                    mapped-bindings))
-                    *handler-clusters*)))
-         #!+stack-allocatable-fixed-objects
-         (declare (truly-dynamic-extent *handler-clusters*))
-         (progn ,form)))))
+  ;; As an optimization, this looks at the handler parts of BINDINGS
+  ;; and turns handlers of the forms (lambda ...) and (function
+  ;; (lambda ...)) into local, dynamic-extent functions.
+  (let ((local-functions '())
+        (cluster-entries '()))
+    (labels ((cons-form (type handler)
+               `(cons ',type ,handler))
+             (local-function (type lambda-form)
+               (let ((name (sb!xc:gensym "HANDLER")))
+                 (push `(,name ,@(rest lambda-form)) local-functions)
+                 (push (cons-form type `(function ,name)) cluster-entries)))
+             (process-binding (binding)
+               (unless (proper-list-of-length-p binding 2)
+                 (error "ill-formed handler binding: ~S" binding))
+               (destructuring-bind (type handler) binding
+                 (typecase handler
+                   ((cons (eql lambda) t)
+                    (local-function type handler))
+                   ((cons (eql function)
+                          (cons (cons (eql lambda) t) t))
+                    (local-function type (second handler)))
+                   (t
+                    (push (apply #'cons-form binding) cluster-entries))))))
+      (mapc #'process-binding bindings)
+      `(dx-flet (,@(reverse local-functions))
+         (let ((*handler-clusters*
+                (list* (list ,@(nreverse cluster-entries)) *handler-clusters*)))
+           #!+stack-allocatable-fixed-objects
+           (declare (truly-dynamic-extent *handler-clusters*))
+           (progn ,form))))))
 
 (defmacro-mundanely handler-bind (bindings &body forms)
   #!+sb-doc
-  "(HANDLER-BIND ( {(type handler)}* )  body)
+  "(HANDLER-BIND ( {(type handler)}* ) body)
 
 Executes body in a dynamic context where the given handler bindings are in
 effect. Each handler must take the condition being signalled as an argument.

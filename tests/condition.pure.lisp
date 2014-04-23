@@ -108,6 +108,40 @@
          (cerror (formatter "Continue from ~A") "bug ~A" :bug)))
      :passed))
 
+(with-test (:name (handler-bind :smoke))
+  (let ((called?))
+    (flet ((handler (condition)
+             (declare (ignore condition))
+             (setf called? t)))
+      (macrolet ((test (handler)
+                   `(progn
+                      (setf called? nil)
+                      (handler-bind ((condition ,handler))
+                        (signal 'condition))
+                      (assert called?))))
+        ;; Test optimized special cases.
+        (test (lambda (condition) (handler condition)))
+        (test #'(lambda (condition) (handler condition)))
+        ;; Test default behavior.
+        ;; (test 'handler) would require function definition => not pure
+        (test #'handler)))))
+
+(with-test (:name (handler-bind :malformed-bindings))
+  (flet ((test (binding)
+           (assert (eq :ok
+                       (handler-case
+                           (macroexpand `(handler-bind (,binding)))
+                         (simple-error (e)
+                           (assert (equal (list binding)
+                                          (simple-condition-format-arguments e)))
+                           :ok))))))
+
+    (test 1)                     ; not even a list
+    (test '())                   ; missing condition type and handler
+    (test '(error))              ; missing handler
+    (test '(error #'print :foo)) ; too many elements
+    ))
+
 ;;; clauses in HANDLER-CASE are allowed to have declarations (and
 ;;; indeed, only declarations)
 (assert
