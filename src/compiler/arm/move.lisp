@@ -35,8 +35,7 @@
        (load-immediate-word y (fixnumize val)))
       (character
        (let* ((codepoint (char-code val))
-              (encoded-character (logior character-widetag
-                                         (ash n-widetag-bits (ldb (byte 24 0) codepoint)))))
+              (encoded-character (dpb codepoint (byte 24 8) character-widetag)))
          (load-immediate-word y encoded-character)))
       (null
        (move y null-tn))
