@@ -1215,7 +1215,13 @@
   (byte 1 7) ; N
   (byte 7 0)) ; #b0010000
 
-(defmacro define-single-reg-transfer-fp-instruction (name precision direction opcode)
+(defun system-reg-encoding (float-reg)
+  (ecase float-reg
+    (:fpsid #b0000)
+    (:fpscr #b0001)
+    (:fpexc #b1000)))
+
+(defmacro define-single-reg-transfer-fp-instruction (name precision direction opcode &optional system-reg)
   (let ((precision-flag (ecase precision
                           (:single 0)
                           (:double 1)))
@@ -1232,11 +1238,15 @@
                                    #b1110
                                    ,opcode
                                    ,direction-flag
-                                   (high-bits-float-reg float-reg)
+                                   ,(if system-reg
+                                        '(system-reg-encoding float-reg)
+                                        '(high-bits-float-reg float-reg))
                                    (tn-offset arm-reg)
                                    #b101
                                    ,precision-flag
-                                   (low-bit-float-reg float-reg)
+                                   ,(if system-reg
+                                        0
+                                        '(low-bit-float-reg float-reg))
                                    #b0010000))))))
 
 (define-single-reg-transfer-fp-instruction fmsr :single :from-arm #b000)
@@ -1245,9 +1255,8 @@
 (define-single-reg-transfer-fp-instruction fmrdl :double :to-arm #b000)
 (define-single-reg-transfer-fp-instruction fmdhr :double :from-arm #b001)
 (define-single-reg-transfer-fp-instruction fmrdh :double :to-arm #b001)
-;; for special registers fpsid (~s0), fpscr (~s2), fpexc (~s16):
-(define-single-reg-transfer-fp-instruction fmxr :single :from-arm #b111)
-(define-single-reg-transfer-fp-instruction fmrx :single :to-arm #b111)
+(define-single-reg-transfer-fp-instruction fmxr :single :from-arm #b111 t)
+(define-single-reg-transfer-fp-instruction fmrx :single :to-arm #b111 t)
 
 (define-bitfield-emitter emit-fp-trt-instruction 32
   (byte 4 28) ; cond
