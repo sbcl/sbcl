@@ -1273,7 +1273,7 @@
         (with-condition-defaulted (args (condition float-reg arm-reg-1 arm-reg-2))
           (emit-fp-trt-instruction segment
                                    (conditional-opcode condition)
-                                   #b1110010
+                                   #b1100010
                                    ,direction-flag
                                    (tn-offset arm-reg-2)
                                    (tn-offset arm-reg-1)
