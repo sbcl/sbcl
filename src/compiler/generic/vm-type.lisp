@@ -35,7 +35,6 @@
 (sb!xc:deftype float-exponent ()
   #!-long-float 'double-float-exponent
   #!+long-float 'long-float-exponent)
-#!-arm
 (sb!xc:deftype float-digits ()
   #!-long-float `(integer 0 ,sb!vm:double-float-digits)
   #!+long-float `(integer 0 ,sb!vm:long-float-digits))
