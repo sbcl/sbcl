@@ -135,14 +135,16 @@
   (:temporary (:scs (non-descriptor-reg)) header)
   (:temporary (:sc non-descriptor-reg :offset ocfp-offset) pa-flag)
   (:generator 6
-    ;; Build the object header.
-    (inst add bytes extra (* words n-word-bytes))
+    ;; Build the object header, assuming that the header was in WORDS
+    ;; but should not be in the header
+    (inst add bytes extra (* (1- words) n-word-bytes))
     (inst mov header (lsl bytes (- n-widetag-bits n-fixnum-tag-bits)))
     (inst add header header type)
-    ;; Round up to the actual allocation granularity.
-    (inst add bytes bytes n-word-bytes)
+    ;; Add the object header to the allocation size and round up to
+    ;; the allocation granularity
+    (inst add bytes bytes (* 2 n-word-bytes))
     (inst bic bytes bytes lowtag-mask)
-    ;; Allocate the object and set its header.
+    ;; Allocate the object and set its header
     (pseudo-atomic (pa-flag)
       (allocation result bytes lowtag :flag-tn pa-flag)
       (storew header result 0 lowtag))))
