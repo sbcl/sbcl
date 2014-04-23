@@ -21,13 +21,19 @@
                      (when (muffle-warning-p warning)
                        (muffle-warning warning)))))))
 
-;;; an alist with elements of the form
+;;; Each cluster is an alist of the form
 ;;;
-;;;  (CONDITION . (HANDLER1 HANDLER2 ...))
+;;;  ((CONDITION-TYPE1 . HANDLER1) (CONDITION-TYPE2 . HANDLER2) ...)
 ;;;
-;;; Recently established handlers are added at the beginning of the
+;;; where CONDITION-TYPEN are type specifiers and HANDLERN are
+;;; function designators.
+;;;
+;;; Newly established handlers are added at the beginning of the
 ;;; list. Elements to the left of the alist take precedence over
 ;;; elements to the right.
+;;;
+;;; Lists to which *HANDLER-CLUSTERS* is bound generally have dynamic
+;;; extent.
 (defvar *handler-clusters* (initial-handler-clusters))
 
 ;;; a list of lists of currently active RESTART instances. maintained
