@@ -855,6 +855,7 @@
             step-instrumenting)
 
      (:ignore
+      ,@(when (eq return :fixed) '(ocfp-temp))
       ,@(unless (or variable (eq return :tail)) '(arg-locs))
       ,@(unless variable '(args))
       ,@(when (eq return :tail) '(old-fp)))
@@ -877,7 +878,8 @@
                          ,name))
                  *register-arg-names* *register-arg-offsets*))
      ,@(when (eq return :fixed)
-         '((:temporary (:scs (descriptor-reg) :from :eval) move-temp)))
+         '((:temporary (:scs (descriptor-reg) :from :eval) move-temp)
+           (:temporary (:sc non-descriptor-reg :from :eval :offset ocfp-offset) ocfp-temp)))
 
      ,@(unless (eq return :tail)
          '((:temporary (:scs (non-descriptor-reg)) temp)
