@@ -13,5 +13,18 @@
 ;;;; more information.
 
 (in-package "SB!VM")
-
-;;; Dummy placeholder file.
+
+;;; Do whatever is necessary to make the given code component
+;;; executable.  This isn't always strictly necessary (some ARM
+;;; systems have coherent caches, for example), but it covers the
+;;; general case.
+(defun sanctify-for-execution (component)
+  (without-gcing
+    (alien-funcall (extern-alien "os_flush_icache"
+                                 (function void
+                                           system-area-pointer
+                                           unsigned-long))
+                   (code-instructions component)
+                   (* (code-header-ref component code-code-size-slot)
+                      n-word-bytes)))
+  nil)
