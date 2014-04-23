@@ -56,6 +56,11 @@ call_into_lisp:
 	@@ Enter PSEUDO-ATOMIC.
 	str     pc, STATIC_SYMBOL_VALUE(PSEUDO_ATOMIC_ATOMIC)
 
+        @@ Copy the current allocation pointer into the symbol.
+        ldr     reg_OCFP, =dynamic_space_free_pointer
+        ldr     reg_OCFP, [reg_OCFP]
+        str     reg_OCFP, STATIC_SYMBOL_VALUE(ALLOCATION_POINTER)
+
 	@@ Clear FFCA, so the runtime knows that we're "in lisp".
 	ldr     reg_OCFP, =foreign_function_call_active
 	str     reg_R2, [reg_OCFP]
@@ -117,6 +122,11 @@ call_into_lisp:
 	@@ Set FFCA, so the runtime knows that we're not "in lisp".
 	ldr     reg_OCFP, =foreign_function_call_active
 	str     pc, [reg_OCFP]
+
+        @@ Copy the current allocation pointer out from the symbol.
+        ldr     reg_OCFP, =dynamic_space_free_pointer
+        ldr     reg_NFP, STATIC_SYMBOL_VALUE(ALLOCATION_POINTER)
+        str     reg_NFP, [reg_OCFP]
 
 	@@ Restore the C stack pointer.
 	ldr	sp, [reg_CSP, #-4]
@@ -196,6 +206,11 @@ call_into_c:
 	ldr     reg_NFP, =foreign_function_call_active
 	str     pc, [reg_NFP]
 
+        @@ Copy the current allocation pointer out from the symbol.
+        ldr     reg_OCFP, =dynamic_space_free_pointer
+        ldr     reg_NFP, STATIC_SYMBOL_VALUE(ALLOCATION_POINTER)
+        str     reg_NFP, [reg_OCFP]
+
         @@ Pick up the C stack pointer.
         ldr     sp, STATIC_SYMBOL_VALUE(NUMBER_STACK_POINTER)
 
@@ -243,6 +258,11 @@ call_into_c:
 	@@ Clear FFCA, so the runtime knows that we're "in lisp".
 	ldr     reg_OCFP, =foreign_function_call_active
 	str     reg_R2, [reg_OCFP]
+
+        @@ Copy the current allocation pointer into the symbol.
+        ldr     reg_OCFP, =dynamic_space_free_pointer
+        ldr     reg_OCFP, [reg_OCFP]
+        str     reg_OCFP, STATIC_SYMBOL_VALUE(ALLOCATION_POINTER)
 
         @@ Save off the C stack pointer.
         str     sp, STATIC_SYMBOL_VALUE(NUMBER_STACK_POINTER)

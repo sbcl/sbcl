@@ -699,6 +699,9 @@ fake_foreign_function_call(os_context_t *context)
     check_blockables_blocked_or_lose(0);
 
     /* Get current Lisp state from context. */
+#ifdef LISP_FEATURE_ARM
+    dynamic_space_free_pointer = SymbolValue(ALLOCATION_POINTER, thread);
+#endif
 #ifdef reg_ALLOC
 #ifdef LISP_FEATURE_SB_THREAD
     thread->pseudo_atomic_bits =
@@ -787,6 +790,9 @@ undo_fake_foreign_function_call(os_context_t *context)
     /* And clear them so we don't get bit later by call-in/call-out
      * not updating them. */
     thread->pseudo_atomic_bits = 0;
+#endif
+#ifdef LISP_FEATURE_ARM
+    SetSymbolValue(ALLOCATION_POINTER, dynamic_space_free_pointer, thread);
 #endif
 }
 

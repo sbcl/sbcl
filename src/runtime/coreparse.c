@@ -352,7 +352,7 @@ process_directory(int fd, lispobj *ptr, int count, os_vm_offset_t file_offset)
                 lose("warning: core/runtime address mismatch: DYNAMIC_SPACE_START\n");
             }
 #endif
-#if defined(ALLOCATION_POINTER)
+#if defined(ALLOCATION_POINTER) && !defined(LISP_FEATURE_ARM)
             SetSymbolValue(ALLOCATION_POINTER, (lispobj)free_pointer,0);
 #else
             dynamic_space_free_pointer = free_pointer;
