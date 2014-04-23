@@ -95,7 +95,7 @@
   (let ((internal-emitter (gensym)))
     `(flet ((,internal-emitter ,arglist
               ,@body))
-       (if (keywordp (car ,argvar))
+       (if (assoc (car ,argvar) *conditions*)
            (apply #',internal-emitter ,argvar)
            (apply #',internal-emitter :al ,argvar)))))
 
