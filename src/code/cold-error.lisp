@@ -79,17 +79,18 @@
                                         arguments
                                         'simple-condition
                                         'signal))
-        (*handler-clusters* *handler-clusters*)
+        (handler-clusters *handler-clusters*)
         (sb!debug:*stack-top-hint* (or sb!debug:*stack-top-hint* 'signal)))
     (when *break-on-signals*
       (maybe-break-on-signal condition))
     (loop
-      (unless *handler-clusters*
+      (unless handler-clusters
         (return))
-      (let ((cluster (pop *handler-clusters*)))
+      (let ((cluster (pop handler-clusters)))
         (dolist (handler cluster)
           (when (typep condition (car handler))
-            (funcall (cdr handler) condition)))))
+            (let ((*handler-clusters* handler-clusters))
+              (funcall (cdr handler) condition))))))
     nil))
 
 (defun error (datum &rest arguments)
