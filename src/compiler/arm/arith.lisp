@@ -467,12 +467,11 @@
          (b :scs (unsigned-reg))
          (c :scs (any-reg)))
   (:arg-types unsigned-num unsigned-num positive-fixnum)
-  (:temporary (:scs (unsigned-reg) :to (:result 0) :target result) temp)
   (:results (result :scs (unsigned-reg))
             (borrow :scs (unsigned-reg) :from :eval))
   (:result-types unsigned-num positive-fixnum)
   (:generator 4
-    (inst rsbs temp c 0) ;; Clear carry if c=0, else set.
+    (inst cmp c 1) ;; Set carry if (fixnum 0 or 1) c=0, else clear.
     (inst sbcs result a b)
     (inst mov :cs borrow 1)
     (inst mov :cc borrow 0)))
