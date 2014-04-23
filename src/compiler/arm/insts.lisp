@@ -1175,7 +1175,8 @@
                 (offset (memory-operand-offset memory-operand))
                 (direction (memory-operand-direction memory-operand)))
             (aver (eq (memory-operand-mode memory-operand) :offset))
-            (aver (zerop (logand offset 3)))
+            (aver (and (integerp offset)
+                       (zerop (logand offset 3))))
             ;; FIXME: Should support LABEL bases.
             (aver (tn-p base))
             (emit-fp-ls-instruction segment
