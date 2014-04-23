@@ -583,3 +583,5 @@
 (define-static-fun two-arg-ior (x y) :translate logior)
 (define-static-fun two-arg-xor (x y) :translate logxor)
 (define-static-fun two-arg-eqv (x y) :translate logeqv)
+
+(define-static-fun %negate (x) :translate %negate)
