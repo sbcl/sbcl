@@ -31,6 +31,4 @@ swap_lispobjs(volatile lispobj *dest, lispobj value)
 
 #define ARCH_HAS_LINK_REGISTER
 
-extern void arm_flush_icache(os_vm_address_t address, os_vm_size_t length);
-
 #endif /* _ARM_ARCH_H */

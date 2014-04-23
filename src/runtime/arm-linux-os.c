@@ -98,5 +98,7 @@ os_restore_fp_control(os_context_t *context)
 void
 os_flush_icache(os_vm_address_t address, os_vm_size_t length)
 {
-    /* FIXME: Implement if necessary. */
+    os_vm_address_t end_address
+        = (os_vm_address_t)(((pointer_sized_uint_t) address) + length);
+    __clear_cache(address, end_address);
 }
