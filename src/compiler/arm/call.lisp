@@ -577,14 +577,12 @@
   (:translate sb!c::%verify-arg-count)
   (:args (nargs :scs (any-reg)))
   (:arg-types positive-fixnum (:constant t))
-  (:temporary (:sc non-descriptor-reg :offset ocfp-offset) error-temp)
   (:info count)
   (:vop-var vop)
   (:save-p :compute-only)
   (:generator 3
     (let ((err-lab
-           (generate-error-code vop error-temp
-                                'invalid-arg-count-error nargs)))
+           (generate-error-code vop 'invalid-arg-count-error nargs)))
       (inst cmp nargs (fixnumize count))
       (inst b :ne err-lab))))
 
@@ -597,11 +595,10 @@
                 (:args ,@(mapcar #'(lambda (arg)
                                      `(,arg :scs (any-reg descriptor-reg)))
                                  args))
-                (:temporary (:sc non-descriptor-reg :offset ocfp-offset) error-temp)
                 (:vop-var vop)
                 (:save-p :compute-only)
                 (:generator 1000
-                  (error-call vop error-temp ',error ,@args)))))
+                  (error-call vop ',error ,@args)))))
   (frob arg-count-error invalid-arg-count-error
     sb!c::%arg-count-error nargs)
   (frob type-check-error object-not-type-error sb!c::%type-check-error

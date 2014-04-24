@@ -35,10 +35,7 @@
   (inst mov rem 0)
 
   (inst tst divisor divisor)
-  ;; KLUDGE: In the error case, we need OCFP as a temp register, but
-  ;; it holds QUO-SIGN right now...  But it's dead as soon as we enter
-  ;; the error case, so ot doesn't matter.
-  (let ((error (generate-error-code nil quo-sign 'division-by-zero-error
+  (let ((error (generate-error-code nil 'division-by-zero-error
                                     dividend divisor)))
     (inst b :eq error))
   (inst rsb :mi divisor divisor 0)

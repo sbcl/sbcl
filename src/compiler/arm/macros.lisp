@@ -166,20 +166,13 @@
        ,@body)))
 
 ;;;; Error Code
-(defun emit-error-break (vop error-temp kind code values)
-  (aver (and (sc-is error-temp non-descriptor-reg)
-             (= (tn-offset error-temp) 7)))
+(defun emit-error-break (vop kind code values)
   (assemble ()
     (when vop
       (note-this-location vop :internal-error))
-    ;; We need R7 to contain BREAK_POINT (#x000f0001) in order to
-    ;; cause a SIGTRAP.
-    (inst mov error-temp #x000f0000)
-    (inst add error-temp error-temp 1)
-    ;; SWI is the syscall instruction, and under EABI rules is to be
-    ;; used with an immediate constant of zero and the syscall number
-    ;; in "scno", which is R7.
-    (inst swi 0)
+    ;; Use the magic officially-undefined instruction that Linux
+    ;; treats as generating SIGTRAP.
+    (inst debug-trap)
     ;; The rest of this is "just" the encoded error details.
     (inst byte kind)
     (with-adjustable-vector (vector)
@@ -193,19 +186,19 @@
         (inst byte (aref vector i)))
       (emit-alignment word-shift))))
 
-(defun error-call (vop error-temp error-code &rest values)
+(defun error-call (vop error-code &rest values)
   #!+sb-doc
   "Cause an error.  ERROR-CODE is the error to cause."
-  (emit-error-break vop error-temp error-trap (error-number-or-lose error-code) values))
+  (emit-error-break vop error-trap (error-number-or-lose error-code) values))
 
-(defun generate-error-code (vop error-temp error-code &rest values)
+(defun generate-error-code (vop error-code &rest values)
   #!+sb-doc
   "Generate-Error-Code Error-code Value*
   Emit code for an error with the specified Error-Code and context Values."
   (assemble (*elsewhere*)
     (let ((start-lab (gen-label)))
       (emit-label start-lab)
-      (emit-error-break vop error-temp error-trap (error-number-or-lose error-code) values)
+      (emit-error-break vop error-trap (error-number-or-lose error-code) values)
       start-lab)))
 
 ;;;; PSEUDO-ATOMIC

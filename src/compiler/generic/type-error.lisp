@@ -19,12 +19,11 @@
   (:arg-types simple-array-nil positive-fixnum)
   (:results (value :scs (descriptor-reg)))
   (:result-types *)
-  #!+arm (:temporary (:sc non-descriptor-reg :offset ocfp-offset) error-temp)
   (:ignore index value)
   (:vop-var vop)
   (:save-p :compute-only)
   (:generator 1
-    (error-call vop #!+arm error-temp
+    (error-call vop
                 #!-(or alpha hppa mips) 'nil-array-accessed-error
                 #!+(or alpha hppa mips) nil-array-accessed-error
                 object)))
@@ -48,12 +47,11 @@
   (:arg-types simple-array-nil positive-fixnum *)
   (:results (result :scs (descriptor-reg)))
   (:result-types *)
-  #!+arm (:temporary (:sc non-descriptor-reg :offset ocfp-offset) error-temp)
   (:ignore index value result)
   (:vop-var vop)
   (:save-p :compute-only)
   (:generator 1
-    (error-call vop #!+arm error-temp
+    (error-call vop
                 #!-(or alpha hppa mips) 'nil-array-accessed-error
                 #!+(or alpha hppa mips) nil-array-accessed-error
                 object)))
@@ -68,12 +66,11 @@
               (:constant (integer 0 0)))
   (:results (value :scs (descriptor-reg)))
   (:result-types *)
-  #!+arm (:temporary (:sc non-descriptor-reg :offset ocfp-offset) error-temp)
   (:ignore index value offset)
   (:vop-var vop)
   (:save-p :compute-only)
   (:generator 1
-    (error-call vop #!+arm error-temp
+    (error-call vop
                 #!-(or alpha hppa mips) 'nil-array-accessed-error
                 #!+(or alpha hppa mips) nil-array-accessed-error
                 object)))
@@ -89,12 +86,11 @@
               (:constant (integer 0 0)))
   (:results (result :scs (descriptor-reg)))
   (:result-types *)
-  #!+arm (:temporary (:sc non-descriptor-reg :offset ocfp-offset) error-temp)
   (:ignore index value result offset)
   (:vop-var vop)
   (:save-p :compute-only)
   (:generator 1
-    (error-call vop #!+arm error-temp
+    (error-call vop
                 #!-(or alpha hppa mips) 'nil-array-accessed-error
                 #!+(or alpha hppa mips) nil-array-accessed-error
                 object)))

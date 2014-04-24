@@ -67,12 +67,11 @@
   (:args (array :scs (descriptor-reg))
          (bound :scs (any-reg descriptor-reg))
          (index :scs (any-reg descriptor-reg) :target result))
-  (:temporary (:scs (non-descriptor-reg) :offset ocfp-offset) temp)
   (:results (result :scs (any-reg descriptor-reg)))
   (:vop-var vop)
   (:save-p :compute-only)
   (:generator 5
-    (let ((error (generate-error-code vop temp 'invalid-array-index-error array bound index)))
+    (let ((error (generate-error-code vop 'invalid-array-index-error array bound index)))
       (inst cmp index bound)
       (inst b :ge error)
       (move result index))))

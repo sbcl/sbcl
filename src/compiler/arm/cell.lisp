@@ -48,7 +48,6 @@
   (:policy :fast-safe)
   (:vop-var vop)
   (:save-p :compute-only)
-  (:temporary (:scs (non-descriptor-reg) :offset ocfp-offset) err-temp)
   (:temporary (:scs (descriptor-reg) :from (:argument 0)) obj-temp))
 
 ;;; With Symbol-Value, we check that the value isn't the trap object.  So
@@ -59,7 +58,7 @@
   (:generator 9
     (move obj-temp object)
     (loadw value obj-temp symbol-value-slot other-pointer-lowtag)
-    (let ((err-lab (generate-error-code vop err-temp 'unbound-symbol-error obj-temp)))
+    (let ((err-lab (generate-error-code vop 'unbound-symbol-error obj-temp)))
       (inst cmp value unbound-marker-widetag)
       (inst b :eq err-lab))))
 
@@ -116,12 +115,11 @@
   (:vop-var vop)
   (:save-p :compute-only)
   (:temporary (:scs (descriptor-reg) :from (:argument 0)) obj-temp)
-  (:temporary (:scs (non-descriptor-reg) :offset ocfp-offset) err-temp)
   (:generator 10
     (move obj-temp object)
     (loadw value obj-temp fdefn-fun-slot other-pointer-lowtag)
     (inst cmp value null-tn)
-    (let ((err-lab (generate-error-code vop err-temp 'undefined-fun-error obj-temp)))
+    (let ((err-lab (generate-error-code vop 'undefined-fun-error obj-temp)))
       (inst b :eq err-lab))))
 
 (define-vop (set-fdefn-fun)
