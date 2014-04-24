@@ -26,7 +26,6 @@
 (when (find :sb-test *shebang-features*)
   (load "tests/type.before-xc.lisp")
   (load "tests/info.before-xc.lisp")
-  #!-arm
   (load "tests/vm.before-xc.lisp"))
 (load "tools-for-build/ucd.lisp")
 
