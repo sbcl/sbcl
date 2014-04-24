@@ -448,6 +448,13 @@
                           (ldb (byte 12 4) code)
                           #b0111
                           (ldb (byte 4 0) code))))
+
+;;; It turns out that the Linux kernel decodes this particular
+;;; officially undefined instruction as a single-instruction SIGTRAP
+;;; generation instruction, or breakpoint.
+(define-instruction debug-trap (segment)
+  (:emitter
+   (emit-word segment #xe7f001f0)))
 
 ;;;; Miscellaneous arithmetic instructions
 
