@@ -204,6 +204,15 @@
 
 ;;;; other miscellaneous VOPs
 
+(defknown sb!unix::receive-pending-interrupt () (values))
+(define-vop (sb!unix::receive-pending-interrupt)
+  (:policy :fast-safe)
+  (:translate sb!unix::receive-pending-interrupt)
+  (:generator 1
+    (inst debug-trap)
+    (inst byte pending-interrupt-trap)
+    (emit-alignment word-shift)))
+
 (define-vop (halt)
   (:temporary (:sc non-descriptor-reg :offset ocfp-offset) error-temp)
   (:generator 1
