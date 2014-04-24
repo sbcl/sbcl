@@ -627,26 +627,36 @@ evaluated as a PROGN."
   ;; As an optimization, this looks at the handler parts of BINDINGS
   ;; and turns handlers of the forms (lambda ...) and (function
   ;; (lambda ...)) into local, dynamic-extent functions.
+  ;;
+  ;; Type specifiers in BINDINGS are translated into local,
+  ;; dynamic-extent functions to allow TYPEP optimizations.
   (let ((local-functions '())
         (cluster-entries '()))
-    (labels ((cons-form (type handler)
-               `(cons ',type ,handler))
-             (local-function (type lambda-form)
-               (let ((name (sb!xc:gensym "HANDLER")))
+    (labels ((local-function (lambda-form &optional name)
+               (let ((name (sb!xc:gensym name)))
                  (push `(,name ,@(rest lambda-form)) local-functions)
-                 (push (cons-form type `(function ,name)) cluster-entries)))
+                 name))
+             (entry-form (type handler)
+               (let ((name (local-function
+                            `(lambda (condition)
+                               (typep condition ',type))
+                            "TYPEP")))
+                 `(cons (function ,name) ,handler)))
+             (local-function-handler (type lambda-form)
+               (let ((name (local-function lambda-form "HANDLER")))
+                 (push (entry-form type `(function ,name)) cluster-entries)))
              (process-binding (binding)
                (unless (proper-list-of-length-p binding 2)
                  (error "ill-formed handler binding: ~S" binding))
                (destructuring-bind (type handler) binding
                  (typecase handler
                    ((cons (eql lambda) t)
-                    (local-function type handler))
+                    (local-function-handler type handler))
                    ((cons (eql function)
                           (cons (cons (eql lambda) t) t))
-                    (local-function type (second handler)))
+                    (local-function-handler type (second handler)))
                    (t
-                    (push (apply #'cons-form binding) cluster-entries))))))
+                    (push (apply #'entry-form binding) cluster-entries))))))
       (mapc #'process-binding bindings)
       `(dx-flet (,@(reverse local-functions))
          (let ((*handler-clusters*

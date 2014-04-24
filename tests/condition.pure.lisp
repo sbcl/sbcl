@@ -315,9 +315,22 @@
 ;; Using an undefined condition type in a HANDLER-BIND clause should
 ;; signal an ERROR at runtime. Bug 1378939 was about landing in LDB
 ;; because of infinite recursion in SIGNAL instead.
+;;
+;; We suppress the compile-time WARNING to avoid noise when running
+;; tests.
+(locally (declare (muffle-conditions warning))
+  (with-test (:name (handler-bind :undefined-condition-type
+                     :bug-1378939))
+    (assert-error
+     (handler-bind ((no-such-condition-class #'print))
+       (error "does not matter")))))
+
+;; Using an undefined condition type in a HANDLER-BIND clause should
+;; signal a [STYLE-]WARNING at compile time.
 (with-test (:name (handler-bind :undefined-condition-type
-                   :bug-1378939))
-  (assert-error
-   (handler-bind
-       ((no-such-condition-class #'print))
-     (error "does not matter"))))
+                   :compile-time-warning))
+  (handler-bind ((warning #'muffle-warning))
+    (assert-signal
+     (compile nil '(lambda () (handler-bind
+                                  ((no-such-condition-class #'print)))))
+     warning)))

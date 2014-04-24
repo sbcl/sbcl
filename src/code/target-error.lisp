@@ -17,16 +17,20 @@
   (typep warning *muffled-warnings*))
 
 (defun initial-handler-clusters ()
-  `(((warning . ,#'(lambda (warning)
-                     (when (muffle-warning-p warning)
-                       (muffle-warning warning)))))))
+  `(((,#'(lambda (condition)
+           (typep condition 'warning))
+      .
+      ,#'(lambda (warning)
+           (when (muffle-warning-p warning)
+             (muffle-warning warning)))))))
 
 ;;; Each cluster is an alist of the form
 ;;;
-;;;  ((CONDITION-TYPE1 . HANDLER1) (CONDITION-TYPE2 . HANDLER2) ...)
+;;;  ((TYPE-TEST1 . HANDLER1) (TYPE-TEST2 . HANDLER2) ...)
 ;;;
-;;; where CONDITION-TYPEN are type specifiers and HANDLERN are
-;;; function designators.
+;;; where TYPE-TESTN are functions of one argument which test a given
+;;; condition instance for the type required by the corresponding
+;;; HANDLERN. HANDLERN are function designators.
 ;;;
 ;;; Newly established handlers are added at the beginning of the
 ;;; list. Elements to the left of the alist take precedence over

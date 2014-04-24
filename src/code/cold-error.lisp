@@ -83,21 +83,18 @@
         (sb!debug:*stack-top-hint* (or sb!debug:*stack-top-hint* 'signal)))
     (when *break-on-signals*
       (maybe-break-on-signal condition))
-    (loop
-      (unless handler-clusters
-        (return))
-       (let* ((cluster (pop handler-clusters))
-              ;; Remove CLUSTER from *HANDLER-CLUSTERS*: if a
-              ;; condition is signaled in either the type test,
-              ;; i.e. (the function (car handler)), or the handler,
-              ;; (the function (cdr handler)), the recursive SIGNAL
-              ;; call should not consider CLUSTER as doing so would
-              ;; lead to infinite recursive SIGNAL calls.
-              (*handler-clusters* handler-clusters))
-         (dolist (handler cluster)
-           (when (typep condition (car handler))
-             (funcall (cdr handler) condition)))))
-    nil))
+    (do ((cluster (pop handler-clusters) (pop handler-clusters)))
+        ((null cluster)
+         nil)
+      ;; Remove CLUSTER from *HANDLER-CLUSTERS*: if a condition is
+      ;; signaled in either the type test, i.e. (the function (car
+      ;; handler)), or the handler, (the function (cdr handler)), the
+      ;; recursive SIGNAL call should not consider CLUSTER as doing
+      ;; would lead to infinite recursive SIGNAL calls.
+      (let ((*handler-clusters* handler-clusters))
+        (dolist (handler cluster)
+          (when (funcall (truly-the function (car handler)) condition)
+            (funcall (cdr handler) condition)))))))
 
 (defun error (datum &rest arguments)
   #!+sb-doc
