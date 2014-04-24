@@ -41,3 +41,25 @@
 
 (defun context-pc (context)
   (int-sap (context-register context pc-offset)))
+
+;;;; INTERNAL-ERROR-ARGS.
+
+;;; Given a (POSIX) signal context, extract the internal error
+;;; arguments from the instruction stream.
+(defun internal-error-args (context)
+  (declare (type (alien (* os-context-t)) context))
+  (let* ((pc (context-pc context))
+         (length (sap-ref-8 pc 5)) ;; Skip trap instruction and kind byte
+         (vector (make-array length :element-type '(unsigned-byte 8))))
+    (declare (type system-area-pointer pc)
+             (type (unsigned-byte 8) length)
+             (type (simple-array (unsigned-byte 8) (*)) vector))
+    (copy-ub8-from-system-area pc 6 vector 0 length)
+    (let* ((index 0)
+           (error-number (sb!c:read-var-integer vector index)))
+      (collect ((sc-offsets))
+               (loop
+                (when (>= index length)
+                  (return))
+                (sc-offsets (sb!c:read-var-integer vector index)))
+               (values error-number (sc-offsets))))))
