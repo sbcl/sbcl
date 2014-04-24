@@ -197,8 +197,8 @@
             (values target not-target))
       (assemble ()
         ;; Is it a fixnum?
-        (inst ands temp value fixnum-tag-mask)
-        (inst b :eq fixnum)
+        (move temp value)
+        (%test-fixnum temp fixnum nil)
 
         ;; If not, is it an other pointer?
         (test-type value nope t (other-pointer-lowtag) :temp temp)
@@ -241,9 +241,9 @@
 
 (define-vop (check-unsigned-byte-32 check-type)
   (:generator 45
-    (let ((loose (generate-error-code vop temp 'object-not-unsigned-byte-32-error value))
+    (let ((lose (generate-error-code vop temp 'object-not-unsigned-byte-32-error value))
           (okay (gen-label)))
-      (unsigned-byte-32-test value temp t loose okay)
+      (unsigned-byte-32-test value temp t lose okay)
       (emit-label okay)
       (move result value))))
 
