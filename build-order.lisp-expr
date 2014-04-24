@@ -792,9 +792,6 @@
  ("src/code/signal" :arm-bootstrap)
  ("src/code/late-defbangmethod" :arm-bootstrap)
 
- ;; This is our arm bootstrapping hack.
- #!+arm ("src/arm-bootstrap" :not-host :trace-file)
-
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
  ;; PCL-related stuff, which shouldn't need to be done earlier than
  ;; anything else in cold build because after all it used to be
