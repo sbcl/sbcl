@@ -1205,7 +1205,6 @@
 
 ;;; Convert Bignum to a float in the specified Format, rounding to the best
 ;;; approximation.
-#!-arm
 (defun bignum-to-float (bignum format)
   (let* ((plusp (bignum-plus-p bignum))
          (x (if plusp bignum (negate-bignum bignum)))
