@@ -450,12 +450,11 @@
          (b :scs (unsigned-reg))
          (c :scs (any-reg)))
   (:arg-types unsigned-num unsigned-num positive-fixnum)
-  (:temporary (:scs (unsigned-reg) :to (:result 0) :target result) temp)
   (:results (result :scs (unsigned-reg))
             (carry :scs (unsigned-reg) :from :eval))
   (:result-types unsigned-num positive-fixnum)
   (:generator 3
-    (inst rsbs temp c 0) ;; Clear carry if c=0, else set.
+    (inst cmp c 1) ;; Set carry if (fixnum 0 or 1) c=0, else clear.
     (inst adcs result a b)
     (inst mov :cs carry 1)
     (inst mov :cc carry 0)))
@@ -542,6 +541,18 @@
       (inst adcs quo quo quo)
       (unless (= i 32)
         (inst adc rem rem rem)))))
+
+(define-vop (signify-digit)
+  (:translate sb!bignum:%fixnum-digit-with-correct-sign)
+  (:policy :fast-safe)
+  (:args (digit :scs (unsigned-reg) :target res))
+  (:arg-types unsigned-num)
+  (:results (res :scs (any-reg signed-reg)))
+  (:result-types signed-num)
+  (:generator 1
+    (if (sc-is res any-reg)
+        (inst mov res (lsl digit n-fixnum-tag-bits))
+        (inst mov res digit))))
 
 (define-vop (digit-ashr)
   (:translate sb!bignum:%ashr)
