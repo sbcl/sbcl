@@ -23,9 +23,6 @@
 (eval-when (:compile-toplevel :execute)
 
 (sb!xc:defmacro def-math-rtn (name num-args)
-  #!+arm
-  (declare (ignore name num-args))
-  #!-arm
   (let ((function (symbolicate "%" (string-upcase name)))
         (args (loop for i below num-args
                     collect (intern (format nil "ARG~D" i)))))
