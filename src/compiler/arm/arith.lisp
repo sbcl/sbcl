@@ -185,37 +185,48 @@
 
 ;;; Shifting
 
-(define-vop (fast-ash/unsigned=>unsigned)
+(define-vop (fast-ash/signed/unsigned)
   (:note "inline ASH")
+  (:args (number)
+         (amount))
+  (:results (result))
+  (:policy :fast-safe)
+  (:temporary (:sc non-descriptor-reg) temp)
+  (:variant-vars variant)
+  (:generator 10
+    (move temp amount)
+    (inst cmp temp 0)
+    (inst b :ge LEFT)
+    (inst rsb temp temp 0) ;; negate
+    (inst cmp temp sb!vm:n-word-bits)
+    (inst mov :gt temp sb!vm:n-word-bits)
+    (inst mov result (ecase variant
+                       (:signed (asr number temp))
+                       (:unsigned (lsr number temp))))
+    (inst b END)
+    LEFT
+    (inst cmp temp sb!vm:n-word-bits)
+    (inst mov :gt temp sb!vm:n-word-bits)
+    (inst mov result (lsl number temp))
+    END))
+
+(define-vop (fast-ash/signed=>signed fast-ash/signed/unsigned)
+  (:args (number :scs (signed-reg) :to :save)
+         (amount :scs (signed-reg) :to :save :target temp))
+  (:arg-types signed-num signed-num)
+  (:results (result :scs (signed-reg)))
+  (:result-types signed-num)
+  (:translate ash)
+  (:variant :signed))
+
+(define-vop (fast-ash/unsigned=>unsigned fast-ash/signed/unsigned)
   (:args (number :scs (unsigned-reg) :to :save)
          (amount :scs (signed-reg) :to :save))
   (:arg-types unsigned-num signed-num)
   (:results (result :scs (unsigned-reg)))
   (:result-types unsigned-num)
   (:translate ash)
-  (:policy :fast-safe)
-  (:temporary (:sc non-descriptor-reg) ndesc)
-  (:generator 3
-    (inst cmp amount 0)
-    (inst rsb :lt ndesc amount 0)
-    (inst mov :lt result (lsr number ndesc))
-    (inst mov :ge result (lsl number amount))))
-
-(define-vop (fast-ash/signed=>signed)
-  (:note "inline ASH")
-  (:args (number :scs (signed-reg) :to :save)
-         (amount :scs (signed-reg) :to :save))
-  (:arg-types signed-num signed-num)
-  (:results (result :scs (signed-reg)))
-  (:result-types signed-num)
-  (:translate ash)
-  (:policy :fast-safe)
-  (:temporary (:sc non-descriptor-reg) ndesc)
-  (:generator 3
-    (inst cmp amount 0)
-    (inst rsb :lt ndesc amount 0)
-    (inst mov :lt result (asr number ndesc))
-    (inst mov :ge result (lsl number amount))))
+  (:variant :unsigned))
 
 (macrolet ((def (name sc-type type result-type cost)
              `(define-vop (,name)
