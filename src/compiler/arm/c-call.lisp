@@ -69,7 +69,7 @@
     (when (> register 7)
       (error "Don't know how to handle alien double floats on stack."))
     (prog1
-        (my-make-wired-tn 'double-float 'double-reg register)
+        (my-make-wired-tn 'double-float 'double-reg (* register 2))
       (incf (arg-state-next-double-register state))
       (when (evenp (arg-state-next-single-register state))
         (incf (arg-state-next-single-register state) 2)))))
