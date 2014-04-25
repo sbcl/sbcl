@@ -100,8 +100,12 @@ call_into_lisp:
 	ldr	reg_R1, [reg_R8, #4]
 	ldr	reg_R0, [reg_R8]
 
+        @@ Load the closure-fun (or simple-fun-self), in case we're
+	@@ trying to call a closure.
+        ldr     reg_CODE, [reg_LEXENV, #CLOSURE_FUN_OFFSET]
+
 	@@ And, finally, call into Lisp!
-	add	reg_PC, reg_LEXENV, #SIMPLE_FUN_CODE_OFFSET
+	add	reg_PC, reg_CODE, #SIMPLE_FUN_CODE_OFFSET
 
 	.align 3
 	.equ	.lra, .+OTHER_POINTER_LOWTAG
