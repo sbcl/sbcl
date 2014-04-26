@@ -59,7 +59,7 @@
 (define-vop (current-stack-pointer)
   (:results (res :scs (any-reg descriptor-reg)))
   (:generator 1
-    (move res csp-tn)))
+    (load-csp res)))
 
 (define-vop (current-binding-pointer)
   (:results (res :scs (any-reg descriptor-reg)))
@@ -173,7 +173,8 @@
                   (loadw move-temp start i 0 :ge)
                   (store-stack-tn tn move-temp :ge)
                   (store-stack-tn tn null-tn :lt)))))))
-    (load-stack-tn csp-tn sp)))
+    (load-stack-tn move-temp sp)
+    (store-csp move-temp)))
 
 (define-vop (nlx-entry-multiple)
   (:args (top :target result) (src) (count))
@@ -210,7 +211,8 @@
 
     ;; Reset the CSP.
     DONE
-    (inst add csp-tn result num)))
+    (inst add temp result num)
+    (store-csp temp)))
 
 ;;; This VOP is just to force the TNs used in the cleanup onto the stack.
 ;;;

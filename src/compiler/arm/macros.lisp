@@ -59,6 +59,15 @@
                            (:big-endian `(+ ,n-offset (1- n-word-bytes))))))
       `(inst ldrb ,predicate ,n-target (@ ,n-source ,target-offset)))))
 
+;;; Macros to handle the fact that our stack pointer isn't actually in
+;;; a register (or won't be, by the time we're done).
+
+(defmacro load-csp (target &optional (predicate :al))
+  `(inst mov ,predicate ,target csp-tn))
+
+(defmacro store-csp (source &optional (predicate :al))
+  `(inst mov ,predicate csp-tn ,source))
+
 ;;; Macros to handle the fact that we cannot use the machine native call and
 ;;; return instructions.
 

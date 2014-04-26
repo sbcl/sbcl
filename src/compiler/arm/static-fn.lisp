@@ -70,6 +70,7 @@
                     static-fun-template)
          (:args ,@(args))
          ,@(temps)
+         (:temporary (:sc any-reg) csp-temp)
          (:results ,@(results))
          (:generator ,(+ 50 num-args num-results)
            (let ((lra-label (gen-label))
@@ -84,9 +85,11 @@
              ;; the new CFP, then pushing another value on CSP, but it
              ;; works for this situation.
              (inst compute-lra lip lip lra-label)
-             (inst str cfp-tn (@ csp-tn 4 :post-index))
-             (inst str lip (@ csp-tn 4 :post-index))
-             (inst sub cfp-tn csp-tn 8)
+             (load-csp csp-temp)
+             (inst str cfp-tn (@ csp-temp 4 :post-index))
+             (inst str lip (@ csp-temp 4 :post-index))
+             (inst sub cfp-tn csp-temp 8)
+             (store-csp csp-temp)
              (note-this-location vop :call-site)
              (lisp-jump function)
              (emit-return-pc lra-label)

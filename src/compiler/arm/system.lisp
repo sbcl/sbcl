@@ -169,7 +169,7 @@
   (:translate control-stack-pointer-sap)
   (:policy :fast-safe)
   (:generator 1
-    (move int csp-tn)))
+    (load-csp int)))
 
 ;;;; Code object frobbing.
 

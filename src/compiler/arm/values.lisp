@@ -14,7 +14,7 @@
 (define-vop (reset-stack-pointer)
   (:args (ptr :scs (any-reg)))
   (:generator 1
-    (move csp-tn ptr)))
+    (store-csp ptr)))
 
 ;;; Push some values onto the stack, returning the start and number of values
 ;;; pushed as results.  It is assumed that the Vals are wired to the standard
@@ -31,8 +31,9 @@
   (:info nvals)
   (:temporary (:scs (descriptor-reg)) temp)
   (:generator 20
-    (inst mov start csp-tn)
-    (inst add csp-tn csp-tn (* nvals n-word-bytes))
+    (load-csp start)
+    (inst add temp start (* nvals n-word-bytes))
+    (store-csp temp)
     (do ((val vals (tn-ref-across val))
          (i 0 (1+ i)))
         ((null val))
@@ -57,24 +58,27 @@
   (:temporary (:scs (descriptor-reg) :type list :from (:argument 0)) list)
   (:temporary (:scs (descriptor-reg)) temp)
   (:temporary (:scs (non-descriptor-reg)) ndescr)
+  (:temporary (:sc any-reg) csp-temp)
   (:vop-var vop)
   (:save-p :compute-only)
   (:generator 0
     (move list arg)
-    (move start csp-tn)
+    (load-csp start)
+    (move csp-temp start)
 
     LOOP
     (inst cmp list null-tn)
     (loadw temp list cons-car-slot list-pointer-lowtag)
     (inst b :eq DONE)
     (loadw list list cons-cdr-slot list-pointer-lowtag)
-    (inst add csp-tn csp-tn n-word-bytes)
-    (storew temp csp-tn -1)
+    (inst add csp-temp csp-temp n-word-bytes)
+    (store-csp csp-temp)
+    (storew temp csp-temp -1)
     (test-type list LOOP nil (list-pointer-lowtag) :temp ndescr)
     (error-call vop 'bogus-arg-to-values-list-error list)
 
     DONE
-    (inst sub count csp-tn start)))
+    (inst sub count csp-temp start)))
 
 
 ;;; Copy the more arg block to the top of the stack so we can use them
@@ -98,10 +102,11 @@
       (any-reg
        (inst add src context skip)))
     (inst adds count num 0)
-    (inst mov start csp-tn)
+    (load-csp start)
     (inst b :eq DONE)
-    (inst mov dst csp-tn)
-    (inst add csp-tn csp-tn count)
+    (inst mov dst start)
+    (inst add i start count)
+    (store-csp i)
     (inst mov i count)
     LOOP
     (inst cmp i 4)
