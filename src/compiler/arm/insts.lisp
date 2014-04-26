@@ -19,7 +19,6 @@
 (setf sb!disassem:*disassem-inst-alignment-bytes* 4)
 
 
-(eval-when (:compile-toplevel :load-toplevel :execute)
 (defparameter *conditions*
   '((:eq . 0)
     (:ne . 1)
@@ -42,18 +41,120 @@
       (when (null (aref vec (cdr cond)))
         (setf (aref vec (cdr cond)) (car cond))))
     vec))
-) ; EVAL-WHEN
 
 ;;; Set assembler parameters. (In CMU CL, this was done with
 ;;; a call to a macro DEF-ASSEMBLER-PARAMS.)
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (setf sb!assem:*assem-scheduler-p* nil))
 
-(sb!disassem:define-arg-type condition-code
-  :printer *condition-name-vec*)
-
 (defun conditional-opcode (condition)
   (cdr (assoc condition *conditions* :test #'eq)))
+
+;;;; disassembler field definitions
+
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  ;; DEFINE-ARG-TYPE requires that any :PRINTER be defined at
+  ;; compile-time...  Why?
+
+  (defun print-condition (value stream dstate)
+    (declare (type stream stream)
+             (fixnum value)
+             (ignore dstate))
+    (unless (= value 14) ;; Don't print :al
+      (princ (aref *condition-name-vec* value) stream)))
+
+  (defun print-reg (value stream dstate)
+    (declare (type stream stream)
+             (fixnum value)
+             (ignore dstate))
+    (princ (aref *register-names* value) stream))
+
+  (defun print-shift-type (value stream dstate)
+    (declare (type stream stream)
+             (fixnum value)
+             (ignore dstate))
+    (princ (aref #(lsl lsr asr ror) value) stream))
+
+  (defun print-immediate-shift (value stream dstate)
+    (declare (type stream stream)
+             (type (cons fixnum (cons fixnum null)))
+             (ignore dstate))
+    (destructuring-bind (amount shift) value
+      (cond
+        ((and (zerop amount)
+              (zerop shift))
+         ;; No shift
+         )
+        ((and (zerop amount)
+              (= shift 3))
+         (princ ", RRX" stream))
+        (t
+         (princ ", " stream)
+         (princ (aref #(lsl lsr asr ror) shift) stream)
+         (princ " #" stream)
+         (princ amount stream)))))
+
+  (defun print-shifter-immediate (value stream dstate)
+    (declare (type stream stream)
+             (fixnum value)
+             (ignore dstate))
+    (let* ((rotate (ldb (byte 4 8) value))
+           (immediate (mask-field (byte 8 0) value))
+           (left (mask-field (byte 32 0)
+                             (ash immediate (- 32 rotate rotate))))
+           (right (ash immediate (- 0 rotate rotate))))
+      (princ (logior left right) stream)))
+) ; EVAL-WHEN
+
+(sb!disassem:define-arg-type condition-code
+    :printer #'print-condition)
+
+(sb!disassem:define-arg-type reg
+    :printer #'print-reg)
+
+(sb!disassem:define-arg-type shift-type
+    :printer #'print-shift-type)
+
+(sb!disassem:define-arg-type immediate-shift
+    :printer #'print-immediate-shift)
+
+(sb!disassem:define-arg-type shifter-immediate
+    :printer #'print-shifter-immediate)
+
+;;;; disassembler instruction format definitions
+
+(sb!disassem:define-instruction-format
+    (dp-shift-immediate 32
+     :default-printer '(:name cond :tab rd ", " rn ", " rm shift))
+  (cond :field (byte 4 28) :type 'condition-code)
+  (opcode-8 :field (byte 8 20))
+  (rn :field (byte 4 16) :type 'reg)
+  (rd :field (byte 4 12) :type 'reg)
+  (shift :fields (list (byte 5 7) (byte 2 5)) :type 'immediate-shift)
+  (register-shift-p :field (byte 1 4) :value 0)
+  (rm :field (byte 4 0) :type 'reg))
+
+(sb!disassem:define-instruction-format
+    (dp-shift-register 32
+      :default-printer '(:name cond :tab rd ", " rn ", " rm ", " shift-type " " rs))
+  (cond :field (byte 4 28) :type 'condition-code)
+  (opcode-8 :field (byte 8 20))
+  (rn :field (byte 4 16) :type 'reg)
+  (rd :field (byte 4 12) :type 'reg)
+  (rs :field (byte 4 8) :type 'reg)
+  (multiply-p :field (byte 1 7) :value 0)
+  (shift-type :field (byte 2 5) :type 'shift-type)
+  (register-shift-p :field (byte 1 4) :value 1)
+  (rm :field (byte 4 0) :type 'reg))
+
+(sb!disassem:define-instruction-format
+    (dp-immediate 32
+      :default-printer '(:name cond :tab rd ", " rn ", #" immediate))
+  (cond :field (byte 4 28) :type 'condition-code)
+  (opcode-8 :field (byte 8 20))
+  (rn :field (byte 4 16) :type 'reg)
+  (rd :field (byte 4 12) :type 'reg)
+  (immediate :field (byte 12 0) :type 'shifter-immediate))
 
 ;;;; primitive emitters
 
@@ -373,6 +474,30 @@
 
 (defmacro define-data-processing-instruction (instruction opcode dest-p src-p)
   `(define-instruction ,instruction (segment &rest args)
+     (:printer dp-shift-immediate ((opcode-8 ,opcode)
+                                   ,@(unless dest-p '((rd 0)))
+                                   ,@(unless src-p '((rn 0))))
+               ,@(cond
+                  ((not dest-p)
+                   '('(:name cond :tab rn ", " rm shift)))
+                  ((not src-p)
+                   '('(:name cond :tab rd ", " rm shift)))))
+     (:printer dp-shift-register ((opcode-8 ,opcode)
+                                  ,@(unless dest-p '((rd 0)))
+                                  ,@(unless src-p '((rn 0))))
+               ,@(cond
+                  ((not dest-p)
+                   '('(:name cond :tab rn ", " rm ", " shift-type " " rs)))
+                  ((not src-p)
+                   '('(:name cond :tab rd ", " rm ", " shift-type " " rs)))))
+     (:printer dp-immediate ((opcode-8 ,(logior opcode #x20))
+                             ,@(unless dest-p '((rd 0)))
+                             ,@(unless src-p '((rn 0))))
+               ,@(cond
+                  ((not dest-p)
+                   '('(:name cond :tab rn ", " immediate)))
+                  ((not src-p)
+                   '('(:name cond :tab rd ", " immediate)))))
      (:emitter
       (with-condition-defaulted (args (condition ,@(if dest-p '(dest))
                                                  ,@(if src-p '(src))
