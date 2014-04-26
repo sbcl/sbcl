@@ -343,6 +343,32 @@
   (:generator 1
     (inst mvn res x)))
 
+(macrolet
+    ((define-modular-backend (fun &optional constantp)
+       (let ((mfun-name (symbolicate fun '-mod32))
+             (modvop (symbolicate 'fast- fun '-mod32/unsigned=>unsigned))
+             (modcvop (symbolicate 'fast- fun 'mod32-c/unsigned=>unsigned))
+             (vop (symbolicate 'fast- fun '/unsigned=>unsigned))
+             (cvop (symbolicate 'fast- fun '-c/unsigned=>unsigned)))
+         `(progn
+            (define-modular-fun ,mfun-name (x y) ,fun :untagged nil 32)
+            (define-vop (,modvop ,vop)
+              (:translate ,mfun-name))
+            ,@(when constantp
+                `((define-vop (,modcvop ,cvop)
+                    (:translate ,mfun-name))))))))
+  (define-modular-backend + t)
+  (define-modular-backend - t)
+  ;; (define-modular-backend * t)
+  ;; (define-modular-backend logeqv)
+  ;; (define-modular-backend lognand)
+  ;; (define-modular-backend lognor)
+  (define-modular-backend logandc1)
+  (define-modular-backend logandc2)
+  ;; (define-modular-backend logorc1)
+  ;; (define-modular-backend logorc2)
+  )
+
 ;;;; Binary conditional VOPs:
 
 (define-vop (fast-conditional)
