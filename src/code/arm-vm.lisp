@@ -6,6 +6,11 @@
 ;;; FIXME: Why is this present in every ARCH-vm.lisp with the the same definition. Is there something like common-vm?
 (define-alien-type os-context-t (struct os-context-t-struct))
 
+(defun machine-type ()
+  #!+sb-doc
+  "Return a string describing the type of the local machine."
+  "ARM")
+
 ;;;; FIXUP-CODE-OBJECT
 
 (defun fixup-code-object (code offset fixup kind)
