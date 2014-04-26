@@ -104,6 +104,11 @@
                              (ash immediate (- 32 rotate rotate))))
            (right (ash immediate (- 0 rotate rotate))))
       (princ (logior left right) stream)))
+
+  (defun use-label-relative-label (value dstate)
+    (declare (type (signed-byte 24) value)
+             (type sb!disassem:disassem-state dstate))
+    (+ 8 (ash value 2) (sb!disassem:dstate-cur-addr dstate)))
 ) ; EVAL-WHEN
 
 (sb!disassem:define-arg-type condition-code
@@ -120,6 +125,10 @@
 
 (sb!disassem:define-arg-type shifter-immediate
     :printer #'print-shifter-immediate)
+
+(sb!disassem:define-arg-type relative-label
+  :sign-extend t
+  :use-label #'use-label-relative-label)
 
 ;;;; disassembler instruction format definitions
 
@@ -155,6 +164,12 @@
   (rn :field (byte 4 16) :type 'reg)
   (rd :field (byte 4 12) :type 'reg)
   (immediate :field (byte 12 0) :type 'shifter-immediate))
+
+(sb!disassem:define-instruction-format
+    (branch 32 :default-printer '(:name cond :tab target))
+  (cond :field (byte 4 28) :type 'condition-code)
+  (opcode-4 :field (byte 4 24))
+  (target :field (byte 24 0) :type 'relative-label))
 
 ;;;; primitive emitters
 
@@ -613,12 +628,14 @@
                                                       (+ posn 8)))))))
 
 (define-instruction b (segment &rest args)
+  (:printer branch ((opcode-4 #b1010)))
   (:emitter
    (with-condition-defaulted (args (condition dest))
      (aver (label-p dest))
      (emit-branch-back-patch segment condition #b1010 dest))))
 
 (define-instruction bl (segment &rest args)
+  (:printer branch ((opcode-4 #b1011)))
   (:emitter
    (with-condition-defaulted (args (condition dest))
      (aver (label-p dest))
