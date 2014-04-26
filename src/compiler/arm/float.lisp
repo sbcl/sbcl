@@ -374,7 +374,7 @@
                   (:generator ,dcost
                     (inst ,dinst r x y))))))
   (frob + fadds +/single-float 2 faddd +/double-float 2)
-  (frob - fsubs -/single-float 2 fsubs -/double-float 2)
+  (frob - fsubs -/single-float 2 fsubd -/double-float 2)
   (frob * fmuls */single-float 4 fmuld */double-float 5)
   (frob / fdivs //single-float 12 fdivd //double-float 19))
 
