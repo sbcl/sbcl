@@ -135,7 +135,6 @@
 
      *control-stack-pointer*
      *binding-stack-pointer*
-     *number-stack-pointer*
      *interrupted-control-stack-pointer*
 
      ;; interrupt handling

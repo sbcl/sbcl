@@ -31,7 +31,7 @@
 #define reg_NULL        REG(10)
 #define reg_CFP         REG(11)
 #define reg_NARGS       REG(12)
-#define reg_CSP         REG(13)
+#define reg_NSP         REG(13)
 #define reg_LR          REG(14)
 #define reg_PC          REG(15)
 
@@ -39,7 +39,7 @@
         "R0",           "R1",           "R2",           "LEXENV", \
         "NL2",          "CODE",         "NL3",          "OCFP", \
         "R8",           "NFP",          "NULL",         "CFP", \
-        "NARGS",        "CSP",          "LR",           "PC"
+        "NARGS",        "NSP",          "LR",           "PC"
 
 #define BOXED_REGISTERS { \
     reg_R0, reg_R1, reg_R2, reg_LEXENV, reg_R8, reg_CODE \

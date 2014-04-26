@@ -168,9 +168,8 @@
       (let ((nfp-tn (current-nfp-tn vop)))
         (when nfp-tn
           (let* ((nbytes (bytes-needed-for-non-descriptor-stack-frame)))
-            (load-symbol-value nfp-tn *number-stack-pointer*)
-            (inst sub nfp-tn nfp-tn nbytes)
-            (store-symbol-value nfp-tn *number-stack-pointer*)))))
+            (inst sub nfp-tn nsp-tn nbytes)
+            (move nsp-tn nfp-tn)))))
     (trace-table-entry trace-table-normal)))
 
 (define-vop (allocate-frame)
@@ -185,9 +184,8 @@
     (store-csp nfp)
     (when (ir2-physenv-number-stack-p callee)
       (let* ((nbytes (bytes-needed-for-non-descriptor-stack-frame)))
-        (load-symbol-value nfp *number-stack-pointer*)
-        (inst sub nfp nfp nbytes)
-        (store-symbol-value nfp *number-stack-pointer*)))
+        (inst sub nfp nsp-tn nbytes)
+        (inst mov nsp-tn nfp)))
     (trace-table-entry trace-table-normal)))
 
 ;;; Allocate a partial frame for passing stack arguments in a full call.  Nargs
@@ -480,10 +478,9 @@
         ;; number stack frame.
         (let ((nfp-tn (current-nfp-tn vop)))
           (when nfp-tn
-            (load-symbol-value nfp-tn *number-stack-pointer*)
-            (inst sub nfp-tn nfp-tn
+            (inst sub nfp-tn nsp-tn
                   (bytes-needed-for-non-descriptor-stack-frame))
-            (store-symbol-value nfp-tn *number-stack-pointer*)))))))
+            (move nsp-tn nfp-tn)))))))
 
 ;;; More args are stored consecutively on the stack, starting
 ;;; immediately at the context pointer.  The context pointer is not
@@ -784,7 +781,7 @@
     (let ((cur-nfp (current-nfp-tn vop)))
       (when cur-nfp
         (inst add cur-nfp cur-nfp (bytes-needed-for-non-descriptor-stack-frame))
-        (store-symbol-value cur-nfp *number-stack-pointer*)))
+        (move nsp-tn cur-nfp)))
     (move cfp-tn old-fp-temp)
     (lisp-return return-pc-temp :known)
     (trace-table-entry trace-table-normal)))
@@ -937,7 +934,7 @@
                                (error "RETURN-PC not in its passing location"))
                               (:frob-nfp
                                (inst add cur-nfp cur-nfp (bytes-needed-for-non-descriptor-stack-frame))
-                               (store-symbol-value cur-nfp *number-stack-pointer*)))
+                               (move nsp-tn cur-nfp)))
                             `((:comp-lra
                                (inst compute-lra lip lip lra-label)
                                (inst str lip (@ new-fp (* lra-save-offset
@@ -1042,7 +1039,7 @@
     (let ((cur-nfp (current-nfp-tn vop)))
       (when cur-nfp
         (inst add cur-nfp cur-nfp (bytes-needed-for-non-descriptor-stack-frame))
-        (store-symbol-value cur-nfp *number-stack-pointer*)))
+        (move nsp-tn cur-nfp)))
     (let ((fixup-lab (gen-label)))
       (assemble (*elsewhere*)
         (emit-label fixup-lab)
@@ -1064,7 +1061,7 @@
     (let ((cur-nfp (current-nfp-tn vop)))
       (when cur-nfp
         (inst add cur-nfp cur-nfp (bytes-needed-for-non-descriptor-stack-frame))
-        (store-symbol-value cur-nfp *number-stack-pointer*)))
+        (move nsp-tn cur-nfp)))
     ;; Clear the control stack, and restore the frame pointer.
     (store-csp cfp-tn)
     (move cfp-tn old-fp)
@@ -1106,7 +1103,7 @@
       (when cur-nfp
         (inst add cur-nfp cur-nfp
               (bytes-needed-for-non-descriptor-stack-frame))
-        (store-symbol-value cur-nfp *number-stack-pointer*)))
+        (move nsp-tn cur-nfp)))
     (cond ((= nvals 1)
            ;; Clear the control stack, and restore the frame pointer.
            (store-csp cfp-tn)
@@ -1156,7 +1153,7 @@
       (when cur-nfp
         (inst add cur-nfp cur-nfp
               (bytes-needed-for-non-descriptor-stack-frame))
-        (store-symbol-value cur-nfp *number-stack-pointer*)))
+        (move nsp-tn cur-nfp)))
 
     ;; Check for the single case.
     (inst cmp nvals-arg (fixnumize 1))

@@ -65,11 +65,6 @@ call_into_lisp:
 	ldr     reg_OCFP, =foreign_function_call_active
 	str     reg_R2, [reg_OCFP]
 
-	@@ Save off the C stack pointer.  Once for our return sequence,
-	@@ and once for the number stack.
-	stmea	reg_CFP!, {sp}
-	str     sp, STATIC_SYMBOL_VALUE(NUMBER_STACK_POINTER)
-
 	@@ We need to set up the lisp stack pointer and the basics of
 	@@ our stack frame while we're still in P-A.  Any sooner and
 	@@ our stack frame can be clobbered by a stray interrupt, any
@@ -125,9 +120,6 @@ call_into_lisp:
 	ldr	reg_OCFP, .stack_pointer_address
 	str	reg_NFP, [reg_OCFP]
 
-        @@ Temporary KLUDGE: Hack up the stack pointer
-        mov     sp, reg_NFP
-
 	@@ Set FFCA, so the runtime knows that we're not "in lisp".
 	ldr     reg_OCFP, =foreign_function_call_active
 	str     pc, [reg_OCFP]
@@ -136,9 +128,6 @@ call_into_lisp:
         ldr     reg_OCFP, =dynamic_space_free_pointer
         ldr     reg_NFP, STATIC_SYMBOL_VALUE(ALLOCATION_POINTER)
         str     reg_NFP, [reg_OCFP]
-
-	@@ Restore the C stack pointer.
-	ldr	sp, [reg_CSP, #-4]
 
 	@@ Leave PSEUDO-ATOMIC and check for interrupts.
 	str     reg_NULL, STATIC_SYMBOL_VALUE(PSEUDO_ATOMIC_ATOMIC)
@@ -222,9 +211,6 @@ call_into_c:
         ldr     reg_NFP, STATIC_SYMBOL_VALUE(ALLOCATION_POINTER)
         str     reg_NFP, [reg_OCFP]
 
-        @@ Pick up the C stack pointer.
-        ldr     sp, STATIC_SYMBOL_VALUE(NUMBER_STACK_POINTER)
-
 	@@ Leave PSEUDO-ATOMIC and check for interrupts.
 	str     reg_NULL, STATIC_SYMBOL_VALUE(PSEUDO_ATOMIC_ATOMIC)
 	ldr     reg_OCFP, STATIC_SYMBOL_VALUE(PSEUDO_ATOMIC_INTERRUPTED)
@@ -274,9 +260,6 @@ call_into_c:
         ldr     reg_OCFP, =dynamic_space_free_pointer
         ldr     reg_OCFP, [reg_OCFP]
         str     reg_OCFP, STATIC_SYMBOL_VALUE(ALLOCATION_POINTER)
-
-        @@ Save off the C stack pointer.
-        str     sp, STATIC_SYMBOL_VALUE(NUMBER_STACK_POINTER)
 
         @@ Restore the Lisp stack and frame pointers, but store the
         @@ control frame pointer in reg_NFP (saving a register move
