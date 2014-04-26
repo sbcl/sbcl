@@ -76,15 +76,16 @@ call_into_lisp:
 	@@ later and we can end up with a half-configured stack frame
 	@@ when we catch a stray interrupt.
 
-	@@ Set up the Lisp stack pointer
-	mov	reg_CSP, reg_CFP
+	@@ Allocate our frame and set up the Lisp stack pointer
+        add     reg_OCFP, reg_CFP, #8
+        str     reg_OCFP, STATIC_SYMBOL_VALUE(CONTROL_STACK_POINTER)
 
 	@@ Set up the "frame link"
-	stmea   reg_CSP!, {reg_NFP}
+	str     reg_NFP, [reg_OCFP, #-8]
 
 	@@ Set up the return address
 	ldr	reg_NL3, =.lra
-	stmea   reg_CSP!, {reg_NL3}
+        str     reg_NL3, [reg_OCFP, #-4]
 
 	@@ Leave PSEUDO-ATOMIC and check for interrupts.
 	str     reg_NULL, STATIC_SYMBOL_VALUE(PSEUDO_ATOMIC_ATOMIC)
@@ -112,16 +113,20 @@ call_into_lisp:
 	.word	RETURN_PC_HEADER_WIDETAG
 
 	@@ Correct stack pointer for return processing.
-	moveq	reg_CSP, reg_OCFP
+	streq	reg_OCFP, STATIC_SYMBOL_VALUE(CONTROL_STACK_POINTER)
 
 	@@ Enter PSEUDO-ATOMIC.
 	str     pc, STATIC_SYMBOL_VALUE(PSEUDO_ATOMIC_ATOMIC)
 
         @@ Save the lisp stack and frame pointers.
 	ldr	reg_NFP, .frame_pointer_address
-	ldr	reg_OCFP, .stack_pointer_address
 	str	reg_CFP, [reg_NFP]
-	str	reg_CSP, [reg_OCFP]
+        ldr     reg_NFP, STATIC_SYMBOL_VALUE(CONTROL_STACK_POINTER)
+	ldr	reg_OCFP, .stack_pointer_address
+	str	reg_NFP, [reg_OCFP]
+
+        @@ Temporary KLUDGE: Hack up the stack pointer
+        mov     sp, reg_NFP
 
 	@@ Set FFCA, so the runtime knows that we're not "in lisp".
 	ldr     reg_OCFP, =foreign_function_call_active
@@ -186,20 +191,22 @@ call_into_c:
         @@ debugger knows about this layout (see COMPUTE-CALLING-FRAME
         @@ in SYS:SRC;CODE;DEBUG-INT.LISP).  The stack is aligned, so
         @@ we can use R0 (a boxed register) as our temporary.
-        mov     reg_R0, sp
-        add     sp, sp, #12
-        str     reg_CFP, [reg_R0]
-        str     reg_NFP, [reg_R0, #4]
-        str     reg_CODE, [reg_R0, #8]
+        ldr     reg_R0, STATIC_SYMBOL_VALUE(CONTROL_STACK_POINTER)
+        add     reg_R0, reg_R0, #12
+        str     reg_R0, STATIC_SYMBOL_VALUE(CONTROL_STACK_POINTER)
+        str     reg_CFP, [reg_R0, #-12]
+        str     reg_NFP, [reg_R0, #-8]
+        str     reg_CODE, [reg_R0, #-4]
 
         @@ Enter PSEUDO-ATOMIC.
 	str     pc, STATIC_SYMBOL_VALUE(PSEUDO_ATOMIC_ATOMIC)
 
         @@ Save the lisp stack and frame pointers.
+	ldr	reg_NFP, .stack_pointer_address
+	str	reg_R0, [reg_NFP]
+        sub     reg_R0, reg_R0, #12
 	ldr	reg_NFP, .frame_pointer_address
 	str	reg_R0, [reg_NFP]
-	ldr	reg_NFP, .stack_pointer_address
-	str	reg_CSP, [reg_NFP]
 
         @@ We're done with R0, and we need to use OCFP when leaving
         @@ pseudo-atomic, so move the first of the C register
@@ -275,7 +282,8 @@ call_into_c:
         @@ control frame pointer in reg_NFP (saving a register move
         @@ later).
 	ldr	reg_NFP, .stack_pointer_address
-	ldr	reg_CSP, [reg_NFP]
+	ldr	reg_CFP, [reg_NFP]
+        str     reg_CFP, STATIC_SYMBOL_VALUE(CONTROL_STACK_POINTER)
 	ldr	reg_NFP, .frame_pointer_address
 	ldr	reg_NFP, [reg_NFP]
 
@@ -290,7 +298,7 @@ call_into_c:
         ldr     reg_CODE, [reg_NFP, #8]
         ldr     reg_NL2, [reg_NFP, #4]
         ldr     reg_CFP, [reg_NFP]
-        mov     reg_CSP, reg_NFP
+        str     reg_NFP, STATIC_SYMBOL_VALUE(CONTROL_STACK_POINTER)
 
         @@ Restore our return address... into the program counter.
         sub     reg_NL2, reg_NL2, #OTHER_POINTER_LOWTAG

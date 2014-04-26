@@ -63,10 +63,10 @@
 ;;; a register (or won't be, by the time we're done).
 
 (defmacro load-csp (target &optional (predicate :al))
-  `(inst mov ,predicate ,target csp-tn))
+  `(load-symbol-value ,target *control-stack-pointer* ,predicate))
 
 (defmacro store-csp (source &optional (predicate :al))
-  `(inst mov ,predicate csp-tn ,source))
+  `(store-symbol-value ,source *control-stack-pointer* ,predicate))
 
 ;;; Macros to handle the fact that we cannot use the machine native call and
 ;;; return instructions.

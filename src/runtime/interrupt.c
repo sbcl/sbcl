@@ -641,10 +641,10 @@ build_fake_control_stack_frames(struct thread *th,os_context_t *context)
 
     /* Build a fake stack frame or frames */
 
+#if !defined(LISP_FEATURE_ARM)
     access_control_frame_pointer(th) =
         (lispobj *)(uword_t)
             (*os_context_register_addr(context, reg_CSP));
-#if !defined(LISP_FEATURE_ARM)
     if ((lispobj *)(uword_t)
             (*os_context_register_addr(context, reg_CFP))
         == access_control_frame_pointer(th)) {
@@ -668,6 +668,9 @@ build_fake_control_stack_frames(struct thread *th,os_context_t *context)
             oldcont = (lispobj)(*os_context_register_addr(context, reg_OCFP));
         }
     } else
+#else /* LISP_FEATURE_ARM */
+    access_control_frame_pointer(th) =
+        SymbolValue(CONTROL_STACK_POINTER, th);
 #endif
     /* We can't tell whether we are still in the caller if it had to
      * allocate a stack frame due to stack arguments. */
@@ -729,6 +732,13 @@ fake_foreign_function_call(os_context_t *context)
         *os_context_register_addr(context, reg_BSP));
 #endif
 
+#ifdef LISP_FEATURE_ARM
+    /* Stash our control stack pointer */
+    bind_variable(INTERRUPTED_CONTROL_STACK_POINTER,
+                  SymbolValue(CONTROL_STACK_POINTER, thread),
+                  thread);
+#endif
+
     build_fake_control_stack_frames(thread,context);
 
     /* Do dynamic binding of the active interrupt context index
@@ -767,6 +777,15 @@ undo_fake_foreign_function_call(os_context_t *context)
 
     /* Undo dynamic binding of FREE_INTERRUPT_CONTEXT_INDEX */
     unbind(thread);
+
+#ifdef LISP_FEATURE_ARM
+    /* Restore our saved control stack pointer */
+    SetSymbolValue(CONTROL_STACK_POINTER,
+                   SymbolValue(INTERRUPTED_CONTROL_STACK_POINTER,
+                               thread),
+                   thread);
+    unbind(thread);
+#endif
 
 #if defined(reg_ALLOC) && !defined(LISP_FEATURE_SB_THREAD)
     /* Put the dynamic space free pointer back into the context. */
