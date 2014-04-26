@@ -1971,9 +1971,6 @@ undoably_install_low_level_interrupt_handler (int signal,
 # endif
     }
 #endif
-#if defined(LISP_FEATURE_ARM)
-    sa.sa_flags |= SA_ONSTACK;
-#endif
 
     sigaction(signal, &sa, NULL);
     interrupt_low_level_handlers[signal] =
