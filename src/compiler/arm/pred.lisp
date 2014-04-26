@@ -52,5 +52,11 @@
   (:policy :fast-safe)
   (:translate eq)
   (:generator 3
-    (inst cmp x y)
+    (inst cmp
+          (sc-case x
+            (null null-tn)  ;; FIXME: should it really be like that?
+            (t x))
+          (sc-case y
+            (null null-tn)
+            (t y)))
     (inst b (if not-p :ne :eq) target)))
