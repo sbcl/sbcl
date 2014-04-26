@@ -315,11 +315,7 @@ http://www.math.sci.hiroshima-u.ac.jp/~m-mat/MT/emt.html
                 %random-single-float))
 (defun %random-single-float (arg state)
   (declare (type (single-float (0f0)) arg)
-           (type random-state state)
-           #!+arm (ignore arg state))
-  #!+arm
-  (error "No float support on ARM yet!")
-  #!-arm
+           (type random-state state))
   (* arg
      (- (make-single-float
          (dpb (ash (random-chunk state)
@@ -342,11 +338,7 @@ http://www.math.sci.hiroshima-u.ac.jp/~m-mat/MT/emt.html
 #!-x86
 (defun %random-double-float (arg state)
   (declare (type (double-float (0d0)) arg)
-           (type random-state state)
-           #!+arm (ignore arg state))
-  #!+arm
-  (error "No float support on ARM yet!")
-  #!-arm
+           (type random-state state))
   (* arg
      (- (sb!impl::make-double-float
          (dpb (ash (random-chunk state)
