@@ -166,7 +166,7 @@
     (unless (zerop amount)
       (let ((delta (logandc2 (+ amount (1- +number-stack-allocation-granularity+))
                              (1- +number-stack-allocation-granularity+))))
-        (inst sub nsp-tn nsp-tn delta)
+        (composite-immediate-instruction sub nsp-tn nsp-tn delta)
         (move result nsp-tn)))))
 
 (define-vop (dealloc-number-stack-space)
@@ -176,4 +176,4 @@
     (unless (zerop amount)
       (let ((delta (logandc2 (+ amount (1- +number-stack-allocation-granularity+))
                              (1- +number-stack-allocation-granularity+))))
-        (inst add nsp-tn nsp-tn delta)))))
+        (composite-immediate-instruction add nsp-tn nsp-tn delta)))))
