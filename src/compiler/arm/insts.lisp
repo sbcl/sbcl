@@ -109,6 +109,29 @@
     (declare (type (signed-byte 24) value)
              (type sb!disassem:disassem-state dstate))
     (+ 8 (ash value 2) (sb!disassem:dstate-cur-addr dstate)))
+
+  (defun print-load/store-immediate (value stream dstate)
+    (declare (type stream stream)
+             (type (cons bit (cons bit (cons bit (cons fixnum null)))) value)
+             (ignore dstate))
+    (destructuring-bind (p u w offset) value
+      (if (zerop offset)
+          (princ "]" stream)
+          (progn
+            (princ (if (zerop p) "], #" ", #") stream)
+            (princ (if (zerop u) "-" "+") stream)
+            (princ offset stream)
+            (unless (zerop p)
+              (princ (if (zerop w) "]" "]!") stream))))))
+
+  (defun print-load/store-register (value stream dstate)
+    (destructuring-bind (p u w offset) value
+      (when (zerop p)
+        (princ "]" stream))
+      (princ (if (zerop u) "-" "+") stream)
+      (print-immediate-shift offset stream dstate)
+      (unless (zerop p)
+        (princ (if (zerop w) "]" "]!") stream))))
 ) ; EVAL-WHEN
 
 (sb!disassem:define-arg-type condition-code
@@ -129,6 +152,12 @@
 (sb!disassem:define-arg-type relative-label
   :sign-extend t
   :use-label #'use-label-relative-label)
+
+(sb!disassem:define-arg-type load/store-immediate
+    :printer #'print-load/store-immediate)
+
+(sb!disassem:define-arg-type load/store-register
+    :printer #'print-load/store-register)
 
 ;;;; disassembler instruction format definitions
 
@@ -170,6 +199,40 @@
   (cond :field (byte 4 28) :type 'condition-code)
   (opcode-4 :field (byte 4 24))
   (target :field (byte 24 0) :type 'relative-label))
+
+(sb!disassem:define-instruction-format
+    (load/store-immediate 32
+     ;; FIXME: cond should come between LDR/STR and B.
+     :default-printer '(:name cond :tab rd ", [" rn load/store-offset))
+  (cond :field (byte 4 28) :type 'condition-code)
+  (opcode-3 :field (byte 3 25))
+  (load/store-offset :fields (list (byte 1 24)
+                                   (byte 1 23)
+                                   (byte 1 21)
+                                   (byte 12 0))
+                     :type 'load/store-immediate)
+  (opcode-b :field (byte 1 22))
+  (opcode-l :field (byte 1 20))
+  (rn :field (byte 4 16) :type 'reg)
+  (rd :field (byte 4 12) :type 'reg))
+
+(sb!disassem:define-instruction-format
+    (load/store-register 32
+     ;; FIXME: cond should come between LDR/STR and B.
+     :default-printer '(:name cond :tab rd ", [" rn rm load/store-offset))
+  (cond :field (byte 4 28) :type 'condition-code)
+  (opcode-3 :field (byte 3 25))
+  (load/store-offset :fields (list (byte 1 24)
+                                   (byte 1 23)
+                                   (byte 1 21)
+                                   (byte 7 5))
+                     :type 'load/store-register)
+  (opcode-b :field (byte 1 22))
+  (opcode-l :field (byte 1 20))
+  (opcode-0 :field (byte 1 4))
+  (rn :field (byte 4 16) :type 'reg)
+  (rd :field (byte 4 12) :type 'reg)
+  (rm :field (byte 4 0) :type 'reg))
 
 ;;;; primitive emitters
 
@@ -862,6 +925,21 @@
 (macrolet
     ((define-load/store-instruction (name kind width)
        `(define-instruction ,name (segment &rest args)
+          (:printer load/store-immediate ((opcode-3 #b010)
+                                          (opcode-b ,(ecase width
+                                                       (:word 0)
+                                                       (:byte 1)))
+                                          (opcode-l ,(ecase kind
+                                                       (:load 1)
+                                                       (:store 0)))))
+          (:printer load/store-register ((opcode-3 #b011)
+                                         (opcode-0 0)
+                                         (opcode-b ,(ecase width
+                                                      (:word 0)
+                                                      (:byte 1)))
+                                         (opcode-l ,(ecase kind
+                                                      (:load 1)
+                                                      (:store 0)))))
           (:emitter
            (with-condition-defaulted (args (condition reg address))
              (aver (or (register-p reg)
