@@ -233,6 +233,12 @@
   (rn :field (byte 4 16) :type 'reg)
   (rd :field (byte 4 12) :type 'reg)
   (rm :field (byte 4 0) :type 'reg))
+
+(sb!disassem:define-instruction-format
+    (swi 32 :default-printer '(:name cond :tab "#" swi-number))
+  (cond :field (byte 4 28) :type 'condition-code)
+  (opcode-4 :field (byte 4 24))
+  (swi-number :field (byte 24 0)))
 
 ;;;; primitive emitters
 
@@ -636,6 +642,7 @@
   (byte 4 28) (byte 4 24) (byte 24 0))
 
 (define-instruction swi (segment &rest args)
+  (:printer swi ((opcode-4 #b1111)))
   (:emitter
    (with-condition-defaulted (args (condition code))
      (emit-swi-instruction segment
