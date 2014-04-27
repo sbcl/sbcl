@@ -731,24 +731,26 @@
           ((csubtypep tspec (specifier-type 'float))
            `(the ,tval (%single-float x)))
           ((csubtypep tspec (specifier-type 'complex))
-           (let ((part-type (cond ((numeric-type-p tspec)
-                                   (numeric-type-format tspec))
-                                  ((csubtypep tspec (specifier-type '(complex float)))
-                                   'float)
-                                  (t
-                                   t))))
-             `(cond ,@(and (eq part-type t)
-                           `(((typep x 'rational)
-                              x)))
-                    (t
-                     (the ,tval
-                          (cond ((not (typep x 'complex))
-                                 (complex (coerce x ',part-type)))
-                                ((typep x ',tval)
-                                 x)
-                                (t
-                                 (complex (coerce (realpart x) ',part-type)
-                                          (coerce (imagpart x) ',part-type)))))))))
+           (multiple-value-bind (part-type result-type)
+               (cond ((and (numeric-type-p tspec)
+                           (numeric-type-format tspec))) ; specific FLOAT type
+                     ((csubtypep tspec (specifier-type '(complex float)))
+                      ;; unspecific FLOAT type
+                      'float)
+                     ((csubtypep tspec (specifier-type '(complex rational)))
+                      (values 'rational `(or ,tval rational)))
+                     (t
+                      (values t `(or ,tval rational))))
+             (let ((result-type (or result-type tval)))
+               `(cond
+                  ((not (typep x 'complex))
+                   (the ,result-type (complex (coerce x ',part-type))))
+                  ((typep x ',tval)
+                   x)
+                  (t     ; X is COMPLEX, but not of the requested type
+                   (the ,result-type
+                        (complex (coerce (realpart x) ',part-type)
+                                 (coerce (imagpart x) ',part-type))))))))
            ;; Special case STRING and SIMPLE-STRING as they are union types
            ;; in SBCL.
           ((member tval '(string simple-string))

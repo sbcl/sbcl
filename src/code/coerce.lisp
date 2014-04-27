@@ -177,7 +177,7 @@
                      ((csubtypep type (specifier-type '(complex float)))
                       (complex (%single-float (realpart object))
                                (%single-float (imagpart object))))
-                     ((and (typep object 'rational)
+                     ((and (typep object 'rational) ; TODO jmoringe unreachable?
                            (csubtypep type (specifier-type '(complex float))))
                       ;; Perhaps somewhat surprisingly, ANSI specifies
                       ;; that (COERCE FOO 'FLOAT) is a SINGLE-FLOAT,
