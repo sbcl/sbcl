@@ -536,6 +536,11 @@
     (true dx)
     nil))
 
+;;; mapfoo should make the initial cons dx
+
+(defun mapcar-negate (x) (mapcar #'- x))
+(defun mapcan-reverse (x) (mapcan #'reverse x))
+
 ;;; handler-case and handler-bind should use DX internally
 
 (defun dx-handler-bind (x)
@@ -571,6 +576,8 @@
   (assert-no-consing (nested-dx-lists))
   (assert-consing (nested-dx-not-used *a-cons*))
   (assert-no-consing (nested-evil-dx-used *a-cons*))
+  (assert-no-consing (mapcar-negate nil))
+  (assert-no-consing (mapcan-reverse nil))
   (assert-no-consing (multiple-dx-uses)))
 
 (with-test (:name (:no-consing :dx-value-cell))
