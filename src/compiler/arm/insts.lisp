@@ -158,6 +158,17 @@
 
 (sb!disassem:define-arg-type load/store-register
     :printer #'print-load/store-register)
+
+;; We use a prefilter in order to read trap codes in order to avoid
+;; encoding the code within the instruction body (requiring the use of
+;; a different trap instruction and a SIGILL handler) and in order to
+;; avoid attempting to include the code in the decoded instruction
+;; proper (requiring moving to a 40-bit instruction for disassembling
+;; trap codes, and being affected by endianness issues).
+(sb!disassem:define-arg-type debug-trap-code
+    :prefilter (lambda (value dstate)
+                 (declare (ignore value))
+                 (sb!disassem:read-suffix 8 dstate)))
 
 ;;;; disassembler instruction format definitions
 
@@ -239,6 +250,66 @@
   (cond :field (byte 4 28) :type 'condition-code)
   (opcode-4 :field (byte 4 24))
   (swi-number :field (byte 24 0)))
+
+(sb!disassem:define-instruction-format
+    (debug-trap 32 :default-printer '(:name :tab code))
+  (opcode-32 :field (byte 32 0))
+  (code :type 'debug-trap-code :reader debug-trap-code))
+
+;;;; special magic to support decoding internal-error and related traps
+
+;; snarf-error-junk is basically identical on all platforms that
+;; define it (meaning, not Alpha).  Shouldn't it be common somewhere?
+(defun snarf-error-junk (sap offset &optional length-only)
+  (let* ((length (sb!sys:sap-ref-8 sap offset))
+         (vector (make-array length :element-type '(unsigned-byte 8))))
+    (declare (type sb!sys:system-area-pointer sap)
+             (type (unsigned-byte 8) length)
+             (type (simple-array (unsigned-byte 8) (*)) vector))
+    (cond (length-only
+           (values 0 (1+ length) nil nil))
+          (t
+           (sb!kernel:copy-ub8-from-system-area sap (1+ offset)
+                                                vector 0 length)
+           (collect ((sc-offsets)
+                     (lengths))
+             (lengths 1)                ; the length byte
+             (let* ((index 0)
+                    (error-number (sb!c:read-var-integer vector index)))
+               (lengths index)
+               (loop
+                 (when (>= index length)
+                   (return))
+                 (let ((old-index index))
+                   (sc-offsets (sb!c:read-var-integer vector index))
+                   (lengths (- index old-index))))
+               (values error-number
+                       (1+ length)
+                       (sc-offsets)
+                       (lengths))))))))
+
+(defun debug-trap-control (chunk inst stream dstate)
+  (declare (ignore inst))
+  (flet ((nt (x) (if stream (sb!disassem:note x dstate))))
+    (case (debug-trap-code chunk dstate)
+      (#.halt-trap
+       (nt "Halt trap"))
+      (#.pending-interrupt-trap
+       (nt "Pending interrupt trap"))
+      (#.error-trap
+       (nt "Error trap")
+       (sb!disassem:handle-break-args #'snarf-error-junk stream dstate))
+      (#.cerror-trap
+       (nt "Cerror trap")
+       (sb!disassem:handle-break-args #'snarf-error-junk stream dstate))
+      (#.breakpoint-trap
+       (nt "Breakpoint trap"))
+      (#.fun-end-breakpoint-trap
+       (nt "Function end breakpoint trap"))
+      (#.single-step-around-trap
+       (nt "Single step around trap"))
+      (#.single-step-before-trap
+       (nt "Single step before trap")))))
 
 ;;;; primitive emitters
 
@@ -663,6 +734,8 @@
 ;;; officially undefined instruction as a single-instruction SIGTRAP
 ;;; generation instruction, or breakpoint.
 (define-instruction debug-trap (segment)
+  (:printer debug-trap ((opcode-32 #xe7f001f0))
+            :default :control #'debug-trap-control)
   (:emitter
    (emit-word segment #xe7f001f0)))
 
