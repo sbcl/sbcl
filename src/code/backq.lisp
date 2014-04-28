@@ -278,6 +278,11 @@
     (assert (equalp (cons 'foo (unquote '*print-case* 4))
                     (!a-random-comma-object-do-not-use)))))
 
+;; If this function causes compilation failure,
+;; the transform for MAPCAR is broken. Otherwise it isn't.
+(defun !a-random-mapcar-do-not-use (x)
+  (mapcar #'cdr x))
+
 #+sb-xc-host (!backq-cold-init nil)
 
 ;;; The pretty-printer needs to know about our special tokens

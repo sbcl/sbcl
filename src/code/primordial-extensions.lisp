@@ -111,16 +111,6 @@
                      ,label-2
                      (unless ,(first endlist) (go ,label-1))
                      (return-from ,block (progn ,@(rest endlist))))))))))
-
-;;; This is like DO, except it has no implicit NIL block. Each VAR is
-;;; initialized in parallel to the value of the specified INIT form.
-;;; On subsequent iterations, the VARS are assigned the value of the
-;;; STEP form (if any) in parallel. The TEST is evaluated before each
-;;; evaluation of the body FORMS. When the TEST is true, the
-;;; EXIT-FORMS are evaluated as a PROGN, with the result being the
-;;; value of the DO.
-(defmacro do-anonymous (varlist endlist &rest body)
-  (frob-do-body varlist endlist body 'let 'psetq 'do-anonymous (gensym)))
 
 ;;;; GENSYM tricks
 
@@ -213,6 +203,9 @@
 ;;; it to cause the system to go totally insane afterwards, but it's a
 ;;; fairly easy mistake to make, so let's try to recover gracefully
 ;;; instead.)
+;;; This function is called while compiling this file because DO-ANONYMOUS
+;;; is a delayed-def!macro, the constructor for which calls SANE-PACKAGE.
+(eval-when (:load-toplevel :execute #+sb-xc-host :compile-toplevel)
 (defun sane-package ()
   (let ((maybe-package *package*))
     (cond ((and (packagep maybe-package)
@@ -240,7 +233,7 @@
                                             (if (packagep maybe-package)
                                                 "deleted package"
                                                 (type-of maybe-package))
-                                            '*package* really-package)))))))
+                                            '*package* really-package))))))))
 
 ;;; Access *DEFAULT-PATHNAME-DEFAULTS*, issuing a warning if its value
 ;;; is silly. (Unlike the vaguely-analogous SANE-PACKAGE, we don't
@@ -375,3 +368,7 @@
     (error 'unsupported-operator
      :format-control ,control
      :format-arguments (if ,controlp ',arguments (list ',name)))))
+
+;;; This is like DO, except it has no implicit NIL block.
+(def!macro do-anonymous (varlist endlist &rest body)
+  (frob-do-body varlist endlist body 'let 'psetq 'do-anonymous (gensym)))

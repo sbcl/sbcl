@@ -47,7 +47,10 @@
                    (declare (truly-dynamic-extent ,map-result))
                    (do-anonymous ((,temp ,map-result) . ,(do-clauses))
                      (,endtest (truly-the list (cdr ,map-result)))
-                     (rplacd ,temp (setq ,temp (list ,call)))))))
+                     ;; Accumulate using %RPLACD. RPLACD becomes (SETF CDR)
+                     ;; which becomes %RPLACD but relies on "defsetfs".
+                     ;; This is for effect, not value, so makes no difference.
+                     (%rplacd ,temp (setq ,temp (list ,call)))))))
              ((nil)
               `(let ((,n-first ,(first arglists)))
                  (do-anonymous ,(do-clauses)
