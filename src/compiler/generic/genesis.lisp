@@ -2245,12 +2245,16 @@ core and return a descriptor to it."
                 (fop-keyword-small-symbol-save)
   (push-fop-table (cold-load-symbol (clone-arg) *keyword-package*)))
 
+(defvar *uninterned-symbol-table* (make-hash-table :test #'equal))
 (clone-cold-fop (fop-uninterned-symbol-save)
                 (fop-uninterned-small-symbol-save)
   (let* ((size (clone-arg))
          (name (make-string size)))
     (read-string-as-bytes *fasl-input-stream* name)
-    (let ((symbol-des (allocate-symbol name)))
+    (let ((symbol-des (gethash name *uninterned-symbol-table*)))
+      (unless symbol-des
+        (setf symbol-des (allocate-symbol name)
+              (gethash name *uninterned-symbol-table*) symbol-des))
       (push-fop-table symbol-des))))
 
 ;;;; cold fops for loading packages

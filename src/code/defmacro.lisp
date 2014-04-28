@@ -31,7 +31,8 @@
     (when (special-operator-p name)
       (error "The special operator ~S can't be redefined as a macro."
              name))
-    (with-unique-names (whole environment)
+    (let ((whole (make-symbol ".WHOLE."))
+          (environment (make-symbol ".ENVIRONMENT.")))
       (multiple-value-bind (new-body local-decs doc)
           (parse-defmacro lambda-list whole body name 'defmacro
                           :environment environment)
