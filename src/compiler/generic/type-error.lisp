@@ -1,4 +1,4 @@
-;;;; generic array operations
+;;;; generic error-call operations
 
 ;;;; This software is part of the SBCL system. See the README file for
 ;;;; more information.
@@ -94,6 +94,20 @@
                 #!-(or alpha hppa mips) 'nil-array-accessed-error
                 #!+(or alpha hppa mips) nil-array-accessed-error
                 object)))
+
+;; The only way to define this VOP on Alpha/HPPA/MIPS would be with
+;; a big CASE statement since the ERRCODE is not eval'ed by ERROR-CALL.
+#!-(or alpha hppa mips)
+(define-vop (type-check-error/c)
+  (:policy :fast-safe)
+  (:translate sb!c::%type-check-error/c)
+  (:args (object :scs (any-reg descriptor-reg)))
+  (:arg-types * (:constant symbol))
+  (:info errcode)
+  (:vop-var vop)
+  (:save-p :compute-only)
+  (:generator 900
+    (error-call vop errcode object)))
 
 ;;; FIXME: There is probably plenty of other array stuff that looks
 ;;; the same or similar enough to be genericized.  Do so, and move it

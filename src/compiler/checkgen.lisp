@@ -420,6 +420,26 @@
     (cond ((not dest) nil)
           (t t))))
 
+;; Type specifiers handled by the general-purpose MAKE-TYPE-CHECK-FORM are often
+;; trivial enough to have an internal error number assigned to them that can be
+;; used in lieu of OBJECT-NOT-TYPE-ERROR. On x86-64 this saves 16 bytes: 1 word
+;; for the symbol in the function's constant area, a MOV instruction to load it,
+;; and an sc-offset in the error trap.
+(defconstant-eqx +primitive-type-check-err-consts+
+  ;; This is a read-time constant because I don't want cold-init to
+  ;; try to re-create it.
+  #!-(or alpha hppa mips)
+  '#.(mapcar (lambda (x)
+               (cons x (intern (format nil "OBJECT-NOT-~A-ERROR" x)
+                               'sb!kernel)))
+             '(list cons
+               number real ratio bignum integer fixnum
+               array vector simple-vector string))
+  ;; But on the backends which don't eval the argument to the ERROR-CALL macro,
+  ;; there's no good way to to express the %TYPE-CHECK-ERROR/C vop.
+  #!+(or alpha hppa mips) NIL
+  #'equal)
+
 ;;; Return a lambda form that we can convert to do a hairy type check
 ;;; of the specified TYPES. TYPES is a list of the format returned by
 ;;; LVAR-CHECK-TYPES in the :HAIRY case.
@@ -436,11 +456,15 @@
                    (let* ((spec
                            (let ((*unparse-fun-type-simplify* t))
                              (type-specifier (second type))))
-                          (test (if (first type) `(not ,spec) spec)))
+                          (test (if (first type) `(not ,spec) spec))
+                          (specifier (type-specifier (third type)))
+                          (interr-symbol
+                           (cdr (assoc specifier
+                                       +primitive-type-check-err-consts+))))
                      `(unless (typep ,temp ',test)
-                        (%type-check-error
-                         ,temp
-                         ',(type-specifier (third type))))))
+                        ,(if interr-symbol
+                             `(%type-check-error/c ,temp ',interr-symbol)
+                             `(%type-check-error ,temp ',specifier)))))
                  temps
                  types)
        (values ,@temps))))

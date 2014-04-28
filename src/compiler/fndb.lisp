@@ -1531,6 +1531,7 @@
 (defknown %nip-values (t t &rest t) (values))
 (defknown %allocate-closures (t) *)
 (defknown %type-check-error (t t) nil)
+(defknown %type-check-error/c (t t) nil)
 
 ;; FIXME: This function does not return, but due to the implementation
 ;; of FILTER-LVAR we cannot write it here.
