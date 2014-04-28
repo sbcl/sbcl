@@ -110,6 +110,8 @@
 (!define-type-vops fdefn-p nil nil nil
   (fdefn-widetag))
 
+(!define-type-vops closurep nil nil nil (closure-header-widetag))
+
 (!define-type-vops funcallable-instance-p nil nil nil
   (funcallable-instance-header-widetag))
 

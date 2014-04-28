@@ -164,9 +164,8 @@
 
 ;;;; CLOSURE type and accessors
 
-(declaim (inline closurep))
 (defun closurep (object)
-  (= sb!vm:closure-header-widetag (widetag-of object)))
+  (closurep object))
 
 (deftype closure ()
   '(satisfies closurep))
