@@ -1,7 +1,9 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 changes relative to sbcl-1.1.18:
-  * bug fix: remove references to asdf-install from the manual.  (lp#1207544;
+  * bug fix: remove references to asdf-install from the manual.  (lp#1207544,
     thanks to Thomas Hlavaty)
+  * bug fix: handle --without-xxx options to make.sh more carefully.
+    (lp#1246665, thanks to Richard M Kreuter)
 
 changes in sbcl-1.1.18 relative to sbcl-1.1.17:
   * optimization: COERCE is now more effecient for more cases when the type is

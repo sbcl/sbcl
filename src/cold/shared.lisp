@@ -112,8 +112,10 @@
 ;;; readmacros instead of the ordinary #+ and #- readmacros.
 (setf *shebang-features*
       (let* ((default-features
-               (append (read-from-file "base-target-features.lisp-expr")
-                       (eval (read-from-file "local-target-features.lisp-expr"))))
+               (funcall (compile
+                         nil
+                         (read-from-file "local-target-features.lisp-expr"))
+                        (read-from-file "base-target-features.lisp-expr")))
              (customizer-file-name "customize-target-features.lisp")
              (customizer (if (probe-file customizer-file-name)
                              (compile nil

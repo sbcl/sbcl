@@ -404,7 +404,7 @@ echo //initializing $ltf
 echo ';;;; This is a machine-generated file.' > $ltf
 echo ';;;; Please do not edit it by hand.' >> $ltf
 echo ';;;; See make-config.sh.' >> $ltf
-echo "((lambda (features) (set-difference features (list$WITHOUT_FEATURES)))" >> $ltf
+echo "(lambda (features) (union (set-difference features (list$WITHOUT_FEATURES))" >> $ltf
 printf " (union (list$WITH_FEATURES) (list " >> $ltf
 
 printf ":%s" "$sbcl_arch" >> $ltf
@@ -677,7 +677,7 @@ export sbcl_os sbcl_arch
 sh tools-for-build/grovel-features.sh >> $ltf
 
 echo //finishing $ltf
-echo ')))' >> $ltf
+echo '))))' >> $ltf
 
 # FIXME: The version system should probably be redone along these lines:
 #
