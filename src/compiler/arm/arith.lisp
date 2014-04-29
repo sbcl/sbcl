@@ -158,6 +158,33 @@
 (define-binop logior 2 orr)
 (define-binop logxor 2 eor)
 
+;;; Multiplication
+
+(define-vop (fast-*/fixnum=>fixnum fast-fixnum-binop)
+  (:translate *)
+  (:generator 2
+    (inst mov r (asr x n-fixnum-tag-bits))
+    (inst mul r r y)))
+
+(define-vop (fast-*-c/fixnum=>fixnum fast-fixnum-binop-c)
+  (:args (x :scs (any-reg) :to :result))
+  (:results (r :scs (any-reg) :from :eval))
+  (:translate *)
+  (:generator 1
+    (load-immediate-word r y)
+    (inst mul r r x)))
+
+(define-vop (fast-*/signed=>signed fast-signed-binop)
+  (:translate *)
+  (:generator 3
+    (inst mul r x y)))
+
+(define-vop (fast-*/unsigned=>unsigned fast-unsigned-binop)
+  (:translate *)
+  (:generator 3
+    (inst mul r x y)))
+
+;;; 
 (define-vop (fast-lognor/fixnum=>fixnum fast-fixnum-binop)
   (:translate lognor)
   (:args (x :target r :scs (any-reg))
@@ -359,7 +386,7 @@
                     (:translate ,mfun-name))))))))
   (define-modular-backend + t)
   (define-modular-backend - t)
-  ;; (define-modular-backend * t)
+  (define-modular-backend *)
   ;; (define-modular-backend logeqv)
   ;; (define-modular-backend lognand)
   ;; (define-modular-backend lognor)
