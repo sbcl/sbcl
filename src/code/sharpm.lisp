@@ -9,7 +9,7 @@
 
 (in-package "SB!IMPL")
 
-(declaim (special *read-suppress* *standard-readtable* *bq-vector-flag*))
+(declaim (special *read-suppress* *bq-vector-flag*))
 
 ;;; FIXME: Is it standard to ignore numeric args instead of raising errors?
 (defun ignore-numarg (sub-char numarg)
@@ -220,6 +220,8 @@
         ((not (<= 2 radix 36))
          (simple-reader-error stream "illegal radix for #R: ~D." radix))
         (t
+         ;; FIXME: (read-from-string "#o#x1f") should not work!
+         ;; The token must be comprised strictly of digits in the radix.
          (let ((res (let ((*read-base* radix))
                       (read stream t nil t))))
            (unless (typep res 'rational)

@@ -22,7 +22,7 @@
   "The absolute pathname of the running SBCL runtime.")
 
 ;;; something not EQ to anything we might legitimately READ
-(defparameter *eof-object* (make-symbol "EOF-OBJECT"))
+(defglobal *eof-object* (make-symbol "EOF-OBJECT"))
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (defconstant max-hash sb!xc:most-positive-fixnum))

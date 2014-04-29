@@ -105,6 +105,8 @@ variable: an unreadable object representing the error is printed instead.")
 "
   `(%with-standard-io-syntax (lambda () ,@body)))
 
+;; duplicate defglobal because this file is compiled before "reader"
+(defglobal *standard-readtable* nil)
 (defun %with-standard-io-syntax (function)
   (declare (type function function))
   (let ((*package* (find-package "COMMON-LISP-USER"))

@@ -1,5 +1,7 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 changes relative to sbcl-1.1.18:
+  * bug fix: SET-[DISPATCH-]MACRO-CHARACTER should coerce a symbolic
+    function-designator to a function only as needed. (lp#1012335)
   * bug fix: remove references to asdf-install from the manual.  (lp#1207544,
     thanks to Thomas Hlavaty)
   * bug fix: handle --without-xxx options to make.sh more carefully.

@@ -53,6 +53,7 @@
       (error "Unknown box reader syntax"))
     (make-instance 'box :value (first objects))))
 (set-macro-character #\[ 'read-box)
+(assert (eq (get-macro-character #\[) 'read-box)) ; not #'READ-BOX
 (set-syntax-from-char #\] #\))
 (multiple-value-bind (res pos)
     (read-from-string "#1=[#1#]")
@@ -131,7 +132,7 @@
               (handler-case
                   (with-input-from-string (s "42")
                     (read s t nil t))
-                (reader-error (e)
+                (reader-error ()
                   :error)))))
 
 (with-test (:name :standard-readtable-modified)
@@ -141,6 +142,7 @@
                      (handler-case
                          (progn ,form t)
                        (sb-int:standard-readtable-modified-error (e)
+                         (declare (ignorable e))
                          ,@(when op
                             `((assert
                                (equal ,op (sb-kernel::standard-readtable-modified-operation e)))))
@@ -165,10 +167,42 @@
     (assert (equal "NO-SUCH-PKG" (test "no-such-pkg::foo")))
     (assert (eq (find-package :cl) (test "cl:no-such-sym")))))
 
+;; lp# 1012335 - also tested by 'READ-BOX above
+(handler-bind ((condition #'continue))
+    (defun nil (stream char) (declare (ignore stream char)) 'foo!))
+(with-test (:name :set-macro-char-lazy-coerce-to-fun)
+  (set-macro-character #\$ #'nil) ; #'NIL is a function
+  (assert (eq (read-from-string "$") 'foo!))
+  (set-macro-character #\$ nil) ; 'NIL never designates a function
+  (assert (eq (read-from-string "$") '$))
+
+  (make-dispatch-macro-character #\$)
+  (assert (set-dispatch-macro-character #\$ #\( 'read-metavar))
+  (assert (eq (get-dispatch-macro-character #\$ #\() 'read-metavar))
+  (assert (eq (handler-case (read-from-string "$(x)")
+                (undefined-function (c)
+                  (if (eq (cell-error-name c) 'read-metavar) :win)))
+              :win))
+  (defun read-metavar (stream subchar arg)
+    (declare (ignore subchar arg))
+    (list :metavar (read stream t nil t)))
+  (assert (equal (read-from-string "$(x)") '(:metavar x)))
+
+  ;; Do not accept extended-function-designators.
+  ;; (circumlocute to prevent a compile-time error)
+  (let ((designator (eval ''(setf no-no-no))))
+    (assert (eq (handler-case (set-macro-character #\$ designator)
+                  (type-error () :ok))
+                :ok))
+    (assert (eq (handler-case
+                    (set-dispatch-macro-character #\# #\$ designator)
+                  (type-error () :ok))
+                :ok))))
+
 ;;; THIS SHOULD BE LAST as it frobs the standard readtable
 (with-test (:name :set-macro-character-nil)
   (handler-bind ((sb-int:standard-readtable-modified-error #'continue))
-    (let ((fun (lambda (&rest args) 'ok)))
+    (let ((fun (lambda (&rest args) (declare (ignore args)) 'ok)))
       ;; NIL means the standard readtable.
       (assert (eq t (set-macro-character #\~ fun nil nil)))
       (assert (eq fun (get-macro-character #\~ nil)))

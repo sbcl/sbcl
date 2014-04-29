@@ -17,7 +17,6 @@
 
 (declaim (special *keyword-package* *cl-package*
                   original-lisp-environment
-                  *standard-readtable*
                   sb!pretty::*standard-pprint-dispatch-table*
                   sb!debug:*in-the-debugger*
                   sb!debug:*stack-top-hint*
