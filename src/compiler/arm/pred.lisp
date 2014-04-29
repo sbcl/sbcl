@@ -33,9 +33,16 @@
 
 (define-vop (branch-if)
   (:info dest flags not-p)
-  (:ignore dest flags not-p)
   (:generator 0
-     (error "BRANCH-IF not yet implemented")))
+    (flet ((negate-condition (name)
+             (let ((code (logxor 1 (conditional-opcode name))))
+               (aref *condition-name-vec* code))))
+      (aver (null (rest flags)))
+      (inst b
+            (if not-p
+                (negate-condition (first flags))
+                (first flags))
+            dest))))
 
 (defun convert-conditional-move-p (node dst-tn x-tn y-tn)
   (declare (ignore node dst-tn x-tn y-tn))

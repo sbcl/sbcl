@@ -91,3 +91,24 @@
   (:result-types character)
   (:generator 1
     (inst mov res (lsr code n-fixnum-tag-bits))))
+
+(define-vop (character-compare)
+  (:args (x :scs (character-reg))
+         (y :scs (character-reg)))
+  (:arg-types character character)
+  (:policy :fast-safe)
+  (:note "inline comparison")
+  (:generator 3
+    (inst cmp x y)))
+
+(define-vop (fast-char=/character character-compare)
+  (:translate char=)
+  (:conditional :eq))
+
+(define-vop (fast-char>/character character-compare)
+  (:translate char>)
+  (:conditional :gt))
+
+(define-vop (fast-char</character character-compare)
+  (:translate char<)
+  (:conditional :lt))
