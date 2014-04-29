@@ -132,6 +132,19 @@
       (print-immediate-shift offset stream dstate)
       (unless (zerop p)
         (princ (if (zerop w) "]" "]!") stream))))
+
+  (defun print-msr-field-mask (value stream dstate)
+    (declare (type stream stream)
+             (type (cons bit (cons (unsigned-byte 4) null)) value)
+             (ignore dstate))
+    (destructuring-bind (spsr-p field-mask) value
+      (if (zerop spsr-p)
+          (princ "CPSR_" stream)
+          (princ "SPSR_" stream))
+      (when (logbitp 0 field-mask) (princ "c" stream))
+      (when (logbitp 1 field-mask) (princ "x" stream))
+      (when (logbitp 2 field-mask) (princ "s" stream))
+      (when (logbitp 3 field-mask) (princ "f" stream))))
 ) ; EVAL-WHEN
 
 (sb!disassem:define-arg-type condition-code
@@ -169,6 +182,9 @@
     :prefilter (lambda (value dstate)
                  (declare (ignore value))
                  (sb!disassem:read-suffix 8 dstate)))
+
+(sb!disassem:define-arg-type msr-field-mask
+    :printer #'print-msr-field-mask)
 
 ;;;; disassembler instruction format definitions
 
@@ -255,6 +271,27 @@
     (debug-trap 32 :default-printer '(:name :tab code))
   (opcode-32 :field (byte 32 0))
   (code :type 'debug-trap-code :reader debug-trap-code))
+
+(sb!disassem:define-instruction-format
+    (msr-immediate 32
+     :default-printer '(:name cond :tab field-mask ", #" immediate))
+  (cond :field (byte 4 28) :type 'condition-code)
+  (opcode-5 :field (byte 5 23) :value #b00110)
+  (field-mask :fields (list (byte 1 22) (byte 4 16)) :type 'msr-field-mask)
+  (opcode-2 :field (byte 2 20) :value #b10)
+  (sbo :field (byte 4 12) :value #b1111)
+  (immediate :field (byte 12 0) :type 'shifter-immediate))
+
+(sb!disassem:define-instruction-format
+    (msr-register 32
+     :default-printer '(:name cond :tab field-mask ", " rm))
+  (cond :field (byte 4 28) :type 'condition-code)
+  (opcode-5 :field (byte 5 23) :value #b00010)
+  (field-mask :fields (list (byte 1 22) (byte 4 16)) :type 'msr-field-mask)
+  (opcode-2 :field (byte 2 20) :value #b10)
+  (sbo :field (byte 4 12) :value #b1111)
+  (sbz :field (byte 8 4) :value #b00000000)
+  (rm :field (byte 4 0) :type 'reg))
 
 ;;;; special magic to support decoding internal-error and related traps
 
@@ -834,6 +871,16 @@
 ;;;; Status-register instructions
 
 (define-instruction mrs (segment &rest args)
+  (:printer dp-shift-immediate ((opcode-8 #b0010000)
+                                (rn #b1111)
+                                (shift '(0 0))
+                                (rm 0))
+            '(:name cond :tab rd ", CPSR"))
+  (:printer dp-shift-immediate ((opcode-8 #b0010100)
+                                (rn #b1111)
+                                (shift '(0 0))
+                                (rm 0))
+            '(:name cond :tab rd ", SPSR"))
   (:emitter
    (with-condition-defaulted (args (condition dest reg))
      (aver (register-p dest))
@@ -864,6 +911,8 @@
   (logior #b10000 (encode-status-register-fields fields)))
 
 (define-instruction msr (segment &rest args)
+  (:printer msr-immediate ())
+  (:printer msr-register ())
   (:emitter
    (with-condition-defaulted (args (condition field-mask src))
      (aver (or (register-p src)
