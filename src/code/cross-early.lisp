@@ -12,3 +12,11 @@
 (in-package "SB!IMPL")
 
 (declaim (declaration truly-dynamic-extent))
+
+;;; MAYBE-INLINE and FREEZE-TYPE declarations can be safely ignored
+;;; (possibly at some cost in efficiency).
+(declaim (declaration freeze-type maybe-inline))
+
+;;; INHIBIT-WARNINGS declarations can be safely ignored (although we
+;;; may then have to wade through some irrelevant warnings).
+(declaim (declaration inhibit-warnings))

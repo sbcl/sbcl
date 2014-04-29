@@ -17,15 +17,6 @@
 (defmacro truly-the (type expr)
   `(the ,type ,expr))
 
-;;; MAYBE-INLINE and FREEZE-TYPE declarations can be safely ignored
-;;; (possibly at some cost in efficiency).
-;;; Shouldn't these be placed near TRULY-DYNAMIC-EXTENT (in 'cross-early')?
-(declaim (declaration freeze-type maybe-inline))
-
-;;; INHIBIT-WARNINGS declarations can be safely ignored (although we
-;;; may then have to wade through some irrelevant warnings).
-(declaim (declaration inhibit-warnings))
-
 ;;; Interrupt control isn't an issue in the cross-compiler: we don't
 ;;; use address-dependent (and thus GC-dependent) hashes, and we only
 ;;; have a single thread of control.
