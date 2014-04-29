@@ -734,8 +734,7 @@
                (arg (pop args))
                (sc (tn-sc first-tn))
                (scn (sc-number sc))
-               #!-(or x86 x86-64) (temp-tn (make-representation-tn
-                                            (tn-primitive-type first-tn) scn))
+               #!-(or x86 x86-64)
                (move-arg-vops (svref (sc-move-arg-vops sc) scn)))
           (aver arg)
           (unless (= (length move-arg-vops) 1)
@@ -746,17 +745,25 @@
                                                      (lvar-tn call block arg)
                                                      nsp
                                                      first-tn)
-          #!-(or x86 x86-64) (progn
-                               (emit-move call
-                                          block
-                                          (lvar-tn call block arg)
-                                          temp-tn)
-                               (emit-move-arg-template call
-                                                       block
-                                                       (first move-arg-vops)
-                                                       temp-tn
-                                                       nsp
-                                                       first-tn))
+          #!-(or x86 x86-64)
+          (cond
+            #!+arm-softfp
+            ((consp tn)
+             (vop sb!vm::move-double-to-int-arg call block
+                  (lvar-tn call block arg) (first tn) (second tn)))
+            (t
+             (let ((temp-tn (make-representation-tn
+                             (tn-primitive-type first-tn) scn)))
+               (emit-move call
+                          block
+                          (lvar-tn call block arg)
+                          temp-tn)
+               (emit-move-arg-template call
+                                       block
+                                       (first move-arg-vops)
+                                       temp-tn
+                                       nsp
+                                       first-tn))))
           #!+(and ppc darwin)
           (when (listp tn)
             ;; This means that we have a float arg that we need to
@@ -784,4 +791,12 @@
       (progn
         (vop reset-stack-pointer call block stack-pointer)
         (vop set-fpu-word-for-lisp call block))
-      (move-lvar-result call block result-tns lvar))))
+      (cond
+        #!+arm-softfp
+        ((and lvar
+              (proper-list-of-length-p result-tns 2))
+         (vop sb!vm::move-int-args-to-double call block
+              (first result-tns) (second result-tns)
+              (car (ir2-lvar-locs (lvar-info lvar)))))
+        (t
+         (move-lvar-result call block result-tns lvar))))))

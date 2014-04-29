@@ -237,7 +237,9 @@ call_into_c:
 
         @@ Stash the return value into NARGS for Lisp.
         mov     reg_NARGS, r0
-
+#ifdef LISP_FEATURE_ARM_SOFTFP
+        mov     reg_NL3, r1
+#endif
         @@ Re-establish NIL.
         ldr     reg_NULL, .known_nil
 

@@ -49,6 +49,12 @@
   (declare (ignore type))
   (int-arg state 'system-area-pointer 'sap-reg 'sap-stack))
 
+#!+arm-softfp
+(define-alien-type-method (single-float :arg-tn) (type state)
+  (declare (ignore type))
+  (int-arg state 'single-float 'unsigned-reg 'single-stack))
+
+#!-arm-softfp
 (define-alien-type-method (single-float :arg-tn) (type state)
   (declare (ignore type))
   (let ((register (arg-state-next-single-register state)))
@@ -63,6 +69,27 @@
             (+ (/ (arg-state-next-single-register state) 2)
                (if (evenp (arg-state-next-single-register state)) 0 1))))))
 
+#!+arm-softfp
+(define-alien-type-method (double-float :arg-tn) (type state)
+  (declare (ignore type))
+  (let* ((register (arg-state-num-register-args state))
+         ;; The registers used are aligned, only r0-r1 and r2-r3 pairs
+         ;; can be used.
+         (register (+ register (logand register 1))))
+    (cond ((> (+ register 2) +max-register-args+)
+           (setf (arg-state-num-register-args state) +max-register-args+)
+           (let ((frame-size (arg-state-stack-frame-size state)))
+             (setf (arg-state-stack-frame-size state) (+ frame-size 2))
+             (my-make-wired-tn 'double-float 'double-stack frame-size)))
+          (t
+           (setf (arg-state-num-register-args state) (+ register 2))
+           (list
+            (my-make-wired-tn 'unsigned-byte-32 'unsigned-reg
+                              (register-args-offset register))
+            (my-make-wired-tn 'unsigned-byte-32 'unsigned-reg
+                              (register-args-offset (1+ register))))))))
+
+#!-arm-softfp
 (define-alien-type-method (double-float :arg-tn) (type state)
   (declare (ignore type))
   (let ((register (arg-state-next-double-register state)))
@@ -87,10 +114,23 @@
   (declare (ignore type state))
   (my-make-wired-tn 'system-area-pointer 'sap-reg nargs-offset))
 
+#!+arm-softfp
+(define-alien-type-method (single-float :result-tn) (type state)
+  (declare (ignore type state))
+  (my-make-wired-tn 'single-float 'unsigned-reg nargs-offset))
+
+#!-arm-softfp
 (define-alien-type-method (single-float :result-tn) (type state)
   (declare (ignore type state))
   (my-make-wired-tn 'single-float 'single-reg 0))
 
+#!+arm-softfp
+(define-alien-type-method (double-float :result-tn) (type state)
+  (declare (ignore type state))
+  (list (my-make-wired-tn 'unsigned-byte-32 'unsigned-reg nargs-offset)
+            (my-make-wired-tn 'unsigned-byte-32 'unsigned-reg nl3-offset)))
+
+#!-arm-softfp
 (define-alien-type-method (double-float :result-tn) (type state)
   (declare (ignore type state))
   (my-make-wired-tn 'double-float 'double-reg 0))
@@ -177,3 +217,28 @@
       (let ((delta (logandc2 (+ amount (1- +number-stack-allocation-granularity+))
                              (1- +number-stack-allocation-granularity+))))
         (composite-immediate-instruction add nsp-tn nsp-tn delta)))))
+;;;
+
+#!+arm-softfp
+(define-vop (move-double-to-int-arg)
+  (:args (double :scs (double-reg)))
+  (:results (lo-bits :scs (unsigned-reg))
+            (hi-bits :scs (unsigned-reg)))
+  (:arg-types double-float)
+  (:result-types unsigned-num unsigned-num)
+  (:policy :fast-safe)
+  (:generator 2
+    (inst fmrdl lo-bits double)
+    (inst fmrdh hi-bits double)))
+
+#!+arm-softfp
+(define-vop (move-int-args-to-double)
+  (:args (lo-bits :scs (unsigned-reg))
+         (hi-bits :scs (unsigned-reg)))
+  (:results (double :scs (double-reg)))
+  (:arg-types unsigned-num unsigned-num)
+  (:result-types double-float)
+  (:policy :fast-safe)
+  (:generator 2
+    (inst fmdlr double lo-bits)
+    (inst fmdhr double hi-bits)))

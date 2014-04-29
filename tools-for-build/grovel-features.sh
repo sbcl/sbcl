@@ -32,3 +32,5 @@ featurep os-provides-suseconds-t
 featurep os-provides-getprotoby-r
 
 featurep os-provides-poll
+
+featurep arm-softfp
