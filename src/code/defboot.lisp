@@ -765,6 +765,5 @@ specification."
                         ;; miscellaneous functions commonly appearing
                         ;; as a result of macro expansions or compiler
                         ;; transformations:
-                        sb!int:find-undeleted-package-or-lose ; IN-PACKAGE
                         sb!kernel::arg-count-error ; PARSE-DEFMACRO
                         ))

@@ -188,6 +188,8 @@
   sb!xc:package)
 (defknown find-package (package-designator) (or sb!xc:package null)
   (flushable))
+(defknown find-undeleted-package-or-lose (package-designator)
+  sb!xc:package) ; not flushable
 (defknown package-name (package-designator) (or simple-string null)
   (unsafely-flushable))
 (defknown package-nicknames (package-designator) list (unsafely-flushable))
