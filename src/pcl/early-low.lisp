@@ -96,6 +96,7 @@
                   *the-class-funcallable-standard-object*
                   *the-class-class*
                   *the-class-generic-function*
+                  *the-class-system-class*
                   *the-class-built-in-class*
                   *the-class-slot-class*
                   *the-class-condition-class*

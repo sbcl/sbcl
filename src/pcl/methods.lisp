@@ -691,7 +691,7 @@
 (mapc
  #'proclaim-incompatible-superclasses
  '(;; superclass class
-   (built-in-class std-class structure-class) ; direct subclasses of pcl-class
+   (system-class std-class structure-class) ; direct subclasses of pcl-class
    (standard-class funcallable-standard-class)
    ;; superclass metaobject
    (class eql-specializer class-eq-specializer method method-combination
@@ -1085,7 +1085,7 @@
   (cond
     ((eq class *the-class-t*) t)
     ((eq class *the-class-slot-object*)
-     `(not (typep (classoid-of ,arg) 'built-in-classoid)))
+     `(not (typep (classoid-of ,arg) 'system-classoid)))
     ((eq class *the-class-standard-object*)
      `(or (std-instance-p ,arg) (fsc-instance-p ,arg)))
     ((eq class *the-class-funcallable-standard-object*)

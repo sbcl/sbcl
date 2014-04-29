@@ -614,9 +614,9 @@ Except see also BREAK-VICIOUS-METACIRCLE.  -- CSR, 2003-05-28
       (let ((cdc  (caching-dfun-cost gf))) ; fast
         (> cdc (dispatch-dfun-cost gf cdc))))))
 
-(defparameter *non-built-in-typep-cost* 100)
+(defparameter *non-system-typep-cost* 100)
 (defparameter *structure-typep-cost*  15)
-(defparameter *built-in-typep-cost* 5)
+(defparameter *system-typep-cost* 5)
 
 ;;; According to comments in the original CMU CL version of PCL,
 ;;; the cost LIMIT is important to cut off exponential growth for
@@ -633,12 +633,11 @@ Except see also BREAK-VICIOUS-METACIRCLE.  -- CSR, 2003-05-28
              (if (eq 'class (car type))
                  (let* ((metaclass (class-of (cadr type)))
                         (mcpl (class-precedence-list metaclass)))
-                   (cond ((memq *the-class-built-in-class* mcpl)
-                          *built-in-typep-cost*)
+                   (cond ((memq *the-class-system-class* mcpl)
+                          *system-typep-cost*)
                          ((memq *the-class-structure-class* mcpl)
                           *structure-typep-cost*)
-                         (t
-                          *non-built-in-typep-cost*)))
+                         (t *non-system-typep-cost*)))
                  0))
             (max-cost-so-far
              (+ (max true-value false-value) type-test-cost)))

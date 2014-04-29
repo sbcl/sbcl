@@ -257,10 +257,10 @@
                        42))))
             (remove-if (lambda (kernel-bic-entry)
                          (member (first kernel-bic-entry)
-                                 ;; I'm not sure why these are removed from
-                                 ;; the list, but that's what the original
-                                 ;; CMU CL code did. -- WHN 20000715
-                                 '(t function stream
+                                 ;; remove special classes (T and our
+                                 ;; SYSTEM-CLASSes) from the
+                                 ;; BUILT-IN-CLASS list
+                                 '(t function stream sequence
                                      file-stream string-stream)))
                        sb-kernel::*built-in-classes*))))
 (/noshow "done setting up SB-PCL::*BUILT-IN-CLASSES*")
@@ -271,16 +271,19 @@
   (:metaclass built-in-class))
 
 (defclass function (t) ()
-  (:metaclass built-in-class))
+  (:metaclass system-class))
 
 (defclass stream (t) ()
-  (:metaclass built-in-class))
+  (:metaclass system-class))
 
 (defclass file-stream (stream) ()
-  (:metaclass built-in-class))
+  (:metaclass system-class))
 
 (defclass string-stream (stream) ()
-  (:metaclass built-in-class))
+  (:metaclass system-class))
+
+(defclass sequence (t) ()
+  (:metaclass system-class))
 
 (defclass slot-object (t) ()
   (:metaclass slot-class))
@@ -684,7 +687,9 @@
 
 (defclass forward-referenced-class (pcl-class) ())
 
-(defclass built-in-class (pcl-class) ())
+(defclass system-class (pcl-class) ())
+
+(defclass built-in-class (system-class) ())
 
 (defclass condition-class (slot-class) ())
 

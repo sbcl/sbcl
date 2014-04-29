@@ -506,9 +506,11 @@
   (declare (ignore initargs))
   (allocate-condition (class-name class)))
 
-(defmethod allocate-instance ((class built-in-class) &rest initargs)
-  (declare (ignore initargs))
-  (error "Cannot allocate an instance of ~S." class)) ; So sayeth AMOP
+(macrolet ((def (name class)
+             `(defmethod ,name ((class ,class) &rest initargs)
+                (declare (ignore initargs))
+                (error "Cannot allocate an instance of ~S." class))))
+  (def allocate-instance system-class))
 
 ;;; AMOP says that CLASS-SLOTS signals an error for unfinalized classes.
 (defmethod class-slots :before ((class slot-class))

@@ -387,9 +387,9 @@
     ;; WRAPPER-OF/LAYOUT-OF/BUILT-IN-OR-STRUCTURE-WRAPPER are all
     ;; equivalent and inlined to each other, we can collapse some
     ;; spurious differences.
-    ((class built-in-instance structure-instance condition-instance)
+    ((class system-instance structure-instance condition-instance)
      (when slot
-       (bug "SLOT requested for metatype ~S, but it isnt' going to happen."
+       (bug "SLOT requested for metatype ~S, but it isn't going to happen."
             metatype))
      `(layout-of ,argument))
     ;; a metatype of NIL should never be seen here, as NIL is only in

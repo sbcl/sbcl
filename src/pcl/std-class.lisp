@@ -446,6 +446,7 @@
                              *the-class-standard-object*))))
          (dolist (superclass direct-superclasses)
            (unless (validate-superclass class superclass)
+             (invalid-superclass class superclass)
              (error "~@<The class ~S was specified as a ~
                      super-class of the class ~S, ~
                      but the meta-classes ~S and ~S are incompatible.  ~
@@ -493,6 +494,29 @@
       (update-class class nil))
   (add-slot-accessors class direct-slots definition-source)
   (make-preliminary-layout class))
+
+(define-condition invalid-superclass (reference-condition error)
+  ((class :initarg :class :reader invalid-superclass-class)
+   (superclass :initarg :superclass :reader invalid-superclass-superclass))
+  (:report
+   (lambda (c s)
+     (let ((class (invalid-superclass-class c))
+           (superclass (invalid-superclass-superclass c)))
+       (format s
+               "~@<The class ~S was specified as a superclass of the ~
+                class ~S, but the metaclasses ~S and ~S are ~
+                incompatible.  ~@[Define a method for ~S to avoid this ~
+                error.~]~@:>"
+               superclass class (class-of superclass) (class-of class)
+               (and (typep superclass 'standard-class)
+                    'validate-superclass))))))
+
+(defmethod invalid-superclass ((class class) (superclass class))
+  (error 'invalid-superclass :class class :superclass superclass
+         :references (list* '(:amop :generic-function validate-superclass)
+                            (and (typep superclass 'built-in-class)
+                                 (list '(:ansi-cl :system-class built-in-class)
+                                       '(:ansi-cl :section (4 3 7)))))))
 
 (defmethod shared-initialize :after ((class forward-referenced-class)
                                      slot-names &key &allow-other-keys)
@@ -1333,8 +1357,7 @@
   (eq (class-of class) (class-of proto-new-class)))
 
 (defmethod validate-superclass ((class class) (superclass class))
-  (or (eq superclass *the-class-t*)
-      (eq (class-of class) (class-of superclass))
+  (or (eq (class-of class) (class-of superclass))
       (and (eq (class-of superclass) *the-class-standard-class*)
            (eq (class-of class) *the-class-funcallable-standard-class*))
       (and (eq (class-of superclass) *the-class-funcallable-standard-class*)
@@ -1676,45 +1699,41 @@
 (defmethod change-class ((instance t) (new-class-name symbol) &rest initargs)
   (apply #'change-class instance (find-class new-class-name) initargs))
 
-;;;; The metaclass BUILT-IN-CLASS
+;;;; The metaclasses SYSTEM-CLASS and BUILT-IN-CLASS
 ;;;;
-;;;; This metaclass is something of a weird creature. By this point, all
-;;;; instances of it which will exist have been created, and no instance
-;;;; is ever created by calling MAKE-INSTANCE.
+;;;; These metaclasses are something of a weird creature. By this
+;;;; point, all instances it which will exist have been created, and
+;;;; no instance is ever created by calling MAKE-INSTANCE.  (The
+;;;; distinction between the metaclasses is that we allow subclassing
+;;;; of SYSTEM-CLASS, such as through STREAM and SEQUENCE protocols,
+;;;; but not of BUILT-IN-CLASS.)
 ;;;;
-;;;; But, there are other parts of the protocol we must follow and those
-;;;; definitions appear here.
+;;;; AMOP mandates some behaviour of the implementation with respect
+;;;; to BUILT-IN-CLASSes, and we implement that through methods on
+;;;; SYSTEM-CLASS here.
 
 (macrolet ((def (name args control)
-               `(defmethod ,name ,args
-                 (declare (ignore initargs))
-                 (error 'metaobject-initialization-violation
-                  :format-control ,(format nil "~@<~A~@:>" control)
-                  :format-arguments (list ',name)
-                  :references (list '(:amop :initialization "Class"))))))
-  (def initialize-instance ((class built-in-class) &rest initargs)
-    "Cannot ~S an instance of BUILT-IN-CLASS.")
-  (def reinitialize-instance ((class built-in-class) &rest initargs)
-    "Cannot ~S an instance of BUILT-IN-CLASS."))
+             `(defmethod ,name ,args
+                (declare (ignore initargs))
+                (error 'metaobject-initialization-violation
+                       :format-control ,(format nil "~@<~A~@:>" control)
+                       :format-arguments (list (class-name class))
+                       :references (list '(:amop :initialization "Class"))))))
+  (def initialize-instance ((class system-class) &rest initargs)
+    "Cannot initialize an instance of ~S.")
+  (def reinitialize-instance ((class system-class) &rest initargs)
+    "Cannot reinitialize an instance of ~S."))
 
-(macrolet ((def (name)
-               `(defmethod ,name ((class built-in-class)) nil)))
+(macrolet ((def (name) `(defmethod ,name ((class system-class)) nil)))
   (def class-direct-slots)
   (def class-slots)
   (def class-direct-default-initargs)
   (def class-default-initargs))
 
+(defmethod validate-superclass ((c class) (s system-class))
+  t)
 (defmethod validate-superclass ((c class) (s built-in-class))
-  (or (eq s *the-class-t*) (eq s *the-class-stream*)
-      ;; FIXME: bad things happen if someone tries to mix in both
-      ;; FILE-STREAM and STRING-STREAM (as they have the same
-      ;; layout-depthoid).  Is there any way we can provide a useful
-      ;; error message?  -- CSR, 2005-05-03
-      (eq s *the-class-file-stream*) (eq s *the-class-string-stream*)
-      ;; This probably shouldn't be mixed in with certain other
-      ;; classes, too, but it seems to work both with STANDARD-OBJECT
-      ;; and FUNCALLABLE-STANDARD-OBJECT
-      (eq s *the-class-sequence*)))
+  nil)
 
 ;;; Some necessary methods for FORWARD-REFERENCED-CLASS
 (defmethod class-direct-slots ((class forward-referenced-class)) ())
@@ -1727,8 +1746,7 @@
   (def class-precedence-list)
   (def class-slots))
 
-(defmethod validate-superclass ((c slot-class)
-                                (f forward-referenced-class))
+(defmethod validate-superclass ((c slot-class) (f forward-referenced-class))
   t)
 
 (defmethod add-dependent ((metaobject dependent-update-mixin) dependent)

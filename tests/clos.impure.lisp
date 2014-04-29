@@ -2132,4 +2132,11 @@
 
   (assert (= (x-633911 (make-instance 'a-633911)) 10)))
 
+(with-test (:name (built-in-class :subclass error))
+  (flet ((mapper (c)
+           (when (and (class-name c) (typep c 'built-in-class))
+             (assert (raises-error? (eval `(defclass ,(gensym) (,(class-name c))
+                                             ())))))))
+    (sb-pcl::map-all-classes #'mapper)))
+
 ;;;; success

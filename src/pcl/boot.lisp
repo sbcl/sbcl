@@ -907,33 +907,33 @@ bootstrapping.
                 (let ((class (specializer-nameoid-class)))
                   ;; CLASS can be null here if the user has
                   ;; erroneously tried to use a defined type as a
-                  ;; specializer; it can be a non-BUILT-IN-CLASS if
+                  ;; specializer; it can be a non-SYSTEM-CLASS if
                   ;; the user defines a type and calls (SETF
                   ;; FIND-CLASS) in a consistent way.
-                 (when (and class (typep class 'built-in-class))
-                   `(type ,(class-name class) ,parameter))))
-              ((:instance nil)
-               (let ((class (specializer-nameoid-class)))
-                 (cond
-                   (class
-                    (if (typep class '(or built-in-class structure-class))
-                        `(type ,class ,parameter)
-                        ;; don't declare CLOS classes as parameters;
-                        ;; it's too expensive.
-                        '(ignorable)))
-                   (t
-                    ;; we can get here, and still not have a failure
-                    ;; case, by doing MOP programming like (PROGN
-                    ;; (ENSURE-CLASS 'FOO) (DEFMETHOD BAR ((X FOO))
-                    ;; ...)).  Best to let the user know we haven't
-                    ;; been able to extract enough information:
-                    (style-warn
-                     "~@<can't find type for specializer ~S in ~S.~@:>"
-                     specializer-nameoid
-                     'parameter-specializer-declaration-in-defmethod)
-                    '(ignorable)))))
-              ((:forthcoming-defclass-type)
-               '(ignorable))))))))
+                  (when (and class (typep class 'system-class))
+                    `(type ,(class-name class) ,parameter))))
+               ((:instance nil)
+                (let ((class (specializer-nameoid-class)))
+                  (cond
+                    (class
+                     (if (typep class '(or system-class structure-class))
+                         `(type ,class ,parameter)
+                         ;; don't declare CLOS classes as parameters;
+                         ;; it's too expensive.
+                         '(ignorable)))
+                    (t
+                     ;; we can get here, and still not have a failure
+                     ;; case, by doing MOP programming like (PROGN
+                     ;; (ENSURE-CLASS 'FOO) (DEFMETHOD BAR ((X FOO))
+                     ;; ...)).  Best to let the user know we haven't
+                     ;; been able to extract enough information:
+                     (style-warn
+                      "~@<can't find type for specializer ~S in ~S.~@:>"
+                      specializer-nameoid
+                      'parameter-specializer-declaration-in-defmethod)
+                     '(ignorable)))))
+               ((:forthcoming-defclass-type)
+                '(ignorable))))))))
 
 ;;; For passing a list (groveled by the walker) of the required
 ;;; parameters whose bindings are modified in the method body to the

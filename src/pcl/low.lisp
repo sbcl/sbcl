@@ -141,6 +141,7 @@
     (let ((class (class-of instance)))
       (when (or (eq class (find-class 'standard-class nil))
                 (eq class (find-class 'funcallable-standard-class nil))
+                (eq class (find-class 'system-class nil))
                 (eq class (find-class 'built-in-class nil)))
         (princ (early-class-name instance) stream)))))
 

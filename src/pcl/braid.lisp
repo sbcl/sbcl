@@ -136,6 +136,7 @@
          standard-class-wrapper standard-class
          funcallable-standard-class-wrapper funcallable-standard-class
          slot-class-wrapper slot-class
+         system-class-wrapper system-class
          built-in-class-wrapper built-in-class
          structure-class-wrapper structure-class
          condition-class-wrapper condition-class
@@ -147,7 +148,7 @@
          standard-generic-function-wrapper standard-generic-function)
     (!initial-classes-and-wrappers
      standard-class funcallable-standard-class
-     slot-class built-in-class structure-class condition-class
+     slot-class system-class built-in-class structure-class condition-class
      standard-direct-slot-definition standard-effective-slot-definition
      class-eq-specializer standard-generic-function)
     ;; First, make a class metaobject for each of the early classes. For
@@ -162,6 +163,7 @@
                         (funcallable-standard-class
                          funcallable-standard-class-wrapper)
                         (built-in-class built-in-class-wrapper)
+                        (system-class system-class-wrapper)
                         (structure-class structure-class-wrapper)
                         (condition-class condition-class-wrapper)))
              (class (or (find-class name nil)
@@ -190,6 +192,7 @@
                                   ((eq class
                                        standard-effective-slot-definition)
                                    standard-effective-slot-definition-wrapper)
+                                  ((eq class system-class) system-class-wrapper)
                                   ((eq class built-in-class)
                                    built-in-class-wrapper)
                                   ((eq class structure-class)
@@ -238,6 +241,11 @@
                   direct-supers direct-subclasses cpl wrapper proto
                   direct-slots slots direct-default-initargs default-initargs))
                 (built-in-class         ; *the-class-t*
+                 (!bootstrap-initialize-class
+                  meta
+                  class name class-eq-specializer-wrapper source
+                  direct-supers direct-subclasses cpl wrapper proto))
+                (system-class
                  (!bootstrap-initialize-class
                   meta
                   class name class-eq-specializer-wrapper source
@@ -420,7 +428,7 @@
     (dolist (definition *early-class-definitions*)
       (let ((name (ecd-class-name definition))
             (meta (ecd-metaclass definition)))
-        (unless (eq meta 'built-in-class)
+        (unless (or (eq meta 'built-in-class) (eq meta 'system-class))
           (let ((direct-slots  (ecd-canonical-slots definition)))
             (dolist (slotd direct-slots)
               (let ((slot-name (getf slotd :name))
@@ -512,10 +520,13 @@
   ;; First make sure that all the supers listed in
   ;; *BUILT-IN-CLASS-LATTICE* are themselves defined by
   ;; *BUILT-IN-CLASS-LATTICE*. This is just to check for typos and
-  ;; other sorts of brainos.
+  ;; other sorts of brainos.  (The exceptions, T and SEQUENCE, are
+  ;; those classes which are SYSTEM-CLASSes which nevertheless have
+  ;; BUILT-IN-CLASS subclasses.)
   (dolist (e *built-in-classes*)
     (dolist (super (cadr e))
       (unless (or (eq super t)
+                  (eq super 'sequence)
                   (assq super *built-in-classes*))
         (error "in *BUILT-IN-CLASSES*: ~S has ~S as a super,~%~
                 but ~S is not itself a class in *BUILT-IN-CLASSES*."

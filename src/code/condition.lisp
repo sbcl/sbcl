@@ -867,6 +867,8 @@
          (:macro (format stream "Macro ~S" data))
          (:section (format stream "Section ~{~D~^.~}" data))
          (:glossary (format stream "Glossary entry for ~S" data))
+         (:type (format stream "Type ~S" data))
+         (:system-class (format stream "System Class ~S" data))
          (:issue (format stream "writeup for Issue ~A" data)))))
     (:sbcl
      (format stream "The SBCL Manual")

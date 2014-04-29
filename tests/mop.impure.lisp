@@ -357,7 +357,7 @@
                  (sl-option (first (sb-mop:class-direct-slots
                                     (find-class 'test-multiple-slot-option-bug))))))))
 
-;;; bug reported by Bruno Haibel on sbcl-devel 2004-11-19: AMOP requires
+;;; bug reported by Bruno Haible on sbcl-devel 2004-11-19: AMOP requires
 ;;; that CLASS-PROTOYPE signals an error if the class is not yet finalized
 (defclass prototype-not-finalized-sub (prototype-not-finalized-super) ())
 (multiple-value-bind (val err)
@@ -366,12 +366,14 @@
   (assert (typep err 'error)))
 
 ;;; AMOP says so
-(find-method (fdefinition 'sb-mop:allocate-instance) () '(built-in-class))
-(dolist (class-name '(fixnum bignum symbol))
-  (let ((class (find-class class-name)))
-    (multiple-value-bind (value error) (ignore-errors (allocate-instance class))
-      (assert (null value))
-      (assert (typep error 'error)))))
+(with-test (:name (allocate-instance built-in-class error))
+  (dolist (class-name '(fixnum bignum symbol t))
+    (let ((class (find-class class-name)))
+      (assert (typep class 'built-in-class))
+      (multiple-value-bind (value error)
+          (ignore-errors (allocate-instance class))
+        (assert (null value))
+        (assert (typep error 'error))))))
 
 ;;; bug reported by David Morse: direct-subclass update protocol was broken
 (defclass vegetable () ())
