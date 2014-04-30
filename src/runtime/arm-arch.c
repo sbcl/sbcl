@@ -338,3 +338,55 @@ void arch_install_interrupt_handlers()
 #endif
     undoably_install_low_level_interrupt_handler(SIGTRAP, sigtrap_handler);
 }
+
+
+#ifdef LISP_FEATURE_LINKAGE_TABLE
+
+/* Linkage tables
+ *
+ * Linkage entry size is 16, because we need at least 4 instructions to
+ * implement a jump.
+ */
+#define LINKAGE_TEMP_REG        reg_NFP
+void arch_write_linkage_table_jmp(void* reloc_addr, void *target_addr)
+{
+  /*
+   *        mov  reg, address[0:8]
+   *        orr  reg, reg, address[8:16]
+   *        orr  reg, reg, address[16:24]
+   *        add  pc,  reg, address[24:32]
+   */
+  int* inst_ptr;
+  unsigned inst;
+  unsigned always_with_imm = 0x71 << 25;
+  unsigned source = LINKAGE_TEMP_REG << 12;
+  unsigned dest = LINKAGE_TEMP_REG << 16;
+  unsigned target = (unsigned) target_addr;
+
+  inst_ptr = (int*) reloc_addr;
+  // mov  reg, address[0:8]
+  inst = always_with_imm | 0xD << 21 | source | (target & 0xFF);
+  *inst_ptr++ = inst;
+  
+  // orr  reg, reg, address[8:16]
+  inst = always_with_imm | 0xC << 21 | dest | source | 0xC << 8 | ((target >> 8) & 0xFF);
+  *inst_ptr++ = inst;
+
+  // orr  reg, reg, address[8:16]
+  inst = always_with_imm | 0xC << 21 | dest | source | 0x8 << 8 |((target >> 16) & 0xFF);
+  *inst_ptr++ = inst;
+
+  // add  pc,  reg, address[24:32]
+  inst = always_with_imm | 0x4 << 21 | dest | 15 << 12 | 0x4 << 8 | ((target >> 24) & 0xFF);
+  *inst_ptr++ = inst;
+  
+  os_flush_icache((os_vm_address_t) reloc_addr, (char*) inst_ptr - (char*) reloc_addr);
+}
+
+void
+arch_write_linkage_table_ref(void * reloc_addr, void *target_addr)
+{
+    *(unsigned long *)reloc_addr = (unsigned long)target_addr;
+}
+
+#endif

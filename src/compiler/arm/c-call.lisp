@@ -170,6 +170,24 @@
         (emit-label fixup-label)
         (inst word (make-fixup foreign-symbol :foreign))))))
 
+#!+linkage-table
+(define-vop (foreign-symbol-dataref-sap)
+  (:translate foreign-symbol-dataref-sap)
+  (:policy :fast-safe)
+  (:args)
+  (:arg-types (:constant simple-string))
+  (:info foreign-symbol)
+  (:temporary (:sc interior-reg) lip)
+  (:results (res :scs (sap-reg)))
+  (:result-types system-area-pointer)
+  (:generator 2
+    (let ((fixup-label (gen-label)))
+      (inst load-from-label res lip fixup-label)
+      (inst ldr res (@ res))
+      (assemble (*elsewhere*)
+        (emit-label fixup-label)
+        (inst word (make-fixup foreign-symbol :foreign-dataref))))))
+
 (define-vop (call-out)
   (:args (function :scs (sap-reg sap-stack))
          (args :more t))
