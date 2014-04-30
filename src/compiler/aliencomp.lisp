@@ -734,7 +734,6 @@
                (arg (pop args))
                (sc (tn-sc first-tn))
                (scn (sc-number sc))
-               #!-(or x86 x86-64)
                (move-arg-vops (svref (sc-move-arg-vops sc) scn)))
           (aver arg)
           (unless (= (length move-arg-vops) 1)
