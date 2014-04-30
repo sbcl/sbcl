@@ -150,8 +150,8 @@ call_into_lisp:
 call_into_c:
 	@@ At this point, we have:
 	@@ R8 -- C function to call.  This routine doesn't support
-        @@       thumb interworking, but linkage-table (when we get
-        @@       around to implementing it) will, so we don't have to.
+        @@       thumb interworking, but linkage-table does, so we
+        @@       don't have to.
         @@ LR -- Return address within the code component.
         @@ OCFP -- First C register argument.
         @@ NARGS -- Second C register argument.
@@ -227,8 +227,7 @@ call_into_c:
         @@ And call the C function.  We don't support interworking
 	@@ here because we have to be able to pass the function
 	@@ pointer in a boxed register, but the linkage-table is quite
-        @@ capable of doing a tail-call to a Thumb routine.  Oh, wait,
-        @@ we don't have a linkage-table yet.  Oops.
+        @@ capable of doing a tail-call to a Thumb routine.
         blx      reg_R8
 
         @@ We're back.  Our main tasks are to move the C return value

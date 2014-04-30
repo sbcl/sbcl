@@ -344,41 +344,42 @@ void arch_install_interrupt_handlers()
 
 /* Linkage tables
  *
- * Linkage entry size is 16, because we need at least 4 instructions to
- * implement a jump.
+ * Linkage entry size is 16, because we need 4 instructions.
  */
+
 #define LINKAGE_TEMP_REG        reg_NFP
+
 void arch_write_linkage_table_jmp(void* reloc_addr, void *target_addr)
 {
   /*
-   *        mov  reg, address[0:8]
-   *        orr  reg, reg, address[8:16]
-   *        orr  reg, reg, address[16:24]
-   *        add  pc,  reg, address[24:32]
-   */
+    ldr reg, [pc, #4]
+    bx  reg
+    nop
+    address
+
+    BX is needed for thumb interworking, without it it could take just two words with
+    ldr pc, [pc, #-4]
+    address
+  */
   int* inst_ptr;
   unsigned inst;
-  unsigned always_with_imm = 0x71 << 25;
-  unsigned source = LINKAGE_TEMP_REG << 12;
-  unsigned dest = LINKAGE_TEMP_REG << 16;
-  unsigned target = (unsigned) target_addr;
 
   inst_ptr = (int*) reloc_addr;
-  // mov  reg, address[0:8]
-  inst = always_with_imm | 0xD << 21 | source | (target & 0xFF);
+
+  // ldr reg, [pc, #4]
+  inst = 0xe59f0000 | LINKAGE_TEMP_REG << 12 | 4;
   *inst_ptr++ = inst;
   
-  // orr  reg, reg, address[8:16]
-  inst = always_with_imm | 0xC << 21 | dest | source | 0xC << 8 | ((target >> 8) & 0xFF);
+  // bx reg
+  inst = 0xe12fff10 | LINKAGE_TEMP_REG;
   *inst_ptr++ = inst;
 
-  // orr  reg, reg, address[8:16]
-  inst = always_with_imm | 0xC << 21 | dest | source | 0x8 << 8 |((target >> 16) & 0xFF);
+  // nop aka mov r0, r0
+  inst = 0xe1a00000;
   *inst_ptr++ = inst;
 
-  // add  pc,  reg, address[24:32]
-  inst = always_with_imm | 0x4 << 21 | dest | 15 << 12 | 0x4 << 8 | ((target >> 24) & 0xFF);
-  *inst_ptr++ = inst;
+  // address
+  *inst_ptr++ = target_addr;
   
   os_flush_icache((os_vm_address_t) reloc_addr, (char*) inst_ptr - (char*) reloc_addr);
 }
