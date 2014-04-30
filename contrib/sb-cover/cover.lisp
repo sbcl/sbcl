@@ -461,13 +461,17 @@ before and after of calling FN in the hashtable SOURCE-MAP."
 The source locations are stored in SOURCE-MAP."
   (let* ((tab (copy-readtable readtable))
          (*readtable* tab))
+    ;; It is unspecified whether doing (SET-MACRO-CHARACTER c1 fn)
+    ;; and then (SET-DISPATCH-MACRO-CHARACTER c1 c2 fn) should be allowed.
+    ;; Portability concerns aside, it doesn't work in the latest code,
+    ;; but first changing the function for #. and then # in that order works.
+    (suppress-sharp-dot tab)
     (dotimes (code 128)
       (let ((char (code-char code)))
         (multiple-value-bind (fn term) (get-macro-character char tab)
           (when fn
             (set-macro-character char (make-source-recorder fn source-map)
                                  term tab)))))
-    (suppress-sharp-dot tab)
     (set-macro-character #\(
                          (make-source-recorder
                           (make-recording-read-list source-map)

@@ -80,7 +80,4 @@ types for the Common Lisp expression reader."
    (make-array base-char-code-limit :initial-element #'undefined-macro-char)
    :type (simple-vector #.base-char-code-limit))
   (character-macro-hash-table (make-hash-table) :type hash-table)
-  ;; an alist from dispatch characters to hash-tables akin to
-  ;; CHARACTER-MACRO-HASH-TABLE.
-  (dispatch-tables () :type list)
   (%readtable-case :upcase :type (member :upcase :downcase :preserve :invert)))
