@@ -74,3 +74,6 @@
                                     :offset lip-offset)
                     :offset 2)))
     (:none)))
+
+(defun return-machine-address (scp)
+  (context-register scp lr-offset))

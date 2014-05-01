@@ -934,7 +934,6 @@
                         (- (get-lisp-obj-address code)
                            sb!vm:other-pointer-lowtag)
                         code-header-len)))
-              #!-arm ;; FIXME: This is wrong for ARM.
               (let ((code-size (* (code-header-ref code
                                                    sb!vm:code-code-size-slot)
                                   sb!vm:n-word-bytes)))
@@ -956,7 +955,10 @@
                              (sap-int (sb!vm:context-pc scp))
                              code
                              (%code-entry-points code)
+                             #!-arm
                              (sb!vm:context-register scp sb!vm::lra-offset)
+                             #!+arm
+                             (stack-ref frame-pointer lra-save-offset)
                              computed-return))
                       ;; We failed to pinpoint where PC is, but set
                       ;; pc-offset to 0 to keep the backtrace from
