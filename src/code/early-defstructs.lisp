@@ -11,8 +11,6 @@
 
 (/show0 "entering early-defstructs.lisp")
 
-(!set-up-structure-object-class)
-
 #.`(progn
      ,@(mapcar (lambda (args)
                  `(defstruct ,@args))
