@@ -184,7 +184,7 @@
   (:generator 3
     (inst mul r x y)))
 
-;;; 
+;;;
 (define-vop (fast-lognor/fixnum=>fixnum fast-fixnum-binop)
   (:translate lognor)
   (:args (x :target r :scs (any-reg))
@@ -473,32 +473,38 @@
 ;;; doing this is to prevent fixnum specific operations from being
 ;;; used on word integers, spuriously consing the argument.
 
-(define-vop (fast-eql/fixnum fast-conditional)
+(define-vop (fast-eql/fixnum)
   (:args (x :scs (any-reg))
          (y :scs (any-reg)))
   (:arg-types tagged-num tagged-num)
   (:note "inline fixnum comparison")
   (:translate eql)
+  (:conditional :eq)
+  (:policy :fast-safe)
   (:generator 4
-    (inst cmp x y)
-    (inst b (if not-p :ne :eq) target)))
+    (inst cmp x y)))
+
 (define-vop (generic-eql/fixnum fast-eql/fixnum)
   (:args (x :scs (any-reg descriptor-reg))
          (y :scs (any-reg)))
   (:arg-types * tagged-num)
   (:variant-cost 7))
 
-(define-vop (fast-eql-c/fixnum fast-conditional/fixnum)
+(define-vop (fast-eql-c/fixnum)
   (:args (x :scs (any-reg)))
-  (:arg-types tagged-num (:constant (unsigned-byte 8)))
-  (:info target not-p y)
+  (:arg-types tagged-num (:constant (signed-byte 9)))
+  (:info y)
   (:translate eql)
-  (:generator 2
-    (inst cmp x (fixnumize y))
-    (inst b (if not-p :ne :eq) target)))
+  (:policy :fast-safe)
+  (:conditional :eq)
+  (:generator 3
+    (if (minusp y)
+        (inst cmn x (fixnumize (abs y)))
+        (inst cmp x (fixnumize y)))))
+
 (define-vop (generic-eql-c/fixnum fast-eql-c/fixnum)
   (:args (x :scs (any-reg descriptor-reg)))
-  (:arg-types * (:constant (unsigned-byte 8)))
+  (:arg-types * (:constant (signed-byte 9)))
   (:variant-cost 6))
 
 (define-source-transform lognand (x y)
