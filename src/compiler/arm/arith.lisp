@@ -32,6 +32,13 @@
   (:arg-types signed-num)
   (:result-types signed-num))
 
+(define-vop (unsigned-unop fast-safe-arith-op)
+  (:args (x :scs (unsigned-reg)))
+  (:results (res :scs (unsigned-reg)))
+  (:note "inline (unsigned-byte 32) arithmetic")
+  (:arg-types unsigned-num)
+  (:result-types unsigned-num))
+
 (define-vop (fast-negate/fixnum fixnum-unop)
   (:translate %negate)
   (:generator 1
@@ -556,6 +563,26 @@
   (:arg-types unsigned-num (:constant (integer 0 31)))
   (:generator 5
     (inst tst x (ash 1 y))))
+
+(define-vop (fast-signum-fixnum fixnum-unop)
+  (:translate signum)
+  (:generator 4
+    (inst cmp x 0)
+    (inst mov :ne res (fixnumize 1))
+    (inst mvn :mi res (lognot (fixnumize -1)))))
+
+(define-vop (fast-signum-signed signed-unop)
+  (:translate signum)
+  (:generator 5
+    (inst cmp x 0)
+    (inst mov :ne res 1)
+    (inst mvn :mi res 0)))
+
+(define-vop (fast-signum-unsigned unsigned-unop)
+  (:translate signum)
+  (:generator 4
+    (inst cmp x 0)
+    (inst mov :ne res 1)))
 
 ;;;; Bignum stuff.
 
