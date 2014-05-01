@@ -292,6 +292,39 @@
   (sbo :field (byte 4 12) :value #b1111)
   (sbz :field (byte 8 4) :value #b00000000)
   (rm :field (byte 4 0) :type 'reg))
+
+(sb!disassem:define-instruction-format
+    (multiply-dzsm 32
+     :default-printer '(:name cond :tab rd ", " rs ", " rm))
+  (cond :field (byte 4 28) :type 'condition-code)
+  (opcode-8 :field (byte 8 20))
+  (rd :field (byte 4 16) :type 'reg)
+  (sbz :field (byte 4 12) :value 0)
+  (rs :field (byte 4 8) :type 'reg)
+  (opcode-4 :field (byte 4 4))
+  (rm :field (byte 4 0) :type 'reg))
+
+(sb!disassem:define-instruction-format
+    (multiply-dnsm 32
+     :default-printer '(:name cond :tab rd ", " rs ", " rm ", " num))
+  (cond :field (byte 4 28) :type 'condition-code)
+  (opcode-8 :field (byte 8 20))
+  (rd :field (byte 4 16) :type 'reg)
+  (num :field (byte 4 12) :type 'reg)
+  (rs :field (byte 4 8) :type 'reg)
+  (opcode-4 :field (byte 4 4))
+  (rm :field (byte 4 0) :type 'reg))
+
+(sb!disassem:define-instruction-format
+    (multiply-ddsm 32
+     :default-printer '(:name cond :tab rdlo ", " rdhi ", " rs ", " rm))
+  (cond :field (byte 4 28) :type 'condition-code)
+  (opcode-8 :field (byte 8 20))
+  (rdhi :field (byte 4 16) :type 'reg)
+  (rdlo :field (byte 4 12) :type 'reg)
+  (rs :field (byte 4 8) :type 'reg)
+  (opcode-4 :field (byte 4 4))
+  (rm :field (byte 4 0) :type 'reg))
 
 ;;;; special magic to support decoding internal-error and related traps
 
@@ -937,6 +970,9 @@
                         (:dnsm '(dest src multiplicand num))
                         (:ddsm '(dest-lo dest src multiplicand)))))
          `(define-instruction ,name (segment &rest args)
+            (:printer ,(symbolicate 'multiply- field-mapping)
+                      ((opcode-8 ,opcode1)
+                       (opcode-4 ,opcode2)))
             (:emitter
              (with-condition-defaulted (args (condition ,@arglist))
                ,@(loop
