@@ -419,15 +419,13 @@
   (:note "inline float arithmetic")
   (:save-p :compute-only)
   (:generator 1
-     (inst fsqrts y x)))
+    (inst fsqrts y x)))
 
 ;;;; Comparison:
 
 (define-vop (float-compare)
   (:args (x) (y))
-  (:conditional)
-  (:info target not-p)
-  (:variant-vars format yep nope is-=)
+  (:variant-vars format is-=)
   (:policy :fast-safe)
   (:note "inline float comparison")
   (:vop-var vop)
@@ -445,8 +443,7 @@
            (inst fcmped x y))))
     ;; We'd like to use FMSTAT, but it's not defined.  Sharing the
     ;; same encoding is "FMRX PC, FPSCR", which we CAN encode.
-    (inst fmrx pc-tn :fpscr)
-    (inst b (if not-p nope yep) target)))
+    (inst fmrx pc-tn :fpscr)))
 
 (macrolet ((frob (name sc ptype)
              `(define-vop (,name float-compare)
@@ -456,17 +453,64 @@
   (frob single-float-compare single-reg single-float)
   (frob double-float-compare double-reg double-float))
 
-(macrolet ((frob (translate yep nope sname dname is-=)
+(macrolet ((frob (translate cond sname dname is-=)
              `(progn
                 (define-vop (,sname single-float-compare)
                   (:translate ,translate)
-                  (:variant :single ,yep ,nope ,is-=))
+                  (:conditional ,cond)
+                  (:variant :single ,is-=))
                 (define-vop (,dname double-float-compare)
                   (:translate ,translate)
-                  (:variant :double ,yep ,nope ,is-=)))))
-  (frob < :mi :pl </single-float </double-float nil)
-  (frob > :gt :le >/single-float >/double-float nil)
-  (frob = :eq :ne eql/single-float eql/double-float t))
+                  (:conditional ,cond)
+                  (:variant :double  ,is-=)))))
+  (frob < :mi </single-float </double-float nil)
+  (frob > :gt >/single-float >/double-float nil)
+  (frob = :eq eql/single-float eql/double-float t))
+
+(define-vop (float-compare-zero)
+  (:args (x))
+  (:info y)
+  (:ignore y)
+  (:variant-vars format is-=)
+  (:policy :fast-safe)
+  (:note "inline float comparison")
+  (:vop-var vop)
+  (:save-p :compute-only)
+  (:generator 2
+    (note-this-location vop :internal-error)
+    (ecase format
+      (:single
+       (if is-=
+           (inst fcmpzs x)
+           (inst fcmpezs x)))
+      (:double
+       (if is-=
+           (inst fcmpzd x)
+           (inst fcmpezd x))))
+    (inst fmrx pc-tn :fpscr)))
+
+(macrolet ((frob (name sc ptype constant-type)
+             `(define-vop (,name float-compare-zero)
+                (:args (x :scs (,sc)))
+                (:arg-types ,ptype (:constant, constant-type)))))
+  (frob single-float-compare-zero single-reg single-float
+        (single-float -0s0 0s0))
+  (frob double-float-compare-zero double-reg double-float
+        (double-float -0d0 0d0)))
+
+(macrolet ((frob (translate cond sname dname is-=)
+             `(progn
+                (define-vop (,sname single-float-compare-zero)
+                  (:translate ,translate)
+                  (:conditional ,cond)
+                  (:variant :single ,is-=))
+                (define-vop (,dname double-float-compare-zero)
+                  (:translate ,translate)
+                  (:conditional ,cond)
+                  (:variant :double ,is-=)))))
+  (frob < :mi </single-float-zero </double-float-zero nil)
+  (frob > :gt >/single-float-zero >/double-float-zero nil)
+  (frob = :eq eql/single-float-zero eql/double-float-zero t))
 
 ;;;; Conversion:
 

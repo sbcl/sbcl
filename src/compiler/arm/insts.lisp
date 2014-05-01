@@ -1437,13 +1437,17 @@
 (define-binary-fp-data-processing-instructions fsub  0 1 1 1)
 (define-binary-fp-data-processing-instructions fdiv  1 0 0 0)
 
-(defmacro define-unary-fp-data-processing-instruction (name precision fn n)
+;;; op-m-sbz means that it should-be-zero, and only one register is supplied.
+(defmacro define-unary-fp-data-processing-instruction (name precision fn n
+                                                       &key op-m-sbz)
   (let ((precision-flag (ecase precision
                           (:single 0)
                           (:double 1))))
     `(define-instruction ,name (segment &rest args)
        (:emitter
-        (with-condition-defaulted (args (condition dest op-m))
+        (with-condition-defaulted (args (condition dest
+                                                   ,@(unless op-m-sbz
+                                                       '(op-m))))
           (emit-fp-dp-instruction segment
                                   (conditional-opcode condition)
                                   #b1110
@@ -1457,14 +1461,20 @@
                                   ,precision-flag
                                   ,n
                                   #b1
-                                  (low-bit-float-reg op-m)
+                                  ,(if op-m-sbz
+                                       0
+                                       '(low-bit-float-reg op-m))
                                   #b0
-                                  (high-bits-float-reg op-m)))))))
+                                  ,(if op-m-sbz
+                                       0
+                                       '(high-bits-float-reg op-m))))))))
 
-(defmacro define-unary-fp-data-processing-instructions (root fn n)
+(defmacro define-unary-fp-data-processing-instructions (root fn n &key op-m-sbz)
   `(progn
-     (define-unary-fp-data-processing-instruction ,(symbolicate root 's) :single ,fn ,n)
-     (define-unary-fp-data-processing-instruction ,(symbolicate root 'd) :double ,fn ,n)))
+     (define-unary-fp-data-processing-instruction ,(symbolicate root 's) :single ,fn ,n
+       :op-m-sbz ,op-m-sbz)
+     (define-unary-fp-data-processing-instruction ,(symbolicate root 'd) :double ,fn ,n
+       :op-m-sbz ,op-m-sbz)))
 
 (define-unary-fp-data-processing-instructions fcpy   #b0000 0)
 (define-unary-fp-data-processing-instructions fabs   #b0000 1)
@@ -1472,8 +1482,8 @@
 (define-unary-fp-data-processing-instructions fsqrt  #b0001 1)
 (define-unary-fp-data-processing-instructions fcmp   #b0100 0)
 (define-unary-fp-data-processing-instructions fcmpe  #b0100 1)
-(define-unary-fp-data-processing-instructions fcmpz  #b0101 0)
-(define-unary-fp-data-processing-instructions fcmpez #b0101 1)
+(define-unary-fp-data-processing-instructions fcmpz  #b0101 0  :op-m-sbz t)
+(define-unary-fp-data-processing-instructions fcmpez #b0101 1  :op-m-sbz t)
 (define-unary-fp-data-processing-instructions fuito  #b1000 0)
 (define-unary-fp-data-processing-instructions fsito  #b1000 1)
 (define-unary-fp-data-processing-instructions ftoui  #b1100 0)
