@@ -59,7 +59,7 @@
   (def %log (x))
   (def %exp (x)))
 
-#!+x86-64 ;; for constant folding
+#!+(or x86-64 arm-vfp) ;; for constant folding
 (macrolet ((def (name ll)
              `(defun ,name ,ll (,name ,@ll))))
   (def %sqrt (x)))
@@ -125,7 +125,7 @@
 #!-x86 (def-math-rtn "log" 1)
 #!-x86 (def-math-rtn "log10" 1)
 #!-(and win32 x86) (def-math-rtn "pow" 2)
-#!-(or x86 x86-64) (def-math-rtn "sqrt" 1)
+#!-(or x86 x86-64 arm-vfp) (def-math-rtn "sqrt" 1)
 #!-win32 (def-math-rtn "hypot" 2)
 #!-x86 (def-math-rtn "log1p" 1)
 

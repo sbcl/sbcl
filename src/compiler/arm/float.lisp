@@ -396,6 +396,30 @@
   (frob abs/double-float fabsd abs double-reg double-float)
   (frob %negate/single-float fnegs %negate single-reg single-float)
   (frob %negate/double-float fnegd %negate double-reg double-float))
+
+(define-vop (fsqrtd)
+  (:args (x :scs (double-reg)))
+  (:results (y :scs (double-reg)))
+  (:translate %sqrt)
+  (:policy :fast-safe)
+  (:arg-types double-float)
+  (:result-types double-float)
+  (:note "inline float arithmetic")
+  (:save-p :compute-only)
+  (:generator 1
+     (inst fsqrtd y x)))
+
+(define-vop (fsqrts)
+  (:args (x :scs (single-reg)))
+  (:results (y :scs (single-reg)))
+  (:translate %sqrt)
+  (:policy :fast-safe)
+  (:arg-types single-float)
+  (:result-types single-float)
+  (:note "inline float arithmetic")
+  (:save-p :compute-only)
+  (:generator 1
+     (inst fsqrts y x)))
 
 ;;;; Comparison:
 
