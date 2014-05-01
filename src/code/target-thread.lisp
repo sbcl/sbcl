@@ -1338,8 +1338,11 @@ have the foreground next."
                    (delete next (session-interactive-threads *session*)))))
     (condition-broadcast (session-interactive-threads-queue *session*))))
 
-(defun foreground-thread ()
-  (car (session-interactive-threads *session*)))
+(defun interactive-threads (&optional (session *session*))
+  (session-interactive-threads session))
+
+(defun foreground-thread (&optional (session *session*))
+  (first (interactive-threads session)))
 
 (defun make-listener-thread (tty-name)
   (assert (probe-file tty-name))
