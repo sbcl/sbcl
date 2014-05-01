@@ -255,7 +255,35 @@
     (set-syntax-from-char (code-char #xbeef) #\a)
     (set-syntax-from-char (code-char #xfeed) #\b)
     (set-syntax-from-char (code-char 35) #\a) ; sharp is dead
-    (assert (null (sb-impl::dispatch-tables *readtable*)))))
+    (assert (null (sb-impl::dispatch-tables *readtable*))))
+
+  ;; Ensure the interface provided for named-readtables remains somewhat intact.
+  (let ((*readtable* (copy-readtable)))
+    (make-dispatch-macro-character #\@)
+    (set-dispatch-macro-character #\@ #\a 'read-at-a)
+    (set-dispatch-macro-character #\@ #\$ 'read-at-dollar)
+    (set-dispatch-macro-character #\@ #\* #'sb-impl::sharp-star)
+    ;; Enter exactly one character in the Unicode range because
+    ;; iteratation order is arbitrary and assert would be fragile.
+    ;; ASCII characters are naturally ordered by code.
+    (set-dispatch-macro-character #\@ (code-char #x2010) 'read-blah)
+    (let ((rt (copy-readtable *readtable*)))
+      ;; Don't want to assert about all the standard noise,
+      ;; and also don't want to kill the ability to write #\char
+      (set-syntax-from-char #\# #\a rt)
+      (assert (equal (sb-impl::dispatch-tables rt nil)
+                     `((#\@ (#\A . read-at-a)
+                            (#\* . ,#'sb-impl::sharp-star)
+                            (#\$ . read-at-dollar)
+                            (#\hyphen . read-blah))))))
+    ;; this removes one entry rather than entering NIL in the hashtable
+    (set-dispatch-macro-character #\@ (code-char #x2010) nil)
+    (let ((rt (copy-readtable *readtable*)))
+      (set-syntax-from-char #\# #\a rt)
+      (assert (equal (sb-impl::dispatch-tables rt nil)
+                     `((#\@ (#\A . read-at-a)
+                            (#\* . ,#'sb-impl::sharp-star)
+                            (#\$ . read-at-dollar))))))))
 
 (with-test (:name :copy-dispatching-macro)
   (let ((*readtable* (copy-readtable)))

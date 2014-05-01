@@ -445,7 +445,7 @@ table.summary tr.subheading td { text-align: left; font-weight: bold; padding-le
   "Return a macro character function that does the same as FN, but
 additionally stores the result together with the stream positions
 before and after of calling FN in the hashtable SOURCE-MAP."
-  (declare (type function fn))
+  (declare (type (or function symbol) fn))
   (lambda (stream char)
     (declare (optimize debug safety))
     (let ((start (file-position stream))

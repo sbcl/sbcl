@@ -85,11 +85,14 @@
   (declare (type (or fdefn callable) new-value))
   (if (typep char 'base-char)
       (setf (svref (character-macro-array rt) (char-code char)) new-value)
-      (setf (gethash char (character-macro-hash-table rt)) new-value)))
+      (if new-value ; never store NILs
+          (setf (gethash char (character-macro-hash-table rt)) new-value)
+          (remhash char (character-macro-hash-table rt)))))
 
 ;;; the value actually stored in the character macro table. As per
 ;;; ANSI #'GET-MACRO-CHARACTER and #'SET-MACRO-CHARACTER, this can
-;;; be either a function-designator or NIL.
+;;; be either a function-designator or NIL, except that we store
+;;; symbols not as themselves but as their #<fdefn>.
 (defun get-raw-cmt-entry (char readtable)
   (declare (readtable readtable))
   (if (typep char 'base-char)
@@ -1764,20 +1767,24 @@ extended <package-name>::<form-in-package> syntax."
 (def!method print-object ((readtable readtable) stream)
   (print-unreadable-object (readtable stream :identity t :type t)))
 
-;; Backward-compatibility adapter. DO NOT USE IN NEW CODE!
-;; The "named-readtables" system in Quicklisp expects this interface,
-;; which is silly because ultimately each hashtable is going to
-;; be reshaped into an alist.
-(defun dispatch-tables (readtable)
+;; Backward-compatibility adapter. The "named-readtables" system in
+;; Quicklisp expects this interface, and it's a reasonable thing to support.
+;; What is silly however is that DISPATCH-TABLES was an alist each of whose
+;; values was a hashtable which got immediately coerced to an alist.
+;; In anticipation of perhaps not doing an extra re-shaping, if HASH-TABLE-P
+;; is NIL then return nested alists: ((#\# (#\R . #<FUNCTION SHARP-R>) ...))
+(defun dispatch-tables (readtable &optional (hash-table-p t))
   (let (alist)
     (flet ((process (char fn &aux (dtable (%dispatch-macro-char-table fn)))
              (when dtable
-               (let ((output (make-hash-table)))
-                 (awhen (car dtable)
-                   (replace/eql-hash-table output it))
-                 (loop for fn across (cdr dtable) and ch from 0
-                       when fn
-                       do (setf (gethash (code-char ch) output) fn))
+               (let ((output (awhen (car dtable) (%hash-table-alist it))))
+                 (loop for fn across (the simple-vector (cdr dtable))
+                       and ch from 0
+                       when fn do (push (cons (code-char ch) fn) output))
+                 (dolist (cell output) ; coerce values to function-designator
+                   (rplacd cell (!cmt-entry-to-fun-designator (cdr cell))))
+                 (when hash-table-p ; caller wants hash-tables
+                   (setq output (%stuff-hash-table (make-hash-table) output)))
                  (push (cons char output) alist)))))
       (loop for fn across (character-macro-array readtable) and ch from 0
             do (process (code-char ch) fn))
