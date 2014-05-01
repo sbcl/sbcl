@@ -42,15 +42,16 @@
   (:generator 1
     (inst rsb res x 0)))
 
-(define-vop (fast-lognot/fixnum fixnum-unop)
+(define-vop (fast-lognot/fixnum signed-unop)
+  (:args (x :scs (any-reg)))
+  (:arg-types tagged-num)
   (:translate lognot)
-  (:generator 2
-    (inst mvn res x)
-    (inst eor res res fixnum-tag-mask)))
+  (:generator 1
+    (inst mvn res (asr x n-fixnum-tag-bits))))
 
 (define-vop (fast-lognot/signed signed-unop)
   (:translate lognot)
-  (:generator 1
+  (:generator 2
     (inst mvn res x)))
 
 
