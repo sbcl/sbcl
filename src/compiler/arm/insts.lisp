@@ -815,6 +815,11 @@
   (byte 4 28) (byte 12 16) (byte 4 12) (byte 8 4) (byte 4 0))
 
 (define-instruction clz (segment &rest args)
+  (:printer dp-shift-register ((opcode-8 #b00010110)
+                               (rn #b1111)
+                               (rs #b1111)
+                               (shift-type #b00))
+            '(:name cond :tab rd ", " rm))
   (:emitter
    (with-condition-defaulted (args (condition dest src))
      (aver (register-p dest))
