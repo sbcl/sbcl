@@ -400,8 +400,7 @@
 ;;;; Binary conditional VOPs:
 
 (define-vop (fast-conditional)
-  (:conditional)
-  (:info target not-p)
+  (:conditional :eq)
   (:effects)
   (:affected)
   (:policy :fast-safe))
@@ -415,7 +414,7 @@
 (define-vop (fast-conditional-c/fixnum fast-conditional/fixnum)
   (:args (x :scs (any-reg)))
   (:arg-types tagged-num (:constant (unsigned-byte 8)))
-  (:info target not-p y))
+  (:info y))
 
 (define-vop (fast-conditional/signed fast-conditional)
   (:args (x :scs (signed-reg))
@@ -426,7 +425,7 @@
 (define-vop (fast-conditional-c/signed fast-conditional/signed)
   (:args (x :scs (signed-reg)))
   (:arg-types signed-num (:constant (unsigned-byte 8)))
-  (:info target not-p y))
+  (:info y))
 
 (define-vop (fast-conditional/unsigned fast-conditional)
   (:args (x :scs (unsigned-reg))
@@ -437,9 +436,9 @@
 (define-vop (fast-conditional-c/unsigned fast-conditional/unsigned)
   (:args (x :scs (unsigned-reg)))
   (:arg-types unsigned-num (:constant (unsigned-byte 8)))
-  (:info target not-p y))
+  (:info y))
 
-(defmacro define-conditional-vop (tran cond unsigned not-cond not-unsigned)
+(defmacro define-conditional-vop (tran cond unsigned)
   `(progn
      ,@(mapcar (lambda (suffix cost signed)
                  (unless (and (member suffix '(/fixnum -c/fixnum))
@@ -450,20 +449,17 @@
                                    (format nil "~:@(FAST-CONDITIONAL~A~)"
                                            suffix)))
                      (:translate ,tran)
+                     (:conditional ,(if signed cond unsigned))
                      (:generator ,cost
                       (inst cmp x
-                       ,(if (eq suffix '-c/fixnum) '(fixnumize y) 'y))
-                      (inst b (if not-p
-                                  ,(if signed not-cond not-unsigned)
-                                  ,(if signed cond unsigned))
-                       target)))))
+                       ,(if (eq suffix '-c/fixnum) '(fixnumize y) 'y))))))
                '(/fixnum -c/fixnum /signed -c/signed /unsigned -c/unsigned)
                '(4 3 6 5 6 5)
                '(t t t t nil nil))))
 
-(define-conditional-vop < :lt :lo :ge :hs)
-(define-conditional-vop > :gt :hi :le :ls)
-(define-conditional-vop eql :eq :eq :ne :ne)
+(define-conditional-vop < :lt :lo)
+(define-conditional-vop > :gt :hi)
+(define-conditional-vop eql :eq :eq)
 
 ;;; EQL/FIXNUM is funny because the first arg can be of any type, not
 ;;; just a known fixnum.
@@ -507,6 +503,28 @@
   (:args (x :scs (any-reg descriptor-reg)))
   (:arg-types * (:constant (signed-byte 9)))
   (:variant-cost 6))
+
+(macrolet ((define-logtest-vops ()
+             `(progn
+                ,@(loop for suffix in '(/fixnum -c/fixnum
+                                        /signed -c/signed
+                                        /unsigned -c/unsigned)
+                        for cost in '(4 3 6 5 6 5)
+                        collect
+                        `(define-vop (,(symbolicate "FAST-LOGTEST" suffix)
+                                      ,(symbolicate "FAST-CONDITIONAL" suffix))
+                           (:translate logtest)
+                           (:conditional :ne)
+                           (:generator ,cost
+                                       (inst tst x
+                                             ,(case suffix
+                                                (-c/fixnum
+                                                 `(fixnumize y))
+                                                ((-c/signed -c/unsigned)
+                                                 `y)
+                                                (t
+                                                 'y)))))))))
+  (define-logtest-vops))
 
 (define-source-transform lognand (x y)
   `(lognot (logand ,x ,y)))

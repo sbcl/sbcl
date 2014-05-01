@@ -301,8 +301,21 @@
       (float-registers (format nil "F~D" offset)))))
 
 (defun combination-implementation-style (node)
-  (declare (type sb!c::combination node) (ignore node))
-  (values :default nil))
+  (flet ((valid-funtype (args result)
+           (sb!c::valid-fun-use node
+                                (sb!c::specifier-type
+                                 `(function ,args ,result)))))
+    (case (sb!c::combination-fun-source-name node)
+      (logtest
+       (cond
+         ((valid-funtype '(fixnum fixnum) '*)
+          (values :direct nil))
+         ((valid-funtype '((signed-byte 32) (signed-byte 32)) '*)
+          (values :direct nil))
+         ((valid-funtype '((unsigned-byte 32) (unsigned-byte 32)) '*)
+          (values :direct nil))
+         (t (values :default nil))))
+      (t (values :default nil)))))
 
 (defun primitive-type-indirect-cell-type (ptype)
   (declare (ignore ptype))
