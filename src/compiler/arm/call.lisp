@@ -887,8 +887,9 @@
 
      ,@(unless (eq return :tail)
          '((:temporary (:scs (non-descriptor-reg)) temp)
-           (:temporary (:scs (interior-reg)) lip)
            (:temporary (:sc control-stack :offset nfp-save-offset) nfp-save)))
+
+     (:temporary (:scs (interior-reg)) lip)
 
      (:generator ,(+ (if named 5 0)
                      (if variable 19 1)
@@ -945,14 +946,31 @@
                                (move cfp-tn new-fp))))
                       ((nil)))))
                 (insert-step-instrumenting (callable-tn)
-                  ;; FIXME-ARM: appeased the compiler for now
-                  (declare (ignorable callable-tn))
                   ;; Conditionally insert a conditional trap:
                   (when step-instrumenting
-                    ;; Get the symbol-value of SB!IMPL::*STEPPING*
-                    #+(or) ;; Doesn't work for :TAIL case.
-                    (load-symbol-value temp sb!impl::*stepping*)
-                    (error "Don't know how to STEP-INSTRUMENT a CALL"))))
+                    (assemble ()
+                      ;; Get the symbol-value of SB!IMPL::*STEPPING*
+                      ;; KLUDGE: ... into LIP.  Either it's NIL or it
+                      ;; isn't, and even taking a stray interrupt and
+                      ;; GC can't screw that up.
+                      (load-symbol-value lip sb!impl::*stepping*)
+                      (inst cmp lip null-tn)
+                      ;; If it's not null, trap.
+                      (inst b :eq step-done-label)
+                      ;; CONTEXT-PC will be pointing here when the
+                      ;; interrupt is handled, not after the
+                      ;; DEBUG-TRAP.
+                      (note-this-location vop :step-before-vop)
+                      ;; Best-guess at a usable trap.  x86oids don't
+                      ;; have much more than this, SPARC, MIPS, PPC
+                      ;; and HPPA encode (TN-OFFSET CALLABLE-TN),
+                      ;; Alpha ignores stepping entirely.
+                      (inst debug-trap)
+                      (inst byte single-step-around-trap)
+                      (inst byte (tn-offset callable-tn))
+                      (emit-alignment word-shift)
+
+                      STEP-DONE-LABEL))))
 
 
            ,@(if named
@@ -1175,3 +1193,24 @@
     (inst word (make-fixup 'return-multiple :assembly-routine))
 
     (trace-table-entry trace-table-normal)))
+
+;;; Single-stepping
+
+(define-vop (step-instrument-before-vop)
+  (:temporary (:scs (descriptor-reg)) stepping)
+  (:policy :fast-safe)
+  (:vop-var vop)
+  (:generator 3
+    (load-symbol-value stepping sb!impl::*stepping*)
+    ;; If it's not NIL, trap.
+    (inst cmp stepping null-tn)
+    (inst b :eq DONE)
+    ;; CONTEXT-PC will be pointing here when the interrupt is handled,
+    ;; not after the BREAK.
+    (note-this-location vop :step-before-vop)
+    ;; A best-guess effort at a debug trap suitable for a
+    ;; single-step-before-trap.
+    (inst debug-trap)
+    (inst byte single-step-before-trap)
+    (emit-alignment word-shift)
+    DONE))

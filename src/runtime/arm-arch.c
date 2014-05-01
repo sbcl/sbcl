@@ -36,6 +36,9 @@ os_vm_address_t arch_get_bad_addr(int sig, siginfo_t *code, os_context_t *contex
 
 void arch_skip_instruction(os_context_t *context)
 {
+    /* KLUDGE: Other platforms check for trap codes and skip inlined
+     * trap/error parameters.  We should too. */
+
     /* Note that we're doing integer arithmetic here, not pointer. So
      * the value that the return value of os_context_pc_addr() points
      * to will be incremented by 4, not 16.
@@ -159,14 +162,14 @@ arch_handle_after_breakpoint(os_context_t *context)
 void
 arch_handle_single_step_trap(os_context_t *context, int trap)
 {
-  /* FIXME-ARM: empty implementation, in order to make the compiler happy. To get the
-     debugger working, this needs a proper implementaiton. */
-#if 0
-    unsigned int code = *((u32 *)(*os_context_pc_addr(context)));
-    int register_offset = code >> 5 & 0x1f;
+    unsigned char register_offset =
+        *((unsigned char *)(*os_context_pc_addr(context))+5);
     handle_single_step_trap(context, trap, register_offset);
+    /* KLUDGE: arch_skip_instruction() only skips one instruction, and
+     * there is a following word to deal with as well, so skip
+     * twice. */
     arch_skip_instruction(context);
-#endif
+    arch_skip_instruction(context);
 }
 
 #if 0

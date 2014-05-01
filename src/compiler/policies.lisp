@@ -89,10 +89,9 @@ and will refer to the new function, bound to FOO.")
   ("degraded" "full" "full" "full"))
 
 (define-optimization-quality insert-step-conditions
-  #!-arm (if (> debug (max speed space compilation-speed))
-             debug
-             0)
-  #!+arm 0 ;;; not implemented yet
+    (if (> debug (max speed space compilation-speed))
+        debug
+        0)
   ("no" "no" "partial" "full")
   "Control instrumentation of code, enabling single-stepping through
 it in the debugger.

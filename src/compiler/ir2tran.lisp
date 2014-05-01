@@ -761,9 +761,6 @@
               (vop current-stack-pointer call block
                    (ir2-lvar-stack-pointer (lvar-info lvar))))
             (when (emit-step-p call)
-              #!+arm
-              (error "Unable to emit stepping support because VOP STEP-INSTRUMENT-BEFORE-VOP is undefined.")
-              #!-arm
               (vop sb!vm::step-instrument-before-vop call block))
             (if info-args
                 (emit-template call block template args r-refs info-args)
