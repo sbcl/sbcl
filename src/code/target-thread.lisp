@@ -1339,9 +1339,15 @@ have the foreground next."
     (condition-broadcast (session-interactive-threads-queue *session*))))
 
 (defun interactive-threads (&optional (session *session*))
+  #!+sb-doc
+  "Return the interactive threads of SESSION defaulting to the current
+session."
   (session-interactive-threads session))
 
 (defun foreground-thread (&optional (session *session*))
+  #!+sb-doc
+  "Return the foreground thread of SESSION defaulting to the current
+session."
   (first (interactive-threads session)))
 
 (defun make-listener-thread (tty-name)
