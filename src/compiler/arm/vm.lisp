@@ -315,6 +315,14 @@
          ((valid-funtype '((unsigned-byte 32) (unsigned-byte 32)) '*)
           (values :direct nil))
          (t (values :default nil))))
+      (logbitp
+       (cond
+         ((or (valid-funtype '((constant-arg (integer 0 29)) fixnum) '*)
+              (valid-funtype '((constant-arg (integer 0 31)) (signed-byte 32)) '*)
+              (valid-funtype '((constant-arg (integer 0 31)) (unsigned-byte 32)) '*))
+          (values :transform '(lambda (index integer)
+                               (%logbitp integer index))))
+         (t (values :default nil))))
       (t (values :default nil)))))
 
 (defun primitive-type-indirect-cell-type (ptype)
