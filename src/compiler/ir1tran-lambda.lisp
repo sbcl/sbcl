@@ -712,9 +712,8 @@
              (default (arg-info-default info))
              (hairy-default (not (sb!xc:constantp default)))
              (supplied-p (arg-info-supplied-p info))
-             (n-val (make-symbol (format nil
-                                         "~A-DEFAULTING-TEMP"
-                                         (leaf-source-name key))))
+             ;; was: (format nil "~A-DEFAULTING-TEMP" (leaf-source-name key))
+             (n-val (make-symbol ".DEFAULTING-TEMP."))
              (val-temp (make-lambda-var :%source-name n-val)))
         (main-vars val-temp)
         (bind-vars key)
