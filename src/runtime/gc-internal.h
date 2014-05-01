@@ -73,7 +73,7 @@ NWORDS(uword_t x, uword_t n_bits)
 
 /* FIXME: Shouldn't this be defined in sbcl.h? */
 
-#if defined(LISP_FEATURE_SPARC)
+#if defined(LISP_FEATURE_SPARC) || defined(LISP_FEATURE_ARM)
 #define FUN_RAW_ADDR_OFFSET 0
 #else
 #define FUN_RAW_ADDR_OFFSET (offsetof(struct simple_fun, code) - FUN_POINTER_LOWTAG)
