@@ -35,7 +35,9 @@
              (:nconc
               (let ((temp (gensym))
                     (map-result (gensym)))
-                `(let ((,map-result (list nil)))
+                `(let ((,map-result
+                        (locally (declare (muffle-conditions compiler-note))
+                          (list nil))))
                    (declare (truly-dynamic-extent ,map-result))
                    (do-anonymous ((,temp ,map-result) . ,(do-clauses))
                      (,endtest (cdr ,map-result))
@@ -43,7 +45,9 @@
              (:list
               (let ((temp (gensym))
                     (map-result (gensym)))
-                `(let ((,map-result (list nil)))
+                `(let ((,map-result
+                        (locally (declare (muffle-conditions compiler-note))
+                          (list nil))))
                    (declare (truly-dynamic-extent ,map-result))
                    (do-anonymous ((,temp ,map-result) . ,(do-clauses))
                      (,endtest (truly-the list (cdr ,map-result)))
