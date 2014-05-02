@@ -112,6 +112,9 @@
 
 (!define-type-vops closurep nil nil nil (closure-header-widetag))
 
+(!define-type-vops simple-fun-p nil nil nil
+  (simple-fun-header-widetag))
+
 (!define-type-vops funcallable-instance-p nil nil nil
   (funcallable-instance-header-widetag))
 

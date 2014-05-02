@@ -63,6 +63,7 @@
            #!+#.(cl:if (cl:= 64 sb!vm:n-word-bits) '(and) '(or))
            signed-byte-64-p
            weak-pointer-p code-component-p lra-p
+           simple-fun-p
            closurep
            funcallable-instance-p)
   (t) boolean (movable foldable flushable))

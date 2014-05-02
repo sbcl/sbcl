@@ -195,6 +195,7 @@
   (define-type-predicate simple-vector-p simple-vector)
   (define-type-predicate stringp string)
   (define-type-predicate %instancep instance)
+  (define-type-predicate simple-fun-p simple-fun)
   (define-type-predicate closurep closure)
   (define-type-predicate funcallable-instance-p funcallable-instance)
   (define-type-predicate symbolp symbol)
