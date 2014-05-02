@@ -73,7 +73,7 @@
 
 ;;; the simplest, most vanilla MAKE-LOAD-FORM function for DEF!STRUCT
 ;;; objects
-;;; If, in general we could reverse-engineer that when a user-written
+;;; If, in general, we could reverse-engineer that when a user-written
 ;;; MAKE-LOAD-FORM was (MAKE-LOAD-FORM-SAVING-SLOTS ...) in an expected way,
 ;;; we could obtain fasl-op-based dumping of user-defined structures.
 ;;; At present we've no way to infer when the semantics of the Lisp code
@@ -81,7 +81,7 @@
 ;;; "dump the layout, dump the slots" (a/k/a :just-dump-it-normally).
 ;;; Barring that, there's no choice but to compile code to recreate users'
 ;;; constant structures. Otherwise we could nearly eliminate DEF!STRUCT too.
-;;; Consider it's objectives:
+;;; Consider its objectives:
 ;;;  - enable efficient structure dumping
 ;;;  - inform the cross-compiler of SBCL-style metadata using only ANSI Lisp
 ;;;  - doing it *before* the defining form has been seen during cross-compile
