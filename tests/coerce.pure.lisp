@@ -100,3 +100,18 @@
     ;; (test-case #C(1/2 .5e0) '(complex (or (real 1) (integer -1 0)))       nil              t)
 
     ))
+
+(with-test (:name :coerce-symbol-to-fun)
+  (flet ((coerce-it (x)
+           (handler-case (sb-kernel:coerce-symbol-to-fun x)
+             (simple-error (c) (simple-condition-format-control c)))))
+    (assert (string= (coerce-it 'defun) "~S names a macro."))
+    (assert (string= (coerce-it 'progn) "~S names a special operator."))
+    (let ((foo (gensym)))
+      (eval `(defmacro ,foo () 5))
+      (setf (sb-int:info :function :kind foo) :function)
+      (assert (string= (coerce-it foo) "~S names a macro.")))
+    (let ((foo (gensym)))
+      (eval `(defun ,foo () 5))
+      (setf (sb-int:info :function :kind foo) :macro)
+      (assert (functionp (coerce-it foo))))))

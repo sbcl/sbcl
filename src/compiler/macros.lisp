@@ -70,7 +70,7 @@
                (error 'special-form-function :name ',name))
              (let ((fun #',guard-name))
                (setf (%simple-fun-arglist fun) ',lambda-list
-                     (%simple-fun-name fun) ',name
+                     (%simple-fun-name fun) '(sb!impl::special-operator ,name)
                      (symbol-function ',name) fun)
                (fmakunbound ',guard-name)))
            ;; FIXME: Evidently "there can only be one!" -- we overwrite any
