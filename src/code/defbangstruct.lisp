@@ -73,6 +73,25 @@
 
 ;;; the simplest, most vanilla MAKE-LOAD-FORM function for DEF!STRUCT
 ;;; objects
+;;; If, in general we could reverse-engineer that when a user-written
+;;; MAKE-LOAD-FORM was (MAKE-LOAD-FORM-SAVING-SLOTS ...) in an expected way,
+;;; we could obtain fasl-op-based dumping of user-defined structures.
+;;; At present we've no way to infer when the semantics of the Lisp code
+;;; produced by MAKE-LOAD-FORM-SAVING-SLOTS is effectively the same as
+;;; "dump the layout, dump the slots" (a/k/a :just-dump-it-normally).
+;;; Barring that, there's no choice but to compile code to recreate users'
+;;; constant structures. Otherwise we could nearly eliminate DEF!STRUCT too.
+;;; Consider it's objectives:
+;;;  - enable efficient structure dumping
+;;;  - inform the cross-compiler of SBCL-style metadata using only ANSI Lisp
+;;;  - doing it *before* the defining form has been seen during cross-compile
+;;;  - (maybe) even during building of the XC
+;;; Of those goals, all but the last can be achieved by writing an ordinary
+;;; DEFSTRUCT, putting it early enough, and attaching a magic property to
+;;; the symbol naming your DEFSTRUCT. Witness that "backq.lisp" contains a
+;;; manipulatable dumpable defstruct, modulo a problem that would be fixed by
+;;; just delaying until after defsetfs is processed. backq is unique in that
+;;; no other defstruct has the distinction of preceding defsetfs.
 (defun just-dump-it-normally (object &optional (env nil env-p))
   (declare (type structure!object object))
   (declare (ignorable env env-p object))
