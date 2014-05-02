@@ -129,8 +129,7 @@
 ;; CALLABLE is a function-designator, not an extended-function-designator,
 ;; i.e. it is a function or symbol, and not a generalized function name.
 ;; This function is defknowned with 'explicit-check', and we avoid calling
-;; SYMBOL-FUNCTION because that would do another check. Three lines
-;; copied-n-pasted seems preferable to yet another macro-like thing.
+;; SYMBOL-FUNCTION because that would do another check.
 (defun %coerce-callable-to-fun (callable)
   (etypecase callable
     (function callable)

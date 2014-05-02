@@ -270,12 +270,8 @@ return NIL. Can be set with SETF when ENV is NIL."
   (case doc-type
     (variable (setf (info :variable :documentation name) string))
     (function
-     ;; KLUDGE: FDEFINITION isn't ready early enough during cold-init, so
-     ;; special case for symbols.
-     (if (symbolp name)
-         (setf (%fun-doc (symbol-function name)) string)
-         (when (legal-fun-name-p name)
-           (setf (%fun-doc (fdefinition name)) string))))
+     (when (legal-fun-name-p name)
+       (setf (%fun-doc (fdefinition name)) string)))
     (structure (cond
                  ((eq (info :type :kind name) :instance)
                   (setf (info :type :documentation name) string))
