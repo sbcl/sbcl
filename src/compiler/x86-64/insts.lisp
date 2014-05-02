@@ -355,8 +355,7 @@
   ;; Do we want to push this logic into MAYBE-NOTE-ASSEMBLER-ROUTINE?
   (dolist (symbol *static-symbols*)
     (when (= (get-lisp-obj-address symbol) value)
-      (return (sb!disassem:note (lambda (s) (format s "possibly ~S" symbol))
-                                dstate))))
+      (return (sb!disassem:note (lambda (s) (prin1 symbol s)) dstate))))
   (princ value stream))
 ) ; EVAL-WHEN
 
