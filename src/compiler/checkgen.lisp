@@ -429,12 +429,18 @@
   ;; This is a read-time constant because I don't want cold-init to
   ;; try to re-create it.
   #!-(or alpha hppa mips)
-  '#.(mapcar (lambda (x)
-               (cons x (intern (format nil "OBJECT-NOT-~A-ERROR" x)
-                               'sb!kernel)))
-             '(list cons
-               number real ratio bignum integer fixnum
-               array vector simple-vector string))
+  '#.(nconc
+      (mapcar (lambda (x)
+                (cons x (intern (format nil "OBJECT-NOT-~A-ERROR" x)
+                                'sb!kernel)))
+              '(list cons
+                number real ratio bignum integer fixnum
+                array vector simple-vector string))
+      ;; why's this one gotta be different? I guess that why it's not fun!
+      '((function . sb!kernel:object-not-fun-error)
+        ;; urgh. should use a patterned approach to generating these
+        ((simple-array (unsigned-byte 8))
+         . sb!kernel:object-not-simple-array-unsigned-byte-8-error)))
   ;; But on the backends which don't eval the argument to the ERROR-CALL macro,
   ;; there's no good way to to express the %TYPE-CHECK-ERROR/C vop.
   #!+(or alpha hppa mips) NIL
@@ -460,7 +466,8 @@
                           (specifier (type-specifier (third type)))
                           (interr-symbol
                            (cdr (assoc specifier
-                                       +primitive-type-check-err-consts+))))
+                                       +primitive-type-check-err-consts+
+                                       :test #'equal))))
                      `(unless (typep ,temp ',test)
                         ,(if interr-symbol
                              `(%type-check-error/c ,temp ',interr-symbol)
