@@ -217,8 +217,8 @@
           "(#+#.(cl:progn (cl-user::esoteric-load-thing) 'sbcl) hiyya hoho)")))
     (assert (equal value '(hiyya hoho)))))
 
-(with-test (:name :unicode-dispatch-macros
-            :skipped-on '(not :sb-unicode))
+#+sb-unicode
+(with-test (:name :unicode-dispatch-macros)
   (let ((*readtable* (copy-readtable)))
     (make-dispatch-macro-character (code-char #x266F)) ; musical sharp
     (set-dispatch-macro-character
