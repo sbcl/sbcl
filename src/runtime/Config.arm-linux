@@ -31,6 +31,9 @@ endif
 ifdef LISP_FEATURE_SB_CORE_COMPRESSION
   OS_LIBS += -lz
 endif
+ifdef LISP_FEATURE_LARGEFILE
+  CFLAGS += -D_LARGEFILE_SOURCE -D_LARGEFILE64_SOURCE -D_FILE_OFFSET_BITS=64
+endif
 
 # Nothing to do for after-grovel-headers.
 .PHONY: after-grovel-headers
