@@ -747,9 +747,12 @@
           #!-(or x86 x86-64)
           (cond
             #!+arm-softfp
-            ((consp tn)
-             (vop sb!vm::move-double-to-int-arg call block
-                  (lvar-tn call block arg) (first tn) (second tn)))
+            ((and (proper-list-of-length-p tn 3)
+                  (symbolp (third tn)))
+             (emit-template call block
+                            (template-or-lose (third tn))
+                            (reference-tn (lvar-tn call block arg) nil)
+                            (reference-tn-list (butlast tn) t)))
             (t
              (let ((temp-tn (make-representation-tn
                              (tn-primitive-type first-tn) scn)))
@@ -779,7 +782,8 @@
       (aver (null args))
       (unless (listp result-tns)
         (setf result-tns (list result-tns)))
-      (let ((arg-tns (flatten-list arg-tns)))
+      (let ((arg-tns (remove-if-not #'tn-p (flatten-list arg-tns)))
+            (result-tns (remove-if-not #'tn-p result-tns)))
         (vop* call-out call block
               ((lvar-tn call block function)
                (reference-tn-list arg-tns nil))
@@ -793,9 +797,11 @@
       (cond
         #!+arm-softfp
         ((and lvar
-              (proper-list-of-length-p result-tns 2))
-         (vop sb!vm::move-int-args-to-double call block
-              (first result-tns) (second result-tns)
-              (car (ir2-lvar-locs (lvar-info lvar)))))
+              (proper-list-of-length-p result-tns 3)
+              (symbolp (third result-tns)))
+         (emit-template call block
+                        (template-or-lose (third result-tns))
+                        (reference-tn-list (butlast result-tns) nil)
+                        (reference-tn (car (ir2-lvar-locs (lvar-info lvar))) t)))
         (t
          (move-lvar-result call block result-tns lvar))))))
