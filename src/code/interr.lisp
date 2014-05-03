@@ -16,52 +16,19 @@
 
 (defvar *internal-errors*
   #.(map 'vector
-         (lambda (x)
-           (if (typep (car x) '(or symbol cons)) (car x) 0))
+         (lambda (x) (if (typep (car x) '(or symbol cons)) (car x) 0))
          sb!c:*backend-internal-errors*))
 
 (eval-when (:compile-toplevel :execute)
-
 (sb!xc:defmacro deferr (name args &rest body)
-  (let* ((rest-pos (position '&rest args))
-         (required (if rest-pos (subseq args 0 rest-pos) args))
-         (fn-name (symbolicate name "-HANDLER")))
-    (with-unique-names (fp context sc-offsets)
-      `(progn
-         ;; FIXME: Having a separate full DEFUN for each error doesn't
-         ;; seem to add much value, and it takes a lot of space. Perhaps
-         ;; we could do this dispatch with a big CASE statement instead?
-         (defun ,fn-name (name ,fp ,context ,sc-offsets)
-           ;; FIXME: It would probably be good to do *STACK-TOP-HINT*
-           ;; tricks to hide this internal error-handling logic from the
-           ;; poor high level user, so his debugger tells him about
-           ;; where his error was detected instead of telling him where
-           ;; he ended up inside the system error-handling logic.
-           (declare (ignorable name ,fp ,context ,sc-offsets))
-           (let (,@(let ((offset -1))
-                        (mapcar (lambda (var)
-                                  `(,var (sb!di::sub-access-debug-var-slot
-                                          ,fp
-                                          (nth ,(incf offset)
-                                           ,sc-offsets)
-                                          ,context)))
-                                required))
-                 ,@(when rest-pos
-                     `((,(nth (1+ rest-pos) args)
-                        (mapcar (lambda (sc-offset)
-                                  (sb!di::sub-access-debug-var-slot
-                                   ,fp
-                                   sc-offset
-                                   ,context))
-                         (nthcdr ,rest-pos ,sc-offsets))))))
-             ,@body))
-        (setf (svref *internal-errors* ,(error-number-or-lose name))
-              #',fn-name)))))
-
+  (let ((n (length args)))
+    (unless (<= n 3)
+      (error "Update (DEFUN INTERNAL-ERROR) for ~D error arguments" n)))
+  `(setf (svref *internal-errors* ,(error-number-or-lose name))
+         (lambda (name ,@args)
+           (declare (optimize (sb!c::verify-arg-count 0)) (ignorable name))
+           ,@body)))
 ) ; EVAL-WHEN
-
-(deferr unknown-error (&rest args)
-  (error "unknown error:~{ ~S~})" args))
 
 (deferr undefined-fun-error (fdefn-or-symbol)
   (error 'undefined-function
@@ -99,8 +66,7 @@
 (deferr invalid-unwind-error ()
   (error 'simple-control-error
          :format-control
-         "attempt to RETURN-FROM a block or GO to a tag that no longer exists"
-         ))
+         "attempt to RETURN-FROM a block or GO to a tag that no longer exists"))
 
 (deferr unseen-throw-tag-error (tag)
   (error 'simple-control-error
@@ -275,8 +241,17 @@
                                                       sb!vm::cfp-offset)))
                  (handler (and (< -1 error-number (length *internal-errors*))
                                (svref *internal-errors* error-number))))
-             (cond ((functionp handler)
-                    (funcall handler name fp alien-context arguments))
+             (cond ((and (functionp handler)
+                         (eql (1- (length (%simple-fun-arglist handler)))
+                              (length arguments)))
+                    (macrolet ((arg (n)
+                                 `(sb!di::sub-access-debug-var-slot
+                                   fp (nth ,n arguments) alien-context)))
+                      (ecase (length arguments)
+                        (0 (funcall handler name))
+                        (1 (funcall handler name (arg 0)))
+                        (2 (funcall handler name (arg 0) (arg 1)))
+                        (3 (funcall handler name (arg 0) (arg 1) (arg 2))))))
                    ((typep handler '(or symbol cons))
                     (error 'type-error
                            :datum (sb!di::sub-access-debug-var-slot
