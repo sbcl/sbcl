@@ -129,10 +129,10 @@
 (declaim (type hash-table *backend-predicate-types*))
 (declaim (type list *backend-type-predicates*))
 
-;;; a vector of the internal errors defined for this backend, or NIL if
-;;; they haven't been installed yet
-(defvar *backend-internal-errors* nil)
-(declaim (type (or simple-vector null) *backend-internal-errors*))
+;;; a vector of the internal errors defined for this backend.
+;;; Empty if they haven't been installed yet.
+(defvar *backend-internal-errors* #())
+(declaim (type simple-vector *backend-internal-errors*))
 
 ;;;; VM support routines which backends need to implement
 

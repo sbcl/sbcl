@@ -1944,7 +1944,7 @@
       t)))
 
 (defun get-internal-error-name (errnum)
-  (car (svref sb!c:*backend-internal-errors* errnum)))
+  (cdr (svref sb!c:*backend-internal-errors* errnum)))
 
 (defun get-sc-name (sc-offs)
   (sb!c:location-print-name

@@ -14,76 +14,45 @@
 (in-package "SB!KERNEL")
 
 (defun error-number-or-lose (name)
-  (or (position name sb!c:*backend-internal-errors* :key #'car)
+  (or (position name sb!c:*backend-internal-errors* :key #'cdr)
       (error "unknown internal error: ~S" name)))
 
-;;; FIXME: Having each of these error handlers be a full, named function
-;;; seems to contribute a noticeable amount of bloat and little value.
-;;; Perhaps we could just make a single error-handling function with a
-;;; big CASE statement inside it? Or at least implement the error handling
-;;; functions as closures instead of DEFUNs?
-(eval-when (:compile-toplevel :execute)
-  (def!macro define-internal-errors (&rest errors)
-             (let ((info (mapcar (lambda (x)
-                                   (cons (symbolicate (first x) "-ERROR")
-                                         (second x)))
-                                 errors)))
-               `(progn
-                  (setf sb!c:*backend-internal-errors*
-                        ',(coerce info 'vector))
-                  nil))))
-
-(define-internal-errors
-  (unknown
-   "unknown system lossage")
-  (object-not-fun
-   "Object is not of type FUNCTION.")
-  (object-not-list
-   "Object is not of type LIST.")
-  (object-not-bignum
-   "Object is not of type BIGNUM.")
-  (object-not-ratio
-   "Object is not of type RATIO.")
-  (object-not-single-float
-   "Object is not of type SINGLE-FLOAT.")
-  (object-not-double-float
-   "Object is not of type DOUBLE-FLOAT.")
-  #!+long-float
-  (object-not-long-float
-   "Object is not of type LONG-FLOAT.")
-  (object-not-simple-string
-   "Object is not of type SIMPLE-STRING.")
-  (object-not-fixnum
-   "Object is not of type FIXNUM.")
-  (object-not-vector
-   "Object is not of type VECTOR.")
-  (object-not-string
-   "Object is not of type STRING.")
-  (object-not-base-string
-   "Object is not of type BASE-STRING.")
-  (object-not-vector-nil
-   "Object is not of type (VECTOR NIL).")
+;; These used to be stored as  (error-number . string) but now they're
+;; (type-spec|string . error-number) for two reasons:
+;; 1. I dislike seeing (object-not-unsigned-byte-8 unsigned-byte 8)
+;;    instead of (object-not-unsigned-byte . (unsigned-byte 8))
+;; 2. It's conceptually a mapping FROM a type-spec TO an error-number.
+;;    Envisioned that way, the alist keys want to be in the car.
+;;    The fact that a few "keys" are strings is largely irrelevant
+;;    and I'd probably like to discard them after genesis.
+;;
+(setf sb!c:*backend-internal-errors*
+(map 'vector (lambda (x) (cons (cadr x) (symbolicate (car x) "-ERROR")))
+`((unknown "unknown system lossage")
+  (object-not-fun function)
+  (object-not-list list)
+  (object-not-bignum bignum)
+  (object-not-ratio ratio)
+  (object-not-single-float single-float)
+  (object-not-double-float double-float)
+  #!+long-float (object-not-long-float long-float)
+  (object-not-simple-string simple-string)
+  (object-not-fixnum fixnum)
+  (object-not-vector vector)
+  (object-not-string string)
+  (object-not-base-string base-string)
+  (object-not-vector-nil (vector nil))
   #!+sb-unicode
-  (object-not-character-string
-   "Object is not of type (VECTOR CHARACTER).")
-  (object-not-bit-vector
-   "Object is not of type BIT-VECTOR.")
-  (object-not-array
-   "Object is not of type ARRAY.")
-  (object-not-number
-   "Object is not of type NUMBER.")
-  (object-not-rational
-   "Object is not of type RATIONAL.")
-  (object-not-float
-   "Object is not of type FLOAT.")
-  (object-not-real
-   "Object is not of type REAL.")
-  (object-not-integer
-   "Object is not of type INTEGER.")
-  (object-not-cons
-   "Object is not of type CONS.")
-  (object-not-symbol
-   "Object is not of type SYMBOL.")
+  (object-not-character-string (vector character))
+  (object-not-bit-vector bit-vector)
+  (object-not-array array)
+  (object-not-number number)
+  (object-not-rational rational)
+  (object-not-float float)
+  (object-not-real real)
+  (object-not-integer integer)
+  (object-not-cons cons)
+  (object-not-symbol symbol)
   (undefined-fun
    ;; FIXME: Isn't this used for calls to unbound (SETF FOO) too? If so, revise
    ;; the name.
@@ -91,76 +60,90 @@
   #!+x86-64
   (undefined-alien-fun
    "An attempt was made to use an undefined alien function")
-  (invalid-arg-count
-   "invalid argument count")
-  (bogus-arg-to-values-list
-   "bogus argument to VALUES-LIST")
-  (unbound-symbol
-   "An attempt was made to use an undefined SYMBOL-VALUE.")
-  (object-not-sap
-   "Object is not a System Area Pointer (SAP).")
-  (invalid-unwind
-   "attempt to RETURN-FROM a block that no longer exists")
-  (unseen-throw-tag
-   "attempt to THROW to a non-existent tag")
-  (division-by-zero
-   "division by zero")
-  (object-not-type
-   "Object is of the wrong type.")
-  (odd-key-args
-   "odd number of &KEY arguments")
-  (unknown-key-arg
-   "unknown &KEY argument")
-  (invalid-array-index
-   "invalid array index")
-  (wrong-number-of-indices
-   "wrong number of indices")
-  (object-not-simple-array
-   "Object is not of type SIMPLE-ARRAY.")
-  (object-not-signed-byte-32
-   "Object is not of type (SIGNED-BYTE 32).")
-  (object-not-unsigned-byte-32
-   "Object is not of type (UNSIGNED-BYTE 32).")
-  (object-not-complex
-   "Object is not of type COMPLEX.")
-  (object-not-complex-rational
-   "Object is not of type (COMPLEX RATIONAL).")
-  (object-not-complex-float
-   "Object is not of type (COMPLEX FLOAT).")
-  (object-not-complex-single-float
-   "Object is not of type (COMPLEX SINGLE-FLOAT).")
-  (object-not-complex-double-float
-   "Object is not of type (COMPLEX DOUBLE-FLOAT).")
-  #!+long-float
-  (object-not-complex-long-float
-   "Object is not of type (COMPLEX LONG-FLOAT).")
-  #!+sb-simd-pack
-  (object-not-simd-pack
-   "Object is not of type SIMD-PACK.")
-  (object-not-weak-pointer
-   "Object is not a WEAK-POINTER.")
-  (object-not-instance
-   "Object is not a INSTANCE.")
-  (object-not-character
-   "Object is not a CHARACTER.")
-  (nil-fun-returned
-   "A function with declared result type NIL returned.")
-  (nil-array-accessed
-   "An array with element-type NIL was accessed.")
-  (layout-invalid
-   "Object layout is invalid. (indicates obsolete instance)")
-  (object-not-complex-vector
-   "Object is not a complex (non-SIMPLE-ARRAY) vector.")
-  (tls-exhausted
-   "Thread local storage exhausted.")
-  .
-  #.(map 'list
+  (invalid-arg-count "invalid argument count")
+  (bogus-arg-to-values-list "bogus argument to VALUES-LIST")
+  (unbound-symbol "An attempt was made to use an undefined SYMBOL-VALUE.")
+  (object-not-sap system-area-pointer)
+  (invalid-unwind "attempt to RETURN-FROM a block that no longer exists")
+  (unseen-throw-tag "attempt to THROW to a non-existent tag")
+  (division-by-zero "division by zero")
+  (object-not-type "Object is of the wrong type.")
+  (odd-key-args "odd number of &KEY arguments")
+  (unknown-key-arg "unknown &KEY argument")
+  (invalid-array-index"invalid array index")
+  (wrong-number-of-indices "wrong number of indices")
+  (object-not-simple-array simple-array)
+  (object-not-signed-byte-32 (signed-byte 32))
+  (object-not-unsigned-byte-8 (unsigned-byte 8))
+  ;; not sure where this is used, but it ranks high on the popularity poll
+  (object-not-unsigned-byte-9 (unsigned-byte 9))
+  (object-not-unsigned-byte-32 (unsigned-byte 32))
+  ;; regardless of word size, this can't hurt to have
+  (object-not-unsigned-byte-64 (unsigned-byte 64))
+  (object-not-complex complex)
+  (object-not-complex-rational (complex rational))
+  (object-not-complex-float (complex float))
+  (object-not-complex-single-float (complex single-float))
+  (object-not-complex-double-float (complex double-float))
+  #!+long-float (object-not-complex-long-float (complex long-float))
+  #!+sb-simd-pack (object-not-simd-pack simd-pack)
+  (object-not-weak-pointer weak-pointer)
+  (object-not-instance instance)
+  (object-not-character character)
+  (nil-fun-returned "A function with declared result type NIL returned.")
+  (nil-array-accessed "An array with element-type NIL was accessed.")
+  (layout-invalid "Object layout is invalid. (indicates obsolete instance)")
+  (object-not-complex-vector (and vector (not simple-array)))
+  (tls-exhausted "Thread local storage exhausted.")
+
+  ;; now, in descending order by popularity.
+  ;; The reasoning is that if we exceed 255 error numbers we can delete
+  ;; harmlessly from the end. Error numbers must not be more than one byte.
+  (object-not-storage-class sb!c:sc) ; the single most popular type
+  ;; also we need (mod index+1) but I'm not sure how to express it
+  (object-not-index sb!int:index) ; the second-most popular type for checkgen
+  (object-not-tn-ref sb!c:tn-ref)
+  (object-not-ctype sb!kernel:ctype)
+  (object-not-buffer sb!impl::buffer)
+  (object-not-vop sb!c::vop)
+  (object-not-basic-combination sb!c::basic-combination)
+  (object-not-fd-stream sb!sys:fd-stream)
+  (object-not-layout layout)
+  (object-not-assem-segment sb!assem:segment)
+  (object-not-cblock sb!c::cblock)
+  (object-not-disassem-state sb!disassem:disassem-state)
+  (object-not-ctran sb!c::ctran)
+  (object-not-clambda sb!c::clambda)
+  (object-not-tn sb!c:tn)
+  (object-not-callable (or function symbol))
+  (object-not-component sb!c:component)
+  (object-not-index-or-null (or index null))
+  (object-not-stream stream)
+  (object-not-ir2-block sb!c::ir2-block)
+  (object-not-lvar sb!c::lvar)
+  (object-not-lop-info sb!c::vop-info)
+  (object-not-disassembler-instruction sb!disassem:instruction)
+  (object-not-unicode-code-point (mod 1114112))
+  (object-not-compiler-node sb!c::node)
+  (object-not-sequence sequence)
+  (object-not-functional sb!c::functional)
+  (object-not-boolean (member t nil)) ; also have (member nil t). Why?
+  (object-not-lambda-var sb!c::lambda-var)
+  (object-not-alien-type-class sb!alien::alien-type-class)
+  (object-not-lexenv sb!kernel:lexenv)
+  (object-not-hash-table hash-table)
+  (object-not-package package)
+  ;; Most of these array types are unimportant to have as primitive traps.
+  ;; It can't hurt to keep them all unless the entire list is too long.
+  ,@(map 'list
          (lambda (saetp)
            (list
             (symbolicate "OBJECT-NOT-" (sb!vm:saetp-primitive-type-name saetp))
-            (format nil "Object is not of type ~A."
-                    (type-specifier
-                     (specifier-type
-                      `(simple-array ,(sb!vm:saetp-specifier saetp) (*)))))))
-         sb!vm:*specialized-array-element-type-properties*))
-
+            ;; back and forth from specifier to type to specifier because:
+            ;;  (SIMPLE-ARRAY BASE-CHAR (*)) -> SIMPLE-BASE-STRING
+            ;;  (SIMPLE-ARRAY BIT (*)) -> SIMPLE-BIT-VECTOR
+            ;;  (SIMPLE-ARRAY T (*)) -> SIMPLE-VECTOR
+            (type-specifier
+             (specifier-type
+              `(simple-array ,(sb!vm:saetp-specifier saetp) (*))))))
+         sb!vm:*specialized-array-element-type-properties*))))

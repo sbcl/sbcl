@@ -81,6 +81,19 @@
         (sb!int:info :function :where-from f) :declared))
 (load "src/cold/compile-cold-sbcl.lisp")
 
+;; After cross-compiling, show me a list of types that checkgen
+;; would have liked to use primitive traps for but couldn't.
+#+nil
+(let ((l (sb-impl::%hash-table-alist sb!c::*checkgen-used-types*)))
+  (format t "~&Types needed by checkgen: ('+' = has internal error number)~%")
+  (setq l (sort l #'> :key #'cadr))
+  (loop for (type-spec . (count . interr-p)) in l
+        do (format t "~:[ ~;+~] ~5D ~S~%" interr-p count type-spec))
+  (format t "~&Error numbers not used by checkgen:~%")
+  (loop for (spec . symbol) across sb!c::*backend-internal-errors*
+        when (and (not (stringp spec))
+                  (not (gethash spec sb!c::*checkgen-used-types*)))
+        do (format t "       ~S~%" spec)))
 
 ;;; miscellaneous tidying up and saving results
 (let ((filename "output/object-filenames-for-genesis.lisp-expr"))

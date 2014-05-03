@@ -425,26 +425,40 @@
 ;; used in lieu of OBJECT-NOT-TYPE-ERROR. On x86-64 this saves 16 bytes: 1 word
 ;; for the symbol in the function's constant area, a MOV instruction to load it,
 ;; and an sc-offset in the error trap.
-(defconstant-eqx +primitive-type-check-err-consts+
-  ;; This is a read-time constant because I don't want cold-init to
-  ;; try to re-create it.
-  #!-(or alpha hppa mips)
-  '#.(nconc
-      (mapcar (lambda (x)
-                (cons x (intern (format nil "OBJECT-NOT-~A-ERROR" x)
-                                'sb!kernel)))
-              '(list cons
-                number real ratio bignum integer fixnum
-                array vector simple-vector string))
-      ;; why's this one gotta be different? I guess that why it's not fun!
-      '((function . sb!kernel:object-not-fun-error)
-        ;; urgh. should use a patterned approach to generating these
-        ((simple-array (unsigned-byte 8))
-         . sb!kernel:object-not-simple-array-unsigned-byte-8-error)))
-  ;; But on the backends which don't eval the argument to the ERROR-CALL macro,
-  ;; there's no good way to to express the %TYPE-CHECK-ERROR/C vop.
-  #!+(or alpha hppa mips) NIL
-  #'equal)
+(defglobal **type-spec-interr-symbols**
+    ;; read-time eval so that cold-init doesn't re-make the table
+    #.(let* ((entries (remove-if #'stringp sb!c:*backend-internal-errors*
+                                 :key #'car))
+             ;; This is an effectively a compact read-only binned hashtable.
+             (hashtable (make-array (logior (length entries) 1)
+                                    :initial-element nil)))
+        ;; Older architectures don't have a VOP that can emit an arbitrary
+        ;; primitive trap (see "compiler/generic/type-error" - and fix that)
+        #!-(or alpha hppa mips)
+        (map nil
+             (lambda (entry)
+               (let* ((canon-type (type-specifier (specifier-type (car entry))))
+                      (bucket (mod (sxhash canon-type) (length hashtable))))
+                 (unless (equal canon-type (car entry))
+                   (setq entry (cons canon-type (cdr entry))))
+                 (push entry (svref hashtable bucket))))
+             entries)
+        hashtable))
+(defun %interr-symbol-for-type-spec (spec)
+  (let ((table **type-spec-interr-symbols**))
+    (cdr (assoc spec (svref table (rem (sxhash spec) (length table)))
+                :test #'equal))))
+#+nil ; some meta-analysis to decide what types should be in "generic/interr"
+(progn
+  (defvar *checkgen-used-types* (make-hash-table :test 'equal))
+  (defun interr-symbol-for-type-spec (spec)
+    (let ((answer (%interr-symbol-for-type-spec spec))
+          (meta (gethash spec *checkgen-used-types*)))
+      ;; spec -> (count . primitive-p)
+      (if meta
+          (incf (car meta))
+          (setf (gethash spec *checkgen-used-types*) (cons 1 answer)))
+      answer)))
 
 ;;; Return a lambda form that we can convert to do a hairy type check
 ;;; of the specified TYPES. TYPES is a list of the format returned by
@@ -463,15 +477,13 @@
                            (let ((*unparse-fun-type-simplify* t))
                              (type-specifier (second type))))
                           (test (if (first type) `(not ,spec) spec))
-                          (specifier (type-specifier (third type)))
+                          (external-spec (type-specifier (third type)))
                           (interr-symbol
-                           (cdr (assoc specifier
-                                       +primitive-type-check-err-consts+
-                                       :test #'equal))))
+                           (%interr-symbol-for-type-spec external-spec)))
                      `(unless (typep ,temp ',test)
                         ,(if interr-symbol
                              `(%type-check-error/c ,temp ',interr-symbol)
-                             `(%type-check-error ,temp ',specifier)))))
+                             `(%type-check-error ,temp ',external-spec)))))
                  temps
                  types)
        (values ,@temps))))

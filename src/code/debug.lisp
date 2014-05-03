@@ -524,7 +524,7 @@ thread, NIL otherwise."
     (let ((error-number (sb!vm:internal-error-args
                          (sb!di::compiled-frame-escaped frame))))
       (when (array-in-bounds-p sb!c:*backend-internal-errors* error-number)
-        (car (svref sb!c:*backend-internal-errors* error-number))))))
+        (cdr (svref sb!c:*backend-internal-errors* error-number))))))
 
 (defun clean-xep (frame name args info)
   (values (second name)

@@ -2953,18 +2953,15 @@ core and return a descriptor to it."
     (terpri))
 
   ;; writing information about internal errors
-  (let ((internal-errors sb!c:*backend-internal-errors*))
-    (dotimes (i (length internal-errors))
-      (let ((current-error (aref internal-errors i)))
-        ;; FIXME: this UNLESS should go away (see also FIXME in
-        ;; interr.lisp) -- APD, 2002-03-05
-        (unless (eq nil (car current-error))
-          (format t "#define ~A ~D~%"
-                  (c-symbol-name (car current-error))
-                  i))))
-    (format t "#define INTERNAL_ERROR_NAMES \\~%~{~S~#[~:;, \\~%~]~}~%"
-            (map 'list #'cdr internal-errors)))
-  (terpri)
+  (loop for (desc . symbol) across sb!c:*backend-internal-errors*
+        for i from 0
+        collect (if (stringp desc)
+                    desc
+                    (format nil "Object is not of type ~A." desc))
+        into texts
+        do (format t "#define ~A ~D~%" (c-symbol-name symbol) i)
+        finally (format t "#define INTERNAL_ERROR_NAMES ~{\\~%~S~^, ~}~2%"
+                        texts))
 
   ;; I'm not really sure why this is in SB!C, since it seems
   ;; conceptually like something that belongs to SB!VM. In any case,
