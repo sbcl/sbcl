@@ -40,10 +40,9 @@
 ;;; kind to associate with NAME.
 (defmacro def-ir1-translator (name (lambda-list start-var next-var result-var)
                               &body body)
-  (let ((fn-name (symbolicate "IR1-CONVERT-" name))
-        (guard-name (symbolicate name "-GUARD")))
+  (let ((fn-name (symbolicate "IR1-CONVERT-" name)))
     (with-unique-names (whole-var n-env)
-      (multiple-value-bind (body decls doc)
+      (multiple-value-bind (body decls #-sb-xc-host doc)
           (parse-defmacro lambda-list whole-var body name "special form"
                           :environment n-env
                           :error-fun 'compiler-error
@@ -63,16 +62,20 @@
            ;; the cross-compilation host Lisp, which owns the
            ;; SYMBOL-FUNCTION of its COMMON-LISP symbols. These guard
            ;; functions also provide the documentation for special forms.
-           (progn
-             (defun ,guard-name (&rest args)
-               ,@(when doc (list doc))
-               (declare (ignore args))
-               (error 'special-form-function :name ',name))
-             (let ((fun #',guard-name))
-               (setf (%simple-fun-arglist fun) ',lambda-list
-                     (%simple-fun-name fun) '(sb!impl::special-operator ,name)
-                     (symbol-function ',name) fun)
-               (fmakunbound ',guard-name)))
+           ;; FIXME: should be disallowed after bootstrap. Package-lock
+           ;; prevents it, but the protection could be stronger than that.
+           (setf (symbol-function ',name)
+                 ,(let ((ll (substitute '&rest '&body lambda-list))
+                        (crud sb!xc:lambda-list-keywords))
+                   (when (eq (first ll) '&whole) (setq ll (cddr ll)))
+                   ;; The lambda name has significance to COERCE-SYMBOL-TO-FUN.
+                   ;; Don't change it haphazardly - a unit test will fail.
+                   `(named-lambda (sb!impl::special-operator ,name) ,ll
+                     ,@(when doc (list doc))
+                     (declare (ignore ,@(remove-if (lambda (x) (memq x crud))
+                                                   ll))
+                              (optimize (verify-arg-count 0)))
+                     (error 'special-form-function :name ',name))))
            ;; FIXME: Evidently "there can only be one!" -- we overwrite any
            ;; other :IR1-CONVERT value. This deserves a warning, I think.
            (setf (info :function :ir1-convert ',name) #',fn-name)
