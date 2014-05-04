@@ -17,19 +17,33 @@
   (or (position name sb!c:*backend-internal-errors* :key #'cdr)
       (error "unknown internal error: ~S" name)))
 
-;; These used to be stored as  (error-number . string) but now they're
-;; (type-spec|string . error-number) for two reasons:
+;; These used to be stored as  (error-symbol . string) but now they're
+;; (error-string|type-spec . error-symbol) for two reasons:
 ;; 1. I dislike seeing (object-not-unsigned-byte-8 unsigned-byte 8)
 ;;    instead of (object-not-unsigned-byte . (unsigned-byte 8))
-;; 2. It's conceptually a mapping FROM a type-spec TO an error-number.
+;; 2. It's conceptually a mapping FROM a type-spec TO an error-symbol.
 ;;    Envisioned that way, the alist keys want to be in the car.
 ;;    The fact that a few "keys" are strings is largely irrelevant
 ;;    and I'd probably like to discard them after genesis.
 ;;
+(defun !c-stringify-internal-error (interr)
+  (destructuring-bind (description . symbol) interr
+    (if (stringp description)
+        description
+        (format nil "Object is not of type ~A."
+                ;; KLUDGE - the C descriptions of these type is too messy
+                (case symbol
+                  (object-not-sap-or-simple-specialized-vector-error
+                   "SAP-OR-SIMPLE-SPECIALIZED-VECTOR")
+                  (object-not-simple-specialized-vector-error
+                   "SIMPLE-SPECIALIZED-VECTOR")
+                  (t
+                   description))))))
+
 (setf sb!c:*backend-internal-errors*
 (map 'vector (lambda (x) (cons (cadr x) (symbolicate (car x) "-ERROR")))
 `((unknown "unknown system lossage")
-  (object-not-fun function)
+  (object-not-function function)
   (object-not-list list)
   (object-not-bignum bignum)
   (object-not-ratio ratio)
@@ -74,6 +88,7 @@
   (wrong-number-of-indices "wrong number of indices")
   (object-not-simple-array simple-array)
   (object-not-signed-byte-32 (signed-byte 32))
+  (object-not-unsigned-byte unsigned-byte)
   (object-not-unsigned-byte-8 (unsigned-byte 8))
   ;; not sure where this is used, but it ranks high on the popularity poll
   (object-not-unsigned-byte-9 (unsigned-byte 9))
@@ -100,7 +115,7 @@
   ;; The reasoning is that if we exceed 255 error numbers we can delete
   ;; harmlessly from the end. Error numbers must not be more than one byte.
   (object-not-storage-class sb!c:sc) ; the single most popular type
-  ;; also we need (mod index+1) but I'm not sure how to express it
+  (object-not-array-dimension (integer 0 ,sb!xc:array-dimension-limit))
   (object-not-index sb!int:index) ; the second-most popular type for checkgen
   (object-not-tn-ref sb!c:tn-ref)
   (object-not-ctype sb!kernel:ctype)
@@ -121,7 +136,7 @@
   (object-not-stream stream)
   (object-not-ir2-block sb!c::ir2-block)
   (object-not-lvar sb!c::lvar)
-  (object-not-lop-info sb!c::vop-info)
+  (object-not-vop-info sb!c::vop-info)
   (object-not-disassembler-instruction sb!disassem:instruction)
   (object-not-unicode-code-point (mod 1114112))
   (object-not-compiler-node sb!c::node)
@@ -135,6 +150,8 @@
   (object-not-package package)
   ;; Most of these array types are unimportant to have as primitive traps.
   ;; It can't hurt to keep them all unless the entire list is too long.
+  ;; [And it would be difficult not to keep them all
+  ;; because compiler/generic/late-type-vops refers to the error number names]
   ,@(map 'list
          (lambda (saetp)
            (list
@@ -146,4 +163,23 @@
             (type-specifier
              (specifier-type
               `(simple-array ,(sb!vm:saetp-specifier saetp) (*))))))
-         sb!vm:*specialized-array-element-type-properties*))))
+         sb!vm:*specialized-array-element-type-properties*)
+  ,@(let ((array-types
+           (remove
+            'simple-vector
+            (map 'list (lambda (saetp)
+                         (type-specifier
+                          (specifier-type
+                           `(simple-array ,(sb!vm:saetp-specifier saetp) (*)))))
+                 sb!vm:*specialized-array-element-type-properties*))))
+    ;; An error number for SIMPLE-SPECIALIZED-VECTOR wins in multiple ways.
+    ;; Every safe use of (VECTOR-SAP x) that had to type-check X also dumped
+    ;; a huge s-expression solely for the ERROR call. The conses alone are
+    ;; nearly 2KB, not to mention all the fasl ops to construct the monster.
+    `((object-not-simple-specialized-vector (or ,@array-types))
+      ;; KLUDGE: Slightly fragile as the order of OR terms makes a difference
+      (object-not-sap-or-simple-specialized-vector
+       (or ,@array-types system-area-pointer))))
+  ;; And finally, simple vector-of-anything is called a "rank-1-array"
+  ;; because "simple-vector" means (simple-array t (*))
+  (object-not-simple-rank-1-array (simple-array * (*))))))

@@ -17,7 +17,7 @@
   ;; we can save a couple of instructions and a branch on the ppc.
   :mask fixnum-tag-mask)
 
-(!define-type-vops functionp check-fun function object-not-fun-error
+(!define-type-vops functionp check-fun function object-not-function-error
   (fun-pointer-lowtag)
   :mask lowtag-mask)
 

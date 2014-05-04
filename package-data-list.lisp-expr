@@ -1292,6 +1292,9 @@ possibly temporarily, because it might be used internally."
    ;;   * Pull all the OBJECT-NOT-FOO symbols out. Maybe we could even
    ;;     figure out a way to stop exporting them? Failing that,
    ;;     they could be in SB-INTERR.
+   ;;     Or better still, since error names are basically meaningless except
+   ;;     for the ~18 errors that are _not_ object-not-<x>, stop naming them.
+   ;;     C just needs a map from number -> string-to-show.
    #s(sb-cold:package-data
       :name "SB!KERNEL"
       :doc
@@ -1630,7 +1633,7 @@ is a good idea, but see SB-SYS re. blurring of boundaries."
                ;; uses in the second sense as "hairy" instead?
                "OBJECT-NOT-COMPLEX-VECTOR-ERROR" "OBJECT-NOT-CONS-ERROR"
                "OBJECT-NOT-DOUBLE-FLOAT-ERROR" "OBJECT-NOT-FIXNUM-ERROR"
-               "OBJECT-NOT-FLOAT-ERROR" "OBJECT-NOT-FUN-ERROR"
+               "OBJECT-NOT-FLOAT-ERROR" "OBJECT-NOT-FUNCTION-ERROR"
                "OBJECT-NOT-INSTANCE-ERROR" "OBJECT-NOT-INTEGER-ERROR"
                "OBJECT-NOT-LIST-ERROR"
                #!+long-float "OBJECT-NOT-LONG-FLOAT-ERROR"

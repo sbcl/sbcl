@@ -107,6 +107,10 @@
   (:vop-var vop)
   (:save-p :compute-only)
   (:generator 900
+    ;; FIXME: this should be in the *elsewhere* segment.
+    ;; For lack of an architecture-independent way to emit
+    ;; a jump, it's in the regular segment which pollutes the
+    ;; instruction pipe with undecodable junk (the sc-numbers).
     (error-call vop errcode object)))
 
 ;;; FIXME: There is probably plenty of other array stuff that looks
