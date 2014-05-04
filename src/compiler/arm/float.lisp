@@ -340,7 +340,7 @@
 ;; which means that the :MOVE VOPs will be used to do the appropriate
 ;; conversion.
 (define-move-vop move-arg :move-arg
-  (single-reg double-reg #| complex-single-reg complex-double-reg |#)
+  (single-reg double-reg complex-single-reg complex-double-reg)
   (descriptor-reg))
 
 ;;;; Arithmetic VOPs:
