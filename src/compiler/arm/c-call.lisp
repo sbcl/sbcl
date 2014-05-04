@@ -281,66 +281,66 @@
          (arg-types (alien-fun-type-arg-types type))
          (result-type (alien-fun-type-result-type type)))
     (aver (= (length arg-types) (length args)))
-    (print (if (or (some (lambda (type)
-                     (and (alien-integer-type-p type)
-                          (> (sb!alien::alien-integer-type-bits type) 32)))
-                   arg-types)
-             (and (alien-integer-type-p result-type)
-                  (> (sb!alien::alien-integer-type-bits result-type) 32)))
-         (collect ((new-args) (lambda-vars) (new-arg-types))
-           (loop with i = 0
-                 for type in arg-types
-                 for arg = (gensym)
-                 do
-                 (lambda-vars arg)
-                 (cond ((and (alien-integer-type-p type)
-                             (> (sb!alien::alien-integer-type-bits type) 32))
-                        (when (oddp i)
-                          ;; long-long is only passed in pairs of r0-r1 and r2-r3,
-                          ;; and the stack is double-word aligned 
-                          (incf i)
-                          (new-args 0)
-                          (new-arg-types (parse-alien-type '(signed 8) env)))
-                        (incf i 2)
-                        (new-args `(logand ,arg #xffffffff))
-                        (new-args `(ash ,arg -32))
-                        (new-arg-types (parse-alien-type '(unsigned 32) env))
-                        (if (alien-integer-type-signed type)
-                            (new-arg-types (parse-alien-type '(signed 32) env))
-                            (new-arg-types (parse-alien-type '(unsigned 32) env))))
+    (if (or (some (lambda (type)
+                    (and (alien-integer-type-p type)
+                         (> (sb!alien::alien-integer-type-bits type) 32)))
+                  arg-types)
+            (and (alien-integer-type-p result-type)
+                 (> (sb!alien::alien-integer-type-bits result-type) 32)))
+        (collect ((new-args) (lambda-vars) (new-arg-types))
+                 (loop with i = 0
+                       for type in arg-types
+                       for arg = (gensym)
+                       do
+                       (lambda-vars arg)
+                       (cond ((and (alien-integer-type-p type)
+                                   (> (sb!alien::alien-integer-type-bits type) 32))
+                              (when (oddp i)
+                                ;; long-long is only passed in pairs of r0-r1 and r2-r3,
+                                ;; and the stack is double-word aligned 
+                                (incf i)
+                                (new-args 0)
+                                (new-arg-types (parse-alien-type '(signed 8) env)))
+                              (incf i 2)
+                              (new-args `(logand ,arg #xffffffff))
+                              (new-args `(ash ,arg -32))
+                              (new-arg-types (parse-alien-type '(unsigned 32) env))
+                              (if (alien-integer-type-signed type)
+                                  (new-arg-types (parse-alien-type '(signed 32) env))
+                                  (new-arg-types (parse-alien-type '(unsigned 32) env))))
+                             (t
+                              (incf i (cond ((or (alien-double-float-type-p type)
+                                                 #!-arm-softfp (alien-single-float-type-p type))
+                                             #!+arm-softfp 2
+                                             #!-arm-softfp 0)
+                                            (t
+                                             1)))
+                              (new-args arg)
+                              (new-arg-types type))))
+                 (cond ((and (alien-integer-type-p result-type)
+                             (> (sb!alien::alien-integer-type-bits result-type) 32))
+                        (let ((new-result-type
+                                (let ((sb!alien::*values-type-okay* t))
+                                  (parse-alien-type
+                                   (if (alien-integer-type-signed result-type)
+                                       '(values (unsigned 32) (signed 32))
+                                       '(values (unsigned 32) (unsigned 32)))
+                                   env))))
+                          `(lambda (function type ,@(lambda-vars))
+                             (declare (ignore type))
+                             (multiple-value-bind (low high)
+                                 (%alien-funcall function
+                                                 ',(make-alien-fun-type
+                                                    :arg-types (new-arg-types)
+                                                    :result-type new-result-type)
+                                                 ,@(new-args))
+                               (logior low (ash high 32))))))
                        (t
-                        (incf i (cond ((or (alien-double-float-type-p type)
-                                           #!-arm-softfp (alien-single-float-type-p type))
-                                       #!+arm-softfp 2
-                                       #!-arm-softfp 0)
-                                      (t
-                                       1)))
-                        (new-args arg)
-                        (new-arg-types type))))
-           (cond ((and (alien-integer-type-p result-type)
-                       (> (sb!alien::alien-integer-type-bits result-type) 32))
-                  (let ((new-result-type
-                          (let ((sb!alien::*values-type-okay* t))
-                            (parse-alien-type
-                             (if (alien-integer-type-signed result-type)
-                                 '(values (unsigned 32) (signed 32))
-                                 '(values (unsigned 32) (unsigned 32)))
-                             env))))
-                    `(lambda (function type ,@(lambda-vars))
-                       (declare (ignore type))
-                       (multiple-value-bind (low high)
+                        `(lambda (function type ,@(lambda-vars))
+                           (declare (ignore type))
                            (%alien-funcall function
                                            ',(make-alien-fun-type
                                               :arg-types (new-arg-types)
-                                              :result-type new-result-type)
-                                           ,@(new-args))
-                         (logior low (ash high 32))))))
-                 (t
-                  `(lambda (function type ,@(lambda-vars))
-                     (declare (ignore type))
-                     (%alien-funcall function
-                                     ',(make-alien-fun-type
-                                        :arg-types (new-arg-types)
-                                        :result-type result-type)
-                                     ,@(new-args))))))
-         (sb!c::give-up-ir1-transform)))))
+                                              :result-type result-type)
+                                           ,@(new-args))))))
+        (sb!c::give-up-ir1-transform))))
