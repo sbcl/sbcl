@@ -1,5 +1,7 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 changes relative to sbcl-1.1.18:
+  * bug fix: MAKE-SEQUENCE works with sequence types defined via DEFTYPE
+    (lp#1315846, thanks to Mark Cox)
   * bug fix: SET-[DISPATCH-]MACRO-CHARACTER should coerce a symbolic
     function-designator to a function only as needed. (lp#1012335)
   * bug fix: remove references to asdf-install from the manual.  (lp#1207544,
@@ -32,7 +34,7 @@ changes in sbcl-1.1.17 relative to sbcl-1.1.16:
     (lp#1077996)
   * bug fix: MAKE-CONDITION reports names of missing condition classes
     properly (lp#1199223)
-  * bug fix: restore building with clang. (lp#1293643) 
+  * bug fix: restore building with clang. (lp#1293643)
   * bug fix: restore building on SPARC (broken since 1.1.15).
   * bug fix: improved FreeBSD support.
   * bug fix: PPC floating point conversion corrupted stack.
