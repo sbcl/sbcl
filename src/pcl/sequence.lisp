@@ -10,8 +10,11 @@
 (in-package "SB-IMPL")
 
 ;;;; basic protocol
-(define-condition sequence::protocol-unimplemented (type-error)
-  ())
+(define-condition sequence::protocol-unimplemented (type-error
+                                                    reference-condition)
+  ()
+  (:default-initargs
+   :references '((:sbcl :node "Extensible Sequences"))))
 
 (defun sequence::protocol-unimplemented (sequence)
   (error 'sequence::protocol-unimplemented
