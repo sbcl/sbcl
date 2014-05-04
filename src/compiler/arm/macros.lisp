@@ -21,6 +21,17 @@
        (inst mov ,predicate ,n-dst ,n-src))))
 
 (macrolet
+    ((def (type inst)
+       `(defmacro ,(symbolicate 'move- type)
+            (dst src &optional (predicate :al))
+          (once-only ((n-dst dst)
+                      (n-src src))
+            `(unless (location= ,n-dst ,n-src)
+               (inst ,',inst ,predicate ,n-dst ,n-src))))))
+  (def single fcpys)
+  (def double fcpyd))
+
+(macrolet
     ((def (op inst shift)
        `(defmacro ,op (object base
                        &optional (offset 0) (lowtag 0) (predicate :al))

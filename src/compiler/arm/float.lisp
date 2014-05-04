@@ -35,7 +35,7 @@
 
 ;;;; Move VOPs:
 
-(macrolet ((frob (vop sc op)
+(macrolet ((frob (vop sc move-macro)
              `(progn
                 (define-vop (,vop)
                   (:args (x :scs (,sc)
@@ -45,11 +45,10 @@
                                :load-if (not (location= x y))))
                   (:note "float move")
                   (:generator 0
-                    (unless (location= y x)
-                      (inst ,op y x))))
+                    (,move-macro y x)))
                 (define-move-vop ,vop :move (,sc) (,sc)))))
-  (frob single-move single-reg fcpys)
-  (frob double-move double-reg fcpyd))
+  (frob single-move single-reg move-single)
+  (frob double-move double-reg move-double))
 
 (define-vop (move-from-float)
   (:args (x :to :save))
@@ -103,8 +102,7 @@
                   (:generator ,(if double-p 2 1)
                     (sc-case y
                       (,sc
-                       (unless (location= x y)
-                         (inst ,(if double-p 'fcpyd 'fcpys) y x)))
+                       (,(if double-p 'move-double 'move-single) y x))
                       (,stack-sc
                        (let ((offset (* (tn-offset y) n-word-bytes)))
                          (inst ,(if double-p 'fstd 'fsts) x (@ nfp offset)))))))
@@ -182,10 +180,10 @@
        ;; overlap.
        (let ((x-real (complex-single-reg-real-tn x))
              (y-real (complex-single-reg-real-tn y)))
-         (inst fcpys y-real x-real))
+         (move-single y-real x-real))
        (let ((x-imag (complex-single-reg-imag-tn x))
              (y-imag (complex-single-reg-imag-tn y)))
-         (inst fcpys y-imag x-imag)))))
+         (move-single y-imag x-imag)))))
 (define-move-vop complex-single-move :move
   (complex-single-reg) (complex-single-reg))
 
@@ -201,10 +199,10 @@
        ;; overlap.
        (let ((x-real (complex-double-reg-real-tn x))
              (y-real (complex-double-reg-real-tn y)))
-         (inst fcpyd y-real x-real))
+         (move-double y-real x-real))
        (let ((x-imag (complex-double-reg-imag-tn x))
              (y-imag (complex-double-reg-imag-tn y)))
-         (inst fcpyd y-imag x-imag)))))
+         (move-double y-imag x-imag)))))
 (define-move-vop complex-double-move :move
   (complex-double-reg) (complex-double-reg))
 
@@ -296,10 +294,10 @@
        (unless (location= x y)
          (let ((x-real (complex-single-reg-real-tn x))
                (y-real (complex-single-reg-real-tn y)))
-           (inst fcpys y-real x-real))
+           (move-single y-real x-real))
          (let ((x-imag (complex-single-reg-imag-tn x))
                (y-imag (complex-single-reg-imag-tn y)))
-           (inst fcpys y-imag x-imag))))
+           (move-single y-imag x-imag))))
       (complex-single-stack
        (let ((offset (* (tn-offset y) n-word-bytes)))
          (let ((real-tn (complex-single-reg-real-tn x)))
@@ -320,10 +318,10 @@
        (unless (location= x y)
          (let ((x-real (complex-double-reg-real-tn x))
                (y-real (complex-double-reg-real-tn y)))
-           (inst fcpyd y-real x-real))
+           (move-double y-real x-real))
          (let ((x-imag (complex-double-reg-imag-tn x))
                (y-imag (complex-double-reg-imag-tn y)))
-           (inst fcpyd y-imag x-imag))))
+           (move-double y-imag x-imag))))
       (complex-double-stack
        (let ((offset (* (tn-offset y) n-word-bytes)))
          (let ((real-tn (complex-double-reg-real-tn x)))
@@ -755,11 +753,9 @@
     (sc-case r
       (complex-single-reg
        (let ((r-real (complex-single-reg-real-tn r)))
-         (unless (location= real r-real)
-           (inst fcpys r-real real)))
+         (move-single r-real real))
        (let ((r-imag (complex-single-reg-imag-tn r)))
-         (unless (location= imag r-imag)
-           (inst fcpys r-imag imag))))
+         (move-single r-imag imag)))
       (complex-single-stack
        (let ((nfp (current-nfp-tn vop))
              (offset (* (tn-offset r) n-word-bytes)))
@@ -783,11 +779,9 @@
     (sc-case r
       (complex-double-reg
        (let ((r-real (complex-double-reg-real-tn r)))
-         (unless (location= real r-real)
-           (inst fcpyd r-real real)))
+         (move-double r-real real))
        (let ((r-imag (complex-double-reg-imag-tn r)))
-         (unless (location= imag r-imag)
-           (inst fcpyd r-imag imag))))
+         (move-double r-imag imag)))
       (complex-double-stack
        (let ((nfp (current-nfp-tn vop))
              (offset (* (tn-offset r) n-word-bytes)))
@@ -811,8 +805,7 @@
        (let ((value-tn (ecase slot
                          (:real (complex-single-reg-real-tn x))
                          (:imag (complex-single-reg-imag-tn x)))))
-         (unless (location= value-tn r)
-           (inst fcpys r value-tn))))
+         (move-single r value-tn)))
       (complex-single-stack
        (inst flds r (@ (current-nfp-tn vop)
                        (* (+ (ecase slot (:real 0) (:imag 1))
@@ -844,8 +837,7 @@
        (let ((value-tn (ecase slot
                          (:real (complex-double-reg-real-tn x))
                          (:imag (complex-double-reg-imag-tn x)))))
-         (unless (location= value-tn r)
-           (inst fcpyd r value-tn))))
+         (move-double r value-tn)))
       (complex-double-stack
        (inst fldd r (@ (current-nfp-tn vop)
                        (* (+ (ecase slot (:real 0) (:imag 2))
