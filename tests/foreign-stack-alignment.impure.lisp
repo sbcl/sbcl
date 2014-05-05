@@ -30,14 +30,14 @@
     output))
 
 (defvar *required-alignment*
+  #+arm 4
   #+(and ppc darwin) 16
   #+(and ppc (not darwin)) 8
   #+x86-64 16
-  #+mips 8
   #+(and x86 (not darwin)) 4
   #+(and x86 darwin) 16
   #+sparc 8
-  #-(or x86 x86-64 mips ppc sparc)
+  #-(or arm x86 x86-64 mips ppc sparc)
   (error "Unknown platform"))
 
 ;;;; Build the offset-tool as regular excutable, and run it with
