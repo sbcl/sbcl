@@ -276,6 +276,13 @@
       (inst jmp (if not-p :ne :e) target))
     NOT-TARGET))
 
+;; FIXME: this vop is never emitted. I suspect that is because whenever
+;; we have something which needs to be asserted as (SIGNED-BYTE 64) and
+;; then moved to a signed-reg, the signed-byte-64-p vop is used and then
+;; move-to-word. We apparently never want to both assert the type and
+;; keep it as a tagged object. Anyway if it ever were emitted before,
+;; GENERATE-ERROR-CODE would have failed since OBJECT-NOT-SIGNED-BYTE-64
+;; did not have an error number.
 (define-vop (check-signed-byte-64 check-type)
   (:generator 45
     (let ((nope (generate-error-code vop

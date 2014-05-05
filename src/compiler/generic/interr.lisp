@@ -88,13 +88,13 @@
   (wrong-number-of-indices "wrong number of indices")
   (object-not-simple-array simple-array)
   (object-not-signed-byte-32 (signed-byte 32))
+  (object-not-signed-byte-64 (signed-byte 64)) ; regardless of word size
   (object-not-unsigned-byte unsigned-byte)
   (object-not-unsigned-byte-8 (unsigned-byte 8))
   ;; not sure where this is used, but it ranks high on the popularity poll
   (object-not-unsigned-byte-9 (unsigned-byte 9))
   (object-not-unsigned-byte-32 (unsigned-byte 32))
-  ;; regardless of word size, this can't hurt to have
-  (object-not-unsigned-byte-64 (unsigned-byte 64))
+  (object-not-unsigned-byte-64 (unsigned-byte 64)) ; regardless of word size
   (object-not-complex complex)
   (object-not-complex-rational (complex rational))
   (object-not-complex-float (complex float))
