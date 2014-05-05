@@ -52,6 +52,18 @@
 
 ;;;; disassembler field definitions
 
+(defun maybe-add-notes (register dstate)
+  (when (eql register code-offset)
+    (let* ((inst (sb!disassem::sap-ref-int
+                  (sb!disassem::dstate-segment-sap dstate)
+                  (sb!disassem::dstate-cur-offs dstate)
+                  n-word-bytes
+                  (sb!disassem::dstate-byte-order dstate)))
+           (op (ldb (byte 8 20) inst)))
+      (case op
+        (89 ;; LDR
+         (sb!disassem:note-code-constant (ldb (byte 12 0) inst) dstate))))))
+
 (eval-when (:compile-toplevel :load-toplevel :execute)
   ;; DEFINE-ARG-TYPE requires that any :PRINTER be defined at
   ;; compile-time...  Why?
@@ -65,8 +77,8 @@
 
   (defun print-reg (value stream dstate)
     (declare (type stream stream)
-             (fixnum value)
-             (ignore dstate))
+             (fixnum value))
+    (maybe-add-notes value dstate)
     (princ (aref *register-names* value) stream))
 
   (defun print-shift-type (value stream dstate)
