@@ -150,7 +150,7 @@
                                             ; +unicode -unicode
 ;;                             Word bits    ;  32 | 64  32 | 64
                                             ;------------------
-                                            ; [ all numers are hex ]
+                                            ; [ all numbers are hex ]
   bignum-widetag                            ;  0A   11  0A   11
   ratio-widetag                             ;  0E   15  0E   15
   single-float-widetag                      ;  12   19  12   19
