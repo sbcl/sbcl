@@ -58,13 +58,18 @@
          ;; To collapse the range of widetags comprising real numbers on 64-bit
          ;; machines, consider SHORT-FLOAT-WIDETAG both a header and immediate.
          ;; No OTHER-POINTER-LOWTAG object can ever have that header tag.
+         ;; But only do so if there would otherwise be a discontinuity
+         ;; in the set of headers.
          ;; Another approach would have been to flip DOUBLE- and SINGLE- float,
          ;; but that would not help NUMBERP, only REALP. Putting SINGLE-
          ;; after the complex widetags would work but harm 32-bit machines.
          (headers (set-difference
-                   extended (if (= n-word-bits 64)
-                                (remove single-float-widetag *immediate-types*)
-                                *immediate-types*)
+                   extended
+                   (if (and (= n-word-bits 64)
+                            (member (- single-float-widetag 4) extended)
+                            (member (+ single-float-widetag 4) extended))
+                       (remove single-float-widetag *immediate-types*)
+                       *immediate-types*)
                    :test #'eql))
          (function-p (if (intersection headers *fun-header-widetags*)
                          (if (subsetp headers *fun-header-widetags*)
