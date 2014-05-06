@@ -37,25 +37,62 @@
   (generate-fixnum-test value)
   (inst jmp (if not-p :nz :z) target))
 
+;; avoid code-deletion notes
+(defmacro !n-tag-bits-case (1-clause other-clause)
+  (assert (eq (car 1-clause) 1))
+  (assert (eq (car other-clause) t))
+  `(progn ,@(if (= n-fixnum-tag-bits 1)
+                (cdr 1-clause)
+                (cdr other-clause))))
+
+;;; General FIXME: it's fine that we wire these to use rAX which has
+;;; the shortest encoding, but for goodness sake can we pass the TN
+;;; from the VOP like every other backend does? Freely referencing the
+;;; permanent globals RAX-TN,EAX-TN,AL-TN is a bad way to go about it.
+
+;; Numerics including fixnum, excluding short-float. (INTEGER,RATIONAL)
 (defun %test-fixnum-and-headers (value target not-p headers)
   (let ((drop-through (gen-label)))
-    (generate-fixnum-test value)
-    (inst jmp :z (if not-p drop-through target))
-    (%test-headers value target not-p nil headers drop-through)))
+    (!n-tag-bits-case
+     (1 (inst lea rax-tn (make-ea :dword :base value
+                                  :disp (- other-pointer-lowtag)))
+        (inst test al-tn 1)
+        (inst jmp :nz (if not-p drop-through target)) ; inverted
+        ;; test the header at [RAX] using no lowtag
+        (%test-headers rax-tn target not-p nil headers
+                       :drop-through drop-through :lowtag 0))
+     (t
+      (generate-fixnum-test value)
+      (inst jmp :z (if not-p drop-through target))
+      (%test-headers value target not-p nil headers
+                     :drop-through drop-through)))))
 
+;; I can see no reason this would ever be used.
+;; (or fixnum character|unbound-marker) is implausible.
 (defun %test-fixnum-and-immediate (value target not-p immediate)
   (let ((drop-through (gen-label)))
     (generate-fixnum-test value)
     (inst jmp :z (if not-p drop-through target))
     (%test-immediate value target not-p immediate drop-through)))
 
+;; Numerics
 (defun %test-fixnum-immediate-and-headers (value target not-p immediate
                                            headers)
   (let ((drop-through (gen-label)))
-    (generate-fixnum-test value)
-    (inst jmp :z (if not-p drop-through target))
-    (%test-immediate-and-headers value target not-p immediate headers
-                                 drop-through)))
+    (!n-tag-bits-case
+     (1 (inst lea rax-tn (make-ea :dword :base value
+                                  :disp (- other-pointer-lowtag)))
+        (inst test al-tn 1)
+        (inst jmp :nz (if not-p drop-through target)) ; inverted
+        (inst cmp al-tn (- immediate other-pointer-lowtag))
+        (inst jmp :e (if not-p drop-through target))
+        ;; test the header at [RAX] using no lowtag
+        (%test-headers rax-tn target not-p nil headers
+                       :drop-through drop-through :lowtag 0))
+     (t (generate-fixnum-test value)
+        (inst jmp :z (if not-p drop-through target))
+        (%test-immediate-and-headers value target not-p immediate headers
+                                     drop-through)))))
 
 (defun %test-immediate (value target not-p immediate
                         &optional (drop-through (gen-label)))
@@ -68,6 +105,7 @@
   (inst jmp (if not-p :ne :e) target)
   (emit-label drop-through))
 
+;; Numerics including short-float, excluding fixnum
 (defun %test-immediate-and-headers (value target not-p immediate headers
                                     &optional (drop-through (gen-label)))
   ;; Code a single instruction byte test if possible.
@@ -77,7 +115,7 @@
          (move rax-tn value)
          (inst cmp al-tn immediate)))
   (inst jmp :e (if not-p drop-through target))
-  (%test-headers value target not-p nil headers drop-through))
+  (%test-headers value target not-p nil headers :drop-through drop-through))
 
 (defun %test-lowtag (value target not-p lowtag)
   (inst lea eax-tn (make-ea :dword :base value :disp (- lowtag)))
@@ -85,8 +123,9 @@
   (inst jmp (if not-p :nz :z) target))
 
 (defun %test-headers (value target not-p function-p headers
-                            &optional (drop-through (gen-label)))
-  (let ((lowtag (if function-p fun-pointer-lowtag other-pointer-lowtag)))
+                      &key (drop-through (gen-label))
+                           (lowtag (if function-p fun-pointer-lowtag
+                                       other-pointer-lowtag)))
     (multiple-value-bind (equal less-or-equal greater-or-equal when-true
                                 when-false)
         ;; EQUAL, LESS-OR-EQUAL, and GREATER-OR-EQUAL are the conditions
@@ -96,7 +135,11 @@
         (if not-p
             (values :ne :a :b drop-through target)
             (values :e :na :nb target drop-through))
-      (%test-lowtag value when-false t lowtag)
+      (unless (zerop lowtag)
+        ;; use 64-bit reg so that BYTE PTR [RAX] is the widetag
+        (inst lea rax-tn (make-ea :dword :base value :disp (- lowtag))))
+      (inst test al-tn lowtag-mask)
+      (inst jmp :nz when-false)
       (do ((remaining headers (cdr remaining))
            ;; It is preferable (smaller and faster code) to directly
            ;; compare the value in memory instead of loading it into
@@ -104,16 +147,15 @@
            ;; WIDETAG-TN accordingly. If impossible, generate the
            ;; register load.
            ;; Compared to x86 we additionally optimize the cases of a
-           ;; range starting with BIGNUM-WIDETAG or ending with
-           ;; COMPLEX-ARRAY-WIDETAG.
+           ;; range starting with BIGNUM-WIDETAG (= min widetag)
+           ;; or ending with COMPLEX-ARRAY-WIDETAG (= max widetag)
            (widetag-tn (if (and (null (cdr headers))
                                 (or (atom (car headers))
                                     (= (caar headers) bignum-widetag)
                                     (= (cdar headers) complex-array-widetag)))
-                           (make-ea :byte :base value :disp (- lowtag))
+                           (make-ea :byte :base rax-tn)
                            (progn
-                             (inst mov eax-tn (make-ea :dword :base value
-                                                       :disp (- lowtag)))
+                             (inst mov eax-tn (make-ea :dword :base rax-tn))
                              al-tn))))
           ((null remaining))
         (let ((header (car remaining))
@@ -147,7 +189,7 @@
                   (inst sub al-tn start)
                   (inst cmp al-tn (- end start))
                   (inst jmp less-or-equal target))))))))
-      (emit-label drop-through))))
+      (emit-label drop-through)))
 
 
 ;;;; type checking and testing
