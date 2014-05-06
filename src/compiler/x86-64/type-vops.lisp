@@ -22,10 +22,12 @@
       (move rax-tn value)))
 
 (defun generate-fixnum-test (value)
-  "zero flag set if VALUE is fixnum"
+  "Set the Z flag if VALUE is fixnum"
   (inst test
         (cond ((sc-is value any-reg descriptor-reg)
                (reg-in-size value :byte))
+              ;; This is hooey. None of the type-vops presently allow
+              ;; control-stack as a storage class.
               ((sc-is value control-stack)
                (make-ea :byte :base rbp-tn
                         :disp (frame-byte-offset (tn-offset value))))
@@ -50,17 +52,18 @@
 ;;; from the VOP like every other backend does? Freely referencing the
 ;;; permanent globals RAX-TN,EAX-TN,AL-TN is a bad way to go about it.
 
+(defun %lea-for-lowtag-test (target value lowtag)
+  (inst lea target (make-ea :dword :base value :disp (- lowtag))))
+
 ;; Numerics including fixnum, excluding short-float. (INTEGER,RATIONAL)
 (defun %test-fixnum-and-headers (value target not-p headers)
   (let ((drop-through (gen-label)))
     (!n-fixnum-tag-bits-case
-     (1 (inst lea rax-tn (make-ea :dword :base value
-                                  :disp (- other-pointer-lowtag)))
+     (1 (%lea-for-lowtag-test eax-tn value other-pointer-lowtag)
         (inst test al-tn 1)
         (inst jmp :nz (if not-p drop-through target)) ; inverted
-        ;; test the header at [RAX] using no lowtag
-        (%test-headers rax-tn target not-p nil headers
-                       :drop-through drop-through :lowtag 0))
+        (%test-headers value target not-p nil headers
+                       :drop-through drop-through :compute-eax nil))
      (t
       (generate-fixnum-test value)
       (inst jmp :z (if not-p drop-through target))
@@ -80,15 +83,13 @@
                                            headers)
   (let ((drop-through (gen-label)))
     (!n-fixnum-tag-bits-case
-     (1 (inst lea rax-tn (make-ea :dword :base value
-                                  :disp (- other-pointer-lowtag)))
+     (1 (%lea-for-lowtag-test eax-tn value other-pointer-lowtag)
         (inst test al-tn 1)
         (inst jmp :nz (if not-p drop-through target)) ; inverted
         (inst cmp al-tn (- immediate other-pointer-lowtag))
         (inst jmp :e (if not-p drop-through target))
-        ;; test the header at [RAX] using no lowtag
-        (%test-headers rax-tn target not-p nil headers
-                       :drop-through drop-through :lowtag 0))
+        (%test-headers value target not-p nil headers
+                       :drop-through drop-through :compute-eax nil))
      (t (generate-fixnum-test value)
         (inst jmp :z (if not-p drop-through target))
         (%test-immediate-and-headers value target not-p immediate headers
@@ -118,14 +119,14 @@
   (%test-headers value target not-p nil headers :drop-through drop-through))
 
 (defun %test-lowtag (value target not-p lowtag)
-  (inst lea eax-tn (make-ea :dword :base value :disp (- lowtag)))
+  (%lea-for-lowtag-test eax-tn value lowtag)
   (inst test al-tn lowtag-mask)
   (inst jmp (if not-p :nz :z) target))
 
 (defun %test-headers (value target not-p function-p headers
                       &key (drop-through (gen-label))
-                           (lowtag (if function-p fun-pointer-lowtag
-                                       other-pointer-lowtag)))
+                           (compute-eax t))
+  (let ((lowtag (if function-p fun-pointer-lowtag other-pointer-lowtag)))
     (multiple-value-bind (equal less-or-equal greater-or-equal when-true
                                 when-false)
         ;; EQUAL, LESS-OR-EQUAL, and GREATER-OR-EQUAL are the conditions
@@ -135,9 +136,8 @@
         (if not-p
             (values :ne :a :b drop-through target)
             (values :e :na :nb target drop-through))
-      (unless (zerop lowtag)
-        ;; use 64-bit reg so that BYTE PTR [RAX] is the widetag
-        (inst lea rax-tn (make-ea :dword :base value :disp (- lowtag))))
+      (when compute-eax
+        (%lea-for-lowtag-test eax-tn value lowtag))
       (inst test al-tn lowtag-mask)
       (inst jmp :nz when-false)
       (do ((remaining headers (cdr remaining))
@@ -153,9 +153,10 @@
                                 (or (atom (car headers))
                                     (= (caar headers) bignum-widetag)
                                     (= (cdar headers) complex-array-widetag)))
-                           (make-ea :byte :base rax-tn)
+                           (make-ea :byte :base value :disp (- lowtag))
                            (progn
-                             (inst mov eax-tn (make-ea :dword :base rax-tn))
+                             (inst mov eax-tn (make-ea :dword :base value
+                                                       :disp (- lowtag)))
                              al-tn))))
           ((null remaining))
         (let ((header (car remaining))
@@ -189,7 +190,7 @@
                   (inst sub al-tn start)
                   (inst cmp al-tn (- end start))
                   (inst jmp less-or-equal target))))))))
-      (emit-label drop-through)))
+      (emit-label drop-through))))
 
 
 ;;;; type checking and testing
@@ -307,23 +308,19 @@
             (values not-target target)
             (values target not-target))
       (!n-fixnum-tag-bits-case
-       (1 (inst lea rax-tn (make-ea :qword :base value
-                                    :disp (- other-pointer-lowtag)))
+       (1 (%lea-for-lowtag-test eax-tn value other-pointer-lowtag)
           (inst test al-tn fixnum-tag-mask) ; 0th bit = 1 => fixnum
           (inst jmp :nz yep)
-          (inst test al-tn lowtag-mask)
-          (inst jmp :ne nope)
-          (inst cmp (make-ea :qword :base rax-tn) ; no displacment
-                (+ (ash 1 n-widetag-bits) bignum-widetag)))
+          (inst test al-tn lowtag-mask))
        (t
         (move-qword-to-eax)
         (inst test al-tn fixnum-tag-mask)
         (inst jmp :e yep)
         (inst and al-tn lowtag-mask)
-        (inst cmp al-tn other-pointer-lowtag)
-        (inst jmp :ne nope)
-        (inst cmp (make-ea-for-object-slot value 0 other-pointer-lowtag)
-              (+ (ash 1 n-widetag-bits) bignum-widetag))))
+        (inst cmp al-tn other-pointer-lowtag)))
+      (inst jmp :ne nope)
+      (inst cmp (make-ea-for-object-slot value 0 other-pointer-lowtag)
+            (+ (ash 1 n-widetag-bits) bignum-widetag))
       (inst jmp (if not-p :ne :e) target))
     NOT-TARGET))
 
