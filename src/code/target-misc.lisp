@@ -18,13 +18,18 @@
 ;;; Underlying SIMPLE-FUN
 (defun %fun-fun (function)
   (declare (function function))
-  (typecase function
-    (simple-fun
+  (declare (optimize (sb!c::recognize-self-calls 3))) ; not working - why?
+  ;; It's too bad that TYPECASE isn't able to generate equivalent code.
+  (case (sb!kernel:%fun-pointer-widetag function)
+    (#.sb!vm:simple-fun-header-widetag
      function)
-    (closure
+    (#.sb!vm:closure-header-widetag
      (%closure-fun function))
-    (funcallable-instance
-     (%fun-fun (funcallable-instance-fun function)))))
+    (#.sb!vm:funcallable-instance-header-widetag
+     ;; %FUNCALLABLE-INSTANCE-FUNCTION is not known to return a FUNCTION.
+     ;; Is that right? Shouldn't we always initialize to something
+     ;; that is a function, such as an error-signaling trampoline?
+     (%fun-fun (%funcallable-instance-function function)))))
 
 (defun %fun-lambda-list (function)
   (typecase function
