@@ -38,7 +38,7 @@
   (inst jmp (if not-p :nz :z) target))
 
 ;; avoid code-deletion notes
-(defmacro !n-tag-bits-case (1-clause other-clause)
+(defmacro !n-fixnum-tag-bits-case (1-clause other-clause)
   (assert (eq (car 1-clause) 1))
   (assert (eq (car other-clause) t))
   `(progn ,@(if (= n-fixnum-tag-bits 1)
@@ -53,7 +53,7 @@
 ;; Numerics including fixnum, excluding short-float. (INTEGER,RATIONAL)
 (defun %test-fixnum-and-headers (value target not-p headers)
   (let ((drop-through (gen-label)))
-    (!n-tag-bits-case
+    (!n-fixnum-tag-bits-case
      (1 (inst lea rax-tn (make-ea :dword :base value
                                   :disp (- other-pointer-lowtag)))
         (inst test al-tn 1)
@@ -79,7 +79,7 @@
 (defun %test-fixnum-immediate-and-headers (value target not-p immediate
                                            headers)
   (let ((drop-through (gen-label)))
-    (!n-tag-bits-case
+    (!n-fixnum-tag-bits-case
      (1 (inst lea rax-tn (make-ea :dword :base value
                                   :disp (- other-pointer-lowtag)))
         (inst test al-tn 1)
@@ -306,15 +306,24 @@
         (if not-p
             (values not-target target)
             (values target not-target))
-      (move-qword-to-eax value)
-      (inst test al-tn fixnum-tag-mask)
-      (inst jmp :e yep)
-
-      (inst and al-tn lowtag-mask)
-      (inst cmp al-tn other-pointer-lowtag)
-      (inst jmp :ne nope)
-      (inst cmp (make-ea-for-object-slot value 0 other-pointer-lowtag)
-            (+ (ash 1 n-widetag-bits) bignum-widetag))
+      (!n-fixnum-tag-bits-case
+       (1 (inst lea rax-tn (make-ea :qword :base value
+                                    :disp (- other-pointer-lowtag)))
+          (inst test al-tn fixnum-tag-mask) ; 0th bit = 1 => fixnum
+          (inst jmp :nz yep)
+          (inst test al-tn lowtag-mask)
+          (inst jmp :ne nope)
+          (inst cmp (make-ea :qword :base rax-tn) ; no displacment
+                (+ (ash 1 n-widetag-bits) bignum-widetag)))
+       (t
+        (move-qword-to-eax)
+        (inst test al-tn fixnum-tag-mask)
+        (inst jmp :e yep)
+        (inst and al-tn lowtag-mask)
+        (inst cmp al-tn other-pointer-lowtag)
+        (inst jmp :ne nope)
+        (inst cmp (make-ea-for-object-slot value 0 other-pointer-lowtag)
+              (+ (ash 1 n-widetag-bits) bignum-widetag))))
       (inst jmp (if not-p :ne :e) target))
     NOT-TARGET))
 
