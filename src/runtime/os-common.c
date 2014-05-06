@@ -128,8 +128,7 @@ os_sem_destroy(os_sem_t *sem)
 
 #if defined(LISP_FEATURE_OS_PROVIDES_DLOPEN) && !defined(LISP_FEATURE_WIN32)
 void* os_dlopen(char* name, int flags) {
-    volatile void* ret = dlopen(name,flags);
-    return ret;
+    return dlopen(name,flags);
 }
 #endif
 
