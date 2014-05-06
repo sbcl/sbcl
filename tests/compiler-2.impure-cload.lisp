@@ -64,3 +64,17 @@
     (aref x y)))
 
 (assert (raises-error? (bubblesort (make-array 10) 9)))
+
+(define-symbol-macro %trash% what)
+(locally
+  ;; just in case we get so smart that INFO becomes foldable
+  (declare (notinline sb-int:info))
+  (assert (eq (sb-int:info :variable :kind '%trash%) :macro))
+  (assert (eq (sb-int:info :variable :macro-expansion '%trash%) 'what))
+  (assert (sb-int:info :source-location :symbol-macro '%trash%)))
+(let ()
+  (declare (notinline sb-int:info))
+  (defconstant %trash% 9) ; this is non-toplevel
+  (multiple-value-bind (val foundp)
+      (sb-int:info :variable :macro-expansion '%trash%)
+    (assert (and (not val) (not foundp)))))

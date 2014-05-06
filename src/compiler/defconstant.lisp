@@ -82,6 +82,13 @@
        ;; don't warn or error or anything, just fall through.)
        )
       (t (warn "redefining ~(~A~) ~S to be a constant" kind name))))
+  ;; We ought to be consistent in treating any change of :VARIABLE :KIND
+  ;; as a continuable error. The above CASE expression pre-dates the
+  ;; existence of symbol-macros (I believe), but at a bare minimum,
+  ;; INFO should return NIL for its second value if requesting the
+  ;; :macro-expansion of something that is getting defined as constant.
+  (clear-info :variable :macro-expansion name)
+  (clear-info :source-location :symbol-macro name)
   (when doc
     (setf (fdocumentation name 'variable) doc))
   #-sb-xc-host
