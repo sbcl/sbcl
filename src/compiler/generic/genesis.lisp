@@ -1558,7 +1558,7 @@ core and return a descriptor to it."
 
 (defun cold-fdefinition-object (cold-name &optional leave-fn-raw)
   (declare (type (or symbol descriptor) cold-name))
-  (/show0 "/cold-fdefinition-object")
+  (/noshow0 "/cold-fdefinition-object")
   (let ((warm-name (warm-fun-name cold-name)))
     (or (gethash warm-name *cold-fdefn-objects*)
         (let ((fdefn (allocate-boxed-object (or *cold-fdefn-gspace* *dynamic*)
