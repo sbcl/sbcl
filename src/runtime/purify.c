@@ -185,34 +185,6 @@ ptrans_instance(lispobj thing, lispobj header, boolean /* ignored */ constant)
         return (ptrans_boxed(thing, header, 1));
     case NIL:
         return (ptrans_boxed(thing, header, 0));
-    case 0:
-        {
-            /* Substructure: special case for the COMPACT-INFO-ENVs,
-             * where the instance may have a point to the dynamic
-             * space placed into it (e.g. the cache-name slot), but
-             * the lists and arrays at the time of a purify can be
-             * moved to the RO space. */
-            long nwords;
-            lispobj result, *new, *old;
-
-            nwords = CEILING(1 + HeaderValue(header), 2);
-
-            /* Allocate it */
-            old = (lispobj *)native_pointer(thing);
-            new = newspace_alloc(nwords, 0); /*  inconstant */
-
-            /* Copy it. */
-            bcopy(old, new, nwords * sizeof(lispobj));
-
-            /* Deposit forwarding pointer. */
-            result = make_lispobj(new, lowtag_of(thing));
-            *old = result;
-
-            /* Scavenge it. */
-            pscav(new, nwords, 1);
-
-            return result;
-        }
     default:
         gc_abort();
         return NIL; /* dummy value: return something ... */

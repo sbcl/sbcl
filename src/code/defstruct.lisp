@@ -179,7 +179,7 @@
   (raw-length 0 :type index)
   ;; the value of the :PURE option, or :UNSPECIFIED. This is only
   ;; meaningful if DD-CLASS-P = T.
-  (pure :unspecified :type (member t nil :substructure :unspecified)))
+  (pure :unspecified :type (member t nil :unspecified)))
 #!-sb-fluid (declaim (freeze-type defstruct-description))
 (def!method print-object ((x defstruct-description) stream)
   (print-unreadable-object (x stream :type t)
@@ -301,11 +301,7 @@
             (cond ((eq pure t)
                    `((setf (layout-pure (classoid-layout
                                          (find-classoid ',name)))
-                           t)))
-                  ((eq pure :substructure)
-                   `((setf (layout-pure (classoid-layout
-                                         (find-classoid ',name)))
-                           0)))))))))
+                           t)))))))))
 
 (sb!xc:defmacro delay-defstruct-functions (name forms)
   ;; KLUDGE: If DEFSTRUCT is not at the top-level,
