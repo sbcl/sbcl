@@ -370,7 +370,7 @@ check_runtime_build_id(void *buf, size_t size)
     size_t idlen;
     char *pos;
 
-    idlen = strlen(build_id) - 1;
+    idlen = strlen((const char*)build_id) - 1;
     while ((pos = memchr(buf, build_id[0], size)) != NULL) {
         size -= (pos + 1) - (char *)buf;
         buf = (pos + 1);
