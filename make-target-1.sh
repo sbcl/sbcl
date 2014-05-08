@@ -23,6 +23,13 @@ export LANG LC_ALL
 # Load our build configuration
 . output/build-config
 
+if [ -n "$SBCL_HOST_LOCATION" ]; then
+    echo //copying host-1 output files to target
+    rsync -a "$SBCL_HOST_LOCATION/output/" output/
+    rsync -a "$SBCL_HOST_LOCATION/src/runtime/genesis" src/runtime
+    rsync -a "$SBCL_HOST_LOCATION/src/runtime/ldso-stubs.S" src/runtime/
+fi
+
 # Build the runtime system and symbol table (.nm) file.
 #
 # (This C build has to come after the first genesis in order to get
@@ -48,3 +55,9 @@ $GNUMAKE -C tools-for-build -I../src/runtime grovel-headers
 tools-for-build/grovel-headers > output/stuff-groveled-from-headers.lisp
 
 $GNUMAKE -C src/runtime after-grovel-headers
+
+if [ -n "$SBCL_HOST_LOCATION" ]; then
+    echo //copying target-1 output files to host
+    rsync -a src/runtime/sbcl.nm "$SBCL_HOST_LOCATION/src/runtime/"
+    rsync -a output/stuff-groveled-from-headers.lisp "$SBCL_HOST_LOCATION/output"
+fi

@@ -81,6 +81,12 @@ do
       --xc-host=)
         $optarg_ok && SBCL_XC_HOST=$optarg
         ;;
+      --host-location=)
+        $optarg_ok && SBCL_HOST_LOCATION=$optarg
+        ;;
+      --target-location=)
+        $optarg_ok && SBCL_TARGET_LOCATION=$optarg
+        ;;
       --dynamic-space-size=)
         $optarg_ok && SBCL_DYNAMIC_SPACE_SIZE=$optarg
 	;;
@@ -247,6 +253,12 @@ echo "DEVNULL=\"$DEVNULL\"; export DEVNULL" > output/build-config
 echo "GNUMAKE=\"$GNUMAKE\"; export GNUMAKE" >> output/build-config
 echo "SBCL_XC_HOST=\"$SBCL_XC_HOST\"; export SBCL_XC_HOST" >> output/build-config
 echo "legacy_xc_spec=\"$legacy_xc_spec\"; export legacy_xc_spec" >> output/build-config
+if [ -n "$SBCL_HOST_LOCATION" ]; then
+    echo "SBCL_HOST_LOCATION=\"$SBCL_HOST_LOCATION\"; export SBCL_HOST_LOCATION" >> output/build-config
+fi
+if [ -n "$SBCL_TARGET_LOCATION" ]; then
+    echo "SBCL_TARGET_LOCATION=\"$SBCL_TARGET_LOCATION\"; export SBCL_TARGET_LOCATION" >> output/build-config
+fi
 
 # And now, sorting out the per-target dependencies...
 
@@ -701,3 +713,9 @@ if [ `uname` = "SunOS" ] ; then
   PATH=/usr/xpg4/bin:$PATH
 fi
 echo '"'`hostname`-`id -un`-`date +%Y-%m-%d-%H-%M-%S`'"' > output/build-id.tmp
+
+if [ -n "$SBCL_HOST_LOCATION" ]; then
+    echo //setting up host configuration
+    rsync --delete-after -a output/ "$SBCL_HOST_LOCATION/output/"
+    rsync -a local-target-features.lisp-expr version.lisp-expr "$SBCL_HOST_LOCATION/"
+fi

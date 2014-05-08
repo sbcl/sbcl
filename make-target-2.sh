@@ -23,6 +23,11 @@ export LANG LC_ALL
 # Load our build configuration
 . output/build-config
 
+if [ -n "$SBCL_HOST_LOCATION" ]; then
+    echo //copying host-2 files to target
+    rsync -a "$SBCL_HOST_LOCATION/output/" output/
+fi
+
 # Do warm init stuff, e.g. building and loading CLOS, and stuff which
 # can't be done until CLOS is running.
 #
