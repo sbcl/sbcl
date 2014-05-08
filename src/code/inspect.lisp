@@ -31,7 +31,7 @@
 
 #+sb-doc
 (setf (documentation '*inspected* 'variable)
-      )
+      "the value currently being inspected in CL:INSPECT")
 
 (defun inspect (object)
   (funcall *inspect-fun* object *standard-input* *standard-output*))
