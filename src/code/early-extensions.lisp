@@ -1186,11 +1186,12 @@
 
 (defmacro define-deprecated-function (state since name replacements lambda-list &body body)
   (let* ((replacements (normalize-deprecation-replacements replacements))
+         #!+sb-doc
          (doc
-          (let ((*package* (find-package :keyword))
-                (*print-pretty* nil))
-            (apply #'format nil
-                   "~S has been deprecated as of SBCL ~A.~
+           (let ((*package* (find-package :keyword))
+                 (*print-pretty* nil))
+             (apply #'format nil
+                    "~S has been deprecated as of SBCL ~A.~
                     ~#[~;~2%Use ~S instead.~;~2%~
                             Use ~S or ~S instead.~:;~2%~
                             Use~@{~#[~; or~] ~S~^,~} instead.~]"
@@ -1200,13 +1201,14 @@
           ((:early :late)
            `(progn
               (defun ,name ,lambda-list
-                ,doc
+                #!+sb-doc ,doc
                 ,@body)))
           ((:final)
            `(progn
               (declaim (ftype (function * nil) ,name))
               (setf (fdefinition ',name)
                     (deprecated-function ',name ',replacements ,since))
+              #!+sb-doc
               (setf (documentation ',name 'function) ,doc))))
        (setf (compiler-macro-function ',name)
              (deprecation-compiler-macro ,state ,since ',name ',replacements)))))
@@ -1217,10 +1219,12 @@
       (deprecation-warning (car info) (cdr info) name nil))))
 
 (defmacro define-deprecated-variable (state since name &key (value nil valuep) replacement)
+  (declare (ignorable replacement))
   `(progn
      (setf (info :variable :deprecated ',name) (cons ,state ,since))
      ,@(when (member state '(:early :late))
          `((defvar ,name ,@(when valuep (list value))
+             #!+sb-doc
              ,(let ((*package* (find-package :keyword)))
                 (format nil
                         "~@<~S has been deprecated as of SBCL ~A~@[, use ~S instead~].~:>"

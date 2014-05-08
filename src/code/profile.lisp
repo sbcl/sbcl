@@ -326,6 +326,7 @@
     (unprofile-1-fun name)))
 
 (defun reset ()
+  #+sb-doc
   "Reset the counters for all profiled functions."
   (dohash ((name profile-info) *profiled-fun-name->info* :locked t)
     (declare (ignore name))
@@ -362,6 +363,7 @@
     (max raw-compensated 0.0)))
 
 (defun report (&key limit (print-no-call-list t))
+  #+sb-doc
   "Report results from profiling. The results are approximately
 adjusted for profiling overhead. The compensation may be rather
 inaccurate when bignums are involved in runtime calculation, as in a

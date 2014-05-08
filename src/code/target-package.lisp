@@ -342,6 +342,7 @@ error if any of PACKAGES is not a valid package designator."
   (def package-shadowing-symbols package-%shadowing-symbols))
 
 (defun package-local-nicknames (package-designator)
+  #!+sb-doc
   "Returns an alist of \(local-nickname . actual-package) describing the
 nicknames local to the designated package.
 
@@ -377,6 +378,7 @@ Experimental: interface subject to change."
           :format-arguments format-args))
 
 (defun package-locally-nicknamed-by-list (package-designator)
+  #!+sb-doc
   "Returns a list of packages which have a local nickname for the designated
 package.
 
@@ -390,6 +392,7 @@ Experimental: interface subject to change."
 
 (defun add-package-local-nickname (local-nickname actual-package
                                    &optional (package-designator (sane-package)))
+  #!+sb-doc
   "Adds LOCAL-NICKNAME for ACTUAL-PACKAGE in the designated package, defaulting
 to current package. LOCAL-NICKNAME must be a string designator, and
 ACTUAL-PACKAGE must be a package designator.
@@ -483,6 +486,7 @@ Experimental: interface subject to change."
 
 (defun remove-package-local-nickname (old-nickname
                                       &optional (package-designator (sane-package)))
+  #!+sb-doc
   "If the designated package had OLD-NICKNAME as a local nickname for
 another package, it is removed. Returns true if the nickname existed and was
 removed, and NIL otherwise.
@@ -547,6 +551,7 @@ Experimental: interface subject to change."
    (find-restart-or-control-error 'debootstrap-package condition)))
 
 (defun find-package (package-designator)
+  #!+sb-doc
   "If PACKAGE-DESIGNATOR is a package, it is returned. Otherwise PACKAGE-DESIGNATOR
 must be a string designator, in which case the package it names is located and returned.
 

@@ -19,6 +19,7 @@
 
 ;;; This is what it all comes down to.
 (def!macro cas (place old new &environment env)
+  #!+sb-doc
   "Synonym for COMPARE-AND-SWAP.
 
 Additionally DEFUN, DEFGENERIC, DEFMETHOD, FLET, and LABELS can be also used to
@@ -146,6 +147,7 @@ EXPERIMENTAL: Interface subject to change."
                 `(,op ,instance))))))
 
 (def!macro define-cas-expander (accessor lambda-list &body body)
+  #!+sb-doc
   "Analogous to DEFINE-SETF-EXPANDER. Defines a CAS-expansion for ACCESSOR.
 BODY must return six values as specified in GET-CAS-EXPANSION.
 
@@ -169,6 +171,7 @@ EXPERIMENTAL: Interface subject to change."
 
 (def!macro defcas (&whole form accessor lambda-list function
                   &optional docstring)
+  #!+sb-doc
   "Analogous to short-form DEFSETF. Defines FUNCTION as responsible
 for compare-and-swap on places accessed using ACCESSOR. LAMBDA-LIST
 must correspond to the lambda-list of the accessor.

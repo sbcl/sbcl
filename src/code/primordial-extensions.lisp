@@ -362,12 +362,14 @@
                                     (OS, CPU, whatever)."
                                    controlp)
                                   arguments)
+  (declare (ignorable doc))
   `(defun ,name (&rest args)
-    ,doc
-    (declare (ignore args))
-    (error 'unsupported-operator
-     :format-control ,control
-     :format-arguments (if ,controlp ',arguments (list ',name)))))
+     #!+sb-doc
+     ,doc
+     (declare (ignore args))
+     (error 'unsupported-operator
+            :format-control ,control
+            :format-arguments (if ,controlp ',arguments (list ',name)))))
 
 ;;; This is like DO, except it has no implicit NIL block.
 (def!macro do-anonymous (varlist endlist &rest body)

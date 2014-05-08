@@ -173,6 +173,7 @@
   "Return the 1st object in a list or NIL if the list is empty."
   (car list))
 (defun second (list)
+  #!+sb-doc
   "Return the 2nd object in a list or NIL if there is no 2nd object."
   (cadr list))
 (defun third (list)
@@ -558,6 +559,7 @@
                      list)))))))
 
 (defun ldiff (list object)
+  #!+sb-doc
   "Return a new list, whose elements are those of LIST that appear before
    OBJECT. If OBJECT is not a tail of LIST, a copy of LIST is returned.
    LIST must be a proper list or a dotted list."

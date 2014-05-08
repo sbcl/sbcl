@@ -38,6 +38,7 @@
          (gethash (concatenate 'base-string "ldso_stub__" extern) table)))))
 
 (defun find-foreign-symbol-address (name)
+  #!+sb-doc
   "Returns the address of the foreign symbol NAME, or NIL. Does not enter the
 symbol in the linkage table, and never returns an address in the linkage-table."
   (or #!-sb-dynamic-core
@@ -45,6 +46,7 @@ symbol in the linkage table, and never returns an address in the linkage-table."
       (find-dynamic-foreign-symbol-address name)))
 
 (defun foreign-symbol-address (name &optional datap)
+  #!+sb-doc
   "Returns the address of the foreign symbol NAME. DATAP must be true if the
 symbol designates a variable (used only on linkage-table platforms). Returns a
 secondary value that is true if DATAP was true and the symbol is a dynamic
@@ -76,6 +78,7 @@ On non-linkage-table ports signals an error if the symbol isn't found."
         (error 'undefined-alien-error :name name))))
 
 (defun foreign-symbol-sap (symbol &optional datap)
+  #!+sb-doc
   "Returns a SAP corresponding to the foreign symbol. DATAP must be true if the
 symbol designates a variable (used only on linkage-table platforms). May enter
 the symbol into the linkage-table. On non-linkage-table ports signals an error

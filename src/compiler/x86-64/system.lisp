@@ -390,6 +390,7 @@
      (move hi edx)))
 
 (defmacro with-cycle-counter (&body body)
+  #!+sb-doc
   "Returns the primary value of BODY as the primary value, and the
 number of CPU cycles elapsed as secondary value. EXPERIMENTAL."
   (with-unique-names (hi0 hi1 lo0 lo1)

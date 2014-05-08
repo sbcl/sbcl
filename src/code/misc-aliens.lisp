@@ -18,6 +18,7 @@
   (n unsigned-int))
 
 (define-alien-routine ("os_get_errno" get-errno) integer)
+#!+sb-doc
 (setf (fdocumentation 'get-errno 'function)
       "Return the value of the C library pseudo-variable named \"errno\".")
 

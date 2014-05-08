@@ -30,6 +30,7 @@
 
 (defmacro with-deadline ((&key seconds override)
                          &body body)
+  #!+sb-doc
   "Arranges for a TIMEOUT condition to be signalled if an operation
 respecting deadlines occurs either after the deadline has passed, or
 would take longer than the time left to complete.
@@ -111,12 +112,14 @@ for calling this when a deadline is reached."
   nil)
 
 (defun defer-deadline (seconds &optional condition)
+  #!+sb-doc
   "Find the DEFER-DEADLINE restart associated with CONDITION, and
 invoke it with SECONDS as argument (deferring the deadline by that many
 seconds.) Otherwise return NIL if the restart is not found."
   (try-restart 'defer-deadline condition seconds))
 
 (defun cancel-deadline (&optional condition)
+  #!+sb-doc
   "Find and invoke the CANCEL-DEADLINE restart associated with
 CONDITION, or return NIL if the restart is not found."
   (try-restart 'cancel-deadline condition))

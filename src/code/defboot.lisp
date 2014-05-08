@@ -173,6 +173,7 @@ evaluated as a PROGN."
    (info :function :inline-expansion-designator name)))
 
 (defmacro-mundanely defun (&environment env name args &body body)
+  #!+sb-doc
   "Define a function at top level."
   #+sb-xc-host
   (unless (symbol-package (fun-name-block-name name))
@@ -639,6 +640,7 @@ condition."
                   #!+x86 (multiple-value-prog1 (progn ,@forms) (float-wait))))
 
 (defmacro-mundanely handler-case (form &rest cases)
+  #!+sb-doc
   "(HANDLER-CASE form { (type ([var]) body) }* )
 
 Execute FORM in a context with handlers established for the condition types. A

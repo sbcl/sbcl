@@ -1319,6 +1319,7 @@ the values returned by the form as a list. No associated restarts."))
 
 ;;; A knob for muffling warnings, mostly for use while loading files.
 (defvar *muffled-warnings* 'uninteresting-redefinition
+  #!+sb-doc
   "A type that ought to specify a subtype of WARNING.  Whenever a
 warning is signaled, if the warning if of this type and is not
 handled by any other handler, it will be muffled.")

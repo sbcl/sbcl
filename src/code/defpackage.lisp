@@ -264,6 +264,7 @@
 
 (declaim (type list *on-package-variance*))
 (defvar *on-package-variance* '(:warn t)
+  #!+sb-doc
   "Specifies behavior when redefining a package using DEFPACKAGE and the
 definition is in variance with the current state of the package.
 

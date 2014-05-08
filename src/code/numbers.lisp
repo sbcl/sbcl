@@ -744,6 +744,7 @@
        (ftruncate-float (dispatch-type divisor))))))
 
 (defun ffloor (number &optional (divisor 1))
+  #!+sb-doc
   "Same as FLOOR, but returns first value as a float."
   (multiple-value-bind (tru rem) (ftruncate number divisor)
     (if (and (not (zerop rem))
@@ -754,6 +755,7 @@
         (values tru rem))))
 
 (defun fceiling (number &optional (divisor 1))
+  #!+sb-doc
   "Same as CEILING, but returns first value as a float."
   (multiple-value-bind (tru rem) (ftruncate number divisor)
     (if (and (not (zerop rem))
@@ -766,6 +768,7 @@
 ;;; FIXME: this probably needs treatment similar to the use of
 ;;; %UNARY-FTRUNCATE for FTRUNCATE.
 (defun fround (number &optional (divisor 1))
+  #!+sb-doc
   "Same as ROUND, but returns first value as a float."
   (multiple-value-bind (res rem)
       (round number divisor)
@@ -1437,7 +1440,8 @@ the first."
 ;;;; miscellaneous number predicates
 
 (macrolet ((def (name doc)
-             `(defun ,name (number) ,doc (,name number))))
+             (declare (ignorable doc))
+             `(defun ,name (number) #!+sb-doc ,doc (,name number))))
   (def zerop "Is this number zero?")
   (def plusp "Is this real number strictly positive?")
   (def minusp "Is this real number strictly negative?")

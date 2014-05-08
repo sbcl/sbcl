@@ -274,8 +274,7 @@ Examples:
   (type-of *foo*)                 ; => (alien (* (array (signed 8) 10)))
   (setf (deref (deref foo) 0) 10) ; => 10
 
-  (make-alien char 12)            ; => (alien (* (signed 8)))
-"
+  (make-alien char 12)            ; => (alien (* (signed 8)))"
   (let ((alien-type (if (alien-type-p type)
                         type
                         (parse-alien-type type env))))
@@ -362,6 +361,7 @@ allocated by MAKE-ALIEN, MAKE-ALIEN-STRING or malloc(3)."
                                  &key (start 0) end
                                       (external-format :default)
                                       (null-terminate t))
+  #!+sb-doc
   "Copy part of STRING delimited by START and END into freshly
 allocated foreign memory, freeable using free(3) or FREE-ALIEN.
 Returns the allocated string as a (* CHAR) alien, and the number of
@@ -369,8 +369,7 @@ bytes allocated as secondary value.
 
 The string is encoded using EXTERNAL-FORMAT. If NULL-TERMINATE is
 true (the default), the alien string is terminated by an additional
-null byte.
-"
+null byte."
   (declare (ignore start end external-format null-terminate))
   (multiple-value-bind (sap bytes)
       (apply #'%make-alien-string string rest)
@@ -841,6 +840,7 @@ way that the argument is passed.
 ;;;; See "Foreign Linkage / Callbacks" in the SBCL Internals manual.
 
 (defvar *alien-callback-info* nil
+  #!+sb-doc
   "Maps SAPs to corresponding CALLBACK-INFO structures: contains all the
 information we need to manipulate callbacks after their creation. Used for
 changing the lisp-side function they point to, invalidation, etc.")
@@ -858,15 +858,18 @@ changing the lisp-side function they point to, invalidation, etc.")
   (cdr (assoc (alien-sap alien) *alien-callback-info* :test #'sap=)))
 
 (defvar *alien-callbacks* (make-hash-table :test #'equal)
+  #!+sb-doc
   "Cache of existing callback SAPs, indexed with (SPECIFER . FUNCTION). Used for
 memoization: we don't create new callbacks if one pointing to the correct
 function with the same specifier already exists.")
 
 (defvar *alien-callback-wrappers* (make-hash-table :test #'equal)
+  #!+sb-doc
   "Cache of existing lisp wrappers, indexed with SPECIFER. Used for memoization:
 we don't create new wrappers if one for the same specifier already exists.")
 
 (defvar *alien-callback-trampolines* (make-array 32 :fill-pointer 0 :adjustable t)
+  #!+sb-doc
   "Lisp trampoline store: assembler wrappers contain indexes to this, and
 ENTER-ALIEN-CALLBACK pulls the corresponding trampoline out and calls it.")
 
@@ -962,12 +965,10 @@ ENTER-ALIEN-CALLBACK pulls the corresponding trampoline out and calls it.")
   (declare (ignore arguments))
   (error "Invalid alien callback called."))
 
-
 (defun parse-callback-specification (result-type lambda-list)
   (values
    `(function ,result-type ,@(mapcar #'second lambda-list))
    (mapcar #'first lambda-list)))
-
 
 (defun parse-alien-ftype (specifier env)
   (destructuring-bind (function result-type &rest argument-types)
@@ -1013,6 +1014,7 @@ ENTER-ALIEN-CALLBACK pulls the corresponding trampoline out and calls it.")
 ;;;; interface (not public, yet) for alien callbacks
 
 (defmacro alien-callback (specifier function &environment env)
+  #!+sb-doc
   "Returns an alien-value with of alien ftype SPECIFIER, that can be passed to
 an alien function as a pointer to the FUNCTION. If a callback for the given
 SPECIFIER and FUNCTION already exists, it is returned instead of consing a new
@@ -1033,6 +1035,7 @@ one."
       ',(parse-alien-type specifier env))))
 
 (defun alien-callback-p (alien)
+  #!+sb-doc
   "Returns true if the alien is associated with a lisp-side callback,
 and a secondary return value of true if the callback is still valid."
   (let ((info (alien-callback-info alien)))
@@ -1040,12 +1043,14 @@ and a secondary return value of true if the callback is still valid."
       (values t (and (callback-info-function info) t)))))
 
 (defun alien-callback-function (alien)
+  #!+sb-doc
   "Returns the lisp function designator associated with the callback."
   (let ((info (alien-callback-info alien)))
     (when info
       (callback-info-function info))))
 
 (defun (setf alien-callback-function) (function alien)
+  #!+sb-doc
   "Changes the lisp function designated by the callback."
   (let ((info (alien-callback-info alien)))
     (unless info
@@ -1062,6 +1067,7 @@ and a secondary return value of true if the callback is still valid."
     function))
 
 (defun invalidate-alien-callback (alien)
+  #!+sb-doc
   "Invalidates the callback designated by the alien, if any, allowing the
 associated lisp function to be GC'd, and causing further calls to the same
 callback signal an error."
@@ -1093,6 +1099,7 @@ callback signal an error."
 ;;; the FDEFINITION should invalidate the callback, and redefining the
 ;;; callback should change existing callbacks to point to the new defintion.
 (defmacro define-alien-callback (name result-type typed-lambda-list &body forms)
+  #!+sb-doc
   "Defines #'NAME as a function with the given body and lambda-list, and NAME as
 the alien callback for that function with the given alien type."
   (declare (symbol name))

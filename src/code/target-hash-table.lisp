@@ -756,9 +756,8 @@ if there is no such entry. Entries can be added using SETF."
                            (update-hash-table-cache hash-table (* 2 next))
                            (let ((value (aref table (1+ (* 2 next)))))
                              (result value t)))))))))))))
-
+;;; Three argument version of GETHASH
 (defun gethash3 (key hash-table default)
-  "Three argument version of GETHASH"
   (declare (type hash-table hash-table))
   (with-hash-table-locks (hash-table :operation :read :inline (%gethash3)
                                      :pin (key))

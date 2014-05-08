@@ -22,6 +22,7 @@
       (move rax-tn value)))
 
 (defun generate-fixnum-test (value)
+  #!+sb-doc
   "Set the Z flag if VALUE is fixnum"
   (inst test
         (cond ((sc-is value any-reg descriptor-reg)

@@ -523,6 +523,7 @@ invoked. In that case it will store into PLACE and start over."
 
 (defmacro-mundanely print-unreadable-object ((object stream &key type identity)
                                              &body body)
+  #!+sb-doc
   "Output OBJECT to STREAM with \"#<\" prefix, \">\" suffix, optionally
   with object-type prefix and object-identity suffix, and executing the
   code in BODY to provide possible further output."

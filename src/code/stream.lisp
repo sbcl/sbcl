@@ -189,6 +189,7 @@
 ;;; probably thinking of something like what Unix calls block devices)
 ;;; but I can't see any better way to do it. -- WHN 2001-04-14
 (defun stream-associated-with-file-p (x)
+  #!+sb-doc
   "Test for the ANSI concept \"stream associated with a file\"."
   (or (typep x 'file-stream)
       (and (synonym-stream-p x)

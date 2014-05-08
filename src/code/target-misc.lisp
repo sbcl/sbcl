@@ -137,9 +137,11 @@ are running on, or NIL if we can't find any useful information."
 
 ;;;; ED
 (defvar *ed-functions* nil
+  #!+sb-doc
   "See function documentation for ED.")
 
 (defun ed (&optional x)
+  #!+sb-doc
   "Starts the editor (on a file or a function if named).  Functions
 from the list *ED-FUNCTIONS* are called in order with X as an argument
 until one of them returns non-NIL; these functions are responsible for

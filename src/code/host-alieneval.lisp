@@ -1115,6 +1115,7 @@
                      (alien-record-field-type field2))))
 
 (defvar *alien-type-matches* nil
+  #!+sb-doc
   "A hashtable used to detect cycles while comparing record types.")
 
 (define-alien-type-method (record :type=) (type1 type2)

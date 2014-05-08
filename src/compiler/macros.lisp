@@ -172,10 +172,12 @@
            (eval-when (:compile-toplevel :load-toplevel :execute)
              (defparameter ,translations-name ',(alist)))
            (defmacro ,(symbolicate name "-ATTRIBUTES") (&rest attribute-names)
+             #!+sb-doc
              "Automagically generated boolean attribute creation function.
   See !DEF-BOOLEAN-ATTRIBUTE."
              (compute-attribute-mask attribute-names ,translations-name))
            (defmacro ,test-name (attributes &rest attribute-names)
+             #!+sb-doc
              "Automagically generated boolean attribute test function.
   See !DEF-BOOLEAN-ATTRIBUTE."
              `(logtest ,(compute-attribute-mask attribute-names
@@ -204,6 +206,7 @@
     (declare (ignore attribute-names))
     `(define-setf-expander ,test-name (place &rest attributes
                                              &environment env)
+       #!+sb-doc
        "Automagically generated boolean attribute setter. See
  !DEF-BOOLEAN-ATTRIBUTE."
        #-sb-xc-host (declare (type lexenv env))

@@ -88,6 +88,7 @@
               double-float complex-double-float))
 
             (system-area-pointer sap-reg move-if/sap)))
+  #!+sb-doc
   "Alist of primitive type -> (storage-class-name VOP-name)
    if values of such a type should be cmoved, and NIL otherwise.
 

@@ -14,7 +14,7 @@
   (read-only-roots unsigned-long))
 
 (defun purify (&key root-structures environment-name)
-  ;; #!+sb-doc
+  #!+sb-doc
   "This function optimizes garbage collection by moving all currently live
    objects into non-collected storage. ROOT-STRUCTURES is an optional list of
    objects which should be copied first to maximize locality.

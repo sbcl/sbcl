@@ -119,6 +119,7 @@
 (defvar *lambda-conversions*)
 
 (defvar *stack-allocate-dynamic-extent* t
+  #!+sb-doc
   "If true (the default), the compiler respects DYNAMIC-EXTENT declarations
 and stack allocates otherwise inaccessible parts of the object whenever
 possible. Potentially long (over one page in size) vectors are, however, not

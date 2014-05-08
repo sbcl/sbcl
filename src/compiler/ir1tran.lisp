@@ -85,6 +85,7 @@
 (defvar *current-path*)
 
 (defvar *derive-function-types* nil
+  #!+sb-doc
   "Should the compiler assume that function types will never change,
   so that it can use type information inferred from current definitions
   to optimize code which uses those definitions? Setting this true

@@ -173,6 +173,7 @@ Experimental."
 (let ((symbols (make-hash-table :test #'equal))
       (undefineds (make-hash-table :test #'equal)))
   (defun ensure-dynamic-foreign-symbol-address (symbol &optional datap)
+    #!+sb-doc
     "Returns the address of the foreign symbol as an integer. On linkage-table
 ports if the symbols isn't found a special guard address is returned instead,
 accesses to which will result in an UNDEFINED-ALIEN-ERROR. On other ports an

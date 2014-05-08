@@ -1467,6 +1467,7 @@ extended <package-name>::<form-in-package> syntax."
        (setq number (+ num (* number base-power)))))))
 
 (defun truncate-exponent (exponent number divisor)
+  #!+sb-doc
   "Truncate exponent if it's too large for a float"
   ;; Work with base-2 logarithms to avoid conversions to floats,
   ;; and convert to base-10 conservatively at the end.

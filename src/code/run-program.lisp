@@ -49,6 +49,7 @@
 (progn
   (define-alien-routine wrapped-environ (* c-string))
   (defun posix-environ ()
+    #+sb-doc
     "Return the Unix environment (\"man environ\") as a list of SIMPLE-STRINGs."
     (c-strings->string-list (wrapped-environ))))
 

@@ -278,14 +278,17 @@ created and old ones may exit at any time."
     (setq *all-threads* (list initial-thread))))
 
 (defun main-thread ()
+  #!+sb-doc
   "Returns the main thread of the process."
   *initial-thread*)
 
 (defun main-thread-p (&optional (thread *current-thread*))
+  #!+sb-doc
   "True if THREAD, defaulting to current thread, is the main thread of the process."
   (eq thread *initial-thread*))
 
 (defmacro return-from-thread (values-form &key allow-exit)
+  #!+sb-doc
   "Unwinds from and terminates the current thread, with values from
 VALUES-FORM as the results visible to JOIN-THREAD.
 
@@ -312,6 +315,7 @@ See also: ABORT-THREAD and SB-EXT:EXIT."
            (throw '%return-from-thread (values-list values))))))
 
 (defun abort-thread (&key allow-exit)
+  #!+sb-doc
   "Unwinds from and terminates the current thread abnormally, causing
 JOIN-THREAD on current thread to signal an error unless a
 default-value is provided.
@@ -461,6 +465,7 @@ See also: RETURN-FROM-THREAD and SB-EXT:EXIT."
   (defconstant +lock-contested+ 2))
 
 (defun mutex-owner (mutex)
+  #!+sb-doc
   "Current owner of the mutex, NIL if the mutex is free. Naturally,
 this is racy by design (another thread may acquire the mutex after
 this function returns), it is intended for informative purposes. For
@@ -1017,6 +1022,7 @@ future."
   (mutex (make-mutex))
   (queue (make-waitqueue)))
 
+#!+sb-doc
 (setf (fdocumentation 'semaphore-name 'function)
       "The name of the semaphore INSTANCE. Setfable.")
 
@@ -1028,6 +1034,7 @@ TRY-SEMAPHORE as the :NOTIFICATION argument. Consequences are undefined if
 multiple threads are using the same notification object in parallel."
   (%status nil :type boolean))
 
+#!+sb-doc
 (setf (fdocumentation 'make-semaphore-notification 'function)
       "Constructor for SEMAPHORE-NOTIFICATION objects. SEMAPHORE-NOTIFICATION-STATUS
 is initially NIL.")
@@ -1282,6 +1289,7 @@ thread is not the foreground thread."
 
 ;;; called from top of invoke-debugger
 (defun debugger-wait-until-foreground-thread (stream)
+  #!+sb-doc
   "Returns T if thread had been running in background, NIL if it was
 interactive."
   (declare (ignore stream))
@@ -1787,6 +1795,7 @@ assume that unknown code can safely be terminated using TERMINATE-THREAD."
           finally (return seen))))
 
 (defun symbol-value-in-thread (symbol thread &optional (errorp t))
+  #!+sb-doc
   "Return the local value of SYMBOL in THREAD, and a secondary value of T
 on success.
 

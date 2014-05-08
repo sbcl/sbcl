@@ -98,12 +98,14 @@
             (length (%pqueue-contents object)))))
 
 (defun priority-queue-maximum (priority-queue)
+  #!+sb-doc
   "Return the item in PRIORITY-QUEUE with the largest key."
   (symbol-macrolet ((contents (%pqueue-contents priority-queue)))
     (unless (zerop (length contents))
       (heap-maximum contents))))
 
 (defun priority-queue-extract-maximum (priority-queue)
+  #!+sb-doc
   "Remove and return the item in PRIORITY-QUEUE with the largest key."
   (symbol-macrolet ((contents (%pqueue-contents priority-queue))
                     (keyfun (%pqueue-keyfun priority-queue)))
@@ -111,6 +113,7 @@
       (heap-extract-maximum contents :key keyfun :test #'<=))))
 
 (defun priority-queue-insert (priority-queue new-item)
+  #!+sb-doc
   "Add NEW-ITEM to PRIORITY-QUEUE."
   (symbol-macrolet ((contents (%pqueue-contents priority-queue))
                     (keyfun (%pqueue-keyfun priority-queue)))
@@ -120,6 +123,7 @@
   (zerop (length (%pqueue-contents priority-queue))))
 
 (defun priority-queue-remove (priority-queue item &key (test #'eq))
+  #!+sb-doc
   "Remove and return ITEM from PRIORITY-QUEUE."
   (symbol-macrolet ((contents (%pqueue-contents priority-queue))
                     (keyfun (%pqueue-keyfun priority-queue)))

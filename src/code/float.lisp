@@ -39,30 +39,31 @@
 
 (defmacro !define-float-dispatching-function
     (name doc single double #!+(and long-float x86) long)
+  (declare (ignorable doc))
   `(defun ,name (x)
-    ,doc
-    (number-dispatch ((x float))
-     ((single-float)
-      (let ((bits (single-float-bits x)))
-        (and (> (ldb sb!vm:single-float-exponent-byte bits)
-                sb!vm:single-float-normal-exponent-max)
-             ,single)))
-     ((double-float)
-      (let ((hi (double-float-high-bits x))
-            (lo (double-float-low-bits x)))
-        (declare (ignorable lo))
-        (and (> (ldb sb!vm:double-float-exponent-byte hi)
-                sb!vm:double-float-normal-exponent-max)
-             ,double)))
-     #!+(and long-float x86)
-     ((long-float)
-      (let ((exp (long-float-exp-bits x))
-            (hi (long-float-high-bits x))
-            (lo (long-float-low-bits x)))
-        (declare (ignorable lo))
-        (and (> (ldb sb!vm:long-float-exponent-byte exp)
-                sb!vm:long-float-normal-exponent-max)
-             ,long))))))
+     #!+sb-doc ,doc
+     (number-dispatch ((x float))
+       ((single-float)
+        (let ((bits (single-float-bits x)))
+          (and (> (ldb sb!vm:single-float-exponent-byte bits)
+                  sb!vm:single-float-normal-exponent-max)
+               ,single)))
+       ((double-float)
+        (let ((hi (double-float-high-bits x))
+              (lo (double-float-low-bits x)))
+          (declare (ignorable lo))
+          (and (> (ldb sb!vm:double-float-exponent-byte hi)
+                  sb!vm:double-float-normal-exponent-max)
+               ,double)))
+       #!+(and long-float x86)
+       ((long-float)
+        (let ((exp (long-float-exp-bits x))
+              (hi (long-float-high-bits x))
+              (lo (long-float-low-bits x)))
+          (declare (ignorable lo))
+          (and (> (ldb sb!vm:long-float-exponent-byte exp)
+                  sb!vm:long-float-normal-exponent-max)
+               ,long))))))
 
 (!define-float-dispatching-function float-infinity-p
   "Return true if the float X is an infinity (+ or -)."
@@ -91,6 +92,7 @@
       (not (zerop lo))))
 
 (!define-float-dispatching-function float-trapping-nan-p
+
   "Return true if the float X is a trapping NaN (Not a Number)."
   #!-(or mips hppa)
   (zerop (logand (ldb sb!vm:single-float-significand-byte bits)
@@ -910,6 +912,7 @@
 ;;;   <http://modular.fas.harvard.edu/edu/Fall2001/124/lectures/lecture17/lecture18/>
 
 (defun rationalize (x)
+  #!+sb-doc
   "Converts any REAL to a RATIONAL.  Floats are converted to a simple rational
   representation exploiting the assumption that floats are only accurate to
   their precision.  RATIONALIZE (and also RATIONAL) preserve the invariant:

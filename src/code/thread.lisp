@@ -59,11 +59,13 @@ temporarily.")
   (state    0 :type fixnum))
 
 (defun mutex-value (mutex)
+  #!+sb-doc
   "Current owner of the mutex, NIL if the mutex is free. May return a
 stale value, use MUTEX-OWNER instead."
   (mutex-%owner mutex))
 
 (defun holding-mutex-p (mutex)
+  #!+sb-doc
   "Test whether the current thread is holding MUTEX."
   ;; This is about the only use for which a stale value of owner is
   ;; sufficient.
@@ -85,6 +87,7 @@ stale value, use MUTEX-OWNER instead."
 ;;; SPINLOCK no longer exists as a type -- provided for backwards compatibility.
 
 (deftype spinlock ()
+  #!+sb-doc
   "Spinlock type."
   (deprecation-warning :early "1.0.53.11" 'spinlock 'mutex)
   'mutex)

@@ -520,6 +520,7 @@ per standard Unix unlink() behaviour."
       pathname))
 
 (defun delete-directory (pathspec &key recursive)
+  #!+sb-doc
   "Deletes the directory designated by PATHSPEC (a pathname designator).
 Returns the truename of the directory deleted.
 

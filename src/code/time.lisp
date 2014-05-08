@@ -110,6 +110,7 @@ format."
 (defconstant +mar-1-1903+ #.(encode-universal-time 0 0 0 1 3 1903 0))
 
 (defun years-since-mar-2000 (utime)
+  #!+sb-doc
   "Returns number of complete years since March 1st 2000, and remainder in seconds"
   (let* ((days-in-year (* 86400 365))
          (days-in-4year (+ (* 4 days-in-year) 86400))

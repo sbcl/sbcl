@@ -76,6 +76,7 @@
                     (stem (string-left-trim "%" (string-right-trim "P-" name)))
                     (article (if (position (schar name 0) "AEIOU") "an" "a")))
                `(defun ,pred (object)
+                  #!+sb-doc
                   ,(format nil
                            "Return true if OBJECT is ~A ~A, and NIL otherwise."
                            article

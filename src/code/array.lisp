@@ -458,6 +458,7 @@
                            (element-type '(unsigned-byte 8))
                            (initial-contents nil initial-contents-p)
                            (initial-element nil initial-element-p))
+  #!+sb-doc
   "Allocate vector of LENGTH elements in static space. Only allocation
 of specialized arrays is supported."
   ;; STEP 1: check inputs fully
@@ -1347,6 +1348,7 @@ of specialized arrays is supported."
 (declaim (ftype (function (array) (values (simple-array * (*)) &optional))
                 array-storage-vector))
 (defun array-storage-vector (array)
+  #!+sb-doc
   "Returns the underlying storage vector of ARRAY, which must be a non-displaced array.
 
 In SBCL, if ARRAY is a of type \(SIMPLE-ARRAY * \(*)), it is its own storage

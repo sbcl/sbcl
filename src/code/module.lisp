@@ -23,6 +23,7 @@
    It is used by PROVIDE and REQUIRE.")
 
 (defvar *module-provider-functions* (list 'module-provide-contrib)
+  #!+sb-doc
   "See function documentation for REQUIRE.")
 
 ;;;; PROVIDE and REQUIRE
@@ -78,6 +79,7 @@
 ;;;; miscellany
 
 (defun module-provide-contrib (name)
+  #!+sb-doc
   "Stringify and downcase NAME, then attempt to load the file
    $SBCL_HOME/name/name"
   (let* ((filesys-name (string-downcase (string name)))

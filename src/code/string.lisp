@@ -161,6 +161,7 @@
   (string<=* string1 string2 start1 end1 start2 end2))
 
 (defun string>= (string1 string2 &key (start1 0) end1 (start2 0) end2)
+  #!+sb-doc
   "Given two strings, if the first string is lexicographically greater
   than or equal to the second string, returns the longest common prefix
   (using char=) of the two strings. Otherwise, returns ()."

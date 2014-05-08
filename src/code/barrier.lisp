@@ -46,7 +46,8 @@
       (error "Unknown barrier kind ~S" kind)))
 
 (def!macro barrier ((kind) &body forms)
-    "Insert a barrier in the code stream, preventing some sort of
+  #!+sb-doc
+  "Insert a barrier in the code stream, preventing some sort of
 reordering.
 
 KIND should be one of:

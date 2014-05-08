@@ -576,6 +576,7 @@
 ;;; helper for alien stuff.
 
 (def!macro with-pinned-objects ((&rest objects) &body body)
+  #!+sb-doc
   "Arrange with the garbage collector that the pages occupied by
 OBJECTS will not be moved in memory for the duration of BODY.
 Useful for e.g. foreign calls where another thread may trigger

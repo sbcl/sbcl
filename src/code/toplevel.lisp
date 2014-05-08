@@ -89,6 +89,7 @@ been specified on the command-line.")
 (defvar *exit-in-process* nil)
 (declaim (type (or null real) *exit-timeout*))
 (defvar *exit-timeout* 60
+  #!+sb-doc
   "Default amount of seconds, if any, EXIT should wait for other
 threads to finish after terminating them. Default value is 60. NIL
 means to wait indefinitely.")

@@ -145,12 +145,14 @@
 ;;; polling function if it does time out.
 (declaim (type (or null symbol function) *periodic-polling-function*))
 (defvar *periodic-polling-function* nil
+  #!+sb-doc
   "Either NIL, or a designator for a function callable without any
 arguments. Called when the system has been waiting for input for
 longer then *PERIODIC-POLLING-PERIOD* seconds. Shared between all
 threads, unless locally bound. EXPERIMENTAL.")
 (declaim (real *periodic-polling-period*))
 (defvar *periodic-polling-period* 0
+  #!+sb-doc
   "A real number designating the number of seconds to wait for input
 at maximum, before calling the *PERIODIC-POLLING-FUNCTION* \(if any.)
 Shared between all threads, unless locally bound. EXPERIMENTAL.")

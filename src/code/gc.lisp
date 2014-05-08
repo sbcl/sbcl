@@ -134,6 +134,7 @@ and submit it as a patch."
 ;;;; GC hooks
 
 (defvar *after-gc-hooks* nil
+  #!+sb-doc
   "Called after each garbage collection, except for garbage collections
 triggered during thread exits. In a multithreaded environment these hooks may
 run in any thread.")
@@ -177,6 +178,7 @@ statistics are appended to it."
         (native-pathname val))))
   (declaim (inline dynamic-space-size))
   (defun dynamic-space-size ()
+    #!+sb-doc
     "Size of the dynamic space in bytes."
     (extern-alien "dynamic_space_size" os-vm-size-t)))
 
@@ -498,6 +500,7 @@ promotion. Available on GENCGC platforms only.
 
 Experimental: interface subject to change."))
   (defun generation-average-age (generation)
+    #!+sb-doc
     "Average age of memory allocated to GENERATION: average number of times
 objects allocated to the generation have seen younger objects promoted to it.
 Available on GENCGC platforms only.

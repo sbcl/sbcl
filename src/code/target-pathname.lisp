@@ -1745,6 +1745,7 @@ experimental and subject to change."
             ("SYS:OUTPUT;**;*.*.*" ,output)))))
 
 (defun set-sbcl-source-location (pathname)
+  #!+sb-doc
   "Initialize the SYS logical host based on PATHNAME, which should be
 the top-level directory of the SBCL sources. This will replace any
 existing translations for \"SYS:SRC;\", \"SYS:CONTRIB;\", and

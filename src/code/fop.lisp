@@ -435,6 +435,7 @@
             (setf (aref array (sb!vm:saetp-typecode saetp))
                   (sb!vm:saetp-n-bits saetp)))
       array)
+    #!+sb-doc
     "255 means bad entry.")
 (declaim (type (simple-array (unsigned-byte 8) (#.(1+ sb!vm:widetag-mask)))
                **saetp-bits-per-length**))
