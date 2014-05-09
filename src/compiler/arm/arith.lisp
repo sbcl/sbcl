@@ -228,7 +228,7 @@
   (:policy :fast-safe)
   (:temporary (:sc non-descriptor-reg) temp)
   (:variant-vars variant)
-  (:generator 10
+  (:generator 6
     (move temp amount)
     (inst cmp temp 0)
     (inst b :ge LEFT)
