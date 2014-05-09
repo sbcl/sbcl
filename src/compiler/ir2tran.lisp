@@ -1454,9 +1454,6 @@
 (defoptimizer (%nip-values ir2-convert) ((last-nipped last-preserved
                                                       &rest moved)
                                          node block)
-  #!+arm
-  (error "Don't know how to %NIP-VALUES")
-  #!-arm
   (let* ( ;; pointer immediately after the nipped block
          (after (lvar-value last-nipped))
          (2after (lvar-info after))
