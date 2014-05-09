@@ -174,16 +174,7 @@
   (:results (y :scs (complex-single-reg) :load-if (not (location= x y))))
   (:note "complex single float move")
   (:generator 0
-     (unless (location= x y)
-       ;; Note the complex-single-float-regs are aligned to every
-       ;; second float register so there is not need to worry about
-       ;; overlap.
-       (let ((x-real (complex-single-reg-real-tn x))
-             (y-real (complex-single-reg-real-tn y)))
-         (move-single y-real x-real))
-       (let ((x-imag (complex-single-reg-imag-tn x))
-             (y-imag (complex-single-reg-imag-tn y)))
-         (move-single y-imag x-imag)))))
+     (move-complex-single y x)))
 (define-move-vop complex-single-move :move
   (complex-single-reg) (complex-single-reg))
 
@@ -193,16 +184,7 @@
   (:results (y :scs (complex-double-reg) :load-if (not (location= x y))))
   (:note "complex double float move")
   (:generator 0
-     (unless (location= x y)
-       ;; Note the complex-double-float-regs are aligned to every
-       ;; fourth float register so there is not need to worry about
-       ;; overlap.
-       (let ((x-real (complex-double-reg-real-tn x))
-             (y-real (complex-double-reg-real-tn y)))
-         (move-double y-real x-real))
-       (let ((x-imag (complex-double-reg-imag-tn x))
-             (y-imag (complex-double-reg-imag-tn y)))
-         (move-double y-imag x-imag)))))
+     (move-complex-double y x)))
 (define-move-vop complex-double-move :move
   (complex-double-reg) (complex-double-reg))
 
@@ -291,13 +273,7 @@
   (:generator 1
     (sc-case y
       (complex-single-reg
-       (unless (location= x y)
-         (let ((x-real (complex-single-reg-real-tn x))
-               (y-real (complex-single-reg-real-tn y)))
-           (move-single y-real x-real))
-         (let ((x-imag (complex-single-reg-imag-tn x))
-               (y-imag (complex-single-reg-imag-tn y)))
-           (move-single y-imag x-imag))))
+       (move-complex-single y x))
       (complex-single-stack
        (let ((offset (* (tn-offset y) n-word-bytes)))
          (let ((real-tn (complex-single-reg-real-tn x)))
@@ -315,13 +291,7 @@
   (:generator 2
     (sc-case y
       (complex-double-reg
-       (unless (location= x y)
-         (let ((x-real (complex-double-reg-real-tn x))
-               (y-real (complex-double-reg-real-tn y)))
-           (move-double y-real x-real))
-         (let ((x-imag (complex-double-reg-imag-tn x))
-               (y-imag (complex-double-reg-imag-tn y)))
-           (move-double y-imag x-imag))))
+       (move-complex-double y x))
       (complex-double-stack
        (let ((offset (* (tn-offset y) n-word-bytes)))
          (let ((real-tn (complex-double-reg-real-tn x)))

@@ -22,12 +22,30 @@
 
 (macrolet
     ((def (type inst)
-       `(defmacro ,(symbolicate 'move- type)
-            (dst src &optional (predicate :al))
-          (once-only ((n-dst dst)
-                      (n-src src))
-            `(unless (location= ,n-dst ,n-src)
-               (inst ,',inst ,predicate ,n-dst ,n-src))))))
+       (let ((real-tn-fn (symbolicate 'complex- type '-reg-real-tn))
+             (imag-tn-fn (symbolicate 'complex- type '-reg-imag-tn)))
+         `(progn
+            (defmacro ,(symbolicate 'move- type)
+                (dst src &optional (predicate :al))
+              (once-only ((n-dst dst)
+                          (n-src src))
+                `(unless (location= ,n-dst ,n-src)
+                   (inst ,',inst ,predicate ,n-dst ,n-src))))
+            (defmacro ,(symbolicate 'move-complex- type)
+                (dst src &optional (predicate :al))
+              (once-only ((n-dst dst)
+                          (n-src src))
+                `(unless (location= ,n-dst ,n-src)
+                   ;; Note that the complex (single and double) float
+                   ;; registers are aligned to paired underlying
+                   ;; (single and double) registers, so there is no
+                   ;; need to worry about overlap.
+                   (let ((src-real (,',real-tn-fn ,n-src))
+                         (dst-real (,',real-tn-fn ,n-dst)))
+                     (inst ,',inst ,predicate dst-real src-real))
+                   (let ((src-imag (,',imag-tn-fn ,n-src))
+                         (dst-imag (,',imag-tn-fn ,n-dst)))
+                     (inst ,', inst ,predicate dst-imag src-imag)))))))))
   (def single fcpys)
   (def double fcpyd))
 
