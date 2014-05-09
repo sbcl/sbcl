@@ -112,21 +112,13 @@
 ;;; Return the 32-bit SINGLE-FLOAT at OFFSET bytes from SAP.
 (defun sap-ref-single (sap offset)
   (declare (type system-area-pointer sap)
-           (fixnum offset)
-           #!+arm (ignore sap offset))
-  #!+arm
-  (error "No float support on ARM yet!")
-  #!-arm
+           (fixnum offset))
   (sap-ref-single sap offset))
 
 ;;; Return the 64-bit DOUBLE-FLOAT at OFFSET bytes from SAP.
 (defun sap-ref-double (sap offset)
   (declare (type system-area-pointer sap)
-           (fixnum offset)
-           #!+arm (ignore sap offset))
-  #!+arm
-  (error "No float support on ARM yet!")
-  #!-arm
+           (fixnum offset))
   (sap-ref-double sap offset))
 
 ;;; Return the LONG-FLOAT at OFFSET bytes from SAP.
@@ -240,21 +232,13 @@
 (defun %set-sap-ref-single (sap offset new-value)
   (declare (type system-area-pointer sap)
            (fixnum offset)
-           (type single-float new-value)
-           #!+arm (ignore sap offset new-value))
-  #!+arm
-  (error "No float support on ARM yet!")
-  #!-arm
+           (type single-float new-value))
   (setf (sap-ref-single sap offset) new-value))
 
 (defun %set-sap-ref-double (sap offset new-value)
   (declare (type system-area-pointer sap)
            (fixnum offset)
-           (type double-float new-value)
-           #!+arm (ignore sap offset new-value))
-  #!+arm
-  (error "No float support on ARM yet!")
-  #!-arm
+           (type double-float new-value))
   (setf (sap-ref-double sap offset) new-value))
 
 #!+long-float

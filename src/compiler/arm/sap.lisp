@@ -152,7 +152,7 @@
                ;; instruction, are confusing to figure out, and might
                ;; be sign-magnitude encoded.  FIXME: Figure these
                ;; things out, and re-enable the VOPs.
-               (ref-name set-name sc type size &optional signed)
+               (ref-name set-name sc type size &key signed use-lip)
                (let ((ref-name-c (symbolicate ref-name "-C"))
                      (set-name-c (symbolicate set-name "-C")))
                  `(progn
@@ -164,16 +164,20 @@
                      (:arg-types system-area-pointer signed-num)
                      (:results (result :scs (,sc)))
                      (:result-types ,type)
+                     ,@(when use-lip
+                             '((:temporary (:sc interior-reg) lip)))
                      (:generator 5
+                      ,@(when use-lip
+                          '((inst add lip sap offset)))
                       (inst ,(ecase size
                                     (:byte (if signed 'ldrsb 'ldrb))
                                     (:short (if signed 'ldrsh 'ldrh))
                                     (:long 'ldr)
-                                    #+(or)
-                                    (:single 'lfsx)
-                                    #+(or)
-                                    (:double 'lfdx))
-                            result (@ sap offset))))
+                                    (:single 'flds)
+                                    (:double 'fldd))
+                            result ,(if use-lip
+                                        '(@ lip)
+                                        '(@ sap offset)))))
                    #+(or)
                    (define-vop (,ref-name-c)
                        (:translate ,ref-name)
@@ -188,10 +192,8 @@
                                     (:byte (if signed 'ldrsb 'ldrb))
                                     (:short (if signed 'ldrsh 'ldrh))
                                     (:long 'ldr)
-                                    #+(or)
-                                    (:single 'lfs)
-                                    #+(or)
-                                    (:double 'lfd))
+                                    (:single 'flds)
+                                    (:double 'fldd))
                             result (@ sap offset))))
                    (define-vop (,set-name)
                        (:translate ,set-name)
@@ -202,24 +204,26 @@
                      (:arg-types system-area-pointer signed-num ,type)
                      (:results (result :scs (,sc)))
                      (:result-types ,type)
+                     ,@(when use-lip
+                             '((:temporary (:sc interior-reg) lip)))
                      (:generator 5
+                      ,@(when use-lip
+                          '((inst add lip sap offset)))
                       (inst ,(ecase size
                                     (:byte 'strb)
                                     (:short 'strh)
                                     (:long 'str)
-                                    #+(or)
-                                    (:single 'stfsx)
-                                    #+(or)
-                                    (:double 'stfdx))
-                            value (@ sap offset))
+                                    (:single 'fsts)
+                                    (:double 'fstd))
+                            value ,(if use-lip
+                                       '(@ lip)
+                                       '(@ sap offset)))
                       (unless (location= result value)
                         ,@(case size
-                                #+(or)
                                 (:single
-                                 '((inst frsp result value)))
-                                #+(or)
+                                 '((inst fcpys result value)))
                                 (:double
-                                 '((inst fmr result value)))
+                                 '((inst fcpyd result value)))
                                 (t
                                  '((inst mov result value)))))))
                    #+(or)
@@ -237,45 +241,37 @@
                                     (:byte 'strb)
                                     (:short 'strh)
                                     (:long 'str)
-                                    #+(or)
-                                    (:single 'stfs)
-                                    #+(or)
-                                    (:double 'stfd))
+                                    (:single 'fsts)
+                                    (:double 'fstd))
                             value (@ sap offset))
                       (unless (location= result value)
                         ,@(case size
-                                #+(or)
                                 (:single
-                                 '((inst frsp result value)))
-                                #+(or)
+                                 '((inst fcpys result value)))
                                 (:double
-                                 '((inst fmr result value)))
+                                 '((inst fcpyd result value)))
                                 (t
                                  '((inst mov result value)))))))))))
   (def-system-ref-and-set sap-ref-8 %set-sap-ref-8
-    unsigned-reg positive-fixnum :byte nil)
+    unsigned-reg positive-fixnum :byte :signed nil)
   (def-system-ref-and-set signed-sap-ref-8 %set-signed-sap-ref-8
-    signed-reg tagged-num :byte t)
+    signed-reg tagged-num :byte :signed t)
   (def-system-ref-and-set sap-ref-16 %set-sap-ref-16
-    unsigned-reg positive-fixnum :short nil)
+    unsigned-reg positive-fixnum :short :signed nil)
   (def-system-ref-and-set signed-sap-ref-16 %set-signed-sap-ref-16
-    signed-reg tagged-num :short t)
+    signed-reg tagged-num :short :signed t)
   (def-system-ref-and-set sap-ref-32 %set-sap-ref-32
-    unsigned-reg unsigned-num :long nil)
+    unsigned-reg unsigned-num :long :signed nil)
   (def-system-ref-and-set signed-sap-ref-32 %set-signed-sap-ref-32
-    signed-reg signed-num :long t)
+    signed-reg signed-num :long :signed t)
   (def-system-ref-and-set sap-ref-sap %set-sap-ref-sap
     sap-reg system-area-pointer :long)
   (def-system-ref-and-set sap-ref-lispobj %set-sap-ref-lispobj
     descriptor-reg * :long)
-  ;; FIXME: Floaty SAP references are disabled because we have no
-  ;; floaty support as of yet.
-  #+(or)
   (def-system-ref-and-set sap-ref-single %set-sap-ref-single
-    single-reg single-float :single)
-  #+(or)
+    single-reg single-float :single :use-lip t)
   (def-system-ref-and-set sap-ref-double %set-sap-ref-double
-    double-reg double-float :double))
+    double-reg double-float :double :use-lip t))
 
 ;;; Noise to convert normal lisp data objects into SAPs.
 (define-vop (vector-sap)
