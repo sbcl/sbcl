@@ -197,7 +197,6 @@
  ;; built. -- WHN 19990620
  ("src/code/target-type" :not-host)
 
- ;; FIXME-ARM: has float conditionals
  ("src/code/pred" :not-host)
 
  ("src/code/target-alieneval" :not-host)
@@ -207,7 +206,6 @@
  ;; This needs DEFINE-ALIEN-ROUTINE from target-alieneval.
  ("src/code/misc-aliens" :not-host)
 
- ;; FIXME-ARM: has float conditionals
  ("src/compiler/generic/vm-array")
  ("src/code/array"         :not-host)
  ("src/code/early-float"   :not-host)
@@ -259,13 +257,10 @@
  #!+win32 ("src/code/target-exception" :not-host)
 
  ("src/code/symbol"     :not-host)
- ;; FIXME-ARM: has float conditionals
  ("src/code/bignum"     :not-host)
- ;; FIXME-ARM: has float conditionals
  ("src/code/numbers"    :not-host)
  ("src/code/float-trap" :not-host)
  ("src/code/float"      :not-host)
- ;; FIXME-ARM: has float conditionals
  ("src/code/irrat"      :not-host)
 
  ("src/code/char")
@@ -277,7 +272,6 @@
  ("src/code/room"   :not-host)
 
  ("src/code/stream"        :not-host)
- ;; FIXME-ARM: has float conditionals
  ("src/code/print"         :not-host)
  ("src/code/pprint"        :not-host)
  ("src/code/early-format")
@@ -288,7 +282,6 @@
  ("src/code/error-error" :not-host) ; needs WITH-STANDARD-IO-SYNTAX macro
 
  ("src/code/deadline" :not-host)
- ;; NOTE BEFORE COMMIT: UP TO HERE WORKS AT THE CURRENT GIT HEAD
  ("src/code/serve-event" :not-host)
  ("src/code/fd-stream"   :not-host)
 
@@ -370,7 +363,6 @@
  ;; in class.lisp.
  ("src/code/condition" :not-host)
 
- ;; FIXME-ARM: has float conditionals
  ("src/compiler/generic/primtype")
 
  ;; the implementation of the compiler-affecting part of forms like
@@ -395,9 +387,7 @@
  ;;   * the function PARSE-DEFMACRO, defined in parse-defmacro.lisp,
  ;; and because they define
  ;;   * the function SPECIFIER-TYPE, which is used in fndb.lisp.
- ;; FIXME-ARM: has float conditionals
  ("src/code/late-type")
- ;; FIXME-ARM: has float conditionals
  ("src/code/deftypes-for-target")
 
  ;; defines IR1-ATTRIBUTES macro, needed by proclaim.lisp
@@ -409,7 +399,6 @@
 
  ;; stuff needed by "code/defstruct"
  ("src/code/cross-type" :not-target)
- ;; FIXME-ARM: has float conditionals
  ("src/compiler/generic/vm-type")
  ("src/compiler/proclaim")
 
@@ -419,9 +408,7 @@
  ;; "code/late-type", and SB!XC:TYPEP, defined in "code/cross-type",
  ;; and SPECIALIZE-ARRAY-TYPE, defined in "compiler/generic/vm-type",
  ;; and SB!XC:PROCLAIM, defined in "src/compiler/proclaim"
- ;; FIXME-ARM: has float conditionals
  ("src/code/defstruct")
- ;; FIXME-ARM: has float conditionals
  ("src/code/target-defstruct" :not-host)
 
  ;; ALIEN-VALUE has to be defined as a class (done by DEFSTRUCT
@@ -673,10 +660,8 @@
                                                 ;   "compiler/generic/core"
 
  ("src/code/eval"              :not-host) ; uses INFO, wants compiler macro
- ;; FIXME-ARM: has float conditionals
  ("src/code/target-sap"        :not-host) ; uses SAP-INT type
  ("src/code/target-package"    :not-host) ; needs "code/package"
- ;; FIXME-ARM: has float conditionals
  ("src/code/target-random"     :not-host) ; needs "code/random"
  ("src/code/bignum-random"     :not-host) ; needs "code/random" and
                                           ;   "code/bignum"
@@ -702,7 +687,6 @@
  ;; defines SB!DI:DO-DEBUG-FUN-BLOCKS, needed by target-disassem.lisp
  ("src/code/gc"     :not-host)
  ("src/code/purify" :not-host)
- ;; FIXME-ARM: has float conditionals
  ("src/code/debug-int" :not-host)
 
  ;; target-only assemblerish stuff

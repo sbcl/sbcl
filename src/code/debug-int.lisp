@@ -910,7 +910,6 @@
               (return
                 (values code pc-offset context)))))))))
 
-;;
 #!-(or x86 x86-64)
 (defun find-escaped-frame (frame-pointer)
   (declare (type system-area-pointer frame-pointer))

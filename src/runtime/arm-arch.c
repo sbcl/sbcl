@@ -372,7 +372,7 @@ void arch_write_linkage_table_jmp(void* reloc_addr, void *target_addr)
   // ldr reg, [pc, #4]
   inst = 0xe59f0000 | LINKAGE_TEMP_REG << 12 | 4;
   *inst_ptr++ = inst;
-  
+
   // bx reg
   inst = 0xe12fff10 | LINKAGE_TEMP_REG;
   *inst_ptr++ = inst;
@@ -383,7 +383,7 @@ void arch_write_linkage_table_jmp(void* reloc_addr, void *target_addr)
 
   // address
   *inst_ptr++ = target_addr;
-  
+
   os_flush_icache((os_vm_address_t) reloc_addr, (char*) inst_ptr - (char*) reloc_addr);
 }
 

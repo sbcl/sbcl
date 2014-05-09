@@ -297,7 +297,7 @@
                                    (> (sb!alien::alien-integer-type-bits type) 32))
                               (when (oddp i)
                                 ;; long-long is only passed in pairs of r0-r1 and r2-r3,
-                                ;; and the stack is double-word aligned 
+                                ;; and the stack is double-word aligned
                                 (incf i)
                                 (new-args 0)
                                 (new-arg-types (parse-alien-type '(signed 8) env)))
