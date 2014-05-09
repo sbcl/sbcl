@@ -169,18 +169,20 @@
 ;;; Multiplication
 
 (define-vop (fast-*/fixnum=>fixnum fast-fixnum-binop)
+  (:args (x :scs (signed-reg)) ;; one operand needs to be untagged
+         (y :target r :scs (any-reg)))
   (:translate *)
   (:generator 2
-    (inst mov r (asr x n-fixnum-tag-bits))
-    (inst mul r r y)))
+    (inst mul r x y)))
 
 (define-vop (fast-*-c/fixnum=>fixnum fast-fixnum-binop-c)
   (:args (x :scs (any-reg) :to :result))
   (:results (r :scs (any-reg) :from :eval))
+  (:temporary (:sc non-descriptor-reg :target r) temp)
   (:translate *)
   (:generator 1
-    (load-immediate-word r y)
-    (inst mul r r x)))
+    (load-immediate-word temp y)
+    (inst mul r temp x)))
 
 (define-vop (fast-*/signed=>signed fast-signed-binop)
   (:translate *)
