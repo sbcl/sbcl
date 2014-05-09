@@ -51,8 +51,7 @@
                   (declare (optimize speed (safety 0)))
                   (= (,accessor-name x index)
                      (,accessor-name y index)))))
-    (let (#!-arm
-          (double-float-alignment
+    (let ((double-float-alignment
             ;; white list of architectures that can load unaligned doubles:
             #!+(or x86 x86-64 ppc) 1
             ;; at least sparc, mips and alpha can't:
@@ -63,7 +62,6 @@
                            :init-vop 'sb!vm::raw-instance-init/word
                            :n-words 1
                            :comparer (make-comparer %raw-instance-ref/word))
-       #!-arm
        (make-raw-slot-data :raw-type 'single-float
                            :accessor-name '%raw-instance-ref/single
                            :init-vop 'sb!vm::raw-instance-init/single
@@ -79,20 +77,17 @@
                            ;; we store it unraw anyway.  :-( -- DFL
                            :n-words 1
                            :comparer (make-comparer %raw-instance-ref/single))
-       #!-arm
        (make-raw-slot-data :raw-type 'double-float
                            :accessor-name '%raw-instance-ref/double
                            :init-vop 'sb!vm::raw-instance-init/double
                            :alignment double-float-alignment
                            :n-words (/ 8 sb!vm:n-word-bytes)
                            :comparer (make-comparer %raw-instance-ref/double))
-       #!-arm
        (make-raw-slot-data :raw-type 'complex-single-float
                            :accessor-name '%raw-instance-ref/complex-single
                            :init-vop 'sb!vm::raw-instance-init/complex-single
                            :n-words (/ 8 sb!vm:n-word-bytes)
                            :comparer (make-comparer %raw-instance-ref/complex-single))
-       #!-arm
        (make-raw-slot-data :raw-type 'complex-double-float
                            :accessor-name '%raw-instance-ref/complex-double
                            :init-vop 'sb!vm::raw-instance-init/complex-double

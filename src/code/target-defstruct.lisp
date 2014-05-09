@@ -61,41 +61,34 @@
   (declare (type index index)
            (type sb!vm:word new-value))
   (%raw-instance-set/word instance index new-value))
-#!-arm
+
 (defun %raw-instance-ref/single (instance index)
   (declare (type index index))
   (%raw-instance-ref/single instance index))
-#!-arm
 (defun %raw-instance-set/single (instance index new-value)
   (declare (type index index)
            (type single-float new-value))
   (%raw-instance-set/single instance index new-value))
 
-#!-arm
 (defun %raw-instance-ref/double (instance index)
   (declare (type index index))
   (%raw-instance-ref/double instance index))
-#!-arm
 (defun %raw-instance-set/double (instance index new-value)
   (declare (type index index)
            (type double-float new-value))
   (%raw-instance-set/double instance index new-value))
 
-#!-arm
 (defun %raw-instance-ref/complex-single (instance index)
   (declare (type index index))
   (%raw-instance-ref/complex-single instance index))
-#!-arm
 (defun %raw-instance-set/complex-single (instance index new-value)
   (declare (type index index)
            (type (complex single-float) new-value))
   (%raw-instance-set/complex-single instance index new-value))
 
-#!-arm
 (defun %raw-instance-ref/complex-double (instance index)
   (declare (type index index))
   (%raw-instance-ref/complex-double instance index))
-#!-arm
 (defun %raw-instance-set/complex-double (instance index new-value)
   (declare (type index index)
            (type (complex double-float) new-value))
