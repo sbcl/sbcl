@@ -1577,6 +1577,19 @@
 (define-load-store-multiple-fp-instruction fstmx :double :store t)
 (define-load-store-multiple-fp-instruction fldmx :double :load t)
 
+;; KLUDGE: this group of pseudo-instructions are fragile (no error
+;; handling for the various ways to mis-use them), have no support for
+;; predication, and use the somewhat-broken interface for the
+;; load-store-multiple-fp instructions above.
+(define-instruction-macro load-complex-single (dest memory-operand)
+  `(inst fldms (memory-operand-base ,memory-operand) ,dest 2))
+(define-instruction-macro load-complex-double (dest memory-operand)
+  `(inst fldmd (memory-operand-base ,memory-operand) ,dest 2))
+(define-instruction-macro store-complex-single (src memory-operand)
+  `(inst fstms (memory-operand-base ,memory-operand) ,src 2))
+(define-instruction-macro store-complex-double (src memory-operand)
+  `(inst fstmd (memory-operand-base ,memory-operand) ,src 2))
+
 ;; Define a load/store one floating point instruction. PRECISION is
 ;; :SINGLE for single precision values and :DOUBLE for double precision values.
 ;; DIRECTION has to be either :LOAD or :STORE.
