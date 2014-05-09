@@ -61,7 +61,14 @@
 
 (define-move-fun (load-constant 5) (vop x y)
   ((constant) (descriptor-reg))
-  (loadw y code-tn (tn-offset x) other-pointer-lowtag))
+  (let ((offset (- (ash (tn-offset x) 2) other-pointer-lowtag)))
+    (typecase offset
+      ((unsigned-byte 12)
+       (inst ldr y (@ code-tn offset)))
+      (t
+       ;; Y is a descriptor-reg, make sure offset is a fixnum.
+       (load-immediate-word y (ash offset n-fixnum-tag-bits))
+       (inst ldr y (@ code-tn (lsr y n-fixnum-tag-bits)))))))
 
 (define-move-fun (load-stack 5) (vop x y)
   ((control-stack) (any-reg descriptor-reg))
