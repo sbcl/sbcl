@@ -1,6 +1,8 @@
 #ifndef _ARM_ARCH_H
 #define _ARM_ARCH_H
 
+#define ALIEN_STACK_GROWS_DOWNWARD
+
 static inline long
 get_spinlock(lispobj *word,long value)
 {
