@@ -147,7 +147,7 @@
 (define-vop (xep-allocate-frame)
   (:info start-lab copy-more-arg-follows)
   (:vop-var vop)
-  (:temporary (:scs (any-reg)) temp)
+  (:temporary (:scs (non-descriptor-reg)) temp)
   (:temporary (:scs (interior-reg)) lip)
   (:generator 1
     ;; Make sure the function is aligned, and drop a label pointing to this
