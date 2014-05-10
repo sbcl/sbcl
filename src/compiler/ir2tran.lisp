@@ -1777,10 +1777,15 @@
 
 ;;;; n-argument functions
 
-#!-arm
 (macrolet ((def (name)
              `(defoptimizer (,name ir2-convert) ((&rest args) node block)
-                (let* ((refs (move-tail-full-call-args node block))
+                (let* ((refs (reference-tn-list
+                              (loop for arg in args
+                                    for tn = (make-normal-tn *backend-t-primitive-type*)
+                                    do
+                                    (emit-move node block (lvar-tn node block arg) tn)
+                                    collect tn)
+                              nil))
                        (lvar (node-lvar node))
                        (res (lvar-result-tns
                              lvar
