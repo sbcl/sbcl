@@ -622,7 +622,7 @@
   ;; don't have a true Alpha64 port yet, we'll have to stick to
   ;; SB!VM:N-MACHINE-WORD-BITS for the time being.  --njf, 2004-08-14
   #.`(progn
-       #!+(or x86 x86-64)
+       #!+(or x86 x86-64 arm)
        (def sb!vm::ash-left-modfx
            :tagged ,(- sb!vm:n-word-bits sb!vm:n-fixnum-tag-bits) t)
        (def ,(intern (format nil "ASH-LEFT-MOD~D" sb!vm:n-machine-word-bits)

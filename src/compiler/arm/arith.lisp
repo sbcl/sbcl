@@ -222,6 +222,49 @@
 
 ;;; Shifting
 
+(define-vop (fast-ash-left-c/fixnum=>fixnum)
+  (:translate ash)
+  (:policy :fast-safe)
+  (:args (number :scs (any-reg) :target result))
+  (:info amount)
+  (:arg-types tagged-num (:constant unsigned-byte))
+  (:results (result :scs (any-reg)))
+  (:result-types tagged-num)
+  (:note "inline ASH")
+  (:generator 1
+    (if (< amount 32)
+        (inst mov result (lsl number amount))
+        (inst mov result 0))))
+
+(define-vop (fast-ash-left-modfx-c/fixnum=>fixnum
+             fast-ash-left-c/fixnum=>fixnum)
+  (:translate ash-left-modfx))
+
+(define-vop (fast-ash-left-mod32-c/fixnum=>fixnum
+             fast-ash-left-c/fixnum=>fixnum)
+  (:translate ash-left-mod32))
+
+(define-vop (fast-ash-c/unsigned=>unsigned)
+  (:translate ash)
+  (:policy :fast-safe)
+  (:args (number :scs (unsigned-reg) :target result))
+  (:info amount)
+  (:arg-types unsigned-num (:constant unsigned-byte))
+  (:results (result :scs (unsigned-reg)))
+  (:result-types unsigned-num)
+  (:note "inline ASH")
+  (:generator 3
+     (cond ((< -32 amount 32)
+            (if (plusp amount)
+                (inst mov result (lsl number amount))
+                (inst mov result (asr number (- amount)))))
+           (t
+            (inst mov result 0)))))
+
+(define-vop (fast-ash-left-mod32-c/unsigned=>unsigned
+             fast-ash-c/unsigned=>unsigned)
+  (:translate ash-left-mod32))
+
 (define-vop (fast-ash/signed/unsigned)
   (:note "inline ASH")
   (:args (number)
@@ -230,7 +273,7 @@
   (:policy :fast-safe)
   (:temporary (:sc non-descriptor-reg) temp)
   (:variant-vars variant)
-  (:generator 6
+  (:generator 5
     (move temp amount)
     (inst cmp temp 0)
     (inst b :ge LEFT)
@@ -270,24 +313,27 @@
                 (:note "inline ASH")
                 (:translate ash)
                 (:args (number :scs (,sc-type))
-                       (amount :scs (signed-reg unsigned-reg immediate)))
+                       (amount :scs (signed-reg unsigned-reg)
+                               :target temp))
+                (:temporary (:sc non-descriptor-reg) temp)
                 (:arg-types ,type positive-fixnum)
                 (:results (result :scs (,result-type)))
                 (:result-types ,type)
                 (:policy :fast-safe)
                 (:generator ,cost
-                   (sc-case amount
-                     ((signed-reg unsigned-reg)
-                      (inst mov result (lsl number amount)))
-                     (immediate
-                      (let ((amount (tn-value amount)))
-                        (aver (> amount 0))
-                        (inst mov result (lsl number amount)))))))))
+                  (move temp amount)
+                  (inst cmp temp sb!vm:n-word-bits)
+                  (inst mov :gt temp sb!vm:n-word-bits)
+                  (inst mov result (lsl number temp))))))
   ;; FIXME: There's the opportunity for a sneaky optimization here, I
   ;; think: a FAST-ASH-LEFT-C/FIXNUM=>SIGNED vop.  -- CSR, 2003-09-03
   (def fast-ash-left/fixnum=>fixnum any-reg tagged-num any-reg 2)
   (def fast-ash-left/signed=>signed signed-reg signed-num signed-reg 3)
   (def fast-ash-left/unsigned=>unsigned unsigned-reg unsigned-num unsigned-reg 3))
+
+(define-vop (fast-ash-left-mod32/unsigned=>unsigned
+             fast-ash-left/unsigned=>unsigned)
+  (:translate ash-left-mod32))
 
 ;;; Only the lower 5 bits of the shift amount are significant.
 (define-vop (shift-towards-someplace)

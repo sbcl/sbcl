@@ -20,9 +20,12 @@
 ;; representation (or maybe an even smarter selection criterion).
 
 (defun load-immediate-word (y val)
-  (if (< val 0)
-      (composite-immediate-instruction bic y y val :first-op mvn :first-no-source t :invert-y t)
-      (composite-immediate-instruction orr y y val :first-op mov :first-no-source t)))
+  (cond ((< val 0)
+         (composite-immediate-instruction bic y y val :first-op mvn :first-no-source t :invert-y t))
+        ((encodable-immediate (ldb (byte 32 0) (lognot val)))
+         (inst mvn y (lognot val)))
+        (t
+         (composite-immediate-instruction orr y y val :first-op mov :first-no-source t))))
 
 (define-move-fun (load-immediate 1) (vop x y)
   ((null immediate)

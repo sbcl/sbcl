@@ -1508,7 +1508,7 @@ the first."
     (bignum (ldb (byte 64 0)
                  (ash (logand integer #xffffffffffffffff) amount)))))
 
-#!+(or x86 x86-64)
+#!+(or x86 x86-64 arm)
 (defun sb!vm::ash-left-modfx (integer amount)
   (let ((fixnum-width (- sb!vm:n-word-bits sb!vm:n-fixnum-tag-bits)))
     (etypecase integer
