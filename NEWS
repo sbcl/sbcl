@@ -1,7 +1,8 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 changes relative to sbcl-1.1.18:
   * enhancement: ported to ARM linux.
-  * enhancement: sb-gmp contrib has been updated.
+  * enhancement: sb-gmp contrib has been updated. (lp#1305266)
+  * enhancement: new contrib sb-mpfr by Stephan Frank.
   * bug fix: MAKE-SEQUENCE works with sequence types defined via DEFTYPE
     (lp#1315846, thanks to Mark Cox)
   * bug fix: SET-[DISPATCH-]MACRO-CHARACTER should coerce a symbolic
