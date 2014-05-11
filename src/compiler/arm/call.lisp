@@ -235,6 +235,7 @@
            (type unsigned-byte nvals) (type tn move-temp temp))
   (let ((expecting-values-on-stack (> nvals register-arg-count))
         (values-on-stack temp))
+    (inst compute-code code-tn lip lra-label temp)
     ;; Pick off the single-value case first.
     (sb!assem:without-scheduling ()
       (note-this-location vop (if (<= nvals 1)
@@ -287,10 +288,7 @@
           (store-stack-tn (tn-ref-tn val) null-tn :lt))
 
         ;; Deallocate the callee stack frame.
-        (store-csp ocfp-tn)))
-
-    ;; And, finally, recompute the correct value for CODE-TN.
-    (inst compute-code code-tn lip lra-label temp))
+        (store-csp ocfp-tn))))
   (values))
 
 ;;;; Unknown values receiving:
