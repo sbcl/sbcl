@@ -2187,12 +2187,36 @@
         (note-single-valuified-lvar lvar)))
     (values)))
 
+(defun may-delete-vestigial-exit (cast)
+  (let ((exit-lexenv (cast-vestigial-exit-lexenv cast)))
+    (when exit-lexenv
+      ;; Vestigial exits are only introduced when eliminating a local
+      ;; RETURN-FROM.  We may delete them only when we can show that
+      ;; there are no other code paths that use the entry LVAR that
+      ;; are live from within the block that contained the deleted
+      ;; EXIT (our predecessor block).  The conservative version of
+      ;; this is that there are no EXITs for any ENTRY introduced
+      ;; between the LEXENV of the deleted EXIT and the LEXENV of the
+      ;; target ENTRY.
+      (let* ((entry-lexenv (cast-vestigial-exit-entry-lexenv cast))
+             (entry-blocks (lexenv-blocks entry-lexenv))
+             (entry-tags (lexenv-tags entry-lexenv)))
+        (do ((current-block (lexenv-blocks exit-lexenv) (cdr current-block)))
+            ((eq current-block entry-blocks))
+          (when (entry-exits (cadar current-block))
+            (return-from may-delete-vestigial-exit nil)))
+        (do ((current-tag (lexenv-tags exit-lexenv) (cdr current-tag)))
+            ((eq current-tag entry-tags))
+          (when (entry-exits (cadar current-tag))
+            (return-from may-delete-vestigial-exit nil))))))
+  (values t))
+
 (defun ir1-optimize-cast (cast &optional do-not-optimize)
   (declare (type cast cast))
   (let ((value (cast-value cast))
         (atype (cast-asserted-type cast)))
     (unless (or do-not-optimize
-                (cast-vestigial-exit-lexenv cast))
+                (not (may-delete-vestigial-exit cast)))
       (let ((lvar (node-lvar cast)))
         (when (values-subtypep (lvar-derived-type value)
                                (cast-asserted-type cast))
