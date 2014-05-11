@@ -527,7 +527,7 @@
 (define-condition cannot-encode-immediate-operand (error)
   ((value :initarg value)))
 
-(defun encode-shifter-immediate (operand)
+(defun encodable-immediate (operand)
   ;; 32-bit immediate data is encoded as an 8-bit immediate data value
   ;; and a 4-bit immediate shift count.  The actual value is the
   ;; immediate data rotated right by a number of bits equal to twice
@@ -543,13 +543,18 @@
   ;; or spacewise) than simply attempting to encode it?
   (labels ((try-immediate-encoding (value shift)
              (unless (<= 0 shift 15)
-               (error 'cannot-encode-immediate-operand :value operand))
+               (return-from encodable-immediate))
              (if (typep value '(unsigned-byte 8))
                  (dpb shift (byte 4 8) value)
                  (try-immediate-encoding (dpb value (byte 30 2)
                                               (ldb (byte 2 30) value))
                                          (1+ shift)))))
     (try-immediate-encoding operand 0)))
+
+(defun encode-shifter-immediate (operand)
+  (or
+   (encodable-immediate operand)
+   (error 'cannot-encode-immediate-operand :value operand)))
 
 (defun encode-shifter-operand (operand)
   (etypecase operand
