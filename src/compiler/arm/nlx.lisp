@@ -78,7 +78,8 @@
   (:temporary (:scs (descriptor-reg)) temp)
   (:temporary (:scs (interior-reg)) lip)
   (:generator 22
-    (inst add block cfp-tn (* (tn-offset tn) n-word-bytes))
+    (composite-immediate-instruction add block cfp-tn
+                                     (* (tn-offset tn) n-word-bytes))
     (load-symbol-value temp *current-unwind-protect-block*)
     (storew temp block unwind-block-current-uwp-slot)
     (storew cfp-tn block unwind-block-current-cont-slot)
