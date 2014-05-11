@@ -837,11 +837,14 @@
             (let* ((exit-block (node-block node))
                    (new-ctran (make-ctran))
                    (new-block (ctran-starts-block new-ctran))
-                   (cast-node (%make-cast :asserted-type *wild-type*
-                                          :type-to-check *wild-type*
-                                          :value value
-                                          :never-delete t
-                                          :%type-check nil)))
+                   (cast-node
+                    (%make-cast
+                     :asserted-type *wild-type*
+                     :type-to-check *wild-type*
+                     :value value
+                     :vestigial-exit-lexenv (node-lexenv node)
+                     :vestigial-exit-entry-lexenv (node-lexenv entry)
+                     :%type-check nil)))
               ;; We only expect a single successor to EXIT-BLOCK,
               ;; because it contains an EXIT node (which must end its
               ;; block) and the only blocks that have more than once
@@ -2189,7 +2192,7 @@
   (let ((value (cast-value cast))
         (atype (cast-asserted-type cast)))
     (unless (or do-not-optimize
-                (cast-never-delete cast))
+                (cast-vestigial-exit-lexenv cast))
       (let ((lvar (node-lvar cast)))
         (when (values-subtypep (lvar-derived-type value)
                                (cast-asserted-type cast))

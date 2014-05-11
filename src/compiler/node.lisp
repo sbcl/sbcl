@@ -1340,17 +1340,22 @@
   ;; T
   ;;    A type check is needed.
   (%type-check t :type (member t :external nil))
-  ;; KLUDGE: an indication that this CAST is used for its effect of
-  ;; moving the value of one LVAR to another LVAR and not for any
-  ;; actual type-check behavior.
-  (never-delete nil :type boolean)
+  ;; the LEXENV for the deleted EXIT node for which this is the
+  ;; remaining value semantics. If NULL, we do not have exit value
+  ;; semantics and may be deleted based on type information.
+  (vestigial-exit-lexenv nil :type (or lexenv null))
+  ;; the LEXENV for the ENTRY node for the deleted EXIT node mentioned
+  ;; above. NULL if we do not have exit value semantics.
+  (vestigial-exit-entry-lexenv nil :type (or lexenv null))
   ;; the lvar which is checked
   (value (missing-arg) :type lvar))
 (defprinter (cast :identity t)
   %type-check
   value
   asserted-type
-  type-to-check)
+  type-to-check
+  vestigial-exit-lexenv
+  vestigial-exit-entry-lexenv)
 
 ;;;; non-local exit support
 ;;;;
