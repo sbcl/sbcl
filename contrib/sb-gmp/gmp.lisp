@@ -10,8 +10,10 @@
    #:mpz-sub
    #:mpz-mul
    #:mpz-mod
+   #:mpz-mul-2exp  ; shift left
    #:mpz-cdiv
    #:mpz-fdiv
+   #:mpz-fdiv-2exp ; shift right
    #:mpz-tdiv
    #:mpz-powm
    #:mpz-pow
@@ -21,10 +23,12 @@
    #:mpz-probably-prime-p
    #:mpz-nextprime
    #:mpz-fac
-   ;; Following three are GMP >= 5.1 only
+   ;; the following functions are GMP >= 5.1 only
    #:mpz-2fac
    #:mpz-mfac
    #:mpz-primorial
+   ;; number theoretic functions
+   #:mpz-remove
    #:mpz-bin
    #:mpz-fib2
    ;; random number generation
@@ -122,7 +126,7 @@ bignum."
   (the (integer * 0) (%normalize-bignum b count)))
 
 ;;; conversion functions that also copy from GMP to SBCL bignum space
-(declaim (inline gmp-z-to-bignum gmp-z-to-bignum-neg))
+(declaim (inline gmp-z-to-bignum))
 
 (defun gmp-z-to-bignum (z b count)
   "Convert and copy a positive GMP integer into the buffer of a
@@ -133,25 +137,6 @@ pre-allocated bignum. The allocated bignum-length must be (1+ COUNT)."
            (type bignum-index count))
   (dotimes (i count (%normalize-bignum b (1+ count)))
     (%bignum-set b i (deref z i))))
-
-(defun gmp-z-to-bignum-neg (z b count)
-  "Convert to twos complement and copy a negative GMP integer into the
-buffer of a pre-allocated bignum. The allocated bignum-length must
-be (1+ COUNT)."
-  (declare (optimize (speed 3) (space 3) (safety 0))
-           (type (alien (* unsigned-long)) z)
-           (type bignum-type b)
-           (type bignum-index count))
-  (let ((carry 0)
-        (add 1))
-    (declare (type (mod 2) carry add))
-    (dotimes (i count (%normalize-bignum b (1+ count)))
-      (multiple-value-bind (value carry-tmp)
-          (%add-with-carry
-           (%lognot (deref z i)) add carry)
-        (%bignum-set b i value)
-        (setf carry carry-tmp
-              add 0)))))
 
 (declaim (inline blength bassert)
          (ftype (function (integer) (values bignum-index &optional)) blength)
@@ -240,14 +225,27 @@ be (1+ COUNT)."
                           __gmpz_tdiv_qr
                           __gmpz_powm))
 
-(declaim (inline __gmpz_pow_ui
+(declaim (inline __gmpz_mul_2exp
+                 __gmpz_fdiv_q_2exp
+                 __gmpz_pow_ui
                  __gmpz_probab_prime_p
                  __gmpz_fac_ui
                  __gmpz_2fac_ui
                  __gmpz_mfac_uiui
                  __gmpz_primorial_ui
+                 __gmpz_remove
                  __gmpz_bin_ui
                  __gmpz_fib2_ui))
+
+(define-alien-routine __gmpz_mul_2exp void
+  (r (* (struct gmpint)))
+  (b (* (struct gmpint)))
+  (e unsigned-long))
+
+(define-alien-routine __gmpz_fdiv_q_2exp void
+  (r (* (struct gmpint)))
+  (b (* (struct gmpint)))
+  (e unsigned-long))
 
 (define-alien-routine __gmpz_pow_ui void
   (r (* (struct gmpint)))
@@ -274,6 +272,11 @@ be (1+ COUNT)."
 (define-alien-routine __gmpz_primorial_ui void
   (r (* (struct gmpint)))
   (n unsigned-long))
+
+(define-alien-routine __gmpz_remove unsigned-long
+  (r (* (struct gmpint)))
+  (x (* (struct gmpint)))
+  (f (* (struct gmpint))))
 
 (define-alien-routine __gmpz_bin_ui void
   (r (* (struct gmpint)))
@@ -307,6 +310,7 @@ be (1+ COUNT)."
 
 ;;; utility macros for GMP mpz variable and result declaration and
 ;;; incarnation of associated SBCL bignums
+#+(or)
 (defmacro with-mpz-results (pairs &body body)
   (loop for (gres size) in pairs
         for res = (gensym "RESULT")
@@ -329,6 +333,33 @@ be (1+ COUNT)."
                          ,@inits
                          ,@body
                          (values ,@normlimbs)))))))
+
+(defmacro with-mpz-results (pairs &body body)
+  (loop for (gres size) in pairs
+        for res = (gensym "RESULT")
+        collect `(when (> ,size sb-bignum::maximum-bignum-length)
+                   (error "Size of result exceeds maxim bignum length")) into checks
+        collect `(,gres (struct gmpint)) into declares
+        collect `(,res (%allocate-bignum ,size))
+          into resinits
+        collect `(setf (slot ,gres 'mp_alloc) (%bignum-length ,res)
+                       (slot ,gres 'mp_size) 0
+                       (slot ,gres 'mp_d) (bignum-data-sap ,res))
+          into inits
+        collect `(if (minusp (slot ,gres 'mp_size)) ; check for negative result
+                     (z-to-bignum-neg ,res ,size)
+                     (z-to-bignum ,res ,size))
+          into normlimbs
+        collect res into results
+        finally (return
+                  `(progn
+                     ,@checks
+                     (let ,resinits
+                       (sb-sys:with-pinned-objects ,results
+                         (with-alien ,declares
+                           ,@inits
+                           ,@body
+                           (values ,@normlimbs))))))))
 
 (defmacro with-mpz-vars (pairs &body body)
   (loop for (a ga) in pairs
@@ -366,10 +397,14 @@ be (1+ COUNT)."
         collect `(__gmpz_init (addr ,gres)) into inits
         collect `(,size (abs (slot ,gres 'mp_size)))
           into resinits
+        collect `(when (> ,size (1- sb-bignum::maximum-bignum-length))
+                   (error "Size of result exceeds maxim bignum length")) into checks
         collect `(,res (%allocate-bignum (1+ ,size)))
-          into resinits
+          into resallocs
         collect `(setf ,res (if (minusp (slot ,gres 'mp_size)) ; check for negative result
-                                (gmp-z-to-bignum-neg (slot ,gres 'mp_d) ,res ,size)
+                                (negate-bignum
+                                 (gmp-z-to-bignum (slot ,gres 'mp_d) ,res ,size)
+                                 nil)
                                 (gmp-z-to-bignum (slot ,gres 'mp_d) ,res ,size)))
           into copylimbs
         collect `(__gmpz_clear (addr ,gres)) into clears
@@ -378,13 +413,15 @@ be (1+ COUNT)."
                   `(with-alien ,declares
                      ,@inits
                      ,@body
-                     (let* ,resinits
+                     (let ,resinits
                        (declare (type bignum-index ,@sizes))
+                       ,@checks
+                       (let ,resallocs
                        ;; copy GMP limbs into result bignum
-                       (sb-sys:with-pinned-objects ,results
-                         ,@copylimbs)
-                       ,@clears
-                       (values ,@results))))))
+                         (sb-sys:with-pinned-objects ,results
+                           ,@copylimbs)
+                         ,@clears
+                         (values ,@results)))))))
 
 ;;; function definition and foreign function relationships
 (defmacro defgmpfun (name args &body body)
@@ -415,6 +452,13 @@ be (1+ COUNT)."
     (with-mpz-vars ((a ga) (b gb))
       (__gmpz_mul (addr result) (addr ga) (addr gb)))))
 
+(defgmpfun mpz-mul-2exp (a b)
+  (check-type b (unsigned-byte #.sb-vm:n-word-bits))
+  (with-mpz-results ((result (+ (1+ (blength a))
+                                (floor b sb-vm:n-word-bits))))
+    (with-mpz-vars ((a ga))
+      (__gmpz_mul_2exp (addr result) (addr ga) b))))
+
 (defgmpfun mpz-mod (a b)
   (with-mpz-results ((result (1+ (max (blength a)
                                       (blength b)))))
@@ -440,6 +484,13 @@ be (1+ COUNT)."
       (with-mpz-vars ((n gn) (d gd))
         (__gmpz_fdiv_qr (addr quot) (addr rem) (addr gn) (addr gd))))))
 
+(defgmpfun mpz-fdiv-2exp (a b)
+  (check-type b (unsigned-byte #.sb-vm:n-word-bits))
+  (with-mpz-results ((result (1+ (- (blength a)
+                                    (floor b sb-vm:n-word-bits)))))
+    (with-mpz-vars ((a ga))
+      (__gmpz_fdiv_q_2exp (addr result) (addr ga) b))))
+
 (defgmpfun mpz-tdiv (n d)
   (let ((size (max (blength n)
                    (blength d))))
@@ -448,7 +499,8 @@ be (1+ COUNT)."
       (with-mpz-vars ((n gn) (d gd))
         (__gmpz_tdiv_qr (addr quot) (addr rem) (addr gn) (addr gd))))))
 
-(defun mpz-pow (base exp)
+(defgmpfun mpz-pow (base exp)
+  (check-type exp (integer 0 #.most-positive-fixnum))
   (with-gmp-mpz-results (rop)
     (with-mpz-vars ((base gbase))
       (__gmpz_pow_ui (addr rop) (addr gbase) exp))))
@@ -480,38 +532,34 @@ be (1+ COUNT)."
 ;;; into a SBCL bignum at the end of the computation when the required
 ;;; bignum length is known.
 (defun mpz-probably-prime-p (n &optional (reps 25))
-  (declare (optimize (speed 3) (space 3) (safety 0)))
+  (declare (optimize (speed 3) (space 3) (safety 0))
+           (type integer n reps))
   (check-type reps fixnum)
   (with-mpz-vars ((n gn))
     (__gmpz_probab_prime_p (addr gn) reps)))
 
-(defun mpz-nextprime (a)
-  (declare (optimize (speed 3) (space 3) (safety 0)))
+(defgmpfun mpz-nextprime (a)
   (with-gmp-mpz-results (prime)
     (with-mpz-vars ((a ga))
       (__gmpz_nextprime (addr prime) (addr ga)))))
 
-(defun mpz-fac (n)
-  (declare (optimize (speed 3) (space 3) (safety 0)))
+(defgmpfun mpz-fac (n)
   (check-type n (unsigned-byte #.sb-vm:n-word-bits))
   (with-gmp-mpz-results (fac)
     (__gmpz_fac_ui (addr fac) n)))
 
-(defun %mpz-2fac (n)
-  (declare (optimize (speed 3) (space 3) (safety 0)))
+(defgmpfun %mpz-2fac (n)
   (check-type n (unsigned-byte #.sb-vm:n-word-bits))
   (with-gmp-mpz-results (fac)
     (__gmpz_2fac_ui (addr fac) n)))
 
-(defun %mpz-mfac (n m)
-  (declare (optimize (speed 3) (space 3) (safety 0)))
+(defgmpfun %mpz-mfac (n m)
   (check-type n (unsigned-byte #.sb-vm:n-word-bits))
   (check-type m (unsigned-byte #.sb-vm:n-word-bits))
   (with-gmp-mpz-results (fac)
     (__gmpz_mfac_uiui (addr fac) n m)))
 
-(defun %mpz-primorial (n)
-  (declare (optimize (speed 3) (space 3) (safety 0)))
+(defgmpfun %mpz-primorial (n)
   (check-type n (unsigned-byte #.sb-vm:n-word-bits))
   (with-gmp-mpz-results (r)
     (__gmpz_primorial_ui (addr r) n)))
@@ -529,15 +577,21 @@ be (1+ COUNT)."
     (stubify mpz-mfac %mpz-mfac n m)
     (stubify mpz-primorial %mpz-primorial n)))
 
-(defun mpz-bin (n k)
-  (declare (optimize (speed 3) (space 3) (safety 0)))
+(defgmpfun mpz-remove (n f)
+  (with-mpz-results ((r (1+ (blength n)))
+                     (cnt 1))
+    (with-mpz-vars ((n gn)
+                    (f gf))
+      (let ((c (__gmpz_remove (addr r) (addr gn) (addr gf))))
+        (setf (deref (slot cnt 'mp_d)) c)))))
+
+(defgmpfun mpz-bin (n k)
   (check-type k (unsigned-byte #.sb-vm:n-word-bits))
   (with-gmp-mpz-results (r)
     (with-mpz-vars ((n gn))
       (__gmpz_bin_ui (addr r) (addr gn) k))))
 
-(defun mpz-fib2 (n)
-  (declare (optimize (speed 3) (space 3) (safety 0)))
+(defgmpfun mpz-fib2 (n)
   ;; (let ((size (1+ (ceiling (* n (log 1.618034 2)) 64)))))
   ;; fibonacci number magnitude in bits is assymptotic to n(log_2 phi)
   ;; This is correct for the result but appears not to be enough for GMP
@@ -595,9 +649,15 @@ be (1+ COUNT)."
   (ref (make-alien (struct gmprandstate))
    :type (alien (* (struct gmprandstate))) :read-only t))
 
+(declaim (sb-ext:maybe-inline make-gmp-rstate
+                              make-gmp-rstate-lc
+                              rand-seed
+                              random-bitcount
+                              random-int))
+
 (defun make-gmp-rstate ()
   "Instantiate a state for the GMP Mersenne-Twister random number generator."
-  (declare (optimize (speed 3) (space 3)))
+  (declare (optimize (speed 3) (space 3) (safety 0)))
   (let* ((state (%make-gmp-rstate))
          (ref (gmp-rstate-ref state)))
     (__gmp_randinit_mt ref)
@@ -606,7 +666,7 @@ be (1+ COUNT)."
 
 (defun make-gmp-rstate-lc (a c m2exp)
   "Instantiate a state for the GMP linear congruential random number generator."
-  (declare (optimize (speed 3) (space 3) (safety 0)))
+  (declare (optimize (speed 3) (space 3)))
   (check-type c (unsigned-byte #.sb-vm:n-word-bits))
   (check-type m2exp (unsigned-byte #.sb-vm:n-word-bits))
   (let* ((state (%make-gmp-rstate))
@@ -641,7 +701,7 @@ be (1+ COUNT)."
 
 (defun random-int (state boundary)
   "Return a random integer in the range 0..(boundary - 1)."
-  (declare (optimize (speed 3) (space 3) (safety 0)))
+  (declare (optimize (speed 3) (space 3)))
   (check-type state gmp-rstate)
   (let ((b (bassert boundary))
         (ref (gmp-rstate-ref state)))
@@ -659,6 +719,27 @@ be (1+ COUNT)."
     (when (zerop (%bignum-ref n (1- length)))
       (decf length))
     (if minusp (- length) length)))
+
+(defmacro with-mpq-var (pair &body body)
+  (destructuring-bind (var mpqvar) pair
+    `(let* ((an (bassert (numerator ,var)))
+            (ad (bassert (denominator ,var)))
+            (asign (not (%bignum-0-or-plusp an (%bignum-length an)))))
+       (when asign
+           (setf an (negate-bignum an nil)))
+       (let* ((anlen (%lsize asign an))
+              (adlen (%lsize NIL ad)))
+           (with-alien ((,mpqvar (struct gmprat)))
+             (sb-sys:with-pinned-objects (an ad)
+               (setf (slot (slot ,mpqvar 'mp_num) 'mp_size) anlen
+                     (slot (slot ,mpqvar 'mp_num) 'mp_alloc) (abs anlen)
+                     (slot (slot ,mpqvar 'mp_num) 'mp_d)
+                     (bignum-data-sap an))
+               (setf (slot (slot ,mpqvar 'mp_den) 'mp_size) adlen
+                     (slot (slot ,mpqvar 'mp_den) 'mp_alloc) (abs adlen)
+                     (slot (slot ,mpqvar 'mp_den) 'mp_d)
+                     (bignum-data-sap ad))
+               ,@body))))))
 
 (defmacro defmpqfun (name gmpfun)
   `(progn
@@ -743,7 +824,8 @@ be (1+ COUNT)."
   (def orig-two-arg-+ sb-kernel:two-arg-+)
   (def orig-two-arg-- sb-kernel:two-arg--)
   (def orig-two-arg-* sb-kernel:two-arg-*)
-  (def orig-two-arg-/ sb-kernel:two-arg-/))
+  (def orig-two-arg-/ sb-kernel:two-arg-/)
+  (def orig-intexp sb-kernel::intexp))
 
 ;;; integers
 (defun gmp-mul (a b)
@@ -831,10 +913,33 @@ be (1+ COUNT)."
       (mpq-div x y)
       (orig-two-arg-/ x y)))
 
+(defun gmp-intexp (base power)
+  (declare (inline mpz-mul-2exp mpz-pow))
+  (check-type power (integer #.(1+ most-negative-fixnum) #.most-positive-fixnum))
+  (cond
+    ((or (and (integerp base)
+              (< (abs power) 1000)
+              (< (blength base) 4))
+         *gmp-disabled*)
+     (orig-intexp base power))
+    (t
+     (when (and sb-kernel::*intexp-maximum-exponent*
+                (> (abs power) sb-kernel::*intexp-maximum-exponent*))
+       (error "The absolute value of ~S exceeds ~S."
+              power 'sb-kernel::*intexp-maximum-exponent*))
+     (cond ((minusp power)
+            (/ (the integer (gmp-intexp base (- power)))))
+           ((eql base 2)
+            (mpz-mul-2exp 1 power))
+           ((typep base 'ratio)
+            (sb-kernel::%make-ratio (gmp-intexp (numerator base) power)
+                                    (gmp-intexp (denominator base) power)))
+           (t
+            (mpz-pow base power))))))
+
 ;;; installation
 (defmacro with-package-locks-ignored (&body body)
-  `(handler-bind (#+sb-package-locks
-                  (sb-ext:package-lock-violation
+  `(handler-bind ((sb-ext:package-lock-violation
                     (lambda (condition)
                       (declare (ignore condition))
                       (invoke-restart :ignore-all))))
@@ -845,15 +950,16 @@ be (1+ COUNT)."
       (macrolet ((def (destination source)
                    `(setf (fdefinition ',destination)
                           (fdefinition ',source))))
-        (def multiply-bignums gmp-mul)
-        (def bignum-truncate gmp-truncate)
-        (def bignum-gcd mpz-gcd)
+        (def sb-bignum:multiply-bignums gmp-mul)
+        (def sb-bignum:bignum-truncate gmp-truncate)
+        (def sb-bignum:bignum-gcd mpz-gcd)
         (def sb-kernel:two-arg-lcm gmp-lcm)
         (def sb-kernel:two-arg-+ gmp-two-arg-+)
         (def sb-kernel:two-arg-- gmp-two-arg--)
         (def sb-kernel:two-arg-* gmp-two-arg-*)
         (def sb-kernel:two-arg-/ gmp-two-arg-/)
-        (def isqrt gmp-isqrt)))
+        (def isqrt gmp-isqrt)
+        (def sb-kernel::intexp gmp-intexp)))
   (values))
 
 (defun uninstall-gmp-funs ()
@@ -869,7 +975,8 @@ be (1+ COUNT)."
         (def sb-kernel:two-arg-- orig-two-arg--)
         (def sb-kernel:two-arg-* orig-two-arg-*)
         (def sb-kernel:two-arg-/ orig-two-arg-/)
-        (def isqrt orig-isqrt)))
+        (def isqrt orig-isqrt)
+        (def sb-kernel::intexp orig-intexp)))
   (values))
 
 (defun load-gmp (&key (persistently t))
