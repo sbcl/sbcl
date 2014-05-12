@@ -28,9 +28,9 @@
   (extern-alien "bytes_allocated" os-vm-size-t))
 #!-gencgc
 (defun dynamic-usage ()
-  (the (unsigned-byte 32)
-       (- (sap-int (sb!c::dynamic-space-free-pointer))
-          (current-dynamic-space-start))))
+  (truly-the word
+             (- (sap-int (sb!c::dynamic-space-free-pointer))
+                (current-dynamic-space-start))))
 
 (defun static-space-usage ()
   (- (ash sb!vm:*static-space-free-pointer* sb!vm:n-fixnum-tag-bits)

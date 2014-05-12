@@ -22,6 +22,7 @@
   (:results (result :scs (descriptor-reg)))
   (:variant-vars star)
   (:policy :fast-safe)
+  (:node-var node)
   (:generator 0
     (cond ((zerop num)
            (move result null-tn))
@@ -40,7 +41,14 @@
              (let* ((cons-cells (if star (1- num) num))
                     (alloc (* (pad-data-block cons-size) cons-cells)))
                (pseudo-atomic (pa-flag)
-                 (allocation res alloc list-pointer-lowtag :flag-tn pa-flag)
+                 (cond ((node-stack-allocate-p node)
+                        (align-csp res pa-flag)
+                        (composite-immediate-instruction add pa-flag res alloc)
+                        (inst orr res res list-pointer-lowtag)
+                        (store-csp pa-flag))
+                       (t
+                        (allocation res alloc list-pointer-lowtag
+                                    :flag-tn pa-flag)))
                  (move ptr res)
                  (dotimes (i (1- cons-cells))
                    (storew (maybe-load (tn-ref-tn things)) ptr

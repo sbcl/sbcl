@@ -97,6 +97,15 @@
 (defmacro store-csp (source &optional (predicate :al))
   `(store-symbol-value ,source *control-stack-pointer* ,predicate))
 
+(defun align-csp (csp temp)
+  ;; Aligns and loads the csp
+  ;; is used for stack allocation of dynamic-extent objects
+  (load-csp csp)
+  (inst tst csp lowtag-mask)
+  (inst add :ne csp csp n-word-bytes)
+  (inst mov :ne temp 0)
+  (storew temp csp -1 0 :ne))
+
 ;;; Macros to handle the fact that we cannot use the machine native call and
 ;;; return instructions.
 

@@ -510,23 +510,16 @@
     ;; We need to do this atomically.
     (pseudo-atomic (pa-flag)
       ;; Allocate a cons (2 words) for each item.
-      (if (node-stack-allocate-p node)
-          #!-(or)
-          (error "Don't know how to stack-allocate an &REST list.")
-          #!+(or)
-          (progn
-            (align-csp temp)
-            (inst clrrwi result csp-tn n-lowtag-bits)
-            (inst ori result result list-pointer-lowtag)
-            (move dst result)
-            (inst slwi temp count 1)
-            (inst add csp-tn csp-tn temp))
-          (progn
-            (inst mov temp (lsl count 1))
-            (allocation result temp list-pointer-lowtag
-                        :flag-tn pa-flag)
-            (move dst result)))
-
+      (cond ((node-stack-allocate-p node)
+             (align-csp dst pa-flag)
+             (inst add pa-flag dst (lsl count 1))
+             (inst orr dst dst list-pointer-lowtag)
+             (store-csp pa-flag))
+            (t
+             (inst mov temp (lsl count 1))
+             (allocation dst temp list-pointer-lowtag
+                         :flag-tn pa-flag)))
+      (move result dst)
       ;; FIXME: This entire loop is based on the PPC version, which is
       ;; a poor fit for the ARM instruction set.
       (inst b ENTER)
@@ -543,8 +536,7 @@
 
       ;; Dec count, and if != zero, go back for more.
       (inst subs count count (fixnumize 1))
-      ;; Store the value into the car of the current cons (in the delay
-      ;; slot).
+      ;; Store the value into the car of the current cons.
       (storew temp dst 0 list-pointer-lowtag)
       (inst b :gt LOOP)
 
