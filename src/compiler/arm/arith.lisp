@@ -665,25 +665,66 @@
     (inst tst x (ash 1 y))))
 
 (define-vop (fast-signum-fixnum fixnum-unop)
+  (:args (x :scs (any-reg) :target res))
   (:translate signum)
   (:generator 4
+    (move res x)
     (inst cmp x 0)
     (inst mov :ne res (fixnumize 1))
     (inst mvn :mi res (lognot (fixnumize -1)))))
 
 (define-vop (fast-signum-signed signed-unop)
+  (:args (x :scs (signed-reg) :target res))
   (:translate signum)
   (:generator 5
+    (move res x)
     (inst cmp x 0)
     (inst mov :ne res 1)
     (inst mvn :mi res 0)))
 
 (define-vop (fast-signum-unsigned unsigned-unop)
+  (:args (x :scs (unsigned-reg) :target res))
   (:translate signum)
-  (:generator 4
+  (:generator 5
+    (move res x)
     (inst cmp x 0)
     (inst mov :ne res 1)))
 
+;; Specialised mask-signed-field VOPs.
+(define-vop (mask-signed-field-word/c)
+  (:translate sb!c::mask-signed-field)
+  (:policy :fast-safe)
+  (:args (x :scs (signed-reg unsigned-reg) :target r))
+  (:arg-types (:constant (integer 0 32)) untagged-num)
+  (:results (r :scs (signed-reg)))
+  (:result-types signed-num)
+  (:info width)
+  (:generator 3
+    (cond ((zerop width)
+           (inst mov r 0))
+          ((= width 32)
+           (move r x))
+          (t
+           (let ((delta (- n-word-bits (print width))))
+             (inst mov r (lsl x delta))
+             (inst mov r (asr r delta)))))))
+
+(define-vop (mask-signed-field-bignum/c)
+  (:translate sb!c::mask-signed-field)
+  (:policy :fast-safe)
+  (:args (x :scs (descriptor-reg) :target r))
+  (:arg-types (:constant (integer 0 32)) bignum)
+  (:results (r :scs (signed-reg)))
+  (:result-types signed-num)
+  (:info width)
+  (:generator 4
+    (cond ((zerop width)
+           (inst mov r 0))
+          (t
+           (loadw r x bignum-digits-offset other-pointer-lowtag)
+           (let ((delta (- n-word-bits width)))
+             (inst mov r (lsl r delta))
+             (inst mov r (asr r delta)))))))
 ;;;; Bignum stuff.
 
 (define-vop (bignum-length get-header-data)
