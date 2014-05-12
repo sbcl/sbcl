@@ -375,8 +375,8 @@
   (movable foldable flushable explicit-check))
 #!+ash-right-vops
 (defknown %ash/right ((or word sb!vm:signed-word) (mod #.sb!vm:n-word-bits))
-    (or word sb!vm:signed-word)
-    (movable foldable flushable always-translatable))
+  (or word sb!vm:signed-word)
+  (movable foldable flushable always-translatable))
 (defknown (logcount integer-length) (integer) bit-index
   (movable foldable flushable explicit-check))
 ;;; FIXME: According to the ANSI spec, it's legal to use any

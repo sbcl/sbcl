@@ -236,6 +236,20 @@
         (inst mov result (lsl number amount))
         (inst mov result 0))))
 
+(define-vop (fast-ash-right-c/fixnum=>fixnum)
+  (:translate ash)
+  (:policy :fast-safe)
+  (:args (number :scs (any-reg) :target result))
+  (:info amount)
+  (:arg-types tagged-num (:constant (integer * -1)))
+  (:results (result :scs (any-reg)))
+  (:result-types tagged-num)
+  (:temporary (:sc unsigned-reg :target result) temp)
+  (:note "inline ASH")
+  (:generator 1
+    (inst mov temp (asr number (min (- amount) 31)))
+    (inst bic result temp fixnum-tag-mask)))
+
 (define-vop (fast-ash-left-modfx-c/fixnum=>fixnum
              fast-ash-left-c/fixnum=>fixnum)
   (:translate ash-left-modfx))
@@ -254,12 +268,12 @@
   (:result-types unsigned-num)
   (:note "inline ASH")
   (:generator 3
-     (cond ((< -32 amount 32)
-            (if (plusp amount)
-                (inst mov result (lsl number amount))
-                (inst mov result (asr number (- amount)))))
-           (t
-            (inst mov result 0)))))
+    (cond ((< -32 amount 32)
+           (if (plusp amount)
+               (inst mov result (lsl number amount))
+               (inst mov result (asr number (- amount)))))
+          (t
+           (inst mov result 0)))))
 
 (define-vop (fast-ash-left-mod32-c/unsigned=>unsigned
              fast-ash-c/unsigned=>unsigned)
@@ -334,6 +348,44 @@
 (define-vop (fast-ash-left-mod32/unsigned=>unsigned
              fast-ash-left/unsigned=>unsigned)
   (:translate ash-left-mod32))
+
+#!+ash-right-vops
+(define-vop (fast-%ash/right/unsigned)
+  (:translate %ash/right)
+  (:policy :fast-safe)
+  (:args (number :scs (unsigned-reg) :target result)
+         (amount :scs (unsigned-reg)))
+  (:arg-types unsigned-num unsigned-num)
+  (:results (result :scs (unsigned-reg) :from (:argument 0)))
+  (:result-types unsigned-num)
+  (:generator 4
+    (inst mov result (lsr number amount))))
+
+#!+ash-right-vops
+(define-vop (fast-%ash/right/signed)
+  (:translate %ash/right)
+  (:policy :fast-safe)
+  (:args (number :scs (signed-reg) :target result)
+         (amount :scs (unsigned-reg)))
+  (:arg-types signed-num unsigned-num)
+  (:results (result :scs (signed-reg) :from (:argument 0)))
+  (:result-types signed-num)
+  (:generator 4
+    (inst mov result (asr number amount))))
+
+#!+ash-right-vops
+(define-vop (fast-%ash/right/fixnum)
+  (:translate %ash/right)
+  (:policy :fast-safe)
+  (:args (number :scs (any-reg) :target result)
+         (amount :scs (unsigned-reg) :target temp))
+  (:arg-types tagged-num unsigned-num)
+  (:results (result :scs (any-reg) :from (:argument 0)))
+  (:result-types tagged-num)
+  (:temporary (:sc unsigned-reg :target result) temp)
+  (:generator 3
+    (inst mov temp (asr number amount))
+    (inst bic result temp fixnum-tag-mask)))
 
 ;;; Only the lower 5 bits of the shift amount are significant.
 (define-vop (shift-towards-someplace)
