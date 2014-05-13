@@ -33,5 +33,11 @@
     (allocation vector ndescr other-pointer-lowtag :flag-tn pa-flag)
     (inst mov ndescr (lsr type word-shift))
     (storew ndescr vector 0 other-pointer-lowtag)
-    (storew length vector vector-length-slot other-pointer-lowtag))
+    (storew length vector vector-length-slot other-pointer-lowtag)
+    ;; Touch the last element, to ensure that null-terminated strings
+    ;; passed to C do not cause a WP violation in foreign code.
+    #!-gencgc
+    (inst mov ndescr 0)
+    #!-gencgc
+    (storew ndescr pa-flag -1))
   (move result vector))
