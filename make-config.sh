@@ -681,7 +681,7 @@ elif [ "$sbcl_arch" = "arm" ]; then
     # hooks in for someone to add the support later.
     printf ' :arm-vfp :arm-vfpv2' >> $ltf
     printf ' :ash-right-vops' >> $ltf
-    printf ' :stack-allocatable-lists' >> $ltf
+    printf ' :stack-allocatable-lists :stack-allocatable-fixed-objects' >> $ltf
 else
     # Nothing need be done in this case, but sh syntax wants a placeholder.
     echo > /dev/null
