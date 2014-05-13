@@ -41,14 +41,9 @@
              (let* ((cons-cells (if star (1- num) num))
                     (alloc (* (pad-data-block cons-size) cons-cells)))
                (pseudo-atomic (pa-flag)
-                 (cond ((node-stack-allocate-p node)
-                        (align-csp res pa-flag)
-                        (composite-immediate-instruction add pa-flag res alloc)
-                        (inst orr res res list-pointer-lowtag)
-                        (store-csp pa-flag))
-                       (t
-                        (allocation res alloc list-pointer-lowtag
-                                    :flag-tn pa-flag)))
+                 (allocation res alloc list-pointer-lowtag
+                             :flag-tn pa-flag
+                             :stack-allocate-p (node-stack-allocate-p node))
                  (move ptr res)
                  (dotimes (i (1- cons-cells))
                    (storew (maybe-load (tn-ref-tn things)) ptr
@@ -179,12 +174,13 @@
 (define-vop (fixed-alloc)
   (:args)
   (:info name words type lowtag stack-allocate-p)
-  (:ignore name stack-allocate-p)
+  (:ignore name)
   (:results (result :scs (descriptor-reg)))
   (:temporary (:sc non-descriptor-reg :offset ocfp-offset) pa-flag)
   (:generator 4
-    (with-fixed-allocation (result pa-flag type words :lowtag lowtag)
-      )))
+    (with-fixed-allocation (result pa-flag type words
+                            :lowtag lowtag
+                            :stack-allocate-p stack-allocate-p))))
 
 (define-vop (var-alloc)
   (:args (extra :scs (any-reg)))

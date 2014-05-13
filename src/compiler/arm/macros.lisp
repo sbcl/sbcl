@@ -97,14 +97,13 @@
 (defmacro store-csp (source &optional (predicate :al))
   `(store-symbol-value ,source *control-stack-pointer* ,predicate))
 
-(defun align-csp (csp temp)
+(defun align-csp (csp)
   ;; Aligns and loads the csp
   ;; is used for stack allocation of dynamic-extent objects
   (load-csp csp)
   (inst tst csp lowtag-mask)
   (inst add :ne csp csp n-word-bytes)
-  (inst mov :ne temp 0)
-  (storew temp csp -1 0 :ne))
+  (storew null-tn csp -1 0 :ne))
 
 ;;; Macros to handle the fact that we cannot use the machine native call and
 ;;; return instructions.
@@ -184,17 +183,30 @@
 ;;; surround a call to ALLOCATION anyway), and to indicate that the
 ;;; P-A FLAG-TN is also acceptable here.
 
-(defmacro allocation (result-tn size lowtag &key flag-tn)
+(defmacro allocation (result-tn size lowtag &key flag-tn
+                                                 stack-allocate-p)
   ;; Normal allocation to the heap.
-  (let ((alloc-size (gensym)))
-    `(let ((,alloc-size ,size))
-       (load-symbol-value ,flag-tn *allocation-pointer*)
-       (inst add ,result-tn ,flag-tn ,lowtag)
-       (inst add ,flag-tn ,flag-tn ,alloc-size)
-       (store-symbol-value ,flag-tn *allocation-pointer*))))
+  (once-only ((result-tn result-tn)
+              (size size)
+              (lowtag lowtag)
+              (flag-tn flag-tn)
+              (stack-allocate-p stack-allocate-p))
+    `(cond (,stack-allocate-p
+            (align-csp ,result-tn)
+            (if (integerp ,size)
+                (composite-immediate-instruction add ,flag-tn ,result-tn ,size)
+                (inst add ,flag-tn ,result-tn ,size))
+            (inst orr ,result-tn ,result-tn ,lowtag)
+            (store-csp ,flag-tn))
+           (t
+            (load-symbol-value ,flag-tn *allocation-pointer*)
+            (inst add ,result-tn ,flag-tn ,lowtag)
+            (inst add ,flag-tn ,flag-tn ,size)
+            (store-symbol-value ,flag-tn *allocation-pointer*)))))
 
 (defmacro with-fixed-allocation ((result-tn flag-tn type-code size
-                                            &key (lowtag other-pointer-lowtag))
+                                            &key (lowtag other-pointer-lowtag)
+                                                 stack-allocate-p)
                                  &body body)
   "Do stuff to allocate an other-pointer object of fixed Size with a single
   word header having the specified Type-Code.  The result is placed in
@@ -205,7 +217,8 @@
               (type-code type-code) (size size) (lowtag lowtag))
     `(pseudo-atomic (,flag-tn)
        (allocation ,result-tn (pad-data-block ,size) ,lowtag
-                   :flag-tn ,flag-tn)
+                   :flag-tn ,flag-tn
+                   :stack-allocate-p ,stack-allocate-p)
        (when ,type-code
          (inst mov ,flag-tn (ash (1- ,size) n-widetag-bits))
          (inst orr ,flag-tn ,flag-tn ,type-code)

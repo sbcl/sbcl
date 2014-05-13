@@ -510,15 +510,15 @@
     ;; We need to do this atomically.
     (pseudo-atomic (pa-flag)
       ;; Allocate a cons (2 words) for each item.
-      (cond ((node-stack-allocate-p node)
-             (align-csp dst pa-flag)
-             (inst add pa-flag dst (lsl count 1))
-             (inst orr dst dst list-pointer-lowtag)
-             (store-csp pa-flag))
-            (t
-             (inst mov temp (lsl count 1))
-             (allocation dst temp list-pointer-lowtag
-                         :flag-tn pa-flag)))
+      (let* ((dx-p (node-stack-allocate-p node))
+             (size (cond (dx-p
+                          (lsl count 1))
+                         (t
+                          (inst mov temp (lsl count 1))
+                          temp))))
+        (allocation dst size list-pointer-lowtag
+                    :flag-tn pa-flag
+                    :stack-allocate-p dx-p))
       (move result dst)
       ;; FIXME: This entire loop is based on the PPC version, which is
       ;; a poor fit for the ARM instruction set.
