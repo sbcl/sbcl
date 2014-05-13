@@ -33,11 +33,13 @@
     (allocation vector ndescr other-pointer-lowtag :flag-tn pa-flag)
     (inst mov ndescr (lsr type word-shift))
     (storew ndescr vector 0 other-pointer-lowtag)
-    (storew length vector vector-length-slot other-pointer-lowtag)
     ;; Touch the last element, to ensure that null-terminated strings
     ;; passed to C do not cause a WP violation in foreign code.
+    ;; Do that before storing length, since nil-arrays don't have any
+    ;; space, but may have non-zero length.
     #!-gencgc
     (inst mov ndescr 0)
     #!-gencgc
-    (storew ndescr pa-flag -1))
+    (storew ndescr pa-flag -1)
+    (storew length vector vector-length-slot other-pointer-lowtag))
   (move result vector))
