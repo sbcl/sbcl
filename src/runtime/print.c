@@ -152,15 +152,16 @@ vodxprint_fun(const char *fmt, va_list args)
     QSHOW_BLOCK;
 
     char buf[1024];
+    int n = 0;
 
 #ifdef LISP_FEATURE_SB_THREAD
     struct thread *arch_os_get_current_thread(void);
     struct thread *self = arch_os_get_current_thread();
     void *pth = self ? (void *) self->os_thread : 0;
     snprintf(buf, sizeof(buf), "[%p/%p] ", self, pth);
+    n = strlen(buf);
 #endif
 
-    int n = strlen(buf);
     vsnprintf(buf + n, sizeof(buf) - n - 1, fmt, args);
     /* buf is now zero-terminated (even in case of overflow).
      * Our caller took care of the newline (if any) through `fmt'. */
