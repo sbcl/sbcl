@@ -200,7 +200,9 @@
     ;; allocation time rather than at function-entry time, largely due
     ;; to a lack of usable registers.
     (load-csp res)
-    (inst add csp-temp res (* (max 1 nargs) n-word-bytes))
+    ;; Our minimum caller frame size is two words, one for the frame
+    ;; link and one for the LRA.
+    (inst add csp-temp res (* (max 2 nargs) n-word-bytes))
     (store-csp csp-temp)
     (storew cfp-tn res ocfp-save-offset)))
 
