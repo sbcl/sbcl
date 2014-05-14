@@ -86,7 +86,7 @@ call_into_lisp:
 	str     reg_NULL, STATIC_SYMBOL_VALUE(PSEUDO_ATOMIC_ATOMIC)
 	ldr     reg_OCFP, STATIC_SYMBOL_VALUE(PSEUDO_ATOMIC_INTERRUPTED)
 	cmp     reg_OCFP, reg_NULL
-	movlt   reg_OCFP, reg_OCFP, lsl #N_FIXNUM_TAG_BITS
+	movlt   reg_OCFP, reg_OCFP, lsr #N_FIXNUM_TAG_BITS
 	swilt   #0
 
 	@@ Load our function args.  Cleverness abounds!
@@ -133,7 +133,7 @@ call_into_lisp:
 	str     reg_NULL, STATIC_SYMBOL_VALUE(PSEUDO_ATOMIC_ATOMIC)
 	ldr     reg_OCFP, STATIC_SYMBOL_VALUE(PSEUDO_ATOMIC_INTERRUPTED)
 	cmp     reg_OCFP, reg_NULL
-	movlt   reg_OCFP, reg_OCFP, lsl #N_FIXNUM_TAG_BITS
+	movlt   reg_OCFP, reg_OCFP, lsr #N_FIXNUM_TAG_BITS
 	swilt   #0
 
 	@@ Restore saved registers.
@@ -215,7 +215,7 @@ call_into_c:
 	str     reg_NULL, STATIC_SYMBOL_VALUE(PSEUDO_ATOMIC_ATOMIC)
 	ldr     reg_OCFP, STATIC_SYMBOL_VALUE(PSEUDO_ATOMIC_INTERRUPTED)
 	cmp     reg_OCFP, reg_NULL
-	movlt   reg_OCFP, reg_OCFP, lsl #N_FIXNUM_TAG_BITS
+	movlt   reg_OCFP, reg_OCFP, lsr #N_FIXNUM_TAG_BITS
 	swilt   #0
 
         @@ Now that we're in C mode, move the remaining register args
@@ -275,7 +275,7 @@ call_into_c:
 	str     reg_NULL, STATIC_SYMBOL_VALUE(PSEUDO_ATOMIC_ATOMIC)
 	ldr     reg_OCFP, STATIC_SYMBOL_VALUE(PSEUDO_ATOMIC_INTERRUPTED)
 	cmp     reg_OCFP, reg_NULL
-	movlt   reg_OCFP, reg_OCFP, lsl #N_FIXNUM_TAG_BITS
+	movlt   reg_OCFP, reg_OCFP, lsr #N_FIXNUM_TAG_BITS
 	swilt   #0
 
         @@ Restore our caller state from our stack frame.
