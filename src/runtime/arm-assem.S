@@ -305,6 +305,10 @@ call_into_c:
 	.word	NIL
 	.word	NIL
 
+        @@ As in ppc-assem.S, point reg_CODE to the header with a
+        @@ function lowtag...  Which the address already has.
+        ldr     reg_CODE, =undefined_tramp
+
         @@ The magic (undefined) "BREAK_POINT" instruction.
         .word 0xe7f001f0
 

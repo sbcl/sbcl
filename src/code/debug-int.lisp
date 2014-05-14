@@ -2029,7 +2029,7 @@ register."
        (= val (+ (- (foreign-symbol-address "undefined_tramp")
                     (* sb!vm:n-word-bytes sb!vm:simple-fun-code-offset))
                  sb!vm:fun-pointer-lowtag))
-       #!+sparc
+       #!+(or sparc arm)
        (= val (foreign-symbol-address "undefined_tramp"))
        ;; pointer
        (not (zerop (valid-lisp-pointer-p (int-sap val)))))
