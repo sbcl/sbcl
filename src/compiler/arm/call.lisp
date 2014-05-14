@@ -237,12 +237,12 @@
            (type unsigned-byte nvals) (type tn move-temp temp))
   (let ((expecting-values-on-stack (> nvals register-arg-count))
         (values-on-stack temp))
+    (note-this-location vop (if (<= nvals 1)
+                                :single-value-return
+                                :unknown-return))
     (inst compute-code code-tn lip lra-label temp)
     ;; Pick off the single-value case first.
     (sb!assem:without-scheduling ()
-      (note-this-location vop (if (<= nvals 1)
-                                  :single-value-return
-                                  :unknown-return))
 
       ;; Default register values for single-value return case.
       ;; The callee returns with condition bits CLEAR in the
