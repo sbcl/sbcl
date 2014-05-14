@@ -97,14 +97,6 @@
 (defmacro store-csp (source &optional (predicate :al))
   `(store-symbol-value ,source *control-stack-pointer* ,predicate))
 
-(defun align-csp (csp)
-  ;; Aligns and loads the csp
-  ;; is used for stack allocation of dynamic-extent objects
-  (load-csp csp)
-  (inst tst csp lowtag-mask)
-  (inst add :ne csp csp n-word-bytes)
-  (storew null-tn csp -1 0 :ne))
-
 ;;; Macros to handle the fact that we cannot use the machine native call and
 ;;; return instructions.
 
@@ -182,7 +174,6 @@
 ;;; to emphasize the parallelism with PSEUDO-ATOMIC (which must
 ;;; surround a call to ALLOCATION anyway), and to indicate that the
 ;;; P-A FLAG-TN is also acceptable here.
-
 (defmacro allocation (result-tn size lowtag &key flag-tn
                                                  stack-allocate-p)
   ;; Normal allocation to the heap.
@@ -192,12 +183,17 @@
               (flag-tn flag-tn)
               (stack-allocate-p stack-allocate-p))
     `(cond (,stack-allocate-p
-            (align-csp ,result-tn)
+            (load-csp ,result-tn)
+            (inst tst ,result-tn lowtag-mask)
+            (inst add :ne ,result-tn ,result-tn n-word-bytes)
             (if (integerp ,size)
                 (composite-immediate-instruction add ,flag-tn ,result-tn ,size)
                 (inst add ,flag-tn ,result-tn ,size))
-            (inst orr ,result-tn ,result-tn ,lowtag)
-            (store-csp ,flag-tn))
+            (store-csp ,flag-tn)
+            ;; :ne is from TST above, this needs to be done after the
+            ;; stack pointer has be stored.
+            (storew null-tn ,result-tn -1 0 :ne)
+            (inst orr ,result-tn ,result-tn ,lowtag))
            (t
             (load-symbol-value ,flag-tn *allocation-pointer*)
             (inst add ,result-tn ,flag-tn ,lowtag)
