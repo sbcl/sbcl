@@ -664,7 +664,7 @@
   (sb-thread:with-mutex (*mutex*)
     (true *mutex*)))
 
-(with-test (:name (:no-consing :mutex) :fails-on :ppc :skipped-on '(not :sb-thread))
+(with-test (:name (:no-consing :mutex) :skipped-on '(not :sb-thread))
   (assert-no-consing (test-mutex)))
 
 
@@ -843,7 +843,7 @@
 (with-test (:name :length-and-words-packed-in-same-tn)
   (assert (= 1 (length-and-words-packed-in-same-tn -3))))
 
-(with-test (:name :handler-case-bogus-compiler-note :fails-on :ppc)
+(with-test (:name :handler-case-bogus-compiler-note)
   (handler-bind
       ((compiler-note (lambda (note)
                         (error "compiler issued note ~S during test" note))))
@@ -876,7 +876,7 @@
     v))
 (defun barvector (x y z)
   (make-array 3 :initial-contents (list x y z)))
-(with-test (:name :dx-compiler-notes :fails-on :ppc)
+(with-test (:name :dx-compiler-notes)
   (flet ((assert-notes (j lambda)
            (let ((n 0))
              (handler-bind ((compiler-note (lambda (c)
@@ -935,25 +935,25 @@
       (if sp
           (assert (= sp (sb-c::%primitive sb-c:current-stack-pointer)))
           (setf sp (sb-c::%primitive sb-c:current-stack-pointer))))))
-(with-test (:name :handler-case-eating-stack :fails-on :ppc)
+(with-test (:name :handler-case-eating-stack)
   (assert-no-consing (handler-case-eating-stack)))
 
 ;;; A nasty bug where RECHECK-DYNAMIC-EXTENT-LVARS thought something was going
 ;;; to be stack allocated when it was not, leading to a bogus %NIP-VALUES.
 ;;; Fixed by making RECHECK-DYNAMIC-EXTENT-LVARS deal properly with nested DX.
 (deftype vec ()
-  `(simple-array single-float (3)))
+  `(simple-array t (3)))
 (declaim (ftype (function (t t t) vec) vec))
 (declaim (inline vec))
 (defun vec (a b c)
-  (make-array 3 :element-type 'single-float :initial-contents (list a b c)))
+  (make-array 3 :initial-contents (list a b c)))
 (defun bad-boy (vec)
   (declare (type vec vec))
   (lambda (fun)
     (let ((vec (vec (aref vec 0) (aref vec 1) (aref vec 2))))
       (declare (dynamic-extent vec))
       (funcall fun vec))))
-(with-test (:name :recheck-nested-dx-bug :fails-on :ppc)
+(with-test (:name :recheck-nested-dx-bug)
   (assert (funcall (bad-boy (vec 1.0 2.0 3.3))
                    (lambda (vec) (equalp vec (vec 1.0 2.0 3.3)))))
   (flet ((foo (x) (declare (ignore x))))
