@@ -1943,6 +1943,11 @@
                              storage-location))))
             dstate)
       t)))
+
+(defun maybe-note-static-symbol (offset dstate)
+  (dolist (symbol sb!vm:*static-symbols*)
+    (when (= (sb!kernel:get-lisp-obj-address symbol) offset)
+      (return (note (lambda (s) (prin1 symbol s)) dstate)))))
 
 (defun get-internal-error-name (errnum)
   (cdr (svref sb!c:*backend-internal-errors* errnum)))

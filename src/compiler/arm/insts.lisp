@@ -53,16 +53,27 @@
 ;;;; disassembler field definitions
 
 (defun maybe-add-notes (register dstate)
-  (when (eql register code-offset)
-    (let* ((inst (sb!disassem::sap-ref-int
-                  (sb!disassem::dstate-segment-sap dstate)
-                  (sb!disassem::dstate-cur-offs dstate)
-                  n-word-bytes
-                  (sb!disassem::dstate-byte-order dstate)))
-           (op (ldb (byte 8 20) inst)))
-      (case op
-        (89 ;; LDR
-         (sb!disassem:note-code-constant (ldb (byte 12 0) inst) dstate))))))
+  (let* ((inst (sb!disassem::sap-ref-int
+                (sb!disassem::dstate-segment-sap dstate)
+                (sb!disassem::dstate-cur-offs dstate)
+                n-word-bytes
+                (sb!disassem::dstate-byte-order dstate)))
+         (op (ldb (byte 8 20) inst))
+         (offset (ldb (byte 12 0) inst)))
+    (cond ((and (= register null-offset))
+           (let ((offset (+ nil-value offset)))
+             (case op
+               ((88 89) ;; LDR/STR
+                (sb!disassem:maybe-note-assembler-routine offset nil dstate)
+                (sb!disassem::maybe-note-static-symbol
+                 (logior offset other-pointer-lowtag) dstate))
+               (40 ;; ADD
+                (sb!disassem::maybe-note-static-symbol offset dstate)))))
+          (t
+           (case op
+             (89 ;; LDR
+              (when (eql register code-offset)
+                (sb!disassem:note-code-constant offset dstate))))))))
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
   ;; DEFINE-ARG-TYPE requires that any :PRINTER be defined at

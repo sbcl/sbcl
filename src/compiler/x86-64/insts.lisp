@@ -351,11 +351,7 @@
 
 (defun print-imm/asm-routine (value stream dstate)
   (sb!disassem:maybe-note-assembler-routine value nil dstate)
-  ;; also note a possible use of a static symbol.
-  ;; Do we want to push this logic into MAYBE-NOTE-ASSEMBLER-ROUTINE?
-  (dolist (symbol *static-symbols*)
-    (when (= (get-lisp-obj-address symbol) value)
-      (return (sb!disassem:note (lambda (s) (prin1 symbol s)) dstate))))
+  (sb!disassem:maybe-note-static-symbol value dstate)
   (princ value stream))
 ) ; EVAL-WHEN
 
