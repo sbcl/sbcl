@@ -12,9 +12,8 @@
 
 (in-package "SB!VM")
 
-(define-assembly-routine (allocate-vector
+(define-assembly-routine (allocate-vector-on-heap
                           (:policy :fast-safe)
-                          (:translate allocate-vector)
                           (:arg-types positive-fixnum
                                       positive-fixnum
                                       positive-fixnum))
@@ -43,3 +42,38 @@
     (storew ndescr pa-flag -1)
     (storew length vector vector-length-slot other-pointer-lowtag))
   (move result vector))
+
+(define-assembly-routine (allocate-vector-on-stack
+                          (:policy :fast-safe)
+                          (:arg-types positive-fixnum
+                                      positive-fixnum
+                                      positive-fixnum))
+    ((:arg type any-reg r0-offset)
+     (:arg length any-reg r1-offset)
+     (:arg words any-reg r2-offset)
+     (:res result descriptor-reg r0-offset)
+
+     (:temp ndescr non-descriptor-reg nl2-offset)
+     (:temp pa-flag non-descriptor-reg ocfp-offset)
+     (:temp vector descriptor-reg r8-offset))
+  (pseudo-atomic (pa-flag)
+    ;; boxed words == unboxed bytes
+    (inst add ndescr words (* (1+ vector-data-offset) n-word-bytes))
+    (inst bic ndescr ndescr lowtag-mask)
+    (allocation vector ndescr other-pointer-lowtag
+                :flag-tn pa-flag
+                :stack-allocate-p t)
+    (inst mov pa-flag (lsr type word-shift))
+    (storew pa-flag vector 0 other-pointer-lowtag)
+    ;; Zero fill
+    (let ((loop (gen-label)))
+      (inst sub result vector (- other-pointer-lowtag n-word-bytes))
+      ;; The header word has already been set, skip it.
+      (inst sub ndescr ndescr (fixnumize 1))
+      (inst mov pa-flag 0)
+      (emit-label loop)
+      (inst str pa-flag (@ result n-word-bytes :post-index))
+      (inst subs ndescr ndescr (fixnumize 1))
+      (inst b :gt loop))
+    (storew length vector vector-length-slot other-pointer-lowtag)
+    (move result vector)))
