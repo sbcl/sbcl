@@ -14,16 +14,17 @@
 (defun lowest-set-bit-index (integer-value)
   (max 0 (1- (integer-length (logand integer-value (- integer-value))))))
 
-;; FIXME: This load-immediate-word stuff could me more clever. The
-;; decision on loading positive or negative shouldn't depend on the sign
-;; of the value, it should depend on the logcount of the two's complement
-;; representation (or maybe an even smarter selection criterion).
-
 (defun load-immediate-word (y val)
-  (cond ((< val 0)
+  (cond ((let ((unsigned (ldb (byte 32 0) val)))
+           (when (encodable-immediate unsigned)
+             (inst mov y unsigned)
+             t)))
+        ((let ((inverted (ldb (byte 32 0) (lognot val))))
+           (when (encodable-immediate inverted)
+             (inst mvn y inverted)
+             t)))
+        ((< val 0)
          (composite-immediate-instruction bic y y val :first-op mvn :first-no-source t :invert-y t))
-        ((encodable-immediate (ldb (byte 32 0) (lognot val)))
-         (inst mvn y (lognot val)))
         (t
          (composite-immediate-instruction orr y y val :first-op mov :first-no-source t))))
 
