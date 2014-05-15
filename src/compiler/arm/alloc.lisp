@@ -122,21 +122,12 @@
     (let* ((size (+ length closure-info-offset))
            (alloc-size (pad-data-block size)))
       (pseudo-atomic (pa-flag)
-        (if stack-allocate-p
-            #!-(or)
-            (error "Stack allocation for MAKE-CLOSURE not yet implemented")
-            #!+(or)
-            (progn
-              (align-csp result)
-              (inst clrrwi. result csp-tn n-lowtag-bits)
-              (inst addi csp-tn csp-tn alloc-size)
-              (inst ori result result fun-pointer-lowtag)
-              (inst lr temp (logior (ash (1- size) n-widetag-bits) closure-header-widetag)))
-            (progn
-              (allocation result alloc-size
-                          fun-pointer-lowtag :flag-tn pa-flag)
-              (inst mov pa-flag (ash (1- size) n-widetag-bits))
-              (inst orr pa-flag pa-flag closure-header-widetag)))
+        (allocation result alloc-size
+                    fun-pointer-lowtag
+                    :flag-tn pa-flag
+                    :stack-allocate-p stack-allocate-p)
+        (inst mov pa-flag (ash (1- size) n-widetag-bits))
+        (inst orr pa-flag pa-flag closure-header-widetag)
         (storew pa-flag result 0 fun-pointer-lowtag)
         (storew function result closure-fun-slot fun-pointer-lowtag)))))
 
@@ -146,10 +137,10 @@
   (:args (value :to :save :scs (descriptor-reg any-reg)))
   (:temporary (:sc non-descriptor-reg :offset ocfp-offset) pa-flag)
   (:info stack-allocate-p)
-  (:ignore stack-allocate-p)
   (:results (result :scs (descriptor-reg)))
   (:generator 10
-    (with-fixed-allocation (result pa-flag value-cell-header-widetag value-cell-size)
+    (with-fixed-allocation (result pa-flag value-cell-header-widetag
+                            value-cell-size :stack-allocate-p stack-allocate-p)
       (storew value result value-cell-value-slot other-pointer-lowtag))))
 
 ;;;; Automatic allocators for primitive objects.
