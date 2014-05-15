@@ -177,12 +177,13 @@
 (define-vop (move-to-word-c)
   (:args (x :scs (constant)))
   (:results (y :scs (signed-reg unsigned-reg)))
+  (:vop-var vop)
   (:note "constant load")
   (:generator 1
     (cond ((sb!c::tn-leaf x)
            (load-immediate-word y (tn-value x)))
           (t
-           (loadw y code-tn (tn-offset x) other-pointer-lowtag)
+           (load-constant vop x y)
            (inst mov y (asr y n-fixnum-tag-bits))))))
 (define-move-vop move-to-word-c :move
   (constant) (signed-reg unsigned-reg))

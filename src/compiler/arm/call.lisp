@@ -972,8 +972,7 @@
                       (loadw name-pass cfp-tn (tn-offset name))
                       (do-next-filler))
                      (constant
-                      (loadw name-pass code-tn (tn-offset name)
-                             other-pointer-lowtag)
+                      (load-constant vop name name-pass)
                       (do-next-filler)))
                    (insert-step-instrumenting name-pass)
                    (loadw function name-pass fdefn-raw-addr-slot
@@ -985,8 +984,7 @@
                       (loadw lexenv cfp-tn (tn-offset arg-fun))
                       (do-next-filler))
                      (constant
-                      (loadw lexenv code-tn (tn-offset arg-fun)
-                             other-pointer-lowtag)
+                      (load-constant vop arg-fun lexenv)
                       (do-next-filler)))
                    (loadw function lexenv closure-fun-slot
                           fun-pointer-lowtag)
