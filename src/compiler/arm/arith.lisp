@@ -705,7 +705,7 @@
           ((= width 32)
            (move r x))
           (t
-           (let ((delta (- n-word-bits (print width))))
+           (let ((delta (- n-word-bits width)))
              (inst mov r (lsl x delta))
              (inst mov r (asr r delta)))))))
 

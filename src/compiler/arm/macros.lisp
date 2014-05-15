@@ -191,13 +191,15 @@
                 (inst add ,flag-tn ,result-tn ,size))
             (store-csp ,flag-tn)
             ;; :ne is from TST above, this needs to be done after the
-            ;; stack pointer has be stored.
+            ;; stack pointer has been stored.
             (storew null-tn ,result-tn -1 0 :ne)
             (inst orr ,result-tn ,result-tn ,lowtag))
            (t
             (load-symbol-value ,flag-tn *allocation-pointer*)
             (inst add ,result-tn ,flag-tn ,lowtag)
-            (inst add ,flag-tn ,flag-tn ,size)
+            (if (integerp ,size)
+                (composite-immediate-instruction add ,flag-tn ,flag-tn ,size)
+                (inst add ,flag-tn ,flag-tn ,size))
             (store-symbol-value ,flag-tn *allocation-pointer*)))))
 
 (defmacro with-fixed-allocation ((result-tn flag-tn type-code size
