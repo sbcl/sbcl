@@ -89,7 +89,7 @@
 
   (defun print-immediate-shift (value stream dstate)
     (declare (type stream stream)
-             (type (cons fixnum (cons fixnum null)))
+             (type (cons fixnum (cons fixnum null)) value)
              (ignore dstate))
     (destructuring-bind (amount shift) value
       (cond
@@ -131,17 +131,19 @@
           (princ "]" stream)
           (progn
             (princ (if (zerop p) "], #" ", #") stream)
-            (princ (if (zerop u) "-" "+") stream)
+            (when (zerop u)
+              (princ "-" stream))
             (princ offset stream)
             (unless (zerop p)
               (princ (if (zerop w) "]" "]!") stream))))))
 
   (defun print-load/store-register (value stream dstate)
-    (destructuring-bind (p u w offset) value
+    (destructuring-bind (p u w shift-imm shift rm) value
       (when (zerop p)
         (princ "]" stream))
-      (princ (if (zerop u) "-" "+") stream)
-      (print-immediate-shift offset stream dstate)
+      (princ (if (zerop u) ", -" ", ") stream)
+      (print-reg rm stream dstate)
+      (print-immediate-shift (list shift-imm shift) stream dstate)
       (unless (zerop p)
         (princ (if (zerop w) "]" "]!") stream))))
 
@@ -258,20 +260,21 @@
 (sb!disassem:define-instruction-format
     (load/store-register 32
      ;; FIXME: cond should come between LDR/STR and B.
-     :default-printer '(:name cond :tab rd ", [" rn rm load/store-offset))
+     :default-printer '(:name cond :tab rd ", [" rn load/store-offset))
   (cond :field (byte 4 28) :type 'condition-code)
   (opcode-3 :field (byte 3 25))
   (load/store-offset :fields (list (byte 1 24)
                                    (byte 1 23)
                                    (byte 1 21)
-                                   (byte 7 5))
+                                   (byte 5 7)  ;; shift_imm
+                                   (byte 2 5)  ;; shift
+                                   (byte 4 0)) ;; Rm
                      :type 'load/store-register)
   (opcode-b :field (byte 1 22))
   (opcode-l :field (byte 1 20))
   (opcode-0 :field (byte 1 4))
   (rn :field (byte 4 16) :type 'reg)
-  (rd :field (byte 4 12) :type 'reg)
-  (rm :field (byte 4 0) :type 'reg))
+  (rd :field (byte 4 12) :type 'reg))
 
 (sb!disassem:define-instruction-format
     (swi 32 :default-printer '(:name cond :tab "#" swi-number))
