@@ -46,7 +46,7 @@
 
 (define-vop (fast-negate/signed signed-unop)
   (:translate %negate)
-  (:generator 1
+  (:generator 2
     (inst rsb res x 0)))
 
 (define-vop (fast-lognot/fixnum signed-unop)
