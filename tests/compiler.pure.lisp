@@ -5058,3 +5058,17 @@
                       (sb-kernel:%other-pointer-widetag other-obj)
                       (sb-kernel:widetag-of other-obj)))))
     (other-foo sb-vm:simple-bit-vector-widetag #*101)))
+
+(with-test (:name :interr-type-specifier-hashing)
+  (let ((specifiers
+         (remove
+          'simple-vector
+          (map 'list
+               (lambda (saetp)
+                 (sb-c::type-specifier
+                  (sb-c::specifier-type
+                   `(simple-array ,(sb-vm:saetp-specifier saetp) (*)))))
+               sb-vm:*specialized-array-element-type-properties*))))
+    (assert (sb-c::%interr-symbol-for-type-spec `(or ,@specifiers)))
+    (assert (sb-c::%interr-symbol-for-type-spec
+             `(or ,@specifiers system-area-pointer)))))

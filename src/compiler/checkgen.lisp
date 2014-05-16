@@ -426,21 +426,26 @@
 ;; for the symbol in the function's constant area, a MOV instruction to load it,
 ;; and an sc-offset in the error trap.
 (defglobal **type-spec-interr-symbols**
-    ;; read-time eval so that cold-init doesn't re-make the table
-    #.(let* ((entries (remove-if #'stringp sb!c:*backend-internal-errors*
-                                 :key #'car))
-             ;; This is an effectively a compact read-only binned hashtable.
-             (hashtable (make-array (logior (length entries) 1)
-                                    :initial-element nil)))
+    (let* ((entries
+            ;; read-time-eval so that during cold-init we can recreate the
+            ;; table using the target's sxhash function, but without relying
+            ;; on readiness of the type system for parsing/unparsing specifiers.
+            #.(map 'vector
+                   (lambda (entry)
+                     (cons (type-specifier (specifier-type (car entry)))
+                           (cdr entry)))
+                   (remove-if #'stringp sb!c:*backend-internal-errors*
+                              :key #'car)))
+           ;; This is effectively a compact read-only binned hashtable.
+           (hashtable (make-array (logior (length entries) 1)
+                                  :initial-element nil)))
         ;; Older architectures don't have a VOP that can emit an arbitrary
         ;; primitive trap (see "compiler/generic/type-error" - and fix that)
         #!-(or alpha hppa mips)
         (map nil
              (lambda (entry)
-               (let* ((canon-type (type-specifier (specifier-type (car entry))))
+               (let* ((canon-type (car entry))
                       (bucket (mod (sxhash canon-type) (length hashtable))))
-                 (unless (equal canon-type (car entry))
-                   (setq entry (cons canon-type (cdr entry))))
                  (push entry (svref hashtable bucket))))
              entries)
         hashtable))
