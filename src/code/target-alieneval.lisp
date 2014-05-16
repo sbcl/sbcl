@@ -182,12 +182,10 @@ This is SETFable."
                        ;; it could just save and restore the number-stack pointer once,
                        ;; instead of doing multiple decrements if there are multiple bindings.
                        #!-(or x86 x86-64)
-                       `((let (,var)
+                       `((let ((,var (make-local-alien ',info)))
                            (unwind-protect
-                               (progn
-                                 (setf ,var (make-local-alien ',info))
-                                 (let ((,var ,var))
-                                   ,@body-forms))
+                                (let ((,var ,var))
+                                  ,@body-forms)
                              (dispose-local-alien ',info ,var))))))))))))
     (/show "revised" body)
     (verify-local-auxiliaries-okay)
