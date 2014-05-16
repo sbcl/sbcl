@@ -182,8 +182,7 @@
                     ;; HPPA are due to not having a full and valid
                     ;; stack frame for the undefined function frame.
                     ;; See PPC undefined_tramp for details.
-              :fails-on '(or :alpha :sparc :mips
-                          (and :x86-64 :freebsd)))
+              :fails-on '(or :alpha :sparc :mips))
     (assert (verify-backtrace
              (lambda () (test #'optimized))
              (list *undefined-function-frame*
