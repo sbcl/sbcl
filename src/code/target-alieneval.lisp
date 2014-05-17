@@ -183,9 +183,13 @@ This is SETFable."
                        ;; instead of doing multiple decrements if there are multiple bindings.
                        #!-(or x86 x86-64)
                        `((let ((,var (make-local-alien ',info)))
-                           (unwind-protect
-                                (let ((,var ,var))
-                                  ,@body-forms)
+                           (multiple-value-prog1
+                               (progn ,@body-forms)
+                             ;; No need for unwind protect here, since
+                             ;; allocation involves modifying NSP, and
+                             ;; NSP is saved and restored during NLX.
+                             ;; And in non-transformed case it
+                             ;; performs finalization.
                              (dispose-local-alien ',info ,var))))))))))))
     (/show "revised" body)
     (verify-local-auxiliaries-okay)
