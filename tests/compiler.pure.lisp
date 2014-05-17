@@ -4882,13 +4882,12 @@
                      x)))))
 
 (with-test (:name :copy-more-arg
-            :fails-on '(not (or :x86 :x86-64)))
+            :fails-on '(not (or :x86 :x86-64 arm)))
   ;; copy-more-arg might not copy in the right direction
   ;; when there are more fixed args than stack frame slots,
   ;; and thus end up splatting a single argument everywhere.
-  ;; Fixed on x86oids only, but other platforms still start
-  ;; their stack frames at 8 slots, so this is less likely
-  ;; to happen.
+  ;; Failing platforms still start their stack frames at 8 slots, so
+  ;; this is less likely to happen.
   (let ((limit 33))
     (labels ((iota (n)
                (loop for i below n collect i))

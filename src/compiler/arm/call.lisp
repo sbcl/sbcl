@@ -422,23 +422,20 @@
         ;; allocation) into the stack pointer.
         (cond ((zerop fixed)
                (inst cmp nargs-tn 0)
-               (inst add temp result nargs-tn)
-               (store-csp temp)
+               (inst add dest result nargs-tn)
+               (store-csp dest)
                (inst b :eq DONE))
               (t
                (inst subs count nargs-tn (fixnumize fixed))
                (store-csp result :le)
                (inst b :le DONE)
-               (inst add temp result count)
-               (store-csp temp)))
+               (inst add dest result count)
+               (store-csp dest)))
 
         (when (< fixed register-arg-count)
           ;; We must stop when we run out of stack args, not when we
           ;; run out of more args.
           (inst add result result (fixnumize (- register-arg-count fixed))))
-
-        ;; Initialize dest to be end of stack.
-        (load-csp dest)
 
         ;; We are copying at most (- NARGS FIXED) values, from last to
         ;; first, in order to shift them out of the allocated part of
@@ -452,11 +449,18 @@
         ;; moved.
 
         LOOP
-        (inst cmp dest result)
         (let ((delta (- (sb-allocated-size 'control-stack) fixed)))
-          (inst ldr :gt temp (@ dest (- (* (1+ delta) n-word-bytes)))))
-        (inst str :gt temp (@ dest (- n-word-bytes) :pre-index))
-        (inst b :gt LOOP)
+          (cond ((zerop delta)) ;; nothing to move
+                ((plusp delta)  ;; copy backward
+                 (inst cmp dest result)
+                 (inst ldr :gt temp (@ dest (- (* (1+ delta) n-word-bytes))))
+                 (inst str :gt temp (@ dest (- n-word-bytes) :pre-index))
+                 (inst b :gt LOOP))
+                (t ;; copy forward
+                 (inst cmp dest result)
+                 (inst ldr :gt temp (@ result (- (* delta n-word-bytes))))
+                 (inst str :gt temp (@ result n-word-bytes :post-index))
+                 (inst b :gt LOOP))))
 
         DO-REGS
         (when (< fixed register-arg-count)
