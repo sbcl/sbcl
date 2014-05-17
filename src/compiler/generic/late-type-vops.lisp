@@ -88,6 +88,20 @@
                   *specialized-array-element-type-properties*))))
   (define-simple-array-type-vops))
 
+;; I think no interpreter stub is needed. This can only be called by a
+;; source transform, hence, by code that is being compiled.
+(macrolet
+    ((def ()
+       `(!define-type-vops simple-rank-1-array-*-p check-simple-rank-1-array-*
+         nil
+         ;; TODO: eliminate naming of errors. The error-emitting logic can find
+         ;; an error number from a type specifier. As impetus to remove them,
+         ;; I'm not adding a new exported symbol to sb-kernel.
+         sb!kernel::object-not-simple-rank-1-array-error
+         ,(map 'list #'saetp-typecode
+               *specialized-array-element-type-properties*))))
+  (def)) ; simple-rank-1-array-*-p
+
 (!define-type-vops characterp check-character character
     object-not-character-error
   (character-widetag))

@@ -214,3 +214,44 @@
      'sb!c:check-fun)
     (t
      nil)))
+
+;; Given TYPES which is a list of types from a union type, if expressible as a
+;; union of widetags for other-pointer-lowtag, return those widetags; otherwise
+;; return NIL. For now this just understands unidimensional arrays and SAPs,
+;; which is a good starting point and more general than a hypothetical predicate
+;; testing only for a particular type such as (simple-unboxed-array (*)).
+;; This is architecture-independent, but unfortunately the needed VOP can't
+;; be defined using DEFINE-TYPE-VOPS, so return NIL for unsupported backends
+;; which can't generate an arbitrary call to %TEST-HEADERS.
+(defun widetags-from-union-type (types)
+  ;; This seems preferable to a reader-conditional in generic code.
+  ;; There is a unit test that the supported architectures don't generate
+  ;; excessively large code, so hopefully it'll not get broken.
+  (let ((info (info :function :info '%other-pointer-subtype-p)))
+    (unless (and info (sb!c::fun-info-templates info))
+      (return-from widetags-from-union-type nil)))
+  (if (every (lambda (x)
+               (or (and (array-type-p x)
+                        (not (array-type-complexp x))
+                        (equal (array-type-dimensions x) '(*))
+                        (type= (array-type-specialized-element-type x)
+                               (array-type-element-type x)))
+                   (and (classoid-p x)
+                        (eq (classoid-name x) 'system-area-pointer))))
+             types)
+      (mapcan (lambda (x)
+                (typecase x
+                  (array-type
+                   (if (eq (array-type-element-type x) *wild-type*)
+                       (map 'list #'sb!vm::saetp-typecode ; all 1-D arrays
+                            sb!vm:*specialized-array-element-type-properties*)
+                       (list
+                        (sb!vm:saetp-typecode
+                         (find (array-type-element-type x)
+                               sb!vm:*specialized-array-element-type-properties*
+                               :key #'sb!vm:saetp-ctype :test #'type=)))))
+                  (classoid
+                   ;; SYSTEM-AREA-POINTER -> SAP
+                   (ecase (classoid-name x)
+                     (system-area-pointer (list sb!vm:sap-widetag))))))
+               types)))

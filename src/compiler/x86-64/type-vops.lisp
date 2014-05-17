@@ -125,7 +125,8 @@
   (inst jmp (if not-p :nz :z) target))
 
 (defun %test-headers (value target not-p function-p headers
-                      &key (drop-through (gen-label))
+                      &key except
+                           (drop-through (gen-label))
                            (compute-eax t))
   (let ((lowtag (if function-p fun-pointer-lowtag other-pointer-lowtag)))
     (multiple-value-bind (equal less-or-equal greater-or-equal when-true
@@ -141,6 +142,9 @@
         (%lea-for-lowtag-test eax-tn value lowtag))
       (inst test al-tn lowtag-mask)
       (inst jmp :nz when-false)
+      ;; FIXME: this backend seems to be missing the special logic for
+      ;;        testing exactly two widetags differing only in a single bit,
+      ;;        which through evolution is almost totally unworkable anyway...
       (do ((remaining headers (cdr remaining))
            ;; It is preferable (smaller and faster code) to directly
            ;; compare the value in memory instead of loading it into
@@ -151,6 +155,7 @@
            ;; range starting with BIGNUM-WIDETAG (= min widetag)
            ;; or ending with COMPLEX-ARRAY-WIDETAG (= max widetag)
            (widetag-tn (if (and (null (cdr headers))
+                                (not except)
                                 (or (atom (car headers))
                                     (= (caar headers) bignum-widetag)
                                     (= (cdar headers) complex-array-widetag)))
@@ -160,6 +165,10 @@
                                                        :disp (- lowtag)))
                              al-tn))))
           ((null remaining))
+        (dolist (widetag except) ; only after loading widetag-tn
+          (inst cmp al-tn widetag)
+          (inst jmp :e when-false))
+        (setq except nil)
         (let ((header (car remaining))
               (last (null (cdr remaining))))
           (cond
@@ -537,6 +546,17 @@
       (inst jmp :e error)
       (test-type value error t (list-pointer-lowtag))
       (move result value))))
+
+;; A vop that accepts a computed set of widetags.
+(define-vop (%other-pointer-subtype-p type-predicate)
+  (:translate %other-pointer-subtype-p)
+  (:info target not-p widetags)
+  (:arg-types * (:constant t)) ; voodoo - 'target' and 'not-p' are absent
+  (:generator 15 ; arbitrary
+    (multiple-value-bind (headers exceptions)
+        (canonicalize-headers-and-exceptions widetags)
+      (%test-headers value target not-p nil headers
+                     :except exceptions))))
 
 #!+sb-simd-pack
 (progn

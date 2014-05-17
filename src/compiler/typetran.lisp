@@ -333,10 +333,13 @@
                                      (remove type-cons
                                              (remove mtype types)))
                         (member ,@(remove nil members))))))
-        (once-only ((n-obj object))
-          `(or ,@(mapcar (lambda (x)
-                           `(typep ,n-obj ',(type-specifier x)))
-                         types))))))
+        (let ((widetags (sb!kernel::widetags-from-union-type types)))
+          (if widetags
+              `(%other-pointer-subtype-p ,object ',widetags)
+              (once-only ((n-obj object))
+                `(or ,@(mapcar (lambda (x)
+                                 `(typep ,n-obj ',(type-specifier x)))
+                               types))))))))
 
 ;;; Do source transformation for TYPEP of a known intersection type.
 (defun source-transform-intersection-typep (object type)
@@ -474,6 +477,16 @@
 ;;; dimensions, then use that predicate and test for dimensions.
 ;;; Otherwise, just do %TYPEP.
 (defun source-transform-array-typep (obj type)
+  ;; Intercept (SIMPLE-ARRAY * (*)) because otherwise it tests
+  ;; (AND SIMPLE-ARRAY (NOT ARRAY-HEADER)) to weed out rank 0 and >1.
+  ;; By design the simple arrays of of rank 1 occupy a contiguous
+  ;; range of widetags, and unlike the arbitrary-widetags code for unions,
+  ;; this nonstandard predicate can be generically defined for all backends.
+  (if (and (not (array-type-complexp type))
+           (eq (array-type-element-type type) *wild-type*)
+           (equal (array-type-dimensions type) '(*)))
+      (return-from source-transform-array-typep
+        `(simple-rank-1-array-*-p ,obj)))
   (multiple-value-bind (pred stype) (find-supertype-predicate type)
     (if (and (array-type-p stype)
              ;; (If the element type hasn't been defined yet, it's

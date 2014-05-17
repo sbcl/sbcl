@@ -53,6 +53,7 @@
            simple-array-complex-single-float-p
            simple-array-complex-double-float-p
            #!+long-float simple-array-complex-long-float-p
+           simple-rank-1-array-*-p
            system-area-pointer-p realp
            ;; #!+#.(cl:if (cl:= 32 sb!vm:n-word-bits) '(and) '(or))
            unsigned-byte-32-p
@@ -75,6 +76,10 @@
 (defknown %other-pointer-p (t) boolean
   (movable foldable flushable always-translatable))
 
+;; Return T if the first arg is an other-pointer and its widetag
+;; is in the collection specified by the second arg.
+(defknown %other-pointer-subtype-p (t list) boolean
+  (movable foldable flushable always-translatable))
 
 ;;;; miscellaneous "sub-primitives"
 

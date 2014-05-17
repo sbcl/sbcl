@@ -141,7 +141,30 @@
 ;;;   ANDcc tag,  0xA6, tag
 ;;;   JNE   tag, label
 ;;;
-;;; rather than two separate tests and jumps
+;;; rather than two separate tests and jumps.
+;;; However, the cases where this is possible are few, and I'm not sure if
+;;; that happened before or after rearrangement of widetags in change 30eccf.
+;;; At present on 64-bit target with unicode we have:
+;;;   (logcount (logxor complex-character-string-widetag simple-character-string-widetag)) = 2
+;;;   (logcount (logxor complex-base-string-widetag simple-base-string-widetag)) = 2
+;;;   (logcount (logxor complex-vector-nil-widetag simple-array-nil-widetag)) = 3
+;;;   (logcount (logxor complex-bit-vector-widetag simple-bit-vector-widetag)) = 1
+;;; and we have one winner.  The situation is slightly different for 32-bit.
+
+;; FIXME: our nomenclature is baffling in more ways than implied by comments in
+;; package-data-list regarding use of the word "complex" in both a numerical
+;; sense and "non-simple" sense:
+;; - There is no widetag specific to (AND (VECTOR T) (NOT SIMPLE-ARRAY)), i.e.
+;; COMPLEX-VECTOR-WIDETAG is not the complex version of SIMPLE-VECTOR-WIDETAG
+;; which is, in part, why the comment in x86/type-vops about optimizing a test
+;; for (VECTOR T) is wrong.
+;; - simple-array-nil should be named simple-rank-1-array-nil, though I think
+;; simple-vector-nil is fine despite some reluctance to glue the particles
+;; "simple" and "vector" together due to overtones of the standard meaning.
+;; We could rename things that mean vector of wild type to VECTOR-*
+;; and simple vector of T to SIMPLE-VECTOR-T. Just because CL says that
+;; SIMPLE-VECTOR means the latter doesn't make it right for SBCL internals.
+
 (defenum (;; The first widetag must be greater than SB!VM:LOWTAG-LIMIT
           ;; otherwise code in generic/early-type-vops will suffer
           ;; a long, horrible death.  --njf, 2004-08-09

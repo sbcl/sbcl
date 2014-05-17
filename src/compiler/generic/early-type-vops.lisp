@@ -20,6 +20,12 @@
         simple-fun-header-widetag
         closure-header-widetag))
 
+;; Given a list of widetags in HEADERS, compress into a minimal list of ranges
+;; and/or singletons that should be tested.
+;; FIXME: At present the "is it effectively a one-sided test" is re-implemented
+;;        in an ad-hoc way by each backend. The range convention should be
+;;        changed to indicate explicitly when either limit needn't be checked.
+;;        (Use NIL or * as a bound perhaps)
 (defun canonicalize-headers (headers)
   (collect ((results))
     (let ((start nil)
@@ -29,7 +35,8 @@
                (results (if (= start prev)
                             start
                             (cons start prev)))))
-        (dolist (header (sort headers #'<))
+        ;; COPY-LIST because the argument may come from immutable source code
+        (dolist (header (sort (copy-list headers) #'<))
           (cond ((null start)
                  (setf start header)
                  (setf prev header))
@@ -41,6 +48,24 @@
                  (setf prev header))))
         (emit-test)))
     (results)))
+
+;; If WIDETAGS is comprised of two ranges that are nearly adjacent,
+;; return a single range spanning both original ranges,
+;; and as a second value the widetag(s) to exclude;
+;; or return the unmodified ranges and NIL.
+;; This could be generalized: three ranges that collapse to one with at most
+;; two exceptions, or three collapsing to two with one exception, etc.
+(defun canonicalize-headers-and-exceptions (widetags)
+  (let ((ranges (canonicalize-headers widetags)))
+    (if (and (cdr ranges) (endp (cddr ranges))
+             (listp (car ranges)) (listp (cadr ranges)) ; 2 ranges
+             (let ((end-range-1 (cdar ranges))
+                   (start-range-2 (caadr ranges)))
+               (= start-range-2 (+ end-range-1 8))))
+        ;; Return ((start-range-1 . end-range-2))
+        (values (list (cons (caar ranges) (cdadr ranges)))
+                (list (+ (cdar ranges) 4))) ; the excluded value
+        (values ranges nil))))
 
 (defmacro test-type (value target not-p
                      (&rest type-codes)

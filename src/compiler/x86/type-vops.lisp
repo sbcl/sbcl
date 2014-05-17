@@ -24,7 +24,7 @@
   (let ((drop-through (gen-label)))
     (generate-fixnum-test value)
     (inst jmp :z (if not-p drop-through target))
-    (%test-headers value target not-p nil headers drop-through)))
+    (%test-headers value target not-p nil headers :drop-through drop-through)))
 
 (defun %test-immediate (value target not-p immediate)
   ;; Code a single instruction byte test if possible.
@@ -55,7 +55,7 @@
   (inst jmp (if not-p :ne :e) target))
 
 (defun %test-headers (value target not-p function-p headers
-                            &optional (drop-through (gen-label)))
+                            &key except (drop-through (gen-label)))
   (let ((lowtag (if function-p fun-pointer-lowtag other-pointer-lowtag)))
     (multiple-value-bind (equal less-or-equal greater-or-equal when-true when-false)
         ;; EQUAL, LESS-OR-EQUAL and GREATER-OR-EQUAL are the conditions for
@@ -68,6 +68,7 @@
       (%test-lowtag value when-false t lowtag)
       (cond
         ((and (null (cdr headers))
+              (not except)
               (numberp (car headers)))
          ;; Optimize the common case: referencing the value from memory
          ;; is slightly smaller than loading it and then doing the
@@ -79,6 +80,9 @@
          (inst jmp equal target))
         (t
          (inst mov al-tn (make-ea :byte :base value :disp (- lowtag)))
+         (dolist (widetag except)
+           (inst cmp al-tn widetag)
+           (inst jmp :e when-false))
          (do ((remaining headers (cdr remaining)))
              ((null remaining))
            (let ((header (car remaining))
@@ -89,6 +93,8 @@
                   ((and (not last) (null (cddr remaining))
                         (atom (cadr remaining))
                         (= (logcount (logxor header (cadr remaining))) 1))
+                   ;; FIXME: (VECTOR T) does not and could not admit this hack.
+                   ;; The others could but are broken except for BIT-VECTOR.
                    ;; BASE-STRING, (VECTOR NIL), BIT-VECTOR, (VECTOR T)
                    (inst and al-tn (ldb (byte 8 0) (logeqv header (cadr remaining))))
                    (inst cmp al-tn (ldb (byte 8 0) (logand header (cadr remaining))))
@@ -488,3 +494,14 @@
       (inst test al-tn other-pointer-lowtag)
       (inst jmp :nz error)
       (move result value))))
+
+;; A vop that accepts a computed set of widetags.
+(define-vop (%other-pointer-subtype-p type-predicate)
+  (:translate %other-pointer-subtype-p)
+  (:info target not-p widetags)
+  (:arg-types * (:constant t)) ; voodoo - 'target' and 'not-p' are absent
+  (:generator 15 ; arbitrary
+    (multiple-value-bind (headers exceptions)
+        (canonicalize-headers-and-exceptions widetags)
+      (%test-headers value target not-p nil headers
+                     :except exceptions))))

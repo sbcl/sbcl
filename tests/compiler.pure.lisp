@@ -5071,3 +5071,43 @@
     (assert (sb-c::%interr-symbol-for-type-spec `(or ,@specifiers)))
     (assert (sb-c::%interr-symbol-for-type-spec
              `(or ,@specifiers system-area-pointer)))))
+
+(with-test (:name :simple-rank-1-array-*-p-works)
+  (loop for saetp across sb-vm:*specialized-array-element-type-properties*
+     do
+     (dotimes (n-dimensions 3) ; test ranks 0, 1, and 2.
+       (let ((dims (make-list n-dimensions :initial-element 2)))
+         (dolist (adjustable-p '(nil t))
+           (let ((a (make-array dims :element-type (sb-vm:saetp-specifier saetp)
+                                     :adjustable adjustable-p)))
+             (assert (eq (and (= n-dimensions 1) (not adjustable-p))
+                         (typep a '(simple-array * (*)))))))))))
+
+(with-test (:name :array-subtype-tests
+            :skipped-on '(:not (:or :x86 :x86-64)))
+  (flet ((approx-lines-of-assembly-code (type-expr)
+           (count #\Newline
+                  (with-output-to-string (s)
+                    (disassemble
+                     `(lambda (x)
+                        (declare (optimize (sb-c::verify-arg-count 0)))
+                        (typep x ',type-expr))
+                     :stream s)))))
+    ;; These are fragile, but less bad than the possibility of messing up
+    ;; any vops, especially since the generic code in 'vm-type' checks for
+    ;; a vop by its name in a place that would otherwise be agnostic of the
+    ;; backend were it not for my inability to test all platforms.
+    (assert (< (approx-lines-of-assembly-code
+                '(simple-array * (*))) 25))
+    ;; this tested all possible widetags one at a time, e.g. in VECTOR-SAP
+    (assert (< (approx-lines-of-assembly-code
+                '(sb-kernel:simple-unboxed-array (*))) 25))
+    ;; This is actually a strange type but it's what ANSI-STREAM-READ-N-BYTES
+    ;; declares as its buffer, which would choke in %BYTE-BLT if you gave it
+    ;; (simple-array t (*)). But that's a different problem.
+    (assert (< (approx-lines-of-assembly-code
+                '(or system-area-pointer (simple-array * (*)))) 25))
+    ;; And this was used by %BYTE-BLT which tested widetags one-at-a-time.
+    (assert (< (approx-lines-of-assembly-code
+                '(or system-area-pointer (sb-kernel:simple-unboxed-array (*))))
+               25))))
