@@ -263,9 +263,26 @@
   (:policy :fast-safe)
   (:args (number :scs (unsigned-reg) :target result))
   (:info amount)
-  (:arg-types unsigned-num (:constant unsigned-byte))
+  (:arg-types unsigned-num (:constant integer))
   (:results (result :scs (unsigned-reg)))
   (:result-types unsigned-num)
+  (:note "inline ASH")
+  (:generator 3
+    (cond ((< -32 amount 32)
+           (if (plusp amount)
+               (inst mov result (lsl number amount))
+               (inst mov result (lsr number (- amount)))))
+          (t
+           (inst mov result 0)))))
+
+(define-vop (fast-ash-c/signed=>signed)
+  (:translate ash)
+  (:policy :fast-safe)
+  (:args (number :scs (signed-reg) :target result))
+  (:info amount)
+  (:arg-types signed-num (:constant integer))
+  (:results (result :scs (signed-reg)))
+  (:result-types signed-num)
   (:note "inline ASH")
   (:generator 3
     (cond ((< -32 amount 32)
@@ -277,6 +294,10 @@
 
 (define-vop (fast-ash-left-mod32-c/unsigned=>unsigned
              fast-ash-c/unsigned=>unsigned)
+  (:translate ash-left-mod32))
+
+(define-vop (fast-ash-left-mod32-c/signed=>signed
+             fast-ash-c/signed=>signed)
   (:translate ash-left-mod32))
 
 (define-vop (fast-ash/signed/unsigned)
