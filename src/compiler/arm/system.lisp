@@ -201,6 +201,34 @@
     (inst add ndescr offset (lsr ndescr (- n-widetag-bits word-shift)))
     (inst sub ndescr ndescr (- other-pointer-lowtag fun-pointer-lowtag))
     (inst add func code ndescr)))
+;;;
+#!+symbol-info-vops
+(define-vop (symbol-info-vector)
+  (:policy :fast-safe)
+  (:translate symbol-info-vector)
+  (:args (x :scs (descriptor-reg)))
+  (:results (res :scs (descriptor-reg)))
+  (:temporary (:sc unsigned-reg) temp)
+  (:generator 1
+    (loadw res x symbol-info-slot other-pointer-lowtag)
+    ;; If RES has list-pointer-lowtag, take its CDR. If not, use it as-is.
+    (inst and temp res lowtag-mask)
+    (inst cmp temp list-pointer-lowtag)
+    (loadw res res cons-cdr-slot list-pointer-lowtag :eq)))
+
+#!+symbol-info-vops
+(define-vop (symbol-plist)
+  (:policy :fast-safe)
+  (:translate symbol-plist)
+  (:args (x :scs (descriptor-reg)))
+  (:results (res :scs (descriptor-reg)))
+  (:generator 1
+    (loadw res x symbol-info-slot other-pointer-lowtag)
+    ;; Instruction pun: (CAR x) is the same as (VECTOR-LENGTH x)
+    ;; so if the info slot holds a vector, this gets a fixnum- it's not a plist.
+    (loadw res res cons-car-slot list-pointer-lowtag)
+    (inst tst res fixnum-tag-mask)
+    (inst mov :eq res null-tn)))
 
 ;;;; other miscellaneous VOPs
 
