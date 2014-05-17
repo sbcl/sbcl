@@ -849,6 +849,33 @@
   (:generator 1
     (inst umull lo hi x y)))
 
+#!+multiply-high-vops
+(define-vop (mulhi)
+  (:translate %multiply-high)
+  (:policy :fast-safe)
+  (:args (x :scs (unsigned-reg) :target hi)
+         (y :scs (unsigned-reg)))
+  (:arg-types unsigned-num unsigned-num)
+  (:temporary (:sc unsigned-reg) lo)
+  (:results (hi :scs (unsigned-reg)))
+  (:result-types unsigned-num)
+  (:generator 20
+    (inst umull lo hi x y)))
+
+#!+multiply-high-vops
+(define-vop (mulhi/fx)
+  (:translate %multiply-high)
+  (:policy :fast-safe)
+  (:args (x :scs (any-reg) :target hi)
+         (y :scs (unsigned-reg)))
+  (:arg-types positive-fixnum unsigned-num)
+  (:temporary (:sc any-reg) lo)
+  (:results (hi :scs (any-reg)))
+  (:result-types positive-fixnum)
+  (:generator 15
+    (inst umull lo hi x y)
+    (inst bic hi hi fixnum-tag-mask)))
+
 (define-vop (bignum-lognot lognot-mod32/unsigned=>unsigned)
   (:translate sb!bignum:%lognot))
 
