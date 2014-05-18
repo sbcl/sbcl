@@ -660,9 +660,9 @@
       (setf (dstate-labels dstate) labels))))
 
 ;;; Get the instruction-space, creating it if necessary.
-(defun get-inst-space ()
+(defun get-inst-space (&key force)
   (let ((ispace *disassem-inst-space*))
-    (when (null ispace)
+    (when (or force (null ispace))
       (let ((insts nil))
         (maphash (lambda (name inst-flavs)
                    (declare (ignore name))

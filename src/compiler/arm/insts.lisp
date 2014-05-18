@@ -351,6 +351,15 @@
   (rs :field (byte 4 8) :type 'reg)
   (opcode-4 :field (byte 4 4))
   (rm :field (byte 4 0) :type 'reg))
+
+(sb!disassem:define-instruction-format
+    (branch-exchange 32
+     :default-printer '(:name cond :tab rm))
+  (cond :field (byte 4 28) :type 'condition-code)
+  (opcode-8 :field (byte 8 20))
+  (sbo :field (byte 12 8) :value #xFFF)
+  (opcode-4 :field (byte 4 4))
+  (rm :field (byte 4 0) :type 'reg))
 
 ;;;; special magic to support decoding internal-error and related traps
 
@@ -895,6 +904,8 @@
   (byte 4 8) (byte 4 4) (byte 4 0))
 
 (define-instruction bx (segment &rest args)
+  (:printer branch-exchange ((opcode-8 #b00010010)
+                             (opcode-4 #b0001)))
   (:emitter
    (with-condition-defaulted (args (condition dest))
      (aver (register-p dest))
@@ -904,6 +915,8 @@
                                        #b1111 #b0001 (tn-offset dest)))))
 
 (define-instruction blx (segment &rest args)
+  (:printer branch-exchange ((opcode-8 #b00010010)
+                             (opcode-4 #b0011)))
   (:emitter
    (with-condition-defaulted (args (condition dest))
      (aver (register-p dest))
