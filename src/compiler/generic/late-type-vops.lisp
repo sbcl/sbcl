@@ -88,8 +88,6 @@
                   *specialized-array-element-type-properties*))))
   (define-simple-array-type-vops))
 
-;; I think no interpreter stub is needed. This can only be called by a
-;; source transform, hence, by code that is being compiled.
 (macrolet
     ((def ()
        `(!define-type-vops simple-rank-1-array-*-p check-simple-rank-1-array-*

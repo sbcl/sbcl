@@ -5073,6 +5073,8 @@
              `(or ,@specifiers system-area-pointer)))))
 
 (with-test (:name :simple-rank-1-array-*-p-works)
+  (assert (funcall (compile nil
+                            '(lambda () (typep #() '(simple-array * (*)))))))
   (loop for saetp across sb-vm:*specialized-array-element-type-properties*
      do
      (dotimes (n-dimensions 3) ; test ranks 0, 1, and 2.

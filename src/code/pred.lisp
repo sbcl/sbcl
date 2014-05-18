@@ -149,6 +149,7 @@
     (saetp-defs))
   ;; Other array types
   (def-type-predicate-wrapper simple-array-p)
+  (def-type-predicate-wrapper simple-rank-1-array-*-p)
   (def-type-predicate-wrapper simple-string-p)
   (def-type-predicate-wrapper stringp)
   (def-type-predicate-wrapper vectorp)
