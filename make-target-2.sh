@@ -1,6 +1,8 @@
 #!/bin/sh
 set -e
 
+# --load argument skips compilation.
+#
 # This is a script to be run as part of make.sh. The only time you'd
 # want to run it by itself is if you're trying to cross-compile the
 # system or if you're doing some kind of troubleshooting.
@@ -37,11 +39,13 @@ fi
 # system with the :SB-SHOW feature enabled, it does it rather silently,
 # without trying to tell you about what it's doing. So unless it hangs
 # for much longer than that, don't worry, it's likely to be normal.
-echo //doing warm init - compilation phase
-./src/runtime/sbcl \
---core output/cold-sbcl.core \
---lose-on-corruption \
---no-sysinit --no-userinit < make-target-2.lisp
+if [ "$1" != --load ]; then
+    echo //doing warm init - compilation phase
+    ./src/runtime/sbcl \
+        --core output/cold-sbcl.core \
+        --lose-on-corruption \
+        --no-sysinit --no-userinit < make-target-2.lisp
+fi
 echo //doing warm init - load and dump phase
 ./src/runtime/sbcl \
 --core output/cold-sbcl.core \
