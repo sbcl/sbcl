@@ -5111,7 +5111,7 @@
     ;; declares as its buffer, which would choke in %BYTE-BLT if you gave it
     ;; (simple-array t (*)). But that's a different problem.
     (assert (< (approx-lines-of-assembly-code
-                '(or system-area-pointer (simple-array * (*)))) 25))
+                '(or system-area-pointer (simple-array * (*)))) 27))
     ;; And this was used by %BYTE-BLT which tested widetags one-at-a-time.
     (assert (< (approx-lines-of-assembly-code
                 '(or system-area-pointer (sb-kernel:simple-unboxed-array (*))))
