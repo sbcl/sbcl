@@ -160,6 +160,11 @@
   (and (fixnump x)
        (<= 0 x limit)))
 
+#!+(or x86 x86-64)
+(defun %other-pointer-subtype-p (x choices)
+  (and (%other-pointer-p x)
+       (member (%other-pointer-widetag x) choices)
+       t))
 
 ;;; Return the specifier for the type of object. This is not simply
 ;;; (TYPE-SPECIFIER (CTYPE-OF OBJECT)) because CTYPE-OF has different

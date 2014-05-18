@@ -5087,6 +5087,9 @@
 
 (with-test (:name :array-subtype-tests
             :skipped-on '(:not (:or :x86 :x86-64)))
+  (assert (funcall (compile nil
+                            '(lambda ()
+                              (typep #() '(or simple-vector simple-string))))))
   (flet ((approx-lines-of-assembly-code (type-expr)
            (count #\Newline
                   (with-output-to-string (s)
