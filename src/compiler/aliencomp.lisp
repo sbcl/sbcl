@@ -101,9 +101,8 @@
              (field (find slot-name (alien-record-type-fields alien-type)
                           :key #'alien-record-field-name)))
         (unless field
-          (abort-ir1-transform "~S doesn't have a slot named ~S"
-                               alien
-                               slot-name))
+          (abort-ir1-transform "~S~% doesn't have a slot named ~S"
+                               type slot-name))
         (values (alien-record-field-offset field)
                 (alien-record-field-type field))))))
 
