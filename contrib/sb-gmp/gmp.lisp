@@ -310,29 +310,6 @@ pre-allocated bignum. The allocated bignum-length must be (1+ COUNT)."
 
 ;;; utility macros for GMP mpz variable and result declaration and
 ;;; incarnation of associated SBCL bignums
-#+(or)
-(defmacro with-mpz-results (pairs &body body)
-  (loop for (gres size) in pairs
-        for res = (gensym "RESULT")
-        collect `(,gres (struct gmpint)) into declares
-        collect `(,res (%allocate-bignum ,size))
-          into resinits
-        collect `(setf (slot ,gres 'mp_alloc) (%bignum-length ,res)
-                       (slot ,gres 'mp_size) 0
-                       (slot ,gres 'mp_d) (bignum-data-sap ,res))
-          into inits
-        collect `(if (minusp (slot ,gres 'mp_size)) ; check for negative result
-                     (z-to-bignum-neg ,res ,size)
-                     (z-to-bignum ,res ,size))
-          into normlimbs
-        collect res into results
-        finally (return
-                  `(let ,resinits
-                     (sb-sys:with-pinned-objects ,results
-                       (with-alien ,declares
-                         ,@inits
-                         ,@body
-                         (values ,@normlimbs)))))))
 
 (defmacro with-mpz-results (pairs &body body)
   (loop for (gres size) in pairs
@@ -402,9 +379,7 @@ pre-allocated bignum. The allocated bignum-length must be (1+ COUNT)."
         collect `(,res (%allocate-bignum (1+ ,size)))
           into resallocs
         collect `(setf ,res (if (minusp (slot ,gres 'mp_size)) ; check for negative result
-                                (negate-bignum
-                                 (gmp-z-to-bignum (slot ,gres 'mp_d) ,res ,size)
-                                 nil)
+                                (- (gmp-z-to-bignum (slot ,gres 'mp_d) ,res ,size))
                                 (gmp-z-to-bignum (slot ,gres 'mp_d) ,res ,size)))
           into copylimbs
         collect `(__gmpz_clear (addr ,gres)) into clears
@@ -578,12 +553,12 @@ pre-allocated bignum. The allocated bignum-length must be (1+ COUNT)."
     (stubify mpz-primorial %mpz-primorial n)))
 
 (defgmpfun mpz-remove (n f)
-  (with-mpz-results ((r (1+ (blength n)))
-                     (cnt 1))
-    (with-mpz-vars ((n gn)
-                    (f gf))
-      (let ((c (__gmpz_remove (addr r) (addr gn) (addr gf))))
-        (setf (deref (slot cnt 'mp_d)) c)))))
+  (let* ((c 0)
+         (res (with-gmp-mpz-results (r)
+                (with-mpz-vars ((n gn)
+                                (f gf))
+                  (setf c (__gmpz_remove (addr r) (addr gn) (addr gf)))))))
+    (values res c)))
 
 (defgmpfun mpz-bin (n k)
   (check-type k (unsigned-byte #.sb-vm:n-word-bits))
