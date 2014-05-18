@@ -16,8 +16,8 @@
 (defconstant +max-register-args+ 4)
 
 (defun my-make-wired-tn (prim-type-name sc-name offset)
-  (make-wired-tn (primitive-type-or-lose prim-type-name )
-                 (sc-number-or-lose sc-name )
+  (make-wired-tn (primitive-type-or-lose prim-type-name)
+                 (sc-number-or-lose sc-name)
                  offset))
 
 (defstruct arg-state
@@ -344,3 +344,173 @@
                                               :result-type result-type)
                                            ,@(new-args))))))
         (sb!c::give-up-ir1-transform))))
+
+;;; Callback
+#-sb-xc-host
+(defun alien-callback-accessor-form (type sap offset)
+  (let ((parsed-type type))
+    (if (alien-integer-type-p parsed-type)
+        (let ((bits (sb!alien::alien-integer-type-bits parsed-type)))
+               (let ((byte-offset
+                      (cond ((< bits n-word-bits)
+                             (- n-word-bytes
+                                (ceiling bits n-byte-bits)))
+                            (t 0))))
+                 `(deref (sap-alien (sap+ ,sap
+                                          ,(+ byte-offset offset))
+                                    (* ,type)))))
+        `(deref (sap-alien (sap+ ,sap ,offset) (* ,type))))))
+
+#-sb-xc-host
+(defun alien-callback-assembler-wrapper (index result-type argument-types)
+  (flet ((make-tn (offset &optional (sc-name 'any-reg))
+           (make-random-tn :kind :normal
+                           :sc (sc-or-lose sc-name)
+                           :offset offset)))
+    (let* ((segment (make-segment))
+
+           ;; How many arguments have been copied
+           (arg-count 0)
+           ;; How many arguments have been copied from the stack
+           (stack-argument-count 0)
+           (r0-tn (make-tn 0))
+           (r1-tn (make-tn 1))
+           (r2-tn (make-tn 2))
+           (r3-tn (make-tn 3))
+           (r4-tn (make-tn 4))
+           (temp-tn (make-tn 5))
+           (nsp-save-tn (make-tn 6))
+           #!-arm-softfp
+           (fp-registers 0)
+           (gprs (list r0-tn r1-tn r2-tn r3-tn)))
+      (assemble (segment)
+        (emit-word segment #xe92d4ff0) ;; stmfd	sp!, {r4-r11, lr}
+        (move nsp-save-tn nsp-tn)
+
+        ;; Make room on the stack for arguments.
+        (inst sub nsp-tn nsp-tn
+              (loop for type in argument-types
+                    sum (* n-word-bytes
+                           (if (alien-double-float-type-p type)
+                               2
+                               1))))
+        ;; Copy arguments from registers to stack
+        (dolist (type argument-types)
+          (let ((integerp (or (not (alien-float-type-p type))
+                              #!+arm-softfp
+                              (alien-single-float-type-p type)))
+                ;; A TN pointing to the stack location where the
+                ;; current argument should be stored for the purposes
+                ;; of ENTER-ALIEN-CALLBACK.
+                (target-tn (@ nsp-tn (* arg-count n-word-bytes)))
+                ;; A TN pointing to the stack location that contains
+                ;; the next argument passed on the stack.
+                (stack-arg-tn (@ nsp-save-tn (* (+ 9 stack-argument-count)
+                                                n-word-bytes))))
+            (cond (integerp
+                   (let ((gpr (pop gprs)))
+                     (cond (gpr
+                            (inst str gpr target-tn))
+                           (t
+                            (incf stack-argument-count)
+                            (inst ldr temp-tn stack-arg-tn)
+                            (inst str temp-tn target-tn))))
+                   (incf arg-count))
+                  #!+arm-softfp
+                  ((alien-double-float-type-p type)
+                   (let ((left (length gprs)))
+                     (case left
+                       ((2 3 4)
+                        (when (= left 3)
+                          (pop gprs))
+                        (inst str (pop gprs) (@ nsp-tn (* arg-count n-word-bytes)))
+                        (incf arg-count)
+                        (inst str (pop gprs) (@ nsp-tn (* arg-count n-word-bytes)))
+                        (incf arg-count))
+                       (t
+                        (pop gprs)
+                        ;; doubles are two-word aligned
+                        (setf stack-argument-count (logandc2 (+ stack-argument-count 1) 1))
+                        (inst ldr temp-tn (@ nsp-save-tn (* (+ 9 stack-argument-count)
+                                                            n-word-bytes)))
+                        (inst str temp-tn (@ nsp-tn (* arg-count n-word-bytes)))
+                        (incf arg-count)
+                        (inst ldr temp-tn (@ nsp-save-tn (* (+ 10 stack-argument-count)
+                                                            n-word-bytes)))
+                        (inst str temp-tn (@ nsp-tn (* arg-count n-word-bytes)))
+                        (incf stack-argument-count 2)
+                        (incf arg-count)))))
+                  #!-arm-softfp
+                  ((alien-double-float-type-p type)
+                   (setf fp-registers (logandc2 (+ fp-registers 1) 1))
+                   (when (> fp-registers 15)
+                     (error "Don't know how to handle alien double floats on stack."))
+                   (inst fstd (make-tn fp-registers 'double-reg) target-tn)
+                   (incf arg-count 2)
+                   (incf fp-registers 2))
+                  #!-arm-softfp
+                  ((alien-single-float-type-p type)
+                   (when (> fp-registers 15)
+                     (error "Don't know how to handle alien single floats on stack."))
+                   (inst fsts (make-tn fp-registers 'single-reg) target-tn)
+                   (incf arg-count 1)
+                   (incf fp-registers 1))
+                  (t
+                   (bug "Unknown alien floating point type: ~S" type)))))
+
+        (progn
+          ;; arg0 to FUNCALL3 (function)
+          ;;
+          ;; Indirect the access to ENTER-ALIEN-CALLBACK through
+          ;; the symbol-value slot of SB-ALIEN::*ENTER-ALIEN-CALLBACK*
+          ;; to ensure it'll work even if the GC moves ENTER-ALIEN-CALLBACK.
+          ;; Skip any SB-THREAD TLS magic, since we don't expect anyone
+          ;; to rebind the variable. -- JES, 2006-01-01
+          (load-immediate-word r0-tn (+ nil-value (static-symbol-offset
+                                                   'sb!alien::*enter-alien-callback*)))
+          (loadw r0-tn r0-tn symbol-value-slot other-pointer-lowtag)
+          ;; arg0 to ENTER-ALIEN-CALLBACK (trampoline index)
+          (inst mov r1-tn (fixnumize index))
+          ;; arg1 to ENTER-ALIEN-CALLBACK (pointer to argument vector)
+          (inst mov r2-tn nsp-tn)
+          ;; add room on stack for return value
+          (inst sub nsp-tn nsp-tn 8)
+          ;; arg2 to ENTER-ALIEN-CALLBACK (pointer to return value)
+          (inst mov r3-tn nsp-tn)
+     
+          ;; Call
+          (load-immediate-word r4-tn (foreign-symbol-address "funcall3"))
+          (inst blx r4-tn))
+
+        ;; Result now on top of stack, put it in the right register
+        (cond
+          ((or (alien-integer-type-p result-type)
+               (alien-pointer-type-p result-type)
+               (alien-type-= #.(parse-alien-type 'system-area-pointer nil)
+                             result-type)
+               #!+arm-softfp
+               (alien-single-float-type-p result-type))
+           (loadw r0-tn nsp-tn))
+          #!+arm-softfp
+          ((alien-double-float-type-p result-type)
+           (loadw r0-tn nsp-tn)
+           (loadw r1-tn nsp-tn 1))
+          #!-arm-softfp
+          ((alien-single-float-type-p result-type)
+           (inst flds (make-tn 0 'single-reg) (@ nsp-tn)))
+          #!-arm-softfp
+          ((alien-double-float-type-p result-type)
+           (inst fldd (make-tn 0 'double-reg) (@ nsp-tn)))
+          ((alien-void-type-p result-type))
+          (t
+           (error "Unrecognized alien type: ~A" result-type)))
+        (move nsp-tn nsp-save-tn)
+        (emit-word segment #xe8bd4ff0) ;; ldmfd	sp!, {r4-r11, lr}
+        (inst bx lr-tn))
+      (finalize-segment segment)
+      ;; Now that the segment is done, convert it to a static
+      ;; vector we can point foreign code to.
+      (let ((buffer (sb!assem::segment-buffer segment)))
+        (make-static-vector (length buffer)
+                            :element-type '(unsigned-byte 8)
+                            :initial-contents buffer)))))

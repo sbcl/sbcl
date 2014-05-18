@@ -383,9 +383,7 @@
              (lambda (offset)
                (make-random-tn :kind :normal
                                :sc (sc-or-lose sc-name)
-                               :offset offset)))
-           (out-of-registers-error ()
-             (error "Too many arguments in callback")))
+                               :offset offset))))
     (let* ((segment (make-segment))
            (rax rax-tn)
            #!+(or win32 (not sb-safepoint)) (rcx rcx-tn)
@@ -522,7 +520,7 @@
            (inst movq xmm0 [rsp]))
           ((alien-void-type-p result-type))
           (t
-           (error "unrecognized alien type: ~A" result-type)))
+           (error "Unrecognized alien type: ~A" result-type)))
 
         ;; Pop the arguments and the return value from the stack to get
         ;; the return address at top of stack.
