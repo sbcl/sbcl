@@ -333,13 +333,14 @@
                                      (remove type-cons
                                              (remove mtype types)))
                         (member ,@(remove nil members))))))
-        (let ((widetags (sb!kernel::widetags-from-union-type types)))
-          (if widetags
-              `(%other-pointer-subtype-p ,object ',widetags)
-              (once-only ((n-obj object))
-                `(or ,@(mapcar (lambda (x)
-                                 `(typep ,n-obj ',(type-specifier x)))
-                               types))))))))
+        (multiple-value-bind (widetags more-types)
+            (sb!kernel::widetags-from-union-type types)
+          (once-only ((n-obj object))
+            `(or ,@(if widetags
+                       `((%other-pointer-subtype-p ,n-obj ',widetags)))
+                 ,@(mapcar (lambda (x)
+                             `(typep ,n-obj ',(type-specifier x)))
+                           more-types)))))))
 
 ;;; Do source transformation for TYPEP of a known intersection type.
 (defun source-transform-intersection-typep (object type)

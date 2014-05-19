@@ -215,11 +215,10 @@
     (t
      nil)))
 
-;; Given TYPES which is a list of types from a union type, if expressible as a
-;; union of widetags for other-pointer-lowtag, return those widetags; otherwise
-;; return NIL. For now this just understands unidimensional arrays and SAPs,
-;; which is a good starting point and more general than a hypothetical predicate
-;; testing only for a particular type such as (simple-unboxed-array (*)).
+;; Given TYPES which is a list of types from a union type, decompose into
+;; two unions, one being an OR over types representable as widetags
+;; with other-pointer-lowtag, and the other being the difference
+;; between the input TYPES and the widetags.
 ;; This is architecture-independent, but unfortunately the needed VOP can't
 ;; be defined using DEFINE-TYPE-VOPS, so return NIL for unsupported backends
 ;; which can't generate an arbitrary call to %TEST-HEADERS.
@@ -229,29 +228,44 @@
   ;; excessively large code, so hopefully it'll not get broken.
   (let ((info (info :function :info '%other-pointer-subtype-p)))
     (unless (and info (sb!c::fun-info-templates info))
-      (return-from widetags-from-union-type nil)))
-  (if (every (lambda (x)
-               (or (and (array-type-p x)
-                        (not (array-type-complexp x))
-                        (equal (array-type-dimensions x) '(*))
-                        (type= (array-type-specialized-element-type x)
-                               (array-type-element-type x)))
-                   (and (classoid-p x)
-                        (eq (classoid-name x) 'system-area-pointer))))
-             types)
-      (mapcan (lambda (x)
-                (typecase x
-                  (array-type
-                   (if (eq (array-type-element-type x) *wild-type*)
-                       (map 'list #'sb!vm::saetp-typecode ; all 1-D arrays
-                            sb!vm:*specialized-array-element-type-properties*)
-                       (list
-                        (sb!vm:saetp-typecode
-                         (find (array-type-element-type x)
-                               sb!vm:*specialized-array-element-type-properties*
-                               :key #'sb!vm:saetp-ctype :test #'type=)))))
-                  (classoid
-                   ;; SYSTEM-AREA-POINTER -> SAP
-                   (ecase (classoid-name x)
-                     (system-area-pointer (list sb!vm:sap-widetag))))))
-               types)))
+      (return-from widetags-from-union-type (values nil types))))
+  (let (widetags remainder)
+    (dolist (x types)
+      (let ((adjunct
+             (cond
+               ((and (array-type-p x)
+                     (equal (array-type-dimensions x) '(*))
+                     (type= (array-type-specialized-element-type x)
+                            (array-type-element-type x)))
+                (if (eq (array-type-element-type x) *wild-type*)
+                    ;; could be done, but probably no merit to implementing
+                    ;; maybe/definitely-complex wild-type.
+                    (unless (array-type-complexp x)
+                      (map 'list #'sb!vm::saetp-typecode
+                           sb!vm:*specialized-array-element-type-properties*))
+                    (let ((saetp
+                           (find
+                            (array-type-element-type x)
+                            sb!vm:*specialized-array-element-type-properties*
+                            :key #'sb!vm:saetp-ctype :test #'type=)))
+                      (cond ((not (array-type-complexp x))
+                             (sb!vm:saetp-typecode saetp))
+                            ((sb!vm:saetp-complex-typecode saetp)
+                             (list* (sb!vm:saetp-complex-typecode saetp)
+                                    (when (eq (array-type-complexp x) :maybe)
+                                      (list (sb!vm:saetp-typecode saetp)))))))))
+               ((classoid-p x)
+                (case (classoid-name x)
+                  (symbol sb!vm:symbol-header-widetag) ; plus a hack for nil
+                  (system-area-pointer sb!vm:sap-widetag))))))
+        (cond ((not adjunct) (push x remainder))
+              ((listp adjunct) (setq widetags (nconc adjunct widetags)))
+              (t (push adjunct widetags)))))
+    (let ((remainder (nreverse remainder)))
+      (when (member sb!vm:symbol-header-widetag widetags)
+        ;; Manipulate 'remainder' to include NULL since NIL's lowtag
+        ;; isn't other-pointer.
+        (let ((null-type (specifier-type 'null)))
+          (unless (member null-type remainder :test #'csubtypep)
+            (push null-type remainder))))
+      (values widetags remainder))))
