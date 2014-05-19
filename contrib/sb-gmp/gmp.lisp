@@ -539,6 +539,24 @@ pre-allocated bignum. The allocated bignum-length must be (1+ COUNT)."
   (with-gmp-mpz-results (r)
     (__gmpz_primorial_ui (addr r) n)))
 
+(defgmpfun mpz-remove-5.1 (n f)
+  (check-type f unsigned-byte
+              "handled by GMP prior to version 5.1")
+  (let* ((c 0)
+         (res (with-gmp-mpz-results (r)
+                (with-mpz-vars ((n gn)
+                                (f gf))
+                  (setf c (__gmpz_remove (addr r) (addr gn) (addr gf)))))))
+    (values res c)))
+
+(defgmpfun mpz-remove (n f)
+  (let* ((c 0)
+         (res (with-gmp-mpz-results (r)
+                (with-mpz-vars ((n gn)
+                                (f gf))
+                  (setf c (__gmpz_remove (addr r) (addr gn) (addr gf)))))))
+    (values res c)))
+
 (defun setup-5.1-stubs ()
   (macrolet ((stubify (name implementation &rest arguments)
                `(setf (fdefinition ',name)
@@ -550,15 +568,9 @@ pre-allocated bignum. The allocated bignum-length must be (1+ COUNT)."
                                    ',name))))))
     (stubify mpz-2fac %mpz-2fac n)
     (stubify mpz-mfac %mpz-mfac n m)
-    (stubify mpz-primorial %mpz-primorial n)))
-
-(defgmpfun mpz-remove (n f)
-  (let* ((c 0)
-         (res (with-gmp-mpz-results (r)
-                (with-mpz-vars ((n gn)
-                                (f gf))
-                  (setf c (__gmpz_remove (addr r) (addr gn) (addr gf)))))))
-    (values res c)))
+    (stubify mpz-primorial %mpz-primorial n))
+  (unless (member :sb-gmp-5.1 *gmp-features*)
+    (setf (fdefinition 'mpz-remove) #'mpz-remove-5.1)))
 
 (defgmpfun mpz-bin (n k)
   (check-type k (unsigned-byte #.sb-vm:n-word-bits))

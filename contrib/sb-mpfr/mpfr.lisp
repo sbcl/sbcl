@@ -1813,4 +1813,3 @@
        result))
     (t
      (error "Unable to handle the combination of ~S and ~S." x type))))
-

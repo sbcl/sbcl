@@ -5,7 +5,7 @@ MPFR integration for SBCL
 
 The MPFR library [1] provides arbitrary precision arithmetic on
 floating-point numbers. It makes use of the GMP library and therefore
-SB-MPFR requires SB-GMP. Contrary to SB-GMP the SB-MPFR contrib does
+SB-MPFR requires SB-GMP [2]. Contrary to SB-GMP the SB-MPFR contrib does
 not deeply integrate with any standard Common Lisp functions. However,
 the SB-MPFR provides several function with equivalent names of
 standard function and similar interface, e.g. SB-MPFR:COERCE,
@@ -235,3 +235,4 @@ The following functions, macros and symbols are exported from the SB-MPFR packag
 
 
 [1] http://www.mpfr.org/mpfr-current/mpfr.html
+[2] https://github.com/sfrank/sb-gmp

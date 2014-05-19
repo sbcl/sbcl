@@ -384,7 +384,7 @@
            (fp-registers 0)
            (gprs (list r0-tn r1-tn r2-tn r3-tn)))
       (assemble (segment)
-        (emit-word segment #xe92d4ff0) ;; stmfd	sp!, {r4-r11, lr}
+        (emit-word segment #xe92d4ff0) ;; stmfd sp!, {r4-r11, lr}
         (move nsp-save-tn nsp-tn)
 
         ;; Make room on the stack for arguments.
@@ -477,7 +477,7 @@
           (inst sub nsp-tn nsp-tn 8)
           ;; arg2 to ENTER-ALIEN-CALLBACK (pointer to return value)
           (inst mov r3-tn nsp-tn)
-     
+
           ;; Call
           (load-immediate-word r4-tn (foreign-symbol-address "funcall3"))
           (inst blx r4-tn))
@@ -505,7 +505,7 @@
           (t
            (error "Unrecognized alien type: ~A" result-type)))
         (move nsp-tn nsp-save-tn)
-        (emit-word segment #xe8bd4ff0) ;; ldmfd	sp!, {r4-r11, lr}
+        (emit-word segment #xe8bd4ff0) ;; ldmfd sp!, {r4-r11, lr}
         (inst bx lr-tn))
       (finalize-segment segment)
       ;; Now that the segment is done, convert it to a static

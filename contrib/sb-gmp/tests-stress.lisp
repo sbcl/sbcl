@@ -90,22 +90,22 @@
            (:no-error (&rest _) _ t)))
      t))
 
-(define-gmp-test (mpz-add :repeat 7 :limbs (+ (random #xFF) 2))
+(define-gmp-test (mpz-add :repeat 7 :limbs (+ (random #xFFFFF) 2))
   (test-n-cases '+ 'mpz-add
                     (gen-mpz :limbs limbs :sign t)
                     (gen-mpz :limbs limbs :sign t)))
 
-(define-gmp-test (mpz-sub :repeat 7 :limbs (+ (random #x1F) 2))
+(define-gmp-test (mpz-sub :repeat 7 :limbs (+ (random #x1FFFF) 2))
   (test-n-cases '- 'mpz-sub
                 (gen-mpz :limbs limbs :sign t)
                 (gen-mpz :limbs limbs :sign t)))
 
-(define-gmp-test (mpz-mul :repeat 7 :limbs (+ (random #x25) 2))
+(define-gmp-test (mpz-mul :repeat 7 :limbs (+ (random #x253F) 2))
   (test-n-cases '* 'mpz-mul
                 (gen-mpz :limbs limbs :sign t)
                 (gen-mpz :limbs limbs :sign t)))
 
-(define-gmp-test (mpz-tdiv :repeat 7 :limbs (+ (random #x23) 2))
+(define-gmp-test (mpz-tdiv :repeat 7 :limbs (+ (random #x253F) 2))
   (test-n-cases 'truncate 'mpz-tdiv
                 (gen-mpz :limbs limbs :sign t)
                 (gen-mpz :limbs limbs :sign t :nonzero t)))
@@ -120,25 +120,25 @@
                 (gen-mpz :limbs limbs :sign t)
                 (gen-mpz :limbs limbs :sign t :nonzero t)))
 
-(define-gmp-test (mpz-gcd :repeat 7 :limbs (+ (random #x25) 2))
+(define-gmp-test (mpz-gcd :repeat 7 :limbs (+ (random #x253F) 2))
   (test-n-cases 'gcd 'mpz-gcd
                 (gen-mpz :limbs limbs :sign t)
                 (gen-mpz :limbs limbs :sign t)))
 
-(define-gmp-test (mpz-lcm :repeat 7 :limbs (+ (random #x25) 2))
+(define-gmp-test (mpz-lcm :repeat 7 :limbs (+ (random #x253F) 2))
   (test-n-cases 'lcm 'mpz-lcm
                 (gen-mpz :limbs limbs :sign t)
                 (gen-mpz :limbs limbs :sign t)))
 
-(define-gmp-test (isqrt :repeat 7 :limbs (+ (random #x25) 2))
+(define-gmp-test (isqrt :repeat 7 :limbs (+ (random #x253F) 2))
   (test-n-cases 'isqrt 'mpz-sqrt (gen-mpz :limbs limbs)))
 
-(define-gmp-test (mpz-mod :repeat 7 :limbs (1+ (random #x25)))
+(define-gmp-test (mpz-mod :repeat 7 :limbs (1+ (random #x253F)))
   (test-n-cases 'mod 'mpz-mod
                 (gen-mpz :limbs limbs :sign t)
                 (gen-mpz :limbs limbs :sign t :nonzero t)))
 
-(define-gmp-test (mpz-pow :repeat 7 :limbs (1+ (random #x25)))
+(define-gmp-test (mpz-pow :repeat 7 :limbs (1+ (random #x253F)))
   (test-n-cases (lambda (base exponent)
                   (let ((*gmp-disabled* nil)) ; atrociously slow otherwise
                     (expt base exponent)))
@@ -147,7 +147,7 @@
                 (lambda ()
                   (1+ (random 40)))))
 
-(define-gmp-test (mpz-powm :repeat 7 :limbs (1+ (random #x23)))
+(define-gmp-test (mpz-powm :repeat 7 :limbs (1+ (random #x253F)))
   (test-n-cases (lambda (base exponent mod)
                   (let ((*gmp-disabled* nil)) ; atrociously slow otherwise
                     (mod (expt base exponent) mod)))
@@ -200,7 +200,6 @@
     (multiple-value-list (mpz-remove 28 2))
   (7 2))
 
-#+sb-gmp-5.1
 (deftest remove-2
     (multiple-value-list (mpz-remove 28 -7))
   (-4 1))
@@ -221,7 +220,7 @@
 
 (define-gmp-test (mpz-nextprime :repeat 7
                                 :gmp-seed 6234
-                                :limbs (1+ (random #x10)))
+                                :limbs (1+ (random #x2F)))
   (let ((a (gen-mpz :limbs limbs)))
     (dotimes (i *iteration-count*)
       (let* ((a (funcall a))
@@ -229,25 +228,25 @@
         (assert (>= p a))
         (assert (plusp (mpz-probably-prime-p p)))))))
 
-(define-gmp-test (mpq-add :repeat 7 :limbs (1+ (random #x3F))
+(define-gmp-test (mpq-add :repeat 7 :limbs (1+ (random #x3FF))
                           :gmp-seed 1235)
   (test-n-cases '+ 'mpq-add
                 (gen-mpq :limbs limbs :sign t)
                 (gen-mpq :limbs limbs :sign t)))
 
-(define-gmp-test (mpq-sub :repeat 7 :limbs (1+ (random #x1F))
+(define-gmp-test (mpq-sub :repeat 7 :limbs (1+ (random #x1FF))
                           :gmp-seed 1235)
   (test-n-cases '- 'mpq-sub
                 (gen-mpq :limbs limbs :sign t)
                 (gen-mpq :limbs limbs :sign t)))
 
-(define-gmp-test (mpq-mul :repeat 7 :limbs (1+ (random #x5F))
+(define-gmp-test (mpq-mul :repeat 7 :limbs (1+ (random #x5FF))
                           :gmp-seed 6235)
   (test-n-cases '* 'mpq-mul
                 (gen-mpq :limbs limbs :sign t)
                 (gen-mpq :limbs limbs :sign t)))
 
-(define-gmp-test (mpq-div :repeat 7 :limbs (1+ (random #x3F))
+(define-gmp-test (mpq-div :repeat 7 :limbs (1+ (random #x3FF))
                           :gmp-seed 7235)
   (test-n-cases '/ 'mpq-div
                 (gen-mpq :limbs limbs :sign t)
