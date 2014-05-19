@@ -1,5 +1,3 @@
-
-
 ;;;; various compiler tests without side effects
 
 ;;;; This software is part of the SBCL system. See the README file for
@@ -5115,4 +5113,4 @@
     ;; And this was used by %BYTE-BLT which tested widetags one-at-a-time.
     (assert (< (approx-lines-of-assembly-code
                 '(or system-area-pointer (sb-kernel:simple-unboxed-array (*))))
-               25))))
+               27))))
