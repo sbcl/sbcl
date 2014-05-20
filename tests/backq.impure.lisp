@@ -66,6 +66,8 @@
   (assert (equal (eval (eval s)) '(1 2 3 10))))
 
 (with-test (:name :sharp-dot-resets-backquote-depth)
+  (assert (equalp `#.(write-to-string (read-from-string "#(1 2 3)"))
+                  "#(1 2 3)"))
   (assert (eq :error
               (handler-case (read-from-string "`(foo bar #.(max 5 ,*print-base*))")
                 (reader-error () :error)))))

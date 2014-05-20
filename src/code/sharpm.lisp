@@ -459,11 +459,12 @@
 
 (defun sharp-dot (stream sub-char numarg)
   (ignore-numarg sub-char numarg)
-  (let ((expr (let ((*backquote-count* 0)) (read stream t nil t))))
-    (unless *read-suppress*
-      (unless *read-eval*
-        (simple-reader-error stream "can't read #. while *READ-EVAL* is NIL"))
-      (eval expr))))
+  (let ((*backquote-count* 0))
+    (let ((expr (read stream t nil t)))
+      (unless *read-suppress*
+        (unless *read-eval*
+          (simple-reader-error stream "can't read #. while *READ-EVAL* is NIL"))
+        (eval expr)))))
 
 (defun sharp-illegal (stream sub-char ignore)
   (declare (ignore ignore))
