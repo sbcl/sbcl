@@ -74,7 +74,7 @@
   ;; [Also note, we won't encapsulate a macro or special-form, so this
   ;; introspective technique to decide what kind something is works either way]
   (let* ((def (fdefinition object))
-         (widetag (%fun-pointer-widetag def)))
+         (widetag (fun-subtype def)))
     (cond ((and (eq widetag sb!vm:closure-header-widetag)
                 (eq (%closure-fun def)
                     (load-time-value

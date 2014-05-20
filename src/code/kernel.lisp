@@ -37,24 +37,17 @@
 (defun widetag-of (x)
   (widetag-of x))
 
-;;; WIDETAG-OF needs extra code to handle all lowtags. When dealing with a
-;;; known lowtag, it's faster to access the widetag byte at a fixed offset.
-;;; FIXME: this is a hideously ugly way to define two related inline functions,
-;;; but MAYBE-INLINE-SYNTACTIC-CLOSURE is behaving as expected and not allowing
-;;; MACROLET to work during cross-compilation, citing the exact use-case
-;;; that I wish would work.
-#.`(progn
-     ,@(mapcan
-        (lambda (name lowtag)
-          `((declaim (inline ,name))
-            (defun ,name (x)
-              (sap-ref-8 (int-sap (get-lisp-obj-address x))
-                         ,(ecase sb!c:*backend-byte-order*
-                            (:little-endian `(- ,lowtag))
-                            (:big-endian
-                             `(- (1- sb!vm:n-word-bytes) ,lowtag)))))))
-        '(%other-pointer-widetag %fun-pointer-widetag)
-        '(sb!vm:other-pointer-lowtag sb!vm:fun-pointer-lowtag)))
+;;; WIDETAG-OF needs extra code to handle LIST and FUNCTION lowtags. When
+;;; we're only dealing with other pointers (eg. when dispatching on array
+;;; element type), this is going to be faster.
+(declaim (inline %other-pointer-widetag))
+(defun %other-pointer-widetag (x)
+  (sb!sys:sap-ref-8 (int-sap (get-lisp-obj-address x))
+                    #.(ecase sb!c:*backend-byte-order*
+                        (:little-endian
+                         (- sb!vm:other-pointer-lowtag))
+                        (:big-endian
+                         (- (1- sb!vm:n-word-bytes) sb!vm:other-pointer-lowtag)))))
 
 ;;; Return a System-Area-Pointer pointing to the data for the vector
 ;;; X, which must be simple.

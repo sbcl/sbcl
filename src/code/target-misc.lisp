@@ -20,7 +20,7 @@
   (declare (function function))
   (declare (optimize (sb!c::recognize-self-calls 3))) ; not working - why?
   ;; It's too bad that TYPECASE isn't able to generate equivalent code.
-  (case (sb!kernel:%fun-pointer-widetag function)
+  (case (fun-subtype function)
     (#.sb!vm:simple-fun-header-widetag
      function)
     (#.sb!vm:closure-header-widetag

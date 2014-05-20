@@ -5042,20 +5042,6 @@
            (frob-some-stuff *print-base* (car foo)))))
     (assert (and fun (not warnings-p) (not failure-p)))))
 
-(with-test (:name :%foo-pointer-widetag)
-  (flet ((fn-foo (widetag fn-obj)
-           (assert (= widetag
-                      (sb-kernel:%fun-pointer-widetag fn-obj)
-                      (sb-kernel:widetag-of fn-obj)))))
-    (fn-foo sb-vm:closure-header-widetag #'sb-int:constantly-t)
-    (fn-foo sb-vm:simple-fun-header-widetag #'cons)
-    (fn-foo sb-vm:funcallable-instance-header-widetag #'add-method))
-  (flet ((other-foo (widetag other-obj)
-           (assert (= widetag
-                      (sb-kernel:%other-pointer-widetag other-obj)
-                      (sb-kernel:widetag-of other-obj)))))
-    (other-foo sb-vm:simple-bit-vector-widetag #*101)))
-
 (with-test (:name :interr-type-specifier-hashing)
   (let ((specifiers
          (remove
