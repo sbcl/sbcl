@@ -368,7 +368,6 @@
                            :sc (sc-or-lose sc-name)
                            :offset offset)))
     (let* ((segment (make-segment))
-
            ;; How many arguments have been copied
            (arg-count 0)
            ;; How many arguments have been copied from the stack
@@ -391,23 +390,27 @@
         (inst sub nsp-tn nsp-tn
               (loop for type in argument-types
                     sum (* n-word-bytes
-                           (if (alien-double-float-type-p type)
+                           (if (or (alien-double-float-type-p type)
+                                   (and (alien-integer-type-p type)
+                                        (eql (alien-type-bits type) 64)))
                                2
                                1))))
-        ;; Copy arguments from registers to stack
+        ;; Copy arguments
         (dolist (type argument-types)
-          (let ((integerp (or (not (alien-float-type-p type))
-                              #!+arm-softfp
-                              (alien-single-float-type-p type)))
-                ;; A TN pointing to the stack location where the
-                ;; current argument should be stored for the purposes
-                ;; of ENTER-ALIEN-CALLBACK.
-                (target-tn (@ nsp-tn (* arg-count n-word-bytes)))
+          (let ((target-tn (@ nsp-tn (* arg-count n-word-bytes)))
                 ;; A TN pointing to the stack location that contains
                 ;; the next argument passed on the stack.
+                ;; 8 is the amount of registers saved by stmfd above,
+                ;; + 1 for the new element.
                 (stack-arg-tn (@ nsp-save-tn (* (+ 9 stack-argument-count)
                                                 n-word-bytes))))
-            (cond (integerp
+            (cond ((or (and (alien-integer-type-p type)
+                            (not (eql (alien-type-bits type) 64)))
+                       (alien-pointer-type-p type)
+                       (alien-type-= #.(parse-alien-type 'system-area-pointer nil)
+                                     type)
+                       #!+arm-softfp
+                       (alien-single-float-type-p type))
                    (let ((gpr (pop gprs)))
                      (cond (gpr
                             (inst str gpr target-tn))
@@ -416,8 +419,10 @@
                             (inst ldr temp-tn stack-arg-tn)
                             (inst str temp-tn target-tn))))
                    (incf arg-count))
-                  #!+arm-softfp
-                  ((alien-double-float-type-p type)
+                  ((or #!+arm-softfp
+                       (alien-double-float-type-p type)
+                       ;; long-long
+                       (alien-integer-type-p type))
                    (let ((left (length gprs)))
                      (case left
                        ((2 3 4)
@@ -429,8 +434,9 @@
                         (incf arg-count))
                        (t
                         (pop gprs)
-                        ;; doubles are two-word aligned
-                        (setf stack-argument-count (logandc2 (+ stack-argument-count 1) 1))
+                        ;; two-word aligned
+                        (setf stack-argument-count
+                              (logandc2 (+ stack-argument-count 1) 1))
                         (inst ldr temp-tn (@ nsp-save-tn (* (+ 9 stack-argument-count)
                                                             n-word-bytes)))
                         (inst str temp-tn (@ nsp-tn (* arg-count n-word-bytes)))
@@ -457,42 +463,42 @@
                    (incf fp-registers 1))
                   (t
                    (bug "Unknown alien floating point type: ~S" type)))))
+        ;; arg0 to FUNCALL3 (function)
+        ;;
+        ;; Indirect the access to ENTER-ALIEN-CALLBACK through
+        ;; the symbol-value slot of SB-ALIEN::*ENTER-ALIEN-CALLBACK*
+        ;; to ensure it'll work even if the GC moves ENTER-ALIEN-CALLBACK.
+        ;; Skip any SB-THREAD TLS magic, since we don't expect anyone
+        ;; to rebind the variable. -- JES, 2006-01-01
+        (load-immediate-word r0-tn (+ nil-value (static-symbol-offset
+                                                 'sb!alien::*enter-alien-callback*)))
+        (loadw r0-tn r0-tn symbol-value-slot other-pointer-lowtag)
+        ;; arg0 to ENTER-ALIEN-CALLBACK (trampoline index)
+        (inst mov r1-tn (fixnumize index))
+        ;; arg1 to ENTER-ALIEN-CALLBACK (pointer to argument vector)
+        (inst mov r2-tn nsp-tn)
+        ;; add room on stack for return value
+        (inst sub nsp-tn nsp-tn 8)
+        ;; arg2 to ENTER-ALIEN-CALLBACK (pointer to return value)
+        (inst mov r3-tn nsp-tn)
 
-        (progn
-          ;; arg0 to FUNCALL3 (function)
-          ;;
-          ;; Indirect the access to ENTER-ALIEN-CALLBACK through
-          ;; the symbol-value slot of SB-ALIEN::*ENTER-ALIEN-CALLBACK*
-          ;; to ensure it'll work even if the GC moves ENTER-ALIEN-CALLBACK.
-          ;; Skip any SB-THREAD TLS magic, since we don't expect anyone
-          ;; to rebind the variable. -- JES, 2006-01-01
-          (load-immediate-word r0-tn (+ nil-value (static-symbol-offset
-                                                   'sb!alien::*enter-alien-callback*)))
-          (loadw r0-tn r0-tn symbol-value-slot other-pointer-lowtag)
-          ;; arg0 to ENTER-ALIEN-CALLBACK (trampoline index)
-          (inst mov r1-tn (fixnumize index))
-          ;; arg1 to ENTER-ALIEN-CALLBACK (pointer to argument vector)
-          (inst mov r2-tn nsp-tn)
-          ;; add room on stack for return value
-          (inst sub nsp-tn nsp-tn 8)
-          ;; arg2 to ENTER-ALIEN-CALLBACK (pointer to return value)
-          (inst mov r3-tn nsp-tn)
-
-          ;; Call
-          (load-immediate-word r4-tn (foreign-symbol-address "funcall3"))
-          (inst blx r4-tn))
+        ;; Call
+        (load-immediate-word r4-tn (foreign-symbol-address "funcall3"))
+        (inst blx r4-tn)
 
         ;; Result now on top of stack, put it in the right register
         (cond
-          ((or (alien-integer-type-p result-type)
+          ((or (and (alien-integer-type-p result-type)
+                    (not (eql (alien-type-bits result-type) 64)))
                (alien-pointer-type-p result-type)
                (alien-type-= #.(parse-alien-type 'system-area-pointer nil)
                              result-type)
                #!+arm-softfp
                (alien-single-float-type-p result-type))
            (loadw r0-tn nsp-tn))
-          #!+arm-softfp
-          ((alien-double-float-type-p result-type)
+          ((or #!+arm-softfp (alien-double-float-type-p result-type)
+               ;; long-long
+               (alien-integer-type-p result-type))
            (loadw r0-tn nsp-tn)
            (loadw r1-tn nsp-tn 1))
           #!-arm-softfp
