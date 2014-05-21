@@ -27,14 +27,18 @@
   (sb-sprof:with-profiling (:reset t
                             ;; setitimer with small intervals
                             ;; is broken on FreeBSD 10.0
-                            #-freebsd :sample-interval #-freebsd 0.0001
+                            ;; And ARM targets are not fast in
+                            ;; general, causing the profiling signal
+                            ;; to be constantly delivered without
+                            ;; making any progress.
+                            #-(or freebsd arm) :sample-interval
+                            #-(or freebsd arm) 0.0001
                             :report :graph :loop nil)
     (let ((target (+ (get-universal-time) 15)))
       (princ #\.)
       (force-output)
-      (loop
-         while (< (get-universal-time) target)
-         do (consalot)))))
+      (loop while (< (get-universal-time) target)
+            do (consalot)))))
 
 #-(or win32 darwin)                    ;not yet
 (test)
