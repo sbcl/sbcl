@@ -21,9 +21,9 @@
                  offset))
 
 (defstruct arg-state
-  (next-double-register 0)
-  (next-single-register 0)
   (num-register-args 0)
+  #!-arm-softfp
+  (fp-registers 0)
   (stack-frame-size 0))
 
 (defstruct (result-state (:copier nil))
@@ -65,17 +65,14 @@
 #!-arm-softfp
 (define-alien-type-method (single-float :arg-tn) (type state)
   (declare (ignore type))
-  (let ((register (arg-state-next-single-register state)))
-    (when (> register 15)
-      (error "Don't know how to handle alien single floats on stack."))
-    (prog1
-        (my-make-wired-tn 'single-float 'single-reg register)
-      (setf (arg-state-next-single-register state)
-            (max (1+ register)
-                 (* 2 (arg-state-next-double-register state))))
-      (setf (arg-state-next-double-register state)
-            (+ (/ (arg-state-next-single-register state) 2)
-               (if (evenp (arg-state-next-single-register state)) 0 1))))))
+  (let ((register (arg-state-fp-registers state)))
+    (cond ((> register 15)
+           (let ((frame-size (arg-state-stack-frame-size state)))
+             (setf (arg-state-stack-frame-size state) (1+ frame-size))
+             (my-make-wired-tn 'single-float 'single-stack frame-size)))
+          (t
+           (incf (arg-state-fp-registers state))
+           (my-make-wired-tn 'single-float 'single-reg register)))))
 
 #!+arm-softfp
 (define-alien-type-method (double-float :arg-tn) (type state)
@@ -101,14 +98,18 @@
 #!-arm-softfp
 (define-alien-type-method (double-float :arg-tn) (type state)
   (declare (ignore type))
-  (let ((register (arg-state-next-double-register state)))
-    (when (> register 7)
-      (error "Don't know how to handle alien double floats on stack."))
-    (prog1
-        (my-make-wired-tn 'double-float 'double-reg (* register 2))
-      (incf (arg-state-next-double-register state))
-      (when (evenp (arg-state-next-single-register state))
-        (incf (arg-state-next-single-register state) 2)))))
+  (let ((register (setf (arg-state-fp-registers state)
+                        (logandc2 (+ (arg-state-fp-registers state) 1) 1))))
+    (cond ((> register 15)
+           (let ((frame-size
+                   ;; align
+                   (setf (arg-state-stack-frame-size state)
+                         (logandc2 (+ (arg-state-stack-frame-size state) 1) 1))))
+             (setf (arg-state-stack-frame-size state) (+ frame-size 2))
+             (my-make-wired-tn 'double-float 'double-stack frame-size)))
+          (t
+           (incf (arg-state-fp-registers state) 2)
+           (my-make-wired-tn 'double-float 'double-reg register)))))
 
 (define-alien-type-method (integer :result-tn) (type state)
   (let ((num-results (result-state-num-results state)))
@@ -451,18 +452,34 @@
                   #!-arm-softfp
                   ((alien-double-float-type-p type)
                    (setf fp-registers (logandc2 (+ fp-registers 1) 1))
-                   (when (> fp-registers 15)
-                     (error "Don't know how to handle alien double floats on stack."))
-                   (inst fstd (make-tn fp-registers 'double-reg) target-tn)
-                   (incf arg-count 2)
-                   (incf fp-registers 2))
+                   (cond
+                     ((> fp-registers 15)
+                      ;; align
+                      (setf stack-argument-count
+                            (logandc2 (+ stack-argument-count 1) 1))
+                      (inst ldr temp-tn (@ nsp-save-tn (* (+ 9 stack-argument-count)
+                                                          n-word-bytes)))
+                      (inst str temp-tn (@ nsp-tn (* arg-count n-word-bytes)))
+                      (incf arg-count)
+                      (inst ldr temp-tn (@ nsp-save-tn (* (+ 10 stack-argument-count)
+                                                          n-word-bytes)))
+                      (inst str temp-tn (@ nsp-tn (* arg-count n-word-bytes)))
+                      (incf stack-argument-count 2)
+                      (incf arg-count))
+                     (t
+                      (inst fstd (make-tn fp-registers 'double-reg) target-tn)
+                      (incf fp-registers 2)
+                      (incf arg-count 2))))
                   #!-arm-softfp
                   ((alien-single-float-type-p type)
-                   (when (> fp-registers 15)
-                     (error "Don't know how to handle alien single floats on stack."))
-                   (inst fsts (make-tn fp-registers 'single-reg) target-tn)
-                   (incf arg-count 1)
-                   (incf fp-registers 1))
+                   (cond ((> fp-registers 15)
+                          (incf stack-argument-count)
+                          (inst ldr temp-tn stack-arg-tn)
+                          (inst str temp-tn target-tn))
+                         (t
+                          (inst fsts (make-tn fp-registers 'single-reg) target-tn)
+                          (incf fp-registers 1)))
+                   (incf arg-count 1))
                   (t
                    (bug "Unknown alien floating point type: ~S" type)))))
         ;; arg0 to FUNCALL3 (function)
