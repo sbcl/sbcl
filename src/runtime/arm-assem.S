@@ -16,6 +16,7 @@
 	.align
 	.global	call_into_lisp
 	.type	call_into_lisp, %function
+        .fpu vfp
 call_into_lisp:
 	@@ At this point, we have:
 	@@ R0 - function
@@ -26,6 +27,7 @@ call_into_lisp:
 
 	@@ All registers other than R0-R3 and R12 are callee-saves.
 	stmfd	sp!, {r4-r11, lr}
+        fstmfdd sp!, {d8-d15}
 
 	@@ Start by finding NIL.
 	ldr	reg_NULL, .known_nil
@@ -137,6 +139,7 @@ call_into_lisp:
 	swilt   #0
 
 	@@ Restore saved registers.
+        fldmfdd sp!, {d8-d15}
 	ldmfd	sp!, {r4-r11, lr}
 	bx	lr
 	.size	call_into_lisp, .-call_into_lisp
@@ -376,4 +379,3 @@ fun_end_breakpoint_trap:
 fun_end_breakpoint_end:
 
 	/* EOF */
-
