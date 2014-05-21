@@ -381,20 +381,22 @@
            (nsp-save-tn (make-tn 6))
            #!-arm-softfp
            (fp-registers 0)
-           (gprs (list r0-tn r1-tn r2-tn r3-tn)))
+           (gprs (list r0-tn r1-tn r2-tn r3-tn))
+           (frame-size
+             (loop for type in argument-types
+                   sum (* n-word-bytes
+                          (if (or (alien-double-float-type-p type)
+                                  (and (alien-integer-type-p type)
+                                       (eql (alien-type-bits type) 64)))
+                              2
+                              1)))))
       (assemble (segment)
         (emit-word segment #xe92d4ff0) ;; stmfd sp!, {r4-r11, lr}
         (move nsp-save-tn nsp-tn)
 
         ;; Make room on the stack for arguments.
-        (inst sub nsp-tn nsp-tn
-              (loop for type in argument-types
-                    sum (* n-word-bytes
-                           (if (or (alien-double-float-type-p type)
-                                   (and (alien-integer-type-p type)
-                                        (eql (alien-type-bits type) 64)))
-                               2
-                               1))))
+        (when (plusp frame-size)
+          (inst sub nsp-tn nsp-tn frame-size))
         ;; Copy arguments
         (dolist (type argument-types)
           (let ((target-tn (@ nsp-tn (* arg-count n-word-bytes)))
@@ -516,7 +518,15 @@
       (finalize-segment segment)
       ;; Now that the segment is done, convert it to a static
       ;; vector we can point foreign code to.
-      (let ((buffer (sb!assem::segment-buffer segment)))
-        (make-static-vector (length buffer)
-                            :element-type '(unsigned-byte 8)
-                            :initial-contents buffer)))))
+      (let* ((buffer (sb!assem::segment-buffer segment))
+             (vector (make-static-vector (length buffer)
+                                         :element-type '(unsigned-byte 8)
+                                         :initial-contents buffer))
+             (sap (vector-sap vector)))
+        (alien-funcall
+         (extern-alien "os_flush_icache"
+                       (function void
+                                 system-area-pointer
+                                 unsigned-long))
+         sap (length buffer))
+        vector))))
