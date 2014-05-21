@@ -626,7 +626,7 @@ elif [ "$sbcl_arch" = "ppc" ]; then
     printf ' :gencgc :stack-allocatable-closures :stack-allocatable-vectors' >> $ltf
     printf ' :stack-allocatable-lists :stack-allocatable-fixed-objects' >> $ltf
     printf ' :linkage-table :raw-instance-init-vops :memory-barrier-vops' >> $ltf
-    printf ' :compare-and-swap-vops :multiply-high-vops' >> $ltf
+    printf ' :compare-and-swap-vops :multiply-high-vops :alien-callbacks' >> $ltf
     if [ "$sbcl_os" = "linux" ]; then
         # Use a C program to detect which kind of glibc we're building on,
         # to bandage across the break in source compatibility between
@@ -637,7 +637,7 @@ elif [ "$sbcl_arch" = "ppc" ]; then
 	tools-for-build/where-is-mcontext > src/runtime/ppc-linux-mcontext.h || (echo "error running where-is-mcontext"; exit 1)
     elif [ "$sbcl_os" = "darwin" ]; then
         # We provide a dlopen shim, so a little lie won't hurt
-	printf " :os-provides-dlopen :alien-callbacks" >> $ltf
+	printf ' :os-provides-dlopen' >> $ltf
         # The default stack ulimit under darwin is too small to run PURIFY.
         # Best we can do is complain and exit at this stage
 	if [ "`ulimit -s`" = "512" ]; then
