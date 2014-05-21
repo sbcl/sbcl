@@ -1744,7 +1744,9 @@
                           (:from-arm 0))))
     `(define-instruction ,name (segment &rest args)
        (:emitter
-        (with-condition-defaulted (args (condition float-reg arm-reg-1 arm-reg-2))
+        (with-condition-defaulted (args (condition ,@(if (eq direction :to-arm)
+                                                         '(arm-reg-1 arm-reg-2 float-reg)
+                                                         '(float-reg arm-reg-1 arm-reg-2))))
           (emit-fp-trt-instruction segment
                                    (conditional-opcode condition)
                                    #b1100010

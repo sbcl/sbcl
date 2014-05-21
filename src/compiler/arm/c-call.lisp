@@ -258,9 +258,8 @@
   (:arg-types double-float)
   (:result-types unsigned-num unsigned-num)
   (:policy :fast-safe)
-  (:generator 2
-    (inst fmrdl lo-bits double)
-    (inst fmrdh hi-bits double)))
+  (:generator 1
+    (inst fmrrd lo-bits hi-bits double)))
 
 #!+arm-softfp
 (define-vop (move-int-args-to-double)
@@ -270,9 +269,8 @@
   (:arg-types unsigned-num unsigned-num)
   (:result-types double-float)
   (:policy :fast-safe)
-  (:generator 2
-    (inst fmdlr double lo-bits)
-    (inst fmdhr double hi-bits)))
+  (:generator 1
+    (inst fmdrr double lo-bits hi-bits)))
 
 ;;; long-long support
 (deftransform %alien-funcall ((function type &rest args) * * :node node)
