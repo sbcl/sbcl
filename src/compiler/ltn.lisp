@@ -58,6 +58,31 @@
     ((:safe :fast-safe) t)
     ((:small :fast) nil)))
 
+;;; For possibly-new blocks, make sure that there is an associated
+;;; IR2-BLOCK.
+(defun ensure-block-has-ir2-block (new-block)
+  ;; If BLOCK-START is NIL then it's the component-tail block (which
+  ;; we don't care about), and if BLOCK-INFO is not null then it
+  ;; doesn't need to be overwritten.
+  (when (and (block-start new-block)
+             (not (block-info new-block)))
+    (setf (block-info new-block)
+          (make-ir2-block new-block))))
+
+;;; When splitting an existing block, make sure that unknown-values
+;;; killed information is distributed appropriately.
+(defun fixup-ir2-blocks-for-split-block (old-block new-block)
+  (ensure-block-has-ir2-block new-block)
+  (let* ((old-ir2-block (block-info old-block))
+         (new-ir2-block (block-info new-block)))
+    (collect ((old-popped) (new-popped))
+      (dolist (lvar (ir2-block-popped old-ir2-block))
+        (if (eq (node-block (lvar-dest lvar)) old-block)
+            (old-popped lvar)
+            (new-popped lvar))
+        (setf (ir2-block-popped old-ir2-block) (old-popped))
+        (setf (ir2-block-popped new-ir2-block) (new-popped))))))
+
 ;;; an annotated lvar's primitive-type
 #!-sb-fluid (declaim (inline lvar-ptype))
 (defun lvar-ptype (lvar)
@@ -136,8 +161,10 @@
     (when tails
       (cond ((eq (return-info-kind (tail-set-info tails)) :unknown)
              (node-ends-block call)
-             (let ((block (node-block call)))
-               (unlink-blocks block (first (block-succ block)))
+             (let* ((block (node-block call))
+                    (new-block (first (block-succ block))))
+               (fixup-ir2-blocks-for-split-block block new-block)
+               (unlink-blocks block new-block)
                (link-blocks block (component-tail (block-component block)))))
             (t
              (setf (node-tail-p call) nil)))))
@@ -341,8 +368,10 @@
     (aver (eq (lambda-tail-set caller)
               (lambda-tail-set (lambda-home callee))))
     (node-ends-block call)
-    (let ((block (node-block call)))
-      (unlink-blocks block (first (block-succ block)))
+    (let* ((block (node-block call))
+           (new-block (first (block-succ block))))
+      (fixup-ir2-blocks-for-split-block block new-block)
+      (unlink-blocks block new-block)
       (link-blocks block (lambda-block callee))))
   (values))
 
@@ -894,10 +923,14 @@
   (declare (type component component))
   (let ((2comp (component-info component)))
     (do-blocks (block component)
+      ;; Set up the IR2 blocks in a separate pass, because CAST nodes
+      ;; could be out-of-order with respect to their result LVAR
+      ;; DESTs, and we need their IR1 blocks to have associated IR2
+      ;; blocks.
       (aver (not (block-info block)))
-      (let ((2block (make-ir2-block block)))
-        (setf (block-info block) 2block)
-        (ltn-analyze-block block)))
+      (setf (block-info block) (make-ir2-block block)))
+    (do-blocks (block component)
+      (ltn-analyze-block block))
     (do-blocks (block component)
       (let ((2block (block-info block)))
         (let ((popped (ir2-block-popped 2block)))
