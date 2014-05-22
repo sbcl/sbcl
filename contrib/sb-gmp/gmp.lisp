@@ -69,16 +69,18 @@
   (sb-sys:sap+ (sb-sys:int-sap (sb-kernel:get-lisp-obj-address x))
                +bignum-raw-area-offset+))
 
-(defun %load-gmp ()
+(defun try-load-shared-object (pathname)
   (handler-case
-      (load-shared-object #-(or win32 darwin) "libgmp.so"
-                          #+darwin "libgmp.dylib"
-                          #+win32 "libgmp-10.dll"
-                          :dont-save t)
+      (load-shared-object pathname :dont-save t)
     (error (e)
-      (warn "GMP not loaded (~a)" e)
-      (return-from %load-gmp nil)))
-  t)
+      nil)))
+
+(defun %load-gmp ()
+  (or (some #'try-load-shared-object
+            #-(or win32 darwin) '("libgmp.so" "libgmp.so.10" "libgmp.so.3")
+            #+darwin '("libgmp.dylib" "libgmp.10.dylib" libgmp.3.dylib)
+            #+win32 '("libgmp.dll" "libgmp-10.dll" "libgmp-3.dll"))
+      (warn "GMP not loaded.")))
 
 (defvar *gmp-features* nil)
 (defvar *gmp-version* nil)
