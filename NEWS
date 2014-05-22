@@ -16,6 +16,8 @@ changes relative to sbcl-1.1.18:
     (lp#1246665, thanks to Richard M Kreuter)
   * bug fix: prevent maybe-delete-exit from doing semantically broken things
     with local exits. (lp#309099, lp#518099, lp#533930)
+  * bug fix: attempts to subclass BUILT-IN-CLASSes signal errors, as required
+    by AMOP.  (lp#861004)
 
 changes in sbcl-1.1.18 relative to sbcl-1.1.17:
   * optimization: COERCE is now more effecient for more cases when the type is
