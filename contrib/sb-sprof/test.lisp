@@ -33,6 +33,7 @@
                             ;; making any progress.
                             #-(or freebsd arm) :sample-interval
                             #-(or freebsd arm) 0.0001
+                            #+arm :sample-interval #+arm 0.1
                             :report :graph :loop nil)
     (let ((target (+ (get-universal-time) 15)))
       (princ #\.)
