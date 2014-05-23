@@ -11,7 +11,7 @@
 
 (in-package "SB!VM")
 
-(defconstant +number-stack-allocation-granularity+ n-word-bytes)
+(defconstant +number-stack-alignment-mask+ 7)
 
 (defconstant +max-register-args+ 4)
 
@@ -235,8 +235,8 @@
   (:results (result :scs (sap-reg any-reg)))
   (:generator 0
     (unless (zerop amount)
-      (let ((delta (logandc2 (+ amount (1- +number-stack-allocation-granularity+))
-                             (1- +number-stack-allocation-granularity+))))
+      (let ((delta (logandc2 (+ amount +number-stack-alignment-mask+)
+                             +number-stack-alignment-mask+)))
         (composite-immediate-instruction sub nsp-tn nsp-tn delta)
         (move result nsp-tn)))))
 
@@ -245,8 +245,8 @@
   (:policy :fast-safe)
   (:generator 0
     (unless (zerop amount)
-      (let ((delta (logandc2 (+ amount (1- +number-stack-allocation-granularity+))
-                             (1- +number-stack-allocation-granularity+))))
+      (let ((delta (logandc2 (+ amount +number-stack-alignment-mask+)
+                             +number-stack-alignment-mask+)))
         (composite-immediate-instruction add nsp-tn nsp-tn delta)))))
 ;;;
 
@@ -389,8 +389,10 @@
                                        (eql (alien-type-bits type) 64)))
                               2
                               1)))))
+      (setf frame-size (logandc2 (+ frame-size +number-stack-alignment-mask+)
+                                 +number-stack-alignment-mask+))
       (assemble (segment)
-        (emit-word segment #xe92d4ff0) ;; stmfd sp!, {r4-r11, lr}
+        (emit-word segment #xe92d4ff8) ;; stmfd sp!, {r3-r11, lr}
         (move nsp-save-tn nsp-tn)
 
         ;; Make room on the stack for arguments.
@@ -401,9 +403,8 @@
           (let ((target-tn (@ nsp-tn (* arg-count n-word-bytes)))
                 ;; A TN pointing to the stack location that contains
                 ;; the next argument passed on the stack.
-                ;; 8 is the amount of registers saved by stmfd above,
-                ;; + 1 for the new element.
-                (stack-arg-tn (@ nsp-save-tn (* (+ 9 stack-argument-count)
+                ;; 10 is the amount of registers saved by stmfd above.
+                (stack-arg-tn (@ nsp-save-tn (* (+ 10 stack-argument-count)
                                                 n-word-bytes))))
             (cond ((or (and (alien-integer-type-p type)
                             (not (eql (alien-type-bits type) 64)))
@@ -438,11 +439,11 @@
                         ;; two-word aligned
                         (setf stack-argument-count
                               (logandc2 (+ stack-argument-count 1) 1))
-                        (inst ldr temp-tn (@ nsp-save-tn (* (+ 9 stack-argument-count)
+                        (inst ldr temp-tn (@ nsp-save-tn (* (+ 10 stack-argument-count)
                                                             n-word-bytes)))
                         (inst str temp-tn (@ nsp-tn (* arg-count n-word-bytes)))
                         (incf arg-count)
-                        (inst ldr temp-tn (@ nsp-save-tn (* (+ 10 stack-argument-count)
+                        (inst ldr temp-tn (@ nsp-save-tn (* (+ 11 stack-argument-count)
                                                             n-word-bytes)))
                         (inst str temp-tn (@ nsp-tn (* arg-count n-word-bytes)))
                         (incf stack-argument-count 2)
@@ -455,11 +456,11 @@
                       ;; align
                       (setf stack-argument-count
                             (logandc2 (+ stack-argument-count 1) 1))
-                      (inst ldr temp-tn (@ nsp-save-tn (* (+ 9 stack-argument-count)
+                      (inst ldr temp-tn (@ nsp-save-tn (* (+ 10 stack-argument-count)
                                                           n-word-bytes)))
                       (inst str temp-tn (@ nsp-tn (* arg-count n-word-bytes)))
                       (incf arg-count)
-                      (inst ldr temp-tn (@ nsp-save-tn (* (+ 10 stack-argument-count)
+                      (inst ldr temp-tn (@ nsp-save-tn (* (+ 11 stack-argument-count)
                                                           n-word-bytes)))
                       (inst str temp-tn (@ nsp-tn (* arg-count n-word-bytes)))
                       (incf stack-argument-count 2)
@@ -528,7 +529,7 @@
           (t
            (error "Unrecognized alien type: ~A" result-type)))
         (move nsp-tn nsp-save-tn)
-        (emit-word segment #xe8bd4ff0) ;; ldmfd sp!, {r4-r11, lr}
+        (emit-word segment #xe8bd4ff8) ;; ldmfd sp!, {r3-r11, lr}
         (inst bx lr-tn))
       (finalize-segment segment)
       ;; Now that the segment is done, convert it to a static

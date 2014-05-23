@@ -26,7 +26,8 @@ call_into_lisp:
 	@@ worry about parameters to be passed on the stack.
 
 	@@ All registers other than R0-R3 and R12 are callee-saves.
-	stmfd	sp!, {r4-r11, lr}
+        @@ Save R3 to get 8-byte alignemnt.
+	stmfd	sp!, {r3-r11, lr}
         fstmfdd sp!, {d8-d15}
 
 	@@ Start by finding NIL.
@@ -140,7 +141,7 @@ call_into_lisp:
 
 	@@ Restore saved registers.
         fldmfdd sp!, {d8-d15}
-	ldmfd	sp!, {r4-r11, lr}
+	ldmfd	sp!, {r3-r11, lr}
 	bx	lr
 	.size	call_into_lisp, .-call_into_lisp
 .frame_pointer_address:	.word	current_control_frame_pointer

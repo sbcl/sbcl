@@ -103,11 +103,11 @@
 ;;;; Frame hackery:
 
 ;;; Return the number of bytes needed for the current non-descriptor
-;;; stack frame.  What's this "PMAX" that almost every other backend
-;;; mentions, and why does it need 8-byte granularity?
+;;; stack frame.
 (defun bytes-needed-for-non-descriptor-stack-frame ()
-  (* (sb-allocated-size 'non-descriptor-stack)
-     n-word-bytes))
+  (logandc2 (+ (* (sb-allocated-size 'non-descriptor-stack) n-word-bytes)
+               +number-stack-alignment-mask+)
+            +number-stack-alignment-mask+))
 
 ;;; Used for setting up the Old-FP in local call.
 (define-vop (current-fp)
