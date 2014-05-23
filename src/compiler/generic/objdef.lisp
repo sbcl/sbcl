@@ -309,10 +309,6 @@
   #!+(and win32 x86) seh-frame-handler
   tag
   (previous-catch :c-type #!-alpha "struct catch_block *" #!+alpha "u32"))
-
-;;; (For an explanation of this, see the comments at the definition of
-;;; KLUDGE-NONDETERMINISTIC-CATCH-BLOCK-SIZE.)
-(aver (= kludge-nondeterministic-catch-block-size catch-block-size))
 
 ;;;; symbols
 
@@ -483,10 +479,3 @@
   #!+alpha
   (padding)
   (interrupt-contexts :c-type "os_context_t *" :rest-p t))
-
-#!+sb-thread
-(dolist (slot (primitive-object-slots
-               (find 'thread *primitive-objects* :key #'primitive-object-name)))
-  (when (slot-special slot)
-    (setf (info :variable :wired-tls (slot-special slot))
-          (ash (slot-offset slot) word-shift))))

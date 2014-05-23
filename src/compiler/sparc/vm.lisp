@@ -124,13 +124,6 @@
       ((null classes)
        (nreverse forms))))
 
-;;; see comment in ../x86/vm.lisp.  The value of 7 was taken from
-;;; vm:catch-block-size in a cmucl that I happened to have around
-;;; and seems to be working so far    -dan
-;;;
-;;; arbitrarily taken for alpha, too. - Christophe
-(def!constant kludge-nondeterministic-catch-block-size 6)
-
 (!define-storage-classes
 
   ;; non-immediate constants in the constant pool
@@ -286,7 +279,7 @@
 
 
   ;; A catch or unwind block.
-  (catch-block control-stack :element-size kludge-nondeterministic-catch-block-size))
+  (catch-block control-stack :element-size catch-block-size))
 
 ;;;; Make some miscellaneous TNs for important registers.
 (macrolet ((defregtn (name sc)

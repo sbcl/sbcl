@@ -99,15 +99,13 @@
       ((null classes)
        (nreverse forms))))
 
-(def!constant kludge-nondeterministic-catch-block-size 6)
-
 (define-storage-classes
 
-  ;; Non-immediate contstants in the constant pool
-  (constant constant)
+    ;; Non-immediate contstants in the constant pool
+    (constant constant)
 
-  ;; NULL is in a register.
-  (null immediate-constant)
+    ;; NULL is in a register.
+    (null immediate-constant)
 
   ;; Anything else that can be an immediate.
   (immediate immediate-constant)
@@ -134,17 +132,17 @@
 
   ;; Pointer descriptor objects.  Must be seen by GC.
   (descriptor-reg registers
-   :locations #.descriptor-regs
-   :constant-scs (constant null immediate)
-   :save-p t
-   :alternate-scs (control-stack))
+                  :locations #.descriptor-regs
+                  :constant-scs (constant null immediate)
+                  :save-p t
+                  :alternate-scs (control-stack))
 
   ;; The non-descriptor stacks.
-  (signed-stack non-descriptor-stack) ; (signed-byte 32)
-  (unsigned-stack non-descriptor-stack) ; (unsigned-byte 32)
+  (signed-stack non-descriptor-stack)    ; (signed-byte 32)
+  (unsigned-stack non-descriptor-stack)  ; (unsigned-byte 32)
   (character-stack non-descriptor-stack) ; non-descriptor characters.
-  (sap-stack non-descriptor-stack) ; System area pointers.
-  (single-stack non-descriptor-stack) ; single-floats
+  (sap-stack non-descriptor-stack)       ; System area pointers.
+  (single-stack non-descriptor-stack)    ; single-floats
   (double-stack non-descriptor-stack
                 :element-size 2 :alignment 2) ; double floats.
   (complex-single-stack non-descriptor-stack :element-size 2)
@@ -154,72 +152,71 @@
 
   ;; Non-Descriptor characters
   (character-reg registers
-   :locations #.non-descriptor-regs
-   :constant-scs (immediate)
-   :save-p t
-   :alternate-scs (character-stack))
+                 :locations #.non-descriptor-regs
+                 :constant-scs (immediate)
+                 :save-p t
+                 :alternate-scs (character-stack))
 
   ;; Non-Descriptor SAP's (arbitrary pointers into address space)
   (sap-reg registers
-   :locations #.non-descriptor-regs
-   :constant-scs (immediate)
-   :save-p t
-   :alternate-scs (sap-stack))
+           :locations #.non-descriptor-regs
+           :constant-scs (immediate)
+           :save-p t
+           :alternate-scs (sap-stack))
 
   ;; Non-Descriptor (signed or unsigned) numbers.
   (signed-reg registers
-   :locations #.non-descriptor-regs
-   :constant-scs (immediate)
-   :save-p t
-   :alternate-scs (signed-stack))
+              :locations #.non-descriptor-regs
+              :constant-scs (immediate)
+              :save-p t
+              :alternate-scs (signed-stack))
   (unsigned-reg registers
-   :locations #.non-descriptor-regs
-   :constant-scs (immediate)
-   :save-p t
-   :alternate-scs (unsigned-stack))
+                :locations #.non-descriptor-regs
+                :constant-scs (immediate)
+                :save-p t
+                :alternate-scs (unsigned-stack))
 
   ;; Random objects that must not be seen by GC.  Used only as temporaries.
   (non-descriptor-reg registers
-   :locations #.non-descriptor-regs)
+                      :locations #.non-descriptor-regs)
 
   ;; Pointers to the interior of objects.  Used only as a temporary.
   (interior-reg registers
-   :locations (#.lr-offset))
+                :locations (#.lr-offset))
 
   ;; **** Things that can go in the floating point registers.
 
   ;; Non-Descriptor single-floats.
   (single-reg float-registers
-   :locations #.(loop for i below 32 collect i)
-   :constant-scs ()
-   :save-p t
-   :alternate-scs (single-stack))
+              :locations #.(loop for i below 32 collect i)
+              :constant-scs ()
+              :save-p t
+              :alternate-scs (single-stack))
 
   ;; Non-Descriptor double-floats.
   (double-reg float-registers
-   :locations #.(loop for i below 32 by 2 collect i)
-   :element-size 2
-   :constant-scs ()
-   :save-p t
-   :alternate-scs (double-stack))
+              :locations #.(loop for i below 32 by 2 collect i)
+              :element-size 2
+              :constant-scs ()
+              :save-p t
+              :alternate-scs (double-stack))
 
   (complex-single-reg float-registers
-   :locations #.(loop for i from 0 below 32 by 2 collect i)
-   :element-size 2
-   :constant-scs ()
-   :save-p t
-   :alternate-scs (complex-single-stack))
+                      :locations #.(loop for i from 0 below 32 by 2 collect i)
+                      :element-size 2
+                      :constant-scs ()
+                      :save-p t
+                      :alternate-scs (complex-single-stack))
 
   (complex-double-reg float-registers
-   :locations #.(loop for i from 0 below 32 by 4 collect i)
-   :element-size 4
-   :constant-scs ()
-   :save-p t
-   :alternate-scs (complex-double-stack))
+                      :locations #.(loop for i from 0 below 32 by 4 collect i)
+                      :element-size 4
+                      :constant-scs ()
+                      :save-p t
+                      :alternate-scs (complex-double-stack))
 
   ;; A catch or unwind block.
-  (catch-block control-stack
-               :element-size kludge-nondeterministic-catch-block-size))
+  (catch-block control-stack :element-size catch-block-size))
 
 ;;;; Make some random tns for important registers.
 

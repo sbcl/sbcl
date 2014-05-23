@@ -210,27 +210,6 @@
     `(progn
        ,@(forms))))
 
-;;; The DEFINE-STORAGE-CLASS call for CATCH-BLOCK refers to the size
-;;; of CATCH-BLOCK. The size of CATCH-BLOCK isn't calculated until
-;;; later in the build process, and the calculation is entangled with
-;;; code which has lots of predependencies, including dependencies on
-;;; the prior call of DEFINE-STORAGE-CLASS. The proper way to
-;;; unscramble this would be to untangle the code, so that the code
-;;; which calculates the size of CATCH-BLOCK can be separated from the
-;;; other lots-of-dependencies code, so that the code which calculates
-;;; the size of CATCH-BLOCK can be executed early, so that this value
-;;; is known properly at this point in compilation. However, that
-;;; would be a lot of editing of code that I (WHN 19990131) can't test
-;;; until the project is complete. So instead, I set the correct value
-;;; by hand here (a sort of nondeterministic guess of the right
-;;; answer:-) and add an assertion later, after the value is
-;;; calculated, that the original guess was correct.
-;;;
-;;; (What a KLUDGE! Anyone who wants to come in and clean up this mess
-;;; has my gratitude.) (FIXME: Maybe this should be me..)
-(eval-when (:compile-toplevel :load-toplevel :execute)
-  (def!constant kludge-nondeterministic-catch-block-size 5))
-
 (!define-storage-classes
 
   ;; non-immediate constants in the constant pool
@@ -411,7 +390,7 @@
                   :alternate-scs (single-sse-stack))
 
   ;; a catch or unwind block
-  (catch-block stack :element-size kludge-nondeterministic-catch-block-size))
+  (catch-block stack :element-size catch-block-size))
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
 (defparameter *byte-sc-names*

@@ -316,6 +316,7 @@
 
  ("src/compiler/macros")
  ("src/compiler/generic/vm-macs")
+ ("src/compiler/generic/objdef")
 
  ;; needed by "compiler/vop"
  ("src/compiler/sset")
@@ -460,7 +461,7 @@
  ("src/compiler/fndb")
  ("src/compiler/generic/vm-fndb")
 
- ("src/compiler/generic/objdef")
+ ("src/compiler/generic/late-objdef")
 
  ("src/compiler/generic/interr")
 

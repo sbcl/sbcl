@@ -64,6 +64,8 @@
                         :key #'primitive-object-name :test #'eq)))
     name))
 
+(defvar *!late-primitive-object-forms* nil)
+
 (defmacro define-primitive-object
           ((name &key lowtag widetag alloc-trans (type t))
            &rest slot-specs)
@@ -137,7 +139,9 @@
                                      :variable-length-p variable-length-p))
            ,@(constants)
            ,@(specials))
-         ,@(forms)))))
+         (setf *!late-primitive-object-forms*
+               (append *!late-primitive-object-forms*
+                       ',(forms)))))))
 
 ;;;; stuff for defining reffers and setters
 

@@ -114,8 +114,6 @@
       ((null classes)
        (nreverse forms))))
 
-(def!constant kludge-nondeterministic-catch-block-size 6)
-
 (!define-storage-classes
 
   ;; Non-immediate constants in the constant pool
@@ -247,7 +245,7 @@
    :alternate-scs (complex-double-stack))
 
   ;; A catch or unwind block.
-  (catch-block control-stack :element-size kludge-nondeterministic-catch-block-size)
+  (catch-block control-stack :element-size catch-block-size)
 
   ;; floating point numbers temporarily stuck in integer registers for c-call
   (single-int-carg-reg registers
