@@ -64,18 +64,18 @@
            ;; functions also provide the documentation for special forms.
            ;; FIXME: should be disallowed after bootstrap. Package-lock
            ;; prevents it, but the protection could be stronger than that.
-           (setf (symbol-function ',name)
-                 ,(let ((ll (substitute '&rest '&body lambda-list))
-                        (crud sb!xc:lambda-list-keywords))
-                   (when (eq (first ll) '&whole) (setq ll (cddr ll)))
-                   ;; The lambda name has significance to COERCE-SYMBOL-TO-FUN.
-                   ;; Don't change it haphazardly - a unit test will fail.
-                   `(named-lambda (sb!impl::special-operator ,name) ,ll
-                     ,@(when doc (list doc))
-                     (declare (ignore ,@(remove-if (lambda (x) (memq x crud))
-                                                   ll))
-                              (optimize (verify-arg-count 0)))
-                     (error 'special-form-function :name ',name))))
+           ;; The lambda name has significance to COERCE-SYMBOL-TO-FUN.
+           (let ((fun (named-lambda (sb!impl::special-operator ,name)
+                          (&rest args)
+                        ,@(when doc (list doc))
+                        (declare (ignore args))
+                        (error 'special-form-function :name ',name)) ))
+             ;; Set up a macro lambda list to a function.
+             (setf (%simple-fun-arglist fun)
+                   ',(if (eq (first lambda-list) '&whole)
+                         (cddr lambda-list)
+                         lambda-list)
+                   (symbol-function ',name) fun))
            ;; FIXME: Evidently "there can only be one!" -- we overwrite any
            ;; other :IR1-CONVERT value. This deserves a warning, I think.
            (setf (info :function :ir1-convert ',name) #',fn-name)
