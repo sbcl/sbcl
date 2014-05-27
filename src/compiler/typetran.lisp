@@ -211,6 +211,9 @@
 #!+sb-unicode
 (define-source-transform base-char-p (x)
   `(typep ,x 'base-char))
+;; CONS is implemented as (and list (not (eql nil))) where the 'and' is
+;; built-in to the consp vop. Reduce to just LISTP if possible.
+(deftransform consp ((x) ((not null))) '(listp x))
 
 ;;;; TYPEP source transform
 
