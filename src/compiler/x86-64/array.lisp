@@ -750,11 +750,6 @@
 (define-full-setter set-vector-raw-bits * vector-data-offset other-pointer-lowtag
   (unsigned-reg) unsigned-num %set-vector-raw-bits)
 
-;;;; miscellaneous array VOPs
-
-(define-vop (get-vector-subtype get-header-data))
-(define-vop (set-vector-subtype set-header-data))
-
 ;;;; ATOMIC-INCF for arrays
 
 (define-vop (array-atomic-incf/word)

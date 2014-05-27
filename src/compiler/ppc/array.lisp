@@ -503,21 +503,6 @@
   (:result-types unsigned-num)
   (:variant vector-data-offset other-pointer-lowtag))
 
-;;;; Misc. Array VOPs.
-
-
-#+nil
-(define-vop (vector-word-length)
-  (:args (vec :scs (descriptor-reg)))
-  (:results (res :scs (any-reg descriptor-reg)))
-  (:generator 6
-    (loadw res vec clc::g-vector-header-words)
-    (inst niuo res res clc::g-vector-words-mask-16)))
-
-(define-vop (get-vector-subtype get-header-data))
-(define-vop (set-vector-subtype set-header-data))
-
-
 ;;;
 
 (define-vop (data-vector-ref/simple-array-signed-byte-8 signed-byte-index-ref)

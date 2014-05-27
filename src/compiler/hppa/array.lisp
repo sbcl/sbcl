@@ -381,7 +381,3 @@
   (unsigned-reg) unsigned-num %vector-raw-bits)
 (define-full-setter set-vector-raw-bits * vector-data-offset other-pointer-lowtag
   (unsigned-reg) unsigned-num %set-vector-raw-bits)
-
-;;;; Misc. Array VOPs.
-(define-vop (get-vector-subtype get-header-data))
-(define-vop (set-vector-subtype set-header-data))
