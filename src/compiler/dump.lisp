@@ -829,9 +829,9 @@
 
 #-sb-xc-host
 (defun dump-specialized-vector (vector file &key data-only)
-  (declare (type (simple-array * (*)) vector))
+  (declare (type (simple-unboxed-array (*)) vector))
   (let* ((length (length vector))
-         (widetag (widetag-of vector))
+         (widetag (%other-pointer-widetag vector))
          (bits-per-length (aref **saetp-bits-per-length** widetag)))
     (aver (< bits-per-length 255))
     (unless data-only
