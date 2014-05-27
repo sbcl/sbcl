@@ -102,27 +102,6 @@
   (with-available-buffers-lock ()
     (push buffer *available-buffers*)))
 
-;;; This is a separate buffer management function, as it wants to be
-;;; clever about locking -- grabbing the lock just once.
-(defun release-fd-stream-buffers (fd-stream)
-  (let ((ibuf (fd-stream-ibuf fd-stream))
-        (obuf (fd-stream-obuf fd-stream))
-        (queue (loop for item in (fd-stream-output-queue fd-stream)
-                       when (buffer-p item)
-                       collect (reset-buffer item))))
-    (when ibuf
-      (push (reset-buffer ibuf) queue))
-    (when obuf
-      (push (reset-buffer obuf) queue))
-    ;; ...so, anything found?
-    (when queue
-      ;; detach from stream
-      (setf (fd-stream-ibuf fd-stream) nil
-            (fd-stream-obuf fd-stream) nil
-            (fd-stream-output-queue fd-stream) nil)
-      ;; splice to *available-buffers*
-      (with-available-buffers-lock ()
-        (setf *available-buffers* (nconc queue *available-buffers*))))))
 
 ;;;; the FD-STREAM structure
 
@@ -192,6 +171,28 @@
   (declare (type stream stream))
   (print-unreadable-object (fd-stream stream :type t :identity t)
     (format stream "for ~S" (fd-stream-name fd-stream))))
+
+;;; This is a separate buffer management function, as it wants to be
+;;; clever about locking -- grabbing the lock just once.
+(defun release-fd-stream-buffers (fd-stream)
+  (let ((ibuf (fd-stream-ibuf fd-stream))
+        (obuf (fd-stream-obuf fd-stream))
+        (queue (loop for item in (fd-stream-output-queue fd-stream)
+                       when (buffer-p item)
+                       collect (reset-buffer item))))
+    (when ibuf
+      (push (reset-buffer ibuf) queue))
+    (when obuf
+      (push (reset-buffer obuf) queue))
+    ;; ...so, anything found?
+    (when queue
+      ;; detach from stream
+      (setf (fd-stream-ibuf fd-stream) nil
+            (fd-stream-obuf fd-stream) nil
+            (fd-stream-output-queue fd-stream) nil)
+      ;; splice to *available-buffers*
+      (with-available-buffers-lock ()
+        (setf *available-buffers* (nconc queue *available-buffers*))))))
 
 ;;;; CORE OUTPUT FUNCTIONS
 
@@ -2631,3 +2632,18 @@
              t)
             (t
              (fd-stream-pathname stream)))))
+
+;; Placing this definition (formerly in "toplevel") after the important
+;; stream types are known produces smaller+faster code than it did before.
+(defun stream-output-stream (stream)
+  (typecase stream
+    (fd-stream
+     stream)
+    (synonym-stream
+     (stream-output-stream
+      (symbol-value (synonym-stream-symbol stream))))
+    (two-way-stream
+     (stream-output-stream
+      (two-way-stream-output-stream stream)))
+    (t
+     stream)))

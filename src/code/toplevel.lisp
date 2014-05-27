@@ -285,19 +285,6 @@ any non-negative real number."
       :next))
   (values))
 
-(defun stream-output-stream (stream)
-  (typecase stream
-    (fd-stream
-     stream)
-    (synonym-stream
-     (stream-output-stream
-      (symbol-value (synonym-stream-symbol stream))))
-    (two-way-stream
-     (stream-output-stream
-      (two-way-stream-output-stream stream)))
-    (t
-     stream)))
-
 (defun process-init-file (specified-pathname kind)
   (multiple-value-bind (context default-function)
       (ecase kind
