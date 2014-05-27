@@ -87,13 +87,6 @@
 (defvar *backend-primitive-type-aliases* (make-hash-table :test 'eq))
 (declaim (type hash-table *backend-primitive-type-aliases*))
 
-;;; meta-compile time translation from names to primitive types
-;;;
-;;; FIXME: As per *BACKEND-META-SC-NAMES* and *BACKEND-META-SB-NAMES*,
-;;; couldn't we get rid of this in SBCL?
-(defvar *backend-meta-primitive-type-names* (make-hash-table :test 'eq))
-(declaim (type hash-table *meta-primitive-type-names*))
-
 ;;; The primitive type T is somewhat magical, in that it is the only
 ;;; primitive type that overlaps with other primitive types. An object
 ;;; of primitive-type T is in the canonical descriptor (boxed or pointer)
@@ -111,15 +104,6 @@
 ;;; structures. This information is only used at meta-compile time.
 (defvar *backend-parsed-vops* (make-hash-table :test 'eq))
 (declaim (type hash-table *backend-parsed-vops*))
-
-;;; support for the assembler
-(defvar *backend-instruction-formats* (make-hash-table :test 'eq))
-(defvar *backend-instruction-flavors* (make-hash-table :test 'equal))
-(defvar *backend-special-arg-types* (make-hash-table :test 'eq))
-(declaim (type hash-table
-               *backend-instruction-formats*
-               *backend-instruction-flavors*
-               *backend-special-arg-types*))
 
 ;;; mappings between CTYPE structures and the corresponding predicate.
 ;;; The type->predicate mapping is implemented as an alist because

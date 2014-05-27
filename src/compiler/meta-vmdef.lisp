@@ -274,11 +274,6 @@
 
 ;;;; primitive type definition
 
-(defun meta-primitive-type-or-lose (name)
-  (the primitive-type
-       (or (gethash name *backend-meta-primitive-type-names*)
-           (error "~S is not a defined primitive type." name))))
-
 ;;; Define a primitive type NAME. Each SCS entry specifies a storage
 ;;; class that values of this type may be allocated in. TYPE is the
 ;;; type descriptor for the Lisp type that is equivalent to this type.
@@ -288,11 +283,6 @@
     `(progn
        (/show0 "doing !DEF-PRIMITIVE-TYPE, NAME=..")
        (/primitive-print ,(symbol-name name))
-       (eval-when (#-sb-xc :compile-toplevel :load-toplevel :execute)
-         (setf (gethash ',name *backend-meta-primitive-type-names*)
-               (make-primitive-type :name ',name
-                                    :scs ',scns
-                                    :specifier ',type)))
        ,(once-only ((n-old `(gethash ',name *backend-primitive-type-names*)))
           `(progn
              ;; If the PRIMITIVE-TYPE structure already exists, we
@@ -1298,7 +1288,7 @@
         (declare (ignore costs))
         (dolist (ptype ptypes)
           (unless (dolist (rep (primitive-type-scs
-                                (meta-primitive-type-or-lose ptype))
+                                (primitive-type-or-lose ptype))
                                nil)
                     (when (svref load-scs rep) (return t)))
             (error "In the ~A ~:[result~;argument~] to VOP ~S,~@
@@ -1315,7 +1305,7 @@
                     (dolist (ptype ptypes nil)
                       (when (meta-sc-allowed-by-primitive-type
                              (meta-sc-or-lose sc)
-                             (meta-primitive-type-or-lose ptype))
+                             (primitive-type-or-lose ptype))
                         (return t))))
           (warn "~:[Result~;Argument~] ~A to VOP ~S~@
                  has SC restriction ~S which is ~
