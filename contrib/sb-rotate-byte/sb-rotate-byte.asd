@@ -11,7 +11,8 @@
     :depends-on ("compiler")
     :pathname ""
     :components
-    ((:file "x86-vm" :if-feature :x86)
+    ((:file "arm-vm" :if-feature :arm)
+     (:file "x86-vm" :if-feature :x86)
      (:file "x86-64-vm" :if-feature :x86-64)
      (:file "ppc-vm" :if-feature :ppc)))
    (:file "rotate-byte" :depends-on ("compiler")))
