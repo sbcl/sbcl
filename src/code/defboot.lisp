@@ -585,14 +585,15 @@ evaluated as a PROGN."
    If restart-name is not invoked, then all values returned by forms are
    returned. If control is transferred to this restart, it immediately
    returns the values NIL and T."
-  `(restart-case
-       ;; If there's just one body form, then don't use PROGN. This allows
-       ;; RESTART-CASE to "see" calls to ERROR, etc.
-       ,(if (= (length forms) 1) (car forms) `(progn ,@forms))
-     (,restart-name ()
-        :report (lambda (stream)
-                  (format stream ,format-string ,@format-arguments))
-      (values nil t))))
+  (let ((stream (gensym "STREAM")))
+   `(restart-case
+        ;; If there's just one body form, then don't use PROGN. This allows
+        ;; RESTART-CASE to "see" calls to ERROR, etc.
+        ,(if (= (length forms) 1) (car forms) `(progn ,@forms))
+      (,restart-name ()
+        :report (lambda (,stream)
+                  (format ,stream ,format-string ,@format-arguments))
+        (values nil t)))))
 
 (defmacro-mundanely %handler-bind (bindings form)
   ;; As an optimization, this looks at the handler parts of BINDINGS
