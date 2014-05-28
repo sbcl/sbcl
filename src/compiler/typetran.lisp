@@ -321,24 +321,25 @@
 ;;; currently just drop through to the general code in this case,
 ;;; rather than trying to optimize it (but FIXME CSR 2004-04-05: it
 ;;; wouldn't be hard to optimize it after all).
+;;; FIXME: if the CONSP|NIL -> LISTP optimization kicks in,
+;;;        we forgo the array optimizations.
 (defun source-transform-union-typep (object type)
   (let* ((types (union-type-types type))
          (type-cons (specifier-type 'cons))
          (mtype (find-if #'member-type-p types))
          (members (when mtype (member-type-members mtype))))
-    (if (and mtype
-             (memq nil members)
-             (memq type-cons types))
-        (once-only ((n-obj object))
+    (once-only ((n-obj object))
+      (if (and mtype
+               (memq nil members)
+               (memq type-cons types))
           `(or (listp ,n-obj)
                (typep ,n-obj
                       '(or ,@(mapcar #'type-specifier
                                      (remove type-cons
                                              (remove mtype types)))
-                        (member ,@(remove nil members))))))
-        (multiple-value-bind (widetags more-types)
-            (sb!kernel::widetags-from-union-type types)
-          (once-only ((n-obj object))
+                        (member ,@(remove nil members)))))
+          (multiple-value-bind (widetags more-types)
+              (sb!kernel::widetags-from-union-type types)
             `(or ,@(if widetags
                        `((%other-pointer-subtype-p ,n-obj ',widetags)))
                  ,@(mapcar (lambda (x)

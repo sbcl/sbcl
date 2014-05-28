@@ -181,6 +181,7 @@
     (labels ((grovel (value)
                ;; Unless VALUE is an object which which obviously
                ;; can't contain other objects
+               ;; FIXME: OAOOM. See MAYBE-EMIT-MAKE-LOAD-FORMS.
                (unless (typep value
                               '(or unboxed-array
                                 symbol

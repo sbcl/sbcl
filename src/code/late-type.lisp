@@ -2653,6 +2653,7 @@ used for a COMPLEX component.~:@>"
   ;; performed pairwise, so we don't have a good hook for it and our
   ;; representation doesn't allow us to easily detect the situation
   ;; anyway.
+  ;; But see SIMPLIFY-ARRAY-UNIONS which is able to do something like that.
   (let* ((eltype1 (array-type-element-type type1))
          (eltype2 (array-type-element-type type2))
          (stype1 (array-type-specialized-element-type type1))
@@ -3223,9 +3224,11 @@ used for a COMPLEX component.~:@>"
                                (type-intersection type1 t2))))))))
 
 (!def-type-translator or (&rest type-specifiers)
-  (apply #'type-union
-         (mapcar #'specifier-type
-                 type-specifiers)))
+  (let ((type (apply #'type-union
+                     (mapcar #'specifier-type type-specifiers))))
+    (if (union-type-p type)
+        (sb!kernel::simplify-array-unions type)
+        type)))
 
 ;;;; CONS types
 

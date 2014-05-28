@@ -313,7 +313,6 @@
 (defun maybe-emit-make-load-forms (constant &optional (name nil namep))
   (let ((xset (alloc-xset)))
     (labels ((trivialp (value)
-               ;; FIXME: this TYPEP test is ~2KB of code. wtf?
                (typep value
                       '(or
                         #-sb-xc-host

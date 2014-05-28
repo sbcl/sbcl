@@ -497,3 +497,8 @@
         (assert (equal (our-type-of hairy-bit)
                        '(and (bit-vector 5) (not simple-array))))
         (assert (equal (type-of hairy-bit) '(bit-vector 5)))))))
+
+(with-test (:name :bug-309098)
+  (let ((u `(or ,@(map 'list (lambda (x) `(array ,(sb-vm:saetp-specifier x)))
+                       sb-vm:*specialized-array-element-type-properties*))))
+    (assert (equal (multiple-value-list (subtypep 'array u)) '(t t)))))

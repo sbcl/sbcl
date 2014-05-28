@@ -37,15 +37,15 @@
                ratio
                )))
   (dolist (i types)
-    (format t "type I=~S~%" i)
+    ;(format t "type I=~S~%" i)
     (dolist (j types)
-      (format t "  type J=~S~%" j)
+      ;(format t "  type J=~S~%" j)
       (assert (subtypep i `(or ,i ,j)))
       (assert (subtypep i `(or ,j ,i)))
       (assert (subtypep i `(or ,i ,i ,j)))
       (assert (subtypep i `(or ,j ,i)))
       (dolist (k types)
-        (format t "    type K=~S~%" k)
+        ;(format t "    type K=~S~%" k)
         (assert (subtypep `(or ,i ,j) `(or ,i ,j ,k)))
         (assert (subtypep `(or ,i ,j) `(or ,k ,j ,i)))))))
 
@@ -762,6 +762,15 @@
 
 ;;; Array type unions have some tricky semantics.
 
+;; borrowed from 'info.impure.lisp' - FIXME: put in test-util
+;; and make it accept with either lists or vectors.
+(defun shuffle (list)
+  (let ((vector (coerce list 'vector)))
+    (loop for lim from (1- (length vector)) downto 0
+          for chosen = (random (1+ lim))
+          do (rotatef (aref vector chosen) (aref vector lim)))
+    (coerce vector 'list)))
+
 (macrolet
     ((disunity-test (name type-specifier-1 type-specifier-2)
        `(with-test (:name ,name)
@@ -848,6 +857,96 @@
 
   (disunity-test (:array-type-union :element-type-and-complexp-dont-unite)
                  (simple-array (unsigned-byte 8))
-                 (and array (not simple-array))))
+                 (and array (not simple-array)))
+
+  ;; These tests aren't really impure once the SHUFFLE function is provided.
+  ;; Logically they belong with the above, so here they are.
+  (with-test (:name :union-of-all-arrays-is-array-of-wild)
+    (flet ((huge-union (fn)
+             (mapcar fn sb-kernel::*specialized-array-element-types*)))
+
+      (let ((answers '(VECTOR
+                       (SIMPLE-ARRAY * (*))
+                       (AND VECTOR (NOT SIMPLE-ARRAY))
+                       (VECTOR * 400)
+                       (SIMPLE-ARRAY * (400))
+                       (AND (VECTOR * 400) (NOT SIMPLE-ARRAY)))))
+        (dolist (dim '(() (400)))
+          (dolist (simpleness '(() (simple-array) ((not simple-array))))
+            (assert
+             (equal
+              (sb-kernel:type-specifier
+               (sb-kernel:specifier-type
+                `(or ,@(huge-union
+                        (lambda (x) `(and ,@simpleness (vector ,x ,@dim)))))))
+              (pop answers))))))
+
+      ;; The algorithm is indifferent to non-array types.
+      (assert
+       (equal (sb-kernel:type-specifier
+               (sb-kernel:specifier-type
+                `(or list ,@(huge-union (lambda (x) `(array ,x (1 1 1)))))))
+              '(or cons null (array * (1 1 1)))))
+
+      ;; And unions of unions of distinct array types should reduce.
+      (assert
+       (equal
+        (sb-kernel:type-specifier
+         (sb-kernel:specifier-type
+          `(or (simple-array bletch (3 2 8))
+               ,@(huge-union
+                  (lambda (x) `(and (not simple-array) (array ,x (2 2)))))
+               function
+               ,@(huge-union (lambda (x) `(simple-array ,x (10)))))))
+        '(or (simple-array bletch (3 2 8))
+             (and (array * (2 2)) (not simple-array))
+             function
+             (simple-array * (10)))))
+
+      ;; After uniting all simple and non-simple arrays of every specializer
+      ;; the result is just ARRAY.
+      (flet ((u (rank)
+               (shuffle ; should be insensitive to ordering
+                (nconc (huge-union
+                        (lambda (x) `(and (not simple-array) (array ,x ,rank))))
+                       (huge-union
+                        (lambda (x) `(and (simple-array) (array ,x ,rank))))))))
+        (assert
+         (equal (sb-kernel:type-specifier
+                 (sb-kernel:specifier-type `(or bit-vector ,@(u 2))))
+                '(or bit-vector (array * (* *)))))
+        (assert
+         (equal (sb-kernel:type-specifier
+                 (sb-kernel:specifier-type `(or bit-vector ,@(u 1))))
+                'vector))))))
+
+(with-test (:name :source-transform-union-of-arrays-typep)
+  ;; Ensure we don't pessimize rank 1 specialized array.
+  ;; (SIMPLE unboxed vector is done differently)
+  (let* ((hair (sb-kernel:specifier-type '(sb-kernel:unboxed-array 1)))
+         (xform (sb-c::source-transform-union-typep 'myobj hair))
+         (g (caar (cadr xform)))) ; (LET ((#:g MYOBJ)) ...)
+    (assert (equal xform
+                   `(let ((,g myobj))
+                      (or (typep ,g '(and vector (not (array t)))))))))
+
+  ;; Exclude one subtype at a time and make sure they all work.
+  (dotimes (i (length sb-vm:*specialized-array-element-type-properties*))
+    (let* ((excluded-type
+            (sb-vm:saetp-specifier
+             (aref sb-vm:*specialized-array-element-type-properties* i)))
+           (hair
+            (loop for x across sb-vm:*specialized-array-element-type-properties*
+                  for j from 0
+                  unless (eql i j)
+                  collect `(array ,(sb-vm:saetp-specifier x))))
+           (xform
+            (sb-c::source-transform-union-typep 'myobj
+             (sb-kernel:specifier-type `(or ,@(shuffle hair) fixnum))))
+           (g (caar (cadr xform)))) ; (LET ((#:g MYOBJ)) ...)
+      (assert (equal xform
+                     `(let ((,g myobj))
+                        (or (typep ,g '(and array (not (array ,excluded-type))))
+                            (typep ,g 'fixnum))))))))
 
 ;;; success
