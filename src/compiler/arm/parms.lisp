@@ -94,6 +94,20 @@
   (def!constant linkage-table-space-start #x0a000000)
   (def!constant linkage-table-space-end   #x0b000000))
 
+#!+gencgc
+(progn
+  (def!constant linkage-table-space-start #x0a000000)
+  (def!constant linkage-table-space-end   #x0b000000)
+
+  (def!constant read-only-space-start     #x04000000)
+  (def!constant read-only-space-end       #x07ff8000)
+
+  (def!constant static-space-start        #x08000000)
+  (def!constant static-space-end          #x097fff00)
+
+  (def!constant dynamic-space-start       #x4f000000)
+  (def!constant dynamic-space-end         (!configure-dynamic-space-end)))
+
 (def!constant linkage-table-entry-size 16)
 
 #!+linux
@@ -144,7 +158,8 @@
      ;; Needed for callbacks to work across saving cores. see
      ;; ALIEN-CALLBACK-ASSEMBLER-WRAPPER in c-call.lisp for gory
      ;; details.
-     sb!alien::*enter-alien-callback*)))
+     sb!alien::*enter-alien-callback*
+     #!+gencgc *restart-lisp-function*)))
 
 (defparameter *static-funs*
   '(two-arg-gcd two-arg-lcm

@@ -63,8 +63,12 @@ boolean arch_pseudo_atomic_atomic(os_context_t *context)
      * The foreign_function_call_active used to live at each call-site
      * to arch_pseudo_atomic_atomic, but this seems clearer.
      * --NS 2007-05-15 */
+#ifdef LISP_FEATURE_GENCGC
+    return SymbolValue(PSEUDO_ATOMIC_ATOMIC, 0) != NIL;
+#else
     return (!foreign_function_call_active)
         && (NIL != SymbolValue(PSEUDO_ATOMIC_ATOMIC,0));
+#endif
 }
 
 void arch_set_pseudo_atomic_interrupted(os_context_t *context)

@@ -174,6 +174,26 @@
 ;;; to emphasize the parallelism with PSEUDO-ATOMIC (which must
 ;;; surround a call to ALLOCATION anyway), and to indicate that the
 ;;; P-A FLAG-TN is also acceptable here.
+
+#!+gencgc
+(defun allocation-tramp (alloc-tn size back-label)
+  (let ((fixup (gen-label)))
+    (when (integerp size)
+      (load-immediate-word alloc-tn size))
+    (emit-word sb!assem::**current-segment** (logior #xe92d0000
+                                                     (ash 1 (if (integerp size)
+                                                                (tn-offset alloc-tn)
+                                                                (tn-offset size)))
+                                                     (ash 1 (tn-offset lr-tn))))
+    (inst load-from-label alloc-tn alloc-tn fixup)
+    (inst blx alloc-tn)
+    (emit-word sb!assem::**current-segment** (logior #xe8bd0000
+                                                     (ash 1 (tn-offset alloc-tn))
+                                                     (ash 1 (tn-offset lr-tn))))
+    (inst b back-label)
+    (emit-label fixup)
+    (inst word (make-fixup "alloc_tramp" :foreign))))
+
 (defmacro allocation (result-tn size lowtag &key flag-tn
                                                  stack-allocate-p)
   ;; Normal allocation to the heap.
@@ -194,13 +214,43 @@
             ;; stack pointer has been stored.
             (storew null-tn ,result-tn -1 0 :ne)
             (inst orr ,result-tn ,result-tn ,lowtag))
+           #!-gencgc
            (t
             (load-symbol-value ,flag-tn *allocation-pointer*)
             (inst add ,result-tn ,flag-tn ,lowtag)
             (if (integerp ,size)
                 (composite-immediate-instruction add ,flag-tn ,flag-tn ,size)
                 (inst add ,flag-tn ,flag-tn ,size))
-            (store-symbol-value ,flag-tn *allocation-pointer*)))))
+            (store-symbol-value ,flag-tn *allocation-pointer*))
+           #!+gencgc
+           (t
+            (let ((fixup (gen-label))
+                  (alloc (gen-label))
+                  (back-from-alloc (gen-label)))
+              (inst load-from-label ,flag-tn ,flag-tn FIXUP)
+              (loadw ,result-tn ,flag-tn)
+              (loadw ,flag-tn ,flag-tn 1)
+              (if (integerp ,size)
+                  (composite-immediate-instruction add ,result-tn ,result-tn ,size)
+                  (inst add ,result-tn ,result-tn ,size))
+              (inst cmp ,result-tn ,flag-tn)
+              (inst b :gt ALLOC)
+              (inst load-from-label ,flag-tn ,flag-tn FIXUP)
+              (storew ,result-tn ,flag-tn)
+
+              (if (integerp ,size)
+                  (composite-immediate-instruction sub ,result-tn ,result-tn ,size)
+                  (inst sub ,result-tn ,result-tn ,size))
+
+              (emit-label BACK-FROM-ALLOC)
+              (when ,lowtag
+                (inst orr ,result-tn ,result-tn ,lowtag))
+
+              (assemble (*elsewhere*)
+                (emit-label ALLOC)
+                (allocation-tramp ,result-tn ,size BACK-FROM-ALLOC)
+                (emit-label FIXUP)
+                (inst word (make-fixup "boxed_region" :foreign))))))))
 
 (defmacro with-fixed-allocation ((result-tn flag-tn type-code size
                                             &key (lowtag other-pointer-lowtag)
@@ -368,6 +418,12 @@
 OBJECTS will not be moved in memory for the duration of BODY.
 Useful for e.g. foreign calls where another thread may trigger
 garbage collection.  This is currently implemented by disabling GC"
-  (declare (ignore objects))            ;should we eval these for side-effect?
+  #!-gencgc
+  (declare (ignore objects))            ; should we eval these for side-effect?
+  #!-gencgc
   `(without-gcing
-    ,@body))
+    ,@body)
+  #!+gencgc
+  `(let ((*pinned-objects* (list* ,@objects *pinned-objects*)))
+     (declare (truly-dynamic-extent *pinned-objects*))
+     ,@body))

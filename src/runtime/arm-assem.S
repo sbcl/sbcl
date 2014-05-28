@@ -379,4 +379,70 @@ fun_end_breakpoint_trap:
         .global fun_end_breakpoint_end
 fun_end_breakpoint_end:
 
-	/* EOF */
+#ifdef LISP_FEATURE_GENCGC
+	.align
+	.global	alloc_tramp
+	.type	alloc_tramp, %function
+alloc_tramp:
+        stmfd	sp!, {r4, r6, r12, lr}
+
+        ldr     r4, =foreign_function_call_active
+        str     pc, [r4]
+
+        ldr     r4, STATIC_SYMBOL_VALUE(CONTROL_STACK_POINTER)
+        add     r6, r4, #8*4
+        str     r6, STATIC_SYMBOL_VALUE(CONTROL_STACK_POINTER)
+
+        @@ Create a new frame and save descriptor regs on the stack
+	@@ for the GC to see.
+        str     reg_CFP, [r4, #0]
+        str     reg_NULL, [r4, #4]
+        str     reg_CODE, [r4, #8]
+        add     r4, r4, #3*4
+        stmea   r4, {r0-reg_LEXENV, r8}
+
+        ldr     r0,  [sp, #4*4]
+        fstmfdd sp!, {d0-d7}
+
+        mov     lr, pc
+        ldr     pc,=alloc
+
+        fldmfdd sp!, {d0-d7}
+        str     r0,  [sp, #4*4]
+        ldr     r4, STATIC_SYMBOL_VALUE(CONTROL_STACK_POINTER)
+        ldmea   r4, {r0-reg_LEXENV, r8}
+        sub     r4, r4, #8*4
+        str     r4, STATIC_SYMBOL_VALUE(CONTROL_STACK_POINTER)
+
+        ldr     r4, =foreign_function_call_active
+        mov     r6, #0
+	str     r6, [r4]
+
+	ldmfd	sp!, {r4, r6, r12, lr}
+	bx	lr
+
+        .align
+	.global	fpu_save
+	.type	fpu_save, %function
+fpu_save:
+        fstmiad r0, {d0-d7}
+	bx	lr
+
+        .align
+	.global	fpu_restore
+	.type	fpu_restore, %function
+fpu_restore:
+        add     r0, r0, #16
+        fldmiad r0, {d0-d7}
+	bx	lr
+
+        .align
+	.global	do_pending_interrupt
+	.type	do_pending_interrupt, %function
+do_pending_interrupt:
+        stmfd	sp!, {reg_OCFP, lr}
+        ldr     reg_OCFP, =0xf0001
+        swi     #0
+        ldmfd	sp!, {reg_OCFP, lr}
+	bx	lr
+#endif
