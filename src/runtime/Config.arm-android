@@ -1,0 +1,41 @@
+# -*- makefile -*- for the C-level run-time support for SBCL
+
+# This software is part of the SBCL system. See the README file for
+# more information.
+#
+# This software is derived from the CMU CL system, which was
+# written at Carnegie Mellon University and released into the
+# public domain. The software is in the public domain and is
+# provided with absolutely no warranty. See the COPYING and CREDITS
+# files for more informration.
+
+CC=${NDK_PATH}/toolchains/arm-linux-androideabi-4.8/prebuilt/linux-x86_64/arm-linux-androideabi/bin/gcc
+CFLAGS = -g -marm -march=armv5 --sysroot=${NDK_PATH}/platforms/android-15/arch-arm/
+LINKFLAGS += --sysroot=${NDK_PATH}/platforms/android-15/arch-arm/
+NM = ${NDK_PATH}/toolchains/arm-linux-androideabi-4.8/prebuilt/linux-x86_64/arm-linux-androideabi/bin/nm
+
+ASSEM_SRC = arm-assem.S ldso-stubs.S
+ARCH_SRC = arm-arch.c
+
+OS_SRC = linux-os.c arm-linux-os.c android-os.c arm-android-os.c
+OS_LIBS = -ldl
+
+ifdef LISP_FEATURE_GENCGC
+  GC_SRC = gencgc.c
+else
+  GC_SRC = cheneygc.c
+endif
+
+ifdef LISP_FEATURE_SB_THREAD
+  OS_LIBS += -lpthread
+endif
+ifdef LISP_FEATURE_SB_CORE_COMPRESSION
+  OS_LIBS += -lz
+endif
+ifdef LISP_FEATURE_LARGEFILE
+  CFLAGS += -D_LARGEFILE_SOURCE -D_LARGEFILE64_SOURCE -D_FILE_OFFSET_BITS=64
+endif
+
+# Nothing to do for after-grovel-headers.
+.PHONY: after-grovel-headers
+after-grovel-headers:

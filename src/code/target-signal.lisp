@@ -203,10 +203,10 @@
                       (sap-int (sb!vm:context-pc context))))))))
 
 (define-signal-handler sigill-handler "illegal instruction")
-#!-linux
+#!-(or linux android)
 (define-signal-handler sigemt-handler "SIGEMT")
 (define-signal-handler sigbus-handler "bus error")
-#!-linux
+#!-(or linux android)
 (define-signal-handler sigsys-handler "bad argument to a system call")
 
 (defun sigint-handler (signal info context)
@@ -282,11 +282,11 @@
   (enable-interrupt sigint #'sigint-handler)
   (enable-interrupt sigterm #'sigterm-handler)
   (enable-interrupt sigill #'sigill-handler :synchronous t)
-  #!-linux
+  #!-(or linux android)
   (enable-interrupt sigemt #'sigemt-handler)
   (enable-interrupt sigfpe #'sb!vm:sigfpe-handler :synchronous t)
   (enable-interrupt sigbus #'sigbus-handler :synchronous t)
-  #!-linux
+  #!-(or linux android)
   (enable-interrupt sigsys #'sigsys-handler :synchronous t)
   #!-sb-wtimer
   (enable-interrupt sigalrm #'sigalrm-handler)

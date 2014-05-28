@@ -387,17 +387,25 @@ corresponds to NAME, or NIL if there is none."
   ;;
   ;; Signal an error at compile-time, since it's needed for the
   ;; runtime to start up
-  #!-(or linux openbsd freebsd netbsd sunos osf1 darwin hpux win32)
+  #!-(or android linux openbsd freebsd netbsd sunos osf1 darwin hpux win32)
   #.(error "POSIX-GETCWD is not implemented.")
-  #!+(or linux openbsd freebsd netbsd sunos osf1 darwin hpux win32)
-  (or (newcharstar-string (alien-funcall (extern-alien "getcwd"
-                                                       (function (* char)
-                                                                 (* char)
-                                                                 size-t))
-                                         nil
-                                         #!+(or linux openbsd freebsd netbsd darwin win32) 0
-                                         #!+(or sunos osf1 hpux) 1025))
-      (simple-perror "getcwd")))
+  (or
+   #!+(or linux openbsd freebsd netbsd sunos osf1 darwin hpux win32)
+   (newcharstar-string (alien-funcall (extern-alien "getcwd"
+                                                    (function (* char)
+                                                              (* char)
+                                                              size-t))
+                                      nil
+                                      #!+(or linux openbsd freebsd netbsd darwin win32) 0
+                                      #!+(or sunos osf1 hpux) 1025))
+   #!+android
+   (with-alien ((ptr (array char #.path-max)))
+     ;; Older bionic versions do not have the above feature.
+     (alien-funcall
+      (extern-alien "getcwd"
+                    (function c-string (array char #.path-max) int))
+      ptr path-max))
+   (simple-perror "getcwd")))
 
 ;;; Return the Unix current directory as a SIMPLE-STRING terminated
 ;;; by a slash character.

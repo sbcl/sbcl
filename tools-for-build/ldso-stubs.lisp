@@ -210,10 +210,11 @@ ldso_stub__ ## fct: ;                  \\
                    "asinh"
                    "atanh"
                    "bind"
-                   "cfgetispeed"
-                   "cfgetospeed"
-                   "cfsetispeed"
-                   "cfsetospeed"
+                   #!-android
+                   '("cfgetispeed"
+                     "cfgetospeed"
+                     "cfsetispeed"
+                     "cfsetospeed")
                    "chmod"
                    "chown"
                    "close"
@@ -243,7 +244,7 @@ ldso_stub__ ## fct: ;                  \\
                    "gethostbyname"
                    "gethostname"
                    "getitimer"
-                   "getpagesize"
+                   #!-android "getpagesize"
                    "getpeername"
                    "getpgrp"
                    "getpid"
@@ -267,7 +268,7 @@ ldso_stub__ ## fct: ;                  \\
                    "memmove"
                    "mkdir"
                    "nanosleep"
-                   "nl_langinfo"
+                   #!-android "nl_langinfo"
                    "open"
                    "opendir"
                    "pipe"
@@ -294,12 +295,13 @@ ldso_stub__ ## fct: ;                  \\
                    "symlink"
                    "sync"
                    "tanh"
-                   "tcdrain"
-                   "tcflow"
-                   "tcflush"
-                   "tcgetattr"
-                   "tcsendbreak"
-                   "tcsetattr"
+                   #!-android
+                   '("tcdrain"
+                     "tcflow"
+                     "tcflush"
+                     "tcgetattr"
+                     "tcsendbreak"
+                     "tcsetattr")
                    "truncate"
                    "ttyname"
                    #!-hpux "tzname"
@@ -333,7 +335,7 @@ ldso_stub__ ## fct: ;                  \\
                  ;; cut down on the number of ports affected.
                  #!-(or win32 darwin freebsd netbsd openbsd)
                  '("ptsname"
-                   "grantpt"
+                   #!-android "grantpt"
                    "unlockpt")
                  #!+(or openbsd freebsd)
                  '("openpty")

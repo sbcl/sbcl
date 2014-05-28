@@ -330,7 +330,7 @@ triggers."
 (define-alien-type wtimer
     #!+win32 system-area-pointer ;HANDLE, but that's not defined yet
     #!+sunos system-area-pointer ;struct os_wtimer *
-    #!+(or linux bsd) int)
+    #!+(or android linux bsd) int)
 
 #!+sb-wtimer
 (progn

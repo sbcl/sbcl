@@ -224,6 +224,7 @@
  #!+mach  ("src/code/mach"     :not-host)
 
  ("src/code/common-os" :not-host)
+ #!+android ("src/code/android-os" :not-host)
  #!+mach  ("src/code/mach-os"  :not-host)
  #!+sunos ("src/code/sunos-os" :not-host)
  #!+hpux  ("src/code/hpux-os"  :not-host)

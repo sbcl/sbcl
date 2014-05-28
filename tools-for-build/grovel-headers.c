@@ -39,9 +39,13 @@
   #include <sys/times.h>
   #include <sys/wait.h>
   #include <sys/ioctl.h>
+#ifdef LISP_FEATURE_ANDROID
+  #include <termios.h>
+#else
   #include <sys/termios.h>
-  #include <sys/time.h>
   #include <langinfo.h>
+#endif
+  #include <sys/time.h>
   #include <dlfcn.h>
 #endif
 
@@ -328,10 +332,10 @@ main(int argc, char *argv[])
     defconstant("pollpri", POLLPRI);
     defconstant("pollhup", POLLHUP);
     DEFTYPE("nfds-t", nfds_t);
-
+#ifndef LISP_FEATURE_ANDROID
     printf(";;; langinfo\n");
     defconstant("codeset", CODESET);
-
+#endif
     printf(";;; types, types, types\n");
     DEFTYPE("clock-t", clock_t);
     DEFTYPE("dev-t",   dev_t);
@@ -527,6 +531,11 @@ main(int argc, char *argv[])
         DEFSLOT(tv-sec, tv_sec);
         DEFSLOT(tv-nsec, tv_nsec));
     printf("\n");
+
+#ifdef LISP_FEATURE_ANDROID
+    defconstant("path-max", PATH_MAX);
+    printf("\n");
+#endif
 
 #ifdef LISP_FEATURE_BSD
     printf(";;; sysctl(3) names\n");

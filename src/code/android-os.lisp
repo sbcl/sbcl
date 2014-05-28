@@ -13,12 +13,12 @@
 
 ;;; Check that target machine features are set up consistently with
 ;;; this file.
-#!-linux (error "missing :LINUX feature")
+#!-android (error "missing :ANDROID feature")
 
 (defun software-type ()
   #!+sb-doc
   "Return a string describing the supporting software."
-  "Linux")
+  "Android")
 
 ;;; FIXME: More duplicated logic here vrt. other oses. Abstract into
 ;;; uname-software-version?
@@ -26,12 +26,7 @@
   #!+sb-doc
   "Return a string describing version of the supporting software, or NIL
   if not available."
-  (or *software-version*
-      (setf *software-version*
-            (string-trim '(#\newline)
-                         (with-output-to-string (stream)
-                           (run-program "/bin/uname" `("-r")
-                                        :output stream))))))
+  NIL)
 
 ;;; Return user time, system time, and number of page faults.
 (defun get-system-info ()
