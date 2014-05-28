@@ -52,15 +52,16 @@
 
 ;;;; disassembler field definitions
 
-(defun maybe-add-notes (register dstate)
+(defun maybe-add-notes (dstate)
   (let* ((inst (sb!disassem::sap-ref-int
                 (sb!disassem::dstate-segment-sap dstate)
                 (sb!disassem::dstate-cur-offs dstate)
                 n-word-bytes
                 (sb!disassem::dstate-byte-order dstate)))
          (op (ldb (byte 8 20) inst))
-         (offset (ldb (byte 12 0) inst)))
-    (cond ((and (= register null-offset))
+         (offset (ldb (byte 12 0) inst))
+         (rn (ldb (byte 4 16) inst)))
+    (cond ((and (= rn null-offset))
            (let ((offset (+ nil-value offset)))
              (case op
                ((88 89) ;; LDR/STR
@@ -72,7 +73,7 @@
           (t
            (case op
              (89 ;; LDR
-              (when (eql register code-offset)
+              (when (eql rn code-offset)
                 (sb!disassem:note-code-constant offset dstate))))))))
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
@@ -88,8 +89,8 @@
 
   (defun print-reg (value stream dstate)
     (declare (type stream stream)
-             (fixnum value))
-    (maybe-add-notes value dstate)
+             (fixnum value)
+             (ignore dstate))
     (princ (aref *register-names* value) stream))
 
   (defun print-shift-type (value stream dstate)
@@ -119,8 +120,8 @@
 
   (defun print-shifter-immediate (value stream dstate)
     (declare (type stream stream)
-             (fixnum value)
-             (ignore dstate))
+             (fixnum value))
+    (maybe-add-notes dstate)
     (let* ((rotate (ldb (byte 4 8) value))
            (immediate (mask-field (byte 8 0) value))
            (left (mask-field (byte 32 0)
@@ -135,8 +136,8 @@
 
   (defun print-load/store-immediate (value stream dstate)
     (declare (type stream stream)
-             (type (cons bit (cons bit (cons bit (cons fixnum null)))) value)
-             (ignore dstate))
+             (type (cons bit (cons bit (cons bit (cons fixnum null)))) value))
+    (maybe-add-notes dstate)
     (destructuring-bind (p u w offset) value
       (if (zerop offset)
           (princ "]" stream)
