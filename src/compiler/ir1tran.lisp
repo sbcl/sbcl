@@ -313,17 +313,18 @@
 (defun maybe-emit-make-load-forms (constant &optional (name nil namep))
   (let ((xset (alloc-xset)))
     (labels ((trivialp (value)
+               ;; FIXME: this TYPEP test is ~2KB of code. wtf?
                (typep value
                       '(or
-                        #-sb-xc-host unboxed-array
-                        #+sb-xc-host (simple-array (unsigned-byte 8) (*))
+                        #-sb-xc-host
+                        (or unboxed-array #!+sb-simd-pack simd-pack)
+                        #+sb-xc-host
+                        (or (simple-array (unsigned-byte 8) (*))
+                            simple-bit-vector)
                         symbol
                         number
                         character
-                        string
-                        #!+sb-simd-pack
-                        #+sb-xc-host nil
-                        #-sb-xc-host simd-pack)))
+                        string))) ; subsumed by UNBOXED-ARRAY
              (grovel (value)
                ;; Unless VALUE is an object which which obviously
                ;; can't contain other objects

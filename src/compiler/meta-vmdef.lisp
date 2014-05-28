@@ -62,16 +62,7 @@
             `(let ((res (copy-finite-sb ',res)))
                (/show0 "not :NON-PACKED, i.e. hairy case")
                (setf (finite-sb-always-live res)
-                     (make-array ',size
-                                 :initial-element
-                                 #-(or sb-xc sb-xc-host) #*
-                                 ;; The cross-compiler isn't very good
-                                 ;; at dumping specialized arrays; we
-                                 ;; work around that by postponing
-                                 ;; generation of the specialized
-                                 ;; array 'til runtime.
-                                 #+(or sb-xc sb-xc-host)
-                                 (make-array 0 :element-type 'bit)))
+                     (make-array ',size :initial-element #*))
                (/show0 "doing second SETF")
                (setf (finite-sb-conflicts res)
                      (make-array ',size :initial-element '#()))
