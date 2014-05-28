@@ -169,7 +169,8 @@
 ;;; Return the specifier for the type of object. This is not simply
 ;;; (TYPE-SPECIFIER (CTYPE-OF OBJECT)) because CTYPE-OF has different
 ;;; goals than TYPE-OF. In particular, speed is more important than
-;;; precision, and it is not permitted to return member types.
+;;; precision here, and it is not permitted to return member types,
+;;; negation, union, or intersection types.
 (defun type-of (object)
   #!+sb-doc
   "Return the type of OBJECT."
@@ -189,7 +190,9 @@
     ((member t) 'boolean)
     (keyword 'keyword)
     ((or array complex #!+sb-simd-pack simd-pack)
-     (type-specifier (ctype-of object)))
+     (let ((sb!kernel::*unparse-allow-negation* nil))
+       (declare (special sb!kernel::*unparse-allow-negation*)) ; forward ref
+       (type-specifier (ctype-of object))))
     (t
      (let* ((classoid (layout-classoid (layout-of object)))
             (name (classoid-name classoid)))

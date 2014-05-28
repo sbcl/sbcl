@@ -188,7 +188,11 @@
 ;;; unparsed as FUNCTION. This is useful when we want a type that we
 ;;; can pass to TYPEP.
 (defvar *unparse-fun-type-simplify*)
-(!cold-init-forms (setq *unparse-fun-type-simplify* nil))
+;;; A flag to prevent TYPE-OF calls by user applications from returning
+;;; (NOT x). TYPE-SPECIFIER usually allows it to preserve information.
+(defvar *unparse-allow-negation*)
+(!cold-init-forms (setq *unparse-fun-type-simplify* nil
+                        *unparse-allow-negation* t))
 
 (!define-type-method (function :negate) (type)
   (make-negation-type :type type))
@@ -2442,6 +2446,8 @@ used for a COMPLEX component.~:@>"
   (let ((dims (array-type-dimensions type))
         (eltype (type-specifier (array-type-element-type type)))
         (complexp (array-type-complexp type)))
+    (if (and (eq complexp t) (not *unparse-allow-negation*))
+        (setq complexp :maybe))
     (cond ((eq dims '*)
            (if (eq eltype '*)
                (ecase complexp

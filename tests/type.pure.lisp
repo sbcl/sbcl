@@ -470,3 +470,30 @@
   (assert (sb-c::type= (sb-c::single-value-type
                         (sb-c::values-specifier-type '(values &optional character)))
                        (sb-c::specifier-type '(or null character)))))
+
+;; lp#1317308 - TYPE-OF must not return a type specifier
+;; involving AND,EQL,MEMBER,NOT,OR,SATISFIES,or VALUES.
+(with-test (:name :ANSIly-report-hairy-array-type)
+  (let ((simp-t (make-array 9))
+        (simp-bit (make-array 16 :element-type 'bit)))
+    ;; TYPE-OF doesn't have an optimization that returns a constant specifier
+    ;; from a non-constant array of known type. If it did, we'd probably
+    ;; want to check that these results are all equal:
+    ;;  - the runtime-determined type
+    ;;  - the compile-time-determined constant type
+    ;;  - the compile-time-determined type of an equivalent object
+    ;;    that is in fact a compile-time constant
+    (flet ((our-type-of (x) (sb-kernel:type-specifier (sb-kernel:ctype-of x))))
+      (let ((hairy-t (make-array 3 :displaced-to simp-t)))
+        (assert (equal (our-type-of hairy-t)
+                       '(and (vector t 3) (not simple-array))))
+        (assert (equal (type-of hairy-t) '(vector t 3))))
+      (let ((hairy-t (make-array '(3 2) :displaced-to simp-t)))
+        (assert (equal (our-type-of hairy-t)
+                       '(and (array t (3 2)) (not simple-array))))
+        (assert (equal (type-of hairy-t) '(array t (3 2)))))
+      (let ((hairy-bit
+             (make-array 5 :displaced-to simp-bit :element-type 'bit)))
+        (assert (equal (our-type-of hairy-bit)
+                       '(and (bit-vector 5) (not simple-array))))
+        (assert (equal (type-of hairy-bit) '(bit-vector 5)))))))

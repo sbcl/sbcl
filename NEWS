@@ -1,4 +1,8 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
+changes relative to sbcl-1.2.0:
+ * bug fix: TYPE-OF must not return AND/OR/NOT expressions.
+   (lp#1317308)
+
 changes in sbcl-1.2.0 relative to sbcl-1.1.18:
   * bug fix: read-time-eval backquote context mixup. (lp#1321047)
   * enhancement: when SAVE-LISP-AND-DIE fails due multiple threads, the
