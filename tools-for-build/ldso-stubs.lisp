@@ -210,11 +210,6 @@ ldso_stub__ ## fct: ;                  \\
                    "asinh"
                    "atanh"
                    "bind"
-                   #!-android
-                   '("cfgetispeed"
-                     "cfgetospeed"
-                     "cfsetispeed"
-                     "cfsetospeed")
                    "chmod"
                    "chown"
                    "close"
@@ -244,7 +239,6 @@ ldso_stub__ ## fct: ;                  \\
                    "gethostbyname"
                    "gethostname"
                    "getitimer"
-                   #!-android "getpagesize"
                    "getpeername"
                    "getpgrp"
                    "getpid"
@@ -268,7 +262,6 @@ ldso_stub__ ## fct: ;                  \\
                    "memmove"
                    "mkdir"
                    "nanosleep"
-                   #!-android "nl_langinfo"
                    "open"
                    "opendir"
                    "pipe"
@@ -295,13 +288,6 @@ ldso_stub__ ## fct: ;                  \\
                    "symlink"
                    "sync"
                    "tanh"
-                   #!-android
-                   '("tcdrain"
-                     "tcflow"
-                     "tcflush"
-                     "tcgetattr"
-                     "tcsendbreak"
-                     "tcsetattr")
                    "truncate"
                    "ttyname"
                    #!-hpux "tzname"
@@ -350,7 +336,20 @@ ldso_stub__ ## fct: ;                  \\
                  #!+os-provides-dladdr
                  '("dladdr")
                  #!-sunos ;; !defined(SVR4)
-                 '("sigsetmask")))
+                 '("sigsetmask")
+                 #!-android
+                   '("nl_langinfo"
+                     "getpagesize"
+                     "cfgetispeed"
+                     "cfgetospeed"
+                     "cfsetispeed"
+                     "cfsetospeed"
+                     "tcdrain"
+                     "tcflow"
+                     "tcflush"
+                     "tcgetattr"
+                     "tcsendbreak"
+                     "tcsetattr")))
 
 (with-open-file (f "src/runtime/ldso-stubs.S" :direction :output :if-exists :supersede)
   (assert (= (length *preludes*) 2))
