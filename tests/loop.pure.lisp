@@ -285,3 +285,11 @@
                                     collect (char-code c)))))
          (consts (ctu:find-code-constants fun :type '(or symbol list))))
     (assert (or (null consts) (equal 'character consts)))))
+
+(with-test (:name :type-of-nilled-vars)
+  (assert (equal (loop for (a b) float = '(1.0 2.0)
+                       return (list a b))
+                 '(1.0 2.0)))
+  (assert (equal (loop for (a nil b) float = '(1.0 3.0 2.0)
+                       return (list a b))
+                 '(1.0 2.0))))
