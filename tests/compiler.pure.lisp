@@ -4309,21 +4309,26 @@
     (assert (every #'plusp (funcall f #'list)))))
 
 (with-test (:name (:malformed-ignore :lp-1000239))
-  (raises-error?
-   (eval '(lambda () (declare (ignore (function . a)))))
-   sb-int:compiled-program-error)
-  (raises-error?
-   (eval '(lambda () (declare (ignore (function a b)))))
-   sb-int:compiled-program-error)
-  (raises-error?
-   (eval '(lambda () (declare (ignore (function)))))
-   sb-int:compiled-program-error)
-  (raises-error?
-   (eval '(lambda () (declare (ignore (a)))))
-   sb-int:compiled-program-error)
-  (raises-error?
-   (eval '(lambda () (declare (ignorable (a b)))))
-   sb-int:compiled-program-error))
+  (assert
+   (raises-error?
+    (eval '(lambda () (declare (ignore (function . a)))))
+    sb-int:simple-program-error))
+  (assert
+   (raises-error?
+    (eval '(lambda () (declare (ignore (function a b)))))
+    sb-int:simple-program-error))
+  (assert
+   (raises-error?
+    (eval '(lambda () (declare (ignore (function)))))
+    sb-int:simple-program-error))
+  (assert
+   (raises-error?
+    (eval '(lambda () (declare (ignore (a)))))
+    sb-int:simple-program-error))
+  (assert
+   (raises-error?
+    (eval '(lambda () (declare (ignorable (a b)))))
+    sb-int:simple-program-error)))
 
 (with-test (:name :malformed-type-declaraions)
   (compile nil '(lambda (a) (declare (type (integer 1 2 . 3) a)))))

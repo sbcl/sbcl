@@ -168,8 +168,9 @@
                                  :default sym)))))
 
 (with-test (:name (:join-thread :nlx :error))
-  (raises-error? (join-thread (make-thread (lambda () (sb-thread:abort-thread))))
-                 join-thread-error))
+  (assert
+   (raises-error? (join-thread (make-thread (lambda () (sb-thread:abort-thread))))
+                  join-thread-error)))
 
 (with-test (:name (:join-thread :multiple-values))
   (assert (equal '(1 2 3)
