@@ -56,19 +56,15 @@
 ;;; FIXME: Couldn't the META versions go away in SBCL now that we don't
 ;;; have to worry about metacompiling and breaking the compiler?
 (defvar *backend-sc-names* (make-hash-table :test 'eq))
-(defvar *backend-sb-names* (make-hash-table :test 'eq))
 (defvar *backend-meta-sc-names* (make-hash-table :test 'eq))
-(defvar *backend-meta-sb-names* (make-hash-table :test 'eq))
 (declaim (type hash-table
                *backend-sc-names*
-               *backend-sb-names*
-               *backend-meta-sc-names*
-               *backend-meta-sb-names*))
+               *backend-meta-sc-names*))
 
 
 ;;; like *SC-NUMBERS*, but updated at meta-compile time
 ;;;
-;;; FIXME: As per *BACKEND-META-SC-NAMES* and *BACKEND-META-SB-NAMES*,
+;;; FIXME: As per *BACKEND-META-SC-NAMES*
 ;;; couldn't we get rid of this in SBCL?
 (defvar *backend-meta-sc-numbers*
   (make-array sc-number-limit :initial-element nil))

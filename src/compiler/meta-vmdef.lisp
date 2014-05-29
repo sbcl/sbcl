@@ -45,21 +45,23 @@
      (aver (not (logtest size (1- size-alignment))))
      (aver (not (logtest size-increment (1- size-alignment))))))
 
-  (let ((res (if (eq kind :non-packed)
+  (let ((sb (if (eq kind :non-packed)
                  (make-sb :name name :kind kind)
                  (make-finite-sb :name name :kind kind :size size
                                  :size-increment size-increment
                                  :size-alignment size-alignment))))
     `(progn
-       (eval-when (:compile-toplevel :load-toplevel :execute)
-         (/show0 "about to SETF GETHASH META-SB-NAMES in DEFINE-STORAGE-BASE")
-         (setf (gethash ',name *backend-meta-sb-names*)
-               ',res))
-       (/show0 "about to SETF GETHASH SB-NAMES in DEFINE-STORAGE-BASE")
-       ,(if (eq kind :non-packed)
-            `(setf (gethash ',name *backend-sb-names*)
-                   (copy-sb ',res))
-            `(let ((res (copy-finite-sb ',res)))
+       (/show0 "in DEFINE-STORAGE-BASE")
+       ;; DEFINE-STORAGE-CLASS need the storage bases while building
+       ;; the cross-compiler, but to eval this during cross-compilation
+       ;; would kill the cross-compiler.
+       (eval-when (#-sb-xc :compile-toplevel :load-toplevel :execute)
+         (let ((sb (,(if (eq kind :non-packed) 'copy-sb 'copy-finite-sb)
+                    ',sb)))
+           (setf *backend-sb-list*
+                 (cons sb (remove ',name *backend-sb-list* :key #'sb-name)))))
+       ,@(unless (eq kind :non-packed)
+           `((let ((res (sb-or-lose ',name)))
                (/show0 "not :NON-PACKED, i.e. hairy case")
                (setf (finite-sb-always-live res)
                      (make-array ',size :initial-element #*))
@@ -71,15 +73,7 @@
                      (make-array ',size :initial-element nil))
                (/show0 "doing fourth SETF")
                (setf (finite-sb-always-live-count res)
-                     (make-array ',size :initial-element 0))
-               (/show0 "doing fifth and final SETF")
-               (setf (gethash ',name *backend-sb-names*)
-                     res)))
-
-       (/show0 "about to put SB onto/into SB-LIST")
-       (setf *backend-sb-list*
-             (cons (sb-or-lose ',name)
-                   (remove ',name *backend-sb-list* :key #'sb-name)))
+                     (make-array ',size :initial-element 0)))))
        (/show0 "finished with DEFINE-STORAGE-BASE expansion")
        ',name)))
 
@@ -129,7 +123,7 @@
   (unless (= (logcount alignment) 1)
     (error "alignment not a power of two: ~W" alignment))
 
-  (let ((sb (meta-sb-or-lose sb-name)))
+  (let ((sb (sb-or-lose sb-name)))
     (if (eq (sb-kind sb) :finite)
         (let ((size (sb-size sb))
               (element-size (eval element-size)))
@@ -160,7 +154,7 @@
     `(progn
        (eval-when (:compile-toplevel :load-toplevel :execute)
          (let ((res (make-sc :name ',name :number ',number
-                             :sb (meta-sb-or-lose ',sb-name)
+                             :sb (sb-or-lose ',sb-name)
                              :element-size ,element-size
                              :alignment ,alignment
                              :locations ',locations
