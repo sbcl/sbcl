@@ -33,12 +33,6 @@
 
 (defun sc-number-or-lose (x)
   (the sc-number (sc-number (sc-or-lose x))))
-
-;;; This is like the non-meta versions, except we go for the
-;;; meta-compile-time info. These should not be used after load time,
-;;; since compiling the compiler changes the definitions.
-(defun meta-sc-number-or-lose (x) ; FIXME: remove
-  (the sc-number (sc-number (sc-or-lose x))))
 
 ;;;; side effect classes
 
