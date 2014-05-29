@@ -1553,6 +1553,8 @@
   (foldable unsafely-flushable explicit-check always-translatable))
 (defknown data-vector-ref-with-offset (simple-array fixnum fixnum) t
   (foldable unsafely-flushable explicit-check always-translatable))
+(defknown data-nil-vector-ref (simple-array index) nil
+  (explicit-check always-translatable))
 (defknown data-vector-set (array index t) t
   (explicit-check always-translatable))
 (defknown data-vector-set-with-offset (array fixnum fixnum t) t

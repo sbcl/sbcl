@@ -11,15 +11,16 @@
 (in-package "SB!VM")
 
 ;;; (ARRAY NIL) stuff looks the same on all platforms
-(define-vop (data-vector-ref/simple-array-nil)
-  (:translate data-vector-ref)
+;;; 
+;;; This is separate from DATA-VECTOR-REF, because it's declared as
+;;; unsafely-flushable, and flushing access to nil arrays causes all
+;;; sorts of problems.
+(define-vop (data-nil-vector-ref)
+  (:translate data-nil-vector-ref)
   (:policy :fast-safe)
   (:args (object :scs (descriptor-reg))
-         (index :scs (unsigned-reg)))
-  (:arg-types simple-array-nil positive-fixnum)
-  (:results (value :scs (descriptor-reg)))
-  (:result-types *)
-  (:ignore index value)
+         (index :scs (any-reg descriptor-reg) :load-if (not t)))
+  (:arg-types simple-array-nil *)
   (:vop-var vop)
   (:save-p :compute-only)
   (:generator 1
@@ -48,25 +49,6 @@
   (:results (result :scs (descriptor-reg)))
   (:result-types *)
   (:ignore index value result)
-  (:vop-var vop)
-  (:save-p :compute-only)
-  (:generator 1
-    (error-call vop
-                #!-(or alpha hppa mips) 'nil-array-accessed-error
-                #!+(or alpha hppa mips) nil-array-accessed-error
-                object)))
-
-(define-vop (data-vector-ref-with-offset/simple-array-nil)
-  (:translate data-vector-ref-with-offset)
-  (:policy :fast-safe)
-  (:args (object :scs (descriptor-reg))
-         (index :scs (unsigned-reg)))
-  (:info offset)
-  (:arg-types simple-array-nil positive-fixnum
-              (:constant (integer 0 0)))
-  (:results (value :scs (descriptor-reg)))
-  (:result-types *)
-  (:ignore index value offset)
   (:vop-var vop)
   (:save-p :compute-only)
   (:generator 1

@@ -101,7 +101,7 @@
           ((simple-array base-char (*))
            (data-vector-ref string index))
           ((simple-array nil (*))
-           (data-vector-ref string index))))))
+           (data-nil-vector-ref string index))))))
 
 ;;; This and the corresponding -SET transform work equally well on non-simple
 ;;; arrays, but after benchmarking (on x86), Nikodemus didn't find any cases
@@ -125,10 +125,13 @@
            (%data-vector-and-index array index)
          (declare (type (simple-array ,element-type-specifier 1) array))
          ,(let ((bare-form '(data-vector-ref array index)))
-            (if (type= element-ctype declared-element-ctype)
-                bare-form
-                `(the ,(type-specifier declared-element-ctype)
-                      ,bare-form)))))))
+            (cond ((eql element-ctype *empty-type*)
+                   `(data-nil-vector-ref array index))
+                  ((type= element-ctype declared-element-ctype)
+                   bare-form)
+                  (t
+                   `(the ,(type-specifier declared-element-ctype)
+                         ,bare-form))))))))
 
 ;;; Transform multi-dimensional array to one dimensional data vector
 ;;; access.

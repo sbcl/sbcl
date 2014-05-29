@@ -89,59 +89,98 @@
            9))
 
 ;; String trimming.
-
-(flet ((make-test (string left right both)
-         (macrolet ((check (fun wanted)
-                      `(let ((result (,fun " " string)))
-                         (assert (equal result ,wanted))
-                         (when (equal string ,wanted)
-                           ;; Check that the original string is
-                           ;; returned when no changes are needed. Not
-                           ;; required by the spec, but a desireable
-                           ;; feature for performance.
-                           (assert (eql result string))))))
-           ;; Check the functional implementations
-           (locally
-               (declare (notinline string-left-trim string-right-trim
-                                   string-trim))
-             (check string-left-trim left)
-             (check string-right-trim right)
-             (check string-trim both))
-           ;; Check the transforms
-           (locally
-               (declare (type simple-string string))
-             (check string-left-trim left)
-             (check string-right-trim right)
-             (check string-trim both)))))
-  (make-test "x " "x " "x" "x")
-  (make-test " x" "x" " x" "x")
-  (make-test " x " "x " " x" "x")
-  (make-test " x x " "x x " " x x" "x x"))
+(with-test (:name :string-trim.1)
+  (flet ((make-test (string left right both)
+           (macrolet ((check (fun wanted)
+                        `(let ((result (,fun " " string)))
+                           (assert (equal result ,wanted))
+                           (when (equal string ,wanted)
+                             ;; Check that the original string is
+                             ;; returned when no changes are needed. Not
+                             ;; required by the spec, but a desireable
+                             ;; feature for performance.
+                             (assert (eql result string))))))
+             ;; Check the functional implementations
+             (locally
+                 (declare (notinline string-left-trim string-right-trim
+                                     string-trim))
+               (check string-left-trim left)
+               (check string-right-trim right)
+               (check string-trim both))
+             ;; Check the transforms
+             (locally
+                 (declare (type simple-string string))
+               (check string-left-trim left)
+               (check string-right-trim right)
+               (check string-trim both)))))
+    (make-test "x " "x " "x" "x")
+    (make-test " x" "x" " x" "x")
+    (make-test " x " "x " " x" "x")
+    (make-test " x x " "x x " " x x" "x x")))
 
 
 ;;; Trimming should respect fill-pointers
-(let* ((s (make-array 9 :initial-contents "abcdabadd" :element-type
-                      'character :fill-pointer 7))
-       (s2 (string-left-trim "ab" s))
-       (s3 (string-right-trim "ab" s)))
-  (assert (equal "abcdaba" s))
-  (assert (equal "cdaba" s2))
-  (assert (equal "abcd" s3)))
+(with-test (:name :string-trim.fill-pointer)
+  (let* ((s (make-array 9 :initial-contents "abcdabadd" :element-type
+                        'character :fill-pointer 7))
+         (s2 (string-left-trim "ab" s))
+         (s3 (string-right-trim "ab" s)))
+    (assert (equal "abcdaba" s))
+    (assert (equal "cdaba" s2))
+    (assert (equal "abcd" s3))))
 
 ;;; Trimming should replace displacement offsets
-(let* ((etype 'base-char)
-             (s0
-              (make-array '(6) :initial-contents "abcaeb" :element-type etype))
-             (s
-              (make-array '(3) :element-type etype :displaced-to s0 :displaced-index-offset 1)))
-  (assert (equal "bc" (string-right-trim "ab" s)))
-  (assert (equal "bca" s))
-  (assert (equal "abcaeb" s0)))
+(with-test (:name :string-trim.displaced)
+ (let* ((etype 'base-char)
+        (s0
+          (make-array '(6) :initial-contents "abcaeb" :element-type etype))
+        (s
+          (make-array '(3) :element-type etype :displaced-to s0 :displaced-index-offset 1)))
+   (assert (equal "bc" (string-right-trim "ab" s)))
+   (assert (equal "bca" s))
+   (assert (equal "abcaeb" s0))))
 
-;;; Trimming non-simple-strings when there is nothing to do
-(let ((a (make-array 10 :element-type 'character :initial-contents "abcde00000" :fill-pointer 5)))
-  (assert (equal "abcde" (string-right-trim "Z" a))))
+(with-test (:name :string-trimg.nothing-to-do)
+  ;; Trimming non-simple-strings when there is nothing to do
+  (let ((a (make-array 10 :element-type 'character :initial-contents "abcde00000" :fill-pointer 5)))
+    (assert (equal "abcde" (string-right-trim "Z" a))))
 
-;;; Trimming non-strings when there is nothing to do.
-(string-right-trim " " #\a)
+  ;; Trimming non-strings when there is nothing to do.
+  (string-right-trim " " #\a))
 
+(with-test (:name :nil-vector-access)
+  (let ((nil-vector (make-array 10 :element-type nil)))
+    (assert-error (write-to-string nil-vector)
+                  sb-kernel:nil-array-accessed-error)
+    (flet ((test (accessor)
+             (assert-error
+              (funcall (compile nil
+                                `(lambda ()
+                                   (,accessor (make-array 10 :element-type nil) 0))))
+              sb-kernel:nil-array-accessed-error)
+             (assert-error
+              (funcall (compile nil `(lambda (x) (,accessor x 0)))
+                       nil-vector)
+              sb-kernel:nil-array-accessed-error)))
+      (test 'aref)
+      (test 'char)
+      (test 'schar)
+      (test 'row-major-aref))))
+
+(with-test (:name :nil-array-access)
+  (let ((nil-array (make-array '(10 10) :element-type nil)))
+    (assert-error (write-to-string nil-array)
+                  sb-kernel:nil-array-accessed-error)
+    (flet ((test (accessor args)
+             (assert-error
+              (funcall (compile nil
+                                `(lambda ()
+                                   (,accessor (make-array '(10 10) :element-type nil)
+                                              ,@(make-list args :initial-element 0)))))
+              sb-kernel:nil-array-accessed-error)
+             (assert-error
+              (funcall (compile nil `(lambda (x) (,accessor x ,@(make-list args :initial-element 0))))
+                       nil-array)
+              sb-kernel:nil-array-accessed-error)))
+      (test 'aref 2)
+      (test 'row-major-aref 1))))

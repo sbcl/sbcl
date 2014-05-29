@@ -1145,14 +1145,16 @@
   (let* ((type (lvar-type array))
          (element-ctype (array-type-upgraded-element-type type)))
     (cond
+      ((eql element-ctype *empty-type*)
+       `(data-nil-vector-ref array index))
       ((and (array-type-p type)
             (null (array-type-complexp type))
             (not (eql element-ctype *wild-type*))
             (eql (length (array-type-dimensions type)) 1))
        (let* ((declared-element-ctype (array-type-declared-element-type type))
               (bare-form
-               `(data-vector-ref array
-                 (%check-bound array (array-dimension array 0) index))))
+                `(data-vector-ref array
+                                  (%check-bound array (array-dimension array 0) index))))
          (if (type= declared-element-ctype element-ctype)
              bare-form
              `(the ,(type-specifier declared-element-ctype) ,bare-form))))

@@ -636,12 +636,15 @@ of specialized arrays is supported."
              (let* ((type (sb!vm:saetp-specifier saetp))
                     (atype `(simple-array ,type (*))))
                `(named-lambda optimized-data-vector-ref (vector index)
-                  (declare (optimize speed (safety 0)))
-                  (data-vector-ref (the ,atype vector)
-                                   (locally
-                                       (declare (optimize (safety 1)))
-                                     (the index
-                                       (,@check-form index)))))))
+                  (declare (optimize speed (safety 0))
+                           (ignorable index))
+                  ,(if type
+                       `(data-vector-ref (the ,atype vector)
+                                         (locally
+                                             (declare (optimize (safety 1)))
+                                           (the index
+                                                (,@check-form index))))
+                       `(data-nil-vector-ref (the ,atype vector) index)))))
            (define-setter (saetp check-form)
              (let* ((type (sb!vm:saetp-specifier saetp))
                     (atype `(simple-array ,type (*))))
