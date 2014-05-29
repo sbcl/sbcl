@@ -11,7 +11,7 @@
 (in-package "SB!VM")
 
 ;;; (ARRAY NIL) stuff looks the same on all platforms
-;;; 
+;;;
 ;;; This is separate from DATA-VECTOR-REF, because it's declared as
 ;;; unsafely-flushable, and flushing access to nil arrays causes all
 ;;; sorts of problems.

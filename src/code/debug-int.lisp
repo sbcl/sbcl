@@ -2591,21 +2591,19 @@ register."
          (namestring (debug-source-namestring d-source)))
     ;; FIXME: External format?
     (with-open-file (f namestring :if-does-not-exist nil)
-      (unless f
-        (error "The source file no longer exists:~%  ~A" namestring))
-      (format *debug-io* "~%; file: ~A~%" namestring)
-      (let ((*readtable* (safe-readtable)))
-        (cond ((eql (debug-source-created d-source) (file-write-date f))
-               (file-position f char-offset))
-              (t
-               (format *debug-io*
-                       "~%; File has been modified since compilation:~%;   ~A~@
+      (when f
+        (let ((*readtable* (safe-readtable)))
+          (cond ((eql (debug-source-created d-source) (file-write-date f))
+                 (file-position f char-offset))
+                (t
+                 (format *debug-io*
+                         "~%; File has been modified since compilation:~%;   ~A~@
                           ; Using form offset instead of character position.~%"
-                       namestring)
-               (let ((*read-suppress* t))
-                 (loop repeat local-tlf-offset
-                       do (read f)))))
-        (read f)))))
+                         namestring)
+                 (let ((*read-suppress* t))
+                   (loop repeat local-tlf-offset
+                         do (read f)))))
+          (read f))))))
 
 ;;;; PREPROCESS-FOR-EVAL
 
