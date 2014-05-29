@@ -46,3 +46,11 @@
     (assert (= index 5))
     (assert (= fp2 6))
     (assert (not bool))))
+
+(with-test (:name :svref-unknown-type)
+  (compile nil `(lambda (a)
+                  (declare ((vector undefined-type) a))
+                  (svref a 0)))
+  (compile nil `(lambda (a)
+                  (declare ((vector undefined-type) a))
+                  (setf (svref a 0) 10))))

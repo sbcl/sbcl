@@ -1059,8 +1059,14 @@
                       t)))
     (with-unique-names (n-vector)
       `(let ((,n-vector ,vector))
+         ;; Using THE creates a union type, e.g. (data-vector-ref (the
+         ;; unknown-type array) i) which, when unknown-type is unknown
+         ;; at compile-time, prevents data-vector-ref VOP from being
+         ;; selected.
+         ;; DECLARE prevents that from happening.
+         (declare (simple-vector ,n-vector))
          (the ,elt-type (data-vector-ref
-                         (the simple-vector ,n-vector)
+                         ,n-vector
                          (%check-bound ,n-vector (length ,n-vector) ,index)))))))
 
 (define-source-transform %svset (vector index value)
@@ -1072,8 +1078,9 @@
                       t)))
     (with-unique-names (n-vector)
       `(let ((,n-vector ,vector))
+         (declare (simple-vector ,n-vector))
          (truly-the ,elt-type (data-vector-set
-                               (the simple-vector ,n-vector)
+                               ,n-vector
                                (%check-bound ,n-vector (length ,n-vector) ,index)
                                (the ,elt-type ,value)))))))
 

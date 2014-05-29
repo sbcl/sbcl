@@ -1,13 +1,15 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 changes relative to sbcl-1.2.0:
- * enhancement: GENCGC is enabled on ARM.
- * bug fix: TYPE-OF must not return AND/OR/NOT expressions.
+  * enhancement: GENCGC is enabled on ARM.
+  * bug fix: TYPE-OF must not return AND/OR/NOT expressions.
    (lp#1317308)
- * bug fix: LOOP: of-type specified for destructed variables is no longer
-   confused by NIL. (lp#1322923)
- * bug fix: accessing NIL arrays stopped producing errors. (lp#1311421)
- * bug fix: DISASSEMBLE no longer prints unwanted stuff. (lp#1251861)
-
+  * bug fix: LOOP: of-type specified for destructed variables is no longer
+    confused by NIL. (lp#1322923)
+  * bug fix: accessing NIL arrays stopped producing errors. (lp#1311421)
+  * bug fix: DISASSEMBLE no longer prints unwanted stuff. (lp#1251861)
+  * bug fix: compiling SVREF on unknown types no longer produces scary errors.
+    (lp#1258716)
+  
 changes in sbcl-1.2.0 relative to sbcl-1.1.18:
   * bug fix: read-time-eval backquote context mixup. (lp#1321047)
   * enhancement: when SAVE-LISP-AND-DIE fails due multiple threads, the
