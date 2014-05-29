@@ -197,7 +197,7 @@
 ;;; bug 46c
 (with-test (:name :coerce-function-on-macro)
   (dolist (fun '(and if))
-    (assert (raises-error? (coerce fun 'function)))))
+    (assert-error (coerce fun 'function))))
 
 (dotimes (i 100)
   (let ((x (make-array 0 :element-type `(unsigned-byte ,(1+ i)))))

@@ -14,6 +14,7 @@
 ; WHITE-BOX TESTS
 
 (in-package "SB-THREAD")
+(shadowing-import 'assertoid:assert-error)
 (use-package :test-util)
 (use-package "ASSERTOID")
 
@@ -168,9 +169,8 @@
                                  :default sym)))))
 
 (with-test (:name (:join-thread :nlx :error))
-  (assert
-   (raises-error? (join-thread (make-thread (lambda () (sb-thread:abort-thread))))
-                  join-thread-error)))
+  (assert-error (join-thread (make-thread (lambda () (sb-thread:abort-thread))))
+                join-thread-error))
 
 (with-test (:name (:join-thread :multiple-values))
   (assert (equal '(1 2 3)

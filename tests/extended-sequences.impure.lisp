@@ -31,5 +31,5 @@
   'bug-1315846-simple-sequence)
 
 (with-test (:name (make-sequence deftype :bug-1315846))
-  (assert (raises-error? (make-sequence 'bug-1315846-sequence 10)
-                         sequence::protocol-unimplemented)))
+  (assert-error (make-sequence 'bug-1315846-sequence 10)
+                sequence::protocol-unimplemented))

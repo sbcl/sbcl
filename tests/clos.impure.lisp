@@ -487,7 +487,7 @@
 
 (defgeneric wam-test-mc-a (val)
   (:method-combination wam-test-method-combination-a))
-(assert (raises-error? (wam-test-mc-a 13)))
+(assert-error (wam-test-mc-a 13))
 (defmethod wam-test-mc-a ((val number))
   (+ val (if (next-method-p) (call-next-method) 0)))
 (assert (= (wam-test-mc-a 13) 13))
@@ -538,7 +538,7 @@
 (assert (= (wam-test-mc-b 13) 26))
 (defmethod wam-test-mc-b :somethingelse ((val number))
   (+ val (if (next-method-p) (call-next-method) 0)))
-(assert (raises-error? (wam-test-mc-b 13)))
+(assert-error (wam-test-mc-b 13))
 
 ;;; now, ensure that it fails with a single group with a qualifier-pattern
 ;;; that is not *
@@ -550,25 +550,25 @@
 
 (defgeneric wam-test-mc-c (val)
   (:method-combination wam-test-method-combination-c))
-(assert (raises-error? (wam-test-mc-c 13)))
+(assert-error (wam-test-mc-c 13))
 (defmethod wam-test-mc-c :foo ((val number))
   (+ val (if (next-method-p) (call-next-method) 0)))
 (assert (= (wam-test-mc-c 13) 13))
 (defmethod wam-test-mc-c :bar ((val number))
   (+ val (if (next-method-p) (call-next-method) 0)))
-(assert (raises-error? (wam-test-mc-c 13)))
+(assert-error (wam-test-mc-c 13))
 
 ;;; DEFMETHOD should signal an ERROR if an incompatible lambda list is
 ;;; given:
 (defmethod incompatible-ll-test-1 (x) x)
-(assert (raises-error? (defmethod incompatible-ll-test-1 (x y) y)))
-(assert (raises-error? (defmethod incompatible-ll-test-1 (x &rest y) y)))
+(assert-error (defmethod incompatible-ll-test-1 (x y) y))
+(assert-error (defmethod incompatible-ll-test-1 (x &rest y) y))
 ;;; Sneakily using a bit of MOPness to check some consistency
 (assert (= (length
             (sb-pcl:generic-function-methods #'incompatible-ll-test-1)) 1))
 
 (defmethod incompatible-ll-test-2 (x &key bar) bar)
-(assert (raises-error? (defmethod incompatible-ll-test-2 (x) x)))
+(assert-error (defmethod incompatible-ll-test-2 (x) x))
 (defmethod incompatible-ll-test-2 (x &rest y) y)
 (assert (= (length
             (sb-pcl:generic-function-methods #'incompatible-ll-test-2)) 1))
@@ -577,7 +577,7 @@
             (sb-pcl:generic-function-methods #'incompatible-ll-test-2)) 2))
 
 ;;; Per Christophe, this is an illegal method call because of 7.6.5
-(assert (raises-error? (incompatible-ll-test-2 t 1 2)))
+(assert-error (incompatible-ll-test-2 t 1 2))
 
 (assert (eq (incompatible-ll-test-2 1 :bar 'yes) 'yes))
 
@@ -586,7 +586,7 @@
                (find-method #'incompatible-ll-test-3
                             nil
                             (list (find-class 'integer))))
-(assert (raises-error? (defmethod incompatible-ll-test-3 (x y) (list x y))))
+(assert-error (defmethod incompatible-ll-test-3 (x y) (list x y)))
 
 
 ;;; Attempting to instantiate classes with forward references in their
@@ -691,7 +691,7 @@
   (reinitialize-instance (make-instance 'class234) :dummy 0))
 (defun subbug-234 ()
   (reinitialize-instance (make-instance 'subclass234) :dummy 0))
-(assert (raises-error? (bug-234) program-error))
+(assert-error (bug-234) program-error)
 (defmethod shared-initialize :after ((i class234) slots &key dummy)
   (incf *bug234*))
 (assert (typep (subbug-234) 'subclass234))
@@ -847,14 +847,14 @@
 (defmethod width ((c character-class) &key font) font)
 (defmethod width ((p picture-class) &key pixel-size) pixel-size)
 
-(assert (raises-error?
-         (width (make-instance 'character-class :char #\Q)
-                :font 'baskerville :pixel-size 10)
-         program-error))
-(assert (raises-error?
-         (width (make-instance 'picture-class :glyph #\Q)
-                :font 'baskerville :pixel-size 10)
-         program-error))
+(assert-error
+ (width (make-instance 'character-class :char #\Q)
+        :font 'baskerville :pixel-size 10)
+ program-error)
+(assert-error
+ (width (make-instance 'picture-class :glyph #\Q)
+        :font 'baskerville :pixel-size 10)
+ program-error)
 (assert (eq (width (make-instance 'character-picture-class :char #\Q)
                    :font 'baskerville :pixel-size 10)
             'baskerville))
@@ -867,9 +867,9 @@
 ;;; attempts to add accessorish methods to generic functions with more
 ;;; complex lambda lists should fail
 (defgeneric accessoroid (object &key &allow-other-keys))
-(assert (raises-error?
-         (defclass accessoroid-class () ((slot :accessor accessoroid)))
-         program-error))
+(assert-error
+ (defclass accessoroid-class () ((slot :accessor accessoroid)))
+ program-error)
 
 ;;; reported by Bruno Haible sbcl-devel 2004-04-15
 (defclass shared-slot-and-redefinition ()
@@ -1088,8 +1088,8 @@
 (defun existing-name (object)
   (list object))
 
-(assert (raises-error? (defclass redefinition-of-accessor-class ()
-                         ((slot :accessor existing-name)))))
+(assert-error (defclass redefinition-of-accessor-class ()
+                ((slot :accessor existing-name))))
 
 (defclass redefinition-of-accessor-class ()
   ((slot :accessor new-name)))
@@ -1106,8 +1106,8 @@
   (mapcar #'eval
           '(
             (deftype defined-type () 'integer)
-            (assert (raises-error?
-                     (defmethod method-on-defined-type ((x defined-type)) x)))
+            (assert-error
+             (defmethod method-on-defined-type ((x defined-type)) x))
             (deftype defined-type-and-class () 'integer)
             (setf (find-class 'defined-type-and-class) (find-class 'integer))
             (defmethod method-on-defined-type-and-class
@@ -1264,7 +1264,7 @@
 (with-test (:name (:ctor :unnamed-after))
   (assert (typep (ctor-unnamed-literal-class2) *unnamed2*)))
 (with-test (:name (:ctor :unnamed-after/symbol))
-  (assert (raises-error? (ctor-unnamed-literal-class2/symbol))))
+  (assert-error (ctor-unnamed-literal-class2/symbol)))
 
 ;;; classes with slot types shouldn't break if the types don't name
 ;;; classes (bug #391)
@@ -1396,7 +1396,7 @@
 (defgeneric test-mc27 (x)
   (:method-combination mc27)
   (:method :ignore ((x number)) (/ 0)))
-(assert (raises-error? (test-mc27 7)))
+(assert-error (test-mc27 7))
 
 (define-method-combination mc27prime ()
   ((normal ())
@@ -1406,7 +1406,7 @@
   (:method-combination mc27prime)
   (:method :ignore ((x number)) (/ 0)))
 (assert (equal '(result) (test-mc27prime 3)))
-(assert (raises-error? (test-mc27 t))) ; still no-applicable-method
+(assert-error (test-mc27 t))           ; still no-applicable-method
 
 ;;; more invalid wrappers.  This time for a long-standing bug in the
 ;;; compiler's expansion for TYPEP on various class-like things, with
@@ -1851,14 +1851,14 @@
   (make-instance 'cacheing-initargs-redefinitions-check)
   (make-instance 'cacheing-initargs-redefinitions-check :slot 3)
   (cacheing-initargs-redefinitions-check-fun :slot)
-  (assert (raises-error? (cacheing-initargs-redefinitions-check-fun :slot2))))
+  (assert-error (cacheing-initargs-redefinitions-check-fun :slot2)))
 (defclass cacheing-initargs-redefinitions-check ()
   ((slot :initarg :slot2)))
 (with-test (:name :make-instance-redefined-initargs)
   (make-instance 'cacheing-initargs-redefinitions-check)
   (make-instance 'cacheing-initargs-redefinitions-check :slot2 3)
   (cacheing-initargs-redefinitions-check-fun :slot2)
-  (assert (raises-error? (cacheing-initargs-redefinitions-check-fun :slot))))
+  (assert-error (cacheing-initargs-redefinitions-check-fun :slot)))
 (defmethod initialize-instance :after ((class cacheing-initargs-redefinitions-check) &key slot)
   nil)
 (with-test (:name :make-instance-new-method-initargs)
@@ -2064,11 +2064,11 @@
      (foo= 15 (funcall (compile nil '(lambda () (make-instance 'bug-1179858b 'foo 15))))))))
 
 (with-test (:name (:cpl-violation-setup :bug-309076))
-  (assert (raises-error?
-           (progn
-             (defclass bug-309076-broken-class (standard-class) ()
-               (:metaclass sb-mop:funcallable-standard-class))
-             (sb-mop:finalize-inheritance (find-class 'bug-309076-broken-class))))))
+  (assert-error
+   (progn
+     (defclass bug-309076-broken-class (standard-class) ()
+       (:metaclass sb-mop:funcallable-standard-class))
+     (sb-mop:finalize-inheritance (find-class 'bug-309076-broken-class)))))
 
 (with-test (:name (:cpl-violation-irrelevant-class :bug-309076))
   (defclass bug-309076-class (standard-class) ())
@@ -2135,8 +2135,8 @@
 (with-test (:name (built-in-class :subclass error))
   (flet ((mapper (c)
            (when (and (class-name c) (typep c 'built-in-class))
-             (assert (raises-error? (eval `(defclass ,(gensym) (,(class-name c))
-                                             ())))))))
+             (assert-error (eval `(defclass ,(gensym) (,(class-name c))
+                                    ()))))))
     (sb-pcl::map-all-classes #'mapper)))
 
 ;;;; success

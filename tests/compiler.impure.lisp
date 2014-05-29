@@ -321,20 +321,20 @@
                    (declare (sb-ext:disable-package-locks t))
                    (symbol-macrolet ((t nil)) t)))
   (assert failure-p)
-  (assert (raises-error? (funcall function) program-error)))
+  (assert-error (funcall function) program-error))
 (multiple-value-bind (function warnings-p failure-p)
     (compile nil
              '(lambda ()
                ;; not interested in the package lock violation here
                (declare (sb-ext:disable-package-locks *standard-input*))
-                (symbol-macrolet ((*standard-input* nil))
-                  *standard-input*)))
+               (symbol-macrolet ((*standard-input* nil))
+                 *standard-input*)))
   (assert failure-p)
-  (assert (raises-error? (funcall function) program-error)))
+  (assert-error (funcall function) program-error))
 (multiple-value-bind (function warnings-p failure-p)
     (compile nil '(lambda () (symbol-macrolet ((s nil)) (declare (special s)) s)))
   (assert failure-p)
-  (assert (raises-error? (funcall function) program-error)))
+  (assert-error (funcall function) program-error))
 
 ;;; bug 120a: Turned out to be constraining code looking like (if foo
 ;;; <X> <X>) where <X> was optimized by the compiler to be the exact
@@ -372,8 +372,9 @@
     (setf y (the single-float (the integer x)))
     (list y y)))
 
-(raises-error? (foo 3) type-error)
-(raises-error? (foo 3f0) type-error)
+(with-test (:name :non-intersecting-the)
+  (assert-error (non-intersecting-the 3) type-error)
+  (assert-error (non-intersecting-the 3f0) type-error))
 
 ;;; until 0.8.2 SBCL did not check THEs in arguments
 (defun the-in-arguments-aux (x)
@@ -527,10 +528,10 @@
 
 (assert (equal (bug211d) '(:x nil :y nil)))
 (assert (equal (bug211d :x 1) '(1 t :y nil)))
-(assert (raises-error? (bug211d :y 2) program-error))
+(assert-error (bug211d :y 2) program-error)
 (assert (equal (bug211d :y 2 :allow-other-keys t :allow-other-keys nil)
                '(:x nil t t)))
-(assert (raises-error? (bug211d :y 2 :allow-other-keys nil) program-error))
+(assert-error (bug211d :y 2 :allow-other-keys nil) program-error)
 
 (let ((failure-p
        (nth-value
@@ -565,11 +566,11 @@
                 (test :y 2 :allow-other-keys nil :allow-other-keys t)))
   (multiple-value-bind (result warnings-p failure-p)
       (compile nil `(lambda ()
-                     (flet ((test (&key (x :x x-p) ((:allow-other-keys y) :y y-p))
-                              (list x x-p y y-p)))
-                       ,form)))
+                      (flet ((test (&key (x :x x-p) ((:allow-other-keys y) :y y-p))
+                               (list x x-p y y-p)))
+                        ,form)))
     (assert failure-p)
-    (assert (raises-error? (funcall result) program-error))))
+    (assert-error (funcall result) program-error)))
 
 ;;; bug 217: wrong type inference
 (defun bug217-1 (x s)
@@ -676,7 +677,7 @@
 (defun bug219-b-aux2 (z)
   (bug219-b z))
 (assert (not *bug219-b-expanded-p*))
-(assert (raises-error? (bug219-b-aux2 1) undefined-function))
+(assert-error (bug219-b-aux2 1) undefined-function)
 (bug219-b-aux1 t)
 (defun bug219-b-aux2 (z)
   (bug219-b z))
@@ -787,14 +788,14 @@
     (declare (type (mod 4) i))
     (unless (< i 5)
       (print j))))
-(assert (raises-error? (bug192b 6) type-error))
+(assert-error (bug192b 6) type-error)
 
 (defun bug192c (x y)
   (locally (declare (type fixnum x y))
     (+ x (* 2 y))))
-(assert (raises-error? (bug192c 1.1 2) type-error))
+(assert-error (bug192c 1.1 2) type-error)
 
-(assert (raises-error? (progn (the real (list 1)) t) type-error))
+(assert-error (progn (the real (list 1)) t) type-error)
 
 (defun bug236 (a f)
   (declare (optimize (speed 2) (safety 0)))
@@ -816,8 +817,8 @@
            (fixnum x)
            (optimize (safety 3)))
   (list x (setq x (/ x 2)) x))
-(assert (raises-error? (test-type-of-special-1 3/2) type-error))
-(assert (raises-error? (test-type-of-special-2 3) type-error))
+(assert-error (test-type-of-special-1 3/2) type-error)
+(assert-error (test-type-of-special-2 3) type-error)
 (assert (equal (test-type-of-special-2 8) '(8 4 4)))
 
 ;;; bug which existed in 0.8alpha.0.4 for several milliseconds before
@@ -851,7 +852,7 @@
            (incf x)))
     (list (bar x) (bar x) (bar x))))
 
-(assert (raises-error? (bug249 1.0) type-error))
+(assert-error (bug249 1.0) type-error)
 
 ;;; bug reported by ohler on #lisp 2003-07-10
 (defun bug-ohler-2003-07-10 (a b)
@@ -889,7 +890,7 @@
 ;;; attribute (reported by Peter Graves)
 (loop for (fun . args) in '((= a) (/= a)
                             (< a) (<= a) (> a) (>= a))
-      do (assert (raises-error? (apply fun args) type-error)))
+      do (assert-error (apply fun args) type-error))
 
 (defclass broken-input-stream (sb-gray:fundamental-input-stream) ())
 (defmethod sb-gray:stream-read-char ((stream broken-input-stream))
@@ -933,11 +934,11 @@
   (:no-error (val) (error "no error: ~S" val)))
 
 ;;; PROGV must not bind constants, or violate declared types -- ditto for SET.
-(assert (raises-error? (set pi 3)))
-(assert (raises-error? (progv '(pi s) '(3 pi) (symbol-value x))))
+(assert-error (set pi 3))
+(assert-error (progv '(pi s) '(3 pi) (symbol-value x)))
 (declaim (cons *special-cons*))
-(assert (raises-error? (set '*special-cons* "nope") type-error))
-(assert (raises-error? (progv '(*special-cons*) '("no hope") (car *special-cons*)) type-error))
+(assert-error (set '*special-cons* "nope") type-error)
+(assert-error (progv '(*special-cons*) '("no hope") (car *special-cons*)) type-error)
 
 ;;; No bogus warnings for calls to functions with complex lambda-lists.
 (defun complex-function-signature (&optional x &rest y &key z1 z2)
@@ -1172,8 +1173,8 @@
                         conds)))))
 
 (with-test (:name :defmacro-not-list-lambda-list)
-  (assert (raises-error? (eval `(defmacro ,(gensym) "foo"))
-                         type-error)))
+  (assert-error (eval `(defmacro ,(gensym) "foo"))
+                type-error))
 
 (with-test (:name :bug-308951)
   (let ((x 1))
@@ -1692,8 +1693,8 @@
     x))
 
 (test-util:with-test (:name (:compiler :constraint-propagation :cast))
-  (assert (assertoid:raises-error?
-           (test-constraint-propagation/cast 1) type-error)))
+  (assertoid:assert-error
+   (test-constraint-propagation/cast 1) type-error))
 
 ;;; bug #399
 (let ((result (make-array 50000 :fill-pointer 0 :adjustable t)))

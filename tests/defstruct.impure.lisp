@@ -22,10 +22,10 @@
 (make-person :name "James") ; not an error, 007 not used
 
 #+#.(cl:if (cl:eq sb-ext:*evaluator-mode* :compile) '(and) '(or))
-(assert (raises-error? (make-person) type-error))
+(assert-error (make-person) type-error)
 #+#.(cl:if (cl:eq sb-ext:*evaluator-mode* :compile) '(and) '(or))
-(assert (raises-error? (setf (person-name (make-person :name "Q")) 1)
-                       type-error))
+(assert-error (setf (person-name (make-person :name "Q")) 1)
+              type-error)
 
 ;;; An &AUX variable in a boa-constructor without a default value
 ;;; means "do not initialize slot" and does not cause type error
@@ -40,7 +40,7 @@
   (let ((s (make-boa-saux)))
     (locally (declare (optimize (safety 3))
                       (inline boa-saux-a))
-      (assert (raises-error? (opaque-identity (boa-saux-a s)) type-error)))
+      (assert-error (opaque-identity (boa-saux-a s)) type-error))
     (setf (boa-saux-a s) 1)
     (setf (boa-saux-c s) 5)
     (assert (eql (boa-saux-a s) 1))
@@ -65,7 +65,7 @@
   (let ((s (make-boa-saux)))
     (locally (declare (optimize (safety 3))
                       (notinline boa-saux-a))
-      (assert (raises-error? (opaque-identity (boa-saux-a s)) type-error)))
+      (assert-error (opaque-identity (boa-saux-a s)) type-error))
     (setf (boa-saux-a s) 1)
     (setf (boa-saux-c s) 5)
     (assert (eql (boa-saux-a s) 1))
@@ -554,7 +554,7 @@
 (assert (= (bug127--foo (make-bug127-e :foo 3)) 3))
 (defstruct (bug127-f (:conc-name bug127--)) foo)
 (assert (= (bug127--foo (make-bug127-f :foo 3)) 3))
-(assert (raises-error? (bug127--foo (make-bug127-e :foo 3)) type-error))
+(assert-error (bug127--foo (make-bug127-e :foo 3)) type-error)
 
 ;;; FIXME: should probably do the same tests on DEFSTRUCT :TYPE
 
@@ -569,8 +569,8 @@
   defstruct-test-scratch::conc-name-nil-slot)
 (assert (= (defstruct-test-scratch::conc-name-nil-slot
             (make-conc-name-nil :conc-name-nil-slot 1)) 1))
-(assert (raises-error? (conc-name-nil-slot (make-conc-name-nil))
-                       undefined-function))
+(assert-error (conc-name-nil-slot (make-conc-name-nil))
+              undefined-function)
 
 ;;; The named/typed predicates were a little fragile, in that they
 ;;; could throw errors on innocuous input:
@@ -613,8 +613,8 @@
                                  (declare (optimize (safety 3))
                                           (,decl ,',up-accessor))
                                  (,',up-accessor s))
-                    do (assert (raises-error? (funcall (compile nil fun) ob)
-                                              type-error))))))))
+                    do (assert-error (funcall (compile nil fun) ob)
+                                     type-error)))))))
   (test nil)
   (test list)
   (test vector))
@@ -1088,8 +1088,8 @@ redefinition."
       (assert (zerop (type-error-datum e))))))
 
 (with-test (:name :defstruct-copier-typechecks-argument)
-  (assert (not (raises-error? (copy-person (make-astronaut :name "Neil")))))
-  (assert (raises-error? (copy-astronaut (make-person :name "Fred")))))
+  (copy-person (make-astronaut :name "Neil"))
+  (assert-error (copy-astronaut (make-person :name "Fred"))))
 
 (with-test (:name :bug-528807)
   (let ((*evaluator-mode* :compile))
@@ -1098,10 +1098,9 @@ redefinition."
                (x nil :type fixnum))))))
 
 (with-test (:name :bug-520607)
-  (assert
-    (raises-error?
-      (eval '(defstruct (typed-struct (:type list) (:predicate typed-struct-p))
-              (a 42 :type fixnum)))))
+  (assert-error
+   (eval '(defstruct (typed-struct (:type list) (:predicate typed-struct-p))
+           (a 42 :type fixnum))))
   ;; NIL is ok, though.
   (eval '(defstruct (typed-struct (:type list) (:predicate nil))
           (a 42 :type fixnum)))
@@ -1179,15 +1178,8 @@ redefinition."
        (search "slot name A specified more than once" (write-to-string c :escape nil)))
      (:no-error (x) x nil))))
 
-(with-test (:name (:defstruct :bogus-aux))
-  (raises-error?
-   (defstruct bogus-aux.1 (:constructor make-bogus-aux.1 (&aux (a b c)))))
-  (raises-error?
-   (defstruct bogus-aux.2 (:constructor make-bogus-aux.2 (&aux (a . b)))))
-  (raises-error?
-   (defstruct bogus-aux.3 (:constructor make-bogus-aux.3 (&aux (1 b)))))
-  (raises-error?
-   (defstruct bogus-aux.4 (:constructor make-bogus-aux.4 (&aux 1)))))
+(assert-error
+ (defstruct bogus-aux.1 (:constructor make-bogus-aux.1 (&aux (a b c)))))
 
 (with-test (:name (:defstruct :lexical-default))
   (let ((x 0)) (defstruct lexical-default (a (incf x)))

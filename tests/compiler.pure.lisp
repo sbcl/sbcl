@@ -430,12 +430,11 @@
 ;;; Moellmann: CONVERT-MORE-CALL failed on the following call
 (assert (eq (eval '((lambda (&key) 'u) :allow-other-keys nil)) 'u))
 
-(assert
- (raises-error? (multiple-value-bind (a b c)
-                    (eval '(truncate 3 4))
-                  (declare (integer c))
-                  (list a b c))
-                type-error))
+(assert-error (multiple-value-bind (a b c)
+                  (eval '(truncate 3 4))
+                (declare (integer c))
+                (list a b c))
+              type-error)
 
 (assert (equal (multiple-value-list (the (values &rest integer)
                                       (eval '(values 3))))
@@ -485,10 +484,10 @@
               2 (compile nil '(lambda ()
                                (make-array nil :initial-element 11))))))
 
-(assert (raises-error? (funcall (eval #'open) "assertoid.lisp"
-                                :external-format '#:nonsense)))
-(assert (raises-error? (funcall (eval #'load) "assertoid.lisp"
-                                :external-format '#:nonsense)))
+(assert-error (funcall (eval #'open) "assertoid.lisp"
+                       :external-format '#:nonsense))
+(assert-error (funcall (eval #'load) "assertoid.lisp"
+                       :external-format '#:nonsense))
 
 (assert (= (the (values integer symbol) (values 1 'foo 13)) 1))
 
@@ -496,8 +495,8 @@
                   '(lambda (v)
                     (declare (optimize (safety 3)))
                     (list (the fixnum (the (real 0) (eval v))))))))
-  (assert (raises-error? (funcall f 0.1) type-error))
-  (assert (raises-error? (funcall f -1) type-error)))
+  (assert-error (funcall f 0.1) type-error)
+  (assert-error (funcall f -1) type-error))
 
 ;;; the implicit block does not enclose lambda list
 (let ((forms '((defmacro #1=#:foo (&optional (x (return-from #1#))))
@@ -514,10 +513,10 @@
                                 (svref (make-array '(8 9) :adjustable t) 1)))))
 
 ;;; CHAR= did not check types of its arguments (reported by Adam Warner)
-(raises-error? (funcall (compile nil '(lambda (x y z) (char= x y z)))
+(assert-error (funcall (compile nil '(lambda (x y z) (char= x y z)))
                         #\a #\b nil)
                type-error)
-(raises-error? (funcall (compile nil
+(assert-error (funcall (compile nil
                                  '(lambda (x y z)
                                    (declare (optimize (speed 3) (safety 3)))
                                    (char/= x y z)))
@@ -2250,9 +2249,9 @@
                 (declare (type (and standard-object function) x))
                 x))
        (fun2 (compile nil form2)))
-  (assert (raises-error? (funcall fun1 (make-condition 'error))))
-  (assert (raises-error? (funcall fun1 fun1)))
-  (assert (raises-error? (funcall fun2 fun2)))
+  (assert-error (funcall fun1 (make-condition 'error)))
+  (assert-error (funcall fun1 fun1))
+  (assert-error (funcall fun2 fun2))
   (assert (eq (funcall fun2 #'print-object) #'print-object)))
 
 ;;; LET* + VALUES declaration: while the declaration is a non-standard
@@ -3578,7 +3577,7 @@
                                1))))
 
 (with-test (:name :dotimes-non-integer-counter-value)
-  (assert (raises-error? (dotimes (i 8.6)) type-error)))
+  (assert-error (dotimes (i 8.6)) type-error))
 
 (with-test (:name :bug-454681)
   ;; This used to break due to reference to a dead lambda-var during
@@ -3942,12 +3941,12 @@
                     (member x ',cycle)))))
 
 (with-test (:name :bug-722734)
-  (assert (raises-error?
-            (funcall (compile
-                      nil
-                      '(lambda ()
-                        (eql (make-array 6)
-                         (list unbound-variable-1 unbound-variable-2))))))))
+  (assert-error
+   (funcall (compile
+             nil
+             '(lambda ()
+               (eql (make-array 6)
+                (list unbound-variable-1 unbound-variable-2)))))))
 
 (with-test (:name :bug-771673)
   (assert (equal `(the foo bar) (macroexpand `(truly-the foo bar))))
@@ -4309,26 +4308,21 @@
     (assert (every #'plusp (funcall f #'list)))))
 
 (with-test (:name (:malformed-ignore :lp-1000239))
-  (assert
-   (raises-error?
-    (eval '(lambda () (declare (ignore (function . a)))))
-    sb-int:simple-program-error))
-  (assert
-   (raises-error?
-    (eval '(lambda () (declare (ignore (function a b)))))
-    sb-int:simple-program-error))
-  (assert
-   (raises-error?
-    (eval '(lambda () (declare (ignore (function)))))
-    sb-int:simple-program-error))
-  (assert
-   (raises-error?
-    (eval '(lambda () (declare (ignore (a)))))
-    sb-int:simple-program-error))
-  (assert
-   (raises-error?
-    (eval '(lambda () (declare (ignorable (a b)))))
-    sb-int:simple-program-error)))
+  (assert-error
+   (eval '(lambda () (declare (ignore (function . a)))))
+   sb-int:simple-program-error)
+  (assert-error
+   (eval '(lambda () (declare (ignore (function a b)))))
+   sb-int:simple-program-error)
+  (assert-error
+   (eval '(lambda () (declare (ignore (function)))))
+   sb-int:simple-program-error)
+  (assert-error
+   (eval '(lambda () (declare (ignore (a)))))
+   sb-int:simple-program-error)
+  (assert-error
+   (eval '(lambda () (declare (ignorable (a b)))))
+   sb-int:simple-program-error))
 
 (with-test (:name :malformed-type-declaraions)
   (compile nil '(lambda (a) (declare (type (integer 1 2 . 3) a)))))
@@ -5004,15 +4998,7 @@
                        (array-dimension a 2)))))))
     (assert noted)))
 
-(with-test (:name :upgraded-array-element-type-undefined-type)
-  (raises-error? (upgraded-array-element-type 'an-undefined-type))
-  (raises-error? (upgraded-array-element-type '(and fixnum an-undefined-type)))
-  (compile nil '(lambda ()
-                 (make-array 10
-                  :element-type '(or null an-undefined-type))))
-  (compile nil '(lambda ()
-                 (make-array '(10 10)
-                  :element-type '(or null an-undefined-type)))))
+(assert-error (upgraded-array-element-type 'an-undefined-type))
 
 (with-test (:name :xchg-misencoding)
   (assert (eql (funcall (compile nil '(lambda (a b)

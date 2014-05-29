@@ -14,7 +14,8 @@
 
 (cl:defpackage "ASSERTOID"
   (:use "CL")
-  (:export "GRAB-CONDITION" "RAISES-ERROR?" "IS" "ASSERTOID"))
+  (:export "GRAB-CONDITION" "ASSERT-ERROR"
+           "HAS-ERROR?" "IS" "ASSERTOID"))
 
 (cl:in-package "ASSERTOID")
 
@@ -22,8 +23,11 @@
   `(nth-value 1
      (ignore-errors ,@body)))
 
-(defmacro raises-error? (form &optional (error-subtype-spec 'error))
+(defmacro has-error? (form &optional (error-subtype-spec 'error))
   `(typep (nth-value 1 (ignore-errors ,form)) ',error-subtype-spec))
+
+(defmacro assert-error (form &optional (error-subtype-spec 'error))
+  `(assert (typep (nth-value 1 (ignore-errors ,form)) ',error-subtype-spec)))
 
 ;;; EXPR is an expression to evaluate (both with EVAL and with
 ;;; COMPILE/FUNCALL). EXTRA-OPTIMIZATIONS is a list of lists of

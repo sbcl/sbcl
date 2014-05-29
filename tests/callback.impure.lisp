@@ -151,13 +151,13 @@
   (assert (= (alien-funcall *add-two-shorts* #x-8000 1) -32767)))
 
 (with-test (:name (:short-result :underflow-detection))
-  (assert (raises-error? (alien-funcall *add-two-shorts* #x-8000 -1))))
+  (assert-error (alien-funcall *add-two-shorts* #x-8000 -1)))
 
 (with-test (:name (:int-result :sign-extension))
   (assert (= (alien-funcall *add-two-ints* #x-80000000 1) -2147483647)))
 
 (with-test (:name (:int-result :underflow-detection))
-  (assert (raises-error? (alien-funcall *add-two-ints* #x-80000000 -1))))
+  (assert-error (alien-funcall *add-two-ints* #x-80000000 -1)))
 
 ;;; tests for handling 64-bit arguments - this was causing problems on
 ;;; ppc - CLH, 2005-12-01

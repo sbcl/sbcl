@@ -58,7 +58,7 @@
 
 ;;; we want malformed format strings to cause errors rather than have
 ;;; some DWIM "functionality".
-(assert (raises-error? (format nil "~:2T")))
+(assert-error (format nil "~:2T"))
 
 ;;; bug reported, with fix, by Robert Strandh, sbcl-devel 2002-03-09,
 ;;; fixed in sbcl-0.7.1.36:
@@ -84,10 +84,10 @@
 (assert (string= (format nil "~/print-foo/" 2) "2"))
 (assert (string= (format nil "~/cl-user:print-foo/" 2) "2"))
 (assert (string= (format nil "~/cl-user::print-foo/" 2) "2"))
-(assert (raises-error? (format nil "~/cl-user:::print-foo/" 2)))
-(assert (raises-error? (format nil "~/cl-user:a:print-foo/" 2)))
-(assert (raises-error? (format nil "~/a:cl-user:print-foo/" 2)))
-(assert (raises-error? (format nil "~/cl-user:print-foo:print-foo/" 2)))
+(assert-error (format nil "~/cl-user:::print-foo/" 2))
+(assert-error (format nil "~/cl-user:a:print-foo/" 2))
+(assert-error (format nil "~/a:cl-user:print-foo/" 2))
+(assert-error (format nil "~/cl-user:print-foo:print-foo/" 2))
 
 ;;; better make sure that we get this one right, too
 (defun print-foo\:print-foo (stream arg colonp atsignp &rest params)
@@ -99,13 +99,13 @@
 
 ;;; Check for error detection of illegal directives in a~<..~> justify
 ;;; block (see ANSI section 22.3.5.2)
-(assert (raises-error? (format nil "~<~W~>" 'foo)))
-(assert (raises-error? (format nil "~<~<~A~:>~>" '(foo))))
+(assert-error (format nil "~<~W~>" 'foo))
+(assert-error (format nil "~<~<~A~:>~>" '(foo)))
 (assert (string= (format nil "~<~<~A~>~>" 'foo) "FOO"))
 
 (with-test (:name (:format :justification-atsign-check))
-  (assert (raises-error? (format nil "~<~@>")))
-  (assert (raises-error? (eval '(format nil "~<~@>")))))
+  (assert-error (format nil "~<~@>"))
+  (assert-error (eval '(format nil "~<~@>"))))
 
 ;;; Check that arrays that we print while *PRINT-READABLY* is true are
 ;;; in fact generating similar objects.
@@ -260,8 +260,8 @@
 (dolist (x (list "~<~:;~>~_" "~<~:;~>~I" "~<~:;~>~W"
                  "~<~:;~>~:T" "~<~:;~>~<~:>" "~_~<~:;~>"
                  "~I~<~:;~>" "~W~<~:;~>" "~:T~<~:;~>" "~<~:>~<~:;~>"))
-  (assert (raises-error? (format nil x nil)))
-  (assert (raises-error? (format nil (eval `(formatter ,x)) nil))))
+  (assert-error (format nil x nil))
+  (assert-error (format nil (eval `(formatter ,x)) nil)))
 ;;; ...but not in judicious cases.
 (dolist (x (list "~<~;~>~_" "~<~;~>~I" "~<~;~>~W"
                  "~<~;~>~:T" "~<~;~>~<~>" "~_~<~;~>"
@@ -379,13 +379,12 @@
 
 (let ((table (make-hash-table)))
   (setf (gethash 1 table) t)
-  (assert
-   (raises-error? (with-standard-io-syntax
-                    (let ((*read-eval* nil)
-                          (*print-readably* t))
-                      (with-output-to-string (*standard-output*)
-                        (prin1 table))))
-                  print-not-readable)))
+  (assert-error (with-standard-io-syntax
+                  (let ((*read-eval* nil)
+                        (*print-readably* t))
+                    (with-output-to-string (*standard-output*)
+                      (prin1 table))))
+                print-not-readable))
 
 ;; Test that we can print characters readably regardless of the external format
 ;; of the stream.
@@ -417,8 +416,8 @@
 (assert (string= (format nil (formatter "~:C") #\a) "a"))
 
 ;;; This used to trigger an AVER instead.
-(assert (raises-error? (eval '(formatter "~>")) sb-format:format-error))
-(assert (raises-error? (eval '(format t "~>")) sb-format:format-error))
+(assert-error (eval '(formatter "~>")) sb-format:format-error)
+(assert-error (eval '(format t "~>")) sb-format:format-error)
 
 ;;; readably printing hash-tables, check for circularity
 (let ((x (cons 1 2))
@@ -637,24 +636,24 @@
         :next))))
 
 (with-test (:name (:format :negative-colinc-and-mincol))
-  (assert (raises-error? (format nil "~-2a" 1)))
-  (assert (raises-error? (format nil "~,0a" 1))))
+  (assert-error (format nil "~-2a" 1))
+  (assert-error (format nil "~,0a" 1)))
 
 (with-test (:name :bug-905817)
   ;; The bug manifests itself in an endless loop in FORMAT.
   ;; Correct behaviour is to signal an error.
   (handler-case
       (with-timeout 5
-        (assert (raises-error? (format nil "e~8,0s" 12395))))
+        (assert-error (format nil "e~8,0s" 12395)))
     (timeout ()
       (error "Endless loop in FORMAT"))))
 
 (with-test (:name :format-type-check)
   (assert (equal "1/10" (format nil "~2r" 1/2)))
-  (assert (raises-error? (format nil "~r" 1.32) sb-format:format-error))
-  (assert (raises-error? (format nil "~c" 1.32) sb-format:format-error))
+  (assert-error (format nil "~r" 1.32) sb-format:format-error)
+  (assert-error (format nil "~c" 1.32) sb-format:format-error)
   (assert (equal "1/10" (eval '(format nil "~2r" 1/2))))
-  (assert (raises-error? (eval '(format nil "~r" 1.32)) sb-format:format-error))
-  (assert (raises-error? (eval '(format nil "~c" 1.32)) sb-format:format-error)))
+  (assert-error (eval '(format nil "~r" 1.32)) sb-format:format-error)
+  (assert-error (eval '(format nil "~c" 1.32)) sb-format:format-error))
 
 ;;; success

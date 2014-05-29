@@ -472,18 +472,18 @@
 (assert (not (subtypep 'standard-class-for-fsc 'function)))
 
 ;;; also check that our sanity check for functionness is good
-(assert (raises-error?
-         (progn
-           (defclass bad-standard-class (funcallable-standard-object)
-             ()
-             (:metaclass standard-class))
-           (make-instance 'bad-standard-class))))
-(assert (raises-error?
-         (progn
-           (defclass bad-funcallable-standard-class (standard-object)
-             ()
-             (:metaclass funcallable-standard-class))
-           (make-instance 'bad-funcallable-standard-class))))
+(assert-error
+ (progn
+   (defclass bad-standard-class (funcallable-standard-object)
+     ()
+     (:metaclass standard-class))
+   (make-instance 'bad-standard-class)))
+(assert-error
+ (progn
+   (defclass bad-funcallable-standard-class (standard-object)
+     ()
+     (:metaclass funcallable-standard-class))
+   (make-instance 'bad-funcallable-standard-class)))
 
 ;;; we should be able to make classes with silly names
 (make-instance 'standard-class :name 3)
@@ -529,7 +529,7 @@
 (defclass has-slots-but-isnt-finalized () (a b c))
 (let ((class (find-class 'has-slots-but-isnt-finalized)))
   (assert (not (sb-mop:class-finalized-p class)))
-  (assert (raises-error? (sb-mop:class-slots class) sb-kernel::reference-condition)))
+  (assert-error (sb-mop:class-slots class) sb-kernel::reference-condition))
 
 ;;; Check that MAKE-METHOD-LAMBDA which wraps the original body doesn't
 ;;; break RETURN-FROM.
@@ -682,10 +682,10 @@
 
 (defgeneric definitely-a-funcallable-instance (x))
 (with-test (:name (set-funcallable-instance-function :typechecking))
-  (assert (raises-error? (set-funcallable-instance-function
-                          (lambda (y) nil)
-                          #'definitely-a-funcallable-instance)
-                         type-error)))
+  (assert-error (set-funcallable-instance-function
+                  (lambda (y) nil)
+                  #'definitely-a-funcallable-instance)
+                 type-error))
 
 (with-test (:name (defstruct :nil-slot-name :bug-633911))
   (defstruct nil-slot-name nil)

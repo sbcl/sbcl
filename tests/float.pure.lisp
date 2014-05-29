@@ -94,11 +94,10 @@
 
 (with-test (:name (:scale-float-overflow :bug-372)
             :fails-on '(and :darwin :ppc)) ;; bug 372
-  (progn
-    (assert (raises-error? (scale-float 1.0 most-positive-fixnum)
-                           floating-point-overflow))
-    (assert (raises-error? (scale-float 1.0d0 (1+ most-positive-fixnum))
-                           floating-point-overflow))))
+  (assert-error (scale-float 1.0 most-positive-fixnum)
+                floating-point-overflow)
+  (assert-error (scale-float 1.0d0 (1+ most-positive-fixnum))
+                floating-point-overflow))
 
 ;;; bug found by jsnell when nfroyd tried to implement better LOGAND
 ;;; type derivation.

@@ -108,8 +108,8 @@
                 (nreverse (1 2 . 3))
                 (nreconc (1 2 . 3) (4 5))
                 (copy-alist ((1 . 2) (3 . 4) . 5))))
-  (assert (raises-error? (apply (first test) (copy-tree (rest test)))
-                         type-error)))
+  (assert-error (apply (first test) (copy-tree (rest test)))
+                type-error))
 
 ;;; Bug reported by Paul Dietz: NSET-EXCLUSIVE-OR should not return
 ;;; extra elements, even when given "sets" contain duplications

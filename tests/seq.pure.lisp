@@ -372,11 +372,11 @@
                          #'< :key #'car))))))))
 
 (with-test (:name :&more-elt-index-too-large)
-  (assert (raises-error? (funcall
-                          (compile nil '(lambda (&rest args)
-                                         (declare (optimize safety))
-                                         (elt args 0))))
-                         sb-kernel:index-too-large-error)))
+  (assert-error (funcall
+                 (compile nil '(lambda (&rest args)
+                                (declare (optimize safety))
+                                (elt args 0))))
+                sb-kernel:index-too-large-error))
 
 (with-test (:name :do-sequence-on-literals)
   (assert (= (sequence:dosequence (e #(1 2 3)) (return e))

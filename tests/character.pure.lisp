@@ -63,7 +63,7 @@
                 (digit-char -1)
                 (digit-char 4 1)
                 (digit-char 4 37)))
-  (assert (raises-error? (apply (car form) (mapcar 'eval (cdr form))) type-error)))
+  (assert-error (apply (car form) (mapcar 'eval (cdr form))) type-error))
 
 (dotimes (i 256)
   (let* ((char (code-char i))
@@ -101,8 +101,8 @@
             (and c (not (typep c 'base-char)))))
   ;; Test the formerly buggy coercions:
   (macrolet ((assert-coerce-type-error (object type)
-               `(assert (raises-error? (coerce ,object ',type)
-                                       type-error))))
+               `(assert-error (coerce ,object ',type)
+                              type-error)))
     (assert-coerce-type-error #\Nak standard-char)
     (assert-coerce-type-error #\a extended-char)
     #+sb-unicode

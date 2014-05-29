@@ -63,7 +63,7 @@
              (optimize (speed 3) (safety 3) (space 0) (debug 0)))
     (aref x y)))
 
-(assert (raises-error? (bubblesort (make-array 10) 9)))
+(assert-error (bubblesort (make-array 10) 9))
 
 (define-symbol-macro %trash% what)
 (locally

@@ -162,11 +162,11 @@
 
 ;;; Bug 264: SYMBOL-MACROLET did not check for a bound SPECIAL
 ;;; declaration
-(assert (raises-error? (progv '(foo) '(1)
-                         (eval '(symbol-macrolet ((foo 3))
-                                 (declare (special foo))
-                                 foo)))
-                       error))
+(assert-error (progv '(foo) '(1)
+                (eval '(symbol-macrolet ((foo 3))
+                        (declare (special foo))
+                        foo)))
+              error)
 
 ;;; MAKE-PACKAGE (and other &key functions) should signal an error
 ;;; when given a NIL key.  This is kind of a compiler test really, but
@@ -224,7 +224,7 @@
 ;;; an error rather than silently return NIL.
 (defvar *scratch*)
 (with-test (:name :toplevel-declare)
-  (assert (raises-error? (eval '(declare (type pathname *scratch*))))))
+  (assert-error (eval '(declare (type pathname *scratch*)))))
 
 (with-test (:name (eval :no-compiler-notes))
   (handler-bind ((sb-ext:compiler-note #'error))

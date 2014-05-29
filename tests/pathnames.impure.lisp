@@ -302,9 +302,9 @@
   (assert (string=
            (namestring (parse-namestring "FOO" (host-namestring #p"SCRATCH:BAR")))
            "SCRATCH:FOO"))
-  (assert (raises-error?
-           (setf (logical-pathname-translations "")
-                 (list '("**;*.*.*" "/**/*.*"))))))
+  (assert-error
+   (setf (logical-pathname-translations "")
+         (list '("**;*.*.*" "/**/*.*")))))
 
 ;;; Bug 200: translate-logical-pathname is according to the spec supposed
 ;;; not to give errors if asked to translate a namestring for a valid
@@ -318,10 +318,10 @@
 ;;; functions (they would cause memory protection errors).  Make sure
 ;;; that those errors are gone:
 (with-test (:name (:string-streams-as-pathnames 1))
-  (assert (raises-error? (pathname (make-string-input-stream "FOO"))
-                         type-error))
-  (assert (raises-error? (merge-pathnames (make-string-output-stream))
-                         type-error)))
+  (assert-error (pathname (make-string-input-stream "FOO"))
+                type-error)
+  (assert-error (merge-pathnames (make-string-output-stream))
+                type-error))
 
 ;;; ensure print-read consistency (or print-not-readable-error) on
 ;;; pathnames:

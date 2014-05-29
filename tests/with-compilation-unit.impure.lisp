@@ -17,7 +17,7 @@
 
 (defun test-files (reset &optional want-suppress-p)
   (funcall reset)
-  (assert (eql (raises-error?
+  (assert (eql (has-error?
                 (handler-bind ((warning (lambda (c)
                                           (error "got a warning: ~a" c))))
                   (with-compilation-unit ()
@@ -27,14 +27,14 @@
 
   (funcall reset)
   (assert
-   (raises-error?
+   (has-error?
     (handler-bind ((warning (lambda (c)
                               (error "got a warning: ~a" c))))
       (compile-file *file-a*)
       (compile-file *file-b*))))
 
   (funcall reset)
-  (assert (eql (raises-error?
+  (assert (eql (has-error?
                 (handler-bind ((warning (lambda (c)
                                           (error "got a warning: ~a" c))))
                   (with-compilation-unit ()
@@ -44,7 +44,7 @@
 
   (funcall reset)
   (assert
-   (raises-error?
+   (has-error?
     (handler-bind ((warning (lambda (c)
                               (error "got a warning: ~a" c))))
       (compile-file *file-a*)

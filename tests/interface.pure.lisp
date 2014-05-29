@@ -199,5 +199,5 @@
   (sb-ext:assert-version->= 1 1 13))
 
 (with-test (:name :version-assert-fails)
-  (assert (raises-error?
-           (sb-ext:assert-version->= most-positive-fixnum))))
+  (assert-error
+   (sb-ext:assert-version->= most-positive-fixnum)))

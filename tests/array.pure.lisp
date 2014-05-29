@@ -120,12 +120,12 @@
 (multiple-value-bind (fun warn fail)
     (compile nil '(lambda () (aref (make-array 0) 0)))
   #+nil (assert fail) ; doesn't work, (maybe because ASSERTED-TYPE is NIL?)
-  (assert (raises-error? (funcall fun) type-error)))
+  (assert-error (funcall fun) type-error))
 
 (multiple-value-bind (fun warn fail)
     (compile nil '(lambda () (aref (make-array 1) 1)))
   (assert fail)
-  (assert (raises-error? (funcall fun) type-error)))
+  (assert-error (funcall fun) type-error))
 
 (multiple-value-bind (fun warn fail)
     (compile nil '(lambda () (make-array 5 :element-type 'undefined-type)))

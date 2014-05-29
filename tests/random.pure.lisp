@@ -81,7 +81,7 @@
                       (declare (optimize ,@optimize))
                       (random (if x 10 20) state))))
       (let ((fun (compile nil expr)))
-        (assert (raises-error? (funcall fun 150 nil) type-error))))))
+        (assert-error (funcall fun 150 nil) type-error)))))
 
 (with-test (:name (:random :integer :distribution))
   (let ((generic-random (compile nil '(lambda (x)

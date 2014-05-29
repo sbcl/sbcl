@@ -66,7 +66,7 @@
 (assert (null (ignore-errors (compiled-logxor #c(2 3)))))
 (assert (= (compiled-logxor -6) -6))
 
-(assert (raises-error? (coerce (expt 10 1000) 'single-float) type-error))
+(assert-error (coerce (expt 10 1000) 'single-float) type-error)
 
 (defun are-we-getting-ash-right (x y)
   (declare (optimize speed)

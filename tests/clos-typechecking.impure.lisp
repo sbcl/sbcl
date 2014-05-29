@@ -43,77 +43,77 @@
 ;; evaluator
 (with-test (:name (:evaluator))
   (eval '(setf (slot-value (make-instance 'foo) 'slot) 1))
-  (assert (raises-error? (eval '(setf (slot-value (make-instance 'foo) 'slot) t))
-                         type-error))
+  (assert-error (eval '(setf (slot-value (make-instance 'foo) 'slot) t))
+                type-error)
   (eval '(setf (slot (make-instance 'foo)) 1))
-  (assert (raises-error? (eval '(setf (slot (make-instance 'foo)) t))
-                         type-error))
+  (assert-error (eval '(setf (slot (make-instance 'foo)) t))
+                type-error)
   (eval '(succeed/sv (make-instance 'foo)))
-  (assert (raises-error? (eval '(fail/sv (make-instance 'foo)))
-                         type-error))
+  (assert-error (eval '(fail/sv (make-instance 'foo)))
+                type-error)
   (eval '(succeed/acc (make-instance 'foo)))
-  (assert (raises-error? (eval '(fail/acc (make-instance 'foo)))
-                         type-error))
+  (assert-error (eval '(fail/acc (make-instance 'foo)))
+                type-error)
   (eval '(make-instance 'foo :slot 1))
-  (assert (raises-error? (eval '(make-instance 'foo :slot t))
-                         type-error))
+  (assert-error (eval '(make-instance 'foo :slot t))
+                type-error)
   (eval '(make-instance 'foo :slot *one*))
-  (assert (raises-error? (eval '(make-instance 'foo :slot *t*))
-                         type-error)))
+  (assert-error (eval '(make-instance 'foo :slot *t*))
+                type-error))
 ;; evaluator/gf
 (with-test (:name (:evaluator/gf))
   (eval '(setf (slot-value (make-instance 'foo/gf) 'slot/gf) 1))
-  (assert (raises-error?
-           (eval '(setf (slot-value (make-instance 'foo/gf) 'slot/gf) t))
-           type-error))
+  (assert-error
+   (eval '(setf (slot-value (make-instance 'foo/gf) 'slot/gf) t))
+   type-error)
   (eval '(setf (slot/gf (make-instance 'foo/gf)) 1))
-  (assert (raises-error? (eval '(setf (slot/gf (make-instance 'foo/gf)) t))
-                         type-error))
+  (assert-error (eval '(setf (slot/gf (make-instance 'foo/gf)) t))
+                type-error)
   (eval '(succeed/sv/gf (make-instance 'foo/gf)))
-  (assert (raises-error? (eval '(fail/sv/gf (make-instance 'foo/gf)))
-                         type-error))
+  (assert-error (eval '(fail/sv/gf (make-instance 'foo/gf)))
+                type-error)
   (eval '(succeed/acc/gf (make-instance 'foo/gf)))
-  (assert (raises-error? (eval '(fail/acc/gf (make-instance 'foo/gf)))
-                         type-error))
+  (assert-error (eval '(fail/acc/gf (make-instance 'foo/gf)))
+                type-error)
   (eval '(make-instance 'foo/gf :slot/gf 1))
-  (assert (raises-error? (eval '(make-instance 'foo/gf :slot/gf t))
-                         type-error))
+  (assert-error (eval '(make-instance 'foo/gf :slot/gf t))
+                type-error)
   (eval '(make-instance 'foo/gf :slot/gf *one*))
-  (assert (raises-error? (eval '(make-instance 'foo/gf :slot/gf *t*))
-                         type-error)))
+  (assert-error (eval '(make-instance 'foo/gf :slot/gf *t*))
+                type-error))
 
 ;; compiler
 (with-test (:name (:compiler))
   (funcall (compile nil '(lambda ()
                           (setf (slot-value (make-instance 'foo) 'slot) 1))))
   (funcall (compile nil '(lambda () (setf (slot (make-instance 'foo)) 1))))
-  (assert (raises-error?
-           (funcall
-            (compile nil '(lambda () (setf (slot (make-instance 'foo)) t))))
-           type-error))
+  (assert-error
+   (funcall
+    (compile nil '(lambda () (setf (slot (make-instance 'foo)) t))))
+   type-error)
   (funcall (compile nil '(lambda () (succeed/sv (make-instance 'foo)))))
-  (assert (raises-error?
-           (funcall (compile nil '(lambda () (fail/sv (make-instance 'foo)))))
-           type-error))
+  (assert-error
+   (funcall (compile nil '(lambda () (fail/sv (make-instance 'foo)))))
+   type-error)
   (funcall (compile nil '(lambda () (succeed/acc (make-instance 'foo)))))
-  (assert (raises-error?
-           (funcall (compile nil '(lambda () (fail/acc (make-instance 'foo)))))
-           type-error))
+  (assert-error
+   (funcall (compile nil '(lambda () (fail/acc (make-instance 'foo)))))
+   type-error)
   (funcall (compile nil '(lambda () (make-instance 'foo :slot 1))))
-  (assert (raises-error?
-           (funcall (compile nil '(lambda () (make-instance 'foo :slot t))))
-           type-error))
+  (assert-error
+   (funcall (compile nil '(lambda () (make-instance 'foo :slot t))))
+   type-error)
   (funcall (compile nil '(lambda () (make-instance 'foo :slot *one*))))
-  (assert (raises-error?
-           (funcall (compile nil '(lambda () (make-instance 'foo :slot *t*))))
-           type-error)))
+  (assert-error
+   (funcall (compile nil '(lambda () (make-instance 'foo :slot *t*))))
+   type-error))
 
 (with-test (:name (:compiler :setf :slot-value))
-  (assert (raises-error?
-           (funcall
-            (compile nil '(lambda ()
-                           (setf (slot-value (make-instance 'foo) 'slot) t))))
-           type-error)))
+  (assert-error
+   (funcall
+    (compile nil '(lambda ()
+                   (setf (slot-value (make-instance 'foo) 'slot) t))))
+   type-error))
 
 ; compiler/gf
 (with-test (:name (:compiler/gf))
@@ -121,39 +121,39 @@
                     '(lambda ()
                       (setf (slot-value (make-instance 'foo/gf) 'slot/gf) 1))))
   (funcall (compile nil '(lambda () (setf (slot/gf (make-instance 'foo/gf)) 1))))
-  (assert (raises-error?
-           (funcall
-            (compile nil
-                     '(lambda () (setf (slot/gf (make-instance 'foo/gf)) t))))
-           type-error))
+  (assert-error
+   (funcall
+    (compile nil
+             '(lambda () (setf (slot/gf (make-instance 'foo/gf)) t))))
+   type-error)
   (funcall (compile nil '(lambda () (succeed/sv/gf (make-instance 'foo/gf)))))
-  (assert (raises-error?
-           (funcall (compile nil '(lambda ()
-                                   (fail/sv/gf (make-instance 'foo/gf)))))
-           type-error))
+  (assert-error
+   (funcall (compile nil '(lambda ()
+                           (fail/sv/gf (make-instance 'foo/gf)))))
+   type-error)
   (funcall (compile nil '(lambda () (succeed/acc/gf (make-instance 'foo/gf)))))
-  (assert (raises-error?
-           (funcall (compile nil '(lambda ()
-                                   (fail/acc/gf (make-instance 'foo/gf)))))
-           type-error))
+  (assert-error
+   (funcall (compile nil '(lambda ()
+                           (fail/acc/gf (make-instance 'foo/gf)))))
+   type-error)
   (funcall (compile nil '(lambda () (make-instance 'foo/gf :slot/gf 1))))
-  (assert (raises-error?
-           (funcall (compile nil '(lambda ()
-                                   (make-instance 'foo/gf :slot/gf t))))
-           type-error))
+  (assert-error
+   (funcall (compile nil '(lambda ()
+                           (make-instance 'foo/gf :slot/gf t))))
+   type-error)
   (funcall (compile nil '(lambda () (make-instance 'foo/gf :slot/gf *one*))))
-  (assert (raises-error?
-           (funcall (compile nil '(lambda ()
-                                   (make-instance 'foo/gf :slot/gf *t*))))
-           type-error)))
+  (assert-error
+   (funcall (compile nil '(lambda ()
+                           (make-instance 'foo/gf :slot/gf *t*))))
+   type-error))
 
 (with-test (:name (:compiler/gf :setf :slot-value))
-  (assert (raises-error?
-           (funcall
-            (compile nil
-                     '(lambda ()
-                       (setf (slot-value (make-instance 'foo/gf) 'slot/gf) t))))
-           type-error)))
+  (assert-error
+   (funcall
+    (compile nil
+             '(lambda ()
+               (setf (slot-value (make-instance 'foo/gf) 'slot/gf) t))))
+   type-error))
 
 
 (with-test (:name (:slot-inheritance :slot-value :float/single-float))
@@ -161,28 +161,28 @@
   (defclass b (a) ((slot1 :initform 0.0 :type single-float)))
   (defmethod inheritance-test ((a a)) (setf (slot-value a 'slot1) 1d0))
   (inheritance-test (make-instance 'a))
-  (assert (raises-error? (inheritance-test (make-instance 'b)) type-error)))
+  (assert-error (inheritance-test (make-instance 'b)) type-error))
 
 (with-test (:name (:slot-inheritance :slot-value :t/single-float))
   (defclass a () ((slot1 :initform 0.0)))
   (defclass b (a) ((slot1 :initform 0.0 :type single-float)))
   (defmethod inheritance-test ((a a)) (setf (slot-value a 'slot1) 1d0))
   (inheritance-test (make-instance 'a))
-  (assert (raises-error? (inheritance-test (make-instance 'b)) type-error)))
+  (assert-error (inheritance-test (make-instance 'b)) type-error))
 
 (with-test (:name (:slot-inheritance :writer :float/single-float))
   (defclass a () ((slot1 :initform 0.0 :type float :accessor slot1-of)))
   (defclass b (a) ((slot1 :initform 0.0 :type single-float)))
   (defmethod inheritance-test ((a a)) (setf (slot1-of a) 1d0))
   (inheritance-test (make-instance 'a))
-  (assert (raises-error? (inheritance-test (make-instance 'b)) type-error)))
+  (assert-error (inheritance-test (make-instance 'b)) type-error))
 
 (with-test (:name (:slot-inheritance :writer :float/single-float))
   (defclass a () ((slot1 :initform 0.0 :accessor slot1-of)))
   (defclass b (a) ((slot1 :initform 0.0 :type single-float)))
   (defmethod inheritance-test ((a a)) (setf (slot1-of a) 1d0))
   (inheritance-test (make-instance 'a))
-  (assert (raises-error? (inheritance-test (make-instance 'b)) type-error)))
+  (assert-error (inheritance-test (make-instance 'b)) type-error))
 
 (with-test (:name (:slot-inheritance :type-intersection))
   (defclass a* ()
@@ -200,15 +200,15 @@
   (setf (slot1-of (make-instance 'a*)) -1)
   (setf (slot1-of (make-instance 'b*)) (1+ most-positive-fixnum))
   (setf (slot1-of (make-instance 'c*)) 1)
-  (assert (raises-error? (setf (slot1-of (make-instance 'c*)) -1)
-                               type-error))
-  (assert (raises-error? (setf (slot1-of (make-instance 'c*))
-                               (1+ most-positive-fixnum))
-                         type-error))
-  (assert (raises-error? (make-instance 'c* :slot1 -1)
-                         type-error))
-  (assert (raises-error? (make-instance 'c* :slot1 (1+ most-positive-fixnum))
-                         type-error)))
+  (assert-error (setf (slot1-of (make-instance 'c*)) -1)
+                type-error)
+  (assert-error (setf (slot1-of (make-instance 'c*))
+                      (1+ most-positive-fixnum))
+                type-error)
+  (assert-error (make-instance 'c* :slot1 -1)
+                type-error)
+  (assert-error (make-instance 'c* :slot1 (1+ most-positive-fixnum))
+                type-error))
 
 (defclass a ()
   ((slot1 :initform nil
@@ -224,10 +224,10 @@
 (with-test (:name (:type :function))
   (setf (slot1-of (make-instance 'a)) (lambda () 1))
   (setf (slot1-of (make-instance 'b)) (lambda () 1))
-  (assert (raises-error? (setf (slot1-of (make-instance 'a)) 1)
-                         type-error))
-  (assert (raises-error? (setf (slot1-of (make-instance 'b)) 1)
-                         type-error))
+  (assert-error (setf (slot1-of (make-instance 'a)) 1)
+                type-error)
+  (assert-error (setf (slot1-of (make-instance 'b)) 1)
+                type-error)
   (make-instance 'a :slot1 (lambda () 1))
   (make-instance 'b :slot1 (lambda () 1)))
 
@@ -240,19 +240,19 @@
     (:metaclass my-alt-metaclass))
   (defun make-my-instance (class)
     (make-instance class :slot :not-a-fixnum))
-  (assert (raises-error? (make-my-instance 'my-alt-metaclass-instance-class)
-                         type-error)))
+  (assert-error (make-my-instance 'my-alt-metaclass-instance-class)
+                type-error))
 
 (with-test (:name :typecheck-class-allocation)
-    ;; :CLASS slot :INITFORMs are executed at class definition time
-  (assert (raises-error?
-           (eval `(locally (declare (optimize safety))
-                    (defclass class-allocation-test-bad ()
-                      ((slot :initform "slot"
-                             :initarg :slot
-                             :type fixnum
-                             :allocation :class)))))
-           type-error))
+  ;; :CLASS slot :INITFORMs are executed at class definition time
+  (assert-error
+   (eval `(locally (declare (optimize safety))
+            (defclass class-allocation-test-bad ()
+              ((slot :initform "slot"
+                     :initarg :slot
+                     :type fixnum
+                     :allocation :class)))))
+   type-error)
   (let ((name (gensym "CLASS-ALLOCATION-TEST-GOOD")))
     (eval `(locally (declare (optimize safety))
              (defclass ,name ()

@@ -106,7 +106,7 @@
 
 (assert (foo (make-instance 'class1)))
 (assert (foo (make-instance 'class2)))
-(assert (raises-error? (foo (make-instance 'class3))))
+(assert-error (foo (make-instance 'class3)))
 (assert (foo (make-instance 'class4)))
 
 ;;; check that we are actually cacheing effective methods.  If the

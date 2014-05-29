@@ -350,16 +350,16 @@
   (dolist (form (append *illegal-runtime-forms* *illegal-double-forms*))
     (with-error-info ("locked illegal runtime form: ~S~%" form)
       (let ((fun (compile nil `(lambda () ,form))))
-        (assert (raises-error? (funcall fun) sb-ext:package-lock-violation)))
-      (assert (raises-error? (eval form) sb-ext:package-lock-violation)))))
+        (assert-error (funcall fun) sb-ext:package-lock-violation))
+      (assert-error (eval form) sb-ext:package-lock-violation))))
 
 (with-test (:name :locked-package/illegal-lexical-forms)
   (dolist (pair *illegal-lexical-forms-alist*)
     (let ((form (cdr pair)))
       (with-error-info ("compile locked illegal lexical form: ~S~%" form)
         (let ((fun (compile nil `(lambda () ,form))))
-          (assert (raises-error? (funcall fun) program-error)))
-        (assert (raises-error? (eval form) program-error))))))
+          (assert-error (funcall fun) program-error))
+        (assert-error (eval form) program-error)))))
 
 ;;; Locked, WITHOUT-PACKAGE-LOCKS
 (reset-test t)
@@ -428,8 +428,8 @@
              (prin1 form f))
            (multiple-value-bind (file warnings failure-p) (compile-file tmp)
              (set-test-locks t)
-             (assert (raises-error? (load fasl)
-                                    sb-ext:package-lock-violation))))
+             (assert-error (load fasl)
+                           sb-ext:package-lock-violation)))
       (when (probe-file tmp)
         (delete-file tmp))
       (when (probe-file fasl)
@@ -445,13 +445,13 @@
                                ,form
                                (locally (declare (enable-package-locks ,sym))
                                  ,form)))))
-      (assert (raises-error? (funcall fun) program-error)))
-    (assert (raises-error?
-             (eval `(locally (declare (disable-package-locks ,sym))
-                      ,form
-                      (locally (declare (enable-package-locks ,sym))
-                        ,form)))
-             program-error))))
+      (assert-error (funcall fun) program-error))
+    (assert-error
+     (eval `(locally (declare (disable-package-locks ,sym))
+              ,form
+              (locally (declare (enable-package-locks ,sym))
+                ,form)))
+     program-error)))
 
 ;;;; See that trace on functions in locked packages doesn't break
 ;;;; anything.
@@ -483,12 +483,12 @@
 (assert (eq *terminal-io* (pcl-type-declaration-method-bug *terminal-io*)))
 
 #+#.(cl:if (cl:eq sb-ext:*evaluator-mode* :compile) '(and) '(or))
-(assert (raises-error?
-         (eval
-          '(defmethod pcl-type-declaration-method-bug ((test:*special* stream))
-            (declare (type stream test:*special*))
-            test:*special*))
-         program-error))
+(assert-error
+ (eval
+  '(defmethod pcl-type-declaration-method-bug ((test:*special* stream))
+    (declare (type stream test:*special*))
+    test:*special*))
+ program-error)
 
 ;;; Bogus package lock violations from LOOP
 
@@ -498,11 +498,11 @@
 ;;; Package lock for DEFMACRO -> DEFUN and vice-versa.
 (reset-test t)
 (with-test (:name :bug-576637)
-  (assert (raises-error? (eval `(defun test:macro (x) x))
-                         sb-ext:package-lock-violation))
+  (assert-error (eval `(defun test:macro (x) x))
+                sb-ext:package-lock-violation)
   (assert (eq 'test:macro (eval `(test:macro))))
-  (assert (raises-error? (eval `(defmacro test:function (x) x))
-                         sb-ext:package-lock-violation))
+  (assert-error (eval `(defmacro test:function (x) x))
+                sb-ext:package-lock-violation)
   (assert (eq 'test:function (eval `(test:function)))))
 
 (defpackage :macro-killing-macro-1
@@ -568,14 +568,14 @@
                     :ok))))))
 
 (with-test (:name :assert-symbol-home-package-unlocked)
-  (assert (raises-error? ; TODO use assert-signals
-           (sb-impl::assert-symbol-home-package-unlocked
-            'cl:cons "trying to foo ~S")
-           symbol-package-locked-error))
-  (assert (raises-error?
-           (sb-impl::assert-symbol-home-package-unlocked
-            'cl:cons "trying to ~*~S ~2:*~A~* as a ~S"
-            :foo :bar)
-           symbol-package-locked-error)))
+  (assert-error                         ; TODO use assert-signals
+                (sb-impl::assert-symbol-home-package-unlocked
+                 'cl:cons "trying to foo ~S")
+                symbol-package-locked-error)
+  (assert-error
+   (sb-impl::assert-symbol-home-package-unlocked
+    'cl:cons "trying to ~*~S ~2:*~A~* as a ~S"
+    :foo :bar)
+   symbol-package-locked-error))
 
 ;;; WOOT! Done.

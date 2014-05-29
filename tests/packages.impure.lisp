@@ -62,7 +62,7 @@
 
 (defpackage "TEST-ORIGINAL" (:nicknames "A-NICKNAME"))
 
-(assert (raises-error? (defpackage "A-NICKNAME")))
+(assert-error (defpackage "A-NICKNAME"))
 
 (assert (eql (find-package "A-NICKNAME")
              (find-package "TEST-ORIGINAL")))

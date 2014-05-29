@@ -158,7 +158,7 @@
      (setq y (+ x 1d0))
      (setq x 3d0)
      (funcall (eval ''list) y (+ y 2d0) (* y 3d0)))))
-(assert (raises-error? (bug233a 4) type-error))
+(assert-error (bug233a 4) type-error)
 
 ;;; compiler failure
 (defun bug145b (x)

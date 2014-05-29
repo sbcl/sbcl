@@ -181,8 +181,8 @@
   (assert (= (loop for v fixnum being each hash-key in ht sum v) 8))
   (assert (= (loop for v fixnum being each hash-value in ht sum v) 18))
   #+#.(cl:if (cl:eq sb-ext:*evaluator-mode* :compile) '(and) '(or))
-  (assert (raises-error? (loop for v float being each hash-value in ht sum v)
-                         type-error)))
+  (assert-error (loop for v float being each hash-value in ht sum v)
+                type-error))
 
 ;; arithmetic indexes can be NIL or symbols.
 (assert (equal (loop for nil from 0 to 2 collect nil)

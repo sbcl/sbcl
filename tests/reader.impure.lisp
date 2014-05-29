@@ -38,8 +38,8 @@
 
 ;;; Bug 51b. (try to throw READER-ERRORs when the reader encounters
 ;;; dubious input)
-(assert (raises-error? (read-from-string "1e1000") reader-error))
-(assert (raises-error? (read-from-string "1/0") reader-error))
+(assert-error (read-from-string "1e1000") reader-error)
+(assert-error (read-from-string "1/0") reader-error)
 
 ;;; Bug reported by Antonio Martinez on comp.lang.lisp 2003-02-03 in
 ;;; message <b32da960.0302030640.7d6fc610@posting.google.com>: reading
@@ -89,7 +89,7 @@
   (frob "#S(READABLE-STRUCT #\\A T :A NIL)"))
 (macrolet
     ((frob (string)
-       `(assert (raises-error? (read-from-string ,string) reader-error))))
+       `(assert-error (read-from-string ,string) reader-error)))
   (frob "#S(READABLE-STRUCT . :A)")
   (frob "#S(READABLE-STRUCT :A . T)")
   (frob "#S(READABLE-STRUCT :A T . :A)")

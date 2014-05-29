@@ -74,8 +74,8 @@
 (assert (eq (intern "")
             (intern (make-array 5 :element-type nil :fill-pointer 0))))
 
-(assert (raises-error? (make-string 5 :element-type t)))
-(assert (raises-error? (let () (make-string 5 :element-type t))))
+(assert-error (make-string 5 :element-type t))
+(assert-error (let () (make-string 5 :element-type t)))
 
 ;; MISC.574
 (assert (= (funcall (lambda (a)

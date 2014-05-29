@@ -18,28 +18,28 @@
 ;;; sbcl-0.7.8.19
 (locally
     (declare (optimize (safety 3)))
-  (assert (raises-error? (make-two-way-stream (make-string-output-stream)
-                                              (make-string-output-stream))
-                         type-error))
-  (assert (raises-error? (make-two-way-stream (make-string-input-stream "foo")
-                                              (make-string-input-stream "bar"))
-                         type-error))
+  (assert-error (make-two-way-stream (make-string-output-stream)
+                                     (make-string-output-stream))
+                type-error)
+  (assert-error (make-two-way-stream (make-string-input-stream "foo")
+                                     (make-string-input-stream "bar"))
+                type-error)
   ;; the following two aren't actually guaranteed, because ANSI, as it
   ;; happens, doesn't say "should signal an error" for
   ;; MAKE-ECHO-STREAM. It's still good to have, but if future
   ;; maintenance work causes this test to fail because of these
   ;; MAKE-ECHO-STREAM clauses, consider simply removing these clauses
   ;; from the test. -- CSR, 2002-10-06
-  (assert (raises-error? (make-echo-stream (make-string-output-stream)
-                                           (make-string-output-stream))
-                         type-error))
-  (assert (raises-error? (make-echo-stream (make-string-input-stream "foo")
-                                           (make-string-input-stream "bar"))
-                         type-error))
-  (assert (raises-error? (make-concatenated-stream
-                          (make-string-output-stream)
-                          (make-string-input-stream "foo"))
-                         type-error)))
+  (assert-error (make-echo-stream (make-string-output-stream)
+                                  (make-string-output-stream))
+                type-error)
+  (assert-error (make-echo-stream (make-string-input-stream "foo")
+                                  (make-string-input-stream "bar"))
+                type-error)
+  (assert-error (make-concatenated-stream
+                 (make-string-output-stream)
+                 (make-string-input-stream "foo"))
+                type-error))
 
 ;;; bug 225: STRING-STREAM was not a class
 (eval `(defgeneric bug225 (s)
@@ -71,17 +71,17 @@
 (let* ((p "this-file-will-exist")
        (stream (open p :direction :output :if-exists :error)))
   (assert (null (with-open-file (s p :direction :output :if-exists nil) s)))
-  (assert (raises-error?
-           (with-open-file (s p :direction :output :if-exists :error))))
+  (assert-error
+   (with-open-file (s p :direction :output :if-exists :error)))
   (close stream)
   (delete-file p))
 
-(assert (raises-error? (read-byte (make-string-input-stream "abc"))
-                       type-error))
-(assert (raises-error? (with-open-file (s "/dev/zero")
-                         (read-byte s))
-                       #-win32 type-error
-                       #+win32 sb-int:simple-file-error))
+(assert-error (read-byte (make-string-input-stream "abc"))
+              type-error)
+(assert-error (with-open-file (s "/dev/zero")
+                (read-byte s))
+              #-win32 type-error
+              #+win32 sb-int:simple-file-error)
 ;;; bidirectional streams getting confused about their position
 (let ((p "bidirectional-stream-test"))
   (with-open-file (s p :direction :output :if-exists :supersede)

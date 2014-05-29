@@ -80,9 +80,9 @@
 
 ;;; sbcl-0.6.10 did (UPGRADED-ARRAY-ELEMENT-TYPE 'SOME-UNDEF-TYPE)=>T
 ;;; and (UPGRADED-COMPLEX-PART-TYPE 'SOME-UNDEF-TYPE)=>T.
-(assert (raises-error? (upgraded-array-element-type 'some-undef-type)))
+(assert-error (upgraded-array-element-type 'some-undef-type))
 (assert (eql (upgraded-array-element-type t) t))
-(assert (raises-error? (upgraded-complex-part-type 'some-undef-type)))
+(assert-error (upgraded-complex-part-type 'some-undef-type))
 (assert (subtypep (upgraded-complex-part-type 'fixnum) 'real))
 
 ;;; Do reasonable things with undefined types, and with compound types
@@ -91,7 +91,7 @@
 ;;; part I: TYPEP
 (assert (typep #(11) '(simple-array t 1)))
 (assert (typep #(11) '(simple-array (or integer symbol) 1)))
-(assert (raises-error? (typep #(11) '(simple-array undef-type 1))))
+(assert-error (typep #(11) '(simple-array undef-type 1)))
 (assert (not (typep 11 '(simple-array undef-type 1))))
 ;;; part II: SUBTYPEP
 
@@ -103,23 +103,23 @@
 (assert-nil-nil (subtypep '(vector t) '(vector utype-2)))
 
 ;;; ANSI specifically disallows bare AND and OR symbols as type specs.
-(assert (raises-error? (typep 11 'and)))
-(assert (raises-error? (typep 11 'or)))
-(assert (raises-error? (typep 11 'member)))
-(assert (raises-error? (typep 11 'values)))
-(assert (raises-error? (typep 11 'eql)))
-(assert (raises-error? (typep 11 'satisfies)))
-(assert (raises-error? (typep 11 'not)))
+(assert-error (typep 11 'and))
+(assert-error (typep 11 'or))
+(assert-error (typep 11 'member))
+(assert-error (typep 11 'values))
+(assert-error (typep 11 'eql))
+(assert-error (typep 11 'satisfies))
+(assert-error (typep 11 'not))
 ;;; and while it doesn't specifically disallow illegal compound
 ;;; specifiers from the CL package, we don't have any.
-(assert (raises-error? (subtypep 'fixnum '(fixnum 1))))
-(assert (raises-error? (subtypep 'class '(list))))
-(assert (raises-error? (subtypep 'foo '(ratio 1/2 3/2))))
-(assert (raises-error? (subtypep 'character '(character 10))))
+(assert-error (subtypep 'fixnum '(fixnum 1)))
+(assert-error (subtypep 'class '(list)))
+(assert-error (subtypep 'foo '(ratio 1/2 3/2)))
+(assert-error (subtypep 'character '(character 10)))
 #+nil ; doesn't yet work on PCL-derived internal types
-(assert (raises-error? (subtypep 'lisp '(class))))
+(assert-error (subtypep 'lisp '(class)))
 #+nil
-(assert (raises-error? (subtypep 'bar '(method number number))))
+(assert-error (subtypep 'bar '(method number number)))
 
 ;;; Of course empty lists of subtypes are still OK.
 (assert (typep 11 '(and)))

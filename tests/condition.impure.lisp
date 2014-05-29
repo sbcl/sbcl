@@ -330,8 +330,8 @@
 
 (macrolet
     ((with-testing-restart ((&key
-                             (condition-var (gensym))
-                             (condition-restart-p t))
+                               (condition-var (gensym))
+                               (condition-restart-p t))
                             &body body)
        `(block block
           (handler-bind ((condition (lambda (,condition-var)
@@ -354,9 +354,9 @@
     ;; INVOKE-RESTART cannot call the :test-function. SBCL considers
     ;; the restart unsuitable for the requested invocation. See
     ;; comment in INVOKE-RESTART.
-    (assert (raises-error? (with-testing-restart ()
-                             (invoke-restart 'testing-restart))
-                           control-error))
+    (assert-error (with-testing-restart ()
+                    (invoke-restart 'testing-restart))
+                  control-error)
 
     ;; When given a RESTART instance (which could only have been found
     ;; by passing an appropriate condition to FIND-RESTART),
@@ -379,10 +379,10 @@
 
   (with-test (:name (invoke-restart-interactively :test-function))
     ;; Comments in (INVOKE-RESTART :TEST-FUNCTION) apply here as well.
-    (assert (raises-error?
-             (with-testing-restart ()
-               (invoke-restart-interactively 'testing-restart))
-             control-error))
+    (assert-error
+     (with-testing-restart ()
+       (invoke-restart-interactively 'testing-restart))
+     control-error)
 
     (assert (eq :transfer
                 (with-testing-restart (:condition-var condition)
