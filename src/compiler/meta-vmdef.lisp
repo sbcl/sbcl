@@ -147,12 +147,12 @@
   (let ((nstack-p
          (if (or (eq sb-name 'non-descriptor-stack)
                  (find 'non-descriptor-stack
-                       (mapcar #'meta-sc-or-lose alternate-scs)
+                       (mapcar #'sc-or-lose alternate-scs)
                        :key (lambda (x)
                               (sb-name (sc-sb x)))))
              t nil)))
     `(progn
-       (eval-when (:compile-toplevel :load-toplevel :execute)
+       (eval-when (#-sb-xc :compile-toplevel :load-toplevel :execute)
          (let ((res (make-sc :name ',name :number ',number
                              :sb (sb-or-lose ',sb-name)
                              :element-size ,element-size
@@ -161,12 +161,11 @@
                              :reserve-locations ',reserve-locations
                              :save-p ',save-p
                              :number-stack-p ,nstack-p
-                             :alternate-scs (mapcar #'meta-sc-or-lose
+                             :alternate-scs (mapcar #'sc-or-lose
                                                     ',alternate-scs)
-                             :constant-scs (mapcar #'meta-sc-or-lose
+                             :constant-scs (mapcar #'sc-or-lose
                                                    ',constant-scs))))
-           (setf (gethash ',name *backend-meta-sc-names*) res)
-           (setf (svref *backend-meta-sc-numbers* ',number) res)
+           (setf (gethash ',name *backend-sc-names*) res)
            (setf (svref (sc-load-costs res) ',number) 0)))
 
        (let ((old (svref *backend-sc-numbers* ',number)))
@@ -174,10 +173,8 @@
            (warn "redefining SC number ~W from ~S to ~S" ',number
                  (sc-name old) ',name)))
 
-       (setf (svref *backend-sc-numbers* ',number)
-             (meta-sc-or-lose ',name))
-       (setf (gethash ',name *backend-sc-names*)
-             (meta-sc-or-lose ',name))
+       (setf (svref *backend-sc-numbers* ',number) (sc-or-lose ',name))
+       (setf (gethash ',name *backend-sc-names*) (sc-or-lose ',name))
        (setf (sc-sb (sc-or-lose ',name)) (sb-or-lose ',sb-name))
        ',name)))
 
@@ -190,9 +187,9 @@
         (tos (cdr ,scs) (cddr tos)))
        ((null froms))
      (dolist (from (car froms))
-       (let ((,from-sc-var (meta-sc-or-lose from)))
+       (let ((,from-sc-var (sc-or-lose from)))
          (dolist (to (car tos))
-           (let ((,to-sc-var (meta-sc-or-lose to)))
+           (let ((,to-sc-var (sc-or-lose to)))
              ,@body))))))
 
 ;;; Define the function NAME and note it as the function used for
@@ -264,7 +261,7 @@
 ;;; type descriptor for the Lisp type that is equivalent to this type.
 (defmacro !def-primitive-type (name scs &key (type name))
   (declare (type symbol name) (type list scs))
-  (let ((scns (mapcar #'meta-sc-number-or-lose scs)))
+  (let ((scns (mapcar #'sc-number-or-lose scs)))
     `(progn
        (/show0 "doing !DEF-PRIMITIVE-TYPE, NAME=..")
        (/primitive-print ,(symbol-name name))
@@ -327,18 +324,6 @@
           types)
        nil)))
 
-;;; Return true if SC is either one of PTYPE's SC's, or one of those
-;;; SC's alternate or constant SCs.
-(defun meta-sc-allowed-by-primitive-type (sc ptype)
-  (declare (type sc sc) (type primitive-type ptype))
-  (let ((scn (sc-number sc)))
-    (dolist (allowed (primitive-type-scs ptype) nil)
-      (when (eql allowed scn)
-        (return t))
-      (let ((allowed-sc (svref *backend-meta-sc-numbers* allowed)))
-        (when (or (member sc (sc-alternate-scs allowed-sc))
-                  (member sc (sc-constant-scs allowed-sc)))
-          (return t))))))
 
 ;;;; VOP definition structures
 ;;;;
@@ -591,9 +576,9 @@
             (setf (aref results index)
                   (if offset
                       (+ (ash offset (1+ sc-bits))
-                         (ash (meta-sc-number-or-lose sc) 1)
+                         (ash (sc-number-or-lose sc) 1)
                          1)
-                      (ash (meta-sc-number-or-lose sc) 1))))
+                      (ash (sc-number-or-lose sc) 1))))
           (incf index))
         ;; KLUDGE: The load-time MAKE-ARRAY here is an artifact of our
         ;; cross-compilation strategy, and the conservative
@@ -702,7 +687,7 @@
 (defun find-move-funs (op load-p)
   (collect ((funs))
     (dolist (sc-name (operand-parse-scs op))
-      (let* ((sc (meta-sc-or-lose sc-name))
+      (let* ((sc (sc-or-lose sc-name))
              (scn (sc-number sc))
              (load-scs (append (when load-p
                                  (sc-constant-scs sc))
@@ -1124,7 +1109,7 @@
         (costs (make-array sc-number-limit :initial-element nil))
         (load-scs (make-array sc-number-limit :initial-element nil)))
     (dolist (sc-name scs)
-      (let* ((load-sc (meta-sc-or-lose sc-name))
+      (let* ((load-sc (sc-or-lose sc-name))
              (load-scn (sc-number load-sc)))
         (setf (svref costs load-scn) 0)
         (setf (svref load-scs load-scn) t)
@@ -1150,7 +1135,7 @@
 
         (dotimes (i sc-number-limit)
           (unless (svref costs i)
-            (let ((op-sc (svref *backend-meta-sc-numbers* i)))
+            (let ((op-sc (svref *backend-sc-numbers* i)))
               (when op-sc
                 (let ((cost (if load-p
                                 (svref (sc-move-costs load-sc) i)
@@ -1288,8 +1273,8 @@
       (dolist (sc scs)
         (unless (or (eq type '*)
                     (dolist (ptype ptypes nil)
-                      (when (meta-sc-allowed-by-primitive-type
-                             (meta-sc-or-lose sc)
+                      (when (sc-allowed-by-primitive-type
+                             (sc-or-lose sc)
                              (primitive-type-or-lose ptype))
                         (return t))))
           (warn "~:[Result~;Argument~] ~A to VOP ~S~@
@@ -1865,8 +1850,7 @@
               (clauses `(t nil ,@(rest case)))
               (return))
             (clauses `((or ,@(mapcar (lambda (x)
-                                       `(eql ,(meta-sc-number-or-lose x)
-                                             ,n-sc))
+                                       `(eql ,(sc-number-or-lose x) ,n-sc))
                                      (if (atom head) (list head) head)))
                        nil ,@(rest case))))))
 
@@ -1878,7 +1862,7 @@
 (defmacro sc-is (tn &rest scs)
   (once-only ((n-sc `(sc-number (tn-sc ,tn))))
     `(or ,@(mapcar (lambda (x)
-                     `(eql ,n-sc ,(meta-sc-number-or-lose x)))
+                     `(eql ,n-sc ,(sc-number-or-lose x)))
                    scs))))
 
 ;;; Iterate over the IR2 blocks in component, in emission order.

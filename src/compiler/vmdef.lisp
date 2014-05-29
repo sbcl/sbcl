@@ -37,12 +37,8 @@
 ;;; This is like the non-meta versions, except we go for the
 ;;; meta-compile-time info. These should not be used after load time,
 ;;; since compiling the compiler changes the definitions.
-(defun meta-sc-or-lose (x)
-  (the sc
-       (or (gethash x *backend-meta-sc-names*)
-           (error "~S is not a defined storage class." x))))
-(defun meta-sc-number-or-lose (x)
-  (the sc-number (sc-number (meta-sc-or-lose x))))
+(defun meta-sc-number-or-lose (x) ; FIXME: remove
+  (the sc-number (sc-number (sc-or-lose x))))
 
 ;;;; side effect classes
 

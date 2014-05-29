@@ -48,27 +48,8 @@
 (declaim (type hash-table *backend-template-names*))
 
 ;;; hashtables mapping from SC and SB names to the corresponding structures
-;;;
-;;; CMU CL comment:
-;;;   The META versions are only used at meta-compile and load times,
-;;;   so the defining macros can change these at meta-compile time
-;;;   without breaking the compiler.
-;;; FIXME: Couldn't the META versions go away in SBCL now that we don't
-;;; have to worry about metacompiling and breaking the compiler?
 (defvar *backend-sc-names* (make-hash-table :test 'eq))
-(defvar *backend-meta-sc-names* (make-hash-table :test 'eq))
-(declaim (type hash-table
-               *backend-sc-names*
-               *backend-meta-sc-names*))
-
-
-;;; like *SC-NUMBERS*, but updated at meta-compile time
-;;;
-;;; FIXME: As per *BACKEND-META-SC-NAMES*
-;;; couldn't we get rid of this in SBCL?
-(defvar *backend-meta-sc-numbers*
-  (make-array sc-number-limit :initial-element nil))
-(declaim (type sc-vector *backend-meta-sc-numbers*))
+(declaim (type hash-table *backend-sc-names*))
 
 ;;; translations from primitive type names to the corresponding
 ;;; primitive-type structure.
