@@ -1024,8 +1024,16 @@ code to be loaded.
   class
   (history nil)
   (tempvars nil)
+  specified-type
   dtype
   (data nil)) ;collector-specific data
+
+(sb!int:defmacro-mundanely with-sum-count (lc &body body)
+  (let ((type (loop-collector-dtype lc))
+        (temp-var (car (loop-collector-tempvars lc))))
+    `(let ((,temp-var ,(loop-typed-init type)))
+       (declare (type ,type ,temp-var))
+       ,@body)))
 
 (defun loop-get-collection-info (collector class default-type)
   (let ((form (loop-get-form))
@@ -1036,27 +1044,41 @@ code to be loaded.
       (loop-error "The value accumulation recipient name, ~S, is not a symbol." name))
     (unless name
       (loop-disallow-aggregate-booleans))
-    (let ((dtype (or (loop-optional-type) default-type))
-          (cruft (find (the symbol name) *loop-collection-cruft*
-                       :key #'loop-collector-name)))
+    (let* ((specified-type (loop-optional-type))
+           (dtype (or specified-type default-type))
+           (cruft (find (the symbol name) *loop-collection-cruft*
+                        :key #'loop-collector-name)))
       (cond ((not cruft)
              (check-var-name name " in INTO clause")
              (push (setq cruft (make-loop-collector
-                                 :name name :class class
-                                 :history (list collector) :dtype dtype))
+                                :name name :class class
+                                :history (list collector)
+                                :specified-type specified-type
+                                :dtype dtype))
                    *loop-collection-cruft*))
             (t (unless (eq (loop-collector-class cruft) class)
                  (loop-error
-                   "incompatible kinds of LOOP value accumulation specified for collecting~@
+                  "incompatible kinds of LOOP value accumulation specified for collecting~@
                     ~:[as the value of the LOOP~;~:*INTO ~S~]: ~S and ~S"
-                   name (car (loop-collector-history cruft)) collector))
-               (unless (equal dtype (loop-collector-dtype cruft))
-                 (loop-warn
-                   "unequal datatypes specified in different LOOP value accumulations~@
-                   into ~S: ~S and ~S"
-                   name dtype (loop-collector-dtype cruft))
-                 (when (eq (loop-collector-dtype cruft) t)
-                   (setf (loop-collector-dtype cruft) dtype)))
+                  name (car (loop-collector-history cruft)) collector))
+               (cond ((equal dtype (loop-collector-dtype cruft)))
+                     ((and (null specified-type)
+                           (null (loop-collector-specified-type cruft)))
+                      ;; Unionize types only for default types, most
+                      ;; likely, SUM and COUNT which have number and
+                      ;; fixnum respectively.
+                      (setf (loop-collector-dtype cruft)
+                            (sb!kernel:type-specifier
+                             (sb!kernel:type-union
+                              (sb!kernel:specifier-type dtype)
+                              (sb!kernel:specifier-type (loop-collector-dtype cruft))))))
+                     (t
+                      (loop-warn
+                       "unequal datatypes specified in different LOOP value accumulations~@
+                        into ~S: ~S and ~S"
+                       name dtype (loop-collector-dtype cruft))
+                      (when (eq (loop-collector-dtype cruft) t)
+                        (setf (loop-collector-dtype cruft) dtype))))
                (push collector (loop-collector-history cruft))))
       (values cruft form))))
 
@@ -1090,12 +1112,11 @@ code to be loaded.
     (let ((tempvars (loop-collector-tempvars lc)))
       (unless tempvars
         (setf (loop-collector-tempvars lc)
-              (setq tempvars (list (loop-make-var
-                                     (or (loop-collector-name lc)
-                                         (gensym "LOOP-SUM-"))
-                                     nil (loop-collector-dtype lc)))))
+              (setq tempvars (list (or (loop-collector-name lc)
+                                  (gensym "LOOP-SUM-")))))
         (unless (loop-collector-name lc)
-          (loop-emit-final-value (car (loop-collector-tempvars lc)))))
+          (loop-emit-final-value (car (loop-collector-tempvars lc))))
+        (push `(with-sum-count ,lc) *loop-wrappers*))
       (loop-emit-body
         (if (eq specifically 'count)
             `(when ,form
@@ -1780,10 +1801,13 @@ code to be loaded.
                          (nconc (loop-list-collection nconc))
                          (nconcing (loop-list-collection nconc))
                          (count (loop-sum-collection count
-                                                     real
-                                                     fixnum))
+                                 ;; This could be REAL, but when
+                                 ;; combined with SUM, it has to be
+                                 ;; NUMBER.
+                                 number
+                                 fixnum))
                          (counting (loop-sum-collection count
-                                                        real
+                                                        number
                                                         fixnum))
                          (sum (loop-sum-collection sum number number))
                          (summing (loop-sum-collection sum number number))

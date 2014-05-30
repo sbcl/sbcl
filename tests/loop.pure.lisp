@@ -342,3 +342,9 @@
 (with-test (:name :destructuring-less)
   (assert (equal (loop with (a b) = '() repeat 1 collect (list a b))
                  '((NIL NIL)))))
+
+(with-test (:name :count-with-sum)
+  (assert (= (loop repeat 1 count 1 sum #c(1 2))
+             #c(2 2)))
+  (assert (= (loop repeat 1 sum 1 count 1)
+             2)))
