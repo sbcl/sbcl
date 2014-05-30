@@ -1032,8 +1032,8 @@ the first."
 
 (defun logcount (integer)
   #!+sb-doc
-  "Count the number of 1 bits if INTEGER is positive, and the number of 0 bits
-  if INTEGER is negative."
+  "Count the number of 1 bits if INTEGER is non-negative,
+and the number of 0 bits if INTEGER is negative."
   (etypecase integer
     (fixnum
      (logcount (truly-the (integer 0
