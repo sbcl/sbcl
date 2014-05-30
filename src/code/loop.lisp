@@ -1113,13 +1113,13 @@ code to be loaded.
       (unless data
         (setf (loop-collector-data lc)
               (setq data (make-loop-minimax
-                           (or (loop-collector-name lc)
-                               (gensym "LOOP-MAXMIN-"))
-                           (loop-collector-dtype lc))))
+                          (or (loop-collector-name lc)
+                              (gensym "LOOP-MAXMIN-"))
+                          (loop-collector-dtype lc))))
         (unless (loop-collector-name lc)
-          (loop-emit-final-value (loop-minimax-answer-variable data))))
+          (loop-emit-final-value (loop-minimax-answer-variable data)))
+        (push `(with-minimax-value ,data) *loop-wrappers*))
       (loop-note-minimax-operation specifically data)
-      (push `(with-minimax-value ,data) *loop-wrappers*)
       (loop-emit-body `(loop-accumulate-minimax-value ,data
                                                       ,specifically
                                                       ,form)))))

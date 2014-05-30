@@ -301,6 +301,7 @@
                          and (nil f)
                          return (list a f))))
    warning))
+
 (with-test (:name :duplicate-bindings)
   (assert-error
    (funcall (compile nil `(lambda ()
@@ -323,3 +324,17 @@
                             (loop with (a) = '(3)
                                   for b to 10
                                   collect a into b))))))
+
+(with-test (:name :multiple-maximize)
+  (assert-no-signal
+   (compile nil `(lambda ()
+                   (loop for x to 10 maximize x minimize x)))
+   warning)
+  (assert-no-signal
+   (compile nil `(lambda ()
+                   (loop for x to 10 minimize x minimize x)))
+   warning)
+  (assert-no-signal
+   (compile nil `(lambda ()
+                   (loop for x to 10 minimize x into z minimize x into z finally (return z))))
+   warning))
