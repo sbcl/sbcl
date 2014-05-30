@@ -1101,6 +1101,7 @@
      `(block search
         (flet ((oops (vector start end)
                  (sequence-bounding-indices-bad-error vector start end)))
+          (declare (ignorable #'oops))
           (let* ((len1 (length pattern))
                  (len2 (length text))
                  (end1 (or end1 len1))

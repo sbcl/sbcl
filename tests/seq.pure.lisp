@@ -381,3 +381,11 @@
 (with-test (:name :do-sequence-on-literals)
   (assert (= (sequence:dosequence (e #(1 2 3)) (return e))
              1)))
+
+(with-test (:name :search-transform-notes)
+  (assert-no-signal
+   (compile nil `(lambda (s)
+                   (declare (optimize (speed 3) (safety 0))
+                            (type simple-string s))
+                   (search "foo" s)))
+   sb-ext:compiler-note))

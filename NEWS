@@ -9,6 +9,7 @@ changes relative to sbcl-1.2.0:
     (lp#1258716)
   * bug fix: assorted LOOP fixes and enhancements. (lp#645534, lp#1322923,
     lp#700538, lp#613876, lp#695286, lp#798388)
+  * bug fix: silence compiler notes from the SEARCH transform. (lp#1071310)
   
 changes in sbcl-1.2.0 relative to sbcl-1.1.18:
   * bug fix: read-time-eval backquote context mixup. (lp#1321047)
