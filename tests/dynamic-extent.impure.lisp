@@ -971,11 +971,16 @@
 
 (with-test (:name :bug-586105 :fails-on '(not (and :stack-allocatable-vectors
                                                    :stack-allocatable-lists)))
-  (flet ((test (x)
-           (let ((vec (make-array 1 :initial-contents (list (list x)))))
-             (declare (dynamic-extent vec))
-             (assert (eql x (car (aref vec 0)))))))
-    (assert-no-consing (test 42))))
+  (macrolet ((vector-of (a) `(vector ,a)))
+    (flet ((test (x)
+             (let ((vec1 (make-array 1 :initial-contents (list (list x))))
+                   (vec2 (make-array 1 :initial-contents `((,x))))
+                   (vec3 (make-array 1 :initial-contents (vector-of `(,x)))))
+             (declare (dynamic-extent vec1 vec2 vec3))
+             (assert (eql x (car (aref vec1 0))))
+             (assert (eql x (car (aref vec2 0))))
+             (assert (eql x (car (aref vec3 0)))))))
+    (assert-no-consing (test 42)))))
 
 (defun bug-681092 ()
   (declare (optimize speed))

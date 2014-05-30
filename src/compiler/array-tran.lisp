@@ -352,19 +352,39 @@
                        ,@(when initial-element
                            '(:initial-element initial-element)))))
 
+;; Traverse the :INTIAL-CONTENTS argument to an array constructor call,
+;; changing the skeleton of the data to be constructed by calls to LIST
+;; and wrapping some declarations around each array cell's constructor.
+;; If a macro is involved, expand it before traversing.
+;; Known bugs:
+;; - Despite the effort to handle multidimensional arrays here,
+;;   an array-header will not be stack-allocated, so the data won't be either.
+;; - inline functions whose behavior is merely to call LIST don't work
+;;   e.g. :INITIAL-CONTENTS (MY-LIST a b) ; where MY-LIST is inline
+;;                                        ; and effectively just (LIST ...)
+;; - in the current implementation it is only with difficulty that
+;;   backquoted vectors could be used as initializers because BACKQ-VECTOR
+;;   is not the analogous function to VECTOR. (New backq macro fixes that.)
 (defun rewrite-initial-contents (rank initial-contents env)
-  (if (plusp rank)
-      (if (and (consp initial-contents)
-               (member (car initial-contents) '(list vector sb!impl::backq-list)))
-          `(list ,@(mapcar (lambda (dim)
-                             (rewrite-initial-contents (1- rank) dim env))
-                           (cdr initial-contents)))
-          initial-contents)
+  (named-let recurse ((rank rank) (data initial-contents))
+    (declare (index rank))
+    (if (plusp rank)
+        (flet ((sequence-constructor-p (form)
+                 (member (car form) '(list vector sb!impl::backq-list))))
+          (let (expanded)
+            (cond ((not (listp data)) data)
+                  ((sequence-constructor-p data)
+                   `(list ,@(mapcar (lambda (dim) (recurse (1- rank) dim))
+                                    (cdr data))))
+                  ((and (sb!xc:macro-function (car data) env)
+                        (listp (setq expanded (sb!xc:macroexpand data env)))
+                        (sequence-constructor-p expanded))
+                   (recurse rank expanded))
+                  (t data))))
       ;; This is the important bit: once we are past the level of
       ;; :INITIAL-CONTENTS that relates to the array structure, reinline LIST
       ;; and VECTOR so that nested DX isn't screwed up.
-      `(locally (declare (inline list vector))
-         ,initial-contents)))
+        `(locally (declare (inline list vector)) ,data))))
 
 ;;; Prevent open coding DIMENSION and :INITIAL-CONTENTS arguments, so that we
 ;;; can pick them apart in the DEFTRANSFORMS, and transform '(3) style
