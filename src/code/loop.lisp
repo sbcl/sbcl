@@ -832,12 +832,49 @@ code to be loaded.
           *loop-desetq-declarations* nil
           *loop-wrappers* nil)))
 
-(defun loop-var-p (name)
-  (do ((entry *loop-bind-stack* (cdr entry)))
-      (nil)
-    (cond
-      ((null entry) (return nil))
-      ((assoc name (caar entry) :test #'eq) (return t)))))
+(defun check-var-name (name &optional (context ""))
+  (labels ((map-name (function name)
+             (do ((x (pop name) (pop name)))
+                 (())
+               (typecase x
+                 (null)
+                 (cons (map-name function x))
+                 (symbol (funcall function x))
+                 (t
+                  (loop-error "Bad variable ~s~a" x context)))
+               (typecase name
+                 (cons)
+                 (null
+                  (return))
+                 (symbol
+                  (funcall function name)
+                  (return))
+                 (t
+                  (loop-error "Bad variable ~s~a" name context)))))
+           (duplicate (x)
+             (loop-error "Duplicated variable ~s~a" x context))
+           (find-in-desetq (name desetqs)
+             (do* ((desetq desetqs (cddr desetq))
+                   (var (car desetq) (car desetq)))
+                  ((null desetq))
+               (map-name (lambda (x)
+                           (when (eql name x)
+                             (duplicate name)))
+                         var))))
+    (cond ((consp name)
+           (map-name (lambda (x) (check-var-name x context)) name))
+          ((assoc name *loop-vars*)
+           (duplicate name))
+          ((find-in-desetq name *loop-desetq*))
+          (t
+           (do ((entry *loop-bind-stack* (cdr entry)))
+               (nil)
+             (cond
+               ((null entry) (return nil))
+               ((assoc name (caar entry) :test #'eq)
+                (duplicate name))
+               (t
+                (find-in-desetq name (caddar entry)))))))))
 
 (defun loop-make-var (name initialization dtype &optional step-var-p)
   (cond ((null name)
@@ -847,11 +884,7 @@ code to be loaded.
          (push `(ignore ,name) *loop-declarations*)
          (loop-declare-var name dtype))
         ((atom name)
-         (when (or (assoc name *loop-vars*)
-                   (loop-var-p name))
-           (loop-error "duplicated variable ~S in a LOOP binding" name))
-         (unless (symbolp name)
-           (loop-error "bad variable ~S somewhere in LOOP" name))
+         (check-var-name name)
          (loop-declare-var name dtype :step-var-p step-var-p
                                       :initialization initialization)
          ;; We use ASSOC on this list to check for duplications (above),
@@ -859,18 +892,20 @@ code to be loaded.
          (push (list name (or initialization (loop-typed-init dtype step-var-p)))
                *loop-vars*))
         (initialization
+         (check-var-name name)
          (let ((newvar (gensym "LOOP-DESTRUCTURE-")))
            (loop-declare-var name dtype :desetq t)
            (push (list newvar initialization) *loop-vars*)
            ;; *LOOP-DESETQ* gathered in reverse order.
            (setq *loop-desetq*
                  (list* name newvar *loop-desetq*))))
-        (t (let ((tcar nil) (tcdr nil))
-             (if (atom dtype) (setq tcar (setq tcdr dtype))
-                 (setq tcar (car dtype) tcdr (cdr dtype)))
-             (loop-make-var (car name) nil tcar)
-             (when (cdr name)
-               (loop-make-var (cdr name) nil tcdr)))))
+        (t
+         (let ((tcar nil) (tcdr nil))
+           (if (atom dtype) (setq tcar (setq tcdr dtype))
+               (setq tcar (car dtype) tcdr (cdr dtype)))
+           (loop-make-var (car name) nil tcar)
+           (when (cdr name)
+             (loop-make-var (cdr name) nil tcdr)))))
   name)
 
 (defun loop-declare-var (name dtype &key step-var-p initialization
@@ -1005,8 +1040,7 @@ code to be loaded.
           (cruft (find (the symbol name) *loop-collection-cruft*
                        :key #'loop-collector-name)))
       (cond ((not cruft)
-             (when (and name (loop-var-p name))
-               (loop-error "Variable ~S in INTO clause is a duplicate" name))
+             (check-var-name name " in INTO clause")
              (push (setq cruft (make-loop-collector
                                  :name name :class class
                                  :history (list collector) :dtype dtype))
@@ -1145,8 +1179,6 @@ code to be loaded.
                      (loop-pop-source)
                      (loop-get-form))
                     (t nil)))
-    (when (and var (loop-var-p var))
-      (loop-error "Variable ~S has already been used" var))
     (loop-make-var var val dtype)
     (if (loop-tequal (car *loop-source-code*) :and)
         (loop-pop-source)

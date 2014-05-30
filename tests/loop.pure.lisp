@@ -301,3 +301,25 @@
                          and (nil f)
                          return (list a f))))
    warning))
+(with-test (:name :duplicate-bindings)
+  (assert-error
+   (funcall (compile nil `(lambda ()
+                            (loop with (a b) = '(1.0 2.0)
+                                  and (c a) = '(3.0 4.0)
+                                  return (list a b c))))))
+  (assert-error
+   (funcall (compile nil `(lambda ()
+                            (loop with a = 10
+                                  with ((a) b) = '((1.0) 2.0)
+                                  return (list a b))))))
+  (assert-error
+   (funcall (compile nil `(lambda ()
+                            (loop with (b) = '(10)
+                                  with (a) = '(3)
+                                  for b to 10
+                                  collect a)))))
+  (assert-error
+   (funcall (compile nil `(lambda ()
+                            (loop with (a) = '(3)
+                                  for b to 10
+                                  collect a into b))))))
