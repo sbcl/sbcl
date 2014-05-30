@@ -417,9 +417,12 @@ code to be loaded.
 ;;; *LOOP-VARS*.
 (defvar *loop-declarations*)
 
+;;; Declarations for destructuring bindings
+(defvar *loop-desetq-declarations*)
+
 ;;; This is used by LOOP for destructuring binding, if it is doing
 ;;; that itself. See LOOP-MAKE-VAR.
-(defvar *loop-desetq-crocks*)
+(defvar *loop-desetq*)
 
 ;;; list of wrapping forms, innermost first, which go immediately
 ;;; inside the current set of parallel bindings being accumulated in
@@ -586,7 +589,8 @@ code to be loaded.
         (*loop-vars* nil)
         (*loop-named-vars* nil)
         (*loop-declarations* nil)
-        (*loop-desetq-crocks* nil)
+        (*loop-desetq-declarations* nil)
+        (*loop-desetq* nil)
         (*loop-bind-stack* nil)
         (*loop-prologue* nil)
         (*loop-wrappers* nil)
@@ -612,19 +616,16 @@ code to be loaded.
                      ,(nreconc *loop-epilogue*
                                (nreverse *loop-after-epilogue*)))))
       (dolist (entry *loop-bind-stack*)
-        (let ((vars (first entry))
-              (dcls (second entry))
-              (crocks (third entry))
-              (wrappers (fourth entry)))
+        (destructuring-bind (vars dcls desetq desetq-decls wrappers) entry
           (dolist (w wrappers)
             (setq answer (append w (list answer))))
-          (when (or vars dcls crocks)
+          (when (or vars dcls desetq)
             (let ((forms (list answer)))
-              ;;(when crocks (push crocks forms))
-              (when dcls (push `(declare ,@dcls) forms))
+              (when desetq-decls (push `(declare ,@desetq-decls) forms))
               (setq answer `(,(if vars 'let 'locally)
                              ,vars
-                             ,@(loop-build-destructuring-bindings crocks
+                             (declare ,@dcls)
+                             ,@(loop-build-destructuring-bindings desetq
                                                                   forms)))))))
       (do () (nil)
         (setq answer `(block ,(pop *loop-names*) ,answer))
@@ -816,15 +817,18 @@ code to be loaded.
 ;;;; loop variables
 
 (defun loop-bind-block ()
-  (when (or *loop-vars* *loop-declarations* *loop-wrappers*)
+  (when (or *loop-vars* *loop-declarations* *loop-wrappers*
+            *loop-desetq*)
     (push (list (nreverse *loop-vars*)
                 *loop-declarations*
-                *loop-desetq-crocks*
+                *loop-desetq*
+                *loop-desetq-declarations*
                 *loop-wrappers*)
           *loop-bind-stack*)
     (setq *loop-vars* nil
           *loop-declarations* nil
-          *loop-desetq-crocks* nil
+          *loop-desetq* nil
+          *loop-desetq-declarations* nil
           *loop-wrappers* nil)))
 
 (defun loop-var-p (name)
@@ -847,18 +851,19 @@ code to be loaded.
            (loop-error "duplicated variable ~S in a LOOP binding" name))
          (unless (symbolp name)
            (loop-error "bad variable ~S somewhere in LOOP" name))
-         (loop-declare-var name dtype step-var-p initialization)
+         (loop-declare-var name dtype :step-var-p step-var-p
+                                      :initialization initialization)
          ;; We use ASSOC on this list to check for duplications (above),
          ;; so don't optimize out this list:
          (push (list name (or initialization (loop-typed-init dtype step-var-p)))
                *loop-vars*))
         (initialization
          (let ((newvar (gensym "LOOP-DESTRUCTURE-")))
-           (loop-declare-var name dtype)
+           (loop-declare-var name dtype :desetq t)
            (push (list newvar initialization) *loop-vars*)
-           ;; *LOOP-DESETQ-CROCKS* gathered in reverse order.
-           (setq *loop-desetq-crocks*
-                 (list* name newvar *loop-desetq-crocks*))))
+           ;; *LOOP-DESETQ* gathered in reverse order.
+           (setq *loop-desetq*
+                 (list* name newvar *loop-desetq*))))
         (t (let ((tcar nil) (tcdr nil))
              (if (atom dtype) (setq tcar (setq tcdr dtype))
                  (setq tcar (car dtype) tcdr (cdr dtype)))
@@ -867,19 +872,23 @@ code to be loaded.
                (loop-make-var (cdr name) nil tcdr)))))
   name)
 
-(defun loop-declare-var (name dtype &optional step-var-p initialization)
+(defun loop-declare-var (name dtype &key step-var-p initialization
+                                         desetq)
   (cond ((or (null name) (null dtype) (eq dtype t)) nil)
         ((symbolp name)
          (unless (or (sb!xc:subtypep t dtype)
                      (and (eq (find-package :cl) (symbol-package name))
                           (eq :special (sb!int:info :variable :kind name))))
-           (let ((dtype (if initialization
-                            dtype
-                            (let ((init (loop-typed-init dtype step-var-p)))
-                              (if (sb!xc:typep init dtype)
-                                  dtype
-                                  `(or ,(type-of init) ,dtype))))))
-             (push `(type ,dtype ,name) *loop-declarations*))))
+           (let ((dtype `(type ,(if initialization
+                                    dtype
+                                    (let ((init (loop-typed-init dtype step-var-p)))
+                                      (if (sb!xc:typep init dtype)
+                                          dtype
+                                          `(or ,(type-of init) ,dtype))))
+                               ,name)))
+             (if desetq
+                 (push dtype *loop-declarations*)
+                 (push dtype *loop-desetq-declarations*)))))
         ((consp name)
          (cond ((consp dtype)
                 (loop-declare-var (car name) (car dtype))

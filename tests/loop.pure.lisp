@@ -293,3 +293,11 @@
   (assert (equal (loop for (a nil b) float = '(1.0 3.0 2.0)
                        return (list a b))
                  '(1.0 2.0))))
+
+(with-test (:name :misplaced-diclarations)
+  (assert-no-signal
+   (compile nil `(lambda ()
+                   (loop with (a) = '(1.0)
+                         and (nil f)
+                         return (list a f))))
+   warning))
