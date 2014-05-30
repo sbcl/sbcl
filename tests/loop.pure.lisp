@@ -338,3 +338,7 @@
    (compile nil `(lambda ()
                    (loop for x to 10 minimize x into z minimize x into z finally (return z))))
    warning))
+
+(with-test (:name :destructuring-less)
+  (assert (equal (loop with (a b) = '() repeat 1 collect (list a b))
+                 '((NIL NIL)))))

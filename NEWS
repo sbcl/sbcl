@@ -2,13 +2,13 @@
 changes relative to sbcl-1.2.0:
   * enhancement: GENCGC is enabled on ARM.
   * bug fix: TYPE-OF must not return AND/OR/NOT expressions.
-   (lp#1317308)
+    (lp#1317308)
   * bug fix: accessing NIL arrays stopped producing errors. (lp#1311421)
   * bug fix: DISASSEMBLE no longer prints unwanted stuff. (lp#1251861)
   * bug fix: compiling SVREF on unknown types no longer produces scary errors.
     (lp#1258716)
   * bug fix: assorted LOOP fixes and enhancements. (lp#645534, lp#1322923,
-    lp#700538, lp#613876)
+    lp#700538, lp#613876, lp#695286)
   
 changes in sbcl-1.2.0 relative to sbcl-1.1.18:
   * bug fix: read-time-eval backquote context mixup. (lp#1321047)

@@ -570,7 +570,7 @@ code to be loaded.
   (let ((*ignores* nil))
     (declare (special *ignores*))
     (let ((d-var-lambda-list (subst-gensyms-for-nil lambda-list)))
-      `(destructuring-bind ,d-var-lambda-list
+      `(destructuring-bind (&optional ,@d-var-lambda-list)
            ,arg-list
          (declare (ignore ,@*ignores*))
          ,@body))))
