@@ -1378,17 +1378,6 @@ extended <package-name>::<form-in-package> syntax."
 
 ;;;; number-reading functions
 
-(defmacro digit* nil
-  `(do ((ch char (inch-read-buffer)))
-       ((or (eofp ch) (not (digit-char-p ch))) (setq char ch))
-     ;; Report if at least one digit is seen.
-     (setq one-digit t)))
-
-;; FIXME: should just check for something like
-;;  (and (typep letter 'base-char) (... +char-attr-constituent-expt+))
-(defmacro exponent-letterp (letter)
-  `(memq ,letter '(#\E #\S #\F #\L #\D #\e #\s #\f #\l #\d)))
-
 ;;; FIXME: It would be cleaner to have these generated automatically
 ;;; by compile-time code instead of having them hand-created like
 ;;; this. The !COLD-INIT-INTEGER-READER code below should be resurrected
@@ -1512,7 +1501,7 @@ extended <package-name>::<form-in-package> syntax."
                                       *read-default-float-format*
                                       stream)))
              (return-from make-float (if negative-fraction (- num) num))))
-          ((exponent-letterp char)
+          ((= (get-constituent-trait char) +char-attr-constituent-expt+)
            (setq float-char char)
            ;; Build exponent.
            (setq char (inch-read-buffer))
