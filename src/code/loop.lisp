@@ -1029,10 +1029,14 @@ code to be loaded.
   (data nil)) ;collector-specific data
 
 (sb!int:defmacro-mundanely with-sum-count (lc &body body)
-  (let ((type (loop-collector-dtype lc))
-        (temp-var (car (loop-collector-tempvars lc))))
-    `(let ((,temp-var ,(loop-typed-init type)))
-       (declare (type ,type ,temp-var))
+  (let* ((type (loop-collector-dtype lc))
+         (temp-var (car (loop-collector-tempvars lc)))
+         (init (loop-typed-init type)))
+    `(let ((,temp-var ,init))
+       (declare (type ,(if (sb!xc:typep init type)
+                           type
+                           `(or ,(type-of init) ,type))
+                      ,temp-var))
        ,@body)))
 
 (defun loop-get-collection-info (collector class default-type)

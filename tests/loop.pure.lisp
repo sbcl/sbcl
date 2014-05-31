@@ -359,3 +359,8 @@
   (assert (equal (let ((n 0))
                    (loop for x from (incf n) to (+ n 5) collect x))
                  '(1 2 3 4 5 6))))
+
+(with-test (:name :summing-complex)
+  (assert (equal (loop for i from 1 to 4
+                       sum (complex i (1+ i)) of-type complex)
+                 #c(10 14))))
