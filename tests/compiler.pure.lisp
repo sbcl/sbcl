@@ -1820,13 +1820,15 @@
 
 ;;; bug #351 -- program-error for malformed LET and LET*, including those
 ;;; resulting from SETF of LET.
-(dolist (fun (list (compile nil '(lambda () (let :bogus-let :oops)))
-                   (compile nil '(lambda () (let* :bogus-let* :oops)))
-                   (compile nil '(lambda (x) (push x (let ((y 0)) y))))))
-  (assert (functionp fun))
-  (multiple-value-bind (res err) (ignore-errors (funcall fun))
-    (assert (not res))
-    (assert (typep err 'program-error))))
+(with-test (:name :bug-351)
+  (dolist (fun (list (compile nil '(lambda (x) (let :bogus-let :oops)))
+                     (compile nil '(lambda (x) (let* :bogus-let* :oops)))
+                     (compile nil '(lambda (x) (push x (let ((y 0)) y))))))
+    (assert (functionp fun))
+    (multiple-value-bind (res err) (ignore-errors (funcall fun t))
+      (princ err) (terpri)
+      (assert (not res))
+      (assert (typep err 'program-error)))))
 
 (let ((fun (compile nil '(lambda (x) (random (if x 10 20))))))
   (dotimes (i 100 (error "bad RANDOM distribution"))
