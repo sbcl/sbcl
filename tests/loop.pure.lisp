@@ -348,3 +348,14 @@
              #c(2 2)))
   (assert (= (loop repeat 1 sum 1 count 1)
              2)))
+
+(with-test (:name :iterate-over-complex)
+  (assert
+   (equal
+    (loop for c from #c(0 1) repeat 5 collect c)
+    '(#C(0 1) #C(1 1) #C(2 1) #C(3 1) #C(4 1)))))
+
+(with-test (:name :side-effecting-start-form)
+  (assert (equal (let ((n 0))
+                   (loop for x from (incf n) to (+ n 5) collect x))
+                 '(1 2 3 4 5 6))))

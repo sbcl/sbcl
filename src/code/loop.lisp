@@ -1565,8 +1565,7 @@ code to be loaded.
          (start-constantp nil)
          (limit-given nil) ; T when prep phrase has specified end
          (limit-constantp nil)
-         (limit-value nil)
-         )
+         (limit-value nil))
      (flet ((assert-index-for-arithmetic (index)
               (unless (atom index)
                 (loop-error "Arithmetic index must be an atom."))))
@@ -1587,7 +1586,7 @@ code to be loaded.
             ;; KLUDGE: loop-make-var generates a temporary symbol for
             ;; indexv if it is NIL. We have to use it to have the index
             ;; actually count
-            (setq indexv (loop-make-var indexv form `(and real ,indexv-type))))
+            (setq indexv (loop-make-var indexv form indexv-type)))
            ((:upto :to :downto :above :below)
             (cond ((loop-tequal prep :upto) (setq inclusive-iteration
                                                   (setq dir ':up)))
@@ -1624,14 +1623,33 @@ code to be loaded.
        (when (and sequence-variable (not sequencep))
          (loop-error "missing OF or IN phrase in sequence path"))
        ;; Now fill in the defaults.
-       (unless start-given
-         (assert-index-for-arithmetic indexv)
-         (setq indexv
-               (loop-make-var
-                indexv
-                (setq start-constantp t
-                      start-value (or (loop-typed-init indexv-type) 0))
-                `(and ,indexv-type real))))
+       (cond ((not start-given)
+              ;; default start
+              ;; DUPLICATE KLUDGE: loop-make-var generates a temporary
+              ;; symbol for indexv if it is NIL. See also the comment in
+              ;; the (:from :downfrom :upfrom) case
+              (assert-index-for-arithmetic indexv)
+              (setq indexv
+                    (loop-make-var
+                     indexv
+                     (setq start-constantp t
+                           start-value (or (loop-typed-init indexv-type) 0))
+                     `(and ,indexv-type real))))
+             (limit-given
+              ;; if both start and limit are given, they had better both
+              ;; be REAL.  We already enforce the REALness of LIMIT,
+              ;; above; here's the KLUDGE to enforce the type of START.
+              (flet ((type-declaration-of (x)
+                       (and (eq (car x) 'type) (caddr x))))
+                (let ((decl (find indexv *loop-declarations*
+                                  :key #'type-declaration-of))
+                      (%decl (find indexv *loop-declarations*
+                                   :key #'type-declaration-of
+                                   :from-end t)))
+                  (sb!int:aver (eq decl %decl))
+                  (when decl
+                    (setf (cadr decl)
+                          `(and real ,(cadr decl))))))))
        (cond ((member dir '(nil :up))
               (when (or limit-given default-top)
                 (unless limit-given
