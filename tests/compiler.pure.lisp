@@ -702,6 +702,54 @@
                   (+ 359749 35728422))))
             -24076)))
 
+(with-test (:name :ansi-misc.293a)
+  (assert (= (funcall
+              (compile
+               nil
+               '(lambda (a b c)
+                 (declare (optimize (speed 2) (space 3) (safety 1)
+                           (debug 2) (compilation-speed 2)))
+                 (block b6
+                   (multiple-value-prog1
+                       0 b 0
+                       (catch 'ct7
+                         (return-from b6
+                           (catch 'ct2
+                             (complex (cl::handler-bind nil -254932942) 0))))))))
+              1 2 3)
+             -254932942)))
+
+(with-test (:name :ansi-misc.293d)
+  (assert (= (funcall
+              (compile
+               nil
+               '(lambda ()
+                 (declare (optimize (debug 3) (safety 0) (space 2)
+                           (compilation-speed 2) (speed 2)))
+                 (block b4
+                   (multiple-value-prog1
+                       0
+                     (catch 'ct8
+                       (return-from b4 (catch 'ct2 (progn (tagbody) 0)))))))))
+             0)))
+
+(with-test (:name :ansi-misc.618)
+  (assert (= (funcall
+              (compile
+               nil
+               '(lambda (c)
+                 (declare (optimize (space 0) (compilation-speed 2) (debug 0)
+                           (speed 3) (safety 0)))
+                 (block b1
+                   (ignore-errors
+                    (multiple-value-prog1 0
+                      (apply (constantly 0)
+                             c
+                             (catch 'ct2 (return-from b1 0))
+                             nil))))))
+              -4951)
+             0)))
+
 ;;; bug 294 reported by Paul Dietz: miscompilation of REM and MOD
 (assert (= (funcall (compile nil `(lambda (b)
                                     (declare (optimize (speed 3))
@@ -1917,17 +1965,12 @@
 ;;; crash in the ASH vop (since a shift of 57 wouldn't fit in the
 ;;; machine's ASH instruction's immediate field) that the compiler
 ;;; thought was legitimate.
-;;;
-;;; FIXME: this has been recorded as bug 383.  The attempted fix (sbcl
-;;; 0.9.2.6) led to lots of spurious optimization notes.  So the bug stil
-;;; exist and this test case serves as a reminder of the problem.
-;;;   --njf, 2005-07-05
-#+nil
-(compile 'nil
-         (LAMBDA (B)
-           (DECLARE (TYPE (INTEGER -2 14) B))
-           (DECLARE (IGNORABLE B))
-           (ASH (IMAGPART B) 57)))
+(with-test (:name :overlarge-immediate-in-ash-vop)
+  (compile 'nil
+           (LAMBDA (B)
+             (DECLARE (TYPE (INTEGER -2 14) B))
+             (DECLARE (IGNORABLE B))
+             (ASH (IMAGPART B) 57))))
 
 ;;; bug reported by Eduardo Mu\~noz
 (multiple-value-bind (fun warnings failure)
