@@ -5136,3 +5136,11 @@
     (assert (< (approx-lines-of-assembly-code
                 '(or system-area-pointer (sb-kernel:simple-unboxed-array (*))))
                27))))
+
+(with-test (:name :local-argument-mismatch-error-string)
+  (let ((f (compile nil `(lambda (x)
+                           (flet ((foo ()))
+                             (foo x))))))
+    (multiple-value-bind (ok err) (ignore-errors (funcall f 42))
+      (assert (not ok))
+      (assert (search "FLET FOO" (princ-to-string err))))))

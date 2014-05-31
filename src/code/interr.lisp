@@ -47,10 +47,14 @@
 (defun undefined-alien-fun-error ()
   (error 'undefined-alien-function-error))
 
-(deferr invalid-arg-count-error (nargs)
-  (error 'simple-program-error
-         :format-control "invalid number of arguments: ~S"
-         :format-arguments (list nargs)))
+(deferr invalid-arg-count-error (nargs &optional (fname nil fnamep))
+  (if fnamep
+      (error 'simple-program-error
+         :format-control "~S called with invalid number of arguments: ~S"
+         :format-arguments (list fname nargs))
+      (error 'simple-program-error
+             :format-control "invalid number of arguments: ~S"
+             :format-arguments (list nargs))))
 
 (deferr bogus-arg-to-values-list-error (list)
   (error 'simple-type-error

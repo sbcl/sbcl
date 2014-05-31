@@ -2099,6 +2099,9 @@ is :ANY, the function name is not checked."
         (values (leaf-source-name leaf) t)
         (values nil nil))))
 
+(defun combination-fun-debug-name (combination)
+  (leaf-debug-name (ref-leaf (lvar-uses (combination-fun combination)))))
+
 ;;; Return the COMBINATION node that is the call to the LET FUN.
 (defun let-combination (fun)
   (declare (type clambda fun))

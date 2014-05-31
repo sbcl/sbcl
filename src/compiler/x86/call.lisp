@@ -1476,7 +1476,7 @@
                 (:generator 1000
                   (error-call vop ',error ,@args)))))
   (def arg-count-error invalid-arg-count-error
-    sb!c::%arg-count-error nargs)
+    sb!c::%arg-count-error nargs fname)
   (def type-check-error object-not-type-error sb!c::%type-check-error
     object type)
   (def layout-invalid-error layout-invalid-error sb!c::%layout-invalid-error
