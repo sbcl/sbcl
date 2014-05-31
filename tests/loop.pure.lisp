@@ -364,6 +364,7 @@
   (assert (equal (loop for i from 1 to 4
                        sum (complex i (1+ i)) of-type complex)
                  #c(10 14))))
+
 (with-test (:name :negative-repeat)
   (assert (zerop (let ((z 0))
                    (loop repeat 0 do (incf z))
@@ -377,3 +378,10 @@
   (assert (zerop (let ((z 0))
                    (loop repeat -1000000 do (incf z))
                    z))))
+
+(with-test (:name :of-type-character)
+  (assert (null (loop with a t return a)))
+  (assert (typep (loop with a of-type extended-char return a) 'extended-char))
+  (assert (typep (loop with a of-type character return a) 'character))
+  (assert (typep (loop with a of-type base-char return a) 'base-char))
+  (assert (typep (loop with a of-type standard-char return a) 'standard-char)))

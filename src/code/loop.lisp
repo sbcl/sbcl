@@ -742,7 +742,10 @@ code to be loaded.
              (let ((etype (sb!kernel:type-*-to-t
                            (sb!kernel:array-type-specialized-element-type ctype))))
                (make-array 0 :element-type (sb!kernel:type-specifier etype))))))
-        ((sb!xc:typep #\x data-type)
+        #!+sb-unicode
+        ((sb!xc:subtypep data-type 'extended-char)
+         (code-char sb!int:base-char-code-limit))
+        ((sb!xc:subtypep data-type 'character)
          #\x)
         (t
          nil)))
