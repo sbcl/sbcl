@@ -1179,8 +1179,13 @@ code to be loaded.
 (defun loop-do-repeat ()
   (loop-disallow-conditional :repeat)
   (let* ((form (loop-get-form))
-         (type (if (realp form)
-                   `(mod ,(1+ (ceiling form)))
+         (type (cond ((not (realp form))
+                      'integer)
+                     ((plusp form)
+                      `(mod ,(1+ (ceiling form))))
+                     (t
+                      `(integer ,(ceiling form) ))
+
                    'integer)))
     (let ((var (loop-make-var (gensym "LOOP-REPEAT-") `(ceiling ,form) type)))
       (push `(if (<= ,var 0) (go end-loop) (decf ,var)) *loop-before-loop*)
