@@ -1,16 +1,29 @@
-Alastair Bridgewater <lisphacker@users.sourceforge.net> lisphacker <lisphacker>
-<lisphacker@users.sourceforge.net> <nyef@arisu.lisphacker.com>
-<lisphacker@users.sourceforge.net> <nyef@kana.lisphacker.com>
-<lisphacker@users.sourceforge.net> <nyef@virtdev-1.lisphacker.com>
-<lisphacker@users.sourceforge.net> <nyef_sbcl@lisphacker.com>
+Alastair Bridgewater <alastair.bridgewater@gmail.com> 
+Alastair Bridgewater <alastair.bridgewater@gmail.com> <lisphacker>
+Alastair Bridgewater <alastair.bridgewater@gmail.com> <lisphacker@users.sourceforge.net>
+Alastair Bridgewater <alastair.bridgewater@gmail.com> <nyef@arisu.lisphacker.com>
+Alastair Bridgewater <alastair.bridgewater@gmail.com> <nyef@kana.lisphacker.com>
+Alastair Bridgewater <alastair.bridgewater@gmail.com> <nyef@lain.lisphacker.com>
+Alastair Bridgewater <alastair.bridgewater@gmail.com> <nyef@lisphacker.com>
+Alastair Bridgewater <alastair.bridgewater@gmail.com> <nyef@virtdev-1.lisphacker.com>
+Alastair Bridgewater <alastair.bridgewater@gmail.com> <nyef_sbcl@lisphacker.com>
+Alastair Bridgewater <alastair.bridgewater@gmail.com> nyef <nyef@sunblade100.lisphacker.com>
+Alastair Bridgewater <alastair.bridgewater@gmail.com> root <root@nemo.lisphacker.com>
 
 Christophe Rhodes <csr21@cantab.net> <csr21@cam.ac.uk>
+<csr21@cantab.net> <c.rhodes@gold.ac.uk>
 
 Cyrus Harmon <ch-sbcl@bobobeach.com> <ch-github@bobobeach.com>
+<ch-sbcl@bobobeach.com> <ch-lisp@bobobeach.com>
 
-Jim Wise <jimwise@users.sourceforge.net> <jwise@draga.com>
+David Lichteblau <david@lichteblau.com> <david@knowledgetools.de>
+
+Francois-Rene Rideau <tunes@google.com> <fare@tunes.org>
+
+Jim Wise <jimwise@users.sourceforge.net>
+Jim Wise <jimwise@users.sourceforge.net> <jimwise>
+<jimwise@users.sourceforge.net> <jwise@draga.com>
 <jimwise@users.sourceforge.net> <jwise@menegroth.draga.com>
-<jimwise@users.sourceforge.net> jimwise <jimwise>
 
 Martin Cracauer <cracauer@google.com> cracauer <cracauer>
 
@@ -22,10 +35,13 @@ NIIMI Satoshi <sa2c@users.sourceforge.net> sa2c <sa2c>
 
 Paul Khuong <pvk@pvk.ca> pkhuong <pkhuong>
 
+Philipp Matthias Schäfer <philipp.schaefer@gmail.com> Philipp Matthias Schaefer <philipp.schaefer@gmail.com>
+
 Richard M Kreuter <kreuter@users.sourceforge.net> kreuter <kreuter>
 
 Robert Brown <brown@google.com> <robert.brown@gmail.com>
 
 Stas Boukarev <stassats@users.sourceforge.net> <stassats@gmail.com>
+Stas Boukarev <stassats@users.sourceforge.net> stas <stas@debian.ar7>
 
 Tobias C. Rittweiler <trittweiler@users.sourceforge.net> trittweiler <trittweiler>
