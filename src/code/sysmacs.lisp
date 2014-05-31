@@ -173,7 +173,7 @@ maintained."
         (if eof-p
             index-or-value
             (progn
-              (setq %frc-index% (1+ index-or-value))
+              (setq %frc-index% (1+ (truly-the index index-or-value)))
               (aref %frc-buffer% index-or-value)))))
      (t
       (prog1 (aref %frc-buffer% %frc-index%)

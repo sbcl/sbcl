@@ -427,35 +427,25 @@ standard Lisp readtable when NIL."
 (defun flush-whitespace (stream)
   ;; This flushes whitespace chars, returning the last char it read (a
   ;; non-white one). It always gets an error on end-of-file.
-  (let ((stream (in-synonym-of stream)))
-    (if (ansi-stream-p stream)
-        (prepare-for-fast-read-char stream
-          (do ((attribute-array (character-attribute-array *readtable*))
-               (attribute-hash-table
-                (character-attribute-hash-table *readtable*))
-               (char (fast-read-char t) (fast-read-char t)))
-              ((/= (the fixnum
-                     (if (typep char 'base-char)
-                         (aref attribute-array (char-code char))
-                         (gethash char attribute-hash-table
-                                  +char-attr-constituent+)))
-                   +char-attr-whitespace+)
-               (done-with-fast-read-char)
-               char)))
+  (let* ((stream (in-synonym-of stream))
+         (rt *readtable*)
+         (attribute-array (character-attribute-array rt))
+         (attribute-hash-table (character-attribute-hash-table rt)))
+    (macrolet ((done-p ()
+                '(not (eql (if (typep char 'base-char)
+                               (aref attribute-array (char-code char))
+                               (gethash char attribute-hash-table
+                                        +char-attr-constituent+))
+                           +char-attr-whitespace+))))
+      (if (ansi-stream-p stream)
+          (prepare-for-fast-read-char stream
+            (do ((char (fast-read-char t) (fast-read-char t)))
+                ((done-p)
+                 (done-with-fast-read-char)
+                 char)))
         ;; CLOS stream
-        (do ((attribute-array (character-attribute-array *readtable*))
-             (attribute-hash-table
-              (character-attribute-hash-table *readtable*))
-             (char (read-char stream nil :eof) (read-char stream nil :eof)))
-            ((or (eq char :eof)
-                 (/= (the fixnum
-                       (if (typep char 'base-char)
-                           (aref attribute-array (char-code char))
-                           (gethash char attribute-hash-table
-                                    +char-attr-constituent+)))
-                     +char-attr-whitespace+))
-             (if (eq char :eof)
-                 (error 'end-of-file :stream stream)
+          (do ((char (read-char stream nil nil) (read-char stream nil nil)))
+              ((if char (done-p) (error 'end-of-file :stream stream))
                  char))))))
 
 ;;;; temporary initialization hack
