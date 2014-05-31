@@ -197,6 +197,17 @@
         nil))))
 
 
+;;; Returns true if number of arguments matches required/optional
+;;; arguments handler expects.
+(defun internal-error-args-ok (arguments handler)
+  (multiple-value-bind (req opt)
+      (parse-lambda-list (%simple-fun-arglist handler) :silent t)
+    ;; The handler always gets name as the first (extra) argument.
+    (let ((n (1+ (length arguments)))
+          (n-req (length req))
+          (n-opt (length opt)))
+      (and (>= n n-req) (<= n (+ n-req n-opt))))))
+
 ;;;; INTERNAL-ERROR signal handler
 
 (defun internal-error (context continuable)
@@ -242,8 +253,7 @@
                  (handler (and (< -1 error-number (length *internal-errors*))
                                (svref *internal-errors* error-number))))
              (cond ((and (functionp handler)
-                         (eql (1- (length (%simple-fun-arglist handler)))
-                              (length arguments)))
+                         (internal-error-args-ok arguments handler))
                     (macrolet ((arg (n)
                                  `(sb!di::sub-access-debug-var-slot
                                    fp (nth ,n arguments) alien-context)))
