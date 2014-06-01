@@ -817,7 +817,7 @@ avoiding atexit(3) hooks, etc. Otherwise exit(2) is called."
 (define-alien-type nil
   (struct wrapped_stat
     (st-dev wst-dev-t)
-    (st-ino ino-t)
+    (st-ino wst-ino-t)
     (st-mode mode-t)
     (st-nlink wst-nlink-t)
     (st-uid wst-uid-t)

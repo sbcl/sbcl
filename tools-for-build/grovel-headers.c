@@ -355,6 +355,7 @@ main(int argc, char *argv[])
     DEFTYPE("uid-t",   uid_t);
     printf(";; Types in src/runtime/wrap.h. See that file for explantion.\n");
     printf(";; Don't use these types for anything other than the stat wrapper.\n");
+    DEFTYPE("wst-ino-t", wst_ino_t);
     DEFTYPE("wst-dev-t", wst_dev_t);
     DEFTYPE("wst-off-t", wst_off_t);
     DEFTYPE("wst-blksize-t", wst_blksize_t);

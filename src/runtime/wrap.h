@@ -42,12 +42,18 @@ typedef unsigned long aliased_dev_t;
 typedef dev_t aliased_dev_t;
 #endif
 
-#if defined(LISP_FEATURE_LARGEFILE) || defined(LISP_FEATURE_DARWIN)
+#ifdef LISP_FEATURE_ANDROID
+typedef unsigned long long wst_ino_t;
+typedef long long wst_off_t;
+typedef unsigned long long wst_dev_t;
+#elif defined(LISP_FEATURE_LARGEFILE) || defined(LISP_FEATURE_DARWIN)
+typedef ino_t wst_ino_t;
 typedef aliased_dev_t wst_dev_t;
 typedef off_t wst_off_t;
 #else
 /* These wrappers shouldn't exist, and since pulling in runtime.h caused
  * problems on Win32, we don't use the u32 typedef. */
+typedef ino_t wst_ino_t;
 typedef unsigned int wst_dev_t; /* since Linux dev_t can be 64 bits */
 typedef unsigned int wst_off_t; /* since OpenBSD 2.8 st_size is 64 bits */
 #endif
@@ -55,6 +61,9 @@ typedef unsigned int wst_off_t; /* since OpenBSD 2.8 st_size is 64 bits */
 #ifdef LISP_FEATURE_OS_PROVIDES_BLKSIZE_T
 typedef blksize_t wst_blksize_t;
 typedef blkcnt_t wst_blkcnt_t;
+#elif defined(LISP_FEATURE_ANDROID)
+typedef unsigned long wst_blksize_t;
+typedef unsigned long long wst_blkcnt_t;
 #else
 typedef unsigned long wst_blksize_t;
 typedef unsigned long wst_blkcnt_t;
@@ -83,7 +92,7 @@ struct stat_wrapper {
      * another entry for Dan Barlow's ongoing episodic rant about C
      * header files, I guess.. -- WHN 2001-05-10 */
     wst_dev_t     wrapped_st_dev;         /* device */
-    ino_t         wrapped_st_ino;         /* inode */
+    wst_ino_t     wrapped_st_ino;         /* inode */
     mode_t        wrapped_st_mode;        /* protection */
     wst_nlink_t   wrapped_st_nlink;       /* number of hard links */
     wst_uid_t     wrapped_st_uid;         /* user ID of owner */
