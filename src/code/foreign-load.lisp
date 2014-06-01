@@ -194,7 +194,7 @@ is never in the linkage-table."
               (remhash symbol symbols)
               (if datap
                   undefined-alien-address
-                  (foreign-symbol-address "undefined_alien_function")))
+                  (find-foreign-symbol-address "undefined_alien_function")))
              (addr
               (setf (gethash symbol symbols) t)
               (remhash symbol undefineds)
