@@ -24,6 +24,7 @@
 #include <sys/types.h>
 #include <dirent.h>
 #include <unistd.h>
+#include <sys/stat.h>
 
 off_t
 lseek_largefile(int fildes, off_t offset, int whence) {
@@ -43,6 +44,21 @@ ftruncate_largefile(int fd, off_t length) {
 void*
 mmap_largefile(void *start, size_t length, int prot, int flags, int fd, off_t offset) {
     return mmap(start, length, prot, flags, fd, offset);
+}
+
+int
+stat_largefile(const char *file_name, struct stat *buf) {
+    return stat(file_name, buf);
+}
+
+int
+fstat_largefile(int filedes, struct stat *buf) {
+    return fstat(filedes, buf);
+}
+
+int
+lstat_largefile(const char *file_name, struct stat *buf) {
+    return lstat(file_name, buf);
 }
 
 struct dirent64 *

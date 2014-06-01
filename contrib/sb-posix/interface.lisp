@@ -547,63 +547,71 @@ not supported."
          :documentation "Microseconds."))
   (:documentation "Instances of this class represent time values."))
 
-(define-protocol-class stat (struct sb-unix::wrapped_stat) ()
-  ((sb-unix::st-mode :initarg :mode :reader stat-mode
+(define-protocol-class stat alien-stat ()
+  ((mode :initarg :mode :reader stat-mode
          :documentation "Mode of file.")
-   (sb-unix::st-ino :initarg :ino :reader stat-ino
+   (ino :initarg :ino :reader stat-ino
         :documentation "File serial number.")
-   (sb-unix::st-dev :initarg :dev :reader stat-dev
+   (dev :initarg :dev :reader stat-dev
         :documentation "Device ID of device containing file.")
-   (sb-unix::st-nlink :initarg :nlink :reader stat-nlink
+   (nlink :initarg :nlink :reader stat-nlink
           :documentation "Number of hard links to the file.")
-   (sb-unix::st-uid :initarg :uid :reader stat-uid
+   (uid :initarg :uid :reader stat-uid
         :documentation "User ID of file.")
-   (sb-unix::st-gid :initarg :gid :reader stat-gid
+   (gid :initarg :gid :reader stat-gid
         :documentation "Group ID of file.")
-   (sb-unix::st-size :initarg :size :reader stat-size
+   (size :initarg :size :reader stat-size
          :documentation "For regular files, the file size in
                          bytes.  For symbolic links, the length
                          in bytes of the filename contained in
                          the symbolic link.")
-   (sb-unix::st-rdev :initarg :rdev :reader stat-rdev
+   (rdev :initarg :rdev :reader stat-rdev
           :documentation "For devices the device number.")
-   (sb-unix::st-atime :initarg :atime :reader stat-atime
+   (atime :initarg :atime :reader stat-atime
           :documentation "Time of last access.")
-   (sb-unix::st-mtime :initarg :mtime :reader stat-mtime
+   (mtime :initarg :mtime :reader stat-mtime
           :documentation "Time of last data modification.")
-   (sb-unix::st-ctime :initarg :ctime :reader stat-ctime
+   (ctime :initarg :ctime :reader stat-ctime
           :documentation "Time of last status change."))
   (:documentation "Instances of this class represent POSIX file metadata."))
 
-(defmacro define-stat-call (lisp-name c-name arg designator-fun type)
+(defmacro define-stat-call (name arg designator-fun type)
   ;; FIXME: this isn't the documented way of doing this, surely?
-  `(progn
-     (export ',lisp-name :sb-posix)
-     (declaim (inline ,lisp-name))
-     (defun ,lisp-name (,arg &optional stat)
-       (declare (type (or null stat) stat))
-       (with-alien ((a-stat (struct sb-unix::wrapped_stat)))
-         (let ((r (alien-funcall
-                   (extern-alien ,(real-c-name c-name) ,type)
-                   (,designator-fun ,arg)
-                   (addr a-stat))))
-           (when (minusp r)
-             (syscall-error ',lisp-name))
-           (alien-to-stat (addr a-stat) stat))))))
+  (let ((lisp-name (lisp-for-c-symbol name))
+        (real-name #+inode64 (format nil "~A$INODE64" name)
+                   #-inode64 name))
+    `(progn
+      (export ',lisp-name :sb-posix)
+      (declaim (inline ,lisp-name))
+      (defun ,lisp-name (,arg &optional stat)
+        (declare (type (or null stat) stat))
+        (with-alien-stat a-stat ()
+          (let ((r (alien-funcall
+                    (extern-alien ,(real-c-name (list real-name :options :largefile)) ,type)
+                    (,designator-fun ,arg)
+                    a-stat)))
+            (when (minusp r)
+              (syscall-error ',lisp-name))
+            (alien-to-stat a-stat stat)))))))
 
-(define-stat-call stat "stat_wrapper"
+(define-stat-call #-win32 "stat" #+win32 "_stat"
                   pathname filename
-  (function int (c-string :not-null t) (* (struct sb-unix::wrapped_stat))))
+                  (function int (c-string :not-null t) (* alien-stat)))
 
-
-(define-stat-call lstat "lstat_wrapper"
+#-win32
+(define-stat-call "lstat"
                   pathname filename
-  (function int (c-string :not-null t) (* (struct sb-unix::wrapped_stat))))
+                  (function int (c-string :not-null t) (* alien-stat)))
+;;; No symbolic links on Windows, so use stat
+#+win32
+(progn
+  (declaim (inline lstat))
+  (export (defun lstat (filename &optional stat)
+            (if stat (stat filename stat) (stat filename)))))
 
-
-(define-stat-call fstat "fstat_wrapper"
+(define-stat-call #-win32 "fstat" #+win32 "_fstat"
                   fd file-descriptor
-  (function int int (* (struct sb-unix::wrapped_stat))))
+                  (function int int (* alien-stat)))
 
 
 ;;; mode flags

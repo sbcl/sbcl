@@ -307,6 +307,28 @@
               (c-string-pointer passwd "char *" "gr_passwd")
               (gid-t gid "gid_t" "gr_gid")))
 
+ (:structure alien-stat
+             ("struct stat"
+              (mode-t mode "mode_t" "st_mode")
+              (ino-t ino "ino_t" "st_ino")
+              ;; Linux/MIPS uses unsigned long instead of dev_t here.
+              #-mips
+              (dev-t dev "dev_t" "st_dev")
+              #+mips
+              ((unsigned 32) dev "dev_t" "st_dev")
+              (nlink-t nlink "nlink_t" "st_nlink")
+              (uid-t uid "uid_t" "st_uid")
+              ;; Linux/MIPS uses unsigned long instead of dev_t here.
+              #-mips
+              (dev-t rdev "dev_t" "st_rdev")
+              #+mips
+              ((unsigned 32) rdev "dev_t" "st_rdev")
+              (gid-t gid "gid_t" "st_gid")
+              (off-t size "off_t" "st_size")
+              (time-t atime "time_t" "st_atime")
+              (time-t mtime "time_t" "st_mtime")
+              (time-t ctime "time_t" "st_ctime")))
+
  #+darwin
  (:structure alien-timespec
              ("struct timespec"
