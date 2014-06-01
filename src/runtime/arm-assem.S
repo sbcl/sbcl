@@ -232,6 +232,8 @@ call_into_c:
 	@@ here because we have to be able to pass the function
 	@@ pointer in a boxed register, but the linkage-table is quite
         @@ capable of doing a tail-call to a Thumb routine.
+        @@
+        @@ R8 is important for undefined_alien_function.
         blx      reg_R8
 
         @@ We're back.  Our main tasks are to move the C return value
@@ -332,7 +334,33 @@ call_into_c:
         @@ offset of 7, not the 3 that we use for LEXENV.
         .byte   sc_DescriptorReg + (0x40 * 3)
 .error_args_end:
+
+        .align	3
+	.global	undefined_alien_function
+	.type	undefined_alien_function, %object
+	.word	SIMPLE_FUN_HEADER_WIDETAG
+	.equ	undefined_alien_function, .+1
+	.word	undefined_alien_function
+	.word	NIL
+	.word	NIL
+	.word	NIL
+	.word	NIL
+	.word	NIL
+undefined_alien_function:
+        ldr     reg_CODE, = undefined_alien_function
 
+        @@ The magic (undefined) "BREAK_POINT" instruction.
+        .word 0xe7f001f0
+
+        @@ Error arguments for an undefined function.
+        .byte   trap_Error
+        .byte   4
+        .byte   UNDEFINED_ALIEN_FUN_ERROR
+        @@ Encode unsigned R8, which comes from call_into_c
+        .byte   0xFE
+        .byte   0x11
+        .byte   0x02
+
 	.align	3
 	.global	closure_tramp
 	.type	closure_tramp, %object

@@ -1603,8 +1603,8 @@ arrange_return_to_lisp_function(os_context_t *context, lispobj function)
 #endif
 }
 
-// x86-64 has an undefined_alien_function tramp in x86-64-assem.S
-#ifndef LISP_FEATURE_X86_64
+// These have undefined_alien_function tramp in x-assem.S
+#if !(defined(LISP_FEATURE_X86_64) || defined(LISP_FEATURE_ARM))
 /* KLUDGE: Theoretically the approach we use for undefined alien
  * variables should work for functions as well, but on PPC/Darwin
  * we get bus error at bogus addresses instead, hence this workaround,

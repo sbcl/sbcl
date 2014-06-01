@@ -302,6 +302,7 @@ main(int argc, char *argv[])
     DEFTYPE("mode-t", mode_t);
 
     DEFTYPE("wst-dev-t", wst_dev_t);
+    DEFTYPE("wst-ino-t", wst_ino_t);
     DEFTYPE("wst-off-t", wst_off_t);
     DEFTYPE("wst-blksize-t", wst_blksize_t);
     DEFTYPE("wst-blkcnt-t", wst_blkcnt_t);

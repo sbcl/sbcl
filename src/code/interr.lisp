@@ -36,14 +36,14 @@
                  (symbol fdefn-or-symbol)
                  (fdefn (fdefn-name fdefn-or-symbol)))))
 
-#!+x86-64
+#!+(or arm x86-64)
 (deferr undefined-alien-fun-error (address)
   (error 'undefined-alien-function-error
          :name
          (and (integerp address)
               (sap-foreign-symbol (int-sap address)))))
 
-#!-x86-64
+#!-(or arm x86-64)
 (defun undefined-alien-fun-error ()
   (error 'undefined-alien-function-error))
 
