@@ -154,6 +154,8 @@ Experimental."
 (defun reopen-shared-objects ()
   ;; Ensure that the runtime is open
   (setf *runtime-dlhandle* (dlopen-or-lose))
+  ;; Without this many symbols aren't accessible.
+  #!+android (load-shared-object "libc.so" :dont-save t)
   ;; Reopen stuff.
   (setf *shared-objects*
         (remove nil (mapcar #'try-reopen-shared-object *shared-objects*))))
