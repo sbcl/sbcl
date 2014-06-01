@@ -351,4 +351,12 @@
                         (optname int)
                         (optval (* t))
                         (optlen (* int)))) ;;; should be socklen-t!
- )
+ ;; Protocols
+ ;; Android have those as enums, foiling #ifdef checks
+ (#-android :integer #+android :integer-no-check IPPROTO_IP "IPPROTO_IP")
+ (#-android :integer #+android :integer-no-check IPPROTO_IPV6 "IPPROTO_IPV6")
+ (#-android :integer #+android :integer-no-check IPPROTO_ICMP "IPPROTO_ICMP")
+ (#-android :integer #+android :integer-no-check IPPROTO_IGMP "IPPROTO_IGMP")
+ (#-android :integer #+android :integer-no-check IPPROTO_TCP "IPPROTO_TCP")
+ (#-android :integer #+android :integer-no-check IPPROTO_UDP "IPPROTO_UDP")
+ (#-android :integer #+android :integer-no-check IPPROTO_RAW "IPPROTO_RAW"))

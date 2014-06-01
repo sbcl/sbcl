@@ -54,7 +54,7 @@ directly instantiated.")))
                                      &allow-other-keys)
   (let* ((proto-num
           (cond ((and protocol (keywordp protocol))
-                 (get-protocol-by-name (string-downcase (symbol-name protocol))))
+                 (get-protocol-by-name protocol))
                 (protocol protocol)
                 (t 0)))
          (fd (or (and (slot-boundp socket 'file-descriptor)

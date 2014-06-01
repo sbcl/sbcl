@@ -122,6 +122,8 @@ code:
            (as-c "#else")
            (printf "(sb-int:style-warn \"Couldn't grovel for ~~A (unknown to the C compiler).\" \"~A\")" cname)
            (as-c "#endif"))
+          ((:integer-no-check)
+           (printf "(cl:defconstant ~A %d \"~A\")" lispname doc cname))
           (:enum
            (c-for-enum lispname cname export))
           (:type

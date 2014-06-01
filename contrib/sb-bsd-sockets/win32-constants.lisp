@@ -247,5 +247,10 @@
                         (lpWSAData wsa-data :out)))
 
  (:function wsa-get-last-error ("WSAGetLastError" int))
-
-)
+ (:integer IPPROTO_IP "IPPROTO_IP")
+ (:integer IPPROTO_IPV6 "IPPROTO_IPV6")
+ (:integer IPPROTO_ICMP "IPPROTO_ICMP")
+ (:integer IPPROTO_IGMP "IPPROTO_IGMP")
+ (:integer IPPROTO_TCP "IPPROTO_TCP")
+ (:integer IPPROTO_UDP "IPPROTO_UDP")
+ (:integer IPPROTO_RAW "IPPROTO_RAW"))

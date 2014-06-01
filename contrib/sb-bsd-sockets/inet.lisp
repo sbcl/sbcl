@@ -63,14 +63,35 @@ Examples:
   (:report (lambda (c s)
              (format s "Protocol not found: ~a" (prin1-to-string
                                                  (unknown-protocol-name c))))))
+(defvar *protocols*
+  `((:tcp ,sockint::ipproto_tcp "tcp" "TCP")
+    (:udp ,sockint::ipproto_udp "udp" "UDP")
+    (:ip ,sockint::ipproto_ip "ip" "IP")
+    (:ipv6 ,sockint::ipproto_ipv6 "ipv6" "IPV6")
+    (:icmp ,sockint::ipproto_icmp "icmp" "ICMP")
+    (:igmp ,sockint::ipproto_igmp "igmp" "IGMP")
+    (:raw ,sockint::ipproto_raw "raw" "RAW")))
 
-#+(and sb-thread (not os-provides-getprotoby-r))
+;;; Try to get to a protocol quickly, falling back to calling
+;;; getprotobyname if it's available.
+(defun get-protocol-by-name (name)
+  (let ((result (cdr (if (keywordp name)
+                         (assoc name *protocols*)
+                         (assoc name *protocols* :test #'string-equal)))))
+    (if result
+        (values (first result) (second result) (third result))
+        #-android
+        (getprotobyname (string-downcase name))
+        #+android (error 'unknown-protocol :name name))))
+
+#+(and sb-thread (not os-provides-getprotoby-r) (not android))
 ;; Since getprotobyname is not thread-safe, we need a lock.
 (sb-ext:defglobal **getprotoby-lock** (sb-thread:make-mutex :name "getprotoby lock"))
 
 ;;; getprotobyname only works in the internet domain, which is why this
 ;;; is here
-(defun get-protocol-by-name (name)      ;exported
+#-android
+(defun getprotobyname (name)
   "Given a protocol name, return the protocol number, the protocol name, and
 a list of protocol aliases"
 
@@ -116,7 +137,7 @@ a list of protocol aliases"
                         #-solaris
                         (when (sb-alien::null-alien (sb-alien:deref result 0))
                           (error 'unknown-protocol :name name))
-                        (return-from get-protocol-by-name
+                        (return-from getprotobyname
                           (protoent-to-values result-buf)))
                        (t
                         (let ((errno (sb-unix::get-errno)))
@@ -139,7 +160,7 @@ a list of protocol aliases"
                 (let ((ent (sockint::getprotobyname name)))
                   (if (sb-alien::null-alien ent)
                       (go :error)
-                      (return-from get-protocol-by-name (protoent-to-values ent))))))
+                      (return-from getprotobyname (protoent-to-values ent))))))
          #+sb-thread
          (sb-thread::with-system-mutex (**getprotoby-lock**)
            (get-it))
