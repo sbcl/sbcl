@@ -20,8 +20,8 @@
  #-win32 "netdb.h"
  "errno.h"
  "dirent.h" "signal.h"
- #-win32 "pwd.h"
- #-win32 "grp.h"
+ #-(or win32 android) "pwd.h"
+ #-(or win32 android) "grp.h"
  "unistd.h"
  #-win32 "termios.h"
  #-win32 "syslog.h")
@@ -278,7 +278,7 @@
                          :distrust-length nil)) t)
 
  ;; password database
- #-win32
+ #-(or android win32)
  (:structure alien-passwd
              ("struct passwd"
               (c-string-pointer name "char *" "pw_name")
@@ -300,7 +300,7 @@
               (:integer fields "int" "pw_fields")))
 
  ;; group database
- #-win32
+ #-(or android win32)
  (:structure alien-group
              ("struct group"
               (c-string-pointer name "char *" "gr_name")

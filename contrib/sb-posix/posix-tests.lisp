@@ -586,19 +586,19 @@
           (values retval (read-line inf)))))
   3 "foo")
 
-#-win32
+#-(or android win32)
 (deftest pwent.1
   ;; make sure that we found something
   (not (sb-posix:getpwuid 0))
   nil)
 
-#-win32
+#-(or android win32)
 (deftest pwent.2
   ;; make sure that we found something
   (not (sb-posix:getpwnam "root"))
   nil)
 
-#-win32
+#-(or android win32)
 (deftest pwent.non-existing
     ;; make sure that we get something sensible, not an error
     (handler-case (progn (sb-posix:getpwnam "almost-certainly-does-not-exist")
@@ -606,19 +606,19 @@
       (t (cond) t))
   nil)
 
-#-win32
+#-(or android win32)
 (deftest grent.1
   ;; make sure that we found something
   (not (sb-posix:getgrgid 0))
   nil)
 
-#-win32
+#-(or android win32)
 (deftest grent.2
   ;; make sure that we found something
   (not (sb-posix:getgrnam "sys"))
   nil)
 
-#-win32
+#-(or android win32)
 (deftest grent.non-existing
     ;; make sure that we get something sensible, not an error
     (handler-case (progn (sb-posix:getgrnam "almost-certainly-does-not-exist")

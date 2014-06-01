@@ -488,7 +488,7 @@ not supported."
 ;;; passwd database
 ;; The docstrings are copied from the descriptions in SUSv3,
 ;; where present.
-#-win32
+#-(or android win32)
 (define-protocol-class passwd alien-passwd ()
   ((name :initarg :name :accessor passwd-name
          :documentation "User's login name.")
@@ -510,14 +510,14 @@ not supported."
    "Instances of this class represent entries in the system's user database."))
 
 ;;; group database
-#-win32
+#-(or android win32)
 (define-protocol-class group alien-group ()
   ((name :initarg :name :accessor group-name)
    (passwd :initarg :passwd :accessor group-passwd)
    (gid :initarg :gid :accessor group-gid)))
 
 (defmacro define-obj-call (name arg type conv)
-  #-win32
+  #-(or win32 android)
   ;; FIXME: this isn't the documented way of doing this, surely?
   (let ((lisp-name (intern (string-upcase name) :sb-posix)))
     `(progn
