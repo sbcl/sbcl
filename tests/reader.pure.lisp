@@ -296,6 +296,12 @@
 (with-test (:name :bug-1095918)
   (assert (= (length `#3(1)) 3)))
 
+(with-test (:name :obscure-reader-package-usage)
+  ;; commit 8fd604 cause a bug in reading "::(foo bar)" which tried
+  ;; to treat the package-designator as a string, but in this case
+  ;; it is hardcoded to *keyword-package*.
+  (assert (equal (read-from-string "::(foo bar)") '(:foo :bar))))
+
 #+x86-64
 ;; I do not know the complete list of platforms for which this test
 ;; will not cons, but there were four different heap allocations

@@ -648,12 +648,6 @@ standard Lisp readtable when NIL."
      (token-buf-ouch-ptr buffer) ; dimension 0
      t nil))) ; displacedp / newp
 
-;; Release the token-buf that was used for a package prefix.
-(defun release-extra-token-buf ()
-  (let ((extra-buf (token-buf-next *read-buffer*)))
-    (setf (token-buf-next *read-buffer*) nil)
-    (release-token-buf extra-buf)))
-
 ;; Acquire a TOKEN-BUF from the pool and execute the body, returning only
 ;; the primary value therefrom. Recycle the buffer when done.
 ;; No UNWIND-PROTECT - recycling is designed to help with the common case
@@ -1064,7 +1058,25 @@ standard Lisp readtable when NIL."
                (cond (all-lower (raise-em))
                      (all-upper (lower-em))))))))))))
 
-(defvar *reader-package* nil)
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (defvar *reader-package* nil))
+(declaim (type (or null package) *reader-package*)
+         (always-bound *reader-package*))
+
+(defun reader-find-package (package-designator stream)
+  (if (%instancep package-designator)
+      package-designator
+      (let ((package (find-package package-designator)))
+        (cond (package
+               ;; Release the token-buf that was used for the designator
+               (release-token-buf (shiftf (token-buf-next *read-buffer*) nil))
+               package)
+              (t
+               (error 'simple-reader-package-error
+                      :package package-designator
+                      :stream stream
+                      :format-control "Package ~A does not exist."
+                      :format-arguments (list package-designator)))))))
 
 (defun read-token (stream firstchar)
   #!+sb-doc
@@ -1418,8 +1430,8 @@ extended <package-name>::<form-in-package> syntax."
         (#.+char-attr-delimiter+
          (unread-char char stream)
          (if package-designator
-             (let* ((*reader-package* (%find-package-or-lose package-designator)))
-               (release-extra-token-buf)
+             (let* ((*reader-package*
+                     (reader-find-package package-designator stream)))
                (return (read stream t nil t)))
              (simple-reader-error stream
                                   "illegal terminating character after a double-colon: ~S"
@@ -1433,36 +1445,28 @@ extended <package-name>::<form-in-package> syntax."
         (t (go SYMBOL)))
       RETURN-SYMBOL
       (casify-read-buffer escapes)
-      (let ((found (if package-designator
-                       (or (find-package package-designator)
-                           (error 'simple-reader-package-error
-                                  :package package-designator
-                                  :stream stream
-                                  :format-control "Package ~A does not exist."
-                                  :format-arguments (list package-designator)))
-                       (or *reader-package* (sane-package)))))
-        (when (stringp package-designator)
-          (release-extra-token-buf))
-        (if (or (zerop colons) (= colons 2) (eq found *keyword-package*))
-            (let ((b *read-buffer*))
-              (return (intern* (token-buf-string b) (token-buf-ouch-ptr b)
-                               found)))
-            (multiple-value-bind (symbol test)
-                (let ((b *read-buffer*))
-                  (find-symbol* (token-buf-string b) (token-buf-ouch-ptr b)
-                                found))
-              (when (eq test :external) (return symbol))
+      (let ((pkg (if package-designator
+                     (reader-find-package package-designator stream)
+                     (or *reader-package* (sane-package))))
+            (buf *read-buffer*))
+        (if (or (zerop colons) (= colons 2) (eq pkg *keyword-package*))
+            (return (intern* (token-buf-string buf) (token-buf-ouch-ptr buf)
+                             pkg))
+            (multiple-value-bind (symbol accessibility)
+                (find-symbol* (token-buf-string buf) (token-buf-ouch-ptr buf)
+                              pkg)
+              (when (eq accessibility :external) (return symbol))
               (let ((name (copy-token-buf-string)))
                 (with-simple-restart (continue "Use symbol anyway.")
                   (error 'simple-reader-package-error
-                         :package found
+                         :package pkg
                          :stream stream
-                         :format-arguments (list name (package-name found))
+                         :format-arguments (list name (package-name pkg))
                          :format-control
-                         (if test
+                         (if accessibility
                              "The symbol ~S is not external in the ~A package."
                              "Symbol ~S not found in the ~A package.")))
-                (return (intern name found)))))))))
+                (return (intern name pkg)))))))))
 
 ;;; for semi-external use:
 ;;;
