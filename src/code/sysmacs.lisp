@@ -163,21 +163,28 @@ maintained."
 
 ;;; a macro with the same calling convention as READ-CHAR, to be used
 ;;; within the scope of a PREPARE-FOR-FAST-READ-CHAR.
+;;; If EOF-ERROR-P is statically T (not any random expression evaluating
+;;; to T) then wrap the whole thing in (TRULY-THE CHARACTER ...)
+;;; because it's either going to yield a character or signal EOF.
 (defmacro fast-read-char (&optional (eof-error-p t) (eof-value ()))
-  `(cond
-     ((not %frc-buffer%)
-      (funcall %frc-method% %frc-stream% ,eof-error-p ,eof-value))
-     ((= %frc-index% +ansi-stream-in-buffer-length+)
-      (multiple-value-bind (eof-p index-or-value)
-          (fast-read-char-refill %frc-stream% ,eof-error-p ,eof-value)
-        (if eof-p
-            index-or-value
-            (progn
-              (setq %frc-index% (1+ (truly-the index index-or-value)))
-              (aref %frc-buffer% index-or-value)))))
-     (t
-      (prog1 (aref %frc-buffer% %frc-index%)
-        (incf %frc-index%)))))
+  (let ((result
+         `(cond
+            ((not %frc-buffer%)
+             (funcall %frc-method% %frc-stream% ,eof-error-p ,eof-value))
+            ((= %frc-index% +ansi-stream-in-buffer-length+)
+             (multiple-value-bind (eof-p index-or-value)
+                 (fast-read-char-refill %frc-stream% ,eof-error-p ,eof-value)
+               (if eof-p
+                   index-or-value
+                   (progn
+                     (setq %frc-index% (1+ (truly-the index index-or-value)))
+                     (aref %frc-buffer% index-or-value)))))
+            (t
+             (prog1 (aref %frc-buffer% %frc-index%)
+               (incf %frc-index%))))))
+    (if (eq eof-error-p 't)
+        `(truly-the character ,result)
+        result)))
 
 ;;;; And these for the fasloader...
 

@@ -13,6 +13,8 @@
 
 (in-package "CL-USER")
 
+(load "compiler-test-util.lisp")
+
 (assert (equal (symbol-name '#:|fd\sA|) "fdsA"))
 
 ;;; Prior to sbcl-0.7.2.10, SBCL disobeyed the ANSI requirements on
@@ -293,3 +295,22 @@
 
 (with-test (:name :bug-1095918)
   (assert (= (length `#3(1)) 3)))
+
+#+x86-64
+;; I do not know the complete list of platforms for which this test
+;; will not cons, but there were four different heap allocations
+;; instead of using dx allocation or a recyclable resource:
+;;  - most obviously, a 128-character buffer per invocation of READ
+;;  - calling SUBSEQ for package names
+;;  - multiple-value-call in WITH-CHAR-MACRO-RESULT
+;;  - the initial cons cell in READ-LIST
+(with-test (:name :read-does-not-cons-per-se)
+  (flet ((test-reading (string)
+           (let ((s (make-string-input-stream string)))
+             (ctu:assert-no-consing
+              (progn (file-position s 0)
+                     (read s))))))
+    ;; These each used to produce at least 5 MB of garbage
+    (test-reading "4.0s0")
+    (test-reading "COMMON-LISP-USER::A-SYMBOL")
+    (test-reading "()")))

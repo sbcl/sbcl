@@ -1404,6 +1404,8 @@ session."
          (sb!impl::*deadline* nil)
          (sb!impl::*deadline-seconds* nil)
          (sb!impl::*step-out* nil)
+         ;; internal reader variables
+         (sb!impl::*token-buf-pool* nil)
          ;; internal printer variables
          (sb!impl::*previous-case* nil)
          (sb!impl::*previous-readtable-case* nil)

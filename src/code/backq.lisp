@@ -91,7 +91,8 @@
         (*backquote-count* (1- *backquote-count*)))
     (flet ((check (what)
              (let ((x (peek-char t stream t nil t)))
-               (when (and (char= x #\)) (eq #'read-right-paren (get-macro-character #\))))
+               (when (and (char= x #\))
+                          (eq 'read-right-paren (get-macro-character #\))))
                  ;; Easier to figure out than an "unmatched parenthesis".
                  (simple-reader-error stream "Trailing ~A in backquoted expression." what)))))
       (cond ((char= c #\@)
