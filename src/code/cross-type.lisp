@@ -252,6 +252,9 @@
              (values (typep host-object 'classoid) t))
             ((target-type-is-in '(fixnum))
              (values (fixnump host-object) t))
+            ((target-type-is-in '(bignum))
+             (values (and (integerp host-object) (not (fixnump host-object)))
+                     t))
             ;; Some types are too hard to handle in the positive
             ;; case, but at least we can be confident in a large
             ;; fraction of the negative cases..
