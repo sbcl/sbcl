@@ -9,3 +9,13 @@
  * places). For some operating systems, a subset of these functions
  * will have to be emulated.
  */
+
+#include <sys/utsname.h>
+
+extern char * software_version () {
+  struct utsname u;
+  int result = uname(&u);
+  if (result < 0)
+    return 0;
+  return strdup(u.release);
+}
