@@ -587,11 +587,6 @@ standard Lisp readtable when NIL."
          (prog1 (elt (token-buf-string b) i)
            (setf (token-buf-inch-ptr b) (1+ i))))))
 
-(declaim (inline read-unwind-read-buffer))
-(defun read-unwind-read-buffer ()
-  ;; Keep contents, but make next (INCH..) return first character.
-  (setf (token-buf-inch-ptr *read-buffer*) 0))
-
 ;; Grab a buffer off the token-buf pool if there is one, or else make one.
 ;; This does not need to be protected against other threads because the
 ;; pool is thread-local, or against async interrupts. An async signal
@@ -1590,7 +1585,7 @@ extended <package-name>::<form-in-package> syntax."
 (defun make-float (stream)
   ;; Assume that the contents of *read-buffer* are a legal float, with nothing
   ;; else after it.
-  (read-unwind-read-buffer)
+  (setf (token-buf-inch-ptr *read-buffer*) 0)
   (let ((negative-fraction nil)
         (number 0)
         (divisor 1)
@@ -1666,34 +1661,36 @@ extended <package-name>::<form-in-package> syntax."
 (defun make-ratio (stream)
   ;; Assume *READ-BUFFER* contains a legal ratio. Build the number from
   ;; the string.
+  ;; This code is inferior to that of MAKE-INTEGER because it makes no
+  ;; attempt to perform as few bignum multiplies as possible.
+  ;; Not to mention it repeats the leading sign check code exactly.
   ;;
-  ;; Look for optional "+" or "-".
-  (let ((numerator 0) (denominator 0) (char ()) (negative-number nil))
-    (read-unwind-read-buffer)
-    (setq char (inch-read-buffer))
-    (cond ((char= char #\+)
-           (setq char (inch-read-buffer)))
-          ((char= char #\-)
-           (setq char (inch-read-buffer))
-           (setq negative-number t)))
+  (let ((numerator 0) (denominator 0) (negativep nil)
+        (base *read-base*) (buf *read-buffer*))
+    ;; Look for optional "+" or "-".
+    ;; guaranteed to have at least one character in buffer
+    (setf (token-buf-inch-ptr buf)
+          (case (elt (token-buf-string buf) 0)
+            (#\- (setq negativep t) 1)
+            (#\+ 1)
+            (t   0)))
     ;; Get numerator.
-    (do* ((ch char (inch-read-buffer))
-          (dig (digit-char-p ch *read-base*)
-               (digit-char-p ch *read-base*)))
-         ((not dig))
-         (setq numerator (+ (* numerator *read-base*) dig)))
+    (loop (let ((dig (digit-char-p (token-buf-getchar buf) base)))
+            (if dig
+                (setq numerator (+ (* numerator base) dig))
+                (return))))
     ;; Get denominator.
-    (do* ((ch (inch-read-buffer) (inch-read-buffer))
+    (do* ((ch (token-buf-getchar buf) (token-buf-getchar buf))
           (dig ()))
-         ((or (eofp ch) (not (setq dig (digit-char-p ch *read-base*)))))
-         (setq denominator (+ (* denominator *read-base*) dig)))
+         ((or (null ch) (not (setq dig (digit-char-p ch base)))))
+         (setq denominator (+ (* denominator base) dig)))
     (let ((num (handler-case
                    (/ numerator denominator)
                  (arithmetic-error (c)
                    (error 'reader-impossible-number-error
                           :error c :stream stream
                           :format-control "failed to build ratio")))))
-      (if negative-number (- num) num))))
+      (if negativep (- num) num))))
 
 ;;;; General reader for dispatch macros
 
