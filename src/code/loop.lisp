@@ -717,38 +717,42 @@ code to be loaded.
 ;;;; loop types
 
 (defun loop-typed-init (data-type &optional step-var-p)
-  (cond ((null data-type)
-         nil)
-        ((sb!xc:subtypep data-type 'number)
-         (let ((init (if step-var-p 1 0)))
-           (flet ((like (&rest types)
-                    (coerce init (find-if (lambda (type)
-                                            (sb!xc:subtypep data-type type))
-                                          types))))
-             (cond ((sb!xc:subtypep data-type 'float)
-                    (like 'single-float 'double-float
-                          'short-float 'long-float 'float))
-                   ((sb!xc:subtypep data-type '(complex float))
-                    (like '(complex single-float)
-                          '(complex double-float)
-                          '(complex short-float)
-                          '(complex long-float)
-                          '(complex float)))
-                   (t
-                    init)))))
-        ((sb!xc:subtypep data-type 'vector)
-         (let ((ctype (sb!kernel:specifier-type data-type)))
-           (when (sb!kernel:array-type-p ctype)
-             (let ((etype (sb!kernel:type-*-to-t
-                           (sb!kernel:array-type-specialized-element-type ctype))))
-               (make-array 0 :element-type (sb!kernel:type-specifier etype))))))
-        #!+sb-unicode
-        ((sb!xc:subtypep data-type 'extended-char)
-         (code-char sb!int:base-char-code-limit))
-        ((sb!xc:subtypep data-type 'character)
-         #\x)
-        (t
-         nil)))
+  ;; FIXME: can't tell if unsupplied or NIL, but it has to be rare.
+  (when data-type
+   (let ((ctype (sb!kernel:specifier-type data-type)))
+     ;; FIXME: use the ctype for the rest of the type operations, now
+     ;; that it's parsed.
+     (cond ((eql ctype sb!kernel:*empty-type*)
+            (values nil t))
+           ((sb!xc:subtypep data-type 'number)
+            (let ((init (if step-var-p 1 0)))
+              (flet ((like (&rest types)
+                       (coerce init (find-if (lambda (type)
+                                               (sb!xc:subtypep data-type type))
+                                             types))))
+                (cond ((sb!xc:subtypep data-type 'float)
+                       (like 'single-float 'double-float
+                             'short-float 'long-float 'float))
+                      ((sb!xc:subtypep data-type '(complex float))
+                       (like '(complex single-float)
+                             '(complex double-float)
+                             '(complex short-float)
+                             '(complex long-float)
+                             '(complex float)))
+                      (t
+                       init)))))
+           ((sb!xc:subtypep data-type 'vector)
+            (when (sb!kernel:array-type-p ctype)
+              (let ((etype (sb!kernel:type-*-to-t
+                            (sb!kernel:array-type-specialized-element-type ctype))))
+                (make-array 0 :element-type (sb!kernel:type-specifier etype)))))
+           #!+sb-unicode
+           ((sb!xc:subtypep data-type 'extended-char)
+            (code-char sb!int:base-char-code-limit))
+           ((sb!xc:subtypep data-type 'character)
+            #\x)
+           (t
+            nil)))))
 
 (defun loop-optional-type (&optional variable)
   ;; No variable specified implies that no destructuring is permissible.
@@ -911,6 +915,22 @@ code to be loaded.
              (loop-make-var (cdr name) nil tcdr)))))
   name)
 
+;;; Find a suitable type for  default initialization
+(defun type-for-default-init (type &optional step-var-p)
+  (multiple-value-bind (init empty-type)
+      (loop-typed-init type step-var-p)
+    (values
+     (cond (empty-type
+            ;; Don't wrap empty types `(or ...), otherwise the will no
+            ;; longer be empty and the compiler won't produce
+            ;; warnings.
+            type)
+           ((sb!xc:typep init type)
+            type)
+           (t
+            `(or ,(type-of init) ,type)))
+     init)))
+
 (defun loop-declare-var (name dtype &key step-var-p initialization
                                          desetq)
   (cond ((or (null name) (null dtype) (eq dtype t)) nil)
@@ -920,10 +940,7 @@ code to be loaded.
                           (eq :special (sb!int:info :variable :kind name))))
            (let ((dtype `(type ,(if initialization
                                     dtype
-                                    (let ((init (loop-typed-init dtype step-var-p)))
-                                      (if (sb!xc:typep init dtype)
-                                          dtype
-                                          `(or ,(type-of init) ,dtype))))
+                                    (type-for-default-init dtype step-var-p))
                                ,name)))
              (if desetq
                  (push dtype *loop-desetq-declarations*)
@@ -1033,14 +1050,12 @@ code to be loaded.
 
 (sb!int:defmacro-mundanely with-sum-count (lc &body body)
   (let* ((type (loop-collector-dtype lc))
-         (temp-var (car (loop-collector-tempvars lc)))
-         (init (loop-typed-init type)))
-    `(let ((,temp-var ,init))
-       (declare (type ,(if (sb!xc:typep init type)
-                           type
-                           `(or ,(type-of init) ,type))
-                      ,temp-var))
-       ,@body)))
+         (temp-var (car (loop-collector-tempvars lc))))
+    (multiple-value-bind (type init)
+        (type-for-default-init type)
+      `(let ((,temp-var ,init))
+         (declare (type ,type ,temp-var))
+         ,@body))))
 
 (defun loop-get-collection-info (collector class default-type)
   (let ((form (loop-get-form))
@@ -1187,9 +1202,7 @@ code to be loaded.
                      ((plusp form)
                       `(mod ,(1+ (ceiling form))))
                      (t
-                      `(integer ,(ceiling form) ))
-
-                   'integer)))
+                      `(integer ,(ceiling form))))))
     (let ((var (loop-make-var (gensym "LOOP-REPEAT-") `(ceiling ,form) type)))
       (push `(if (<= ,var 0) (go end-loop) (decf ,var)) *loop-before-loop*)
       (push `(if (<= ,var 0) (go end-loop) (decf ,var)) *loop-after-body*)

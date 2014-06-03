@@ -381,7 +381,18 @@
 
 (with-test (:name :of-type-character)
   (assert (null (loop with a t return a)))
+  #-sb-unicode
   (assert (typep (loop with a of-type extended-char return a) 'extended-char))
   (assert (typep (loop with a of-type character return a) 'character))
   (assert (typep (loop with a of-type base-char return a) 'base-char))
   (assert (typep (loop with a of-type standard-char return a) 'standard-char)))
+
+(with-test (:name :empty-type)
+  (assert-signal
+   (compile nil `(lambda ()
+                   (loop with a of-type (and fixnum string) return a)))
+   warning)
+  (assert-signal
+   (compile nil `(lambda ()
+                   (loop for i to 10 sum i of-type (and fixnum string))))
+   warning))
