@@ -381,7 +381,7 @@
 
 (with-test (:name :of-type-character)
   (assert (null (loop with a t return a)))
-  #-sb-unicode
+  #+sb-unicode
   (assert (typep (loop with a of-type extended-char return a) 'extended-char))
   (assert (typep (loop with a of-type character return a) 'character))
   (assert (typep (loop with a of-type base-char return a) 'base-char))
