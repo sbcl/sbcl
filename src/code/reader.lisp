@@ -567,22 +567,11 @@ standard Lisp readtable when NIL."
     (setf (token-buf-string b)
           (replace (make-string (* 2 (length string))) string))))
 
-(defun inch-read-buffer ()
-  (let ((b *read-buffer*))
-    (if (>= (token-buf-inch-ptr b) (token-buf-fill-ptr b))
-        ;; this is inefficient. *eof-object* makes sense returned from READ,
-        ;; but character input doesn't need it. This isn't even a stream
-        ;; in the technical sense by the time we get to re-scanning the
-        ;; token-buf. We should just use the obvious choice: NIL.
-        *eof-object*
-      (prog1
-          (elt (token-buf-string b) (token-buf-inch-ptr b))
-        (incf (token-buf-inch-ptr b))))))
-
-;; Exactly the same as above but with a convenient NIL=EOF convention
+;; Retun the next character from the buffered token, or NIL.
+(declaim (maybe-inline token-buf-getchar))
 (defun token-buf-getchar (b)
   (declare (optimize (sb!c::insert-array-bounds-checks 0)))
-  (let ((i (token-buf-inch-ptr b)))
+  (let ((i (token-buf-inch-ptr (truly-the token-buf b))))
     (and (< i (token-buf-fill-ptr b))
          (prog1 (elt (token-buf-string b) i)
            (setf (token-buf-inch-ptr b) (1+ i))))))
@@ -1521,11 +1510,24 @@ extended <package-name>::<form-in-package> syntax."
       (assert (typep (parse-integer string :end n-digits :radix base)
                      `(unsigned-byte ,sb!vm:n-positive-fixnum-bits))))))
 
+(defmacro !setq-optional-leading-sign (sign-flag token-buf rewind)
+  ;; guaranteed to have at least one character in buffer at the start
+  ;; or immediately following [ESFDL] marker depending on 'rewind' flag.
+  `(locally (declare (optimize (sb!c::insert-array-bounds-checks 0)))
+     (,(if rewind 'setf 'incf)
+       (token-buf-inch-ptr ,token-buf)
+       (case (elt (token-buf-string ,token-buf)
+                  ,(if rewind 0 `(token-buf-inch-ptr ,token-buf)))
+         (#\- (setq ,sign-flag t) 1)
+         (#\+ 1)
+         (t   0)))))
+
 (defun make-integer (&optional (base *read-base*))
   #!+sb-doc
   "Minimizes bignum-fixnum multiplies by reading a 'safe' number of digits,
   then multiplying by a power of the base and adding."
-  (declare ((integer 2 36) base))
+  (declare ((integer 2 36) base)
+           (inline token-buf-getchar)) ; makes for smaller code
   (let* ((fixnum-max-digits
           (macrolet ((maxdigits () (integer-reader-safe-digits)))
             (aref (maxdigits) (- base 2))))
@@ -1541,12 +1543,7 @@ extended <package-name>::<form-in-package> syntax."
          (negativep nil)
          (result 0)
          (buf *read-buffer*))
-    ;; guaranteed to have at least one character in buffer
-    (setf (token-buf-inch-ptr buf)
-          (case (elt (token-buf-string buf) 0)
-            (#\- (setq negativep t) 1)
-            (#\+ 1)
-            (t   0)))
+    (!setq-optional-leading-sign negativep buf t)
     (loop
      (let ((acc 0))
        (declare (type (and fixnum unsigned-byte) acc))
@@ -1585,35 +1582,31 @@ extended <package-name>::<form-in-package> syntax."
 (defun make-float (stream)
   ;; Assume that the contents of *read-buffer* are a legal float, with nothing
   ;; else after it.
-  (setf (token-buf-inch-ptr *read-buffer*) 0)
-  (let ((negative-fraction nil)
+  (let ((buf *read-buffer*)
+        (negative-fraction nil)
         (number 0)
         (divisor 1)
         (negative-exponent nil)
         (exponent 0)
         (float-char ())
-        (char (inch-read-buffer)))
-    (if (cond ((char= char #\+) t)
-              ((char= char #\-) (setq negative-fraction t)))
-        ;; Flush it.
-        (setq char (inch-read-buffer)))
+        char)
+    (!setq-optional-leading-sign negative-fraction buf t)
     ;; Read digits before the dot.
-    (do* ((ch char (inch-read-buffer))
-          (dig (digit-char-p ch) (digit-char-p ch)))
-         ((not dig) (setq char ch))
-      (setq number (+ (* number 10) dig)))
+    (macrolet ((accumulate (expr)
+                 `(let (digit)
+                    (loop (if (and (setq char (token-buf-getchar buf))
+                                   (setq digit (digit-char-p char)))
+                              ,expr
+                              (return))))))
+      (accumulate (setq number (+ (* number 10) digit)))
     ;; Deal with the dot, if it's there.
-    (when (char= char #\.)
-      (setq char (inch-read-buffer))
+      (when (char= char #\.)
       ;; Read digits after the dot.
-      (do* ((ch char (inch-read-buffer))
-            (dig (and (not (eofp ch)) (digit-char-p ch))
-                 (and (not (eofp ch)) (digit-char-p ch))))
-           ((not dig) (setq char ch))
-        (setq divisor (* divisor 10))
-        (setq number (+ (* number 10) dig))))
+        (accumulate (setq divisor (* divisor 10)
+                          number (+ (* number 10) digit))))
     ;; Is there an exponent letter?
-    (cond ((eofp char)
+      (cond
+          ((null char)
            ;; If not, we've read the whole number.
            (let ((num (make-float-aux number divisor
                                       *read-default-float-format*
@@ -1621,20 +1614,11 @@ extended <package-name>::<form-in-package> syntax."
              (return-from make-float (if negative-fraction (- num) num))))
           ((= (get-constituent-trait char) +char-attr-constituent-expt+)
            (setq float-char char)
-           ;; Build exponent.
-           (setq char (inch-read-buffer))
            ;; Check leading sign.
-           (if (cond ((char= char #\+) t)
-                     ((char= char #\-) (setq negative-exponent t)))
-               ;; Flush sign.
-               (setq char (inch-read-buffer)))
+           (!setq-optional-leading-sign negative-exponent buf nil)
            ;; Read digits for exponent.
-           (do* ((ch char (inch-read-buffer))
-                 (dig (and (not (eofp ch)) (digit-char-p ch))
-                      (and (not (eofp ch)) (digit-char-p ch))))
-                ((not dig)
-                 (setq exponent (if negative-exponent (- exponent) exponent)))
-             (setq exponent (+ (* exponent 10) dig)))
+           (accumulate (setq exponent (+ (* exponent 10) digit)))
+           (setq exponent (if negative-exponent (- exponent) exponent))
            ;; Generate and return the float, depending on FLOAT-CHAR:
            (let* ((float-format (case (char-upcase float-char)
                                   (#\E *read-default-float-format*)
@@ -1647,7 +1631,7 @@ extended <package-name>::<form-in-package> syntax."
                                           divisor float-format stream)))
              (return-from make-float
                (if negative-fraction (- result) result))))
-          (t (bug "bad fallthrough in floating point reader")))))
+          (t (bug "bad fallthrough in floating point reader"))))))
 
 (defun make-float-aux (number divisor float-format stream)
   (handler-case
@@ -1663,17 +1647,10 @@ extended <package-name>::<form-in-package> syntax."
   ;; the string.
   ;; This code is inferior to that of MAKE-INTEGER because it makes no
   ;; attempt to perform as few bignum multiplies as possible.
-  ;; Not to mention it repeats the leading sign check code exactly.
   ;;
   (let ((numerator 0) (denominator 0) (negativep nil)
         (base *read-base*) (buf *read-buffer*))
-    ;; Look for optional "+" or "-".
-    ;; guaranteed to have at least one character in buffer
-    (setf (token-buf-inch-ptr buf)
-          (case (elt (token-buf-string buf) 0)
-            (#\- (setq negativep t) 1)
-            (#\+ 1)
-            (t   0)))
+    (!setq-optional-leading-sign negativep buf t)
     ;; Get numerator.
     (loop (let ((dig (digit-char-p (token-buf-getchar buf) base)))
             (if dig
