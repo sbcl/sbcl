@@ -514,7 +514,7 @@ standard Lisp readtable when NIL."
   (fill-ptr 0 :type index)
   ;; Counter advanced as characters are consumed from 'string' on re-scan
   ;; by auxilliary functions MAKE-{INTEGER,FLOAT,RATIONAL} etc.
-  (inch-ptr 0 :type index)
+  (cursor 0 :type index)
   ;; A string used only for FIND-PACKAGE calls in package-qualified
   ;; symbols so that we don't need to call SUBSEQ on the 'string'.
   (adjustable-string nil :type (and (array character (*)) (not simple-array)))
@@ -544,7 +544,7 @@ standard Lisp readtable when NIL."
 (defun reset-read-buffer (&optional (b *read-buffer*))
   ;; Turn *READ-BUFFER* into an empty read buffer.
   (setf (token-buf-fill-ptr b) 0)
-  (setf (token-buf-inch-ptr b) 0))
+  (setf (token-buf-cursor b) 0))
 
 ;; "Output" a character into the reader's buffer.
 ;; FIXME: Most code still does not specify the optional argument.
@@ -571,10 +571,10 @@ standard Lisp readtable when NIL."
 (declaim (maybe-inline token-buf-getchar))
 (defun token-buf-getchar (b)
   (declare (optimize (sb!c::insert-array-bounds-checks 0)))
-  (let ((i (token-buf-inch-ptr (truly-the token-buf b))))
+  (let ((i (token-buf-cursor (truly-the token-buf b))))
     (and (< i (token-buf-fill-ptr b))
          (prog1 (elt (token-buf-string b) i)
-           (setf (token-buf-inch-ptr b) (1+ i))))))
+           (setf (token-buf-cursor b) (1+ i))))))
 
 ;; Grab a buffer off the token-buf pool if there is one, or else make one.
 ;; This does not need to be protected against other threads because the
@@ -1515,9 +1515,9 @@ extended <package-name>::<form-in-package> syntax."
   ;; or immediately following [ESFDL] marker depending on 'rewind' flag.
   `(locally (declare (optimize (sb!c::insert-array-bounds-checks 0)))
      (,(if rewind 'setf 'incf)
-       (token-buf-inch-ptr ,token-buf)
+       (token-buf-cursor ,token-buf)
        (case (elt (token-buf-string ,token-buf)
-                  ,(if rewind 0 `(token-buf-inch-ptr ,token-buf)))
+                  ,(if rewind 0 `(token-buf-cursor ,token-buf)))
          (#\- (setq ,sign-flag t) 1)
          (#\+ 1)
          (t   0)))))
