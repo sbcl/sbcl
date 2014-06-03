@@ -1837,9 +1837,7 @@ extended <package-name>::<form-in-package> syntax."
 
 (defun !reader-cold-init ()
   (!cold-init-constituent-trait-table)
-  (!cold-init-standard-readtable)
-  ;; FIXME: This was commented out, but should probably be restored.
-  #+nil (!cold-init-integer-reader))
+  (!cold-init-standard-readtable))
 
 (def!method print-object ((readtable readtable) stream)
   (print-unreadable-object (readtable stream :identity t :type t)))
