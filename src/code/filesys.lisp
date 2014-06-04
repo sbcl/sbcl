@@ -294,10 +294,12 @@
              :format-control "~@<can't find the ~A of wild pathname ~A~
                               (physicalized from ~A).~:>"
              :format-arguments (list query-for pathname pathspec)))
-    (flet ((fail (note-format pathname errno)
-             (if errorp
-                 (simple-file-perror note-format pathname errno)
-                 (return-from query-file-system nil))))
+    (macrolet ((fail (note-format pathname errno)
+                 ;; Do this as a macro to avoid evaluating format
+                 ;; calls when ERROP is NIL
+                 `(if errorp
+                      (simple-file-perror ,note-format ,pathname ,errno)
+                      (return-from query-file-system nil))))
       (let ((filename (native-namestring pathname :as-file t)))
         #!+win32
         (case query-for
