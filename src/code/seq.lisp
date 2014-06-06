@@ -1042,31 +1042,48 @@ many elements are copied."
 ;;; length of the output sequence matches any length specified
 ;;; in RESULT-TYPE.
 (defun %map (result-type function first-sequence &rest more-sequences)
-  (let ((really-fun (%coerce-callable-to-fun function))
-        (type (specifier-type result-type)))
-    ;; Handle one-argument MAP NIL specially, using ETYPECASE to turn
-    ;; it into something which can be DEFTRANSFORMed away. (It's
-    ;; fairly important to handle this case efficiently, since
-    ;; quantifiers like SOME are transformed into this case, and since
-    ;; there's no consing overhead to dwarf our inefficiency.)
-    (if (and (null more-sequences)
-             (null result-type))
-        (%map-for-effect-arity-1 really-fun first-sequence)
-        ;; Otherwise, use the industrial-strength full-generality
-        ;; approach, consing O(N-ARGS) temporary storage (which can have
-        ;; DYNAMIC-EXTENT), then using O(N-ARGS * RESULT-LENGTH) time.
-        (let ((sequences (cons first-sequence more-sequences)))
-          (cond
-            ((eq type *empty-type*) (%map-for-effect really-fun sequences))
-            ((csubtypep type (specifier-type 'list))
-             (%map-to-list really-fun sequences))
-            ((csubtypep type (specifier-type 'vector))
-             (%map-to-vector result-type really-fun sequences))
-            ((and (csubtypep type (specifier-type 'sequence))
-                  (find-class result-type nil))
-             (%map-to-sequence result-type really-fun sequences))
-            (t
-             (bad-sequence-type-error result-type)))))))
+  (labels ((slower-map (type)
+             (let ((really-fun (%coerce-callable-to-fun function))
+                   (sequences (cons first-sequence more-sequences)))
+               (cond
+                 ((eq type *empty-type*)
+                  (%map-for-effect really-fun sequences))
+                 ((csubtypep type (specifier-type 'list))
+                  (%map-to-list really-fun sequences))
+                 ((csubtypep type (specifier-type 'vector))
+                  (%map-to-vector result-type really-fun sequences))
+                 ((and (csubtypep type (specifier-type 'sequence))
+                       (find-class result-type nil))
+                  (%map-to-sequence result-type really-fun sequences))
+                 (t
+                  (bad-sequence-type-error result-type)))))
+           (slow-map ()
+             (let ((type (specifier-type result-type)))
+               (cond
+                 (more-sequences
+                  (slower-map type))
+                 ((eq type *empty-type*)
+                  (%map-for-effect-arity-1 function first-sequence))
+                 ((csubtypep type (specifier-type 'list))
+                  (%map-to-list-arity-1 function first-sequence))
+                 ((or (csubtypep type (specifier-type 'simple-vector))
+                      (csubtypep type (specifier-type '(vector t))))
+                  (%map-to-simple-vector-arity-1 function first-sequence))
+                 (t
+                  (slower-map type))))))
+    ;; Handle some easy cases faster
+    (cond (more-sequences
+           (slow-map))
+          ((null result-type)
+           (%map-for-effect-arity-1 function first-sequence))
+          ((or (eq result-type 'list)
+               (eq result-type 'cons))
+           (%map-to-list-arity-1 function first-sequence))
+          ((or (eq result-type 'vector)
+               (eq result-type 'simple-vector))
+           (%map-to-simple-vector-arity-1 function first-sequence))
+          (t
+           (slow-map)))))
 
 (defun map (result-type function first-sequence &rest more-sequences)
   (apply #'%map
