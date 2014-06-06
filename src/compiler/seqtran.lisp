@@ -177,8 +177,7 @@
                        (places `(locally (declare (optimize (insert-array-bounds-checks 0)))
                                   (aref ,data (truly-the index (+ index ,start)))))))
                     (t
-                     (give-up-ir1-transform
-                      "can't determine sequence argument type"))))
+                     (return-from build-sequence-iterator))))
         (when into
           (process-vector `(array-dimension ,into 0))))
       (when found-vector-p
@@ -248,8 +247,8 @@
                              ',result-type-value))
                    (t (bug "impossible (?) sequence type"))))
             (t
-             (let* ((seqs (cons seq seqs))
-                    (seq-args (make-gensym-list (length seqs))))
+             (let* ((all-seqs (cons seq seqs))
+                    (seq-args (make-gensym-list (length all-seqs))))
                (multiple-value-bind (push-dacc result)
                    (ecase result-supertype
                      (null (values nil nil))
@@ -258,22 +257,30 @@
                      (vector (values `(push funcall-result acc)
                                      `(coerce (nreverse acc)
                                               ',result-type-value))))
-                 ;; (We use the same idiom, of returning a LAMBDA from
-                 ;; DEFTRANSFORM, as is used in the DEFTRANSFORMs for
-                 ;; FUNCALL and ALIEN-FUNCALL, and for the same
-                 ;; reason: we need to get the runtime values of each
-                 ;; of the &REST vars.)
-                 `(lambda (result-type fun ,@seq-args)
-                    (declare (ignore result-type))
-                    (let ((fun (%coerce-callable-to-fun fun))
-                          (acc nil))
-                      (declare (type list acc))
-                      (declare (ignorable acc))
-                      ,(build-sequence-iterator
-                        seqs seq-args
-                        :result result
-                        :body push-dacc
-                        :fast (policy node (> speed space))))))))))))
+                 (let ((iterator
+                         (build-sequence-iterator
+                          all-seqs seq-args
+                          :result result
+                          :body push-dacc
+                          :fast (policy node (> speed space)))))
+                  ;; (We use the same idiom, of returning a LAMBDA from
+                  ;; DEFTRANSFORM, as is used in the DEFTRANSFORMs for
+                  ;; FUNCALL and ALIEN-FUNCALL, and for the same
+                  ;; reason: we need to get the runtime values of each
+                  ;; of the &REST vars.)
+                   (cond (iterator
+                          `(lambda (result-type fun ,@seq-args)
+                             (declare (ignore result-type))
+                             (let ((fun (%coerce-callable-to-fun fun))
+                                   (acc nil))
+                               (declare (type list acc))
+                               (declare (ignorable acc))
+                               ,iterator)))
+                         ((and (null result-type-value) (null seqs))
+                          '(%map-for-effect-arity-1 fun seq))
+                         (t
+                          (give-up-ir1-transform
+                           "can't determine sequence argument type")))))))))))
 
 ;;; MAP-INTO
 (deftransform map-into ((result fun &rest seqs)

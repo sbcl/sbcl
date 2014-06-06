@@ -498,6 +498,7 @@
   (call)
 ; :DERIVE-TYPE 'TYPE-SPEC-ARG1 ? Nope... (MAP NIL ...) returns NULL, not NIL.
   )
+(defknown %map-for-effect-arity-1 (callable sequence) null (call))
 (defknown %map-to-list-arity-1 (callable sequence) list (flushable call))
 (defknown %map-to-simple-vector-arity-1 (callable sequence) simple-vector
   (flushable call))
