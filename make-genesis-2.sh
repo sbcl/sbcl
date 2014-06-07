@@ -16,6 +16,8 @@ set -e
 
 echo //entering make-genesis-2.sh
 
+. output/build-config
+
 # In a fresh host Lisp invocation, load the cross-compiler (in order
 # to get various definitions that GENESIS needs, not in order to
 # cross-compile GENESIS, then load and run GENESIS. (We use a fresh
