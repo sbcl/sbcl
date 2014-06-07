@@ -16,8 +16,7 @@
 (use-package "ASSERTOID")
 
 ;;; tests of MAP
-;;; FIXME: Move these into their own file.
-(test-util:with-test (:name :map)
+(with-test (:name :map)
   (assertoid (map 'vector #'+ '(1 2 3) '(30 20))
              :expected-equalp #(31 22))
   (assertoid (map 'list #'+ #(1 2) '(100) #(0) #(100 100))
@@ -25,7 +24,7 @@
 
 ;;; tests of MAP-INTO
 
-(test-util:with-test (:name :map-into)
+(with-test (:name :map-into)
   (assertoid (map-into (vector) #'+ '(1 2 3) '(30 20))
              :expected-equalp #())
   (assertoid (map-into (vector 99) #'+ '(1 2 3) '(30 20))
@@ -94,7 +93,7 @@
        ,@body
        (nreverse reversed-result))))
 
-(test-util:with-test (:name :map-nil)
+(with-test (:name :map-nil)
   (assertoid (with-mapnil-test-fun fun
                (map nil #'fun #(1)))
              :expected-equal '((1)))
@@ -168,7 +167,7 @@
                      :expected-equal (coerce ,result-seq 'list)))))
     `(progn ,@(nreverse reversed-assertoids))))
 
-(test-util:with-test (:name :maptest)
+(with-test (:name :maptest)
   (maptest :result-seq '(2 3)
            :fun-name 1+
            :arg-seqs (*list-2*)
@@ -182,9 +181,14 @@
            :arg-seqs (*list-2* *list-2* *vector-30*)
            :arg-types (list list vector)))
 
-(test-util:with-test (:name :map-into-vector-from-list)
+(with-test (:name :map-into-vector-from-list)
   (map-into (eval (make-array 10))
             #'list
-            (make-list 10)))
+            (make-list 10))
+  (assert (equalp (funcall (compile nil
+                                   `(lambda (a)
+                                      (map-into (make-array 3) #'identity a)))
+                          '(1 2 3))
+                 #(1 2 3))))
 
 ;;; success
