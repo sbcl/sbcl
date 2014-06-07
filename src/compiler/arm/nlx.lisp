@@ -120,7 +120,8 @@
   (:args (tn))
   (:temporary (:scs (descriptor-reg)) new-uwp)
   (:generator 7
-    (inst add new-uwp cfp-tn (* (tn-offset tn) n-word-bytes))
+    (composite-immediate-instruction
+     add new-uwp cfp-tn (* (tn-offset tn) n-word-bytes))
     (store-symbol-value new-uwp *current-unwind-protect-block*)))
 
 (define-vop (unlink-catch-block)
