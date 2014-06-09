@@ -100,7 +100,7 @@
               (error "~@<unknown element type in array type: ~2I~_~S~:>"
                      (type-specifier type))
               t)
-          (or (eq (array-type-element-type type) *wild-type*)
+          (or (eq (array-type-specialized-element-type type) *wild-type*)
               (values (type= (array-type-specialized-element-type type)
                              (specifier-type (array-element-type
                                               object)))))))
