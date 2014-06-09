@@ -502,3 +502,24 @@
   (let ((u `(or ,@(map 'list (lambda (x) `(array ,(sb-vm:saetp-specifier x)))
                        sb-vm:*specialized-array-element-type-properties*))))
     (assert (equal (multiple-value-list (subtypep 'array u)) '(t t)))))
+
+(with-test (:name :bug-1258716)
+  (let ((intersection (sb-kernel:type-intersection
+                       (sb-kernel:specifier-type 'simple-vector)
+                       (sb-kernel:specifier-type `(vector #:unknown)))))
+    (assert (sb-kernel:array-type-p intersection))
+    ;; and not *wild-type*
+    (assert (sb-kernel:type= (sb-kernel:array-type-specialized-element-type intersection)
+                             sb-kernel:*universal-type*))))
+
+(with-test (:name :unparse-safely)
+  (let* ((intersection (sb-kernel:type-intersection
+                        (sb-kernel:specifier-type '(vector (or bit character)))
+                        (sb-kernel:specifier-type `(vector (or bit symbol)))))
+         (round-trip (sb-kernel:specifier-type
+                     (sb-kernel:type-specifier intersection))))
+    (assert (sb-kernel:type= intersection round-trip))
+    (assert (sb-kernel:array-type-p intersection))
+    ;; and not *wild-type*
+    (assert (sb-kernel:type/= (sb-kernel:array-type-specialized-element-type intersection)
+                              (sb-kernel:specifier-type 'bit)))))

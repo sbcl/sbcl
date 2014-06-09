@@ -2445,9 +2445,24 @@ used for a COMPLEX component.~:@>"
   (make-negation-type :type type))
 
 (!define-type-method (array :unparse) (type)
-  (let ((dims (array-type-dimensions type))
-        (eltype (type-specifier (array-type-element-type type)))
-        (complexp (array-type-complexp type)))
+  (let* ((dims (array-type-dimensions type))
+         ;; Compare the specialised element type and the
+         ;; derived element type.  If the derived type
+         ;; is so small that it jumps to a smaller upgraded
+         ;; element type, use the specialised element type.
+         ;;
+         ;; This protects from unparsing
+         ;;   (and (vector (or bit symbol))
+         ;;        (vector (or bit character)))
+         ;; i.e., the intersection of two T array types,
+         ;; as a bit vector.
+         (stype (array-type-specialized-element-type type))
+         (dtype (array-type-element-type type))
+         (utype (%upgraded-array-element-type dtype))
+         (eltype (type-specifier (if (type= stype utype)
+                                     dtype
+                                     stype)))
+         (complexp (array-type-complexp type)))
     (if (and (eq complexp t) (not *unparse-allow-negation*))
         (setq complexp :maybe))
     (cond ((eq dims '*)
@@ -2722,24 +2737,23 @@ used for a COMPLEX component.~:@>"
             (eltype2 (array-type-element-type type2))
             (stype1 (array-type-specialized-element-type type1))
             (stype2 (array-type-specialized-element-type type2)))
-        (flet ((intersect ()
-                 (make-array-type
-                  :dimensions (cond ((eq dims1 '*) dims2)
-                                    ((eq dims2 '*) dims1)
-                                    (t
-                                     (mapcar (lambda (x y) (if (eq x '*) y x))
-                                             dims1 dims2)))
-                  :complexp (if (eq complexp1 :maybe) complexp2 complexp1)
-                  :element-type (cond
-                                  ((eq eltype1 *wild-type*) eltype2)
-                                  ((eq eltype2 *wild-type*) eltype1)
-                                  (t (type-intersection eltype1 eltype2))))))
-          (if (or (eq stype1 *wild-type*) (eq stype2 *wild-type*))
-              (specialize-array-type (intersect))
-              (let ((type (intersect)))
-                (aver (type= stype1 stype2))
-                (setf (array-type-specialized-element-type type) stype1)
-                type))))
+        (make-array-type
+         :dimensions (cond ((eq dims1 '*) dims2)
+                           ((eq dims2 '*) dims1)
+                           (t
+                            (mapcar (lambda (x y) (if (eq x '*) y x))
+                                    dims1 dims2)))
+         :complexp (if (eq complexp1 :maybe) complexp2 complexp1)
+         :element-type (cond
+                         ((eq eltype1 *wild-type*) eltype2)
+                         ((eq eltype2 *wild-type*) eltype1)
+                         (t (type-intersection eltype1 eltype2)))
+         :specialized-element-type (cond
+                                     ((eq stype1 *wild-type*) stype2)
+                                     ((eq stype2 *wild-type*) stype1)
+                                     (t
+                                      (aver (type= stype1 stype2))
+                                      stype1))))
       *empty-type*))
 
 ;;; Check a supplied dimension list to determine whether it is legal,
@@ -3588,21 +3602,25 @@ used for a COMPLEX component.~:@>"
 
 (!def-type-translator array (&optional (element-type '*)
                                        (dimensions '*))
-  (specialize-array-type
-   (make-array-type :dimensions (canonical-array-dimensions dimensions)
-                    :complexp :maybe
-                    :element-type (if (eq element-type '*)
-                                      *wild-type*
-                                      (specifier-type element-type)))))
+  (let ((eltype (if (eq element-type '*)
+                    *wild-type*
+                    (specifier-type element-type))))
+    (make-array-type :dimensions (canonical-array-dimensions dimensions)
+                     :complexp :maybe
+                     :element-type eltype
+                     :specialized-element-type (%upgraded-array-element-type
+                                                eltype))))
 
 (!def-type-translator simple-array (&optional (element-type '*)
                                               (dimensions '*))
-  (specialize-array-type
+  (let ((eltype (if (eq element-type '*)
+                    *wild-type*
+                    (specifier-type element-type))))
    (make-array-type :dimensions (canonical-array-dimensions dimensions)
                     :complexp nil
-                    :element-type (if (eq element-type '*)
-                                      *wild-type*
-                                      (specifier-type element-type)))))
+                    :element-type eltype
+                    :specialized-element-type (%upgraded-array-element-type
+                                               eltype))))
 
 ;;;; SIMD-PACK types
 #!+sb-simd-pack
