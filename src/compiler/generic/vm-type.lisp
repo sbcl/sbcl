@@ -101,33 +101,26 @@
     (double-float 'double-float)
     #!+long-float (long-float 'long-float)))
 
-;;; This function is called when the type code wants to find out how
-;;; an array will actually be implemented. We set the
-;;; SPECIALIZED-ELEMENT-TYPE to correspond to the actual
-;;; specialization used in this implementation.
-(declaim (ftype (function (array-type) array-type) specialize-array-type))
-(defun specialize-array-type (type)
-  (let ((eltype (array-type-element-type type)))
-    (setf (array-type-specialized-element-type type)
-          (if (or (eq eltype *wild-type*)
-                  ;; This is slightly dubious, but not as dubious as
-                  ;; assuming that the upgraded-element-type should be
-                  ;; equal to T, given the way that the AREF
-                  ;; DERIVE-TYPE optimizer works.  -- CSR, 2002-08-19
-                  (contains-unknown-type-p eltype))
-              *wild-type*
-              (dolist (stype-name *specialized-array-element-types*
-                                  *universal-type*)
-                ;; FIXME: Mightn't it be better to have
-                ;; *SPECIALIZED-ARRAY-ELEMENT-TYPES* be stored as precalculated
-                ;; SPECIFIER-TYPE results, instead of having to calculate
-                ;; them on the fly this way? (Call the new array
-                ;; *SPECIALIZED-ARRAY-ELEMENT-SPECIFIER-TYPES* or something..)
-                (let ((stype (specifier-type stype-name)))
-                  (aver (not (unknown-type-p stype)))
-                  (when (csubtypep eltype stype)
-                    (return stype))))))
-    type))
+(declaim (ftype (sfunction (ctype) ctype) %upgraded-array-element-type))
+(defun %upgraded-array-element-type (eltype)
+  (if (or (eq eltype *wild-type*)
+          ;; This is slightly dubious, but not as dubious as
+          ;; assuming that the upgraded-element-type should be
+          ;; equal to T, given the way that the AREF
+          ;; DERIVE-TYPE optimizer works.  -- CSR, 2002-08-19
+          (contains-unknown-type-p eltype))
+      *wild-type*
+      (dolist (stype-name *specialized-array-element-types*
+                          *universal-type*)
+        ;; FIXME: Mightn't it be better to have
+        ;; *SPECIALIZED-ARRAY-ELEMENT-TYPES* be stored as precalculated
+        ;; SPECIFIER-TYPE results, instead of having to calculate
+        ;; them on the fly this way? (Call the new array
+        ;; *SPECIALIZED-ARRAY-ELEMENT-SPECIFIER-TYPES* or something..)
+        (let ((stype (specifier-type stype-name)))
+          (aver (not (unknown-type-p stype)))
+          (when (csubtypep eltype stype)
+            (return stype))))))
 
 (defun sb!xc:upgraded-array-element-type (spec &optional environment)
   #!+sb-doc
@@ -139,10 +132,10 @@
       ;; the case of (AND KNOWN UNKNOWN), since the result of the
       ;; outter call to SPECIFIER-TYPE can be cached by the code that
       ;; doesn't catch PARSE-UNKNOWN-TYPE signal.
-      (if (contains-unknown-type-p (specifier-type spec))
-          (error "Undefined type: ~S" spec)
-          (type-specifier (array-type-specialized-element-type
-                           (specifier-type `(array ,spec)))))
+      (let ((type (specifier-type spec)))
+        (if (contains-unknown-type-p type)
+            (error "Undefined type: ~S" spec)
+            (type-specifier (%upgraded-array-element-type type))))
     (parse-unknown-type (c)
       (error "Undefined type: ~S" (parse-unknown-type-specifier c)))))
 
@@ -265,8 +258,8 @@
                   (equal (array-type-dimensions a) (array-type-dimensions b))))
            (saetp-index (type)
              (and (array-type-p type)
-                  (neq (array-type-element-type type) *wild-type*)
-                  (position (array-type-element-type type) array-props
+                  (neq (array-type-specialized-element-type type) *wild-type*)
+                  (position (array-type-specialized-element-type type) array-props
                             :key #'sb!vm:saetp-ctype :test #'type=)))
            (wild (type)
              (make-array-type :element-type *wild-type*
@@ -359,7 +352,7 @@
                      (equal (array-type-dimensions x) '(*))
                      (type= (array-type-specialized-element-type x)
                             (array-type-element-type x)))
-                (if (eq (array-type-element-type x) *wild-type*)
+                (if (eq (array-type-specialized-element-type x) *wild-type*)
                     ;; could be done, but probably no merit to implementing
                     ;; maybe/definitely-complex wild-type.
                     (unless (array-type-complexp x)
