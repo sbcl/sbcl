@@ -54,7 +54,9 @@
         ((intersection-type-p ctype)
          (some #'contains-unknown-type-p (intersection-type-types ctype)))
         ((union-type-p ctype)
-         (some #'contains-unknown-type-p (union-type-types ctype)))))
+         (some #'contains-unknown-type-p (union-type-types ctype)))
+        ((negation-type-p ctype)
+         (contains-unknown-type-p (negation-type-type ctype)))))
 
 ;;; This is used by !DEFINE-SUPERCLASSES to define the SUBTYPE-ARG1
 ;;; method. INFO is a list of conses
