@@ -3735,6 +3735,209 @@ used for a COMPLEX component.~:@>"
                          :low low
                          :high high))))
 
+;;; The following function is a generic driver for approximating
+;;; set-valued functions over types.  Putting this here because it'll
+;;; probably be useful for a lot of type analyses.
+;;;
+;;; Let f be a function from values of type X to Y, e.g., ARRAY-RANK.
+;;;
+;;; We compute an over or under-approximation of the set
+;;;
+;;;  F(TYPE) = { f(x) : x in TYPE /\ x in X } \subseteq Y
+;;;
+;;; via set-valued approximations of f, OVER and UNDER.
+;;;
+;;; These functions must have the property that
+;;;   Forall TYPE, OVER(TYPE) \superseteq F(TYPE) and
+;;;   Forall TYPE, UNDER(TYPE) \subseteq F(TYPE)
+;;;
+;;; The driver is also parameterised over the finite set
+;;; representation.
+;;;
+;;; Union, intersection and difference are binary functions to compute
+;;; set union, intersection and difference.  Top and bottom are the
+;;; concrete representations for the universe and empty sets; we never
+;;; call the set functions on top or bottom, so it's safe to use
+;;; special values there.
+;;;
+;;; Arguments:
+;;;
+;;;  TYPE: the ctype for which we wish to approximate F(TYPE)
+;;;  OVERAPPROXIMATE: true if we wish to overapproximate, nil otherwise.
+;;;     You usually want T.
+;;;  UNION/INTERSECTION/DIFFERENCE: implementations of finite set operations.
+;;;     Conform to cl::(union/intersection/set-difference).  Passing NIL will
+;;;     disable some cleverness and result in quicker computation of coarser
+;;;     approximations.  However, passing difference without union and intersection
+;;;     will probably not end well.
+;;;  TOP/BOTTOM: concrete representation of the universe and empty set.  Finite
+;;;     set operations are never called on TOP/BOTTOM, so it's safe to use special
+;;;     values there.
+;;;  OVER/UNDER: the set-valued approximations of F.
+;;;
+;;; Implementation details.
+;;;
+;;; It's a straightforward walk down the type.
+;;; Union types -> take the union of children, intersection ->
+;;; intersect.  There is some complication for negation types: we must
+;;; not only negate the result, but also flip from overapproximating
+;;; to underapproximating in the children (or vice versa).
+;;;
+;;; We represent sets as a pair of (negate-p finite-set) in order to
+;;; support negation types.
+
+(declaim (inline generic-abstract-type-function))
+(defun generic-abstract-type-function
+    (type overapproximate
+     union intersection difference
+     top bottom
+     over under)
+  (labels ((union* (x y)
+             ;; wrappers to avoid calling union/intersection on
+             ;; top/bottom.
+             (cond ((or (eql x top)
+                        (eql y top))
+                    top)
+                   ((eql x bottom) y)
+                   ((eql y bottom) x)
+                   (t
+                    (funcall union x y))))
+           (intersection* (x y)
+             (cond ((or (eql x bottom)
+                        (eql y bottom))
+                    bottom)
+                   ((eql x top) y)
+                   ((eql y top) x)
+                   (t
+                    (funcall intersection x y))))
+           (unite (not-x-p x not-y-p y)
+             ;; if we only have one negated set, it's x.
+             (when not-y-p
+               (rotatef not-x-p not-y-p)
+               (rotatef x y))
+             (cond ((and not-x-p not-y-p)
+                    ;; -x \/ -y = -(x /\ y)
+                    (normalize t (intersection* x y)))
+                   (not-x-p
+                    ;; -x \/ y = -(x \ y)
+                    (cond ((eql x top)
+                           (values nil y))
+                          ((or (eql y top)
+                               (eql x bottom))
+                           (values nil top))
+                          ((eql y bottom)
+                           (values t x))
+                          (t
+                           (normalize t
+                                      (funcall difference x y)))))
+                   (t
+                    (values nil (union* x y)))))
+           (intersect (not-x-p x not-y-p y)
+             (when not-y-p
+               (rotatef not-x-p not-y-p)
+               (rotatef x y))
+             (cond ((and not-x-p not-y-p)
+                    ;; -x /\ -y = -(x \/ y)
+                    (normalize t (union* x y)))
+                   (not-x-p
+                    ;; -x /\ y = y \ x
+                    (cond ((or (eql x top) (eql y bottom))
+                           (values nil bottom))
+                          ((eql x bottom)
+                           (values nil y))
+                          ((eql y top)
+                           (values t x))
+                          (t
+                           (values nil (funcall difference y x)))))
+                   (t
+                    (values nil (intersection* x y)))))
+           (normalize (not-x-p x)
+             ;; catch some easy cases of redundant negation.
+             (cond ((not not-x-p)
+                    (values nil x))
+                   ((eql x top)
+                    bottom)
+                   ((eql x bottom)
+                    top)
+                   (t
+                    (values t x))))
+           (default (overapproximate)
+             ;; default value
+             (if overapproximate top bottom))
+           (walk-union (types overapproximate)
+             ;; Only do this if union is provided.
+             (unless union
+               (return-from walk-union (default overapproximate)))
+             ;; Reduce/union from bottom.
+             (let ((not-acc-p nil)
+                   (acc bottom))
+               (dolist (type types (values not-acc-p acc))
+                 (multiple-value-bind (not x)
+                     (walk type overapproximate)
+                   (setf (values not-acc-p acc)
+                         (unite not-acc-p acc not x)))
+                 ;; Early exit on top set.
+                 (when (and (eql acc top)
+                            (not not-acc-p))
+                   (return (values nil top))))))
+           (walk-intersection (types overapproximate)
+             ;; Skip if we don't know how to intersect sets
+             (unless intersection
+               (return-from walk-intersection (default overapproximate)))
+             ;; Reduce/intersection from top
+             (let ((not-acc-p nil)
+                   (acc top))
+               (dolist (type types (values not-acc-p acc))
+                 (multiple-value-bind (not x)
+                     (walk type overapproximate)
+                   (setf (values not-acc-p acc)
+                         (intersect not-acc-p acc not x)))
+                 (when (and (eql acc bottom)
+                            (not not-acc-p))
+                   (return (values nil bottom))))))
+           (walk-negate (type overapproximate)
+             ;; Don't introduce negated types if we don't know how to
+             ;; subtract sets.
+             (unless difference
+               (return-from walk-negate (default overapproximate)))
+             (multiple-value-bind (not x)
+                 (walk type (not overapproximate))
+               (normalize (not not) x)))
+           (walk (type overapproximate)
+             (typecase type
+               (union-type
+                (walk-union (union-type-types type) overapproximate))
+               ((cons (member or union))
+                (walk-union (rest type) overapproximate))
+               (intersection-type
+                (walk-intersection (intersection-type-types type) overapproximate))
+               ((cons (member and intersection))
+                (walk-intersection (rest type) overapproximate))
+               (negation-type
+                (walk-negate (negation-type-type type) overapproximate))
+               ((cons (eql not))
+                (walk-negate (second type) overapproximate))
+               (t
+                (values nil
+                        (if overapproximate
+                            (if over
+                                (funcall over type)
+                                (default t))
+                            (if under
+                                (funcall under type)
+                                (default nil))))))))
+    (multiple-value-call #'normalize (walk type overapproximate))))
+(declaim (notinline generic-abstract-type-function))
+
+;;; Standard list representation of sets. Use CL:* for the universe.
+(defun list-abstract-type-function (type over &key under (overapproximate t))
+  (declare (inline generic-abstract-walk-type))
+  (generic-abstract-type-function
+   type overapproximate
+   #'union #'intersection #'set-difference
+   '* nil
+   over under))
+
 (locally
   ;; Why SAFETY 0? To suppress the is-it-the-right-structure-type
   ;; checking for declarations in structure accessors. Otherwise we
