@@ -767,20 +767,60 @@
     ;; FIXME: intersection type
     (t :maybe)))
 
-;;; If we can tell the rank from the type info, use it instead.
+;; Let type derivation handle constant cases. We only do easy strength
+;; reduction.
 (deftransform array-rank ((array) (array) * :node node)
   (let ((array-type (lvar-type array)))
-    (let ((dims (array-type-dimensions-or-give-up array-type)))
-      (cond ((listp dims)
-             (length dims))
-            ((eq t (and (array-type-p array-type)
-                        (array-type-complexp array-type)))
-             '(%array-rank array))
-            (t
-             (delay-ir1-transform node :constraint)
-             `(if (array-header-p array)
-                  (%array-rank array)
-                  1))))))
+    (cond ((eq t (and (array-type-p array-type)
+                      (array-type-complexp array-type)))
+           '(%array-rank array))
+          (t
+           (delay-ir1-transform node :constraint)
+           `(if (array-header-p array)
+                (%array-rank array)
+                1)))))
+
+(defun derive-array-rank (ctype)
+  (let ((array (specifier-type 'array)))
+    (flet ((over (x)
+             (cond ((not (types-equal-or-intersect x array))
+                    '()) ; Definitely not an array!
+                   ((array-type-p x)
+                    (let ((dims (array-type-dimensions x)))
+                      (if (eql dims '*)
+                          '*
+                          (list (length dims)))))
+                   (t '*)))
+           (under (x)
+             ;; Might as well catch some easy negation cases.
+             (typecase x
+               (array-type
+                (let ((dims (array-type-dimensions x)))
+                  (cond ((eql dims '*)
+                         '*)
+                        ((every (lambda (dim)
+                                  (eql dim '*))
+                                dims)
+                         (list (length dims)))
+                        (t
+                         '()))))
+               (t '()))))
+      (declare (dynamic-extent #'over #'under))
+      (multiple-value-bind (not-p ranks)
+          (list-abstract-type-function ctype #'over :under #'under)
+        (cond ((eql ranks '*)
+               (aver (not not-p))
+               nil)
+              (not-p
+               (specifier-type `(not (member ,@ranks))))
+              (t
+               (specifier-type `(member ,@ranks))))))))
+
+(defoptimizer (array-rank derive-type) ((array))
+  (derive-array-rank (lvar-type array)))
+
+(defoptimizer (%array-rank derive-type) ((array))
+  (derive-array-rank (lvar-type array)))
 
 ;;; If we know the dimensions at compile time, just use it. Otherwise,
 ;;; if we can tell that the axis is in bounds, convert to

@@ -5144,3 +5144,25 @@
     (multiple-value-bind (ok err) (ignore-errors (funcall f 42))
       (assert (not ok))
       (assert (search "FLET FOO" (princ-to-string err))))))
+
+(with-test (:name :bug-1310574-0)
+  (multiple-value-bind (function warning failure)
+      (compile nil `(lambda (a)
+                      (typecase a
+                        ((or (array * (* * 3)) (array * (* * 4)))
+                         (case (array-rank a)
+                           (2 (aref a 1 2)))))))
+    (declare (ignore function))
+    (assert (not warning))
+    (assert (not failure))))
+
+(with-test (:name :bug-1310574-1)
+  (multiple-value-bind (function warning failure)
+      (compile nil `(lambda (a)
+                      (typecase a
+                        ((or (array * ()) (array * (1)) (array * (1 2)))
+                         (case (array-rank a)
+                           (3 (aref a 1 2 3)))))))
+    (declare (ignore function))
+    (assert (not warning))
+    (assert (not failure))))
