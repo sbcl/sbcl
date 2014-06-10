@@ -156,17 +156,7 @@ of condition handling occurring."
    ARGUMENTS. While the condition is being signaled, a MUFFLE-WARNING restart
    exists that causes WARN to immediately return NIL."
   (/show0 "entering WARN")
-  ;; KLUDGE: The current cold load initialization logic causes several calls
-  ;; to WARN, so we need to be able to handle them without dying. (And calling
-  ;; FORMAT or even PRINC in cold load is a good way to die.) Of course, the
-  ;; ideal would be to clean up cold load so that it doesn't call WARN..
-  ;; -- WHN 19991009
-  (if (not *cold-init-complete-p*)
-      (progn
-        (/show0 "ignoring WARN in cold init, arguments=..")
-        #!+sb-show (dolist (argument arguments)
-                     (sb!impl::cold-print argument)))
-      (infinite-error-protect
+  (infinite-error-protect
        (/show0 "doing COERCE-TO-CONDITION")
        (let ((condition (coerce-to-condition datum arguments
                                              'simple-warning 'warn)))
@@ -187,5 +177,5 @@ of condition handling occurring."
                    "~&~@<~S: ~3i~:_~A~:>~%"
                    badness
                    condition)
-           (/show0 "back from FORMAT, voila!")))))
+           (/show0 "back from FORMAT, voila!"))))
   nil)
