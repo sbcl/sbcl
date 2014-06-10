@@ -34,12 +34,19 @@
    the expanded form and a T-or-NIL flag indicating whether the form was, in
    fact, a macro. ENV is the lexical environment to expand in, which defaults
    to the null environment."
-  (cond ((and (consp form) (symbolp (car form)))
-         (let ((def (sb!xc:macro-function (car form) env)))
-           (if def
-               (values (funcall sb!xc:*macroexpand-hook*
-                                def
-                                form
+  (flet ((perform-expansion (expander)
+           ;; I disagree that expanders need to receive a "proper" environment
+           ;; - whatever that is - in lieu of NIL because an environment is
+           ;; opaque, and the only thing an expander can do with it (per the
+           ;; CL standard, barring things that code-walkers might want)
+           ;; is recursively invoke macroexpand[-1] or one of the handful of
+           ;; other builtins (9 or so) accepting an environment.
+           ;; Those functions all must in turn accept NIL as an environment.
+           ;; Whether or not this is put back to the way it was in CMUCL, it's
+           ;; good to have a single entry point for macros and symbol-macros.
+           (values (funcall sb!xc:*macroexpand-hook*
+                            expander
+                            form
                                 ;; As far as I can tell, it's not clear from
                                 ;; the ANSI spec whether a MACRO-FUNCTION
                                 ;; function needs to be prepared to handle
@@ -49,31 +56,31 @@
                                 ;; in what it sends and liberal in what it
                                 ;; accepts" by doing the defaulting itself.
                                 ;; -- WHN 19991128
-                                (coerce-to-lexenv env))
-                       t)
-               (values form nil))))
-        ((symbolp form)
-         (flet ((perform-symbol-expansion (symbol expansion)
+                            (coerce-to-lexenv env))
+                   t)))
+    (cond ((consp form)
+           (let ((expander (and (symbolp (car form))
+                                (sb!xc:macro-function (car form) env))))
+             (if expander
+                 (perform-expansion expander)
+                 (values form nil))))
+          ((symbolp form)
+           (multiple-value-bind (expansion winp)
+               (let* ((venv (when env (sb!c::lexenv-vars env)))
+                      (local-def (cdr (assoc form venv))))
+                 (cond ((not local-def)
+                        (info :variable :macro-expansion form))
+                       ((and (consp local-def) (eq (car local-def) 'macro))
+                        (values (cdr local-def) t))))
+             (if winp
                   ;; CLHS 3.1.2.1.1 specifies that symbol-macros are expanded
                   ;; via the macroexpand hook, too.
-                  (funcall sb!xc:*macroexpand-hook*
-                           (constantly expansion)
-                           symbol
-                           env)))
-           (let* ((venv (when env (sb!c::lexenv-vars env)))
-                  (local-def (cdr (assoc form venv))))
-             (cond ((and (consp local-def)
-                         (eq (car local-def) 'macro))
-                    (values (perform-symbol-expansion form (cdr local-def)) t))
-                   (local-def
-                    (values form nil))
-                   ((eq (info :variable :kind form) :macro)
-                    (let ((expansion (info :variable :macro-expansion form)))
-                      (values (perform-symbol-expansion form expansion) t)))
-                   (t
-                    (values form nil))))))
-        (t
-         (values form nil))))
+                 (perform-expansion (lambda (form env)
+                                      (declare (ignore form env))
+                                      expansion))
+                 (values form nil))))
+          (t
+           (values form nil)))))
 
 (defun sb!xc:macroexpand (form &optional env)
   #!+sb-doc
