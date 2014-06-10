@@ -95,7 +95,8 @@
 ;;; into build-order.lisp-expr with some new flag (perhaps :WARM) to
 ;;; indicate that the files should be handled not in cold load but
 ;;; afterwards.
-(dolist (stem '(;; CLOS, derived from the PCL reference implementation
+(let ((pcl-srcs
+              '(;; CLOS, derived from the PCL reference implementation
                 ;;
                 ;; This PCL build order is based on a particular
                 ;; (arbitrary) linearization of the declared build
@@ -135,9 +136,9 @@
                 "SRC;PCL;DOCUMENTATION"
                 "SRC;PCL;PRINT-OBJECT"
                 "SRC;PCL;PRECOM1"
-                "SRC;PCL;PRECOM2"
-
-                ;; miscellaneous functionality which depends on CLOS
+                "SRC;PCL;PRECOM2"))
+      (other-srcs
+              '(;; miscellaneous functionality which depends on CLOS
                 "SRC;CODE;FORCE-DELAYED-DEFBANGMETHODS"
                 "SRC;CODE;LATE-CONDITION"
 
@@ -161,49 +162,57 @@
                 "SRC;CODE;STEP"
                 "SRC;CODE;WARM-LIB"
                 #+win32 "SRC;CODE;WARM-MSWIN"
-                "SRC;CODE;RUN-PROGRAM"))
-
-  (let ((fullname (concatenate 'string "SYS:" stem ".LISP")))
-    (sb-int:/show "about to compile" fullname)
-    (flet ((report-recompile-restart (stream)
-             (format stream "Recompile file ~S" fullname))
-           (report-continue-restart (stream)
-             (format stream
-                     "Continue, using possibly bogus file ~S"
-                     (compile-file-pathname fullname))))
-      (tagbody
-       retry-compile-file
-         (multiple-value-bind (output-truename warnings-p failure-p)
-             (if *compile-files-p*
-                 (compile-file fullname)
-                 (compile-file-pathname fullname))
-           (declare (ignore warnings-p))
-           (sb-int:/show "done compiling" fullname)
-           (cond ((not output-truename)
-                  (error "COMPILE-FILE of ~S failed." fullname))
-                 (failure-p
-                  (unwind-protect
-                       (restart-case
-                           (error "FAILURE-P was set when creating ~S."
-                                  output-truename)
-                         (recompile ()
-                           :report report-recompile-restart
-                           (go retry-compile-file))
-                         (continue ()
-                           :report report-continue-restart
-                           (setf failure-p nil)))
-                    ;; Don't leave failed object files lying around.
-                    (when (and failure-p (probe-file output-truename))
-                          (delete-file output-truename)
-                          (format t "~&deleted ~S~%" output-truename))))
-                 ;; Otherwise: success, just fall through.
-                 (t nil))
-           (unless (handler-bind
-                       ((sb-kernel:redefinition-with-defgeneric
-                         #'muffle-warning))
-                     (load output-truename))
-             (error "LOAD of ~S failed." output-truename))
-           (sb-int:/show "done loading" output-truename))))))
+                "SRC;CODE;RUN-PROGRAM")))
+ (declare (special *compile-files-p*))
+ (flet
+    ((do-srcs (list)
+       (dolist (stem list)
+         (let ((fullname (concatenate 'string "SYS:" stem ".LISP")))
+           (sb-int:/show "about to compile" fullname)
+           (flet ((report-recompile-restart (stream)
+                    (format stream "Recompile file ~S" fullname))
+                  (report-continue-restart (stream)
+                    (format stream
+                            "Continue, using possibly bogus file ~S"
+                            (compile-file-pathname fullname))))
+             (tagbody
+              retry-compile-file
+                (multiple-value-bind (output-truename warnings-p failure-p)
+                    (if *compile-files-p*
+                        (compile-file fullname)
+                        (compile-file-pathname fullname))
+                  (declare (ignore warnings-p))
+                  (sb-int:/show "done compiling" fullname)
+                  (cond ((not output-truename)
+                         (error "COMPILE-FILE of ~S failed." fullname))
+                        (failure-p
+                         (unwind-protect
+                              (restart-case
+                                  (error "FAILURE-P was set when creating ~S."
+                                         output-truename)
+                                (recompile ()
+                                  :report report-recompile-restart
+                                  (go retry-compile-file))
+                                (continue ()
+                                  :report report-continue-restart
+                                  (setf failure-p nil)))
+                           ;; Don't leave failed object files lying around.
+                           (when (and failure-p (probe-file output-truename))
+                                 (delete-file output-truename)
+                                 (format t "~&deleted ~S~%" output-truename))))
+                        ;; Otherwise: success, just fall through.
+                        (t nil))
+                  (unless (handler-bind
+                              ((sb-kernel:redefinition-with-defgeneric
+                                #'muffle-warning))
+                            (load output-truename))
+                    (error "LOAD of ~S failed." output-truename))
+                  (sb-int:/show "done loading" output-truename))))))))
+  (with-compilation-unit ()
+    (do-srcs pcl-srcs))
+  (when *compile-files-p*
+    (format t "~&; Done with PCL compilation~2%"))
+  (do-srcs other-srcs)))
 
 ;;;; setting package documentation
 

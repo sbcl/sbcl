@@ -3,15 +3,12 @@
 #+sb-show (print "/hello, world!")
 
 ;;; Until PRINT-OBJECT and other machinery is set up, we want limits
-;;; on printing to avoid infinite output.  (Don't forget to undo these
-;;; tweaks after the printer is set up. It'd be cleaner to use LET to
-;;; make sure that happens automatically, but LET is implemented in
-;;; terms of the compiler, and the compiler isn't initialized yet.)
-(setq *print-length* 10)
-(setq *print-level* 5)
-(setq *print-circle* t)
-
+;;; on printing to avoid infinite output.
+(let ((*print-length*   10)
+      (*print-level*     5)
+      (*print-circle*    t)
+      (*compile-files-p* t))
+  (declare (special *compile-files-p*))
 ;;; Do warm init.
-(defvar *compile-files-p* t)
-#+sb-show (print "/about to LOAD warm.lisp (with *compile-files-p* = T)")
-(load "src/cold/warm.lisp")
+  #+sb-show (print "/about to LOAD warm.lisp (with *compile-files-p* = T)")
+  (load "src/cold/warm.lisp"))
