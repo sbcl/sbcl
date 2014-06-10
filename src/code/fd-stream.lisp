@@ -1870,8 +1870,7 @@
         ;; FD that appears open.
         (sb!unix:unix-close (fd-stream-fd fd-stream))
         (set-closed-flame fd-stream)
-        (when (fboundp 'cancel-finalization)
-          (cancel-finalization fd-stream)))
+        (cancel-finalization fd-stream))
     ;; On error unwind from WITHOUT-INTERRUPTS.
     (serious-condition (e)
       (error e)))
@@ -2226,12 +2225,12 @@
         ((not (or input output))
          (error "File descriptor must be opened either for input or output.")))
   (let ((stream (%make-fd-stream :fd fd
-                                 :fd-type (progn
-                                            #!-win32 (sb!unix:fd-type fd)
-                                            ;; KLUDGE.
-                                            #!+win32 (if serve-events
-                                                         :unknown
-                                                         :regular))
+                                 :fd-type
+                                 #!-win32 (sb!unix:fd-type fd)
+                                 ;; KLUDGE.
+                                 #!+win32 (if serve-events
+                                              :unknown
+                                              :regular)
                                  :name name
                                  :file file
                                  :original original
@@ -2247,7 +2246,7 @@
                                      nil))))
     (set-fd-stream-routines stream element-type external-format
                             input output input-buffer-p)
-    (when (and auto-close (fboundp 'finalize))
+    (when auto-close
       (finalize stream
                 (lambda ()
                   (sb!unix:unix-close fd)
