@@ -323,7 +323,7 @@
           (inst jmp :nz yep)
           (inst test al-tn lowtag-mask))
        (t
-        (move-qword-to-eax)
+        (move-qword-to-eax value)
         (inst test al-tn fixnum-tag-mask)
         (inst jmp :e yep)
         (inst and al-tn lowtag-mask)
