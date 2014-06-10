@@ -60,10 +60,30 @@
   (:args (x :scs (descriptor-reg)))
   (:results (res :scs (unsigned-reg)))
   (:result-types positive-fixnum)
-  (:generator 6
-    (loadw res x 0 other-pointer-lowtag)
-    (inst shr res n-widetag-bits)
-    (inst sub res (1- array-dimensions-offset))))
+  (:generator 3
+    ;; An unaligned dword read not spanning a 16-byte boundary is as fast as
+    ;; and shorter by 5 bytes than a qword read and right-shift by 8.
+    (inst mov (reg-in-size res :dword)
+          (make-ea :dword :base x :disp (1+ (- other-pointer-lowtag))))
+    (inst sub (reg-in-size res :dword) (1- array-dimensions-offset))))
+
+(define-vop (array-rank-vop=>fixnum)
+  (:translate %array-rank)
+  (:policy :fast-safe)
+  (:args (x :scs (descriptor-reg)))
+  (:results (res :scs (any-reg)))
+  (:result-types positive-fixnum)
+  (:generator 2
+    (inst mov (reg-in-size res :dword)
+          (make-ea :dword :base x :disp (1+ (- other-pointer-lowtag))))
+    (inst lea (reg-in-size res :dword)
+          (let ((scale (ash 1 n-fixnum-tag-bits)))
+            ;; Compute [res*N-disp]. for N=2 use [res+res-disp]
+            (make-ea :dword
+                     :scale (if (= scale 2) 1 scale)
+                     :index res
+                     :base (if (= scale 2) res nil)
+                     :disp (- (* scale (1- array-dimensions-offset))))))))
 
 ;;;; bounds checking routine
 
