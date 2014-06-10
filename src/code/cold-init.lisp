@@ -172,8 +172,17 @@
                (let ((hexstr (hexstr r-c-tl-length)))
                  (/show0 "(hexstr calculated..)")
                  (/primitive-print hexstr)))
-  (let (#!+sb-show (index-in-cold-toplevels 0))
+  (let (#!+sb-show (index-in-cold-toplevels 0)
+        (really-note-if-setf-fun-and-macro #'sb!c::note-if-setf-fun-and-macro)
+        (really-assign-setf-macro #'sb!impl::assign-setf-macro)
+        (really-defun #'sb!impl::%defun))
     #!+sb-show (declare (type fixnum index-in-cold-toplevels))
+
+    (setf (symbol-function 'sb!c::note-if-setf-fun-and-macro)
+          (lambda (name) (declare (ignore name)) (values))
+          (symbol-function 'sb!impl::assign-setf-macro)
+          #'sb!impl::!quietly-assign-setf-macro
+          (symbol-function 'sb!impl::%defun) #'sb!impl::!%quietly-defun)
 
     (dolist (toplevel-thing (prog1
                                 (nreverse *!reversed-cold-toplevels*)
@@ -203,7 +212,11 @@
                    (svref *!load-time-values* (fourth toplevel-thing)))))
            (t
             (!cold-lose "bogus fixup code in *!REVERSED-COLD-TOPLEVELS*"))))
-        (t (!cold-lose "bogus function in *!REVERSED-COLD-TOPLEVELS*")))))
+        (t (!cold-lose "bogus function in *!REVERSED-COLD-TOPLEVELS*"))))
+    (setf (symbol-function 'sb!c::note-if-setf-fun-and-macro)
+          really-note-if-setf-fun-and-macro
+          (symbol-function 'sb!impl::assign-setf-macro) really-assign-setf-macro
+          (symbol-function 'sb!impl::%defun) really-defun))
   (/show0 "done with loop over cold toplevel forms and fixups")
 
   ;; Set sane values again, so that the user sees sane values instead

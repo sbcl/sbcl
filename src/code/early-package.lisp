@@ -36,7 +36,11 @@
   #!+sb-package-locks
   (with-unique-names (topmost)
     `(progn
-       (/show0 ,(first format))
+       ;; /show was fairly useless here because it printed "/foo-ing ~A"
+       ;; without any clue as to what the interesting THING was.
+       ;; It could be handy for debugging package locks in bootstrap code,
+       ;; but if package locks work fine, it's just way too much noise.
+       (/noshow0 ,(first format))
        (let ((,topmost nil))
          ;; We use assignment and conditional restoration instead of
          ;; dynamic binding because we want the ignored locks
