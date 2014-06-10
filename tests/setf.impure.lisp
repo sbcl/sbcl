@@ -148,4 +148,20 @@
            (assert (and output warnings-p (not failure-p)))))
       (ignore-errors (delete-file *tmpfile*))))
 
+;; Make sure that the second values of INFO :SETF :EXPANDER/:INVERSE
+;; are not both T.  Each of :EXPANDER and :INVERSE set the other one
+;; to NIL but the WINP return value from INFO was still T so could not
+;; reliably be used to test existence or non-existence.
+(defsetf foo1 set-foo1)
+(define-setf-expander foo1 (a b) (declare (ignore a b)))
+
+(define-setf-expander foo2 (a b) (declare (ignore a b)))
+(defsetf foo2 set-foo2)
+
+(with-test (:name :setf-inverse-clears-expander-and-vice-versa)
+  (multiple-value-bind (val winp) (sb-int:info :setf :inverse 'foo1)
+    (assert (and (not val) (not winp))))
+  (multiple-value-bind (val winp) (sb-int:info :setf :expander 'foo2)
+    (assert (and (not val) (not winp)))))
+
 ;;; success

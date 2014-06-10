@@ -338,6 +338,19 @@
 
 (eval-when (#-sb-xc :compile-toplevel :load-toplevel :execute)
   ;;; Assign SETF macro information for NAME, making all appropriate checks.
+  (macrolet ((assign-it ()
+               `(progn
+                  (when inverse
+                    (clear-info :setf :expander name)
+                    (setf (info :setf :inverse name) inverse))
+                  (when expander
+                    #-sb-xc-host (setf (%fun-lambda-list expander)
+                                       expander-lambda-list)
+                    (clear-info :setf :inverse name)
+                    (setf (info :setf :expander name) expander))
+                  (when doc
+                    (setf (fdocumentation name 'setf) doc))
+                  name)))
   (defun assign-setf-macro (name expander expander-lambda-list inverse doc)
     #+sb-xc-host (declare (ignore expander-lambda-list))
     (with-single-package-locked-error
@@ -368,16 +381,11 @@
            ;; The user can declare an FTYPE if both things are intentional.
            (style-warn "defining setf macro for ~S when ~S is fbound"
                        name setf-fn-name)))))
-    #-sb-xc-host
-    (when expander
-      (setf (%fun-lambda-list expander) expander-lambda-list))
-    (when (or inverse (info :setf :inverse name))
-      (setf (info :setf :inverse name) inverse))
-    (when (or expander (info :setf :expander name))
-      (setf (info :setf :expander name) expander))
-    (when doc
-      (setf (fdocumentation name 'setf) doc))
-    name))
+    (assign-it))
+    #+sb-xc
+    (defun !quietly-assign-setf-macro ; For cold-init
+        (name expander expander-lambda-list inverse doc)
+      (assign-it))))
 
 (def!macro sb!xc:defsetf (access-fn &rest rest)
   #!+sb-doc
