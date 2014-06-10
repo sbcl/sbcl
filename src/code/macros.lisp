@@ -145,21 +145,23 @@ invoked. In that case it will store into PLACE and start over."
            :format-arguments (list name)))
   (with-single-package-locked-error
       (:symbol name "defining ~A as a symbol-macro"))
-  (sb!c:with-source-location (source-location)
-    (setf (info :source-location :symbol-macro name) source-location))
   (let ((kind (info :variable :kind name)))
-    (ecase kind
+    (case kind
      ((:macro :unknown)
+      (sb!c:with-source-location (source-location)
+        (setf (info :source-location :symbol-macro name) source-location))
       (setf (info :variable :kind name) :macro)
       (setf (info :variable :macro-expansion name) expansion))
-     ((:special :global)
+     (t
       (error 'simple-program-error
-             :format-control "Symbol macro name already declared ~A: ~S."
-             :format-arguments (list kind name)))
-     (:constant
-      (error 'simple-program-error
-             :format-control "Symbol macro name already defined as a constant: ~S."
-             :format-arguments (list name)))))
+             :format-control "Symbol ~S is already defined as ~A."
+             :format-arguments (list name
+                                     (ecase kind
+                                       (:alien "an alien variable")
+                                       (:constant "a constant")
+                                       (:special "a special variable")
+                                       (:global "a global variable")
+                                       (t kind)))))))
   name)
 
 ;;;; DEFINE-COMPILER-MACRO

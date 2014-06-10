@@ -66,3 +66,12 @@
                                 (macroexpand symbol env)))
                      (expand /foo/)))))
   (assert expanded-p))
+
+;; Check that DEFINE-SYMBOL-MACRO on a variable whose global :KIND
+;; was :ALIEN gets a sane error message instead of ECASE failure.
+(sb-alien:define-alien-variable ("posix_argv" foo-argv) (* (* char)))
+(handler-case (define-symbol-macro foo-argv (silly))
+  (error (e)
+    (assert (string= "Symbol FOO-ARGV is already defined as an alien variable."
+                     (write-to-string e :escape nil))))
+  (:no-error () (error "Expected an error")))
