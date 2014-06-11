@@ -84,7 +84,7 @@ Examples:
         (getprotobyname (string-downcase name))
         #+android (error 'unknown-protocol :name name))))
 
-#+(and sb-thread (not os-provides-getprotoby-r) (not android))
+#+(and sb-thread (not os-provides-getprotoby-r) (not android) (not netbsd))
 ;; Since getprotobyname is not thread-safe, we need a lock.
 (sb-ext:defglobal **getprotoby-lock** (sb-thread:make-mutex :name "getprotoby lock"))
 
@@ -111,7 +111,7 @@ a list of protocol aliases"
                            (sb-alien:alien-sap alias)
                            (sb-impl::default-external-format)
                            'character))))))
-    #+(and sb-thread os-provides-getprotoby-r)
+    #+(and sb-thread os-provides-getprotoby-r (not netbsd))
     (let ((buffer-length 1024)
           (max-buffer 10000)
           (result-buf nil)
@@ -154,17 +154,17 @@ a list of protocol aliases"
           #-solaris
           (when result
             (sb-alien:free-alien result)))))
-    #-(and sb-thread os-provides-getprotoby-r)
+    #+(or (not sb-thread) (not os-provides-getprotoby-r) netbsd)
     (tagbody
        (flet ((get-it ()
                 (let ((ent (sockint::getprotobyname name)))
                   (if (sb-alien::null-alien ent)
                       (go :error)
                       (return-from getprotobyname (protoent-to-values ent))))))
-         #+sb-thread
+         #+(and sb-thread (not netbsd))
          (sb-thread::with-system-mutex (**getprotoby-lock**)
            (get-it))
-         #-sb-thread
+         #+(or (not sb-thread) netbsd)
          (get-it))
      :error
        (error 'unknown-protocol :name name))))

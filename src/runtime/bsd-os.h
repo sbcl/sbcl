@@ -75,6 +75,8 @@ extern int openbsd_use_fxsave;
 typedef ucontext_t os_context_t;
 #define SIG_MEMORY_FAULT SIGSEGV
 
+#define SIG_STOP_FOR_GC (SIGUSR2)
+
 #elif defined LISP_FEATURE_DARWIN
 #include "darwin-os.h"
 #else
