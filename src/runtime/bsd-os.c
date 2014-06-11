@@ -61,6 +61,7 @@ os_vm_size_t os_vm_page_size;
 #include <dirent.h>   /* For the opendir()/readdir() wrappers */
 #include <sys/socket.h> /* For the socket() wrapper */
 static void netbsd_init();
+static os_vm_size_t max_allocation_size;
 #endif /* __NetBSD__ */
 
 #if defined LISP_FEATURE_FREEBSD
@@ -124,7 +125,36 @@ os_validate(os_vm_address_t addr, os_vm_size_t len)
     if (addr)
         flags |= MAP_FIXED;
 
-    addr = mmap(addr, len, OS_VM_PROT_ALL, flags, -1, 0);
+#ifdef __NetBSD__
+    if (addr) {
+        os_vm_address_t curaddr = addr;
+
+        while (len > 0) {
+            os_vm_address_t resaddr;
+            os_vm_size_t curlen = MIN(max_allocation_size, len);
+
+            resaddr = mmap(curaddr, curlen, OS_VM_PROT_ALL, flags, -1, 0);
+
+            if (resaddr == (os_vm_address_t) - 1) {
+                perror("mmap");
+
+                while (curaddr > addr) {
+                    curaddr -= max_allocation_size;
+                    munmap(curaddr, max_allocation_size);
+                }
+
+                return NULL;
+            }
+
+            curaddr += curlen;
+            len -= curlen;
+        }
+    } else {
+#endif
+     addr = mmap(addr, len, OS_VM_PROT_ALL, flags, -1, 0);
+#ifdef __NetBSD__
+    }
+#endif
 
     if (addr == MAP_FAILED) {
         perror("mmap");
@@ -312,18 +342,32 @@ static void netbsd_init()
     /* NetBSD counts mmap()ed space against the process's data size limit,
      * so yank it up. This might be a nasty thing to do? */
     getrlimit (RLIMIT_DATA, &rl);
-    /* Amazingly for such a new port, the provenance and meaning of
-       this number are unknown.  It might just mean REALLY_BIG_LIMIT,
-       or possibly it should be calculated from dynamic space size.
-       -- CSR, 2004-04-08 */
-    rl.rlim_cur = 1073741824;
-    if (setrlimit (RLIMIT_DATA, &rl) < 0) {
-        fprintf (stderr,
-                 "RUNTIME WARNING: unable to raise process data size limit:\n\
-  %s.\n\
+    if (rl.rlim_cur < rl.rlim_max) {
+        rl.rlim_cur = rl.rlim_max;
+        if (setrlimit (RLIMIT_DATA, &rl) < 0) {
+            fprintf (stderr,
+                     "RUNTIME WARNING: unable to raise process data size limit:\n\
+%s.\n\
 The system may fail to start.\n",
-                 strerror(errno));
+                     strerror(errno));
+        }
     }
+    max_allocation_size = (os_vm_size_t)((rl.rlim_cur / 2) &
+      ~(32 * 1024 * 1024));
+
+#ifdef LISP_FEATURE_X86
+    {
+        size_t len;
+        int sse;
+
+        len = sizeof(sse);
+        if (sysctlbyname("machdep.sse", &sse, &len,
+                         NULL, 0) == 0 && sse != 0) {
+            /* Use the SSE detector */
+            fast_bzero_pointer = fast_bzero_detect;
+        }
+     }
+#endif /* LISP_FEATURE_X86 */
 }
 
 /* Various routines in NetBSD's C library are compatibility wrappers
