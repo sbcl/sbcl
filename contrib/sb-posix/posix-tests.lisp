@@ -443,7 +443,7 @@
                   sb-posix::o-nonblock)))
   t)
 
-#-(or hpux win32) ; fix: cant handle c-vargs
+#-(or hpux win32 netbsd) ; fix: cant handle c-vargs
 (deftest fcntl.flock.1
     (locally (declare (sb-ext:muffle-conditions sb-ext:compiler-note))
       (let ((flock (make-instance 'sb-posix:flock
@@ -662,7 +662,7 @@
     (plusp (sb-posix:time))
   t)
 
-#-win32
+#-(or win32)
 (deftest utimes.1
     (let ((file (merge-pathnames #p"utimes.1" *test-directory*))
           (atime (random (1- (expt 2 31))))

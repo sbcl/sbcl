@@ -546,5 +546,10 @@ int sb_setitimer(int which, struct itimerval *value, struct itimerval *ovalue)
 {
         return setitimer(which, value, ovalue);
 }
+
+int sb_utimes(char *path, struct timeval times[2])
+{
+    return utimes(path, times);
+}
 #endif /* !LISP_FEATURE_WIN32 */
 

@@ -445,7 +445,7 @@ not supported."
  (define-call ("mmap" :options :largefile) sb-sys:system-area-pointer
    (lambda (res)
      (= (sb-sys:sap-int res) #.(1- (expt 2 sb-vm::n-machine-word-bits))))
-   (addr sap-or-nil) (length unsigned) (prot unsigned)
+   (addr sap-or-nil) (length size-t) (prot unsigned)
    (flags unsigned) (fd file-descriptor) (offset off-t))
 
  (define-call "munmap" int minusp
@@ -774,7 +774,7 @@ not supported."
              (if (minusp value)
                  (syscall-error 'utimes)
                  value)))
-      (let ((fun (extern-alien "utimes" (function int (c-string :not-null t)
+      (let ((fun (extern-alien "sb_utimes" (function int (c-string :not-null t)
                                                   (* (array alien-timeval 2)))))
             (name (filename filename)))
         (if (not (and access-time modification-time))
