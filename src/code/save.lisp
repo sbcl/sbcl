@@ -250,4 +250,5 @@ sufficiently motivated to do lengthy fixes."
   (foreign-deinit)
   (stream-deinit)
   (deinit-finalizers)
-  (drop-all-hash-caches))
+  (drop-all-hash-caches)
+  (os-deinit))

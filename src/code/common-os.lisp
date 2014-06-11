@@ -40,7 +40,18 @@
 
 ;;; If something ever needs to be done differently for one OS, then
 ;;; split out the different part into per-os functions.
+
+(defun os-deinit ()
+  (setf *default-pathname-defaults* (make-trivial-default-pathname)
+        *core-string* ""
+        *software-version* nil
+        *runtime-pathname* nil
+        *core-pathname* nil
+        *posix-argv* nil)
+  (sb!impl::%makunbound '*machine-version*))
+
 (defun os-cold-init-or-reinit ()
+  (/show0 "entering OS-COLD-INIT-OR-REINIT")
   (/show0 "setting *CORE-STRING*")
   (init-var-ignoring-errors
    *core-string*
@@ -53,15 +64,14 @@
          for arg = (sb!alien:deref *native-posix-argv* i)
          until (sb!alien:null-alien arg)
          collect (sb!alien:cast arg sb!alien:c-string)))
-  (/show0 "entering OS-COLD-INIT-OR-REINIT")
-  (setf *software-version* nil)
   (/show0 "setting *DEFAULT-PATHNAME-DEFAULTS*")
-  ;; Temporary value, so that #'NATIVE-PATHNAME won't blow up when
-  ;; we call it below
+  ;; Temporary value, so that #'PARSE-NATIVE-NAMESTRING won't blow up
+  ;; when we call it below.
   (setf *default-pathname-defaults* (make-trivial-default-pathname))
   (init-var-ignoring-errors
-   *default-pathname-defaults* (native-pathname (sb!unix:posix-getcwd/))
-   :default (make-trivial-default-pathname)
+   *default-pathname-defaults*
+   (parse-native-namestring (sb!unix:posix-getcwd/))
+   :default *default-pathname-defaults*
    :explanation "with the current directory")
   (/show0 "setting *CORE-PATHNAME*")
   (setf *core-pathname* (merge-pathnames (native-pathname *core-string*)))
