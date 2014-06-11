@@ -171,6 +171,14 @@ sufficiently motivated to do lengthy fixes."
   #!-sb-core-compression
   (when compression
     (error "Unable to save compressed core: this runtime was not built with zlib support"))
+  (when *dribble-stream*
+    (restart-case (error "Dribbling to ~s is enabled." (pathname *dribble-stream*))
+      (continue ()
+        :report "Stop dribbling and save the core."
+        (dribble))
+      (abort ()
+        :report "Abort saving the core."
+        (return-from save-lisp-and-die))))
   (when (eql t compression)
     (setf compression -1))
   (tune-hashtable-sizes-of-all-packages)
