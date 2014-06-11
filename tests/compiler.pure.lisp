@@ -5166,3 +5166,9 @@
     (declare (ignore function))
     (assert (not warning))
     (assert (not failure))))
+
+(with-test (:name :bug-573747)
+  (multiple-value-bind (function warnings-p failure-p)
+      (compile nil '(lambda (x) (progn (declare (integer x)) (* x 6))))
+    (assert warnings-p)
+    (assert failure-p)))

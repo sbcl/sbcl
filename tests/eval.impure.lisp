@@ -294,4 +294,17 @@
                  (function-lambda-expression
                   (eval `(lambda (x y z) (+ x 1 y z)))))))
 
+(with-test (:name (:bug-573747 eval :compile))
+  (let ((*out* (make-string-output-stream))
+        (sb-ext:*evaluator-mode* :compile))
+    (declare (special *out*))
+    (assert-error (eval '(declare (print "foo" *out*))))
+    (assert (string= (get-output-stream-string *out*) ""))))
+
+(with-test (:name (:bug-573747 eval :interpret))
+  (let ((*out* (make-string-output-stream))
+        (sb-ext:*evaluator-mode* :interpret))
+    (declare (special *out*))
+    (assert-error (eval '(declare (print "foo" *out*))))
+    (assert (string= (get-output-stream-string *out*) ""))))
 ;;; success

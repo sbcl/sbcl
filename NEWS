@@ -17,6 +17,9 @@ changes relative to sbcl-1.2.0:
     misleading translations from our internal type representation.
   * bug fix: array-rank now sees through union and intersection types.
     (lp#1310574)
+  * bug fix: when DECLARE expressions are in the wrong place, be careful not
+    to attempt to evaluate the subforms.  (lp#573747; thanks to Roman
+    Marynchak)
   
 changes in sbcl-1.2.0 relative to sbcl-1.1.18:
   * bug fix: read-time-eval backquote context mixup. (lp#1321047)

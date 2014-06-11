@@ -790,6 +790,12 @@
 (defun ir1-convert-global-functoid (start next result form fun)
   (declare (type ctran start next) (type (or lvar null) result)
            (list form))
+  (when (eql fun 'declare)
+    (compiler-error
+     "~@<There is no function named ~S.  ~
+      References to ~S in some contexts (like starts of blocks) are unevaluated ~
+      expressions, but here the expression is being evaluated, which invokes ~
+      undefined behaviour.~@:>" fun fun))
   ;; FIXME: Couldn't all the INFO calls here be converted into
   ;; standard CL functions, like MACRO-FUNCTION or something? And what
   ;; happens with lexically-defined (MACROLET) macros here, anyway?
