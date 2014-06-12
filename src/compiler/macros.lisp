@@ -277,75 +277,73 @@
 (eval-when (#-sb-xc :compile-toplevel :load-toplevel :execute)
 
 ;;; Given a DEFTRANSFORM-style lambda-list, generate code that parses
-;;; the arguments of a combination with respect to that
-;;; lambda-list. BODY is the list of forms which are to be
-;;; evaluated within the bindings. ARGS is the variable that holds
-;;; list of argument lvars. ERROR-FORM is a form which is evaluated
-;;; when the syntax of the supplied arguments is incorrect or a
-;;; non-constant argument keyword is supplied. Defaults and other gunk
-;;; are ignored. The second value is a list of all the arguments
-;;; bound. We make the variables IGNORABLE so that we don't have to
-;;; manually declare them IGNORE if their only purpose is to make the
-;;; syntax work.
-(defun parse-deftransform (lambda-list body args error-form)
+;;; the arguments of a combination with respect to that lambda-list.
+;;; NODE-VAR the variable that holds the combination node.
+;;; ERROR-FORM is a form which is evaluated when the syntax of the
+;;; supplied arguments is incorrect or a non-constant argument keyword
+;;; is supplied. Defaults and other gunk are ignored. The second value
+;;; is a list of all the arguments bound, which the caller should make
+;;; IGNORABLE if their only purpose is to make the syntax work.
+(defun parse-deftransform (lambda-list node-var error-form)
   (multiple-value-bind (req opt restp rest keyp keys allowp)
       (parse-lambda-list lambda-list)
-    (let* ((min-args (length req))
-           (max-args (+ min-args (length opt)))
-           (n-keys (gensym)))
-      (collect ((binds)
-                (vars)
-                (pos 0 +)
-                (keywords))
-        (dolist (arg req)
-          (vars arg)
-          (binds `(,arg (nth ,(pos) ,args)))
-          (pos 1))
-
+    (let* ((all-dummies (make-gensym-list 3))
+           (dummies all-dummies)
+           (tail (pop dummies))
+           (keys (mapcar (lambda (spec)
+                           (multiple-value-bind (key var)
+                               (if (atom spec)
+                                   (values (keywordicate spec) spec)
+                                   (let ((head (car spec)))
+                                     (if (atom head)
+                                         (values (keywordicate head) head)
+                                         (values (car head) (cadr head)))))
+                             (cons var key)))
+                         keys))
+           final-mandatory-arg)
+      (collect ((binds))
+        (binds `(,tail (basic-combination-args ,node-var)))
+        ;; The way this code checks for mandatory args is to verify that
+        ;; the last positional arg is not null (it should be an LVAR).
+        ;; But somebody could pedantically declare IGNORE on the last arg
+        ;; (though we typically make them IGNORABLE), so bind a dummy for
+        ;; it and then bind from the dummy.
+        (mapl (lambda (args)
+                (cond ((cdr args)
+                       (binds `(,(car args) (pop ,tail))))
+                      (t
+                       (setq final-mandatory-arg (pop dummies))
+                       (binds `(,final-mandatory-arg (pop ,tail))
+                              `(,(car args) ,final-mandatory-arg)))))
+              req)
+        ;; Optionals are pretty easy.
         (dolist (arg opt)
-          (let ((var (if (atom arg) arg (first  arg))))
-            (vars var)
-            (binds `(,var (nth ,(pos) ,args)))
-            (pos 1)))
-
+          (binds `(,(if (atom arg) arg (car arg)) (pop ,tail))))
+        ;; Now if min or max # of args is incorrect,
+        ;; or there are unacceptable keywords, bail out
+        (when (or req keyp (not restp))
+          (binds `(,(pop dummies) ; binding is for effect, not value
+                   (unless (and ,@(if req `(,final-mandatory-arg))
+                                ,@(if (and (not restp) (not keyp))
+                                      `((endp ,tail)))
+                                ,@(if keyp
+                                      (if allowp
+                                          `((check-key-args-constant ,tail))
+                                          `((check-transform-keys
+                                             ,tail ',(mapcar #'cdr keys))))))
+                      ,error-form))))
         (when restp
-          (vars rest)
-          (binds `(,rest (nthcdr ,(pos) ,args))))
-
-        (dolist (spec keys)
-          (if (or (atom spec) (atom (first spec)))
-              (let* ((var (if (atom spec) spec (first spec)))
-                     (key (keywordicate var)))
-                (vars var)
-                (binds `(,var (find-keyword-lvar ,n-keys ,key)))
-                (keywords key))
-              (let* ((head (first spec))
-                     (var (second head))
-                     (key (first head)))
-                (vars var)
-                (binds `(,var (find-keyword-lvar ,n-keys ,key)))
-                (keywords key))))
-
-        (let ((n-length (gensym))
-              (limited-legal (not (or restp keyp))))
-          (values
-           `(let ((,n-length (length ,args))
-                  ,@(when keyp `((,n-keys (nthcdr ,(pos) ,args)))))
-              (unless (and
-                       ;; FIXME: should be PROPER-LIST-OF-LENGTH-P
-                       ,(if limited-legal
-                            `(<= ,min-args ,n-length ,max-args)
-                            `(<= ,min-args ,n-length))
-                       ,@(when keyp
-                           (if allowp
-                               `((check-key-args-constant ,n-keys))
-                               `((check-transform-keys ,n-keys ',(keywords))))))
-                ,error-form)
-              (let ,(binds)
-                (declare (ignorable ,@(vars)))
-                ,@body))
-           (vars)))))))
-
+          (binds `(,rest ,tail)))
+        ;; Return list of bindings and list of ignorables. Actually the caller
+        ;; should make *all* bindings ignorable but might need to know the
+        ;; symbols from the lambda-list per se.
+        (values (append (binds)
+                        (mapcar (lambda (k)
+                                  `(,(car k)
+                                     (find-keyword-lvar ,tail ',(cdr k))))
+                                keys))
+                (append (nset-difference (mapcar #'car (binds)) all-dummies)
+                        (mapcar #'car keys)))))))
 ) ; EVAL-WHEN
 
 ;;;; DEFTRANSFORM
@@ -415,33 +413,32 @@
   (when (and eval-name defun-only)
     (error "can't specify both DEFUN-ONLY and EVAL-NAME"))
   (multiple-value-bind (body decls doc) (parse-body body-decls-doc)
-    (let ((n-args (sb!xc:gensym))
-          (n-node (or node (sb!xc:gensym)))
+    (let ((n-node (or node (sb!xc:gensym)))
           (n-decls (sb!xc:gensym))
-          (n-lambda (sb!xc:gensym))
-          (decls-body `(,@decls ,@body)))
-      (multiple-value-bind (parsed-form vars)
-          (parse-deftransform lambda-list
-                              (if policy
-                                  `((unless (policy ,n-node ,policy)
-                                      (give-up-ir1-transform))
-                                    ,@decls-body)
-                                  body)
-                              n-args
+          (n-lambda (sb!xc:gensym)))
+      (multiple-value-bind (bindings vars)
+          (parse-deftransform lambda-list n-node
                               '(give-up-ir1-transform))
         (let ((stuff
-               `((,n-node)
-                 (let* ((,n-args (basic-combination-args ,n-node))
-                        ,@(when result
-                            `((,result (node-lvar ,n-node)))))
-                   (multiple-value-bind (,n-lambda ,n-decls)
-                       ,parsed-form
+               `((,n-node &aux ,@bindings
+                               ,@(when result
+                                   `((,result (node-lvar ,n-node)))))
+                 (declare (ignorable ,@(mapcar #'car bindings)))
+                 ,@decls
+                 ,@(if policy
+                      `((unless (policy ,n-node ,policy)
+                          (give-up-ir1-transform))))
+                 ;; What purpose does it serve to allow the transform's body
+                 ;; to return decls as a second value? They would go in the
+                 ;; right place if simply returned as part of the expression.
+                 (multiple-value-bind (,n-lambda ,n-decls)
+                       (progn ,@body)
                      (if (and (consp ,n-lambda) (eq (car ,n-lambda) 'lambda))
                          ,n-lambda
                        `(lambda ,',lambda-list
                           (declare (ignorable ,@',vars))
                           ,@,n-decls
-                          ,,n-lambda)))))))
+                          ,,n-lambda))))))
           (if defun-only
               `(defun ,name ,@(when doc `(,doc)) ,@stuff)
               `(%deftransform
@@ -530,13 +527,14 @@
                    (symbolicate (function-name (first what))
                                 "-" (second what) "-OPTIMIZER"))))
 
-     (let ((n-args (gensym)))
+     (let ((binds (parse-deftransform lambda-list n-node
+                                      `(return-from ,name nil))))
        `(progn
           (defun ,name (,n-node ,@vars)
             (declare (ignorable ,@vars))
-            (let ((,n-args (basic-combination-args ,n-node)))
-              ,(parse-deftransform lambda-list body n-args
-                                   `(return-from ,name nil))))
+            (let* ,binds
+              (declare (ignorable ,@(mapcar #'car binds)))
+              ,@body))
           ,@(when (consp what)
               `((setf (,(let ((*package* (symbol-package 'fun-info)))
                           (symbolicate "FUN-INFO-" (second what)))

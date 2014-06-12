@@ -2481,4 +2481,28 @@
   (defmethod expt-type-derivation ((x list) &optional (y 0.0))
     (declare (type float y))
     (expt 2 y)))
+
+;; Lp# 1066451 - declarations were either misplaced or dropped
+;; depending on whether the :policy argument was used in DEFTRANSFORM.
+;; That was a bit random. :policy doesn't affect whether decls
+;; are accepted now.
+(defun foo (blah)
+  (declare (special randomness-factor))
+  (if (constant-lvar-p randomness-factor)
+      (format nil "Weird transform answer is ~D"
+              (+ (lvar-value randomness-factor) blah))))
+(defknown weird-fn (integer symbol &key (:magic real)) t)
+(deftransform weird-fn ((x s &key ((:magic randomness-factor)))
+                        (fixnum t &key (:magic fixnum)))
+  ;; I can't see much use for declarations other than SPECIAL here,
+  ;; but we shouldn't supposedly allow them and then not handle them right.
+  (declare (special fred) (special randomness-factor) (lvar x s))
+  (foo fred))
+(test-util:with-test (:name :deftransform-bug-1066451)
+  (let ((f (let ((fred 3))
+             (declare (special fred))
+             (compile nil '(lambda () (weird-fn 2 'foo :magic 11))))))
+    (assert (string= (funcall f)
+                     "Weird transform answer is 14"))))
+
 ;;; success
