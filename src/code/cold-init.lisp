@@ -129,7 +129,6 @@
 
   ;; This needs to be done early, but needs to be after INFO is
   ;; initialized.
-  (show-and-call !function-names-cold-init)
   (show-and-call !fdefn-cold-init)
 
   ;; Various toplevel forms call MAKE-ARRAY, which calls SUBTYPEP, so

@@ -22,9 +22,7 @@ situations."
   (let ((syntax-checker (symbolicate '%check- symbol '-fun-name)))
     `(progn
        (defun ,syntax-checker (,var) ,@body)
-       ;; FIXME: is it too expensive to go through a runtime call to
-       ;; FDEFINITION each time we want to check a name's syntax?
-       (%define-fun-name-syntax ',symbol ',syntax-checker))))
+       (%define-fun-name-syntax ',symbol #',syntax-checker))))
 
 ;;; FIXME: this is a really lame name for something that has two
 ;;; return values.
@@ -62,7 +60,7 @@ use as a BLOCK name in the function in question."
 ;; (CAS (CAS BAZ)), (SETF (CAS BAZ)), (CAS (SETF BAZ)) are not reasonable.
 ;; 'cas.lisp' doesn't need to know this technique for sharing the parser,
 ;; so the name syntax is defined here instead of there.
-(%define-fun-name-syntax 'cas '%check-setf-fun-name)
+(%define-fun-name-syntax 'cas #'%check-setf-fun-name)
 
 (defun macro-function-name (name)
   (when (and (cdr name)
@@ -81,7 +79,3 @@ use as a BLOCK name in the function in question."
 
 (define-function-name-syntax macrolet (name)
   (macro-function-name name))
-
-#-sb-xc-host
-(defun !function-names-cold-init ()
-  (setf *valid-fun-names-alist* '#.*valid-fun-names-alist*))
