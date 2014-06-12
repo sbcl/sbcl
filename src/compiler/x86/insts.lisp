@@ -15,7 +15,6 @@
 ;;; I wonder whether the separation of the disassembler from the
 ;;; virtual machine is valid or adds value.
 
-;;; Note: In CMU CL, this used to be a call to SET-DISASSEM-PARAMS.
 (setf sb!disassem:*disassem-inst-alignment-bytes* 1)
 
 (deftype reg () '(unsigned-byte 3))

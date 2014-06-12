@@ -116,6 +116,7 @@
                   *the-class-standard-generic-function*
                   *the-class-standard-direct-slot-definition*
                   *the-class-standard-effective-slot-definition*
+                  *the-class-standard-specializer*
 
                   *the-eslotd-standard-class-slots*
                   *the-eslotd-funcallable-standard-class-slots*))

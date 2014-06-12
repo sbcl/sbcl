@@ -16,7 +16,7 @@
 (declaim (inline standard-char-p graphic-char-p alpha-char-p
                  upper-case-p lower-case-p both-case-p alphanumericp
                  char-int))
-(declaim (maybe-inline digit-char-p digit-weight))
+(declaim (maybe-inline digit-char-p))
 
 (deftype char-code ()
   `(integer 0 (,sb!xc:char-code-limit)))

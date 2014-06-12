@@ -11,12 +11,8 @@
 
 (in-package "SB!VM")
 
-;;;(def-assembler-params
-;;;  :scheduler-p nil)
+(setf sb!disassem:*disassem-inst-alignment-bytes* 1)
 
-;;; ../x86/insts contains the invocation
-;;; (setf sb!disassem:*disassem-inst-alignment-bytes* 1)
-;;; which apparently was another use of def-assembler-params
 
 ;;;; utility functions
 
@@ -41,9 +37,6 @@
      (tn-offset tn))))
 
 ;;;; initial disassembler setup
-
-;; XXX find out what this was supposed to do
-;; (sb!disassem:set-disassem-params :instruction-alignment 32)
 
 (defvar *disassem-use-lisp-reg-names* t)
 

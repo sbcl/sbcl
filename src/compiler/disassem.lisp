@@ -59,57 +59,9 @@
   "The width of instruction bytes.")
 (declaim (type text-width *disassem-inst-column-width*))
 
-
 (defvar *disassem-note-column* (+ 45 *disassem-inst-column-width*)
   #!+sb-doc
   "The column in which end-of-line comments for notes are started.")
-
-;;; the old CMU CL code to set the CMU CL disassembly parameters
-#|
-(defmacro set-disassem-params (&rest args)
-  #!+sb-doc
-  "Specify global disassembler params. &KEY arguments include:
-
-  :INSTRUCTION-ALIGNMENT number
-      Minimum alignment of instructions, in bits.
-
-  :ADDRESS-SIZE number
-      Size of a machine address, in bits.
-
-  :OPCODE-COLUMN-WIDTH
-      Width of the column used for printing the opcode portion of the
-      instruction, or NIL to use the default."
-  (gen-preamble-form args))
-
-(defun gen-preamble-form (args)
-  #!+sb-doc
-  "Generate a form to specify global disassembler params. See the
-  documentation for SET-DISASSEM-PARAMS for more info."
-  (destructuring-bind
-      (&key instruction-alignment
-            address-size
-            (opcode-column-width nil opcode-column-width-p))
-      args
-    `(progn
-       (eval-when (:compile-toplevel :execute)
-         ;; these are not in the params because they only exist at compile time
-         (defparameter ,(format-table-name) (make-hash-table))
-         (defparameter ,(arg-type-table-name) nil)
-         (defparameter ,(fun-cache-name) (make-fun-cache)))
-       (let ((params
-              (or sb!c:*backend-disassem-params*
-                  (setf sb!c:*backend-disassem-params* (make-params)))))
-         (declare (ignorable params))
-         ,(when instruction-alignment
-            `(setf (params-instruction-alignment params)
-                   (bits-to-bytes ,instruction-alignment)))
-         ,(when address-size
-            `(setf (params-location-column-width params)
-                   (* 2 ,address-size)))
-         ,(when opcode-column-width-p
-            `(setf (params-opcode-column-width params) ,opcode-column-width))
-         'disassem-params))))
-|#
 
 ;;;; cached functions
 ;;;;

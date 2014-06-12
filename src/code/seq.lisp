@@ -914,9 +914,6 @@ many elements are copied."
 ;;;; MAP
 
 ;;; helper functions to handle arity-1 subcases of MAP
-(declaim (ftype (function (function sequence) list) %map-list-arity-1))
-(declaim (ftype (function (function sequence) simple-vector)
-                %map-simple-vector-arity-1))
 (defun %map-to-list-arity-1 (fun sequence)
   (let ((reversed-result nil)
         (really-fun (%coerce-callable-to-fun fun)))

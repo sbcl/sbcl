@@ -71,14 +71,14 @@
 
 ;;; Send the signal SIGNAL to the process with process id PID. SIGNAL
 ;;; should be a valid signal number
-#!-sb-fluid (declaim (inline real-unix-kill))
+#!-sb-fluid (declaim (inline unix-kill))
 (define-alien-routine ("kill" unix-kill) int
   (pid int)
   (signal int))
 
 ;;; Send the signal SIGNAL to the all the process in process group
 ;;; PGRP. SIGNAL should be a valid signal number
-#!-sb-fluid (declaim (inline real-unix-killpg))
+#!-sb-fluid (declaim (inline unix-killpg))
 (define-alien-routine ("killpg" unix-killpg) int
   (pgrp int)
   (signal int))

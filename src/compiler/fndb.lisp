@@ -767,8 +767,6 @@
 ;;; not check it now :-).
 (defknown nconc (&rest t) t ()
   :destroyed-constant-args (remove-non-constants-and-nils #'butlast))
-(defknown sb!impl::nconc2 (list t) t ()
-  :destroyed-constant-args (remove-non-constants-and-nils #'butlast))
 
 (defknown nreconc (list t) t (important-result)
   :destroyed-constant-args (nth-constant-nonempty-sequence-args 1))
@@ -1660,14 +1658,6 @@
 (defknown %check-vector-sequence-bounds (vector index sequence-end)
   index
   (unwind))
-;;; FIXME: including this information here is probably necessary to
-;;; get efficient compilation of the inline expansion of
-;;; %FIND-POSITION-IF, so it should maybe be in a more
-;;; compiler-friendly package (SB-INT?)
-(defknown sb!impl::signal-bounding-indices-bad-error
-    (sequence index sequence-end)
-  nil) ; never returns
-
 
 (defknown arg-count-error (t t t t t t) nil ())
 

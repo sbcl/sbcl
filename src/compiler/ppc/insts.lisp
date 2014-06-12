@@ -38,8 +38,6 @@
     (error "~S isn't a floating-point register." tn))
   (tn-offset tn))
 
-;(sb!disassem:set-disassem-params :instruction-alignment 32)
-
 (defvar *disassem-use-lisp-reg-names* t)
 
 (defun location-number (loc)

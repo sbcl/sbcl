@@ -126,8 +126,7 @@
 
 ;;;; Initial disassembler setup.
 
-;;; FIXME-lav: is this still used, if so , why use package prefix
-;;; (setf sb!disassem:*disassem-inst-alignment-bytes* 4)
+(setf sb!disassem:*disassem-inst-alignment-bytes* 4)
 
 (defvar *disassem-use-lisp-reg-names* t)
 

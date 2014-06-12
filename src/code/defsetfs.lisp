@@ -138,11 +138,7 @@
 (in-package "SB!KERNEL")
 (defsetf code-header-ref code-header-set)
 
-;;; from serve-event.lisp
 (in-package "SB!IMPL")
-(defsetf object-set-operation %set-object-set-operation
-  #!+sb-doc
-  "Set the handler function for an object set operation.")
 
 ;; A test of the ability of the cross-compiler to dump a function
 ;; that references as constant a tree containing a COMMA struct.

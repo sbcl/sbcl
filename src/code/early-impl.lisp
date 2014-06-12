@@ -21,14 +21,14 @@
                   *stdout*
                   *stderr*
                   *tty*
-                  *read-only-space-free-pointer*
+                  sb!vm:*read-only-space-free-pointer*
                   sb!vm:*static-space-free-pointer*
-                  sb!vm::*current-catch-block*
+                  sb!vm:*current-catch-block*
                   sb!vm::*current-unwind-protect-block*
                   sb!vm::*alien-stack-pointer*
-                  sb!vm::*control-stack-start*
-                  sb!vm::*control-stack-end*
-                  sb!vm::*binding-stack-start*
+                  sb!vm:*control-stack-start*
+                  sb!vm:*control-stack-end*
+                  sb!vm:*binding-stack-start*
                   ;; FIXME: The pseudo-atomic variable stuff should be
                   ;; conditional on :SB-PSEUDO-ATOMIC-SYMBOLS, which
                   ;; should be conditional on :X86, instead of the

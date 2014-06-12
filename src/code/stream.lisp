@@ -1271,10 +1271,6 @@
 
 (defparameter *string-output-stream-buffer-initial-size* 64)
 
-#!-sb-fluid
-(declaim (inline string-output-string-stream-buffer
-                 string-output-string-stream-pointer
-                 string-output-string-stream-index))
 (defstruct (string-output-stream
             (:include ansi-stream
                       (out #'string-ouch)
@@ -1569,7 +1565,7 @@ benefit of the function GET-OUTPUT-STREAM-STRING.")
 
 ;;; FIXME: need to support (VECTOR NIL), ideally without destroying all hope
 ;;; of efficiency.
-(declaim (inline vector-with-fill-pointer))
+(declaim (inline vector-with-fill-pointer-p))
 (defun vector-with-fill-pointer-p (x)
   (and (vectorp x)
        (array-has-fill-pointer-p x)))

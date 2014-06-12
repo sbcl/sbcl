@@ -16,7 +16,6 @@
 (in-package "SB!IMPL")
 
 (declaim (special *keyword-package* *cl-package*
-                  original-lisp-environment
                   sb!pretty::*standard-pprint-dispatch-table*
                   sb!debug:*in-the-debugger*
                   sb!debug:*stack-top-hint*
@@ -25,14 +24,12 @@
                   *in-without-gcing* *gc-inhibit* *gc-pending*
                   #!+sb-thread *stop-for-gc-pending*
                   #!+sb-dynamic-core sb!vm::*required-runtime-c-symbols*
-                  *software-interrupt-vector* *load-verbose*
-                  *load-print-stuff* *in-compilation-unit*
-                  *aborted-compilation-unit-count* *char-name-alist*
+                  *load-verbose*
                   *posix-argv*))
 
 (declaim (ftype (function * *)
-                find-keyword keyword-test assert-error
-                assert-prompt check-type-error case-body-error print-object
+                assert-error assert-prompt check-type-error
+                case-body-error print-object
                 describe-object sb!pcl::check-wrapper-validity))
 
 ;;; Gray streams functions not defined until after PCL is loaded

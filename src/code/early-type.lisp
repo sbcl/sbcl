@@ -137,7 +137,7 @@
             (:predicate %values-type-p)
             (:copier nil)))
 
-(declaim (inline value-type-p))
+(declaim (inline values-type-p))
 (defun values-type-p (x)
   (or (eq x *wild-type*)
       (%values-type-p x)))

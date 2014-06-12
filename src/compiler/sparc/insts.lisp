@@ -40,9 +40,6 @@
           (t
            (tn-offset tn)))))
 
-;;;(sb!disassem:set-disassem-params :instruction-alignment 32
-;;;                              :opcode-column-width 11)
-
 (defvar *disassem-use-lisp-reg-names* t
   #!+sb-doc
   "If non-NIL, print registers using the Lisp register names.
