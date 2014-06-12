@@ -259,4 +259,7 @@ sufficiently motivated to do lengthy fixes."
   (stream-deinit)
   (deinit-finalizers)
   (drop-all-hash-caches)
-  (os-deinit))
+  (os-deinit)
+  (setf * nil ** nil *** nil
+        - nil + nil ++ nil +++ nil
+        /// nil // nil / nil))
