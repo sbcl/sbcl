@@ -33,7 +33,7 @@
                   #!+sb-thruption *thruption-pending*
                   *type-system-initialized*))
 
-(defvar *cold-init-complete-p*)
+(defglobal *cold-init-complete-p* nil)
 
 ;;; counts of nested errors (with internal errors double-counted)
 (defvar *maximum-error-depth*)
@@ -139,27 +139,28 @@ means to wait indefinitely.")
 (defun infinite-error-protector ()
   (/show0 "entering INFINITE-ERROR-PROTECTOR, *CURRENT-ERROR-DEPTH*=..")
   (/hexstr *current-error-depth*)
-  (cond ((not *cold-init-complete-p*)
-         (%primitive print "Argh! error in cold init, halting")
-         (%primitive sb!c:halt))
-        ((or (not (boundp '*current-error-depth*))
-             (not (realp   *current-error-depth*))
-             (not (boundp '*maximum-error-depth*))
-             (not (realp   *maximum-error-depth*)))
-         (%primitive print "Argh! corrupted error depth, halting")
-         (%primitive sb!c:halt))
-        ((> *current-error-depth* *maximum-error-depth*)
-         (/show0 "*MAXIMUM-ERROR-DEPTH*=..")
-         (/hexstr *maximum-error-depth*)
-         (/show0 "in INFINITE-ERROR-PROTECTOR, calling ERROR-ERROR")
-         (error-error "Help! "
-                      *current-error-depth*
-                      " nested errors. "
-                      "SB-KERNEL:*MAXIMUM-ERROR-DEPTH* exceeded.")
-         t)
-        (t
-         (/show0 "returning normally from INFINITE-ERROR-PROTECTOR")
-         nil)))
+  (unless *cold-init-complete-p*
+    (%primitive print "Argh! error in cold init, halting")
+    (%primitive sb!c:halt))
+  ;; Checking BOUNDP on these variables would be superfluous
+  ;; because REALP will return false for unbound-marker.
+  (let ((cur (locally (declare (optimize (safety 0))) *current-error-depth*))
+        (max (locally (declare (optimize (safety 0))) *maximum-error-depth*)))
+    (cond ((or (not (realp cur)) (not (realp max))) ; why not just FIXNUMP?
+           (%primitive print "Argh! corrupted error depth, halting")
+           (%primitive sb!c:halt))
+          ((> cur max)
+           (/show0 "*MAXIMUM-ERROR-DEPTH*=..")
+           (/hexstr max)
+           (/show0 "in INFINITE-ERROR-PROTECTOR, calling ERROR-ERROR")
+           (error-error "Help! "
+                        cur
+                        " nested errors. "
+                        "SB-KERNEL:*MAXIMUM-ERROR-DEPTH* exceeded.")
+           t)
+          (t
+           (/show0 "returning normally from INFINITE-ERROR-PROTECTOR")
+           nil))))
 
 ;;;; miscellaneous external functions
 
