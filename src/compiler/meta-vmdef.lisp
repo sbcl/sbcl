@@ -849,7 +849,7 @@
 ;;; operands, and a single OPERAND-PARSE describing any more operand.
 ;;; If we are inheriting a VOP, we default attributes to the inherited
 ;;; operand of the same name.
-(defun !parse-vop-operands (parse specs kind)
+(defun parse-vop-operands (parse specs kind)
   (declare (list specs)
            (type (member :argument :result) kind))
   (let ((num -1)
@@ -1020,12 +1020,12 @@
       (case (first spec)
         (:args
          (multiple-value-bind (fixed more)
-             (!parse-vop-operands parse (rest spec) :argument)
+             (parse-vop-operands parse (rest spec) :argument)
            (setf (vop-parse-args parse) fixed)
            (setf (vop-parse-more-args parse) more)))
         (:results
          (multiple-value-bind (fixed more)
-             (!parse-vop-operands parse (rest spec) :result)
+             (parse-vop-operands parse (rest spec) :result)
            (setf (vop-parse-results parse) fixed)
            (setf (vop-parse-more-results parse) more))
          (setf (vop-parse-conditional-p parse) nil))
@@ -1069,10 +1069,10 @@
          (setf (vop-parse-note parse) (vop-spec-arg spec '(or string null))))
         (:arg-types
          (setf (vop-parse-arg-types parse)
-               (!parse-vop-operand-types (rest spec) t)))
+               (parse-vop-operand-types (rest spec) t)))
         (:result-types
          (setf (vop-parse-result-types parse)
-               (!parse-vop-operand-types (rest spec) nil)))
+               (parse-vop-operand-types (rest spec) nil)))
         (:translate
          (setf (vop-parse-translate parse) (rest spec)))
         (:guard
@@ -1195,7 +1195,7 @@
 
 ;;; Given a list of arg/result restrictions, check for valid syntax
 ;;; and convert to canonical form.
-(defun !parse-vop-operand-types (specs args-p)
+(defun parse-vop-operand-types (specs args-p)
   (declare (list specs))
   (labels ((parse-operand-type (spec)
              (cond ((eq spec '*) spec)
