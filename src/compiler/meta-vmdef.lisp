@@ -265,35 +265,20 @@
     `(progn
        (/show0 "doing !DEF-PRIMITIVE-TYPE, NAME=..")
        (/primitive-print ,(symbol-name name))
-       ,(once-only ((n-old `(gethash ',name *backend-primitive-type-names*)))
-          `(progn
-             ;; If the PRIMITIVE-TYPE structure already exists, we
-             ;; destructively modify it so that existing references in
-             ;; templates won't be invalidated. FIXME: This should no
-             ;; longer be an issue in SBCL, since we don't try to do
-             ;; serious surgery on ourselves. Probably this should
-             ;; just become an assertion that N-OLD is NIL, so that we
-             ;; don't have to try to maintain the correctness of the
-             ;; never-ordinarily-used clause.
-             (/show0 "in !DEF-PRIMITIVE-TYPE, about to COND")
-             (cond (,n-old
-                    (/show0 "in ,N-OLD clause of COND")
-                    (setf (primitive-type-scs ,n-old) ',scns)
-                    (setf (primitive-type-specifier ,n-old) ',type))
-                   (t
-                    (/show0 "in T clause of COND")
-                    (setf (gethash ',name *backend-primitive-type-names*)
-                          (make-primitive-type :name ',name
-                                               :scs ',scns
-                                               :specifier ',type))))
-             (/show0 "done with !DEF-PRIMITIVE-TYPE")
-             ',name)))))
+       (assert (not (gethash ',name *backend-primitive-type-names*)))
+       (setf (gethash ',name *backend-primitive-type-names*)
+             (make-primitive-type :name ',name
+                                  :scs ',scns
+                                  :specifier ',type))
+       (/show0 "done with !DEF-PRIMITIVE-TYPE")
+       ',name)))
 
 ;;; Define NAME to be an alias for RESULT in VOP operand type restrictions.
 (defmacro !def-primitive-type-alias (name result)
   ;; Just record the translation.
-  `(eval-when (:compile-toplevel :load-toplevel :execute)
-     (setf (gethash ',name *backend-primitive-type-aliases*) ',result)
+  `(progn
+     (assert (not (assoc ',name *backend-primitive-type-aliases*)))
+     (push (cons ',name ,result) *backend-primitive-type-aliases*)
      ',name))
 
 (defparameter *primitive-type-slot-alist*
@@ -1197,11 +1182,12 @@
 ;;; and convert to canonical form.
 (defun parse-vop-operand-types (specs args-p)
   (declare (list specs))
-  (labels ((parse-operand-type (spec)
+  (labels ((primtype-alias-p (spec)
+             (cdr (assq spec *backend-primitive-type-aliases*)))
+           (parse-operand-type (spec)
              (cond ((eq spec '*) spec)
                    ((symbolp spec)
-                    (let ((alias (gethash spec
-                                          *backend-primitive-type-aliases*)))
+                    (let ((alias (primtype-alias-p spec)))
                       (if alias
                           (parse-operand-type alias)
                           `(:or ,spec))))
@@ -1211,14 +1197,11 @@
                     (case (first spec)
                       (:or
                        (collect ((results))
-                         (results :or)
                          (dolist (item (cdr spec))
                            (unless (symbolp item)
                              (error "bad PRIMITIVE-TYPE name in ~S: ~S"
                                     spec item))
-                           (let ((alias
-                                  (gethash item
-                                           *backend-primitive-type-aliases*)))
+                           (let ((alias (primtype-alias-p item)))
                              (if alias
                                  (let ((alias (parse-operand-type alias)))
                                    (unless (eq (car alias) :or)
@@ -1228,9 +1211,7 @@
                                    (dolist (x (cdr alias))
                                      (results x)))
                                  (results item))))
-                         (remove-duplicates (results)
-                                            :test #'eq
-                                            :start 1)))
+                         `(:or ,@(remove-duplicates (results) :test #'eq))))
                       (:constant
                        (unless args-p
                          (error "can't :CONSTANT for a result"))

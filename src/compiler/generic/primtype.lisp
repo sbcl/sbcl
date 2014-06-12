@@ -51,20 +51,17 @@
 (defvar *fixnum-primitive-type* (primitive-type-or-lose 'fixnum))
 
 (/show0 "primtype.lisp 53")
-(!def-primitive-type-alias tagged-num (:or positive-fixnum fixnum))
-(progn
-  (!def-primitive-type-alias unsigned-num #1=
-    #!+#.(cl:if (cl:= sb!vm::n-machine-word-bits 64) '(and) '(or))
-    (:or unsigned-byte-64 unsigned-byte-63 positive-fixnum)
-    #!-#.(cl:if (cl:= sb!vm::n-machine-word-bits 64) '(and) '(or))
-    (:or unsigned-byte-32 unsigned-byte-31 positive-fixnum))
-  (!def-primitive-type-alias signed-num #2=
-    #!+#.(cl:if (cl:= sb!vm::n-machine-word-bits 64) '(and) '(or))
-    (:or signed-byte-64 fixnum unsigned-byte-63 positive-fixnum)
-    #!-#.(cl:if (cl:= sb!vm::n-machine-word-bits 64) '(and) '(or))
-    (:or signed-byte-32 fixnum unsigned-byte-31 positive-fixnum))
+(!def-primitive-type-alias tagged-num '(:or positive-fixnum fixnum))
+(multiple-value-bind (unsigned signed)
+    (case sb!vm::n-machine-word-bits
+      (64 (values '(unsigned-byte-64 unsigned-byte-63 positive-fixnum)
+                  '(signed-byte-64 fixnum unsigned-byte-63 positive-fixnum)))
+      (32 (values '(unsigned-byte-32 unsigned-byte-31 positive-fixnum)
+                  '(signed-byte-32 fixnum unsigned-byte-31 positive-fixnum))))
+  (!def-primitive-type-alias unsigned-num `(:or ,@unsigned))
+  (!def-primitive-type-alias signed-num `(:or ,@signed))
   (!def-primitive-type-alias untagged-num
-    (:or . #.(sort (copy-list (union (cdr '#1#) (cdr '#2#))) #'string<))))
+    `(:or ,@(sort (copy-list (union unsigned signed)) #'string<))))
 
 ;;; other primitive immediate types
 (/show0 "primtype.lisp 68")
@@ -104,7 +101,8 @@
     :type (simd-pack double-float))
   (!def-primitive-type simd-pack-int (int-sse-reg descriptor-reg)
    :type (simd-pack integer))
-  (!def-primitive-type-alias simd-pack (:or simd-pack-single simd-pack-double simd-pack-int)))
+  (!def-primitive-type-alias simd-pack
+   '(:or simd-pack-single simd-pack-double simd-pack-int)))
 
 ;;; primitive other-pointer array types
 (/show0 "primtype.lisp 96")

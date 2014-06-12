@@ -61,8 +61,8 @@
 ;;; whatever. These names can only be used as the :ARG-TYPES or
 ;;; :RESULT-TYPES for VOPs and can map to anything else that can be
 ;;; used as :ARG-TYPES or :RESULT-TYPES (e.g. :OR, :CONSTANT).
-(defvar *backend-primitive-type-aliases* (make-hash-table :test 'eq))
-(declaim (type hash-table *backend-primitive-type-aliases*))
+(defvar *backend-primitive-type-aliases* nil)
+(declaim (type list *backend-primitive-type-aliases*))
 
 ;;; The primitive type T is somewhat magical, in that it is the only
 ;;; primitive type that overlaps with other primitive types. An object
