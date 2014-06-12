@@ -719,6 +719,9 @@
 (define-info-type (:setf :documentation) :type-spec (or string null))
 (define-info-type (:setf :expander) :type-spec (or function null))
 
+;;;; ":CAS" subsection - Like SETF but there are no "inverses", just expanders
+(define-info-type (:cas :expander) :type-spec (or function null))
+
 ;;;; ":RANDOM-DOCUMENTATION" subsection.
 ;;; This is used for storing miscellaneous documentation types. The
 ;;; stuff is an alist translating documentation kinds to values.
