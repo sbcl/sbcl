@@ -21,7 +21,9 @@ changes relative to sbcl-1.2.0:
     to attempt to evaluate the subforms.  (lp#573747; thanks to Roman
     Marynchak)
   * bug fix: misplaced and missing declarations in DEFTRANSFORM. (lp#1066451)
-  
+  * bug fix: FBOUNDP returned NIL for a class of incorrect function names
+    instead of signaling an error. (lp#1095483)
+
 changes in sbcl-1.2.0 relative to sbcl-1.1.18:
   * bug fix: read-time-eval backquote context mixup. (lp#1321047)
   * enhancement: when SAVE-LISP-AND-DIE fails due multiple threads, the

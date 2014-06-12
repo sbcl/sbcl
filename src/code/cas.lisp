@@ -12,11 +12,6 @@
                                               #-sb-xc-host #-sb-xc-host
                                               :synchronized t))
 
-(define-function-name-syntax cas (list)
-  (destructuring-bind (cas symbol) list
-    (aver (eq 'cas cas))
-    (values t symbol)))
-
 ;;; This is what it all comes down to.
 (def!macro cas (place old new &environment env)
   #!+sb-doc

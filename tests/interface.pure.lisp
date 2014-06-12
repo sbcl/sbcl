@@ -201,3 +201,6 @@
 (with-test (:name :version-assert-fails)
   (assert-error
    (sb-ext:assert-version->= most-positive-fixnum)))
+
+(with-test (:name :bug-1095483)
+  (assert-error (fboundp '(cas "foo"))))

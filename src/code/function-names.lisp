@@ -28,6 +28,9 @@ situations."
 
 ;;; FIXME: this is a really lame name for something that has two
 ;;; return values.
+;;; See CSR's log comment in bd0ba0f214518e8d72ff2d44de5a1e3e4b02af2c
+;;; I would think that after 11 years of we're entitled to rename it.
+;;; VALIDATE-FUNCTION-NAME would be apt.
 (defun valid-function-name-p (name)
   #!+sb-doc
   "The primary return value indicates whether NAME is a valid function
@@ -44,17 +47,22 @@ use as a BLOCK name in the function in question."
     (otherwise nil)))
 
 (define-function-name-syntax setf (name)
-  (when (and (cdr name)
-             (consp (cdr name)))
-    (destructuring-bind (fun &rest rest) (cdr name)
-      (when (null rest)
+  (let ((tail (cdr name)))
+    (when (and (consp tail) (null (cdr tail)))
+      (let ((fun (car tail)))
         (typecase fun
           ;; ordinary (SETF FOO) case
           (symbol (values t fun))
           ;; reasonable (SETF (QUUX BAZ)) case [but not (SETF (SETF
           ;; FOO))]
-          (cons (unless (eq (car fun) 'setf)
+          (cons (unless (member (car fun) '(cas setf))
                   (valid-function-name-p fun))))))))
+
+;; CAS and SETF names should have in common the aspect that
+;; (CAS (CAS BAZ)), (SETF (CAS BAZ)), (CAS (SETF BAZ)) are not reasonable.
+;; 'cas.lisp' doesn't need to know this technique for sharing the parser,
+;; so the name syntax is defined here instead of there.
+(%define-fun-name-syntax 'cas '%check-setf-fun-name)
 
 (defun macro-function-name (name)
   (when (and (cdr name)
