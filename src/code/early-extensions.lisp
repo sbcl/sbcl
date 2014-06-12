@@ -776,16 +776,13 @@
 ;;; name is less mnemonic. (Maybe it should be changed?)
 (declaim (ftype (function ((or symbol cons)) symbol) fun-name-block-name))
 (defun fun-name-block-name (fun-name)
-  (cond ((symbolp fun-name)
-         fun-name)
-        ((consp fun-name)
-         (multiple-value-bind (legalp block-name)
-             (valid-function-name-p fun-name)
-           (if legalp
-               block-name
-               (error "not legal as a function name: ~S" fun-name))))
-        (t
-         (error "not legal as a function name: ~S" fun-name))))
+  (if (symbolp fun-name)
+      fun-name
+      (multiple-value-bind (legalp block-name)
+          (valid-function-name-p fun-name)
+        (if legalp
+            block-name
+            (error "not legal as a function name: ~S" fun-name)))))
 
 (defun looks-like-name-of-special-var-p (x)
   (and (symbolp x)
