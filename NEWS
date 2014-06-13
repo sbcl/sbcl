@@ -2,6 +2,8 @@
 changes relative to sbcl-1.2.0:
   * enhancement: GENCGC is enabled on ARM.
   * enhancement: better error reporting for invalid calls to local functions.
+  * enhancement: support for GNU/kFreeBSD distributions.  (lp#1079954, thanks
+    to Christoph Egger)
   * bug fix: TYPE-OF must not return AND/OR/NOT expressions.
     (lp#1317308)
   * bug fix: accessing NIL arrays stopped producing errors. (lp#1311421)
