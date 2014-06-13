@@ -795,7 +795,8 @@ Experimental: interface subject to change."
   ;; scanning threads for negative answers? Similarly, STACK-ALLOCATED-P for
   ;; checking if an object has been stack-allocated by a given thread for
   ;; testing purposes might not come amiss.
-  (if (typep object '(or fixnum character))
+  (if (typep object '(or fixnum character
+                      #.(if (= sb-vm:n-word-bits 64) 'single-float (values))))
       (values :immediate nil)
       (let ((plist
              (sb-sys:without-gcing

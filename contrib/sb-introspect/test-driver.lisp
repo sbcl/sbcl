@@ -303,6 +303,10 @@
 (deftest allocation-information.3
     (tai 42 :immediate nil)
   t)
+#+x86-64
+(deftest allocation-information.3b
+    (tai 42s0 :immediate nil)
+  t)
 
 ;;; Skip the whole damn test on GENCGC PPC -- the combination is just
 ;;; to flaky for this to make too much sense.  GENCGC SPARC almost
