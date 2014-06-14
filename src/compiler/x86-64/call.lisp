@@ -207,7 +207,6 @@
   (:vop-var vop)
   (:generator 1
     (emit-alignment n-lowtag-bits)
-    (trace-table-entry trace-table-fun-prologue)
     (emit-label start-lab)
     ;; Skip space for the function header.
     (inst simple-fun-header-word)
@@ -227,9 +226,7 @@
             (make-ea :qword :base rbp-tn
                      :disp (- (* n-word-bytes
                                  (- (max 3 (sb-allocated-size 'stack))
-                                    sp->fp-offset))))))
-
-    (trace-table-entry trace-table-normal)))
+                                    sp->fp-offset))))))))
 
 ;;; This is emitted directly before either a known-call-local, call-local,
 ;;; or a multiple-call-local. All it does is allocate stack space for the
@@ -364,7 +361,6 @@
            (let ((defaults (defaults)))
              (when defaults
                (assemble (*elsewhere*)
-                 (trace-table-entry trace-table-fun-prologue)
                  (emit-label default-stack-slots)
                  (dolist (default defaults)
                    (emit-label (car default))
@@ -376,8 +372,7 @@
                      ;; above.
                      (inst push rdx-tn))
                    (inst mov (second default) rax-tn))
-                 (inst jmp defaulting-done)
-                 (trace-table-entry trace-table-normal)))))))
+                 (inst jmp defaulting-done)))))))
       (t
        (let ((regs-defaulted (gen-label))
              (restore-edi (gen-label))
@@ -599,12 +594,10 @@
   (:ignore nfp arg-locs args callee)
   (:node-var node)
   (:generator 5
-    (trace-table-entry trace-table-call-site)
     (move rbp-tn fp)
     (note-this-location vop :call-site)
     (inst call target)
-    (default-unknown-values vop values nvals node)
-    (trace-table-entry trace-table-normal)))
+    (default-unknown-values vop values nvals node)))
 
 ;;; Non-TR local call for a variable number of return values passed according
 ;;; to the unknown values convention. The results are the start of the values
@@ -620,13 +613,11 @@
   (:vop-var vop)
   (:node-var node)
   (:generator 20
-    (trace-table-entry trace-table-call-site)
     (move rbp-tn fp)
     (note-this-location vop :call-site)
     (inst call target)
     (note-this-location vop :unknown-return)
-    (receive-unknown-values values-start nvals start count node)
-    (trace-table-entry trace-table-normal)))
+    (receive-unknown-values values-start nvals start count node)))
 
 ;;;; local call with known values return
 
@@ -647,12 +638,10 @@
   (:ignore args res save nfp callee)
   (:vop-var vop)
   (:generator 5
-    (trace-table-entry trace-table-call-site)
     (move rbp-tn fp)
     (note-this-location vop :call-site)
     (inst call target)
-    (note-this-location vop :known-return)
-    (trace-table-entry trace-table-normal)))
+    (note-this-location vop :known-return)))
 
 ;;; From Douglas Crosher
 ;;; Return from known values call. We receive the return locations as
@@ -668,12 +657,10 @@
   (:vop-var vop)
   (:generator 6
     (check-ocfp-and-return-pc old-fp return-pc)
-    (trace-table-entry trace-table-fun-epilogue)
     ;; Zot all of the stack except for the old-fp and return-pc.
     (inst mov rsp-tn rbp-tn)
     (inst pop rbp-tn)
-    (inst ret)
-    (trace-table-entry trace-table-normal)))
+    (inst ret)))
 
 ;;;; full call
 ;;;
@@ -792,8 +779,6 @@
                                (if (eq return :tail) 0 10)
                                15
                                (if (eq return :unknown) 25 0))
-               (trace-table-entry trace-table-call-site)
-
                ;; This has to be done before the frame pointer is
                ;; changed! RAX stores the 'lexical environment' needed
                ;; for closures.
@@ -911,8 +896,7 @@
                     '((note-this-location vop :unknown-return)
                       (receive-unknown-values values-start nvals start count
                                               node)))
-                   (:tail))
-               (trace-table-entry trace-table-normal)))))
+                   (:tail))))))
 
   (define-full-call call nil :fixed nil)
   (define-full-call call-named t :fixed nil)
@@ -962,7 +946,6 @@
   (:ignore value)
   (:generator 6
     (check-ocfp-and-return-pc old-fp return-pc)
-    (trace-table-entry trace-table-fun-epilogue)
     ;; Drop stack above old-fp
     (inst mov rsp-tn rbp-tn)
     ;; Clear the multiple-value return flag
@@ -1004,7 +987,6 @@
     (when (= nvals 1)
       ;; This is handled in RETURN-SINGLE.
       (error "nvalues is 1"))
-    (trace-table-entry trace-table-fun-epilogue)
     ;; Establish the values pointer and values count.
     (inst lea rbx (make-ea :qword :base rbp-tn
                            :disp (* sp->fp-offset n-word-bytes)))
@@ -1042,9 +1024,7 @@
                                :disp (frame-byte-offset
                                       (+ sp->fp-offset
                                          (tn-offset return-pc)))))
-           (inst ret)))
-
-    (trace-table-entry trace-table-normal)))
+           (inst ret)))))
 
 ;;; Do unknown-values return of an arbitrary number of values (passed
 ;;; on the stack.) We check for the common case of a single return
@@ -1068,7 +1048,6 @@
   (:node-var node)
   (:generator 13
     (check-ocfp-and-return-pc old-fp return-pc)
-    (trace-table-entry trace-table-fun-epilogue)
     (unless (policy node (> space speed))
       ;; Check for the single case.
       (let ((not-single (gen-label)))
@@ -1088,8 +1067,7 @@
     (move rsi vals)
     (move rcx nvals)
     (inst mov return-asm (make-fixup 'return-multiple :assembly-routine))
-    (inst jmp return-asm)
-    (trace-table-entry trace-table-normal)))
+    (inst jmp return-asm)))
 
 ;;;; XEP hackery
 

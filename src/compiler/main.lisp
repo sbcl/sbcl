@@ -597,7 +597,7 @@ necessary, since type inference may take arbitrarily long to converge.")
             (describe-ir2-component component *compiler-trace-output*))
 
           (maybe-mumble "code ")
-          (multiple-value-bind (code-length trace-table fixup-notes)
+          (multiple-value-bind (code-length fixup-notes)
               (generate-code component)
 
             #-sb-xc-host
@@ -613,7 +613,6 @@ necessary, since type inference may take arbitrarily long to converge.")
                (fasl-dump-component component
                                     *code-segment*
                                     code-length
-                                    trace-table
                                     fixup-notes
                                     *compile-object*))
               (core-object
@@ -621,7 +620,6 @@ necessary, since type inference may take arbitrarily long to converge.")
                (make-core-component component
                                     *code-segment*
                                     code-length
-                                    trace-table
                                     fixup-notes
                                     *compile-object*))
               (null))))))

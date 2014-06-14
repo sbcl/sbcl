@@ -1013,23 +1013,16 @@
 (defun dump-code-object (component
                          code-segment
                          code-length
-                         trace-table-as-list
                          fixups
                          fasl-output)
 
   (declare (type component component)
-           (list trace-table-as-list)
            (type index code-length)
            (type fasl-output fasl-output))
 
   (let* ((2comp (component-info component))
          (constants (sb!c::ir2-component-constants 2comp))
-         (header-length (length constants))
-         (packed-trace-table (pack-trace-table trace-table-as-list))
-         (total-length (+ code-length
-                          (* (length packed-trace-table)
-                             sb!c::tt-bytes-per-entry))))
-
+         (header-length (length constants)))
     (collect ((patches))
 
       ;; Dump the offset of the trace table.
@@ -1082,22 +1075,21 @@
           (push info-handle (fasl-output-debug-info fasl-output))))
 
       (let ((num-consts (- header-length sb!vm:code-trace-table-offset-slot)))
-        (cond ((and (< num-consts #x100) (< total-length #x10000))
+        (cond ((and (< num-consts #x100) (< code-length #x10000))
                (dump-fop 'fop-small-code fasl-output)
                (dump-byte num-consts fasl-output)
-               (dump-integer-as-n-bytes total-length (/ sb!vm:n-word-bytes 2) fasl-output))
+               (dump-integer-as-n-bytes code-length (/ sb!vm:n-word-bytes 2) fasl-output))
               (t
                (dump-fop 'fop-code fasl-output)
                (dump-word num-consts fasl-output)
-               (dump-word total-length fasl-output))))
+               (dump-word code-length fasl-output))))
 
       ;; These two dumps are only ones which contribute to our
-      ;; TOTAL-LENGTH value.
+      ;; LENGTH value.
       (dump-segment code-segment code-length fasl-output)
-      (dump-specialized-vector packed-trace-table fasl-output :data-only t)
 
       ;; DUMP-FIXUPS does its own internal DUMP-FOPs: the bytes it
-      ;; dumps aren't included in the TOTAL-LENGTH passed to our
+      ;; dumps aren't included in the LENGTH passed to our
       ;; FOP-CODE/FOP-SMALL-CODE fop.
       (dump-fixups fixups fasl-output)
 
@@ -1155,10 +1147,9 @@
 (defun fasl-dump-component (component
                             code-segment
                             code-length
-                            trace-table
                             fixups
                             file)
-  (declare (type component component) (list trace-table))
+  (declare (type component component))
   (declare (type fasl-output file))
 
   (dump-fop 'fop-verify-table-size file)
@@ -1172,7 +1163,6 @@
   (let ((code-handle (dump-code-object component
                                        code-segment
                                        code-length
-                                       trace-table
                                        fixups
                                        file))
         (2comp (component-info component)))

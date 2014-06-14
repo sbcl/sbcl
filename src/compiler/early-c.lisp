@@ -113,7 +113,6 @@
 (defvar *source-info*)
 (defvar *source-plist*)
 (defvar *source-namestring*)
-(defvar *trace-table*)
 (defvar *undefined-warnings*)
 (defvar *warnings-p*)
 (defvar *lambda-conversions*)

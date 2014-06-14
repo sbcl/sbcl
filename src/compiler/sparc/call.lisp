@@ -151,7 +151,6 @@
     ;; Make sure the function is aligned, and drop a label pointing to this
     ;; function header.
     (emit-alignment n-lowtag-bits)
-    (trace-table-entry trace-table-fun-prologue)
     (emit-label start-lab)
     ;; Allocate function header.
     (inst simple-fun-header-word)
@@ -166,22 +165,19 @@
     (let ((nfp-tn (current-nfp-tn vop)))
       (when nfp-tn
         (inst sub nsp-tn (bytes-needed-for-non-descriptor-stack-frame))
-        (inst add nfp-tn nsp-tn number-stack-displacement)))
-    (trace-table-entry trace-table-normal)))
+        (inst add nfp-tn nsp-tn number-stack-displacement)))))
 
 (define-vop (allocate-frame)
   (:results (res :scs (any-reg))
             (nfp :scs (any-reg)))
   (:info callee)
   (:generator 2
-    (trace-table-entry trace-table-fun-prologue)
     (move res csp-tn)
     (inst add csp-tn csp-tn
           (* n-word-bytes (sb-allocated-size 'control-stack)))
     (when (ir2-physenv-number-stack-p callee)
       (inst sub nsp-tn (bytes-needed-for-non-descriptor-stack-frame))
-      (inst add nfp nsp-tn number-stack-displacement))
-    (trace-table-entry trace-table-normal)))
+      (inst add nfp nsp-tn number-stack-displacement))))
 
 ;;; Allocate a partial frame for passing stack arguments in a full call.  Nargs
 ;;; is the number of arguments passed.  If no stack arguments are passed, then
@@ -320,15 +316,13 @@ default-value-8
               (when defaults
                 (assemble (*elsewhere*)
                   (emit-label default-stack-vals)
-                  (trace-table-entry trace-table-fun-prologue)
                   (do ((remaining defaults (cdr remaining)))
                       ((null remaining))
                     (let ((def (car remaining)))
                       (emit-label (car def))
                       (when (null (cdr remaining))
                         (inst b defaulting-done))
-                      (store-stack-tn (cdr def) null-tn)))
-                  (trace-table-entry trace-table-normal))))))
+                      (store-stack-tn (cdr def) null-tn))))))))
 
         (inst compute-code-from-lra code-tn code-tn lra-label temp)))
   (values))
@@ -368,7 +362,6 @@ default-value-8
     (emit-label done)
 
     (assemble (*elsewhere*)
-      (trace-table-entry trace-table-fun-prologue)
       (emit-label variable-values)
       (inst compute-code-from-lra code-tn code-tn lra-label temp)
       (do ((arg *register-arg-tns* (rest arg))
@@ -378,8 +371,7 @@ default-value-8
       (move start args)
       (move count nargs)
       (inst b done)
-      (inst nop)
-      (trace-table-entry trace-table-normal)))
+      (inst nop)))
   (values))
 
 
@@ -442,7 +434,6 @@ default-value-8
   (:temporary (:sc any-reg :offset ocfp-offset :from (:eval 0)) ocfp)
   (:ignore arg-locs args ocfp)
   (:generator 5
-    (trace-table-entry trace-table-call-site)
     (let ((label (gen-label))
           (cur-nfp (current-nfp-tn vop)))
       (when cur-nfp
@@ -459,8 +450,7 @@ default-value-8
       (emit-return-pc label)
       (default-unknown-values vop values nvals move-temp temp label)
       (when cur-nfp
-        (load-stack-tn cur-nfp nfp-save)))
-    (trace-table-entry trace-table-normal)))
+        (load-stack-tn cur-nfp nfp-save)))))
 
 
 ;;; Non-TR local call for a variable number of return values passed according
@@ -481,7 +471,6 @@ default-value-8
   (:vop-var vop)
   (:temporary (:sc control-stack :offset nfp-save-offset) nfp-save)
   (:generator 20
-    (trace-table-entry trace-table-call-site)
     (let ((label (gen-label))
           (cur-nfp (current-nfp-tn vop)))
       (when cur-nfp
@@ -499,8 +488,7 @@ default-value-8
       (note-this-location vop :unknown-return)
       (receive-unknown-values values-start nvals start count label temp)
       (when cur-nfp
-        (load-stack-tn cur-nfp nfp-save)))
-    (trace-table-entry trace-table-normal)))
+        (load-stack-tn cur-nfp nfp-save)))))
 
 
 ;;;; Local call with known values return:
@@ -524,7 +512,6 @@ default-value-8
   (:temporary (:sc control-stack :offset nfp-save-offset) nfp-save)
   (:temporary (:scs (non-descriptor-reg)) temp)
   (:generator 5
-    (trace-table-entry trace-table-call-site)
     (let ((label (gen-label))
           (cur-nfp (current-nfp-tn vop)))
       (when cur-nfp
@@ -541,8 +528,7 @@ default-value-8
       (emit-return-pc label)
       (note-this-location vop :known-return)
       (when cur-nfp
-        (load-stack-tn cur-nfp nfp-save)))
-    (trace-table-entry trace-table-normal)))
+        (load-stack-tn cur-nfp nfp-save)))))
 
 ;;; Return from known values call.  We receive the return locations as
 ;;; arguments to terminate their lifetimes in the returning function.  We
@@ -562,7 +548,6 @@ default-value-8
   (:ignore val-locs vals)
   (:vop-var vop)
   (:generator 6
-    (trace-table-entry trace-table-fun-epilogue)
     (maybe-load-stack-tn old-fp-temp old-fp)
     (maybe-load-stack-tn return-pc-temp return-pc)
     (move csp-tn cfp-tn)
@@ -572,8 +557,7 @@ default-value-8
               (- (bytes-needed-for-non-descriptor-stack-frame)
                  number-stack-displacement))))
     (inst j return-pc-temp (- n-word-bytes other-pointer-lowtag))
-    (move cfp-tn old-fp-temp)
-    (trace-table-entry trace-table-normal)))
+    (move cfp-tn old-fp-temp)))
 
 
 ;;;; Full call:
@@ -701,7 +685,6 @@ default-value-8
                      (if (eq return :tail) 0 10)
                      15
                      (if (eq return :unknown) 25 0))
-       (trace-table-entry trace-table-call-site)
        (let* ((cur-nfp (current-nfp-tn vop))
               ,@(unless (eq return :tail)
                   '((lra-label (gen-label))))
@@ -840,8 +823,7 @@ default-value-8
                                         lra-label temp)
                 (when cur-nfp
                   (load-stack-tn cur-nfp nfp-save))))
-             (:tail)))
-       (trace-table-entry trace-table-normal))))
+             (:tail))))))
 
 
 (define-full-call call nil :fixed nil)
@@ -904,7 +886,6 @@ default-value-8
   (:ignore value)
   (:vop-var vop)
   (:generator 6
-    (trace-table-entry trace-table-fun-epilogue)
     ;; Clear the number stack.
     (let ((cur-nfp (current-nfp-tn vop)))
       (when cur-nfp
@@ -915,8 +896,7 @@ default-value-8
     (move csp-tn cfp-tn)
     (move cfp-tn old-fp)
     ;; Out of here.
-    (lisp-return return-pc :offset 2)
-    (trace-table-entry trace-table-normal)))
+    (lisp-return return-pc :offset 2)))
 
 ;;; Do unknown-values return of a fixed number of values.  The Values are
 ;;; required to be set up in the standard passing locations.  Nvals is the
@@ -947,7 +927,6 @@ default-value-8
   (:temporary (:sc any-reg :offset ocfp-offset) val-ptr)
   (:vop-var vop)
   (:generator 6
-    (trace-table-entry trace-table-fun-epilogue)
     ;; Clear the number stack.
     (let ((cur-nfp (current-nfp-tn vop)))
       (when cur-nfp
@@ -973,8 +952,7 @@ default-value-8
              (dolist (reg (subseq (list a0 a1 a2 a3 a4 a5) nvals))
                (move reg null-tn)))
            ;; And away we go.
-           (lisp-return return-pc)))
-    (trace-table-entry trace-table-normal)))
+           (lisp-return return-pc)))))
 
 ;;; Do unknown-values return of an arbitrary number of values (passed on the
 ;;; stack.)  We check for the common case of a single return value, and do that
@@ -998,7 +976,6 @@ default-value-8
   (:vop-var vop)
 
   (:generator 13
-    (trace-table-entry trace-table-fun-epilogue)
     (let ((not-single (gen-label)))
       ;; Clear the number stack.
       (let ((cur-nfp (current-nfp-tn vop)))
@@ -1024,8 +1001,7 @@ default-value-8
       (move vals vals-arg)
       (move nvals nvals-arg)
       (inst ji temp (make-fixup 'return-multiple :assembly-routine))
-      (inst nop))
-    (trace-table-entry trace-table-normal)))
+      (inst nop))))
 
 
 

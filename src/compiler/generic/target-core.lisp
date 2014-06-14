@@ -47,24 +47,19 @@
 
 ;;; Dump a component to core. We pass in the assembler fixups, code
 ;;; vector and node info.
-(defun make-core-component (component segment length trace-table fixup-notes object)
+(defun make-core-component (component segment length fixup-notes object)
   (declare (type component component)
            (type sb!assem:segment segment)
            (type index length)
-           (list trace-table fixup-notes)
+           (list fixup-notes)
            (type core-object object))
   (without-gcing
     (let* ((2comp (component-info component))
            (constants (ir2-component-constants 2comp))
-           (trace-table (pack-trace-table trace-table))
-           (trace-table-len (length trace-table))
-           (trace-table-bits (* trace-table-len tt-bits-per-entry))
-           (total-length (+ length
-                            (ceiling trace-table-bits sb!vm:n-byte-bits)))
            (box-num (- (length constants) sb!vm:code-trace-table-offset-slot))
-           (code-obj (allocate-code-object box-num total-length))
+           (code-obj (allocate-code-object box-num length))
            (fill-ptr (code-instructions code-obj)))
-      (declare (type index box-num total-length))
+      (declare (type index box-num length))
 
       (let ((v (sb!assem:segment-contents-as-vector segment)))
         (declare (type (simple-array sb!assem:assembly-unit 1) v))
@@ -85,18 +80,6 @@
 
       (setf (code-header-ref code-obj sb!vm:code-trace-table-offset-slot)
             length)
-      ;; KLUDGE: the "old" COPY-TO-SYSTEM-AREA automagically worked if
-      ;; somebody changed the number of bytes in a trace table entry.
-      ;; This version is a bit more fragile; if only there were some way
-      ;; to insulate ourselves against changes like that...
-      ;;
-      ;; Then again, PACK-TRACE-TABLE in src/compiler/trace-table.lisp
-      ;; doesn't appear to do anything interesting, returning a 0-length
-      ;; array.  So it seemingly doesn't matter what we do here.  Is this
-      ;; stale code?
-      ;;   --njf, 2005-03-23
-      (copy-ub16-to-system-area trace-table 0 fill-ptr 0 trace-table-len)
-
       (do ((index sb!vm:code-constants-offset (1+ index)))
           ((>= index (length constants)))
         (let ((const (aref constants index)))

@@ -55,7 +55,6 @@
 
 ;;;; specials used during code generation
 
-(defvar *trace-table-info*)
 (defvar *code-segment* nil)
 (defvar *elsewhere* nil)
 (defvar *elsewhere-label* nil)
@@ -135,7 +134,6 @@
             "~|~%assembly code for ~S~2%"
             component))
   (let ((prev-env nil)
-        (*trace-table-info* nil)
         (*prev-segment* nil)
         (*prev-vop* nil)
         (*fixup-notes* nil))
@@ -201,7 +199,6 @@
             *constant-vector*  nil
             *constant-table*   nil))
     (values (sb!assem:finalize-segment *code-segment*)
-            (nreverse *trace-table-info*)
             *fixup-notes*)))
 
 (defun emit-label-elsewhere (label)

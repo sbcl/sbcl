@@ -205,9 +205,3 @@
 (progn
   (def!constant +highest-normal-generation+ 5)
   (def!constant +pseudo-static-generation+ 6))
-
-(defenum ()
-  trace-table-normal
-  trace-table-call-site
-  trace-table-fun-prologue
-  trace-table-fun-epilogue)
