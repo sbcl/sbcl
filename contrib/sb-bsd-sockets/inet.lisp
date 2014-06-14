@@ -75,6 +75,8 @@ Examples:
 ;;; Try to get to a protocol quickly, falling back to calling
 ;;; getprotobyname if it's available.
 (defun get-protocol-by-name (name)
+  "Given a protocol name, return the protocol number, the protocol name, and
+a list of protocol aliases"
   (let ((result (cdr (if (keywordp name)
                          (assoc name *protocols*)
                          (assoc name *protocols* :test #'string-equal)))))
@@ -92,9 +94,6 @@ Examples:
 ;;; is here
 #-android
 (defun getprotobyname (name)
-  "Given a protocol name, return the protocol number, the protocol name, and
-a list of protocol aliases"
-
   ;; Brownie Points.  Hopefully there's one person out there using
   ;; RSPF sockets and SBCL who will appreciate the extra info
   (labels ((protoent-to-values (protoent)
