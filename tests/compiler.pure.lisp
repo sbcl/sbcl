@@ -5172,3 +5172,122 @@
       (compile nil '(lambda (x) (progn (declare (integer x)) (* x 6))))
     (assert warnings-p)
     (assert failure-p)))
+
+;; Something in this function used to confuse lifetime analysis into
+;; recording multiple conflicts for a single TNs in the dolist block.
+(with-test (:name :bug-1327008)
+  (handler-bind (((or style-warning compiler-note)
+                   (lambda (c)
+                     (muffle-warning c))))
+    (compile nil
+             `(lambda (scheduler-spec
+                       schedule-generation-method
+                       utc-earliest-time utc-latest-time
+                       utc-other-earliest-time utc-other-latest-time
+                       &rest keys
+                       &key queue
+                         maximum-mileage
+                         maximum-extra-legs
+                         maximum-connection-time
+                         slice-number
+                         scheduler-hints
+                         permitted-route-locations prohibited-route-locations
+                         preferred-connection-locations disfavored-connection-locations
+                         origins destinations
+                         permitted-carriers prohibited-carriers
+                         permitted-operating-carriers prohibited-operating-carriers
+                         start-airports end-airports
+                         circuity-limit
+                         specified-circuity-limit-extra-miles
+                         (preferred-carriers :unspecified)
+                       &allow-other-keys)
+                (declare (optimize speed))
+                (let  ((table1 (list nil))
+                       (table2 (list nil))
+                       (skip-flifo-checks (getf scheduler-spec :skip-flifo-checks))
+                       (construct-gaps-p (getf scheduler-spec :construct-gaps-p))
+                       (gap-locations (getf scheduler-spec :gap-locations))
+                       (result-array (make-array 100))
+                       (number-dequeued 0)
+                       (n-new 0)
+                       (n-calcs 0)
+                       (exit-reason 0)
+                       (prev-start-airports origins)
+                       (prev-end-airports destinations)
+                       (prev-permitted-carriers permitted-carriers))
+                  (flet ((run-with-hint (hint random-magic other-randomness
+                                         maximum-extra-legs
+                                         preferred-origins
+                                         preferred-destinations
+                                         same-pass-p)
+                           (let* ((hint-permitted-carriers (first hint))
+                                  (preferred-end-airports
+                                    (ecase schedule-generation-method
+                                      (:DEPARTURE preferred-destinations)
+                                      (:ARRIVAL preferred-origins)))
+                                  (revised-permitted-carriers
+                                    (cond ((and hint-permitted-carriers
+                                                (not (eq permitted-carriers :ANY)))
+                                           (intersection permitted-carriers
+                                                         hint-permitted-carriers))
+                                          (hint-permitted-carriers)
+                                          (permitted-carriers)))
+                                  (revised-maximum-mileage
+                                    (min (let ((maximum-mileage 0))
+                                           (dolist (o start-airports)
+                                             (dolist (d end-airports)
+                                               (setf maximum-mileage
+                                                     (max maximum-mileage (mileage o d)))))
+                                           (round (+ (* circuity-limit maximum-mileage)
+                                                     (or specified-circuity-limit-extra-miles
+                                                         (hairy-calculation slice-number)))))
+                                         maximum-mileage)))
+                             (when (or (not (equal start-airports prev-start-airports))
+                                       (not (equal end-airports prev-end-airports))
+                                       (and (not (equal revised-permitted-carriers
+                                                        prev-permitted-carriers))))
+                               (incf n-calcs)
+                               (calculate-vectors
+                                prohibited-carriers
+                                permitted-operating-carriers
+                                prohibited-operating-carriers
+                                permitted-route-locations
+                                prohibited-route-locations
+                                construct-gaps-p
+                                gap-locations
+                                preferred-carriers)
+                               (setf prev-permitted-carriers revised-permitted-carriers))
+                             (multiple-value-bind (this-number-dequeued
+                                                   this-exit-reason
+                                                   this-n-new)
+                                 (apply #'schedule-loop
+                                        utc-earliest-time  utc-other-earliest-time
+                                        utc-latest-time    utc-other-latest-time
+                                        scheduler-spec     schedule-generation-method
+                                        queue
+                                        :maximum-mileage revised-maximum-mileage
+                                        :maximum-extra-legs maximum-extra-legs
+                                        :maximum-connection-time maximum-connection-time
+                                        :same-pass-p same-pass-p
+                                        :preferred-end-airports preferred-end-airports
+                                        :maximum-blah random-magic
+                                        :skip-flifo-checks skip-flifo-checks
+                                        :magic1 table1
+                                        :magic2 table2
+                                        :preferred-connection-locations preferred-connection-locations
+                                        :disfavored-connection-locations disfavored-connection-locations
+                                        keys)
+                               (when other-randomness
+                                 (loop for i fixnum from n-new to (+ n-new (1- this-n-new))
+                                       do (hairy-calculation i result-array)))
+                               (incf number-dequeued this-number-dequeued)
+                               (incf n-new this-n-new)
+                               (setq exit-reason (logior exit-reason this-exit-reason))))))
+                    (let ((n-hints-processed 0))
+                      (dolist (hint scheduler-hints)
+                        (run-with-hint hint n-hints-processed t 0
+                                       nil nil nil)
+                        (incf n-hints-processed)))
+                    (run-with-hint nil 42 nil maximum-extra-legs
+                                   '(yyy) '(xxx) t))
+                  exit-reason)))))

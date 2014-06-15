@@ -6,7 +6,6 @@ changes relative to sbcl-1.2.0:
     to Christoph Egger)
   * enhancement: experimental support for threads on NetBSD/x86-64.  (thanks
     to Robert Swindells)
-
   * bug fix: TYPE-OF must not return AND/OR/NOT expressions.
     (lp#1317308)
   * bug fix: accessing NIL arrays stopped producing errors. (lp#1311421)
@@ -28,6 +27,9 @@ changes relative to sbcl-1.2.0:
   * bug fix: misplaced and missing declarations in DEFTRANSFORM. (lp#1066451)
   * bug fix: FBOUNDP returned NIL for a class of incorrect function names
     instead of signaling an error. (lp#1095483)
+  * bug fix: fix a compile-time AVER in regalloc: lifetime analysis
+    used to (rarely) introduce duplicate conflict markers in a single
+    TN/block pair. (lp#1327008)
 
 changes in sbcl-1.2.0 relative to sbcl-1.1.18:
   * bug fix: read-time-eval backquote context mixup. (lp#1321047)

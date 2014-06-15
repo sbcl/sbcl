@@ -547,6 +547,13 @@
                 (tn-conflicts (tn-current-conflict tn))
                 (number1 (ir2-block-number block1)))
            (aver tn-conflicts)
+           (when (> (ir2-block-number (global-conflicts-block tn-conflicts))
+                    number1)
+             ;; The TN-CURRENT-CONFLICT finger overshot.  Reset it
+             ;; conservatively.
+             (setf tn-conflicts (tn-global-conflicts tn)
+                   (tn-current-conflict tn) tn-conflicts)
+             (aver tn-conflicts))
            (do ((current tn-conflicts (global-conflicts-next-tnwise current))
                 (prev nil current))
                ((or (null current)
