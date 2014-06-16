@@ -1245,37 +1245,59 @@
 ;;; FLAG may be NIL or :EXIT-IF-NULL
 ;;;
 ;;; This form unites LET*, MULTIPLE-VALUE-BIND and AWHEN.
+;;; Any name in a list of names may be NIL to ignore the respective value.
+;;; If NAMES itself is nil, the initial-value form is evaluated only for effect.
+;;;
+;;; Clauses with no flags and one binding per clause are equivalent to LET*.
+;;; We reduce to LET* when possible so that the body can contain declarations
+;;; without having to split out declarations which affect variables and insert
+;;; them into the appropriate places. This qualifies as an extreme KLUDGE,
+;;; but has desirable behavior of allowing declarations in the innermost form.
+;;;
 (defmacro binding* ((&rest bindings) &body body)
-  (let ((bindings (reverse bindings)))
-    (loop with form = `(progn ,@body)
-          for binding in bindings
-          do (destructuring-bind (names initial-value &optional flag)
-                 binding
-               (multiple-value-bind (names declarations)
-                   (etypecase names
-                     (null
-                      (let ((name (gensym)))
-                        (values (list name) `((declare (ignorable ,name))))))
-                     (symbol
-                      (values (list names) nil))
-                     (list
-                      (collect ((new-names) (ignorable))
-                        (dolist (name names)
-                          (when (eq name nil)
-                            (setq name (gensym))
-                            (ignorable name))
-                          (new-names name))
-                        (values (new-names)
-                                (when (ignorable)
-                                  `((declare (ignorable ,@(ignorable)))))))))
-                 (setq form `(multiple-value-bind ,names
-                                 ,initial-value
-                               ,@declarations
-                               ,(ecase flag
-                                       ((nil) form)
-                                       ((:exit-if-null)
-                                        `(when ,(first names) ,form)))))))
-          finally (return form))))
+  (labels
+      ((recurse (bindings &aux ignores)
+         (cond
+           ((not bindings) body)
+           ((some (lambda (x)
+                    (destructuring-bind (names value-form &optional flag) x
+                      (declare (ignore value-form))
+                      (or flag (not (symbolp names)))))
+                  bindings)
+            (destructuring-bind (names value-form &optional flag) (car bindings)
+              (etypecase names
+                ;; () for names is esoteric. Does anyone really need that?
+                (null   (setq names (list (gensym)) ignores names))
+                (symbol (setq names (list names)))
+                (list
+                 (setq names (mapcar (lambda (name)
+                                       (or name (car (push (gensym) ignores))))
+                                     names))))
+              `((multiple-value-bind ,names ,value-form
+                  ,@(ignore ignores)
+                  ,@(ecase flag
+                      ((nil) (recurse (cdr bindings)))
+                      ((:exit-if-null)
+                       `((when ,(first names)
+                           ,@(recurse (cdr bindings))))))))))
+           (t
+            `((let* ,(mapcar (lambda (binding)
+                               (if (car binding)
+                                   binding
+                                   (let ((var (gensym)))
+                                     (push var ignores)
+                                     (cons var (cdr binding)))))
+                             bindings)
+                ,@(ignore ignores)
+                ,@body)))))
+       (ignore (list)
+         ;; IGNORABLE, not IGNORE, just in case :EXIT-IF-NULL reads a gensym
+         (if list `((declare (ignorable ,@list))))))
+    ;; Zero bindings have to be special-cased. RECURSE returns a list of forms
+    ;; because we musn't wrap BODY in a PROGN if it contains declarations,
+    ;; so we unwrap once here, but if the body was returned as the base case
+    ;; of recursion then (CAR (RECURSE)) would be wrong.
+    (if bindings (car (recurse bindings)) `(locally ,@body))))
 
 ;;; Delayed evaluation
 (defmacro delay (form)
