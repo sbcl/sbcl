@@ -75,3 +75,16 @@
     (assert (string= "Symbol FOO-ARGV is already defined as an alien variable."
                      (write-to-string e :escape nil))))
   (:no-error () (error "Expected an error")))
+
+(assert (equal (macroexpand-1
+                '(sb-int:binding* (((foo x bar zz) (f) :exit-if-null)
+                                   ((baz y) (g bar)))
+                  (declare (integer x foo) (special foo y))
+                  (declare (special zz bar l) (real q foo))
+                  (thing)))
+               '(MULTIPLE-VALUE-BIND (FOO X BAR ZZ) (F)
+                 (DECLARE
+                  (INTEGER X FOO) (SPECIAL FOO) (SPECIAL ZZ BAR) (REAL FOO))
+                 (WHEN FOO (MULTIPLE-VALUE-BIND (BAZ Y) (G BAR)
+                             (DECLARE (SPECIAL Y))
+                             (DECLARE (SPECIAL L) (REAL Q)) (THING))))))

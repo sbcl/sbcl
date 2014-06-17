@@ -1241,6 +1241,50 @@
                (let ((it ,test)) (declare (ignorable it)),@body)
                (acond ,@rest))))))
 
+;; Given DECLS as returned by from parse-body, and SYMBOLS to be bound
+;; (with LET, MULTIPLE-VALUE-BIND, etc) return two sets of declarations:
+;; those which pertain to the variables and those which don't.
+(defun extract-var-decls (decls symbols)
+  (labels ((applies-to-variables (decl)
+             (let ((id (car decl)))
+               (remove-if (lambda (x) (not (memq x symbols)))
+                          (cond ((eq id 'type)
+                                 (cddr decl))
+                                ((or (listp id) ; must be a type-specifier
+                                     (memq id '(special ignorable ignore 
+                                                dynamic-extent
+                                                truly-dynamic-extent))
+                                     (info :type :kind id))
+                                 (cdr decl))))))
+           (partition (spec)
+             (let ((variables (applies-to-variables spec)))
+               (cond ((not variables)
+                      (values nil spec))
+                     ((eq (car spec) 'type)
+                      (let ((more (set-difference (cddr spec) variables)))
+                        (values `(type ,(cadr spec) ,@variables)
+                                (if more `(type ,(cadr spec) ,@more)))))
+                     (t
+                      (let ((more (set-difference (cdr spec) variables)))
+                        (values `(,(car spec) ,@variables)
+                                (if more `(,(car spec) ,@more)))))))))
+    ;; This loop is less inefficient than theoretically possible,
+    ;; reconstructing the tree even if no need,
+    ;; but it's just a macroexpander, so... fine.
+    (collect ((binding-decls))
+      (let ((filtered
+             (mapcar (lambda (decl-expr) ; a list headed by DECLARE
+                       (mapcan (lambda (spec)
+                                 (multiple-value-bind (binding other)
+                                     (partition spec)
+                                   (when binding
+                                     (binding-decls binding))
+                                   (if other (list other))))
+                               (cdr decl-expr)))
+                     decls)))
+        (values (awhen (binding-decls) `(declare ,@it))
+                (mapcan (lambda (x) (if x (list `(declare ,@x)))) filtered))))))
+
 ;;; (binding* ({(names initial-value [flag])}*) body)
 ;;; FLAG may be NIL or :EXIT-IF-NULL
 ;;;
@@ -1254,11 +1298,16 @@
 ;;; them into the appropriate places. This qualifies as an extreme KLUDGE,
 ;;; but has desirable behavior of allowing declarations in the innermost form.
 ;;;
+;;; Caution: don't use declarations of the form (<type-id> <var>) before the
+;;; INFO database is set up in building the cross-compiler, or you will lose.
+;;; Of course, since some other host Lisps don't seem to think that's
+;;; acceptable syntax anyway, you're pretty much prevented from writing it.
+;;;
 (defmacro binding* ((&rest bindings) &body body)
-  (labels
-      ((recurse (bindings &aux ignores)
+  (multiple-value-bind (forms decls) (parse-body body :doc-string-allowed nil)
+    (labels
+      ((recurse (bindings decls &aux ignores)
          (cond
-           ((not bindings) body)
            ((some (lambda (x)
                     (destructuring-bind (names value-form &optional flag) x
                       (declare (ignore value-form))
@@ -1273,14 +1322,24 @@
                  (setq names (mapcar (lambda (name)
                                        (or name (car (push (gensym) ignores))))
                                      names))))
-              `((multiple-value-bind ,names ,value-form
-                  ,@(ignore ignores)
-                  ,@(ecase flag
-                      ((nil) (recurse (cdr bindings)))
-                      ((:exit-if-null)
-                       `((when ,(first names)
-                           ,@(recurse (cdr bindings))))))))))
+              (multiple-value-bind (binding-decls rest-decls)
+                  ;; If no more bindings, and no (WHEN ...) before the FORMS,
+                  ;; then don't bother parsing decls.
+                  (if (or (cdr bindings) flag)
+                      (extract-var-decls decls names)
+                      (values nil decls))
+                (let ((continue (acond ((cdr bindings) (recurse it rest-decls))
+                                       (t (append decls forms)))))
+                  `((multiple-value-bind ,names ,value-form
+                      ,@(decl-expr binding-decls ignores)
+                      ,@(ecase flag
+                          ((nil) continue)
+                          ((:exit-if-null)
+                           `((when ,(first names) ,@continue))))))))))
            (t
+            ;; This case is not strictly necessary now that declarations that
+            ;; affect variables are correctly inserted into the M-V-BIND,
+            ;; but it makes the expansion more legible/concise when applicable.
             `((let* ,(mapcar (lambda (binding)
                                (if (car binding)
                                    binding
@@ -1288,16 +1347,17 @@
                                      (push var ignores)
                                      (cons var (cdr binding)))))
                              bindings)
-                ,@(ignore ignores)
+                ,@(decl-expr nil ignores)
                 ,@body)))))
-       (ignore (list)
+       (decl-expr (binding-decls ignores)
+         (nconc (if binding-decls (list binding-decls))
          ;; IGNORABLE, not IGNORE, just in case :EXIT-IF-NULL reads a gensym
-         (if list `((declare (ignorable ,@list))))))
+               (if ignores `((declare (ignorable ,@ignores)))))))
     ;; Zero bindings have to be special-cased. RECURSE returns a list of forms
     ;; because we musn't wrap BODY in a PROGN if it contains declarations,
     ;; so we unwrap once here, but if the body was returned as the base case
     ;; of recursion then (CAR (RECURSE)) would be wrong.
-    (if bindings (car (recurse bindings)) `(locally ,@body))))
+    (if bindings (car (recurse bindings decls)) `(locally ,@body)))))
 
 ;;; Delayed evaluation
 (defmacro delay (form)
