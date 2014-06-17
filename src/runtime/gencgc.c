@@ -1667,7 +1667,7 @@ sniff_code_object(struct code *code, os_vm_size_t displacement)
 
     FSHOW((stderr, "/sniffing code: %p, %lu\n", code, displacement));
 
-    ncode_words = fixnum_value(code->code_size);
+    ncode_words = fixnum_word_value(code->code_size);
     nheader_words = HeaderValue(*(lispobj *)code);
     nwords = ncode_words + nheader_words;
 
@@ -1840,7 +1840,7 @@ gencgc_apply_code_fixups(struct code *old_code, struct code *new_code)
     lispobj fixups = NIL;
     struct vector *fixups_vector;
 
-    ncode_words = fixnum_value(new_code->code_size);
+    ncode_words = fixnum_word_value(new_code->code_size);
     nheader_words = HeaderValue(*(lispobj *)new_code);
     nwords = ncode_words + nheader_words;
     /* FSHOW((stderr,
@@ -3038,17 +3038,9 @@ verify_space(lispobj *start, size_t words)
                         /* Check that it's not in the dynamic space.
                          * FIXME: Isn't is supposed to be OK for code
                          * objects to be in the dynamic space these days? */
+                        /* It is for byte compiled code, but there's
+                         * no byte compilation in SBCL anymore. */
                         if (is_in_dynamic_space
-                            /* It's ok if it's byte compiled code. The trace
-                             * table offset will be a fixnum if it's x86
-                             * compiled code - check.
-                             *
-                             * FIXME: #^#@@! lack of abstraction here..
-                             * This line can probably go away now that
-                             * there's no byte compiler, but I've got
-                             * too much to worry about right now to try
-                             * to make sure. -- WHN 2001-10-06 */
-                            && fixnump(code->trace_table_offset)
                             /* Only when enabled */
                             && verify_dynamic_code_check) {
                             FSHOW((stderr,
@@ -3056,7 +3048,7 @@ verify_space(lispobj *start, size_t words)
                                    start));
                         }
 
-                        ncode_words = fixnum_value(code->code_size);
+                        ncode_words = fixnum_word_value(code->code_size);
                         nheader_words = HeaderValue(object);
                         nwords = ncode_words + nheader_words;
                         nwords = CEILING(nwords, 2);

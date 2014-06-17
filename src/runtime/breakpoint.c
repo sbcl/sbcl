@@ -116,7 +116,7 @@ static long compute_offset(os_context_t *context, lispobj code)
             return 0;
         else {
             uword_t offset = pc - code_start;
-            if (offset >= (N_WORD_BYTES * fixnum_value(codeptr->code_size)))
+            if (offset >= fixnum_value(codeptr->code_size))
                 return 0;
             else
                 return make_fixnum(offset);

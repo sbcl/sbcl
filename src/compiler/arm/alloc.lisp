@@ -68,7 +68,7 @@
   (:variant t))
 
 ;;;; Special purpose inline allocators.
-
+#!-gencgc
 (define-vop (allocate-code-object)
   (:args (boxed-arg :scs (any-reg))
          (unboxed-arg :scs (any-reg)))
@@ -76,10 +76,10 @@
   (:temporary (:scs (non-descriptor-reg)) ndescr)
   (:temporary (:scs (non-descriptor-reg)) size)
   (:temporary (:scs (any-reg) :from (:argument 0)) boxed)
-  (:temporary (:scs (non-descriptor-reg) :from (:argument 1)) unboxed)
+  (:temporary (:scs (non-descriptor-reg)) unboxed)
   (:temporary (:sc non-descriptor-reg :offset ocfp-offset) pa-flag)
   (:generator 100
-    (inst add boxed boxed-arg (fixnumize (1+ code-trace-table-offset-slot)))
+    (inst add boxed boxed-arg (fixnumize (1+ code-constants-offset)))
     (inst bic boxed boxed lowtag-mask)
     (inst mov unboxed (lsr unboxed-arg word-shift))
     (inst add unboxed unboxed lowtag-mask)
@@ -90,7 +90,7 @@
     (pseudo-atomic (pa-flag)
       (allocation result size other-pointer-lowtag :flag-tn pa-flag)
       (storew ndescr result 0 other-pointer-lowtag)
-      (storew unboxed result code-code-size-slot other-pointer-lowtag)
+      (storew unboxed-arg result code-code-size-slot other-pointer-lowtag)
       (storew null-tn result code-entry-points-slot other-pointer-lowtag)
       (storew null-tn result code-debug-info-slot other-pointer-lowtag))))
 

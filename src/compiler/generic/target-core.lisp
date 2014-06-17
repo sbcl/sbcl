@@ -56,7 +56,7 @@
   (without-gcing
     (let* ((2comp (component-info component))
            (constants (ir2-component-constants 2comp))
-           (box-num (- (length constants) sb!vm:code-trace-table-offset-slot))
+           (box-num (- (length constants) sb!vm:code-constants-offset))
            (code-obj (allocate-code-object box-num length))
            (fill-ptr (code-instructions code-obj)))
       (declare (type index box-num length))
@@ -78,8 +78,6 @@
         (push info (core-object-debug-info object))
         (setf (%code-debug-info code-obj) info))
 
-      (setf (code-header-ref code-obj sb!vm:code-trace-table-offset-slot)
-            length)
       (do ((index sb!vm:code-constants-offset (1+ index)))
           ((>= index (length constants)))
         (let ((const (aref constants index)))

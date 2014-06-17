@@ -255,12 +255,11 @@
            (values (tagged-object other-pointer-lowtag)
                    code-header-widetag
                    (round-to-dualword
-                    (* (+ header-value
-                          (the fixnum
+                    (+ (* header-value n-word-bytes)
+                       (the fixnum
                             (sap-ref-lispobj object-sap
                                              (* code-code-size-slot
-                                                n-word-bytes))))
-                       n-word-bytes))))
+                                                n-word-bytes)))))))
 
           (t
            (error "Unrecognized room-info-kind ~S in reconstitute-object"
@@ -531,102 +530,6 @@
     (when print-summary (print-summary spaces totals)))
 
   (values))
-
-;;; Print info about how much code and no-ops there are in SPACE.
-(defun count-no-ops (space)
-  (declare (type spaces space))
-  (let ((code-words 0)
-        (no-ops 0)
-        (total-bytes 0))
-    (declare (fixnum code-words no-ops)
-             (type unsigned-byte total-bytes))
-    (map-allocated-objects
-     (lambda (obj type size)
-       (when (eql type code-header-widetag)
-         (let ((words (truly-the fixnum (%code-code-size obj)))
-               (sap (%primitive code-instructions obj))
-               (size size))
-           (declare (fixnum size))
-           (incf total-bytes size)
-           (incf code-words words)
-           (dotimes (i words)
-             (when (zerop (sap-ref-word sap (* i n-word-bytes)))
-               (incf no-ops))))))
-     space)
-
-    (format t
-            "~:D code-object bytes, ~:D code words, with ~:D no-ops (~D%).~%"
-            total-bytes code-words no-ops
-            (round (* no-ops 100) code-words)))
-
-  (values))
-
-(defun descriptor-vs-non-descriptor-storage (&rest spaces)
-  (let ((descriptor-words 0)
-        (non-descriptor-headers 0)
-        (non-descriptor-bytes 0))
-    (declare (type unsigned-byte descriptor-words non-descriptor-headers
-                   non-descriptor-bytes))
-    (dolist (space (or spaces '(:read-only :static :dynamic)))
-      (declare (inline map-allocated-objects))
-      (map-allocated-objects
-       (lambda (obj type size)
-         (case type
-           (#.code-header-widetag
-            (let ((inst-words (truly-the fixnum (%code-code-size obj)))
-                  (size size))
-              (declare (type fixnum size inst-words))
-              (incf non-descriptor-bytes (* inst-words n-word-bytes))
-              (incf descriptor-words
-                    (- (truncate size n-word-bytes) inst-words))))
-           ((#.bignum-widetag
-             #.single-float-widetag
-             #.double-float-widetag
-             #.simple-base-string-widetag
-             #!+sb-unicode #.simple-character-string-widetag
-             #.simple-array-nil-widetag
-             #.simple-bit-vector-widetag
-             #.simple-array-unsigned-byte-2-widetag
-             #.simple-array-unsigned-byte-4-widetag
-             #.simple-array-unsigned-byte-8-widetag
-             #.simple-array-unsigned-byte-16-widetag
-             #.simple-array-unsigned-byte-32-widetag
-             #.simple-array-signed-byte-8-widetag
-             #.simple-array-signed-byte-16-widetag
-             #.simple-array-signed-byte-32-widetag
-             #.simple-array-single-float-widetag
-             #.simple-array-double-float-widetag
-             #.simple-array-complex-single-float-widetag
-             #.simple-array-complex-double-float-widetag)
-            (incf non-descriptor-headers)
-            (incf non-descriptor-bytes (- size n-word-bytes)))
-           ((#.list-pointer-lowtag
-             #.instance-pointer-lowtag
-             #.ratio-widetag
-             #.complex-widetag
-             #.simple-array-widetag
-             #.simple-vector-widetag
-             #.complex-base-string-widetag
-             #.complex-vector-nil-widetag
-             #.complex-bit-vector-widetag
-             #.complex-vector-widetag
-             #.complex-array-widetag
-             #.closure-header-widetag
-             #.funcallable-instance-header-widetag
-             #.value-cell-header-widetag
-             #.symbol-header-widetag
-             #.sap-widetag
-             #.weak-pointer-widetag
-             #.instance-header-widetag)
-            (incf descriptor-words (truncate (the fixnum size) n-word-bytes)))
-           (t
-            (error "bogus widetag: ~W" type))))
-       space))
-    (format t "~:D words allocated for descriptor objects.~%"
-            descriptor-words)
-    (format t "~:D bytes data/~:D words header for non-descriptor objects.~%"
-            non-descriptor-bytes non-descriptor-headers)
-    (values)))
 
 ;;; Print a breakdown by instance type of all the instances allocated
 ;;; in SPACE. If TOP-N is true, print only information for the

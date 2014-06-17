@@ -209,10 +209,9 @@
 
 ;;; Code object layout:
 ;;;     header-word
-;;;     code-size (starting from first inst, in words)
+;;;     code-size (starting from first inst, in bytes)
 ;;;     entry-points (points to first function header)
 ;;;     debug-info
-;;;     trace-table-offset (starting from first inst, in bytes)
 ;;;     constant1
 ;;;     constant2
 ;;;     ...
@@ -221,7 +220,6 @@
 ;;;     ...
 ;;;     fun-headers and lra's buried in here randomly
 ;;;     ...
-;;;     start of trace-table
 ;;;     <padding to dual-word boundary>
 ;;;
 ;;; Function header layout (dual word aligned):
@@ -320,22 +318,12 @@
 ;;; Return the length of the instruction area in CODE-COMPONENT.
 (defun code-inst-area-length (code-component)
   (declare (type sb!kernel:code-component code-component))
-  (sb!kernel:code-header-ref code-component
-                             sb!vm:code-trace-table-offset-slot))
+  (sb!kernel:%code-code-size code-component))
 
 ;;; Return the address of the instruction area in CODE-COMPONENT.
 (defun code-inst-area-address (code-component)
   (declare (type sb!kernel:code-component code-component))
   (sb!sys:sap-int (sb!kernel:code-instructions code-component)))
-
-;;; unused as of sbcl-0.pre7.129
-#|
-;;; Return the first function in CODE-COMPONENT.
-(defun code-first-function (code-component)
-  (declare (type sb!kernel:code-component code-component))
-  (sb!kernel:code-header-ref code-component
-                             sb!vm:code-trace-table-offset-slot))
-|#
 
 (defun segment-offs-to-code-offs (offset segment)
   (sb!sys:without-gcing
@@ -982,12 +970,9 @@
   (declare (type compiled-function function))
   (let* ((self (fun-self function))
          (code (sb!kernel:fun-code-header self)))
-    (format t "Code-header ~S: size: ~S, trace-table-offset: ~S~%"
+    (format t "Code-header ~S: size: ~S~%"
             code
-            (sb!kernel:code-header-ref code
-                                       sb!vm:code-code-size-slot)
-            (sb!kernel:code-header-ref code
-                                       sb!vm:code-trace-table-offset-slot))
+            (sb!kernel:%code-code-size code))
     (do ((fun (sb!kernel:code-header-ref code sb!vm:code-entry-points-slot)
               (fun-next fun)))
         ((null fun))
@@ -1690,19 +1675,16 @@
     (if (null code)
       (return-from get-code-constant-absolute (values nil nil)))
     (sb!sys:without-gcing
-     (let* ((n-header-words (sb!kernel:get-header-data code))
-            (n-code-words (sb!kernel:%code-code-size code))
+     (let* ((n-header-bytes (* (sb!kernel:get-header-data code) sb!vm:n-word-bytes))
+            (n-code-bytes (sb!kernel:%code-code-size code))
             (header-addr (- (sb!kernel:get-lisp-obj-address code)
-                             sb!vm:other-pointer-lowtag)))
-         (cond ((<= header-addr addr (+ header-addr (ash (1- n-header-words)
-                                                         sb!vm:word-shift)))
+                            sb!vm:other-pointer-lowtag))
+            (code-start (+ header-addr n-header-bytes)))
+         (cond ((< header-addr addr code-start)
                 (values (sb!sys:sap-ref-lispobj (sb!sys:int-sap addr) 0) t))
                ;; guess it's a non-descriptor constant from the instructions
                ((and (eq width :qword)
-                     (< n-header-words
-                        ;; convert ADDR to header-relative Nth word
-                        (ash (- addr header-addr) (- sb!vm:word-shift))
-                        (+ n-header-words n-code-words)))
+                     (< code-start addr (+ code-start n-code-bytes)))
                 (values (make-code-constant-raw
                          :value (sb!sys:sap-ref-64 (sb!sys:int-sap addr) 0))
                         t))

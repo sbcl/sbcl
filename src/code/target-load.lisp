@@ -211,7 +211,7 @@
   (declare (fixnum box-num code-length))
   (with-fop-stack t
     (let ((code (sb!c:allocate-code-object box-num code-length))
-          (index (+ sb!vm:code-trace-table-offset-slot box-num)))
+          (index (+ sb!vm:code-constants-offset box-num)))
       (declare (type index index))
       (setf (%code-debug-info code) (pop-stack))
       (dotimes (i box-num)
@@ -240,24 +240,22 @@
       (dotimes (i box-num)
         (declare (fixnum i))
         (push (pop-stack) stuff))
-      (let* ((dbi (car (last stuff)))   ; debug-info
-             (tto (first stuff)))       ; trace-table-offset
+      (let* ((dbi (car (last stuff))))  ; debug-info
 
         (setq stuff (nreverse stuff))
 
         ;; FIXME: *LOAD-CODE-VERBOSE* should probably be #!+SB-SHOW.
         (when *load-code-verbose*
-              (format t "stuff: ~S~%" stuff)
-              (format t
-                      "   : ~S ~S ~S ~S~%"
-                      (sb!c::compiled-debug-info-p dbi)
-                      (sb!c::debug-info-p dbi)
-                      (sb!c::compiled-debug-info-name dbi)
-                      tto)
-              (format t "   loading to the dynamic space~%"))
+          (format t "stuff: ~S~%" stuff)
+          (format t
+                  "   : ~S ~S ~S~%"
+                  (sb!c::compiled-debug-info-p dbi)
+                  (sb!c::debug-info-p dbi)
+                  (sb!c::compiled-debug-info-name dbi))
+          (format t "   loading to the dynamic space~%"))
 
         (let ((code (sb!c:allocate-code-object box-num code-length))
-              (index (+ sb!vm:code-trace-table-offset-slot box-num)))
+              (index (+ sb!vm:code-constants-offset box-num)))
           (declare (type index index))
           (when *load-code-verbose*
             (format t
@@ -268,10 +266,10 @@
             (declare (fixnum i))
             (setf (code-header-ref code (decf index)) (pop stuff)))
           (without-gcing
-           (read-n-bytes *fasl-input-stream*
-                         (code-instructions code)
-                         0
-                         code-length))
+            (read-n-bytes *fasl-input-stream*
+                          (code-instructions code)
+                          0
+                          code-length))
           code)))))
 
 ;;;; linkage fixups

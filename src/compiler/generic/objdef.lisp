@@ -145,9 +145,13 @@
           :type index)
   (data :rest-p t :c-type #!-alpha "uword_t" #!+alpha "u32"))
 
+;;; The header contains the size of slots and constants in words.
 (define-primitive-object (code :type code-component
                                :lowtag other-pointer-lowtag
                                :widetag t)
+  ;; This is the size of instructions in bytes, not aligned.
+  ;; Adding the size from the header and aligned code-size will yield
+  ;; the total size of the code-object.
   (code-size :type index
              :ref-known (flushable movable)
              :ref-trans %code-code-size)
@@ -161,7 +165,6 @@
               :ref-trans %code-debug-info
               :set-known ()
               :set-trans (setf %code-debug-info))
-  (trace-table-offset)
   (constants :rest-p t))
 
 (define-primitive-object (fdefn :type fdefn

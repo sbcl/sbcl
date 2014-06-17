@@ -138,12 +138,11 @@
   (:results (result :scs (descriptor-reg)))
   (:temporary (:scs (non-descriptor-reg)) ndescr)
   (:temporary (:scs (any-reg) :from (:argument 0)) boxed)
-  (:temporary (:scs (non-descriptor-reg) :from (:argument 1)) unboxed)
+  (:temporary (:scs (non-descriptor-reg)) unboxed)
   (:temporary (:sc non-descriptor-reg :offset nl4-offset) pa-flag)
   (:generator 100
     (inst li ndescr (lognot lowtag-mask))
-    (inst addu boxed boxed-arg
-          (fixnumize (1+ code-trace-table-offset-slot)))
+    (inst addu boxed boxed-arg (fixnumize (1+ code-code-size-slot)))
     (inst and boxed ndescr)
     (inst srl unboxed unboxed-arg word-shift)
     (inst addu unboxed unboxed lowtag-mask)
@@ -155,7 +154,7 @@
       (inst or result alloc-tn other-pointer-lowtag)
       (inst addu alloc-tn boxed)
       (storew ndescr result 0 other-pointer-lowtag)
-      (storew unboxed result code-code-size-slot other-pointer-lowtag)
+      (storew unboxed-arg result code-code-size-slot other-pointer-lowtag)
       (inst addu alloc-tn unboxed)
       (storew null-tn result code-entry-points-slot other-pointer-lowtag)
       (storew null-tn result code-debug-info-slot other-pointer-lowtag))))

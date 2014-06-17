@@ -196,20 +196,20 @@ alloc_sap(void *ptr)
 lispobj
 alloc_code_object (unsigned boxed, unsigned unboxed) {
     struct code * code;
-    /* Coming in, boxed is the number of boxed words requested.
-     * Converting it to a fixnum makes it measured in bytes. It's also
-     * rounded up to double word along the way. */
+    /* boxed is the number of constants, add other slots, align it to
+     * two words, so that the code start is aligned, and convert it to
+     * bytes. */
     boxed = (boxed + 1 +
-             (offsetof(struct code, trace_table_offset) >>
+             (offsetof(struct code, constants) >>
               WORD_SHIFT)) << WORD_SHIFT;
     boxed &= ~LOWTAG_MASK;
 
-    /* Unboxed is in bytes, round it up to double word boundary. Now
-     * it's also a fixnum containing the number of unboxed words. */
-    unboxed += LOWTAG_MASK;
-    unboxed &= ~LOWTAG_MASK;
+    /* Unboxed is the size of instructions in bytes. It will be stored
+     * as is in the code_size slot, but it needs to be allocated with
+     * double-word alignment. */
+    unsigned unboxed_aligned = (unboxed + LOWTAG_MASK) & ~LOWTAG_MASK;
 
-    code = (struct code *)pa_alloc(boxed + unboxed, CODE_PAGE_FLAG);
+    code = (struct code *)pa_alloc(boxed + unboxed_aligned, CODE_PAGE_FLAG);
 
     /* It used to be that even on gencgc builds the
      * ALLOCATE-CODE-OBJECT VOP did all this initialization within
@@ -218,7 +218,7 @@ alloc_code_object (unsigned boxed, unsigned unboxed) {
         lose("alloc_code_object called with GC enabled.");
     boxed = boxed << (N_WIDETAG_BITS - WORD_SHIFT);
     code->header = boxed | CODE_HEADER_WIDETAG;
-    code->code_size = unboxed >> (WORD_SHIFT - N_FIXNUM_TAG_BITS);
+    code->code_size = make_fixnum(unboxed);
     code->entry_points = NIL;
     code->debug_info = NIL;
     return make_lispobj(code, OTHER_POINTER_LOWTAG);

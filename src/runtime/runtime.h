@@ -334,6 +334,15 @@ fixnum_value(lispobj n)
     return n >> N_FIXNUM_TAG_BITS;
 }
 
+static inline sword_t
+fixnum_word_value(lispobj n)
+{
+    /* Convert bytes into words, double-word aligned. */
+    sword_t x = ((n >> N_FIXNUM_TAG_BITS) + LOWTAG_MASK) & ~LOWTAG_MASK;
+    
+    return x >> WORD_SHIFT;
+}
+
 #if defined(LISP_FEATURE_WIN32)
 /* KLUDGE: Avoid double definition of boolean by rpcndr.h included via
  * shlobj.h.

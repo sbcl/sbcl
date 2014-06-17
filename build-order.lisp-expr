@@ -497,7 +497,6 @@
 
  ("src/code/debug-info")
  ;; Compiling this requires fop definitions from code/fop.lisp and
- ;; trace table definitions from compiler/trace-table.lisp.
  ("src/compiler/dump")
 
  ("src/compiler/main") ; needs DEFSTRUCT FASL-OUTPUT from dump.lisp

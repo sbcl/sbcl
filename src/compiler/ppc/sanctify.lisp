@@ -26,8 +26,7 @@
                                            system-area-pointer
                                            unsigned-long))
                    (code-instructions component)
-                   (* (code-header-ref component code-code-size-slot)
-                      n-word-bytes)))
+                   (%code-code-size component)))
   nil)
 
 

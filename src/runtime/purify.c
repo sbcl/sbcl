@@ -281,7 +281,7 @@ ptrans_code(lispobj thing)
     lispobj func, result;
 
     code = (struct code *)native_pointer(thing);
-    nwords = CEILING(HeaderValue(code->header) + fixnum_value(code->code_size),
+    nwords = CEILING(HeaderValue(code->header) + fixnum_word_value(code->code_size),
                      2);
 
     new = (struct code *)newspace_alloc(nwords,1); /* constant */
@@ -306,20 +306,10 @@ ptrans_code(lispobj thing)
     /* Arrange to scavenge the debug info later. */
     pscav_later(&new->debug_info, 1);
 
-    /* FIXME: why would this be a fixnum? */
-    /* "why" is a hard word, but apparently for compiled functions the
-       trace_table_offset contains the length of the instructions, as
-       a fixnum.  See CODE-INST-AREA-LENGTH in
-       src/compiler/target-disassem.lisp.  -- CSR, 2004-01-08 */
-    if (!(fixnump(new->trace_table_offset)))
-#if 0
-        pscav(&new->trace_table_offset, 1, 0);
-#else
-        new->trace_table_offset = NIL; /* limit lifetime */
-#endif
-
     /* Scavenge the constants. */
-    pscav(new->constants, HeaderValue(new->header)-5, 1);
+    pscav(new->constants,
+          HeaderValue(new->header) - (offsetof(struct code, constants) >> WORD_SHIFT),
+          1);
 
     /* Scavenge all the functions. */
     pscav(&new->entry_points, 1, 1);

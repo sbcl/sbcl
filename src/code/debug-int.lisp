@@ -897,9 +897,7 @@
                            sb!vm:other-pointer-lowtag)
                         code-header-len)))
               (/noshow "got PC-OFFSET")
-              (unless (<= 0 pc-offset
-                          (* (code-header-ref code sb!vm:code-code-size-slot)
-                             sb!vm:n-word-bytes))
+              (unless (<= 0 pc-offset (%code-code-size code))
                 ;; We were in an assembly routine. Therefore, use the
                 ;; LRA as the pc.
                 ;;
@@ -933,9 +931,7 @@
                         (- (get-lisp-obj-address code)
                            sb!vm:other-pointer-lowtag)
                         code-header-len)))
-              (let ((code-size (* (code-header-ref code
-                                                   sb!vm:code-code-size-slot)
-                                  sb!vm:n-word-bytes)))
+              (let ((code-size (%code-code-size code)))
                 (unless (<= 0 pc-offset code-size)
                   ;; We were in an assembly routine.
                   (multiple-value-bind (new-pc-offset computed-return)
@@ -3228,8 +3224,6 @@ register."
                     src-start src-end dst-start trap-loc)
               (type index length))
      (setf (%code-debug-info code-object) :bogus-lra)
-     (setf (code-header-ref code-object sb!vm:code-trace-table-offset-slot)
-           length)
      #!-(or x86 x86-64)
      (setf (code-header-ref code-object real-lra-slot) real-lra)
      #!+(or x86 x86-64)
