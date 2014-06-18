@@ -10,6 +10,23 @@
 ;;;; files for more information.
 
 (in-package "SB!VM")
+
+(defun !both-fixnum-p (temp x y)
+  (inst mov (reg-in-size temp :dword)
+        (reg-in-size x :dword))
+  (inst or (reg-in-size temp :dword)
+        (reg-in-size y :dword))
+  (inst test (reg-in-size temp :byte)
+        fixnum-tag-mask))
+
+(defun !some-fixnum-p (temp x y)
+  (inst mov (reg-in-size temp :dword)
+        (reg-in-size x :dword))
+  (inst and (reg-in-size temp :dword)
+        (reg-in-size y :dword))
+  (inst test (reg-in-size temp :byte)
+        fixnum-tag-mask))
+
 
 ;;;; addition, subtraction, and multiplication
 
@@ -27,10 +44,7 @@
 
                  (:temp rax unsigned-reg rax-offset)
                  (:temp rcx unsigned-reg rcx-offset))
-
-                (inst mov rcx x)
-                (inst or rcx y)
-                (inst test rcx fixnum-tag-mask) ; both fixnums?
+                (!both-fixnum-p rax x y)
                 (inst jmp :nz DO-STATIC-FUN)    ; no - do generic
 
                 ,@body
@@ -129,12 +143,12 @@
 
                           (:temp rax unsigned-reg rax-offset)
                           (:temp rcx unsigned-reg rcx-offset))
-  (inst test x fixnum-tag-mask)
+  (inst test (reg-in-size x :byte) fixnum-tag-mask)
   (inst jmp :z FIXNUM)
 
   (inst push rbp-tn)
   (inst mov rbp-tn rsp-tn)
-  (inst sub rsp-tn (* n-word-bytes 1))
+  (inst sub rsp-tn n-word-bytes)
   (inst push (make-ea :qword :base rbp-tn
                       :disp (frame-byte-offset return-pc-save-offset)))
   (inst mov rcx (fixnumize 1))    ; arg count
@@ -165,10 +179,8 @@
 
                    (:temp rcx unsigned-reg rcx-offset))
 
-                (inst mov rcx x)
-                (inst or rcx y)
-                (inst test rcx fixnum-tag-mask)
-                (inst jmp :nz DO-STATIC-FUN)  ; are both fixnums?
+                (!both-fixnum-p rcx x y)
+                (inst jmp :nz DO-STATIC-FUN)
 
                 (inst cmp x y)
                 (inst ret)
@@ -236,9 +248,7 @@
 
                           (:temp rcx unsigned-reg rcx-offset))
 
-  (inst mov rcx x)
-  (inst and rcx y)
-  (inst test rcx fixnum-tag-mask)
+  (!some-fixnum-p rcx x y)
   (inst jmp :nz DO-STATIC-FUN)
 
   ;; At least one fixnum
@@ -263,8 +273,7 @@
   (inst mov rcx (fixnumize 2))
   (inst call (make-ea :qword
                       :disp (+ nil-value (static-fun-offset 'eql))))
-  (load-symbol y t)
-  (inst cmp x y)
+  (inst cmp x (+ nil-value (static-symbol-offset t)))
   (inst pop rbp-tn)
   (inst ret))
 
@@ -300,9 +309,7 @@
                           (:arg y (descriptor-reg any-reg) rdi-offset)
 
                           (:temp rcx unsigned-reg rcx-offset))
-  (inst mov rcx x)
-  (inst or rcx y)
-  (inst test rcx fixnum-tag-mask)
+  (!both-fixnum-p rcx x y)
   (inst jmp :nz DO-STATIC-FUN)
 
   ;; Both fixnums
@@ -328,8 +335,7 @@
   (inst mov rcx (fixnumize 2))
   (inst call (make-ea :qword
                       :disp (+ nil-value (static-fun-offset 'two-arg-=))))
-  (load-symbol y t)
-  (inst cmp x y)
+  (inst cmp x (+ nil-value (static-symbol-offset t)))
   (inst pop rbp-tn)
   (inst ret))
 
