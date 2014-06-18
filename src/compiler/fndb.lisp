@@ -886,7 +886,9 @@
                       (:initial-element t)
                       (:initial-contents t)
                       (:adjustable t)
-                      (:fill-pointer t)
+                      ;; the type constraint doesn't do anything
+                      ;; on account of EXPLICIT-CHECK. it's documentation.
+                      (:fill-pointer (or index boolean))
                       (:displaced-to (or array null))
                       (:displaced-index-offset index))
   array (flushable explicit-check))
@@ -899,7 +901,7 @@
                        (:initial-element t)
                        (:initial-contents t)
                        (:adjustable t)
-                       (:fill-pointer t)
+                       (:fill-pointer (or index boolean))
                        (:displaced-to (or array null))
                        (:displaced-index-offset index))
     array (flushable))
@@ -913,6 +915,10 @@
   type-specifier
   (foldable flushable recursive))
 (defknown array-rank (array) array-rank (foldable flushable))
+;; FIXME: there's a fencepost bug, but for all practical purposes our
+;; ARRAY-RANK-LIMIT is infinite, thus masking the bug. e.g. if the
+;; exclusive limit on rank were 8, then your dimension numbers can
+;; be in the range 0 through 6, not 0 through 7.
 (defknown array-dimension (array array-rank) index (foldable flushable))
 (defknown array-dimensions (array) list (foldable flushable))
 (defknown array-in-bounds-p (array &rest integer) boolean (foldable flushable))
@@ -963,7 +969,8 @@
 (defknown adjust-array
   (array (or index list) &key (:element-type type-specifier)
          (:initial-element t) (:initial-contents t)
-         (:fill-pointer t) (:displaced-to (or array null))
+         (:fill-pointer (or index boolean))
+         (:displaced-to (or array null))
          (:displaced-index-offset index))
   array ())
 ;  :derive-type 'result-type-arg1) Not even close...

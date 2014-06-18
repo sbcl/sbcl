@@ -346,6 +346,21 @@
     (let ((widetag (%other-pointer-widetag array)))
       (make-case))))
 
+;; Complain in various ways about wrong :INITIAL-foo arguments,
+;; returning the two initialization arguments needed for DATA-VECTOR-FROM-INITS.
+(defun validate-array-initargs (element-p element contents-p contents displaced)
+  (cond ((and displaced (or element-p contents-p))
+         (if (and element-p contents-p)
+             (error "Neither :INITIAL-ELEMENT nor :INITIAL-CONTENTS ~
+                     may be specified with the :DISPLACED-TO option")
+             (error "~S may not be specified with the :DISPLACED-TO option"
+                    (if element-p :initial-element :initial-contents))))
+        ((and element-p contents-p)
+         (error "Can't specify both :INITIAL-ELEMENT and :INITIAL-CONTENTS"))
+        (element-p  (values :initial-element element))
+        (contents-p (values :initial-contents contents))
+        (t          (values nil nil))))
+
 ;;; Widetag is the widetag of the underlying vector,
 ;;; it'll be the same as the resulting array widetag only for simple vectors
 (defun %make-array (dimensions widetag n-bits
@@ -356,12 +371,16 @@
                       adjustable fill-pointer
                       displaced-to displaced-index-offset)
   (declare (ignore element-type))
-  (let* ((dimensions (if (listp dimensions) dimensions (list dimensions)))
-         (array-rank (length (the list dimensions)))
-         (simple (and (null fill-pointer)
-                      (not adjustable)
-                      (null displaced-to))))
-    (declare (fixnum array-rank))
+  (binding* ((dimensions (if (listp dimensions) dimensions (list dimensions)))
+             (array-rank (length (the list dimensions)))
+             ((initialize initial-data)
+              (validate-array-initargs initial-element-p initial-element
+                                       initial-contents-p initial-contents
+                                       displaced-to))
+             (simple (and (null fill-pointer)
+                          (not adjustable)
+                          (null displaced-to))))
+    (declare (type array-rank array-rank))
     (cond ((and displaced-index-offset (null displaced-to))
            (error "can't specify :DISPLACED-INDEX-OFFSET without :DISPLACED-TO"))
           ((and simple (= array-rank 1))
@@ -372,9 +391,6 @@
              (when initial-element-p
                (fill array initial-element))
              (when initial-contents-p
-               (when initial-element-p
-                 (error "can't specify both :INITIAL-ELEMENT and ~
-                       :INITIAL-CONTENTS"))
                (unless (= length (length initial-contents))
                  (error "There are ~W elements in the :INITIAL-CONTENTS, but ~
                        the vector length is ~W."
@@ -391,8 +407,7 @@
                   (data (or displaced-to
                             (data-vector-from-inits
                              dimensions total-size nil widetag n-bits
-                             initial-contents initial-contents-p
-                             initial-element initial-element-p)))
+                             initialize initial-data)))
                   (array (make-array-header
                           (cond ((= array-rank 1)
                                  (%complex-vector-widetag widetag))
@@ -407,13 +422,11 @@
                       (setf (%array-fill-pointer array)
                             (cond ((eq fill-pointer t)
                                    length)
-                                  (t
-                                   (unless (and (fixnump fill-pointer)
-                                                (>= fill-pointer 0)
-                                                (<= fill-pointer length))
+                                  ((not (<= fill-pointer length))
                                      ;; FIXME: should be TYPE-ERROR?
                                      (error "invalid fill-pointer ~W"
                                             fill-pointer))
+                                  (t
                                    fill-pointer))))
                     (setf (%array-fill-pointer-p array) t))
                    (t
@@ -423,9 +436,6 @@
              (setf (%array-data-vector array) data)
              (setf (%array-displaced-from array) nil)
              (cond (displaced-to
-                    (when (or initial-element-p initial-contents-p)
-                      (error "Neither :INITIAL-ELEMENT nor :INITIAL-CONTENTS ~
-                   can be specified along with :DISPLACED-TO"))
                     (let ((offset (or displaced-index-offset 0)))
                       (when (> (+ offset total-size)
                                (array-total-size displaced-to))
@@ -469,9 +479,9 @@ of specialized arrays is supported."
   (when (eq t (upgraded-array-element-type element-type))
     (error "Static arrays of type ~S not supported."
            element-type))
+  (validate-array-initargs initial-element-p initial-element
+                           initial-contents-p initial-contents nil) ; for effect
   (when initial-contents-p
-    (when initial-element-p
-      (error "can't specify both :INITIAL-ELEMENT and :INITIAL-CONTENTS"))
     (unless (= length (length initial-contents))
       (error "There are ~W elements in the :INITIAL-CONTENTS, but the ~
               vector length is ~W."
@@ -506,25 +516,19 @@ of specialized arrays is supported."
 ;;; initial-contents.
 (defun data-vector-from-inits (dimensions total-size
                                element-type widetag n-bits
-                               initial-contents initial-contents-p
-                               initial-element initial-element-p)
-  (when initial-element-p
-    (when initial-contents-p
-      (error "cannot supply both :INITIAL-CONTENTS and :INITIAL-ELEMENT to
-            either MAKE-ARRAY or ADJUST-ARRAY."))
+                               initialize initial-data)
     ;; FIXME: element-type can be NIL when widetag is non-nil,
     ;; and FILL will check the type, although the error will be not as nice.
     ;; (cond (typep initial-element element-type)
     ;;   (error "~S cannot be used to initialize an array of type ~S."
     ;;          initial-element element-type))
-    )
   (let ((data (if widetag
                   (allocate-vector-with-widetag widetag total-size n-bits)
                   (make-array total-size :element-type element-type))))
-    (cond (initial-element-p
-           (fill (the vector data) initial-element))
-          (initial-contents-p
-           (fill-data-vector data dimensions initial-contents)))
+    (ecase initialize
+     (:initial-element (fill (the vector data) initial-data))
+     (:initial-contents (fill-data-vector data dimensions initial-data))
+     ((nil)))
     data))
 
 (defun vector (&rest objects)
@@ -1055,33 +1059,36 @@ of specialized arrays is supported."
   "Adjust ARRAY's dimensions to the given DIMENSIONS and stuff."
   (when (invalid-array-p array)
     (invalid-array-error array))
-  (let ((dimensions (if (listp dimensions) dimensions (list dimensions))))
-    (cond ((/= (the fixnum (length (the list dimensions)))
-               (the fixnum (array-rank array)))
-           (error "The number of dimensions not equal to rank of array."))
-          ((and element-type-p
+  (binding* ((dimensions (if (listp dimensions) dimensions (list dimensions)))
+             (array-rank (array-rank array))
+             (()
+              (unless (= (length dimensions) array-rank)
+                (error "The number of dimensions not equal to rank of array.")))
+             ((initialize initial-data)
+              (validate-array-initargs initial-element-p initial-element
+                                       initial-contents-p initial-contents
+                                       displaced-to)))
+    (cond ((and element-type-p
                 (not (subtypep element-type (array-element-type array))))
+           ;; This is weird. Should check upgraded type against actual
+           ;; array element type I think. See lp#1331299. CLHS says that
+           ;; "consequences are unspecified" so current behavior isn't wrong.
            (error "The new element type, ~S, is incompatible with old type."
                   element-type))
+          ((and fill-pointer (/= array-rank 1))
+           (error "Only vectors can have fill pointers."))
           ((and fill-pointer (not (array-has-fill-pointer-p array)))
-           (error 'type-error
-                  :datum array
-                  :expected-type '(satisfies array-has-fill-pointer-p))))
-    (let ((array-rank (length (the list dimensions))))
-      (declare (fixnum array-rank))
-      (unless (= array-rank 1)
-        (when fill-pointer
-          (error "Only vectors can have fill pointers.")))
-      (cond (initial-contents-p
+           ;; This case always struck me as odd. It seems like it might mean
+           ;; that the user asks that the array gain a fill-pointer if it didn't
+           ;; have one, yet CLHS is clear that the argument array must have a
+           ;; fill-pointer or else signal a type-error.
+           (fill-pointer-error array)))
+    (cond (initial-contents-p
              ;; array former contents replaced by INITIAL-CONTENTS
-             (if (or initial-element-p displaced-to)
-                 (error ":INITIAL-CONTENTS may not be specified with ~
-                         the :INITIAL-ELEMENT or :DISPLACED-TO option."))
              (let* ((array-size (apply #'* dimensions))
                     (array-data (data-vector-from-inits
                                  dimensions array-size element-type nil nil
-                                 initial-contents initial-contents-p
-                                 initial-element initial-element-p)))
+                                 initialize initial-data)))
                (if (adjustable-array-p array)
                    (set-array-header array array-data array-size
                                  (get-new-fill-pointer array array-size
@@ -1093,12 +1100,10 @@ of specialized arrays is supported."
                                    :element-type element-type
                                    :initial-contents initial-contents)
                        array-data))))
-            (displaced-to
+          (displaced-to
              ;; We already established that no INITIAL-CONTENTS was supplied.
-             (when initial-element
-               (error "The :INITIAL-ELEMENT option may not be specified ~
-                       with :DISPLACED-TO."))
              (unless (subtypep element-type (array-element-type displaced-to))
+               ;; See lp#1331299 again. Require exact match on upgraded type?
                (error "can't displace an array of type ~S into another of ~
                        type ~S"
                       element-type (array-element-type displaced-to)))
@@ -1120,7 +1125,7 @@ of specialized arrays is supported."
                                :displaced-to displaced-to
                                :displaced-index-offset
                                displaced-index-offset))))
-            ((= array-rank 1)
+          ((= array-rank 1)
              (let ((old-length (array-total-size array))
                    (new-length (car dimensions))
                    new-data)
@@ -1134,8 +1139,7 @@ of specialized arrays is supported."
                               (data-vector-from-inits
                                dimensions new-length element-type
                                (%other-pointer-widetag old-data) nil
-                               initial-contents initial-contents-p
-                               initial-element initial-element-p))
+                               initialize initial-data))
                         ;; Provide :END1 to avoid full call to LENGTH
                         ;; inside REPLACE.
                         (replace new-data old-data
@@ -1149,7 +1153,7 @@ of specialized arrays is supported."
                                                              fill-pointer)
                                        0 dimensions nil nil)
                      new-data))))
-            (t
+          (t
              (let ((old-length (%array-available-elements array))
                    (new-length (apply #'* dimensions)))
                (declare (fixnum old-length new-length))
@@ -1163,8 +1167,8 @@ of specialized arrays is supported."
                                       dimensions new-length
                                       element-type
                                       (%other-pointer-widetag old-data) nil
-                                      () nil
-                                      initial-element initial-element-p)
+                                      (if initial-element-p :initial-element)
+                                      initial-element)
                                      old-data)))
                    (if (or (zerop old-length) (zerop new-length))
                        (when initial-element-p (fill new-data initial-element))
@@ -1180,23 +1184,19 @@ of specialized arrays is supported."
                               (make-array-header
                                sb!vm:simple-array-widetag array-rank)))
                          (set-array-header new-array new-data new-length
-                                           nil 0 dimensions nil t)))))))))))
+                                           nil 0 dimensions nil t))))))))))
 
 
 (defun get-new-fill-pointer (old-array new-array-size fill-pointer)
   (cond ((not fill-pointer)
+         ;; "The consequences are unspecified if array is adjusted to a
+         ;;  size smaller than its fill pointer ..."
          (when (array-has-fill-pointer-p old-array)
            (when (> (%array-fill-pointer old-array) new-array-size)
              (error "cannot ADJUST-ARRAY an array (~S) to a size (~S) that is ~
                      smaller than its fill pointer (~S)"
                     old-array new-array-size (fill-pointer old-array)))
            (%array-fill-pointer old-array)))
-        ((not (array-has-fill-pointer-p old-array))
-         (error "cannot supply a non-NIL value (~S) for :FILL-POINTER ~
-                 in ADJUST-ARRAY unless the array (~S) was originally ~
-                 created with a fill pointer"
-                fill-pointer
-                old-array))
         ((numberp fill-pointer)
          (when (> fill-pointer new-array-size)
            (error "can't supply a value for :FILL-POINTER (~S) that is larger ~
@@ -1204,10 +1204,7 @@ of specialized arrays is supported."
                   fill-pointer new-array-size))
          fill-pointer)
         ((eq fill-pointer t)
-         new-array-size)
-        (t
-         (error "bogus value for :FILL-POINTER in ADJUST-ARRAY: ~S"
-                fill-pointer))))
+         new-array-size)))
 
 ;;; Destructively alter VECTOR, changing its length to NEW-LENGTH,
 ;;; which must be less than or equal to its current length. This can

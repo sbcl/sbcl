@@ -298,3 +298,16 @@
        t)
      (:no-error (&rest args)
        nil))))
+
+(with-test (:name :dont-make-array-bad-keywords)
+  ;; This used to get a heap exhaustion error because of trying
+  ;; to make the array before checking keyword validity.
+  (handler-case
+      (locally
+          (declare (notinline make-array))
+        (make-array (1- array-total-size-limit)
+                    :initial-contents '(a b c) :initial-element 9))
+    (simple-error (c)
+      (assert
+       (string= (simple-condition-format-control c)
+                "Can't specify both :INITIAL-ELEMENT and :INITIAL-CONTENTS")))))
