@@ -81,7 +81,7 @@
   (enumerable nil :read-only t)
   ;; an arbitrary hash code used in EQ-style hashing of identity
   ;; (since EQ hashing can't be done portably)
-  (hash-value (random #.(ash 1 15)
+  (hash-value (random #.(ash 1 28)
                       (if (boundp '*type-random-state*)
                           *type-random-state*
                           (setf *type-random-state*
@@ -123,7 +123,7 @@
         ((csubtypep type2 type1) type1)
         (t nil)))
 
-;;; Hash two things (types) down to 8 bits. In CMU CL this was an EQ
+;;; Hash two things (types) down to a fixnum. In CMU CL this was an EQ
 ;;; hash, but since it now needs to run in vanilla ANSI Common Lisp at
 ;;; cross-compile time, it's now based on the CTYPE-HASH-VALUE field
 ;;; instead.
@@ -132,20 +132,17 @@
 ;;; it important for it to be INLINE, or could be become an ordinary
 ;;; function without significant loss? -- WHN 19990413
 #!-sb-fluid (declaim (inline type-cache-hash))
-(declaim (ftype (function (ctype ctype) (unsigned-byte 8)) type-cache-hash))
+(declaim (ftype (function (ctype ctype) fixnum) type-cache-hash))
 (defun type-cache-hash (type1 type2)
-  (logand (logxor (ash (type-hash-value type1) -3)
-                  (type-hash-value type2))
-          #xFF))
+  (logxor (ash (type-hash-value type1) -3) (type-hash-value type2)))
+
 #!-sb-fluid (declaim (inline type-list-cache-hash))
-(declaim (ftype (function (list) (unsigned-byte 8)) type-list-cache-hash))
+(declaim (ftype (function (list) fixnum) type-list-cache-hash))
 (defun type-list-cache-hash (types)
-  (logand #xFF
-          (loop with res fixnum = 0
-                for type in types
-                for hash = (type-hash-value type)
-                do (setq res (logxor res hash))
-                finally (return res))))
+  (loop with res fixnum = 0
+        for type in types
+        do (setq res (logxor (ash res -1) (type-hash-value type)))
+        finally (return res)))
 
 ;;;; cold loading initializations
 

@@ -144,7 +144,7 @@
 ;;; user might find most informative.
 (declaim (ftype (function (t) ctype) ctype-of))
 (defun-cached (ctype-of
-               :hash-function (lambda (x) (logand (sxhash x) #x1FF))
+               :hash-function #'sxhash
                :hash-bits 9
                :init-wrapper !cold-init-forms)
               ((x eq))

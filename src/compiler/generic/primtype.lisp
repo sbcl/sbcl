@@ -154,8 +154,7 @@
   (primitive-type-aux type))
 (/show0 "primtype.lisp 191")
 (defun-cached (primitive-type-aux
-               :hash-function (lambda (x)
-                                (logand (type-hash-value x) #x1FF))
+               :hash-function #'type-hash-value
                :hash-bits 9
                :values 2
                :default (values nil :empty))

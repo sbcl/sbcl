@@ -146,18 +146,19 @@
                :hash-bits 8
                :hash-function
                (lambda (req opt rest allowp)
-                 (logand (logxor
-                          (type-list-cache-hash req)
-                          (type-list-cache-hash opt)
+                 (logxor (type-list-cache-hash req)
+                         (type-list-cache-hash opt)
                           (if rest
                               (type-hash-value rest)
                               42)
                           ;; Results (logand #xFF (sxhash t/nil))
                           ;; hardcoded to avoid relying on the xc host.
+                          ;; [but (logand (sxhash nil) #xff) => 2
+                          ;;  for me, so the code and comment disagree,
+                          ;;  but not in a way that matters.]
                           (if allowp
                               194
-                              11))
-                         #xFF)))
+                              11))))
     ((required equal-but-no-car-recursion)
      (optional equal-but-no-car-recursion)
      (rest eq)
@@ -570,8 +571,7 @@
 ;;; Note: VALUES-SPECIFIER-TYPE-CACHE-CLEAR must be called whenever a
 ;;; type is defined (or redefined).
 (defun-cached (values-specifier-type
-               :hash-function (lambda (x)
-                                (logand (sxhash x) #x3FF))
+               :hash-function #'sxhash
                :hash-bits 10
                :init-wrapper !cold-init-forms)
               ((orig equal-but-no-car-recursion))

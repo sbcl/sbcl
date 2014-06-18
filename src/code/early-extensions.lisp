@@ -529,7 +529,7 @@
 ;;;   The size of the cache as a power of 2.
 ;;; :HASH-FUNCTION function
 ;;;   Some thing that can be placed in CAR position which will compute
-;;;   a value between 0 and (1- (expt 2 <hash-bits>)).
+;;;   a fixnum with at least (* 2 <hash-bits>) of information in it.
 ;;; :VALUES <n>
 ;;;   the number of return values cached for each function call
 ;;; :INIT-WRAPPER <name>
@@ -547,20 +547,18 @@
                                   (init-wrapper 'progn)
                                   (values 1))
   (let* ((var-name (symbolicate "**" name "-CACHE-VECTOR**"))
-         (probes-name (when *profile-hash-cache*
-                       (symbolicate "**" name "-CACHE-PROBES**")))
-         (misses-name (when *profile-hash-cache*
-                      (symbolicate "**" name "-CACHE-MISSES**")))
+         (statistics-name (when *profile-hash-cache*
+                            (symbolicate "**" name "-CACHE-STATISTICS**")))
          (nargs (length args))
          (size (ash 1 hash-bits))
          (default-values (if (and (consp default) (eq (car default) 'values))
                              (cdr default)
                              (list default)))
          (args-and-values (sb!xc:gensym "ARGS-AND-VALUES"))
-         (args-and-values-size (+ nargs values))
          (n-index (sb!xc:gensym "INDEX"))
          (n-cache (sb!xc:gensym "CACHE")))
-    (declare (ignorable probes-name misses-name))
+    (declare (ignorable statistics-name))
+    (assert (typep hash-bits '(integer 5 14))) ; reasonable bounds
     (unless (= (length default-values) values)
       (error "The number of default values ~S differs from :VALUES ~W."
              default values))
@@ -568,7 +566,6 @@
     (collect ((inlines)
               (forms)
               (inits)
-              (sets)
               (tests)
               (arg-vars)
               (values-refs)
@@ -576,8 +573,7 @@
       (dotimes (i values)
         (let ((name (sb!xc:gensym "VALUE")))
           (values-names name)
-          (values-refs `(svref ,args-and-values (+ ,nargs ,i)))
-          (sets `(setf (svref ,args-and-values (+ ,nargs ,i)) ,name))))
+          (values-refs `(svref ,args-and-values (+ ,nargs ,i)))))
       (let ((n 0))
         (dolist (arg args)
           (unless (= (length arg) 2)
@@ -585,44 +581,63 @@
           (let ((arg-name (first arg))
                 (test (second arg)))
             (arg-vars arg-name)
-            (tests `(,test (svref ,args-and-values ,n) ,arg-name))
-            (sets `(setf (svref ,args-and-values ,n) ,arg-name)))
+            (tests `(,test (svref ,args-and-values ,n) ,arg-name)))
           (incf n)))
 
       (when *profile-hash-cache*
-        (inits `(setq ,probes-name 0))
-        (inits `(setq ,misses-name 0))
-        (forms `(declaim (fixnum ,probes-name ,misses-name))))
+        (inits `(setq ,statistics-name (make-array 3 :element-type 'fixnum)))
+        (forms `(declaim (type (simple-array fixnum (3)) ,statistics-name))))
 
       (let ((fun-name (symbolicate name "-CACHE-LOOKUP")))
         (inlines fun-name)
         (forms
          `(defun ,fun-name ,(arg-vars)
             ,@(when *profile-hash-cache*
-                `((incf ,probes-name)))
+                `((incf (aref ,statistics-name 0))))
             (flet ((miss ()
                      ,@(when *profile-hash-cache*
-                         `((incf ,misses-name)))
-                     (return-from ,fun-name ,default)))
-              (let* ((,n-index (,hash-function ,@(arg-vars)))
-                     (,n-cache (or ,var-name (miss)))
-                     (,args-and-values (svref ,n-cache ,n-index)))
-                (cond ((and (not (eql 0 ,args-and-values))
-                            ,@(tests))
-                       (values ,@(values-refs)))
-                      (t
-                       (miss))))))))
+                         `((incf (aref ,statistics-name 1))))
+                     (return-from ,fun-name ,default))
+                   (try (,args-and-values)
+                     (if (and (not (eql 0 ,args-and-values))
+                              ,@(tests))
+                         (return-from ,fun-name
+                           (values ,@(values-refs))))))
+              (let ((,n-cache (or ,var-name (miss)))
+                    (,n-index (funcall ,hash-function ,@(arg-vars))))
+                ;; The matching entry might be in either index.
+                ;; Replacement picks one at random if both choices were taken.
+                (try (svref ,n-cache (ldb (byte ,hash-bits 0) ,n-index)))
+                (try (svref ,n-cache (ldb (byte ,hash-bits ,hash-bits)
+                                          ,n-index)))
+                (miss))))))
 
       (let ((fun-name (symbolicate name "-CACHE-ENTER")))
         (inlines fun-name)
         (forms
          `(defun ,fun-name (,@(arg-vars) ,@(values-names))
-            (let ((,n-index (,hash-function ,@(arg-vars)))
+            (let ((,n-index (funcall ,hash-function ,@(arg-vars)))
                   (,n-cache (or ,var-name
                                 (setq ,var-name (make-array ,size :initial-element 0))))
-                  (,args-and-values (make-array ,args-and-values-size)))
-              ,@(sets)
-              (setf (svref ,n-cache ,n-index) ,args-and-values))
+                  ;; TODO: 1-arg/1-result should use CONS instead of VECTOR.
+                  (,args-and-values (vector ,@(arg-vars) ,@(values-names))))
+              (let ((idx1 (ldb (byte ,hash-bits 0) ,n-index))
+                    (idx2 (ldb (byte ,hash-bits ,hash-bits) ,n-index)))
+                (cond ((eql (svref ,n-cache idx1) 0)
+                       (setf (svref ,n-cache idx1) ,args-and-values))
+                      ((eql (svref ,n-cache idx2) 0)
+                       (setf (svref ,n-cache idx2) ,args-and-values))
+                      (t
+                       ,@(when *profile-hash-cache* ; tally up the evictions
+                           `((incf (aref ,statistics-name 2))))
+                       ;; Use one bit of randomness to pick a victim.
+                       (setf (svref ,n-cache
+                                    (if #-sb-xc-host
+                                        (logbitp 4 (sb!kernel:get-lisp-obj-address
+                                                    ,(car (arg-vars))))
+                                        #+sb-xc-host (zerop (random 2))
+                                        idx1 idx2))
+                             ,args-and-values)))))
             (values))))
 
       (let ((fun-name (symbolicate name "-CACHE-CLEAR")))
@@ -638,8 +653,8 @@
          (pushnew ',var-name *cache-vector-symbols*)
          (defglobal ,var-name nil)
          ,@(when *profile-hash-cache*
-             `((defglobal ,probes-name 0)
-               (defglobal ,misses-name 0)))
+             `((defglobal ,statistics-name
+                   (make-array 3 :element-type 'fixnum))))
          (declaim (type (or null (simple-vector ,size)) ,var-name))
          #!-sb-fluid (declaim (inline ,@(inlines)))
          (,init-wrapper ,@(inits))
@@ -693,9 +708,7 @@
     (name &optional (original (symbolicate "%" name)))
   (let ((cached-name (symbolicate "%%" name "-CACHED")))
     `(progn
-       (defun-cached (,cached-name :hash-bits 8
-                                   :hash-function (lambda (x)
-                                                    (logand (sxhash x) #xff)))
+       (defun-cached (,cached-name :hash-bits 8 :hash-function #'sxhash)
            ((args equal))
          (apply #',original args))
        (defun ,name (&rest args)
@@ -1465,6 +1478,44 @@ to :INTERPRET, an interpreter will be used.")
                ,@(mapcar (lambda (bind) (if (consp bind) (car bind) bind))
                          bindings)))
      ,@forms))
+
+;; This is not my preferred name for this function, but chosen for harmony
+;; with everything else that refers to these as 'hash-caches'.
+;; Hashing is just one particular way of memoizing, and it would have been
+;; slightly more abstract and yet at the same time more concrete to say
+;; "memoized-function-caches". "hash-caches" is pretty nonspecific.
+#.(if *profile-hash-cache*
+'(defun show-hash-cache-statistics ()
+  (flet ((cache-stats (symbol)
+           (let* ((name (string symbol))
+                  (prefix
+                   (subseq name 0 (- (length name) (length "VECTOR**")))))
+             (values
+              (symbol-value (let ((*package* (symbol-package symbol)))
+                              (symbolicate prefix "STATISTICS**")))
+              (subseq prefix 2 (1- (length prefix)))))))
+    (format t "~%Type function memoization:~%     Seek       Hit      (%)~:
+    Evict      (%) Size    full~%")
+    ;; Sort by descending seek count to rank by likely relative importance
+    (dolist (symbol (sort (copy-list *cache-vector-symbols*) #'>
+                          :key (lambda (x) (aref (cache-stats x) 0))))
+      ;; Sadly we can't use BINDING* within this file
+      (multiple-value-bind (stats short-name) (cache-stats symbol)
+        (let* ((seek (aref stats 0))
+               (miss (aref stats 1))
+               (hit (- seek miss))
+               (evict (aref stats 2))
+               (cache (symbol-value symbol)))
+          (format t "~9d ~9d (~5,1f%) ~8d (~5,1f%) ~4d ~6,1f% ~A~%"
+                  seek hit
+                  (if (plusp seek) (* 100 (/ hit seek)))
+                  evict
+                  (if (plusp seek) (* 100 (/ evict seek)))
+                  (length cache)
+                  (if (plusp (length cache))
+                      (* 100 (/ (count-if-not #'fixnump cache)
+                                (length cache))))
+                  short-name)))))))
 
 (in-package "SB!KERNEL")
 

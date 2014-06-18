@@ -131,9 +131,7 @@
     (weaken-integer-type-part type 'integer)))
 
 (defun-cached
-    (weaken-type :hash-bits 8
-                 :hash-function (lambda (x)
-                                  (logand (type-hash-value x) #xFF)))
+    (weaken-type :hash-bits 7 :hash-function #'type-hash-value)
     ((type eq))
   (declare (type ctype type))
   (cond ((named-type-p type)
