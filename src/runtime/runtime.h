@@ -339,7 +339,7 @@ fixnum_word_value(lispobj n)
 {
     /* Convert bytes into words, double-word aligned. */
     sword_t x = ((n >> N_FIXNUM_TAG_BITS) + LOWTAG_MASK) & ~LOWTAG_MASK;
-    
+
     return x >> WORD_SHIFT;
 }
 

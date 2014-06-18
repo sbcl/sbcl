@@ -126,7 +126,7 @@ scavenge(lispobj *start, sword_t n_words)
         lispobj object = *object_ptr;
 #ifdef LISP_FEATURE_GENCGC
         if (forwarding_pointer_p(object_ptr))
-            lose("unexpect forwarding pointer in scavenge: %p, start=%p, n=%l\n",
+            lose("unexpect forwarding pointer in scavenge: %p, start=%p, n=%ld\n",
                  object_ptr, start, n_words);
 #endif
         if (is_lisp_pointer(object)) {
