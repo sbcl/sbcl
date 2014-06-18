@@ -402,4 +402,26 @@
                 (push (car list) result))))
           (setf indices (cdr indices)))))))
 
+(defun read-elt-type-deriver (skip-arg-p element-type-spec no-hang)
+  (lambda (call)
+    (let* ((element-type (specifier-type element-type-spec))
+           (null-type (specifier-type 'null))
+           (err-args (if skip-arg-p ; for PEEK-CHAR, skip 'peek-type' + 'stream'
+                         (cddr (combination-args call))
+                         (cdr (combination-args call)))) ; else just 'stream'
+           (eof-error-p (first err-args))
+           (eof-value (second err-args))
+           (unexceptional-type ; the normally returned thing
+            (if (and eof-error-p
+                     (types-equal-or-intersect (lvar-type eof-error-p)
+                                               null-type))
+                ;; (READ-elt stream nil <x>) returns (OR (EQL <x>) elt-type)
+                (type-union (if eof-value (lvar-type eof-value) null-type)
+                            element-type)
+                ;; If eof-error is unsupplied, or was but couldn't be nil
+                element-type)))
+      (if no-hang
+          (type-union unexceptional-type null-type)
+          unexceptional-type))))
+
 (/show0 "knownfun.lisp end of file")

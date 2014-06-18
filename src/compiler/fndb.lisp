@@ -1124,19 +1124,28 @@
   ())
 
 ;;; may return any type due to eof-value...
-(defknown (read read-preserving-whitespace read-char-no-hang read-char)
+;;; and because READ generally returns anything.
+(defknown (read read-preserving-whitespace)
   (&optional stream-designator t t t) t (explicit-check))
+
+(defknown read-char (&optional stream-designator t t t) t (explicit-check)
+  :derive-type (read-elt-type-deriver nil 'character nil))
+(defknown read-char-no-hang (&optional stream-designator t t t) t
+  (explicit-check)
+  :derive-type (read-elt-type-deriver nil 'character t))
 
 (defknown read-delimited-list (character &optional stream-designator t) list
   (explicit-check))
+;; FIXME: add a type-deriver => (values (or string eof-value) boolean)
 (defknown read-line (&optional stream-designator t t t) (values t boolean)
   (explicit-check))
 (defknown unread-char (character &optional stream-designator) t
   (explicit-check))
 (defknown peek-char (&optional (or character (member nil t))
-                               stream-designator t t t)
-  t
-  (explicit-check))
+                               stream-designator t t t) t
+  (explicit-check)
+  :derive-type (read-elt-type-deriver t 'character nil))
+
 (defknown listen (&optional stream-designator) boolean (flushable explicit-check))
 
 (defknown clear-input (&optional stream-designator) null (explicit-check))
@@ -1156,7 +1165,8 @@
           (:junk-allowed t))
   (values (or integer null ()) index))
 
-(defknown read-byte (stream &optional t t) t (explicit-check))
+(defknown read-byte (stream &optional t t) t (explicit-check)
+  :derive-type (read-elt-type-deriver nil 'integer nil))
 
 (defknown (prin1 print princ) (t &optional stream-designator)
   t
