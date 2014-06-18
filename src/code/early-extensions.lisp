@@ -543,9 +543,11 @@
   (dolist (name *cache-vector-symbols*)
     (set name nil)))
 
-(defmacro define-hash-cache (name args &key hash-function hash-bits default
+(defmacro define-hash-cache (name args
+                             &key hash-function hash-bits memoizer default
                                   (init-wrapper 'progn)
                                   (values 1))
+  (declare (ignore memoizer))
   (let* ((var-name (symbolicate "**" name "-CACHE-VECTOR**"))
          (statistics-name (when *profile-hash-cache*
                             (symbolicate "**" name "-CACHE-STATISTICS**")))
@@ -663,7 +665,20 @@
 
 ;;; some syntactic sugar for defining a function whose values are
 ;;; cached by DEFINE-HASH-CACHE
+;;; These keywords are mostly defined at DEFINE-HASH-CACHE.
+;;; Additional options:
+;;; :MEMOIZER <name>
+;;;   If provided, it is the name of a local macro that must be called
+;;;   within the body forms to perform cache lookup/insertion.
+;;;   If not provided, then the function's behavior is to automatically
+;;;   attempt cache lookup, and on miss, execute the body code and
+;;;   insert into the cache.
+;;;   Manual control over memoization is useful if there are cases for
+;;;   which computing the result is simpler than cache lookup.
+
 (defmacro defun-cached ((name &rest options &key (values 1) default
+                              (memoizer (make-symbol "MEMOIZE")
+                                        memoizer-supplied-p)
                               &allow-other-keys)
                         args &body body-decls-doc)
   (let ((default-values (if (and (consp default) (eq (car default) 'values))
@@ -671,13 +686,15 @@
                             (list default)))
         (arg-names (mapcar #'car args))
         (values-names (make-gensym-list values)))
+    ;; What I wouldn't give to be able to use BINDING*, right?
     (multiple-value-bind (body decls doc) (parse-body body-decls-doc)
       `(progn
         (define-hash-cache ,name ,args ,@options)
         (defun ,name ,arg-names
           ,@decls
-          ,doc
-          (cond #!+sb-show
+          ,@(if doc (list doc))
+          (macrolet ((,memoizer (&body body)
+            `(cond #!+sb-show
                 ((not (boundp '*hash-caches-initialized-p*))
                  ;; This shouldn't happen, but it did happen to me
                  ;; when revising the type system, and it's a lot
@@ -692,17 +709,18 @@
                  (/hexstr ,(first arg-names))
                  ,@body)
                 (t
-                 (multiple-value-bind ,values-names
-                     (,(symbolicate name "-CACHE-LOOKUP") ,@arg-names)
-                   (if (and ,@(mapcar (lambda (val def)
-                                        `(eq ,val ,def))
-                                      values-names default-values))
-                       (multiple-value-bind ,values-names
-                           (progn ,@body)
-                         (,(symbolicate name "-CACHE-ENTER") ,@arg-names
-                           ,@values-names)
-                         (values ,@values-names))
-                       (values ,@values-names))))))))))
+                 (multiple-value-bind ,',values-names
+                     ,'(,(symbolicate name "-CACHE-LOOKUP") ,@arg-names)
+                   (if ,'(and ,@(mapcar (lambda (val def) `(eq ,val ,def))
+                                 values-names default-values))
+                       (multiple-value-bind ,',values-names (progn ,@body)
+                         ,'(,(symbolicate name "-CACHE-ENTER") ,@arg-names
+                            ,@values-names)
+                         (values ,@',values-names))
+                       (values ,@',values-names)))))))
+             ,@(if memoizer-supplied-p
+                   body
+                   `((,memoizer ,@body)))))))))
 
 (defmacro define-cached-synonym
     (name &optional (original (symbolicate "%" name)))

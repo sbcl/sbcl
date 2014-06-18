@@ -798,6 +798,7 @@
 ;;; like SUBTYPEP, only works on CTYPE structures
 (defun-cached (csubtypep :hash-function #'type-cache-hash
                          :hash-bits 10
+                         :memoizer memoize
                          :values 2
                          :default (values nil :empty)
                          :init-wrapper !cold-init-forms)
@@ -811,9 +812,10 @@
         ((eq type1 *universal-type*)
          (values nil t))
         (t
-         (!invoke-type-method :simple-subtypep :complex-subtypep-arg2
-                              type1 type2
-                              :complex-arg1 :complex-subtypep-arg1))))
+         (memoize
+          (!invoke-type-method :simple-subtypep :complex-subtypep-arg2
+                               type1 type2
+                               :complex-arg1 :complex-subtypep-arg1)))))
 
 ;;; Just parse the type specifiers and call CSUBTYPE.
 (defun sb!xc:subtypep (type1 type2 &optional environment)
@@ -830,6 +832,7 @@
 ;;; This should only fail in the presence of HAIRY types.
 (defun-cached (type= :hash-function #'type-cache-hash
                      :hash-bits 11
+                     :memoizer memoize
                      :values 2
                      :default (values nil :empty)
                      :init-wrapper !cold-init-forms)
@@ -837,7 +840,7 @@
   (declare (type ctype type1 type2))
   (if (eq type1 type2)
       (values t t)
-      (!invoke-type-method :simple-= :complex-= type1 type2)))
+      (memoize (!invoke-type-method :simple-= :complex-= type1 type2))))
 
 ;;; Not exactly the negation of TYPE=, since when the relationship is
 ;;; uncertain, we still return NIL, NIL. This is useful in cases where
@@ -872,6 +875,7 @@
 ;;; unless we find no other way to represent the result.
 (defun-cached (type-union2 :hash-function #'type-cache-hash
                            :hash-bits 8
+                           :memoizer memoize
                            :init-wrapper !cold-init-forms)
               ((type1 eq) (type2 eq))
   ;; KLUDGE: This was generated from TYPE-INTERSECTION2 by Ye Olde Cut And
@@ -880,8 +884,10 @@
   ;; should probably become shared code. -- WHN 2001-03-16
   (declare (type ctype type1 type2))
   (let ((t2 nil))
-    (cond ((eq type1 type2)
-           type1)
+    (if (eq type1 type2)
+        type1
+        (memoize
+         (cond
           ;; CSUBTYPEP for array-types answers questions about the
           ;; specialized type, yet for union we want to take the
           ;; expressed type in account too.
@@ -897,7 +903,7 @@
           (type-union type1 type2))
          (t
           ;; the ordinary case: we dispatch to type methods
-          (%type-union2 type1 type2)))))
+          (%type-union2 type1 type2)))))))
 
 ;;; the type method dispatch case of TYPE-INTERSECTION2
 (defun %type-intersection2 (type1 type2)
@@ -934,16 +940,19 @@
 
 (defun-cached (type-intersection2 :hash-function #'type-cache-hash
                                   :hash-bits 9
+                                  :memoizer memoize
                                   :values 1
                                   :default nil
                                   :init-wrapper !cold-init-forms)
               ((type1 eq) (type2 eq))
   (declare (type ctype type1 type2))
-  (cond ((eq type1 type2)
+  (if (eq type1 type2)
          ;; FIXME: For some reason, this doesn't catch e.g. type1 =
          ;; type2 = (SPECIFIER-TYPE
          ;; 'SOME-UNKNOWN-TYPE). Investigate. - CSR, 2002-04-10
-         type1)
+      type1
+      (memoize
+       (cond
         ((or (intersection-type-p type1)
              (intersection-type-p type2))
          ;; Intersections of INTERSECTION-TYPE should have the
@@ -953,7 +962,7 @@
          (type-intersection type1 type2))
         (t
          ;; the ordinary case: we dispatch to type methods
-         (%type-intersection2 type1 type2))))
+         (%type-intersection2 type1 type2))))))
 
 ;;; Return as restrictive and simple a type as we can discover that is
 ;;; no more restrictive than the intersection of TYPE1 and TYPE2. At
