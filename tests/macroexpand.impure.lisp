@@ -88,3 +88,13 @@
                  (WHEN FOO (MULTIPLE-VALUE-BIND (BAZ Y) (G BAR)
                              (DECLARE (SPECIAL Y))
                              (DECLARE (SPECIAL L) (REAL Q)) (THING))))))
+
+(assert (equal (macroexpand-1
+                '(sb-int:binding* (((x y) (f))
+                                   (x (g y x)))
+                  (declare (integer x))
+                  (foo)))
+               '(MULTIPLE-VALUE-BIND (X Y) (F)
+                 (LET* ((X (G Y X)))
+                   (DECLARE (INTEGER X))
+                   (FOO)))))

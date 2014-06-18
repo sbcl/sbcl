@@ -1251,7 +1251,7 @@
                           (cond ((eq id 'type)
                                  (cddr decl))
                                 ((or (listp id) ; must be a type-specifier
-                                     (memq id '(special ignorable ignore 
+                                     (memq id '(special ignorable ignore
                                                 dynamic-extent
                                                 truly-dynamic-extent))
                                      (info :type :kind id))
@@ -1298,8 +1298,9 @@
 ;;; them into the appropriate places. This qualifies as an extreme KLUDGE,
 ;;; but has desirable behavior of allowing declarations in the innermost form.
 ;;;
-;;; Caution: don't use declarations of the form (<type-id> <var>) before the
-;;; INFO database is set up in building the cross-compiler, or you will lose.
+;;; Caution: don't use declarations of the form (<non-builtin-type-id> <var>)
+;;; before the INFO database is set up in building the cross-compiler,
+;;; or you will probably lose.
 ;;; Of course, since some other host Lisps don't seem to think that's
 ;;; acceptable syntax anyway, you're pretty much prevented from writing it.
 ;;;
@@ -1326,7 +1327,8 @@
                   ;; If no more bindings, and no (WHEN ...) before the FORMS,
                   ;; then don't bother parsing decls.
                   (if (or (cdr bindings) flag)
-                      (extract-var-decls decls names)
+                      (extract-var-decls decls
+                                         (filter-names names (cdr bindings)))
                       (values nil decls))
                 (let ((continue (acond ((cdr bindings) (recurse it rest-decls))
                                        (t (append decls forms)))))
@@ -1349,6 +1351,16 @@
                              bindings)
                 ,@(decl-expr nil ignores)
                 ,@body)))))
+       (filter-names (names more-bindings)
+         ;; Return the subset of SYMBOLs that does not intersect any
+         ;; symbol in MORE-BINDINGS. This makes declarations apply only
+         ;; to the final occurrence of a repeated name, as is the custom.
+         (remove-if (lambda (x) (subsequently-bound-p x more-bindings)) names))
+       (subsequently-bound-p (name more-bindings)
+         (member-if (lambda (binding)
+                      (let ((names (car binding)))
+                        (if (listp names) (memq name names) (eq name names))))
+                    more-bindings))
        (decl-expr (binding-decls ignores)
          (nconc (if binding-decls (list binding-decls))
          ;; IGNORABLE, not IGNORE, just in case :EXIT-IF-NULL reads a gensym
