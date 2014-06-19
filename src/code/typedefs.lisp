@@ -58,8 +58,6 @@
             (setf (info :type :translator ',name) fun)))
          ',name))))
 
-;;; DEFVARs for these come later, after we have enough stuff defined.
-(declaim (special *wild-type* *universal-type* *empty-type*))
 
 (defvar *type-random-state*)
 
@@ -81,6 +79,9 @@
   (enumerable nil :read-only t)
   ;; an arbitrary hash code used in EQ-style hashing of identity
   ;; (since EQ hashing can't be done portably)
+  ;; In the target lisp, we could grab some bits of the address and assign
+  ;; them into this slot rather than use RANDOM. The object isn't created
+  ;; yet, so there's a chicken-and-egg issue to solve.
   (hash-value (random #.(ash 1 28)
                       (if (boundp '*type-random-state*)
                           *type-random-state*

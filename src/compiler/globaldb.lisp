@@ -36,10 +36,6 @@
 (!begin-collecting-cold-init-forms)
 #!+sb-show (!cold-init-forms (/show0 "early in globaldb.lisp cold init"))
 
-;;; The DEFVAR for this appears later.
-;;; FIXME: centralize
-(declaim (special *universal-type*))
-
 ;;; This is sorta semantically equivalent to SXHASH, but better-behaved for
 ;;; legal function names. It performs more work by not cutting off as soon
 ;;; in the CDR direction, thereby improving the distribution of method names.
@@ -474,6 +470,7 @@
                  (if (fboundp name)
                      (handler-bind ((style-warning #'muffle-warning))
                        (specifier-type (sb!impl::%fun-type (fdefinition name))))
+                     ;; I think this should be *universal-fun-type*
                      (specifier-type 'function))))
 
 ;;; the ASSUMED-TYPE for this function, if we have to infer the type
@@ -572,8 +569,8 @@
 ;;; the declared type for this variable
 (define-info-type (:variable :type)
   :type-spec ctype
-  ;; Delay evaluation of *UNIVERSAL-TYPE* since it can't work yet
-  :default (lambda (x) (declare (ignore x)) *universal-type*))
+  ;; This gets set to *UNIVERSAL-TYPE* in 'late-type'
+  :default (lambda (x) (declare (ignore x)) (error "Too early for INFO")))
 
 ;;; where this type and kind information came from
 (define-info-type (:variable :where-from)

@@ -11,7 +11,7 @@
 
 (in-package "SB!C")
 
-(declaim (special *wild-type* *universal-type* *compiler-error-context*))
+(declaim (special *compiler-error-context*))
 
 ;;; An INLINEP value describes how a function is called. The values
 ;;; have these meanings:

@@ -13,9 +13,10 @@
 ;;; use it?)
 (defvar *type-system-initialized* #+sb-xc-host nil) ; (set in cold load)
 
-(defvar *wild-type*)
-(defvar *empty-type*)
-(defvar *universal-type*)
+;; These are set by cold-init-forms in 'late-type' (look for "macrolet frob").
+(defglobal *wild-type* -1)
+(defglobal *empty-type* -1)
+(defglobal *universal-type* -1)
 (defvar *universal-fun-type*)
 (defvar *instance-type*)
 (defvar *funcallable-instance-type*)
