@@ -270,6 +270,19 @@
 ;;; shared, we copy it. We don't have to copy the lists, since each
 ;;; function that has generators or transforms has already been
 ;;; through here.
+;;;
+;;; Note that this operation is somewhat garbage-producing in the current
+;;; globaldb implementation.  Setting a piece of INFO for a name makes
+;;; a shallow copy of the name's info-vector. FUN-INFO-OR-LOSE sounds
+;;; like a data reader, and you might be disinclined to think that it
+;;; copies at all, but:
+;;;   (TIME (LOOP REPEAT 1000 COUNT (FUN-INFO-OR-LOSE '*)))
+;;;   294,160 bytes consed
+;;; whereas just copying the info per se is not half as bad:
+;;;   (LET ((X (INFO :FUNCTION :INFO '*)))
+;;;     (TIME (LOOP REPEAT 1000 COUNT (COPY-FUN-INFO X))))
+;;;   130,992 bytes consed
+;;;
 (declaim (ftype (sfunction (t) fun-info) fun-info-or-lose))
 (defun fun-info-or-lose (name)
     (let ((old (info :function :info name)))
