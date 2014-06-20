@@ -61,6 +61,14 @@ extern int sig_memory_fault;
 
 #define SIG_STOP_FOR_GC (SIGUSR2)
 
+#elif defined __DragonFly__
+
+#include <sys/ucontext.h>
+typedef ucontext_t os_context_t;
+
+#define SIG_MEMORY_FAULT (SIGSEGV)
+#define SIG_STOP_FOR_GC (SIGUSR2)
+
 #elif defined __OpenBSD__
 
 typedef struct sigcontext os_context_t;

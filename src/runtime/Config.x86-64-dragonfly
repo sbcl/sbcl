@@ -1,0 +1,24 @@
+# -*- makefile -*- for the C-level run-time support for SBCL
+
+# This software is part of the SBCL system. See the README file for
+# more information.
+#
+# This software is derived from the CMU CL system, which was
+# written at Carnegie Mellon University and released into the
+# public domain. The software is in the public domain and is
+# provided with absolutely no warranty. See the COPYING and CREDITS
+# files for more information.
+
+# DragonFly BSD config is a modification of one for FreeBSD
+
+include Config.x86-64-bsd
+
+ASSEM_SRC += ldso-stubs.S
+LINKFLAGS += -dynamic -export-dynamic
+
+# Link against pthread even if we do not want threaded SBCL
+# This is because of bug in DragonFly RTLD which sometimes
+# (in very rare situations) makes loading threaded libraries
+# impossible without it.
+# See: https://bugs.dragonflybsd.org/issues/2663
+OS_LIBS   += -lutil -lpthread

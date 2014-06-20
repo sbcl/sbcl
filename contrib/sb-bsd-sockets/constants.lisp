@@ -324,7 +324,7 @@
  (:integer EAI-BADFLAGS "EAI_BADFLAGS")
  (:integer EAI-NONAME "EAI_NONAME")
  (:integer EAI-SERVICE "EAI_SERVICE")
- #-freebsd
+ #-(or freebsd dragonfly)
  (:integer EAI-ADDRFAMILY "EAI_ADDRFAMILY")
  (:integer EAI-MEMORY "EAI_MEMORY")
  (:integer EAI-FAIL "EAI_FAIL")

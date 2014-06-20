@@ -30,6 +30,7 @@
 ;;; Apparently getprotobyname_r on FreeBSD says -1 and EINTR
 ;;; for unknown protocols...
 #-(and freebsd sb-thread)
+#-(and dragonfly sb-thread)
 (deftest get-protocol-by-name/error
   (handler-case (get-protocol-by-name "nonexistent-protocol")
     (unknown-protocol ()

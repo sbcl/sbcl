@@ -444,23 +444,24 @@
  ;;     implemented for this platform.
  ;;
  ;; operating system features:
- ;;   :unix    = We're intended to run under some Unix-like OS. (This is not
- ;;              exclusive with the features which indicate which particular
- ;;              Unix-like OS we're intended to run under.)
- ;;   :linux   = We're intended to run under some version of Linux.
- ;;   :bsd     = We're intended to run under some version of BSD Unix. (This
- ;;              is not exclusive with the features which indicate which
- ;;              particular version of BSD we're intended to run under.)
- ;;   :freebsd = We're intended to run under FreeBSD.
- ;;   :openbsd = We're intended to run under OpenBSD.
- ;;   :netbsd  = We're intended to run under NetBSD.
- ;;   :darwin  = We're intended to run under Darwin (including MacOS X).
- ;;   :sunos   = We're intended to run under Solaris user environment
- ;;              with the SunOS kernel.
- ;;   :hpux    = We're intended to run under HP-UX 11.11 or later
- ;;   :osf1    = We're intended to run under Tru64 (aka Digital Unix
- ;;              aka OSF/1).
- ;;   :win32   = We're intended to under some version of Microsoft Windows.
+ ;;   :unix       = We're intended to run under some Unix-like OS. (This is not
+ ;;                 exclusive with the features which indicate which particular
+ ;;                 Unix-like OS we're intended to run under.)
+ ;;   :linux      = We're intended to run under some version of Linux.
+ ;;   :bsd        = We're intended to run under some version of BSD Unix. (This
+ ;;                 is not exclusive with the features which indicate which
+ ;;                 particular version of BSD we're intended to run under.)
+ ;;   :freebsd    = We're intended to run under FreeBSD.
+ ;;   :openbsd    = We're intended to run under OpenBSD.
+ ;;   :netbsd     = We're intended to run under NetBSD.
+ ;;   :dragonfly  = We're intended to run under DragonFly BSD.
+ ;;   :darwin     = We're intended to run under Darwin (including MacOS X).
+ ;;   :sunos      = We're intended to run under Solaris user environment
+ ;;                 with the SunOS kernel.
+ ;;   :hpux       = We're intended to run under HP-UX 11.11 or later
+ ;;   :osf1       = We're intended to run under Tru64 (aka Digital Unix
+ ;;                 aka OSF/1).
+ ;;   :win32      = We're intended to under some version of Microsoft Windows.
  ;; (No others are supported by SBCL as of 1.0.8, but :hpux or :irix
  ;; support could be ported from CMU CL if anyone is sufficiently
  ;; motivated to do so.)

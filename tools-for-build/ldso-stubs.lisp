@@ -323,7 +323,7 @@ ldso_stub__ ## fct: ;                  \\
                  '("ptsname"
                    #!-android "grantpt"
                    "unlockpt")
-                 #!+(or openbsd freebsd)
+                 #!+(or openbsd freebsd dragonfly)
                  '("openpty")
                  '("dlclose"
                    "dlerror"

@@ -16,7 +16,7 @@
 #endif /* LISP_FEATURE_DARWIN */
 #endif
 
-#if defined(LISP_FEATURE_FREEBSD)
+#if defined(LISP_FEATURE_FREEBSD) || defined(LISP_FEATURE_DRAGONFLY)
 #include "machine/npx.h"
 #endif
 
@@ -40,7 +40,7 @@
  * entails; unfortunately, currently the situation is worse, not
  * better, than in the above paragraph. */
 
-#if defined(__FreeBSD__) || defined(__OpenBSD__) || defined(LISP_FEATURE_DARWIN)
+#if defined(__FreeBSD__) || defined(__OpenBSD__) || defined(LISP_FEATURE_DARWIN) || defined(__DragonFly__)
 int *
 os_context_register_addr(os_context_t *context, int offset)
 {
@@ -72,7 +72,7 @@ os_context_sp_addr(os_context_t *context)
     return (int *)CONTEXT_ADDR_FROM_STEM(esp);
 }
 
-#endif /* __FreeBSD__ || __OpenBSD__ */
+#endif /* __FreeBSD__ || __OpenBSD__ || __DragonFly__ */
 
 #ifdef __NetBSD__
 int *
@@ -112,7 +112,7 @@ os_context_sp_addr(os_context_t *context)
 
 int *os_context_pc_addr(os_context_t *context)
 {
-#if defined __FreeBSD__
+#if defined(__FreeBSD__) || defined(__DragonFly__)
     return CONTEXT_ADDR_FROM_STEM(eip);
 #elif defined __OpenBSD__
     return CONTEXT_ADDR_FROM_STEM(pc);
@@ -263,6 +263,14 @@ os_restore_fp_control(os_context_t *context)
 #endif
 }
 #endif
+
+#if defined(LISP_FEATURE_DRAGONFLY)
+void os_restore_fp_control (os_context_t *context)
+{
+    struct envxmm *ex = (struct envxmm *)(context->uc_mcontext.mc_fpregs);
+    __asm__ __volatile__ ("fldcw %0" : : "m" (ex->en_cw));
+}
+#endif /* LISP_FEATURE_DRAGONFLY */
 
 #if defined(LISP_FEATURE_OPENBSD)
 void

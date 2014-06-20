@@ -187,13 +187,14 @@
 ;;; NetBSD configuration used to have this comment regarding the linkage
 ;;; table: "In CMUCL: 0xB0000000->0xB1000000"
 
-#!+win32   (!gencgc-space-setup #x22000000 nil nil #x10000)
-#!+linux   (!gencgc-space-setup #x01000000 #x09000000)
-#!+sunos   (!gencgc-space-setup #x20000000 #x48000000)
-#!+freebsd (!gencgc-space-setup #x01000000 #x58000000)
-#!+openbsd (!gencgc-space-setup #x1b000000 #x40000000)
-#!+netbsd  (!gencgc-space-setup #x20000000 #x60000000)
-#!+darwin  (!gencgc-space-setup #x04000000 #x10000000)
+#!+win32     (!gencgc-space-setup #x22000000 nil nil #x10000)
+#!+linux     (!gencgc-space-setup #x01000000 #x09000000)
+#!+sunos     (!gencgc-space-setup #x20000000 #x48000000)
+#!+freebsd   (!gencgc-space-setup #x01000000 #x58000000)
+#!+dragonfly (!gencgc-space-setup #x01000000 #x58000000)
+#!+openbsd   (!gencgc-space-setup #x1b000000 #x40000000)
+#!+netbsd    (!gencgc-space-setup #x20000000 #x60000000)
+#!+darwin    (!gencgc-space-setup #x04000000 #x10000000)
 
 ;;; Size of one linkage-table entry in bytes.
 (def!constant linkage-table-entry-size 8)

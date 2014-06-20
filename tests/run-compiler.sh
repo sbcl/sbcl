@@ -37,6 +37,8 @@ while [ $# -gt 0 ]; do
                 SunOS-SPARC)     new=-fPIC ;;
                 SunOS-X86)       new=-fPIC ;;
                 SunOS-X86-64)    new=-fPIC ;;
+                DragonFly-X86-64)new=-fPIC ;;
+                DragonFly-X86)   new=-fPIC ;;
             esac
             ;;
 

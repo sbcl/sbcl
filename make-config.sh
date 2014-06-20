@@ -289,6 +289,9 @@ case `uname` in
                 ;;
         esac
         ;;
+    DragonFly)
+	sbcl_os="dragonfly"
+	;;
     Darwin)
         sbcl_os="darwin"
         ;;
@@ -399,7 +402,8 @@ then
     # If --fancy, enable threads on platforms where they can be built.
     case $sbcl_arch in
         x86|x86-64|ppc)
-	    if [ "$sbcl_os" = "sunos" ] && [ "$sbcl_arch" = "x86-64" ]
+	    if ([ "$sbcl_os" = "sunos" ] && [ "$sbcl_arch" = "x86-64" ]) || \
+                [ "$sbcl_os" = "dragonfly" ]
 	    then
 		echo "No threads on this platform."
 	    else
@@ -513,6 +517,19 @@ case "$sbcl_os" in
                 ;;
         esac
         ;;
+    dragonfly)
+        printf ' :unix' >> $ltf
+        printf ' :bsd' >> $ltf
+        printf ' :elf' >> $ltf
+        printf ' :dragonfly' >> $ltf
+        printf ' :sb-qshow' >> $ltf
+        if [ $sbcl_arch = "x86" ]; then
+            printf ' :restore-fs-segment-register-from-tls' >> $ltf
+        fi
+        link_or_copy $sbcl_arch-bsd-os.h target-arch-os.h
+        link_or_copy bsd-os.h target-os.h
+        link_or_copy Config.$sbcl_arch-dragonfly Config
+        ;;
     darwin)
         printf ' :unix' >> $ltf
         printf ' :mach-o' >> $ltf
@@ -598,7 +615,7 @@ if [ "$sbcl_arch" = "x86" ]; then
     printf ' :alien-callbacks :cycle-counter :inline-constants ' >> $ltf
     printf ' :memory-barrier-vops :multiply-high-vops :ash-right-vops :symbol-info-vops' >> $ltf
     case "$sbcl_os" in
-    linux | freebsd | netbsd | openbsd | sunos | darwin | win32)
+    linux | freebsd | netbsd | openbsd | sunos | darwin | win32 | dragonfly)
         printf ' :linkage-table' >> $ltf
     esac
     if [ "$sbcl_os" = "win32" ]; then

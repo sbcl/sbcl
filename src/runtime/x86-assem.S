@@ -32,7 +32,8 @@
  *
  * (Except Win32, which is unlikely ever to be ELF, sorry. -- AB 2005-12-08)
  */
-#if defined __linux__  || defined LISP_FEATURE_FREEBSD || defined __NetBSD__ || defined __OpenBSD__ || defined __sun
+#if defined __linux__  || defined LISP_FEATURE_FREEBSD || defined __NetBSD__ || defined __OpenBSD__ || \
+        defined __sun || defined __DragonFly__
 #define GNAME(var) var
 #else
 #define GNAME(var) _##var
@@ -47,7 +48,8 @@
  * matter any more, perhaps it's just clutter we could get
  * rid of? -- WHN 2004-04-18)
  */
-#if defined(__linux__) || defined(LISP_FEATURE_FREEBSD) || defined(__NetBSD__) || defined(__OpenBSD__) || defined(__sun) || defined(LISP_FEATURE_WIN32)
+#if defined(__linux__) || defined(LISP_FEATURE_FREEBSD) || defined(__NetBSD__) || defined(__OpenBSD__) || \
+        defined(__sun) || defined(LISP_FEATURE_WIN32) || defined(__DragonFly__)
 #define align_4byte	4
 #define align_8byte	8
 #define align_16byte	16
@@ -131,7 +133,8 @@
 # define LoadCurrentThreadSlot(offset,reg);     \
 	movl	SBCL_THREAD_BASE_EA, reg ;      \
 	movl	offset(reg), reg ;
-#elif defined(LISP_FEATURE_LINUX) || defined(LISP_FEATURE_SUNOS) || defined(LISP_FEATURE_FREEBSD)
+#elif defined(LISP_FEATURE_LINUX) || defined(LISP_FEATURE_SUNOS) || defined(LISP_FEATURE_FREEBSD) || \
+        defined(LISP_FEATURE_DRAGONFLY)
   /* see comment in arch_os_thread_init */
 # define SBCL_THREAD_BASE_EA %fs:THREAD_SELFPTR_OFFSET
 # define MAYBE_FS(addr) addr

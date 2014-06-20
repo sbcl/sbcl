@@ -176,7 +176,10 @@
                (and ppc (or sparc x86 x86-64))
                (and sparc (or x86 x86-64))
                (and x86 x86-64))"
-          "More than one architecture selected")))
+          "More than one architecture selected")
+         ;; There is still hope to make multithreading on DragonFly x86-64
+         ("(and sb-thread x86 dragonfly)"
+          ":SB-THREAD not supported on selected architecture")))
       (failed-test-descriptions nil))
   (dolist (test feature-compatability-tests)
     (let ((*features* *shebang-features*))

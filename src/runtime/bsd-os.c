@@ -73,6 +73,12 @@ static os_vm_size_t max_allocation_size;
 static void freebsd_init();
 #endif /* __FreeBSD__ */
 
+#ifdef __DragonFly__
+#include <sys/sysctl.h>
+
+static void dragonfly_init();
+#endif /* __DragonFly__ */
+
 #ifdef __OpenBSD__
 #include <sys/types.h>
 #include <sys/resource.h>
@@ -99,6 +105,8 @@ os_init(char *argv[], char *envp[])
     openbsd_init();
 #elif defined(LISP_FEATURE_DARWIN)
     darwin_init();
+#elif defined(__DragonFly__)
+    dragonfly_init();
 #endif
 }
 
@@ -108,7 +116,8 @@ os_context_sigmask_addr(os_context_t *context)
     /* (Unlike most of the other context fields that we access, the
      * signal mask field is a field of the basic, outermost context
      * struct itself both in FreeBSD 4.0 and in OpenBSD 2.6.) */
-#if defined(LISP_FEATURE_FREEBSD) || defined(__NetBSD__) || defined(LISP_FEATURE_DARWIN)
+#if defined(LISP_FEATURE_FREEBSD) || defined(__NetBSD__) || defined(LISP_FEATURE_DARWIN) \
+    || defined(__DragonFly__)
     return &context->uc_sigmask;
 #elif defined (__OpenBSD__)
     return &context->sc_mask;
@@ -494,6 +503,58 @@ futex_wake(int *lock_word, int n)
 #endif
 #endif /* __FreeBSD__ */
 
+#ifdef __DragonFly__
+static void dragonfly_init()
+{
+#ifdef LISP_FEATURE_X86
+    size_t len;
+    int instruction_sse;
+
+    len = sizeof(instruction_sse);
+    if (sysctlbyname("hw.instruction_sse", &instruction_sse, &len,
+                     NULL, 0) == 0 && instruction_sse != 0) {
+        /* Use the SSE detector */
+        fast_bzero_pointer = fast_bzero_detect;
+    }
+#endif /* LISP_FEATURE_X86 */
+}
+
+
+#if defined(LISP_FEATURE_SB_THREAD) && defined(LISP_FEATURE_SB_FUTEX) \
+    && !defined(LISP_FEATURE_SB_PTHREAD_FUTEX)
+int
+futex_wait(int *lock_word, long oldval, long sec, unsigned long usec)
+{
+    int ret;
+
+    if (sec < 0)
+        ret = umtx_sleep(lock_word, oldval, 0);
+    else {
+        int count = usec + 1000000 * sec;
+        ret = umtx_sleep(lock_word, oldval, count);
+    }
+
+    if (ret == 0) return 0;
+    else {
+        switch (errno) {
+        case EWOULDBLOCK: // Operation timed out
+            return 1;
+        case EINTR:
+            return 2;
+        default: // Such as EINVAL or EBUSY
+            return -1;
+        }
+    }
+}
+
+int
+futex_wake(int *lock_word, int n)
+{
+    return umtx_wakeup(lock_word, n);
+}
+#endif
+#endif /* __DragonFly__ */
+
 #ifdef LISP_FEATURE_DARWIN
 /* defined in ppc-darwin-os.c instead */
 #elif defined(LISP_FEATURE_FREEBSD)
@@ -532,6 +593,20 @@ os_get_runtime_executable_path(int external)
         return NULL;
     return copied_string(path);
 }
+#elif defined(LISP_FEATURE_DRAGONFLY)
+char *
+os_get_runtime_executable_path(int external)
+{
+    char path[PATH_MAX + 1];
+    int size = readlink("/proc/curproc/file", path, sizeof(path) - 1);
+    if (size < 0)
+        return NULL;
+    path[size] = '\0';
+
+    if (strcmp(path, "unknown") == 0)
+        return NULL;
+    return copied_string(path);
+}
 #elif defined(LISP_FEATURE_NETBSD) || defined(LISP_FEATURE_OPENBSD)
 char *
 os_get_runtime_executable_path(int external)
@@ -541,7 +616,7 @@ os_get_runtime_executable_path(int external)
         return copied_string("/proc/curproc/file");
     return NULL;
 }
-#else /* Not DARWIN or FREEBSD or NETBSD or OPENBSD */
+#else /* Not DARWIN or FREEBSD or NETBSD or OPENBSD or DragonFly */
 char *
 os_get_runtime_executable_path(int external)
 {

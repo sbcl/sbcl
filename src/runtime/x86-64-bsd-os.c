@@ -12,6 +12,10 @@
 #include <machine/fpu.h>
 #endif
 
+#if defined(LISP_FEATURE_DRAGONFLY)
+#include <machine/npx.h>
+#endif
+
 /* KLUDGE: There is strong family resemblance in the signal context
  * stuff in FreeBSD and OpenBSD, but in detail they're different in
  * almost every line of code. It would be nice to find some way to
@@ -23,7 +27,7 @@
  * entails; unfortunately, currently the situation is worse, not
  * better, than in the above paragraph. */
 
-#if defined(LISP_FEATURE_FREEBSD) || defined(LISP_FEATURE_DARWIN) || defined(LISP_FEATURE_OPENBSD)
+#if defined(LISP_FEATURE_FREEBSD) || defined(LISP_FEATURE_DARWIN) || defined(LISP_FEATURE_OPENBSD) || defined(LISP_FEATURE_DRAGONFLY)
 os_context_register_t *
 os_context_register_addr(os_context_t *context, int offset)
 {
@@ -167,6 +171,19 @@ int arch_os_thread_init(struct thread *thread) {
 int arch_os_thread_cleanup(struct thread *thread) {
     return 1;                  /* success */
 }
+
+#if defined(LISP_FEATURE_DRAGONFLY)
+void
+os_restore_fp_control(os_context_t *context)
+{
+    struct envxmm *ex = (struct envxmm*)(&context->uc_mcontext.mc_fpregs);
+    /* reset exception flags and restore control flags on SSE2 FPU */
+    unsigned int temp = (ex->en_mxcsr) & ~0x3F;
+    asm ("ldmxcsr %0" : : "m" (temp));
+    /* same for x87 FPU. */
+    asm ("fldcw %0" : : "m" (ex->en_cw));
+}
+#endif
 
 #if defined(LISP_FEATURE_FREEBSD)
 void

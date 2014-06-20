@@ -406,7 +406,7 @@ status slot."
 ;;; Find an unused pty. Return three values: the file descriptor for
 ;;; the master side of the pty, the file descriptor for the slave side
 ;;; of the pty, and the name of the tty device for the slave side.
-#-(or win32 openbsd freebsd)
+#-(or win32 openbsd freebsd dragonfly)
 (progn
   (define-alien-routine ptsname c-string (fd int))
   (define-alien-routine grantpt boolean (fd int))
@@ -458,7 +458,7 @@ status slot."
               (sb-unix:unix-close master-fd))))))
     (error "could not find a pty")))
 
-#+(or openbsd freebsd)
+#+(or openbsd freebsd dragonfly)
 (progn
   (define-alien-routine openpty int (amaster int :out) (aslave int :out)
                         (name (* char)) (termp (* t)) (winp (* t)))
