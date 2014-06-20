@@ -702,9 +702,7 @@
 ;;; The return convention seems to be analogous to
 ;;; TYPES-EQUAL-OR-INTERSECT. -- WHN 19990910.
 (defun-cached (values-type-union :hash-function #'type-cache-hash
-                                 :hash-bits 8
-                                 :default nil
-                                 :init-wrapper !cold-init-forms)
+                                 :hash-bits 8)
     ((type1 eq) (type2 eq))
   (declare (type ctype type1 type2))
   (cond ((or (eq type1 *wild-type*) (eq type2 *wild-type*)) *wild-type*)
@@ -714,9 +712,7 @@
          (values (values-type-op type1 type2 #'type-union #'min)))))
 
 (defun-cached (values-type-intersection :hash-function #'type-cache-hash
-                                        :hash-bits 8
-                                        :default (values nil)
-                                        :init-wrapper !cold-init-forms)
+                                        :hash-bits 8)
     ((type1 eq) (type2 eq))
   (declare (type ctype type1 type2))
   (cond ((eq type1 *wild-type*)
@@ -756,9 +752,7 @@
 ;;; VALUES types
 (defun-cached (values-subtypep :hash-function #'type-cache-hash
                                :hash-bits 8
-                               :values 2
-                               :default (values nil :empty)
-                               :init-wrapper !cold-init-forms)
+                               :values 2)
     ((type1 eq) (type2 eq))
   (declare (type ctype type1 type2))
   (cond ((or (eq type2 *wild-type*) (eq type2 *universal-type*)
@@ -799,9 +793,7 @@
 (defun-cached (csubtypep :hash-function #'type-cache-hash
                          :hash-bits 10
                          :memoizer memoize
-                         :values 2
-                         :default (values nil :empty)
-                         :init-wrapper !cold-init-forms)
+                         :values 2)
               ((type1 eq) (type2 eq))
   (declare (type ctype type1 type2))
   (cond ((or (eq type1 type2)
@@ -833,9 +825,7 @@
 (defun-cached (type= :hash-function #'type-cache-hash
                      :hash-bits 11
                      :memoizer memoize
-                     :values 2
-                     :default (values nil :empty)
-                     :init-wrapper !cold-init-forms)
+                     :values 2)
               ((type1 eq) (type2 eq))
   (declare (type ctype type1 type2))
   (if (eq type1 type2)
@@ -875,8 +865,7 @@
 ;;; unless we find no other way to represent the result.
 (defun-cached (type-union2 :hash-function #'type-cache-hash
                            :hash-bits 8
-                           :memoizer memoize
-                           :init-wrapper !cold-init-forms)
+                           :memoizer memoize)
               ((type1 eq) (type2 eq))
   ;; KLUDGE: This was generated from TYPE-INTERSECTION2 by Ye Olde Cut And
   ;; Paste technique of programming. If it stays around (as opposed to
@@ -941,9 +930,7 @@
 (defun-cached (type-intersection2 :hash-function #'type-cache-hash
                                   :hash-bits 9
                                   :memoizer memoize
-                                  :values 1
-                                  :default nil
-                                  :init-wrapper !cold-init-forms)
+                                  :values 1)
               ((type1 eq) (type2 eq))
   (declare (type ctype type1 type2))
   (if (eq type1 type2)
@@ -1002,18 +989,14 @@
 
 (defun-cached (type-negation :hash-function #'type-hash-value
                              :hash-bits 8
-                             :values 1
-                             :default nil
-                             :init-wrapper !cold-init-forms)
+                             :values 1)
               ((type eq))
   (declare (type ctype type))
   (funcall (type-class-negate (type-class-info type)) type))
 
 (defun-cached (type-singleton-p :hash-function #'type-hash-value
                              :hash-bits 8
-                             :values 2
-                             :default (values nil t)
-                             :init-wrapper !cold-init-forms)
+                             :values 2)
               ((type eq))
   (declare (type ctype type))
   (let ((function (type-class-singleton-p (type-class-info type))))

@@ -572,8 +572,7 @@
 ;;; type is defined (or redefined).
 (defun-cached (values-specifier-type
                :hash-function #'sxhash
-               :hash-bits 10
-               :init-wrapper !cold-init-forms)
+               :hash-bits 10)
               ((orig equal-but-no-car-recursion))
   (let ((u (uncross orig)))
     (or (info :type :builtin u)

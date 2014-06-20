@@ -487,14 +487,6 @@
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (defvar *profile-hash-cache* nil))
 
-;;; a flag for whether it's too early in cold init to use caches so
-;;; that we have a better chance of recovering so that we have a
-;;; better chance of getting the system running so that we have a
-;;; better chance of diagnosing the problem which caused us to use the
-;;; caches too early
-#!+sb-show
-(defvar *hash-caches-initialized-p*)
-
 ;;; Define a hash cache that associates some number of argument values
 ;;; with a result value. The TEST-FUNCTION paired with each ARG-NAME
 ;;; is used to compare the value for that arg in a cache entry with a
@@ -532,136 +524,180 @@
 ;;;   a fixnum with at least (* 2 <hash-bits>) of information in it.
 ;;; :VALUES <n>
 ;;;   the number of return values cached for each function call
-;;; :INIT-WRAPPER <name>
-;;;   The code for initializing the cache is wrapped in a form with
-;;;   the specified name. (:INIT-WRAPPER is set to COLD-INIT-FORMS
-;;;   in type system definitions so that caches will be created
-;;;   before top level forms run.)
 (defvar *cache-vector-symbols* nil)
 
 (defun drop-all-hash-caches ()
   (dolist (name *cache-vector-symbols*)
     (set name nil)))
 
+;; Make a new hash-cache and optionally create the statistics vector.
+(defun alloc-hash-cache (size symbol)
+  (let (cache)
+    ;; It took me a while to figure out why infinite recursion could occur
+    ;; in VALUES-SPECIFIER-TYPE. It's because SET calls VALUES-SPECIFIER-TYPE.
+    (macrolet ((set! (symbol value)
+                 `(#+sb-xc-host set
+                   #-sb-xc-host sb!kernel:%set-symbol-global-value
+                   ,symbol ,value))
+               (reset-stats ()
+                 ;; If statistics gathering is not not compiled-in,
+                 ;; no sense in setting a symbol that is never used.
+                 ;; While this uses SYMBOLICATE at runtime,
+                 ;; it is inconsequential to performance.
+                 (if *profile-hash-cache*
+                     `(let ((statistics
+                             (let ((*package* (symbol-package symbol)))
+                               (symbolicate symbol "STATISTICS"))))
+                        (unless (boundp statistics)
+                          (set! statistics
+                                (make-array 3 :element-type 'fixnum
+                                              :initial-contents '(1 0 0))))))))
+      ;; It would be bad if another thread sees MAKE-ARRAY's result in the
+      ;; global variable before the vector's header+length have been set.
+      ;; This is theoretically possible if the architecture allows out-of-order
+      ;; memory writes.  A barrier will prevent that, but a meta-bug prevents
+      ;; using SB!THREAD:BARRIER here. The macro isn't defined yet? (FIXME)
+      ;; Note that this bug already existed and I'm just documenting it.
+      ;; Most likely all caches are made before ever starting multiple threads.
+      (progn ; sb!thread:barrier (:write)
+        (reset-stats)
+        (setq cache (make-array size :initial-element 0)))
+      (set! symbol cache))))
+
+;; At present we make a new vector every time a line is re-written,
+;; to make it thread-safe and interrupt-safe. A multi-word compare-and-swap
+;; is tricky to code and stronger than we need. It is possible instead
+;; to provide multi-word reads that can detect failure of atomicity,
+;; and on x86 it's possible to have atomic double-wide read/write,
+;; so a 1-arg/1-result cache line needn't cons at all except once
+;; (and maybe not even that if we make the cache into pairs of cells).
+;; But this way is easier to understand, for now anyway.
+(macrolet ((def (n)
+             (let* ((ftype `(sfunction ,(make-list n :initial-element t) t))
+                    (fn (symbolicate "ALLOC-HASH-CACHE-LINE/"
+                                     (write-to-string n)))
+                    (args (loop for i from 1 to n
+                                collect (make-symbol (write-to-string i)))))
+               `(progn
+                  (declaim (ftype ,ftype ,fn))
+                  (defun ,fn ,args
+                    (declare (optimize (safety 0)))
+                    ,(if (<= n 3)
+                         `(list* ,@args)
+                         ;; FIXME: (VECTOR ,@args) should emit exactly the
+                         ;; same code as this, except it is worse.
+                         `(let ((a (make-array ,n)))
+                            ,@(loop for i from 0 for arg in args
+                                    collect `(setf (svref a ,i) ,arg))
+                            a)))))))
+  (def 2)
+  (def 3)
+  (def 4)
+  (def 5)
+  (def 6))
+
+;; Should this be !DEFINE-HASH-CACHE ?
 (defmacro define-hash-cache (name args
-                             &key hash-function hash-bits memoizer default
-                                  (init-wrapper 'progn)
+                             &key hash-function hash-bits memoizer
                                   (values 1))
   (declare (ignore memoizer))
-  (let* ((var-name (symbolicate "**" name "-CACHE-VECTOR**"))
-         (statistics-name (when *profile-hash-cache*
-                            (symbolicate "**" name "-CACHE-STATISTICS**")))
+  (dolist (arg args)
+    (unless (= (length arg) 2)
+      (error "bad argument spec: ~S" arg)))
+  (assert (typep hash-bits '(integer 5 14))) ; reasonable bounds
+  (let* ((fun-name (symbolicate name "-MEMO-WRAPPER"))
+         (var-name (symbolicate "**" name "-CACHE-VECTOR**"))
+         (statistics-name
+          (when *profile-hash-cache*
+            (symbolicate var-name "STATISTICS")))
          (nargs (length args))
          (size (ash 1 hash-bits))
-         (default-values (if (and (consp default) (eq (car default) 'values))
-                             (cdr default)
-                             (list default)))
-         (args-and-values (sb!xc:gensym "ARGS-AND-VALUES"))
-         (n-index (sb!xc:gensym "INDEX"))
-         (n-cache (sb!xc:gensym "CACHE")))
-    (declare (ignorable statistics-name))
-    (assert (typep hash-bits '(integer 5 14))) ; reasonable bounds
-    (unless (= (length default-values) values)
-      (error "The number of default values ~S differs from :VALUES ~W."
-             default values))
-
-    (collect ((inlines)
-              (forms)
-              (inits)
-              (tests)
-              (arg-vars)
-              (values-refs)
-              (values-names))
-      (dotimes (i values)
-        (let ((name (sb!xc:gensym "VALUE")))
-          (values-names name)
-          (values-refs `(svref ,args-and-values (+ ,nargs ,i)))))
-      (let ((n 0))
-        (dolist (arg args)
-          (unless (= (length arg) 2)
-            (error "bad argument spec: ~S" arg))
-          (let ((arg-name (first arg))
-                (test (second arg)))
-            (arg-vars arg-name)
-            (tests `(,test (svref ,args-and-values ,n) ,arg-name)))
-          (incf n)))
-
-      (when *profile-hash-cache*
-        (inits `(setq ,statistics-name (make-array 3 :element-type 'fixnum)))
-        (forms `(declaim (type (simple-array fixnum (3)) ,statistics-name))))
-
-      (let ((fun-name (symbolicate name "-CACHE-LOOKUP")))
-        (inlines fun-name)
-        (forms
-         `(defun ,fun-name ,(arg-vars)
-            ,@(when *profile-hash-cache*
-                `((incf (aref ,statistics-name 0))))
-            (flet ((miss ()
-                     ,@(when *profile-hash-cache*
-                         `((incf (aref ,statistics-name 1))))
-                     (return-from ,fun-name ,default))
-                   (try (,args-and-values)
-                     (if (and (not (eql 0 ,args-and-values))
-                              ,@(tests))
-                         (return-from ,fun-name
-                           (values ,@(values-refs))))))
-              (let ((,n-cache (or ,var-name (miss)))
-                    (,n-index (funcall ,hash-function ,@(arg-vars))))
-                ;; The matching entry might be in either index.
-                ;; Replacement picks one at random if both choices were taken.
-                (try (svref ,n-cache (ldb (byte ,hash-bits 0) ,n-index)))
-                (try (svref ,n-cache (ldb (byte ,hash-bits ,hash-bits)
-                                          ,n-index)))
-                (miss))))))
-
-      (let ((fun-name (symbolicate name "-CACHE-ENTER")))
-        (inlines fun-name)
-        (forms
-         `(defun ,fun-name (,@(arg-vars) ,@(values-names))
-            (let ((,n-index (funcall ,hash-function ,@(arg-vars)))
-                  (,n-cache (or ,var-name
-                                (setq ,var-name (make-array ,size :initial-element 0))))
-                  ;; TODO: 1-arg/1-result should use CONS instead of VECTOR.
-                  (,args-and-values (vector ,@(arg-vars) ,@(values-names))))
-              (let ((idx1 (ldb (byte ,hash-bits 0) ,n-index))
-                    (idx2 (ldb (byte ,hash-bits ,hash-bits) ,n-index)))
-                (cond ((eql (svref ,n-cache idx1) 0)
-                       (setf (svref ,n-cache idx1) ,args-and-values))
-                      ((eql (svref ,n-cache idx2) 0)
-                       (setf (svref ,n-cache idx2) ,args-and-values))
-                      (t
-                       ,@(when *profile-hash-cache* ; tally up the evictions
-                           `((incf (aref ,statistics-name 2))))
-                       ;; Use one bit of randomness to pick a victim.
-                       (setf (svref ,n-cache
-                                    (if #-sb-xc-host
-                                        (logbitp 4 (sb!kernel:get-lisp-obj-address
-                                                    ,(car (arg-vars))))
-                                        #+sb-xc-host (zerop (random 2))
-                                        idx1 idx2))
-                             ,args-and-values)))))
-            (values))))
-
-      (let ((fun-name (symbolicate name "-CACHE-CLEAR")))
-        (forms
-         `(defun ,fun-name ()
-            (setq ,var-name nil))))
-
-      ;; Needed for cold init!
-      (inits `(setq ,var-name nil))
-      #!+sb-show (inits `(setq *hash-caches-initialized-p* t))
-
-      `(progn
-         (pushnew ',var-name *cache-vector-symbols*)
-         (defglobal ,var-name nil)
-         ,@(when *profile-hash-cache*
-             `((defglobal ,statistics-name
-                   (make-array 3 :element-type 'fixnum))))
-         (declaim (type (or null (simple-vector ,size)) ,var-name))
-         #!-sb-fluid (declaim (inline ,@(inlines)))
-         (,init-wrapper ,@(inits))
-         ,@(forms)
-         ',name))))
+         (hashval (make-symbol "HASH"))
+         (cache (make-symbol "CACHE"))
+         (entry (make-symbol "LINE"))
+         (thunk (make-symbol "THUNK"))
+         (arg-vars (mapcar #'first args))
+         (result-temps (loop for i from 1 to values
+                             collect (make-symbol (format nil "RES~D" i))))
+         (temps (append (mapcar (lambda (x) (make-symbol (string x)))
+                                arg-vars)
+                        result-temps))
+         (tests (mapcar (lambda (arg temp) ; -> (EQx ARG #:ARG)
+                          `(,(cadr arg) ,(car arg) ,temp))
+                        args temps))
+         (cache-type `(simple-vector ,size))
+         (line-type (let ((n (+ nargs values)))
+                      (if (<= n 3) 'cons `(simple-vector ,n))))
+         (binds
+          (case (length temps)
+            (2 `((,(first temps) (car ,entry))
+                 (,(second temps) (cdr ,entry))))
+            (3 (let ((arg-temp (sb!xc:gensym "ARGS")))
+                 `((,arg-temp (cdr ,entry))
+                   (,(first temps) (car ,entry))
+                   (,(second temps) (car (truly-the cons ,arg-temp)))
+                   (,(third temps) (cdr ,arg-temp)))))
+            (t (loop for i from 0 for x in temps
+                     collect `(,x (svref ,entry ,i))))))
+         (fun
+          `(defun ,fun-name (,thunk ,@arg-vars)
+             ,@(when *profile-hash-cache* ; count seeks
+                 `((when (boundp ',statistics-name)
+                     (incf (aref ,statistics-name 0)))))
+             (let ((,hashval (the fixnum (funcall ,hash-function ,@arg-vars)))
+                   (,cache ,var-name))
+               (when ,cache
+                 (let ((,hashval ,hashval))
+                   (declare (fixnum ,hashval))
+                   (loop repeat 2 do
+                     (let ((,entry (svref (truly-the ,cache-type ,cache)
+                                          (ldb (byte ,hash-bits 0) ,hashval))))
+                       (unless (eql ,entry 0)
+                         (locally (declare (type ,line-type ,entry))
+                           (let* ,binds
+                             (when (and ,@tests)
+                               (return-from ,fun-name
+                                 (values ,@result-temps))))))
+                       (setq ,hashval (ash ,hashval ,(- hash-bits)))))))
+               (unless ,cache
+                 (setq ,cache (alloc-hash-cache ,size ',var-name)))
+               ,@(when *profile-hash-cache*
+                   `((incf (aref ,statistics-name 1)))) ; count misses
+               (multiple-value-bind ,result-temps (funcall ,thunk)
+                 (let ((,entry
+                        (,(let ((*package* (symbol-package 'alloc-hash-cache)))
+                            (symbolicate "ALLOC-HASH-CACHE-LINE/"
+                                         (write-to-string (+ nargs values))))
+                         ,@arg-vars ,@result-temps))
+                        (idx1 (ldb (byte ,hash-bits 0) ,hashval))
+                        (idx2 (ldb (byte ,hash-bits ,hash-bits) ,hashval)))
+                    (declare (type (simple-vector ,size) ,cache))
+                    (cond ((eql (svref ,cache idx1) 0)
+                           (setf (svref ,cache idx1) ,entry))
+                          ((eql (svref ,cache idx2) 0)
+                           (setf (svref ,cache idx2) ,entry))
+                          (t
+                           ,@(when *profile-hash-cache* ; count evictions
+                               `((incf (aref ,statistics-name 2))))
+                             ;; Use one bit of randomness to pick a victim.
+                           (setf (svref ,cache ; [revisit- PVK says pick idx1]
+                                     (if #-sb-xc-host
+                                         (logbitp 4 (sb!kernel:get-lisp-obj-address
+                                                     ,(car arg-vars)))
+                                         #+sb-xc-host (zerop (random 2))
+                                         idx1 idx2))
+                              ,entry))))
+                 (values ,@result-temps))))))
+    `(progn
+       (pushnew ',var-name *cache-vector-symbols*)
+       (defglobal ,var-name nil)
+       ,@(when *profile-hash-cache*
+           `((declaim (type (simple-array fixnum (3)) ,statistics-name))
+             (defvar ,statistics-name)))
+       (declaim (type (or null ,cache-type) ,var-name))
+       (defun ,(symbolicate name "-CACHE-CLEAR") () (setq ,var-name nil))
+       (declaim (inline ,fun-name))
+       ,fun)))
 
 ;;; some syntactic sugar for defining a function whose values are
 ;;; cached by DEFINE-HASH-CACHE
@@ -676,51 +712,28 @@
 ;;;   Manual control over memoization is useful if there are cases for
 ;;;   which computing the result is simpler than cache lookup.
 
-(defmacro defun-cached ((name &rest options &key (values 1) default
+(defmacro defun-cached ((name &rest options &key
                               (memoizer (make-symbol "MEMOIZE")
                                         memoizer-supplied-p)
                               &allow-other-keys)
                         args &body body-decls-doc)
-  (let ((default-values (if (and (consp default) (eq (car default) 'values))
-                            (cdr default)
-                            (list default)))
-        (arg-names (mapcar #'car args))
-        (values-names (make-gensym-list values)))
+  (let ((arg-names (mapcar #'car args)))
     ;; What I wouldn't give to be able to use BINDING*, right?
-    (multiple-value-bind (body decls doc) (parse-body body-decls-doc)
+    (multiple-value-bind (forms decls doc) (parse-body body-decls-doc)
       `(progn
         (define-hash-cache ,name ,args ,@options)
         (defun ,name ,arg-names
           ,@decls
           ,@(if doc (list doc))
           (macrolet ((,memoizer (&body body)
-            `(cond #!+sb-show
-                ((not (boundp '*hash-caches-initialized-p*))
-                 ;; This shouldn't happen, but it did happen to me
-                 ;; when revising the type system, and it's a lot
-                 ;; easier to figure out what what's going on with
-                 ;; that kind of problem if the system can be kept
-                 ;; alive until cold boot is complete. The recovery
-                 ;; mechanism should definitely be conditional on some
-                 ;; debugging feature (e.g. SB-SHOW) because it's big,
-                 ;; duplicating all the BODY code. -- WHN
-                 (/show0 ,name " too early in cold init, uncached")
-                 (/show0 ,(first arg-names) "=..")
-                 (/hexstr ,(first arg-names))
-                 ,@body)
-                (t
-                 (multiple-value-bind ,',values-names
-                     ,'(,(symbolicate name "-CACHE-LOOKUP") ,@arg-names)
-                   (if ,'(and ,@(mapcar (lambda (val def) `(eq ,val ,def))
-                                 values-names default-values))
-                       (multiple-value-bind ,',values-names (progn ,@body)
-                         ,'(,(symbolicate name "-CACHE-ENTER") ,@arg-names
-                            ,@values-names)
-                         (values ,@',values-names))
-                       (values ,@',values-names)))))))
+                       ;; We don't need (DX-FLET ((,thunk () ,@body)) ...)
+                       ;; This lambda is a single-use local call within
+                       ;; the inline memoizing wrapper.
+                       `(,',(symbolicate name "-MEMO-WRAPPER")
+                         (lambda () ,@body) ,@',arg-names)))
              ,@(if memoizer-supplied-p
-                   body
-                   `((,memoizer ,@body)))))))))
+                   forms
+                   `((,memoizer ,@forms)))))))))
 
 (defmacro define-cached-synonym
     (name &optional (original (symbolicate "%" name)))
@@ -1509,8 +1522,10 @@ to :INTERPRET, an interpreter will be used.")
                   (prefix
                    (subseq name 0 (- (length name) (length "VECTOR**")))))
              (values
-              (symbol-value (let ((*package* (symbol-package symbol)))
-                              (symbolicate prefix "STATISTICS**")))
+              (handler-case
+                  (symbol-value (let ((*package* (symbol-package symbol)))
+                                  (symbolicate symbol "STATISTICS")))
+                (unbound-symbol-error () (make-array 3 :element-type 'fixnum)))
               (subseq prefix 2 (1- (length prefix)))))))
     (format t "~%Type function memoization:~%     Seek       Hit      (%)~:
     Evict      (%) Size    full~%")

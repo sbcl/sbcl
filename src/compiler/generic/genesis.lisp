@@ -1345,6 +1345,9 @@ core and return a descriptor to it."
                                            sb!vm:word-shift)))
     (cold-set 'sb!vm::*tls-index-lock* (make-fixnum-descriptor 0)))
 
+  (dolist (symbol sb!impl::*cache-vector-symbols*)
+    (cold-set symbol *nil-descriptor*))
+
   (/show "dumping packages" (mapcar #'car *cold-package-symbols*))
   (let ((initial-symbols *nil-descriptor*))
     (dolist (cold-package-symbols-entry *cold-package-symbols*)

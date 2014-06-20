@@ -156,8 +156,7 @@
 (defun-cached (primitive-type-aux
                :hash-function #'type-hash-value
                :hash-bits 9
-               :values 2
-               :default (values nil :empty))
+               :values 2)
               ((type eq))
   (declare (type ctype type))
   (macrolet ((any () '(values *backend-t-primitive-type* nil))
