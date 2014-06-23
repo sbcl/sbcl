@@ -446,13 +446,7 @@
                              *the-class-standard-object*))))
          (dolist (superclass direct-superclasses)
            (unless (validate-superclass class superclass)
-             (invalid-superclass class superclass)
-             (error "~@<The class ~S was specified as a ~
-                     super-class of the class ~S, ~
-                     but the meta-classes ~S and ~S are incompatible.  ~
-                     Define a method for ~S to avoid this error.~@:>"
-                    superclass class (class-of superclass) (class-of class)
-                    'validate-superclass)))
+             (invalid-superclass class superclass)))
          (setf (slot-value class 'direct-superclasses) direct-superclasses))
         (t
          (setq direct-superclasses (slot-value class 'direct-superclasses))))
@@ -505,7 +499,7 @@
        (format s
                "~@<The class ~S was specified as a superclass of the ~
                 class ~S, but the metaclasses ~S and ~S are ~
-                incompatible.  ~@[Define a method for ~S to avoid this ~
+                incompatible.~@[  Define a method for ~S to avoid this ~
                 error.~]~@:>"
                superclass class (class-of superclass) (class-of class)
                (and (typep superclass 'standard-class)
@@ -1702,8 +1696,8 @@
 ;;;; The metaclasses SYSTEM-CLASS and BUILT-IN-CLASS
 ;;;;
 ;;;; These metaclasses are something of a weird creature. By this
-;;;; point, all instances it which will exist have been created, and
-;;;; no instance is ever created by calling MAKE-INSTANCE.  (The
+;;;; point, all instances which will exist have been created, and no
+;;;; instance is ever created by calling MAKE-INSTANCE.  (The
 ;;;; distinction between the metaclasses is that we allow subclassing
 ;;;; of SYSTEM-CLASS, such as through STREAM and SEQUENCE protocols,
 ;;;; but not of BUILT-IN-CLASS.)
@@ -1759,4 +1753,3 @@
 (defmethod map-dependents ((metaobject dependent-update-mixin) function)
   (dolist (dependent (plist-value metaobject 'dependents))
     (funcall function dependent)))
-
