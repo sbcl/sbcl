@@ -720,6 +720,10 @@
                       (class class)))))))
 
 
+;; These are not normally inlined.
+;; READ-CHAR is 1K of code, etc. This was probably either a brute-force
+;; way to optimize IN-SYNONYM-OF and/or optimize for known sub-hierarchy
+;; at compile-time, but how likely is that to help?
 (declaim (inline read-byte read-char read-char-no-hang unread-char))
 
 (defun read-byte (stream &optional (eof-error-p t) eof-value)
@@ -727,14 +731,17 @@
   (let ((stream (sb-impl::in-synonym-of stream)))
     (etypecase stream
       (simple-stream
-       (%read-byte stream eof-error-p eof-value))
+       (let ((byte (%read-byte stream eof-error-p eof-value)))
+         (if (eq byte eof-value)
+             byte
+             (the integer byte))))
       (ansi-stream
        (sb-impl::ansi-stream-read-byte stream eof-error-p eof-value nil))
       (fundamental-stream
-       (let ((char (sb-gray:stream-read-byte stream)))
-         (if (eq char :eof)
+       (let ((byte (sb-gray:stream-read-byte stream)))
+         (if (eq byte :eof)
              (sb-impl::eof-or-lose stream eof-error-p eof-value)
-             char))))))
+             (the integer byte)))))))
 
 (defun read-char (&optional (stream *standard-input*) (eof-error-p t)
                             eof-value recursive-p)
@@ -742,7 +749,10 @@
   (let ((stream (sb-impl::in-synonym-of stream)))
     (etypecase stream
       (simple-stream
-       (%read-char stream eof-error-p eof-value recursive-p t))
+       (let ((char (%read-char stream eof-error-p eof-value recursive-p t)))
+         (if (eq char eof-value)
+             char
+             (the character char))))
       (ansi-stream
        (sb-impl::ansi-stream-read-char stream eof-error-p eof-value
                                        recursive-p))
@@ -750,7 +760,7 @@
        (let ((char (sb-gray:stream-read-char stream)))
          (if (eq char :eof)
              (sb-impl::eof-or-lose stream eof-error-p eof-value)
-             char))))))
+             (the character char)))))))
 
 (defun read-char-no-hang (&optional (stream *standard-input*) (eof-error-p t)
                                     eof-value recursive-p)
@@ -759,8 +769,12 @@
     (etypecase stream
       (simple-stream
        (%check stream :input)
-       (with-stream-class (simple-stream)
-         (funcall-stm-handler j-read-char stream eof-error-p eof-value nil)))
+       (let ((char
+              (with-stream-class (simple-stream)
+                (funcall-stm-handler j-read-char stream eof-error-p eof-value nil))))
+         (if (or (eq char eof-value) (not char))
+             char
+             (the character char))))
       (ansi-stream
        (sb-impl::ansi-stream-read-char-no-hang stream eof-error-p eof-value
                                                recursive-p))
@@ -768,7 +782,7 @@
        (let ((char (sb-gray:stream-read-char-no-hang stream)))
          (if (eq char :eof)
              (sb-impl::eof-or-lose stream eof-error-p eof-value)
-             char))))))
+             (the (or character null) char)))))))
 
 (defun unread-char (character &optional (stream *standard-input*))
   "Puts the Character back on the front of the input Stream."
@@ -790,13 +804,18 @@
   (let ((stream (sb-impl::in-synonym-of stream)))
     (etypecase stream
       (simple-stream
-       (%peek-char stream peek-type eof-error-p eof-value recursive-p))
+       (let ((char
+              (%peek-char stream peek-type eof-error-p eof-value recursive-p)))
+         (if (eq char eof-value)
+             char
+             (the character char))))
       ;; FIXME: Broken on ECHO-STREAM (cf internal implementation?) --
       ;; CSR, 2004-01-19
       (ansi-stream
        (sb-impl::ansi-stream-peek-char peek-type stream eof-error-p eof-value
                                        recursive-p))
       (fundamental-stream
+       ;; This seems to duplicate all the code of GENERALIZED-PEEKING-MECHANISM
        (cond ((characterp peek-type)
               (do ((char (sb-gray:stream-read-char stream)
                          (sb-gray:stream-read-char stream)))
@@ -819,7 +838,7 @@
               (let ((char (sb-gray:stream-peek-char stream)))
                 (if (eq char :eof)
                     (sb-impl::eof-or-lose stream eof-error-p eof-value)
-                    char))))))))
+                    (the character char)))))))))
 
 (defun listen (&optional (stream *standard-input*) (width 1))
   "Returns T if WIDTH octets are available on STREAM.  If WIDTH is

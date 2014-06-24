@@ -312,6 +312,8 @@
   (assert (char= (peek-char t (make-string-input-stream " a")) #\a))
   (set-syntax-from-char #\Space #\a)
   (assert (char= (peek-char t (make-string-input-stream " a")) #\Space)))
+(with-test (:name :whitespace[2]p-is-type-safe)
+  (assert-error (sb-impl::whitespace[2]p :potato)))
 
 ;;; It is actually easier to run into the problem exercised by this
 ;;; test with sockets, due to their delays between availabilities of

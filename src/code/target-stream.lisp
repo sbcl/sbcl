@@ -37,6 +37,7 @@
           ((characterp ,peek-type)
            (do ((,char-var ,char-var ,read-form))
                ((or (eql ,char-var ,read-eof)
+                    ;; CHAR= will type-check for us
                     (char= ,char-var ,peek-type))
                 (cond ((eql ,char-var ,read-eof)
                        ,(if eof-detected-form
@@ -48,6 +49,7 @@
           ((eql ,peek-type t)
            (do ((,char-var ,char-var ,read-form))
                ((or (eql ,char-var ,read-eof)
+                    ;; whitespace[2]p will type-check for us
                     (not (whitespace[2]p ,char-var)))
                 (cond ((eql ,char-var ,read-eof)
                        ,(if eof-detected-form
@@ -92,17 +94,21 @@
         (ansi-stream-peek-char peek-type stream eof-error-p eof-value
                                recursive-p)
         ;; by elimination, must be Gray streams FUNDAMENTAL-STREAM
-        (generalized-peeking-mechanism
-         peek-type :eof char
-         (if (null peek-type)
-             (stream-peek-char stream)
-             (stream-read-char stream))
-         :eof
-         (if (null peek-type)
-             ()
-             (stream-unread-char stream char))
-         ()
-         (eof-or-lose stream eof-error-p eof-value)))))
+        (let ((char
+               (generalized-peeking-mechanism
+                peek-type :eof char
+                (if (null peek-type)
+                    (stream-peek-char stream)
+                    (stream-read-char stream))
+                :eof
+                (if (null peek-type)
+                    ()
+                    (stream-unread-char stream char))
+                ()
+                (eof-or-lose stream eof-error-p eof-value))))
+          (if (eq char eof-value)
+              char
+              (the character char))))))
 
 (defun echo-misc (stream operation &optional arg1 arg2)
   (let* ((in (two-way-stream-input-stream stream))

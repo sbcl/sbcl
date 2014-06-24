@@ -336,3 +336,28 @@
 (with-output-to-string (s)
   (assert (zerop (file-position s)))
   (assert (zerop (stream-file-position s))))
+
+(defclass broken-char-input-stream (fundamental-input-stream) ())
+(defmethod stream-read-char ((s broken-char-input-stream))
+  :1potato)
+(defmethod stream-read-char-no-hang ((s broken-char-input-stream))
+  :1potato)
+(defmethod stream-peek-char ((s broken-char-input-stream))
+  :1potato)
+(defclass broken-binary-input-stream (fundamental-input-stream) ())
+(defmethod stream-read-byte ((s broken-binary-input-stream))
+  :2potato)
+
+(with-test (:name :read-char/read-byte-check-types)
+  (loop for (class fn . arg) in '((broken-char-input-stream read-char)
+                                  (broken-char-input-stream read-char-no-hang)
+                                  (broken-char-input-stream peek-char #\z)
+                                  (broken-char-input-stream peek-char t)
+                                  (broken-char-input-stream peek-char nil)
+                                  (broken-binary-input-stream read-byte))
+        for stream = (make-instance class)
+        do (assert (eq 'type-error
+                       (handler-case (if arg
+                                         (funcall fn (car arg) stream)
+                                         (funcall fn stream))
+                         (type-error () 'type-error))))))
