@@ -182,7 +182,7 @@
                        (when (boundp 'sb-c:*lexenv*)
                          (sb-c:compiler-notify
                           "~@<Cannot optimize slot access, inheritance of ~S is not ~
-                           yet finaliable due to forward-referenced superclasses:~
+                           yet finalizable due to forward-referenced superclasses:~
                            ~%  ~S~:@>"
                           class form))
                        (setf class nil))))
