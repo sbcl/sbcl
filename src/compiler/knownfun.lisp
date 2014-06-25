@@ -437,28 +437,4 @@
           (type-union unexceptional-type null-type)
           unexceptional-type))))
 
-;; This deriver avoids a spurious call to KEYWORDP when user code
-;; in a safe policy does something like:
-;;  (declaim (ftype (function ((or string symbol)) keyword) keywordize))
-;;  (defun keywordize (x) (values (intern (string x) 'keyword)))
-;; The call to INTERN is otherwise not known to produce a keyword.
-(defun intern-derive-type (call)
-  (let* ((pkg (second (combination-args call)))
-         (1st-val-type
-          (if (and pkg
-                   (constant-lvar-p pkg)
-                   (string= "KEYWORD"
-                            (let ((val (lvar-value pkg)))
-                              (typecase val
-                                (string  val)
-                                (package (package-name val))
-                                (symbol  (symbol-name val))
-                                (t "")))))
-              'keyword
-              'symbol)))
-    (make-values-type
-     :required (list (specifier-type 1st-val-type)
-                     (specifier-type
-                      '(member :internal :external :inherited nil))))))
-
 (/show0 "knownfun.lisp end of file")
