@@ -1,5 +1,5 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
-changes relative to sbcl-1.2.0:
+changes in sbcl-1.2.1 relative to sbcl-1.2.0:
   * enhancement: GENCGC is enabled on ARM.
   * enhancement: better error reporting for invalid calls to local functions.
   * enhancement: support for GNU/kFreeBSD distributions.  (lp#1079954, thanks
