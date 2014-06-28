@@ -1099,8 +1099,9 @@
     ;; Clear the number stack.
     (let ((cur-nfp (current-nfp-tn vop)))
       (when cur-nfp
-        (inst add cur-nfp cur-nfp
-              (bytes-needed-for-non-descriptor-stack-frame))
+        (composite-immediate-instruction
+         add cur-nfp cur-nfp
+         (bytes-needed-for-non-descriptor-stack-frame))
         (move nsp-tn cur-nfp)))
     (cond ((= nvals 1)
            ;; Clear the control stack, and restore the frame pointer.
@@ -1114,10 +1115,11 @@
            ;; restore the frame pointer and clear as much of the control
            ;; stack as possible.
            (move cfp-tn old-fp)
-           (inst add nargs val-ptr (* nvals n-word-bytes))
+           (composite-immediate-instruction
+            add nargs val-ptr (* nvals n-word-bytes))
            (store-csp nargs)
            ;; Establish the values count.
-           (inst mov nargs (fixnumize nvals))
+           (load-immediate-word nargs (fixnumize nvals))
            ;; pre-default any argument register that need it.
            (when (< nvals register-arg-count)
              (dolist (reg (subseq (list r0 r1 r2) nvals))
@@ -1147,8 +1149,9 @@
     ;; Clear the number stack.
     (let ((cur-nfp (current-nfp-tn vop)))
       (when cur-nfp
-        (inst add cur-nfp cur-nfp
-              (bytes-needed-for-non-descriptor-stack-frame))
+        (composite-immediate-instruction
+         add cur-nfp cur-nfp
+         (bytes-needed-for-non-descriptor-stack-frame))
         (move nsp-tn cur-nfp)))
 
     ;; Check for the single case.
