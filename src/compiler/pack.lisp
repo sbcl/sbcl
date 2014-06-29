@@ -1542,20 +1542,9 @@
       (let ((size (sb-size sb)))
         (fill (finite-sb-always-live sb) nil)
         (setf (finite-sb-always-live sb)
-              (make-array size
-                          :initial-element
-                          #-sb-xc #*
-                          ;; The cross-compiler isn't very good at
-                          ;; dumping specialized arrays, so we delay
-                          ;; construction of this SIMPLE-BIT-VECTOR
-                          ;; until runtime.
-                          #+sb-xc (make-array 0 :element-type 'bit)))
+              (make-array size :initial-element #*))
         (setf (finite-sb-always-live-count sb)
-              (make-array size
-                          :initial-element
-                          #-sb-xc #*
-                          ;; Ibid
-                          #+sb-xc (make-array 0 :element-type 'fixnum)))
+              (make-array size :initial-element 0))
 
         (fill (finite-sb-conflicts sb) nil)
         (setf (finite-sb-conflicts sb)
