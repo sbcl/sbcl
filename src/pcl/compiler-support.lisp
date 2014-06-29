@@ -45,7 +45,7 @@
       ((csubtypep otype standard-object) t)
       ((not (types-equal-or-intersect otype standard-object)) nil)
       (t
-       `(layout-for-std-class-p (layout-of object))))))
+       `(sb-pcl::%pcl-instance-p object)))))
 
 (defun sb-pcl::safe-code-p (&optional env)
   (let* ((lexenv (or env (make-null-lexenv)))

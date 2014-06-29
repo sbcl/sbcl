@@ -217,9 +217,19 @@ comparison.")
 
 ;;; Return true of any object which is either a funcallable-instance,
 ;;; or an ordinary instance that is not a structure-object.
+;;; This used to be implemented as (LAYOUT-FOR-STD-CLASS-P (LAYOUT-OF x))
+;;; but LAYOUT-OF is more general than need be here. So this bails out
+;;; after the first two clauses of the equivalent COND in LAYOUT-OF
+;;; because nothing else could possibly return T.
+(declaim (inline %pcl-instance-p))
+(defun %pcl-instance-p (x)
+  (layout-for-std-class-p
+   (cond ((%instancep x) (%instance-layout x))
+         ((funcallable-instance-p x) (%funcallable-instance-layout x))
+         (t (return-from %pcl-instance-p nil)))))
+
 ;;; This definition is for interpreted code.
-(defun pcl-instance-p (x)
-  (layout-for-std-class-p (layout-of x)))
+(defun pcl-instance-p (x) (%pcl-instance-p x))
 
 ;;; CMU CL comment:
 ;;;   We define this as STANDARD-INSTANCE, since we're going to
