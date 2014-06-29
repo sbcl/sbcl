@@ -1198,9 +1198,10 @@ on this semaphore, then N of them is woken up."
 (defun %delete-thread-from-session (thread session)
   (with-session-lock (session)
     (setf (session-threads session)
-          (delete thread (session-threads session))
+          ;; DELQ never conses, but DELETE does. (FIXME)
+          (delq thread (session-threads session))
           (session-interactive-threads session)
-          (delete thread (session-interactive-threads session)))))
+          (delq thread (session-interactive-threads session)))))
 
 (defun call-with-new-session (fn)
   (%delete-thread-from-session *current-thread* *session*)
@@ -1223,7 +1224,7 @@ on this semaphore, then N of them is woken up."
   (with-all-threads-lock
     (setf (thread-%alive-p thread) nil)
     (setf (thread-os-thread thread) nil)
-    (setq *all-threads* (delete thread *all-threads*))
+    (setq *all-threads* (delq thread *all-threads*))
     (when *session*
       (%delete-thread-from-session thread *session*))))
 
@@ -1415,10 +1416,14 @@ session."
     (setf sb!vm:*alloc-signal* *default-alloc-signal*)
     (setf (thread-os-thread thread) (current-thread-os-thread))
     (with-mutex ((thread-result-lock thread))
-      (with-all-threads-lock
-        (push thread *all-threads*))
-      (with-session-lock (*session*)
-        (push thread (session-threads *session*)))
+      (let* ((cell1 (shiftf (thread-result thread) nil))
+             (cell2 (cdr cell1)))
+        (with-all-threads-lock
+          (setf *all-threads* (rplacd (rplaca cell1 thread) *all-threads*)))
+        (let ((session *session*))
+          (with-session-lock (session)
+            (setf (session-threads session)
+                  (rplacd (rplaca cell2 thread) (session-threads session))))))
       (setf (thread-%alive-p thread) t)
       (when setup-sem (signal-semaphore setup-sem))
       ;; Using handling-end-of-the-world would be a bit tricky
