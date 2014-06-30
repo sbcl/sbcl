@@ -230,6 +230,30 @@
            (inst not r)
            (inst xor r y))))))
 
+(define-vop (fast-logior-unsigned-signed=>signed fast-safe-arith-op)
+  (:args (x :scs (unsigned-reg))
+         (y :target r :scs (signed-reg)))
+  (:arg-types unsigned-num signed-num)
+  (:results (r :scs (signed-reg) :from (:argument 1)))
+  (:result-types signed-num)
+  (:note "inline (unsigned-byte 64) arithmetic")
+  (:translate logior)
+  (:generator 3
+    (move r y)
+    (inst or r x)))
+
+(define-vop (fast-logior-signed-unsigned=>signed fast-safe-arith-op)
+  (:args (x :target r :scs (signed-reg))
+         (y :scs (unsigned-reg)))
+  (:arg-types signed-num unsigned-num)
+  (:results (r :scs (signed-reg) :from (:argument 0)))
+  (:result-types signed-num)
+  (:note "inline (unsigned-byte 64) arithmetic")
+  (:translate logior)
+  (:generator 3
+    (move r x)
+    (inst or r y)))
+
 ;;; Special handling of add on the x86; can use lea to avoid a
 ;;; register load, otherwise it uses add.
 ;;; FIXME: either inherit from fast-foo-binop or explain why not.
