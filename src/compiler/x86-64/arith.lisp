@@ -64,6 +64,14 @@
     (move res x)
     (inst neg res)))
 
+(define-vop (fast-negate/unsigned signed-unop)
+  (:args (x :scs (unsigned-reg) :target res))
+  (:arg-types unsigned-num)
+  (:translate %negate)
+  (:generator 3
+    (move res x)
+    (inst neg res)))
+
 (define-vop (fast-lognot/fixnum fixnum-unop)
   (:translate lognot)
   (:generator 1
