@@ -771,6 +771,39 @@
   (def string>* nil nil)
   (def string>=* nil t))
 
+(deftransform string=* ((string1 string2 start1 end1 start2 end2)
+                        (string string
+                                (constant-arg (eql 0))
+                                (constant-arg null)
+                                (constant-arg (eql 0))
+                                (constant-arg null)))
+  (cond ((and (constant-lvar-p string1)
+              (equal (lvar-value string1) ""))
+         `(zerop (length string2)))
+        ((and (constant-lvar-p string2)
+              (equal (lvar-value string2) ""))
+         `(zerop (length string1)))
+        (t
+         (give-up-ir1-transform))))
+
+(deftransform string/=* ((string1 string2 start1 end1 start2 end2)
+                         (string string
+                                 (constant-arg (eql 0))
+                                 (constant-arg null)
+                                 (constant-arg (eql 0))
+                                 (constant-arg null)))
+  (cond ((and (constant-lvar-p string1)
+              (equal (lvar-value string1) ""))
+         (lvar-type string2)
+         `(and (plusp (length string2))
+               0))
+        ((and (constant-lvar-p string2)
+              (equal (lvar-value string2) ""))
+         `(and (plusp (length string1))
+               0))
+        (t
+         (give-up-ir1-transform))))
+
 (macrolet ((def (name result-fun)
              `(deftransform ,name ((string1 string2 start1 end1 start2 end2)
                                    (simple-base-string simple-base-string t t t t) *)
