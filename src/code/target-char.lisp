@@ -129,7 +129,8 @@
     (#x04 "Eot" "^d")
     (#x05 "Enq" "^e")
     (#x06 "Ack" "^f")
-    (#x07 "Bel" "Bell" "^g")
+    ;; Don't alias to Bell, another Unicode character has that name.
+    (#x07 "Bel" "^g")
     (#x08 "Backspace" "^h" "Bs") ; *** See Note above
     (#x09 "Tab" "^i" "Ht") ; *** See Note above
     (#x0A "Newline" "Linefeed" "^j" "Lf" "Nl") ; *** See Note above
