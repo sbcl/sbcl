@@ -482,5 +482,5 @@ distinct from the global value. Can also be SETF."
                        :format-control "~@<Cannot ~@? to ~S, not of type ~S.~:@>"
                        :format-arguments (list (describe-action) symbol new-value spec)
                        :datum new-value
-                       :expected-type spec))))))))
-  (values))
+                       :expected-type spec)))))))
+    nil))

@@ -449,3 +449,21 @@
                                       (sleep 0.00001))))))
       (assert (not y))
       (assert (eql n (length x))))))
+
+(with-test (:name :local-special-symbol-value)
+  (assert
+   (= (funcall (compile nil
+                        `(lambda ()
+                           (let ((x 10))
+                             (declare (special x))
+                             (cas (symbol-value 'x) 10 12)
+                             x))))
+      12))
+  (assert
+   (= (funcall
+       (compile nil
+                `(lambda ()
+                   (let ((x (list 1)))
+                     (declare (special x))
+                     (atomic-pop (symbol-value 'x))))))
+      1)))

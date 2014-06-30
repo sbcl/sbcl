@@ -1,6 +1,8 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 changes relative to sbcl-1.2.1:
   * bug fix: #\Bell and #\Bel now read to different characters. (lp#1319452).
+  * bug fix: CAS SYMBOL-VALUE on locally special variables didn't work.
+    (lp#1098355)
 
 changes in sbcl-1.2.1 relative to sbcl-1.2.0:
   * enhancement: GENCGC is enabled on ARM.

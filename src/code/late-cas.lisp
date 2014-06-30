@@ -11,24 +11,24 @@
       (if (sb!xc:constantp name env)
           (values nil nil (constant-form-value name env))
           (values (gensymify name) name nil))
-    (with-unique-names (old new)
-      (values (when tmp (list tmp))
-              (when val (list val))
-              old
-              new
-              (let ((slow
-                      `(locally
-                           (declare (symbol ,tmp))
-                         (about-to-modify-symbol-value ,tmp 'compare-and-swap ,new)
-                         (%compare-and-swap-symbol-value ,tmp ,old ,new))))
-                (if cname
-                    (if (member (info :variable :kind cname) '(:special :global))
-                        ;; We can generate the type-check reasonably.
-                        `(%compare-and-swap-symbol-value
-                          ',cname ,old (the ,(info :variable :type cname) ,new))
-                        slow)
-                    slow))
-              `(symbol-global-value ,(or tmp `',cname))))))
+    (let ((symbol (or tmp `',cname)))
+      (with-unique-names (old new)
+        (values (when tmp (list tmp))
+                (when val (list val))
+                old
+                new
+                (let ((slow
+                        `(progn
+                           (about-to-modify-symbol-value ,symbol 'compare-and-swap ,new)
+                           (%compare-and-swap-symbol-value ,symbol ,old ,new))))
+                  (if cname
+                      (if (member (info :variable :kind cname) '(:special :global))
+                          ;; We can generate the type-check reasonably.
+                          `(%compare-and-swap-symbol-value
+                            ',cname ,old (the ,(info :variable :type cname) ,new))
+                          slow)
+                      slow))
+                `(symbol-value ,symbol))))))
 
 (define-cas-expander svref (vector index)
   (with-unique-names (v i old new)

@@ -98,6 +98,8 @@
 ;;; This is not FLUSHABLE, since it's required to signal an error if
 ;;; unbound.
 (defknown (symbol-value) (symbol) t ())
+(defknown about-to-modify-symbol-value (symbol t &optional t t) null
+  (explicit-check))
 ;;; From CLHS, "If the symbol is globally defined as a macro or a
 ;;; special operator, an object of implementation-dependent nature and
 ;;; identity is returned. If the symbol is not globally defined as
