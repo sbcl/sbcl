@@ -3913,7 +3913,7 @@ used for a COMPLEX component.~:@>"
 
 ;;; Standard list representation of sets. Use CL:* for the universe.
 (defun list-abstract-type-function (type over &key under (overapproximate t))
-  (declare (inline generic-abstract-walk-type))
+  (declare (inline generic-abstract-type-function))
   (generic-abstract-type-function
    type overapproximate
    #'union #'intersection #'set-difference
