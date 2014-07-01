@@ -41,7 +41,6 @@
   ;; legal name?
   (check-fun-name name)
 
-
   ;; KLUDGE: This can happen when eg. compiling a NAMED-LAMBDA, and isn't
   ;; guarded against elsewhere -- so we want to assert package locks here. The
   ;; reason we do it only when stomping on existing stuff is because we want
@@ -74,7 +73,19 @@
   (when (boundp '*free-funs*)       ; when compiling
     (remhash name *free-funs*))
 
-  (note-if-setf-fun-and-macro name)
+  ;; It's uncommon for users to define both a SETF macro and function for
+  ;; the same thing, so usually we warn about it, but offer a somewhat arbitrary
+  ;; escape to avoid a warning - if the function gets an ftype proclaimed
+  ;; before DEFSETF (or -EXPANDER) is used, we don't complain about the macro.
+  ;; SBCL itself provides most SETFable things both ways even when CLHS does not
+  ;; say specifically that #'(SETF x) exists.
+  ;; But when building SBCL the order of function/macro definition is not
+  ;; directly controlled because most SETF functions are defined en masse by
+  ;; 'setf-funs' with no regard for what exists, and we also have to respect
+  ;; all other constraints on build order to make bootstrap work.
+  ;; So, ... just don't warn when running the cross-compiler, which means
+  ;; don't compile this line in when building the cross-compiler.
+  #-sb-xc-host(note-if-setf-fun-and-macro name)
 
   (values))
 
@@ -87,12 +98,11 @@
 (defun note-if-setf-fun-and-macro (name)
   (when (and (consp name)
              (eq (car name) 'setf))
-    (when (or (info :setf :inverse (second name))
-              (info :setf :expander (second name)))
-      (compiler-style-warn
-       "defining as a SETF function a name that already has a SETF macro:~
-       ~%  ~S"
-       name)))
+    (let ((stem (second name)))
+      (when (or (info :setf :inverse stem) (info :setf :expander stem))
+        (compiler-style-warn
+         "defining function ~S when ~S already has a SETF macro"
+         name stem))))
   (values))
 
 ;;; Make NAME no longer be a function name: clear everything back to

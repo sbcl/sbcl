@@ -33,6 +33,8 @@
       nil))))
 
 ;;; FIXME: should probably become MACROLET
+;;; [But can't until we fix the "lexical environment too hairy" warning.
+;;;  And this environment isn't too hairy so it's especially annoying]
 (sb!xc:defmacro define-setters (packages &rest ignore)
   (collect ((res))
     (dolist (pkg packages)
