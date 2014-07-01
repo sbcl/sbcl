@@ -173,6 +173,28 @@
 (define-binop logior 2 orr)
 (define-binop logxor 2 eor)
 
+(define-vop (fast-logior-unsigned-signed=>signed fast-safe-arith-op)
+  (:args (x :scs (unsigned-reg))
+         (y :target r :scs (signed-reg)))
+  (:arg-types unsigned-num signed-num)
+  (:results (r :scs (signed-reg) :from (:argument 1)))
+  (:result-types signed-num)
+  (:note "inline (unsigned-byte 32) arithmetic")
+  (:translate logior)
+  (:generator 3
+    (inst orr r x y)))
+
+(define-vop (fast-logior-signed-unsigned=>signed fast-safe-arith-op)
+  (:args (x :target r :scs (signed-reg))
+         (y :scs (unsigned-reg)))
+  (:arg-types signed-num unsigned-num)
+  (:results (r :scs (signed-reg) :from (:argument 0)))
+  (:result-types signed-num)
+  (:note "inline (unsigned-byte 32) arithmetic")
+  (:translate logior)
+  (:generator 3
+    (inst orr r x y)))
+
 ;;; Multiplication
 
 (define-vop (fast-*/fixnum=>fixnum fast-fixnum-binop)
