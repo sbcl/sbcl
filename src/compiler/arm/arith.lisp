@@ -49,6 +49,13 @@
   (:generator 2
     (inst rsb res x 0)))
 
+(define-vop (fast-negate/unsigned signed-unop)
+  (:args (x :scs (unsigned-reg) :target res))
+  (:arg-types unsigned-num)
+  (:translate %negate)
+  (:generator 3
+    (inst rsb res x 0)))
+
 (define-vop (fast-lognot/fixnum signed-unop)
   (:args (x :scs (any-reg)))
   (:arg-types tagged-num)
