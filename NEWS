@@ -1,5 +1,7 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 changes relative to sbcl-1.2.1:
+  * enhancement: ATOMIC-INCF and ATOMIC-DECF can operate on (CAR x), (CDR x)
+    and DEFGLOBAL variables of type fixnum.
   * bug fix: #\Bell and #\Bel now read to different characters. (lp#1319452).
   * bug fix: CAS SYMBOL-VALUE on locally special variables didn't work.
     (lp#1098355)

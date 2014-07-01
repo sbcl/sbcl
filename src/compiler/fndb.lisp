@@ -1785,5 +1785,9 @@
     ())
 (defknown %compare-and-swap-symbol-value (symbol t t) t
     (unwind))
+(defknown (%atomic-dec-symbol-global-value %atomic-inc-symbol-global-value)
+    (symbol fixnum) fixnum)
+(defknown (%atomic-dec-car %atomic-inc-car %atomic-dec-cdr %atomic-inc-cdr)
+    (cons fixnum) fixnum)
 (defknown spin-loop-hint () (values)
     (always-translatable))

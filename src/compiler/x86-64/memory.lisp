@@ -78,9 +78,93 @@
   (:policy :fast-safe)
   (:generator 4
     (move result value)
-    (inst xadd (make-ea :dword :base object
-                        :disp (- (* offset n-word-bytes) lowtag))
-          value)))
+    (inst xadd (make-ea-for-object-slot object offset lowtag) result :lock)))
+
+(define-vop (cell-xsub cell-xadd)
+  (:args (object)
+         (value :scs (any-reg immediate) :target result))
+  (:generator 5
+    ;; For constant delta we can avoid a mov followed by neg
+    ;; but if 'delta' is most-negative-fixnum, don't negate it.
+    ;; Decrementing by most-negative-fixnum is the same as incrementing.
+    (sc-case value
+     (immediate
+      (let ((k (tn-value value)))
+        (inst mov result (fixnumize (if (= k most-negative-fixnum) k (- k))))))
+     (t
+      (move result value)
+      (inst neg result)))
+    (inst xadd (make-ea-for-object-slot object offset lowtag) result :lock)))
+
+(define-vop (atomic-inc-symbol-global-value cell-xadd)
+  (:translate %atomic-inc-symbol-global-value)
+  ;; The function which this vop translates will not
+  ;; be used unless the variable is proclaimed as fixnum.
+  ;; All stores are checked in a safe policy, so this
+  ;; vop is safe because it increments a known fixnum.
+  (:policy :fast-safe)
+  (:arg-types * tagged-num)
+  (:variant symbol-value-slot other-pointer-lowtag))
+
+(define-vop (atomic-dec-symbol-global-value cell-xsub)
+  (:translate %atomic-dec-symbol-global-value)
+  (:policy :fast-safe)
+  (:arg-types * tagged-num)
+  (:variant symbol-value-slot other-pointer-lowtag))
+
+(macrolet
+    ((def-atomic (fun-name inherit slot)
+       `(progn
+          (define-vop (,(symbolicate fun-name "/FAST") ,inherit)
+            (:translate ,fun-name)
+            (:policy :fast)
+            (:arg-types * tagged-num)
+            (:variant ,slot list-pointer-lowtag))
+          (define-vop (,(symbolicate fun-name "/SAFE"))
+            (:translate ,fun-name)
+            (:policy :fast-safe)
+            (:args (cell :scs (descriptor-reg))
+                   (delta :scs (any-reg immediate)))
+            (:results (result :scs (any-reg)))
+            (:temporary (:sc descriptor-reg :offset rax-offset) rax)
+            (:temporary (:sc any-reg) newval)
+            (:arg-types * tagged-num)
+            (:result-types tagged-num)
+            (:vop-var vop)
+            (:generator 10
+             (let ((err (generate-error-code vop 'object-not-fixnum-error rax))
+                   (const (if (sc-is delta immediate)
+                              (fixnumize ,(if (eq inherit 'cell-xsub)
+                                              `(let ((x (tn-value delta)))
+                                                 (if (= x most-negative-fixnum)
+                                                     x (- x)))
+                                              `(tn-value delta)))))
+                   (retry (gen-label)))
+               (loadw rax cell ,slot list-pointer-lowtag)
+               (emit-label retry)
+               (inst test rax fixnum-tag-mask)
+               (inst jmp :nz err)
+               (if const
+                   (cond ((typep const '(signed-byte 32))
+                          (inst lea newval
+                                (make-ea :qword :base rax :disp const)))
+                         (t
+                          (inst mov newval const)
+                          (inst add newval rax)))
+                   ,(if (eq inherit 'cell-xsub)
+                        `(progn (move newval rax)
+                                (inst sub newval delta))
+                        `(inst lea newval
+                               (make-ea :qword :base rax :index delta))))
+               (inst cmpxchg
+                     (make-ea-for-object-slot cell ,slot list-pointer-lowtag)
+                     newval :lock)
+               (inst jmp :ne retry)
+               (inst mov result rax)))))))
+  (def-atomic %atomic-inc-car cell-xadd cons-car-slot)
+  (def-atomic %atomic-inc-cdr cell-xadd cons-cdr-slot)
+  (def-atomic %atomic-dec-car cell-xsub cons-car-slot)
+  (def-atomic %atomic-dec-cdr cell-xsub cons-cdr-slot))
 
 ;;; SLOT-REF and SLOT-SET are used to define VOPs like CLOSURE-REF,
 ;;; where the offset is constant at compile time, but varies for
@@ -135,6 +219,12 @@
     (move result eax)))
 
 ;;; X86 special
+;;; FIXME: Figure out whether we should delete this.
+;;; It looks just like 'cell-xadd' and is buggy in the same ways:
+;;;   - modifies 'value' operand which *should* be in the same physical reg
+;;;     as 'result' operand, but would cause harm if not.
+;;;   - operand width needs to be :qword
+;;;   - :LOCK is missing
 (define-vop (slot-xadd)
   (:args (object :scs (descriptor-reg) :to :result)
          (value :scs (any-reg) :target result))

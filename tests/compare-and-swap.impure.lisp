@@ -164,6 +164,56 @@
     (mapc #'sb-thread:join-thread threads)
     (assert (= 0 (box-word box)))))
 
+(defglobal **my-atomic-counter* 0)
+(declaim (fixnum **my-atomic-counter*))
+;; Assert that safe (atomic-incf car) type-checks the car.
+(with-test (:name :atomic-incf-car-safe)
+  (let ((x (cons (1+ most-positive-fixnum) 0))) ; a bignum
+    (assert (eq (handler-case (atomic-incf (car x))
+                  (type-error () 'win)) 'win))))
+
+;; Basic correctness tests, not testing atomicity
+(macrolet
+    ((test-place (place)
+       `(progn
+          ;; using a constant for the delta
+          (assert (eq (atomic-incf ,place 2) 0))
+          (assert (eq ,place 2))
+          (assert (eq (atomic-incf ,place -1) 2))
+          (assert (eq ,place 1))
+          (assert (eq (atomic-decf ,place 1) 1))
+          (assert (eq ,place 0))
+          ;; using a non-constant for the delta
+          (assert (eq (atomic-incf ,place (eval 2)) 0))
+          (assert (eq ,place 2))
+          (assert (eq (atomic-incf ,place (eval -1)) 2))
+          (assert (eq ,place 1))
+          (assert (eq (atomic-decf ,place (eval 1)) 1))
+          (assert (eq ,place 0))
+          (setf ,place most-positive-fixnum)
+          (atomic-incf ,place)
+          (assert (eq ,place most-negative-fixnum))
+          (atomic-decf ,place)
+          (assert (eq ,place most-positive-fixnum)))))
+  (with-test (:name (:atomic-incf :global-var))
+    (test-place **my-atomic-counter*))
+  (with-test (:name (:atomic-incf :car))
+    (let ((x (cons 0 'foo)))
+      (test-place (car x))))
+  (with-test (:name (:atomic-incf :cdr))
+    (let ((x (cons 'foo 0)))
+      (test-place (cdr x))))
+  ;; Fast code for (atomic-{incf|decf} {car|cdr}) is decidedly unsafe
+  ;; on x86-64. Ensure basic correctness when used correctly.
+  (with-test (:name (:atomic-incf-fast :car))
+    (let ((x (cons 0 'foo)))
+      (declare (optimize (safety 0)))
+      (test-place (car x))))
+  (with-test (:name (:atomic-incf-fast :cdr))
+    (let ((x (cons 'foo 0)))
+      (declare (optimize (safety 0)))
+      (test-place (cdr x)))))
+
 ;;; STANDARD-INSTANCE-ACCESS, FUNCALLABLE-STANDARD-INSTANCE-ACCESS
 
 (defclass sia-cas-test ()
