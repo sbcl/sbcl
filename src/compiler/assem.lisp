@@ -1462,7 +1462,7 @@
 
 (defun grovel-lambda-list (lambda-list vop-var)
   (let ((segment-name (car lambda-list))
-        (vop-var (or vop-var (sb!xc:gensym "VOP"))))
+        (vop-var (or vop-var (make-symbol "VOP"))))
     (sb!int:collect ((new-lambda-list))
       (new-lambda-list segment-name)
       (new-lambda-list vop-var)
