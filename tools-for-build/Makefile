@@ -20,3 +20,4 @@ all: grovel-headers determine-endianness where-is-mcontext \
 clean:
 	rm -f *.o grovel-headers determine-endianness where-is-mcontext \
                 modify-ldt-structure-name sigaction-sa-nodefer-works-test
+	rm -f *.exe
