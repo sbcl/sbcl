@@ -1260,6 +1260,12 @@ possibly temporarily, because it might be used internally."
                ;; catch tags
                "TOPLEVEL-CATCHER"
 
+               ;; Constructors for arrays whose element-type is recoverable
+               ;; even if the host Lisp upgrades it to something unexpected.
+               "!MAKE-SPECIALIZED-ARRAY"
+               "!COERCE-TO-SPECIALIZED"
+               "!SPECIALIZED-ARRAY-ELEMENT-TYPE"
+
                ;; hooks for contrib/ stuff we're insufficiently sure
                ;; about to add to SB!EXT
                "*REPL-PROMPT-FUN*"
@@ -1596,7 +1602,7 @@ is a good idea, but see SB-SYS re. blurring of boundaries."
                #!+long-float "MAKE-LONG-FLOAT"
                "MAKE-MEMBER-TYPE" "MAKE-NAMED-TYPE" "MAKE-NULL-LEXENV"
                "MAKE-NUMERIC-TYPE"
-               "MAKE-SINGLE-FLOAT" "MAKE-SPECIALIZABLE-ARRAY"
+               "MAKE-SINGLE-FLOAT"
                "MAKE-UNPORTABLE-FLOAT"
                "MAKE-SHORT-VALUES-TYPE" "MAKE-SINGLE-VALUE-TYPE"
                "MAKE-VALUE-CELL" "MAKE-VALUES-TYPE"
@@ -1751,7 +1757,7 @@ is a good idea, but see SB-SYS re. blurring of boundaries."
                "SINGLE-FLOAT-BITS" "SINGLE-FLOAT-EXPONENT"
                "SINGLE-FLOAT-INT-EXPONENT" "SINGLE-FLOAT-SIGNIFICAND"
                "SINGLE-VALUE-TYPE" "SINGLE-VALUE-SPECIFIER-TYPE"
-               "SPECIALIZABLE" "SPECIALIZABLE-VECTOR" "SPECIFIER-TYPE"
+               "SPECIFIER-TYPE"
                #!+sb-simd-pack "SIMD-PACK-SINGLE"
                #!+sb-simd-pack "SIMD-PACK-DOUBLE"
                #!+sb-simd-pack "SIMD-PACK-INT"

@@ -395,6 +395,26 @@
              (values nil t)))
         ((union-type-p ctype)
          (any/type #'ctypep obj (union-type-types ctype)))
+        ((array-type-p ctype)
+         ;; This is essentially just the ARRAY-TYPE case of %%TYPEP
+         ;; using !SPECIALIZED-ARRAY-ELEMENT-TYPE, not ARRAY-ELEMENT-TYPE.
+         (if (and (arrayp obj)
+                  (case (array-type-complexp ctype)
+                    ((t) (not (typep obj 'simple-array)))
+                    ((nil) (typep obj 'simple-array)))
+                  (or (eq (array-type-element-type ctype) *wild-type*)
+                      (type= (specifier-type
+                              (!specialized-array-element-type obj))
+                             (array-type-specialized-element-type ctype)))
+                  (or (eq (array-type-dimensions ctype) '*)
+                      (and (= (length (array-type-dimensions ctype))
+                              (array-rank obj)))
+                      (every (lambda (required actual)
+                               (or (eq required '*) (eql required actual)))
+                             (array-type-dimensions ctype)
+                             (array-dimensions obj))))
+               (values t t)
+               (values nil t)))
         (t
          (let ( ;; the Common Lisp type specifier corresponding to CTYPE
                (type (type-specifier ctype)))
@@ -417,14 +437,13 @@
      (make-member-type :members (list x)))
     (number
      (ctype-of-number x))
-    (string
-     (make-array-type :dimensions (array-dimensions x)
-                      :complexp (not (typep x 'simple-array))
-                      :element-type (specifier-type 'base-char)
-                      :specialized-element-type (specifier-type 'base-char)))
     (array
-     (let ((etype (specifier-type (array-element-type x))))
+     ;; It is critical not to inquire of the host for the array's element type.
+     (let ((etype (specifier-type (!specialized-array-element-type x))))
        (make-array-type :dimensions (array-dimensions x)
+                        ;; complexp relies on the host implementation,
+                        ;; but in practice any array for which we need to
+                        ;; call ctype-of will be a simple-array.
                         :complexp (not (typep x 'simple-array))
                         :element-type etype
                         :specialized-element-type etype)))

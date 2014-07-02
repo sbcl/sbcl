@@ -684,16 +684,16 @@
   (num-results 0 :type index)
   ;; a vector of the temporaries the vop needs. See EMIT-VOP
   ;; in vmdef for information on how the temps are encoded.
-  (temps nil :type (or null (specializable-vector (unsigned-byte 16))))
+  (temps nil :type (or null (simple-array (unsigned-byte 16) 1)))
   ;; the order all the refs for this vop should be put in. Each
   ;; operand is assigned a number in the following ordering: args,
   ;; more-args, results, more-results, temps. This vector represents
   ;; the order the operands should be put into in the next-ref link.
-  (ref-ordering nil :type (or null (specializable-vector (unsigned-byte 8))))
+  (ref-ordering nil :type (or null (simple-array (unsigned-byte 8) 1)))
   ;; a vector of the various targets that should be done. Each element
   ;; encodes the source ref (shifted 8, it is also encoded in
   ;; MAX-VOP-TN-REFS) and the dest ref index.
-  (targets nil :type (or null (specializable-vector (unsigned-byte 16)))))
+  (targets nil :type (or null (simple-array (unsigned-byte 16) 1))))
 
 ;;;; SBs and SCs
 

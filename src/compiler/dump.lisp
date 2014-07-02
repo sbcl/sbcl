@@ -800,6 +800,14 @@
 ;;; we need to be target-endian.  dump-integer-as-n-bytes always writes
 ;;; little-endian (which is correct for all other integers) so for a bigendian
 ;;; target we need to swap octets -- CSR, after DB
+;;; We sanity-check that VECTOR was registered as a specializd array.
+;;; Slight problem: if the host upgraded an array to T and we wanted it
+;;; more specialized, this would be undetected because the check is that
+;;; _if_ the array is specialized, _then_ it must have been registered.
+;;; The reverse is always true. But we wouldn't get here at all for (array T).
+;;; As a practical matter, silent failure is unlikely because
+;;; when building SBCL in SBCL, the needed specializations exist,
+;;; so the sanity-check will be triggered, and we can fix the source.
 #+sb-xc-host
 (defun dump-specialized-vector (vector file &key data-only)
   (labels ((octet-swap (word bits)
@@ -819,17 +827,32 @@
                   (:little-endian i)
                   (:big-endian (octet-swap i bits)))
                 bytes file))))
-    (etypecase vector
-      ((simple-bit-vector 0)
-       ;; NIL bits+bytes are ok- DUMP-INTEGER-AS-N-BYTES is unreachable.
-       ;; Otherwise we'd need to fill up octets using an ash/logior loop.
-       (dump-unsigned-vector sb!vm:simple-bit-vector-widetag nil nil))
-      ((simple-array (unsigned-byte 8) (*))
-       (dump-unsigned-vector sb!vm:simple-array-unsigned-byte-8-widetag 1 8))
-      ((simple-array (unsigned-byte 16) (*))
-       (dump-unsigned-vector sb!vm:simple-array-unsigned-byte-16-widetag 2 16))
-      ((simple-array (unsigned-byte 32) (*))
-       (dump-unsigned-vector sb!vm:simple-array-unsigned-byte-32-widetag 4 32)))))
+    (let ((et (!specialized-array-element-type vector)))
+      (cond
+        ((listp et)
+         (destructuring-bind (type-id bits) et
+           (dump-unsigned-vector
+            (ecase type-id ; could easily extend this to signed-byte
+              (unsigned-byte
+               (ecase bits
+                 (8  sb!vm:simple-array-unsigned-byte-8-widetag)
+                 (16 sb!vm:simple-array-unsigned-byte-16-widetag)
+                 (32 sb!vm:simple-array-unsigned-byte-32-widetag))))
+            (/ bits sb!vm:n-byte-bits)
+            bits)))
+        ((typep vector '(simple-bit-vector 0))
+         ;; NIL bits+bytes are ok- DUMP-INTEGER-AS-N-BYTES is unreachable.
+         ;; Otherwise we'd need to fill up octets using an ash/logior loop.
+         (dump-unsigned-vector sb!vm:simple-bit-vector-widetag nil nil))
+        ((and (typep vector '(vector * 0)) data-only)
+         nil) ; empty vector and data-only => nothing to do
+        ((typep vector '(vector (unsigned-byte 8)))
+         ;; FIXME: eliminate this case, falling through to ERROR.
+         (compiler-style-warn
+          "Unportably dumping (ARRAY (UNSIGNED-BYTE 8)) ~S" vector)
+         (dump-unsigned-vector sb!vm:simple-array-unsigned-byte-8-widetag 1 8))
+        (t
+         (error "Won't dump specialized array ~S" vector))))))
 
 #-sb-xc-host
 (defun dump-specialized-vector (vector file &key data-only)

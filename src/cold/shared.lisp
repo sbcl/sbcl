@@ -238,12 +238,15 @@
 
 (defparameter *stems-and-flags* (read-from-file "build-order.lisp-expr"))
 
+(defvar *array-to-specialization* (make-hash-table :test #'eq))
+
 (defmacro do-stems-and-flags ((stem flags) &body body)
   (let ((stem-and-flags (gensym "STEM-AND-FLAGS")))
     `(dolist (,stem-and-flags *stems-and-flags*)
        (let ((,stem (first ,stem-and-flags))
              (,flags (rest ,stem-and-flags)))
-         ,@body))))
+         ,@body
+         (clrhash *array-to-specialization*)))))
 
 ;;; Given a STEM, remap the path component "/target/" to a suitable
 ;;; target directory.

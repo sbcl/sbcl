@@ -249,7 +249,9 @@
         (dolist (loc (elsewhere))
           (dump-location-from-info loc tlf-num var-locs))))
 
-    (values (copy-seq byte-buffer) tlf-num)))
+    (values (!make-specialized-array (length byte-buffer) '(unsigned-byte 8)
+                                     byte-buffer)
+            tlf-num)))
 
 ;;; Return DEBUG-SOURCE structure containing information derived from
 ;;; INFO.
@@ -276,13 +278,12 @@
 
 ;;; Given an arbitrary sequence, coerce it to an unsigned vector if
 ;;; possible. Ordinarily we coerce it to the smallest specialized
-;;; vector we can. However, we also have a special hack for
-;;; cross-compiling at bootstrap time, when arbitrarily-specialized
-;;; vectors aren't fully supported: in that case, we coerce it only to
-;;; a vector whose element size is an integer multiple of output byte
-;;; size.
+;;; vector we can.
+;;; During cross-compilation the in-memory representation is opaque -
+;;; we don't care how it looks, but can recover the intended specialization.
+
 (defun coerce-to-smallest-eltype (seq)
-  (let ((maxoid 0))
+  (let ((maxoid 0) (length 0))
     (flet ((frob (x)
              (if (typep x 'unsigned-byte)
                  (when (>= x maxoid)
@@ -291,33 +292,18 @@
                    (coerce seq 'simple-vector)))))
       (if (listp seq)
           (dolist (i seq)
+            (incf length) ; so not to traverse again to compute it
             (frob i))
-          (dovector (i seq)
+          (dovector (i seq (setq length (length seq)))
             (frob i)))
       (let ((specializer `(unsigned-byte
                            ,(etypecase maxoid
                               ((unsigned-byte 8) 8)
                               ((unsigned-byte 16) 16)
                               ((unsigned-byte 32) 32)))))
-        ;; cross-compilers beware! It would be possible for the
-        ;; upgraded-array-element-type of (UNSIGNED-BYTE 16) to be
-        ;; (SIGNED-BYTE 17) or (UNSIGNED-BYTE 23), and this is
-        ;; completely valid by ANSI.  However, the cross-compiler
-        ;; doesn't know how to dump (in practice) anything but the
-        ;; above three specialized array types, so make it break here
-        ;; if this is violated.
-        #+sb-xc-host
-        (aver
-         ;; not SB!XC:UPGRADED-ARRAY-ELEMENT-TYPE, because we are
-         ;; worried about whether the host's implementation of arrays.
-         (let ((uaet (upgraded-array-element-type specializer)))
-           (dolist (et '((unsigned-byte 8)
-                         (unsigned-byte 16)
-                         (unsigned-byte 32))
-                    nil)
-             (when (and (subtypep et uaet) (subtypep uaet et))
-               (return t)))))
-        (coerce seq `(simple-array ,specializer (*)))))))
+        ;; formerly (coerce seq `(simple-array ,specializer (*)))
+        ;; plus a kludge for cross-compilation. This is nicer.
+        (!make-specialized-array length specializer seq)))))
 
 ;;;; variables
 

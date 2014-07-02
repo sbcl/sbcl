@@ -1,20 +1,23 @@
 (in-package "SB!IMPL")
 
 (defmacro define-unibyte-permutation-mapper (byte-code-name code-byte-name table)
-  `(let ((byte-to-code-table ',(coerce table '(simple-array (unsigned-byte 8) (256))))
-         (code-to-byte-table (make-array 256 :element-type '(unsigned-byte 8))))
-     (dotimes (i 256)
-       (setf (aref code-to-byte-table (aref byte-to-code-table i)) i))
-     (defun ,byte-code-name (byte)
-       (declare (optimize speed (safety 0))
-                (type (unsigned-byte 8) byte))
-       (aref byte-to-code-table byte))
-     (defun ,code-byte-name (code)
-       (declare (optimize speed (safety 0))
-                (type char-code code))
-       (if (> code 255)
-           nil
-           (aref code-to-byte-table code)))))
+  (let ((byte-to-code-table
+         (!make-specialized-array 256 '(unsigned-byte 8) table))
+        (code-to-byte-table
+         (!make-specialized-array 256 '(unsigned-byte 8))))
+    (dotimes (i 256)
+      (setf (aref code-to-byte-table (aref byte-to-code-table i)) i))
+    `(progn
+       (defun ,byte-code-name (byte)
+         (declare (optimize speed (safety 0))
+                  (type (unsigned-byte 8) byte))
+         (aref ,byte-to-code-table byte))
+       (defun ,code-byte-name (code)
+         (declare (optimize speed (safety 0))
+                  (type char-code code))
+         (if (> code 255)
+             nil
+             (aref ,code-to-byte-table code))))))
 
 (define-unibyte-permutation-mapper ebcdic-us->code-mapper code->ebcdic-us-mapper
   (#x00 #x01 #x02 #x03 #x9c #x09 #x86 #x7f #x97 #x8d #x8e #x0b #x0c #x0d #x0e #x0f

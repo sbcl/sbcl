@@ -2981,7 +2981,8 @@
   (declare (type segment segment)
            (type index amount))
   ;; Pack all instructions into one byte vector to save space.
-  (let* ((bytes #.(coerce #(#x90
+  (let* ((bytes #.(!coerce-to-specialized
+                          #(#x90
                             #x66 #x90
                             #x0f #x1f #x00
                             #x0f #x1f #x40 #x00
@@ -2990,7 +2991,7 @@
                             #x0f #x1f #x80 #x00 #x00 #x00 #x00
                             #x0f #x1f #x84 #x00 #x00 #x00 #x00 #x00
                             #x66 #x0f #x1f #x84 #x00 #x00 #x00 #x00 #x00)
-                          '(vector (unsigned-byte 8))))
+                          '(unsigned-byte 8)))
          (max-length (isqrt (* 2 (length bytes)))))
     (loop
       (let* ((count (min amount max-length))

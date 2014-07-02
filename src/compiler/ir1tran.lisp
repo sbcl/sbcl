@@ -318,8 +318,7 @@
                         #-sb-xc-host
                         (or unboxed-array #!+sb-simd-pack simd-pack)
                         #+sb-xc-host
-                        (or (simple-array (unsigned-byte 8) (*))
-                            simple-bit-vector)
+                        (and array (not (array t)))
                         symbol
                         number
                         character
