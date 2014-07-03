@@ -367,7 +367,7 @@
 ;;   is not the analogous function to VECTOR. (New backq macro fixes that.)
 (defun rewrite-initial-contents (rank initial-contents env)
   (named-let recurse ((rank rank) (data initial-contents))
-    (declare (index rank))
+    (declare (type index rank))
     (if (plusp rank)
         (flet ((sequence-constructor-p (form)
                  (member (car form) '(list vector sb!impl::backq-list))))

@@ -206,6 +206,7 @@
  ;; This needs DEFINE-ALIEN-ROUTINE from target-alieneval.
  ("src/code/misc-aliens" :not-host)
 
+ ("src/code/typedefs")
  ("src/compiler/generic/vm-array")
  ("src/code/array"         :not-host)
  ("src/code/early-float"   :not-host)
@@ -311,7 +312,6 @@
  ("src/compiler/early-c")
  ("src/compiler/policy")
  ("src/compiler/policies")
- ("src/code/typedefs")
 
  ;; ("src/code/defbangmacro" was here until sbcl-0.6.7.3.)
 
