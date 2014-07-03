@@ -188,11 +188,21 @@
 (defmethod documentation ((x structure-class) (doc-type (eql 'type)))
   (fdocumentation (class-name x) 'type))
 
-(defmethod documentation ((x standard-class) (doc-type (eql 't)))
+(defmethod documentation ((x class) (doc-type (eql 't)))
   (slot-value x '%documentation))
 
-(defmethod documentation ((x standard-class) (doc-type (eql 'type)))
+(defmethod documentation ((x class) (doc-type (eql 'type))) ; TODO setf
   (slot-value x '%documentation))
+
+(defmethod (setf documentation) (new-value
+                                 (x class)
+                                 (doc-type (eql 't)))
+  (setf (slot-value x '%documentation) new-value))
+
+(defmethod (setf documentation) (new-value
+                                 (x class)
+                                 (doc-type (eql 'type)))
+  (setf (slot-value x '%documentation) new-value))
 
 ;;; although the CLHS doesn't mention this, it is reasonable to assume
 ;;; that parallel treatment of condition-class was intended (if
@@ -222,16 +232,6 @@
                                  (x structure-class)
                                  (doc-type (eql 'type)))
   (setf (fdocumentation (class-name x) 'type) new-value))
-
-(defmethod (setf documentation) (new-value
-                                 (x standard-class)
-                                 (doc-type (eql 't)))
-  (setf (slot-value x '%documentation) new-value))
-
-(defmethod (setf documentation) (new-value
-                                 (x standard-class)
-                                 (doc-type (eql 'type)))
-  (setf (slot-value x '%documentation) new-value))
 
 (defmethod (setf documentation) (new-value
                                  (x condition-class)

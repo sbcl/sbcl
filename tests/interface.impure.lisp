@@ -149,6 +149,11 @@
   ()
   (:documentation "FOO"))
 
+(defclass documentation.funcallable-instance ()
+  ()
+  (:metaclass sb-mop:funcallable-standard-class)
+  (:documentation "FEZ"))
+
 (defstruct bar "BAR")
 
 (define-condition baz ()
@@ -180,8 +185,11 @@
                   (setf (documentation ',name 'structure) new4)
                   (assert-documentation ',name 'structure new4)))))))
 
-  (with-test (:name (documentation class))
+  (with-test (:name (documentation class standard-class))
     (do-class foo "FOO"))
+
+  (with-test (:name (documentation class sb-mop:funcallable-standard-class))
+    (do-class documentation.funcallable-instance "FEZ"))
 
   (with-test (:name (documentation struct 1))
     (do-class bar "BAR" t))
