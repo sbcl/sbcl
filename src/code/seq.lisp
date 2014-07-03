@@ -168,6 +168,10 @@
                    (let ((,sequence (truly-the vector ,sequence)))
                      (declare (ignorable ,sequence))
                      ,array-form)
+                   ;; This could assert (THE EXTENDED-SEQUENCE ,sequence)
+                   ;; for a slight win, however the error string would be wrong.
+                   ;; It needs to be "<x> is not a SEQUENCE", not "<x> is not
+                   ;; an EXTENDED-SEQUENCE".
                    (let ((,sequence (the sequence ,sequence)))
                      ,other-form)))
              `((let ((,sequence (the vector ,sequence)))

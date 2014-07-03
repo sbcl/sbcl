@@ -31,37 +31,32 @@
   (def))
 
 ;;; Is X an extended sequence?
+;; This is like the "hierarchical layout depths for other things"
+;; case of the TYPEP transform (cf 'typetran'). Ideally it would
+;; be preferable to share TYPEP's code rather than repeat it here.
+(declaim (maybe-inline extended-sequence-p))
 (defun extended-sequence-p (x)
-  (and (not (listp x))
-       (not (vectorp x))
-       (let* ((slayout #.(info :type :compiler-layout 'sequence))
-             (depthoid #.(layout-depthoid (info :type :compiler-layout 'sequence)))
-             (layout (layout-of x)))
-        (when (layout-invalid layout)
-          (setq layout (update-object-layout-or-invalid x slayout)))
-        (if (eq layout slayout)
-            t
-            (let ((inherits (layout-inherits layout)))
-              (declare (optimize (safety 0)))
-              (and (> (length inherits) depthoid)
-                   (eq (svref inherits depthoid) slayout)))))))
+  (let* ((slayout #.(info :type :compiler-layout 'sequence))
+         (depthoid #.(layout-depthoid (info :type :compiler-layout 'sequence)))
+         (layout
+          ;; It is not an error to define a class that is both SEQUENCE and
+          ;; FUNCALLABLE-INSTANCE with metaclass FUNCALLABLE-STANDARD-CLASS
+          (cond ((%instancep x) (%instance-layout x))
+                ((funcallable-instance-p x) (%funcallable-instance-layout x))
+                (t (return-from extended-sequence-p nil)))))
+    (when (layout-invalid layout)
+      (setq layout (update-object-layout-or-invalid x slayout)))
+    (if (eq layout slayout)
+        t
+        (let ((inherits (layout-inherits layout)))
+          (declare (optimize (safety 0)))
+          (and (> (length inherits) depthoid)
+               (eq (svref inherits depthoid) slayout))))))
 
 ;;; Is X a SEQUENCE?  Harder than just (OR VECTOR LIST)
 (defun sequencep (x)
-  (or (listp x)
-      (vectorp x)
-      ;; FIXME: factor out the common guts of SEQUENCEP and EXTENDED-SEQUENCE-P
-      (let* ((slayout #.(info :type :compiler-layout 'sequence))
-             (depthoid #.(layout-depthoid (info :type :compiler-layout 'sequence)))
-             (layout (layout-of x)))
-        (when (layout-invalid layout)
-          (setq layout (update-object-layout-or-invalid x slayout)))
-        (if (eq layout slayout)
-            t
-            (let ((inherits (layout-inherits layout)))
-              (declare (optimize (safety 0)))
-              (and (> (length inherits) depthoid)
-                   (eq (svref inherits depthoid) slayout)))))))
+  (declare (inline extended-sequence-p))
+  (or (listp x) (vectorp x) (extended-sequence-p x)))
 
 ;;;; primitive predicates. These must be supported directly by the
 ;;;; compiler.
