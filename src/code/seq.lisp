@@ -150,6 +150,30 @@
                  (declare (ignorable ,sequence))
                  ,array-form)))))
 
+;; Same as above, but don't assume that ARRAYP implies VECTORP,
+;; and call SEQUENCEP only after checking for not LISTP and not VECTORP.
+;; This is for dispatching within sequence functions that have the
+;; EXPLICIT-CHECK attribute. [Because there is no way to have the compiler
+;; insert checks for a subset of arguments, it is inconvenient to declare
+;; things like DELETE-IF with explicit-check to suppress checking of the
+;; 'sequence' because then you have to manually check all other arguments.]
+(sb!xc:defmacro seq-dispatch-checking
+    (sequence list-form array-form &optional other-form)
+  `(if (listp ,sequence)
+       (let ((,sequence (truly-the list ,sequence)))
+         (declare (ignorable ,sequence))
+         ,list-form)
+       ,@(if other-form
+             `((if (vectorp ,sequence)
+                   (let ((,sequence (truly-the vector ,sequence)))
+                     (declare (ignorable ,sequence))
+                     ,array-form)
+                   (let ((,sequence (the sequence ,sequence)))
+                     ,other-form)))
+             `((let ((,sequence (the vector ,sequence)))
+                 (declare (ignorable ,sequence))
+                 ,array-form)))))
+
 (sb!xc:defmacro %make-sequence-like (sequence length)
   #!+sb-doc
   "Return a sequence of the same type as SEQUENCE and the given LENGTH."
@@ -310,7 +334,7 @@
 
 (defun length (sequence)
   #!+sb-doc "Return an integer that is the length of SEQUENCE."
-  (seq-dispatch sequence
+  (seq-dispatch-checking sequence
                 (length sequence)
                 (length sequence)
                 (sb!sequence:length sequence)))
@@ -744,10 +768,10 @@ many elements are copied."
 (defun reverse (sequence)
   #!+sb-doc
   "Return a new sequence containing the same elements but in reverse order."
-  (seq-dispatch sequence
+  (seq-dispatch-checking sequence
     (list-reverse* sequence)
     (vector-reverse* sequence)
-    (sb!sequence:reverse sequence)))
+    (the sequence (sb!sequence:reverse sequence))))
 
 ;;; internal frobs
 
@@ -791,10 +815,10 @@ many elements are copied."
   #!+sb-doc
   "Return a sequence of the same elements in reverse order; the argument
    is destroyed."
-  (seq-dispatch sequence
+  (seq-dispatch-checking sequence
     (list-nreverse* sequence)
     (vector-nreverse* sequence)
-    (sb!sequence:nreverse sequence)))
+    (the sequence (sb!sequence:nreverse sequence))))
 
 ;;;; CONCATENATE
 

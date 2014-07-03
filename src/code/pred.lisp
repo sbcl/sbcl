@@ -50,6 +50,7 @@
 (defun sequencep (x)
   (or (listp x)
       (vectorp x)
+      ;; FIXME: factor out the common guts of SEQUENCEP and EXTENDED-SEQUENCE-P
       (let* ((slayout #.(info :type :compiler-layout 'sequence))
              (depthoid #.(layout-depthoid (info :type :compiler-layout 'sequence)))
              (layout (layout-of x)))
