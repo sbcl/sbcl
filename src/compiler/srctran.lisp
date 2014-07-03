@@ -4212,25 +4212,28 @@
         (associate-args fun `(,fun ,first-arg ,arg) next identity))))
 
 ;;; Reduce constants in ARGS list.
-(declaim (ftype (sfunction (symbol list t symbol) list) reduce-constants))
-(defun reduce-constants (fun args identity one-arg-result-type)
+(declaim (ftype (sfunction (symbol list symbol) list) reduce-constants))
+(defun reduce-constants (fun args one-arg-result-type)
   (let ((one-arg-constant-p (ecase one-arg-result-type
                               (number #'numberp)
                               (integer #'integerp)))
-        (reduced-value identity)
+        (reduced-value)
         (reduced-p nil))
     (collect ((not-constants))
       (dolist (arg args)
-        (if (funcall one-arg-constant-p arg)
-            (setf reduced-value (funcall fun reduced-value arg)
-                  reduced-p t)
-            (not-constants arg)))
+        (cond ((not (funcall one-arg-constant-p arg))
+               (not-constants arg))
+              (reduced-value
+               (setf reduced-value (funcall fun reduced-value arg)
+                     reduced-p t))
+              (t
+               (setf reduced-value arg))))
       ;; It is tempting to drop constants reduced to identity here,
       ;; but if X is SNaN in (* X 1), we cannot drop the 1.
       (if (not-constants)
           (if reduced-p
               `(,reduced-value ,@(not-constants))
-              (not-constants))
+              args)
           `(,reduced-value)))))
 
 ;;; Do source transformations for transitive functions such as +.
@@ -4247,8 +4250,9 @@
     (0 identity)
     (1 `(,@one-arg-prefixes (the ,one-arg-result-type ,(first args))))
     (2 (values nil t))
-    (t (let ((reduced-args (reduce-constants fun args identity one-arg-result-type)))
-         (associate-args fun (first reduced-args) (rest reduced-args) identity)))))
+    (t
+     (let ((reduced-args (reduce-constants fun args one-arg-result-type)))
+       (associate-args fun (first reduced-args) (rest reduced-args) identity)))))
 
 (define-source-transform + (&rest args)
   (source-transform-transitive '+ args 0))
@@ -4278,9 +4282,10 @@
   (case (length args)
     ((0 2) (values nil t))
     (1 `(,@one-arg-prefixes (the ,one-arg-result-type ,(first args))))
-    (t (let ((reduced-args
-              (reduce-constants fun* (rest args) identity one-arg-result-type)))
-         (associate-args fun (first args) reduced-args identity)))))
+    (t
+     (let ((reduced-args
+             (reduce-constants fun* (rest args) one-arg-result-type)))
+       (associate-args fun (first args) reduced-args identity)))))
 
 (define-source-transform - (&rest args)
   (source-transform-intransitive '- '+ args 0 '(%negate)))
