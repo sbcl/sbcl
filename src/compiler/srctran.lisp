@@ -4221,13 +4221,16 @@
         (reduced-p nil))
     (collect ((not-constants))
       (dolist (arg args)
-        (cond ((not (funcall one-arg-constant-p arg))
-               (not-constants arg))
-              (reduced-value
-               (setf reduced-value (funcall fun reduced-value arg)
-                     reduced-p t))
-              (t
-               (setf reduced-value arg))))
+        (let ((value (if (constantp arg)
+                         (constant-form-value arg)
+                         arg)))
+          (cond ((not (funcall one-arg-constant-p value))
+                 (not-constants arg))
+                (reduced-value
+                 (setf reduced-value (funcall fun reduced-value value)
+                       reduced-p t))
+                (t
+                 (setf reduced-value value)))))
       ;; It is tempting to drop constants reduced to identity here,
       ;; but if X is SNaN in (* X 1), we cannot drop the 1.
       (if (not-constants)
