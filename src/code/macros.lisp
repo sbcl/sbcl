@@ -156,7 +156,7 @@ invoked. In that case it will store into PLACE and start over."
       (error 'simple-program-error
              :format-control "Symbol ~S is already defined as ~A."
              :format-arguments (list name
-                                     (ecase kind
+                                     (case kind
                                        (:alien "an alien variable")
                                        (:constant "a constant")
                                        (:special "a special variable")
