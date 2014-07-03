@@ -93,22 +93,24 @@
                                 ((speed 0) (space 1))))
           (let ((seq (make-sequence-for-type seq-type))
                 (lambda-expr `(lambda (seq)
+                                (declare (sb-ext:muffle-conditions
+                                          sb-ext:compiler-note))
                                 ,@(when declaredness
                                     `((declare (type ,seq-type seq))))
                                 (declare (optimize ,@optimization))
                                 ,snippet)))
             (when (not seq)
               (return))
-            (format t "~&~S~%" lambda-expr)
+            ;(format t "~&~S~%" lambda-expr)
             (multiple-value-bind (fun warnings-p failure-p)
                 (compile nil lambda-expr)
               (when (or warnings-p failure-p)
                 (error "~@<failed compilation:~2I ~_LAMBDA-EXPR=~S ~_WARNINGS-P=~S ~_FAILURE-P=~S~:@>"
                        lambda-expr warnings-p failure-p))
-              (format t "~&~S ~S~%~S~%~S ~S~%"
-                      base-seq snippet seq-type declaredness optimization)
-              (format t "~&(TYPEP SEQ 'SIMPLE-ARRAY)=~S~%"
-                      (typep seq 'simple-array))
+              ;(format t "~&~S ~S~%~S~%~S ~S~%"
+              ;        base-seq snippet seq-type declaredness optimization)
+              ;(format t "~&(TYPEP SEQ 'SIMPLE-ARRAY)=~S~%"
+              ;        (typep seq 'simple-array))
               (unless (funcall fun seq)
                 (error "~@<failed test:~2I ~_BASE-SEQ=~S ~_SNIPPET=~S ~_SEQ-TYPE=~S ~_DECLAREDNESS=~S ~_OPTIMIZATION=~S~:@>"
                        base-seq
