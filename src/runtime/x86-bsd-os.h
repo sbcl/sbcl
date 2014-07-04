@@ -17,7 +17,7 @@ static inline os_context_t *arch_os_get_context(void **void_context)
  * store signal context information, but at least they tend to use the
  * same stems to name the structure fields, so by using this macro we
  * can share a fair amount of code between different variants. */
-#if defined(__FreeBSD__) || defined(__DragonFly__)
+#if defined(LISP_FEATURE_FREEBSD) || defined(__DragonFly__)
 #define CONTEXT_ADDR_FROM_STEM(stem) &context->uc_mcontext.mc_ ## stem
 #elif defined(__OpenBSD__)
 #define CONTEXT_ADDR_FROM_STEM(stem) &context->sc_ ## stem

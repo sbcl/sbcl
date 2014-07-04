@@ -1,5 +1,6 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 changes relative to sbcl-1.2.1:
+  * enhancement: support for GNU/kFreeBSD x86.
   * enhancement: ATOMIC-INCF and ATOMIC-DECF can operate on (CAR x), (CDR x)
     and DEFGLOBAL variables of type fixnum.
   * enhancement: arithmetic constant reduction is now performed on defconstant

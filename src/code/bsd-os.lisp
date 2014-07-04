@@ -76,7 +76,8 @@
 (defun software-type ()
   #!+sb-doc
   "Return a string describing the supporting software."
-  (sysctl :str ctl-kern kern-ostype))
+  #!-gnu-kfreebsd (sysctl :str ctl-kern kern-ostype)
+  #!+gnu-kfreebsd "GNU/kFreeBSD")
 
 (defun software-version ()
   #!+sb-doc

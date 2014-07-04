@@ -1,5 +1,4 @@
 # -*- makefile -*- for the C-level run-time support for SBCL
-# configuration stuff shared between various *BSD OSes
 
 # This software is part of the SBCL system. See the README file for
 # more information.
@@ -10,20 +9,18 @@
 # provided with absolutely no warranty. See the COPYING and CREDITS
 # files for more information.
 
-ASSEM_SRC = x86-64-assem.S
-ARCH_SRC = x86-64-arch.c
+include Config.x86-64-bsd
 
-OS_SRC = bsd-os.c x86-64-bsd-os.c
-OS_LIBS = # -ldl
-ifdef LISP_FEATURE_SB_CORE_COMPRESSION
-  OS_LIBS += -lz
+ASSEM_SRC += ldso-stubs.S
+
+# Until sbcl-0.6.7.3, we used "LINKFLAGS+=-static" here, which
+# worked fine for most things, but LOAD-FOREIGN & friends require
+# dlopen() etc., which in turn depend on dynamic linking of the
+# runtime.
+OS_LIBS += -lutil -ldl
+
+# use libthr (1:1 threading).  libpthread (m:n threading) does not work.
+ifdef LISP_FEATURE_SB_THREAD
+  #OS_LIBS += -lpthread
+  OS_LIBS += -lthr
 endif
-
-CFLAGS += -fno-omit-frame-pointer
-LINKFLAGS += -Wl,--export-dynamic
-
-GC_SRC = gencgc.c
-
-# Nothing to do for after-grovel-headers.
-.PHONY: after-grovel-headers
-after-grovel-headers:

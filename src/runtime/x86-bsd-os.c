@@ -40,7 +40,7 @@
  * entails; unfortunately, currently the situation is worse, not
  * better, than in the above paragraph. */
 
-#if defined(__FreeBSD__) || defined(__OpenBSD__) || defined(LISP_FEATURE_DARWIN) || defined(__DragonFly__)
+#if defined(LISP_FEATURE_FREEBSD) || defined(__OpenBSD__) || defined(LISP_FEATURE_DARWIN) || defined(__DragonFly__)
 int *
 os_context_register_addr(os_context_t *context, int offset)
 {
@@ -72,7 +72,7 @@ os_context_sp_addr(os_context_t *context)
     return (int *)CONTEXT_ADDR_FROM_STEM(esp);
 }
 
-#endif /* __FreeBSD__ || __OpenBSD__ || __DragonFly__ */
+#endif /* LISP_FEATURE_FREEBSD || __OpenBSD__ || __DragonFly__ */
 
 #ifdef __NetBSD__
 int *
@@ -112,7 +112,7 @@ os_context_sp_addr(os_context_t *context)
 
 int *os_context_pc_addr(os_context_t *context)
 {
-#if defined(__FreeBSD__) || defined(__DragonFly__)
+#if defined(LISP_FEATURE_FREEBSD) || defined(__DragonFly__)
     return CONTEXT_ADDR_FROM_STEM(eip);
 #elif defined __OpenBSD__
     return CONTEXT_ADDR_FROM_STEM(pc);

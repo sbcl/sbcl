@@ -274,8 +274,11 @@ case `uname` in
         ;;
     *BSD)
         case `uname` in
-            *FreeBSD)
+            FreeBSD)
                 sbcl_os="freebsd"
+                ;;
+            GNU/kFreeBSD)
+                sbcl_os="gnu-kfreebsd"
                 ;;
             OpenBSD)
                 sbcl_os="openbsd"
@@ -492,14 +495,18 @@ case "$sbcl_os" in
         link_or_copy $sbcl_arch-bsd-os.h target-arch-os.h
         link_or_copy bsd-os.h target-os.h
         case "$sbcl_os" in
-            freebsd)
+            *freebsd)
                 printf ' :elf' >> $ltf
                 printf ' :freebsd' >> $ltf
                 printf ' :gcc-tls' >> $ltf
+                if [ $sbcl_os = "gnu-kfreebsd" ]; then
+                    printf ' :gnu-kfreebsd' >> $ltf
+                fi
+
                 if [ $sbcl_arch = "x86" ]; then
                     printf ' :restore-fs-segment-register-from-tls' >> $ltf
                 fi
-                link_or_copy Config.$sbcl_arch-freebsd Config
+                link_or_copy Config.$sbcl_arch-$sbcl_os Config
                 ;;
             openbsd)
                 printf ' :elf' >> $ltf
@@ -615,7 +622,7 @@ if [ "$sbcl_arch" = "x86" ]; then
     printf ' :alien-callbacks :cycle-counter :inline-constants ' >> $ltf
     printf ' :memory-barrier-vops :multiply-high-vops :ash-right-vops :symbol-info-vops' >> $ltf
     case "$sbcl_os" in
-    linux | freebsd | netbsd | openbsd | sunos | darwin | win32 | dragonfly)
+    linux | freebsd | gnu-kfreebsd | netbsd | openbsd | sunos | darwin | win32 | dragonfly)
         printf ' :linkage-table' >> $ltf
     esac
     if [ "$sbcl_os" = "win32" ]; then
