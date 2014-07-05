@@ -900,6 +900,7 @@
       (return-from %ensure-both-classoids-valid nil))))
 
 (defun update-object-layout-or-invalid (object layout)
+  ;; FIXME: explain why this isn't (LAYOUT-FOR-STD-CLASS-P LAYOUT).
   (if (layout-for-std-class-p (layout-of object))
       (sb!pcl::check-wrapper-validity object)
       (sb!c::%layout-invalid-error object layout)))

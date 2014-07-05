@@ -608,7 +608,8 @@
                                          object ',layout)))
                       (if (eq ,n-layout ',layout)
                           t
-                          (let ((,n-inherits (layout-inherits ,n-layout)))
+                          (let ((,n-inherits (layout-inherits
+                                              (truly-the layout ,n-layout))))
                             (declare (optimize (safety 0)))
                             (and (> (length ,n-inherits) ,depthoid)
                                  ;; See above.

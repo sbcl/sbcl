@@ -48,7 +48,7 @@
       (setq layout (update-object-layout-or-invalid x slayout)))
     (if (eq layout slayout)
         t
-        (let ((inherits (layout-inherits layout)))
+        (let ((inherits (layout-inherits (truly-the layout layout))))
           (declare (optimize (safety 0)))
           (and (> (length inherits) depthoid)
                (eq (svref inherits depthoid) slayout))))))
