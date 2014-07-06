@@ -947,34 +947,41 @@ implementation it is ~S." *default-package-use-list*)
                names))
     res))
 
-(defun intern (name &optional (package (sane-package)))
+(macrolet ((find/intern (function)
+             ;; Both FIND-SYMBOL* and INTERN* require a SIMPLE-STRING,
+             ;; but accept a LENGTH. Given a non-simple string,
+             ;; we need copy it only if the cumulative displacement
+             ;; into the underlying simple-string is nonzero.
+             ;; FIXME: something in here generates a type-check for
+             ;; simple-rank-1-array, which ought to have been obviated
+             ;; by the assertion in the XEP that NAME is a STRING.
+             `(multiple-value-bind (name length)
+                  (if (simple-string-p name)
+                      (values name (length name))
+                      (with-array-data ((name name) (start) (end)
+                                        :check-fill-pointer t)
+                        (if (eql start 0)
+                            (values name end)
+                            (values (subseq name start end)
+                                    (- end start)))))
+                (truly-the
+                 (values symbol (member :internal :external :inherited nil))
+                 (,function name length
+                            (find-undeleted-package-or-lose package))))))
+
+  (defun intern (name &optional (package (sane-package)))
   #!+sb-doc
   "Return a symbol in PACKAGE having the specified NAME, creating it
   if necessary."
-  ;; We just simple-stringify the name and call INTERN*, where the real
-  ;; logic is.
-  (let ((name (if (simple-string-p name)
-                  name
-                  (coerce name 'simple-string)))
-        (package (find-undeleted-package-or-lose package)))
-    (declare (simple-string name))
-      (intern* name
-               (length name)
-               package)))
+    (find/intern intern*))
 
-(defun find-symbol (name &optional (package (sane-package)))
+  (defun find-symbol (name &optional (package (sane-package)))
   #!+sb-doc
   "Return the symbol named STRING in PACKAGE. If such a symbol is found
   then the second value is :INTERNAL, :EXTERNAL or :INHERITED to indicate
   how the symbol is accessible. If no symbol is found then both values
   are NIL."
-  ;; We just simple-stringify the name and call FIND-SYMBOL*, where the
-  ;; real logic is.
-  (let ((name (if (simple-string-p name) name (coerce name 'simple-string))))
-    (declare (simple-string name))
-    (find-symbol* name
-                  (length name)
-                  (find-undeleted-package-or-lose package))))
+    (find/intern find-symbol*)))
 
 ;;; If the symbol named by the first LENGTH characters of NAME doesn't exist,
 ;;; then create it, special-casing the keyword package.
@@ -995,6 +1002,8 @@ implementation it is ~S." *default-package-use-list*)
                  (let ((symbol-name (cond (no-copy
                                            (aver (= (length name) length))
                                            name)
+                                          ((typep name '(simple-array nil (*)))
+                                           "")
                                           (t
                                            ;; This so that SUBSEQ is inlined,
                                            ;; because we need it fixed for cold init.
