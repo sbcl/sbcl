@@ -928,7 +928,7 @@ implementation it is ~S." *default-package-use-list*)
                           ;; for tidiness and to help the GC.
                           (package-%nicknames package) nil))
                   (setf (package-%use-list package) nil
-                        (package-tables package) nil
+                        (package-tables package) #()
                         (package-%shadowing-symbols package) nil
                         (package-internal-symbols package)
                         (make-or-remake-package-hashtable 0)
@@ -1041,27 +1041,25 @@ implementation it is ~S." *default-package-use-list*)
                         string length hash ehash)
       (when found
         (return-from find-symbol* (values symbol :external))))
-    (let ((head (package-tables package)))
-      (do ((prev head table)
-           (table (cdr head) (cdr table)))
-          ((null table) (values nil nil))
-        (with-symbol (found symbol (car table) string length hash ehash)
-          (when found
-            ;; At this point we used to move the table to the
-            ;; beginning of the list, probably on the theory that we'd
-            ;; soon be looking up further items there. Unfortunately
-            ;; that was very much non-thread safe. Since the failure
-            ;; mode was nasty (corruption of the package in a way
-            ;; which would make symbol lookups loop infinitely) and it
-            ;; would be triggered just by doing reads to a resource
-            ;; that users can't do their own locking on, that code has
-            ;; been removed. If we ever add locking to packages,
-            ;; resurrecting that code might make sense, even though it
-            ;; didn't seem to have much of an performance effect in
-            ;; normal use.
-            ;;
-            ;; -- JES, 2006-09-13
-            (return-from find-symbol* (values symbol :inherited))))))))
+    (let* ((tables (package-tables package))
+           (n (length tables)))
+      (unless (eql n 0)
+        ;; Try the most-recently-used table, then others.
+        ;; TABLES is treated as circular for this purpose.
+        (let* ((mru (package-mru-table-index package))
+               (start (if (< mru n) mru 0))
+               (i start))
+          (loop
+             (with-symbol (found symbol
+                                 (locally (declare (optimize (safety 0)))
+                                   (svref tables i))
+                                 string length hash ehash)
+               (when found
+                 (setf (package-mru-table-index package) i)
+                 (return-from find-symbol* (values symbol :inherited))))
+             (if (< (decf i) 0) (setq i (1- n)))
+             (if (= i start) (return)))))))
+  (values nil nil))
 
 ;;; Similar to FIND-SYMBOL, but only looks for an external symbol.
 ;;; This is used for fast name-conflict checking in this file and symbol
@@ -1524,7 +1522,11 @@ PACKAGE."
                        (name-conflict package 'use-package pkg sym s)))))))
 
             (push pkg (package-%use-list package))
-            (push (package-external-symbols pkg) (cdr (package-tables package)))
+            (setf (package-tables package)
+                  (let ((tbls (package-tables package)))
+                    (replace (make-array (1+ (length tbls))
+                              :initial-element (package-external-symbols pkg))
+                             tbls)))
             (push package (package-%used-by-list pkg)))))))
   t)
 
@@ -1543,7 +1545,7 @@ PACKAGE."
                 (remove p (the list (package-%use-list package))))
           (setf (package-tables package)
                 (delete (package-external-symbols p)
-                        (the list (package-tables package))))
+                        (package-tables package)))
           (setf (package-%used-by-list p)
                 (remove package (the list (package-%used-by-list p))))))
       t)))

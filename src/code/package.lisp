@@ -78,19 +78,13 @@
   (%nicknames () :type list)
   ;; packages used by this package
   (%use-list () :type list)
-  ;; a list of all the hashtables for inherited symbols. This is
-  ;; derived from %USE-LIST, but maintained separately from %USE-LIST
-  ;; for some reason. (Perhaps the reason is that when FIND-SYMBOL*
-  ;; hits an inherited symbol, it pulls it to the head of the list.)
-  ;;
-  ;; FIXME: This needs a more-descriptive name
-  ;; (USED-PACKAGE-HASH-TABLES?). It also needs an explanation of why
-  ;; the last entry is NIL. Perhaps it should even just go away and
-  ;; let us do indirection on the fly through %USE-LIST. (If so,
-  ;; benchmark to make sure that performance doesn't get stomped..)
-  ;; (If benchmark performance is important, this should prob'ly
-  ;; become a vector instead of a list.)
-  (tables (list nil) :type list)
+  ;; a simple-vector of the external symbol hashtables for used packages.
+  ;; Derived from %USE-LIST, but maintained separately.
+  (tables #() :type simple-vector)
+  ;; index into TABLES of the table in which an inherited symbol was most
+  ;; recently found. On the next FIND-SYMBOL* operation, the indexed table
+  ;; is tested first.
+  (mru-table-index 0 :type index)
   ;; packages that use this package
   (%used-by-list () :type list)
   ;; PACKAGE-HASHTABLEs of internal & external symbols
