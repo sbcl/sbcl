@@ -185,12 +185,14 @@
   (declare (ignore context control))
   symbol)
 
-(defun assert-package-unlocked (package &optional control &rest args)
-  (declare (ignore control args))
+(defun assert-package-unlocked (package &optional format-control
+                                &rest format-arguments)
+  (declare (ignore format-control format-arguments))
   package)
 
-(defun assert-symbol-home-package-unlocked (name format &key continuablep)
-  (declare (ignore format continuablep))
+(defun assert-symbol-home-package-unlocked (name &optional format-control
+                                            &rest format-arguments)
+  (declare (ignore format-control format-arguments))
   name)
 
 (declaim (declaration enable-package-locks disable-package-locks))
