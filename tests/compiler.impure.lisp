@@ -447,7 +447,7 @@
 ;;; bugs 178, 199: compiler failed to compile a call of a function
 ;;; with a hairy type
 (defun bug178 (x)
-      (funcall (the function (the standard-object x))))
+  (funcall (the function (the standard-object x))))
 
 (defun bug199-aux (f)
   (eq nil (funcall f)))
@@ -455,6 +455,15 @@
 (defun bug199 (f x)
   (declare (type (and function (satisfies bug199-aux)) f))
   (funcall f x))
+
+(test-util:with-test (:name (declaim &optional &rest :bogus style-warning))
+  (assert-no-signal
+   (ctu:file-compile
+    "(declaim (ftype (function (symbol &optional t &rest t)) foo))
+     (defun foo (x &optional y &rest z)
+       (declare (ignore x y z)))"
+    :load nil)
+   style-warning))
 
 ;;; check non-toplevel DEFMACRO
 (defvar *defmacro-test-status* nil)
