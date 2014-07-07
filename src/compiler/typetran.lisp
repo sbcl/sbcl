@@ -598,12 +598,12 @@
            ((and layout (>= (layout-depthoid layout) 0))
             ;; hierarchical layout depths for other things (e.g.
             ;; CONDITION, STREAM)
-            (let ((depthoid (layout-depthoid layout))
-                  (n-layout (gensym))
-                  (n-inherits (gensym)))
-              `(and (,pred object)
-                    (let ((,n-layout (,get-layout object)))
-                      (when (layout-invalid ,n-layout)
+            ;; SEQUENCE is special-cased, but could be handled here.
+            (let* ((depthoid (layout-depthoid layout))
+                   (n-layout (gensym))
+                   (n-inherits (gensym))
+                   (guts
+                    `((when (layout-invalid ,n-layout)
                         (setq ,n-layout (update-object-layout-or-invalid
                                          object ',layout)))
                       (if (eq ,n-layout ',layout)
@@ -614,7 +614,23 @@
                             (and (> (length ,n-inherits) ,depthoid)
                                  ;; See above.
                                  (eq (data-vector-ref ,n-inherits ,depthoid)
-                                     ',layout))))))))
+                                     ',layout)))))))
+              ;; We can do slightly better than to use LAYOUT-OF
+              ;; because objects with LIST-POINTER-LOWTAG and
+              ;; OTHER-POINTER-LOWTAG can't possibly pass.
+              (if (eq get-layout 'layout-of)
+                  `(block typep
+                     (let ((,n-layout
+                            (cond ((%instancep object)
+                                   (%instance-layout object))
+                                  ((funcallable-instance-p object)
+                                   (%funcallable-instance-layout object))
+                                  (t
+                                   (return-from typep nil)))))
+                       ,@guts))
+                  `(and (,pred object)
+                        (let ((,n-layout (,get-layout object)))
+                          ,@guts)))))
            (t
             (/noshow "default case -- ,PRED and CLASS-CELL-TYPEP")
             `(and (,pred object)
