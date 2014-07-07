@@ -324,11 +324,8 @@ error if any of PACKAGES is not a valid package designator."
 
 (def!method print-object ((package package) stream)
   (let ((name (package-%name package)))
-    (if name
-        (print-unreadable-object (package stream :type t)
-          (prin1 name stream))
-        (print-unreadable-object (package stream :type t :identity t)
-          (write-string "(deleted)" stream)))))
+    (print-unreadable-object (package stream :type t :identity (not name))
+      (if name (prin1 name stream) (write-string "(deleted)" stream)))))
 
 ;;; ANSI says (in the definition of DELETE-PACKAGE) that these, and
 ;;; most other operations, are unspecified for deleted packages. We
