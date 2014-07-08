@@ -35,16 +35,16 @@
 
   ;; removing nonexistent types returns NIL
   (assert (equal nil (packed-info-remove foo-iv +no-auxilliary-key+
-                                         4 6 7)))
-  (assert (equal nil (packed-info-remove baz-iv 'mumble 4 6 7)))
+                                         '(4 6 7))))
+  (assert (equal nil (packed-info-remove baz-iv 'mumble '(4 6 7))))
 
   ;; removing the one info shrinks the vector to nothing
   ;; and all values of nothing are EQ
-  (assert (equalp #(0) (packed-info-remove foo-iv +no-auxilliary-key+ 5)))
-  (assert (eq (packed-info-remove foo-iv +no-auxilliary-key+ 5)
-              (packed-info-remove bar-iv +no-auxilliary-key+ 6)))
-  (assert (eq (packed-info-remove foo-iv +no-auxilliary-key+ 5)
-              (packed-info-remove baz-iv 'mumble 9))))
+  (assert (equalp #(0) (packed-info-remove foo-iv +no-auxilliary-key+ '(5))))
+  (assert (eq (packed-info-remove foo-iv +no-auxilliary-key+ '(5))
+              (packed-info-remove bar-iv +no-auxilliary-key+ '(6))))
+  (assert (eq (packed-info-remove foo-iv +no-auxilliary-key+ '(5))
+              (packed-info-remove baz-iv 'mumble '(9)))))
 
 ;; Test that the packing invariants are maintained:
 ;; 1. if an FDEFINITION is present in an info group, it is the *first* info
@@ -54,7 +54,7 @@
   (flet ((iv-put (aux-key number val)
            (setq vect (packed-info-insert vect aux-key number val)))
          (iv-del (aux-key number)
-           (awhen (packed-info-remove vect aux-key number)
+           (awhen (packed-info-remove vect aux-key (list number))
              (setq vect it)))
          (verify (ans)
            (let (result) ; => ((name . ((type . val) (type . val))) ...)

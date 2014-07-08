@@ -109,17 +109,26 @@
 ;;; the default.
 (defun undefine-fun-name (name)
   (when name
-    (macrolet ((frob (type) `(clear-info :function ,type name)))
-      (frob :info)
-      (frob :type)
-      (frob :where-from)
-      (frob :inlinep)
-      (frob :kind)
-      (frob :macro-function)
-      (frob :inline-expansion-designator)
-      (frob :source-transform)
-      (frob :structure-accessor)
-      (frob :assumed-type)))
+    (macrolet ((frob (&rest types)
+                 `(clear-info-values
+                   name ',(mapcar (lambda (x)
+                                    (type-info-number
+                                     (type-info-or-lose :function x)))
+                                  types))))
+      ;; Note that this does not clear the :DEFINITION.
+      ;; That's correct, because if we lose the association between a
+      ;; symbol and its #<fdefn> object, it could lead to creation of
+      ;; a non-unique #<fdefn> for a name.
+      (frob :info
+            :type
+            :where-from
+            :inlinep
+            :kind
+            :macro-function
+            :inline-expansion-designator
+            :source-transform
+            :structure-accessor
+            :assumed-type)))
   (values))
 
 ;;; part of what happens with DEFUN, also with some PCL stuff: Make

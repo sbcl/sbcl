@@ -906,9 +906,8 @@
 ;; While this could determine whether it would do anything before unpacking,
 ;; clearing does not happen often enough to warrant the pre-check.
 ;;
-(defun packed-info-remove (input key2 &rest type-nums)
-  (declare (dynamic-extent type-nums)
-           (simple-vector input))
+(defun packed-info-remove (input key2 type-nums)
+  (declare (simple-vector input))
   (when (or (eql (length input) (length +nil-packed-infos+))
             (and (not (eql key2 +no-auxilliary-key+))
                  (not (info-find-aux-key/packed input key2))))
@@ -952,7 +951,7 @@
             ((eql end 1) +nil-packed-infos+)
             (t (packify-infos new end)))))) ; otherwise repack
 
-;; We new a few magic constants to be shared between the next two functions.
+;; We need a few magic constants to be shared between the next two functions.
 (defconstant-eqx !+pcl-reader-name+ (make-symbol "READER") (constantly t))
 (defconstant-eqx !+pcl-writer-name+ (make-symbol "WRITER") (constantly t))
 (defconstant-eqx !+pcl-boundp-name+ (make-symbol "BOUNDP") (constantly t))
