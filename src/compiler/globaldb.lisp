@@ -415,8 +415,7 @@
 ;; with it, passing the function the Name as its only argument.
 ;;
 (defun call-with-each-globaldb-name (function)
-  (let ((name (list nil nil)) ; preallocate just one, and mutate as we go
-        (function (%coerce-callable-to-fun function)))
+  (let ((function (%coerce-callable-to-fun function)))
     (dolist (package (list-all-packages))
       (do-symbols (symbol package)
         (when (eq (symbol-package symbol) package)
@@ -427,9 +426,9 @@
                 (funcall function symbol))
               ;; Now deal with (<othersym> SYMBOL) names
               (do-packed-info-vector-aux-key (vector key-index)
-                (progn (setf (first name) (svref vector key-index)
-                             (second name) symbol)
-                       (funcall function name))))))))
+                (funcall function
+                         (construct-globaldb-name (svref vector key-index)
+                                                  symbol))))))))
     (info-maphash (lambda (name data)
                     (declare (ignore data))
                     (funcall function name))
@@ -753,11 +752,10 @@
        (unless (eq name prev)
          (format t "~&~S" (setq prev name)))
        (let ((type (svref *info-types* type-num)))
-         (format t "~&  ~@[type ~D~]~@[~{~S ~S~}~] ~S = "
+         (format t "~&  ~@[type ~D~]~@[~{~S ~S~}~] = "
                  (if (not type) type-num)
                  (if type
-                     (list (type-info-class type) (type-info-name type)))
-                 name)
+                     (list (type-info-class type) (type-info-name type))))
          (write val :level 1)))
      sym)))
 

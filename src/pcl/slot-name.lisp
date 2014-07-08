@@ -23,6 +23,15 @@
 
 (in-package "SB-PCL")
 
+;; This choice of naming structure is perhaps unfortunate, because were the
+;; names 2-lists, the globaldb hack to support this would instead be
+;; a natural use of the (SETF <x>) style naming that globaldb favors.
+;; But this naming is documented, and changing it would be incompatible.
+;; The 4-part name can be thought of as a 2-part name because
+;; half of it is composed of constants:
+;; (SB-PCL::SLOT-ACCESSOR :GLOBAL <foo> SB-PCL::{READER|WRITER|BOUNDP})
+;; -> ({READER|WRITER|BOUNDP} <foo>)
+;;
 (defun slot-reader-name (slot-name)
   (list 'slot-accessor :global slot-name 'reader))
 
