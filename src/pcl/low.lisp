@@ -53,18 +53,21 @@
 
 ;;; Lambda which executes its body (or not) randomly. Used to drop
 ;;; random cache entries.
+;;; This formerly punted with slightly greater than 50% probability,
+;;; and there was a periodicity to the nonrandomess.
+;;; If that was intentional, it should have been commented to that effect.
 (defmacro randomly-punting-lambda (lambda-list &body body)
   (with-unique-names (drops drop-pos)
-    `(let ((,drops (random-fixnum))
-           (,drop-pos sb-vm:n-fixnum-bits))
+    `(let ((,drops (random-fixnum)) ; means a POSITIVE fixnum
+           (,drop-pos sb-vm:n-positive-fixnum-bits))
        (declare (fixnum ,drops)
-                (type (integer 0 #.sb-vm:n-fixnum-bits) ,drop-pos))
+                (type (mod #.sb-vm:n-fixnum-bits) ,drop-pos))
        (lambda ,lambda-list
          (when (logbitp (the unsigned-byte (decf ,drop-pos)) ,drops)
            (locally ,@body))
          (when (zerop ,drop-pos)
            (setf ,drops (random-fixnum)
-                 ,drop-pos sb-vm:n-fixnum-bits))))))
+                 ,drop-pos sb-vm:n-positive-fixnum-bits))))))
 
 ;;;; PCL's view of funcallable instances
 
@@ -281,6 +284,8 @@ comparison.")
   (when (pcl-instance-p instance)
     (get-slots instance)))
 
+;; This macro is used only by %CHANGE-CLASS. Can we just do this there?
+;; [The code in 'fsc.lisp' which looks like it needs it is commented out]
 (defmacro get-wrapper (inst)
   (once-only ((wrapper `(layout-of ,inst)))
     `(progn
