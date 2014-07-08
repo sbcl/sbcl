@@ -708,6 +708,7 @@
   (classoid nil :type (or classoid null))
   ;; PCL class, if any
   (pcl-class nil))
+(declaim (freeze-type classoid-cell))
 
 (defun find-classoid-cell (name &key create)
   (let ((real-name (uncross name)))

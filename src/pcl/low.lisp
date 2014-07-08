@@ -169,9 +169,6 @@ Value of +SLOT-UNBOUND+ is unspecified, and should not be relied to be
 of any particular type, but it is guaranteed to be suitable for EQ
 comparison.")
 
-(defmacro %allocate-static-slot-storage--class (no-of-slots)
-  `(make-array ,no-of-slots :initial-element +slot-unbound+))
-
 (defmacro std-instance-class (instance)
   `(wrapper-class* (std-instance-wrapper ,instance)))
 
