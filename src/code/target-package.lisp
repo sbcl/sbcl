@@ -949,9 +949,16 @@ implementation it is ~S." *default-package-use-list*)
              ;; but accept a LENGTH. Given a non-simple string,
              ;; we need copy it only if the cumulative displacement
              ;; into the underlying simple-string is nonzero.
-             ;; FIXME: something in here generates a type-check for
-             ;; simple-rank-1-array, which ought to have been obviated
-             ;; by the assertion in the XEP that NAME is a STRING.
+             ;; There are two things that can be improved
+             ;; about the generated code here:
+             ;; 1. if X is known to satisfy STRINGP (generally any rank-1 array),
+             ;;    then testing SIMPLE-<base|character>-STRING-P should not
+             ;;    re-test the lowtag. This is constrained by the backends,
+             ;;    because there are no type vops that assume a known lowtag.
+             ;; 2. if X is known to satisfy VECTORP, then
+             ;;    (NOT (ARRAY-HEADER-P)) implies SIMPLE-P, but the compiler
+             ;;    does not actually know that, and generates a check.
+             ;;    This is more of a front-end issue.
              `(multiple-value-bind (name length)
                   (if (simple-string-p name)
                       (values name (length name))
