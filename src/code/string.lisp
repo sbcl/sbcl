@@ -87,9 +87,89 @@
   (setf (schar string index) new-el))
 
 (defun string=* (string1 string2 start1 end1 start2 end2)
+  (declare (optimize speed))
   (with-two-strings string1 string2 start1 end1 nil start2 end2
+    (let ((len (- end1 start1)))
+      (unless (= len (- end2 start2)) ; trivial
+        (return-from string=* nil))
+      ;; Optimizing the non-unicode builds is not terribly important
+      ;; because no per-character test for base/UCS4 is needed.
+      #!+sb-unicode
+      (let* ((widetag1 (%other-pointer-widetag string1))
+             (widetag2 (%other-pointer-widetag string2))
+             (char-shift
+              #!+(or x86 x86-64)
+              ;; The cost of WITH-PINNED-OBJECTS is near nothing on x86,
+              ;; and memcmp() is much faster except below a cutoff point.
+              ;; The threshold is higher on x86-32 because the overhead
+              ;; of a foreign call is higher due to FPU stack save/restore.
+              (if (and (= widetag1 widetag2)
+                       (>= len #!+x86 16
+                               #!+x86-64 8))
+                  (case widetag1
+                    (#.sb!vm:simple-base-string-widetag 0)
+                    (#.sb!vm:simple-character-string-widetag 2)))))
+        (when char-shift
+          (return-from string=*
+            ;; Efficiently compute byte indices. Derive-type on ASH isn't
+            ;; good enough. For 32-bit, it should be ok because
+            ;; (TYPEP (ASH ARRAY-TOTAL-SIZE-LIMIT 2) 'SB-VM:SIGNED-WORD) => T
+            ;; For 63-bit fixnums, that's false in theory, but true in practice.
+            ;; ARRAY-TOTAL-SIZE-LIMIT is too large for a 48-bit address space.
+            (macrolet ((sap (string start)
+                         `(sap+ (vector-sap (truly-the string ,string))
+                                (scale ,start)))
+                       (scale (index)
+                         `(truly-the sb!vm:signed-word
+                           (ash (truly-the index ,index) char-shift))))
+              (declare (optimize (sb!c:alien-funcall-saves-fp-and-pc 0)))
+              (with-pinned-objects (string1 string2)
+                (zerop (alien-funcall
+                        (extern-alien "memcmp"
+                                      (function int (* char) (* char) long))
+                        (sap string1 start1) (sap string2 start2)
+                        (scale len)))))))
+        (macrolet
+            ((char-loop (type1 type2)
+               `(return-from string=*
+                  (let ((string1 (truly-the (simple-array ,type1 1) string1))
+                        (string2 (truly-the (simple-array ,type2 1) string2)))
+                    (declare (optimize (sb!c::insert-array-bounds-checks 0)))
+                    (do ((index1 start1 (1+ index1))
+                         (index2 start2 (1+ index2)))
+                        ((>= index1 end1) t)
+                      (declare (index index1 index2))
+                      (unless (char= (schar string1 index1)
+                                     (schar string2 index2))
+                        (return nil)))))))
+          ;; On x86-64, short strings with same widetag use the general case.
+          ;; Why not always have cases for equal widetags and short strings?
+          ;; Because the code below deals with comparison when memcpy _can't_
+          ;; be used and is essential to this logic. No major speed gain is had
+          ;; with extra cases where memcpy would do, but was avoided.
+          ;; On non-x86, Lisp code is used always because I did not profile
+          ;; memcmp(), and this code is at least as good as %SP-STRING-COMPARE.
+          ;; Also, (ARRAY NIL) always punts.
+          (cond #!-x86-64
+                ((= widetag1 widetag2)
+                 (case widetag1
+                   (#.sb!vm:simple-base-string-widetag
+                    (char-loop base-char base-char))
+                   (#.sb!vm:simple-character-string-widetag
+                    (char-loop character character))))
+                ((or (and (= widetag1 sb!vm:simple-character-string-widetag)
+                          (= widetag2 sb!vm:simple-base-string-widetag))
+                     (and (= widetag2 sb!vm:simple-character-string-widetag)
+                          (= widetag1 sb!vm:simple-base-string-widetag)
+                          (progn (rotatef start1 start2)
+                                 (rotatef end1 end2)
+                                 (rotatef string1 string2)
+                                 t)))
+                 (char-loop character base-char))))))
     (not (%sp-string-compare string1 start1 end1 string2 start2 end2))))
 
+;; TODO If STRING/= is used for a conditional branch and not for the mismatch
+;;      index, it should be transformed to NOT STRING=.
 (defun string/=* (string1 string2 start1 end1 start2 end2)
   (with-two-strings string1 string2 start1 end1 offset1 start2 end2
     (let ((comparison (%sp-string-compare string1 start1 end1

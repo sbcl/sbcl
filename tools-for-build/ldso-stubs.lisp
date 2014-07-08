@@ -259,6 +259,7 @@ ldso_stub__ ## fct: ;                  \\
                    "lstat"
                    #!+inode64 "lstat$INODE64"
                    "malloc"
+                   #!+(or x86 x86-64) "memcmp"
                    "memmove"
                    "mkdir"
                    "nanosleep"
