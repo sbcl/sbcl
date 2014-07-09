@@ -221,7 +221,10 @@
          (simple-reader-error stream "illegal radix for #R: ~D." radix))
         (t
          ;; FIXME: (read-from-string "#o#x1f") should not work!
-         ;; The token must be comprised strictly of digits in the radix.
+         ;; The token should be comprised strictly of digits in the radix,
+         ;; though the docs say this is undefined behavior, so it's ok,
+         ;; other than it being something we should complain about
+         ;; for portability reasons.
          (let ((res (let ((*read-base* radix))
                       (read stream t nil t))))
            (unless (typep res 'rational)

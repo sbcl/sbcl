@@ -521,6 +521,8 @@ standard Lisp readtable when NIL."
   ;; A small string that is permanently assigned into this token-buf.
   (initial-string nil :type (simple-array character (128))
                   :read-only t)
+  (escapes (make-array 10 :element-type 'fixnum :fill-pointer 0 :adjustable t)
+           :type (and (vector fixnum) (not simple-array)) :read-only t)
   ;; Link to next TOKEN-BUF, to chain the *TOKEN-BUF-POOL* together.
   (next nil :type (or null token-buf)))
 (declaim (freeze-type token-buf))
@@ -543,6 +545,7 @@ standard Lisp readtable when NIL."
 (declaim (inline reset-read-buffer))
 (defun reset-read-buffer (&optional (b *read-buffer*))
   ;; Turn *READ-BUFFER* into an empty read buffer.
+  (setf (fill-pointer (token-buf-escapes b)) 0)
   (setf (token-buf-fill-ptr b) 0)
   (setf (token-buf-cursor b) 0))
 
@@ -560,6 +563,10 @@ standard Lisp readtable when NIL."
       (grow-read-buffer))
     (setf (elt (token-buf-string b) op) char)
     (setf (token-buf-fill-ptr b) (1+ op))))
+
+(defun ouch-read-buffer-escaped (char buf)
+  (vector-push-extend (token-buf-fill-ptr buf) (token-buf-escapes buf))
+  (ouch-read-buffer char buf))
 
 (defun grow-read-buffer ()
   (let* ((b *read-buffer*)
@@ -607,10 +614,9 @@ standard Lisp readtable when NIL."
         (setf (token-buf-next buffer) *token-buf-pool*)))
   (setf *token-buf-pool* chain))
 
-;; Return a fresh copy of *READ-BUFFER*'s string
-(defun copy-token-buf-string ()
-  (let ((b *read-buffer*))
-    (subseq (token-buf-string b) 0 (token-buf-fill-ptr b))))
+;; Return a fresh copy of BUFFER's string
+(defun copy-token-buf-string (&optional (buffer *read-buffer*))
+  (subseq (token-buf-string buffer) 0 (token-buf-fill-ptr buffer)))
 
 ;; Return a string displaced to *READ-BUFFER*'s string. Also get a
 ;; new token-buf which becomes the value of *READ-BUFFER*,
@@ -871,28 +877,31 @@ standard Lisp readtable when NIL."
 (defun internal-read-extended-token (stream firstchar escape-firstchar
                                      &aux (read-buffer *read-buffer*))
   (reset-read-buffer read-buffer)
-  (let ((escapes '()))
-    (when escape-firstchar
-      (push (token-buf-fill-ptr read-buffer) escapes)
-      (ouch-read-buffer firstchar)
-      (setq firstchar (read-char stream nil *eof-object*)))
+  (when escape-firstchar
+    (ouch-read-buffer-escaped firstchar read-buffer)
+    (setq firstchar (read-char stream nil *eof-object*)))
   (do ((char firstchar (read-char stream nil *eof-object*))
+       (seen-multiple-escapes nil)
+       (rt *readtable*)
        (colon nil))
       ((cond ((eofp char) t)
-             ((token-delimiterp char)
+             ((token-delimiterp char rt)
               (unread-char char stream)
               t)
              (t nil))
-       (values escapes colon))
-    (cond ((single-escape-p char)
+       (values read-buffer
+               (or (plusp (fill-pointer (token-buf-escapes read-buffer)))
+                   seen-multiple-escapes)
+               colon))
+    (cond ((single-escape-p char rt)
            ;; It can't be a number, even if it's 1\23.
            ;; Read next char here, so it won't be casified.
-           (push (token-buf-fill-ptr read-buffer) escapes)
            (let ((nextchar (read-char stream nil *eof-object*)))
              (if (eofp nextchar)
                  (reader-eof-error stream "after escape character")
-                 (ouch-read-buffer nextchar))))
-          ((multiple-escape-p char)
+                 (ouch-read-buffer-escaped nextchar read-buffer))))
+          ((multiple-escape-p char rt)
+           (setq seen-multiple-escapes t)
            ;; Read to next multiple-escape, escaping single chars
            ;; along the way.
            (loop
@@ -900,24 +909,21 @@ standard Lisp readtable when NIL."
                (cond
                 ((eofp ch)
                  (reader-eof-error stream "inside extended token"))
-                ((multiple-escape-p ch) (return))
-                ((single-escape-p ch)
+                ((multiple-escape-p ch rt) (return))
+                ((single-escape-p ch rt)
                  (let ((nextchar (read-char stream nil *eof-object*)))
-                   (cond ((eofp nextchar)
-                          (reader-eof-error stream "after escape character"))
-                         (t
-                          (push (token-buf-fill-ptr read-buffer) escapes)
-                          (ouch-read-buffer nextchar)))))
+                   (if (eofp nextchar)
+                       (reader-eof-error stream "after escape character")
+                       (ouch-read-buffer-escaped nextchar read-buffer))))
                 (t
-                 (push (token-buf-fill-ptr read-buffer) escapes)
-                 (ouch-read-buffer ch))))))
+                 (ouch-read-buffer-escaped ch read-buffer))))))
           (t
-           (when (and (constituentp char)
+           (when (and (not colon) ; easiest test first
+                      (constituentp char)
                       (eql (get-constituent-trait char)
-                           +char-attr-package-delimiter+)
-                      (not colon))
+                           +char-attr-package-delimiter+))
              (setq colon (token-buf-fill-ptr read-buffer)))
-           (ouch-read-buffer char))))))
+           (ouch-read-buffer char)))))
 
 ;;;; character classes
 
@@ -999,13 +1005,12 @@ standard Lisp readtable when NIL."
 (declaim (type (integer 2 36) *read-base*))
 
 ;;; Modify the read buffer according to READTABLE-CASE, ignoring
-;;; ESCAPES. ESCAPES is a list of the escaped indices, in reverse
-;;; order.
-(defun casify-read-buffer (escapes)
+;;; ESCAPES. ESCAPES is a vector of the escaped indices.
+(defun casify-read-buffer (token-buf)
   (let ((case (readtable-case *readtable*))
-        (token-buf *read-buffer*))
+        (escapes (token-buf-escapes token-buf)))
     (cond
-     ((and (null escapes) (eq case :upcase))
+     ((and (zerop (length escapes)) (eq case :upcase))
       (let ((buffer (token-buf-string token-buf)))
         (dotimes (i (token-buf-fill-ptr token-buf))
           (declare (optimize (sb!c::insert-array-bounds-checks 0)))
@@ -1015,20 +1020,18 @@ standard Lisp readtable when NIL."
       (macrolet ((skip-esc (&body body)
                    `(do ((i (1- (token-buf-fill-ptr token-buf)) (1- i))
                          (buffer (token-buf-string token-buf))
-                         (escapes escapes))
+                         (esc (if (zerop (fill-pointer escapes))
+                                  -1 (vector-pop escapes))))
                         ((minusp i))
                       (declare (fixnum i)
                                (optimize (sb!c::insert-array-bounds-checks 0)))
-                      (when (or (null escapes)
-                                (let ((esc (first escapes)))
-                                  (declare (fixnum esc))
-                                  (cond ((< esc i) t)
-                                        (t
-                                         (aver (= esc i))
-                                         (pop escapes)
-                                         nil))))
-                        (let ((ch (schar buffer i)))
-                          ,@body)))))
+                      (if (< esc i)
+                          (let ((ch (schar buffer i)))
+                            ,@body)
+                          (progn
+                            (aver (= esc i))
+                            (setq esc (if (zerop (fill-pointer escapes))
+                                          -1 (vector-pop escapes))))))))
         (flet ((lower-em ()
                  (skip-esc (setf (schar buffer i) (char-downcase ch))))
                (raise-em ()
@@ -1038,12 +1041,14 @@ standard Lisp readtable when NIL."
             (:downcase (lower-em))
             (:invert
              (let ((all-upper t)
-                   (all-lower t))
+                   (all-lower t)
+                   (fillptr (fill-pointer escapes)))
                (skip-esc
                  (when (both-case-p ch)
                    (if (upper-case-p ch)
                        (setq all-lower nil)
                        (setq all-upper nil))))
+               (setf (fill-pointer escapes) fillptr)
                (cond (all-lower (raise-em))
                      (all-upper (lower-em))))))))))))
 
@@ -1083,15 +1088,16 @@ extended <package-name>::<form-in-package> syntax."
     (return-from read-token nil))
   (let ((attribute-array (character-attribute-array *readtable*))
         (attribute-hash-table (character-attribute-hash-table *readtable*))
+        (buf *read-buffer*)
         (package-designator nil)
         (colons 0)
         (possibly-rational t)
         (seen-digit-or-expt nil)
         (possibly-float t)
         (was-possibly-float nil)
-        (escapes ())
         (seen-multiple-escapes nil))
-    (reset-read-buffer)
+    (declare (token-buf buf))
+    (reset-read-buffer buf)
     (prog ((char firstchar))
       (case (char-class3 char attribute-array attribute-hash-table)
         (#.+char-attr-constituent-sign+ (go SIGN))
@@ -1357,8 +1363,7 @@ extended <package-name>::<form-in-package> syntax."
       (let ((nextchar (read-char stream nil nil)))
         (unless nextchar
           (reader-eof-error stream "after single-escape character"))
-        (push (token-buf-fill-ptr *read-buffer*) escapes)
-        (ouch-read-buffer nextchar))
+        (ouch-read-buffer-escaped nextchar buf))
       (setq char (read-char stream nil nil))
       (unless char (go RETURN-SYMBOL))
       (case (char-class char attribute-array attribute-hash-table)
@@ -1369,11 +1374,12 @@ extended <package-name>::<form-in-package> syntax."
         (t (go SYMBOL)))
       MULT-ESCAPE
       (setq seen-multiple-escapes t)
+      ;; sometimes we pass eof-error=nil but check. here we just let it err.
+      ;; should pick one style and stick with it.
       (do ((char (read-char stream t) (read-char stream t)))
           ((multiple-escape-p char))
         (if (single-escape-p char) (setq char (read-char stream t)))
-        (push (token-buf-fill-ptr *read-buffer*) escapes)
-        (ouch-read-buffer char))
+        (ouch-read-buffer-escaped char buf))
       (setq char (read-char stream nil nil))
       (unless char (go RETURN-SYMBOL))
       (case (char-class char attribute-array attribute-hash-table)
@@ -1383,19 +1389,19 @@ extended <package-name>::<form-in-package> syntax."
         (#.+char-attr-package-delimiter+ (go COLON))
         (t (go SYMBOL)))
       COLON
-      (casify-read-buffer escapes)
       (unless (zerop colons)
         (simple-reader-error stream
                              "too many colons in ~S"
                              (copy-token-buf-string)))
+      (casify-read-buffer buf)
       (setq colons 1)
       (setq package-designator
             (if (or (plusp (token-buf-fill-ptr *read-buffer*))
                     seen-multiple-escapes)
                 (share-token-buf-string)
                 *keyword-package*))
-      (reset-read-buffer)
-      (setq escapes ())
+      (setq buf *read-buffer*)
+      (reset-read-buffer buf)
       (setq char (read-char stream nil nil))
       (unless char (reader-eof-error stream "after reading a colon"))
       (case (char-class char attribute-array attribute-hash-table)
@@ -1431,11 +1437,10 @@ extended <package-name>::<form-in-package> syntax."
                               package-designator))
         (t (go SYMBOL)))
       RETURN-SYMBOL
-      (casify-read-buffer escapes)
+      (casify-read-buffer buf)
       (let ((pkg (if package-designator
                      (reader-find-package package-designator stream)
-                     (or *reader-package* (sane-package))))
-            (buf *read-buffer*))
+                     (or *reader-package* (sane-package)))))
         (if (or (zerop colons) (= colons 2) (eq pkg *keyword-package*))
             (return (intern* (token-buf-string buf) (token-buf-fill-ptr buf)
                              pkg))
@@ -1463,10 +1468,10 @@ extended <package-name>::<form-in-package> syntax."
 (defun read-extended-token (stream &optional (*readtable* *readtable*))
   (let ((first-char (read-char stream nil nil t)))
     (cond (first-char
-           (multiple-value-bind (escapes colon)
+           (multiple-value-bind (buffer escapes-p colon)
                (internal-read-extended-token stream first-char nil)
-             (casify-read-buffer escapes)
-             (values (copy-token-buf-string) (not (null escapes)) colon)))
+             (casify-read-buffer buffer)
+             (values (copy-token-buf-string) escapes-p colon)))
           (t
            (values "" nil nil)))))
 
@@ -1477,9 +1482,9 @@ extended <package-name>::<form-in-package> syntax."
 (defun read-extended-token-escaped (stream &optional (*readtable* *readtable*))
   (let ((first-char (read-char stream nil nil)))
     (cond (first-char
-            (let ((escapes (internal-read-extended-token stream first-char t)))
-              (casify-read-buffer escapes)
-              (copy-token-buf-string)))
+            (let ((buffer (internal-read-extended-token stream first-char t)))
+              (casify-read-buffer buffer)
+              (copy-token-buf-string buffer)))
           (t
             (reader-eof-error stream "after escape")))))
 

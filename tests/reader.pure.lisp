@@ -334,3 +334,8 @@
     (test-reading "4.0s0")
     (test-reading "COMMON-LISP-USER::A-SYMBOL")
     (test-reading "()")))
+
+(with-test (:name :sharp-star-empty-multiple-escapes)
+  (assert (eq (handler-case (read-from-string "#*101||1")
+                (sb-int:simple-reader-error () :win))
+              :win)))
