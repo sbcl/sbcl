@@ -50,43 +50,43 @@
 
 (defun sharp-star (stream ignore numarg)
   (declare (ignore ignore))
-  (multiple-value-bind (bstring escape-appearedp) (read-extended-token stream)
-    (declare (simple-string bstring))
+  (declare (type (or null fixnum) numarg))
+  (binding* (((buffer escape-appearedp) (read-extended-token stream))
+             (input-len (token-buf-fill-ptr buffer))
+             (bstring (token-buf-string buffer)))
     (cond (*read-suppress* nil)
           (escape-appearedp
            (simple-reader-error stream
                                 "An escape character appeared after #*."))
-          ((and numarg (zerop (length bstring)) (not (zerop numarg)))
+          ((and numarg (zerop input-len) (not (zerop numarg)))
            (simple-reader-error
             stream
             "You have to give a little bit for non-zero #* bit-vectors."))
-          ((or (null numarg) (>= (the fixnum numarg) (length bstring)))
-           (let* ((len1 (length bstring))
-                  (last1 (1- len1))
-                  (len2 (or numarg len1))
-                  (bvec (make-array len2 :element-type 'bit
-                                    :initial-element 0)))
-             (declare (fixnum len1 last1 len2))
-             (do ((i 0 (1+ i))
-                  (char ()))
-                 ((= i len2))
-               (declare (fixnum i))
-               (setq char (elt bstring (if (< i len1) i last1)))
+          ((or (null numarg) (>= numarg input-len))
+           (do ((bvec
+                 (make-array (or numarg input-len)
+                             :element-type 'bit
+                             :initial-element
+                             (if (and (plusp input-len)
+                                      (char= (char bstring (1- input-len)) #\1))
+                                 1 0)))
+                (i 0 (1+ i)))
+               ((= i input-len) bvec)
+             (declare (index i) (optimize (sb!c::insert-array-bounds-checks 0)))
+             (let ((char (char bstring i)))
                (setf (elt bvec i)
-                     (cond ((char= char #\0) 0)
-                           ((char= char #\1) 1)
-                           (t
-                            (simple-reader-error
-                             stream
-                             "illegal element given for bit-vector: ~S"
-                             char)))))
-             bvec))
+                     (case char
+                       (#\0 0)
+                       (#\1 1)
+                       (t (simple-reader-error
+                           stream "illegal element given for bit-vector: ~S"
+                           char)))))))
           (t
            (simple-reader-error
             stream
             "Bit vector is longer than specified length #~A*~A"
             numarg
-            bstring)))))
+            (copy-token-buf-string buffer))))))
 
 (defun sharp-A (stream ignore dimensions)
   (declare (ignore ignore))
@@ -386,16 +386,16 @@
 
 (defun sharp-backslash (stream backslash numarg)
   (ignore-numarg backslash numarg)
-  (let ((charstring (read-extended-token-escaped stream)))
-    (declare (simple-string charstring))
+  (let ((buf (read-extended-token-escaped stream)))
     (cond (*read-suppress* nil)
-          ((= (the fixnum (length charstring)) 1)
-           (char charstring 0))
-          ((name-char charstring))
+          ((= (token-buf-fill-ptr buf) 1)
+           (char (token-buf-string buf) 0))
+          ;; NAME-CHAR is specified as case-insensitive
+          ((name-char (sized-token-buf-string buf)))
           (t
            (simple-reader-error stream
                                 "unrecognized character name: ~S"
-                                charstring)))))
+                                (copy-token-buf-string buf))))))
 
 (defun sharp-vertical-bar (stream sub-char numarg)
   (ignore-numarg sub-char numarg)
@@ -444,17 +444,26 @@
   ;; The fourth arg tells READ that this is a recursive call.
   `(function ,(read stream t nil t)))
 
+;;; Read an uninterned symbol.
+;;; Unescaped whitespace terminates the token, however a token comprised
+;;; of zero characters is an edge-case that is not extremely portable other
+;;; than for a few well-known uses, such as the incontrovertible fact that
+;;; "#* foo" is two tokens: an empty bit-vector followed by a symbol.
+;;; But different behaviors can be observed for #: in other implementations:
+;;;  (read-from-string "#:  foo") => #:FOO
+;;;  (read-from-string "#:  foo") => ERROR "token expected"
 (defun sharp-colon (stream sub-char numarg)
   (ignore-numarg sub-char numarg)
-  (multiple-value-bind (token escapep colon) (read-extended-token stream)
-    (declare (simple-string token) (ignore escapep))
-    (cond
-     (*read-suppress* nil)
-     (colon
-      (simple-reader-error
-       stream "The symbol following #: contains a package marker: ~S" token))
-     (t
-      (make-symbol token)))))
+  (multiple-value-bind (buffer escapep colon) (read-extended-token stream)
+    (declare (ignore escapep))
+    (unless *read-suppress*
+      (casify-read-buffer buffer)
+      (let ((token (copy-token-buf-string buffer)))
+        (if colon
+            (simple-reader-error
+             stream "The symbol following #: contains a package marker: ~S"
+             token)
+            (make-symbol token))))))
 
 (defvar *read-eval* t
   #!+sb-doc
@@ -482,27 +491,22 @@
   (set-dispatch-macro-character #\# #\* #'sharp-star)
   (set-dispatch-macro-character #\# #\: #'sharp-colon)
   (set-dispatch-macro-character #\# #\. #'sharp-dot)
-  (set-dispatch-macro-character #\# #\R #'sharp-R)
+  ;; This used to set the dispatch-function for pairs of alphabetics, but
+  ;; {SET,GET}-DISPATCH-MACRO-CHARACTER and READ-DISPATCH-CHAR
+  ;; all use CHAR-UPCASE on the sub-char, so it makes no difference.
   (set-dispatch-macro-character #\# #\r #'sharp-R)
-  (set-dispatch-macro-character #\# #\B #'sharp-B)
   (set-dispatch-macro-character #\# #\b #'sharp-B)
-  (set-dispatch-macro-character #\# #\O #'sharp-O)
   (set-dispatch-macro-character #\# #\o #'sharp-O)
-  (set-dispatch-macro-character #\# #\X #'sharp-X)
   (set-dispatch-macro-character #\# #\x #'sharp-X)
-  (set-dispatch-macro-character #\# #\A #'sharp-A)
   (set-dispatch-macro-character #\# #\a #'sharp-A)
-  (set-dispatch-macro-character #\# #\S #'sharp-S)
   (set-dispatch-macro-character #\# #\s #'sharp-S)
   (set-dispatch-macro-character #\# #\= #'sharp-equal)
   (set-dispatch-macro-character #\# #\# #'sharp-sharp)
   (set-dispatch-macro-character #\# #\+ #'sharp-plus)
   (set-dispatch-macro-character #\# #\- #'sharp-minus)
-  (set-dispatch-macro-character #\# #\C #'sharp-C)
   (set-dispatch-macro-character #\# #\c #'sharp-C)
   (set-dispatch-macro-character #\# #\| #'sharp-vertical-bar)
   (set-dispatch-macro-character #\# #\p #'sharp-P)
-  (set-dispatch-macro-character #\# #\P #'sharp-P)
   (set-dispatch-macro-character #\# #\) #'sharp-illegal)
   (set-dispatch-macro-character #\# #\< #'sharp-illegal)
   (set-dispatch-macro-character #\# #\Space #'sharp-illegal)

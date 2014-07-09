@@ -542,27 +542,25 @@ standard Lisp readtable when NIL."
 (declaim (type (or null token-buf) *token-buf-pool*))
 (defvar *token-buf-pool* nil)
 
-(declaim (inline reset-read-buffer))
-(defun reset-read-buffer (&optional (b *read-buffer*))
-  ;; Turn *READ-BUFFER* into an empty read buffer.
-  (setf (fill-pointer (token-buf-escapes b)) 0)
-  (setf (token-buf-fill-ptr b) 0)
-  (setf (token-buf-cursor b) 0))
+(defun reset-read-buffer (buffer)
+  ;; Turn BUFFER into an empty read buffer.
+  (setf (fill-pointer (token-buf-escapes buffer)) 0)
+  (setf (token-buf-fill-ptr buffer) 0)
+  (setf (token-buf-cursor buffer) 0)
+  buffer)
 
 ;; "Output" a character into the reader's buffer.
-;; FIXME: Most code still does not specify the optional argument.
-;;        It is more efficient to do so than not.
 (declaim (inline ouch-read-buffer))
-(defun ouch-read-buffer (char &optional (b *read-buffer*))
+(defun ouch-read-buffer (char buffer)
   ;; When buffer overflow
-  (let ((op (token-buf-fill-ptr b)))
+  (let ((op (token-buf-fill-ptr buffer)))
     (declare (optimize (sb!c::insert-array-bounds-checks 0)))
-    (when (>= op (length (token-buf-string b)))
+    (when (>= op (length (token-buf-string buffer)))
     ;; an out-of-line call for the uncommon case avoids bloat.
     ;; Size should be doubled.
       (grow-read-buffer))
-    (setf (elt (token-buf-string b) op) char)
-    (setf (token-buf-fill-ptr b) (1+ op))))
+    (setf (elt (token-buf-string buffer) op) char)
+    (setf (token-buf-fill-ptr buffer) (1+ op))))
 
 (defun ouch-read-buffer-escaped (char buf)
   (vector-push-extend (token-buf-fill-ptr buf) (token-buf-escapes buf))
@@ -615,17 +613,13 @@ standard Lisp readtable when NIL."
   (setf *token-buf-pool* chain))
 
 ;; Return a fresh copy of BUFFER's string
-(defun copy-token-buf-string (&optional (buffer *read-buffer*))
+(defun copy-token-buf-string (buffer)
   (subseq (token-buf-string buffer) 0 (token-buf-fill-ptr buffer)))
 
-;; Return a string displaced to *READ-BUFFER*'s string. Also get a
-;; new token-buf which becomes the value of *READ-BUFFER*,
-;; with its 'next' slot pointing to the old one.
-(defun share-token-buf-string ()
-  (let ((new-buffer (acquire-token-buf))
-        (buffer *read-buffer*))
-    (setf (token-buf-next new-buffer) buffer
-          *read-buffer* new-buffer)
+;; Return a string displaced to BUFFER's string.
+;; The string should not be held onto - either a copy must be made
+;; by the receiver, or it should be parsed into something else.
+(defun sized-token-buf-string (buffer)
     ;; It would in theory be faster to make the adjustable array have
     ;; a fill-pointer, and just set that most of the time. Except we still
     ;; need the ability to displace to a different string if a package name
@@ -641,7 +635,7 @@ standard Lisp readtable when NIL."
      nil ; fill-pointer
      0 ; displacement
      (token-buf-fill-ptr buffer) ; dimension 0
-     t nil))) ; displacedp / newp
+     t nil)) ; displacedp / newp
 
 ;; Acquire a TOKEN-BUF from the pool and execute the body, returning only
 ;; the primary value therefrom. Recycle the buffer when done.
@@ -863,8 +857,8 @@ standard Lisp readtable when NIL."
             (setq char (read-char stream nil :eof))
             (if (eq char :eof)
                 (error 'end-of-file :stream stream)))
-          (ouch-read-buffer char buf))))
-  (copy-token-buf-string))
+          (ouch-read-buffer char buf)))
+    (copy-token-buf-string buf)))
 
 (defun read-right-paren (stream ignore)
   (declare (ignore ignore))
@@ -923,7 +917,7 @@ standard Lisp readtable when NIL."
                       (eql (get-constituent-trait char)
                            +char-attr-package-delimiter+))
              (setq colon (token-buf-fill-ptr read-buffer)))
-           (ouch-read-buffer char)))))
+           (ouch-read-buffer char read-buffer)))))
 
 ;;;; character classes
 
@@ -1115,7 +1109,7 @@ extended <package-name>::<form-in-package> syntax."
         ;; can't have eof, whitespace, or terminating macro as first char!
         (t (go SYMBOL)))
      SIGN ; saw "sign"
-      (ouch-read-buffer char)
+      (ouch-read-buffer char buf)
       (setq char (read-char stream nil nil))
       (unless char (go RETURN-SYMBOL))
       (setq possibly-rational t
@@ -1133,7 +1127,7 @@ extended <package-name>::<form-in-package> syntax."
         (#.+char-attr-delimiter+ (unread-char char stream) (go RETURN-SYMBOL))
         (t (go SYMBOL)))
      LEFTDIGIT ; saw "[sign] {digit}+"
-      (ouch-read-buffer char)
+      (ouch-read-buffer char buf)
       (setq char (read-char stream nil nil))
       (unless char (return (make-integer)))
       (setq was-possibly-float possibly-float)
@@ -1163,7 +1157,7 @@ extended <package-name>::<form-in-package> syntax."
         (#.+char-attr-package-delimiter+ (go COLON))
         (t (go SYMBOL)))
      LEFTDIGIT-OR-EXPT
-      (ouch-read-buffer char)
+      (ouch-read-buffer char buf)
       (setq char (read-char stream nil nil))
       (unless char (return (make-integer)))
       (case (char-class3 char attribute-array attribute-hash-table)
@@ -1184,7 +1178,7 @@ extended <package-name>::<form-in-package> syntax."
         (t (go SYMBOL)))
      LEFTDECIMALDIGIT ; saw "[sign] {decimal-digit}+"
       (aver possibly-float)
-      (ouch-read-buffer char)
+      (ouch-read-buffer char buf)
       (setq char (read-char stream nil nil))
       (unless char (go RETURN-SYMBOL))
       (case (char-class char attribute-array attribute-hash-table)
@@ -1200,7 +1194,7 @@ extended <package-name>::<form-in-package> syntax."
         (#.+char-attr-package-delimiter+ (go COLON))
         (t (go SYMBOL)))
      MIDDLEDOT ; saw "[sign] {digit}+ dot"
-      (ouch-read-buffer char)
+      (ouch-read-buffer char buf)
       (setq char (read-char stream nil nil))
       (unless char (return (make-integer 10)))
       (case (char-class char attribute-array attribute-hash-table)
@@ -1214,7 +1208,7 @@ extended <package-name>::<form-in-package> syntax."
         (#.+char-attr-package-delimiter+ (go COLON))
         (t (go SYMBOL)))
      RIGHTDIGIT ; saw "[sign] {decimal-digit}* dot {digit}+"
-      (ouch-read-buffer char)
+      (ouch-read-buffer char buf)
       (setq char (read-char stream nil nil))
       (unless char (return (make-float stream)))
       (case (char-class char attribute-array attribute-hash-table)
@@ -1228,7 +1222,7 @@ extended <package-name>::<form-in-package> syntax."
         (#.+char-attr-package-delimiter+ (go COLON))
         (t (go SYMBOL)))
      SIGNDOT ; saw "[sign] dot"
-      (ouch-read-buffer char)
+      (ouch-read-buffer char buf)
       (setq char (read-char stream nil nil))
       (unless char (go RETURN-SYMBOL))
       (case (char-class char attribute-array attribute-hash-table)
@@ -1238,7 +1232,7 @@ extended <package-name>::<form-in-package> syntax."
         (#.+char-attr-multiple-escape+ (go MULT-ESCAPE))
         (t (go SYMBOL)))
      FRONTDOT ; saw "dot"
-      (ouch-read-buffer char)
+      (ouch-read-buffer char buf)
       (setq char (read-char stream nil nil))
       (unless char (simple-reader-error stream "dot context error"))
       (case (char-class char attribute-array attribute-hash-table)
@@ -1251,7 +1245,7 @@ extended <package-name>::<form-in-package> syntax."
         (#.+char-attr-package-delimiter+ (go COLON))
         (t (go SYMBOL)))
      EXPONENT
-      (ouch-read-buffer char)
+      (ouch-read-buffer char buf)
       (setq char (read-char stream nil nil))
       (unless char (go RETURN-SYMBOL))
       (setq possibly-float t)
@@ -1264,7 +1258,7 @@ extended <package-name>::<form-in-package> syntax."
         (#.+char-attr-package-delimiter+ (go COLON))
         (t (go SYMBOL)))
      EXPTSIGN ; got to EXPONENT, and saw a sign character
-      (ouch-read-buffer char)
+      (ouch-read-buffer char buf)
       (setq char (read-char stream nil nil))
       (unless char (go RETURN-SYMBOL))
       (case (char-class char attribute-array attribute-hash-table)
@@ -1275,7 +1269,7 @@ extended <package-name>::<form-in-package> syntax."
         (#.+char-attr-package-delimiter+ (go COLON))
         (t (go SYMBOL)))
      EXPTDIGIT ; got to EXPONENT, saw "[sign] {digit}+"
-      (ouch-read-buffer char)
+      (ouch-read-buffer char buf)
       (setq char (read-char stream nil nil))
       (unless char (return (make-float stream)))
       (case (char-class char attribute-array attribute-hash-table)
@@ -1288,7 +1282,7 @@ extended <package-name>::<form-in-package> syntax."
         (#.+char-attr-package-delimiter+ (go COLON))
         (t (go SYMBOL)))
      RATIO ; saw "[sign] {digit}+ slash"
-      (ouch-read-buffer char)
+      (ouch-read-buffer char buf)
       (setq char (read-char stream nil nil))
       (unless char (go RETURN-SYMBOL))
       (case (char-class2 char attribute-array attribute-hash-table)
@@ -1299,7 +1293,7 @@ extended <package-name>::<form-in-package> syntax."
         (#.+char-attr-package-delimiter+ (go COLON))
         (t (go SYMBOL)))
      RATIODIGIT ; saw "[sign] {digit}+ slash {digit}+"
-      (ouch-read-buffer char)
+      (ouch-read-buffer char buf)
       (setq char (read-char stream nil nil))
       (unless char (return (make-ratio stream)))
       (case (char-class2 char attribute-array attribute-hash-table)
@@ -1312,7 +1306,7 @@ extended <package-name>::<form-in-package> syntax."
         (#.+char-attr-package-delimiter+ (go COLON))
         (t (go SYMBOL)))
      DOTS ; saw "dot {dot}+"
-      (ouch-read-buffer char)
+      (ouch-read-buffer char buf)
       (setq char (read-char stream nil nil))
       (unless char (simple-reader-error stream "too many dots"))
       (case (char-class char attribute-array attribute-hash-table)
@@ -1330,7 +1324,7 @@ extended <package-name>::<form-in-package> syntax."
             (prepare-for-fast-read-char stream
               (prog ()
                SYMBOL-LOOP
-               (ouch-read-buffer char)
+               (ouch-read-buffer char buf)
                (setq char (fast-read-char nil nil))
                (unless char (go RETURN-SYMBOL))
                (case (char-class char attribute-array attribute-hash-table)
@@ -1347,7 +1341,7 @@ extended <package-name>::<form-in-package> syntax."
             ;; CLOS stream
             (prog ()
              SYMBOL-LOOP
-             (ouch-read-buffer char)
+             (ouch-read-buffer char buf)
              (setq char (read-char stream nil :eof))
              (when (eq char :eof) (go RETURN-SYMBOL))
              (case (char-class char attribute-array attribute-hash-table)
@@ -1390,17 +1384,18 @@ extended <package-name>::<form-in-package> syntax."
         (t (go SYMBOL)))
       COLON
       (unless (zerop colons)
-        (simple-reader-error stream
-                             "too many colons in ~S"
-                             (copy-token-buf-string)))
+        (simple-reader-error
+         stream "too many colons in ~S" (copy-token-buf-string buf)))
       (casify-read-buffer buf)
       (setq colons 1)
       (setq package-designator
             (if (or (plusp (token-buf-fill-ptr *read-buffer*))
                     seen-multiple-escapes)
-                (share-token-buf-string)
+                (prog1 (sized-token-buf-string buf)
+                  (let ((new (acquire-token-buf)))
+                    (setf (token-buf-next new) buf ; new points to old
+                          buf new *read-buffer* new)))
                 *keyword-package*))
-      (setq buf *read-buffer*)
       (reset-read-buffer buf)
       (setq char (read-char stream nil nil))
       (unless char (reader-eof-error stream "after reading a colon"))
@@ -1448,7 +1443,7 @@ extended <package-name>::<form-in-package> syntax."
                 (find-symbol* (token-buf-string buf) (token-buf-fill-ptr buf)
                               pkg)
               (when (eq accessibility :external) (return symbol))
-              (let ((name (copy-token-buf-string)))
+              (let ((name (copy-token-buf-string buf)))
                 (with-simple-restart (continue "Use symbol anyway.")
                   (error 'simple-reader-package-error
                          :package pkg
@@ -1460,33 +1455,24 @@ extended <package-name>::<form-in-package> syntax."
                              "Symbol ~S not found in the ~A package.")))
                 (return (intern name pkg)))))))))
 
-;;; for semi-external use:
-;;;
-;;; For semi-external use: Return 3 values: the string for the token,
+;;; For semi-external use: Return 3 values: the token-buf,
 ;;; a flag for whether there was an escape char, and the position of
-;;; any package delimiter.
-(defun read-extended-token (stream &optional (*readtable* *readtable*))
+;;; any package delimiter. The returned token-buf is not case-converted.
+(defun read-extended-token (stream)
   (let ((first-char (read-char stream nil nil t)))
-    (cond (first-char
-           (multiple-value-bind (buffer escapes-p colon)
-               (internal-read-extended-token stream first-char nil)
-             (casify-read-buffer buffer)
-             (values (copy-token-buf-string) escapes-p colon)))
-          (t
-           (values "" nil nil)))))
+    (if first-char
+        (internal-read-extended-token stream first-char nil)
+        (values (reset-read-buffer *read-buffer*) nil nil))))
 
 ;;; for semi-external use:
 ;;;
 ;;; Read an extended token with the first character escaped. Return
-;;; the string for the token.
-(defun read-extended-token-escaped (stream &optional (*readtable* *readtable*))
+;;; the token-buf. The returned token-buf is not case-converted.
+(defun read-extended-token-escaped (stream)
   (let ((first-char (read-char stream nil nil)))
-    (cond (first-char
-            (let ((buffer (internal-read-extended-token stream first-char t)))
-              (casify-read-buffer buffer)
-              (copy-token-buf-string buffer)))
-          (t
-            (reader-eof-error stream "after escape")))))
+    (if first-char
+        (values (internal-read-extended-token stream first-char t))
+        (reader-eof-error stream "after escape"))))
 
 ;;;; number-reading functions
 
@@ -1647,7 +1633,7 @@ extended <package-name>::<form-in-package> syntax."
       (error 'reader-impossible-number-error
              :error c :stream stream
              :format-control "failed to build float from ~a"
-             :format-arguments (list (copy-token-buf-string))))))
+             :format-arguments (list (copy-token-buf-string *read-buffer*))))))
 
 (defun make-ratio (stream)
   ;; Assume *READ-BUFFER* contains a legal ratio. Build the number from

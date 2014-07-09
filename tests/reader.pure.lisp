@@ -313,6 +313,7 @@
 (with-test (:name :read-does-not-cons-per-se)
   (flet ((test-reading (string)
            (let ((s (make-string-input-stream string)))
+             (read s) ; once outside the loop, to make A-SYMBOL
              (ctu:assert-no-consing
               (progn (file-position s 0)
                      (read s))
@@ -333,7 +334,9 @@
     ;; backend-page-bytes to exceed 32KB. Not sure what to do about that.
     (test-reading "4.0s0")
     (test-reading "COMMON-LISP-USER::A-SYMBOL")
-    (test-reading "()")))
+    (test-reading "()")
+    (test-reading "#\\-") ; should not copy the token buffer
+    ))
 
 (with-test (:name :sharp-star-empty-multiple-escapes)
   (assert (eq (handler-case (read-from-string "#*101||1")
