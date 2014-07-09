@@ -316,25 +316,9 @@ sigtrap_handler(int signal, siginfo_t *siginfo, os_context_t *context)
              trap_instruction);
     }
 
-    switch (condition_bits) {
-
-    case 11: /* LT */
-        /* This is a handle-pending-interrupt trap. */
-        arch_clear_pseudo_atomic_interrupted(context);
-        arch_skip_instruction(context);
-        interrupt_handle_pending(context);
-        break;
-
-    case 14: /* AL */
-        /* This is a generic trap. */
-        handle_trap(context, code);
-        break;
-
-    default:
-        /* This is something that we don't recognize and therefore
-         * should not happen. */
-        lose("Unknown trap condition bits 0x%x", condition_bits);
-    }
+    arch_clear_pseudo_atomic_interrupted(context);
+    arch_skip_instruction(context);
+    interrupt_handle_pending(context);
 }
 
 void arch_install_interrupt_handlers()
