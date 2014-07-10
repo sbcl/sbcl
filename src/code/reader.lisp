@@ -426,9 +426,7 @@ standard Lisp readtable when NIL."
 
 ;;;; definitions to support internal programming conventions
 
-(declaim (inline eofp))
-(defun eofp (char)
-  (eq char *eof-object*))
+(defconstant +EOF+ 0)
 
 (defun flush-whitespace (stream)
   ;; This flushes whitespace chars, returning the last char it read (a
@@ -445,14 +443,14 @@ standard Lisp readtable when NIL."
                            +char-attr-whitespace+))))
       (if (ansi-stream-p stream)
           (prepare-for-fast-read-char stream
-            (do ((char (fast-read-char t) (fast-read-char t)))
-                ((done-p)
-                 (done-with-fast-read-char)
-                 char)))
+            (loop (let ((char (fast-read-char t)))
+                    (cond ((done-p)
+                           (done-with-fast-read-char)
+                           (return char))))))
         ;; CLOS stream
-          (do ((char (read-char stream nil nil) (read-char stream nil nil)))
-              ((if char (done-p) (error 'end-of-file :stream stream))
-                 char))))))
+          (loop (let ((char (read-char stream nil +EOF+)))
+                  (cond ((eq char +EOF+) (error 'end-of-file :stream stream))
+                        ((done-p) (return char)))))))))
 
 ;;;; temporary initialization hack
 
@@ -680,8 +678,8 @@ standard Lisp readtable when NIL."
   (if recursive-p
       ;; a loop for repeating when a macro returns nothing
       (loop
-       (let ((char (read-char stream eof-error-p *eof-object*)))
-         (cond ((eofp char) (return eof-value))
+       (let ((char (read-char stream eof-error-p +EOF+)))
+         (cond ((eq char +EOF+) (return eof-value))
                ((whitespace[2]p char))
                (t
                 (with-char-macro-result (result result-p) (stream char)
@@ -726,8 +724,8 @@ standard Lisp readtable when NIL."
     ;; don't want to discard trailing whitespace, call
     ;; CL:READ-PRESERVING-WHITESPACE instead.
     (unless (or (eql result eof-value) recursive-p)
-      (let ((next-char (read-char stream nil nil)))
-        (unless (or (null next-char)
+      (let ((next-char (read-char stream nil +EOF+)))
+        (unless (or (eq next-char +EOF+)
                     (whitespace[2]p next-char))
           (unread-char next-char stream))))
     result))
@@ -776,13 +774,13 @@ standard Lisp readtable when NIL."
     (let ((stream (in-synonym-of stream)))
       (if (ansi-stream-p stream)
           (prepare-for-fast-read-char stream
-           (do ((char (fast-read-char nil nil)
-                      (fast-read-char nil nil)))
-               ((or (not char) (char= char #\newline))
-                (done-with-fast-read-char))))
+           (loop (let ((char (fast-read-char nil +EOF+)))
+                   (when (or (eq char +EOF+) (char= char #\newline))
+                     (return (done-with-fast-read-char))))))
           ;; CLOS stream
-          (do ((char (read-char stream nil :eof) (read-char stream nil :eof)))
-              ((or (eq char :eof) (char= char #\newline)))))))
+          (loop (let ((char (read-char stream nil +EOF+)))
+                  (when (or (eq char +EOF+) (char= char #\newline))
+                    (return)))))))
   ;; Don't return anything.
   (values))
 
@@ -841,27 +839,26 @@ standard Lisp readtable when NIL."
 (defun read-string (stream closech)
   ;; This accumulates chars until it sees same char that invoked it.
   ;; For a very long string, this could end up bloating the read buffer.
+  (declare (character closech))
   (let ((stream (in-synonym-of stream))
         (buf *read-buffer*)
         (rt *readtable*))
     (reset-read-buffer buf)
-    (if (ansi-stream-p stream)
-        (prepare-for-fast-read-char stream
-          (do ((char (fast-read-char t) (fast-read-char t)))
-              ((char= char closech)
-               (done-with-fast-read-char))
-            (if (single-escape-p char rt) (setq char (fast-read-char t)))
-            (ouch-read-buffer char buf)))
+    (macrolet ((scan (read-a-char eofp &optional finish)
+                 `(loop (let ((char ,read-a-char))
+                          (cond (,eofp (error 'end-of-file :stream stream))
+                                ((eql char closech)
+                                 (return ,finish))
+                                ((single-escape-p char rt)
+                                 (setq char ,read-a-char)
+                                 (when ,eofp
+                                   (error 'end-of-file :stream stream))))
+                         (ouch-read-buffer (truly-the character char) buf)))))
+      (if (ansi-stream-p stream)
+          (prepare-for-fast-read-char stream
+           (scan (fast-read-char t) nil (done-with-fast-read-char)))
         ;; CLOS stream
-        (do ((char (read-char stream nil :eof) (read-char stream nil :eof)))
-            ((or (eq char :eof) (char= char closech))
-             (if (eq char :eof)
-                 (error 'end-of-file :stream stream)))
-          (when (single-escape-p char rt)
-            (setq char (read-char stream nil :eof))
-            (if (eq char :eof)
-                (error 'end-of-file :stream stream)))
-          (ouch-read-buffer char buf)))
+          (scan (read-char stream nil +EOF+) (eq char +EOF+))))
     (copy-token-buf-string buf)))
 
 (defun read-right-paren (stream ignore)
@@ -877,12 +874,12 @@ standard Lisp readtable when NIL."
   (reset-read-buffer read-buffer)
   (when escape-firstchar
     (ouch-read-buffer-escaped firstchar read-buffer)
-    (setq firstchar (read-char stream nil *eof-object*)))
-  (do ((char firstchar (read-char stream nil *eof-object*))
+    (setq firstchar (read-char stream nil +EOF+)))
+  (do ((char firstchar (read-char stream nil +EOF+))
        (seen-multiple-escapes nil)
        (rt *readtable*)
        (colon nil))
-      ((cond ((eofp char) t)
+      ((cond ((eq char +EOF+) t)
              ((token-delimiterp char rt)
               (unread-char char stream)
               t)
@@ -894,8 +891,8 @@ standard Lisp readtable when NIL."
     (cond ((single-escape-p char rt)
            ;; It can't be a number, even if it's 1\23.
            ;; Read next char here, so it won't be casified.
-           (let ((nextchar (read-char stream nil *eof-object*)))
-             (if (eofp nextchar)
+           (let ((nextchar (read-char stream nil +EOF+)))
+             (if (eq nextchar +EOF+)
                  (reader-eof-error stream "after escape character")
                  (ouch-read-buffer-escaped nextchar read-buffer))))
           ((multiple-escape-p char rt)
@@ -903,14 +900,14 @@ standard Lisp readtable when NIL."
            ;; Read to next multiple-escape, escaping single chars
            ;; along the way.
            (loop
-             (let ((ch (read-char stream nil *eof-object*)))
+             (let ((ch (read-char stream nil +EOF+)))
                (cond
-                ((eofp ch)
+                ((eq ch +EOF+)
                  (reader-eof-error stream "inside extended token"))
                 ((multiple-escape-p ch rt) (return))
                 ((single-escape-p ch rt)
-                 (let ((nextchar (read-char stream nil *eof-object*)))
-                   (if (eofp nextchar)
+                 (let ((nextchar (read-char stream nil +EOF+)))
+                   (if (eq nextchar +EOF+)
                        (reader-eof-error stream "after escape character")
                        (ouch-read-buffer-escaped nextchar read-buffer))))
                 (t
@@ -1097,7 +1094,10 @@ extended <package-name>::<form-in-package> syntax."
          (seen-multiple-escapes nil))
     (declare (token-buf buf))
     (reset-read-buffer buf)
-    (prog ((char firstchar))
+    (macrolet ((getchar-or-else (what)
+                 `(when (eq (setq char (read-char stream nil +EOF+)) +EOF+)
+                    ,what)))
+     (prog ((char firstchar))
       (case (char-class3 char attribute-array attribute-hash-table)
         (#.+char-attr-constituent-sign+ (go SIGN))
         (#.+char-attr-constituent-digit+ (go LEFTDIGIT))
@@ -1115,8 +1115,7 @@ extended <package-name>::<form-in-package> syntax."
         (t (go SYMBOL)))
      SIGN ; saw "sign"
       (ouch-read-buffer char buf)
-      (setq char (read-char stream nil nil))
-      (unless char (go RETURN-SYMBOL))
+      (getchar-or-else (go RETURN-SYMBOL))
       (setq possibly-rational t
             possibly-float t)
       (case (char-class3 char attribute-array attribute-hash-table)
@@ -1133,8 +1132,7 @@ extended <package-name>::<form-in-package> syntax."
         (t (go SYMBOL)))
      LEFTDIGIT ; saw "[sign] {digit}+"
       (ouch-read-buffer char buf)
-      (setq char (read-char stream nil nil))
-      (unless char (return (make-integer)))
+      (getchar-or-else (return (make-integer)))
       (setq was-possibly-float possibly-float)
       (case (char-class3 char attribute-array attribute-hash-table)
         (#.+char-attr-constituent-digit+ (go LEFTDIGIT))
@@ -1163,8 +1161,7 @@ extended <package-name>::<form-in-package> syntax."
         (t (go SYMBOL)))
      LEFTDIGIT-OR-EXPT
       (ouch-read-buffer char buf)
-      (setq char (read-char stream nil nil))
-      (unless char (return (make-integer)))
+      (getchar-or-else (return (make-integer)))
       (case (char-class3 char attribute-array attribute-hash-table)
         (#.+char-attr-constituent-digit+ (go LEFTDIGIT))
         (#.+char-attr-constituent-decimal-digit+ (bug "impossible!"))
@@ -1184,8 +1181,7 @@ extended <package-name>::<form-in-package> syntax."
      LEFTDECIMALDIGIT ; saw "[sign] {decimal-digit}+"
       (aver possibly-float)
       (ouch-read-buffer char buf)
-      (setq char (read-char stream nil nil))
-      (unless char (go RETURN-SYMBOL))
+      (getchar-or-else (go RETURN-SYMBOL))
       (case (char-class char attribute-array attribute-hash-table)
         (#.+char-attr-constituent-digit+ (go LEFTDECIMALDIGIT))
         (#.+char-attr-constituent-dot+ (go MIDDLEDOT))
@@ -1200,8 +1196,7 @@ extended <package-name>::<form-in-package> syntax."
         (t (go SYMBOL)))
      MIDDLEDOT ; saw "[sign] {digit}+ dot"
       (ouch-read-buffer char buf)
-      (setq char (read-char stream nil nil))
-      (unless char (return (make-integer 10)))
+      (getchar-or-else (return (make-integer 10)))
       (case (char-class char attribute-array attribute-hash-table)
         (#.+char-attr-constituent-digit+ (go RIGHTDIGIT))
         (#.+char-attr-constituent-expt+ (go EXPONENT))
@@ -1214,8 +1209,7 @@ extended <package-name>::<form-in-package> syntax."
         (t (go SYMBOL)))
      RIGHTDIGIT ; saw "[sign] {decimal-digit}* dot {digit}+"
       (ouch-read-buffer char buf)
-      (setq char (read-char stream nil nil))
-      (unless char (return (make-float stream)))
+      (getchar-or-else (return (make-float stream)))
       (case (char-class char attribute-array attribute-hash-table)
         (#.+char-attr-constituent-digit+ (go RIGHTDIGIT))
         (#.+char-attr-constituent-expt+ (go EXPONENT))
@@ -1228,8 +1222,7 @@ extended <package-name>::<form-in-package> syntax."
         (t (go SYMBOL)))
      SIGNDOT ; saw "[sign] dot"
       (ouch-read-buffer char buf)
-      (setq char (read-char stream nil nil))
-      (unless char (go RETURN-SYMBOL))
+      (getchar-or-else (go RETURN-SYMBOL))
       (case (char-class char attribute-array attribute-hash-table)
         (#.+char-attr-constituent-digit+ (go RIGHTDIGIT))
         (#.+char-attr-delimiter+ (unread-char char stream) (go RETURN-SYMBOL))
@@ -1238,8 +1231,7 @@ extended <package-name>::<form-in-package> syntax."
         (t (go SYMBOL)))
      FRONTDOT ; saw "dot"
       (ouch-read-buffer char buf)
-      (setq char (read-char stream nil nil))
-      (unless char (simple-reader-error stream "dot context error"))
+      (getchar-or-else (simple-reader-error stream "dot context error"))
       (case (char-class char attribute-array attribute-hash-table)
         (#.+char-attr-constituent-digit+ (go RIGHTDIGIT))
         (#.+char-attr-constituent-dot+ (go DOTS))
@@ -1251,8 +1243,7 @@ extended <package-name>::<form-in-package> syntax."
         (t (go SYMBOL)))
      EXPONENT
       (ouch-read-buffer char buf)
-      (setq char (read-char stream nil nil))
-      (unless char (go RETURN-SYMBOL))
+      (getchar-or-else (go RETURN-SYMBOL))
       (setq possibly-float t)
       (case (char-class char attribute-array attribute-hash-table)
         (#.+char-attr-constituent-sign+ (go EXPTSIGN))
@@ -1264,8 +1255,7 @@ extended <package-name>::<form-in-package> syntax."
         (t (go SYMBOL)))
      EXPTSIGN ; got to EXPONENT, and saw a sign character
       (ouch-read-buffer char buf)
-      (setq char (read-char stream nil nil))
-      (unless char (go RETURN-SYMBOL))
+      (getchar-or-else (go RETURN-SYMBOL))
       (case (char-class char attribute-array attribute-hash-table)
         (#.+char-attr-constituent-digit+ (go EXPTDIGIT))
         (#.+char-attr-delimiter+ (unread-char char stream) (go RETURN-SYMBOL))
@@ -1275,8 +1265,7 @@ extended <package-name>::<form-in-package> syntax."
         (t (go SYMBOL)))
      EXPTDIGIT ; got to EXPONENT, saw "[sign] {digit}+"
       (ouch-read-buffer char buf)
-      (setq char (read-char stream nil nil))
-      (unless char (return (make-float stream)))
+      (getchar-or-else (return (make-float stream)))
       (case (char-class char attribute-array attribute-hash-table)
         (#.+char-attr-constituent-digit+ (go EXPTDIGIT))
         (#.+char-attr-delimiter+
@@ -1288,8 +1277,7 @@ extended <package-name>::<form-in-package> syntax."
         (t (go SYMBOL)))
      RATIO ; saw "[sign] {digit}+ slash"
       (ouch-read-buffer char buf)
-      (setq char (read-char stream nil nil))
-      (unless char (go RETURN-SYMBOL))
+      (getchar-or-else (go RETURN-SYMBOL))
       (case (char-class2 char attribute-array attribute-hash-table)
         (#.+char-attr-constituent-digit+ (go RATIODIGIT))
         (#.+char-attr-delimiter+ (unread-char char stream) (go RETURN-SYMBOL))
@@ -1299,8 +1287,7 @@ extended <package-name>::<form-in-package> syntax."
         (t (go SYMBOL)))
      RATIODIGIT ; saw "[sign] {digit}+ slash {digit}+"
       (ouch-read-buffer char buf)
-      (setq char (read-char stream nil nil))
-      (unless char (return (make-ratio stream)))
+      (getchar-or-else (return (make-ratio stream)))
       (case (char-class2 char attribute-array attribute-hash-table)
         (#.+char-attr-constituent-digit+ (go RATIODIGIT))
         (#.+char-attr-delimiter+
@@ -1312,8 +1299,7 @@ extended <package-name>::<form-in-package> syntax."
         (t (go SYMBOL)))
      DOTS ; saw "dot {dot}+"
       (ouch-read-buffer char buf)
-      (setq char (read-char stream nil nil))
-      (unless char (simple-reader-error stream "too many dots"))
+      (getchar-or-else (simple-reader-error stream "too many dots"))
       (case (char-class char attribute-array attribute-hash-table)
         (#.+char-attr-constituent-dot+ (go DOTS))
         (#.+char-attr-delimiter+
@@ -1325,46 +1311,34 @@ extended <package-name>::<form-in-package> syntax."
         (t (go SYMBOL)))
      SYMBOL ; not a dot, dots, or number
       (let ((stream (in-synonym-of stream)))
-        (if (ansi-stream-p stream)
-            (prepare-for-fast-read-char stream
-              (prog ()
+        (macrolet
+           ((scan (read-a-char &optional finish)
+             `(prog ()
                SYMBOL-LOOP
                (ouch-read-buffer char buf)
-               (setq char (fast-read-char nil nil))
-               (unless char (go RETURN-SYMBOL))
+               (setq char ,read-a-char)
+               (when (eq char +EOF+) (go RETURN-SYMBOL))
                (case (char-class char attribute-array attribute-hash-table)
-                 (#.+char-attr-single-escape+ (done-with-fast-read-char)
-                                              (go SINGLE-ESCAPE))
-                 (#.+char-attr-delimiter+ (done-with-fast-read-char)
+                 (#.+char-attr-single-escape+ ,finish (go SINGLE-ESCAPE))
+                 (#.+char-attr-delimiter+ ,finish
                                           (unread-char char stream)
                                           (go RETURN-SYMBOL))
-                 (#.+char-attr-multiple-escape+ (done-with-fast-read-char)
-                                                (go MULT-ESCAPE))
-                 (#.+char-attr-package-delimiter+ (done-with-fast-read-char)
-                                                  (go COLON))
-                 (t (go SYMBOL-LOOP)))))
+                 (#.+char-attr-multiple-escape+ ,finish (go MULT-ESCAPE))
+                 (#.+char-attr-package-delimiter+ ,finish (go COLON))
+                 (t (go SYMBOL-LOOP))))))
+        (if (ansi-stream-p stream)
+            (prepare-for-fast-read-char stream
+              (scan (fast-read-char nil +EOF+) (done-with-fast-read-char)))
             ;; CLOS stream
-            (prog ()
-             SYMBOL-LOOP
-             (ouch-read-buffer char buf)
-             (setq char (read-char stream nil :eof))
-             (when (eq char :eof) (go RETURN-SYMBOL))
-             (case (char-class char attribute-array attribute-hash-table)
-               (#.+char-attr-single-escape+ (go SINGLE-ESCAPE))
-               (#.+char-attr-delimiter+ (unread-char char stream)
-                            (go RETURN-SYMBOL))
-               (#.+char-attr-multiple-escape+ (go MULT-ESCAPE))
-               (#.+char-attr-package-delimiter+ (go COLON))
-               (t (go SYMBOL-LOOP))))))
+            (scan (read-char stream nil +EOF+)))))
      SINGLE-ESCAPE ; saw a single-escape
       ;; Don't put the escape character in the read buffer.
       ;; READ-NEXT CHAR, put in buffer (no case conversion).
-      (let ((nextchar (read-char stream nil nil)))
-        (unless nextchar
+      (let ((nextchar (read-char stream nil +EOF+)))
+        (when (eq nextchar +EOF+)
           (reader-eof-error stream "after single-escape character"))
         (ouch-read-buffer-escaped nextchar buf))
-      (setq char (read-char stream nil nil))
-      (unless char (go RETURN-SYMBOL))
+      (getchar-or-else (go RETURN-SYMBOL))
       (case (char-class char attribute-array attribute-hash-table)
         (#.+char-attr-delimiter+ (unread-char char stream) (go RETURN-SYMBOL))
         (#.+char-attr-single-escape+ (go SINGLE-ESCAPE))
@@ -1379,8 +1353,7 @@ extended <package-name>::<form-in-package> syntax."
           ((multiple-escape-p char rt))
         (if (single-escape-p char rt) (setq char (read-char stream t)))
         (ouch-read-buffer-escaped char buf))
-      (setq char (read-char stream nil nil))
-      (unless char (go RETURN-SYMBOL))
+      (getchar-or-else (go RETURN-SYMBOL))
       (case (char-class char attribute-array attribute-hash-table)
         (#.+char-attr-delimiter+ (unread-char char stream) (go RETURN-SYMBOL))
         (#.+char-attr-single-escape+ (go SINGLE-ESCAPE))
@@ -1402,8 +1375,7 @@ extended <package-name>::<form-in-package> syntax."
                           buf new *read-buffer* new)))
                 *keyword-package*))
       (reset-read-buffer buf)
-      (setq char (read-char stream nil nil))
-      (unless char (reader-eof-error stream "after reading a colon"))
+      (getchar-or-else (reader-eof-error stream "after reading a colon"))
       (case (char-class char attribute-array attribute-hash-table)
         (#.+char-attr-delimiter+
          (unread-char char stream)
@@ -1416,9 +1388,7 @@ extended <package-name>::<form-in-package> syntax."
         (t (go SYMBOL)))
       INTERN
       (setq colons 2)
-      (setq char (read-char stream nil nil))
-      (unless char
-        (reader-eof-error stream "after reading a colon"))
+      (getchar-or-else (reader-eof-error stream "after reading a colon"))
       (case (char-class char attribute-array attribute-hash-table)
         (#.+char-attr-delimiter+
          (unread-char char stream)
@@ -1458,14 +1428,15 @@ extended <package-name>::<form-in-package> syntax."
                          (if accessibility
                              "The symbol ~S is not external in the ~A package."
                              "Symbol ~S not found in the ~A package.")))
-                (return (intern name pkg)))))))))
+                (return (intern name pkg))))))))))
 
 ;;; For semi-external use: Return 3 values: the token-buf,
 ;;; a flag for whether there was an escape char, and the position of
 ;;; any package delimiter. The returned token-buf is not case-converted.
 (defun read-extended-token (stream)
-  (let ((first-char (read-char stream nil nil t)))
-    (if first-char
+  ;; recursive-p = T is basically irrelevant.
+  (let ((first-char (read-char stream nil +EOF+ t)))
+    (if (neq first-char +EOF+)
         (internal-read-extended-token stream first-char nil)
         (values (reset-read-buffer *read-buffer*) nil nil))))
 
@@ -1474,8 +1445,8 @@ extended <package-name>::<form-in-package> syntax."
 ;;; Read an extended token with the first character escaped. Return
 ;;; the token-buf. The returned token-buf is not case-converted.
 (defun read-extended-token-escaped (stream)
-  (let ((first-char (read-char stream nil nil)))
-    (if first-char
+  (let ((first-char (read-char stream nil +EOF+)))
+    (if (neq first-char +EOF+)
         (values (internal-read-extended-token stream first-char t))
         (reader-eof-error stream "after escape"))))
 
@@ -1682,17 +1653,15 @@ extended <package-name>::<form-in-package> syntax."
   (let ((numargp nil)
         (numarg 0)
         (sub-char ()))
-    (do* ((ch (read-char stream nil *eof-object*)
-              (read-char stream nil *eof-object*))
-          (dig ()))
-         ((or (eofp ch)
-              (not (setq dig (digit-char-p ch))))
+    (loop
+     (let ((ch (read-char stream nil +EOF+)))
+       (if (eq ch +EOF+)
+           (reader-eof-error stream "inside dispatch character")
           ;; Take care of the extra char.
-          (if (eofp ch)
-              (reader-eof-error stream "inside dispatch character")
-              (setq sub-char (char-upcase ch))))
-      (setq numargp t)
-      (setq numarg (+ (* numarg 10) dig)))
+           (let ((dig (digit-char-p ch)))
+             (if dig
+                 (setq numargp t numarg (+ (* numarg 10) dig))
+                 (return (setq sub-char (char-upcase ch))))))))
     ;; Look up the function and call it.
     (let ((fn (get-raw-cmt-dispatch-entry sub-char dispatch-table)))
       (funcall (!cmt-entry-to-function fn #'dispatch-char-error)
@@ -1723,6 +1692,8 @@ extended <package-name>::<form-in-package> syntax."
                   (read stream eof-error-p eof-value))
               (- (string-input-stream-current stream) offset)))))
 
+(locally
+(declare (muffle-conditions style-warning))
 (defun read-from-string (string &optional (eof-error-p t) eof-value
                                 &key (start 0) end preserve-whitespace)
   #!+sb-doc
@@ -1731,7 +1702,7 @@ extended <package-name>::<form-in-package> syntax."
    will take effect."
   (declare (string string))
   (maybe-note-read-from-string-signature-issue eof-error-p)
-  (%read-from-string string eof-error-p eof-value start end preserve-whitespace))
+  (%read-from-string string eof-error-p eof-value start end preserve-whitespace)))
 
 (define-compiler-macro read-from-string (&whole form string &rest args)
   ;; Check this at compile-time, and rewrite it so we're silent at runtime.

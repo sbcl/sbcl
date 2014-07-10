@@ -182,9 +182,14 @@ maintained."
             (t
              (prog1 (aref %frc-buffer% %frc-index%)
                (incf %frc-index%))))))
-    (if (eq eof-error-p 't)
-        `(truly-the character ,result)
-        result)))
+    (cond ((eq eof-error-p 't)
+           `(truly-the character ,result))
+          ((and (symbolp eof-value) (constantp eof-value)
+                ;; use an EQL specifier only if the const is EQL-comparable
+                (typep (symbol-value eof-value) '(or symbol fixnum)))
+           `(truly-the (or (eql ,(symbol-value eof-value)) character) ,result))
+          (t
+           result))))
 
 ;;;; And these for the fasloader...
 
