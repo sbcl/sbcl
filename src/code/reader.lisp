@@ -166,21 +166,25 @@
 
 ;;; the [1] and [2] here refer to ANSI glossary entries for
 ;;; "whitespace".
+;; whitespace[2]p is the only predicate whose readtable is optional
+;; - other than whitespace[1]p which has a fixed readtable - due to
+;; callers not otherwise needing a readtable at all, and so not binding
+;; *READTABLE* into a local variable throughout their lifetime.
 (defun whitespace[1]p (char)
   (test-attribute char +char-attr-whitespace+ *standard-readtable*))
 (defun whitespace[2]p (char &optional (rt *readtable*))
   (test-attribute char +char-attr-whitespace+ rt))
 
-(defun constituentp (char &optional (rt *readtable*))
+(defun constituentp (char rt)
   (test-attribute char +char-attr-constituent+ rt))
 
-(defun terminating-macrop (char &optional (rt *readtable*))
+(defun terminating-macrop (char rt)
   (test-attribute char +char-attr-terminating-macro+ rt))
 
-(defun single-escape-p (char &optional (rt *readtable*))
+(defun single-escape-p (char rt)
   (test-attribute char +char-attr-single-escape+ rt))
 
-(defun multiple-escape-p (char &optional (rt *readtable*))
+(defun multiple-escape-p (char rt)
   (test-attribute char +char-attr-multiple-escape+ rt))
 
 (defun token-delimiterp (char &optional (rt *readtable*))
@@ -489,7 +493,7 @@ standard Lisp readtable when NIL."
        (char))
       ((= ichar base-char-code-limit))
     (setq char (code-char ichar))
-    (when (constituentp char)
+    (when (constituentp char *readtable*)
       (set-cmt-entry char nil)))
 
   (/show0 "leaving !cold-init-standard-readtable"))
@@ -913,7 +917,7 @@ standard Lisp readtable when NIL."
                  (ouch-read-buffer-escaped ch read-buffer))))))
           (t
            (when (and (not colon) ; easiest test first
-                      (constituentp char)
+                      (constituentp char rt)
                       (eql (get-constituent-trait char)
                            +char-attr-package-delimiter+))
              (setq colon (token-buf-fill-ptr read-buffer)))
@@ -1080,16 +1084,17 @@ extended <package-name>::<form-in-package> syntax."
   (when *read-suppress*
     (internal-read-extended-token stream firstchar nil)
     (return-from read-token nil))
-  (let ((attribute-array (character-attribute-array *readtable*))
-        (attribute-hash-table (character-attribute-hash-table *readtable*))
-        (buf *read-buffer*)
-        (package-designator nil)
-        (colons 0)
-        (possibly-rational t)
-        (seen-digit-or-expt nil)
-        (possibly-float t)
-        (was-possibly-float nil)
-        (seen-multiple-escapes nil))
+  (let* ((rt *readtable*)
+         (attribute-array (character-attribute-array rt))
+         (attribute-hash-table (character-attribute-hash-table rt))
+         (buf *read-buffer*)
+         (package-designator nil)
+         (colons 0)
+         (possibly-rational t)
+         (seen-digit-or-expt nil)
+         (possibly-float t)
+         (was-possibly-float nil)
+         (seen-multiple-escapes nil))
     (declare (token-buf buf))
     (reset-read-buffer buf)
     (prog ((char firstchar))
@@ -1371,8 +1376,8 @@ extended <package-name>::<form-in-package> syntax."
       ;; sometimes we pass eof-error=nil but check. here we just let it err.
       ;; should pick one style and stick with it.
       (do ((char (read-char stream t) (read-char stream t)))
-          ((multiple-escape-p char))
-        (if (single-escape-p char) (setq char (read-char stream t)))
+          ((multiple-escape-p char rt))
+        (if (single-escape-p char rt) (setq char (read-char stream t)))
         (ouch-read-buffer-escaped char buf))
       (setq char (read-char stream nil nil))
       (unless char (go RETURN-SYMBOL))
