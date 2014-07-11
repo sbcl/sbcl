@@ -146,6 +146,7 @@
 ;;; In a bootstrapping situation, we should be careful to use the
 ;;; correct values for the system parameters.
 ;;;
+;;; Meta: the following comment is not true. Should remove the AUX fn.
 ;;; We need an aux function because we need to use both
 ;;; !DEF-VM-SUPPORT-ROUTINE and DEFUN-CACHED.
 (/show0 "primtype.lisp 188")
