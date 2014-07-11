@@ -2839,7 +2839,7 @@
    (maybe-emit-rex-for-ea segment src dst)
    (emit-byte segment #b00001111)
    (emit-byte segment (dpb (conditional-opcode cond) (byte 4 0) #b01000000))
-   (emit-ea segment src (reg-tn-encoding dst))))
+   (emit-ea segment src (reg-tn-encoding dst) :allow-constants t)))
 
 ;;;; conditional byte set
 

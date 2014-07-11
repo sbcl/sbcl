@@ -30,6 +30,11 @@
 ;;; avoids host-Lisp-based reflection, and avoids having a DEFTYPE that
 ;;; changes its meaning between the host and target compilations.
 
+;;; The motivation for this host-agnostic approach is that it supports dumping
+;;; (UNSIGNED-BYTE 64) array literals in a 32-bit cross-compilation host,
+;;; where that array type is almost surely upgraded to (ARRAY T).
+;;; Therefore a host-reflection-based mechanism would be almost certain to fail.
+
 ;;; In case anyone wants to rewrite this yet again, here's an alternate way
 ;;; that was deemed unworkable: in cross-compilation, all specialized arrays
 ;;; were wrapped in an XC-ARRAY-WRAPPER struct consisting of one slot for
