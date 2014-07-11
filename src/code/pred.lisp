@@ -46,12 +46,14 @@
                 (t (return-from extended-sequence-p nil)))))
     (when (layout-invalid layout)
       (setq layout (update-object-layout-or-invalid x slayout)))
-    (if (eq layout slayout)
-        t
-        (let ((inherits (layout-inherits (truly-the layout layout))))
-          (declare (optimize (safety 0)))
-          (and (> (length inherits) depthoid)
-               (eq (svref inherits depthoid) slayout))))))
+    ;; It's impossible to create an instance which is exactly
+    ;; of type SEQUENCE. To wit: (make-instance 'sequence) =>
+    ;;   "Cannot allocate an instance of #<BUILT-IN-CLASS SEQUENCE>."
+    ;; So we do not need to check for that. Just use the 'inherits' vector.
+    (let ((inherits (layout-inherits (truly-the layout layout))))
+      (declare (optimize (safety 0)))
+      (and (> (length inherits) depthoid)
+           (eq (svref inherits depthoid) slayout)))))
 
 ;;; Is X a SEQUENCE?  Harder than just (OR VECTOR LIST)
 (defun sequencep (x)

@@ -551,26 +551,73 @@
        (delay-ir1-transform node :constraint)
 
        ;; Otherwise transform the type test.
-       (multiple-value-bind (pred get-layout)
-           (cond
-             ((csubtypep class (specifier-type 'funcallable-instance))
-              (values 'funcallable-instance-p '%funcallable-instance-layout))
-             ((csubtypep class (specifier-type 'instance))
-              (values '%instancep '%instance-layout))
-             (t
-              (values '(lambda (x) (declare (ignore x)) t) 'layout-of)))
+       (binding* (((pred get-layout)
+                   (cond ((csubtypep class (specifier-type 'funcallable-instance))
+                          (values '(funcallable-instance-p object)
+                                  '(%funcallable-instance-layout object)))
+                         ((csubtypep class (specifier-type 'instance))
+                          (values '(%instancep object)
+                                  '(%instance-layout object)))))
+                  (get-layout-or-return-false
+                   (if pred
+                       ;; Test just one of %INSTANCEP or %FUNCALLABLE-INSTANCE-P
+                       `(if ,pred ,get-layout (return-from typep nil))
+                       ;; But if we don't know which is will be, try both.
+                       ;; This is less general than LAYOUT-OF,and therefore
+                       ;; a little quicker to fail, because objects with
+                       ;; {LIST|OTHER}-POINTER-LOWTAG can't possibly pass.
+                       `(cond ((%instancep object)
+                               (%instance-layout object))
+                              ((funcallable-instance-p object)
+                               (%funcallable-instance-layout object))
+                              (t (return-from typep nil)))))
+                  (n-layout (gensym)))
          (cond
+           ;; It's possible to seal a STANDARD-CLASS, not just a STRUCTURE-CLASS,
+           ;; though probably extremely weird. Also the PRED should be set in
+           ;; that event, but it isn't.
            ((and (eq (classoid-state class) :sealed) layout
                  (not (classoid-subclasses class)))
             ;; Sealed and has no subclasses.
-            `(and (,pred object)
-                  (eq (,get-layout object) ',layout)))
+            ;; The crummy dual expressions for the same result are because
+            ;; (BLOCK (RETURN ...)) seems to emit a forward branch in the
+            ;; passing case, but AND emits a forward branch in the failing
+            ;; case which I believe is the better choice.
+            (if pred
+                `(and ,pred (eq ,get-layout ',layout))
+                `(block typep (eq ,get-layout-or-return-false ',layout))))
+
            ((and (typep class 'structure-classoid) layout)
             ;; structure type tests; hierarchical layout depths
-            (let ((depthoid (layout-depthoid layout))
-                  (n-layout (gensym)))
-              `(and (,pred object)
-                    (let ((,n-layout (,get-layout object)))
+            (let* ((depthoid (layout-depthoid layout))
+                   ;; If a structure is apparently an abstract base type,
+                   ;; having no constructor, then no instance layout should
+                   ;; be EQ to the classoid's layout. It is a slight win
+                   ;; to use the depth-based check first, then do the EQ check.
+                   ;; There is no loss in the case where both fail, and there
+                   ;; is a benefit in a passing case. Always try both though,
+                   ;; because (MAKE-INSTANCE 'x) works on any structure class.
+                   (abstract-base-p
+                    (let ((dd (layout-info layout)))
+                      (and dd
+                           (not (dd-default-constructor dd))
+                           (let ((ctors (sb!kernel::dd-constructors dd)))
+                             (or (not ctors) (equal ctors '((nil))))))))
+                   (hierarchy-check
+                    ;; Use DATA-VECTOR-REF directly, since that's what SVREF in
+                    ;; a SAFETY 0 lexenv will eventually be transformed to.
+                    ;; This can give a large compilation speedup, since
+                    ;; %INSTANCE-TYPEPs are frequently created during
+                    ;; GENERATE-TYPE-CHECKS, and the normal aref transformation
+                    ;; path is pretty heavy.
+                    `(and (> (layout-depthoid ,n-layout) ,depthoid)
+                          (locally (declare (optimize (safety 0)))
+                            (eq (data-vector-ref (layout-inherits ,n-layout)
+                                                 ,depthoid)
+                                ',layout)))))
+              (aver (equal pred '(%instancep object)))
+              `(and ,pred
+                    (let ((,n-layout ,get-layout))
                       ;; we used to check for invalid layouts here,
                       ;; but in fact that's both unnecessary and
                       ;; wrong; it's unnecessary because structure
@@ -578,63 +625,43 @@
                       ;; because it is quite legitimate to pass an
                       ;; object with an invalid layout to a structure
                       ;; type test.
-                      (if (eq ,n-layout ',layout)
-                          t
-                          (and (> (layout-depthoid ,n-layout)
-                                  ,depthoid)
-                               (locally (declare (optimize (safety 0)))
-                                 ;; Use DATA-VECTOR-REF directly,
-                                 ;; since that's what SVREF in a
-                                 ;; SAFETY 0 lexenv will eventually be
-                                 ;; transformed to. This can give a
-                                 ;; large compilation speedup, since
-                                 ;; %INSTANCE-TYPEPs are frequently
-                                 ;; created during GENERATE-TYPE-CHECKS,
-                                 ;; and the normal aref transformation path
-                                 ;; is pretty heavy.
-                                 (eq (data-vector-ref (layout-inherits ,n-layout)
-                                                      ,depthoid)
-                                     ',layout))))))))
+                      ,(if abstract-base-p
+                           `(if ,hierarchy-check t (eq ,n-layout ',layout))
+                           `(if (eq ,n-layout ',layout) t ,hierarchy-check))))))
+
            ((and layout (>= (layout-depthoid layout) 0))
             ;; hierarchical layout depths for other things (e.g.
             ;; CONDITION, STREAM)
+            ;; The quasi-hierarchical types are abstract base types,
+            ;; so perform inheritance check first, and EQ second.
+            ;; Actually, since you can't make an abstract STREAM,
+            ;; maybe we should skip the EQ test? But you *can* make
+            ;; an instance of CONDITION for what it's worth.
             ;; SEQUENCE is special-cased, but could be handled here.
             (let* ((depthoid (layout-depthoid layout))
-                   (n-layout (gensym))
                    (n-inherits (gensym))
                    (guts
                     `((when (layout-invalid ,n-layout)
                         (setq ,n-layout (update-object-layout-or-invalid
                                          object ',layout)))
-                      (if (eq ,n-layout ',layout)
-                          t
-                          (let ((,n-inherits (layout-inherits
+                      (if (let ((,n-inherits (layout-inherits
                                               (truly-the layout ,n-layout))))
                             (declare (optimize (safety 0)))
-                            (and (> (length ,n-inherits) ,depthoid)
+                            (and (> (vector-length ,n-inherits) ,depthoid)
                                  ;; See above.
                                  (eq (data-vector-ref ,n-inherits ,depthoid)
-                                     ',layout)))))))
-              ;; We can do slightly better than to use LAYOUT-OF
-              ;; because objects with LIST-POINTER-LOWTAG and
-              ;; OTHER-POINTER-LOWTAG can't possibly pass.
-              (if (eq get-layout 'layout-of)
+                                     ',layout)))
+                          t
+                          (eq ,n-layout ',layout)))))
+              (if pred
+                  `(and ,pred (let ((,n-layout ,get-layout)) ,@guts))
                   `(block typep
-                     (let ((,n-layout
-                            (cond ((%instancep object)
-                                   (%instance-layout object))
-                                  ((funcallable-instance-p object)
-                                   (%funcallable-instance-layout object))
-                                  (t
-                                   (return-from typep nil)))))
-                       ,@guts))
-                  `(and (,pred object)
-                        (let ((,n-layout (,get-layout object)))
-                          ,@guts)))))
+                     (let ((,n-layout ,get-layout-or-return-false)) ,@guts)))))
+
            (t
             (/noshow "default case -- ,PRED and CLASS-CELL-TYPEP")
-            `(and (,pred object)
-                  (classoid-cell-typep (,get-layout object)
+            `(block typep
+               (classoid-cell-typep ,get-layout-or-return-false
                                        ',(find-classoid-cell name :create t)
                                        object)))))))))
 
