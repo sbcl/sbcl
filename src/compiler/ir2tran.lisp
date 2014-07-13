@@ -180,9 +180,15 @@
       (:global-function
        (cond #-sb-xc-host
              ((and (info :function :definition name)
-                   (info :function :info name))
+                   (info :function :info name)
+                   (let ((*lexenv* (node-lexenv node)))
+                     (not (fun-lexically-notinline-p name))))
               ;; Known functions can be saved without going through fdefns,
               ;; except during cross-compilation
+              ;; But if NOTINLINEd, don't early-bind to the functional value
+              ;; because that disallows redefinition, including but not limited
+              ;; to encapsulations, which in turn makes TRACE not work, which
+              ;; leads to extreme frustration when debugging.
               (emit-move node block (make-load-time-constant-tn :known-fun name)
                          res))
              (t

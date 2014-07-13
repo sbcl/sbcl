@@ -697,6 +697,12 @@
   integer)
 
 
+;;; Meta: the following comment is mostly true, but gray stream support
+;;;   is already incorporated into the definitions within this file.
+;;;   But these need to redefinable, otherwise the relative order of
+;;;   loading sb-simple-streams and any user-defined code which executes
+;;;   (F #'read-char ...) is sensitive to the order in which those
+;;;   are loaded, though insensitive at compile-time.
 ;;; (These were inline throughout this file, but that's not appropriate
 ;;; globally.  And we must not inline them in the rest of this file if
 ;;; dispatch to gray or simple streams is to work, since both redefine

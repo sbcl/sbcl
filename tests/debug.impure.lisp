@@ -571,6 +571,24 @@
     (load (compile-file "bug-414.lisp"))
     (disassemble 'bug-414)))
 
+;; A known function can be stored as a code constant in lieu of the
+;; usual mode of storing an #<fdefn> and looking up the function from it.
+;; One such usage occurs with TAIL-CALL-VARIABLE (e.g. via APPLY).
+;; Show that declaring the function locally notinline uses the #<fdefn>
+;; by first compiling a call that would have elided the #<fdefn>
+;; and then TRACE.
+(defun test-compile-then-load (filename junk)
+  (declare (notinline compile-file load))
+  (apply 'load (apply 'compile-file filename junk) junk))
+(compile 'test-compile-then-load)
+(with-test (:name :traceable-known-fun)
+  (let ((s (make-string-output-stream)))
+    (trace compile-file load)
+    (let ((*trace-output* s))
+      (test-compile-then-load "bug-414.lisp" nil))
+    (untrace)
+    (assert (>= (count #\Newline (get-output-stream-string s)) 4))))
+
 (with-test (:name :bug-310175 :fails-on '(not :stack-allocatable-lists))
   ;; KLUDGE: Not all DX-enabled platforms DX CONS, and the compiler
   ;; transforms two-arg-LIST* (and one-arg-LIST) to CONS.  Therefore,
