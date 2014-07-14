@@ -34,6 +34,16 @@
  :dd-type funcallable-structure
  :runtime-type-checks-p nil)
 
+;; INTERPRETED-FUNCTION can not subclassed at runtime.
+;; For one, DEFSTRUCT-WITH-ALTERNATE-METACLASS does not exist in the target,
+;; and DEFSTRUCT would have to allow SB-KERNEL:FUNCALLABLE-STRUCTURE as
+;; the :TYPE option to avoid mismatch, which it does not; nor is there any
+;; way to allow it with DEFCLASS.  But, KLUDGE - loading the cross-compiler
+;; seals the class before the run of the cross-compiler gets to doing the declaim
+;; because 'target-misc' is cross-compiled before 'early-full-eval' is.
+#+sb-xc-host (sb!c::seal-class (specifier-type 'interpreted-function))
+(declaim (freeze-type interpreted-function))
+
 #-sb-xc-host
 (progn
   (defun make-interpreted-function
