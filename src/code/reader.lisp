@@ -792,27 +792,27 @@ standard Lisp readtable when NIL."
     (do ((firstchar (flush-whitespace stream) (flush-whitespace stream)))
         ((char= firstchar #\) ) (cdr thelist))
       (when (char= firstchar #\.)
-            (let ((nextchar (read-char stream t)))
-              (cond ((token-delimiterp nextchar)
-                     (cond ((eq listtail thelist)
-                            (unless *read-suppress*
-                              (simple-reader-error
+        (let ((nextchar (read-char stream t)))
+          (cond ((token-delimiterp nextchar)
+                 (cond ((eq listtail thelist)
+                        (unless *read-suppress*
+                          (simple-reader-error
                                stream
                                "Nothing appears before . in list.")))
-                           ((whitespace[2]p nextchar)
-                            (setq nextchar (flush-whitespace stream))))
-                     (rplacd listtail
+                       ((whitespace[2]p nextchar)
+                        (setq nextchar (flush-whitespace stream))))
+                 (rplacd listtail
                              ;; Return list containing last thing.
-                             (car (read-after-dot stream nextchar)))
-                     (return (cdr thelist)))
+                         (car (read-after-dot stream nextchar)))
+                 (return (cdr thelist)))
                     ;; Put back NEXTCHAR so that we can read it normally.
-                    (t (unread-char nextchar stream)))))
+                (t (unread-char nextchar stream)))))
       ;; Next thing is not an isolated dot.
       (let ((listobj (read-maybe-nothing stream firstchar)))
         ;; allows the possibility that a comment was read
         (when listobj
-              (rplacd listtail listobj)
-              (setq listtail listobj))))))
+          (rplacd listtail listobj)
+          (setq listtail listobj))))))
 
 (defun read-after-dot (stream firstchar)
   ;; FIRSTCHAR is non-whitespace!
