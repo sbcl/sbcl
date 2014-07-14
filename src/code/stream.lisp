@@ -1174,7 +1174,7 @@
              (:constructor internal-make-string-input-stream
                            (string current end))
              (:copier nil))
-  (string (missing-arg) :type simple-string)
+  (string (missing-arg) :type simple-string :read-only t)
   (current (missing-arg) :type index)
   (end (missing-arg) :type index))
 
@@ -1234,8 +1234,7 @@
                  (:start 0)
                  (:end (string-input-stream-end stream))
                  ;; We allow moving position beyond EOF. Errors happen
-                 ;; on read, not move -- or the user may extend the
-                 ;; input string.
+                 ;; on read, not move.
                  (t arg1)))
          (string-input-stream-current stream)))
     ;; According to ANSI: "Should signal an error of type type-error
@@ -1257,7 +1256,8 @@
            (type index start)
            (type (or index null) end))
   (let* ((string (coerce string '(simple-array character (*)))))
-    ;; FIXME: Why WITH-ARRAY-DATA, since the array is already simple?
+    ;; Why WITH-ARRAY-DATA, since the array is already simple?
+    ;; because it's a nice abstract way to check the START and END.
     (with-array-data ((string string) (start start) (end end))
       (internal-make-string-input-stream
        string ;; now simple
