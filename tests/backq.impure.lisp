@@ -71,3 +71,140 @@
   (assert (eq :error
               (handler-case (read-from-string "`(foo bar #.(max 5 ,*print-base*))")
                 (reader-error () :error)))))
+
+#+nil (with-test (:name :triple-backquote)
+  (flet  ((expect (expect val)
+            (assert (string= (write-to-string val) expect))))
+    (let ((plet/fast 'val1)
+          (expr '```(,',',plet/fast ,',kernel ,@body)))
+      (declare (special plet/fast))
+      (expect "```(,',',PLET/FAST ,',KERNEL ,@BODY)" expr)
+      (expect "``(,','VAL1 ,',KERNEL ,@BODY)" (eval expr))
+      (let ((kernel 'val2))
+        (declare (special kernel))
+        (expect "`(,'VAL1 ,'VAL2 ,@BODY)" (eval (eval expr)))
+        (let ((body '((fn) (otherfn))))
+          (declare (special body))
+          (expect "(VAL1 VAL2 (FN) (OTHERFN))" (eval (eval (eval expr)))))))))
+
+(defmacro broken-macro (more-bindings)
+  `(macrolet ((with-bindings (&body body)
+                `(let ((thing1 :something) ,',@more-bindings) ,@body)))
+     (with-bindings (thing))))
+
+;; In the above macro (WITH-BINDINGS (THING)) can be rendered unevaluable
+;; due to syntax error via improper format of MORE-BINDINGS.
+;; Regardless, the pprinter should faithfully indicate how BROKEN-MACRO expands.
+;; All of these tests except for the baseline "accidentally working" case
+;; either crash the pprinter or display incorrectly.
+#+nil (with-test (:name :bug-1063414-unprintable-nested-backquote)
+  (flet  ((expect (expect form)
+            (assert (string= (write-to-string (macroexpand-1 form))
+                             expect))))
+
+    ;; this example's expansion is correct but only by accident
+    (expect "(MACROLET ((WITH-BINDINGS (&BODY BODY)
+             `(LET ((THING1 :SOMETHING) ,'(VAR VAL))
+                ,@BODY)))
+  (WITH-BINDINGS (THING)))" '(broken-macro ((var val))))
+
+    ;; this example should correctly print QUOTE with no operand
+    (expect "(MACROLET ((WITH-BINDINGS (&BODY BODY)
+             `(LET ((THING1 :SOMETHING) ,(QUOTE))
+                ,@BODY)))
+  (WITH-BINDINGS (THING)))" '(broken-macro nil))
+
+    ;; ... or two operands
+    (expect "(MACROLET ((WITH-BINDINGS (&BODY BODY)
+             `(LET ((THING1 :SOMETHING) ,(QUOTE (VAR :SOME-FORM) (VAR2 2)))
+                ,@BODY)))
+  (WITH-BINDINGS (THING)))" '(broken-macro ((var :some-form) (var2 2))))
+
+    ;; ... or an attempt to bind the symbol NIL
+    (expect "(MACROLET ((WITH-BINDINGS (&BODY BODY)
+             `(LET ((THING1 :SOMETHING) ,'NIL)
+                ,@BODY)))
+  (WITH-BINDINGS (THING)))" '(broken-macro (nil)))
+
+    ;; ... or even a meaningless dotted-list QUOTE form
+    (expect "(MACROLET ((WITH-BINDINGS (&BODY BODY)
+             `(LET ((THING1 :SOMETHING) ,(QUOTE . FROB))
+                ,@BODY)))
+  (WITH-BINDINGS (THING)))" '(broken-macro frob))))
+
+#+nil (with-test (:name :preserving-inner-backquotes)
+  (flet  ((expect (expect val)
+            (assert (string= (write-to-string val) expect))))
+
+    ;; Continuing with *BACKQUOTE-TESTS*, instead of checking for the value
+    ;; after twice evaluating, check for expected printed form after one eval.
+    (expect "`(,(*RR* *SS*))" ``(,,*QQ*))
+    (expect "`(,@(*RR* *SS*))" ``(,@,*QQ*))
+    (expect "`(,*RR* ,*SS*)" ``(,,@*QQ*))
+
+    ;; Three tests inspired by tests from CLISP, but our expected answers are,
+    ;; I think, better because inner backquotes are preserved.
+    (expect "(FOO `(BAR ,@'((BAZ 'A A) (BAZ 'B B) (BAZ 'C C) (BAZ 'D D))))"
+            (let ((list '(a b c d)))
+              `(foo `(bar ,@',(mapcar (lambda (sym) `(baz ',sym ,sym))
+                                      list)))))
+
+    (expect "```,,,X" ````,,,,'x)
+
+    ;; In this one the leftmost backquote's comma is the second from the left.
+    ;; That subform is "`,3" which is just 3. The inner quasiquote remains.
+    (expect "`,3" ``,,`,3)))
+
+#+nil (with-test (:name :preserving-backquotes-difficult)
+  (assert (string= (write-to-string
+                    (let ((c 'cee) (d 'dee) (g 'gee) (h 'hooray))
+                      `(`(a ,b ,',c ,,d) . `(e ,f ,',g ,,h))))
+                   "(`(A ,B ,'CEE ,DEE) . `(E ,F ,'GEE ,HOORAY))"))
+  (assert (string= (write-to-string
+                    (let ((c 'cee) (d 'dee) (g 'gee) (h 'hooray))
+                      `(foo `(a ,b ,',c ,,d) . `(e ,f ,',g ,,h))))
+                   "(FOO `(A ,B ,'CEE ,DEE) . `(E ,F ,'GEE ,HOORAY))")))
+
+(with-test (:name :backquote-permissible-circularity)
+  (flet  ((expect (expect val)
+            (assert (string= (write-to-string val) expect))))
+    (let ((*print-circle* t))
+      ;; this should be agnostic of the circular form after the comma
+      (expect "`(FOO BAR ,(HI '#1=(BAR FOO #1# . #1#)))"
+              '`(FOO BAR ,(HI '#1=(BAR FOO #1# . #1#)))))))
+
+(with-test (:name :read-backq-missing-expression)
+  (assert (string= (handler-case (read-from-string "`(foo ,@)")
+                     (sb-int:simple-reader-error (c)
+                       (simple-condition-format-control c)))
+                   "Trailing ~A in backquoted expression.")))
+#+nil (with-test (:name :read-backq-vector-illegal)
+  (assert (eql (search "Improper list"
+                       (handler-case
+                           (read-from-string "`((a  #(foo bar . ,(cons 1 2))))")
+                         (sb-int:simple-reader-error (c)
+                           (simple-condition-format-control c))))
+               0)))
+
+;; Since the backquote reader doesn't reduce to simplest form in all cases,
+;; make sure that IR1 does.
+(defun list-fun-referenced-constants (f)
+  (let ((code (sb-kernel:fun-code-header f)))
+    (loop for i from sb-vm:code-constants-offset
+          below (sb-kernel:get-header-data code)
+          collect (sb-kernel:code-header-ref code i))))
+
+;; In the expression `(,@l1 a b ,@l2) is it preferable that we expand this
+;; as (APPEND L1 (LIST* 'A 'B L2)) or as (APPEND L1 '(A) '(B) L2)?
+;; The IR1 transform is designed to catch the latter case, but the expander
+;; returns the former, which probably favors speed over code size.
+;; This is perhaps an interesting reason to make expansion policy-sensitive.
+;; I'll test a case that definitely triggers the IR1 transform.
+(defun a-backq-expr (l1) `(,@l1 ,most-positive-fixnum a))
+(compile 'a-backq-expr)
+(with-test (:name :backquote-ir1-simplifier)
+  ;; The compiled code should reference the a constant list
+  ;; whose two elements are #.MOST-POSITIVE-FIXNUM and A.
+  (assert (member (list most-positive-fixnum 'a)
+                  (list-fun-referenced-constants #'a-backq-expr)
+                  :test #'equal)))
