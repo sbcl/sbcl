@@ -279,7 +279,6 @@
  ("src/code/early-format")
  ("src/code/target-format" :not-host)
  ("src/code/defpackage"    :not-host)
- ("src/code/pp-backq"      :not-host)
 
  ("src/code/error-error" :not-host) ; needs WITH-STANDARD-IO-SYNTAX macro
 

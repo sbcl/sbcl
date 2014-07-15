@@ -191,6 +191,10 @@
   (error "~@<don't know how to dump ~S (default ~S method called).~>"
          object 'make-load-form))
 
+(defmethod make-load-form ((object sb-impl::comma) &optional env)
+  (declare (ignore env))
+  (sb-impl::!unquoting-comma-load-form object))
+
 (defun make-load-form-saving-slots (object &key (slot-names nil slot-names-p) environment)
   (declare (ignore environment))
   (let ((class (class-of object)))

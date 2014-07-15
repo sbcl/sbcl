@@ -1063,15 +1063,6 @@ line break."
 
 (defun pprint-lambda-list (stream lambda-list &rest noise)
   (declare (ignore noise))
-  (when (and (consp lambda-list)
-             (member (car lambda-list) *backq-tokens*))
-    ;; if this thing looks like a backquoty thing, then we don't want
-    ;; to destructure it, we want to output it straight away.  [ this
-    ;; is the exception to the normal processing: if we did this
-    ;; generally we would find lambda lists such as (FUNCTION FOO)
-    ;; being printed as #'FOO ]  -- CSR, 2003-12-07
-    (output-object lambda-list stream)
-    (return-from pprint-lambda-list nil))
   (pprint-logical-block (stream lambda-list :prefix "(" :suffix ")")
     (let ((state :required)
           (first t))
@@ -1187,24 +1178,35 @@ line break."
   (funcall (formatter "~:<~^~W~^~3I ~:_~W~^ ~_~W~^~1I~@{ ~_~W~}~:>")
            stream list))
 
+(defun pprint-unquoting-comma (stream obj &rest noise)
+  (declare (ignore noise))
+  (write-string (svref #("," ",." ",@") (comma-kind obj)) stream)
+  (when (eql (comma-kind obj) 0)
+    ;; Ensure a space is written before any output that would change the meaning
+    ;; of the preceding the comma to ",." or ",@" such as a symbol named "@BAR".
+    (setf (pretty-stream-char-out-oneshot-hook stream)
+          (lambda (stream char)
+            (when (member char '(#\. #\@))
+              (write-char #\Space stream)))))
+  (output-object (comma-expr obj) stream))
+
 (defvar *pprint-quote-with-syntactic-sugar* t)
 
 (defun pprint-quote (stream list &rest noise)
   (declare (ignore noise))
-  (if (and (consp list)
-           (consp (cdr list))
-           (null (cddr list))
-           *pprint-quote-with-syntactic-sugar*)
-      (case (car list)
-        (function
-         (write-string "#'" stream)
-         (output-object (cadr list) stream))
-        (quote
-         (write-char #\' stream)
-         (output-object (cadr list) stream))
-        (t
-         (pprint-fill stream list)))
-      (pprint-fill stream list)))
+  (when (and (consp list)
+             (let ((cdr (cdr list))) (and (consp cdr) (null (cdr cdr)))))
+    (let* ((pretty-p nil)
+           (sigil (case (car list)
+                    (function "#'")
+                    (quote "'")
+                    ;; QUASIQUOTE can't choose not to print prettily.
+                    ;; Wrongly nested commas beget unreadable sexprs.
+                    (quasiquote (setq pretty-p t) "`"))))
+      (when (or pretty-p *pprint-quote-with-syntactic-sugar*)
+        (write-string sigil stream)
+        (return-from pprint-quote (output-object (cadr list) stream)))))
+  (pprint-fill stream list))
 
 (defun pprint-declare (stream list &rest noise)
   (declare (ignore noise))
@@ -1498,6 +1500,7 @@ line break."
   (let ((*print-pprint-dispatch* *initial-pprint-dispatch-table*)
         (*building-initial-table* t))
     (/show0 "doing SET-PPRINT-DISPATCH for regular types")
+    (set-pprint-dispatch 'comma #'pprint-unquoting-comma)
     (set-pprint-dispatch '(and array (not (or string bit-vector))) #'pprint-array)
     (set-pprint-dispatch '(cons (and symbol (satisfies mboundp)))
                          #'pprint-macro-call -1)
@@ -1576,6 +1579,7 @@ line break."
                           (prog2 pprint-prog2)
                           (psetf pprint-setq)
                           (psetq pprint-setq)
+                          (quasiquote pprint-quote)
                           #+nil (restart-bind ...)
                           #+nil (restart-case ...)
                           (setf pprint-setq)
@@ -1600,12 +1604,7 @@ line break."
                           ))
 
       (set-pprint-dispatch `(cons (eql ,(first magic-form)))
-                           (symbol-function (second magic-form))))
-
-    ;; other pretty-print init forms
-    (/show0 "about to call !BACKQ-PP-COLD-INIT")
-    (sb!impl::!backq-pp-cold-init)
-    (/show0 "leaving !PPRINT-COLD-INIT"))
+                           (symbol-function (second magic-form)))))
 
   (setf *standard-pprint-dispatch-table*
         (copy-pprint-dispatch *initial-pprint-dispatch-table*))

@@ -13,6 +13,10 @@
 
 (in-package "CL-USER")
 
+(with-test (:name :backq-smoke-test)
+  (assert (equalp (macroexpand '`#(() a #(#() nil x) #()))
+                  ''#(NIL A #(#() NIL X) #()))))
+
 (defparameter *qq* '(*rr* *ss*))
 (defparameter *rr* '(3 5))
 (defparameter *ss* '(4 6))
@@ -56,11 +60,11 @@
       *backquote-tests*)
 
 (let ((string "`(foobar a b ,c ,'(e f g) d ,@'(e f g) (h i j) ,@foo)"))
-  (assert (equal (print (read-from-string string)) (read-from-string string))))
+  (assert (equalp (print (read-from-string string)) (read-from-string string))))
 
 (let ((a '`(1 ,@a ,@b ,.c ,.d)))
   (let ((*print-circle* t))
-    (assert (equal (read-from-string (write-to-string a)) a))))
+    (assert (equalp (read-from-string (write-to-string a)) a))))
 
 (let ((s '``(,,@(list 1 2 3) 10)))
   (assert (equal (eval (eval s)) '(1 2 3 10))))
@@ -72,7 +76,7 @@
               (handler-case (read-from-string "`(foo bar #.(max 5 ,*print-base*))")
                 (reader-error () :error)))))
 
-#+nil (with-test (:name :triple-backquote)
+(with-test (:name :triple-backquote)
   (flet  ((expect (expect val)
             (assert (string= (write-to-string val) expect))))
     (let ((plet/fast 'val1)
@@ -96,8 +100,8 @@
 ;; due to syntax error via improper format of MORE-BINDINGS.
 ;; Regardless, the pprinter should faithfully indicate how BROKEN-MACRO expands.
 ;; All of these tests except for the baseline "accidentally working" case
-;; either crash the pprinter or display incorrectly.
-#+nil (with-test (:name :bug-1063414-unprintable-nested-backquote)
+;; either crashed the pprinter or displayed incorrectly.
+(with-test (:name :bug-1063414-unprintable-nested-backquote)
   (flet  ((expect (expect form)
             (assert (string= (write-to-string (macroexpand-1 form))
                              expect))))
@@ -132,7 +136,7 @@
                 ,@BODY)))
   (WITH-BINDINGS (THING)))" '(broken-macro frob))))
 
-#+nil (with-test (:name :preserving-inner-backquotes)
+(with-test (:name :preserving-inner-backquotes)
   (flet  ((expect (expect val)
             (assert (string= (write-to-string val) expect))))
 
@@ -155,7 +159,7 @@
     ;; That subform is "`,3" which is just 3. The inner quasiquote remains.
     (expect "`,3" ``,,`,3)))
 
-#+nil (with-test (:name :preserving-backquotes-difficult)
+(with-test (:name :preserving-backquotes-difficult)
   (assert (string= (write-to-string
                     (let ((c 'cee) (d 'dee) (g 'gee) (h 'hooray))
                       `(`(a ,b ,',c ,,d) . `(e ,f ,',g ,,h))))
@@ -178,7 +182,7 @@
                      (sb-int:simple-reader-error (c)
                        (simple-condition-format-control c)))
                    "Trailing ~A in backquoted expression.")))
-#+nil (with-test (:name :read-backq-vector-illegal)
+(with-test (:name :read-backq-vector-illegal)
   (assert (eql (search "Improper list"
                        (handler-case
                            (read-from-string "`((a  #(foo bar . ,(cons 1 2))))")
@@ -201,10 +205,33 @@
 ;; This is perhaps an interesting reason to make expansion policy-sensitive.
 ;; I'll test a case that definitely triggers the IR1 transform.
 (defun a-backq-expr (l1) `(,@l1 ,most-positive-fixnum a))
+(defun vector-backq-expr () `#(foo ,char-code-limit)) ; no xform, but folded
 (compile 'a-backq-expr)
+(compile 'vector-backq-expr)
 (with-test (:name :backquote-ir1-simplifier)
-  ;; The compiled code should reference the a constant list
+  (assert (equal (macroexpand sb-impl::'`(,@l1 ,char-code-limit x))
+                 'sb-impl::(|Append| l1 (|List*| char-code-limit '(X)))))
+  (assert (equal (macroexpand '`#(,char-code-limit sb-impl::foo))
+                 'sb-impl::(|Vector| char-code-limit 'foo)))
+  ;; The compiled code should reference a constant list
   ;; whose two elements are #.MOST-POSITIVE-FIXNUM and A.
   (assert (member (list most-positive-fixnum 'a)
                   (list-fun-referenced-constants #'a-backq-expr)
-                  :test #'equal)))
+                  :test #'equal))
+  ;; Compiled code should reference a constant vector.
+  (assert (member (vector 'foo char-code-limit)
+                  (list-fun-referenced-constants #'vector-backq-expr)
+                  :test #'equalp)))
+
+(in-package sb-impl)
+
+(test-util:with-test (:name :backquote-more-weirdness)
+  ;; No expectation on any other Lisp.
+  (flet  ((expect (expect val)
+            (assert (string= (write-to-string val) expect))))
+    ;; There is one quasiquote and one comma
+    (expect "`(QUASIQUOTE QUASIQUOTE CADR ,FOO)"
+            '`(quasiquote quasiquote cadr ,foo))
+    ;; There are three quasiquotes
+    (expect "```(CADR ,FOO)"
+            '`(quasiquote (quasiquote (cadr ,foo))))))

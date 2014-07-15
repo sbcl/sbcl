@@ -362,15 +362,13 @@
 ;; - inline functions whose behavior is merely to call LIST don't work
 ;;   e.g. :INITIAL-CONTENTS (MY-LIST a b) ; where MY-LIST is inline
 ;;                                        ; and effectively just (LIST ...)
-;; - in the current implementation it is only with difficulty that
-;;   backquoted vectors could be used as initializers because BACKQ-VECTOR
-;;   is not the analogous function to VECTOR. (New backq macro fixes that.)
 (defun rewrite-initial-contents (rank initial-contents env)
   (named-let recurse ((rank rank) (data initial-contents))
     (declare (type index rank))
     (if (plusp rank)
         (flet ((sequence-constructor-p (form)
-                 (member (car form) '(list vector sb!impl::backq-list))))
+                 (member (car form) '(sb!impl::|List| list
+                                      sb!impl::|Vector| vector))))
           (let (expanded)
             (cond ((not (listp data)) data)
                   ((sequence-constructor-p data)
@@ -467,7 +465,8 @@
           ;; constant LENGTH.
           ((and initial-contents c-length
                 (lvar-matches initial-contents
-                              :fun-names '(list vector sb!impl::backq-list)
+                              :fun-names '(list vector
+                                           sb!impl::|List| sb!impl::|Vector|)
                               :arg-count c-length))
            (let ((parameters (eliminate-keyword-args
                               call 1 '((:element-type element-type)

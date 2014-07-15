@@ -88,10 +88,10 @@
                        (block ,block-name
                          (flet ((,pp-pop-name ()
                                   ,@(when object
-                                          `((unless (listp ,object-var)
-                                              (write-string ". " ,stream-var)
-                                              (output-object ,object-var ,stream-var)
-                                              (return-from ,block-name nil))))
+                                     `((unless (listp-for-pprint ,object-var)
+                                         (return-from ,block-name
+                                           (%pprint-dotted-tail ,object-var
+                                                                ,stream-var)))))
                                   (when (and (not *print-readably*)
                                              (eql ,count-name *print-length*))
                                     (write-string "..." ,stream-var)
@@ -154,3 +154,20 @@
    If the LIST argument to PPRINT-LOGICAL-BLOCK was NIL, then nothing
    is popped, but the *PRINT-LENGTH* testing still happens."
   (error "PPRINT-POP must be lexically inside PPRINT-LOGICAL-BLOCK."))
+
+;; utilities needed by PPRINT-POP
+;; Consider (A . `(,B C)) = (A QUASIQUOTE ,B C)
+;; We have to detect this and print as the form on the left since pretty commas
+;; with no containing #\` will fail at read-time due to a nesting error.
+;; There isn't an equivalent of *BACKQUOTE-DEPTH* for output streams so we
+;; can't revert to printing the comma as #S(SB-IMPL::COMMA ...)
+(declaim (inline listp-for-pprint))
+(defun listp-for-pprint (x)
+  (and (listp x)
+       (if (and (eq (car x) 'quasiquote)
+                (let ((cdr (cdr x))) (and (consp cdr) (not (cdr cdr)))))
+           nil t)))
+(defun %pprint-dotted-tail (obj stream)
+  (write-string ". " stream)
+  (output-object obj stream)
+  nil)

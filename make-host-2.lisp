@@ -50,8 +50,8 @@
     ;; instead of host code.
     ;; FIXME: Isn't this now taken care of automatically by
     ;; toplevel forms in the xcompiler backq.lisp file?
-    (set-macro-character #\` #'sb!impl::backquote-macro)
-    (set-macro-character #\, #'sb!impl::comma-macro)
+    (set-macro-character #\` #'sb!impl::backquote-charmacro)
+    (set-macro-character #\, #'sb!impl::comma-charmacro)
 
     (set-dispatch-macro-character #\# #\+ #'she-reader)
     (set-dispatch-macro-character #\# #\- #'she-reader)
@@ -79,6 +79,11 @@
              sb!kernel:layout-inherits))
   (setf (sb!int:info :function :kind f) :function
         (sb!int:info :function :where-from f) :declared))
+;; ... and since the cross-compiler hasn't seen a DEFMACRO for QUASIQUOTE,
+;; make it think it has, otherwise it fails more-or-less immediately.
+(setf (sb!int:info :function :kind 'sb!int:quasiquote) :macro
+      (sb!int:info :function :macro-function 'sb!int:quasiquote)
+      (cl:macro-function 'sb!int:quasiquote))
 (load "src/cold/compile-cold-sbcl.lisp")
 
 ;; After cross-compiling, show me a list of types that checkgen

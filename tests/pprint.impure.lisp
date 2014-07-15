@@ -122,7 +122,6 @@
            (with-output-to-string (s)
              (write '`(foo ,@x) :stream s :pretty t :readably t))
            "`(FOO ,@X)"))
-  #+nil                       ; '`(foo ,.x) => '`(foo ,@x) apparently.
   (assert (equal
            (with-output-to-string (s)
              (write '`(foo ,.x) :stream s :pretty t :readably t))
@@ -135,7 +134,6 @@
            (with-output-to-string (s)
              (write '`(lambda ,@x) :stream s :pretty t :readably t))
            "`(LAMBDA ,@X)"))
-  #+nil                                 ; see above
   (assert (equal
            (with-output-to-string (s)
              (write '`(lambda ,.x) :stream s :pretty t :readably t))
@@ -146,12 +144,7 @@
            "`(LAMBDA (,X))")))
 
 ;;; more backquote printing brokenness, fixed quasi-randomly by CSR.
-;;; NOTE KLUDGE FIXME: because our backquote optimizes at read-time,
-;;; these assertions, like the ones above, are fragile.  Likewise, it
-;;; is very possible that at some point READABLY printing backquote
-;;; expressions will have to change to printing the low-level conses,
-;;; since the magical symbols are accessible though (car '`(,foo)) and
-;;; friends.  HATE HATE HATE.  -- CSR, 2004-06-10
+;;; and fixed a little more by DPK.
 (with-test (:name :pprint-more-backquote-brokeness)
   (flet ((try (input expect)
            (assert (equalp (read-from-string expect) input))

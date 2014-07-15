@@ -9,7 +9,7 @@
 
 (in-package "SB!IMPL")
 
-(declaim (special *read-suppress* *bq-vector-flag*))
+(declaim (special *read-suppress*))
 
 ;;; FIXME: Is it standard to ignore numeric args instead of raising errors?
 (defun ignore-numarg (sub-char numarg)
@@ -21,11 +21,10 @@
 (defun sharp-left-paren (stream ignore length)
   (declare (ignore ignore))
   (let* ((list (read-list stream nil))
-         (list-length (handler-case (length list)
-                        (type-error ()
-                          (simple-reader-error stream
-                                               "Improper list in #(): ~S."
-                                               list)))))
+         (list-length
+          (handler-case (length list)
+            (type-error ()
+              (simple-reader-error stream "Improper list in #(): ~S." list)))))
     (declare (list list)
              (fixnum list-length))
     (cond (*read-suppress* nil)
@@ -34,19 +33,15 @@
             stream
             "Vector longer than the specified length: #~S~S."
             length list))
-          ((zerop *backquote-count*)
-           (if length
-               (fill (replace (make-array length) list)
-                     (car (last list))
-                     :start list-length)
-               (coerce list 'vector)))
+          (length
+           ;; the syntax `#n(foo ,@bar) is not well-defined. [See lp#1096043.]
+           ;; We take it to mean that the vector as read should be padded to
+           ;; length 'n'. It could be argued that 'n' is the length after
+           ;; expansion, but that's not easy, not to mention unportable.
+           (fill (replace (make-array length) list)
+                 (car (last list)) :start list-length))
           (t
-           (cons *bq-vector-flag*
-                 (if length
-                     (append list
-                             (make-list (- length list-length)
-                                        :initial-element (car (last list))))
-                     list))))))
+           (coerce list 'vector)))))
 
 (defun sharp-star (stream ignore numarg)
   (declare (ignore ignore))
@@ -97,10 +92,10 @@
     (simple-reader-error stream "No dimensions argument to #A."))
   (collect ((dims))
     (let* ((*bq-error*
-            (if (zerop *backquote-count*)
+            (if (zerop *backquote-depth*)
                 *bq-error*
                 "Comma inside a backquoted array (not a list or general vector.)"))
-           (*backquote-count* 0)
+           (*backquote-depth* 0)
            (contents (read stream t nil t))
            (seq contents))
       (dotimes (axis dimensions
@@ -128,11 +123,11 @@
     (read stream t nil t)
     (return-from sharp-S nil))
   (let* ((*bq-error*
-          (if (zerop *backquote-count*)
+          (if (zerop *backquote-depth*)
               *bq-error*
               "Comma inside backquoted structure (not a list or general vector.)"))
          (body (if (char= (read-char stream t) #\( )
-                  (let ((*backquote-count* 0))
+                  (let ((*backquote-depth* 0))
                     (read-list stream nil))
                   (simple-reader-error stream "non-list following #S"))))
     (unless (listp body)
@@ -471,7 +466,7 @@
 
 (defun sharp-dot (stream sub-char numarg)
   (ignore-numarg sub-char numarg)
-  (let ((*backquote-count* 0))
+  (let ((*backquote-depth* 0))
     (let ((expr (read stream t nil t)))
       (unless *read-suppress*
         (unless *read-eval*

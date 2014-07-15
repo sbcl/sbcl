@@ -1723,14 +1723,14 @@
                         `(list* ,@variants ',tail)
                         `(list ,@variants)))))))))
 
-(deftransform sb!impl::backq-list ((&rest elts))
+(deftransform sb!impl::|List| ((&rest elts))
   (transform-backq-list-or-list* 'list elts))
 
-(deftransform sb!impl::backq-list* ((&rest elts))
+(deftransform sb!impl::|List*| ((&rest elts))
   (transform-backq-list-or-list* 'list* elts))
 
 ;; Merge adjacent constant values
-(deftransform sb!impl::backq-append ((&rest elts))
+(deftransform sb!impl::|Append| ((&rest elts))
   (let ((gensyms (make-gensym-list (length elts)))
         (acc nil)
         (ignored '())
@@ -1757,12 +1757,3 @@
       `(lambda ,gensyms
          (declare (ignore ,@ignored))
          (append ,@arguments)))))
-
-;; Nothing special for nconc
-(define-source-transform sb!impl::backq-nconc (&rest elts)
-  `(nconc ,@elts))
-
-;; cons and vector are handled with regular constant folding...
-;; but we still want to convert backq-cons into cl:cons.
-(deftransform sb!impl::backq-cons ((x y))
-  `(cons x y))

@@ -1093,6 +1093,7 @@ possibly temporarily, because it might be used internally."
                "AWHEN" "ACOND" "IT"
                "BINDING*"
                "!DEF-BOOLEAN-ATTRIBUTE"
+               "QUASIQUOTE"
                "WITH-REBOUND-IO-SYNTAX"
                "WITH-SANE-IO-SYNTAX"
                "WITH-PROGRESSIVE-TIMEOUT"
@@ -1246,10 +1247,6 @@ possibly temporarily, because it might be used internally."
                "INTERN*"
                "WITH-FAST-READ-BYTE"
                "PREPARE-FOR-FAST-READ-CHAR"
-
-               ;; reflection of our backquote implementation that the
-               ;; pprinter needs
-               "*BACKQ-TOKENS*"
 
                ;; hackery to help set up for cold init
                "!BEGIN-COLLECTING-COLD-INIT-FORMS"
@@ -2407,6 +2404,7 @@ package is deprecated in favour of SB-MOP."
       :name "SB!PRETTY"
       :doc "private: implementation of pretty-printing"
       :use ("CL" "SB!EXT" "SB!INT" "SB!KERNEL")
+      :import-from (("SB!IMPL" "COMMA" "COMMA-KIND" "COMMA-EXPR"))
       :export ("OUTPUT-PRETTY-OBJECT"
                "PRETTY-STREAM" "PRETTY-STREAM-P"
                "PPRINT-DISPATCH-TABLE"

@@ -1,5 +1,12 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 changes relative to sbcl-1.2.1:
+  * incompatible change: the #\` ("backquote") reader macro was reimplemented
+    to support robust pretty-printing. Reading a form involving #\` produces
+    an invocation of the QUASIQUOTE ordinary macro which may contain subforms
+    that are not lists. Code that unportably attempts operations on
+    un-evaluated forms resulting therefrom, e.g.
+      (SUBST a b (read-from-string "`(x (,y))"))
+    might generate incorrect results and/or errors.
   * enhancement: support for GNU/kFreeBSD x86.
   * enhancement: ATOMIC-INCF and ATOMIC-DECF can operate on (CAR x), (CDR x)
     and DEFGLOBAL variables of type fixnum.

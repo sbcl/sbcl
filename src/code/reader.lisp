@@ -804,6 +804,15 @@ standard Lisp readtable when NIL."
                  (rplacd listtail
                              ;; Return list containing last thing.
                          (car (read-after-dot stream nextchar)))
+                 ;; Check for improper ". ,@" or ". ,." now rather than
+                 ;; in the #\` reader. The resulting QUASIQUOTE macro might
+                 ;; never be exapanded, but nonetheless could be erroneous.
+                 (when (and (plusp *backquote-depth*) (not *read-suppress*))
+                   (let ((lastcdr (cdr (last listtail))))
+                     (when (and (comma-p lastcdr) (comma-splicing-p lastcdr))
+                       (simple-reader-error
+                        stream "~S contains a splicing comma after a dot"
+                        (cdr thelist)))))
                  (return (cdr thelist)))
                     ;; Put back NEXTCHAR so that we can read it normally.
                 (t (unread-char nextchar stream)))))

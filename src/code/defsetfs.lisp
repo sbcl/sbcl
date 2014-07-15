@@ -138,15 +138,6 @@
 (in-package "SB!KERNEL")
 (defsetf code-header-ref code-header-set)
 
-(in-package "SB!IMPL")
-
-;; A test of the ability of the cross-compiler to dump a function
-;; that references as constant a tree containing a COMMA struct.
-;; Does not really belong here, but ensures that stays working.
-;; It is called by !backq-cold-init.
-(defun !a-random-comma-object-do-not-use ()
-  '(foo . #.(unquote '*print-case* 4)))
-
 ;;; from x86-vm.lisp
 (in-package "SB!VM")
 (defsetf context-register %set-context-register)
