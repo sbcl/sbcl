@@ -6,7 +6,7 @@ changes relative to sbcl-1.2.1:
   * enhancement: arithmetic constant reduction is now performed on defconstant
     constants too. (lp#1337069).
   * bug fix: certain ftype proclamations containing &optional t &rest t no
-    longer cause subsequent definitions to signal bogs style-warnings.
+    longer cause subsequent definitions to signal bogus style-warnings.
   * bug fix: #\Bell and #\Bel now read to different characters. (lp#1319452).
   * bug fix: CAS SYMBOL-VALUE on locally special variables didn't work.
     (lp#1098355)
