@@ -121,7 +121,7 @@
 ;;; for either signed or unsigned integers. There's no range checking
 ;;; -- if you don't specify enough bytes for the number to fit, this
 ;;; function cheerfully outputs the low bytes.
-(defun dump-integer-as-n-bytes  (num bytes fasl-output)
+(defun dump-integer-as-n-bytes (num bytes fasl-output)
   (declare (integer num) (type index bytes))
   (declare (type fasl-output fasl-output))
   (do ((n num (ash n -8))
@@ -825,14 +825,19 @@
                (dump-integer-as-n-bytes
                 (ecase sb!c:*backend-byte-order*
                   (:little-endian i)
-                  (:big-endian (octet-swap i bits)))
+                  (:big-endian (octet-swap i bits))) ; signed or unsigned OK
                 bytes file))))
     (let ((et (!specialized-array-element-type vector)))
       (cond
         ((listp et)
          (destructuring-bind (type-id bits) et
            (dump-unsigned-vector
-            (ecase type-id ; could easily extend this to signed-byte
+            (ecase type-id
+              (signed-byte
+               (ecase bits
+                 (8  sb!vm:simple-array-signed-byte-8-widetag)
+                 (16 sb!vm:simple-array-signed-byte-16-widetag)
+                 (32 sb!vm:simple-array-signed-byte-32-widetag)))
               (unsigned-byte
                (ecase bits
                  (8  sb!vm:simple-array-unsigned-byte-8-widetag)

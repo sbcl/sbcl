@@ -186,32 +186,57 @@ one-past-the-end"
          ;; Create the lookup table.
          (sorted-lookup-table
           (reduce #'append sorted-pairs :from-end t :initial-value nil)))
-    `(progn
-       ; Can't inline it with a non-null lexical environment anyway.
+    (flet ((pick-type (vector &optional missing-points-p)
+             (if missing-points-p
+                 (let ((max (reduce #'max (remove nil vector))))
+                   (cond ((<= max #x7F) '(signed-byte 8))
+                         ((<= max #x7FFF) '(signed-byte 16))
+                         (t '(signed-byte 32))))
+                 (let ((max (reduce #'max vector)))
+                   (cond ((<= max #xFF) '(unsigned-byte 8))
+                         ((<= max #xFFFF) '(unsigned-byte 16))
+                         (t '(unsigned-byte 32)))))))
+      `(progn
+         ;; We *could* inline this, but it's not obviously the right thing,
+         ;; because each use of the inlined function in a different file
+         ;; would be forced to dump the large-ish array. To do things like
+         ;; this, you generally want a load-time ref to a global constant.
        ;(declaim (inline ,byte-char-name))
-       (let ((byte-to-code-table
-              ,(make-array 256 :element-type t #+nil 'char-code
-                           :initial-contents (loop for byte below 256
-                                                collect
-                                                (let ((exception (cdr (assoc byte exceptions))))
-                                                  (if exception
-                                                      (car exception)
-                                                      byte)))))
-             (code-to-byte-table
-              ,(make-array (length sorted-lookup-table)
-                           :initial-contents sorted-lookup-table)))
          (defun ,byte-char-name (byte)
            (declare (optimize speed (safety 0))
                     (type (unsigned-byte 8) byte))
-           (aref byte-to-code-table byte))
+           ,(let ((byte-to-code
+                   (loop for byte below 256
+                      collect (let ((exception (cdr (assoc byte exceptions))))
+                                (if exception
+                                    (car exception)
+                                    byte)))))
+              (if (position nil byte-to-code)
+                  ;; There are bytes with no translation. Represent "missing"
+                  ;; as -1 when stored, convert to NIL when accessed.
+                  ;; We could use a single otherwise-unused point to mean NIL,
+                  ;; but it would be confusing if in one table #xFFFF represents
+                  ;; NIL and another #xF00D represents NIL.
+                  `(let ((code (aref ,(!make-specialized-array
+                                       256 (pick-type byte-to-code t)
+                                       (substitute -1 nil byte-to-code))
+                                     byte)))
+                     (if (>= code 0) code))
+                  ;; Every byte has a translation
+                  `(aref ,(!make-specialized-array
+                           256 (pick-type byte-to-code) byte-to-code)
+                         byte))))
          (defun ,code-byte-name (code)
            (declare (optimize speed (safety 0))
                     (type char-code code))
            (if (< code ,lowest-non-equivalent-code)
                code
-               ;; We could toss in some TRULY-THEs if we really needed to
-               ;; make this faster...
-               (loop with low = 0
+               (loop with code-to-byte-table =
+                    ,(!make-specialized-array
+                      (length sorted-lookup-table)
+                      (pick-type sorted-lookup-table)
+                      sorted-lookup-table)
+                  with low = 0
                   with high = (- (length code-to-byte-table) 2)
                   while (< low high)
                   do (let ((mid (logandc2 (truncate (+ low high 2) 2) 1)))
