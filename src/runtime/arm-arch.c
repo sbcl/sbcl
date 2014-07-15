@@ -316,9 +316,13 @@ sigtrap_handler(int signal, siginfo_t *siginfo, os_context_t *context)
              trap_instruction);
     }
 
-    arch_clear_pseudo_atomic_interrupted(context);
-    arch_skip_instruction(context);
-    interrupt_handle_pending(context);
+    if (trap_instruction == 0xe7f001f0) {
+        handle_trap(context, code);
+    } else {
+        arch_clear_pseudo_atomic_interrupted(context);
+        arch_skip_instruction(context);
+        interrupt_handle_pending(context);
+    }
 }
 
 void arch_install_interrupt_handlers()
