@@ -363,6 +363,10 @@
                 #!+sb-doc
                 ,doc
                 (if numbers
+                    ;; FIXME: using NTH here produces
+                    ;; "caught STYLE-WARNING:
+                    ;;  The binding of RESULT is not a NUMBER"
+                    ;; Same warning occurs in -, /, =, /=, etc
                     (do ((result (nth 0 numbers) (,op result (nth i numbers)))
                          (i 1 (1+ i)))
                         ((>= i (length numbers))
