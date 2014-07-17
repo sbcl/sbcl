@@ -58,6 +58,7 @@
             (coerce base-seq type))
            ((cons (eql simple-array) (cons * (cons (eql 1) null)))
             (destructuring-bind (eltype one) (rest type)
+              (declare (ignore one))
               (when (entirely eltype)
                 (coerce base-seq type))))
            ((cons (eql vector))
@@ -360,8 +361,8 @@
 
 ;;; As pointed out by Raymond Toy on #lisp IRC, MERGE had some issues
 ;;; with user-defined types until sbcl-0.7.8.11
+(deftype list-typeoid () 'list)
 (with-test (:name :merge-user-types)
- (deftype list-typeoid () 'list)
  (assert (equal '(1 2 3 4) (merge 'list-typeoid (list 1 3) (list 2 4) '<)))
 ;;; and also with types that weren't precicely LIST
  (assert (equal '(1 2 3 4) (merge 'cons (list 1 3) (list 2 4) '<))))
@@ -1159,10 +1160,10 @@
 
 ;;; Both :TEST and :TEST-NOT provided
 (with-test (:name :test-and-test-not-to-adjoin)
-  (let* ((wc 0)
+  (let* ((wc 0) ; warning counter
          (fun
           (handler-bind (((and warning (not style-warning))
-                          (lambda (w) (incf wc))))
+                          (lambda (w) (declare (ignore w)) (incf wc))))
             (compile nil `(lambda (item test test-not) (adjoin item '(1 2 3 :foo)
                                                                :test test
                                                                :test-not test-not))))))
@@ -1183,14 +1184,15 @@
   (dolist (type '(%string %simple-string string-3 simple-string-3))
     (assert (string= "foo" (coerce '(#\f #\o #\o) type)))
     (assert (string= "foo" (map type 'identity #(#\f #\o #\o))))
-    (assert (string= "foo" (merge type '(#\o) '(#\f #\o) 'char<)))
+    (assert (string= "foo" (merge type (copy-seq '(#\o)) (copy-seq '(#\f #\o))
+                                  'char<)))
     (assert (string= "foo" (concatenate type '(#\f) "oo")))
     (assert (string= "ooo" (make-sequence type 3 :initial-element #\o)))))
 (with-test (:name :user-defined-string-types-map-etc-error)
   (dolist (type '(string-3 simple-string-3))
     (assert-error (coerce '(#\q #\u #\u #\x) type))
     (assert-error (map type 'identity #(#\q #\u #\u #\x)))
-    (assert-error (merge type '(#\q #\x) "uu" 'char<))
+    (assert-error (merge type (copy-seq '(#\q #\x)) (copy-seq "uu") 'char<))
     (assert-error (concatenate type "qu" '(#\u #\x)))
     (assert-error (make-sequence type 4 :initial-element #\u))))
 
