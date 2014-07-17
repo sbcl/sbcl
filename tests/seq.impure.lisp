@@ -1285,4 +1285,12 @@
 (with-test (:name (:bit-position :random-test))
   (random-test-bit-position 10000))
 
+;; REVERSE and NREVERSE should assert that the returned value
+;; from a generic sequence operation is of type SEQUENCE.
+(defclass bogus-reversal-seq (sequence standard-object) ())
+(defmethod sequence:reverse ((self bogus-reversal-seq))
+  #2a((x y) (1 2)))
+(with-test (:name :generic-sequence-reverse)
+  (assert-error (reverse (make-instance 'bogus-reversal-seq))))
+
 ;;; success

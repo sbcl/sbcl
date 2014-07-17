@@ -775,7 +775,14 @@ many elements are copied."
   (seq-dispatch-checking sequence
     (list-reverse* sequence)
     (vector-reverse* sequence)
-    (the sequence (sb!sequence:reverse sequence))))
+    ;; The type deriver says that LIST => LIST and VECTOR => VECTOR
+    ;; but does not claim to know anything about extended-sequences.
+    ;; So this could theoretically return any subtype of SEQUENCE
+    ;; given an EXTENDED-SEQUENCE as input. But fndb says this returns
+    ;; a CONSED-SEQUENCE, which precludes non-simple vectors.
+    ;; But a CLOS sequence can apparently decide to return a LIST when
+    ;; reversed. [Is that too weird? Make this EXTENDED-SEQUENCE maybe?]
+    (the consed-sequence (values (sb!sequence:reverse sequence)))))
 
 ;;; internal frobs
 
@@ -822,7 +829,10 @@ many elements are copied."
   (seq-dispatch-checking sequence
     (list-nreverse* sequence)
     (vector-nreverse* sequence)
-    (the sequence (sb!sequence:nreverse sequence))))
+    ;; The type deriver for this is 'result-type-first-arg',
+    ;; meaning it should return definitely an EXTENDED-SEQUENCE
+    ;; and not a list or vector.
+    (the extended-sequence (values (sb!sequence:nreverse sequence)))))
 
 ;;;; CONCATENATE
 
