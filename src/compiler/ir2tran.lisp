@@ -302,7 +302,7 @@
     (find-in-physenv what this-env)))
 
 (defoptimizer (%allocate-closures ltn-annotate) ((leaves) node ltn-policy)
-  ltn-policy ; a hack to effectively (DECLARE (IGNORE LTN-POLICY))
+  (declare (ignore ltn-policy))
   (when (lvar-dynamic-extent leaves)
     (let ((info (make-ir2-lvar *backend-t-primitive-type*)))
       (setf (ir2-lvar-kind info) :delayed)
@@ -779,6 +779,7 @@
 ;;; case of IR2-CONVERT-TEMPLATE is that there can be codegen-info
 ;;; arguments.
 (defoptimizer (%%primitive ir2-convert) ((template info &rest args) call block)
+  (declare (ignore args))
   (let* ((template (lvar-value template))
          (info (lvar-value info))
          (lvar (node-lvar call))
@@ -799,6 +800,7 @@
   (values))
 
 (defoptimizer (%%primitive derive-type) ((template info &rest args))
+  (declare (ignore info args))
   (let ((type (template-type (lvar-value template))))
     (if (fun-type-p type)
         (fun-type-returns type)
@@ -1559,6 +1561,7 @@
       (vop sb!vm::bind/let node block (lvar-tn node block value) name))))
 
 (defoptimizer (%special-unbind ir2-convert) ((var) node block)
+  (declare (ignore var))
   (vop unbind node block))
 
 ;;; ### It's not clear that this really belongs in this file, or
@@ -1717,6 +1720,7 @@
   (check-catch-tag-type tag)
   (emit-nlx-start node block (lvar-value info-lvar) tag))
 (defoptimizer (%unwind-protect ir2-convert) ((info-lvar cleanup) node block)
+  (declare (ignore cleanup))
   (emit-nlx-start node block (lvar-value info-lvar) nil))
 
 ;;; Emit the entry code for a non-local exit. We receive values and
@@ -1850,6 +1854,7 @@
 
 ;; just a fancy identity
 (defoptimizer (%typep-wrapper ir2-convert) ((value variable type) node block)
+  (declare (ignore variable type))
   (let* ((lvar (node-lvar node))
          (results (lvar-result-tns lvar (list (primitive-type-or-lose t)))))
     (emit-move node block (lvar-tn node block value) (first results))

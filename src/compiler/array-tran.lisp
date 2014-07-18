@@ -226,7 +226,7 @@
                 t
                 (give-up))))))))
 
-(defoptimizer (aref derive-type) ((array &rest indices) node)
+(defoptimizer (aref derive-type) ((array &rest indices))
   (assert-array-rank array (length indices))
   (derive-aref-type array))
 
@@ -236,6 +236,7 @@
 
 (macrolet ((define (name)
              `(defoptimizer (,name derive-type) ((array index))
+                (declare (ignore index))
                 (derive-aref-type array))))
   (define hairy-data-vector-ref)
   (define hairy-data-vector-ref/check-bounds)
@@ -243,10 +244,12 @@
 
 #!+(or x86 x86-64)
 (defoptimizer (data-vector-ref-with-offset derive-type) ((array index offset))
+  (declare (ignore index offset))
   (derive-aref-type array))
 
 (macrolet ((define (name)
              `(defoptimizer (,name derive-type) ((array index new-value))
+                (declare (ignore index))
                 (assert-new-value-type new-value array))))
   (define hairy-data-vector-set)
   (define hairy-data-vector-set/check-bounds)
@@ -254,6 +257,7 @@
 
 #!+(or x86 x86-64)
 (defoptimizer (data-vector-set-with-offset derive-type) ((array index offset new-value))
+  (declare (ignore index offset))
   (assert-new-value-type new-value array))
 
 ;;; Figure out the type of the data vector if we know the argument
@@ -266,8 +270,10 @@
                         (array-type-specialized-element-type atype))
                       (*))))))
 (defoptimizer (%with-array-data derive-type) ((array start end))
+  (declare (ignore start end))
   (derive-%with-array-data/mumble-type array))
 (defoptimizer (%with-array-data/fp derive-type) ((array start end))
+  (declare (ignore start end))
   (derive-%with-array-data/mumble-type array))
 
 (defoptimizer (array-row-major-index derive-type) ((array &rest indices))
@@ -275,9 +281,11 @@
   *universal-type*)
 
 (defoptimizer (row-major-aref derive-type) ((array index))
+  (declare (ignore index))
   (derive-aref-type array))
 
 (defoptimizer (%set-row-major-aref derive-type) ((array index new-value))
+  (declare (ignore index))
   (assert-new-value-type new-value array))
 
 (defun derive-make-array-type (dims element-type adjustable

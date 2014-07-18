@@ -272,9 +272,9 @@
 (defun parse-deftransform (lambda-list node-var error-form)
   (multiple-value-bind (req opt restp rest keyp keys allowp)
       (parse-lambda-list lambda-list)
-    (let* ((all-dummies (make-gensym-list 3))
-           (dummies all-dummies)
-           (tail (pop dummies))
+    (let* ((tail (make-symbol "ARGS"))
+           (dummies (make-gensym-list 2))
+           (all-dummies (cons tail dummies))
            (keys (mapcar (lambda (spec)
                            (multiple-value-bind (key var)
                                (if (atom spec)
@@ -291,8 +291,7 @@
         ;; The way this code checks for mandatory args is to verify that
         ;; the last positional arg is not null (it should be an LVAR).
         ;; But somebody could pedantically declare IGNORE on the last arg
-        ;; (though we typically make them IGNORABLE), so bind a dummy for
-        ;; it and then bind from the dummy.
+        ;; so bind a dummy for it and then bind from the dummy.
         (mapl (lambda (args)
                 (cond ((cdr args)
                        (binds `(,(car args) (pop ,tail))))
@@ -319,16 +318,16 @@
                       ,error-form))))
         (when restp
           (binds `(,rest ,tail)))
-        ;; Return list of bindings and list of ignorables. Actually the caller
-        ;; should make *all* bindings ignorable but might need to know the
-        ;; symbols from the lambda-list per se.
+        ;; Return list of bindings, the list of user-specified symbols,
+        ;; and the list of gensyms to be declared ignorable.
         (values (append (binds)
                         (mapcar (lambda (k)
                                   `(,(car k)
                                      (find-keyword-lvar ,tail ',(cdr k))))
                                 keys))
                 (append (nset-difference (mapcar #'car (binds)) all-dummies)
-                        (mapcar #'car keys)))))))
+                        (mapcar #'car keys))
+                (intersection (mapcar #'car (binds)) (cdr all-dummies)))))))
 ) ; EVAL-WHEN
 
 ;;;; DEFTRANSFORM
@@ -499,32 +498,45 @@
 ;;; the rest of the optimizer function's lambda-list. LTN-ANNOTATE
 ;;; methods are passed an additional POLICY argument, and IR2-CONVERT
 ;;; methods are passed an additional IR2-BLOCK argument.
-(defmacro defoptimizer (what (lambda-list &optional (n-node (sb!xc:gensym))
-                                          &rest vars)
-                             &body body)
-  (flet ((function-name (name)
-           (etypecase name
-             (symbol name)
-             ((cons (eql setf) (cons symbol null))
-              (symbolicate (car name) "-" (cadr name))))))
-   (let ((name (if (symbolp what)
-                   what
-                   (symbolicate (function-name (first what))
-                                "-" (second what) "-OPTIMIZER"))))
-
-     (let ((binds (parse-deftransform lambda-list n-node
-                                      `(return-from ,name nil))))
-       `(progn
-          (defun ,name (,n-node ,@vars)
-            (declare (ignorable ,@vars))
-            (let* ,binds
-              (declare (ignorable ,@(mapcar #'car binds)))
-              ,@body))
-          ,@(when (consp what)
-              `((setf (,(let ((*package* (symbol-package 'fun-info)))
+(defmacro defoptimizer (what (lambda-list
+                              &optional (node (sb!xc:gensym) node-p)
+                              &rest vars)
+                        &body body)
+  (binding* ((name
+              (flet ((function-name (name)
+                       (etypecase name
+                         (symbol name)
+                         ((cons (eql setf) (cons symbol null))
+                          (symbolicate (car name) "-" (cadr name))))))
+                (if (symbolp what)
+                    what
+                    (symbolicate (function-name (first what))
+                                 "-" (second what) "-OPTIMIZER"))))
+             ((forms decls) (parse-body body :doc-string-allowed nil))
+             ((var-decls more-decls) (extract-var-decls decls vars))
+             ;; In case the BODY declares IGNORE of the formal NODE var,
+             ;; we rebind it from N-NODE and never reference it from BINDS.
+             (n-node (make-symbol "NODE"))
+             ((binds lambda-vars gensyms)
+              (parse-deftransform lambda-list n-node
+                                  `(return-from ,name nil))))
+    (declare (ignore lambda-vars))
+    `(progn
+       ;; We can't stuff the BINDS as &AUX vars into the lambda list
+       ;; because there can be a RETURN-FROM in there.
+       (defun ,name (,n-node ,@vars)
+         ,@(if var-decls (list var-decls))
+         (let* (,@binds ,@(if node-p `((,node ,n-node))))
+           ;; Syntax requires naming NODE even if undesired if VARS
+           ;; are present, so in that case make NODE ignorable.
+           (declare (ignorable ,@(if (and vars node-p) `(,node))
+                               ,@gensyms))
+           ,@more-decls ,@forms))
+       ,@(when (consp what)
+           `((setf (,(let ((*package* (symbol-package 'fun-info)))
                           (symbolicate "FUN-INFO-" (second what)))
                        (fun-info-or-lose ',(first what)))
-                      #',name))))))))
+                      #',name))))))
 
 ;;;; IR groveling macros
 

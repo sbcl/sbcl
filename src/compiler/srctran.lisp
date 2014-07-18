@@ -134,7 +134,7 @@
     (1 `(cons ,(first args) nil))
     (t (values nil t))))
 
-(defoptimizer (list derive-type) ((&rest args) node)
+(defoptimizer (list derive-type) ((&rest args))
   (if args
       (specifier-type 'cons)
       (specifier-type 'null)))
@@ -2476,6 +2476,7 @@
 
 #-sb-xc-host ; (See CROSS-FLOAT-INFINITY-KLUDGE.)
 (defoptimizer (random derive-type) ((bound &optional state))
+  (declare (ignore state))
   (one-arg-derive-type bound #'random-derive-type-aux nil))
 
 ;;;; miscellaneous derive-type methods
@@ -2647,6 +2648,7 @@
       `(%deposit-field ,newbyte ,size ,pos ,int))))
 
 (defoptimizer (%ldb derive-type) ((size posn num))
+  (declare (ignore posn num))
   (let ((size (lvar-type size)))
     (if (and (numeric-type-p size)
              (csubtypep size (specifier-type 'integer)))
@@ -2657,6 +2659,7 @@
         *universal-type*)))
 
 (defoptimizer (%mask-field derive-type) ((size posn num))
+  (declare (ignore num))
   (let ((size (lvar-type size))
         (posn (lvar-type posn)))
     (if (and (numeric-type-p size)
@@ -2703,9 +2706,11 @@
                  `(unsigned-byte* ,raw-bit-count)))))))))
 
 (defoptimizer (%dpb derive-type) ((newbyte size posn int))
+  (declare (ignore newbyte))
   (%deposit-field-derive-type-aux size posn int))
 
 (defoptimizer (%deposit-field derive-type) ((newbyte size posn int))
+  (declare (ignore newbyte))
   (%deposit-field-derive-type-aux size posn int))
 
 (deftransform %ldb ((size posn int)
@@ -2764,6 +2769,7 @@
              (logand int (lognot mask)))))
 
 (defoptimizer (mask-signed-field derive-type) ((size x))
+  (declare (ignore x))
   (let ((size (lvar-type size)))
     (if (numeric-type-p size)
         (let ((size-high (numeric-type-high size)))
@@ -3155,6 +3161,7 @@
               )))))))
 
 (defoptimizer (mask-signed-field optimizer) ((width x) node)
+  (declare (ignore width))
   (let ((result-type (single-value-type (node-derived-type node))))
     (multiple-value-bind (low high)
         (integer-type-numeric-bounds result-type)
@@ -4503,6 +4510,7 @@
                  :format-arguments (list nargs fun string max))))))))
 
 (defoptimizer (format optimizer) ((dest control &rest args))
+  (declare (ignore dest))
   (when (constant-lvar-p control)
     (let ((x (lvar-value control)))
       (when (stringp x)
@@ -4756,6 +4764,7 @@
                 *universal-type*)))))))
 
 (defoptimizer (compile derive-type) ((nameoid function))
+  (declare (ignore function))
   (when (csubtypep (lvar-type nameoid)
                    (specifier-type 'null))
     (values-specifier-type '(values function boolean boolean))))

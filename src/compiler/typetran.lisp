@@ -134,6 +134,7 @@
 
 (defoptimizer (%typep-wrapper constraint-propagate-if)
     ((test-value variable type) node gen)
+  (declare (ignore test-value gen))
   (aver (constant-lvar-p type))
   (let ((type (lvar-value type)))
     (values variable (if (ctype-p type)

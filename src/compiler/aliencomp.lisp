@@ -413,6 +413,7 @@
         '(error "This should be eliminated as dead code."))))
 
 (defoptimizer (%local-alien-addr derive-type) ((info var))
+  (declare (ignore var))
   (if (constant-lvar-p info)
       (let* ((info (lvar-value info))
              (alien-type (local-alien-info-type info)))
@@ -444,6 +445,7 @@
 ;;;; %CAST
 
 (defoptimizer (%cast derive-type) ((alien type))
+  (declare (ignore alien))
   (or (when (constant-lvar-p type)
         (let ((alien-type (lvar-value type)))
           (when (alien-type-p alien-type)
@@ -688,6 +690,7 @@
 
 (defoptimizer (%alien-funcall ltn-annotate)
               ((function type &rest args) node ltn-policy)
+  (declare (ignore type ltn-policy))
   (setf (basic-combination-info node) :funny)
   (setf (node-tail-p node) nil)
   (annotate-ordinary-lvar function)

@@ -969,16 +969,14 @@
 
 (defoptimizer (%compile-time-type-error ir2-convert)
     ((objects atype dtype context) node block)
+  (declare (ignore objects))
   (let ((*compiler-error-context* node))
     (setf (node-source-path node)
           (cdr (node-source-path node)))
-    (destructuring-bind (values atype dtype context)
-        (basic-combination-args node)
-      (declare (ignore values))
-      (let ((atype (lvar-value atype))
-            (dtype (lvar-value dtype))
-            (detail (cdr (lvar-value context))))
-        (unless (eq atype nil)
+    (let ((atype (lvar-value atype))
+          (dtype (lvar-value dtype))
+          (detail (cdr (lvar-value context))))
+      (unless (eq atype nil)
           (if (singleton-p detail)
               (let ((detail (first detail)))
                 (if (constantp detail)
@@ -998,5 +996,5 @@
                     "~@<Derived type of ~2I~_~{~S~^~#[~; and ~:;, ~]~} ~
                      ~I~_in ~2I~_~S ~I~_is ~2I~_~S, ~I~_conflicting with ~
                      their asserted type ~2I~_~S.~@:>"
-                    :format-arguments (list (rest detail) (first detail) dtype atype))))))
+                    :format-arguments (list (rest detail) (first detail) dtype atype)))))
     (ir2-convert-full-call node block)))

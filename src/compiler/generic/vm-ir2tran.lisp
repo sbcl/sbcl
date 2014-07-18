@@ -14,7 +14,9 @@
            nil)
 
 #!+stack-allocatable-fixed-objects
-(defoptimizer (%make-structure-instance stack-allocate-result) ((defstruct-description &rest args) node dx)
+(defoptimizer (%make-structure-instance stack-allocate-result)
+    ((defstruct-description &rest args) node dx)
+  (declare (ignore args dx))
   (aver (constant-lvar-p defstruct-description))
   ;; A structure instance can be stack-allocated if it has no raw
   ;; slots, or if we're on a target with a conservatively-scavenged
@@ -168,6 +170,7 @@
 
 (defoptimizer ir2-convert-structure-allocation
     ((dd slot-specs &rest args) node block name words type lowtag inits)
+  (declare (ignore inits))
   (let* ((lvar (node-lvar node))
          (locs (lvar-result-tns lvar (list *backend-t-primitive-type*)))
          (result (first locs)))
@@ -247,6 +250,7 @@
 (progn
   (defoptimizer (allocate-vector stack-allocate-result)
       ((type length words) node dx)
+    (declare (ignorable type) (ignore length))
     (and
      ;; Can't put unboxed data on the stack unless we scavenge it
      ;; conservatively.
@@ -267,6 +271,7 @@
                                                            sb!vm:vector-data-offset))))))))
 
   (defoptimizer (allocate-vector ltn-annotate) ((type length words) call ltn-policy)
+    (declare (ignore type length words))
     (let ((args (basic-combination-args call))
           (template (template-or-lose (if (awhen (node-lvar call)
                                             (lvar-dynamic-extent it))
@@ -288,16 +293,21 @@
 #!+stack-allocatable-lists
 (progn
   (defoptimizer (list stack-allocate-result) ((&rest args) node dx)
+    (declare (ignore dx))
     (not (null args)))
   (defoptimizer (list* stack-allocate-result) ((&rest args) node dx)
+    (declare (ignore dx))
     (not (null (rest args))))
   (defoptimizer (%listify-rest-args stack-allocate-result) ((&rest args) node dx)
+    (declare (ignore args dx))
     t))
 
 ;;; ...conses
 #!+stack-allocatable-fixed-objects
 (progn
   (defoptimizer (cons stack-allocate-result) ((&rest args) node dx)
+    (declare (ignore args dx))
     t)
   (defoptimizer (%make-complex stack-allocate-result) ((&rest args) node dx)
+    (declare (ignore args dx))
     t))

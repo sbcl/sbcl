@@ -289,6 +289,7 @@
   (def array-storage-vector))
 
 (defoptimizer (%data-vector-and-index derive-type) ((array index))
+  (declare (ignore index))
   (let ((spec (maybe-array-data-vector-type-specifier array)))
     (when spec
       (values-specifier-type `(values ,spec index)))))
