@@ -114,67 +114,9 @@
   |#
   )
 
-(eval-when (:compile-toplevel :load-toplevel :execute)
-  ;; KLUDGE: If the slots of TYPE-CLASS ever change, the slots here
-  ;; will have to be tweaked to match. -- WHN 19991021
-  (defparameter *type-class-fun-slots*
-    '((:simple-subtypep . type-class-simple-subtypep)
-      (:complex-subtypep-arg1 . type-class-complex-subtypep-arg1)
-      (:complex-subtypep-arg2 . type-class-complex-subtypep-arg2)
-      (:simple-union2 . type-class-simple-union2)
-      (:complex-union2 . type-class-complex-union2)
-      (:simple-intersection2 . type-class-simple-intersection2)
-      (:complex-intersection2 . type-class-complex-intersection2)
-      (:simple-= . type-class-simple-=)
-      (:complex-= . type-class-complex-=)
-      (:negate . type-class-negate)
-      (:unparse . type-class-unparse)
-      (:singleton-p . type-class-singleton-p))))
-
-(declaim (ftype (function (type-class) type-class) copy-type-class-coldly))
 (eval-when (#-sb-xc :compile-toplevel :load-toplevel :execute)
-;;; Copy TYPE-CLASS object X, using only operations which will work
-;;; early in cold load. (COPY-STRUCTURE won't work early in cold load,
-;;; because it needs RAW-INDEX and RAW-LENGTH information from
-;;; LAYOUT-INFO, and LAYOUT-INFO isn't initialized early in cold
-;;; load.)
-;;;
-;;; FIXME: It's nasty having to maintain this hand-written copy
-;;; function. And it seems intrinsically dain-bramaged to have
-;;; RAW-INDEX and RAW-LENGTH in LAYOUT-INFO instead of directly in
-;;; LAYOUT. We should fix this:
-;;;   * Move RAW-INDEX and RAW-LENGTH slots into LAYOUT itself.
-;;;   * Rewrite the various CHECK-LAYOUT-related functions so that
-;;;     they check RAW-INDEX and RAW-LENGTH too.
-;;;   * Remove this special hacked copy function, just use
-;;;     COPY-STRUCTURE instead.
-;;; (For even more improvement, it might be good to move the raw slots
-;;; into the same object as the ordinary slots, instead of having the
-;;; unfortunate extra level of indirection. But that'd probably
-;;; require a lot of work, including updating the garbage collector to
-;;; understand it. And it might even hurt overall performance, because
-;;; the positive effect of removing indirection could be cancelled by
-;;; the negative effect of imposing an unnecessary GC write barrier on
-;;; raw data which doesn't actually affect GC.)
-(defun copy-type-class-coldly (x)
-  ;; KLUDGE: If the slots of TYPE-CLASS ever change in a way not
-  ;; reflected in *TYPE-CLASS-FUN-SLOTS*, the slots here will
-  ;; have to be hand-tweaked to match. -- WHN 2001-03-19
-  (make-type-class :name (type-class-name x)
-                   . #.(mapcan (lambda (type-class-fun-slot)
-                                 (destructuring-bind (keyword . slot-accessor)
-                                     type-class-fun-slot
-                                   `(,keyword (,slot-accessor x))))
-                               *type-class-fun-slots*)))
-
-(defun class-fun-slot-or-lose (name)
-  (or (cdr (assoc name *type-class-fun-slots*))
-      (error "~S is not a defined type class method." name)))
-;;; FIXME: This seems to be called at runtime by cold init code.
-;;; Make sure that it's not being called at runtime anywhere but
-;;; one-time toplevel initialization code.
-
-) ; EVAL-WHEN
+  (defun !type-class-fun-slot (name)
+    (symbolicate "TYPE-CLASS-" name)))
 
 (defmacro !define-type-method ((class method &rest more-methods)
                                lambda-list &body body)
@@ -184,7 +126,7 @@
          ,@body)
        (!cold-init-forms
         ,@(mapcar (lambda (method)
-                    `(setf (,(class-fun-slot-or-lose method)
+                    `(setf (,(!type-class-fun-slot method)
                             (type-class-or-lose ',class))
                            #',name))
                   (cons method more-methods)))
@@ -193,7 +135,7 @@
 (defmacro !define-type-class (name &key inherits)
   `(!cold-init-forms
      ,(once-only ((n-class (if inherits
-                               `(copy-type-class-coldly (type-class-or-lose
+                               `(copy-structure (type-class-or-lose
                                                          ',inherits))
                                '(make-type-class))))
         `(progn
@@ -218,10 +160,10 @@
                                       (default '(values nil t))
                                       (complex-arg1 :foo complex-arg1-p))
   (declare (type keyword simple complex-arg1 complex-arg2))
-  (let ((simple (class-fun-slot-or-lose simple))
-        (cslot1 (class-fun-slot-or-lose
+  (let ((simple (!type-class-fun-slot simple))
+        (cslot1 (!type-class-fun-slot
                  (if complex-arg1-p complex-arg1 complex-arg2)))
-        (cslot2 (class-fun-slot-or-lose complex-arg2)))
+        (cslot2 (!type-class-fun-slot complex-arg2)))
     (once-only ((ntype1 type1)
                 (ntype2 type2))
       (once-only ((class1 `(type-class-info ,ntype1))
