@@ -1031,7 +1031,7 @@
                     (the index ,cumulative-offset)))
          (declare (type index ,cumulative-offset))))))
 
-(defun transform-%with-array-data/muble (array node check-fill-pointer)
+(defun transform-%with-array-data/mumble (array node check-fill-pointer)
   (let ((element-type (upgraded-element-type-specifier-or-give-up array))
         (type (lvar-type array))
         (check-bounds (policy node (plusp insert-array-bounds-checks))))
@@ -1071,14 +1071,14 @@
                                 :node node
                                 :policy (> speed space))
   "inline non-SIMPLE-vector-handling logic"
-  (transform-%with-array-data/muble array node nil))
+  (transform-%with-array-data/mumble array node nil))
 (deftransform %with-array-data/fp ((array start end)
                                 ((or vector simple-array) index (or index null) t)
                                 *
                                 :node node
                                 :policy (> speed space))
   "inline non-SIMPLE-vector-handling logic"
-  (transform-%with-array-data/muble array node t))
+  (transform-%with-array-data/mumble array node t))
 
 ;;;; array accessors
 
