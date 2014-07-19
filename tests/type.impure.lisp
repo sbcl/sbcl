@@ -244,6 +244,18 @@
 (assert-t-t (subtypep '(float 0.0) '(float -0.0)))
 (assert-t-t (subtypep '(float (0.0)) '(float (-0.0))))
 (assert-t-t (subtypep '(float (-0.0)) '(float (0.0))))
+
+(with-test (:name :member-type-and-numeric)
+  ;; (MEMBER 0s0 -s0) used to appear to parse correctly,
+  ;; but it didn't because MAKE-MEMBER-TYPE returned a union type
+  ;; (OR (MEMBER 0.0) (SINGLE-FLOAT 0.0 0.0)) which was further reduced
+  ;; to just the numeric type, being a supertype of the singleton.
+  ;; The parsing problem became evident when any other member was added in,
+  ;; because in that case the member type is not a subtype of the numeric.
+  (let* ((x (sb-kernel:specifier-type '(member 0s0 foo -0s0)))
+         (m (find-if #'sb-kernel:member-type-p (sb-kernel:union-type-types x))))
+    (assert (equal (sb-kernel:member-type-members m) '(foo)))))
+
 
 ;;;; Douglas Thomas Crosher rewrote the CMU CL type test system to
 ;;;; allow inline type tests for CONDITIONs and STANDARD-OBJECTs, and

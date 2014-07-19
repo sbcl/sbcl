@@ -398,21 +398,23 @@
   ;; canonicalize to (DOUBLE-FLOAT 0.0d0 0.0d0), because numeric
   ;; ranges are compared by arithmetic operators (while MEMBERship is
   ;; compared by EQL).  -- CSR, 2003-04-23
-  (let ((unpaired nil)
+  (let ((presence 0)
+        (unpaired nil)
         (union-types nil))
-    (do ((tail (cdr fp-zeroes) (cdr tail))
-         (zero (car fp-zeroes) (car tail)))
-        ((not zero))
-      (macrolet ((frob (c)
-                   `(let ((neg (neg-fp-zero zero)))
-                      (if (member neg tail)
-                          (push (ctype-of ,c) union-types)
-                          (push zero unpaired)))))
-        (etypecase zero
-          (single-float (frob 0.0f0))
-          (double-float (frob 0.0d0))
-          #!+long-float
-          (long-float (frob 0.0l0)))))
+    (dotimes (pass 2)
+      (dolist (z fp-zeroes)
+        (let ((sign (if (minusp (nth-value 2 (integer-decode-float z))) 1 0))
+              (pair-idx
+                (etypecase z
+                  (single-float 0)
+                  (double-float 2
+                  #!+long-float (long-float 4)))))
+          (if (= pass 0)
+              (setf (ldb (byte 1 (+ pair-idx sign)) presence) 1)
+              (if (eq (ldb (byte 2 pair-idx) presence) #b11)
+                  (when (= sign 0)
+                    (push (ctype-of z) union-types))
+                  (push z unpaired))))))
     ;; The actual member-type contains the XSET (with no FP zeroes),
     ;; and a list of unpaired zeroes.
     (let ((member-type (unless (and (xset-empty-p xset) (not unpaired))
@@ -421,8 +423,7 @@
              (make-union-type t (if member-type
                                     (cons member-type union-types)
                                     union-types)))
-            (member-type
-             member-type)
+            (member-type)
             (t
              *empty-type*)))))
 
