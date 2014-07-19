@@ -262,8 +262,8 @@
                   (position (array-type-specialized-element-type type) array-props
                             :key #'sb!vm:saetp-ctype :test #'type=)))
            (wild (type)
-             (make-array-type :element-type *wild-type*
-                              :dimensions (array-type-dimensions type)
+             (make-array-type (array-type-dimensions type)
+                              :element-type *wild-type*
                               :complexp (array-type-complexp type))))
       ;; Bucket the array types by <dimensions,complexp> where each bucket
       ;; tracks which SAETPs were seen.

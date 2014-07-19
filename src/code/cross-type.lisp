@@ -440,7 +440,7 @@
     (array
      ;; It is critical not to inquire of the host for the array's element type.
      (let ((etype (specifier-type (!specialized-array-element-type x))))
-       (make-array-type :dimensions (array-dimensions x)
+       (make-array-type (array-dimensions x)
                         ;; complexp relies on the host implementation,
                         ;; but in practice any array for which we need to
                         ;; call ctype-of will be a simple-array.

@@ -22,7 +22,7 @@
                       (class-info (type-class-or-lose 'alien)))
             (:constructor %make-alien-type-type (alien-type))
             (:copier nil))
-  (alien-type nil :type alien-type))
+  (alien-type nil :type alien-type :read-only t))
 
 (!define-type-class alien)
 

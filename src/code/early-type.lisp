@@ -24,7 +24,7 @@
                        (:copier nil)
                        #!+cmu (:pure nil))
   ;; the Common Lisp type-specifier of the type we represent
-  (specifier nil :type t))
+  (specifier nil :type t :read-only t))
 
 (!define-type-class hairy)
 
@@ -62,7 +62,7 @@
                                     (might-contain-other-types-p t))
                           (:copier nil)
                           #!+cmu (:pure nil))
-  (type (missing-arg) :type ctype))
+  (type (missing-arg) :type ctype :read-only t))
 
 (!define-type-class negation)
 
@@ -72,16 +72,16 @@
                       (:constructor nil)
                       (:copier nil))
   ;; Lists of the type for each required and optional argument.
-  (required nil :type list)
-  (optional nil :type list)
+  (required nil :type list :read-only t)
+  (optional nil :type list :read-only t)
   ;; The type for the rest arg. NIL if there is no &REST arg.
-  (rest nil :type (or ctype null))
+  (rest nil :type (or ctype null) :read-only t)
   ;; true if &KEY arguments are specified
-  (keyp nil :type boolean)
+  (keyp nil :type boolean :read-only t)
   ;; list of KEY-INFO structures describing the &KEY arguments
-  (keywords nil :type list)
+  (keywords nil :type list :read-only t)
   ;; true if other &KEY arguments are allowed
-  (allowp nil :type boolean))
+  (allowp nil :type boolean :read-only t))
 
 (defun canonicalize-args-type-args (required optional rest &optional keyp)
   (when (eq rest *empty-type*)
@@ -194,10 +194,10 @@
                                                     nil
                                                     rest)))))
   ;; true if the arguments are unrestrictive, i.e. *
-  (wild-args nil :type boolean)
+  (wild-args nil :type boolean :read-only t)
   ;; type describing the return values. This is a values type
   ;; when multiple values were specified for the return.
-  (returns (missing-arg) :type ctype))
+  (returns (missing-arg) :type ctype :read-only t))
 
 ;;; The CONSTANT-TYPE structure represents a use of the CONSTANT-ARG
 ;;; "type specifier", which is only meaningful in function argument
@@ -209,7 +209,7 @@
             (:copier nil))
   ;; The type which the argument must be a constant instance of for this type
   ;; specifier to win.
-  (type (missing-arg) :type ctype))
+  (type (missing-arg) :type ctype :read-only t))
 
 ;;; The NAMED-TYPE is used to represent *, T and NIL, the standard
 ;;; special cases, as well as other special cases needed to
@@ -223,7 +223,7 @@
 (defstruct (named-type (:include ctype
                                  (class-info (type-class-or-lose 'named)))
                        (:copier nil))
-  (name nil :type symbol))
+  (name nil :type symbol :read-only t))
 
 ;;; a list of all the float "formats" (i.e. internal representations;
 ;;; nothing to do with #'FORMAT), in order of decreasing precision
@@ -362,17 +362,19 @@
 ;;; things such as SIMPLE-BASE-STRING.
 (defstruct (array-type (:include ctype
                                  (class-info (type-class-or-lose 'array)))
-                       (:constructor %make-array-type)
+                       (:constructor %make-array-type
+                        (dimensions &key complexp element-type
+                                    specialized-element-type))
                        (:copier nil))
   ;; the dimensions of the array, or * if unspecified. If a dimension
   ;; is unspecified, it is *.
-  (dimensions '* :type (or list (member *)))
+  (dimensions '* :type (or list (member *)) :read-only t)
   ;; Is this not a simple array type? (:MAYBE means that we don't know.)
-  (complexp :maybe :type (member t nil :maybe))
+  (complexp :maybe :type (member t nil :maybe) :read-only t)
   ;; the element type as originally specified
-  (element-type (missing-arg) :type ctype)
+  (element-type (missing-arg) :type ctype :read-only t)
   ;; the element type as it is specialized in this implementation
-  (specialized-element-type *wild-type* :type ctype))
+  (specialized-element-type *wild-type* :type ctype :read-only t))
 (define-cached-synonym make-array-type)
 
 ;;; A MEMBER-TYPE represent a use of the MEMBER type specifier. We
@@ -384,8 +386,8 @@
                         (:copier nil)
                         (:constructor %make-member-type (xset fp-zeroes))
                         #-sb-xc-host (:pure nil))
-  (xset (missing-arg) :type xset)
-  (fp-zeroes (missing-arg) :type list))
+  (xset (missing-arg) :type xset :read-only t)
+  (fp-zeroes (missing-arg) :type list :read-only t))
 (defun make-member-type (&key xset fp-zeroes members)
   (unless xset
     (aver (not fp-zeroes))
@@ -511,8 +513,6 @@
                                         cdr-type))
                       (:copier nil))
   ;; the CAR and CDR element types (to support ANSI (CONS FOO BAR) types)
-  ;;
-  ;; FIXME: Most or all other type structure slots could also be :READ-ONLY.
   (car-type (missing-arg) :type ctype :read-only t)
   (cdr-type (missing-arg) :type ctype :read-only t))
 (defun make-cons-type (car-type cdr-type)

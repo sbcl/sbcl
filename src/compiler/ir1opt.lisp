@@ -154,7 +154,6 @@
          (if (array-type-complexp type)
              (make-array-type
               ;; ADJUST-ARRAY may change dimensions, but rank stays same.
-              :dimensions
               (let ((old (array-type-dimensions type)))
                 (if (eq '* old)
                     old

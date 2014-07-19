@@ -1603,7 +1603,7 @@
          (neltype (array-type-element-type ntype)))
     (if (and (eql ndims '*) (null ncomplexp)
              (eql neltype *wild-type*) (eql nseltype *wild-type*))
-        (make-array-type :dimensions (array-type-dimensions type1)
+        (make-array-type (array-type-dimensions type1)
                          :complexp t
                          :element-type (array-type-element-type type1)
                          :specialized-element-type (array-type-specialized-element-type type1)))))
@@ -2702,8 +2702,7 @@ used for a COMPLEX component.~:@>"
                    (not (eq result-eltype :incompatible))
                    (unite-array-types-supertypes-compatible-p
                     eltype-supertype complexp-supertype dimensions-supertype))
-          (make-array-type
-           :dimensions result-dimensions
+          (make-array-type result-dimensions
            :complexp result-complexp
            :element-type result-eltype
            :specialized-element-type result-stype))))))
@@ -2719,12 +2718,11 @@ used for a COMPLEX component.~:@>"
             (eltype2 (array-type-element-type type2))
             (stype1 (array-type-specialized-element-type type1))
             (stype2 (array-type-specialized-element-type type2)))
-        (make-array-type
-         :dimensions (cond ((eq dims1 '*) dims2)
-                           ((eq dims2 '*) dims1)
-                           (t
-                            (mapcar (lambda (x y) (if (eq x '*) y x))
-                                    dims1 dims2)))
+        (make-array-type (cond ((eq dims1 '*) dims2)
+                               ((eq dims2 '*) dims1)
+                               (t
+                                (mapcar (lambda (x y) (if (eq x '*) y x))
+                                        dims1 dims2)))
          :complexp (if (eq complexp1 :maybe) complexp2 complexp1)
          :element-type (cond
                          ((eq eltype1 *wild-type*) eltype2)
@@ -3587,7 +3585,7 @@ used for a COMPLEX component.~:@>"
   (let ((eltype (if (eq element-type '*)
                     *wild-type*
                     (specifier-type element-type))))
-    (make-array-type :dimensions (canonical-array-dimensions dimensions)
+    (make-array-type (canonical-array-dimensions dimensions)
                      :complexp :maybe
                      :element-type eltype
                      :specialized-element-type (%upgraded-array-element-type
@@ -3598,7 +3596,7 @@ used for a COMPLEX component.~:@>"
   (let ((eltype (if (eq element-type '*)
                     *wild-type*
                     (specifier-type element-type))))
-   (make-array-type :dimensions (canonical-array-dimensions dimensions)
+   (make-array-type (canonical-array-dimensions dimensions)
                     :complexp nil
                     :element-type eltype
                     :specialized-element-type (%upgraded-array-element-type

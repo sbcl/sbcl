@@ -156,7 +156,7 @@
      (ctype-of-number x))
     (array
      (let ((etype (specifier-type (array-element-type x))))
-       (make-array-type :dimensions (array-dimensions x)
+       (make-array-type (array-dimensions x)
                         :complexp (not (typep x 'simple-array))
                         :element-type etype
                         :specialized-element-type etype)))
