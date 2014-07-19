@@ -659,8 +659,6 @@
                                (return-from ,fun-name
                                  (values ,@result-temps))))))
                        (setq ,hashval (ash ,hashval ,(- hash-bits)))))))
-               (unless ,cache
-                 (setq ,cache (alloc-hash-cache ,size ',var-name)))
                ,@(when *profile-hash-cache*
                    `((incf (aref ,statistics-name 1)))) ; count misses
                (multiple-value-bind ,result-temps (funcall ,thunk)
@@ -669,9 +667,11 @@
                             (symbolicate "ALLOC-HASH-CACHE-LINE/"
                                          (write-to-string (+ nargs values))))
                          ,@arg-vars ,@result-temps))
-                        (idx1 (ldb (byte ,hash-bits 0) ,hashval))
-                        (idx2 (ldb (byte ,hash-bits ,hash-bits) ,hashval)))
-                    (declare (type (simple-vector ,size) ,cache))
+                       (,cache
+                        (truly-the ,cache-type
+                         (or ,cache (alloc-hash-cache ,size ',var-name))))
+                       (idx1 (ldb (byte ,hash-bits 0) ,hashval))
+                       (idx2 (ldb (byte ,hash-bits ,hash-bits) ,hashval)))
                     (cond ((eql (svref ,cache idx1) 0)
                            (setf (svref ,cache idx1) ,entry))
                           ((eql (svref ,cache idx2) 0)
