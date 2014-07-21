@@ -659,8 +659,6 @@
                                (return-from ,fun-name
                                  (values ,@result-temps))))))
                        (setq ,hashval (ash ,hashval ,(- hash-bits)))))))
-               ,@(when *profile-hash-cache*
-                   `((incf (aref ,statistics-name 1)))) ; count misses
                (multiple-value-bind ,result-temps (funcall ,thunk)
                  (let ((,entry
                         (,(let ((*package* (symbol-package 'alloc-hash-cache)))
@@ -672,11 +670,13 @@
                          (or ,cache (alloc-hash-cache ,size ',var-name))))
                        (idx1 (ldb (byte ,hash-bits 0) ,hashval))
                        (idx2 (ldb (byte ,hash-bits ,hash-bits) ,hashval)))
-                    (cond ((eql (svref ,cache idx1) 0)
-                           (setf (svref ,cache idx1) ,entry))
-                          ((eql (svref ,cache idx2) 0)
-                           (setf (svref ,cache idx2) ,entry))
-                          (t
+                   ,@(when *profile-hash-cache*
+                       `((incf (aref ,statistics-name 1)))) ; count misses
+                   (cond ((eql (svref ,cache idx1) 0)
+                          (setf (svref ,cache idx1) ,entry))
+                         ((eql (svref ,cache idx2) 0)
+                          (setf (svref ,cache idx2) ,entry))
+                         (t
                            ,@(when *profile-hash-cache* ; count evictions
                                `((incf (aref ,statistics-name 2))))
                              ;; Use one bit of randomness to pick a victim.
@@ -1519,14 +1519,14 @@ to :INTERPRET, an interpreter will be used.")
 '(defun show-hash-cache-statistics ()
   (flet ((cache-stats (symbol)
            (let* ((name (string symbol))
+                  (statistics (let ((*package* (symbol-package symbol)))
+                                (symbolicate symbol "STATISTICS")))
                   (prefix
                    (subseq name 0 (- (length name) (length "VECTOR**")))))
-             (values
-              (handler-case
-                  (symbol-value (let ((*package* (symbol-package symbol)))
-                                  (symbolicate symbol "STATISTICS")))
-                (unbound-symbol-error () (make-array 3 :element-type 'fixnum)))
-              (subseq prefix 2 (1- (length prefix)))))))
+             (values (if (boundp statistics)
+                         (symbol-value statistics)
+                         (make-array 3 :element-type 'fixnum))
+                     (subseq prefix 2 (1- (length prefix)))))))
     (format t "~%Type function memoization:~%     Seek       Hit      (%)~:
     Evict      (%) Size    full~%")
     ;; Sort by descending seek count to rank by likely relative importance
