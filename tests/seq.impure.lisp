@@ -1293,4 +1293,7 @@
 (with-test (:name :generic-sequence-reverse)
   (assert-error (reverse (make-instance 'bogus-reversal-seq))))
 
+(with-test (:name :abstract-base-sequence-satisfies-sequencep)
+  (assert (typep (sb-pcl::class-prototype (find-class 'sequence)) 'sequence)))
+
 ;;; success
