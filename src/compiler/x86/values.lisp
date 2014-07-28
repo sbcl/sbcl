@@ -120,21 +120,15 @@
   (:generator 20
     (sc-case skip
       (immediate
-       (cond ((zerop (tn-value skip))
-              (move src context)
-              (move count num))
-             (t
-              (inst lea src (make-ea :dword :base context
-                                     :disp (- (* (tn-value skip)
-                                                 n-word-bytes))))
-              (move count num)
-              (inst sub count (* (tn-value skip) n-word-bytes)))))
-
+       (if (zerop (tn-value skip))
+           (move src context)
+           (inst lea src (make-ea :dword :base context
+                                  :disp (- (* (tn-value skip)
+                                              n-word-bytes))))))
       (any-reg
        (move src context)
-       (inst sub src skip)
-       (move count num)
-       (inst sub count skip)))
+       (inst sub src skip)))
+    (move count num)
 
     (move loop-index count)
     (inst mov start esp-tn)

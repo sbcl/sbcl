@@ -2514,4 +2514,39 @@
     (assert (string= (funcall f)
                      "Weird transform answer is 14"))))
 
+(defun skip-1-passthrough (a b sb-int:&more context count)
+  (declare (ignore a b))
+  (multiple-value-call 'list
+    'start
+    (sb-c::%more-arg-values context 1 (1- (truly-the fixnum count)))
+    'end))
+(defun skip-2-passthrough (a b sb-int:&more context count)
+  (declare (ignore a b))
+  (multiple-value-call 'list
+    'start
+    (sb-c::%more-arg-values context 2 (- (truly-the fixnum count) 2))
+    'end))
+(defun skip-n-passthrough (n-skip n-copy sb-int:&more context count)
+  (assert (>= count (+ n-copy n-skip))) ; prevent crashes
+  (multiple-value-call 'list
+    'start
+    (sb-c::%more-arg-values context n-skip n-copy)
+    'end))
+
+;; %MORE-ARG-VALUES was wrong on x86 and x86-64 with nonzero 'skip'.
+;; It's entirely possible that other backends are also not working.
+(test-util:with-test (:name more-arg-fancy)
+  (assert (equal (skip-1-passthrough 0 0 'a 'b 'c 'd 'e 'f)
+                 '(start b c d e f end)))
+  (assert (equal (skip-2-passthrough 0 0 'a 'b 'c 'd 'e 'f)
+                 '(start c d e f end)))
+  (assert (equal (skip-n-passthrough 1 5 'a 'b 'c 'd 'e 'f)
+                 '(start b c d e f end)))
+  (assert (equal (skip-n-passthrough 1 5 'a 'b 'c 'd 'e 'f 'g)
+                 '(start b c d e f end)))
+  (assert (equal (skip-n-passthrough 2 5 'a 'b 'c 'd 'e 'f 'g)
+                 '(start c d e f g end)))
+  (assert (equal (skip-n-passthrough 2 5 'a 'b 'c 'd 'e 'f 'g 'h)
+                 '(start c d e f g end))))
+
 ;;; success

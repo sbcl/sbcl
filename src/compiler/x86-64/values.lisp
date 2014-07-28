@@ -118,29 +118,25 @@
   (:generator 20
     (sc-case skip
       (immediate
-       (cond ((zerop (tn-value skip))
-              (move src context)
-              (move count num))
-             (t
-              (inst lea src (make-ea :dword :base context
-                                     :disp (- (* (tn-value skip)
-                                                 n-word-bytes))))
-              (move count num)
-              (inst sub count (* (tn-value skip) n-word-bytes)))))
-
+       (if (zerop (tn-value skip))
+           (move src context)
+           (inst lea src (make-ea :dword :base context
+                                  :disp (- (* (tn-value skip)
+                                              n-word-bytes))))))
       (any-reg
-       (move src context)
-       #!+#.(cl:if (cl:= sb!vm:word-shift sb!vm:n-fixnum-tag-bits) '(and) '(or))
-       (inst sub src skip)
-       #!-#.(cl:if (cl:= sb!vm:word-shift sb!vm:n-fixnum-tag-bits) '(and) '(or))
-       (progn
-         ;; FIXME: This can't be efficient, but LEA (my first choice)
-         ;; doesn't do subtraction.
-         (inst shl skip (- word-shift n-fixnum-tag-bits))
-         (inst sub src skip)
-         (inst shr skip (- word-shift n-fixnum-tag-bits)))
-       (move count num)
-       (inst sub count skip)))
+       (cond ((= word-shift n-fixnum-tag-bits)
+              (move src context)
+              (inst sub src skip))
+             (t
+              ;; TODO: Reducing CALL-ARGUMENTS-LIMIT to something reasonable to
+              ;; allow DWORD ops without it looking like a bug would make sense.
+              ;; With a stack size of about 2MB, the limit is absurd anyway.
+              (inst neg skip)
+              (inst lea src
+                    (make-ea :qword :base context :index skip
+                             :scale (ash 1 (- word-shift n-fixnum-tag-bits))))
+              (inst neg skip)))))
+    (move count num)
 
     (inst lea loop-index (make-ea :byte :index count
                                   :scale (ash 1 (- word-shift n-fixnum-tag-bits))))
