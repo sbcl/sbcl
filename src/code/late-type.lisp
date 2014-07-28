@@ -2807,10 +2807,8 @@ used for a COMPLEX component.~:@>"
 
 (!define-type-method (member :unparse) (type)
   (let ((members (member-type-members type)))
-    (cond
-      ((equal members '(nil)) 'null)
-      ((type= type (specifier-type 'standard-char)) 'standard-char)
-      (t `(member ,@members)))))
+    (cond ((equal members '(nil)) 'null)
+          (t `(member ,@members)))))
 
 (!define-type-method (member :singleton-p) (type)
   (if (eql 1 (member-type-size type))
@@ -3432,7 +3430,8 @@ used for a COMPLEX component.~:@>"
     ((type= type (specifier-type 'standard-char)) 'standard-char)
     (t
      ;; Unparse into either MEMBER or CHARACTER-SET. We use MEMBER if there
-     ;; are at most as many characters than there are character code ranges.
+     ;; are at most as many characters as there are character code ranges.
+     ;; (basically saying to use MEMBER if each range is one character)
      (let* ((pairs (character-set-type-pairs type))
             (count (length pairs))
             (chars (loop named outer
