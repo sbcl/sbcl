@@ -732,7 +732,7 @@
           (values (sb!xc:compiler-macro-function opname *lexenv*) opname)
           (values nil nil))))
 
-;;; Picks of special forms and compiler-macro expansions, and hands
+;;; Picks off special forms and compiler-macro expansions, and hands
 ;;; the rest to IR1-CONVERT-COMMON-FUNCTOID
 (defun ir1-convert-functoid (start next result form)
   (let* ((op (car form))
