@@ -2424,7 +2424,23 @@ used for a COMPLEX component.~:@>"
   ;; FIXME (and hint to PFD): we're vulnerable here to attacks of the
   ;; form "are (AND ARRAY (NOT (ARRAY T))) and (OR (ARRAY BIT) (ARRAY
   ;; NIL) (ARRAY CHAR) ...) equivalent?" -- CSR, 2003-12-10
-  (make-negation-type :type type))
+  ;; A symptom of the aforementioned is that the following are not TYPE=
+  ;;   (AND (VECTOR T) (NOT SIMPLE-ARRAY)) ; an ARRAY-TYPE
+  ;;   (AND (VECTOR T) (NOT SIMPLE-VECTOR)) ; an INTERSECTION-TYPE
+  ;; even though (VECTOR T) makes it so that the (NOT) clause in each can
+  ;; only provide one additional bit of information: that the vector
+  ;; is complex as opposed to simple. The rank and element-type are fixed.
+  (if (and (eq (array-type-dimensions type) '*)
+           (eq (array-type-complexp type) 't)
+           (eq (array-type-element-type type) *wild-type*))
+      ;; (NOT <hairy-array>) = either SIMPLE-ARRAY or (NOT ARRAY).
+      ;; This is deliberately asymmetric - trying to say that NOT simple-array
+      ;; equals hairy-array leads to infinite recursion.
+      (type-union (make-array-type '* :complexp nil
+                                   :element-type *wild-type*)
+                  (make-negation-type
+                   :type (make-array-type '* :element-type *wild-type*)))
+      (make-negation-type :type type)))
 
 (!define-type-method (array :unparse) (type)
   (let* ((dims (array-type-dimensions type))

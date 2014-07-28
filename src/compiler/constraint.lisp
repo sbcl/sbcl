@@ -50,7 +50,7 @@
 
 ;;; *CONSTRAINT-UNIVERSE* gets bound in IR1-PHASES to a fresh,
 ;;; zero-length, non-zero-total-size vector-with-fill-pointer.
-(declaim (type (and vector (not simple-vector)) *constraint-universe*))
+(declaim (type (and (vector t) (not simple-array)) *constraint-universe*))
 (defvar *constraint-universe*)
 
 (deftype constraint-y () '(or ctype lvar lambda-var constant))

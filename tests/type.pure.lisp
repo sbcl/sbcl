@@ -523,3 +523,40 @@
     ;; and not *wild-type*
     (assert (sb-kernel:type/= (sb-kernel:array-type-specialized-element-type intersection)
                               (sb-kernel:specifier-type 'bit)))))
+
+(in-package "SB-KERNEL")
+(test-util:with-test (:name :partition-array-into-simple/hairy)
+  ;; Some tests that (simple-array | hairy-array) = array
+  ;; At present this works only for wild element-type.
+  (multiple-value-bind (eq winp)
+      (type= (specifier-type '(not (and array (not simple-array))))
+             (specifier-type '(or (not array) simple-array)))
+    (assert (and eq winp)))
+
+  ;; if X is neither simple-array nor hairy-array, it is not an array
+  (assert (type= (specifier-type '(and (not simple-array)
+                                       (not (and array (not simple-array)))))
+                 (specifier-type '(not array))))
+
+  ;; (simple-array * (*)) = (AND (NOT <hairy-array>) VECTOR) etc
+  (flet ((try (unrestricted simple)
+           (assert (type= (specifier-type simple)
+                          (type-intersection
+                           (specifier-type
+                            '(not (and array (not simple-array))))
+                           (specifier-type unrestricted))))))
+    (try 'vector '(simple-array * (*)))
+    (try '(vector t) 'simple-vector)
+    (try 'bit-vector 'simple-bit-vector)
+    (try 'string 'simple-string)
+    (try 'base-string 'simple-base-string)
+    (try 'character-string 'simple-character-string))
+
+  ;; if X is a known string and not an array-header
+  ;; it must be a SIMPLE-STRING
+  (assert (type= (type-intersection
+                  (specifier-type 'string)
+                  (specifier-type
+                   '(not (or (and simple-array (not vector))
+                             (and array (not simple-array))))))
+                 (specifier-type 'simple-string))))
