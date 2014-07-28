@@ -1,5 +1,5 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
-changes relative to sbcl-1.2.1:
+changes in sbcl-1.2.2 relative to sbcl-1.2.1:
   * incompatible change: the #\` ("backquote") reader macro was reimplemented
     to support robust pretty-printing. Reading a form involving #\` produces
     an invocation of the QUASIQUOTE ordinary macro which may contain subforms
