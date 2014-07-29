@@ -85,15 +85,13 @@
                      ((if)
                       (and (<= 2 (length args) 3)
                            (every #'fopcompilable-p args)))
-                     ;; Allow SETQ only on special variables
+                     ;; Allow SETQ only on special or global variables
                      ((setq)
                       (loop for (name value) on args by #'cddr
-                            unless (and (symbolp name)
-                                        (let ((kind (info :variable :kind name)))
-                                          (eq kind :special))
-                                        (fopcompilable-p value))
-                            return nil
-                            finally (return t)))
+                            always (and (symbolp name)
+                                        (member (info :variable :kind name)
+                                                '(:special :global))
+                                        (fopcompilable-p value))))
                      ;; The real toplevel form processing has already been
                      ;; done, so EVAL-WHEN handling will be easy.
                      ((eval-when)
@@ -174,7 +172,7 @@
        (member (car form)
                '(lambda named-lambda lambda-with-lexenv))))
 
-;;; Check that a literal form is fopcompilable. It would not for example
+;;; Check that a literal form is fopcompilable. It would not be, for example,
 ;;; when the form contains structures with funny MAKE-LOAD-FORMS.
 (defun constant-fopcompilable-p (constant)
   (let ((xset (alloc-xset)))
