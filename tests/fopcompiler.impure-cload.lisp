@@ -93,3 +93,51 @@
   (let* ((x (bar (foo)))
          (y (bar (x foo))))
     (bar (y x foo))))
+
+;;; Some tests involving compiler-macros.
+
+(defvar *cmacro-result* nil)
+
+(defun baz (x) (declare (ignore x)))
+
+;; functional foo - a function with a compiler-macro
+(defun ffoo (x) (push `(regular-ffoo ,x) *cmacro-result*))
+(define-compiler-macro ffoo (x)
+  `(push `(cmacro-ffoo ,,x) *cmacro-result*))
+
+;; macro foo - a macro with a compiler-macro
+(defmacro mfoo (x) `(push `(regular-mfoo ,,x) *cmacro-result*))
+(define-compiler-macro mfoo (x)
+  `(push `(cmacro-mfoo ,,x) *cmacro-result*))
+
+(defun get-s () (declare (special s)) s)
+
+;; Verify some assumptions that the tests will test what was intended.
+(eval-when (:compile-toplevel)
+  (let ((sb-c::*lexenv* (sb-kernel:make-null-lexenv)))
+    (assert (sb-c::fopcompilable-p '(baz (ffoo 3))))
+    (assert (sb-c::fopcompilable-p '(baz (mfoo 3))))
+    ;; The special binding of S makes these forms not fopcompilable.
+    (assert (not (sb-c::fopcompilable-p
+                  '(ffoo (let ((s 3)) (declare (special s)) (get-s))))))
+    (assert (not (sb-c::fopcompilable-p
+                  '(mfoo (let ((s 3)) (declare (special s)) (get-s))))))))
+
+;; fopcompilable toplevel form should execute the compiler macro
+(ffoo 1)
+(mfoo 1)
+;; fopcompilable form expands embedded compiler-macro
+(baz (ffoo 2))
+(baz (mfoo 2))
+;; not-fopcompilable toplevel form should execute the compiler macro.
+;; This was ok if the toplevel call was a function with a compiler-macro,
+;; but was not working for a toplevel macro having a compiler-macro.
+(ffoo (let ((s 3)) (declare (special s)) (get-s)))
+(mfoo (let ((s 3)) (declare (special s)) (get-s)))
+
+(with-test (:name :compiler-macros-at-toplevel)
+  ;; Now assert about the macroexpansions that happened.
+  (assert (equal *cmacro-result*
+                 '((CMACRO-MFOO 3) (CMACRO-FFOO 3)
+                   (CMACRO-MFOO 2) (CMACRO-FFOO 2)
+                   (CMACRO-MFOO 1) (CMACRO-FFOO 1)))))

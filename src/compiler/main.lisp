@@ -1000,8 +1000,16 @@ necessary, since type inference may take arbitrarily long to converge.")
 
 ;;; Macroexpand FORM in the current environment with an error handler.
 ;;; We only expand one level, so that we retain all the intervening
-;;; forms in the source path.
+;;; forms in the source path. A compiler-macro takes precedence over
+;;; an ordinary macro as specified in CLHS 3.2.3.1
+;;; Note that this function is _only_ for processing of toplevel forms.
+;;; Non-toplevel forms use IR1-CONVERT-FUNCTOID which considers compiler macros.
 (defun preprocessor-macroexpand-1 (form)
+  (if (listp form)
+      (let ((expansion (expand-compiler-macro form)))
+        (if (neq expansion form)
+            (return-from preprocessor-macroexpand-1
+              (values expansion t)))))
   (handler-case (%macroexpand-1 form *lexenv*)
     (error (condition)
       (compiler-error "(during macroexpansion of ~A)~%~A"

@@ -732,34 +732,42 @@
           (values (sb!xc:compiler-macro-function opname *lexenv*) opname)
           (values nil nil))))
 
+;;; If FORM has a usable compiler macro, use it; otherwise return FORM itself.
+;;; Return the name of the compiler-macro as a secondary value, if applicable.
+(defun expand-compiler-macro (form)
+  (multiple-value-bind (cmacro-fun cmacro-fun-name)
+      (find-compiler-macro (car form) form)
+    (if (and cmacro-fun
+             ;; CLHS 3.2.2.1.3 specifies that NOTINLINE
+             ;; suppresses compiler-macros.
+             (not (fun-lexically-notinline-p cmacro-fun-name)))
+        (values (handler-case (careful-expand-macro cmacro-fun form t)
+                  (compiler-macro-keyword-problem (c)
+                    (print-compiler-message *error-output* "note: ~A" (list c))
+                    form))
+                cmacro-fun-name)
+        (values form nil))))
+
 ;;; Picks off special forms and compiler-macro expansions, and hands
 ;;; the rest to IR1-CONVERT-COMMON-FUNCTOID
 (defun ir1-convert-functoid (start next result form)
   (let* ((op (car form))
          (translator (and (symbolp op) (info :function :ir1-convert op))))
     (cond (translator
+           ;; FIXME: redundant? A macro can not be defined in the first place.
            (when (sb!xc:compiler-macro-function op *lexenv*)
              (compiler-warn "ignoring compiler macro for special form"))
            (funcall translator start next result form))
           (t
-           (multiple-value-bind (cmacro-fun cmacro-fun-name)
-               (find-compiler-macro op form)
-             (if (and cmacro-fun
-                      ;; CLHS 3.2.2.1.3 specifies that NOTINLINE
-                      ;; suppresses compiler-macros.
-                      (not (fun-lexically-notinline-p cmacro-fun-name)))
-                 (let ((res (handler-case
-                                (careful-expand-macro cmacro-fun form t)
-                              (compiler-macro-keyword-problem (c)
-                                (print-compiler-message *error-output* "note: ~A" (list c))
-                                form))))
-                   (cond ((eq res form)
-                          (ir1-convert-common-functoid start next result form op))
-                         (t
-                          (unless (policy *lexenv* (zerop store-xref-data))
-                            (record-call cmacro-fun-name (ctran-block start) *current-path*))
-                          (ir1-convert start next result res))))
-                 (ir1-convert-common-functoid start next result form op)))))))
+           (multiple-value-bind (res cmacro-fun-name)
+               (expand-compiler-macro form)
+             (cond ((eq res form)
+                    (ir1-convert-common-functoid start next result form op))
+                   (t
+                    (unless (policy *lexenv* (zerop store-xref-data))
+                      (record-call cmacro-fun-name (ctran-block start)
+                                   *current-path*))
+                    (ir1-convert start next result res))))))))
 
 ;;; Handles the "common" cases: any other forms except special forms
 ;;; and compiler-macros.
