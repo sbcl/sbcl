@@ -84,7 +84,8 @@
 (setf (sb!int:info :function :kind 'sb!int:quasiquote) :macro
       (sb!int:info :function :macro-function 'sb!int:quasiquote)
       (cl:macro-function 'sb!int:quasiquote))
-(load "src/cold/compile-cold-sbcl.lisp")
+(sb-xc:with-compilation-unit ()
+  (load "src/cold/compile-cold-sbcl.lisp"))
 
 ;; After cross-compiling, show me a list of types that checkgen
 ;; would have liked to use primitive traps for but couldn't.

@@ -1592,7 +1592,7 @@ core and return a descriptor to it."
                        sb!vm:fdefn-raw-addr-slot
                        (ecase type
                          (#.sb!vm:simple-fun-header-widetag
-                          (/show0 "static-fset (simple-fun)")
+                          (/noshow0 "static-fset (simple-fun)")
                           #!+(or sparc arm)
                           defn
                           #!-(or sparc arm)
