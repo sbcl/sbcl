@@ -549,8 +549,8 @@
     (try '(vector t) 'simple-vector)
     (try 'bit-vector 'simple-bit-vector)
     (try 'string 'simple-string)
-    (try 'base-string 'simple-base-string)
-    (try 'character-string 'simple-character-string))
+    #+sb-unicode(try 'character-string 'simple-character-string)
+    (try 'base-string 'simple-base-string))
 
   ;; if X is a known string and not an array-header
   ;; it must be a SIMPLE-STRING
