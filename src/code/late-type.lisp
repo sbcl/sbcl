@@ -51,17 +51,15 @@
 
 (defun contains-unknown-type-p (ctype)
   (cond ((unknown-type-p ctype) t)
-        ((intersection-type-p ctype)
-         (some #'contains-unknown-type-p (intersection-type-types ctype)))
-        ((union-type-p ctype)
-         (some #'contains-unknown-type-p (union-type-types ctype)))
+        ((compound-type-p ctype)
+         (some #'contains-unknown-type-p (compound-type-types ctype)))
         ((negation-type-p ctype)
          (contains-unknown-type-p (negation-type-type ctype)))))
 
 ;;; This is used by !DEFINE-SUPERCLASSES to define the SUBTYPE-ARG1
 ;;; method. INFO is a list of conses
 ;;;   (SUPERCLASS-CLASS . {GUARD-TYPE-SPECIFIER | NIL}).
-(defun !has-superclasses-complex-subtypep-arg1 (type1 type2 info)
+(defun has-superclasses-complex-subtypep-arg1 (type1 type2 info)
   ;; If TYPE2 might be concealing something related to our class
   ;; hierarchy
   (if (type-might-contain-other-types-p type2)
@@ -110,7 +108,7 @@
                             ',specs)))
          (setf (type-class-complex-subtypep-arg1 ,type-class)
                (lambda (type1 type2)
-                 (!has-superclasses-complex-subtypep-arg1 type1 type2 ,info)))
+                 (has-superclasses-complex-subtypep-arg1 type1 type2 ,info)))
          (setf (type-class-complex-subtypep-arg2 ,type-class)
                #'delegate-complex-subtypep-arg2)
          (setf (type-class-complex-intersection2 ,type-class)
@@ -136,9 +134,9 @@
 (defstruct (key-info #-sb-xc-host (:pure t)
                      (:copier nil))
   ;; the key (not necessarily a keyword in ANSI Common Lisp)
-  (name (missing-arg) :type symbol)
+  (name (missing-arg) :type symbol :read-only t)
   ;; the type of the argument value
-  (type (missing-arg) :type ctype))
+  (type (missing-arg) :type ctype :read-only t))
 
 (!define-type-method (values :simple-subtypep :complex-subtypep-arg1)
                      (type1 type2)
