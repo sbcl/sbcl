@@ -5291,3 +5291,13 @@
                     (run-with-hint nil 42 nil maximum-extra-legs
                                    '(yyy) '(xxx) t))
                   exit-reason)))))
+
+(with-test (:name :dead-code-in-optional-dispatch)
+  (multiple-value-bind (f warningp)
+      ;; the translation of each optional entry is
+      ;;   (let ((#:g (error "nope"))) (funcall #<clambda> ...))
+      ;; but the funcall is unreachable. Since this is an artifact of how the
+      ;; lambda is converted, it should not generate a note as if in user code.
+      (compile nil '(lambda (a &optional (b (error "nope")) (c (error "nope")))
+                     (values c b a)))
+    (assert (and f (not warningp)))))
