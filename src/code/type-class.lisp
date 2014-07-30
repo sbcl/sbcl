@@ -13,14 +13,55 @@
 
 (!begin-collecting-cold-init-forms)
 
-(defvar *type-classes*)
-(!cold-init-forms
-  (unless (boundp '*type-classes*) ; FIXME: How could this be bound?
-    (setq *type-classes* (make-hash-table :test 'eq))))
+;; We can't make an instance of any CTYPE descendant until its type-class
+;; exists in *TYPE-CLASSES* and the random state has been made.
+;; By initializing the random state and type-class storage vector at once,
+;; it is obvious that either both have been made or neither one has been.
+;; As such, a type-class need never call MAKE-RANDOM-STATE in its constructor.
+;; FIXME: the random state is shared across all threads and works only
+;; by accident of the fact that the PRNG doesn't suffer "hard" failure from
+;; multiple writers.
+#-sb-xc
+(progn (defvar *type-random-state* (make-random-state))
+       (defvar *type-classes* (make-array 20 :fill-pointer 0)))
+#+sb-xc
+(macrolet ((def ()
+             (let ((n (length *type-classes*)))
+             `(progn
+                (declaim (type random-state *type-random-state*)
+                         (type (simple-vector ,n) *type-classes*))
+                ;; The value forms are for type-correctness only.
+                ;; COLD-INIT-FORMS will already have been run.
+                (defglobal *type-random-state* (make-random-state))
+                (defglobal *type-classes* (make-array ,n))
+                (!cold-init-forms
+                 (setq *type-random-state* (make-random-state)
+                       *type-classes* (make-array ,n)))))))
+  (def))
 
 (defun type-class-or-lose (name)
-  (or (gethash name *type-classes*)
+  (or (find name *type-classes* :key #'type-class-name)
       (error "~S is not a defined type class." name)))
+
+#-sb-xc-host
+(define-compiler-macro type-class-or-lose (&whole form name)
+  ;; If NAME is a quoted constant, the resultant form should be
+  ;; a fixed index into *TYPE-CLASSES* except that during the building
+  ;; of the cross-compiler the array hasn't been populated yet.
+  ;; One solution to that, which I favored, is that DEFINE-TYPE-CLASS
+  ;; appear before the structure definition that uses the corresponding
+  ;; type-class in its slot initializer. That posed a problem for
+  ;; the :INHERITS option, because the constructor of a descendant
+  ;; grabs all the methods [sic] from its ancestor at the time the
+  ;; descendant is defined, which means the methods of the ancestor
+  ;; should have been filled in, which means at least one DEFINE-TYPE-CLASS
+  ;; wants to appear _after_ a structure definition that uses it.
+  (if (constantp name)
+      (let ((name (constant-form-value name)))
+        `(aref *type-classes*
+               ,(or (position name *type-classes* :key #'type-class-name)
+                    (error "~S is not a defined type class." name))))
+      form))
 
 (defun must-supply-this (&rest foo)
   (/show0 "failing in MUST-SUPPLY-THIS")
@@ -36,7 +77,7 @@
                               (print-unreadable-object (x stream :type t)
                                 (prin1 (type-class-name x) stream)))))
   ;; the name of this type class (used to resolve references at load time)
-  (name nil :type symbol) ; FIXME: should perhaps be (MISSING-ARG) default?
+  (name (missing-arg) :type symbol)
   ;; Dyadic type methods. If the classes of the two types are EQ, then
   ;; we call the SIMPLE-xxx method. If the classes are not EQ, and
   ;; either type's class has a COMPLEX-xxx method, then we call it.
@@ -113,6 +154,7 @@
   (coerce :type (or symbol null))
   |#
   )
+#!-sb-fluid (declaim (freeze-type type-class))
 
 (eval-when (#-sb-xc :compile-toplevel :load-toplevel :execute)
   (defun !type-class-fun-slot (name)
@@ -133,15 +175,22 @@
        ',name)))
 
 (defmacro !define-type-class (name &key inherits)
-  `(!cold-init-forms
-     ,(once-only ((n-class (if inherits
-                               `(copy-structure (type-class-or-lose
-                                                         ',inherits))
-                               '(make-type-class))))
-        `(progn
-           (setf (type-class-name ,n-class) ',name)
-           (setf (gethash ',name *type-classes*) ,n-class)
-           ',name))))
+  (let ((make-it
+         (if inherits
+             `(let ((class (copy-structure (type-class-or-lose ',inherits))))
+                (setf (type-class-name class) ',name)
+                class)
+             `(make-type-class :name ',name))))
+    #-sb-xc
+    `(progn
+       (eval-when (:compile-toplevel :load-toplevel :execute)
+         (unless (find ',name *type-classes* :key #'type-class-name)
+           (vector-push-extend ,make-it *type-classes*))))
+    #+sb-xc
+    `(!cold-init-forms
+      (setf (svref *type-classes*
+                   ,(position name *type-classes* :key #'type-class-name))
+            ,make-it))))
 
 ;;; Invoke a type method on TYPE1 and TYPE2. If the two types have the
 ;;; same class, invoke the simple method. Otherwise, invoke any
