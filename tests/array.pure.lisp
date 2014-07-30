@@ -311,3 +311,9 @@
       (assert
        (string= (simple-condition-format-control c)
                 "Can't specify both :INITIAL-ELEMENT and :INITIAL-CONTENTS")))))
+
+(with-test (:name :make-array-size-overflow)
+  ;; 1-bit fixnum tags make array limits overflow the word length
+  ;; when converted to bytes
+  (when (= sb-vm:n-fixnum-tag-bits 1)
+    (assert-error (make-array (1- array-total-size-limit)) error)))

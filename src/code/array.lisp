@@ -312,6 +312,8 @@
                        ,(sb!vm:saetp-n-bits info)) into forms
         finally (return `(progn ,@forms)))
 
+(declaim (type (simple-vector #.(1+ sb!vm:widetag-mask)) %%simple-array-n-bits%%))
+
 (defun allocate-vector-with-widetag (widetag length &optional n-bits)
   (declare (type (unsigned-byte 8) widetag)
            (type index length))
