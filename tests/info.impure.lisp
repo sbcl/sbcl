@@ -549,4 +549,58 @@
                                (aref output name-index))
                              random-results)))))))))
 
+;; As explained in the comments at the top of 'info-vector.lisp',
+;; it is a bad idea to use globaldb to store an atomic counter as
+;; a piece of info for a name, as it is quite brutal and consy,
+;; but for this test, that's precisely the goal.
+;; This test conses ~5 Megabytes on 64-bit almost entirely due
+;; to allocation of each immutable info storage vector.
+(test-util:with-test (:name :get-info-value-updating
+                      :skipped-on '(not :sb-thread))
+  (flet ((run (names)
+           (declare (simple-vector names))
+           (let* ((n (length names))
+                  (counts (make-array n :element-type 'sb-ext:word))
+                  (threads))
+             (dotimes (i 15)
+               (push (sb-thread:make-thread
+                      (lambda ()
+                        (dotimes (iter 1000)
+                          ;; increment (:variable :macro-expansion)
+                          ;; for a randomly chosen name. That particular
+                          ;; info-type harmlessly accepts any data type.
+                          (let* ((index (random n))
+                                 (name (aref names index)))
+                            (atomic-incf (aref counts index))
+                            ;; should probably be SB-INT:
+                            (sb-c::atomic-set-info-value
+                             :variable :macro-expansion name
+                             (lambda (old old-p)
+                               (if old-p (1+ old) 1))))
+                          ;; randomly touch an item of info
+                          ;; for another (or the same) name.
+                          (let* ((index (random n))
+                                 (name (aref names index)))
+                            ;; source-location also accepts anything :-(
+                            (setf (info :type :source-location name) iter)))))
+                     threads))
+             (mapc #'sb-thread:join-thread threads)
+             ;; assert that no updates were lost
+             (loop for name across names
+                   for count across counts
+                   for val = (info :variable :macro-expansion name)
+                   do (assert (eql (or val 0) count))))))
+    ;; Try it when names are symbols or "simple" 2-list names
+    (run (coerce (loop repeat 50
+                       for sym = (gensym)
+                       nconc (list `(setf ,sym) sym))
+                 'vector))
+    ;; For hairy names, the tricky piece is in the rehash algorithm,
+    ;; but there's no way to stress-test that because *INFO-ENVIRONMENT*
+    ;; would have to keep doubling in size. To that end, it would have to begin
+    ;; as a tiny table again, but it can't, without destroying the Lisp runtime.
+    ;; The :lockfree-hash-concurrent-twiddling test should give high confidence
+    ;; that it works, by creating and testing a standalone hash-table.
+    (run (coerce (loop repeat 50 collect `(foo ,(gensym) hair)) 'vector))))
+
 ;;; success

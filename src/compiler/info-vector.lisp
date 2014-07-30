@@ -1164,8 +1164,8 @@ This is interpreted as
 ;;; the cell contents does not affecting the globaldb. In contrast,
 ;;; (INCF (INFO :function :full-calls myname)) would perform poorly.
 ;;;
-;;; See also ATOMICALLY-GET-OR-PUT-SYMBOL-INFO for atomic
-;;; read/modify/write operations.
+;;; See also ATOMIC-SET-INFO-VALUE and GET-INFO-VALUE-INITIALIZING
+;;; for atomic read/modify/write operations.
 ;;;
 ;;; Return the new value so that this can be conveniently used in a
 ;;; SETF function.
@@ -1196,6 +1196,44 @@ This is interpreted as
                              +no-auxilliary-key+)))
           (info-puthash *info-environment* name #'hairy-name)))))
   new-value)
+
+;; Instead of accepting a new-value, call NEW-VALUE-FUN to compute it
+;; from the existing value.  The function receives two arguments:
+;; if there was already a value, that value and T; otherwise two NILs.
+;; Return the newly-computed value. If NEW-VALUE-FUN returns the old value
+;; (compared by EQ) when there was one, then no globaldb update is made.
+(defun %atomic-set-info-value (name type-number new-value-fun)
+  (declare (function new-value-fun))
+  (when (typep name 'fixnum)
+    (error "~D is not a legal INFO name." name))
+  (let ((name (uncross name)) new-value)
+    (dx-flet ((augment (vect aux-key) ; VECT is a packed vector, never NIL
+                (declare (simple-vector vect))
+                (let ((index
+                       (packed-info-value-index vect aux-key type-number)))
+                  (if (not index)
+                      (packed-info-insert
+                       vect aux-key type-number
+                       (setq new-value (funcall new-value-fun nil nil)))
+                      (let ((oldval (svref vect index)))
+                        (setq new-value (funcall new-value-fun oldval t))
+                        (if (eq new-value oldval)
+                            vect ; return the old vector
+                            (let ((copy (copy-seq vect)))
+                              (setf (svref copy index) new-value)
+                              copy)))))))
+      (with-globaldb-name (key1 key2) name
+        :simple
+        ;; UPDATE-SYMBOL-INFO never supplies OLD-INFO as NIL.
+        (dx-flet ((simple-name (old-info) (augment old-info key2)))
+          (update-symbol-info key1 #'simple-name))
+        :hairy
+        ;; INFO-PUTHASH supplies NIL for OLD-INFO if NAME was absent.
+        (dx-flet ((hairy-name (old-info)
+                    (augment (or old-info +nil-packed-infos+)
+                             +no-auxilliary-key+)))
+          (info-puthash *info-environment* name #'hairy-name))))
+    new-value))
 
 ;; %GET-INFO-VALUE-INITIALIZING is provided as a low-level operation similar
 ;; to the above because it does not require info metadata for defaulting,

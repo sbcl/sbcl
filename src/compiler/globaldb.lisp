@@ -414,6 +414,26 @@
        (dx-flet ((,proc () ,creation-form))
          (%get-info-value-initializing ,name ,type-number #',proc)))))
 
+;; interface to %ATOMIC-SET-INFO-VALUE
+;; GET-INFO-VALUE-INITIALIZING is a restricted case of this,
+;; and perhaps could be implemented as such.
+;; Atomic update will be important for making the fasloader threadsafe
+;; using a predominantly lock-free design, and other nice things.
+(def!macro atomic-set-info-value (info-class info-type name lambda)
+  (with-unique-names (type-number proc)
+    `(let ((,type-number
+            ,(if (and (keywordp info-type) (keywordp info-class))
+                 (type-info-number (type-info-or-lose info-class info-type))
+                 `(type-info-number
+                   (type-info-or-lose ,info-class ,info-type)))))
+       ,(if (and (listp lambda) (eq (car lambda) 'lambda))
+            ;; rewrite as FLET because the compiler is unable to dxify
+            ;;   (DX-LET ((x (LAMBDA <whatever>))) (F x))
+            (destructuring-bind (lambda-list . body) (cdr lambda)
+              `(dx-flet ((,proc ,lambda-list ,@body))
+                 (%atomic-set-info-value ,name ,type-number #',proc)))
+            `(%atomic-set-info-value ,name ,type-number ,lambda)))))
+
 ;; Call FUNCTION once for each Name in globaldb that has information associated
 ;; with it, passing the function the Name as its only argument.
 ;;
