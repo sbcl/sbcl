@@ -193,8 +193,11 @@
 
 
 (defknown allocate-vector ((unsigned-byte 8) index
-                           ;; The number of words is later converted to bytes, make sure it fits.
-                           (unsigned-byte #.(- sb!vm:n-word-bits sb!vm:word-shift)))
+                           ;; The number of words is later converted
+                           ;; to bytes, make sure it fits.
+                           (and index
+                                (unsigned-byte #.(- sb!vm:n-word-bits
+                                                    sb!vm:word-shift))))
     (simple-array * (*))
     (flushable movable))
 
