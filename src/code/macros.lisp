@@ -302,7 +302,7 @@ invoked. In that case it will store into PLACE and start over."
                       (null (cdr cases)))
                  (push `(t nil ,@forms) clauses))
                 ((and multi-p (listp keyoid))
-                 (setf keys (append keyoid keys))
+                 (setf keys (nconc (reverse keyoid) keys))
                  (check-clause keyoid)
                  (push `((or ,@(mapcar (lambda (key)
                                          `(,test ,keyform-value ',key))
@@ -328,6 +328,11 @@ invoked. In that case it will store into PLACE and start over."
                          nil
                          ,@forms)
                        clauses))))))
+    (setq keys
+          (nreverse (mapcon (lambda (tail)
+                              (unless (member (car tail) (cdr tail))
+                                (list (car tail))))
+                            keys)))
     (case-body-aux name keyform keyform-value clauses keys errorp proceedp
                    `(,(if multi-p 'member 'or) ,@keys))))
 

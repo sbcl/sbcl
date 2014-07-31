@@ -558,3 +558,25 @@
 (test-util:with-test (:name :mv-call-regression-1.0.43.57)
   ;; This used to signal a bogus argument-count error.
   (mv-call-regression-1.0.43.57-quux 1s0 10s0 1s0 10s0))
+
+(defun etypecase-failure-test (x)
+  (etypecase x
+    (bignum 'b)
+    (character 'c)
+    ((or fixnum float) 'f)))
+(locally
+    (declare (muffle-conditions style-warning))
+  (defun ecase-failure-test (x)
+    (ecase x ((a b c) 1) ((b c d) 2) ((e d f) 3) ((c g h i) 4))))
+
+(test-util:with-test (:name :case-failures)
+  (assert (equal (handler-case (etypecase-failure-test 'hi)
+                   (sb-kernel:case-failure (c)
+                     (sb-kernel::case-failure-possibilities c)))
+                 ;; In order as originally written
+                 '(bignum character (or fixnum float))))
+  (assert (equal (handler-case (ecase-failure-test 'hi)
+                   (sb-kernel:case-failure (c)
+                     (sb-kernel::case-failure-possibilities c)))
+                 ;; In order as originally written, and no dups.
+                 '(a b c d e f g h i))))
