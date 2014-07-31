@@ -371,3 +371,13 @@
          ;; returned BAR, not "BAR" (and then subsequent reads would
          ;; lose).
          "bar"))
+
+;; WITH-INPUT-FROM-STRING would multiply evaluate the :END argument,
+;; and so previously this returned the symbol A, not ABC.
+(with-test (:name :with-input-from-string-end-once-only)
+  (assert (eq (let ((s "ABCDEFG")
+                    (i 5))
+                (symbol-macrolet ((ptr (decf i 2)))
+                  (with-input-from-string (stream s :end ptr)
+                    (read stream))))
+              'abc)))

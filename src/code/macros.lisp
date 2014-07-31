@@ -436,30 +436,21 @@ invoked. In that case it will store into PLACE and start over."
                                             &body forms-decls)
   (multiple-value-bind (forms decls)
       (parse-body forms-decls :doc-string-allowed nil)
-    ;; The ONCE-ONLY inhibits compiler note for unreachable code when
-    ;; END is true.
-    (once-only ((string string))
-      `(let ((,var
-              ,(cond ((null end)
-                      `(make-string-input-stream ,string ,(or start 0)))
-                     ((symbolp end)
-                      `(if ,end
-                           (make-string-input-stream ,string
-                                                     ,(or start 0)
-                                                     ,end)
-                           (make-string-input-stream ,string
-                                                     ,(or start 0))))
-                     (t
-                      `(make-string-input-stream ,string
-                                                 ,(or start 0)
-                                                 ,end)))))
+    `(let ((,var
+            ;; Should (WITH-INPUT-FROM-STRING (stream str :start nil :end 5))
+            ;; pass the explicit NIL, and thus get an error? It's logical
+            ;; because an explicit NIL does not mean "default" in any other
+            ;; string operation. So why does it here?
+            ,(if (null end)
+                 `(make-string-input-stream ,string ,@(if start (list start)))
+                 `(make-string-input-stream ,string ,(or start 0) ,end))))
          ,@decls
          (multiple-value-prog1
              (unwind-protect
                   (progn ,@forms)
                (close ,var))
            ,@(when index
-               `((setf ,index (string-input-stream-current ,var)))))))))
+               `((setf ,index (string-input-stream-current ,var))))))))
 
 (defmacro-mundanely with-output-to-string
     ((var &optional string &key (element-type ''character))

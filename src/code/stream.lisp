@@ -1255,6 +1255,14 @@
   (declare (type string string)
            (type index start)
            (type (or index null) end))
+  ;; FIXME: very inefficient if the input string is, say a 100000-character
+  ;; adjustable string but (- END START) is 100 characters. We should use
+  ;; SUBSEQ instead of coercing the whole string. And if STRING is non-simple
+  ;; but has element type CHARACTER, wouldn't it work to just use the
+  ;; underlying simple-string since INTERNAL-MAKE- accepts bounding indices
+  ;; that can be fudged to deal with any offset?
+  ;; And (for unicode builds) if the input is BASE-STRING, we should use
+  ;; MAKE-ARRAY and REPLACE to coerce just the specified piece.
   (let* ((string (coerce string '(simple-array character (*)))))
     ;; Why WITH-ARRAY-DATA, since the array is already simple?
     ;; because it's a nice abstract way to check the START and END.
