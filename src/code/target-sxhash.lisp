@@ -70,6 +70,36 @@
          (xor (logand 608948948376289905 sb!xc:most-positive-fixnum))
          (xy (logand (+ (* x mul) y) sb!xc:most-positive-fixnum)))
     (logand (logxor xor xy (ash xy -5)) sb!xc:most-positive-fixnum)))
+
+;; Return a number that increments by 1 for each word-pair allocation,
+;; barring complications such as exhaustion of the current page.
+;; The result is guaranteed to be a positive fixnum.
+(declaim (inline address-based-counter-val))
+(defun address-based-counter-val ()
+  #!+(and (not sb-thread) cheneygc)
+  (ash (sap-int (dynamic-space-free-pointer)) (- (1+ sb!vm:word-shift)))
+  ;; dynamic-space-free-pointer increments only when a page is full.
+  ;; Using boxed_region directly is finer-grained.
+  #!+(and (not sb-thread) gencgc)
+  (ash (extern-alien "boxed_region" unsigned-long)
+       (- (1+ sb!vm:word-shift)))
+  ;; threads imply gencgc. use the per-thread alloc region pointer
+  #!+sb-thread
+  (ash (sap-int (sb!vm::current-thread-offset-sap
+                 sb!vm::thread-alloc-region-slot))
+       (- (1+ sb!vm:word-shift))))
+
+;; Return some bits that are dependent on the next address that will be
+;; allocated, mixed with the previous state (in case addresses get recycled).
+;; This algorithm, used for stuffing a hash-code into instances of CTYPE
+;; subtypes, is simpler than RANDOM, and a test of randomness won't
+;; measure up as well, but for the intended use, it doesn't matter.
+;; CLOS hashes could probably be made to use this.
+(defun quasi-random-address-based-hash (state)
+  (declare (type (simple-array (and fixnum unsigned-byte) (1)) state))
+  ;; Ok with multiple threads - No harm, no foul.
+  (setf (aref state 0) (mix (address-based-counter-val) (aref state 0))))
+
 
 ;;;; hashing strings
 ;;;;

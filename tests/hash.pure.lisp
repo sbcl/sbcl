@@ -35,3 +35,18 @@
 (assert (/= (sxhash (pathname "foo.txt")) (sxhash (pathname "bar.txt"))))
 (assert (/= (sxhash (list 1 2 3)) (sxhash (list 3 2 1))))
 (assert (/= (sxhash #*1010) (sxhash #*0101)))
+
+(with-test (:name :address-based-hash-counter)
+  ;; It doesn't particularly matter what ADDRESS-BASED-COUNTER-VAL returns,
+  ;; but it's best to verify the assumption that each cons bumps the count by 1,
+  ;; lest it be violated in a way that affects the quality of CTYPE hashes.
+  (let ((win 0) (n-trials 10) (prev (sb-impl::address-based-counter-val)))
+    (dotimes (i n-trials)
+      (declare (notinline cons)) ; it's flushable, but don't flush it
+      (cons 1 2)
+      (let ((ptr (sb-impl::address-based-counter-val)))
+        (when (= ptr (1+ prev))
+          (incf win))
+        (setq prev ptr)))
+    ;; GC could occur in here. Just check that 9 out of 10 trials succeed.
+    (assert (>= win 9))))

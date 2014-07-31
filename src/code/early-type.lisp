@@ -571,6 +571,9 @@
 ;;;
 ;;; Note: VALUES-SPECIFIER-TYPE-CACHE-CLEAR must be called whenever a
 ;;; type is defined (or redefined).
+;;; This cache is sized extremely generously, which has payoff
+;;; elsewhere: it improves the TYPE= and CSUBTYPEP functions,
+;;; since EQ types are an immediate win.
 (defun-cached (values-specifier-type
                :hash-function #'sxhash
                :hash-bits 10)

@@ -14,28 +14,27 @@
 (!begin-collecting-cold-init-forms)
 
 ;; We can't make an instance of any CTYPE descendant until its type-class
-;; exists in *TYPE-CLASSES* and the random state has been made.
-;; By initializing the random state and type-class storage vector at once,
+;; exists in *TYPE-CLASSES* and the quasi-random state has been made.
+;; By initializing the state and type-class storage vector at once,
 ;; it is obvious that either both have been made or neither one has been.
-;; As such, a type-class need never call MAKE-RANDOM-STATE in its constructor.
-;; FIXME: the random state is shared across all threads and works only
-;; by accident of the fact that the PRNG doesn't suffer "hard" failure from
-;; multiple writers.
 #-sb-xc
-(progn (defvar *type-random-state* (make-random-state))
+(progn (defvar *ctype-hash-state* (make-random-state))
        (defvar *type-classes* (make-array 20 :fill-pointer 0)))
 #+sb-xc
 (macrolet ((def ()
-             (let ((n (length *type-classes*)))
+             (let* ((state-type `(unsigned-byte ,sb!vm:n-positive-fixnum-bits))
+                    (initform `(make-array 1 :element-type ',state-type))
+                    (n (length *type-classes*)))
              `(progn
-                (declaim (type random-state *type-random-state*)
+                (declaim (type (simple-array ,state-type (1))
+                               *ctype-hash-state*)
                          (type (simple-vector ,n) *type-classes*))
                 ;; The value forms are for type-correctness only.
                 ;; COLD-INIT-FORMS will already have been run.
-                (defglobal *type-random-state* (make-random-state))
+                (defglobal *ctype-hash-state* ,initform)
                 (defglobal *type-classes* (make-array ,n))
                 (!cold-init-forms
-                 (setq *type-random-state* (make-random-state)
+                 (setq *ctype-hash-state* ,initform
                        *type-classes* (make-array ,n)))))))
   (def))
 

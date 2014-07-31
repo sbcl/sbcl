@@ -81,11 +81,13 @@
   (enumerable nil :read-only t)
   ;; an arbitrary hash code used in EQ-style hashing of identity
   ;; (since EQ hashing can't be done portably)
-  ;; In the target lisp, we could grab some bits of the address and assign
-  ;; them into this slot rather than use RANDOM. The object isn't created
-  ;; yet, so there's a chicken-and-egg issue to solve.
-  (hash-value (random #.(ash 1 28) *type-random-state*)
-              :type (and fixnum unsigned-byte)
+  ;; In host lisp, use integers that are likely to be host fixnums,
+  ;; but don't declare the slot-type as such, in case not.
+  ;; In the target, use scrambled bits from the allocation pointer instead.
+  (hash-value
+   #+sb-xc-host (random #.(ash 1 23) *ctype-hash-state*)
+   #-sb-xc-host (sb!impl::quasi-random-address-based-hash *ctype-hash-state*)
+              :type (and #-sb-xc-host fixnum unsigned-byte)
               :read-only t)
   ;; Can this object contain other types? A global property of our
   ;; implementation (which unfortunately seems impossible to enforce
