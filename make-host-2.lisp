@@ -84,7 +84,9 @@
 (setf (sb!int:info :function :kind 'sb!int:quasiquote) :macro
       (sb!int:info :function :macro-function 'sb!int:quasiquote)
       (cl:macro-function 'sb!int:quasiquote))
-(sb-xc:with-compilation-unit ()
+(progn ; Should be: sb-xc:with-compilation-unit () ... but
+  ;; leaving aside the question of building in any host - which shouldn't
+  ;; matter - building SBCL in SBCL can hang in a way I haven't tracked down.
   (load "src/cold/compile-cold-sbcl.lisp"))
 
 ;; After cross-compiling, show me a list of types that checkgen
