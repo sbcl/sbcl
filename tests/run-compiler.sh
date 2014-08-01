@@ -27,6 +27,7 @@ while [ $# -gt 0 ]; do
         -sbcl-pic)
             case "$platform" in
                 FreeBSD-X86-64)  new=-fPIC ;;
+                Linux-ARM)       new=-fPIC ;;
                 Linux-MIPS)      new=-fPIC ;;
                 Linux-X86-64)    new=-fPIC ;;
                 Linux-PowerPC)   new=-fPIC ;;
