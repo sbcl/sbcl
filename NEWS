@@ -5,6 +5,8 @@ changes in sbcl-1.2.3 relative to sbcl-1.2.2:
     additional to global functions.
   * bug fix: some methods on CHANGE-CLASS did not finalize the new class
     before accessing its class-precedence list.
+  * bug fix: CHANGE-CLASS no longer fails on unbound slots in the source
+    object.
 
 changes in sbcl-1.2.2 relative to sbcl-1.2.1:
   * incompatible change: the #\` ("backquote") reader macro was reimplemented

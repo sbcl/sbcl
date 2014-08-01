@@ -1568,47 +1568,45 @@
         nwrapper)))
 
 (defun %change-class (instance new-class initargs)
-  (let* ((old-class (class-of instance))
-         (copy (allocate-instance new-class))
-         (new-wrapper (get-wrapper copy))
-         (old-wrapper (class-wrapper old-class))
-         (old-slots (get-slots instance))
-         (new-slots (get-slots copy))
-         (safe (safe-p new-class)))
-    (multiple-value-bind (new-instance-slots new-class-slots)
-        (classify-slotds (layout-slot-list new-wrapper))
-      (declare (ignore new-class-slots))
-      (multiple-value-bind (old-instance-slots old-class-slots)
-          (classify-slotds (layout-slot-list old-wrapper))
+  (binding* ((old-class (class-of instance))
+             (copy (allocate-instance new-class))
+             (new-wrapper (get-wrapper copy))
+             (old-wrapper (class-wrapper old-class))
+             (old-slots (get-slots instance))
+             (new-slots (get-slots copy))
+             (safe (safe-p new-class))
+             (new-instance-slots
+              (classify-slotds (layout-slot-list new-wrapper)))
+             ((old-instance-slots old-class-slots)
+              (classify-slotds (layout-slot-list old-wrapper))))
+    (labels ((find-slot (name slots)
+               (find name slots :key #'slot-definition-name))
+             (set-value (value slotd)
+               (when (and safe (neq value +slot-unbound+))
+                 (assert (typep value (slot-definition-type slotd)) (value)
+                         "~@<Error changing class. Current value in slot ~
+                          ~S of an instance of ~S is ~S, which does not ~
+                          match the new slot type ~S in class ~S.~:@>"
+                         (slot-definition-name slotd) old-class value
+                         (slot-definition-type slotd) new-class))
+               (setf (clos-slots-ref new-slots (slot-definition-location slotd)) value)))
 
-        (flet ((set-value (value slotd)
-                 (when safe
-                   (assert (typep value (slot-definition-type slotd)) (value)
-                           "~@<Error changing class. Current value in slot ~S ~
-                            of an instance of ~S is ~S, which does not match the new ~
-                            slot type ~S in class ~S.~:@>"
-                           (slot-definition-name slotd) old-class value
-                           (slot-definition-type slotd) new-class))
-                 (setf (clos-slots-ref new-slots (slot-definition-location slotd)) value)))
+      ;; "The values of local slots specified by both the class CTO and
+      ;; CFROM are retained. If such a local slot was unbound, it
+      ;; remains unbound."
+      (dolist (new new-instance-slots)
+        (binding* ((old (find-slot (slot-definition-name new) old-instance-slots)
+                        :exit-if-null)
+                   (value (clos-slots-ref old-slots (slot-definition-location old))))
+          (set-value value new)))
 
-          ;; "The values of local slots specified by both the class CTO and
-          ;; CFROM are retained. If such a local slot was unbound, it
-          ;; remains unbound."
-          (dolist (new new-instance-slots)
-            (let* ((name (slot-definition-name new))
-                   (old (find name old-instance-slots :key #'slot-definition-name)))
-              (when old
-                (set-value (clos-slots-ref old-slots (slot-definition-location old))
-                           new))))
-
-          ;; "The values of slots specified as shared in the class CFROM and
-          ;; as local in the class CTO are retained."
-          (dolist (old old-class-slots)
-            (let* ((slot-and-val (slot-definition-location old))
-                   (new (find (car slot-and-val) new-instance-slots
-                              :key #'slot-definition-name)))
-              (when new
-                (set-value (cdr slot-and-val) new)))))))
+      ;; "The values of slots specified as shared in the class CFROM and
+      ;; as local in the class CTO are retained."
+      (dolist (old old-class-slots)
+        (binding* ((slot-and-val (slot-definition-location old))
+                   (new (find-slot (car slot-and-val) new-instance-slots)
+                        :exit-if-null))
+          (set-value (cdr slot-and-val) new))))
 
     ;; Make the copy point to the old instance's storage, and make the
     ;; old instance point to the new storage.
