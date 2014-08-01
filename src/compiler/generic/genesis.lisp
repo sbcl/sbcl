@@ -1317,12 +1317,26 @@ core and return a descriptor to it."
 ;;; intern it.
 (defun finish-symbols ()
 
-  ;; I think the point of setting these functions into SYMBOL-VALUEs
-  ;; here, instead of using SYMBOL-FUNCTION, is that in CMU CL
-  ;; SYMBOL-FUNCTION reduces to FDEFINITION, which is a pretty
-  ;; hairy operation (involving globaldb.lisp etc.) which we don't
-  ;; want to invoke early in cold init. -- WHN 2001-12-05
+  ;; Everything between this preserved-for-posterity comment down to
+  ;; the assignment of *CURRENT-CATCH-BLOCK* could be entirely deleted,
+  ;; including the list of *C-CALLABLE-STATIC-SYMBOLS* itself,
+  ;; if it is GC-safe for the C runtime to have its own implementation
+  ;; of the INFO-VECTOR-FDEFN function in a multi-threaded build.
   ;;
+  ;;   "I think the point of setting these functions into SYMBOL-VALUEs
+  ;;    here, instead of using SYMBOL-FUNCTION, is that in CMU CL
+  ;;    SYMBOL-FUNCTION reduces to FDEFINITION, which is a pretty
+  ;;    hairy operation (involving globaldb.lisp etc.) which we don't
+  ;;    want to invoke early in cold init. -- WHN 2001-12-05"
+  ;;
+  ;; So... that's no longer true. We _do_ associate symbol -> fdefn in genesis.
+  ;; Additionally, the INFO-VECTOR-FDEFN function is extremely simple and could
+  ;; easily be implemented in C. However, info-vectors are inevitably
+  ;; reallocated when new info is attached to a symbol, so the vectors can't be
+  ;; in static space; they'd gradually become permanent garbage if they did.
+  ;; That's the real reason for preserving the approach of storing an #<fdefn>
+  ;; in a symbol's value cell - that location is static, the symbol-info is not.
+
   ;; FIXME: So OK, that's a reasonable reason to do something weird like
   ;; this, but this is still a weird thing to do, and we should change
   ;; the names to highlight that something weird is going on. Perhaps
@@ -1432,7 +1446,7 @@ core and return a descriptor to it."
           (cold-push r initial-symbols))))
     (cold-set '*!initial-symbols* initial-symbols))
 
-  (cold-set '*!initial-fdefn-objects* (list-all-fdefn-objects))
+  (attach-fdefinitions-to-symbols)
 
   (cold-set '*!reversed-cold-toplevels* *current-reversed-cold-toplevels*)
   (cold-set '*!initial-debug-sources* *current-debug-sources*)
@@ -1621,24 +1635,37 @@ core and return a descriptor to it."
           (error "Offset from FDEFN ~S to ~S is ~W, not ~W."
                  sym nil offset desired))))))
 
-(defun list-all-fdefn-objects ()
-  (let ((fdefns nil)
-        (result *nil-descriptor*))
-    (maphash (lambda (key value)
-               (push (cons key value) fdefns))
-             *cold-fdefn-objects*)
-    (flet ((sorter (x y)
-             (let* ((xbn (fun-name-block-name x))
-                    (ybn (fun-name-block-name y))
-                    (xbnpn (package-name (symbol-package-for-target-symbol xbn)))
-                    (ybnpn (package-name (symbol-package-for-target-symbol ybn))))
-               (cond
-                 ((eql xbn ybn) (consp x))
-                 ((string= xbn ybn) (string< xbnpn ybnpn))
-                 (t (string< xbn ybn))))))
-      (setq fdefns (sort fdefns #'sorter :key #'car)))
-    (dolist (fdefn fdefns result)
-      (cold-push (cdr fdefn) result))))
+;; Create pointer from SYMBOL and/or (SETF SYMBOL) to respective fdefinition
+;;
+(defun attach-fdefinitions-to-symbols ()
+  (let ((hashtable (make-hash-table :test #'eq)))
+    ;; Collect fdefinitions that go with one symbol, e.g. CAR and (SETF CAR),
+    ;; using the hosts's code for manipulating a packed info-vector.
+    (maphash (lambda (warm-name cold-fdefn)
+               (sb!c::with-globaldb-name (key1 key2) warm-name
+                 :hairy (error "Hairy fdefn name in genesis: ~S" warm-name)
+                 :simple
+                 (setf (gethash key1 hashtable)
+                       (sb!c::packed-info-insert
+                        (gethash key1 hashtable sb!c::+nil-packed-infos+)
+                        key2 sb!c::+fdefn-type-num+ cold-fdefn))))
+              *cold-fdefn-objects*)
+    ;; Emit in the same order symbols reside in core, for no particular reason.
+    (loop for (warm-sym . info)
+          in (sort (sb!impl::%hash-table-alist hashtable) #'<
+                   :key (lambda (x) (descriptor-bits (cold-intern (car x)))))
+          do (write-wordindexed
+              (cold-intern warm-sym) sb!vm:symbol-info-slot
+              ;; Each vector will have one fixnum, possibly the symbol SETF,
+              ;; and one or two #<fdefn> objects in it.
+              (apply #'vector-in-core
+                     (map 'list (lambda (elt)
+                                  (etypecase elt
+                                    (symbol (cold-intern elt))
+                                    (fixnum (make-fixnum-descriptor elt))
+                                    (descriptor elt)))
+                          info))))))
+
 
 ;;;; fixups and related stuff
 

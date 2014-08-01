@@ -40,16 +40,6 @@
   (declare (type fdefn fdefn))
   (fdefn-makunbound fdefn))
 
-;;; This function is called by !COLD-INIT after the globaldb has been
-;;; initialized, but before anything else. We need to install these
-;;; fdefn objects into the globaldb before any top level forms run, or
-;;; we will end up with two different fdefn objects being used for the
-;;; same function name. *!INITIAL-FDEFN-OBJECTS* is set up by GENESIS.
-(defvar *!initial-fdefn-objects*)
-(defun !fdefn-cold-init ()
-  (dolist (fdefn *!initial-fdefn-objects*)
-    (setf (info :function :definition (fdefn-name fdefn)) fdefn)))
-
 ;; Return the fdefn object for NAME, or NIL if there is no fdefn.
 ;; Signal an error if name isn't valid.
 ;; Assume that exists-p implies LEGAL-FUN-NAME-P.

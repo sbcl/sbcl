@@ -127,10 +127,6 @@
   (/show0 "about to SHOW-AND-CALL !GLOBALDB-COLD-INIT")
   (show-and-call !globaldb-cold-init)
 
-  ;; This needs to be done early, but needs to be after INFO is
-  ;; initialized.
-  (show-and-call !fdefn-cold-init)
-
   ;; Various toplevel forms call MAKE-ARRAY, which calls SUBTYPEP, so
   ;; the basic type machinery needs to be initialized before toplevel
   ;; forms run.

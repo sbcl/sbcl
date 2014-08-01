@@ -151,3 +151,11 @@ unspecified."
   `(sb!thread::with-recursive-system-lock
        ((hash-table-lock ,hash-table))
      ,@body))
+
+;;; Return an association list representing the same data as HASH-TABLE.
+(defun %hash-table-alist (hash-table)
+  (let ((result nil))
+    (maphash (lambda (key value)
+               (push (cons key value) result))
+             hash-table)
+    result))

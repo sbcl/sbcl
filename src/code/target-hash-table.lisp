@@ -1038,14 +1038,6 @@ to protect the MAPHASH call."
     :rehash-threshold ',(hash-table-rehash-threshold hash-table)
     :weakness         ',(hash-table-weakness         hash-table)))
 
-;;; Return an association list representing the same data as HASH-TABLE.
-(defun %hash-table-alist (hash-table)
-  (let ((result nil))
-    (maphash (lambda (key value)
-               (push (cons key value) result))
-             hash-table)
-    result))
-
 ;;; Stuff an association list into HASH-TABLE. Return the hash table,
 ;;; so that we can use this for the *PRINT-READABLY* case in
 ;;; PRINT-OBJECT (HASH-TABLE T) without having to worry about LET
