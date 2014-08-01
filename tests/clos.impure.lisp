@@ -175,49 +175,219 @@
 (assert (eq (born-to-be-redefined 1) 'int))
 
 ;;; In the removal of ITERATE from SB-PCL, a bug was introduced
-;;; preventing forward-references and also change-class (which
-;;; forward-references used interally) from working properly.  One
-;;; symptom was reported by Brian Spilsbury (sbcl-devel 2002-04-08),
-;;; and another on IRC by Dan Barlow simultaneously.  Better check
-;;; that it doesn't happen again.
+;;; preventing forward-references and also CHANGE-CLASS (which
+;;; forward-references used interally) from working properly.
 ;;;
-;;; First, the forward references:
+;;; One symptom was reported by Brian Spilsbury (sbcl-devel
+;;; 2002-04-08), and another on IRC by Dan Barlow simultaneously.
+;;; Better check that it doesn't happen again.
+;;;
+;;; Some more CHANGE-CLASS testing (which only applies to the now
+;;; ANSI-compliant version) thanks to Espen Johnsen)
+
+;; First, the forward references:
 (defclass forward-ref-a (forward-ref-b) ())
 (defclass forward-ref-b () ())
-;;; (a couple more complicated examples found by Paul Dietz' test
-;;; suite):
+;; (a couple more complicated examples found by Paul Dietz' test
+;; suite):
 (defclass forward-ref-c1 (forward-ref-c2) ())
 (defclass forward-ref-c2 (forward-ref-c3) ())
 
-(defclass forward-ref-d1 (forward-ref-d2 forward-ref-d3) ())
-(defclass forward-ref-d2 (forward-ref-d4 forward-ref-d5) ())
+(defclass forward-ref-d1 (forward-ref-d2 forward-ref-d3)
+  ())
+(defclass forward-ref-d2 (forward-ref-d4 forward-ref-d5)
+  ())
 
-;;; Then change-class
-(defclass class-with-slots ()
-  ((a-slot :initarg :a-slot :accessor a-slot)
-   (b-slot :initarg :b-slot :accessor b-slot)
-   (c-slot :initarg :c-slot :accessor c-slot)))
+;; Then CHANGE-CLASS
+(defun change-class-test-case (spec)
+  (destructuring-bind (from-class from-initargs
+                       to-class   to-initargs
+                       expected-slots)
+      spec
+    (let ((from (apply #'make-instance from-class from-initargs)))
+      (flet ((change ()
+               (apply #'change-class from to-class to-initargs))
+             ;; These local functions make ASSERT produce better error
+             ;; messages.
+             (slot-value-equal (instance name value expected)
+               (declare (ignore instance name))
+               (equal value expected))
+             (slot-not-bound (instance name)
+               (not (slot-boundp instance name))))
+        (case expected-slots
+          (error
+           (assert-error (change)))
+          (type-error
+           (assert-error (change) type-error))
+          (t
+           (let ((to (change)))
+             (loop :for (name value) :in expected-slots
+                :do (case value
+                      (:unbound
+                       (assert (slot-not-bound to name)))
+                      (t
+                       (assert
+                        (slot-value-equal
+                         to name (slot-value to name) value))))))))))))
 
-(let ((foo (make-instance 'class-with-slots
-                          :a-slot 1
-                          :b-slot 2
-                          :c-slot 3)))
-  (let ((bar (change-class foo 'class-with-slots)))
-    (assert (= (a-slot bar) 1))
-    (assert (= (b-slot bar) 2))
-    (assert (= (c-slot bar) 3))))
+(defclass change-class.smoke.1 ()
+  ((foo :initarg :foo)))
+(defclass change-class.smoke.2 (change-class.smoke.1) ())
+(defclass change-class.smoke.3 (change-class.smoke.1)
+  ((foo :initarg :foo)))
+(defclass change-class.smoke.4 ()
+  ((foo :initarg :foo) (bar :initarg :bar)))
+(defclass change-class.smoke.5 ()
+  ((a :initarg :a) (b :initarg :b) (c :initarg :c)))
 
-;;; some more CHANGE-CLASS testing, now that we have an ANSI-compliant
-;;; version (thanks to Espen Johnsen)
-(defclass from-class ()
-  ((foo :initarg :foo :accessor foo)))
-(defclass to-class ()
-  ((foo :initarg :foo :accessor foo)
-   (bar :initarg :bar :accessor bar)))
-(let* ((from (make-instance 'from-class :foo 1))
-       (to (change-class from 'to-class :bar 2)))
-  (assert (= (foo to) 1))
-  (assert (= (bar to) 2)))
+(with-test (:name (change-class :smoke))
+  (mapc
+   #'change-class-test-case
+   '(;; Test unbound slots.
+     (change-class.smoke.1 ()               change-class.smoke.1 ()
+      ((foo :unbound)))
+     (change-class.smoke.1 ()               change-class.smoke.2 ()
+      ((foo :unbound)))
+     (change-class.smoke.1 ()               change-class.smoke.3 ()
+      ((foo :unbound)))
+     (change-class.smoke.1 ()               change-class.smoke.4 ()
+      ((foo :unbound) (bar :unbound)))
+     (change-class.smoke.4 (:bar 1)         change-class.smoke.1 ()
+      ((foo :unbound)))
+
+     ;; Bound slots are retained.
+     (change-class.smoke.1 (:foo :baz)      change-class.smoke.1 ()
+      ((foo :baz)))
+     (change-class.smoke.1 (:foo :baz)      change-class.smoke.2 ()
+      ((foo :baz)))
+     (change-class.smoke.1 (:foo :baz)      change-class.smoke.3 ()
+      ((foo :baz)))
+     (change-class.smoke.1 (:foo :baz)      change-class.smoke.4 ()
+      ((foo :baz) (bar :unbound)))
+     (change-class.smoke.4 (:foo :baz)      change-class.smoke.1 ()
+      ((foo :baz)))
+
+     ;; Original test.
+     (change-class.smoke.5 (:a 1 :b 2 :c 3) change-class.smoke.5 ()
+      ((a 1) (b 2) (c 3)))
+
+     ;; Original test by Espen Johnsen
+     (change-class.smoke.1 (:foo 1)         change-class.smoke.4 (:bar 2)
+      ((foo 1) (bar 2))))))
+
+;; Test for type-checking
+
+(locally (declare (optimize (safety 3))) ; force slot type-checking
+  (defclass change-class.type-check.1 ()
+    ((foo :initarg :foo :type real)))
+  (defclass change-class.type-check.2 ()
+    ((foo :initarg :foo :type integer))))
+
+(with-test (:name (change-class :type-check))
+  (mapc
+   #'change-class-test-case
+   '(;; These are allowed.
+     (change-class.type-check.1 ()         change-class.type-check.2 ()
+      ((foo :unbound)))
+     (change-class.type-check.1 (:foo 1)   change-class.type-check.2 ()
+      ((foo 1)))
+     (change-class.type-check.1 (:foo 1.0) change-class.type-check.2 (:foo 2)
+      ((foo 2)))
+
+     ;; These are not allowed.
+     (change-class.type-check.1 ()         change-class.type-check.2 (:foo 1.0)
+      type-error)
+     (change-class.type-check.1 (:foo 1.0) change-class.type-check.2 ()
+      type-error)))
+
+  ;; Type-mismatches should be recoverable via USE-VALUE restart.
+  (let* ((from (make-instance 'change-class.type-check.1 :foo 1.0))
+         (to (handler-bind ((type-error (lambda (condition)
+                                          (use-value 3))))
+               (change-class from 'change-class.type-check.2))))
+    (assert (equal (slot-value to 'foo) 3))))
+
+;; Test interaction with initforms and -args
+
+(defclass change-class.initforms.1 ()
+  ())
+(defclass change-class.initforms.2 ()
+  ((foo :initarg :foo)))
+(defclass change-class.initforms.3 ()
+  ((foo :initarg :foo :initform :bar)))
+(defclass change-class.initforms.4 ()
+  ((foo :initarg :foo))
+  (:default-initargs
+   :foo :bar))
+
+(with-test (:name (change-class :initforms))
+  (mapc
+   #'change-class-test-case
+   '(;; Initialization of added slot.
+     (change-class.initforms.1 ()          change-class.initforms.3 ()
+      ((foo :bar)))
+     (change-class.initforms.1 ()          change-class.initforms.3 (:foo :fez)
+      ((foo :fez)))
+     (change-class.initforms.1 ()          change-class.initforms.4 ()
+      ((foo :unbound))) ; default initargs are not used
+     (change-class.initforms.1 ()          change-class.initforms.4 (:foo :fez)
+      ((foo :fez)))
+
+     ;; Unbound slot remains unbound.
+     (change-class.initforms.2 ()          change-class.initforms.3 ()
+      ((foo :unbound)))
+     (change-class.initforms.2 ()          change-class.initforms.3 (:foo :fez)
+      ((foo :fez)))
+     (change-class.initforms.2 ()          change-class.initforms.4 ()
+      ((foo :unbound)))
+     (change-class.initforms.2 ()          change-class.initforms.4 (:foo :fez)
+      ((foo :fez)))
+
+     ;; Value is retained.
+     (change-class.initforms.2 (:foo :baz) change-class.initforms.3 ()
+      ((foo :baz)))
+     (change-class.initforms.2 (:foo :baz) change-class.initforms.3 (:foo :fez)
+      ((foo :fez)))
+     (change-class.initforms.2 (:foo :baz) change-class.initforms.4 ()
+      ((foo :baz)))
+     (change-class.initforms.2 (:foo :baz) change-class.initforms.4 (:foo :fez)
+      ((foo :fez))))))
+(change-class (make-instance 'change-class.initforms.1) 'change-class.initforms.3)
+;; Test for FORWARD-REFERENCED-CLASS
+
+(defclass change-class.forward-referenced.1 () ())
+;; CHANGE-CLASS.FORWARD-REFERENCED.2 is only needed to create the
+;; FORWARD-REFERENCED-CLASS CHANGE-CLASS.FORWARD-REFERENCED.3.
+(defclass change-class.forward-referenced.2 (change-class.forward-referenced.3) ())
+
+(with-test (:name (change-class sb-pcl:forward-referenced-class))
+  (mapc
+   #'change-class-test-case
+   '((change-class.forward-referenced.1 () change-class.forward-referenced.3 ()
+      error))))
+
+;; Test for FUNCALLABLE-STANDARD-CLASS
+
+(defclass change-class.funcallable.1 () ())
+(defclass change-class.funcallable.2 () ()
+  (:metaclass sb-mop:funcallable-standard-class))
+(defclass change-class.funcallable.3 () ()
+  (:metaclass sb-mop:funcallable-standard-class))
+
+(with-test (:name (change-class sb-mop:funcallable-standard-class))
+  (mapc
+   #'change-class-test-case
+   '(;; Cannot change STANDARD-OBJECT into FUNCALLABLE-STANDARD-OBJECT
+     ;; and vice-versa.
+     (change-class.funcallable.1 () change-class.funcallable.2 ()
+      error)
+     (change-class.funcallable.2 () change-class.funcallable.1 ()
+      error)
+     ;; FUNCALLABLE-STANDARD-OBJECTs should work.
+     (change-class.funcallable.2 () change-class.funcallable.2 ()
+      ())
+     (change-class.funcallable.2 () change-class.funcallable.3 ()
+      ()))))
 
 ;;; Until Pierre Mai's patch (sbcl-devel 2002-06-18, merged in
 ;;; sbcl-0.7.4.39) the :MOST-SPECIFIC-LAST option had no effect.
