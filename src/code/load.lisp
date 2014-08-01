@@ -207,7 +207,7 @@
 ;;; Define a local macro to pop from the stack. Push the result of evaluation
 ;;; if PUSHP.
 (defmacro with-fop-stack (pushp &body forms)
-  (aver (member pushp '(nil t :nope)))
+  (aver (member pushp '(nil t)))
   `(macrolet ((pop-stack ()
                 `(pop-fop-stack))
               (push-stack (value)
