@@ -3,6 +3,8 @@
 changes in sbcl-1.2.3 relative to sbcl-1.2.2:
   * enhancement: ASSERT reports arguments of calls to lexical functions in
     additional to global functions.
+  * bug fix: some methods on CHANGE-CLASS did not finalize the new class
+    before accessing its class-precedence list.
 
 changes in sbcl-1.2.2 relative to sbcl-1.2.1:
   * incompatible change: the #\` ("backquote") reader macro was reimplemented
