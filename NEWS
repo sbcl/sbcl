@@ -7,6 +7,8 @@ changes in sbcl-1.2.3 relative to sbcl-1.2.2:
     before accessing its class-precedence list.
   * bug fix: CHANGE-CLASS no longer fails on unbound slots in the source
     object.
+  * bug fix: CHANGE-CLASS signals an appropriate error when the destination
+    class is a FORWARD-REFERENCED-CLASS.
 
 changes in sbcl-1.2.2 relative to sbcl-1.2.1:
   * incompatible change: the #\` ("backquote") reader macro was reimplemented

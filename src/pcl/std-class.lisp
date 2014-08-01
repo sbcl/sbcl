@@ -1654,6 +1654,15 @@
          (return nil)))
      (%change-class instance new-class initargs)))
 
+  (defmethod change-class ((instance t)
+                           (new-class forward-referenced-class) &rest initargs)
+    (error 'metaobject-initialization-violation
+           :format-control "~@<Cannot ~S objects into ~S objects.~@:>"
+           :format-arguments (list 'change-class 'forward-referenced-class)
+           :references
+           (list '(:amop :generic-function ensure-class-using-class)
+                 '(:amop :initialization class))))
+
  (defmethod change-class ((instance funcallable-standard-object)
                           (new-class funcallable-standard-class)
                           &rest initargs)
