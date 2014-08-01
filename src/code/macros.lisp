@@ -198,7 +198,7 @@ invoked. In that case it will store into PLACE and start over."
            (defun sb!c::%define-compiler-macro
                (name definition lambda-list doc debug-name)
              ,@(unless set-p
-                 '((declare (ignore lambda-list debug-name))))
+                 '((declare (ignore lambda-list doc debug-name))))
              ;; FIXME: warn about incompatible lambda list with
              ;; respect to parent function?
              (setf (sb!xc:compiler-macro-function name) definition)

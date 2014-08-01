@@ -151,6 +151,7 @@
 ;;;; comparison
 
 (macrolet ((define-cond-assem-rtn (name translate static-fn test)
+             (declare (ignorable static-fn)) ; not used if #-sb-assembling
              #+sb-assembling
              `(define-assembly-routine (,name
                                         (:return-style :none))

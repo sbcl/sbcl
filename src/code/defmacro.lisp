@@ -59,6 +59,7 @@
        `(eval-when (,@times)
           (defun sb!c::%defmacro (name definition lambda-list doc debug-name
                                   source-location)
+            (declare (ignorable source-location)) ; xc-host doesn't use
             ;; old note (ca. 1985, maybe:-): "Eventually %%DEFMACRO
             ;; should deal with clearing old compiler information for
             ;; the functional value."

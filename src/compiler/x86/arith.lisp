@@ -1383,6 +1383,7 @@ constant shift greater than word length")))
                    (funfx (intern (format nil "~S-MODFX" name)))
                    (vopfxf (intern (format nil "FAST-~S-MODFX/FIXNUM=>FIXNUM" name)))
                    (vopfxcf (intern (format nil "FAST-~S-MODFX-C/FIXNUM=>FIXNUM" name))))
+               (declare (ignore vop32cf)) ; maybe someone will want it some day
                `(progn
                   (define-modular-fun ,fun32 (x y) ,name :untagged nil 32)
                   (define-modular-fun ,funfx (x y) ,name :tagged t

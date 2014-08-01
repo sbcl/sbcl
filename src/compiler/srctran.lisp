@@ -2446,6 +2446,7 @@
 
 #+sb-xc-host ; (See CROSS-FLOAT-INFINITY-KLUDGE.)
 (defoptimizer (random derive-type) ((bound &optional state))
+  (declare (ignore state))
   (let ((type (lvar-type bound)))
     (when (numeric-type-p type)
       (let ((class (numeric-type-class type))
