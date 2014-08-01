@@ -9,6 +9,8 @@ changes in sbcl-1.2.3 relative to sbcl-1.2.2:
     object.
   * bug fix: CHANGE-CLASS signals an appropriate error when the destination
     class is a FORWARD-REFERENCED-CLASS.
+  * bug fix: CHANGE-CLASS no longer signals bogus TYPE-ERRORs for slots for
+    which initargs have been supplied.
 
 changes in sbcl-1.2.2 relative to sbcl-1.2.1:
   * incompatible change: the #\` ("backquote") reader macro was reimplemented

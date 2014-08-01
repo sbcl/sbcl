@@ -1581,24 +1581,48 @@
               (classify-slotds (layout-slot-list old-wrapper))))
     (labels ((find-slot (name slots)
                (find name slots :key #'slot-definition-name))
+             (initarg-for-slot-p (slot)
+               (dolist (slot-initarg (slot-definition-initargs slot))
+                 ;; Abuse +slot-unbound+
+                 (unless (eq +slot-unbound+
+                             (getf initargs slot-initarg +slot-unbound+))
+                   (return t))))
              (set-value (value slotd)
                (when (and safe (neq value +slot-unbound+))
-                 (assert (typep value (slot-definition-type slotd)) (value)
-                         "~@<Error changing class. Current value in slot ~
-                          ~S of an instance of ~S is ~S, which does not ~
-                          match the new slot type ~S in class ~S.~:@>"
-                         (slot-definition-name slotd) old-class value
-                         (slot-definition-type slotd) new-class))
+                 ;; TODO same logic is in %OBSOLETE-INSTANCE-TRAP
+                 (let ((name (slot-definition-name slotd))
+                       (type (slot-definition-type slotd)))
+                   (do () ((typep value type))
+                     (restart-case
+                         (bad-type
+                          value type
+                          "~@<Error changing class. Current value in ~
+                           slot ~/sb-impl::print-symbol-with-prefix/ of ~
+                           an instance of ~S is ~S, which does not ~
+                           match the new slot type ~S in class ~
+                           ~S.~:@>"
+                          name old-class value type new-class)
+                       (use-value (new-value)
+                         :interactive read-evaluated-form
+                         :report (lambda (stream)
+                                   (format stream "~@<Specify a new ~
+                                                   value to by used ~
+                                                   for slot ~/sb-impl::print-symbol-with-prefix/ ~
+                                                   instead of ~
+                                                   ~S.~@:>"
+                                           name value))
+                         (setf value new-value))))))
                (setf (clos-slots-ref new-slots (slot-definition-location slotd)) value)))
 
-      ;; "The values of local slots specified by both the class CTO and
-      ;; CFROM are retained. If such a local slot was unbound, it
+      ;; "The values of local slots specified by both the class CTO
+      ;; and CFROM are retained. If such a local slot was unbound, it
       ;; remains unbound."
       (dolist (new new-instance-slots)
-        (binding* ((old (find-slot (slot-definition-name new) old-instance-slots)
-                        :exit-if-null)
-                   (value (clos-slots-ref old-slots (slot-definition-location old))))
-          (set-value value new)))
+        (unless (initarg-for-slot-p new)
+          (binding* ((old (find-slot (slot-definition-name new) old-instance-slots)
+                          :exit-if-null)
+                     (value (clos-slots-ref old-slots (slot-definition-location old))))
+            (set-value value new))))
 
       ;; "The values of slots specified as shared in the class CFROM and
       ;; as local in the class CTO are retained."
