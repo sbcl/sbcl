@@ -58,11 +58,12 @@
                 ;; attempt this if TEST-FORM is the application of a
                 ;; special operator because of argument evaluation
                 ;; order issues.
-                ((and (typep test-form '(cons symbol list))
-                      (eq (info :function :kind (first test-form)) :function))
-                 (let ((name (first test-form))
-                       (args (mapcar #'process-place (rest test-form))))
-                   `(,name ,@args)))
+                ((when (typep test-form '(cons symbol list))
+                   (let ((name (first test-form)))
+                     (when (or (eq (info :function :kind name) :function)
+                               (when (typep env 'sb!kernel:lexenv)
+                                 (assoc name (sb!c::lexenv-funs env))))
+                       `(,name ,@(mapcar #'process-place (rest test-form)))))))
                 ;; For all other cases, just evaluate TEST-FORM and do
                 ;; not report any details if the assertion fails.
                 (t

@@ -306,7 +306,14 @@
     (test ((a t)) (not a) "The assertion (NOT A) failed with A = T.")
     (test () (not t) "The assertion (NOT T) failed.")
     (test ((a -1)) (plusp (signum a))
-          "The assertion (PLUSP (SIGNUM A)) failed with (SIGNUM A) = -1.")))
+          "The assertion (PLUSP (SIGNUM A)) failed with (SIGNUM A) = -1.")
+    ;; Same for local functions.
+    (flet ((my-not (x) (not x))
+           (my-plusp (x) (plusp x)))
+      (test ((a t)) (my-not a) "The assertion (MY-NOT A) failed with A = T.")
+      (test () (my-not t) "The assertion (MY-NOT T) failed.")
+      (test ((a -1)) (my-plusp (signum a))
+            "The assertion (MY-PLUSP (SIGNUM A)) failed with (SIGNUM A) = -1."))))
 
 (with-test (:name (find-restart :recheck-conditions-and-tests :bug-774410))
   (let ((activep t))
