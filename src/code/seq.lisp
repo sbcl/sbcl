@@ -841,25 +841,25 @@ many elements are copied."
   "Executes BODY with ELEMENT subsequently bound to each element of
   SEQUENCE, then returns RETURN."
   (multiple-value-bind (forms decls) (parse-body body :doc-string-allowed nil)
-    (let ((s sequence)
-          (sequence (gensym "SEQUENCE")))
-      `(block nil
-        (let ((,sequence ,s))
-          (seq-dispatch ,sequence
-            (dolist (,element ,sequence ,return) ,@body)
-            (do-vector-data (,element ,sequence ,return) ,@body)
-            (multiple-value-bind (state limit from-end step endp elt)
-                (sb!sequence:make-sequence-iterator ,sequence)
-              (do ((state state (funcall step ,sequence state from-end)))
-                  ((funcall endp ,sequence state limit from-end)
-                   (let ((,element nil))
-                     ,@(filter-dolist-declarations decls)
-                     ,element
-                     ,return))
-                (let ((,element (funcall elt ,sequence state)))
-                  ,@decls
-                  (tagbody
-                     ,@forms))))))))))
+    (once-only ((sequence sequence))
+      (with-unique-names (state limit from-end step endp elt)
+        `(block nil
+           (seq-dispatch ,sequence
+             (dolist (,element ,sequence ,return) ,@body)
+             (do-vector-data (,element ,sequence ,return) ,@body)
+             (multiple-value-bind (,state ,limit ,from-end ,step ,endp ,elt)
+                 (sb!sequence:make-sequence-iterator ,sequence)
+               (do ((,state ,state (funcall ,step ,sequence ,state ,from-end)))
+                   ((funcall ,endp ,sequence ,state ,limit ,from-end)
+                    (let ((,element nil))
+                      ,@(filter-dolist-declarations decls)
+                      (declare (ignorable ,element))
+                      ,return))
+                 (let ((,element (funcall ,elt ,sequence ,state)))
+                   ,@decls
+                   (tagbody
+                      ,@forms))))))))))
+
 
 (defun concatenate (output-type-spec &rest sequences)
   #!+sb-doc
