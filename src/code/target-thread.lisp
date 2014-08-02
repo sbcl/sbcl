@@ -1124,10 +1124,17 @@ WAIT-ON-SEMAPHORE or TRY-SEMAPHORE."
            ;; lock being held!
            (sb!ext:atomic-decf (semaphore-waitcount semaphore))))))))
 
-(defun wait-on-semaphore (semaphore &key timeout notification)
+(declaim (ftype (sfunction (semaphore &key
+                                      (:n (integer 1))
+                                      (:timeout (real (0)))
+                                      (:notification semaphore-notification))
+                           (or null (integer 0)))
+                wait-on-semaphore))
+(defun wait-on-semaphore (semaphore &key (n 1) timeout notification)
   #!+sb-doc
-  "Decrement the count of SEMAPHORE if the count would not be negative. Else
-blocks until the semaphore can be decremented. Returns the new count of
+  "Decrement the count of SEMAPHORE by N if the count would not be negative.
+
+Else blocks until the semaphore can be decremented. Returns the new count of
 SEMAPHORE on success.
 
 If TIMEOUT is given, it is the maximum number of seconds to wait. If the count
@@ -1138,8 +1145,12 @@ If NOTIFICATION is given, it must be a SEMAPHORE-NOTIFICATION object whose
 SEMAPHORE-NOTIFICATION-STATUS is NIL. If WAIT-ON-SEMAPHORE succeeds and
 decrements the count, the status is set to T."
   (%decrement-semaphore
-   semaphore 1 (or timeout t) notification 'wait-on-semaphore))
+   semaphore n (or timeout t) notification 'wait-on-semaphore))
 
+(declaim (ftype (sfunction (semaphore &optional
+                                      (integer 1) semaphore-notification)
+                           (or null (integer 0)))
+                try-semaphore))
 (defun try-semaphore (semaphore &optional (n 1) notification)
   #!+sb-doc
   "Try to decrement the count of SEMAPHORE by N. If the count were to
@@ -1149,7 +1160,6 @@ SEMAPHORE.
 If NOTIFICATION is given it must be a semaphore notification object
 with SEMAPHORE-NOTIFICATION-STATUS of NIL. If the count is decremented,
 the status is set to T."
-  (declare (type (integer 1) n))
   (%decrement-semaphore semaphore n nil notification 'try-semaphore))
 
 (defun signal-semaphore (semaphore &optional (n 1))

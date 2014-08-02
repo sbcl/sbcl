@@ -517,7 +517,7 @@
                              :timeout 0.01
                              :default cookie)))))
 
-(with-test (:name (:semaphore-notification :wait-on-semaphore :lp-1038034)
+(with-test (:name (wait-on-semaphore semaphore-notification :lp-1038034)
             :skipped-on '(not :sb-thread)
             :fails-on :sb-thread)
   ;; Test robustness of semaphore acquisition and notification with
@@ -565,7 +565,7 @@
     (write-char #\.)
     (force-output)))
 
-(with-test (:name (:semaphore-notification :wait-on-semaphore)
+(with-test (:name (wait-on-semaphore semaphore-notification)
             :skipped-on '(not :sb-thread))
   (let ((sem (make-semaphore))
         (ok nil)
@@ -612,7 +612,12 @@
           (assert (= n (+ k (length safe))))
           (assert unsafe))))))
 
-(with-test (:name (:semaphore-notification :try-sempahore)
+(with-test (:name (wait-on-semaphore :n))
+  (let ((semaphore (make-semaphore :count 3)))
+    (assert (= 1 (wait-on-semaphore semaphore :n 2)))
+    (assert (= 1 (semaphore-count semaphore)))))
+
+(with-test (:name (try-semaphore semaphore-notification)
             :skipped-on '(not :sb-thread))
   (let* ((sem (make-semaphore))
          (note (make-semaphore-notification)))
