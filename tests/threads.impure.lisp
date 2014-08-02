@@ -428,7 +428,7 @@
 (with-test (:name (:semaphore :initial-count))
   (let ((sem (make-semaphore :count 1)))
     (sb-ext:with-timeout 0.1
-      (wait-on-semaphore sem))))
+      (assert (= 0 (wait-on-semaphore sem))))))
 
 (with-test (:name (:semaphore :wait-then-signal))
   (let ((sem (make-semaphore))
@@ -437,7 +437,7 @@
                         (sleep 0.1)
                         (setq signalled-p t)
                         (signal-semaphore sem)))
-    (wait-on-semaphore sem)
+    (assert (= 0 (wait-on-semaphore sem)))
     (assert signalled-p)))
 
 (with-test (:name (:semaphore :signal-then-wait))
@@ -447,7 +447,7 @@
                         (signal-semaphore sem)
                         (setq signalled-p t)))
     (loop until signalled-p)
-    (wait-on-semaphore sem)
+    (assert (= 0 (wait-on-semaphore sem)))
     (assert signalled-p)))
 
 (defun test-semaphore-multiple-signals (wait-on-semaphore)
@@ -477,7 +477,7 @@
 
 (with-test (:name (:try-semaphore :trivial-success))
   (let ((sem (make-semaphore :count 1)))
-    (assert (try-semaphore sem))
+    (assert (= 0 (try-semaphore sem)))
     (assert (zerop (semaphore-count sem)))))
 
 (with-test (:name (:try-semaphore :trivial-fail :n>1))
@@ -485,8 +485,8 @@
 
 (with-test (:name (:try-semaphore :trivial-success :n>1))
   (let ((sem (make-semaphore :count 10)))
-    (assert (try-semaphore sem 5))
-    (assert (try-semaphore sem 5))
+    (assert (= 5 (try-semaphore sem 5)))
+    (assert (= 0 (try-semaphore sem 5)))
     (assert (zerop (semaphore-count sem)))))
 
 (with-test (:name (:try-semaphore :emulate-wait-on-semaphore))
@@ -529,8 +529,6 @@
       (assert (zerop (count-live-threads triers)))
       (assert (zerop (count-live-threads waiters)))
       (assert (zerop (count-live-threads more-waiters))))))
-
-
 
 (format t "~&semaphore tests done~%")
 

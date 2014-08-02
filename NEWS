@@ -1,5 +1,7 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 changes relative to sbcl-1.2.12:
+  * incompatible change: on success, TRY-SEMAPHORE and WAIT-ON-SEMAPHORE
+    return the new count
   * enhancement: On Windows DBG_PRINTEXCEPTION_C is handled and its message is
     printed. (lp#1437947)
   * bug-fix: TRUENAME works properly on broken symlinks presented as
@@ -85,7 +87,7 @@ changes in sbcl-1.2.10 relative to sbcl-1.2.9:
     encountering invalid FUNCTION forms like (function 1)
   * bug fix: express proper dependencies in the ASDF contrib, to support
     systems where make runs in parallel.  (lp#1434768; thanks to Nikhil
-    Benesch) 
+    Benesch)
 
 changes in sbcl-1.2.9 relative to sbcl-1.2.8:
   * minor incompatible change and bug fix: unboxed numeric constants

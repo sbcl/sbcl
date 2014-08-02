@@ -1069,23 +1069,18 @@ WAIT-ON-SEMAPHORE or TRY-SEMAPHORE."
   (barrier (:read))
   (semaphore-%count instance))
 
-(defun wait-on-semaphore (semaphore &key timeout notification)
-  #!+sb-doc
-  "Decrement the count of SEMAPHORE if the count would not be negative. Else
-blocks until the semaphore can be decremented. Returns T on success.
-
-If TIMEOUT is given, it is the maximum number of seconds to wait. If the count
-cannot be decremented in that time, returns NIL without decrementing the
-count.
-
-If NOTIFICATION is given, it must be a SEMAPHORE-NOTIFICATION object whose
-SEMAPHORE-NOTIFICATION-STATUS is NIL. If WAIT-ON-SEMAPHORE succeeds and
-decrements the count, the status is set to T."
+(declaim (ftype (sfunction (semaphore (integer 1) (or boolean real)
+                            (or null semaphore-notification) symbol)
+                           t)
+                %decrement-semaphore))
+(defun %decrement-semaphore (semaphore n wait notification context)
   (when (and notification (semaphore-notification-status notification))
     (with-simple-restart (continue "Clear notification status and continue.")
-      (error "~@<Semaphore notification object status not cleared on entry to ~S on ~S.~:@>"
-             'wait-on-semaphore semaphore))
+      (error "~@<Semaphore notification object status not cleared on ~
+              entry to ~S on ~S.~:@>"
+             context semaphore))
     (clear-semaphore-notification notification))
+
   ;; A more direct implementation based directly on futexes should be
   ;; possible.
   ;;
@@ -1095,57 +1090,67 @@ decrements the count, the status is set to T."
   ;;
   ;; FIXME: No timeout on initial mutex acquisition.
   (with-system-mutex ((semaphore-mutex semaphore) :allow-with-interrupts t)
-    ;; Quick check: is it positive? If not, enter the wait loop.
-    (let ((count (semaphore-%count semaphore)))
-      (cond ((plusp count)
-             (setf (semaphore-%count semaphore) (1- count))
-             (when notification
-               (setf (semaphore-notification-%status notification) t)))
-            (t
-             (unwind-protect
-                  (progn
-                    ;; Need to use ATOMIC-INCF despite the lock, because on our
-                    ;; way out from here we might not be locked anymore -- so
-                    ;; another thread might be tweaking this in parallel using
-                    ;; ATOMIC-DECF. No danger over overflow, since there it
-                    ;; at most one increment per thread waiting on the semaphore.
-                    (sb!ext:atomic-incf (semaphore-waitcount semaphore))
-                    (loop until (plusp (setf count (semaphore-%count semaphore)))
-                          do (or (condition-wait (semaphore-queue semaphore)
-                                                 (semaphore-mutex semaphore)
-                                                 :timeout timeout)
-                                 (return-from wait-on-semaphore nil)))
-                    (setf (semaphore-%count semaphore) (1- count))
-                    (when notification
-                      (setf (semaphore-notification-%status notification) t)))
-               ;; Need to use ATOMIC-DECF as we may unwind without the lock
-               ;; being held!
-               (sb!ext:atomic-decf (semaphore-waitcount semaphore)))))))
-  t)
+    (flet ((success (new-count)
+             (prog1
+                 (setf (semaphore-%count semaphore) new-count)
+               (when notification
+                 (setf (semaphore-notification-%status notification) t)))))
+      ;; Quick check: can we decrement right away? If not, return or
+      ;; enter the wait loop.
+      (cond
+        ((let ((old-count (semaphore-%count semaphore)))
+           (when (>= old-count n)
+             (success (- old-count n)))))
+        ((not wait)
+         nil)
+        (t
+         (unwind-protect
+              (let (old-count
+                    (timeout (when (realp wait) wait)))
+                ;; Need to use ATOMIC-INCF despite the lock, because
+                ;; on our way out from here we might not be locked
+                ;; anymore -- so another thread might be tweaking this
+                ;; in parallel using ATOMIC-DECF. No danger over
+                ;; overflow, since there it at most one increment per
+                ;; thread waiting on the semaphore.
+                (sb!ext:atomic-incf (semaphore-waitcount semaphore))
+                (loop until (>= (setf old-count (semaphore-%count semaphore)) n)
+                   do (or (condition-wait (semaphore-queue semaphore)
+                                          (semaphore-mutex semaphore)
+                                          :timeout timeout)
+                          (return-from %decrement-semaphore nil)))
+                (success (- old-count n)))
+           ;; Need to use ATOMIC-DECF as we may unwind without the
+           ;; lock being held!
+           (sb!ext:atomic-decf (semaphore-waitcount semaphore))))))))
+
+(defun wait-on-semaphore (semaphore &key timeout notification)
+  #!+sb-doc
+  "Decrement the count of SEMAPHORE if the count would not be negative. Else
+blocks until the semaphore can be decremented. Returns the new count of
+SEMAPHORE on success.
+
+If TIMEOUT is given, it is the maximum number of seconds to wait. If the count
+cannot be decremented in that time, returns NIL without decrementing the
+count.
+
+If NOTIFICATION is given, it must be a SEMAPHORE-NOTIFICATION object whose
+SEMAPHORE-NOTIFICATION-STATUS is NIL. If WAIT-ON-SEMAPHORE succeeds and
+decrements the count, the status is set to T."
+  (%decrement-semaphore
+   semaphore 1 (or timeout t) notification 'wait-on-semaphore))
 
 (defun try-semaphore (semaphore &optional (n 1) notification)
   #!+sb-doc
   "Try to decrement the count of SEMAPHORE by N. If the count were to
-become negative, punt and return NIL, otherwise return true.
+become negative, punt and return NIL, otherwise return the new count of
+SEMAPHORE.
 
 If NOTIFICATION is given it must be a semaphore notification object
 with SEMAPHORE-NOTIFICATION-STATUS of NIL. If the count is decremented,
 the status is set to T."
   (declare (type (integer 1) n))
-  (when (and notification (semaphore-notification-status notification))
-    (with-simple-restart (continue "Clear notification status and continue.")
-      (error "~@<Semaphore notification object status not cleared on entry to ~S on ~S.~:@>"
-             'try-semaphore semaphore))
-    (clear-semaphore-notification notification))
-  (with-system-mutex ((semaphore-mutex semaphore) :allow-with-interrupts t)
-    (let ((new-count (- (semaphore-%count semaphore) n)))
-      (when (not (minusp new-count))
-        (setf (semaphore-%count semaphore) new-count)
-        (when notification
-          (setf (semaphore-notification-%status notification) t))
-        ;; FIXME: We don't actually document this -- should we just
-        ;; return T, or document new count as the return?
-        new-count))))
+  (%decrement-semaphore semaphore n nil notification 'try-semaphore))
 
 (defun signal-semaphore (semaphore &optional (n 1))
   #!+sb-doc

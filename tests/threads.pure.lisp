@@ -467,31 +467,42 @@
       (unless (eql 50 ok)
         (error "Wanted 50, got ~S" ok)))))
 
-(with-test (:name (:wait-on-semaphore :timeout :one-thread))
-  (let ((sem (make-semaphore))
-        (n 0))
-    (signal-semaphore sem 10)
-    (loop repeat 100
-          do (when (wait-on-semaphore sem :timeout 0.001)
-               (incf n)))
-    (assert (= n 10))))
+(with-test (:name (wait-on-semaphore :timeout :one-thread))
+  (let ((count 10)
+        (semaphore (make-semaphore)))
+    (signal-semaphore semaphore count)
+    (let ((values (loop repeat 100
+                     collect (wait-on-semaphore semaphore :timeout 0.001)))
+          (expected (loop for i from 9 downto 0 collect i)))
+      (assert (equal (remove nil values) expected)))))
 
-(with-test (:name (:wait-on-semaphore :timeout :many-threads)
+(with-test (:name (wait-on-semaphore :timeout :many-threads)
             :skipped-on '(not :sb-thread))
-  (let* ((sem (make-semaphore))
-         (threads
-           (progn
-             (signal-semaphore sem 10)
-             (loop repeat 100
-                   collect (make-thread
-                            (lambda ()
-                              (sleep (random 0.02))
-                              (wait-on-semaphore sem :timeout 0.5)))))))
-    (loop repeat 5
-          do (signal-semaphore sem 2))
-    (let ((ok (count-if #'join-thread threads)))
-      (unless (eql 20 ok)
-        (error "Wanted 20, got ~S" ok)))))
+  (let* ((count 10)
+         (semaphore (make-semaphore)))
+    ;; Add 10 tokens right away.
+    (signal-semaphore semaphore count)
+    ;; 100 threads try to decrement the semaphore by 1.
+    (let ((threads
+           (loop repeat 100
+              collect (make-thread
+                       (lambda ()
+                         (sleep (random 0.02))
+                         (wait-on-semaphore semaphore :timeout 0.5))))))
+      ;; Add 10 more tokens while threads may already be waiting and
+      ;; decrementing.
+      (loop repeat (floor count 2) do (signal-semaphore semaphore 2))
+      ;; 20 threads should have been able to decrement the semaphore
+      ;; and obtain an updated count.
+      (let ((values (mapcar #'join-thread threads)))
+        ;; 20 threads should succeed waiting for the semaphore.
+        (assert (= (* 2 count) (count-if-not #'null values)))
+        ;; The updated semaphore count should be in [0,19] at all
+        ;; times.
+        (assert (every (lambda (value) (<= 0 value (1- (* 2 count))))
+                       (remove nil values)))
+        ;; (At least) one thread should decrease the count to 0.
+        (assert (find 0 values))))))
 
 (with-test (:name (:join-thread :timeout)
             :skipped-on '(not :sb-thread))
@@ -605,10 +616,10 @@
             :skipped-on '(not :sb-thread))
   (let* ((sem (make-semaphore))
          (note (make-semaphore-notification)))
-    (try-semaphore sem 1 note)
+    (assert (eql nil (try-semaphore sem 1 note)))
     (assert (not (semaphore-notification-status note)))
     (signal-semaphore sem)
-    (try-semaphore sem 1 note)
+    (assert (eql 0 (try-semaphore sem 1 note)))
     (assert (semaphore-notification-status note))))
 
 (with-test (:name (:return-from-thread :normal-thread)
