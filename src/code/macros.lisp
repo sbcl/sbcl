@@ -61,8 +61,9 @@
                 ((when (typep test-form '(cons symbol list))
                    (let ((name (first test-form)))
                      (when (or (eq (info :function :kind name) :function)
-                               (when (typep env 'sb!kernel:lexenv)
-                                 (assoc name (sb!c::lexenv-funs env))))
+                               (and (typep env 'sb!kernel:lexenv)
+                                    (sb!c::functional-p
+                                     (cdr (assoc name (sb!c::lexenv-funs env))))))
                        `(,name ,@(mapcar #'process-place (rest test-form)))))))
                 ;; For all other cases, just evaluate TEST-FORM and do
                 ;; not report any details if the assertion fails.
