@@ -1049,27 +1049,6 @@ many elements are copied."
         (declare (truly-dynamic-extent #'f))
         (%map-for-effect #'f sequences))
       result)))
-(defun %map-to-sequence (result-type fun sequences)
-  (declare (type function fun)
-           (type list sequences))
-  (let ((min-len 0))
-    (flet ((f (&rest args)
-             (declare (truly-dynamic-extent args))
-             (declare (ignore args))
-             (incf min-len)))
-      (declare (truly-dynamic-extent #'f))
-      (%map-for-effect #'f sequences))
-    (let ((result (make-sequence result-type min-len)))
-      (multiple-value-bind (state limit from-end step endp elt setelt)
-          (sb!sequence:make-sequence-iterator result)
-        (declare (ignore limit endp elt))
-        (flet ((f (&rest args)
-                 (declare (truly-dynamic-extent args))
-                 (funcall setelt (apply fun args) result state)
-                 (setq state (funcall step result state from-end))))
-          (declare (truly-dynamic-extent #'f))
-          (%map-for-effect #'f sequences)))
-      result)))
 
 ;;; %MAP is just MAP without the final just-to-be-sure check that
 ;;; length of the output sequence matches any length specified
@@ -1086,8 +1065,11 @@ many elements are copied."
                  ((csubtypep type (specifier-type 'vector))
                   (%map-to-vector result-type really-fun sequences))
                  ((and (csubtypep type (specifier-type 'sequence))
-                       (find-class result-type nil))
-                  (%map-to-sequence result-type really-fun sequences))
+                       (awhen (find-class result-type nil)
+                         (apply #'sb!sequence:map
+                                (sb!mop:class-prototype
+                                 (sb!pcl:ensure-class-finalized it))
+                                really-fun sequences))))
                  (t
                   (bad-sequence-type-error result-type)))))
            (slow-map ()

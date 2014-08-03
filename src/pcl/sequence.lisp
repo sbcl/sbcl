@@ -378,6 +378,54 @@
 
 ;;;; generic implementations for sequence functions.
 
+(defgeneric sequence:map (result-prototype function sequence &rest sequences)
+  #+sb-doc
+  (:documentation
+   "Implements CL:MAP for extended sequences.
+
+    RESULT-PROTOTYPE corresponds to the RESULT-TYPE of CL:MAP but
+    receives a prototype instance of an extended sequence class
+    instead of a type specifier. By dispatching on RESULT-PROTOTYPE,
+    methods on this generic function specify how extended sequence
+    classes act when they are specified as the result type in a CL:MAP
+    call. RESULT-PROTOTYPE may not be fully initialized and thus
+    should only be used for dispatch and to determine its class.
+
+    Another difference to CL:MAP is that FUNCTION is a function, not a
+    function designator."))
+
+(defmethod sequence:map ((result-prototype sequence) (function function)
+                         (sequence sequence) &rest sequences)
+  (let ((sequences (list* sequence sequences))
+        (min-length 0))
+    (declare (dynamic-extent sequences))
+    ;; Visit elements of SEQUENCES in parallel to determine length of
+    ;; the result. Determining the length of the result like this
+    ;; allows cases like
+    ;;
+    ;;   (map 'my-sequence 'my-fun (circular-list 1 2 3) '(4 5 6))
+    ;;
+    ;; to return a sequence with three elements.
+    (flet ((counting-visit (&rest args)
+             (declare (truly-dynamic-extent args)
+                      (ignore args))
+             (incf min-length)))
+      (declare (truly-dynamic-extent #'counting-visit))
+      (%map-for-effect #'counting-visit sequences))
+    ;; Map local function over SEQUENCES that steps through the result
+    ;; sequence and stores results of applying FUNCTION.
+    (binding* ((result (make-sequence (class-of result-prototype) min-length))
+               ((state nil from-end step nil nil setelt)
+                (sequence:make-sequence-iterator result)))
+      (declare (type function state step setelt))
+      (flet ((one-element (&rest args)
+               (declare (truly-dynamic-extent args))
+               (funcall setelt (apply function args) result state)
+               (setq state (funcall step result state from-end))))
+        (declare (truly-dynamic-extent #'one-element))
+        (%map-for-effect #'one-element sequences))
+      result)))
+
 ;;; FIXME: COUNT, POSITION and FIND share an awful lot of structure.
 ;;; They could usefully be defined in an OAOO way.
 (defgeneric sequence:count
