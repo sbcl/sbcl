@@ -275,21 +275,12 @@
 
 (with-test (:name :bug-332)
   (flet ((stimulate-sbcl ()
-           (let ((filename
-                  (format nil "~A/~A.lisp"
-                          (or (posix-getenv "TEST_DIRECTORY")
-                              (posix-getenv "TMPDIR")
-                              "/tmp")
-                          (gensym))))
-             (ensure-directories-exist filename)
-             ;; create a file which redefines a structure incompatibly
-             (with-open-file (f filename :direction :output :if-exists :supersede)
-               (print '(defstruct bug-332 foo) f)
-               (print '(defstruct bug-332 foo bar) f))
-             ;; compile and load the file, then invoke the continue restart on
-             ;; the structure redefinition error
-             (handler-bind ((error (lambda (c) (continue c))))
-               (load (compile-file filename))))))
+           ;; compile and load the file, then invoke the continue restart on
+           ;; the structure redefinition error
+           (handler-bind ((error (lambda (c) (continue c))))
+             (let ((fasl (compile-file "bug-332.lisp")))
+               (load fasl)
+               (ignore-errors (delete-file fasl))))))
     (stimulate-sbcl)
     (stimulate-sbcl)
     (stimulate-sbcl)))
