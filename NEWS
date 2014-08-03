@@ -3,6 +3,8 @@
 changes in sbcl-1.2.3 relative to sbcl-1.2.2:
   * enhancement: ASSERT reports arguments of calls to lexical functions in
     additional to global functions.
+  * enhancement: ASDF updated to 3.1.3
+  * enhancement: UIOP can be loaded without ASDF.
   * bug fix: some methods on CHANGE-CLASS did not finalize the new class
     before accessing its class-precedence list.
   * bug fix: CHANGE-CLASS no longer fails on unbound slots in the source
@@ -11,6 +13,8 @@ changes in sbcl-1.2.3 relative to sbcl-1.2.2:
     class is a FORWARD-REFERENCED-CLASS.
   * bug fix: CHANGE-CLASS no longer signals bogus TYPE-ERRORs for slots for
     which initargs have been supplied.
+  * bug fix: saving cores on ARM was broken since the introduction of GENCGC.
+    (lp#1349795)
 
 changes in sbcl-1.2.2 relative to sbcl-1.2.1:
   * incompatible change: the #\` ("backquote") reader macro was reimplemented

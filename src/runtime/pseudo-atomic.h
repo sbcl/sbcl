@@ -130,13 +130,10 @@ clear_pseudo_atomic_interrupted(struct thread *thread)
     SetSymbolValue(PSEUDO_ATOMIC_INTERRUPTED, NIL, 0);
 }
 
-#define set_alloc_pointer(value) \
-    (dynamic_space_free_pointer = \
-     ((lispobj *) \
-      ((value) | (((uword_t)dynamic_space_free_pointer) & LOWTAG_MASK))))
-
-#define get_alloc_pointer()                                     \
-    ((uword_t) dynamic_space_free_pointer & ~LOWTAG_MASK)
+#define set_alloc_pointer(value)                \
+    SetSymbolValue(ALLOCATION_POINTER, value, 0)
+#define get_alloc_pointer()                     \
+    SymbolValue(ALLOCATION_POINTER, 0)
 
 #elif defined(LISP_FEATURE_GENCGC)
 
@@ -185,4 +182,3 @@ clear_pseudo_atomic_interrupted(struct thread *thread)
 #endif
 
 #endif /* PSEUDO_ATOMIC_H */
-
