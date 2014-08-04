@@ -142,11 +142,16 @@
           "target backend-subfeatures *SHEBANG-BACKEND-FEATURES*=~@<~S~:>~%"
           *shebang-backend-subfeatures*))
 
+(let ((arch (intersection '(:alpha :arm :hppa :mips :ppc :sparc :x86 :x86-64)
+                          *shebang-features*)))
+  (cond ((not arch) (error "No architecture selected"))
+        ((> (length arch) 1) (error "More than one architecture selected"))))
+
 ;;; Some feature combinations simply don't work, and sometimes don't
 ;;; fail until quite a ways into the build.  Pick off the more obvious
 ;;; combinations now, and provide a description of what the actual
 ;;; failure is (not always obvious from when the build fails).
-(let ((feature-compatability-tests
+(let ((feature-compatibility-tests
        '(("(and sb-thread (not gencgc))"
           ":SB-THREAD requires :GENCGC")
          ("(and sb-thread (not (or ppc x86 x86-64)))"
@@ -169,19 +174,11 @@
           ;; updated to take the additional indirection into account.
           ;; Let's avoid this unusual combination.
           ":SB-DYNAMIC-CORE requires :LINKAGE-TABLE and :SB-THREAD")
-         ("(or (and alpha (or arm hppa mips ppc sparc x86 x86-64))
-               (and arm (or hppa mips ppc sparc x86 x86-64))
-               (and hppa (or mips ppc sparc x86 x86-64))
-               (and mips (or ppc sparc x86 x86-64))
-               (and ppc (or sparc x86 x86-64))
-               (and sparc (or x86 x86-64))
-               (and x86 x86-64))"
-          "More than one architecture selected")
          ;; There is still hope to make multithreading on DragonFly x86-64
          ("(and sb-thread x86 dragonfly)"
           ":SB-THREAD not supported on selected architecture")))
       (failed-test-descriptions nil))
-  (dolist (test feature-compatability-tests)
+  (dolist (test feature-compatibility-tests)
     (let ((*features* *shebang-features*))
       (when (read-from-string (concatenate 'string "#+" (first test) "T NIL"))
         (push (second test) failed-test-descriptions))))
