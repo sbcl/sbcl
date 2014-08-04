@@ -491,8 +491,8 @@ invoked. In that case it will store into PLACE and start over."
 
 (defmacro-mundanely nth-value (n form)
   #!+sb-doc
-  "Evaluate FORM and return the Nth value (zero based). This involves no
-  consing when N is a trivial constant integer."
+  "Evaluate FORM and return the Nth value (zero based)
+ without consing a temporary list of values."
   ;; FIXME: The above is true, if slightly misleading.  The
   ;; MULTIPLE-VALUE-BIND idiom [ as opposed to MULTIPLE-VALUE-CALL
   ;; (LAMBDA (&REST VALUES) (NTH N VALUES)) ] does indeed not cons at
@@ -506,12 +506,12 @@ invoked. In that case it will store into PLACE and start over."
         `(multiple-value-bind (,@dummy-list ,keeper) ,form
            (declare (ignore ,@dummy-list))
            ,keeper))
-      (once-only ((n n))
-        `(case (the fixnum ,n)
-           (0 (nth-value 0 ,form))
-           (1 (nth-value 1 ,form))
-           (2 (nth-value 2 ,form))
-           (t (nth (the fixnum ,n) (multiple-value-list ,form)))))))
+      ;; &MORE conversion handily deals with non-constant N,
+      ;; avoiding the unstylish practice of inserting FORM into the
+      ;; expansion more than once to pick off a few small values.
+      `(multiple-value-call
+           (lambda (n &rest list) (nth (truly-the index n) list))
+         (the index ,n) ,form)))
 
 (defmacro-mundanely declaim (&rest specs)
   #!+sb-doc

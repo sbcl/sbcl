@@ -5301,3 +5301,10 @@
       (compile nil '(lambda (a &optional (b (error "nope")) (c (error "nope")))
                      (values c b a)))
     (assert (and f (not warningp)))))
+
+(with-test (:name :nth-value-of-non-constant-N)
+  (labels ((foo (n f) (nth-value n (funcall f)))
+           (bar () (values 0 1 2 3 4 5 6 7 8 9)))
+    (assert (= (foo 5 #'bar) 5)) ; basic correctness
+    (assert (eq (foo 12 #'bar) nil))
+    (ctu:assert-no-consing (eql (foo 953 #'bar) 953))))
