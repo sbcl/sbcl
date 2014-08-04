@@ -865,52 +865,34 @@
 #!-sb-fluid (declaim (inline find-in position-in))
 
 ;;; Find ELEMENT in a null-terminated LIST linked by the accessor
-;;; function NEXT. KEY, TEST and TEST-NOT are the same as for generic
-;;; sequence functions.
+;;; function NEXT. KEY and TEST are the same as for generic sequence functions.
 (defun find-in (next
                 element
                 list
                 &key
                 (key #'identity)
-                (test #'eql test-p)
-                (test-not #'eql not-p))
-  (declare (type function next key test test-not))
-  (when (and test-p not-p)
-    (error "It's silly to supply both :TEST and :TEST-NOT arguments."))
-  (if not-p
-      (do ((current list (funcall next current)))
-          ((null current) nil)
-        (unless (funcall test-not (funcall key current) element)
-          (return current)))
-      (do ((current list (funcall next current)))
-          ((null current) nil)
-        (when (funcall test (funcall key current) element)
-          (return current)))))
+                (test #'eql))
+  (declare (type function next key test))
+  (do ((current list (funcall next current)))
+      ((null current) nil)
+    (when (funcall test (funcall key current) element)
+      (return current))))
 
 ;;; Return the position of ELEMENT (or NIL if absent) in a
-;;; null-terminated LIST linked by the accessor function NEXT. KEY,
-;;; TEST and TEST-NOT are the same as for generic sequence functions.
+;;; null-terminated LIST linked by the accessor function NEXT.
+;;; KEY and TEST are the same as for generic sequence functions.
 (defun position-in (next
                     element
                     list
                     &key
                     (key #'identity)
-                    (test #'eql test-p)
-                    (test-not #'eql not-p))
-  (declare (type function next key test test-not))
-  (when (and test-p not-p)
-    (error "It's silly to supply both :TEST and :TEST-NOT arguments."))
-  (if not-p
-      (do ((current list (funcall next current))
-           (i 0 (1+ i)))
-          ((null current) nil)
-        (unless (funcall test-not (funcall key current) element)
-          (return i)))
-      (do ((current list (funcall next current))
-           (i 0 (1+ i)))
-          ((null current) nil)
-        (when (funcall test (funcall key current) element)
-          (return i)))))
+                    (test #'eql))
+  (declare (type function next key test))
+  (do ((current list (funcall next current))
+       (i 0 (1+ i)))
+      ((null current) nil)
+    (when (funcall test (funcall key current) element)
+      (return i))))
 
 
 ;;; KLUDGE: This is expanded out twice, by cut-and-paste, in a
