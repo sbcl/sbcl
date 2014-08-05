@@ -86,8 +86,12 @@
                            ,n-result
                            (cond ,@more))))
                   (if (eq t test)
-                      ;; THE to perserve non-toplevelness for FOO in
+                      ;; THE to preserve non-toplevelness for FOO in
                       ;;   (COND (T (FOO)))
+                      ;; FIXME: this hides all other possible stylistic issues,
+                      ;; not the least of which is a code deletion note,
+                      ;; if there are forms following the one whose head is T.
+                      ;; This is not usually the SBCL preferred way.
                       `(the t (progn ,@forms))
                       `(if ,test
                            (progn ,@forms)

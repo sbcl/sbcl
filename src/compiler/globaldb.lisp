@@ -699,9 +699,8 @@
 
 ;;;; ":DECLARATION" subsection - Data pertaining to user-defined declarations.
 ;; CLTL2 offers an API to provide a list of known declarations, but it is
-;; inefficient to iterate over info environments to find all such declarations,
-;; and this is likely to be even slower when info is attached
-;; directly to symbols, as it would entail do-all-symbols or similar.
+;; inefficient to iterate over all symbols to find ones which have the
+;; (:DECLARATION :RECOGNIZED) info.
 ;; Therefore maintain a list of recognized declarations. This list makes the
 ;; globaldb storage of same redundant, but oh well.
 (defglobal *recognized-declarations* nil)

@@ -995,7 +995,7 @@
         ((eq aux-symbol !+pcl-boundp-name+) (sb!pcl::slot-boundp-name stem))
         (t (list aux-symbol stem)))) ; something like (SETF frob)
 
-;; Call FUNCTION with each piece of symbol in packed VECT using ROOT-SYMBOL
+;; Call FUNCTION with each piece of info in packed VECT using ROOT-SYMBOL
 ;; as the primary name. FUNCTION must accept 3 values (NAME TYPE-NUMBER VALUE).
 (defun %call-with-each-info (function vect root-symbol)
   (let ((name root-symbol)
