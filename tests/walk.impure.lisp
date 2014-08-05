@@ -861,7 +861,7 @@ Form: 'GLOBAL-FOO   Context: EVAL
                    `(INNER-FOO-EXPANDED ,A)))
         (FOO 1))   Context: EVAL
 Form: `(INNER-FOO-EXPANDED ,A)   Context: EVAL
-Form: (SB-IMPL::|List| 'INNER-FOO-EXPANDED A)   Context: EVAL
+Form: (LIST 'INNER-FOO-EXPANDED A)   Context: EVAL
 Form: 'INNER-FOO-EXPANDED   Context: EVAL
 Form: A   Context: EVAL; lexically bound
 Form: (FOO 1)   Context: EVAL
@@ -888,7 +888,7 @@ Form: (MACROLET ((BAR (A)
                    `(INNER-BAR-EXPANDED ,A)))
         (BAR 2))   Context: EVAL
 Form: `(INNER-BAR-EXPANDED ,A)   Context: EVAL
-Form: (SB-IMPL::|List| 'INNER-BAR-EXPANDED A)   Context: EVAL
+Form: (LIST 'INNER-BAR-EXPANDED A)   Context: EVAL
 Form: 'INNER-BAR-EXPANDED   Context: EVAL
 Form: A   Context: EVAL; lexically bound
 Form: (BAR 2)   Context: EVAL
@@ -922,7 +922,7 @@ Form: (MACROLET ((BAR (S)
 Form: (BAR S)   Context: EVAL
 Form: 'GLOBAL-BAR   Context: EVAL
 Form: `(INNER-BAR-EXPANDED ,S)   Context: EVAL
-Form: (SB-IMPL::|List| 'INNER-BAR-EXPANDED S)   Context: EVAL
+Form: (LIST 'INNER-BAR-EXPANDED S)   Context: EVAL
 Form: 'INNER-BAR-EXPANDED   Context: EVAL
 Form: S   Context: EVAL; lexically bound
 Form: (BAR 2)   Context: EVAL
