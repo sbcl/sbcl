@@ -105,6 +105,7 @@
     (write-sequence data in)
     (let ((process (sb-ext:run-program "/bin/cat" '() :wait t :output out :input in))
           (buf (make-array (length data))))
+      (declare (ignore process))
       (assert (= 13 (read-sequence buf out)))
       (assert (= 0 (read-sequence (make-array 8) out)))
       (assert (equalp buf data)))))

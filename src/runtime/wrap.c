@@ -258,16 +258,14 @@ fstat_wrapper(int filedes, struct stat_wrapper *buf)
    exist on Windows; (2) by passing down a mode_t, we don't need a
    binding to chmod in SB-UNIX, and need not concern ourselves with
    umask issues if we want to use mkstemp to make new files in
-   OPEN. */
+   OPEN as implied by the cagey remark (in 'unix.lisp') that
+     "There are good reasons to implement some OPEN options with a[n]
+      mkstemp(3)-like routine, but we don't do that yet." */
+
 int sb_mkstemp (char *template, mode_t mode) {
+  int fd;
 #ifdef LISP_FEATURE_WIN32
 #define PATHNAME_BUFFER_SIZE MAX_PATH
-#define MKTEMP _mktemp
-#else
-#define PATHNAME_BUFFER_SIZE PATH_MAX
-#define MKTEMP mktemp
-#endif
-  int fd;
   char buf[PATHNAME_BUFFER_SIZE];
 
   while (1) {
@@ -278,7 +276,7 @@ int sb_mkstemp (char *template, mode_t mode) {
        _mktemp. */
     strncpy(buf, template, PATHNAME_BUFFER_SIZE);
     buf[PATHNAME_BUFFER_SIZE-1]=0; /* force NULL-termination */
-    if (MKTEMP(buf)) {
+    if (_mktemp(buf)) {
       if ((fd=open(buf, O_CREAT|O_EXCL|O_RDWR, mode))!=-1) {
         strcpy(template, buf);
         return (fd);
@@ -288,8 +286,28 @@ int sb_mkstemp (char *template, mode_t mode) {
     } else
       return (-1);
   }
-#undef MKTEMP
 #undef PATHNAME_BUFFER_SIZE
+#else
+  /* It makes no sense to reimplement mkstemp() with logic susceptible
+     to the exploit that mkstemp() was designed to avoid.
+     Unfortunately, there is a subtle bug in this more nearly correct technique.
+     open() uses the given creation mode ANDed with the process umask,
+     but fchmod() uses exactly the specified mode.  Attempting to perform the
+     masking operation manually would result in another race: you can't obtain
+     the current mask except by calling umask(), which both sets and gets it.
+     But since RUN-PROGRAM is the only use of this, and the mode given is #o600
+     which is the default for mkstemp(), RUN-PROGRAM should be indifferent.
+     [The GNU C library documents but doesn't implement getumask() by the way.]
+     So we're patching a security hole with a known innocuous design flaw
+     by necessity to avoid the gcc linker warning that
+       "the use of `mktemp' is dangerous, better use `mkstemp'" */
+  fd = mkstemp(template);
+  if (fd != -1 && fchmod(fd, mode) == -1) {
+    close(fd); // got a file descriptor but couldn't fchmod() it
+    return -1;
+  }
+  return fd;
+#endif
 }
 
 
@@ -552,4 +570,3 @@ int sb_utimes(char *path, struct timeval times[2])
     return utimes(path, times);
 }
 #endif /* !LISP_FEATURE_WIN32 */
-

@@ -225,6 +225,7 @@
                         (unsupported-warning ',lisp-name ,c-name)
                         form)
                       (export ',lisp-name)))))
+    ;; FIXME: The man page for it says "Never use mktemp()"
     (def-mk*temp mktemp "mktemp" (* char) null-alien nil nil)
     ;; FIXME: Windows does have _mktemp, which has a slightly different
     ;; interface
