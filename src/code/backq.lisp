@@ -92,7 +92,7 @@
 
 (/show0 "backq.lisp 83")
 
-(declaim (ftype (function (t fixnum) (values t t &optional))
+(declaim (ftype (function (t fixnum boolean) (values t t &optional))
                 qq-template-to-sexpr qq-template-1))
 
 ;; A QQ-SUBFORM is a cons whose car is an arbitrary S-expression, and
@@ -105,21 +105,36 @@
     (|Append| '|Append|)
     (nconc 'nconc)))
 
-(defmacro quasiquote (thing)
+(defun expand-quasiquote (thing compiler-p)
   ;; QQ-TEMPLATE-TO-SEXPR returns the parts of a QQ-SUBFORM as 2 values.
-  (multiple-value-bind (expr operator) (qq-template-to-sexpr thing 0)
+  (multiple-value-bind (expr operator)
+      (qq-template-to-sexpr thing 0 compiler-p)
     (ecase operator ; Splicing is illegal at toplevel
       (eval expr)
       (quote (list 'quote expr)))))
 
+;; The compiler macro for QUASIQUOTE assumes that it's fine to use
+;; the foldable list constructors.
+(define-compiler-macro quasiquote (thing)
+  (expand-quasiquote thing t))
+
+;; The ordinary macro uses CL-standard list constructors for a few reasons:
+;; - It makes COMPILE do slightly less work than COMPILE-FILE
+;; - If expanded forms are leaked to the user, it looks nicer.
+;;   Pending discussion of how to or whether to prettify the value
+;;   of (MACROEXPAND-1 '`(FOO ,X)) this could be irrelevant.
+(defmacro quasiquote (thing)
+  (expand-quasiquote thing nil))
+
 ;; Convert a quasi-quote template to a Lisp form that when evaluated constructs
 ;; the template, substituting into the outermost commas. Return two values:
 ;; the S-expression, and an indicator of how to incorporate it into its parent.
-(defun qq-template-to-sexpr (expr depth)
+(defun qq-template-to-sexpr (expr depth compiler-p)
   (cond ((not expr) (values nil 'quote))
         ((listp expr)
-         (qq-template-1 expr (+ (if (eq (car expr) 'quasiquote) 1 0) depth)))
-        ((simple-vector-p expr) (qq-template-1 expr depth))
+         (qq-template-1 expr (+ (if (eq (car expr) 'quasiquote) 1 0) depth)
+                        compiler-p))
+        ((simple-vector-p expr) (qq-template-1 expr depth compiler-p))
         ((not (comma-p expr)) (values expr 'quote))
         ((zerop depth)
          (values (comma-expr expr)
@@ -129,7 +144,7 @@
          ;; If its expression interpolates 1 item, reconstruct it using its
          ;; ordinary constructor, otherwise its multi-constructor.
          (multiple-value-bind (subexpr operator)
-             (qq-template-to-sexpr (comma-expr expr) (1- depth))
+             (qq-template-to-sexpr (comma-expr expr) (1- depth) compiler-p)
            (when (eq operator 'quote)
              (setq subexpr (list 'quote subexpr) operator 'eval))
            (values (list (cond ((eq operator 'eval) (comma-constructor expr))
@@ -178,10 +193,11 @@
 ;; as if by MAP. The cdr of the last cons of the input (if a list) may be a
 ;; non-nil atom. Return a secondary value indicating whether it was or not.
 ;; The output list never "dots" its last cons, regardless of the input.
-(defun qq-map-template-to-list (input depth)
+(defun qq-map-template-to-list (input depth compiler-p)
   (let ((original input) list dotted-p)
     (flet ((to-sexpr (x)
-             (multiple-value-call #'cons (qq-template-to-sexpr x depth))))
+             (multiple-value-call #'cons
+               (qq-template-to-sexpr x depth compiler-p))))
       (typecase input
         (cons
          (loop
@@ -219,8 +235,9 @@
 
 ;; Return an expression to quasi-quote INPUT, which is either a list
 ;; or simple-vector, by recursing over its subexpressions.
-(defun qq-template-1 (input depth)
-  (multiple-value-bind (subforms dot-p) (qq-map-template-to-list input depth)
+(defun qq-template-1 (input depth compiler-p)
+  (multiple-value-bind (subforms dot-p)
+      (qq-map-template-to-list input depth compiler-p)
     (labels ((const-p (subform) ; is SUBFORM constant?
                ;; This needs to notice only the QQ-SUBFORM kind of QUOTE,
                ;; but it helps to get EVAL forms whose expression is (QUOTE x).
@@ -246,12 +263,22 @@
                           (not (and (atom exp) (atom-const-p exp))))
                      (list 'quote exp)
                      exp)))
+             (normalize-fn (fn-name)
+               (if compiler-p
+                   fn-name
+                   (ecase fn-name
+                     (|Append| 'append)
+                     (|List|   'list)
+                     (|List*|  'list*)
+                     (|Vector| 'vector))))
              (recurse (list &aux (elt (car list)) (rest (cdr list)))
                (if (endp rest)
                    (cond ((or dot-p (qq-subform-splicing-p elt)) (render elt))
                          ((const-p elt) (list 'quote (list (const-val elt))))
-                         (t (list '|List| (render elt)))) ; singleton list
-                   (let ((fn (or (qq-subform-splicing-p elt) '|List*|))
+                         (t (list (normalize-fn '|List|)
+                                  (render elt)))) ; singleton list
+                   (let ((fn (normalize-fn
+                              (or (qq-subform-splicing-p elt) '|List*|)))
                          (head (render elt))
                          (tail (recurse rest)))
                      (if (and (listp tail) (eq (car tail) fn))
@@ -265,7 +292,8 @@
             (let ((fn (cond (vect-p '|Vector|) (dot-p '|List*|) (t '|List|))))
               (if (every #'const-p subforms)
                   (values (apply fn (mapcar #'const-val subforms)) 'quote)
-                  (values (cons fn (mapcar #'render subforms)) 'eval))))))))
+                  (values (cons (normalize-fn fn)
+                                (mapcar #'render subforms)) 'eval))))))))
 
 ;;; COMPILE-FILE may treat anything as constant that is part of quoted
 ;;; structure, including quasi-quoted structure (lp#1026439).

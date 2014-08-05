@@ -32,11 +32,11 @@
 (defparameter *s* '((append *x* *y*)))
 
 (defun test-double-backquote (expression value)
-  (format t "~&Testing: ~A... " expression)
+  #+nil(format t "~&Testing: ~A... " expression)
   (assert (equal (eval (eval (read-from-string expression)))
                  value))
-  (format t "Ok. Look at PPRINTed version: ")
-  (pprint (read-from-string expression)))
+  #+nil(progn (format t "Ok. Look at PPRINTed version: ")
+              (pprint (read-from-string expression))))
 
 (defparameter *backquote-tests*
   '(("``(,,*QQ*)" . (24))
@@ -189,39 +189,6 @@
                          (sb-int:simple-reader-error (c)
                            (simple-condition-format-control c))))
                0)))
-
-;; Since the backquote reader doesn't reduce to simplest form in all cases,
-;; make sure that IR1 does.
-(defun list-fun-referenced-constants (f)
-  (let ((code (sb-kernel:fun-code-header f)))
-    (loop for i from sb-vm:code-constants-offset
-          below (sb-kernel:get-header-data code)
-          collect (sb-kernel:code-header-ref code i))))
-
-;; In the expression `(,@l1 a b ,@l2) is it preferable that we expand this
-;; as (APPEND L1 (LIST* 'A 'B L2)) or as (APPEND L1 '(A) '(B) L2)?
-;; The IR1 transform is designed to catch the latter case, but the expander
-;; returns the former, which probably favors speed over code size.
-;; This is perhaps an interesting reason to make expansion policy-sensitive.
-;; I'll test a case that definitely triggers the IR1 transform.
-(defun a-backq-expr (l1) `(,@l1 ,most-positive-fixnum a))
-(defun vector-backq-expr () `#(foo ,char-code-limit)) ; no xform, but folded
-(compile 'a-backq-expr)
-(compile 'vector-backq-expr)
-(with-test (:name :backquote-ir1-simplifier)
-  (assert (equal (macroexpand sb-impl::'`(,@l1 ,char-code-limit x))
-                 'sb-impl::(|Append| l1 (|List*| char-code-limit '(X)))))
-  (assert (equal (macroexpand '`#(,char-code-limit sb-impl::foo))
-                 'sb-impl::(|Vector| char-code-limit 'foo)))
-  ;; The compiled code should reference a constant list
-  ;; whose two elements are #.MOST-POSITIVE-FIXNUM and A.
-  (assert (member (list most-positive-fixnum 'a)
-                  (list-fun-referenced-constants #'a-backq-expr)
-                  :test #'equal))
-  ;; Compiled code should reference a constant vector.
-  (assert (member (vector 'foo char-code-limit)
-                  (list-fun-referenced-constants #'vector-backq-expr)
-                  :test #'equalp)))
 
 (in-package sb-impl)
 
