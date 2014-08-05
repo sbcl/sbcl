@@ -286,21 +286,42 @@ return NIL. Can be set with SETF when ENV is NIL."
 
 (defun (setf fdocumentation) (string name doc-type)
   (declare (type (or null string) string))
-  (case doc-type
-    (variable (setf (info :variable :documentation name) string))
-    (function
-     (when (legal-fun-name-p name)
-       (setf (%fun-doc (fdefinition name)) string)))
-    (structure (cond
-                 ((eq (info :type :kind name) :instance)
-                  (setf (info :type :documentation name) string))
-                 ((info :typed-structure :info name)
-                  (setf (info :typed-structure :documentation name) string))))
-    (type (setf (info :type :documentation name) string))
-    (setf (setf (info :setf :documentation name) string))
-    (t
-     (when (typep name '(or symbol cons))
-       (setf (random-documentation name doc-type) string))))
+  (let ((info-number
+         (macrolet ((info-number (class type)
+                      (type-info-number (type-info-or-lose class type))))
+           (case doc-type
+             (variable (info-number :variable :documentation))
+             (structure
+              (cond ((eq (info :type :kind name) :instance)
+                     (info-number :type :documentation))
+                    ((info :typed-structure :info name)
+                     (info-number :typed-structure :documentation))))
+             (type (info-number :type :documentation))
+             (setf (info-number :setf :documentation))))))
+    (cond (info-number
+           (if string
+               (set-info-value name info-number string)
+               (clear-info-values name (list info-number))))
+          ((eq doc-type 'function)
+           ;; FIXME: this silently loses
+           ;; * (setf (documentation '(a bad name) 'function) "x") => "x"
+           ;; * (documentation '(a bad name) 'function) => NIL
+           ;; which is fine because as noted in pcl/documentation.lsp
+           ;;   even for supported doc types an implementation is permitted
+           ;;   to discard docs at any time
+           ;; but should a warning be issued just as for an unknown DOC-TYPE?
+           ;;
+           ;; And there's additional weirdness if you do, in this order -
+           ;;  * (setf (documentation 'foo 'function) "hi")
+           ;;  * (defun foo () "hey" 1)
+           ;;  * (documentation 'foo 'function) => "hi" ; should be "hey"
+           ;; CLHS says regarding DEFUN:
+           ;; " Documentation is attached as a documentation string to
+           ;;   /name/ (as kind function) and to the /function object/."
+           (when (legal-fun-name-p name)
+             (setf (%fun-doc (fdefinition name)) string)))
+          ((typep name '(or symbol cons))
+           (setf (random-documentation name doc-type) string))))
   string)
 
 (defun random-documentation (name type)
