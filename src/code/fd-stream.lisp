@@ -2166,7 +2166,7 @@
            (let ((posn (sb!unix:unix-lseek (fd-stream-fd stream)
                                            offset origin)))
              ;; CLHS says to return true if the file-position was set
-             ;; succesfully, and NIL otherwise. We are to signal an error
+             ;; successfully, and NIL otherwise. We are to signal an error
              ;; only if the given position was out of bounds, and that is
              ;; dealt with above. In times past we used to return NIL for
              ;; errno==ESPIPE, and signal an error in other cases.
