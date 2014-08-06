@@ -638,7 +638,10 @@ variable: an unreadable object representing the error is printed instead.")
   (declare (type simple-string name))
   (let ((*readtable* (if *print-readably* *standard-readtable* *readtable*)))
     (setup-printer-state)
-    (if (and maybe-quote (symbol-quotep name))
+    (if (and maybe-quote (or
+                          (and (readtable-normalization *readtable*)
+                               (not (sb!unicode:normalized-p name :nfkc)))
+                          (symbol-quotep name)))
         (output-quoted-symbol-name name stream)
         (funcall *internal-symbol-output-fun* name stream))))
 

@@ -16,6 +16,29 @@
 (load "assertoid.lisp")
 (use-package "ASSERTOID")
 
+;;; Test that symbols are properly normalized in SB-UNICODE builds
+(with-test (:name (:normalizing-reader)
+                  :skipped-on '(not :sb-unicode))
+  (labels ((str (&rest chars)
+             (coerce chars 'string))
+           (symbol (&rest chars)
+             (read-from-string (apply #'str chars))))
+    (assert (eq :a :a))
+    (assert (eq :a :A))
+    (assert (eq (symbol #\UF984) (symbol #\U6FFE)))
+    (make-package "BAFFLE")
+    (intern "C" "BAFFLE")
+    (assert (eq (symbol #\b #\a #\f #\f #\l #\e #\: #\: #\c)
+                (symbol #\b #\a #\UFB04 #\e #\: #\: #\c)))
+    (assert (not (eq (symbol #\| #\f #\f #\l #\|) (symbol #\| #\UFB04 #\|))))
+    (assert (not (eq (symbol #\\ #\U32C0) (symbol #\1 #\U6708))))
+    (assert (eq (symbol #\U32C0) (symbol #\1 #\U6708)))
+    (let ((*readtable* (copy-readtable)))
+      (setf (sb-ext:readtable-normalization *readtable*) nil)
+      (assert (not (eq (symbol #\b #\a #\f #\f #\l #\e)
+                       (symbol #\b #\a #\UFB04 #\e))))
+      (assert (not (eq (symbol #\U32C0) (symbol #\1 #\U6708)))))))
+
 ;;; Bug 30, involving mistakes in binding the read table, made this
 ;;; code fail.
 (defun read-vector (stream char)
