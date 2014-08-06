@@ -1785,8 +1785,15 @@ variable: an unreadable object representing the error is printed instead.")
 
 (defun output-fdefn (fdefn stream)
   (print-unreadable-object (fdefn stream)
-    (write-string "FDEFINITION object for " stream)
-    (output-object (fdefn-name fdefn) stream)))
+    (write-string "FDEFINITION for " stream)
+    ;; It's somewhat unhelpful to print as <FDEFINITION for (SETF #)>
+    ;; Generalized function names are indivisible.
+    (let ((name (fdefn-name fdefn)))
+      (if (atom name)
+          (output-object name stream)
+          ;; This needn't protect against improper lists.
+          ;; (You'd get crashes in INTERNAL-NAME-P and other places)
+          (format stream "(~{~S~^ ~})" name)))))
 
 #!+sb-simd-pack
 (defun output-simd-pack (pack stream)
