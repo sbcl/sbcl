@@ -98,14 +98,14 @@
                         (setf (gethash k hash) v)
                         (setf list (cddr list)))
                       (setf **proplist-properties** hash))
-                    (setf **confusables**
-                          (create-union-find
-                           (mapcar
-                            #'(lambda (set)
-                                (mapcar #'(lambda (item)
-                                            (coerce (mapcar #'code-char item)
-                                                    'string)) set))
-                            ',confusable-sets)))
+                    (let ((hash (make-hash-table :test #'equal)))
+                      (loop for set in ',confusable-sets
+                         for items = (mapcar #'(lambda (item)
+                                                 (map 'simple-string
+                                                      #'code-char item)) set)
+                         do (dolist (i items)
+                              (setf (gethash i hash) (first items))))
+                      (setf **confusables** hash))
                     (let ((hash (make-hash-table)) (list ',bidi-mirroring-list))
                       (loop for (k v) in list do
                            (setf (gethash k hash) v))
@@ -1705,16 +1705,12 @@ with variable-weight characters, as described in UTS #10"
          (loop for offset from 1 to 5
             while (<= (+ i offset) len)
             do
-              (let ((node (uf-find (subseq string i (+ i offset))
+              (let ((node (gethash (subseq string i (+ i offset))
                                    **confusables**)))
                 (when node (setf best-node node new-i (+ i offset)))))
-         (if best-node
-             (progn
-               (push (uf-node-item best-node) ret)
-               (setf i new-i))
-             (progn
-               (push (subseq string i (1+ i)) ret)
-               (incf i)))
+         (cond
+           (best-node (push best-node ret) (setf i new-i))
+           (t (push (subseq string i (1+ i)) ret) (incf i)))
          (setf best-node nil new-i nil))
     (apply #'concatenate 'string (nreverse ret))))
 
@@ -1727,37 +1723,3 @@ according to the IDNA confusableSummary.txt table"
            (skeleton1 (normalize-string (canonically-deconfuse str1) :nfd))
            (skeleton2 (normalize-string (canonically-deconfuse str2) :nfd)))
       (string= skeleton1 skeleton2)))
-
-(defun %flatten-all-ways (heads to-append)
-  (when (not to-append) (return-from %flatten-all-ways heads))
-  (let ((ret nil))
-    (loop for elem in (car to-append) do
-         (loop for list in heads do
-              (push (cons elem list) ret)))
-    (%flatten-all-ways ret (cdr to-append))))
-
-(defun flatten-all-ways (lists)
-  (mapcar #'reverse (%flatten-all-ways (mapcar #'list (car lists)) (cdr lists))))
-
-(defun list-all-confusables (string)
-  #!+sb-doc
-  "Returns a list of all strings that could be visually confusable with STRING."
-  (let (ret (i 0) new-i (len (length string))
-            best-set)
-    (loop while (< i len) do
-         (loop for offset from 1 to 5
-            while (<= (+ i offset) len)
-            do
-              (let ((set (uf-set-containing (subseq string i (+ i offset))
-                                            **confusables**)))
-                (when set (setf best-set set new-i (+ i offset)))))
-         (if best-set
-             (progn
-               (push best-set ret)
-               (setf i new-i))
-             (progn
-               (push (list (subseq string i (1+ i))) ret)
-               (incf i)))
-         (setf best-set nil new-i nil))
-    (mapcar #'(lambda (strs) (apply #'concatenate 'string strs))
-            (flatten-all-ways (nreverse ret)))))

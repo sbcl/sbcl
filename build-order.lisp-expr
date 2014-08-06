@@ -268,7 +268,6 @@
  ("src/code/char")
  ("src/code/huffman")
  ("src/code/target-char"    :not-host)
- ("src/code/union-find")
  ("src/code/target-unicode" :not-host)
  ("src/code/target-misc"    :not-host)
  ("src/code/misc")
