@@ -162,19 +162,15 @@
                                             key-length
                                             :element-type '(unsigned-byte 32)))
                                       (codepoints nil))
-                                 (/hexstr index)
                                  (assert (and (/= cp-length 0) (/= key-length 0)))
                                  (loop repeat cp-length do
-                                      (/show0 "Raw value") (/hexstr (aref info index))
                                       (push (dpb 0 (byte 10 22) (aref info index))
                                             codepoints)
                                       (incf index))
                                  (setf codepoints (nreverse codepoints))
-                                 (/show0 "Finished codepoints") (/hexstr codepoints)
                                  (dotimes (i key-length)
                                    (setf (aref key i) (aref info index))
                                    (incf index))
-                                 (/show0 "Finished key") (/hexstr key)
                                  (setf (gethash
                                         (apply #'pack-3-codepoints codepoints)
                                         table) key)))
