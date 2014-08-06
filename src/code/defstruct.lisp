@@ -1902,6 +1902,8 @@
 
 ;;; finding these beasts
 (defun find-defstruct-description (name &optional (errorp t))
+  ;; FIXME: errorp=nil doesn't actually work.
+  ;; FIND-CLASSOID returns NIL, and the rest is obvious.
   (let ((info (layout-info (classoid-layout (find-classoid name errorp)))))
     (if (defstruct-description-p info)
         info
