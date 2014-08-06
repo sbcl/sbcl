@@ -640,7 +640,6 @@
     ;; Essentially we want `(FIND-CLASS ',NAME) but without using backquote.
     ;; Because this is a delayed DEF!METHOD, its entire body is quoted structure
     ;; and can't contain a comma object until a MAKE-LOAD-FORM exists for that.
-    ;; :JUST-DUMP-IT-NORMALLY was a temporary hack for cross-compilation.
     (list 'find-class (list 'quote name))))
 
 ;;; The class PCL-CLASS is an implementation-specific common

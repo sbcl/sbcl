@@ -192,8 +192,8 @@
          object 'make-load-form))
 
 (defmethod make-load-form ((object sb-impl::comma) &optional env)
-  (declare (ignore env))
-  (sb-impl::!unquoting-comma-load-form object))
+  (declare (ignore object env))
+  :sb-just-dump-it-normally)
 
 (defun make-load-form-saving-slots (object &key (slot-names nil slot-names-p) environment)
   (declare (ignore environment))

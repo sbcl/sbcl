@@ -37,18 +37,12 @@
   (svref #(unquote unquote-nsplice unquote-splice) (comma-kind x)))
 (defun comma-splicing-p (comma) (not (zerop (comma-kind comma))))
 
-;; The host Lisp needs a MAKE-LOAD-FORM for commas. The warm image does too,
-;; but can't have until PCL is compiled. It's too early for DEF!METHOD,
-;; so we need a different way to avoid writing this code in two places.
-(declaim (inline !unquoting-comma-load-form))
-(defun !unquoting-comma-load-form (obj)
-  (list (comma-constructor obj) (list 'quote (comma-expr obj))))
 #+sb-xc-host
 (progn
   ;; tell the host how to dump it
   (defmethod make-load-form ((self comma) &optional environment)
     (declare (ignore environment))
-    (!unquoting-comma-load-form self))
+    (list (comma-constructor self) (list 'quote (comma-expr self))))
   ;; tell the cross-compiler that it can do :just-dump-it-normally
   (setf (get 'comma :sb-xc-allow-dumping-instances) t))
 
