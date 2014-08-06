@@ -585,6 +585,7 @@ variable: an unreadable object representing the error is printed instead.")
 ;;; Output PNAME (a symbol-name or package-name) surrounded with |'s,
 ;;; and with any embedded |'s or \'s escaped.
 (defun output-quoted-symbol-name (pname stream)
+  (declare (string pname))
   (write-char #\| stream)
   (dotimes (index (length pname))
     (let ((char (schar pname index)))

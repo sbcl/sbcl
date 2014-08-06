@@ -16,6 +16,7 @@
 ;;; The current level we are printing at, to be compared against
 ;;; *PRINT-LEVEL*. See the macro DESCEND-INTO for a handy interface to
 ;;; depth abbreviation.
+(declaim (index *current-level-in-print*))
 (defvar *current-level-in-print* 0)
 
 ;;; Automatically handle *PRINT-LEVEL* abbreviation. If we are too

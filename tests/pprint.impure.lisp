@@ -13,6 +13,19 @@
 
 (in-package :cl-user)
 
+;;;; Assert that entries inserted into a dispatch table with equal priority
+;;;; are order-preserving - unless they are of the form (CONS (EQL x)).
+;;;; This is not a requirement in general, but is quite reasonable.
+(with-test (:name :pprint-dispatch-order-preserving)
+  (let ((tbl (sb-pretty::make-pprint-dispatch-table)))
+    (handler-bind ((style-warning #'muffle-warning)) ; nonexistent types
+      (set-pprint-dispatch 'foo1 #'pprint-fill 5 tbl)
+      (set-pprint-dispatch 'fool #'pprint-fill 0 tbl)
+      (set-pprint-dispatch 'foo2 #'pprint-fill 5 tbl))
+    (let ((entries (sb-pretty::pprint-dispatch-table-entries tbl)))
+      (assert (equal (mapcar #'sb-pretty::pprint-dispatch-entry-type entries)
+                     '(foo1 foo2 fool))))))
+
 ;;;; tests for former BUG 99, where pretty-printing was pretty messed
 ;;;; up, e.g. PPRINT-LOGICAL-BLOCK - because of CHECK-FOR-CIRCULARITY
 ;;;; - didn't really work:
