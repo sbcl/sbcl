@@ -9,10 +9,7 @@
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
 
-;;; KLUDGE: eventually we will export NORMALIZE-STRING from somewhere.
-;;; Until we do, import it here so we can test it without putting ::
-;;; everywhere.
-(import 'sb-impl::normalize-string)
+(use-package :sb-unicode)
 
 (defun parse-one-line (line)
   (do* ((i 0 (1+ i))

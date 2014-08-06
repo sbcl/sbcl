@@ -1,0 +1,1763 @@
+;;;; Unicode functions
+
+;;;; This software is part of the SBCL system. See the README file for
+;;;; more information.
+;;;;
+;;;; This software is derived from the CMU CL system, which was
+;;;; written at Carnegie Mellon University and released into the
+;;;; public domain. The software is in the public domain and is
+;;;; provided with absolutely no warranty. See the COPYING and CREDITS
+;;;; files for more information.
+
+(in-package "SB!UNICODE")
+
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  ;; Lift some internal stuff from SB-IMPL to prevent piles of packkage prefixes
+  (import 'SB!IMPL::**CHARACTER-MISC-DATABASE**)
+  (import 'SB!IMPL::**CHARACTER-HIGH-PAGES**)
+  (import 'SB!IMPL::**CHARACTER-LOW-PAGES**)
+  (import 'SB!IMPL::**CHARACTER-DECOMPOSITIONS**)
+  (import 'SB!IMPL::**CHARACTER-PRIMARY-COMPOSITIONS**)
+  (import 'SB!IMPL::**CHARACTER-CASES**)
+  (import 'SB!IMPL::**CHARACTER-CASE-PAGES**)
+  (import 'SB!IMPL::**CHARACTER-COLLATIONS**)
+  (import 'SB!IMPL::*UNICODE-CHARACTER-NAME-DATABASE*)
+  (import 'SB!IMPL::*UNICODE-CHARACTER-NAME-HUFFMAN-TREE*)
+  (import 'SB!IMPL::BINARY-SEARCH)
+  (import 'SB!IMPL::HUFFMAN-DECODE)
+  (import 'SB!IMPL::MISC-INDEX)
+  (import 'SB!IMPL::CLEAR-FLAG)
+  (import 'SB!IMPL::PACK-3-CODEPOINTS))
+
+(defparameter **special-numerics**
+  '#.(with-open-file (stream
+                     (merge-pathnames
+                      (make-pathname
+                       :directory
+                       '(:relative :up :up "output")
+                       :name "numerics" :type "lisp-expr")
+                      sb!xc:*compile-file-truename*)
+                     :direction :input
+                     :element-type 'character)
+        (read stream)))
+
+(defparameter **block-ranges**
+  '#.(with-open-file (stream
+                     (merge-pathnames
+                      (make-pathname
+                       :directory
+                       '(:relative :up :up "output")
+                       :name "blocks" :type "lisp-expr")
+                      sb!xc:*compile-file-truename*)
+                     :direction :input
+                     :element-type 'character)
+        (read stream)))
+
+(macrolet ((unicode-property-init ()
+             (let ((proplist-dump
+                    (with-open-file (stream
+                                     (merge-pathnames
+                                      (make-pathname
+                                       :directory
+                                       '(:relative :up :up "output")
+                                       :name "misc-properties" :type "lisp-expr")
+                                      sb!xc:*compile-file-truename*)
+                                     :direction :input
+                                     :element-type 'character)
+                      (read stream)))
+                   (confusable-sets
+                    (with-open-file (stream
+                                     (merge-pathnames
+                                      (make-pathname
+                                       :directory
+                                       '(:relative :up :up "output")
+                                       :name "confusables" :type "lisp-expr")
+                                      sb!xc:*compile-file-truename*)
+                                     :direction :input
+                                     :element-type 'character)
+                      (read stream)))
+                   (bidi-mirroring-list
+                    (with-open-file (stream
+                                     (merge-pathnames
+                                      (make-pathname
+                                       :directory
+                                       '(:relative :up :up "output")
+                                       :name "bidi-mirrors" :type "lisp-expr")
+                                      sb!xc:*compile-file-truename*)
+                                     :direction :input
+                                     :element-type 'character)
+                      (read stream))))
+               `(progn
+                  (sb!impl::defglobal **proplist-properties** ',proplist-dump)
+                  (sb!impl::defglobal **confusables** ',confusable-sets)
+                  (sb!impl::defglobal **bidi-mirroring-glyphs** ',bidi-mirroring-list)
+                  (defun !unicode-properties-cold-init ()
+                    (let ((hash (make-hash-table)) (list ',proplist-dump))
+                      (do ((k (car list) (car list)) (v (cadr list) (cadr list)))
+                          ((not list) hash)
+                        (setf (gethash k hash) v)
+                        (setf list (cddr list)))
+                      (setf **proplist-properties** hash))
+                    (setf **confusables**
+                          (create-union-find
+                           (mapcar
+                            #'(lambda (set)
+                                (mapcar #'(lambda (item)
+                                            (coerce (mapcar #'code-char item)
+                                                    'string)) set))
+                            ',confusable-sets)))
+                    (let ((hash (make-hash-table)) (list ',bidi-mirroring-list))
+                      (loop for (k v) in list do
+                           (setf (gethash k hash) v))
+                      (setf **bidi-mirroring-glyphs** hash)))))))
+  (unicode-property-init))
+
+;;; Unicode property access
+(defun reverse-ucd-indices (strings)
+  (let ((hash (make-hash-table)))
+    (loop for string in strings
+          for index from 0
+          do (setf (gethash index hash) string))
+    hash))
+
+(defun ordered-ranges-member (item vector)
+  (labels ((recurse (start end)
+             (when (< start end)
+               (let* ((i (+ start (truncate (- end start) 2)))
+                      (index (* 2 i))
+                      (elt1 (svref vector index))
+                      (elt2 (svref vector (1+ index))))
+                 (cond ((< item elt1)
+                        (recurse start i))
+                       ((> item elt2)
+                        (recurse (+ 1 i) end))
+                       (t
+                        item))))))
+    (recurse 0 (/ (length vector) 2))))
+
+;; Returns which range `item` was found in or NIL
+;; First range = 0, second range = 1 ...
+(defun ordered-ranges-position (item vector)
+  (labels ((recurse (start end)
+             (when (< start end)
+               (let* ((i (+ start (truncate (- end start) 2)))
+                      (index (* 2 i))
+                      (elt1 (svref vector index))
+                      (elt2 (svref vector (1+ index))))
+                 (cond ((< item elt1)
+                        (recurse start i))
+                       ((> item elt2)
+                        (recurse (+ 1 i) end))
+                       (t
+                        i))))))
+    (recurse 0 (/ (length vector) 2))))
+
+(defun proplist-p (character property)
+  #!+sb-doc
+  "Returns T if CHARACTER has the specified PROPERTY.
+PROPERTY is a keyword representing one of the properties from PropList.txt,
+with underscores replaced by dashes."
+  (ordered-ranges-member (char-code character)
+                         (gethash property **proplist-properties**)))
+
+;; WARNING: These have to be manually kept in sync with the values in ucd.lisp
+(defparameter *general-categories*
+  (reverse-ucd-indices
+   '(:Lu :Ll :Lt :Lm :Lo :Cc :Cf :Co :Cs :Cn :Mc :Me :Mn :Nd
+     :Nl :No :Pc :Pd :Pe :Pf :Pi :Po :Ps :Sc :Sk :Sm :So :Zl
+     :Zp :Zs)))
+
+(defparameter *bidi-classes*
+  (reverse-ucd-indices
+   '(:BN :AL :AN :B :CS :EN :ES :ET :L :LRE :LRO :NSM :ON
+     :PDF :R :RLE :RLO :S :WS :LRI :RLI :FSI :PDI)))
+
+(defparameter *east-asian-widths*
+  (reverse-ucd-indices '(:N :A :H :W :F :Na)))
+
+(defparameter *scripts*
+  (reverse-ucd-indices
+   '(:Unknown :Common :Latin :Greek :Cyrillic :Armenian :Hebrew :Arabic :Syriac
+     :Thaana :Devanagari :Bengali :Gurmukhi :Gujarati :Oriya :Tamil :Telugu
+     :Kannada :Malayalam :Sinhala :Thai :Lao :Tibetan :Myanmar :Georgian :Hangul
+     :Ethiopic :Cherokee :Canadian-Aboriginal :Ogham :Runic :Khmer :Mongolian
+     :Hiragana :Katakana :Bopomofo :Han :Yi :Old-Italic :Gothic :Deseret
+     :Inherited :Tagalog :Hanunoo :Buhid :Tagbanwa :Limbu :Tai-Le :Linear-B
+     :Ugaritic :Shavian :Osmanya :Cypriot :Braille :Buginese :Coptic :New-Tai-Lue
+     :Glagolitic :Tifinagh :Syloti-Nagri :Old-Persian :Kharoshthi :Balinese
+     :Cuneiform :Phoenician :Phags-Pa :Nko :Sundanese :Lepcha :Ol-Chiki :Vai
+     :Saurashtra :Kayah-Li :Rejang :Lycian :Carian :Lydian :Cham :Tai-Tham
+     :Tai-Viet :Avestan :Egyptian-Hieroglyphs :Samaritan :Lisu :Bamum :Javanese
+     :Meetei-Mayek :Imperial-Aramaic :Old-South-Arabian :Inscriptional-Parthian
+     :Inscriptional-Pahlavi :Old-Turkic :Kaithi :Batak :Brahmi :Mandaic :Chakma
+     :Meroitic-Cursive :Meroitic-Hieroglyphs :Miao :Sharada :Sora-Sompeng
+     :Takri :Bassa-Vah :Mahajani :Pahawh-Hmong :Caucasian-Albanian :Manichaean
+     :Palmyrene :Duployan :Mende-Kikakui :Pau-Cin-Hau :Elbasan :Modi
+     :Psalter-Pahlavi :Grantha :Mro :Siddham :Khojki :Nabataean :Tirhuta
+     :Khudawadi :Old-North-Arabian :Warang-Citi :Linear-A :Old-Permic)))
+
+(defparameter *blocks*
+  #(:Basic-Latin :Latin-1-Supplement :Latin-Extended-A :Latin-Extended-B
+    :IPA-Extensions :Spacing-Modifier-Letters :Combining-Diacritical-Marks
+    :Greek-and-Coptic :Cyrillic :Cyrillic-Supplement :Armenian :Hebrew :Arabic
+    :Syriac :Arabic-Supplement :Thaana :NKo :Samaritan :Mandaic
+    :Arabic-Extended-A :Devanagari :Bengali :Gurmukhi :Gujarati :Oriya :Tamil
+    :Telugu :Kannada :Malayalam :Sinhala :Thai :Lao :Tibetan :Myanmar :Georgian
+    :Hangul-Jamo :Ethiopic :Ethiopic-Supplement :Cherokee
+    :Unified-Canadian-Aboriginal-Syllabics :Ogham :Runic :Tagalog :Hanunoo
+    :Buhid :Tagbanwa :Khmer :Mongolian
+    :Unified-Canadian-Aboriginal-Syllabics-Extended :Limbu :Tai-Le :New-Tai-Lue
+    :Khmer-Symbols :Buginese :Tai-Tham :Combining-Diacritical-Marks-Extended
+    :Balinese :Sundanese :Batak :Lepcha :Ol-Chiki :Sundanese-Supplement
+    :Vedic-Extensions :Phonetic-Extensions :Phonetic-Extensions-Supplement
+    :Combining-Diacritical-Marks-Supplement :Latin-Extended-Additional
+    :Greek-Extended :General-Punctuation :Superscripts-and-Subscripts
+    :Currency-Symbols :Combining-Diacritical-Marks-for-Symbols
+    :Letterlike-Symbols :Number-Forms :Arrows :Mathematical-Operators
+    :Miscellaneous-Technical :Control-Pictures :Optical-Character-Recognition
+    :Enclosed-Alphanumerics :Box-Drawing :Block-Elements :Geometric-Shapes
+    :Miscellaneous-Symbols :Dingbats :Miscellaneous-Mathematical-Symbols-A
+    :Supplemental-Arrows-A :Braille-Patterns :Supplemental-Arrows-B
+    :Miscellaneous-Mathematical-Symbols-B :Supplemental-Mathematical-Operators
+    :Miscellaneous-Symbols-and-Arrows :Glagolitic :Latin-Extended-C :Coptic
+    :Georgian-Supplement :Tifinagh :Ethiopic-Extended :Cyrillic-Extended-A
+    :Supplemental-Punctuation :CJK-Radicals-Supplement :Kangxi-Radicals
+    :Ideographic-Description-Characters :CJK-Symbols-and-Punctuation :Hiragana
+    :Katakana :Bopomofo :Hangul-Compatibility-Jamo :Kanbun :Bopomofo-Extended
+    :CJK-Strokes :Katakana-Phonetic-Extensions :Enclosed-CJK-Letters-and-Months
+    :CJK-Compatibility :CJK-Unified-Ideographs-Extension-A
+    :Yijing-Hexagram-Symbols :CJK-Unified-Ideographs :Yi-Syllables :Yi-Radicals
+    :Lisu :Vai :Cyrillic-Extended-B :Bamum :Modifier-Tone-Letters
+    :Latin-Extended-D :Syloti-Nagri :Common-Indic-Number-Forms :Phags-pa
+    :Saurashtra :Devanagari-Extended :Kayah-Li :Rejang :Hangul-Jamo-Extended-A
+    :Javanese :Myanmar-Extended-B :Cham :Myanmar-Extended-A :Tai-Viet
+    :Meetei-Mayek-Extensions :Ethiopic-Extended-A :Latin-Extended-E
+    :Meetei-Mayek :Hangul-Syllables :Hangul-Jamo-Extended-B :High-Surrogates
+    :High-Private-Use-Surrogates :Low-Surrogates :Private-Use-Area
+    :CJK-Compatibility-Ideographs :Alphabetic-Presentation-Forms
+    :Arabic-Presentation-Forms-A :Variation-Selectors :Vertical-Forms
+    :Combining-Half-Marks :CJK-Compatibility-Forms :Small-Form-Variants
+    :Arabic-Presentation-Forms-B :Halfwidth-and-Fullwidth-Forms :Specials
+    :Linear-B-Syllabary :Linear-B-Ideograms :Aegean-Numbers
+    :Ancient-Greek-Numbers :Ancient-Symbols :Phaistos-Disc :Lycian :Carian
+    :Coptic-Epact-Numbers :Old-Italic :Gothic :Old-Permic :Ugaritic :Old-Persian
+    :Deseret :Shavian :Osmanya :Elbasan :Caucasian-Albanian :Linear-A
+    :Cypriot-Syllabary :Imperial-Aramaic :Palmyrene :Nabataean :Phoenician
+    :Lydian :Meroitic-Hieroglyphs :Meroitic-Cursive :Kharoshthi
+    :Old-South-Arabian :Old-North-Arabian :Manichaean :Avestan
+    :Inscriptional-Parthian :Inscriptional-Pahlavi :Psalter-Pahlavi :Old-Turkic
+    :Rumi-Numeral-Symbols :Brahmi :Kaithi :Sora-Sompeng :Chakma :Mahajani
+    :Sharada :Sinhala-Archaic-Numbers :Khojki :Khudawadi :Grantha :Tirhuta
+    :Siddham :Modi :Takri :Warang-Citi :Pau-Cin-Hau :Cuneiform
+    :Cuneiform-Numbers-and-Punctuation :Egyptian-Hieroglyphs :Bamum-Supplement
+    :Mro :Bassa-Vah :Pahawh-Hmong :Miao :Kana-Supplement :Duployan
+    :Shorthand-Format-Controls :Byzantine-Musical-Symbols :Musical-Symbols
+    :Ancient-Greek-Musical-Notation :Tai-Xuan-Jing-Symbols
+    :Counting-Rod-Numerals :Mathematical-Alphanumeric-Symbols :Mende-Kikakui
+    :Arabic-Mathematical-Alphabetic-Symbols :Mahjong-Tiles :Domino-Tiles
+    :Playing-Cards :Enclosed-Alphanumeric-Supplement
+    :Enclosed-Ideographic-Supplement :Miscellaneous-Symbols-and-Pictographs
+    :Emoticons :Ornamental-Dingbats :Transport-and-Map-Symbols
+    :Alchemical-Symbols :Geometric-Shapes-Extended :Supplemental-Arrows-C
+    :CJK-Unified-Ideographs-Extension-B :CJK-Unified-Ideographs-Extension-C
+    :CJK-Unified-Ideographs-Extension-D :CJK-Compatibility-Ideographs-Supplement
+    :Tags :Variation-Selectors-Supplement :Supplementary-Private-Use-Area-A
+    :Supplementary-Private-Use-Area-B))
+
+(defparameter *line-break-classes*
+  (reverse-ucd-indices
+   '(:XX :AI :AL :B2 :BA :BB :BK :CB :CJ :CL :CM :CP :CR :EX :GL
+     :HL :HY :ID :IN :IS :LF :NL :NS :NU :OP :PO :PR :QU :RI :SA
+     :SG :SP :SY :WJ :ZW)))
+
+(defun general-category (character)
+  #!+sb-doc
+  "Returns the general category of CHARACTER as it appears in UnicodeData.txt"
+  (gethash (sb!impl::ucd-general-category character) *general-categories*))
+
+(defun bidi-class (character)
+  #!+sb-doc
+  "Returns the bidirectional class of CHARACTER"
+  (if (and (eql (general-category character) :Cn)
+           (default-ignorable-p character))
+      :Bn
+      (gethash
+       (aref **character-misc-database** (+ 1 (misc-index character)))
+       *bidi-classes*)))
+
+(defun combining-class (character)
+  #!+sb-doc
+  "Returns the canonical combining class (CCC) of CHARACTER"
+  (aref **character-misc-database** (+ 2 (misc-index character))))
+
+(defun decimal-value (character)
+  #!+sb-doc
+  "Returns the decimal digit value associated with CHARACTER or NIL if
+there is no such value.
+
+The only characters in Unicode with a decimal digit value are those
+that are part of a range of characters that encode the digits 0-9.
+Because of this, `(decimal-digit c) <=> (digit-char-p c 10)` in
+#+sb-unicode builds"
+  (sb!impl::ucd-decimal-digit character))
+
+(defun digit-value (character)
+  #!+sb-doc
+  "Returns the Unicode digit value of CHARACTER or NIL if it doesn't exist.
+
+Digit values are guaranteed to be integers between 0 and 9 inclusive.
+All characters with decimal digit values have the same digit value,
+but there are characters (such as digits of number systems without a 0 value)
+that have a digit value but no decimal digit value"
+  (let ((%digit (clear-flag 6
+                            (aref **character-misc-database**
+                                  (+ 3 (misc-index character))))))
+    (if (< %digit 10) %digit nil)))
+
+(defun numeric-value (character)
+  #!+sb-doc
+  "Returns the numeric value of CHARACTER or NIL if there is no such value.
+
+Numeric value is the most general of the Unicode numeric properties.
+The only constraint on the numeric value is that it be a rational number."
+  (cdr (or (assoc (char-code character) **special-numerics**)
+           (cons nil (digit-value character)))))
+
+(defun mirrored-p (character)
+  #!+sb-doc
+  "Returns T if CHARACTER needs to be mirrored in bidirectional text.
+Otherwise, returns NIL."
+  (logbitp 5 (aref **character-misc-database**
+                    (+ 5 (misc-index character)))))
+
+(defun bidi-mirroring-glyph (character)
+  #!+sb-doc
+  "Returns the mirror image of CHARACTER if it exists.
+Otherwise, returns NIL."
+  (when (mirrored-p character)
+    (let ((ret (gethash (char-code character) **bidi-mirroring-glyphs**)))
+      (when ret (code-char ret)))))
+
+(defun east-asian-width (character)
+  #!+sb-doc
+  "Returns the East Asian Width property of CHARACTER as
+one of the keywords :N (Narrow), :A (Ambiguous), :H (Halfwidth),
+:W (Wide), :F (Fullwidth), or :NA (Not applicable)"
+  (gethash (ldb (byte 3 0)
+                (aref **character-misc-database**
+                      (+ 5 (misc-index character))))
+           *east-asian-widths*))
+
+(defun script (character)
+  #!+sb-doc
+  "Returns the Script property of CHARACTER as a keyword.
+If CHARACTER does not have a known script, returns :UNKNOWN"
+  (gethash (aref **character-misc-database** (+ 6 (misc-index character)))
+           *scripts*))
+
+(defun char-block (character)
+  #!+sb-doc
+  "Returns the Unicode block in which CHARACTER resides as a keyword.
+If CHARACTER does not have a known block, returns :NO-BLOCK"
+  (let* ((code (char-code character))
+         (block-index (ordered-ranges-position code **block-ranges**)))
+    (if block-index
+        (aref *blocks* block-index) :no-block)))
+
+(defun unicode-1-name (character)
+  #!+sb-doc
+  "Returns the name assigned to CHARACTER in Unicode 1.0 if it is distinct
+from the name currently assigned to CHARACTER. Otherwise, returns NIL.
+This property has been officially obsoleted by the Unicode standard, and
+is only included for backwards compatibility."
+  (let* ((char-code (+ #x110000 (char-code character)))
+         (h-code (cdr (binary-search char-code
+                                     (car *unicode-character-name-database*)
+                                     :key #'car))))
+    (when h-code
+      ;; Remove UNICODE1_ prefix
+      (subseq (huffman-decode h-code *unicode-character-name-huffman-tree*) 9))))
+
+(defun age (character)
+  #!+sb-doc
+  "Returns the version of Unicode in which CHARACTER was assigned as a pair
+of values, both integers, representing the major and minor version respectively.
+If CHARACTER is not assigned in Unicode, returns NIL for both values."
+  (let* ((value (aref **character-misc-database** (+ 8 (misc-index character))))
+         (major (ash value -3))
+         (minor (ldb (byte 3 0) value)))
+    (if (zerop value) (values nil nil) (values major minor))))
+
+(defun hangul-syllable-type (character)
+  #!+sb-doc
+  "Returns the Hangul syllable type of CHARACTER.
+The syllable type can be one of :L, :V, :T, :LV, or :LVT.
+If the character is not a Hangul syllable or Jamo, returns NIL"
+  (let ((cp (char-code character)))
+    (cond
+      ((or
+        (and (<= #x1100 cp) (<= cp #x115f))
+        (and (<= #xa960 cp) (<= cp #xa97c))) :L)
+      ((or
+        (and (<= #x1160 cp) (<= cp #x11a7))
+        (and (<= #xd7B0 cp) (<= cp #xd7C6))) :V)
+      ((or
+        (and (<= #x11a8 cp) (<= cp #x11ff))
+        (and (<= #xd7c8 cp) (<= cp #xd7fb))) :T)
+      ((and (<= #xac00 cp) (<= cp #xd7a3))
+       (if (= 0 (rem (- cp #xac00) 28)) :LV :LVT)))))
+
+(defun line-break-class (character &key resolve)
+  #!+sb-doc
+  "Returns the line breaking class of CHARACTER, as specified in UAX #14.
+If :RESOLVE is NIL, returns the character class found in the property file.
+If :RESOLVE is non-NIL, centain line-breaking classes will be mapped to othec
+classes as specified in the applicable standards. Addinionally, if :RESOLVE
+is :EAST-ASIAN, Ambigious (class :AI) characters will be mapped to the
+Ideographic (:ID) class instead of Alphabetic (:AL)."
+  (when (and resolve (listp character)) (setf character (car character)))
+  (when (and resolve (not character)) (return-from line-break-class :nil))
+  (let ((raw-class
+         (gethash (aref **character-misc-database** (+ 7 (misc-index character)))
+           *line-break-classes*))
+        (syllable-type (hangul-syllable-type character)))
+    (when syllable-type
+      (setf raw-class
+            (cdr (assoc syllable-type
+                        '((:l . :JL) (:v . :JV) (:t . :JT)
+                          (:lv . :H2) (:lvt . :H3))))))
+    (when resolve
+      (setf raw-class
+            (case raw-class
+              (:ai (if (eql resolve :east-asion) :ID :AL))
+              ; If we see :CM when resolving, we have a CM that isn't subject
+              ; to LB9, so we do LB10
+              ((:xx :cm) :al)
+              (:sa (if (member (general-category character) '(:Mn :Mc))
+                       :CM :AL))
+              (:cj :ns)
+              (:sg (error "The character ~S is a surrogate, which should not
+appear in an SBCL string. The line-breaking behavior of surrogates is undefined."
+                          character))
+              (t raw-class))))
+    raw-class))
+
+(defun uppercase-p (character)
+  #!+sb-doc
+  "Returns T if CHARACTER has the Unicode property Uppercase and NIL otherwise"
+  (or (eql (general-category character) :Lu) (proplist-p character :other-uppercase)))
+
+(defun lowercase-p (character)
+  #!+sb-doc
+  "Returns T if CHARACTER has the Unicode property Lowercase and NIL otherwise"
+  (or (eql (general-category character) :Ll) (proplist-p character :other-lowercase)))
+
+(defun cased-p (character)
+  #!+sb-doc
+  "Returns T if CHARACTER has a (Unicode) case, and NIL otherwise"
+  (or (uppercase-p character) (lowercase-p character)
+      (eql (general-category character) :Lt)))
+
+(defun case-ignorable-p (character)
+  #!+sb-doc
+  "Returns T if CHARACTER is Case Ignorable as defined in Unicode 6.3, Chapter
+3"
+  (or (member (general-category character)
+              '(:Mn :Me :Cf :Lm :Sk))
+      (member (word-break-class character)
+              '(:midletter :midnumlet :single-quote))))
+
+(defun alphabetic-p (character)
+  #!+sb-doc
+  "Returns T if CHARACTER is Alphabetic according to the Unicode standard
+and NIL otherwise"
+  (or (member (general-category character) '(:Lu :Ll :Lt :Lm :Lo :Nl))
+      (proplist-p character :other-alphabetic)))
+
+(defun ideographic-p (character)
+  #!+sb-doc
+  "Returns T if CHARACTER has the Unicode property Ideographic,
+which loosely corresponds to the set of \"Chinese characters\""
+  (proplist-p character :ideographic))
+
+(defun math-p (character)
+  #!+sb-doc
+  "Returns T if CHARACTER is a mathematical symbol according to Unicode and
+NIL otherwise"
+  (or (eql (general-category character) :sm) (proplist-p character :other-math)))
+
+(defun whitespace-p (character)
+  #!+sb-doc
+  "Returns T if CHARACTER is whitespace according to Unicode
+and NIL otherwise"
+  (proplist-p character :white-space))
+
+(defun hex-digit-p (character &key ascii)
+  #!+sb-doc
+  "Returns T if CHARACTER is a hexadecimal digit and NIL otherwise.
+If :ASCII is non-NIL, fullwidth equivalents of the Latin letters A through F
+are excluded."
+  (proplist-p character (if ascii :ascii-hex-digit :hex-digit)))
+
+(defun soft-dotted-p (character)
+  #!+sb-doc
+  "Returns T if CHARACTER has a soft dot (such as the dots on i and j) which
+disappears when accents are placed on top of it. and NIL otherwise"
+  (proplist-p character :soft-dotted))
+
+(defun default-ignorable-p (character)
+  #!+sb-doc
+  "Returns T if CHARACTER is a Default_Ignorable_Code_Point"
+  (and
+   (or (proplist-p character :other-default-ignorable-code-point)
+       (eql (general-category character) :cf)
+       (proplist-p character :variation-selector))
+   (not
+    (or (whitespace-p character)
+        (ordered-ranges-member
+         (char-code character)
+         #(#x0600 #x0604 #x06DD #x06DD #x070F #x070F #xFFF9 #xFFFB
+           #x110BD #x110BD))))))
+
+
+;;; Implements UAX#15: Normalization Forms
+(defun char-decomposition-info (char)
+  (let ((value (aref **character-misc-database**
+                     (+ 4 (misc-index char)))))
+    (values (clear-flag 7 value) (logbitp 7 value))))
+
+(defun char-decomposition (char length)
+  ;; Caller should have gotten length from char-decomposition-info
+  (let* ((cp (char-code char))
+         (cp-high (ash cp -8))
+         (decompositions **character-decompositions**)
+         (high-page (aref **character-high-pages** cp-high))
+         (index (unless (logbitp 15 high-page) ;; Hangul syllable
+                  (aref **character-low-pages**
+                        (+ 1 (* 2 (+ (ldb (byte 8 0) cp) (ash high-page 8)))))))
+         (entry (when index (loop for i from 0 below length
+                               collecting (aref decompositions (+ i index)))))
+         (result (make-string length)))
+    (if (= length 1)
+        (string (code-char (car entry)))
+        (progn
+          (if (<= #xac00 cp #xd7a3)
+              ;; see Unicode 6.2, section 3-12
+              (let* ((sbase #xac00)
+                     (lbase #x1100)
+                     (vbase #x1161)
+                     (tbase #x11a7)
+                     (lcount 19)
+                     (vcount 21)
+                     (tcount 28)
+                     (ncount (* vcount tcount))
+                     (scount (* lcount ncount))
+                     (sindex (- cp sbase))
+                     (lindex (floor sindex ncount))
+                     (vindex (floor (mod sindex ncount) tcount))
+                     (tindex (mod sindex tcount)))
+                (declare (ignore scount))
+                (setf (char result 0) (code-char (+ lbase lindex)))
+                (setf (char result 1) (code-char (+ vbase vindex)))
+                (if (> tindex 0)
+                  (setf (char result 2) (code-char (+ tbase tindex)))
+                  (setf result (subseq result 0 2)))) ; Remove trailing #\Nul
+              (loop for i from 0 for code in entry
+                 do (setf (char result i) (code-char code))))
+          result))))
+
+(defun decompose-char (char)
+  (let ((info (char-decomposition-info char)))
+    (if (= info 0)
+        (string char)
+        (char-decomposition char info))))
+
+(defun decompose-string (string &optional (kind :canonical))
+  (declare (type (member :canonical :compatibility) kind))
+  (flet ((canonical (char)
+           (multiple-value-bind (len compat) (char-decomposition-info char)
+             (and (/= len 0) (not compat))))
+         (compat (char)
+           (/= 0 (char-decomposition-info char))))
+    (let (result
+          (fun (ecase kind
+                 (:canonical #'canonical)
+                 (:compatibility #'compat))))
+      (do* ((start 0 (1+ end))
+            (end (position-if fun string :start start)
+                 (position-if fun string :start start)))
+           ((null end) (push (subseq string start end) result))
+        (unless (= start end)
+          (push (subseq string start end) result))
+        ;; FIXME: this recursive call to DECOMPOSE-STRING is necessary
+        ;; for correctness given our direct encoding of the
+        ;; decomposition data in UnicodeData.txt.  It would, however,
+        ;; be straightforward enough to perform the recursion in table
+        ;; construction, and then have this simply revert to a single
+        ;; lookup.  (Wait for tests to be hooked in, then implement).
+        (push (decompose-string (decompose-char (char string end)) kind)
+              result))
+      (apply 'concatenate 'string (nreverse result)))))
+
+(defun sort-combiners (string)
+  (let (result (start 0) first-cc first-non-cc)
+    (tagbody
+     again
+       (setf first-cc (position 0 string :key #'combining-class :test #'/= :start start))
+       (when first-cc
+         (setf first-non-cc (position 0 string :key #'combining-class :test #'= :start first-cc)))
+       (push (subseq string start first-cc) result)
+       (when first-cc
+         (push (stable-sort (subseq string first-cc first-non-cc) #'< :key #'combining-class) result))
+       (when first-non-cc
+         (setf start first-non-cc first-cc nil first-non-cc nil)
+         (go again)))
+    (apply 'concatenate 'string (nreverse result))))
+
+(defun composition-hangul-syllable-type (cp)
+  (cond
+    ((and (<= #x1100 cp) (<= cp #x1112)) :L)
+    ((and (<= #x1161 cp) (<= cp #x1175)) :V)
+    ((and (<= #x11a8 cp) (<= cp #x11c2)) :T)
+    ((and (<= #xac00 cp) (<= cp #.(+ #xac00 11171)))
+     (if (= 0 (rem (- cp #xac00) 28)) :LV :LVT))))
+
+(defun primary-composition (char1 char2)
+  (let ((c1 (char-code char1))
+        (c2 (char-code char2)))
+    (cond
+      ((gethash (dpb (char-code char1) (byte 21 21) (char-code char2))
+                **character-primary-compositions**))
+      ((and (eql (composition-hangul-syllable-type c1) :L)
+            (eql (composition-hangul-syllable-type c2) :V))
+       (let ((lindex (- c1 #x1100))
+             (vindex (- c2 #x1161)))
+         (code-char (+ #xac00 (* lindex 588) (* vindex 28)))))
+      ((and (eql (composition-hangul-syllable-type c1) :LV)
+            (eql (composition-hangul-syllable-type c2) :T))
+       (code-char (+ c1 (- c2 #x11a7)))))))
+
+;;; This implements a sequence data structure, specialized for
+;;; efficient deletion of characters at an index, along with tolerable
+;;; random access.  The purpose is to support the canonical
+;;; composition algorithm from Unicode, which involves replacing (not
+;;; necessarily consecutive) pairs of code points with a single code
+;;; point (e.g. [#\e #\combining_acute_accent] with
+;;; #\latin_small_letter_e_with_acute).  The data structure is a list
+;;; of three-element lists, each denoting a chunk of string data
+;;; starting at the first index and ending at the second.
+;;;
+;;; Actually, the implementation isn't particularly efficient, and
+;;; would probably benefit from being rewritten in terms of displaced
+;;; arrays, which would substantially reduce copying.
+;;;
+;;; (also, generic sequences.  *sigh*.)
+(defun lref (lstring index)
+  (dolist (l lstring)
+    (when (and (<= (first l) index)
+               (< index (second l)))
+      (return (aref (third l) (- index (first l)))))))
+
+(defun (setf lref) (newchar lstring index)
+  (dolist (l lstring)
+    (when (and (<= (first l) index)
+               (< index (second l)))
+      (return (setf (aref (third l) (- index (first l))) newchar)))))
+
+(defun llength (lstring)
+  (second (first (last lstring))))
+
+(defun lstring (lstring)
+  (let ((result (make-string (llength lstring))))
+    (dolist (l lstring result)
+      (replace result (third l) :start1 (first l) :end1 (second l)))))
+
+(defun ldelete (lstring index)
+  (do* ((ls lstring (cdr ls))
+        (l (car ls) (car ls))
+        so-fars)
+       ((and (<= (first l) index)
+             (< index (second l)))
+        (append
+         (nreverse so-fars)
+         (cond
+           ((= (first l) index)
+            (list (list (first l) (1- (second l)) (subseq (third l) 1))))
+           ((= index (1- (second l)))
+            (list (list (first l) (1- (second l)) (subseq (third l) 0 (1- (length (third l)))))))
+           (t
+            (list
+             (list (first l) index
+                   (subseq (third l) 0 (- index (first l))))
+             (list index (1- (second l))
+                   (subseq (third l) (1+ (- index (first l))))))))
+         (mapcar (lambda (x) (list (1- (first x)) (1- (second x)) (third x)))
+                 (cdr ls))))
+    (push l so-fars)))
+
+(defun canonically-compose (string)
+  (labels ()
+    (let* ((result (list (list 0 (length string) string)))
+           (previous-starter-index (position 0 string :key #'combining-class))
+           (i (and previous-starter-index (1+ previous-starter-index))))
+      (when (or (not i) (= i (length string)))
+        (return-from canonically-compose string))
+      (tagbody
+       again
+         (when (and (>= (- i previous-starter-index) 2)
+                    ;; test for Blocked (Unicode 3.11 para. D115)
+                    ;;
+                    ;; (assumes here that string has sorted combiners,
+                    ;; so can look back just one step)
+                    (>= (combining-class (lref result (1- i)))
+                        (combining-class (lref result i))))
+           (when (= (combining-class (lref result i)) 0)
+             (setf previous-starter-index i))
+           (incf i)
+           (go next))
+
+         (let ((comp (primary-composition (lref result previous-starter-index)
+                                          (lref result i))))
+           (cond
+             (comp
+              (setf (lref result previous-starter-index) comp)
+              (setf result (ldelete result i)))
+             (t
+              (when (= (combining-class (lref result i)) 0)
+                (setf previous-starter-index i))
+              (incf i))))
+       next
+         (unless (= i (llength result))
+           (go again)))
+      (if (= i (length string))
+          string
+          (lstring result)))))
+
+(defun quick-normalization-check (string no-prop &optional maybe-prop)
+  (let ((prev-cc 0))
+    (loop for c across string
+       for cp = (char-code c)
+       for cc = (combining-class c)
+       do
+         (unless (<= #x100000 cp #x10FFFF)
+           (if (or
+                (and (> prev-cc cc) (/= cc 0))
+                (proplist-p c no-prop)
+                (proplist-p c maybe-prop))
+               (return-from quick-normalization-check nil)
+               (setf prev-cc cc))))
+    string))
+
+(defun normalize-string (string &optional (form :nfd))
+  #!+sb-doc
+  "Normalize STRING to the Unicode normalization form form.
+   Acceptable values for form are :NFD, :NFC, :NFKD, and :NFKC"
+  (declare (type (member :nfd :nfkd :nfc :nfkc) form))
+  #!-sb-unicode
+  (etypecase string
+    ((array nil (*)) string)
+    (string
+     (ecase form
+       ((:nfc :nfkc) string)
+       ((:nfd :nfkd) (error "Cannot normalize to ~A form in #-SB-UNICODE builds" form)))))
+  #!+sb-unicode
+  (etypecase string
+    (base-string string)
+    ((array character (*))
+     (ecase form
+       ((:nfc)
+        (or
+         (quick-normalization-check string :nfc-qc :nfc-qc-maybe)
+         (canonically-compose (sort-combiners (decompose-string string)))))
+       ((:nfd)
+        (or
+         (quick-normalization-check string :nfd-qc)
+         (sort-combiners (decompose-string string))))
+       ((:nfkc)
+        (or
+         (quick-normalization-check string :nfkc-qc :nfkc-qc-maybe)
+         (canonically-compose (sort-combiners (decompose-string string :compatibility)))))
+       ((:nfkd)
+        (or
+         (quick-normalization-check string :nfkd-qc)
+         (sort-combiners (decompose-string string :compatibility))))))
+    ((array nil (*)) string)))
+
+(defun normalized-p (string &optional (form :nfd))
+  #!+sb-doc
+  "Tests if STRING is normalized to FORM"
+  ;; This is fast because of the quick check
+  (string= string (normalize-string string form)))
+
+
+;;; Unicode case algorithms
+;; FIXME: Make these parts less redundant (macro?)
+(defparameter **special-titlecases**
+  '#.(with-open-file (stream
+                     (merge-pathnames
+                      (make-pathname
+                       :directory
+                       '(:relative :up :up "output")
+                       :name "titlecases" :type "lisp-expr")
+                      sb!xc:*compile-file-truename*)
+                     :direction :input
+                     :element-type 'character)
+        (read stream)))
+
+(defparameter **special-casefolds**
+  '#.(with-open-file (stream
+                     (merge-pathnames
+                      (make-pathname
+                       :directory
+                       '(:relative :up :up "output")
+                       :name "foldcases" :type "lisp-expr")
+                      sb!xc:*compile-file-truename*)
+                     :direction :input
+                     :element-type 'character)
+        (read stream)))
+
+(defun has-case-p (char)
+  ;; Bit 6 is the Unicode case flag, as opposed to the Common Lisp one
+  (logbitp 6 (aref **character-misc-database** (+ 5 (misc-index char)))))
+
+(defun char-uppercase (char)
+  (if (has-case-p char)
+      (let ((cp (car (gethash (char-code char) **character-cases**))))
+        (if (atom cp) (list (code-char cp)) (mapcar #'code-char cp)))
+      (list char)))
+
+(defun char-lowercase (char)
+  (if (has-case-p char)
+      (let ((cp (cdr (gethash (char-code char) **character-cases**))))
+        (if (atom cp) (list (code-char cp)) (mapcar #'code-char cp)))
+      (list char)))
+
+(defun char-titlecase (char)
+  (unless (has-case-p char) (return-from char-titlecase (list char)))
+  (let* ((cp (char-code char))
+         (value (assoc cp **special-titlecases**)))
+    (if value
+        (if (atom (cdr value))
+            (list (code-char (cdr value)))
+            (mapcar #'code-char (cdr value)))
+        (char-uppercase char))))
+
+(defun char-foldcase (char)
+  (unless (has-case-p char) (return-from char-foldcase (list char)))
+  (let* ((cp (char-code char))
+         (value (assoc cp **special-casefolds**)))
+    (if value
+        (if (atom (cdr value))
+            (list (code-char (cdr value)))
+            (mapcar #'code-char (cdr value)))
+        (char-lowercase char))))
+
+(defun string-somethingcase (fn string special-fn)
+  (let (result (len (length string)))
+    (loop for index from 0 below len
+       for char = (char string index)
+       for cased = (or (funcall special-fn char index len)
+                       (funcall fn char))
+       do (loop for c in (remove :none cased) do (push c result)))
+    (setf result (nreverse result))
+    (coerce result 'string)))
+
+(declaim (type function sb!unix::posix-getenv))
+(defun get-user-locale ()
+  (let ((raw-locale
+         #!+(or win32 unix) (or (sb!unix::posix-getenv "LC_ALL")
+                                (sb!unix::posix-getenv "LANG"))
+         #!-(or win32 unix) nil))
+    (when raw-locale
+      (let ((lang-code (string-upcase
+                        (subseq raw-locale 0 (position #\_ raw-locale)))))
+        (when lang-code
+          (intern lang-code "KEYWORD"))))))
+
+
+(defun uppercase (string &key locale)
+  #!+sb-doc
+  "Returns the full uppercase of STRING according to the Unicode standard.
+The result is not guaranteed to have the same length as the input. If :LOCALE
+is NIL, no language-specific case transformations are applied. If :LOCALE is a
+keyword representing a two-letter ISO country code, the case transforms of that
+locale are used. If :LOCALE is T, the user's current locale is used (Unix and
+Win32 only)."
+  (when (eq locale t) (setf locale (get-user-locale)))
+  (string-somethingcase
+   #'char-uppercase string
+   #'(lambda (char index len)
+       (declare (ignore len))
+       (cond
+         ((and (eql locale :lt) (char= char (code-char #x0307))
+                  (loop for i from (1- index) downto 0
+                     for c = (char string i)
+                     do (case (combining-class c)
+                          (0 (return (soft-dotted-p c)))
+                          (230 (return nil))
+                          (t t))
+                     finally (return nil)))
+          '(:none))
+         ((and (or (eql locale :tr) (eql locale :az))
+               (char= char #\i))
+          (list (code-char #x0130)))
+         (t nil)))))
+
+(defun lowercase (string &key locale)
+  #!+sb-doc
+  "Returns the full lowercase of STRING according to the Unicode standard.
+The result is not guaranteed to have the same length as the input.
+:LOCALE has the same semantics as the :LOCALE argument to UPPERCASE."
+  (when (eq locale t) (setf locale (get-user-locale)))
+  (string-somethingcase
+   #'char-lowercase string
+   #'(lambda (char index len)
+       (cond
+         ((and (char= char (code-char #x03A3))
+               (loop for i from (1- index) downto 0
+                  for c = (char string i)
+                  do (cond ((cased-p c) (return t))
+                           ((case-ignorable-p c))
+                           (t (return nil)))
+                  finally (return nil))
+               (loop for i from (1+ index) below len
+                  for c = (char string i)
+                  do (cond ((cased-p c) (return nil))
+                           ((case-ignorable-p c))
+                           (t (return t)))
+                  finally (return t)))
+          (list (code-char #x03C2)))
+       ((eql locale :lt)
+        (mapcar
+         #'code-char
+         (cdr (or
+               (assoc (char-code char)
+                      '((#x00CC . (#x0069 #x0307 #x0300))
+                        (#x00CD . (#x0069 #x0307 #x0301))
+                        (#x0128 . (#x0069 #x0307 #x0303))))
+               (and (loop for i from (1+ index) below len
+                       for c = (char string i)
+                       do (case (combining-class c)
+                            (230 (return t))
+                            (0 (return nil))
+                            (t t))
+                       finally (return nil))
+                    (assoc (char-code char)
+                           '((#x0049 . (#x0069 #x0307))
+                             (#x004A . (#x006A #x0307))
+                             (#x012E . (#x012F #x0307)))))))))
+       ((or (eql locale :tr) (eql locale :az))
+        (cond
+          ((char= char (code-char #x0130)) (list #\i))
+          ((and (char= char (code-char #x0307))
+                (loop for i from (1- index) downto 0
+                   for c = (char string i)
+                   do (case (combining-class c)
+                        (0 (return (char= c #\I)))
+                        (230 (return nil))
+                        (t t))
+                   finally (return nil)))
+           '(:none))
+          ((and (char= char #\I)
+                (loop for i from (1+ index) below len
+                   for c = (char string i)
+                   do (case (combining-class c)
+                        (0 (return t))
+                        (230 (return (char/= c (code-char #x0307))))
+                        (t t))
+                   finally (return t)))
+           (list (code-char #x0131)))
+          (t nil)))
+       (t nil)))))
+
+(defun titlecase (string &key locale)
+  #!+sb-doc
+  "Returns the titlecase of STRING. The resulting string can
+be longer than the input.
+:LOCALE has the same semantics as the :LOCALE argument to UPPERCASE."
+  (when (eq locale t) (setf locale (get-user-locale)))
+  (let ((words (words string))
+        (cased nil))
+   (loop for word in words
+      for first-cased = (or (position-if #'cased-p word) 0)
+      for pre = (subseq word 0 first-cased)
+      for initial = (char word first-cased)
+      for rest = (subseq word (1+ first-cased))
+      do (let ((up (char-titlecase initial)) (down (lowercase rest)))
+           (when (and (or (eql locale :tr) (eql locale :az))
+                      (eql initial #\i))
+             (setf up (list (code-char #x0130))))
+           (when (and (eql locale :lt)
+                      (soft-dotted-p initial)
+                      (eql (char down
+                                 (position-if
+                                  #'(lambda (c)
+                                      (or (eql (combining-class c) 0)
+                                          (eql (combining-class c) 230))) down))
+                           (code-char #x0307)))
+             (setf down (delete (code-char #x0307) down :count 1)))
+           (push (concatenate 'string pre up down) cased)))
+   (apply #'concatenate 'string (nreverse cased))))
+
+(defun casefold (string)
+  #!+sb-doc
+  "Returns the full casefolding of STRING according to the Unicode standard.
+Casefolding remove case information in a way that allaws the results to be used
+for case-insensitive comparisons.
+The result is not guaranteed to have the same length as the input."
+  (string-somethingcase #'char-foldcase string (constantly nil)))
+
+
+;;; Unicode break algorithms
+;;; In all the breaking methods:
+;;; (brk) establishes a break between `first` and `second`
+;;; (nobrk) prevents a break between `first` and `second`
+;;; Setting flag=T/state=:nobrk-next prevents a break between `second` and `htird`
+
+;; Word breaking sets this to make their algorithms less tricky
+(defvar *other-break-special-graphemes* nil)
+(defun grapheme-break-class (char)
+  #!+sb-doc
+  "Returns the grapheme breaking class of CHARACTER, as specified in UAX #29."
+  (let ((cp (when char (char-code char)))
+        (gc (when char (general-category char)))
+        (not-spacing-mark
+         #(#x102B #x102C #x1038 #x1062 #x1063 #x1064 #x1067 #x1068 #x1069
+           #x106A #x106B #x106C #x106D #x1083 #x1087 #x1088 #x1089 #x108A
+           #x108B #x108C #x108F #x109A #x109B #x109C #x19B0 #x19B1 #x19B2
+           #x19B3 #x19B4 #x19B8 #x19B9 #x19BB #x19BC #x19BD #x19BE #x19BF
+           #x19C0 #x19C8 #x19C9 #x1A61 #x1A63 #x1A64 #xAA7B #xAA7D)))
+    (cond
+      ((not char) nil)
+      ((= cp 10) :LF)
+      ((= cp 13) :CR)
+      ((or (member gc '(:Mn :Me))
+           (proplist-p char :other-grapheme-extend)
+           (and *other-break-special-graphemes*
+                (member gc '(:Mc :Cf)) (not (<= #x200B cp #x200D))))
+       :extend)
+      ((or (member gc '(:Zl :Zp :Cc :Cs :Cf))
+           ;; From Cn and Default_Ignorable_Code_Point
+           (eql cp #x2065) (eql cp #xE0000)
+           (<= #xFFF0 cp #xFFF8)
+           (<= #xE0002 cp #xE001F)
+           (<= #xE0080 cp #xE00FF)
+           (<= #xE01F0 cp #xE0FFF)) :control)
+      ((<= #x1F1E6 cp #x1F1FF) :regional-indicator)
+      ((and (or (eql gc :Mc)
+                (eql cp #x0E33) (eql cp #x0EB3))
+            (not (binary-search cp not-spacing-mark))) :spacing-mark)
+      (t (hangul-syllable-type char)))))
+
+(defun graphemes (string)
+  #!+sb-doc
+  "Breaks STRING into graphemes acording to the default
+grapheme breaking rules specified in UAX #29, returning a list of strings."
+  (let* ((chars (coerce string 'list)) clusters (cluster (list (car chars))))
+    (do ((first (car chars) second)
+         (tail (cdr chars) (when tail (cdr tail)))
+         (second (cadr chars) (when tail (cadr tail))))
+        ((not first) (nreverse (mapcar #'(lambda (l) (coerce l 'string)) clusters)))
+      (flet ((brk () (push (nreverse cluster) clusters) (setf cluster (list second)))
+             (nobrk () (push second cluster)))
+        (let ((c1 (grapheme-break-class first))
+              (c2 (grapheme-break-class second)))
+          (cond
+            ((and (eql c1 :cr) (eql c2 :lf)) (nobrk))
+            ((or (member c1 '(:control :cr :lf))
+                 (member c2 '(:control :cr :lf))) (brk))
+             ((or (and (eql c1 :l) (member c2 '(:l :v :lv :lvt)))
+                  (and (or (eql c1 :v) (eql c1 :lv))
+                       (or (eql c2 :v) (eql c2 :t)))
+                  (and (eql c2 :t) (or (eql c1 :lvt) (eql c1 :t))))
+              (nobrk))
+             ((and (eql c1 :regional-indicator) (eql c2 :regional-indicator)) (nobrk))
+             ((or (eql c2 :extend) (eql c2 :spacing-mark) (eql c1 :prepend)) (nobrk))
+             (t (brk))))))))
+
+(defun word-break-class (char)
+  #!+sb-doc
+  "Returns the word breaking class of CHARACTER, as specified in UAX #29."
+  ;; Words use graphemes as characters to deal with the ignore rule
+  (when (listp char) (setf char (car char)))
+  (let ((cp (when char (char-code char)))
+        (gc (when char (general-category char)))
+        (newlines #(#xB #xC #x0085 #x0085 #x2028 #x2029))
+        (also-katakana
+         #(#x3031 #x3035 #x309B #x309C
+           #x30A0 #x30A0 #x30FC #x30FC
+           #xFF70 #xFF70))
+        (midnumlet #(#x002E #x2018 #x2019 #x2024 #xFE52 #xFF07 #xFF0E))
+        (midletter
+         #(#x003A #x00B7 #x002D7 #x0387 #x05F4 #x2027 #xFE13 #xFE55 #xFF1A))
+        (midnum
+         ;; Grepping of Line_Break = IS adjusted per UAX #29
+         #(#x002C #x003B #x037E #x0589 #x060C #x060D #x066C #x07F8 #x2044
+           #xFE10 #xFE14 #xFE50 #xFE54 #xFF0C #xFF1B)))
+    (cond
+      ((not char) nil)
+      ((= cp 10) :LF)
+      ((= cp 13) :CR)
+      ((= cp #x27) :single-quote)
+      ((= cp #x22) :double-quote)
+      ((ordered-ranges-member cp newlines) :newline)
+      ((or (eql (grapheme-break-class char) :extend)
+           (eql gc :mc)) :extend)
+      ((<= #x1F1E6 cp #x1F1FF) :regional-indicator)
+      ((and (eql gc :Cf) (not (<= #x200B cp #x200D))) :format)
+      ((or (eql (script char) :katakana)
+           (ordered-ranges-member cp also-katakana)) :katakana)
+      ((and (eql (script char) :Hebrew) (eql gc :lo)) :hebrew-letter)
+      ((and (or (alphabetic-p char) (= cp #x05F3))
+            (not (or (ideographic-p char)
+                     (eql (line-break-class char) :sa)
+                     (eql (script char) :hiragana)))) :aletter)
+      ((binary-search cp midnumlet) :midnumlet)
+      ((binary-search cp midletter) :midletter)
+      ((binary-search cp midnum) :midnum)
+      ((or (and (eql gc :Nd) (not (<= #xFF10 cp #xFF19))) ;Fullwidth digits
+           (eql cp #x066B)) :numeric)
+      ((eql gc :Pc) :extendnumlet)
+      (t nil))))
+
+(defmacro flatpush (thing list)
+  (let ((%thing (gensym)) (%i (gensym)))
+    `(let ((,%thing ,thing))
+       (if (listp ,%thing)
+           (dolist (,%i ,%thing)
+             (push ,%i ,list))
+           (push ,%thing ,list)))))
+
+(defun words (string)
+  #!+sb-doc
+  "Breaks STRING into words acording to the default
+word breaking rules specified in UAX #29. Returns a list of strings"
+  (let ((chars (mapcar
+                 #'(lambda (s)
+                     (let ((l (coerce s 'list)))
+                       (if (cdr l) l (car l))))
+                 (let ((*other-break-special-graphemes* t)) (graphemes string))))
+         words word flag)
+    (flatpush (car chars) word)
+    (do ((first (car chars) second)
+         (tail (cdr chars) (cdr tail))
+         (second (cadr chars) (cadr tail)))
+        ((not first) (nreverse (mapcar #'(lambda (l) (coerce l 'string)) words)))
+      (flet ((brk () (push (nreverse word) words) (setf word nil) (flatpush second word))
+             (nobrk () (flatpush second word)))
+        (let ((c1 (word-break-class first))
+              (c2 (word-break-class second))
+              (c3 (when (and tail (cdr tail)) (word-break-class (cadr tail)))))
+          (cond
+            (flag (nobrk) (setf flag nil))
+            ;; CR+LF are bound together by the grapheme clustering
+            ((or (eql c1 :newline) (eql c1 :cr) (eql c1 :lf)
+                 (eql c2 :newline) (eql c2 :cr) (eql c2 :lf)) (brk))
+            ((or (eql c2 :format) (eql c2 :extend)) (nobrk))
+            ((and (or (eql c1 :aletter) (eql c1 :hebrew-letter))
+                  (or (eql c2 :aletter) (eql c2 :hebrew-letter))) (nobrk))
+            ((and (or (eql c1 :aletter) (eql c1 :hebrew-letter))
+                  (member c2 '(:midletter :midnumlet :single-quote))
+                  (or (eql c3 :aletter) (eql c3 :hebrew-letter)))
+             (nobrk) (setf flag t)) ; Handle the multiple breaks from this rule
+            ((and (eql c1 :hebrew-letter) (eql c2 :double-quote)
+                  (eql c3 :hebrew-letter))
+             (nobrk) (setf flag t))
+            ((and (eql c1 :hebrew-letter) (eql c2 :single-quote)) (nobrk))
+            ((or (and (eql c1 :numeric) (member c2 '(:numeric :aletter :hebrew-letter)))
+                 (and (eql c2 :numeric) (member c1 '(:numeric :aletter :hebrew-letter))))
+             (nobrk))
+            ((and (eql c1 :numeric)
+                  (member c2 '(:midnum :midnumlet :single-quote))
+                  (eql c3 :numeric))
+             (nobrk) (setf flag t))
+            ((and (eql c1 :katakana) (eql c2 :katakana)) (nobrk))
+            ((or (and (member c1
+                              '(:aletter :hebrew-letter :katakana
+                                :numeric :extendnumlet)) (eql c2 :extendnumlet))
+                 (and (member c2
+                              '(:aletter :hebrew-letter :katakana
+                                :numeric :extendnumlet)) (eql c1 :extendnumlet)))
+             (nobrk))
+            ((and (eql c1 :regional-indicator) (eql c2 :regional-indicator)) (nobrk))
+            (t (brk))))))))
+
+(defun sentence-break-class (char)
+  #!+sb-doc
+  "Returns the sentence breaking class of CHARACTER, as specified in UAX #29."
+  (when (listp char) (setf char (car char)))
+  (let ((cp (when char (char-code char)))
+        (gc (when char (general-category char)))
+        (aterms #(#x002E #x2024 #xFE52 #xFF0E))
+        (scontinues
+         #(#x002C #x002D #x003A #x055D #x060C #x060D #x07F8 #x1802 #x1808
+           #x2013 #x2014 #x3001 #xFE10 #xFE11 #xFE13 #xFE31 #xFE32 #xFE50
+           #xFE51 #xFE55 #xFE58 #xFE63 #xFF0C #xFF0D #xFF1A #xFF64)))
+    (cond
+      ((not char) nil)
+      ((= cp 10) :LF)
+      ((= cp 13) :CR)
+      ((or (eql (grapheme-break-class char) :extend)
+           (eql gc :mc)) :extend)
+      ((or (eql cp #x0085) (<= #x2028 cp #x2029)) :sep)
+      ((and (eql gc :Cf) (not (<= #x200C cp #x200D))) :format)
+      ((whitespace-p char) :sp)
+      ((lowercase-p char) :lower)
+      ((or (uppercase-p char) (eql gc :Lt)) :upper)
+      ((or (alphabetic-p char) (eql cp #x00A0) (eql cp #x05F3)) :oletter)
+      ((or (and (eql gc :Nd) (not (<= #xFF10 cp #xFF19))) ;Fullwidth digits
+           (<= #x066B cp #x066C)) :numeric)
+      ((binary-search cp aterms) :aterm)
+      ((binary-search cp scontinues) :scontinue)
+      ((proplist-p char :sterm) :sterm)
+      ((and (or (member gc '(:Po :Ps :Pe :Pf :Pi))
+                (eql (line-break-class char) :qu))
+            (not (eql cp #x05F3))) :close)
+      (t nil))))
+
+(defun sentence-prebreak (string)
+  #!+sb-doc
+  "Pre-combines some sequences of characters to make the sentence-break
+algorithm simpler..
+Specifically,
+- Combines any character with the following extend of format characters
+- Combines CR + LF into '(CR LF)
+- Combines any run of :cp*:close* into one character"
+  (let ((chars (coerce string 'list))
+        cluster clusters last-seen sp-run)
+    (labels ((flush () (if (cdr cluster) (push (nreverse cluster) clusters)
+                           (if cluster (push (car cluster) clusters)))
+                    (setf cluster nil))
+             (brk (x)
+               (flush) (push x clusters))
+             (nobrk (x) (push x cluster)))
+    (loop for ch in chars
+       for type = (sentence-break-class ch)
+       do (cond
+            ((and (eql last-seen :cr) (eql type :lf)) (nobrk ch) (flush) (setf last-seen nil))
+            ((eql last-seen :cr) (brk ch) (setf last-seen nil))
+            ((eql type :cr) (nobrk ch) (setf last-seen :cr))
+            ((eql type :lf) (brk ch) (setf last-seen nil))
+            ((eql type :sep) (brk ch) (setf last-seen nil))
+            ((and last-seen (or (eql type :extend) (eql type :format)))
+             (nobrk ch))
+            ((eql type :close)
+             (unless (eql last-seen :close) (flush))
+             (nobrk ch) (setf last-seen :close sp-run nil))
+            ((eql type :sp)
+             (unless (or (and (not sp-run) (eql last-seen :close)) (eql last-seen :sp))
+               (flush) (setf sp-run t))
+             (nobrk ch) (setf last-seen :sp))
+            (t (flush) (nobrk ch) (setf last-seen type sp-run nil))))
+    (flush) (nreverse clusters))))
+
+(defun sentences (string)
+  #!+sb-doc
+  "Breaks STRING into sentences acording to the default
+sentence breaking rules specified in UAX #29"
+  (let ((special-handling '(:close :sp :sep :cr :lf :scontinue :sterm :aterm))
+        (chars (sentence-prebreak string))
+        sentence sentences state)
+    (flatpush (car chars) sentence)
+    (do ((first (car chars) second)
+         (tail (cdr chars) (cdr tail))
+         (second (cadr chars) (cadr tail))
+         (third (caddr chars) (caddr tail)))
+        ((not first)
+         (progn
+           ; Shake off last sentence
+           (when sentence (push (nreverse sentence) sentences))
+           (nreverse (mapcar #'(lambda (l) (coerce l 'string)) sentences))))
+      (flet ((brk () (push (nreverse sentence) sentences)
+                  (setf sentence nil) (flatpush second sentence))
+             (nobrk () (flatpush second sentence)))
+      (let ((c1 (sentence-break-class first))
+            (c2 (sentence-break-class second))
+            (c3 (sentence-break-class third)))
+        (cond
+          ((eql state :brk-next) (brk) (setf state nil))
+          ((eql state :nobrk-next) (nobrk) (setf state nil))
+          ((member c1 '(:sep :cr :lf)) (brk))
+          ((and (eql c1 :aterm) (eql c2 :numeric)) (nobrk))
+          ((and (eql c1 :upper) (eql c2 :aterm)
+                (eql c3 :upper)) (nobrk) (setf state :nobrk-next))
+          ((or (and (member c1 '(:sterm :aterm)) (member c2 '(:close :sp))
+                    (member c3 '(:scontinue :sterm :aterm)))
+               (and (member c1 '(:sterm :aterm))
+                    (member c2 '(:scontinue :sterm :aterm))))
+           (nobrk) (when (member c2 '(:close :sp)) (setf state :nobrk-next)))
+          ((and (member c1 '(:sterm :aterm)) (member c2 '(:close :sp))
+                (member c3 '(:sep :cr :lf)))
+           (nobrk) (setf state :nobrk-next)) ;; Let the linebreak call (brk)
+          ((and (member c1 '(:sterm :aterm)) (member c2 '(:sep :cr :lf)))
+           (nobrk)) ; Doesn't trigger rule 8
+          ((eql c1 :sterm) ; Not ambiguous anymore, rule 8a already handled
+           (if (member c2 '(:close :sp))
+               (progn (nobrk) (setf state :brk-next))
+               (brk)))
+          ((and (eql c2 :sterm) third (not (member c3 special-handling)))
+           (nobrk) (setf state :brk-next)) ; STerm followed by nothing important
+          ((or (eql c1 :aterm)
+               (and (eql c2 :aterm) third
+                    (not (member c3 special-handling)) (not (eql c3 :numeric))))
+           ; Finally handle rule 8
+           (if (loop for c in
+                    (if (and third (not (or (member c3 special-handling)
+                                            (eql c3 :numeric))))
+                        (cdr tail) tail)
+                  for type = (sentence-break-class c) do
+                    (when (member type '(:oletter :upper :sep :cr :lf
+                                         :sterm :aterm))
+                      (return nil))
+                    (when (eql type :lower) (return t)) finally (return nil))
+               ; Ambiguous case
+               (progn (nobrk) (setf state :nobrk-next))
+               ; Otherwise
+               (if (member c2 '(:close :sp :aterm))
+                   (progn (nobrk) (setf state :brk-next))
+                   (brk))))
+          (t (nobrk))))))))
+
+(defun line-prebreak (string)
+  (let ((chars (coerce string 'list))
+        cluster clusters last-seen)
+    (loop for char in chars
+       for type = (line-break-class char)
+       do
+         (when
+             (and cluster
+                  (or
+                   (not (eql type :cm))
+                   (and (eql type :cm)
+                        (member last-seen '(nil :BK :CR :LF :NL :SP :ZW)))))
+           (if (cdr cluster)
+               (push (nreverse cluster) clusters)
+               (push (car cluster) clusters))
+           (setf cluster nil))
+         (unless (eql type :cm) (setf last-seen type))
+         (push char cluster))
+    (if (cdr cluster)
+        (push (nreverse cluster) clusters)
+        (push (car cluster) clusters))
+    (nreverse clusters)))
+
+(defun line-break-annotate (string)
+  (let ((chars (line-prebreak string))
+        first second t1 t2 tail (ret (list :cant))
+        state after-spaces)
+    (macrolet ((cmpush (thing)
+                 (let ((gthing (gensym)))
+                   `(let ((,gthing ,thing))
+                      (if (listp ,gthing)
+                          (loop for (c next) on ,gthing do
+                               (push c ret)
+                               (when next (push :cant ret)))
+                          (push ,thing ret)))))
+               (between (a b action)
+                 (let ((atest (if (eql a :any) t
+                                  (if (listp a)
+                                      `(member t1 ,a)
+                                      `(eql t1 ,a))))
+                       (btest (if (eql b :any) t
+                                  (if (listp b)
+                                      `(member t2 ,b)
+                                      `(eql t2 ,b)))))
+                 `(when (and ,atest ,btest)
+                    (cmpush ,action)
+                    (cmpush second)
+                    (go tail))))
+               (after-spaces (a b action)
+                 (let ((atest (if (eql a :any) t
+                                  (if (listp a)
+                                      `(member t1 ,a)
+                                      `(eql t1 ,a))))
+                       (btest (if (eql b :any) t
+                                  (if (listp b)
+                                      `(member type ,b)
+                                      `(eql type ,b)))))
+                   `(when
+                        (and ,atest
+                             (loop for c in tail
+                                for type = (line-break-class c :resolve t)
+                                do
+                                  (when (not (eql type :sp))
+                                    (return ,btest))))
+                      (if (eql t2 :sp)
+                         (progn (cmpush :cant)
+                                (cmpush second)
+                                (setf state :eat-spaces)
+                                (setf after-spaces ,action)
+                                (go tail))
+                         (progn (cmpush ,action)
+                                (cmpush second)
+                                (go tail)))))))
+
+      (cmpush (car chars))
+      (setf first (car chars))
+      (setf tail (cdr chars))
+      (setf second (car tail))
+      (tagbody
+         top
+         (when (not first) (go end))
+         (setf t1 (line-break-class first :resolve t))
+         (setf t2 (line-break-class second :resolve t))
+         (between :any :nil :must)
+         (when (and (eql state :eat-spaces) (eql t2 :sp))
+            (cmpush :cant) (cmpush second) (go tail))
+         (between :bk :any :must)
+         (between :cr :lf :cant)
+         (between '(:cr :lf :nl) :any :must)
+         (between :any '(:zw :bk :cr :lf :nl) :cant)
+         (when after-spaces (cmpush after-spaces) (cmpush second)
+               (setf state nil after-spaces nil) (go tail))
+         (after-spaces :zw :any :can)
+         (between :any :wj :cant)
+         (between :wj :any :cant)
+         (between :gl :any :cant)
+         (between '(:ZW :WJ :SY :SG :SA :RI :QU :PR :PO :OP :NU :NS :NL
+                    :LF :IS :IN :ID :HL :GL :EX :CR :CP :CM :CL :CJ :CB
+                    :BK :BB :B2 :AL :AI :JL :JV :JT :H2 :H3 :XX)
+                  :gl :cant)
+         (between :any '(:cl :cp :ex :is :sy) :cant)
+         (after-spaces :op :any :cant)
+         (after-spaces :qu :op :cant)
+         (after-spaces '(:cl :cp) :ns :cant)
+         (after-spaces :b2 :b2 :cant)
+         (between :any :sp :cant) ;; Goes here to deal with after-spaces
+         (between :sp :any :can)
+         (between :any :qu :cant)
+         (between :qu :any :cant)
+         (between :any :cb :can)
+         (between :cb :any :can)
+         (between :any '(:ba :hy :ns) :cant)
+         (between :bb :any :cant)
+         (when (and (eql t1 :hl) (eql t2 :hy))
+           (cmpush :cant) (cmpush second)
+           (setf after-spaces :can) (go tail))
+         (between '(:al :hl :id :in :nu) :in :cant)
+         (between :id :po :cant)
+         (between '(:al :hl) :nu :cant)
+         (between '(:nu :po) '(:al :hl) :cant)
+         (between :pr '(:id :al :hl) :cant)
+         (between '(:cl :cp :nu) '(:po :pr) :cant)
+         (between :nu '(:po :pr :nu) :cant)
+         (between '(:po :pr) :op :cant)
+         (between '(:po :pr :hy :is :sy) :nu :cant)
+         (between :jl '(:jl :jv :h2 :h3) :cant)
+         (between '(:jv :h2) '(:jv :jt) :cant)
+         (between '(:jt :h3) :jt :cant)
+         (between '(:jl :jv :jt :h2 :h3) '(:in :po) :cant)
+         (between :pr '(:jl :jv :jt :h2 :h3) :cant)
+         (between '(:al :hl :is) '(:al :hl) :cant)
+         (between '(:al :hl :nu) :op :cant)
+         (between :cp '(:al :hl :nu) :cant)
+         (between :ri :ri :cant)
+         (between :any :any :can)
+         tail
+         (setf first second)
+         (setf tail (cdr tail))
+         (setf second (car tail))
+         (go top)
+         end)
+      ;; LB3 satisfied by (:any :nil) -> :must
+      (setf ret (nreverse ret))
+      ret)))
+
+(defun break-list-at (list n)
+  (let ((tail list) (pre-tail nil))
+    (loop repeat n do (setf pre-tail tail) (setf tail (cdr tail)))
+    (setf (cdr pre-tail) nil)
+    (values list tail)))
+
+(defun lines (string &key (margin *print-right-margin*))
+  #!+sb-doc
+  "Breaks STRING into lines that are no wider than :MARGIN according to the
+line breaking rules outlined in UAX #14. Combining marks will awsays be kept
+together with their base characters, and spaces (but not other types of
+whitespace) will be removed from the end of lines. If :MARGIN is unspecified,
+it defaults to 80 characters"
+  (when (string= string "") (return-from lines (list "")))
+  (unless margin (setf margin 80))
+  (do* ((chars (line-break-annotate string))
+        line lines (filled 0) last-break-distance
+        (break-type (car chars) (car tail))
+        (char (cadr chars) (cadr tail))
+        (tail (cddr chars) (cddr tail)))
+       ((not break-type)
+        (mapcar #'(lambda (s) (coerce s 'string)) (nreverse lines)))
+    (ecase break-type
+      (:cant
+       (push char line)
+       (unless (eql (line-break-class char) :CM)
+         (incf filled))
+       (when last-break-distance (incf last-break-distance)))
+      (:can
+       (push char line)
+       (setf last-break-distance 1)
+       (incf filled))
+      (:must
+       (push char line)
+       (setf last-break-distance 1)
+       (incf filled)
+       (go break)))
+    (if (> filled margin)
+        (go break)
+        (go next))
+   break
+    (when (not last-break-distance)
+      ;; If we don't have any line breaks, remove the last thing we added that
+      ;; takes up space, and all its combining marks
+      (setf last-break-distance
+            (1+ (loop for c in line while (eql (line-break-class c) :cm) summing 1))))
+    (multiple-value-bind (next-line this-line) (break-list-at line last-break-distance)
+      (loop while (eql (line-break-class (car this-line)) :sp)
+         do (setf this-line (cdr this-line)))
+      (push (nreverse this-line) lines)
+      (setf line next-line)
+      (setf filled (length line))
+      (setf last-break-distance nil))
+   next))
+
+
+;;; Collation
+(defparameter **maximum-variable-primary-element**
+  #.(with-open-file (stream
+                     (merge-pathnames
+                      (make-pathname
+                       :directory
+                       '(:relative :up :up "output")
+                       :name "other-collation-info" :type "lisp-expr")
+                      sb!xc:*compile-file-truename*)
+                     :direction :input
+                     :element-type 'character)
+      (read stream)))
+
+(defun unpack-collation-key (key)
+  (loop for value across key collect
+       (list (ldb (byte 16 16) value)
+             (ldb (byte 11 5) value)
+             (ldb (byte 5 0) value))))
+
+(defun variable-p (unpacked-key)
+  (<= 1 (car unpacked-key) **maximum-variable-primary-element**))
+
+(defun collation-key (char1 &optional char2 char3 &rest overflow)
+  ;; There are never more than three characters in a contraction, right?
+  (when overflow (return-from collation-key nil))
+  ;; hack around the inability of the cross-compiler to deal with characters
+  (when (not char2) (setf char2 (code-char 0)))
+  (when (not char3) (setf char3 (code-char 0)))
+  (let ((packed-key (gethash (pack-3-codepoints
+                              (char-code char1)
+                              (char-code char2)
+                              (char-code char3))
+                             **character-collations**)))
+    (if packed-key (unpack-collation-key packed-key)
+        (when (char= (code-char 0) char2 char3)
+          (let* ((cp (char-code char1))
+                 (base
+                  (if (proplist-p char1 :unified-ideograph)
+                     (if (or (<= #x4E00 cp #x9FFF)
+                             (<= #xF900 cp #xFAFF))
+                         #xFB40 #xFB80) #xFBC0))
+                 (a (+ base (ash cp -15)))
+                 (b (logior #.(ash 1 15) (logand cp #x7FFFF))))
+            (list (list a #x20 #x2) (list b 0 0)))))))
+
+(defun generic-apply (fn args)
+  (apply fn (coerce args 'list)))
+
+(defun sort-key (string)
+   (let* ((str (normalize-string string :nfd))
+          (i 0) (len (length str)) max-match new-i
+          sort-key)
+     (loop while (< i len) do
+          (loop for offset from 1 to 3
+               for index = (+ i offset)
+               while (<= index len)
+               when (generic-apply #'collation-key (subseq str i index))
+             do (setf max-match
+                      (generic-apply #'collation-key (subseq str i index))
+                      new-i index))
+          (loop for index from new-i below len
+             for char = (char str index)
+             until (eql 0 (combining-class char))
+             unless (and (>= (- index new-i) 1)
+                         ;; Combiners are sorted, we only have to look back
+                         ;; one step (see canonically-compose)
+                         (>= (combining-class (char str (1- index)))
+                             (combining-class char)))
+             do (rotatef (char str new-i) (char str index))
+               (if (generic-apply #'collation-key (subseq str i (1+ new-i)))
+                   (setf max-match
+                         (generic-apply #'collation-key (subseq str i (1+ new-i)))
+                         new-i (1+ new-i))
+                   (rotatef (char str new-i) (char str index))))
+          (loop for key in max-match do (push key sort-key))
+          (setf i new-i))
+     (setf
+      sort-key
+      (let (after-variable)
+        (mapcar
+         #'(lambda (key)
+             (destructuring-bind (k1 k2 k3) key
+               (cond
+                 ((= k1 k2 k3 0) (list k1 k2 k3 0))
+                 ((and (/= k1 0) (variable-p key))
+                  (setf after-variable t)
+                  (list 0 0 0 k1))
+                 ((/= k1 0) (setf after-variable nil)
+                  (list k1 k2 k3 #xFFFF))
+                 ((and (= k1 0) (/= k3 0))
+                  (if after-variable
+                      (list 0 0 0 0)
+                      (list k1 k2 k3 #xFFFF))))))
+         (nreverse sort-key))))
+     (let (primary secondary tertiary quatenary)
+       (loop for (k1 k2 k3 k4) in sort-key do
+            (when (/= k1 0) (push k1 primary))
+            (when (/= k2 0) (push k2 secondary))
+            (when (/= k3 0) (push k3 tertiary))
+            (when (/= k4 0) (push k4 quatenary)))
+       (setf primary (nreverse primary)
+             secondary (nreverse secondary)
+             tertiary (nreverse tertiary)
+             quatenary (nreverse quatenary))
+       (concatenate 'vector primary (list 0) secondary (list 0)
+                    tertiary (list 0) quatenary))))
+
+(defun vector< (vector1 vector2)
+  (loop for i across vector1
+     for j across vector2
+     do
+       (cond ((< i j) (return-from vector< t))
+             ((> i j) (return-from vector< nil))))
+  ;; If there's no differences, shortest vector wins
+  (< (length vector1) (length vector2)))
+
+(defun unicode= (string1 string2 &key (start1 0) end1 (start2 0) end2 (strict t))
+  #!+sb-doc
+  "Determines whether STRING1 and STRING2 are canonically equivalent according
+to Unicode. The START and END arguments behave like the arguments to STRING=.
+If :STRICT is NIL, UNICODE= tests compatibility equavalence instead."
+  (let ((str1 (normalize-string (subseq string1 start1 end1) (if strict :nfd :nfkd)))
+        (str2 (normalize-string (subseq string2 start2 end2) (if strict :nfd :nfkd))))
+    (string= str1 str2)))
+
+(defun unicode-equal (string1 string2 &key (start1 0) end1 (start2 0) end2 (strict t))
+    #!+sb-doc
+  "Determines whether STRING1 and STRING2 are canonically equivalent after
+casefoldin8 (that is, ignoring case differences) according to Unicode. The
+START and END arguments behave like the arguments to STRING=. If :STRICT is
+NIL, UNICODE= tests compatibility equavalence instead."
+  (let ((str1 (normalize-string (subseq string1 start1 end1) (if strict :nfd :nfkd)))
+        (str2 (normalize-string (subseq string2 start2 end2) (if strict :nfd :nfkd))))
+    (string=
+     (normalize-string (casefold str1) (if strict :nfd :nfkd))
+     (normalize-string (casefold str2) (if strict :nfd :nfkd)))))
+
+(defun unicode< (string1 string2 &key (start1 0) end1 (start2 0) end2)
+  #!+sb-doc
+  "Determines whether STRING1 sorts before STRING2 using the Unicode Collation
+Algorithm, The function uses an untailored Default Unicode Collation Element Table
+to produce the sort keys. The function uses the Shifted method for dealing
+with variable-weight characters, as described in UTS #10"
+  (let* ((s1 (subseq string1 start1 end1))
+         (s2 (subseq string2 start2 end2))
+         (k1 (sort-key s1)) (k2 (sort-key s2)))
+    (if (equalp k1 k2)
+        (flet ((to-codepoints (str)
+                 (map 'vector #'char-code (normalize-string str :nfd))))
+          (vector< (to-codepoints s1) (to-codepoints s2)))
+        (vector< k1 k2))))
+
+(defun unicode<= (string1 string2 &key (start1 0) end1 (start2 0) end2)
+  #!+sb-doc
+  "Tests if STRING1 and STRING2 are either UNICODE< or UNICODE="
+  (or
+   (unicode= string1 string2 :start1 start1 :end1 end1
+             :start2 start2 :end2 end2)
+   (unicode< string1 string2 :start1 start1 :end1 end1
+             :start2 start2 :end2 end2)))
+
+(defun unicode> (string1 string2 &key (start1 0) end1 (start2 0) end2)
+  #!+sb-doc
+  "Tests if STRING2 is UNICODE< STRING1."
+   (unicode< string2 string1 :start1 start2 :end1 end2
+             :start2 start1 :end2 end1))
+
+(defun unicode>= (string1 string2 &key (start1 0) end1 (start2 0) end2)
+  #!+sb-doc
+  "Tests if STRING1 and STRING2 are either UNICODE= or UNICODE>"
+  (or
+   (unicode= string1 string2 :start1 start1 :end1 end1
+             :start2 start2 :end2 end2)
+   (unicode> string1 string2 :start1 start1 :end1 end1
+             :start2 start2 :end2 end2)))
+
+
+;;; Confusable detection
+
+(defun canonically-deconfuse (string)
+  (let (ret (i 0) new-i (len (length string))
+            best-node)
+    (loop while (< i len) do
+         (loop for offset from 1 to 5
+            while (<= (+ i offset) len)
+            do
+              (let ((node (uf-find (subseq string i (+ i offset))
+                                   **confusables**)))
+                (when node (setf best-node node new-i (+ i offset)))))
+         (if best-node
+             (progn
+               (push (uf-node-item best-node) ret)
+               (setf i new-i))
+             (progn
+               (push (subseq string i (1+ i)) ret)
+               (incf i)))
+         (setf best-node nil new-i nil))
+    (apply #'concatenate 'string (nreverse ret))))
+
+(defun confusable-p (string1 string2 &key (start1 0) end1 (start2 0) end2)
+  #!+sb-doc
+  "Determines whether STRING1 and STRING2 could be visually confusable
+according to the IDNA confusableSummary.txt table"
+    (let* ((str1 (normalize-string (subseq string1 start1 end1) :nfd))
+           (str2 (normalize-string (subseq string2 start2 end2) :nfd))
+           (skeleton1 (normalize-string (canonically-deconfuse str1) :nfd))
+           (skeleton2 (normalize-string (canonically-deconfuse str2) :nfd)))
+      (string= skeleton1 skeleton2)))
+
+(defun %flatten-all-ways (heads to-append)
+  (when (not to-append) (return-from %flatten-all-ways heads))
+  (let ((ret nil))
+    (loop for elem in (car to-append) do
+         (loop for list in heads do
+              (push (cons elem list) ret)))
+    (%flatten-all-ways ret (cdr to-append))))
+
+(defun flatten-all-ways (lists)
+  (mapcar #'reverse (%flatten-all-ways (mapcar #'list (car lists)) (cdr lists))))
+
+(defun list-all-confusables (string)
+  #!+sb-doc
+  "Returns a list of all strings that could be visually confusable with STRING."
+  (let (ret (i 0) new-i (len (length string))
+            best-set)
+    (loop while (< i len) do
+         (loop for offset from 1 to 5
+            while (<= (+ i offset) len)
+            do
+              (let ((set (uf-set-containing (subseq string i (+ i offset))
+                                            **confusables**)))
+                (when set (setf best-set set new-i (+ i offset)))))
+         (if best-set
+             (progn
+               (push best-set ret)
+               (setf i new-i))
+             (progn
+               (push (list (subseq string i (1+ i))) ret)
+               (incf i)))
+         (setf best-set nil new-i nil))
+    (mapcar #'(lambda (strs) (apply #'concatenate 'string strs))
+            (flatten-all-ways (nreverse ret)))))

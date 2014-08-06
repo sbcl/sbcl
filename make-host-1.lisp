@@ -31,6 +31,7 @@
 
 ;;; Generate character database tables.
 (sb-cold::slurp-ucd)
+(sb-cold::slurp-proplist)
 (sb-cold::output)
 
 ;;; propagate structure offset and other information to the C runtime

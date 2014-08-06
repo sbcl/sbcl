@@ -722,6 +722,9 @@ like *STACK-TOP-HINT* and unsupported stuff like *TRACED-FUN-LIST*."
 
                "PRINT-UNREADABLY"
 
+               ;; Readtable normalization control
+               "READTABLE-NORMALIZATION"
+
                ;; and a mechanism for controlling same at compile time
                "MUFFLE-CONDITIONS" "UNMUFFLE-CONDITIONS"
 
@@ -2572,6 +2575,58 @@ SB-KERNEL) have been undone, but probably more remain."
                "WITHOUT-INTERRUPTS"
                "WITH-INTERRUPT-BINDINGS"
                "WORDS"))
+
+   #s(sb-cold:package-data
+      :name "SB!UNICODE"
+      :doc "public: algorithms for Unicode data"
+      :use ("CL")
+      :export ("GENERAL-CATEGORY"
+               "BIDI-CLASS"
+               "COMBINING-CLASS"
+               "DECIMAL-VALUE"
+               "DIGIT-VALUE"
+               "NUMERIC-VALUE"
+               "MIRRORED-P"
+               "BIDI-MIRRORING-GLYPH"
+               "AGE"
+               "HANGUL-SYLLABLE-TYPE"
+               "EAST-ASIAN-WIDTH"
+               "SCRIPT"
+               "CHAR-BLOCK"
+               "UNICODE-1-NAME"
+               "LINE-BREAK-CLASS"
+               "PROPLIST-P"
+               "UPPERCASE-P"
+               "LOWERCASE-P"
+               "CASED-P"
+               "CASE-IGNORABLE-P"
+               "ALPHABETIC-P"
+               "IDEOGRAPHIC-P"
+               "MATH-P"
+               "WHITESPACE-P"
+               "HEX-DIGIT-P"
+               "SOFT-DOTTED-P"
+               "DEFAULT-IGNORABLE-P"
+               "NORMALIZE-STRING"
+               "NORMALIZED-P"
+               "UPPERCASE"
+               "LOWERCASE"
+               "TITLECASE"
+               "CASEFOLD"
+               "GRAPHEME-BREAK-CLASS"
+               "WORD-BREAK-CLASS"
+               "SENTENCE-BREAK-CLASS"
+               "GRAPHEMES"
+               "WORDS"
+               "SENTENCES"
+               "LINES"
+               "UNICODE="
+               "UNICODE-EQUAL"
+               "UNICODE<"
+               "UNICODE<="
+               "UNICODE>"
+               "UNICODE>="
+               "CONFUSABLE-P"))
 
    #s(sb-cold:package-data
       :name "SB!UNIX"

@@ -14,6 +14,7 @@ it still has quite a few.  @xref{Contributed Modules}.
 * Metaobject Protocol::
 * Extensible Sequences::
 * Support For Unix::
+* Unicode Support::
 * Customization Hooks for Users::
 * Tools To Help Developers::
 * Resolution of Name Conflicts::
@@ -45,6 +46,18 @@ Example:
 
 Doesn't alter @code{*package*}: if @code{foo::bar} would cause a
 read-time package lock violation, so does @code{foo::(bar)}.
+
+SBCL also extends the reader to normalize all symbols to Normalization
+Form KC in builds with Unicode enabled. Whether symbols are normalized
+is controlled by
+
+@include fun-sb-ext-readtable-normalization.texinfo
+
+Symbols created by
+@findex @cl{intern}
+@code{intern} and similar functions are not affected by this setting. If
+@code{sb-ext:readtable-normalization} is @code{t}, symbols that are not
+normalized are escaped during printing.
 
 @node  Package-Local Nicknames
 @comment  node-name,  next,  previous,  up
@@ -691,6 +704,170 @@ following functions are available for use with processes:
 @include fun-sb-ext-process-close.texinfo
 
 @include fun-sb-ext-process-kill.texinfo
+
+@node  Unicode Support
+@comment  node-name,  next,  previous,  up
+@section Unicode Support
+
+SBCL provides support for working with Unicode text and querying the
+standard Unicode database for information about individual codepoints.
+Unicode-related functions are located in the @code{sb-unicode} package.
+
+SBCL also extends ANSI character literal syntax to support Unicode
+codepoints. You can either specify a character by its Unicode name, with
+spaces replaced by underscores, if a unique name exists @footnote{aPlease
+note that the codepoint U+1F5CF (PAGE) introduced in Unicode 7.0 is
+named @code{UNICODE_PAGE}, since the name ``Page'' is required to be
+assigned to form-feed (U+0C) by the ANSI standard.} or
+by giving its hexadecimal codepoint preceded by a ``U'', an optional
+``+'', and an arbitrary number of leading zeros. You may also input the
+character directly into your source code if it can be encoded in your
+file. If a character had an assigned name in Unicode 1.0 that was
+distinct from its current name, you may also use that name (with spaces
+replaced by underscares) prefixed by ``UNICODE1_'' to specify the character.
+
+For example, you can specify the codepoint U+00E1 (``Latin
+Small Letter A With Acute'') as
+@itemize @bullet
+@item
+@code{#\LATIN_SMALL_LETTER_A_WITH_ACUTE}
+@item
+@code{#\UNICODE1_LATIN_SMALL_LETTER_A_ACUTE}
+@item
+@code{#\á} assuming a Unicode source file
+@item
+@code{#\U00E1}
+@item
+@code{#\UE1}
+@item
+@code{#\U+00E1}
+@end itemize
+
+@subsection Unicode property access
+
+The following functions can be used to find information about a Unicode
+codepoint.
+
+@include fun-sb-unicode-general-category.texinfo
+
+@include fun-sb-unicode-bidi-class.texinfo
+
+@include fun-sb-unicode-combining-class.texinfo
+
+@include fun-sb-unicode-decimal-value.texinfo
+
+@include fun-sb-unicode-digit-value.texinfo
+
+@include fun-sb-unicode-numeric-value.texinfo
+
+@include fun-sb-unicode-mirrored-p.texinfo
+
+@include fun-sb-unicode-bidi-mirroring-glyph.texinfo
+
+@include fun-sb-unicode-age.texinfo
+
+@include fun-sb-unicode-hangul-syllable-type.texinfo
+
+@include fun-sb-unicode-east-asian-width.texinfo
+
+@include fun-sb-unicode-script.texinfo
+
+@include fun-sb-unicode-char-block.texinfo
+
+@include fun-sb-unicode-unicode-1-name.texinfo
+
+@include fun-sb-unicode-proplist-p.texinfo
+
+@include fun-sb-unicode-uppercase-p.texinfo
+
+@include fun-sb-unicode-lowercase-p.texinfo
+
+@include fun-sb-unicode-cased-p.texinfo
+
+@include fun-sb-unicode-case-ignorable-p.texinfo
+
+@include fun-sb-unicode-alphabetic-p.texinfo
+
+@include fun-sb-unicode-ideographic-p.texinfo
+
+@include fun-sb-unicode-math-p.texinfo
+
+@include fun-sb-unicode-whitespace-p.texinfo
+
+@include fun-sb-unicode-soft-dotted-p.texinfo
+
+@include fun-sb-unicode-hex-digit-p.texinfo
+
+@include fun-sb-unicode-default-ignorable-p.texinfo
+
+@include fun-sb-unicode-grapheme-break-class.texinfo
+
+@include fun-sb-unicode-word-break-class.texinfo
+
+@include fun-sb-unicode-sentence-break-class.texinfo
+
+@include fun-sb-unicode-line-break-class.texinfo
+
+@subsection String operations
+
+SBCL can normalize strings using:
+
+@include fun-sb-unicode-normalize-string.texinfo
+
+@include fun-sb-unicode-normalized-p.texinfo
+
+SBCL implements the full range of Unicode case operations with the
+functions
+
+@include fun-sb-unicode-uppercase.texinfo
+
+@include fun-sb-unicode-lowercase.texinfo
+
+@include fun-sb-unicode-titlecase.texinfo
+
+@include fun-sb-unicode-casefold.texinfo
+
+It also extends standard Common Lisp case functions such as
+@findex @cl{string-upcase}
+@code{string-upcase} and
+@findex @cl{char-downcase}
+@code{string-downcase} to support a subset of Unicode's casing behavior.
+Specifically, a character is
+@findex @cl{both-case-p} 
+@code{both-case-p} if its case mapping in Unicode is one-to-one and
+invertable.
+
+The @code{sb-unicode} package also provides functions for
+collating/sorting strings according to the Unicode Collation Algorithm. 
+
+@include fun-sb-unicode-unicode-lt.texinfo
+
+@include fun-sb-unicode-unicode=.texinfo
+
+@include fun-sb-unicode-unicode-equal.texinfo
+
+@include fun-sb-unicode-unicode-lt=.texinfo
+
+@include fun-sb-unicode-unicode-gt.texinfo
+
+@include fun-sb-unicode-unicode-gt=.texinfo
+
+The following functions are provided for detecting visually confusable strings:
+
+@include fun-sb-unicode-confusable-p.texinfo
+
+@subsection Breaking strings
+
+The @code{sb-unicode} package includes several functions for breaking a
+Unicode string into useful parts.
+
+@include fun-sb-unicode-graphemes.texinfo
+
+@include fun-sb-unicode-words.texinfo
+
+@include fun-sb-unicode-sentences.texinfo
+
+@include fun-sb-unicode-lines.texinfo
 
 @node  Customization Hooks for Users
 @comment  node-name,  next,  previous,  up
