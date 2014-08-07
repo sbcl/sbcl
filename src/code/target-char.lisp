@@ -21,7 +21,6 @@
 (deftype char-code ()
   `(integer 0 (,sb!xc:char-code-limit)))
 
-#!+sb-unicode
 (progn
  (defvar *unicode-character-name-database*)
  (defvar *unicode-character-name-huffman-tree*))
@@ -106,12 +105,11 @@
                   (setf **character-primary-compositions**
                         (let ((table (make-hash-table))
                             (info (make-ubn-vector ,primary-compositions 3)))
-                        #!+sb-unicode
                         (dotimes (i (/ (length info) 3))
                           (setf (gethash (dpb (aref info (* 3 i)) (byte 21 21)
                                               (aref info (1+ (* 3 i))))
                                          table)
-                                (code-char (aref info (+ (* 3 i) 2)))))
+                                (aref info (+ (* 3 i) 2))))
                         table))
 
                   (setf **character-cases**
@@ -180,14 +178,12 @@
                                        :direction :input
                                        :element-type 'character)
                                (let ((names (make-hash-table)))
-                                 #!+sb-unicode
                                  (loop
                                        for code-point = (read stream nil nil)
                                        for char-name = (string-upcase (read stream nil nil))
                                        while code-point
                                        do (setf (gethash code-point names) char-name))
                                  (let ((tree
-                                        #!+sb-unicode
                                          (make-huffman-tree
                                           (let (list)
                                             (maphash (lambda (code name)
@@ -210,7 +206,6 @@
                                          (sort (copy-seq name->code) #'< :key #'car))
                                    (setf names nil)
                                    `(defun !character-name-database-cold-init ()
-                                      #!+sb-unicode
                                       (setq *unicode-character-name-database*
                                             (cons ',code->name ',name->code)
                                             *unicode-character-name-huffman-tree* ',tree))))))))))
@@ -424,7 +419,6 @@ strings and symbols of length 1."
   "Return the name (a STRING) for a CHARACTER object."
   (let ((char-code (char-code char)))
     (or (second (assoc char-code *base-char-name-alist*))
-        #!+sb-unicode
         (let ((h-code (cdr (binary-search char-code
                                           (car *unicode-character-name-database*)
                                           :key #'car))))
@@ -443,7 +437,6 @@ name is that string, if one exists. Otherwise, NIL is returned."
                                        *base-char-name-alist*))))
         (when char-code
           (code-char char-code)))
-      #!+sb-unicode
       (let* ((%name (string-upcase name))
              (encoding (huffman-encode (if (string= "U+" (subseq %name 0 2))
                                            (remove #\+ %name :count 1)

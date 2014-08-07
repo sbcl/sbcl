@@ -42,7 +42,11 @@ is replaced with replacement."
     (declare (ignore decomp-map old-comment simple-up
                      simple-down simple-title))
     (let* ((cp (parse-integer %cp :radix 16))
-           (char (code-char cp))
+           (char #+sb-unicode (code-char cp)
+                 #-sb-unicode
+                 (if (< cp 256)
+                     (code-char cp)
+                     (return-from test-line t)))
            (gc (intern (string-upcase %gc) "KEYWORD"))
            (bidi (intern (string-upcase %bidi) "KEYWORD"))
            ;; See `normalize-character-name` in ucd.lisp for a discussion
@@ -79,8 +83,7 @@ is replaced with replacement."
                        :directory '(:relative :up "tools-for-build")
                        :name "UnicodeData" :type "txt")
                       (or *load-truename* *compile-file-truename*)))
-    (with-test (:name (:unicode-properties)
-                :skipped-on '(not :sb-unicode))
+    (with-test (:name (:unicode-properties))
       (loop for line = (read-line s nil nil)
             while line
             do (test-line line)))))
@@ -88,11 +91,15 @@ is replaced with replacement."
 (test-property-reads)
 
 (defun codepoint-or-range (string)
-  (flet ((parse (str) (parse-integer str :radix 16 :junk-allowed t)))
-    (let ((parts (remove "" (split-string string #\.) :test #'string=)))
-      (if (cdr parts)
-          (loop for i from (parse (car parts)) to (parse (cadr parts)) collect i)
-          (mapcar #'parse parts)))))
+  (remove-if-not
+   #'(lambda (i)
+       #+sb-unicode i
+       #-sb-unicode (< i 256))
+   (flet ((parse (str) (parse-integer str :radix 16 :junk-allowed t)))
+     (let ((parts (remove "" (split-string string #\.) :test #'string=)))
+       (if (cdr parts)
+           (loop for i from (parse (car parts)) to (parse (cadr parts)) collect i)
+           (mapcar #'parse parts))))))
 
 (defun test-property-line (fn line)
   (destructuring-bind (%codepoints value) (split-string line #\;)
@@ -112,8 +119,7 @@ Wanted ~S, got ~S."
 (defun test-bidi-class ()
   (declare (optimize (debug 2)))
   (with-open-file (s "data/DerivedBidiClass.txt" :external-format :ascii)
-    (with-test (:name (:bidi-class)
-                :skipped-on '(not :sb-unicode))
+    (with-test (:name (:bidi-class))
       (loop for line = (read-line s nil nil)
             while line
             unless (or (string= "" line) (eql 0 (position #\# line)))
@@ -124,8 +130,7 @@ Wanted ~S, got ~S."
 (defun test-hangul-syllable-type ()
   (declare (optimize (debug 2)))
   (with-open-file (s "data/HangulSyllableType.txt" :external-format :ascii)
-    (with-test (:name (:hangul-syllable-type)
-                :skipped-on '(not :sb-unicode))
+    (with-test (:name (:hangul-syllable-type))
       (loop for line = (read-line s nil nil)
             while line
             unless (or (string= "" line) (eql 0 (position #\# line)))
@@ -137,8 +142,7 @@ Wanted ~S, got ~S."
   (declare (optimize (debug 2)))
   (with-open-file (s "../tools-for-build/EastAsianWidth.txt"
                      :external-format :ascii)
-    (with-test (:name (:east-asian-width)
-                :skipped-on '(not :sb-unicode))
+    (with-test (:name (:east-asian-width))
       (loop for line = (read-line s nil nil)
             while line
             unless (or (string= "" line) (eql 0 (position #\# line)))
@@ -150,8 +154,7 @@ Wanted ~S, got ~S."
   (declare (optimize (debug 2)))
   (with-open-file (s "../tools-for-build/Scripts.txt"
                      :external-format :ascii)
-    (with-test (:name (:script)
-                :skipped-on '(not :sb-unicode))
+    (with-test (:name (:script))
       (loop for line = (read-line s nil nil)
             while line
             unless (or (string= "" line) (eql 0 (position #\# line)))
@@ -163,8 +166,7 @@ Wanted ~S, got ~S."
   (declare (optimize (debug 2)))
   (with-open-file (s "../tools-for-build/Blocks.txt"
                      :external-format :ascii)
-    (with-test (:name (:script)
-                :skipped-on '(not :sb-unicode))
+    (with-test (:name (:block))
       (loop for line = (read-line s nil nil)
             while line
             unless (or (string= "" line) (eql 0 (position #\# line)))
@@ -181,8 +183,7 @@ Wanted ~S, got ~S."
   (declare (optimize (debug 2)))
   (with-open-file (s "../tools-for-build/PropList.txt"
                      :external-format :ascii)
-    (with-test (:name (:proplist)
-                :skipped-on '(not :sb-unicode))
+    (with-test (:name (:proplist))
       (loop for line = (read-line s nil nil)
          while line
          unless (or (string= "" line) (eql 0 (position #\# line)))
@@ -230,8 +231,7 @@ Wanted ~S, got ~S."
   (declare (optimize (debug 2)))
   (with-open-file (s "../tools-for-build/DerivedAge.txt"
                      :external-format :ascii)
-    (with-test (:name (:age)
-                :skipped-on '(not :sb-unicode))
+    (with-test (:name (:age))
       (loop for line = (read-line s nil nil)
          while line
          unless (or (string= "" line) (eql 0 (position #\# line)))
@@ -255,8 +255,7 @@ Wanted ~S, got ~S."
   (declare (optimize (debug 2)))
   (with-open-file (s "data/GraphemeBreakProperty.txt"
                      :external-format :ascii)
-    (with-test (:name (:grapheme-break-class)
-                :skipped-on '(not :sb-unicode))
+    (with-test (:name (:grapheme-break-class))
       (loop for line = (read-line s nil nil)
             while line
             unless (or (string= "" line) (eql 0 (position #\# line)))
@@ -270,8 +269,7 @@ Wanted ~S, got ~S."
   (declare (optimize (debug 2)))
   (with-open-file (s "data/WordBreakProperty.txt"
                      :external-format :ascii)
-    (with-test (:name (:word-break-class)
-                :skipped-on '(not :sb-unicode))
+    (with-test (:name (:word-break-class))
       (loop for line = (read-line s nil nil)
             while line
             unless (or (string= "" line) (eql 0 (position #\# line)))
@@ -284,8 +282,7 @@ Wanted ~S, got ~S."
   (declare (optimize (debug 2)))
   (with-open-file (s "data/SentenceBreakProperty.txt"
                      :external-format :ascii)
-    (with-test (:name (:sentence-break-class)
-                :skipped-on '(not :sb-unicode))
+    (with-test (:name (:sentence-break-class))
       (loop for line = (read-line s nil nil)
             while line
             unless (or (string= "" line) (eql 0 (position #\# line)))
@@ -297,8 +294,7 @@ Wanted ~S, got ~S."
   (declare (optimize (debug 2)))
   (with-open-file (s "../tools-for-build/LineBreakProperty.txt"
                      :external-format :ascii)
-    (with-test (:name (:line-break-class)
-                :skipped-on '(not :sb-unicode))
+    (with-test (:name (:line-break-class))
       (loop for line = (read-line s nil nil)
             while line
             unless (or (string= "" line) (eql 0 (position #\# line)))

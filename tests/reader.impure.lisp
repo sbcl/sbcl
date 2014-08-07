@@ -17,6 +17,7 @@
 (use-package "ASSERTOID")
 
 ;;; Test that symbols are properly normalized in SB-UNICODE builds
+#+sb-unicode
 (with-test (:name (:normalizing-reader)
                   :skipped-on '(not :sb-unicode))
   (labels ((str (&rest chars)
