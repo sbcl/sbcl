@@ -521,7 +521,8 @@ standard Lisp readtable when NIL."
   (escapes (make-array 10 :element-type 'fixnum :fill-pointer 0 :adjustable t)
            :type (and (vector fixnum) (not simple-array)) :read-only t)
   ;; Link to next TOKEN-BUF, to chain the *TOKEN-BUF-POOL* together.
-  (next nil :type (or null token-buf)))
+  (next nil :type (or null token-buf))
+  (only-base-chars t :type boolean))
 (declaim (freeze-type token-buf))
 
 (def!method print-object ((self token-buf) stream)
@@ -544,6 +545,7 @@ standard Lisp readtable when NIL."
   (setf (fill-pointer (token-buf-escapes buffer)) 0)
   (setf (token-buf-fill-ptr buffer) 0)
   (setf (token-buf-cursor buffer) 0)
+  (setf (token-buf-only-base-chars buffer) t)
   buffer)
 
 ;; "Output" a character into the reader's buffer.
@@ -556,6 +558,8 @@ standard Lisp readtable when NIL."
     ;; an out-of-line call for the uncommon case avoids bloat.
     ;; Size should be doubled.
       (grow-read-buffer))
+    (unless (typep char 'base-char)
+      (setf (token-buf-only-base-chars buffer) nil))
     (setf (elt (token-buf-string buffer) op) char)
     (setf (token-buf-fill-ptr buffer) (1+ op))))
 
@@ -1016,6 +1020,8 @@ standard Lisp readtable when NIL."
 ;;; COLON value
 (defun normalize-read-buffer (token-buf &optional colon)
   (unless (readtable-normalization *readtable*)
+    (return-from normalize-read-buffer (values token-buf colon)))
+  (when (token-buf-only-base-chars token-buf)
     (return-from normalize-read-buffer (values token-buf colon)))
   (let ((current-buffer (copy-token-buf-string token-buf))
         (old-escapes (copy-seq (token-buf-escapes token-buf)))
