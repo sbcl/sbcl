@@ -1186,3 +1186,8 @@ redefinition."
     (assert (= (lexical-default-a (make-lexical-default))
                x
                1))))
+
+(with-test (:name (:defstruct :find-defstruct-description))
+  (assert (null (sb-kernel:find-defstruct-description 'not-foo nil)))
+
+  (assert-error (sb-kernel:find-defstruct-description 'not-foo t)))

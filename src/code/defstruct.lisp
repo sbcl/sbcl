@@ -1900,14 +1900,13 @@
          (inherits (inherits-for-structure dd)))
     (%compiler-defstruct dd inherits)))
 
-;;; finding these beasts
 (defun find-defstruct-description (name &optional (errorp t))
-  ;; FIXME: errorp=nil doesn't actually work.
-  ;; FIND-CLASSOID returns NIL, and the rest is obvious.
-  (let ((info (layout-info (classoid-layout (find-classoid name errorp)))))
-    (if (defstruct-description-p info)
-        info
-        (when errorp
-          (error "No DEFSTRUCT-DESCRIPTION for ~S." name)))))
+  (let* ((classoid (find-classoid name errorp))
+         (info (and classoid
+                    (layout-info (classoid-layout classoid)))))
+    (cond ((defstruct-description-p info)
+           info)
+          (errorp
+           (error "No DEFSTRUCT-DESCRIPTION for ~S." name)))))
 
 (/show0 "code/defstruct.lisp end of file")
