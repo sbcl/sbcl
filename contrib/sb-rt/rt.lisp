@@ -113,7 +113,8 @@
   (do-entry (get-entry name)))
 
 (defun equalp-with-case (x y)
-  "Like EQUALP, but doesn't do case conversion of characters."
+  "Like EQUALP, but doesn't do case conversion of characters.
+Also does not descend into structures, which EQUALP does."
   (cond
    ((eq x y) t)
    ((consp x)

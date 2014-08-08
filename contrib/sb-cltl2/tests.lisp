@@ -65,6 +65,24 @@
     (macroexpand-all '(symbol-macrolet ((srlt '(nil zool))) (testr)))
   (symbol-macrolet ((srlt '(nil zool))) 'zool))
 
+;; Quasiquotation
+(deftest macroexpand-all.5
+    ;; The second use of (W) is expanded to X, the first is untouched.
+    ;; Use EQUALP explicitly because the RT tester's EQUALP-WITH-CASE
+    ;; is not quite EQUALP with regard to structures.
+    (equalp (macroexpand-all '(macrolet ((w () 'x))
+               `(let ((y `(z ,(w) ,,(w)))) (g))))
+            '(macrolet ((w () 'x)) `(let ((y `(z ,(w) ,,x))) (g))))
+  t)
+
+(deftest macroexpand-all.6
+    ;; The subform (AND Z) in (PROGN `(F ,(WHEN X Y) . `(,B ,,(AND Z))))
+    ;; is evaluable though unlikely to appear in real code. Unless F is a
+    ;; macro, this form when evaluated does not comprise a well-formed sexpr.
+    (equalp (macroexpand-all '(progn `(f ,(when x y) . `(,b ,,(and z)))))
+            '(progn `(f ,(if x (progn y) nil) . `(,b ,,(the t z)))))
+  t)
+
 ;;;; DECLARATION-INFORMATION
 
 (defmacro dinfo (thing &environment env)
