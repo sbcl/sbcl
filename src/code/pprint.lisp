@@ -1157,8 +1157,7 @@ line break."
 
 (defun pprint-quote (stream list &rest noise)
   (declare (ignore noise))
-  (when (and (consp list)
-             (let ((cdr (cdr list))) (and (consp cdr) (null (cdr cdr)))))
+  (when (and (listp list) (singleton-p (cdr list)))
     (let* ((pretty-p nil)
            (sigil (case (car list)
                     (function "#'")
