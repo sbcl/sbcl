@@ -321,17 +321,6 @@
     ;; These each used to produce at least 20 MB of garbage,
     ;; a result of using 128-character (= 512 bytes for Unicode) buffers.
     ;; Now we use exactly one buffer, or maybe two for package + symbol-name.
-    ;; There is no way to allow an allocation of precisely 512 bytes
-    ;; without counting a whole allocation page against this test.
-    ;; If you get unlucky, the tests might cons one SB-IMPL::TOKEN-BUFFER.
-    ;; And if you get really unlucky, that might be the straw that breaks
-    ;; the camel's back - forcing the use of a new GC page, which looks
-    ;; like it consed 32768 bytes on the old page. Due to the allowable
-    ;; tolerance in CHECK-CONSING, running the test more times than there
-    ;; are bytes consed should pass for "no consing" because it's obviously
-    ;; impossible to cons 1 byte per run.
-    ;; If this still fails, it might be due to somebody changing the
-    ;; backend-page-bytes to exceed 32KB. Not sure what to do about that.
     (test-reading "4.0s0")
     (test-reading "COMMON-LISP-USER::A-SYMBOL")
     (test-reading "()")
