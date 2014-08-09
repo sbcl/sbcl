@@ -191,6 +191,8 @@
                0)))
 
 (with-test (:name :backq-vector)
+  (assert-error (eval (read-from-string "`#(,@#())")))
+  (assert-error (eval (read-from-string "`#(,@`#())")))
   (assert (equalp `#(,@(list 1 2 3)) #(1 2 3)))
   (assert (equalp `#(0 ,@(list 1 2 3)) #(0 1 2 3)))
   (assert (equalp `#(,@(list 1 2 3) ,4) #(1 2 3 4))))

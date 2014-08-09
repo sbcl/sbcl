@@ -263,7 +263,13 @@
                      (|Vector| 'vector))))
              (recurse (list &aux (elt (car list)) (rest (cdr list)))
                (if (endp rest)
-                   (cond ((or dot-p (qq-subform-splicing-p elt)) (render elt))
+                   (cond ((or dot-p (qq-subform-splicing-p elt))
+                          (let ((tail (render elt)))
+                            (if (vectorp input)
+                                ;; When splicing pieces into a vector,
+                                ;; force the tail to be a list.
+                                (list (normalize-fn '|Append|) tail nil)
+                                tail)))
                          ((const-p elt) (list 'quote (list (const-val elt))))
                          (t (list (normalize-fn '|List|)
                                   (render elt)))) ; singleton list
