@@ -194,14 +194,14 @@
   ;; string used in efficiency notes
   (note (missing-arg) :type string)
   ;; T if we should emit a failure note even if SPEED=INHIBIT-WARNINGS.
-  (important nil :type (member t nil)))
+  (important nil :type (member nil :slightly t)))
 
 (defprinter (transform) type note important)
 
 ;;; Grab the FUN-INFO and enter the function, replacing any old
 ;;; one with the same type and note.
 (declaim (ftype (function (t list function &optional (or string null)
-                             (member t nil))
+                             (member nil :slightly t))
                           *)
                 %deftransform))
 (defun %deftransform (name type fun &optional note important)

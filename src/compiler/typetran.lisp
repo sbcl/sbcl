@@ -214,7 +214,7 @@
   `(typep ,x 'base-char))
 ;; CONS is implemented as (and list (not (eql nil))) where the 'and' is
 ;; built-in to the consp vop. Reduce to just LISTP if possible.
-(deftransform consp ((x) ((not null))) '(listp x))
+(deftransform consp ((x) ((not null)) * :important nil) '(listp x))
 
 ;;;; TYPEP source transform
 

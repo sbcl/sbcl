@@ -385,15 +385,17 @@
 ;;;             Name with the specified transform definition function. This
 ;;;             may be later instantiated with %DEFTRANSFORM.
 ;;;   :IMPORTANT
-;;;           - If supplied and non-NIL, note this transform as ``important,''
-;;;             which means efficiency notes will be generated when this
-;;;             transform fails even if INHIBIT-WARNINGS=SPEED (but not if
-;;;             INHIBIT-WARNINGS>SPEED).
+;;;           - If the transform fails and :IMPORTANT is
+;;;               NIL,       then never print an efficiency note.
+;;;               :SLIGHTLY, then print a note if SPEED>=INHIBIT-WARNINGS.
+;;;               T,         then print a note if SPEED>INHIBIT-WARNINGS.
+;;;             :SLIGHTLY is the default.
 (defmacro deftransform (name (lambda-list &optional (arg-types '*)
                                           (result-type '*)
                                           &key result policy node defun-only
-                                          eval-name important)
+                                          eval-name (important :slightly))
                              &body body-decls-doc)
+  (declare (type (member nil :slightly t) important))
   (when (and eval-name defun-only)
     (error "can't specify both DEFUN-ONLY and EVAL-NAME"))
   (multiple-value-bind (body decls doc) (parse-body body-decls-doc)
@@ -432,7 +434,7 @@
                      `'(function ,arg-types ,result-type))
                 (lambda ,@stuff)
                 ,doc
-                ,(if important t nil))))))))
+                ,important)))))))
 
 ;;;; DEFKNOWN and DEFOPTIMIZER
 
