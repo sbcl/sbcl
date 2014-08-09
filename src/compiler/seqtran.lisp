@@ -814,6 +814,7 @@
   (def string=* not)
   (def string/=* identity))
 
+(deftransform string ((x) (symbol)) '(symbol-name x))
 
 ;;;; transforms for sequence functions
 
