@@ -208,27 +208,24 @@
 such that successive invocations of (MNAME) will return the symbols, one by
 one, from the packages in PACKAGE-LIST. SYMBOL-TYPES may be any
 of :INHERITED :EXTERNAL :INTERNAL."
-  (with-unique-names (packages these-packages counter kind hash-vector vector
+  (when (null symbol-types)
+    (error 'simple-program-error
+           :format-control
+           "At least one of :INTERNAL, :EXTERNAL, or :INHERITED must be supplied."))
+  (dolist (symbol symbol-types)
+    (unless (member symbol '(:internal :external :inherited))
+      (error 'simple-program-error
+             :format-control
+             "~S is not one of :INTERNAL, :EXTERNAL, or :INHERITED."
+             :format-arguments (list symbol))))
+  (with-unique-names (packages counter kind hash-vector vector
                       package-use-list init-macro end-test-macro real-symbol-p
                       inherited-symbol-p BLOCK)
     (let ((ordered-types (let ((res nil))
                            (dolist (kind '(:inherited :external :internal) res)
                              (when (member kind symbol-types)
                                (push kind res))))))  ; Order SYMBOL-TYPES.
-      `(let* ((,these-packages ,package-list)
-              (,packages `,(mapcar (lambda (package)
-                                     (if (packagep package)
-                                         package
-                                         ;; Maybe FIND-PACKAGE-OR-DIE?
-                                         (or (find-package package)
-                                             (error 'simple-package-error
-                                                    ;; could be a character
-                                                    :package (string package)
-                                                    :format-control "~@<~S does not name a package ~:>"
-                                                    :format-arguments (list package)))))
-                                   (if (consp ,these-packages)
-                                       ,these-packages
-                                       (list ,these-packages))))
+      `(let* ((,packages (package-listify ,package-list))
               (,counter nil)
               (,kind (car ,packages))
               (,hash-vector nil)
@@ -275,17 +272,6 @@ of :INHERITED :EXTERNAL :INTERNAL."
                                   (return-from ,',BLOCK)
                                   (,',init-macro ,(car ',ordered-types)))))))
           (when ,packages
-            ,(when (null symbol-types)
-                   (error 'simple-program-error
-                          :format-control
-                          "At least one of :INTERNAL, :EXTERNAL, or ~
-                      :INHERITED must be supplied."))
-            ,(dolist (symbol symbol-types)
-                     (unless (member symbol '(:internal :external :inherited))
-                       (error 'simple-program-error
-                              :format-control
-                              "~S is not one of :INTERNAL, :EXTERNAL, or :INHERITED."
-                              :format-arguments (list symbol))))
             (,init-macro ,(car ordered-types))
             (flet ((,real-symbol-p (number)
                      (> number 1)))

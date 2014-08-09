@@ -289,6 +289,13 @@ if a restart was invoked."
                   (assert (equal (list :foo) (simple-condition-format-arguments c)))
                   :good)))))
 
+;; X3J13 writeup HASH-TABLE-PACKAGE-GENERATORS says
+;;  "An argument of NIL is treated as an empty list of packages."
+;; This used to fail with "NIL does not name a package"
+(with-test (:name :with-package-iterator-nil-list)
+  (with-package-iterator (iter '() :internal)
+    (print (nth-value 1 (iter)))))
+
 ;;; MAKE-PACKAGE error in another thread blocking FIND-PACKAGE & FIND-SYMBOL
 (with-test (:name :bug-511072 :skipped-on '(not :sb-thread))
   (let* ((p (make-package :bug-511072))
