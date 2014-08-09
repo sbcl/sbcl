@@ -151,7 +151,7 @@
 ;; as a proper list, and new DOTTED-P flag. i.e. Conceptually:
 ;;    `(a ,[@]b c d)   -> `(a ,[@]b . (c d))
 ;;    `(a ,[@]b c . d) -> `(a ,[@]b . (c . d))
-(defun qq-fold-suffix (subforms dotted-p)
+(defun qq-fold-suffix (subforms dotted-p vectorp)
   (labels ((const-tailp (list)
              (if list
                  (let* ((rest (cdr list))
@@ -173,7 +173,7 @@
                  (and (not (qq-subform-splicing-p (car list)))
                       (convertible-p (cdr list)))
                  (qq-subform-splicing-p (car list)))))
-    (when (and (not dotted-p) (convertible-p subforms))
+    (when (and (not dotted-p) (not vectorp) (convertible-p subforms))
       (let ((tail (car (last subforms))))
         (setq subforms (nconc (nbutlast subforms) (list (list (car tail))))
               dotted-p t))))
@@ -220,7 +220,7 @@
     ;; list no matter what. It could theoretically be avoided by doing:
     ;;  (MULTIPLE-VALUE-CALL #'VECTOR ... (VALUES-LIST <splice>) ...)
     (if (or (listp original) (some #'qq-subform-splicing-p list))
-        (qq-fold-suffix list dotted-p)
+        (qq-fold-suffix list dotted-p (vectorp input))
         (values list dotted-p))))
 
 ;; Return an expression to quasi-quote INPUT, which is either a list

@@ -190,6 +190,11 @@
                            (simple-condition-format-control c))))
                0)))
 
+(with-test (:name :backq-vector)
+  (assert (equalp `#(,@(list 1 2 3)) #(1 2 3)))
+  (assert (equalp `#(0 ,@(list 1 2 3)) #(0 1 2 3)))
+  (assert (equalp `#(,@(list 1 2 3) ,4) #(1 2 3 4))))
+
 (in-package sb-impl)
 
 (test-util:with-test (:name :backquote-more-weirdness)
