@@ -15,6 +15,8 @@ changes in sbcl-1.2.3 relative to sbcl-1.2.2:
     which initargs have been supplied.
   * bug fix: saving cores on ARM was broken since the introduction of GENCGC.
     (lp#1349795)
+  * bug fix: macroexpanding a backquoted expression involving ",."
+    outside of the compiler failed. (lp#1354623)
 
 changes in sbcl-1.2.2 relative to sbcl-1.2.1:
   * incompatible change: the #\` ("backquote") reader macro was reimplemented

@@ -225,6 +225,11 @@
 
 ;; Return an expression to quasi-quote INPUT, which is either a list
 ;; or simple-vector, by recursing over its subexpressions.
+;; The expansion is in terms of CL-standard functions for MACROEXPAND,
+;; but SBCL-private functions for the compiler-macro.
+;; This is mainly for aesthetics. If users expressly macroexpand a sexpr
+;; and then compile it, they miss out on the opportunity for the minor
+;; advantage provided by the foldable functions, but why would they do that?
 (defun qq-template-1 (input depth compiler-p)
   (multiple-value-bind (subforms dot-p)
       (qq-map-template-to-list input depth compiler-p)
@@ -254,7 +259,7 @@
                      (list 'quote exp)
                      exp)))
              (normalize-fn (fn-name)
-               (if compiler-p
+               (if (or compiler-p (eq fn-name 'nconc))
                    fn-name
                    (ecase fn-name
                      (|Append| 'append)
