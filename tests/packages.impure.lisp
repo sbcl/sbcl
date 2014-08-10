@@ -658,3 +658,64 @@ if a restart was invoked."
              (delete-package (gensym)))))
     (assert ok)
     (assert (not result))))
+
+;; WITH-PACKAGE-ITERATOR isn't well-exercised by tests (though LOOP uses it)
+;; so here's a basic correctness test with some complications involving
+;; shadowing symbols.
+(make-package "P1" :use '("SB-FORMAT"))
+(make-package "P2")
+(export 'p1::foo 'p1)
+(shadow "FORMAT-ERROR" 'p1)
+(make-package "A" :use '("SB-FORMAT" "P1" "P2"))
+(shadow '("PROG2" "FOO") 'a)
+(intern "BLAH" "P2")
+(export 'p2::(foo bar baz) 'p2)
+(export 'a::goodfun 'a)
+
+(with-test (:name :with-package-iterator)
+  (let ((tests '((:internal) (:external) (:inherited)
+                 (:internal :inherited)
+                 (:internal :external)
+                 (:external :inherited)
+                 (:internal :external :inherited)))
+        (maximum-answer
+         '(;; symbols visible in A
+           (a::prog2 :internal "A")
+           (a::foo :internal "A")
+           (a:goodfun :external "A")
+           (p2:bar :inherited "A")
+           (p2:baz :inherited "A")
+           (sb-format:%compiler-walk-format-string :inherited "A")
+           (sb-format:format-error :inherited "A")
+           ;; ... P1
+           (p1:foo :external "P1")
+           (p1::format-error :internal "P1")
+           (sb-format:%compiler-walk-format-string :inherited "P1")
+           ;; ... P2
+           (p2::blah :internal "P2")
+           (p2:foo :external "P2")
+           (p2:bar :external "P2")
+           (p2:baz :external "P2"))))
+    ;; Compile a new function to test each combination of
+    ;; accessibility-kind since the macro doesn't eval them.
+    (dolist (access tests)
+      ; (print `(testing ,access))
+      (let ((f (compile
+                nil
+                `(lambda ()
+                   (with-package-iterator (iter '(p1 a p2) ,@access)
+                     (let (res)
+                       (loop
+                        (multiple-value-bind (foundp sym access pkg) (iter)
+                          (if foundp
+                              (push (list sym access (package-name pkg)) res)
+                              (return))))
+                       res))))))
+        (let ((answer (funcall f))
+              (expect (remove-if-not (lambda (x) (member (second x) access))
+                                     maximum-answer)))
+          ;; exactly as many results as expected
+          (assert (equal (length answer) (length expect)))
+          ;; each result is right
+          (assert (equal (length (intersection answer expect :test #'equal))
+                         (length expect))))))))

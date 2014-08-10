@@ -218,6 +218,9 @@
 (defknown (use-package unuse-package)
   ((or list package-designator) &optional package-designator) (eql t))
 (defknown find-all-symbols (string-designator) list (flushable))
+;; private
+(defknown package-iter-step (fixnum index package-hashtable list)
+  (values fixnum index package-hashtable list))
 
 ;;;; from the "Numbers" chapter:
 
