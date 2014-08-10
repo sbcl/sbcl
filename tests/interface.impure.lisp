@@ -138,6 +138,14 @@
     (assert (assert-documentation-helper
              thing doc-type (documentation thing doc-type) expected))))
 
+(defpackage #:documentation.package
+  (:documentation "PACKAGE"))
+
+(with-test (:name (documentation package))
+  (assert-documentation (find-package '#:documentation.package) t "PACKAGE")
+  (setf (documentation (find-package '#:documentation.package) t) "PACKAGE2")
+  (assert-documentation (find-package '#:documentation.package) t "PACKAGE2"))
+
 (defclass foo ()
   ()
   (:documentation "FOO"))
@@ -301,6 +309,17 @@
 
 (with-test (:name (documentation :built-in-function) :skipped-on '(not :sb-doc))
   (assert (documentation 'cons 'function)))
+
+(defvar documentation.variable nil
+  "foo variable documentation")
+
+(with-test (:name (documentation variable))
+  (assert-documentation 'documentation.variable 'variable
+                        "foo variable documentation")
+  (setf (documentation 'documentation.variable 'variable)
+        "baz variable documentation")
+  (assert-documentation 'documentation.variable 'variable
+                        "baz variable documentation"))
 
 (with-test (:name (documentation :mismatch-for-function))
   (defun test ()
