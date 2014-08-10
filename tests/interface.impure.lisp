@@ -16,19 +16,6 @@
 (use-package "ASSERTOID")
 (use-package "TEST-UTIL")
 
-(defun (setf foo) (x)
-  "(setf foo) documentation"
-  x)
-
-(assert (string= (documentation '(setf foo) 'function)
-                 "(setf foo) documentation"))
-(assert (string= (documentation #'(setf foo) 'function)
-                 "(setf foo) documentation"))
-
-(assert (string= (documentation '(setf foo) 'function)
-                 "(setf foo) documentation"))
-(assert (string= (documentation #'(setf foo) 'function)
-                 "(setf foo) documentation"))
 
 (with-test (:name :disassemble)
 ;;; DISASSEMBLE shouldn't fail on closures or unpurified functions
@@ -143,7 +130,13 @@
 ;;; Tests of documentation on types and classes
 
 (defun assert-documentation (thing doc-type expected)
-  (assert (equal (documentation thing doc-type) expected)))
+  ;; This helper function makes ASSERT errors print THING, DOC-TYPE,
+  ;; the return value of DOCUMENTATION and EXPECTED.
+  (flet ((assert-documentation-helper (thing doc-type documentation expected)
+           (declare (ignore thing doc-type))
+           (equal documentation expected)))
+    (assert (assert-documentation-helper
+             thing doc-type (documentation thing doc-type) expected))))
 
 (defclass foo ()
   ()
@@ -225,6 +218,35 @@
 (with-test (:name (documentation compiler-macro))
   (assert-documentation 'cmacro 'compiler-macro "compiler macro")
   (assert-documentation '(setf cmacro) 'compiler-macro "setf compiler macro"))
+
+(defun (setf documentation.setf) (x)
+  "(setf foo) documentation"
+  x)
+
+(with-test (:name (documentation function setf))
+  (flet ((expect (documentation)
+           (assert-documentation
+            '(setf documentation.setf) 'function documentation)
+           (assert-documentation
+            #'(setf documentation.setf) 'function documentation)
+           (assert-documentation
+            #'(setf documentation.setf) t documentation)))
+    (expect "(setf foo) documentation")
+    ;; The original test checked this twice. No idea why.
+    (expect "(setf foo) documentation")
+
+    ;; Modification
+    (setf (documentation '(setf documentation.setf) 'function)
+          "(setf bar) documentation")
+    (expect "(setf bar) documentation")
+
+    (setf (documentation #'(setf documentation.setf) 'function)
+          "(setf baz) documentation")
+    (expect "(setf baz) documentation")
+
+    (setf (documentation #'(setf documentation.setf) t)
+          "(setf fez) documentation")
+    (expect "(setf fez) documentation")))
 
 (with-test (:name (documentation lambda))
   (let ((f (lambda () "aos the zos" t))
