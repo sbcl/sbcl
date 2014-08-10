@@ -1351,13 +1351,8 @@ constant shift greater than word length")))
              `(progn
                 ,@(mapcar
                    (lambda (suffix cost signed)
-                     `(define-vop (;; FIXME: These could be done more
-                                   ;; cleanly with SYMBOLICATE.
-                                   ,(intern (format nil "~:@(FAST-IF-~A~A~)"
-                                                    tran suffix))
-                                   ,(intern
-                                     (format nil "~:@(FAST-CONDITIONAL~A~)"
-                                             suffix)))
+                     `(define-vop (,(symbolicate "FAST-IF-" tran suffix)
+                                   ,(symbolicate "FAST-CONDITIONAL"  suffix))
                         (:translate ,tran)
                         (:conditional ,(if signed cond unsigned))
                         (:generator ,cost
