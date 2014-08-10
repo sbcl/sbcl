@@ -37,7 +37,7 @@ sequential changes, please send it in as single patch.
 
 If your patch includes algorithmic changes, explain them. If your
 patch uses a published algorithm, please include a link to the paper.
-We aren't always as well-educated as we'd like to...
+We aren't always as well-educated as we'd like to be...
 
 Ready-to-apply patches should be submitted via Launchpad: please add
 the tag "review" to the associated bug (create new bug with name if
