@@ -616,6 +616,26 @@
                        sb!vm:vector-length-slot
                        (make-fixnum-descriptor length))
     des))
+
+;; Make a structure and set the header word and layout.
+;; LAYOUT-LENGTH is as returned by the like-named function.
+(defun allocate-structure-object (gspace layout-length layout)
+  ;; The math in here is best illustrated by two examples:
+  ;; even: size 4 => request to allocate 5 => rounds up to 6, logior => 5
+  ;; odd : size 5 => request to allocate 6 => no rounding up, logior => 5
+  ;; In each case, the length of the memory block is even.
+  ;; ALLOCATE-BOXED-OBJECT performs the rounding. It must be supplied
+  ;; the number of words minimally needed, counting the header itself.
+  ;; The number written into the header (%INSTANCE-LENGTH) is always odd.
+  (let ((des (allocate-boxed-object gspace
+                                    (1+ layout-length)
+                                    sb!vm:instance-pointer-lowtag)))
+    (write-memory des
+                  (make-other-immediate-descriptor
+                   (logior layout-length 1)
+                   sb!vm:instance-header-widetag))
+    (write-wordindexed des sb!vm:instance-slots-offset layout)
+    des))
 
 ;;;; copying simple objects into the cold core
 
@@ -940,6 +960,8 @@ core and return a descriptor to it."
 (defvar *layout-layout*)
 
 (defconstant target-layout-length
+  ;; LAYOUT-LENGTH counts the number of words in an instance,
+  ;; including the layout itself as 1 word
   (layout-length (find-layout 'layout)))
 
 (defun target-layout-index (slot-name)
@@ -981,22 +1003,9 @@ core and return a descriptor to it."
                           descriptor)
                 make-cold-layout))
 (defun make-cold-layout (name length inherits depthoid nuntagged)
-  (let ((result (allocate-boxed-object *dynamic*
-                                       ;; KLUDGE: Why 1+? -- WHN 19990901
-                                       ;; header word? -- CSR 20051204
-                                       (1+ target-layout-length)
-                                       sb!vm:instance-pointer-lowtag)))
-    (write-memory result
-                  (make-other-immediate-descriptor
-                   target-layout-length sb!vm:instance-header-widetag))
-
-    ;; KLUDGE: The offsets into LAYOUT below should probably be pulled out
-    ;; of the cross-compiler's tables at genesis time instead of inserted
-    ;; by hand as bare numeric constants. -- WHN ca. 19990901
-
-    ;; Set slot 0 = the layout of the layout.
-    (write-wordindexed result sb!vm:instance-slots-offset *layout-layout*)
-
+  (let ((result (allocate-structure-object *dynamic*
+                                           target-layout-length
+                                           *layout-layout*)))
     ;; Don't set the CLOS hash value: done in cold-init instead.
     ;;
     ;; Set other slot values.
@@ -2160,11 +2169,9 @@ core and return a descriptor to it."
 
 (clone-cold-fop (fop-struct)
                 (fop-small-struct)
-  (let* ((size (clone-arg))
-         (result (allocate-boxed-object *dynamic*
-                                        (1+ size)
-                                        sb!vm:instance-pointer-lowtag))
+  (let* ((size (clone-arg)) ; n-words including layout, excluding header
          (layout (pop-stack))
+         (result (allocate-structure-object *dynamic* size layout))
          (nuntagged
           (descriptor-fixnum
            (read-wordindexed
@@ -2172,12 +2179,6 @@ core and return a descriptor to it."
             (+ sb!vm:instance-slots-offset
                (target-layout-index 'n-untagged-slots)))))
          (ntagged (- size nuntagged)))
-    ;; An instance's header word should always indicate that it has an *odd*
-    ;; number of words after the header so that the total with header is even.
-    (write-memory result (make-other-immediate-descriptor
-                          (logior size 1)
-                          sb!vm:instance-header-widetag))
-    (write-wordindexed result sb!vm:instance-slots-offset layout)
     (do ((index 1 (1+ index)))
         ((eql index size))
       (declare (fixnum index))
