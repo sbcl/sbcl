@@ -1322,20 +1322,10 @@ uninterned."
           (symbols (symbol-listify symbols))
           (syms ()))
       ;; Punt any symbols that are already external.
-      ;; BUG:
-      ;;  * (make-package "E1") => #<PACKAGE "E1">
-      ;;  * (make-package "E2") => #<PACKAGE "E2">
-      ;;  * (export (intern "A" "E2") 'e2) ; ok
-      ;;  * (export (intern "A" "E1") 'e2) => T ; wrong
-      ;; The latter export does nothing but should have failed,
-      ;; saying that E1::A is not accessible in E2. This loop
-      ;; assumes that if it finds an external already,
-      ;; then it's definitely the one you wanted to export.
       (dolist (sym symbols)
-        (multiple-value-bind (s w)
+        (multiple-value-bind (s found)
             (find-external-symbol (symbol-name sym) package)
-          (declare (ignore s))
-          (unless (or w (member sym syms))
+          (unless (or (and found (eq s sym)) (member sym syms))
             (push sym syms))))
       (with-single-package-locked-error ()
         (when syms

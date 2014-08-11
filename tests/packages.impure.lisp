@@ -719,3 +719,14 @@ if a restart was invoked."
           ;; each result is right
           (assert (equal (length (intersection answer expect :test #'equal))
                          (length expect))))))))
+
+(with-test (:name :export-inaccessible-lookalike)
+  (make-package "E1")
+  (make-package "E2")
+  (export (intern "A" "E2") 'e2)
+  (multiple-value-bind (answer condition)
+      (ignore-errors  (export (intern "A" "E1") 'e2))
+    (assert (and (not answer)
+                 (and (typep condition 'sb-kernel:simple-package-error)
+                      (search "not accessible"
+                              (simple-condition-format-control condition)))))))
