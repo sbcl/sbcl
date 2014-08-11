@@ -1036,18 +1036,22 @@
           (let* ((node (block-last block))
                  (old-consequent-constraints (if-consequent-constraints node))
                  (old-alternative-constraints (if-alternative-constraints node))
+                 (no-consequent (conset-empty consequent-constraints))
+                 (no-alternative (conset-empty alternative-constraints))
                  (succ ()))
             ;; Add the consequent and alternative constraints to GEN.
-            (cond ((conset-empty consequent-constraints)
+            (cond ((and no-consequent no-alternative)
                    (setf (if-consequent-constraints node) gen)
                    (setf (if-alternative-constraints node) gen))
                   (t
                    (setf (if-consequent-constraints node) (copy-conset gen))
-                   (conset-union (if-consequent-constraints node)
-                                 consequent-constraints)
+                   (unless no-consequent
+                     (conset-union (if-consequent-constraints node)
+                                   consequent-constraints))
                    (setf (if-alternative-constraints node) gen)
-                   (conset-union (if-alternative-constraints node)
-                                 alternative-constraints)))
+                   (unless no-alternative
+                     (conset-union (if-alternative-constraints node)
+                                   alternative-constraints))))
             ;; Has the consequent been changed?
             (unless (and old-consequent-constraints
                          (conset= (if-consequent-constraints node)
