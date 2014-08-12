@@ -134,8 +134,8 @@
 ;;; table. As per ANSI #'GET-MACRO-CHARACTER and #'SET-MACRO-CHARACTER,
 ;;; a function value represents itself, and a NIL value represents the
 ;;; default behavior.
-(defmacro with-char-macro-result ((result-var supplied-p-var)
-                                  (stream char) &body body)
+(defmacro !with-char-macro-result ((result-var supplied-p-var)
+                                   (stream char) &body body)
   (with-unique-names (proc)
     `(dx-flet ((,proc (&optional (,result-var nil ,supplied-p-var) &rest junk)
                  (declare (ignore junk)) ; is this ANSI-specified?
@@ -682,7 +682,7 @@ standard Lisp readtable when NIL."
          (cond ((eq char +EOF+) (return eof-value))
                ((whitespace[2]p char))
                (t
-                (with-char-macro-result (result result-p) (stream char)
+                (!with-char-macro-result (result result-p) (stream char)
                   ;; Repeat if macro returned nothing.
                   (when result-p
                     (return (unless *read-suppress* result))))))))
@@ -708,7 +708,7 @@ standard Lisp readtable when NIL."
 ;;; for functions that want comments to return so that they can look
 ;;; past them. We assume CHAR is not whitespace.
 (defun read-maybe-nothing (stream char)
-  (with-char-macro-result (retval retval-p) (stream char)
+  (!with-char-macro-result (retval retval-p) (stream char)
     (if retval-p (list retval))))
 
 (defun read (&optional (stream *standard-input*)
@@ -875,9 +875,10 @@ standard Lisp readtable when NIL."
   (simple-reader-error stream "unmatched close parenthesis"))
 
 ;;; Read from the stream up to the next delimiter. Leave the resulting
-;;; token in *READ-BUFFER*, and return two values:
-;;; -- a list of the escaped character positions, and
-;;; -- The position of the first package delimiter (or NIL).
+;;; token in *READ-BUFFER*, and return three values:
+;;; -- a TOKEN-BUF
+;;; -- whether any escape character was seen (even if no character is escaped)
+;;; -- whether a package delimiter character was seen
 (defun internal-read-extended-token (stream firstchar escape-firstchar
                                      &aux (read-buffer *read-buffer*))
   (reset-read-buffer read-buffer)
@@ -926,7 +927,7 @@ standard Lisp readtable when NIL."
                       (constituentp char rt)
                       (eql (get-constituent-trait char)
                            +char-attr-package-delimiter+))
-             (setq colon (token-buf-fill-ptr read-buffer)))
+             (setq colon t))
            (ouch-read-buffer char read-buffer)))))
 
 ;;;; character classes
