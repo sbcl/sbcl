@@ -1285,7 +1285,7 @@
 
 ;;; Compute stuff that can only be computed after we are done parsing
 ;;; everying. We set the VOP-PARSE-OPERANDS, and do various error checks.
-(defun !grovel-vop-operands (parse)
+(defun grovel-vop-operands (parse)
   (declare (type vop-parse parse))
 
   (setf (vop-parse-operands parse)
@@ -1624,7 +1624,7 @@
     (setf (vop-parse-inherits parse) inherits)
 
     (parse-define-vop parse specs)
-    (!grovel-vop-operands parse)
+    (grovel-vop-operands parse)
 
     `(progn
        (eval-when (:compile-toplevel :load-toplevel :execute)
