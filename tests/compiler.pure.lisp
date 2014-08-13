@@ -5308,3 +5308,9 @@
     (assert (= (foo 5 #'bar) 5)) ; basic correctness
     (assert (eq (foo 12 #'bar) nil))
     (ctu:assert-no-consing (eql (foo 953 #'bar) 953))))
+
+(with-test (:name :position-derive-type-optimizer)
+  (assert-code-deletion-note
+   '(lambda (x) ; the call to POSITION can't return 4
+     (let ((i (position x #(a b c d) :test 'eq)))
+       (case i (4 'nope) (t 'okeydokey))))))

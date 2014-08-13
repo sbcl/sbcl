@@ -439,4 +439,14 @@
           (type-union unexceptional-type null-type)
           unexceptional-type))))
 
+(defun position-derive-type (call)
+  (declare (type combination call))
+  (let ((seq (second (combination-args call))))
+    ;; Could possibly constrain the result more highly if
+    ;; the :start/:end were provided and of known types.
+    (when (constant-lvar-p seq)
+      (let ((seq (lvar-value seq)))
+        (when (typep seq '(simple-array * (*)))
+          (specifier-type `(or (integer 0 (,(length seq))) null)))))))
+
 (/show0 "knownfun.lisp end of file")

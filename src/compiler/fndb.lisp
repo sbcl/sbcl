@@ -635,13 +635,15 @@
                     (:test-not callable) (:start index) (:from-end t)
                     (:end sequence-end) (:key callable))
   (or index null)
-  (foldable flushable call))
+  (foldable flushable call)
+  :derive-type #'position-derive-type)
 
 (defknown (position-if position-if-not)
   (callable sequence &rest t &key (:from-end t) (:start index)
    (:end sequence-end) (:key callable))
   (or index null)
-  (foldable flushable call))
+  (foldable flushable call)
+  :derive-type #'position-derive-type)
 
 (defknown count (t sequence &rest t &key
                    (:test callable) (:test-not callable) (:start index)
