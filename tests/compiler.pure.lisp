@@ -1559,12 +1559,14 @@
                    (compile nil '(lambda ,arglist ,@body))
                  (sb-ext:compiler-note (e)
                    (error "bad compiler note for ~S:~%  ~A" ',body e)))
-               (catch :got-note
-                 (handler-case
+               (let ((gotit nil))
+                 (handler-bind ((compiler-note
+                                 (lambda (c)
+                                   (setq gotit t) (muffle-warning c))))
                      (compile nil '(lambda ,arglist (declare (optimize speed))
-                                    ,@body))
-                   (sb-ext:compiler-note (e) (throw :got-note nil)))
-                 (error "missing compiler note for ~S" ',body)))))
+                                    ,@body)))
+                 (unless gotit
+                   (error "missing compiler note for ~S" ',body))))))
   (frob (x) (funcall x))
   (frob (x y) (find x y))
   (frob (x y) (find-if x y))
@@ -1576,11 +1578,13 @@
 
 (macrolet ((frob (style-warn-p form)
              (if style-warn-p
-                 `(catch :got-style-warning
-                   (handler-case
-                       (eval ',form)
-                     (style-warning (e) (throw :got-style-warning nil)))
-                   (error "missing style-warning for ~S" ',form))
+                 `(let ((gotit nil))
+                   (handler-bind ((style-warning
+                                   (lambda (c)
+                                     (setq gotit t) (muffle-warning c))))
+                       (eval ',form))
+                    (unless gotit
+                      (error "missing style-warning for ~S" ',form)))
                  `(handler-case
                    (eval ',form)
                    (style-warning (e)
@@ -2134,65 +2138,61 @@
                           x))))
     (compiler-note () (error "Deleted reachable code."))))
 
+(defun assert-code-deletion-note (lambda &optional (howmany 1))
+  (let ((n 0))
+    (handler-bind ((code-deletion-note
+                    (lambda (c)
+                      (incf n)
+                      ;; even though notes are not warnings,
+                      ;; compiler-notify provides the MUFFLE-WARNING restart.
+                      (muffle-warning c))))
+      (compile nil lambda)
+      (assert (eql n howmany)))))
+
 (with-test (:name (:compiler :constraint-propagation :float-bounds-2))
-  (catch :note
-    (handler-case
-        (compile nil '(lambda (x)
+  (assert-code-deletion-note
+                     '(lambda (x)
                         (declare (type single-float x))
                         (when (< 1.0 x)
                           (when (<= x 1.0)
-                            (error "This is unreachable.")))))
-      (compiler-note () (throw :note nil)))
-    (error "Unreachable code undetected.")))
+                            (error "This is unreachable."))))))
 
 (with-test (:name (:compiler :constraint-propagation :float-bounds-3
                    :LP-894498))
-  (catch :note
-    (handler-case
-        (compile nil '(lambda (x)
+  (assert-code-deletion-note
+                     '(lambda (x)
                         (declare (type (single-float 0.0) x))
                         (when (> x 0.0)
                           (when (zerop x)
-                            (error "This is unreachable.")))))
-      (compiler-note () (throw :note nil)))
-    (error "Unreachable code undetected.")))
+                            (error "This is unreachable."))))))
 
 (with-test (:name (:compiler :constraint-propagation :float-bounds-4
                    :LP-894498))
-  (catch :note
-    (handler-case
-        (compile nil '(lambda (x y)
+  (assert-code-deletion-note
+                     '(lambda (x y)
                         (declare (type (single-float 0.0) x)
                                  (type (single-float (0.0)) y))
                         (when (> x y)
                           (when (zerop x)
-                            (error "This is unreachable.")))))
-      (compiler-note () (throw :note nil)))
-    (error "Unreachable code undetected.")))
+                            (error "This is unreachable."))))))
 
 (with-test (:name (:compiler :constraint-propagation :var-eql-to-var-1))
-  (catch :note
-    (handler-case
-        (compile nil '(lambda (x y)
+  (assert-code-deletion-note
+                     '(lambda (x y)
                         (when (typep y 'fixnum)
                           (when (eql x y)
                             (unless (typep x 'fixnum)
                               (error "This is unreachable"))
-                            (setq y nil)))))
-      (compiler-note () (throw :note nil)))
-    (error "Unreachable code undetected.")))
+                            (setq y nil))))))
 
 (with-test (:name (:compiler :constraint-propagation :var-eql-to-var-2))
-  (catch :note
-    (handler-case
-        (compile nil '(lambda (x y)
+  (assert-code-deletion-note
+                     '(lambda (x y)
                         (when (typep y 'fixnum)
                           (when (eql y x)
                             (unless (typep x 'fixnum)
                               (error "This is unreachable"))
-                            (setq y nil)))))
-      (compiler-note () (throw :note nil)))
-    (error "Unreachable code undetected.")))
+                            (setq y nil))))))
 
 ;; Reported by John Wiseman, sbcl-devel
 ;; Subject: [Sbcl-devel] float type derivation bug?
