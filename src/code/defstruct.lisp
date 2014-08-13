@@ -423,7 +423,7 @@
 (defun typed-predicate-definitions (defstruct)
   (let ((name (dd-name defstruct))
         (predicate-name (dd-predicate-name defstruct))
-        (argname (gensym)))
+        (argname 'x)) ; KISS: no user code appears in the DEFUN
     (when (and predicate-name (dd-named defstruct))
       (let ((ltype (dd-lisp-type defstruct))
             (name-index (cdr (car (last (find-name-indices defstruct))))))
@@ -436,7 +436,7 @@
                           ((or (not (consp head)) (= i ,name-index))
                            (and (consp head) (eq ',name (car head))))))
                    ((subtypep ltype 'vector)
-                    `(and (= (length (the ,ltype ,argname))
+                    `(and (>= (length (the ,ltype ,argname))
                            ,(dd-length defstruct))
                           (eq ',name (aref (the ,ltype ,argname) ,name-index))))
                    (t (bug "Uncatered-for lisp type in typed DEFSTRUCT: ~S."

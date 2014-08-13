@@ -1191,3 +1191,13 @@ redefinition."
   (assert (null (sb-kernel:find-defstruct-description 'not-foo nil)))
 
   (assert-error (sb-kernel:find-defstruct-description 'not-foo t)))
+
+(defstruct (a-named-struct :named (:type vector)) a b c)
+(defstruct (a-kid-struct :named (:type vector) (:include a-named-struct)) n)
+(with-test (:name (:defstruct :named-typed-struct-subtype-pred))
+  (let ((par (make-a-named-struct :b 6))
+        (kid (make-a-kid-struct :n 5)))
+    (assert (a-named-struct-p par))
+    (assert (a-named-struct-p kid))
+    (assert (not (a-kid-struct-p par)))
+    (assert (a-kid-struct-p kid))))
