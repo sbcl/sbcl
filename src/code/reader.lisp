@@ -70,7 +70,7 @@
                        +char-attr-constituent+))))
 
 (defun set-cat-entry (char newvalue &optional (rt *readtable*))
-  (declare (type (unsigned-byte 8) newvalue) (readtable rt))
+  (declare (character char) (type (unsigned-byte 8) newvalue) (readtable rt))
   (if (typep char 'base-char)
       (setf (elt (character-attribute-array rt) (char-code char)) newvalue)
       (if (= newvalue +char-attr-constituent+)
@@ -82,7 +82,8 @@
 ;; Set the character-macro-table entry without coercing NEW-VALUE.
 ;; As used by set-syntax-from-char it must always process "raw" values.
 (defun set-cmt-entry (char new-value &optional (rt *readtable*))
-  (declare (type (or null function fdefn) new-value)
+  (declare (character char)
+           (type (or null function fdefn) new-value)
            (type readtable rt))
   (if (typep char 'base-char)
       (setf (svref (character-macro-array rt) (char-code char)) new-value)
@@ -95,7 +96,7 @@
 ;;; be either a function-designator or NIL, except that we store
 ;;; symbols not as themselves but as their #<fdefn>.
 (defun get-raw-cmt-entry (char readtable)
-  (declare (readtable readtable))
+  (declare (character char) (readtable readtable))
   (if (typep char 'base-char)
       (svref (character-macro-array readtable) (char-code char))
       ;; Note: DEFAULT here is NIL, not #'UNDEFINED-MACRO-CHAR, so
@@ -105,6 +106,7 @@
 
 ;; As above but get the entry for SUB-CHAR in a dispatching macro table.
 (defun get-raw-cmt-dispatch-entry (sub-char sub-table)
+  (declare (character sub-char))
   (if (typep sub-char 'base-char)
       (svref (truly-the (simple-vector #.base-char-code-limit)
                         (cdr (truly-the cons sub-table)))
@@ -938,7 +940,7 @@ standard Lisp readtable when NIL."
 ;;; FIXME: why aren't these ATT-getting forms using GET-CAT-ENTRY?
 ;;; Because we've cached the readtable tables?
 (defmacro char-class (char attarray atthash)
-  `(let ((att (if (typep ,char 'base-char)
+  `(let ((att (if (typep (truly-the character ,char) 'base-char)
                   (aref ,attarray (char-code ,char))
                   (gethash ,char ,atthash +char-attr-constituent+))))
      (declare (fixnum att))
@@ -953,7 +955,7 @@ standard Lisp readtable when NIL."
 ;;; Return the character class for CHAR, which might be part of a
 ;;; rational number.
 (defmacro char-class2 (char attarray atthash)
-  `(let ((att (if (typep ,char 'base-char)
+  `(let ((att (if (typep (truly-the character ,char) 'base-char)
                   (aref ,attarray (char-code ,char))
                   (gethash ,char ,atthash +char-attr-constituent+))))
      (declare (fixnum att))
@@ -972,7 +974,7 @@ standard Lisp readtable when NIL."
 ;;; rational or floating number. (Assume that it is a digit if it
 ;;; could be.)
 (defmacro char-class3 (char attarray atthash)
-  `(let ((att (if (typep ,char 'base-char)
+  `(let ((att (if (typep (truly-the character ,char) 'base-char)
                   (aref ,attarray (char-code ,char))
                   (gethash ,char ,atthash +char-attr-constituent+))))
      (declare (fixnum att))
