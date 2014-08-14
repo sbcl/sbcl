@@ -167,14 +167,16 @@
   ;; any INITIAL-OFFSET option on this direct type
   (offset nil :type (or index null))
 
-  ;; the argument to the PRINT-FUNCTION option, or NIL if a
-  ;; PRINT-FUNCTION option was given with no argument, or 0 if no
-  ;; PRINT-FUNCTION option was given
-  (print-function 0 :type (or cons symbol (member 0)))
-  ;; the argument to the PRINT-OBJECT option, or NIL if a PRINT-OBJECT
-  ;; option was given with no argument, or 0 if no PRINT-OBJECT option
-  ;; was given
-  (print-object 0 :type (or cons symbol (member 0)))
+  ;; which :PRINT-mumble option was given, if either was.
+  (print-option nil :type (member nil :print-function :print-object))
+  ;; the argument to the PRINT-FUNCTION or PRINT-OBJECT option.
+  ;; NIL if the option was given with no argument.
+  ;; FIXME: a random sexpr such as (LAMBDA (...) (INSANE-HAIR ...))
+  ;; is preserved in a fasl file, which is weird, because like most
+  ;; other "source code" it should disappear. Perhaps this struct
+  ;; merits separation into its parse-time and run-time aspects.
+  (printer-fname nil :type (or cons symbol))
+
   ;; The number of untagged slots at the end.
   (raw-length 0 :type index)
   ;; the value of the :PURE option, or :UNSPECIFIED. This is only
@@ -264,39 +266,32 @@
 ;;; Return a list of forms to install PRINT and MAKE-LOAD-FORM funs,
 ;;; mentioning them in the expansion so that they can be compiled.
 (defun class-method-definitions (defstruct)
-  (let ((name (dd-name defstruct)))
-    `((locally
+  (let ((name (dd-name defstruct))
+        (print-option (dd-print-option defstruct)))
+    `(,@(when print-option
+          (let* ((x (sb!xc:gensym "OBJECT"))
+                 (s (sb!xc:gensym "STREAM"))
+                 (fname (dd-printer-fname defstruct))
+                 (depthp (eq print-option :print-function)))
+            ;; Giving empty :PRINT-OBJECT or :PRINT-FUNCTION options
+            ;; leaves FNAME eq to NIL. The user-level effect is
+            ;; to generate a PRINT-OBJECT method specialized for the type,
+            ;; implementing the default #S structure-printing behavior.
+            (unless fname
+              (setf fname 'default-structure-print depthp t))
+            ;; It would be nice to expand into DEFMETHOD, not DEF!METHOD
+            ;; if only because it pprints correctly [or we can go adding
+            ;; pprint dispatch entries for DEF!everything]
+            ;; But alas, building PCL needs it to be DEF!METHOD still.
+            `((def!method print-object ((,x ,name) ,s)
+                (funcall #',fname ,x ,s
+                         ,@(if depthp `(*current-level-in-print*)))))))
+        (locally
         ;; KLUDGE: There's a FIND-CLASS DEFTRANSFORM for constant
         ;; class names which creates fast but non-cold-loadable,
         ;; non-compact code. In this context, we'd rather have
         ;; compact, cold-loadable code. -- WHN 19990928
         (declare (notinline find-classoid))
-        ,@(let ((pf (dd-print-function defstruct))
-                (po (dd-print-object defstruct))
-                (x (sb!xc:gensym "OBJECT"))
-                (s (sb!xc:gensym "STREAM")))
-            ;; Giving empty :PRINT-OBJECT or :PRINT-FUNCTION options
-            ;; leaves PO or PF equal to NIL. The user-level effect is
-            ;; to generate a PRINT-OBJECT method specialized for the type,
-            ;; implementing the default #S structure-printing behavior.
-            (when (or (eq pf nil) (eq po nil))
-              (setf pf '(default-structure-print)
-                    po 0))
-            (flet (;; Given an arg from a :PRINT-OBJECT or :PRINT-FUNCTION
-                   ;; option, return the value to pass as an arg to FUNCTION.
-                   (farg (oarg)
-                     (destructuring-bind (fun-name) oarg
-                       fun-name)))
-              (cond ((not (eql pf 0))
-                     `((def!method print-object ((,x ,name) ,s)
-                         (funcall #',(farg pf)
-                                  ,x
-                                  ,s
-                                  *current-level-in-print*))))
-                    ((not (eql po 0))
-                     `((def!method print-object ((,x ,name) ,s)
-                         (funcall #',(farg po) ,x ,s))))
-                    (t nil))))
         ,@(let ((pure (dd-pure defstruct)))
             (cond ((eq pure t)
                    `((setf (layout-pure (classoid-layout
@@ -481,17 +476,12 @@
 
 ;;;; parsing
 
-(defun require-no-print-options-so-far (defstruct)
-  (unless (and (eql (dd-print-function defstruct) 0)
-               (eql (dd-print-object defstruct) 0))
-    (error "No more than one of the following options may be specified:
-  :PRINT-FUNCTION, :PRINT-OBJECT, :TYPE")))
-
 ;;; Parse a single DEFSTRUCT option and store the results in DD.
 (defun parse-1-dd-option (option dd)
-  (let ((args (rest option))
+  (let ((keyword (first option))
+        (args (rest option))
         (name (dd-name dd)))
-    (case (first option)
+    (case keyword
       (:conc-name
        (destructuring-bind (&optional conc-name) args
          (setf (dd-conc-name dd)
@@ -515,14 +505,14 @@
        (when (dd-include dd)
          (error "more than one :INCLUDE option"))
        (setf (dd-include dd) args))
-      (:print-function
-       (require-no-print-options-so-far dd)
-       (setf (dd-print-function dd)
-             (the (or symbol cons) args)))
-      (:print-object
-       (require-no-print-options-so-far dd)
-       (setf (dd-print-object dd)
-             (the (or symbol cons) args)))
+      ((:print-function :print-object)
+       (cond ((eq (dd-print-option dd) keyword)
+              (error "More than one ~S option is not allowed" keyword))
+             ((dd-print-option dd)
+              (error "~S and ~S may not both be specified"
+                     (dd-print-option dd) keyword)))
+       (destructuring-bind (&optional name) args
+         (setf (dd-print-option dd) keyword (dd-printer-fname dd) name)))
       (:type
        (destructuring-bind (type) args
          (cond ((member type '(list vector))
@@ -578,7 +568,8 @@
          ;; In case we are here, :TYPE is specified.
          (when (and predicate-named-p (not (dd-named dd)))
            (error ":PREDICATE cannot be used with :TYPE unless :NAMED is also specified."))
-         (require-no-print-options-so-far dd)
+         (awhen (dd-print-option dd)
+           (error ":TYPE option precludes specification of ~S option" it))
          (when (dd-named dd)
            (incf (dd-length dd)))
          (let ((offset (dd-offset dd)))
