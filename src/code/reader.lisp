@@ -82,7 +82,8 @@
 ;; Set the character-macro-table entry without coercing NEW-VALUE.
 ;; As used by set-syntax-from-char it must always process "raw" values.
 (defun set-cmt-entry (char new-value &optional (rt *readtable*))
-  (declare (type (or fdefn callable) new-value))
+  (declare (type (or null function fdefn) new-value)
+           (type readtable rt))
   (if (typep char 'base-char)
       (setf (svref (character-macro-array rt) (char-code char)) new-value)
       (if new-value ; never store NILs
