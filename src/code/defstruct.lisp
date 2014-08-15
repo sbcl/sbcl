@@ -113,30 +113,21 @@
              (:conc-name dd-)
              (:make-load-form-fun just-dump-it-normally)
              #-sb-xc-host (:pure t)
-             ;; When this gets called directly by !cold-init as opposed to a
-             ;; random toplevel form, the package isn't as expected yet.
-             ;; SYMBOLICATE would create junk symbols for the predicate
-             ;; and copier. NIL is the right value for them.
-             (:constructor !make-defstruct-description-no-functions (name))
-             (:constructor make-defstruct-description
-                           (name &aux
-                                 (conc-name (symbolicate name "-"))
-                                 (copier-name (symbolicate "COPY-" name))
-                                 (predicate-name (symbolicate name "-P")))))
+             (:constructor make-defstruct-description (name)))
   ;; name of the structure
   (name (missing-arg) :type symbol :read-only t)
   ;; documentation on the structure
   (doc nil :type (or string null))
   ;; prefix for slot names. If NIL, none.
-  (conc-name nil :type symbol)
+  (conc-name nil :type (or string null))
   ;; the name of the primary standard keyword constructor, or NIL if none
   (default-constructor nil :type symbol)
   ;; all the explicit :CONSTRUCTOR specs, with name defaulted
   (constructors () :type list)
   ;; name of copying function
-  (copier-name nil :type (or symbol null))
+  (copier-name nil :type symbol)
   ;; name of type predicate
-  (predicate-name nil :type (or symbol null))
+  (predicate-name nil :type symbol)
   ;; the arguments to the :INCLUDE option, or NIL if no included
   ;; structure
   (include nil :type list)
@@ -184,7 +175,7 @@
   (pure :unspecified :type (member t nil :unspecified)))
 #!-sb-fluid (declaim (freeze-type defstruct-description))
 (def!method print-object ((x defstruct-description) stream)
-  (print-unreadable-object (x stream :type t)
+  (print-unreadable-object (x stream :type t :identity t)
     (prin1 (dd-name x) stream)))
 
 ;;; Does DD describe a structure with a class?
@@ -419,7 +410,8 @@
   (let ((name (dd-name defstruct))
         (predicate-name (dd-predicate-name defstruct))
         (argname 'x)) ; KISS: no user code appears in the DEFUN
-    (when (and predicate-name (dd-named defstruct))
+    (when predicate-name
+      (aver (dd-named defstruct))
       (let ((ltype (dd-lisp-type defstruct))
             (name-index (cdr (car (last (find-name-indices defstruct))))))
         `((defun ,predicate-name (,argname)
@@ -476,82 +468,116 @@
 
 ;;;; parsing
 
+;;; CLHS says that
+;;;   A defstruct option can be either a keyword or a list of a keyword
+;;;   and arguments for that keyword; specifying the keyword by itself is
+;;;   equivalent to specifying a list consisting of the keyword
+;;;   and no arguments.
+;;; It is unclear whether that is meant to imply that any of the keywords
+;;; may be present in their atom form, or only if the grammar at the top
+;;; shows the atom form does <atom> have the meaning of (<atom>).
+;;; At least one other implementation accepts :NAMED as a singleton list.
+;;  We take a more rigid view that the depicted grammar is exhaustive.
+;;;
+(defconstant-eqx +dd-option-names+
+    ;; Each keyword, except :CONSTRUCTOR which may appear more than once,
+    ;; and :NAMED which is trivial, and unambiguous if present more than
+    ;; once, though possibly worth a style-warning.
+    #(:include        ; at least 1 argument
+      :initial-offset ; exactly 1 argument
+      :pure           ; exactly 1 argument [nonstandard]
+      :type           ; exactly 1 argument
+      :conc-name      ; 0 or 1 arg
+      :copier         ; "
+      :predicate      ; "
+      :print-function ; "
+      :print-object)  ; "
+  #'equalp)
+
 ;;; Parse a single DEFSTRUCT option and store the results in DD.
-(defun parse-1-dd-option (option dd)
-  (let ((keyword (first option))
-        (args (rest option))
-        (name (dd-name dd)))
+(defun parse-1-dd-option (option dd seen-options)
+  (let* ((keyword (first option))
+         (bit (position keyword +dd-option-names+))
+         (args (rest option))
+         (arg-p (consp args))
+         (arg (if arg-p (car args)))
+         (name (dd-name dd)))
+    (declare (type (unsigned-byte 9) seen-options)) ; mask over DD-OPTION-NAMES
+    (when bit
+      (if (logbitp bit seen-options)
+          (error "More than one ~S option is not allowed" keyword)
+          (setf seen-options (logior seen-options (ash 1 bit))))
+      (multiple-value-bind (syntax-group winp)
+          (cond ; Perform checking per comment at +DD-OPTION-NAMES+.
+            ((= bit 0) (values 0 (and arg-p (proper-list-p args)))) ; >1 arg
+            ((< bit 4) (values 1 (and arg-p (not (cdr args))))) ; exactly 1
+            (t         (values 2 (or (not args) (singleton-p args))))) ; 0 or 1
+        (unless winp
+          (if (proper-list-p option)
+              (error "DEFSTRUCT option ~S ~[requires at least~;~
+requires exactly~;accepts at most~] one argument" keyword syntax-group)
+              (error "Invalid syntax in DEFSTRUCT option ~S" option)))))
     (case keyword
       (:conc-name
-       (destructuring-bind (&optional conc-name) args
-         (setf (dd-conc-name dd)
-               (if (symbolp conc-name)
-                   conc-name
-                   (make-symbol (string conc-name))))))
-      (:constructor
+       ;; unlike (:predicate) and (:copier) which mean "yes" if supplied
+       ;; without their argument, (:conc-name) and :conc-name mean no conc-name.
+       ;; Also note a subtle difference in :conc-name "" vs :conc-name NIL.
+       ;; The former re-interns each slot name into *PACKAGE* which might
+       ;; not be the same as using the given name directly as an accessor.
+       (setf (dd-conc-name dd) (if arg (string arg))))
+      (:constructor ; takes 0 to 2 arguments.
        (destructuring-bind (&optional (cname (symbolicate "MAKE-" name))
-                                      &rest stuff)
-           args
-         (push (cons cname stuff) (dd-constructors dd))))
+                            lambda-list) args
+         (declare (ignore lambda-list))
+         (push (cons cname (cdr args)) (dd-constructors dd))))
       (:copier
-       (destructuring-bind (&optional (copier (symbolicate "COPY-" name)))
-           args
-         (setf (dd-copier-name dd) copier)))
+       (setf (dd-copier-name dd) (if arg-p arg (symbolicate "COPY-" name))))
       (:predicate
-       (destructuring-bind (&optional (predicate-name (symbolicate name "-P")))
-           args
-         (setf (dd-predicate-name dd) predicate-name)))
+       (setf (dd-predicate-name dd) (if arg-p arg (symbolicate name "-P"))))
       (:include
-       (when (dd-include dd)
-         (error "more than one :INCLUDE option"))
        (setf (dd-include dd) args))
       ((:print-function :print-object)
-       (cond ((eq (dd-print-option dd) keyword)
-              (error "More than one ~S option is not allowed" keyword))
-             ((dd-print-option dd)
-              (error "~S and ~S may not both be specified"
-                     (dd-print-option dd) keyword)))
-       (destructuring-bind (&optional name) args
-         (setf (dd-print-option dd) keyword (dd-printer-fname dd) name)))
+       (when (dd-print-option dd)
+         (error "~S and ~S may not both be specified"
+                (dd-print-option dd) keyword))
+       (setf (dd-print-option dd) keyword (dd-printer-fname dd) arg))
       (:type
-       (destructuring-bind (type) args
-         (cond ((member type '(list vector))
-                (setf (dd-element-type dd) t)
-                (setf (dd-type dd) type))
-               ((and (consp type) (eq (first type) 'vector))
-                (destructuring-bind (vector vtype) type
-                  (declare (ignore vector))
-                  (setf (dd-element-type dd) vtype)
-                  (setf (dd-type dd) 'vector)))
-               (t
-                (error "~S is a bad :TYPE for DEFSTRUCT." type)))))
+       (cond ((member arg '(list vector))
+              (setf (dd-type dd) arg (dd-element-type dd) t))
+             ((and (listp arg) (eq (first arg) 'vector))
+              (destructuring-bind (elt-type) (cdr arg)
+                (setf (dd-type dd) 'vector (dd-element-type dd) elt-type)))
+             (t
+              (error "~S is a bad :TYPE for DEFSTRUCT." arg))))
       (:named
        (error "The DEFSTRUCT option :NAMED takes no arguments."))
       (:initial-offset
-       (destructuring-bind (offset) args
-         (setf (dd-offset dd) offset)))
+       (setf (dd-offset dd) arg)) ; FIXME: disallow (:INITIAL-OFFSET NIL)
       (:pure
-       (destructuring-bind (fun) args
-         (setf (dd-pure dd) fun)))
-      (t (error "unknown DEFSTRUCT option:~%  ~S" option)))))
+       (setf (dd-pure dd) arg))
+      (t
+       (error "unknown DEFSTRUCT option:~%  ~S" option)))
+    seen-options))
 
 ;;; Given name and options, return a DD holding that info.
 (defun parse-defstruct-name-and-options (name-and-options)
   (destructuring-bind (name &rest options) name-and-options
     (let ((dd (make-defstruct-description name))
-          (predicate-named-p nil))
+          (seen-options 0))
       (dolist (option options)
-        (cond ((eq option :named)
-               (setf (dd-named dd) t))
-              ((consp option)
-               (when (and (eq (car option) :predicate) (second option))
-                 (setf predicate-named-p t))
-               (parse-1-dd-option option dd))
-              ((member option '(:conc-name :constructor :copier :predicate))
-               (parse-1-dd-option (list option) dd))
-              (t
-               (error "unrecognized DEFSTRUCT option: ~S" option))))
-
+        (if (eq option :named)
+            (setf (dd-named dd) t)
+            (setq seen-options
+                  (parse-1-dd-option
+                   (cond ((consp option) option)
+                         ((member option
+                                  '(:conc-name :constructor :copier :predicate))
+                          (list option))
+                         (t
+                          ;; FIXME: ugly message (defstruct (s :include) a)
+                          ;; saying "unrecognized" when it means "bad syntax"
+                          (error "unrecognized DEFSTRUCT option: ~S" option)))
+                   dd seen-options))))
       (case (dd-type dd)
         (structure
          (when (dd-offset dd)
@@ -566,8 +592,17 @@
            (incf (dd-length dd))))
         (t
          ;; In case we are here, :TYPE is specified.
-         (when (and predicate-named-p (not (dd-named dd)))
-           (error ":PREDICATE cannot be used with :TYPE unless :NAMED is also specified."))
+         (if (dd-named dd)
+             ;; CLHS - "The structure can be :named only if the type SYMBOL
+             ;; is a subtype of the supplied element-type."
+             (multiple-value-bind (winp certainp)
+                 (subtypep 'symbol (dd-element-type dd))
+               (when (and (not winp) certainp)
+                 (error ":NAMED option is incompatible with element type ~S"
+                        (dd-element-type dd))))
+             (when (dd-predicate-name dd)
+               (error ":PREDICATE cannot be used with :TYPE ~
+unless :NAMED is also specified.")))
          (awhen (dd-print-option dd)
            (error ":TYPE option precludes specification of ~S option" it))
          (when (dd-named dd)
@@ -575,6 +610,16 @@
          (let ((offset (dd-offset dd)))
            (when offset (incf (dd-length dd) offset)))))
 
+      (flet ((option-present-p (bit-name)
+               (logbitp (position bit-name +dd-option-names+) seen-options)))
+        (declare (inline option-present-p))
+        (when (and (not (option-present-p :predicate))
+                   (or (dd-class-p dd) (dd-named dd)))
+          (setf (dd-predicate-name dd) (symbolicate name "-P")))
+        (unless (option-present-p :conc-name)
+          (setf (dd-conc-name dd) (concatenate 'string (string name) "-")))
+        (unless (option-present-p :copier)
+          (setf (dd-copier-name dd) (symbolicate "COPY-" name))))
       (when (dd-include dd)
         (frob-dd-inclusion-stuff dd))
 
@@ -1673,6 +1718,11 @@
 ;;;; reduced-functionality macro seems pretty close to the
 ;;;; functionality of DEFINE-PRIMITIVE-OBJECT..)
 
+;;; The complete list of alternate-metaclass DEFSTRUCTs:
+;;;   CONDITION SB-EVAL:INTERPRETED-FUNCTION
+;;;   SB-PCL::STANDARD-INSTANCE SB-PCL::STANDARD-FUNCALLABLE-INSTANCE
+;;;   SB-PCL::CTOR SB-PCL::%METHOD-FUNCTION
+;;;
 (defun make-dd-with-alternate-metaclass (&key (class-name (missing-arg))
                                               (superclass-name (missing-arg))
                                               (metaclass-name (missing-arg))
@@ -1698,6 +1748,9 @@
                              reversed-result)
                        (incf index))
                      (nreverse reversed-result))))
+    ;; We do *not* fill in the COPIER-NAME and PREDICATE-NAME
+    ;; because none of the magical alternate-metaclass structures
+    ;; have copiers and predicates that "Just work"
     (case dd-type
       ;; We don't support inheritance of alternate metaclass stuff,
       ;; and it's not a general-purpose facility, so sanity check our
@@ -1868,7 +1921,7 @@
 ;;; special enough (and simple enough) that we just build it by hand
 ;;; instead of trying to generalize the ordinary DEFSTRUCT code.
 (defun !set-up-structure-object-class ()
-  (let ((dd (!make-defstruct-description-no-functions 'structure-object)))
+  (let ((dd (make-defstruct-description 'structure-object)))
     (setf
      ;; Note: This has an ALTERNATE-METACLASS only because of blind
      ;; clueless imitation of the CMU CL code -- dunno if or why it's
