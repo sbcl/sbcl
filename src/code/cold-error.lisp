@@ -11,7 +11,7 @@
 
 (in-package "SB!KERNEL")
 
-(defvar *break-on-signals* nil
+(!defvar *break-on-signals* nil
   #!+sb-doc
   "When (TYPEP condition *BREAK-ON-SIGNALS*) is true, then calls to SIGNAL will
    enter the debugger prior to signalling that condition.")

@@ -60,7 +60,7 @@
                   sb!vm::*fp-constant-l2e*
                   sb!vm::*fp-constant-lg2*
                   sb!vm::*fp-constant-ln2*
-                  sb!vm:*alloc-signal*
                   sb!pcl::..slot-unbound..
                   sb!pcl::*cache-miss-values-stack*
                   sb!pcl::*dfun-miss-gfs-on-stack*))
+(!defvar sb!vm:*alloc-signal* nil)

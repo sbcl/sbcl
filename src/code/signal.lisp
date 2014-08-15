@@ -48,10 +48,10 @@
 ;;;    (foo))
 ;;; provided that the first branch is true "often enough".
 
-(defvar *interrupts-enabled* t)
-(defvar *interrupt-pending* nil)
-#!+sb-thruption (defvar *thruption-pending* nil)
-(defvar *allow-with-interrupts* t)
+(!defvar *interrupts-enabled* t)
+(!defvar *interrupt-pending* nil)
+#!+sb-thruption (!defvar *thruption-pending* nil)
+(!defvar *allow-with-interrupts* t)
 ;;; This is to support signal handlers that want to return to the
 ;;; interrupted context without leaving anything extra on the stack. A
 ;;; simple
@@ -63,7 +63,7 @@
 ;;; would not cut it, as upon leaving WITHOUT-INTERRUPTS the pending
 ;;; handlers is run with stuff from the function in which this is
 ;;; still on the stack.
-(defvar *unblock-deferrables-on-enabling-interrupts-p* nil)
+(!defvar *unblock-deferrables-on-enabling-interrupts-p* nil)
 
 (sb!xc:defmacro without-interrupts (&body body)
   #!+sb-doc

@@ -1173,6 +1173,18 @@ core and return a descriptor to it."
             (bug "~A in bad package for target: ~A" symbol result))
           result))))
 
+;;; Assign target representation of VALUE to DESCRIPTOR.
+;;; The VALUE should not have shared substructure in a way that matters,
+;;; because sharing detection is not performed. It must not have cycles.
+(defun cold-set-symbol-global-value (descriptor value)
+  (labels ((target-representation (value)
+             (etypecase value
+               (symbol (cold-intern value))
+               (number (number-to-core value))
+               (cons (cold-cons (target-representation (car value))
+                                (target-representation (cdr value)))))))
+    (cold-set descriptor (target-representation value))))
+
 ;;; Return a handle on an interned symbol. If necessary allocate the
 ;;; symbol and record which package the symbol was referenced in. When
 ;;; we allocate the symbol, make sure we record a reference to the
@@ -1208,8 +1220,10 @@ core and return a descriptor to it."
                #!+sb-thread
                (assign-tls-index symbol handle)
                (setf (gethash (descriptor-bits handle) *cold-symbols*) symbol)
-               (when (eq package *keyword-package*)
-                 (cold-set handle handle))
+               (acond ((eq package *keyword-package*)
+                       (cold-set handle handle))
+                      ((assoc symbol sb-cold:*symbol-values-for-genesis*)
+                       (cold-set-symbol-global-value handle (cdr it))))
                (setq cold-intern-info
                      (setf (get symbol 'cold-intern-info) (cons handle nil)))))
             (t

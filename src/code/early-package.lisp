@@ -12,16 +12,11 @@
 
 (in-package "SB!IMPL")
 
-(!begin-collecting-cold-init-forms)
-
 ;;; Unbound outside package lock context, inside either list of
 ;;; packages for which locks are ignored, T when locks for
 ;;; all packages are ignored, and :invalid outside package-lock
 ;;; context. FIXME: This needs to be rebound for each thread.
-(defvar *ignored-package-locks*
-  (error "*IGNORED-PACKAGE-LOCKS* should be set up in cold-init."))
-(!cold-init-forms
-  (setf *ignored-package-locks* :invalid))
+(!defvar *ignored-package-locks* :invalid)
 
 ;; This proclamation avoids a ton of style warnings due to so many calls
 ;; that get cross-compiled prior to compiling "target-package.lisp"
@@ -83,5 +78,3 @@
 body. Body can begin with declarations."
   `(let (#!+sb-package-locks (*ignored-package-locks* t))
     ,@body))
-
-(!defun-from-collected-cold-init-forms !early-package-cold-init)

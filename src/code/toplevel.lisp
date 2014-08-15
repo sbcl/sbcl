@@ -30,14 +30,13 @@
                   *allow-with-interrupts*
                   *interrupts-enabled*
                   *interrupt-pending*
-                  #!+sb-thruption *thruption-pending*
-                  *type-system-initialized*))
+                  #!+sb-thruption *thruption-pending*))
 
-(defglobal *cold-init-complete-p* nil)
+(!defglobal *cold-init-complete-p* nil)
 
 ;;; counts of nested errors (with internal errors double-counted)
-(defvar *maximum-error-depth*)
-(defvar *current-error-depth*)
+(!defvar *maximum-error-depth* 10)
+(!defvar *current-error-depth* 0)
 
 ;;;; default initfiles
 

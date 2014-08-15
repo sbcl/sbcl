@@ -11,7 +11,7 @@
 
 ;;; Has the type system been properly initialized? (I.e. is it OK to
 ;;; use it?)
-(defvar *type-system-initialized* #+sb-xc-host nil) ; (set in cold load)
+(!defglobal *type-system-initialized* nil)
 
 ;; These are set by cold-init-forms in 'late-type' (look for "macrolet frob").
 (defglobal *wild-type* -1)

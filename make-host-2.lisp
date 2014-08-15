@@ -133,6 +133,8 @@ Sample output
 ;;; miscellaneous tidying up and saving results
 (let ((filename "output/object-filenames-for-genesis.lisp-expr"))
   (ensure-directories-exist filename :verbose t)
+  ;; save the initial-symbol-values before writing the object filenames.
+  (save-initial-symbol-values)
   (with-open-file (s filename :direction :output :if-exists :supersede)
     (write *target-object-file-names* :stream s :readably t)))
 

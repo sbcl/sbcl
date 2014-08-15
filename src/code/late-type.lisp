@@ -186,12 +186,10 @@
 ;;; a flag that we can bind to cause complex function types to be
 ;;; unparsed as FUNCTION. This is useful when we want a type that we
 ;;; can pass to TYPEP.
-(defvar *unparse-fun-type-simplify*)
+(!defvar *unparse-fun-type-simplify* nil)
 ;;; A flag to prevent TYPE-OF calls by user applications from returning
 ;;; (NOT x). TYPE-SPECIFIER usually allows it to preserve information.
-(defvar *unparse-allow-negation*)
-(!cold-init-forms (setq *unparse-fun-type-simplify* nil
-                        *unparse-allow-negation* t))
+(!defvar *unparse-allow-negation* t)
 
 (!define-type-method (function :negate) (type)
   (make-negation-type :type type))

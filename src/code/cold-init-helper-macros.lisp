@@ -52,6 +52,33 @@
                (makunbound '*cold-init-forms*)))
   #-sb-xc (declare (ignore name)))
 
+;;; !DEFGLOBAL, !DEFPARAMETER and !DEFVAR are named by analogy
+;;; with !COLD-INIT-FORMS and (not DEF!FOO) because they are
+;;; basically additional cold-init-helpers to avoid the tedious sequence:
+;;;    (!begin-collecting-cold-init-forms)
+;;;    (defvar *foo*)
+;;;    (!cold-init-forms (setq *foo* nil))
+;;;    (!defun-from-cold-init-forms !some-cold-init-fun)
+;;; or the less respectable (defvar *foo*) and a random SETQ in !COLD-INIT.
+;;; Each is like its namesake, but also arranges so that genesis knows
+;;; the initial toplevel value, which must be a constant of a restricted type.
+(macrolet ((def (wrapper real-name)
+             `(defmacro ,wrapper (sym value &optional (doc nil doc-p))
+                `(progn (eval-when (:compile-toplevel)
+                          (!delayed-cold-set-symbol-value ',sym ',value))
+                        (,',real-name ,sym ,value ,@(if doc-p (list doc)))))))
+  (def !defglobal defglobal)
+  (def !defparameter defparameter)
+  (def !defvar defvar))
+
+(defun !delayed-cold-set-symbol-value (symbol value)
+  (assert (or (typep value '(or (member t nil) keyword integer
+                                (cons (eql quote) (cons t null))))))
+  ;; Obfuscate the reference into SB-COLD to avoid "bad package for target"
+  (let ((list (find-symbol "*SYMBOL-VALUES-FOR-GENESIS*" "SB-COLD")))
+    (set list (acons symbol (if (consp value) (second value) value)
+                     (delete symbol (symbol-value list) :key #'car)))))
+
 ;;; FIXME: Consider renaming this file asap.lisp,
 ;;; and the renaming the various things
 ;;;   *ASAP-FORMS* or *REVERSED-ASAP-FORMS*

@@ -133,7 +133,7 @@ and submit it as a patch."
 
 ;;;; GC hooks
 
-(defvar *after-gc-hooks* nil
+(!defvar *after-gc-hooks* nil
   #!+sb-doc
   "Called after each garbage collection, except for garbage collections
 triggered during thread exits. In a multithreaded environment these hooks may
@@ -215,7 +215,7 @@ statistics are appended to it."
 ;;; comparisons. Unlikely, but the cost of using a cons instead is too
 ;;; small to measure. -- JES, 2007-09-30
 (declaim (type cons *gc-epoch*))
-(defvar *gc-epoch* (cons nil nil))
+(!defvar *gc-epoch* '(nil . nil))
 
 (defun sub-gc (&key (gen 0))
   (cond (*gc-inhibit*

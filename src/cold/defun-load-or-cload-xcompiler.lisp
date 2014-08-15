@@ -9,6 +9,14 @@
 
 (in-package "SB-COLD")
 
+(export '*symbol-values-for-genesis*)
+(let ((pathname "output/init-symbol-values.lisp-expr"))
+  (defvar *symbol-values-for-genesis*
+    (and (probe-file pathname) (read-from-file pathname)))
+  (defun save-initial-symbol-values ()
+    (with-open-file (f pathname :direction :output :if-exists :supersede)
+      (write *symbol-values-for-genesis* :stream f :readably t))))
+
 ;;; Either load or compile-then-load the cross-compiler into the
 ;;; cross-compilation host Common Lisp.
 (defun load-or-cload-xcompiler (load-or-cload-stem)

@@ -11,14 +11,7 @@
 
 (in-package "SB!IMPL")
 
-(defparameter *eval-calls* 0)
-
-(defun !eval-cold-init ()
-  (setf *eval-calls* 0
-        *evaluator-mode* :compile)
-  #!+sb-eval
-  (setf sb!eval::*eval-level* -1
-        sb!eval::*eval-verbose* nil))
+(!defparameter *eval-calls* 0)
 
 (defvar *eval-source-context* nil)
 

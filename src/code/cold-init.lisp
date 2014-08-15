@@ -81,32 +81,6 @@
 
   (/show0 "entering !COLD-INIT")
 
-  ;; FIXME: It'd probably be cleaner to have most of the stuff here
-  ;; handled by calls like !GC-COLD-INIT, !ERROR-COLD-INIT, and
-  ;; !UNIX-COLD-INIT. And *TYPE-SYSTEM-INITIALIZED* could be changed to
-  ;; *TYPE-SYSTEM-INITIALIZED-WHEN-BOUND* so that it doesn't need to
-  ;; be explicitly set in order to be meaningful.
-  (setf *after-gc-hooks* nil
-        *in-without-gcing* nil
-        *gc-inhibit* t
-        *gc-pending* nil
-        #!+sb-thread *stop-for-gc-pending* #!+sb-thread nil
-        *allow-with-interrupts* t
-        sb!unix::*unblock-deferrables-on-enabling-interrupts-p* nil
-        *interrupts-enabled* t
-        *interrupt-pending* nil
-        #!+sb-thruption #!+sb-thruption *thruption-pending* nil
-        *break-on-signals* nil
-        *maximum-error-depth* 10
-        *current-error-depth* 0
-        *cold-init-complete-p* nil
-        *type-system-initialized* nil
-        sb!vm:*alloc-signal* nil
-        sb!kernel::*gc-epoch* (cons nil nil))
-
-  ;; I'm not sure where eval is first called, so I put this first.
-  (show-and-call !eval-cold-init)
-  (show-and-call !deadline-cold-init)
   (show-and-call thread-init-or-reinit)
 
   ;; Anyone might call RANDOM to initialize a hash value or something;
@@ -120,7 +94,6 @@
   (show-and-call !character-database-cold-init)
   (show-and-call !character-name-database-cold-init)
 
-  (show-and-call !early-package-cold-init)
   (show-and-call !package-cold-init)
 
   ;; All sorts of things need INFO and/or (SETF INFO).
@@ -148,7 +121,6 @@
   (/show0 "back from !POLICY-COLD-INIT-OR-RESANIFY")
 
   (show-and-call !constantp-cold-init)
-  (show-and-call !early-proclaim-cold-init)
   ;; Must be done before toplevel forms are invoked
   ;; because a toplevel defstruct will need to add itself
   ;; to the subclasses of STRUCTURE-OBJECT.

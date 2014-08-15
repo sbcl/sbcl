@@ -1488,7 +1488,7 @@
 ;;; Default evaluator mode (interpeter / compiler)
 
 (declaim (type (member :compile #!+sb-eval :interpret) *evaluator-mode*))
-(defparameter *evaluator-mode* :compile
+(!defparameter *evaluator-mode* :compile
   #!+sb-doc
   "Toggle between different evaluator implementations. If set to :COMPILE,
 an implementation of EVAL that calls the compiler will be used. If set

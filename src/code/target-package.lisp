@@ -537,9 +537,7 @@ Experimental: interface subject to change."
 (defvar *in-package-init*)
 
 ;;; pending USE-PACKAGE arguments saved up while *IN-PACKAGE-INIT* is true
-(defvar *!deferred-use-packages*)
-(!cold-init-forms
-  (setf *!deferred-use-packages* nil))
+(!defvar *!deferred-use-packages* nil)
 
 (define-condition bootstrap-package-not-found (condition)
   ((name :initarg :name :reader bootstrap-package-name)))

@@ -132,11 +132,7 @@
       (enable-package-locks
        (set-difference old names :test #'equal)))))
 
-(defvar *queued-proclaims*) ; initialized in !COLD-INIT-FORMS
-
-(!begin-collecting-cold-init-forms)
-(!cold-init-forms (setf *queued-proclaims* nil))
-(!defun-from-collected-cold-init-forms !early-proclaim-cold-init)
+(!defvar *queued-proclaims* nil) ; should this be !*QUEUED-PROCLAIMS* ?
 
 (defun process-variable-declaration (name kind info-value)
   (unless (symbolp name)

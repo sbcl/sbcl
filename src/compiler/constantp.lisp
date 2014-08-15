@@ -18,9 +18,7 @@
 (!cold-init-forms
   (setf **special-form-constantp-tests** (make-hash-table)))
 
-(defvar *special-constant-variables*)
-(!cold-init-forms
-  (setf *special-constant-variables* nil))
+(!defvar *special-constant-variables* nil)
 
 (defun %constantp (form environment envp)
   (let ((form (if envp
