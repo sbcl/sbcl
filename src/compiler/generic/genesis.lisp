@@ -1036,52 +1036,29 @@ core and return a descriptor to it."
 (defun initialize-layouts ()
 
   (clrhash *cold-layouts*)
-
-  ;; We initially create the layout of LAYOUT itself with NIL as the LAYOUT and
-  ;; #() as INHERITS,
+  ;; This assertion is due to the fact that MAKE-COLD-LAYOUT does not
+  ;; know how to set any raw slots.
+  (aver (= 0 (layout-n-untagged-slots (find-layout 'layout))))
   (setq *layout-layout* *nil-descriptor*)
-  (let ((xlayout-layout (find-layout 'layout)))
-    (aver (= 0 (layout-n-untagged-slots xlayout-layout)))
-    (setq *layout-layout*
-          (make-cold-layout 'layout
-                            (number-to-core target-layout-length)
-                            (vector-in-core)
-                            (number-to-core (layout-depthoid xlayout-layout))
-                            (number-to-core 0)))
-  (write-wordindexed
-   *layout-layout* sb!vm:instance-slots-offset *layout-layout*)
-
-  ;; Then we create the layouts that we'll need to make a correct INHERITS
-  ;; vector for the layout of LAYOUT itself..
-  ;;
-  ;; FIXME: The various LENGTH and DEPTHOID numbers should be taken from
-  ;; the compiler's tables, not set by hand.
-  (let* ((t-layout
-          (make-cold-layout 't
-                            (number-to-core 0)
-                            (vector-in-core)
-                            (number-to-core 0)
-                            (number-to-core 0)))
-         (so-layout
-          (make-cold-layout 'structure-object
-                            (number-to-core 1)
-                            (vector-in-core t-layout)
-                            (number-to-core 1)
-                            (number-to-core 0)))
-         (bso-layout
-          (make-cold-layout 'structure!object
-                            (number-to-core 1)
-                            (vector-in-core t-layout so-layout)
-                            (number-to-core 2)
-                            (number-to-core 0)))
-         (layout-inherits (vector-in-core t-layout
-                                          so-layout
-                                          bso-layout)))
-
-    ;; ..and return to backpatch the layout of LAYOUT.
-    (setf (fourth (gethash 'layout *cold-layouts*))
-          (listify-cold-inherits layout-inherits))
-    (cold-set-layout-slot *layout-layout* 'inherits layout-inherits))))
+  (flet ((chill-layout (name &rest inherits)
+           ;; Check that the number of specified INHERITS matches
+           ;; the length of the layout's inherits in the cross-compiler.
+           (let ((warm-layout (classoid-layout (find-classoid name))))
+             (assert (eql (length (layout-inherits warm-layout))
+                          (length inherits)))
+             (make-cold-layout
+              name
+              (number-to-core (layout-length warm-layout))
+              (apply #'vector-in-core inherits)
+              (number-to-core (layout-depthoid warm-layout))
+              (number-to-core (layout-n-untagged-slots warm-layout))))))
+    (let* ((t-layout   (chill-layout 't))
+           (s-o-layout (chill-layout 'structure-object t-layout))
+           (s!o-layout (chill-layout 'structure!object t-layout s-o-layout))
+           (ll         (chill-layout 'layout t-layout s-o-layout s!o-layout)))
+      (setf *layout-layout* ll)
+      (dolist (layout (list t-layout s-o-layout s!o-layout ll))
+        (write-wordindexed layout sb!vm:instance-slots-offset ll)))))
 
 ;;;; interning symbols in the cold image
 
