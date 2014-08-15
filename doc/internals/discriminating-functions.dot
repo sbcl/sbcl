@@ -35,9 +35,9 @@ twoclass -> nn
 // nn -> checking
 // nn -> dispatch
 
-subgraph class -> caching
-subgraph class -> checking
-subgraph class -> dispatch
+subgraph { class -> caching }
+subgraph { class -> checking }
+subgraph { class -> dispatch }
 
 initial -> oneclass
 
