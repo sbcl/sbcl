@@ -42,7 +42,7 @@
 
 ;;; FIXME: These forward declarations should be moved somewhere earlier,
 ;;; or discarded.
-(declaim (special *package* *keyword-package* *read-base*))
+(declaim (special *package* *read-base*))
 
 ;;;; reader errors
 

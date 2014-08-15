@@ -2030,7 +2030,7 @@ bootstrapping.
                         (package (symbol-package symbol)))
                    (and (or (eq package *pcl-package*)
                             (memq package (package-use-list *pcl-package*)))
-                        (not (eq package #.(find-package "CL")))
+                        (not (eq package *cl-package*))
                         ;; FIXME: this test will eventually be
                         ;; superseded by the *internal-pcl...* test,
                         ;; above.  While we are in a process of

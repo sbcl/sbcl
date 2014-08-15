@@ -379,9 +379,6 @@ distinct from the global value. Can also be SETF."
       (setf (symbol-function new-symbol) (symbol-function symbol))))
   new-symbol)
 
-;;; FIXME: This declaration should be redundant.
-(declaim (special *keyword-package*))
-
 (defun keywordp (object)
   #!+sb-doc
   "Return true if Object is a symbol in the \"KEYWORD\" package."

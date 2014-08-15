@@ -170,8 +170,8 @@
 ;;; (The initialization forms here only matter on the cross-compilation
 ;;; host; In the target SBCL, these variables are set in cold init.)
 (declaim (type package *cl-package* *keyword-package*))
-(defvar *cl-package*      (find-package "COMMON-LISP"))
-(defvar *keyword-package* (find-package "KEYWORD"))
+(defglobal *cl-package*      (find-package "COMMON-LISP"))
+(defglobal *keyword-package* (find-package "KEYWORD"))
 
 ;;; Concatenate together the names of some strings and symbols,
 ;;; producing a symbol in the current package.

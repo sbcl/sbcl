@@ -15,8 +15,7 @@
 
 (in-package "SB!IMPL")
 
-(declaim (special *keyword-package* *cl-package*
-                  sb!pretty::*standard-pprint-dispatch-table*
+(declaim (special sb!pretty::*standard-pprint-dispatch-table*
                   sb!debug:*in-the-debugger*
                   sb!debug:*stack-top-hint*
                   *handler-clusters*

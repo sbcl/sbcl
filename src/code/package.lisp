@@ -55,6 +55,13 @@
 
 ;;;; the PACKAGE structure
 
+;;; Meta: the original comment by WHN is partially untrue.
+;;;  IN-PACKAGE references a string constant, not a package; and moreover,
+;;;  xc never dumps constant package objects. If, as implied by the word
+;;;  "nuisance" we would like this to be done differently, perhaps it could
+;;;  be now, since the alleged rationale no longer exists.
+;;;  I tested that it works to remove the :make-load-form-fun and instead
+;;;  define an ordinary MAKE-LOAD-FORM method in PCL compilation.
 ;;; KLUDGE: We use DEF!STRUCT to define this not because we need to
 ;;; manipulate target package objects on the cross-compilation host,
 ;;; but only because its MAKE-LOAD-FORM function needs to be hooked
