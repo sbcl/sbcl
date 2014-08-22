@@ -810,9 +810,9 @@ core and return a descriptor to it."
 
 ;;; Make a simple-vector on the target that holds the specified
 ;;; OBJECTS, and return its descriptor.
-(defun vector-in-core (&rest objects)
+(defun vector-to-core (objects &optional (gspace *dynamic*))
   (let* ((size (length objects))
-         (result (allocate-vector-object *dynamic* sb!vm:n-word-bits size
+         (result (allocate-vector-object gspace sb!vm:n-word-bits size
                                          sb!vm:simple-vector-widetag)))
     (dotimes (index size)
       (write-wordindexed result (+ index sb!vm:vector-data-offset)
@@ -1034,7 +1034,6 @@ core and return a descriptor to it."
     result))
 
 (defun initialize-layouts ()
-
   (clrhash *cold-layouts*)
   ;; This assertion is due to the fact that MAKE-COLD-LAYOUT does not
   ;; know how to set any raw slots.
@@ -1049,16 +1048,17 @@ core and return a descriptor to it."
              (make-cold-layout
               name
               (number-to-core (layout-length warm-layout))
-              (apply #'vector-in-core inherits)
+              (vector-to-core inherits)
               (number-to-core (layout-depthoid warm-layout))
               (number-to-core (layout-n-untagged-slots warm-layout))))))
     (let* ((t-layout   (chill-layout 't))
            (s-o-layout (chill-layout 'structure-object t-layout))
-           (s!o-layout (chill-layout 'structure!object t-layout s-o-layout))
-           (ll         (chill-layout 'layout t-layout s-o-layout s!o-layout)))
-      (setf *layout-layout* ll)
-      (dolist (layout (list t-layout s-o-layout s!o-layout ll))
-        (write-wordindexed layout sb!vm:instance-slots-offset ll)))))
+           (s!o-layout (chill-layout 'structure!object t-layout s-o-layout)))
+      (setf *layout-layout*
+	    (chill-layout 'layout t-layout s-o-layout s!o-layout))
+      (dolist (layout (list t-layout s-o-layout s!o-layout *layout-layout*))
+        (write-wordindexed layout sb!vm:instance-slots-offset
+			   *layout-layout*)))))
 
 ;;;; interning symbols in the cold image
 
@@ -1241,17 +1241,16 @@ core and return a descriptor to it."
                        (+ 1 sb!vm:symbol-value-slot)
                        result)
     (write-wordindexed des
-                       (+ 2 sb!vm:symbol-value-slot)
+                       (+ 2 sb!vm:symbol-value-slot) ; = 1 + symbol-hash-slot
                        result)
     (write-wordindexed des
                        (+ 1 sb!vm:symbol-info-slot)
                        (cold-cons result result)) ; NIL's info is (nil . nil)
     (write-wordindexed des
                        (+ 1 sb!vm:symbol-name-slot)
-                       ;; This is *DYNAMIC*, and DES is *STATIC*,
-                       ;; because that's the way CMU CL did it; I'm
-                       ;; not sure whether there's an underlying
-                       ;; reason. -- WHN 1990826
+                       ;; NIL's name is in dynamic space because any extra
+                       ;; bytes allocated in static space would need to
+                       ;; be accounted for by STATIC-SYMBOL-OFFSET.
                        (base-string-to-core "NIL" *dynamic*))
     (write-wordindexed des
                        (+ 1 sb!vm:symbol-package-slot)
@@ -1658,7 +1657,7 @@ core and return a descriptor to it."
               (cold-intern warm-sym) sb!vm:symbol-info-slot
               ;; Each vector will have one fixnum, possibly the symbol SETF,
               ;; and one or two #<fdefn> objects in it.
-              (apply #'vector-in-core
+              (vector-to-core
                      (map 'list (lambda (elt)
                                   (etypecase elt
                                     (symbol (cold-intern elt))
@@ -2072,21 +2071,21 @@ core and return a descriptor to it."
         (cold-push (cold-cons (base-string-to-core (car symbol))
                               (number-to-core (cdr symbol)))
                    result)))
-    (cold-set (cold-intern '*!initial-foreign-symbols*) result)
+    (cold-set '*!initial-foreign-symbols* result)
     #!+sb-dynamic-core
     (let ((runtime-linking-list *nil-descriptor*))
       (dolist (symbol *dyncore-linkage-keys*)
         (cold-push (cold-cons (base-string-to-core (car symbol))
                               (cdr symbol))
                    runtime-linking-list))
-      (cold-set (cold-intern 'sb!vm::*required-runtime-c-symbols*)
+      (cold-set 'sb!vm::*required-runtime-c-symbols*
                 runtime-linking-list)))
   (let ((result *nil-descriptor*))
     (dolist (rtn (sort (copy-list *cold-assembler-routines*) #'string< :key #'car))
       (cold-push (cold-cons (cold-intern (car rtn))
                             (number-to-core (cdr rtn)))
                  result))
-    (cold-set (cold-intern '*!initial-assembler-routines*) result)))
+    (cold-set '*!initial-assembler-routines* result)))
 
 
 ;;;; general machinery for cold-loading FASL files
@@ -2473,7 +2472,7 @@ core and return a descriptor to it."
     (make-descriptor 0 0 :load-time-value counter)))
 
 (defun finalize-load-time-value-noise ()
-  (cold-set (cold-intern '*!load-time-values*)
+  (cold-set '*!load-time-values*
             (allocate-vector-object *dynamic*
                                     sb!vm:n-word-bits
                                     *load-time-value-counter*
