@@ -1474,7 +1474,7 @@ line break."
     (set-pprint-dispatch '(cons symbol)
                          #'pprint-data-list -2)
     (set-pprint-dispatch 'cons #'pprint-fill -2)
-    (set-pprint-dispatch 'comma #'pprint-unquoting-comma -3)
+    (set-pprint-dispatch 'sb!impl::comma #'pprint-unquoting-comma -3)
     ;; cons cells with interesting things for the car
     (/show0 "doing SET-PPRINT-DISPATCH for CONS with interesting CAR")
 

@@ -2413,7 +2413,6 @@ package is deprecated in favour of SB-MOP."
       :name "SB!PRETTY"
       :doc "private: implementation of pretty-printing"
       :use ("CL" "SB!EXT" "SB!INT" "SB!KERNEL")
-      :import-from (("SB!IMPL" "COMMA" "COMMA-KIND" "COMMA-EXPR"))
       :export ("OUTPUT-PRETTY-OBJECT"
                "PRETTY-STREAM" "PRETTY-STREAM-P"
                "PPRINT-DISPATCH-TABLE"
