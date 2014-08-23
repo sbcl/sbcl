@@ -23,11 +23,6 @@
 
 (in-package "SB!IMPL")
 
-(!begin-collecting-cold-init-forms)
-
-(!cold-init-forms
-  (/show0 "entering !PACKAGE-COLD-INIT"))
-
 ;;;; Thread safety
 ;;;;
 ;;;; ...this could still use work, but the basic idea is:
@@ -54,8 +49,6 @@
 ;;;; needs to be considered with some care.
 
 (defvar *package-graph-lock*)
-(!cold-init-forms
- (setf *package-graph-lock* (sb!thread:make-mutex :name "Package Graph Lock")))
 
 (defun call-with-package-graph (function)
   (declare (function function))
@@ -67,8 +60,6 @@
 ;;; a map from package names to packages
 (defvar *package-names*)
 (declaim (type hash-table *package-names*))
-(!cold-init-forms
- (setf *package-names* (make-hash-table :test 'equal :synchronized t)))
 
 (defmacro with-package-names ((names &key) &body body)
   `(let ((,names *package-names*))
@@ -525,20 +516,6 @@ Experimental: interface subject to change."
 ;;; FIXME: should be declared of type PACKAGE, with no NIL init form,
 ;;; after I get around to cleaning up DOCUMENTATION
 
-;;; This magical variable is T during initialization so that
-;;; USE-PACKAGE's of packages that don't yet exist quietly win. Such
-;;; packages are thrown onto the list *DEFERRED-USE-PACKAGES* so that
-;;; this can be fixed up later.
-;;;
-;;; FIXME: This could be cleaned up the same way I do it in my package
-;;; hacking when setting up the cross-compiler. Then we wouldn't have
-;;; this extraneous global variable and annoying runtime tests on
-;;; package operations. (*DEFERRED-USE-PACKAGES* would also go away.)
-(defvar *in-package-init*)
-
-;;; pending USE-PACKAGE arguments saved up while *IN-PACKAGE-INIT* is true
-(!defvar *!deferred-use-packages* nil)
-
 (define-condition bootstrap-package-not-found (condition)
   ((name :initarg :name :reader bootstrap-package-name)))
 (defun debootstrap-package (&optional condition)
@@ -579,7 +556,7 @@ REMOVE-PACKAGE-LOCAL-NICKNAME, and the DEFPACKAGE option :LOCAL-NICKNAMES."
                                (cdr (assoc string nicknames :test #'string=))))
                   (packageoid (or nicknamed (gethash string *package-names*))))
              (if (and (null packageoid)
-                      (not *in-package-init*) ; KLUDGE
+                      ;; FIXME: should never need 'debootstrap' hack
                       (let ((mismatch (mismatch "SB!" string)))
                         (and mismatch (= mismatch 3))))
                  (restart-case
@@ -831,9 +808,7 @@ implementation it is ~S." *default-package-use-list*)
 
          ;; Do a USE-PACKAGE for each thing in the USE list so that checking for
          ;; conflicting exports among used packages is done.
-         (if *in-package-init*
-             (push (list use package) *!deferred-use-packages*)
-             (use-package use package))
+         (use-package use package)
 
          ;; FIXME: ENTER-NEW-NICKNAMES can fail (ERROR) if nicknames are illegal,
          ;; which would leave us with possibly-bad side effects from the earlier
@@ -1641,45 +1616,45 @@ PACKAGE."
 
 ;;;; final initialization
 
-;;;; The cold loader (GENESIS) makes the data structure in
-;;;; *!INITIAL-SYMBOLS*. We grovel over it, making the specified
-;;;; packages and interning the symbols. For a description of the
-;;;; format of *!INITIAL-SYMBOLS*, see the GENESIS source.
-
+;;;; Due to the relative difficulty - but not impossibility - of manipulating
+;;;; package-hashtables in the cross-compilation host, all interning operations
+;;;; are delayed until cold-init.
+;;;; The cold loader (GENESIS) set *!INITIAL-SYMBOLS* to the target
+;;;; representation of the hosts's *COLD-PACKAGE-SYMBOLS*.
+;;;; The shape of this list is ((package . (externals . internals)) ...)
 (defvar *!initial-symbols*)
 
-(!cold-init-forms
+(defun !package-cold-init ()
+  (setf *package-graph-lock* (sb!thread:make-mutex :name "Package Graph Lock")
+        *package-names* (make-hash-table :test 'equal :synchronized t))
+  (with-package-names (names)
+    (dolist (spec *!initial-symbols*)
+      (let ((pkg (car spec)) (symbols (cdr spec)))
+        ;; the symbol MAKE-TABLE wouldn't magically disappear,
+        ;; though its only use be to name an FLET in a function
+        ;; hanging on an otherwise uninternable symbol. strange but true :-(
+        (flet ((!make-table (input)
+                 (let ((table (make-or-remake-package-hashtable
+                               (length (the simple-vector input)))))
+                   (dovector (symbol input table)
+                     (add-symbol table symbol)))))
+          (setf (package-external-symbols pkg) (!make-table (car symbols))
+                (package-internal-symbols pkg) (!make-table (cdr symbols))))
+        (setf (package-%shadowing-symbols pkg) nil
+              (package-%local-nicknames pkg) nil
+              (package-%locally-nicknamed-by pkg) nil
+              (package-source-location pkg) nil
+              (gethash (package-%name pkg) names) pkg)
+        (%enter-new-nicknames pkg (package-%nicknames pkg))
+        #!+sb-package-locks
+        (setf (package-lock pkg) nil
+              (package-%implementation-packages pkg) nil))))
 
-  (setq *in-package-init* t)
-
-  (/show0 "about to loop over *!INITIAL-SYMBOLS* to make packages")
+  ;; pass 2 - set the 'tables' slots only after all tables have been made
   (dolist (spec *!initial-symbols*)
-    (let* ((pkg (apply #'make-package (first spec)))
-           (internal (package-internal-symbols pkg))
-           (external (package-external-symbols pkg)))
-      (/show0 "back from MAKE-PACKAGE, PACKAGE-NAME=..")
-      (/primitive-print (package-name pkg))
-
-      ;; Put internal symbols in the internal hashtable and set package.
-      (dolist (symbol (second spec))
-        (add-symbol internal symbol)
-        (%set-symbol-package symbol pkg))
-
-      ;; External symbols same, only go in external table.
-      (dolist (symbol (third spec))
-        (add-symbol external symbol)
-        (%set-symbol-package symbol pkg))
-
-      ;; Don't set package for imported symbols.
-      (dolist (symbol (fourth spec))
-        (add-symbol internal symbol))
-      (dolist (symbol (fifth spec))
-        (add-symbol external symbol))
-
-      ;; Put shadowing symbols in the shadowing symbols list.
-      (setf (package-%shadowing-symbols pkg) (sixth spec))
-      ;; Set the package documentation
-      (setf (package-doc-string pkg) (seventh spec))))
+    (let ((pkg (car spec)))
+      (setf (package-tables pkg)
+            (map 'vector #'package-external-symbols (package-%use-list pkg)))))
 
   ;; FIXME: These assignments are also done at toplevel in
   ;; boot-extensions.lisp. They should probably only be done once.
@@ -1708,23 +1683,9 @@ PACKAGE."
                        "SB!ALIEN" "SB!ALIEN" "SB!DEBUG"
                        "SB!EXT" "SB!GRAY" "SB!PROFILE"))
 
-  ;; Now do the *!DEFERRED-USE-PACKAGES*.
-  (/show0 "about to do *!DEFERRED-USE-PACKAGES*")
-  (dolist (args *!deferred-use-packages*)
-    (apply #'use-package args))
-
-  ;; The Age Of Magic is over, we can behave ANSIly henceforth.
-  (/show0 "about to SETQ *IN-PACKAGE-INIT*")
-  (setq *in-package-init* nil)
-
   ;; For the kernel core image wizards, set the package to *CL-PACKAGE*.
   ;;
   ;; FIXME: We should just set this to (FIND-PACKAGE
   ;; "COMMON-LISP-USER") once and for all here, instead of setting it
   ;; once here and resetting it later.
   (setq *package* *cl-package*))
-
-(!cold-init-forms
-  (/show0 "done with !PACKAGE-COLD-INIT"))
-
-(!defun-from-collected-cold-init-forms !package-cold-init)

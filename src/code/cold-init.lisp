@@ -116,7 +116,6 @@
   ;; functions are called in the same relative order as the toplevel
   ;; forms of the corresponding source files.
 
-  ;;(show-and-call !package-cold-init)
   (show-and-call !policy-cold-init-or-resanify)
   (/show0 "back from !POLICY-COLD-INIT-OR-RESANIFY")
 

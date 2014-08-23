@@ -958,6 +958,8 @@ core and return a descriptor to it."
 
 ;;; the descriptor for layout's layout (needed when making layouts)
 (defvar *layout-layout*)
+;;; the descriptor for PACKAGE's layout (needed when making packages)
+(defvar *package-layout*)
 
 (defconstant target-layout-length
   ;; LAYOUT-LENGTH counts the number of words in an instance,
@@ -1055,40 +1057,89 @@ core and return a descriptor to it."
            (s-o-layout (chill-layout 'structure-object t-layout))
            (s!o-layout (chill-layout 'structure!object t-layout s-o-layout)))
       (setf *layout-layout*
-	    (chill-layout 'layout t-layout s-o-layout s!o-layout))
+            (chill-layout 'layout t-layout s-o-layout s!o-layout))
       (dolist (layout (list t-layout s-o-layout s!o-layout *layout-layout*))
         (write-wordindexed layout sb!vm:instance-slots-offset
-			   *layout-layout*)))))
+                           *layout-layout*))
+      (setf *package-layout*
+            (chill-layout 'package ; *NOT* SB!XC:PACKAGE, or you lose
+                          t-layout s-o-layout s!o-layout)))))
 
 ;;;; interning symbols in the cold image
 
-;;; In order to avoid having to know about the package format, we
-;;; build a data structure in *COLD-PACKAGE-SYMBOLS* that holds all
-;;; interned symbols along with info about their packages. The data
-;;; structure is a list of sublists, where the sublists have the
-;;; following format:
-;;;   (<make-package-arglist>
-;;;    <internal-symbols>
-;;;    <external-symbols>
-;;;    <imported-internal-symbols>
-;;;    <imported-external-symbols>
-;;;    <shadowing-symbols>
-;;;    <package-documentation>)
-;;;
-;;; KLUDGE: It would be nice to implement the sublists as instances of
-;;; a DEFSTRUCT (:TYPE LIST). (They'd still be lists, but at least we'd be
-;;; using mnemonically-named operators to access them, instead of trying
-;;; to remember what THIRD and FIFTH mean, and hoping that we never
-;;; need to change the list layout..) -- WHN 19990825
-
-;;; an alist from packages to lists of that package's symbols to be dumped
+;;; a map from package name as a host string to
+;;; (cold-package-descriptor . (external-symbols . internal-symbols))
 (defvar *cold-package-symbols*)
-(declaim (type list *cold-package-symbols*))
+(declaim (type hash-table *cold-package-symbols*))
 
 ;;; a map from descriptors to symbols, so that we can back up. The key
 ;;; is the address in the target core.
 (defvar *cold-symbols*)
 (declaim (type hash-table *cold-symbols*))
+
+(defun initialize-packages (package-data-list)
+  (let ((slots (dd-slots (layout-info (find-layout 'package))))
+        (target-pkg-list nil))
+    (labels ((set-slot (obj slot-name value)
+               (write-wordindexed obj (slot-index slot-name) value))
+             (slot-index (slot-name)
+               (+ sb!vm:instance-slots-offset
+                  (dsd-index
+                   (find slot-name slots :key #'dsd-name :test #'string=))))
+             (init-cold-package (name &optional docstring)
+               (let ((cold-package (car (gethash name *cold-package-symbols*))))
+                 ;; patch in the layout
+                 (write-wordindexed cold-package sb!vm:instance-slots-offset
+                                    *package-layout*)
+                 ;; Initialize string slots
+                 (set-slot cold-package '%name (base-string-to-core name))
+                 (set-slot cold-package '%nicknames (chill-nicknames name))
+                 (set-slot cold-package 'doc-string
+                           (if docstring
+                               (base-string-to-core docstring)
+                               *nil-descriptor*))
+                 (set-slot cold-package '%use-list *nil-descriptor*)
+                 ;; the cddr of this will accumulate the 'used-by' package list
+                 (push (list name cold-package) target-pkg-list)))
+             (chill-nicknames (pkg-name)
+               (let ((result *nil-descriptor*))
+                 ;; Make the package nickname lists for the standard packages
+                 ;; be the minimum specified by ANSI, regardless of what value
+                 ;; the cross-compilation host happens to use.
+                 ;; For packages other than the standard packages, the nickname
+                 ;; list was specified by our package setup code, and we can just
+                 ;; propagate the current state into the target.
+                 (dolist (nickname
+                          (cond ((string= pkg-name "COMMON-LISP") '("CL"))
+                                ((string= pkg-name "KEYWORD") '())
+                                (t (package-nicknames (find-package pkg-name))))
+                          result)
+                   (cold-push (base-string-to-core nickname) result))))
+             (find-package-cell (name)
+               (or (assoc (if (string= name "CL") "COMMON-LISP" name)
+                          target-pkg-list :test #'string=)
+                   (error "No cold package named ~S" name)))
+             (list-to-core (list)
+               (let ((res *nil-descriptor*))
+                 (dolist (x list res) (cold-push x res)))))
+      ;; pass 1: make all proto-packages
+      (init-cold-package "COMMON-LISP")
+      (init-cold-package "KEYWORD")
+      (dolist (pd package-data-list)
+        (init-cold-package (sb-cold:package-data-name pd)
+                           #!+sb-doc(sb-cold::package-data-doc pd)))
+      ;; pass 2: set the 'use' lists and collect the 'used-by' lists
+      (dolist (pd package-data-list)
+        (let ((this (cadr (find-package-cell (sb-cold:package-data-name pd))))
+              (use nil))
+          (dolist (that (sb-cold:package-data-use pd))
+            (let ((cell (find-package-cell that)))
+              (push (cadr cell) use)
+              (push this (cddr cell))))
+          (set-slot this '%use-list (list-to-core (nreverse use)))))
+      ;; pass 3: set the 'used-by' lists
+      (dolist (cell target-pkg-list)
+        (set-slot (cadr cell) '%used-by-list (list-to-core (cddr cell)))))))
 
 ;;; sanity check for a symbol we're about to create on the target
 ;;;
@@ -1163,14 +1214,11 @@ core and return a descriptor to it."
     (cold-set descriptor (target-representation value))))
 
 ;;; Return a handle on an interned symbol. If necessary allocate the
-;;; symbol and record which package the symbol was referenced in. When
-;;; we allocate the symbol, make sure we record a reference to the
-;;; symbol in the home package so that the package gets set.
+;;; symbol and record its home package.
 (defun cold-intern (symbol
-                    &key
-                    (package (symbol-package-for-target-symbol symbol))
-                    (gspace *dynamic*))
-
+                    &key (access nil)
+                         (gspace *dynamic*)
+                    &aux (package (symbol-package-for-target-symbol symbol)))
   (aver (package-ok-for-target-symbol-p package))
 
   ;; Anything on the cross-compilation host which refers to the target
@@ -1183,45 +1231,44 @@ core and return a descriptor to it."
     (when (eq (symbol-package symbol) p)
       (setf symbol (intern (symbol-name symbol) *cl-package*))))
 
-  (let (;; Information about each cold-interned symbol is stored
-        ;; in COLD-INTERN-INFO.
-        ;;   (CAR COLD-INTERN-INFO) = descriptor of symbol
-        ;;   (CDR COLD-INTERN-INFO) = list of packages, other than symbol's
-        ;;                            own package, referring to symbol
-        ;; (*COLD-PACKAGE-SYMBOLS* and *COLD-SYMBOLS* store basically the
-        ;; same information, but with the mapping running the opposite way.)
-        (cold-intern-info (get symbol 'cold-intern-info)))
-    (unless cold-intern-info
-      (cond ((eq (symbol-package-for-target-symbol symbol) package)
-             (let ((handle (allocate-symbol (symbol-name symbol) :gspace gspace)))
-               #!+sb-thread
-               (assign-tls-index symbol handle)
-               (setf (gethash (descriptor-bits handle) *cold-symbols*) symbol)
-               (acond ((eq package *keyword-package*)
-                       (cold-set handle handle))
-                      ((assoc symbol sb-cold:*symbol-values-for-genesis*)
-                       (cold-set-symbol-global-value handle (cdr it))))
-               (setq cold-intern-info
-                     (setf (get symbol 'cold-intern-info) (cons handle nil)))))
-            (t
-             (cold-intern symbol)
-             (setq cold-intern-info (get symbol 'cold-intern-info)))))
-    (unless (or (null package)
-                (member package (cdr cold-intern-info)))
-      (push package (cdr cold-intern-info))
-      (let* ((old-cps-entry (assoc package *cold-package-symbols*))
-             (cps-entry (or old-cps-entry
-                            (car (push (list package)
-                                       *cold-package-symbols*)))))
-        (unless old-cps-entry
-          (/show "created *COLD-PACKAGE-SYMBOLS* entry for" package symbol))
-        (push symbol (rest cps-entry))))
-    (car cold-intern-info)))
+  (or (get symbol 'cold-intern-info)
+      (let ((pkg-info (gethash (package-name package) *cold-package-symbols*))
+            (handle (allocate-symbol (symbol-name symbol) :gspace gspace)))
+        (unless pkg-info
+          (error "No target package descriptor for ~S" package))
+        (record-accessibility
+         (or access (nth-value 1 (find-symbol (symbol-name symbol) package)))
+         handle pkg-info symbol package t)
+        #!+sb-thread
+        (assign-tls-index symbol handle)
+        (acond ((eq package *keyword-package*)
+                (setq access :external)
+                (cold-set handle handle))
+               ((assoc symbol sb-cold:*symbol-values-for-genesis*)
+                (cold-set-symbol-global-value handle (cdr it))))
+        ;; maintain reverse map from target descriptor to host symbol
+        (setf (gethash (descriptor-bits handle) *cold-symbols*) symbol)
+        (setf (get symbol 'cold-intern-info) handle))))
+
+(defun record-accessibility (accessibility symbol-descriptor target-pkg-info
+                             host-symbol host-package &optional set-home-p)
+  (when set-home-p
+    (write-wordindexed symbol-descriptor sb!vm:symbol-package-slot
+                       (car target-pkg-info)))
+  (when (member host-symbol (package-shadowing-symbols host-package))
+    ;; Fail in an obvious way if target shadowing symbols exist.
+    ;; (This is simply not an important use-case during system bootstrap.)
+    (error "Genesis doesn't like shadowing symbol ~S, sorry." host-symbol))
+  (let ((access-lists (cdr target-pkg-info)))
+    (case accessibility
+      (:external (push symbol-descriptor (car access-lists)))
+      (:internal (push symbol-descriptor (cdr access-lists)))
+      (t (error "~S inaccessible in package ~S" host-symbol host-package)))))
 
 ;;; Construct and return a value for use as *NIL-DESCRIPTOR*.
 ;;; It might be nice to put NIL on a readonly page by itself to prevent unsafe
 ;;; code from destroying the world with (RPLACx nil 'kablooey)
-(defun make-nil-descriptor ()
+(defun make-nil-descriptor (target-cl-pkg-info)
   (let* ((des (allocate-unboxed-object
                *static*
                sb!vm:n-word-bits
@@ -1252,13 +1299,14 @@ core and return a descriptor to it."
                        ;; bytes allocated in static space would need to
                        ;; be accounted for by STATIC-SYMBOL-OFFSET.
                        (base-string-to-core "NIL" *dynamic*))
+    ;; RECORD-ACCESSIBILITY can't assign to the package slot
+    ;; due to NIL's base address and lowtag being nonstandard.
     (write-wordindexed des
                        (+ 1 sb!vm:symbol-package-slot)
-                       result)
-    (setf (get nil 'cold-intern-info)
-          (cons result nil))
-    (cold-intern nil)
-    result))
+                       (car target-cl-pkg-info))
+    (record-accessibility :external result target-cl-pkg-info nil *cl-package*)
+    (setf (gethash (descriptor-bits result) *cold-symbols*) nil
+          (get nil 'cold-intern-info) result)))
 
 ;;; Since the initial symbols must be allocated before we can intern
 ;;; anything else, we intern those here. We also set the value of T.
@@ -1310,10 +1358,6 @@ core and return a descriptor to it."
 
 ;;; Establish initial values for magic symbols.
 ;;;
-;;; Scan over all the symbols referenced in each package in
-;;; *COLD-PACKAGE-SYMBOLS* making that for each one there's an
-;;; appropriate entry in the *!INITIAL-SYMBOLS* data structure to
-;;; intern it.
 (defun finish-symbols ()
 
   ;; Everything between this preserved-for-posterity comment down to
@@ -1361,89 +1405,44 @@ core and return a descriptor to it."
   (dolist (symbol sb!impl::*cache-vector-symbols*)
     (cold-set symbol *nil-descriptor*))
 
-  (/show "dumping packages" (mapcar #'car *cold-package-symbols*))
-  (let ((initial-symbols *nil-descriptor*))
-    (dolist (cold-package-symbols-entry *cold-package-symbols*)
-      (let* ((cold-package (car cold-package-symbols-entry))
-             (symbols (cdr cold-package-symbols-entry))
-             (shadows (package-shadowing-symbols cold-package))
-             (documentation (base-string-to-core
-                             ;; KLUDGE: NIL punned as 0-length string.
-                             (unless
-                                 ;; don't propagate the arbitrary
-                                 ;; docstring from host packages into
-                                 ;; the core
-                                 (or (eql cold-package *cl-package*)
-                                     (eql cold-package *keyword-package*))
-                               (documentation cold-package t))))
-             (internal-count 0)
-             (external-count 0)
-             (internal *nil-descriptor*)
-             (external *nil-descriptor*)
-             (imported-internal *nil-descriptor*)
-             (imported-external *nil-descriptor*)
-             (shadowing *nil-descriptor*))
-        (declare (type package cold-package)) ; i.e. not a target descriptor
-        (/show "dumping" cold-package symbols)
+  ;; Symbols for which no call to COLD-INTERN would occur - due to not being
+  ;; referenced until warm init - must be artificially cold-interned.
+  ;; Inasmuch as the "offending" things are compiled by ordinary target code
+  ;; and not cold-init, I think we should use an ordinary DEFPACKAGE for
+  ;; the added-on bits. What I've done is somewhat of a fragile kludge.
+  (with-package-iterator (iter '("SB!PCL" "SB!MOP" "SB!GRAY" "SB!SEQUENCE"
+                                 "SB!PROFILE" "SB!EXT" "SB!KERNEL" "SB!VM"
+                                 "SB!C" "SB!FASL" "SB!DEBUG")
+                               :external)
+    (loop
+     (multiple-value-bind (foundp sym accessibility package) (iter)
+       (declare (ignore accessibility))
+       (cond ((not foundp) (return))
+             ((eq (symbol-package sym) package) (cold-intern sym))))))
 
-        ;; FIXME: Add assertions here to make sure that inappropriate stuff
-        ;; isn't being dumped:
-        ;;   * the CL-USER package
-        ;;   * the SB-COLD package
-        ;;   * any internal symbols in the CL package
-        ;;   * basically any package other than CL, KEYWORD, or the packages
-        ;;     in package-data-list.lisp-expr
-        ;; and that the structure of the KEYWORD package (e.g. whether
-        ;; any symbols are internal to it) matches what we want in the
-        ;; target SBCL.
-
-        ;; FIXME: It seems possible that by looking at the contents of
-        ;; packages in the target SBCL we could find which symbols in
-        ;; package-data-lisp.lisp-expr are now obsolete. (If I
-        ;; understand correctly, only symbols which actually have
-        ;; definitions or which are otherwise referred to actually end
-        ;; up in the target packages.)
-
-        (dolist (symbol symbols)
-          (let ((handle (car (get symbol 'cold-intern-info)))
-                (imported-p (not (eq (symbol-package-for-target-symbol symbol)
-                                     cold-package))))
-            (multiple-value-bind (found where)
-                (find-symbol (symbol-name symbol) cold-package)
-              (unless (and where (eq found symbol))
-                (error "The symbol ~S is not available in ~S."
-                       symbol
-                       cold-package))
-              (when (memq symbol shadows)
-                (cold-push handle shadowing))
-              (case where
-                (:internal (if imported-p
-                               (cold-push handle imported-internal)
-                               (progn
-                                 (cold-push handle internal)
-                                 (incf internal-count))))
-                (:external (if imported-p
-                               (cold-push handle imported-external)
-                               (progn
-                                 (cold-push handle external)
-                                 (incf external-count))))))))
-        (let ((r *nil-descriptor*))
-          (cold-push documentation r)
-          (cold-push shadowing r)
-          (cold-push imported-external r)
-          (cold-push imported-internal r)
-          (cold-push external r)
-          (cold-push internal r)
-          (cold-push (make-make-package-args cold-package
-                                             internal-count
-                                             external-count)
-                     r)
-          ;; FIXME: It would be more space-efficient to use vectors
-          ;; instead of lists here, and space-efficiency here would be
-          ;; nice, since it would reduce the peak memory usage in
-          ;; genesis and cold init.
-          (cold-push r initial-symbols))))
-    (cold-set '*!initial-symbols* initial-symbols))
+  (let ((cold-pkg-inits *nil-descriptor*))
+    (maphash
+     (lambda (pkg-name pkg-info)
+       (unless (member pkg-name '("COMMON-LISP" "KEYWORD") :test 'string=)
+         (let ((host-pkg (find-package pkg-name))
+               (sb-xc-pkg (find-package "SB-XC")))
+           ;; Scan for symbols present in this package whose home is not this,
+           ;; but skip any present symbol whose home package is SB-XC because
+           ;; on the target, no symbol will be imported from SB-XC.
+           (with-package-iterator (iter host-pkg :internal :external)
+             (loop
+              (multiple-value-bind (foundp sym accessibility) (iter)
+                (unless foundp (return))
+                (unless (or (eq (symbol-package sym) host-pkg)
+                            (eq (symbol-package sym) sb-xc-pkg))
+                  (record-accessibility
+                   accessibility (cold-intern sym) pkg-info sym host-pkg)))))))
+       (cold-push (cold-cons (car pkg-info)
+                             (cold-cons (vector-to-core (cadr pkg-info))
+                                        (vector-to-core (cddr pkg-info))))
+                  cold-pkg-inits))
+     *cold-package-symbols*)
+    (cold-set 'sb!impl::*!initial-symbols* cold-pkg-inits))
 
   (attach-fdefinitions-to-symbols)
 
@@ -1456,56 +1455,6 @@ core and return a descriptor to it."
     (cold-set 'sb!vm::*fp-constant-1d0* (number-to-core 1d0))
     (cold-set 'sb!vm::*fp-constant-0f0* (number-to-core 0f0))
     (cold-set 'sb!vm::*fp-constant-1f0* (number-to-core 1f0))))
-
-;;; Make a cold list that can be used as the arg list to MAKE-PACKAGE in
-;;; order to make a package that is similar to PKG.
-(defun make-make-package-args (pkg internal-count external-count)
-  (let* ((use *nil-descriptor*)
-         (cold-nicknames *nil-descriptor*)
-         (res *nil-descriptor*))
-    (dolist (u (package-use-list pkg))
-      (when (assoc u *cold-package-symbols*)
-        (cold-push (base-string-to-core (package-name u)) use)))
-    (let* ((pkg-name (package-name pkg))
-           ;; Make the package nickname lists for the standard packages
-           ;; be the minimum specified by ANSI, regardless of what value
-           ;; the cross-compilation host happens to use.
-           (warm-nicknames (cond ((string= pkg-name "COMMON-LISP")
-                                  '("CL"))
-                                 ((string= pkg-name "COMMON-LISP-USER")
-                                  '("CL-USER"))
-                                 ((string= pkg-name "KEYWORD")
-                                  '())
-                                 ;; For packages other than the
-                                 ;; standard packages, the nickname
-                                 ;; list was specified by our package
-                                 ;; setup code, not by properties of
-                                 ;; what cross-compilation host we
-                                 ;; happened to use, and we can just
-                                 ;; propagate it into the target.
-                                 (t
-                                  (package-nicknames pkg)))))
-      (dolist (warm-nickname warm-nicknames)
-        (cold-push (base-string-to-core warm-nickname) cold-nicknames)))
-
-    ;; INTERNAL-COUNT and EXTERNAL-COUNT are the number of symbols that
-    ;; the package contains in the core. We arrange for the package
-    ;; symbol tables to be created somewhat larger so that they don't
-    ;; need to be rehashed so easily when additional symbols are
-    ;; interned during the warm build.
-    (cold-push (number-to-core (truncate internal-count 0.8)) res)
-    (cold-push (cold-intern :internal-symbols) res)
-    (cold-push (number-to-core (truncate external-count 0.8)) res)
-    (cold-push (cold-intern :external-symbols) res)
-
-    (cold-push cold-nicknames res)
-    (cold-push (cold-intern :nicknames) res)
-
-    (cold-push use res)
-    (cold-push (cold-intern :use) res)
-
-    (cold-push (base-string-to-core (package-name pkg)) res)
-    res))
 
 ;;;; functions and fdefinition objects
 
@@ -3411,8 +3360,9 @@ initially undefined function references:~2%")
     (let* ((*foreign-symbol-placeholder-value* (if core-file-name nil 0))
            (*load-time-value-counter* 0)
            (*cold-fdefn-objects* (make-hash-table :test 'equal))
-           (*cold-symbols* (make-hash-table :test 'equal))
-           (*cold-package-symbols* nil)
+           (*cold-symbols* (make-hash-table :test 'eql)) ; integer keys
+           (*cold-package-symbols* (make-hash-table :test 'equal)) ; string keys
+           (pkg-metadata (sb-cold:read-from-file "package-data-list.lisp-expr"))
            (*read-only* (make-gspace :read-only
                                      read-only-core-space-id
                                      sb!vm:read-only-space-start))
@@ -3423,7 +3373,23 @@ initially undefined function references:~2%")
                                      dynamic-core-space-id
                                      #!+gencgc sb!vm:dynamic-space-start
                                      #!-gencgc sb!vm:dynamic-0-space-start))
-           (*nil-descriptor* (make-nil-descriptor))
+           ;; There's a cyclic dependency here: NIL refers to a package;
+           ;; a package needs its layout which needs others layouts
+           ;; which refer to NIL, which refers to a package ...
+           ;; Break the cycle by preallocating packages without a layout.
+           ;; This avoids having to track any symbols created prior to
+           ;; creation of packages, since packages are primordial.
+           (target-cl-pkg-info
+            (dolist (name (list* "COMMON-LISP" "KEYWORD"
+                                 (mapcar #'sb-cold:package-data-name
+                                         pkg-metadata))
+                          (gethash "COMMON-LISP" *cold-package-symbols*))
+              (setf (gethash name *cold-package-symbols*)
+                    (cons (allocate-structure-object
+                           *dynamic* (layout-length (find-layout 'package))
+                           (make-fixnum-descriptor 0))
+                          (cons nil nil))))) ; (externals . internals)
+           (*nil-descriptor* (make-nil-descriptor target-cl-pkg-info))
            (*current-reversed-cold-toplevels* *nil-descriptor*)
            (*current-debug-sources* *nil-descriptor*)
            (*unbound-marker* (make-other-immediate-descriptor
@@ -3436,61 +3402,21 @@ initially undefined function references:~2%")
       ;; Prepare for cold load.
       (initialize-non-nil-symbols)
       (initialize-layouts)
+      (initialize-packages pkg-metadata)
       (initialize-static-fns)
 
       ;; Initialize the *COLD-SYMBOLS* system with the information
-      ;; from package-data-list.lisp-expr and
-      ;; common-lisp-exports.lisp-expr.
-      ;;
-      ;; Why do things this way? Historically, the *COLD-SYMBOLS*
-      ;; machinery was designed and implemented in CMU CL long before
-      ;; I (WHN) ever heard of CMU CL. It dumped symbols and packages
-      ;; iff they were used in the cold image. When I added the
-      ;; package-data-list.lisp-expr mechanism, the idea was to
-      ;; centralize all information about packages and exports. Thus,
-      ;; it was the natural place for information even about packages
-      ;; (such as SB!PCL and SB!WALKER) which aren't used much until
-      ;; after cold load. This didn't quite match the CMU CL approach
-      ;; of filling *COLD-SYMBOLS* with symbols which appear in the
-      ;; cold image and then dumping only those symbols. By explicitly
-      ;; putting all the symbols from package-data-list.lisp-expr and
-      ;; from common-lisp-exports.lisp-expr into *COLD-SYMBOLS* here,
-      ;; we feed our centralized symbol information into the old CMU
-      ;; CL code without having to change the old CMU CL code too
-      ;; much. (And the old CMU CL code is still useful for making
-      ;; sure that the appropriate keywords and internal symbols end
-      ;; up interned in the target Lisp, which is good, e.g. in order
-      ;; to make &KEY arguments work right and in order to make
-      ;; BACKTRACEs into target Lisp system code be legible.)
+      ;; from common-lisp-exports.lisp-expr.
+      ;; Packages whose names match SB!THING were set up on the host according
+      ;; to "package-data-list.lisp-expr" which expresses the desired target
+      ;; package configuration, so we can just mirror the host into the target.
+      ;; But by waiting to observe calls to COLD-INTERN that occur during the
+      ;; loading of the cross-compiler's outputs, it is possible to rid the
+      ;; target of accidental leftover symbols, not that it wouldn't also be
+      ;; a good idea to clean up package-data-list once in a while.
       (dolist (exported-name
                (sb-cold:read-from-file "common-lisp-exports.lisp-expr"))
-        (cold-intern (intern exported-name *cl-package*)))
-      (dolist (pd (sb-cold:read-from-file "package-data-list.lisp-expr"))
-        (declare (type sb-cold:package-data pd))
-        (let ((package (find-package (sb-cold:package-data-name pd))))
-          (labels (;; Call FN on every node of the TREE.
-                   (mapc-on-tree (fn tree)
-                                 (declare (type function fn))
-                                 (typecase tree
-                                   (cons (mapc-on-tree fn (car tree))
-                                         (mapc-on-tree fn (cdr tree)))
-                                   (t (funcall fn tree)
-                                      (values))))
-                   ;; Make sure that information about the association
-                   ;; between PACKAGE and the symbol named NAME gets
-                   ;; recorded in the cold-intern system or (as a
-                   ;; convenience when dealing with the tree structure
-                   ;; allowed in the PACKAGE-DATA-EXPORTS slot) do
-                   ;; nothing if NAME is NIL.
-                   (chill (name)
-                     (when name
-                       (cold-intern (intern name package) :package package))))
-            (mapc-on-tree #'chill (sb-cold:package-data-export pd))
-            (mapc #'chill (sb-cold:package-data-reexport pd))
-            (dolist (sublist (sb-cold:package-data-import-from pd))
-              (destructuring-bind (package-name &rest symbol-names) sublist
-                (declare (ignore package-name))
-                (mapc #'chill symbol-names))))))
+        (cold-intern (intern exported-name *cl-package*) :access :external))
 
       ;; Cold load.
       (dolist (file-name object-file-names)
