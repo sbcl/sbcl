@@ -45,6 +45,9 @@
   use)
 
 (let ((package-data-list (read-from-file "package-data-list.lisp-expr")))
+  (labels ((flatten (tree)
+             (mapcan (lambda (x) (if (listp x) (flatten x) (list x)))
+                     tree)))
 
     ;; Build all packages that we need, and initialize them as far as we
     ;; can without referring to any other packages.
@@ -60,19 +63,9 @@
                        ;; cold init.
                        :nicknames nil
                        :use nil)))
-        (progn
-          #!+sb-doc (setf (documentation package t)
-                          (package-data-doc package-data)))
         ;; Walk the tree of exported names, exporting each name.
-        (labels ((recurse (tree)
-                   (etypecase tree
-                     ;; FIXME: The comments above say the structure is a tree,
-                     ;; but here we're sleazily treating it as though
-                     ;; dotted lists never occur. Replace this LIST case
-                     ;; with separate NULL and CONS cases to fix this.
-                     (list (mapc #'recurse tree))
-                     (string (export (intern tree package) package)))))
-          (recurse (package-data-export package-data)))))
+        (dolist (string (flatten (package-data-export package-data)))
+          (export (intern string package) package))))
 
     ;; Now that all packages exist, we can set up package-package
     ;; references.
@@ -96,7 +89,7 @@
                                   ;; new way, works for SB!DI stuff
                                   ;; -- WHN 19990714
                                   (intern name from-package))
-                                symbol-names)))
+                                (flatten symbol-names))))
           (import symbols (package-data-name package-data)))))
 
     ;; Now that all package-package references exist, we can handle
@@ -119,7 +112,8 @@
                                      :test #'string=))
                            package-data-list
                            :key #'package-data-name))
-                  (dolist (symbol-name (package-data-reexport package-data))
+                  (dolist (symbol-name
+                           (flatten (package-data-reexport package-data)))
                     (multiple-value-bind (symbol status)
                         (find-symbol symbol-name package)
                       (unless status
@@ -133,4 +127,4 @@
                   (push package done))))))
         (dolist (x package-data-list)
           (reexport x))
-        (assert (= (length done) (length package-data-list))))))
+        (assert (= (length done) (length package-data-list)))))))
