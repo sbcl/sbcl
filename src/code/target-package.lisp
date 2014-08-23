@@ -1268,24 +1268,6 @@ uninterned."
   (mapcar #'string (if (listp thing)
                        thing
                        (list thing))))
-
-;;; This is like UNINTERN, except if SYMBOL is inherited, it chases
-;;; down the package it is inherited from and uninterns it there. Used
-;;; for name-conflict resolution. Shadowing symbols are not uninterned
-;;; since they do not cause conflicts.
-(defun moby-unintern (symbol package)
-  (unless (member symbol (package-%shadowing-symbols package))
-    (or (unintern symbol package)
-        (let ((name (symbol-name symbol)))
-          (multiple-value-bind (s w) (find-symbol name package)
-            (declare (ignore s))
-            (when (eq w :inherited)
-              (dolist (q (package-%use-list package))
-                (multiple-value-bind (u x) (find-external-symbol name q)
-                  (declare (ignore u))
-                  (when x
-                    (unintern symbol q)
-                    (return t))))))))))
 
 (defun export (symbols &optional (package (sane-package)))
   #!+sb-doc
