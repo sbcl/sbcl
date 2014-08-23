@@ -927,15 +927,8 @@ pre-allocated bignum. The allocated bignum-length must be (1+ COUNT)."
             (mpz-pow base power))))))
 
 ;;; installation
-(defmacro with-package-locks-ignored (&body body)
-  `(handler-bind ((sb-ext:package-lock-violation
-                    (lambda (condition)
-                      (declare (ignore condition))
-                      (invoke-restart :ignore-all))))
-     ,@body))
-
 (defun install-gmp-funs ()
-  (with-package-locks-ignored
+  (sb-ext:without-package-locks
       (macrolet ((def (destination source)
                    `(setf (fdefinition ',destination)
                           (fdefinition ',source))))
@@ -952,7 +945,7 @@ pre-allocated bignum. The allocated bignum-length must be (1+ COUNT)."
   (values))
 
 (defun uninstall-gmp-funs ()
-  (with-package-locks-ignored
+  (sb-ext:without-package-locks
       (macrolet ((def (destination source)
                    `(setf (fdefinition ',destination)
                           ,(intern (format nil "*~A-FUNCTION*" source)))))
