@@ -521,16 +521,21 @@ invoked. In that case it will store into PLACE and start over."
      ,@(mapcar (lambda (spec) `(sb!xc:proclaim ',spec))
                specs)))
 
+;; Avoid unknown return values in emitted code for PRINT-UNREADABLE-OBJECT
+(declaim (ftype (sfunction (t t t t &optional t) null)
+                %print-unreadable-object))
 (defmacro-mundanely print-unreadable-object ((object stream &key type identity)
                                              &body body)
   #!+sb-doc
   "Output OBJECT to STREAM with \"#<\" prefix, \">\" suffix, optionally
   with object-type prefix and object-identity suffix, and executing the
   code in BODY to provide possible further output."
-  `(%print-unreadable-object ,object ,stream ,type ,identity
-                             ,(if body
-                                  `(lambda () ,@body)
-                                  nil)))
+  ;; Note: possibly out-of-order keyword argument evaluation.
+  (if body
+      (let ((fun (make-symbol "THUNK")))
+        `(dx-flet ((,fun () ,@body))
+           (%print-unreadable-object ,object ,stream ,type ,identity #',fun)))
+      `(%print-unreadable-object ,object ,stream ,type ,identity)))
 
 (defmacro-mundanely ignore-errors (&rest forms)
   #!+sb-doc

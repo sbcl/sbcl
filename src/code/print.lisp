@@ -340,7 +340,7 @@ variable: an unreadable object representing the error is printed instead.")
       o)))
 
 ;;; guts of PRINT-UNREADABLE-OBJECT
-(defun %print-unreadable-object (object stream type identity body)
+(defun %print-unreadable-object (object stream type identity &optional body)
   (declare (type (or null function) body))
   (if *print-readably*
       (print-not-readable-error object stream)
