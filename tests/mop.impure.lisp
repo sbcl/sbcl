@@ -369,11 +369,12 @@
 (with-test (:name (allocate-instance built-in-class error))
   (dolist (class-name '(fixnum bignum symbol t))
     (let ((class (find-class class-name)))
-      (assert (typep class 'built-in-class))
-      (multiple-value-bind (value error)
-          (ignore-errors (allocate-instance class))
-        (assert (null value))
-        (assert (typep error 'error))))))
+      ;; actually T can't be a built-in-class
+      (when (typep class 'built-in-class)
+        (multiple-value-bind (value error)
+            (ignore-errors (allocate-instance class))
+          (assert (null value))
+          (assert (typep error 'error)))))))
 
 ;;; bug reported by David Morse: direct-subclass update protocol was broken
 (defclass vegetable () ())

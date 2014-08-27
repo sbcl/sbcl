@@ -157,3 +157,7 @@
   (assert-error (make-instance 'sb-mop:direct-slot-definition
                                :name 'x :writers '(foo . bar))
                 sb-pcl::slotd-initialization-error))
+
+(with-test (:name (:bug-1332983 :validate-superclass stream t))
+  (assert
+   (sb-mop:validate-superclass (find-class 'stream) (find-class 't))))

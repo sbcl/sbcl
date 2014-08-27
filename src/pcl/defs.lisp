@@ -268,7 +268,10 @@
 ;;;; the classes that define the kernel of the metabraid
 
 (defclass t () ()
-  (:metaclass built-in-class))
+  ;; AMOP specifies that the class named T should be an instance of
+  ;; BUILT-IN-CLASS, but this conflicts with other specifications in
+  ;; AMOP and CLHS.
+  (:metaclass system-class))
 
 (defclass function (t) ()
   (:metaclass system-class))

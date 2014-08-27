@@ -182,7 +182,7 @@ indicate, and apparently no clients for it.
 @tindex @sbmop{funcallable-standard-object}
 @tindex @cl{standard-object}
 @tindex @cl{function}
-The direct superclasses of @code{sb-mop:funcallable-standard-object} are
+The direct superclasses of @code{funcallable-standard-object} are
 @code{(function standard-object)}, not @code{(standard-object function)}.
 
 This is to ensure that the @code{standard-object} class is the last of
@@ -223,9 +223,9 @@ of metaclass @code{funcallable-standard-class} must have
 @findex @cl{subtypep}
 After a class has been finalized, it is associated with a class
 prototype which is accessible by a standard mop function
-@code{sb-mop:class-prototype}.  The user can then ask whether this
-object is a @code{function} or not in several different ways: whether it
-is a function according to @code{typep}; whether its @code{class-of} is
+@code{class-prototype}.  The user can then ask whether this object is a
+@code{function} or not in several different ways: whether it is a
+function according to @code{typep}; whether its @code{class-of} is
 @code{subtypep} @code{function}, or whether @code{function} appears in
 the superclasses of the class.  The additional consistency requirement
 comes from the desire to make all of these answers the same.
@@ -254,8 +254,8 @@ and leads to a class whose instances are funcallable and have one slot.
 
 @tindex @sbmop{funcallable-standard-object}
 Note that this requirement also applies to the class
-@code{sb-mop:funcallable-standard-object}, which has metaclass
-@code{sb-mop:funcallable-standard-class} rather than
+@code{funcallable-standard-object}, which has metaclass
+@code{funcallable-standard-class} rather than
 @code{standard-class} as AMOP specifies.
 
 @item
@@ -277,8 +277,8 @@ of software from colliding with each other.
 @findex @setf{@sbmop{slot-value-using-class}}
 @findex @sbmop{slot-boundp-using-class}
 specializations of the @code{new-value} argument to @code{(setf
-sb-mop:slot-value-using-class)} are not allowed: all user-defined
-methods must have a specializer of the class @code{t}.
+slot-value-using-class)} are not allowed: all user-defined methods must
+have a specializer of the class @code{t}.
 
 This prohibition is motivated by a separation of layers: the
 @code{slot-value-using-class} family of functions is intended for use in
@@ -321,6 +321,24 @@ associated with a class of type @code{structure-class}).
 This allows code which uses constant names for structure slots to
 continue working as specified in ANSI, while enforcing the constraint
 for all other types of slot.
+
+@item
+@tindex @cl{t}
+@tindex @cl{built-in-class}
+@findex @sbmop{validate-superclass}
+@findex @cl{defclass}
+the class named @code{t} is not an instance of the @code{built-in-class}
+metaclass.
+
+AMOP specifies, in the ``Inheritance Structure of Metaobject Classes''
+section, that the class named @code{t} should be an instance of
+@code{built-in-class}.  However, it also specifies that
+@code{validate-superclass} should return true (indicating that a direct
+superclass relationship is permissible) if the second argument is the
+class named @code{t}.  Also, ANSI specifies that classes with metaclass
+@code{built-in-class} may not be subclassed using @code{defclass}, and
+also that the class named @code{t} is the universal superclass,
+inconsistent with it being a @code{built-in-class}.
 
 @end itemize
 
