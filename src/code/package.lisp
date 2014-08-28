@@ -30,6 +30,7 @@
 ;;;   the entry is unused. If it is one, then it is deleted.
 ;;;   Double-hashing is used for collision resolution.
 
+;; FIXME: too vaguely named. Should be PACKAGE-HASH-VECTOR.
 (def!type hash-vector () '(simple-array (unsigned-byte 8) (*)))
 
 (def!struct (package-hashtable
@@ -211,13 +212,9 @@
 
 ;;;; WITH-PACKAGE-ITERATOR
 
-(defvar *empty-package-hashtable*
-    (%make-package-hashtable
-     #() (make-array 0 :element-type '(unsigned-byte 8)) 0))
-
 (defun package-iter-init (access-types pkg-designator-list)
   (declare (type (integer 1 7) access-types)) ; a nonzero bitmask over types
-  (values (logior (ash access-types 3) #b11) 0 *empty-package-hashtable*
+  (values (logior (ash access-types 3) #b11) 0 0 #()
           (package-listify pkg-designator-list)))
 
 ;; The STATE parameter is comprised of 4 packed fields
@@ -228,10 +225,10 @@
 ;;
 (defconstant +package-iter-check-shadows+  #b000100)
 
-(defun package-iter-step (start-state index table pkglist)
+(defun package-iter-step (start-state index hash-vec sym-vec pkglist)
   ;; the defknown isn't enough
   (declare (type fixnum start-state) (type index index)
-           (type package-hashtable table) (type list pkglist))
+           (type simple-vector sym-vec) (type list pkglist))
   (declare (optimize speed))
   (labels
       ((advance (state) ; STATE is the one just completed
@@ -264,7 +261,7 @@
                 (advance 1))) ; skip state 1
            (t ; initial state
             (cond ((endp pkglist) ; latch into returning NIL forever more
-                   (values 0 0 *empty-package-hashtable* nil))
+                   (values 0 0 0 #() nil nil nil))
                   ((desired-state-p 0) ; enter state 0
                    (start 0 (package-internal-symbols (this-package))))
                   (t (advance 0)))))) ; skip state 0
@@ -273,32 +270,33 @@
        (this-package ()
          (truly-the sb!xc:package (car pkglist)))
        (start (next-state new-table)
-         (package-iter-step (logior (mask-field (byte 3 3) start-state)
-                                    next-state)
-                            (length (package-hashtable-table new-table))
-                            new-table pkglist)))
+         (let ((symbols (package-hashtable-table new-table)))
+           (package-iter-step (logior (mask-field (byte 3 3) start-state)
+                                      next-state)
+                              (length symbols)
+                              (package-hashtable-hash new-table)
+                              symbols pkglist))))
     (declare (inline desired-state-p this-package))
     (if (zerop index)
         (advance start-state)
-        (let ((hash-vec (package-hashtable-hash table)))
-          ;; We could disable bounds-checking here, but if somebody manages
-          ;; to shrink a package-hashtable while iterating, that would be bad.
-          (macrolet ((scan (&optional (guard t))
-                       `(loop
-                         (when (and (>= (aref hash-vec (decf index)) 2) ,guard)
-                           (return (values start-state index table pkglist)))
-                         (when (zerop index)
-                           (return (advance start-state))))))
-            (if (logtest start-state +package-iter-check-shadows+)
-                (let ((sym-vec (package-hashtable-table table))
-                      (shadows (package-%shadowing-symbols (this-package))))
-                  (scan (not (member (symbol-name (svref sym-vec index))
-                                     shadows :test #'string=))))
-                (scan)))))))
-
-(defconstant-eqx +package-iter-access-kind+
-    #(:internal :external :inherited)
-  #'equalp)
+        (macrolet ((scan (&optional (guard t))
+                   `(loop
+                     (when (and (>= (aref hash-vec (decf index)) 2) ,guard)
+                       (return (values start-state index hash-vec sym-vec
+                                       pkglist
+                                       (svref sym-vec index)
+                                       (aref #(:internal :external :inherited)
+                                             (logand start-state 3)))))
+                     (when (zerop index)
+                       (return (advance start-state))))))
+          ;; HASH-VEC wasn't type-checked yet
+          (declare (type hash-vector hash-vec)
+                   #-sb-xc-host(optimize (sb!c::insert-array-bounds-checks 0)))
+          (if (logtest start-state +package-iter-check-shadows+)
+              (let ((shadows (package-%shadowing-symbols (this-package))))
+                (scan (not (member (symbol-name (svref sym-vec index))
+                                   shadows :test #'string=))))
+              (scan))))))
 
 (defmacro-mundanely with-package-iterator ((mname package-list
                                                   &rest symbol-types)
@@ -319,27 +317,21 @@ of :INHERITED :EXTERNAL :INTERNAL."
              :format-control
              "~S is not one of :INTERNAL, :EXTERNAL, or :INHERITED."
              :format-arguments (list symbol))))
-  (with-unique-names (bits index table pkglist)
-    (let ((state (list bits index table pkglist))
+  (with-unique-names (bits index hash-vec sym-vec pkglist symbol kind)
+    (let ((state (list bits index hash-vec sym-vec pkglist))
           (select (logior (if (member :internal  symbol-types) 1 0)
                           (if (member :external  symbol-types) 2 0)
                           (if (member :inherited symbol-types) 4 0))))
       `(multiple-value-bind ,state (package-iter-init ,select ,package-list)
-         (macrolet
-           ((,mname ()
-              '(if (eql 0 (multiple-value-setq ,state
-                            (package-iter-step ,@state)))
-                   nil
-                   (values
-                    t
-                    ;; If the iterator state held the symbol vector directly,
-                    ;; we could safely elide bounds-checking. The fix mentioned
-                    ;; in the comment above WITH-SYMBOL would also help.
-                    (svref (package-hashtable-table ,table) ,index)
-                    (svref +package-iter-access-kind+
-                           (truly-the (mod 3) (logand ,bits #b11)))
-                    (car ,pkglist)))))
-           ,@body)))))
+         (let (,symbol ,kind)
+           (macrolet
+               ((,mname ()
+                   '(if (eql 0 (multiple-value-setq (,@state ,symbol ,kind)
+                                 (package-iter-step ,@state)))
+                        nil
+                        (values t ,symbol ,kind
+                                (car (truly-the list ,pkglist))))))
+             ,@body))))))
 
 (defmacro-mundanely with-package-graph ((&key) &body forms)
   `(flet ((thunk () ,@forms))

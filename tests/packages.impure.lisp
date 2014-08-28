@@ -720,6 +720,39 @@ if a restart was invoked."
           (assert (equal (length (intersection answer expect :test #'equal))
                          (length expect))))))))
 
+;; Assert that changes in size of a package-hashtable's symbol vector
+;; do not cause WITH-PACKAGE-ITERATOR to crash. The vector shouldn't grow,
+;; because it is not permitted to INTERN new symbols, but it can shrink
+;; because it is expressly permitted to UNINTERN the current symbol.
+;; (In fact we allow INTERN, but that's beside the point)
+(with-test (:name :with-package-iterator-and-mutation)
+  (flet ((table-size (pkg)
+           (length (sb-impl::package-hashtable-table
+                    (sb-impl::package-internal-symbols pkg)))))
+    (let* ((p (make-package (string (gensym))))
+           (initial-table-size (table-size p))
+           (strings
+            '("a" "b" "c" "d" "e" "f" "g" "h" "i" "j" "k" "l" "m")))
+      (dolist (x strings)
+        (intern x p))
+      (let ((grown-table-size (table-size p)))
+        (assert (> grown-table-size initial-table-size))
+        (let ((n 0))
+          (with-package-iterator (iter p :internal)
+            (loop (multiple-value-bind (foundp sym) (iter)
+                    (cond (foundp
+                           (incf n)
+                           (unintern sym p))
+                          (t
+                           (return)))))
+            (assert (= n (length strings)))
+            ;; while we're at it, assert that calling the iterator
+            ;; a couple more times returns nothing.
+            (dotimes (i 2)
+              (assert (not (iter))))))
+        (let ((shrunk-table-size (table-size p)))
+          (assert (< shrunk-table-size grown-table-size)))))))
+
 (with-test (:name :export-inaccessible-lookalike)
   (make-package "E1")
   (make-package "E2")
