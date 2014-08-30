@@ -73,7 +73,7 @@
   (:generator 5
     (let ((error (generate-error-code vop 'invalid-array-index-error array bound index)))
       (inst cmp index bound)
-      (inst b :ge error)
+      (inst b :hs error)
       (move result index))))
 
 ;;;; Accessors/Setters

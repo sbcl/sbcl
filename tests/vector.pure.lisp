@@ -54,3 +54,13 @@
   (compile nil `(lambda (a)
                   (declare ((vector undefined-type) a))
                   (setf (svref a 0) 10))))
+
+(with-test (:name :svref-negative-index)
+  (let ((vector #(1)))
+    (flet ((test (index)
+             (funcall (compile nil `(lambda (vector index)
+                                      (svref vector index)))
+                      vector index)))
+      (assert-error (test -1))
+      (assert (= (test 0) 1))
+      (assert-error (test 1)))))
