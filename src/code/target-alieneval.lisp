@@ -120,7 +120,7 @@ This is SETFable."
     (dolist (binding (reverse bindings))
       (/show binding)
       (destructuring-bind
-            (symbol type &optional (opt1 nil opt1p) (opt2 nil opt2p))
+          (symbol type &optional opt1 (opt2 nil opt2p))
           binding
         (/show symbol type opt1 opt2)
         (let* ((alien-type (parse-alien-type type env))

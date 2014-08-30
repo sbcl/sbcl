@@ -46,3 +46,29 @@
     (error-p (&optional foo &optional bar))
     (error-p (&rest foo &rest bar))
     (error-p (&rest foo &optional bar))))
+
+(with-test (:name :supplied-p-order)
+  (let ((* 10))
+    (assert (eql ((lambda (&key (x * *)) () x)) 10))
+    (assert (eql ((lambda (&key (y * *) (x *)) () x) :y 1) t))
+    (assert (eql ((lambda (&key (x *) (y * *)) () x) :y 1) 10))
+
+    (assert (eql (destructuring-bind (&key (x * *)) () x) 10))
+    (assert (eql (destructuring-bind (&key (y * *) (x *)) '(:y 1) x) t))
+    (assert (eql (destructuring-bind (&key (x *) (y * *)) '(:y 1) x) 10))
+
+    (assert (eql ((lambda (&optional (x * *)) () x)) 10))
+    (assert (eql ((lambda (&optional (y * *) (x *)) () x) 1) t))
+    (assert (eql ((lambda (&optional (x *) (y * *)) () x)) 10))
+
+    (assert (eql (destructuring-bind (&optional (x * *)) () x) 10))
+    (assert (eql (destructuring-bind (&optional (y * *) (x *)) '(1) x) t))
+    (assert (eql (destructuring-bind (&optional (x *) (y * *)) () x) 10))))
+
+(with-test (:name :supplied-p-order)
+  (assert-no-signal
+   (compile nil (lambda ()
+                  (destructuring-bind (&optional (x nil xp)) '()
+                    (declare (ignore x xp))
+                    nil)))
+   warning))

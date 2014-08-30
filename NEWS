@@ -1,4 +1,8 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
+changes relative to sbcl-1.2.3:
+  * bug fix: Wrong binding order of supplied-p parameters in macro lambda lists.
+    (lp#721135)
+
 changes in sbcl-1.2.3 relative to sbcl-1.2.2:
   * enhancement: DOCUMENTATION works on instances of
     FUNCALLABLE-STANDARD-CLASS

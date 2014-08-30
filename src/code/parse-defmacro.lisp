@@ -378,22 +378,24 @@
 
 (defun push-optional-binding (value-var init-form suppliedp-name
                               &key is-supplied-p path name context error-fun)
-  (unless suppliedp-name
-    (setq suppliedp-name (gensym "SUPPLIEDP-")))
-  (push-let-binding suppliedp-name is-supplied-p :system t)
-  (cond ((consp value-var)
-         (let ((whole-thing (gensym "OPTIONAL-SUBLIST-")))
-           (push-sublist-binding whole-thing
-                                 `(if ,suppliedp-name ,path ,init-form)
-                                 value-var name context error-fun)
-           (parse-defmacro-lambda-list value-var whole-thing name
-                                       context
-                                       :error-fun error-fun
-                                       :sublist t)))
-        ((symbolp value-var)
-         (push-let-binding value-var path :when suppliedp-name :else init-form))
-        (t
-         (error "illegal optional variable name: ~S" value-var))))
+  (let ((sym (gensym "SUPPLIEDP-")))
+    (push-let-binding sym is-supplied-p :system t)
+    (cond ((consp value-var)
+           (let ((whole-thing (gensym "OPTIONAL-SUBLIST-")))
+             (push-sublist-binding whole-thing
+                                   `(if ,sym ,path ,init-form)
+                                   value-var name context error-fun)
+             (parse-defmacro-lambda-list value-var whole-thing name
+                                         context
+                                         :error-fun error-fun
+                                         :sublist t)))
+          ((symbolp value-var)
+           (push-let-binding value-var path :when sym :else init-form))
+          (t
+           (error "Illegal optional variable name: ~S" value-var)))
+    ;; Shouldn't be bound during the initform evaluation
+    (when suppliedp-name
+      (push-let-binding suppliedp-name sym))))
 
 (defun defmacro-error (problem context name)
   (error "illegal or ill-formed ~A argument in ~A~@[ ~S~]"
