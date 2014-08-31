@@ -22,8 +22,8 @@
   `(integer 0 (,sb!xc:char-code-limit)))
 
 (progn
- (defvar *unicode-character-name-database*)
- (defvar *unicode-character-name-huffman-tree*))
+ (defvar **unicode-character-name-database**)
+ (defvar **unicode-character-name-huffman-tree**))
 
 (defun sorted-position (item list)
   (let ((index 0))
@@ -206,9 +206,9 @@
                                          (sort (copy-seq name->code) #'< :key #'car))
                                    (setf names nil)
                                    `(defun !character-name-database-cold-init ()
-                                      (setq *unicode-character-name-database*
+                                      (setq **unicode-character-name-database**
                                             (cons ',code->name ',name->code)
-                                            *unicode-character-name-huffman-tree* ',tree))))))))))
+                                            **unicode-character-name-huffman-tree** ',tree))))))))))
 
   (frob))
 #+sb-xc-host (!character-name-database-cold-init)
@@ -420,11 +420,11 @@ strings and symbols of length 1."
   (let ((char-code (char-code char)))
     (or (second (assoc char-code *base-char-name-alist*))
         (let ((h-code (cdr (binary-search char-code
-                                          (car *unicode-character-name-database*)
+                                          (car **unicode-character-name-database**)
                                           :key #'car))))
           (cond
             (h-code
-             (huffman-decode h-code *unicode-character-name-huffman-tree*))
+             (huffman-decode h-code **unicode-character-name-huffman-tree**))
             (t
              (format nil "U~X" char-code)))))))
 
@@ -441,11 +441,11 @@ name is that string, if one exists. Otherwise, NIL is returned."
              (encoding (huffman-encode (if (string= "U+" (subseq %name 0 2))
                                            (remove #\+ %name :count 1)
                                            %name)
-                                       *unicode-character-name-huffman-tree*)))
+                                       **unicode-character-name-huffman-tree**)))
         (when encoding
           (let* ((char-code
                   (car (binary-search encoding
-                                      (cdr *unicode-character-name-database*)
+                                      (cdr **unicode-character-name-database**)
                                       :key #'cdr)))
                  (name-string (string name))
                  (name-length (length name-string)))

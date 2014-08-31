@@ -11,24 +11,6 @@
 
 (in-package "SB!UNICODE")
 
-(eval-when (:compile-toplevel :load-toplevel :execute)
-  ;; Lift some internal stuff from SB-IMPL to prevent piles of packkage prefixes
-  (import 'SB!IMPL::**CHARACTER-MISC-DATABASE**)
-  (import 'SB!IMPL::**CHARACTER-HIGH-PAGES**)
-  (import 'SB!IMPL::**CHARACTER-LOW-PAGES**)
-  (import 'SB!IMPL::**CHARACTER-DECOMPOSITIONS**)
-  (import 'SB!IMPL::**CHARACTER-PRIMARY-COMPOSITIONS**)
-  (import 'SB!IMPL::**CHARACTER-CASES**)
-  (import 'SB!IMPL::**CHARACTER-CASE-PAGES**)
-  (import 'SB!IMPL::**CHARACTER-COLLATIONS**)
-  (import 'SB!IMPL::*UNICODE-CHARACTER-NAME-DATABASE*)
-  (import 'SB!IMPL::*UNICODE-CHARACTER-NAME-HUFFMAN-TREE*)
-  (import 'SB!IMPL::BINARY-SEARCH)
-  (import 'SB!IMPL::HUFFMAN-DECODE)
-  (import 'SB!IMPL::MISC-INDEX)
-  (import 'SB!IMPL::CLEAR-FLAG)
-  (import 'SB!IMPL::PACK-3-CODEPOINTS))
-
 (defparameter **special-numerics**
   '#.(with-open-file (stream
                      (merge-pathnames
@@ -380,11 +362,11 @@ This property has been officially obsoleted by the Unicode standard, and
 is only included for backwards compatibility."
   (let* ((char-code (+ #x110000 (char-code character)))
          (h-code (cdr (binary-search char-code
-                                     (car *unicode-character-name-database*)
+                                     (car **unicode-character-name-database**)
                                      :key #'car))))
     (when h-code
       ;; Remove UNICODE1_ prefix
-      (subseq (huffman-decode h-code *unicode-character-name-huffman-tree*) 9))))
+      (subseq (huffman-decode h-code **unicode-character-name-huffman-tree**) 9))))
 
 (defun age (character)
   #!+sb-doc

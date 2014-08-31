@@ -1278,7 +1278,29 @@ possibly temporarily, because it might be used internally."
                ;; hooks for contrib/ stuff we're insufficiently sure
                ;; about to add to SB!EXT
                "*REPL-PROMPT-FUN*"
-               "*REPL-READ-FORM-FUN*"))
+               "*REPL-READ-FORM-FUN*"
+
+               ;; Character database
+               "**CHARACTER-MISC-DATABASE**"
+               "**CHARACTER-HIGH-PAGES**"
+               "**CHARACTER-LOW-PAGES**"
+               "**CHARACTER-DECOMPOSITIONS**"
+               "**CHARACTER-PRIMARY-COMPOSITIONS**"
+               "**CHARACTER-CASES**"
+               "**CHARACTER-CASE-PAGES**"
+               "**CHARACTER-COLLATIONS**"
+               "**UNICODE-CHARACTER-NAME-DATABASE**"
+               "**UNICODE-CHARACTER-NAME-HUFFMAN-TREE**"
+
+               ;; Character database access
+               "MISC-INDEX"
+               "CLEAR-FLAG"
+               "PACK-3-CODEPOINTS"
+
+               ;; Huffman trees
+               "HUFFMAN-ENCODE"
+               "HUFFMAN-DECODE"
+               "BINARY-SEARCH"))
 
    ;; FIXME: This package is awfully huge. It'd probably be good to
    ;; split it. There's at least one natural way to split it: the
@@ -2579,7 +2601,7 @@ SB-KERNEL) have been undone, but probably more remain."
    #s(sb-cold:package-data
       :name "SB!UNICODE"
       :doc "public: algorithms for Unicode data"
-      :use ("CL")
+      :use ("CL" "SB!INT")
       :export ("GENERAL-CATEGORY"
                "BIDI-CLASS"
                "COMBINING-CLASS"
