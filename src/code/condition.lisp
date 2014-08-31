@@ -1419,9 +1419,6 @@ handled by any other handler, it will be muffled.")
 
 (defun uninteresting-ordinary-function-redefinition-p (warning)
   (and
-   ;; There's garbage in various places when the first DEFUN runs in
-   ;; cold-init.
-   *cold-init-complete-p*
    (typep warning 'redefinition-with-defun)
    ;; Shared logic.
    (let ((name (redefinition-warning-name warning)))
