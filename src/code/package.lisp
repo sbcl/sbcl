@@ -119,6 +119,22 @@
 ;; If uninterning stored 0 for the tombstone instead of NIL in the symbol
 ;; vector, we wouldn't mistake it for a genuinely present symbol.
 
+(flet ((expand-iterator (range var body result-form)
+         (multiple-value-bind (forms decls)
+             (parse-body body :doc-string-allowed nil)
+           (with-unique-names (iterator winp next)
+             `(block nil
+                (with-package-iterator (,iterator ,@range)
+                 (tagbody
+                  ,next
+                  (multiple-value-bind (,winp ,var) (,iterator)
+                    ;; I don't think this VAR is automatically ignorable.
+                    ;; The user should use it, or declare IGNORE/IGNORABLE.
+                    ,@decls
+                    (if ,winp
+                        (tagbody ,@forms (go ,next))
+                        (return ,result-form))))))))))
+
 (defmacro-mundanely do-symbols ((var &optional
                                      (package '*package*)
                                      result-form)
@@ -127,33 +143,9 @@
   "DO-SYMBOLS (VAR [PACKAGE [RESULT-FORM]]) {DECLARATION}* {TAG | FORM}*
    Executes the FORMs at least once for each symbol accessible in the given
    PACKAGE with VAR bound to the current symbol."
-  (multiple-value-bind (body decls)
-      (parse-body body-decls :doc-string-allowed nil)
-    (let ((flet-name (sb!xc:gensym "DO-SYMBOLS-")))
-      `(block nil
-         (flet ((,flet-name (,var)
-                  ,@decls
-                  (tagbody ,@body)))
-           (let* ((package (find-undeleted-package-or-lose ,package))
-                  (shadows (package-%shadowing-symbols package)))
-             (flet ((iterate-over-hash-table (table ignore)
-                      (let ((hash-vec (package-hashtable-hash table))
-                            (sym-vec (package-hashtable-table table)))
-                        (dotimes (i (length sym-vec))
-                          (when (>= (aref hash-vec i) 2)
-                            (let ((sym (aref sym-vec i)))
-                              (declare (inline member))
-                              (unless (member sym ignore :test #'string=)
-                                (,flet-name sym))))))))
-               (iterate-over-hash-table (package-internal-symbols package) nil)
-               (iterate-over-hash-table (package-external-symbols package) nil)
-               (dolist (use (package-%use-list package))
-                 (iterate-over-hash-table (package-external-symbols use)
-                                          shadows)))))
-         (let ((,var nil))
-           (declare (ignorable ,var))
-           ,@decls
-           ,result-form)))))
+  (expand-iterator `((find-undeleted-package-or-lose ,package)
+                     :internal :external :inherited)
+                   var body-decls result-form))
 
 (defmacro-mundanely do-external-symbols ((var &optional
                                               (package '*package*)
@@ -163,24 +155,8 @@
   "DO-EXTERNAL-SYMBOLS (VAR [PACKAGE [RESULT-FORM]]) {DECL}* {TAG | FORM}*
    Executes the FORMs once for each external symbol in the given PACKAGE with
    VAR bound to the current symbol."
-  (multiple-value-bind (body decls)
-      (parse-body body-decls :doc-string-allowed nil)
-    (let ((flet-name (sb!xc:gensym "DO-SYMBOLS-")))
-      `(block nil
-         (flet ((,flet-name (,var)
-                  ,@decls
-                  (tagbody ,@body)))
-           (let* ((package (find-undeleted-package-or-lose ,package))
-                  (table (package-external-symbols package))
-                  (hash-vec (package-hashtable-hash table))
-                  (sym-vec (package-hashtable-table table)))
-             (dotimes (i (length sym-vec))
-               (when (>= (aref hash-vec i) 2)
-                 (,flet-name (aref sym-vec i))))))
-         (let ((,var nil))
-           (declare (ignorable ,var))
-           ,@decls
-           ,result-form)))))
+  (expand-iterator `((find-undeleted-package-or-lose ,package) :external)
+                   var body-decls result-form))
 
 (defmacro-mundanely do-all-symbols ((var &optional
                                          result-form)
@@ -189,26 +165,9 @@
   "DO-ALL-SYMBOLS (VAR [RESULT-FORM]) {DECLARATION}* {TAG | FORM}*
    Executes the FORMs once for each symbol in every package with VAR bound
    to the current symbol."
-  (multiple-value-bind (body decls)
-      (parse-body body-decls :doc-string-allowed nil)
-    (let ((flet-name (sb!xc:gensym "DO-SYMBOLS-")))
-      `(block nil
-         (flet ((,flet-name (,var)
-                  ,@decls
-                  (tagbody ,@body)))
-           (dolist (package (list-all-packages))
-             (flet ((iterate-over-hash-table (table)
-                      (let ((hash-vec (package-hashtable-hash table))
-                            (sym-vec (package-hashtable-table table)))
-                        (dotimes (i (length sym-vec))
-                          (when (>= (aref hash-vec i) 2)
-                            (,flet-name (aref sym-vec i)))))))
-               (iterate-over-hash-table (package-internal-symbols package))
-               (iterate-over-hash-table (package-external-symbols package)))))
-         (let ((,var nil))
-           (declare (ignorable ,var))
-           ,@decls
-           ,result-form)))))
+  (expand-iterator '((list-all-packages) :internal :external)
+                   var body-decls result-form)))
+
 
 ;;;; WITH-PACKAGE-ITERATOR
 

@@ -753,6 +753,14 @@ if a restart was invoked."
         (let ((shrunk-table-size (table-size p)))
           (assert (< shrunk-table-size grown-table-size)))))))
 
+;; example from CLHS
+(with-test (:name :do-symbols-block-scope)
+  (assert (eq t
+              (block nil
+                (do-symbols (s (or (find-package "FROB") (return nil)))
+                  (print s))
+                t))))
+
 (with-test (:name :export-inaccessible-lookalike)
   (make-package "E1")
   (make-package "E2")
