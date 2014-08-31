@@ -219,8 +219,8 @@
   ((or list package-designator) &optional package-designator) (eql t))
 (defknown find-all-symbols (string-designator) list (flushable))
 ;; private
-(defknown package-iter-step (fixnum index t simple-vector list)
-  (values fixnum index t simple-vector list symbol symbol))
+(defknown package-iter-step (fixnum index simple-vector list)
+  (values fixnum index simple-vector list symbol symbol))
 
 ;;;; from the "Numbers" chapter:
 

@@ -35,14 +35,10 @@
 
 (def!struct (package-hashtable
              (:constructor %make-package-hashtable
-                           (table hash size &aux (free size)))
+                           (table size &aux (free size)))
              (:copier nil))
-  ;; These first two slots would be better named as 'sym-vec'
-  ;; and 'hash-vec' which is how they're referred to in code.
-  ;; The g-vector of symbols.
+  ;; The general-vector of symbols, with a hash-vector in its last cell.
   (table (missing-arg) :type simple-vector)
-  ;; The i-vector of pname hash values.
-  (hash (missing-arg) :type hash-vector)
   ;; The total number of entries allowed before resizing.
   ;;
   ;; FIXME: CAPACITY would be a more descriptive name. (This is
@@ -97,6 +93,7 @@
   (internal-symbols (missing-arg) :type package-hashtable)
   (external-symbols (missing-arg) :type package-hashtable)
   ;; shadowing symbols
+  ;; Todo: dynamically changeover to a PACKAGE-HASHTABLE if list gets long
   (%shadowing-symbols () :type list)
   ;; documentation string for this package
   (doc-string nil :type (or simple-string null))
@@ -112,12 +109,6 @@
   (%locally-nicknamed-by nil :type list))
 
 ;;;; iteration macros
-
-;; Concerning traversal, it's not clear that scanning the hash-vector makes
-;; the code faster, it might even make it slower because assuming tables
-;; are half full, it's 150% as many reads as just reading the symbols.
-;; If uninterning stored 0 for the tombstone instead of NIL in the symbol
-;; vector, we wouldn't mistake it for a genuinely present symbol.
 
 (flet ((expand-iterator (range var body result-form)
          (multiple-value-bind (forms decls)
@@ -173,7 +164,7 @@
 
 (defun package-iter-init (access-types pkg-designator-list)
   (declare (type (integer 1 7) access-types)) ; a nonzero bitmask over types
-  (values (logior (ash access-types 3) #b11) 0 0 #()
+  (values (logior (ash access-types 3) #b11) 0 #()
           (package-listify pkg-designator-list)))
 
 ;; The STATE parameter is comprised of 4 packed fields
@@ -184,7 +175,7 @@
 ;;
 (defconstant +package-iter-check-shadows+  #b000100)
 
-(defun package-iter-step (start-state index hash-vec sym-vec pkglist)
+(defun package-iter-step (start-state index sym-vec pkglist)
   ;; the defknown isn't enough
   (declare (type fixnum start-state) (type index index)
            (type simple-vector sym-vec) (type list pkglist))
@@ -220,7 +211,7 @@
                 (advance 1))) ; skip state 1
            (t ; initial state
             (cond ((endp pkglist) ; latch into returning NIL forever more
-                   (values 0 0 0 #() nil nil nil))
+                   (values 0 0 #() '() nil nil))
                   ((desired-state-p 0) ; enter state 0
                    (start 0 (package-internal-symbols (this-package))))
                   (t (advance 0)))))) ; skip state 0
@@ -232,29 +223,25 @@
          (let ((symbols (package-hashtable-table new-table)))
            (package-iter-step (logior (mask-field (byte 3 3) start-state)
                                       next-state)
-                              (length symbols)
-                              (package-hashtable-hash new-table)
+                              ;; assert that physical length was nonzero
+                              (the index (1- (length symbols)))
                               symbols pkglist))))
     (declare (inline desired-state-p this-package))
     (if (zerop index)
         (advance start-state)
         (macrolet ((scan (&optional (guard t))
                    `(loop
-                     (when (and (>= (aref hash-vec (decf index)) 2) ,guard)
-                       (return (values start-state index hash-vec sym-vec
-                                       pkglist
-                                       (svref sym-vec index)
-                                       (aref #(:internal :external :inherited)
-                                             (logand start-state 3)))))
+                     (let ((sym (aref sym-vec (decf index))))
+                       (when (and (not (eql sym 0)) ,guard)
+                         (return (values start-state index sym-vec pkglist sym
+                                         (aref #(:internal :external :inherited)
+                                               (logand start-state 3))))))
                      (when (zerop index)
                        (return (advance start-state))))))
-          ;; HASH-VEC wasn't type-checked yet
-          (declare (type hash-vector hash-vec)
-                   #-sb-xc-host(optimize (sb!c::insert-array-bounds-checks 0)))
+          (declare #-sb-xc-host(optimize (sb!c::insert-array-bounds-checks 0)))
           (if (logtest start-state +package-iter-check-shadows+)
               (let ((shadows (package-%shadowing-symbols (this-package))))
-                (scan (not (member (symbol-name (svref sym-vec index))
-                                   shadows :test #'string=))))
+                (scan (not (member sym shadows :test #'string=))))
               (scan))))))
 
 (defmacro-mundanely with-package-iterator ((mname package-list
@@ -276,8 +263,8 @@ of :INHERITED :EXTERNAL :INTERNAL."
              :format-control
              "~S is not one of :INTERNAL, :EXTERNAL, or :INHERITED."
              :format-arguments (list symbol))))
-  (with-unique-names (bits index hash-vec sym-vec pkglist symbol kind)
-    (let ((state (list bits index hash-vec sym-vec pkglist))
+  (with-unique-names (bits index sym-vec pkglist symbol kind)
+    (let ((state (list bits index sym-vec pkglist))
           (select (logior (if (member :internal  symbol-types) 1 0)
                           (if (member :external  symbol-types) 2 0)
                           (if (member :inherited symbol-types) 4 0))))

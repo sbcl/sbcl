@@ -771,3 +771,39 @@ if a restart was invoked."
                  (and (typep condition 'sb-kernel:simple-package-error)
                       (search "not accessible"
                               (simple-condition-format-control condition)))))))
+
+;; Concurrent FIND-SYMBOL was adversely affected by package rehash.
+;; It's slightly difficult to show that this is fixed, because this
+;; test only sometimes failed prior to the fix. Now it never fails though.
+(with-test (:name :concurrent-find-symbol :skipped-on '(not :sb-thread))
+ (let ((pkg (make-package (gensym)))
+       (threads)
+       (names)
+       (run nil))
+   (dotimes (i 50)
+     (let ((s (string (gensym "FRED"))))
+       (push s names)
+       (intern s pkg)))
+   (dotimes (i 5)
+     (push (sb-thread:make-thread
+            (lambda ()
+              (wait-for run)
+              (let ((n-missing 0))
+                (dotimes (i 10 n-missing)
+                  (dolist (name names)
+                    (unless (find-symbol name pkg)
+                      (incf n-missing)))))))
+           threads))
+   (setq run t)
+   ;; Interning new symbols can't cause the pre-determined
+   ;; 50 names to transiently disappear.
+   (let ((s (make-string 3))
+         (alphabet "ABCDEFGHIJKLMNOPQRSTUVWXYZ012345"))
+     (dotimes (i (expt 32 3))
+       (setf (char s 0) (char alphabet (ldb (byte 5 10) i))
+             (char s 1) (char alphabet (ldb (byte 5  5) i))
+             (char s 2) (char alphabet (ldb (byte 5  0) i)))
+       (intern s pkg)))
+   (let ((tot-missing 0))
+     (dolist (thread threads (assert (zerop tot-missing)))
+       (incf tot-missing (sb-thread:join-thread thread))))))

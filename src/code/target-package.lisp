@@ -92,9 +92,7 @@
 ;;; Actually, the smallest table built here has three entries. This
 ;;; is necessary because the double hashing step size is calculated
 ;;; using a division by the table size minus two.
-(defun make-or-remake-package-hashtable (size
-                                         &optional
-                                         res)
+(defun make-package-hashtable (size)
   (flet ((actual-package-hashtable-size (size)
            (loop for n of-type fixnum
               from (logior (ceiling size +package-rehash-threshold+) 1)
@@ -102,29 +100,26 @@
               when (positive-primep n) return n)))
     (let* ((n (actual-package-hashtable-size size))
            (size (truncate (* n +package-rehash-threshold+)))
-           (table (make-array n))
-           (hash (make-array n
-                             :element-type '(unsigned-byte 8)
-                             :initial-element 0)))
-      (if res
-          (setf (package-hashtable-table res) table
-                (package-hashtable-hash res) hash
-                (package-hashtable-size res) size
-                (package-hashtable-free res) size
-                (package-hashtable-deleted res) 0)
-          (setf res (%make-package-hashtable table hash size)))
-      res)))
+           (table (make-array (1+ n) :initial-element 0)))
+      (setf (aref table n)
+            (make-array n :element-type '(unsigned-byte 8)
+                          :initial-element 0))
+      (%make-package-hashtable table size))))
 
 ;;; Destructively resize TABLE to have room for at least SIZE entries
 ;;; and rehash its existing entries.
 (defun resize-package-hashtable (table size)
-  (let* ((vec (package-hashtable-table table))
-         (hash (package-hashtable-hash table))
-         (len (length vec)))
-    (make-or-remake-package-hashtable size table)
+  (let* ((symvec (package-hashtable-table table))
+         (len (1- (length symvec)))
+         (temp-table (make-package-hashtable size)))
     (dotimes (i len)
-      (when (> (aref hash i) 1)
-        (add-symbol table (svref vec i))))))
+      (let ((sym (svref symvec i)))
+        (unless (eql sym 0)
+          (add-symbol temp-table sym))))
+    (setf (package-hashtable-table table) (package-hashtable-table temp-table)
+          (package-hashtable-size table) (package-hashtable-size temp-table)
+          (package-hashtable-free table) (package-hashtable-free temp-table)
+          (package-hashtable-deleted table) 0)))
 
 ;;;; package locking operations, built conditionally on :sb-package-locks
 
@@ -513,8 +508,6 @@ Experimental: interface subject to change."
 
 (defvar *package* (error "*PACKAGE* should be initialized in cold load!")
   #!+sb-doc "the current package")
-;;; FIXME: should be declared of type PACKAGE, with no NIL init form,
-;;; after I get around to cleaning up DOCUMENTATION
 
 (define-condition bootstrap-package-not-found (condition)
   ((name :initarg :name :reader bootstrap-package-name)))
@@ -622,23 +615,22 @@ REMOVE-PACKAGE-LOCAL-NICKNAME, and the DEFPACKAGE option :LOCAL-NICKNAMES."
                               (* (- (package-hashtable-size table)
                                     (package-hashtable-deleted table))
                                  2)))
-  (let* ((vec (package-hashtable-table table))
-         (hash (package-hashtable-hash table))
-         (len (length vec))
+  (let* ((symvec (package-hashtable-table table))
+         (len (1- (length symvec)))
+         (hashvec (the hash-vector (aref symvec len)))
          (sxhash (%sxhash-simple-string (symbol-name symbol)))
          (h2 (1+ (rem sxhash (- len 2)))))
     (declare (fixnum sxhash h2))
     (do ((i (rem sxhash len) (rem (+ i h2) len)))
-        ((< (the fixnum (aref hash i)) 2)
-         (if (zerop (the fixnum (aref hash i)))
+        ((< (aref hashvec i) 2)
+         (if (eql (aref hashvec i) 0)
              (decf (package-hashtable-free table))
              (decf (package-hashtable-deleted table)))
-         ;; This order is critical but the code is not strong enough as is.
-         ;; There should be a write barrier in here somewhere, otherwise
-         ;; in a system which allows out-of-order memory writes,
-         ;; another thread could see a valid hash but 0 for the symbol.
-         (setf (svref vec i) symbol)
-         (setf (aref hash i)
+         ;; This order of these two SETFs does not matter.
+         ;; A symbol cell of 0 is skipped on lookup if the hash cell
+         ;; matches something accidentally.
+         (setf (svref symvec i) symbol)
+         (setf (aref hashvec i)
                (entry-hash (length (symbol-name symbol))
                            sxhash)))
       (declare (fixnum i)))))
@@ -664,37 +656,14 @@ REMOVE-PACKAGE-LOCAL-NICKNAME, and the DEFPACKAGE option :LOCAL-NICKNAMES."
 ;;; is bound to the symbol. LENGTH and HASH are the length and sxhash
 ;;; of STRING. ENTRY-HASH is the entry-hash of the string and length.
 
-#| WITH-SYMBOL is supposedly thread-safe for single-writer/multi-reader,
-   but it can crash in two ways during resize of a package-hashtable:
-   - MAKE-OR-REMAKE-PACKAGE-HASHTABLE assigns the TABLE slot before
-     the HASH slot, so the initial index computed into HASH can be wrong.
-   - If a hash-vector element is a positive hit but there is a zero in the
-     corresponding location in the symbol-vector, it calls (SYMBOL-NAME 0).
-Example:
-* (let ((h (sxhash "GG"))) (values (mod h 17) (entry-hash 2 h))) => 8, 238
-* (let ((h (sxhash "$o"))) (values (mod h 37) (entry-hash 2 h))) => 8, 238
-* (intern "GG" (make-package "X"))
-;; Simulate growth of TABLE to the next larger size. Also suppose that the
-;; the rehashing thread is switched out by the OS after this setf.
-* (setf (package-hashtable-table (package-internal-symbols (find-package "X")))
-        (make-array 37)) ; the next size up
-* (find-symbol "A" "X") ; failure mode 1 - bad index computation
-debugger invoked on a SB-INT:INVALID-ARRAY-INDEX-ERROR:
-* (find-symboL "$o" "X") ; failure mode 2 - hash matched but no symbol present
-debugger invoked on a TYPE-ERROR: The value 0 is not of type SYMBOL.
-
-Probably we need to atomically store both vectors by keeping them in a cons
-which is freshly allocated whenever the vectors are reallocated.
-It might also work to store the zero-filled hash vector first. |#
-
 (defmacro with-symbol ((index-var symbol-var table string length sxhash
                                   entry-hash)
                        &body forms)
   (let ((vec (gensym)) (hash (gensym)) (len (gensym)) (h2 (gensym))
-        (name (gensym)) (name-len (gensym)) (ehash (gensym)))
+        (name (gensym)) (ehash (gensym)))
     `(let* ((,vec (package-hashtable-table ,table))
-            (,hash (package-hashtable-hash ,table))
-            (,len (length ,vec))
+            (,len (1- (length ,vec)))
+            (,hash (the hash-vector (svref ,vec ,len)))
             (,h2 (1+ (the index (rem (the hash ,sxhash)
                                       (the index (- ,len 2)))))))
        (declare (type index ,len ,h2))
@@ -705,14 +674,12 @@ It might also work to store the zero-filled hash vector first. |#
          (setq ,ehash (aref ,hash ,index-var))
          (cond ((eql ,ehash ,entry-hash)
                 (setq ,symbol-var (svref ,vec ,index-var))
-                (let* ((,name (symbol-name ,symbol-var))
-                       (,name-len (length ,name)))
-                  (declare (type index ,name-len))
-                  (when (and (= ,name-len ,length)
-                             (string= ,string ,name
-                                      :end1 ,length
-                                      :end2 ,name-len))
-                    (go DOIT))))
+                (unless (eql ,symbol-var 0)
+                  (let ((,name (symbol-name (truly-the symbol ,symbol-var))))
+                    (when (and (= (length ,name) ,length)
+                               (string= ,string ,name
+                                        :end1 ,length :end2 ,length))
+                      (go DOIT)))))
                ((zerop ,ehash)
                 (setq ,index-var nil)
                 (go DOIT)))
@@ -724,6 +691,30 @@ It might also work to store the zero-filled hash vector first. |#
          (return (progn ,@forms))))))
 
 ;;; Delete the entry for STRING in TABLE. The entry must exist.
+;;; Deletion stores 0 for the symbol and 1 for the hash tombstone.
+;;; Formerly this logic stored NIL instead of 0 for the symbol,
+;;; being vulnerable to a rare concurrency bug because many strings
+;;  have the same ENTRY-HASH value as NIL:
+;;;  (entry-hash 3 (sxhash "NIL")) => 177 and
+;;;  (entry-hash 2 (sxhash "3M")) => 177
+;;; Suppose, in the former approach, that "3M" is interned,
+;;; and then the following sequence of events occur:
+;;;  - thread 1 performs FIND-SYMBOL on "NIL", hits the hash code at
+;;;    at index I, and is then context-switched out. When this thread
+;;     resumes, it assumes a valid symbol in (SVREF SYM-VEC I)
+;;;  - thread 2 uninterns "3M" and fully completes that, storing NIL
+;;;    in the slot for the symbol that thread 1 will next read.
+;;;  - thread 1 continues, and test for STRING= to NIL,
+;;;    wrongly seeing NIL as a present symbol.
+;;; It's possible this is harmless, because NIL is usually inherited from CL,
+;;; but if the secondary return value mattered to the application,
+;;; it is probably wrong. And of course if NIL was not intended to be found
+;;; - as in a package that does not use CL - then finding NIL at all is wrong.
+;;; The better approach is to treat 'hash' as purely a heuristic without
+;;; ill-effect from false positives. No barrier, nor read-consistency
+;;; check is required, since a symbol is both its key and value,
+;;; and the "absence of a symbol" marker is never mistaken for a symbol.
+;;;
 (defun nuke-symbol (table string)
   (declare (simple-string string))
   (let* ((length (length string))
@@ -732,8 +723,12 @@ It might also work to store the zero-filled hash vector first. |#
     (declare (type index length)
              (type hash hash))
     (with-symbol (index symbol table string length hash ehash)
-      (setf (aref (package-hashtable-hash table) index) 1)
-      (setf (aref (package-hashtable-table table) index) nil)
+      ;; It is suboptimal to grab the vectors again, but not broken,
+      ;; because we have exclusive use of the table for writing.
+      (let* ((symvec (package-hashtable-table table))
+             (hashvec (the hash-vector (aref symvec (1- (length symvec))))))
+        (setf (aref hashvec index) 1)
+        (setf (aref symvec index) 0))
       (incf (package-hashtable-deleted table))))
   ;; If the table is less than one quarter full, halve its size and
   ;; rehash the entries.
@@ -799,12 +794,11 @@ implementation it is ~S." *default-package-use-list*)
        (when (and (not clobber) (find-package name))
          (go :restart))
        (let* ((name (package-namify name))
-              (package (internal-make-package
-                        :%name name
-                        :internal-symbols (make-or-remake-package-hashtable
-                                           internal-symbols)
-                        :external-symbols (make-or-remake-package-hashtable
-                                           external-symbols))))
+              (package
+               (internal-make-package
+                :%name name
+                :internal-symbols (make-package-hashtable internal-symbols)
+                :external-symbols (make-package-hashtable external-symbols))))
 
          ;; Do a USE-PACKAGE for each thing in the USE list so that checking for
          ;; conflicting exports among used packages is done.
@@ -931,9 +925,9 @@ implementation it is ~S." *default-package-use-list*)
                         (package-tables package) #()
                         (package-%shadowing-symbols package) nil
                         (package-internal-symbols package)
-                        (make-or-remake-package-hashtable 0)
+                        (make-package-hashtable 0)
                         (package-external-symbols package)
-                        (make-or-remake-package-hashtable 0)))
+                        (make-package-hashtable 0)))
                 (return-from delete-package t)))))))
 
 (defun list-all-packages ()
@@ -1324,8 +1318,8 @@ uninterned."
         (let ((internal (package-internal-symbols package))
               (external (package-external-symbols package)))
           (dolist (sym syms)
-            (nuke-symbol internal (symbol-name sym))
-            (add-symbol external sym))))
+            (add-symbol external sym)
+            (nuke-symbol internal (symbol-name sym)))))
       t)))
 
 ;;; Check that all symbols are accessible, then move from external to internal.
@@ -1619,7 +1613,7 @@ PACKAGE."
         ;; though its only use be to name an FLET in a function
         ;; hanging on an otherwise uninternable symbol. strange but true :-(
         (flet ((!make-table (input)
-                 (let ((table (make-or-remake-package-hashtable
+                 (let ((table (make-package-hashtable
                                (length (the simple-vector input)))))
                    (dovector (symbol input table)
                      (add-symbol table symbol)))))
