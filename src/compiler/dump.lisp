@@ -766,10 +766,21 @@
        #!-sb-unicode
        (bug "how did we get here?"))
       (simple-vector
-       (dump-simple-vector simple-version file)
+       ;; xc-host may upgrade anything to T, so pre-check that it
+       ;; wasn't actually supposed to be a specialized array,
+       ;; and in case a copy was made, tell DUMP-S-V the original type.
+       (cond #+sb-xc-host
+             ((neq (!specialized-array-element-type x) t)
+              (dump-specialized-vector (!specialized-array-element-type x)
+                                       simple-version file))
+             (t
+              (dump-simple-vector simple-version file)))
        (eq-save-object x file))
       (t
-       (dump-specialized-vector simple-version file)
+       ;; Host may have a different specialization, which is ok in itself,
+       ;; but again we might have have copied the vector, losing the type.
+       (dump-specialized-vector
+        #+sb-xc-host (!specialized-array-element-type x) simple-version file)
        (eq-save-object x file)))))
 
 ;;; Dump a SIMPLE-VECTOR, handling any circularities.
@@ -809,7 +820,8 @@
 ;;; when building SBCL in SBCL, the needed specializations exist,
 ;;; so the sanity-check will be triggered, and we can fix the source.
 #+sb-xc-host
-(defun dump-specialized-vector (vector file &key data-only)
+(defun dump-specialized-vector (element-type vector file
+                                &key data-only) ; basically unused now
   (labels ((octet-swap (word bits)
              "BITS must be a multiple of 8"
              (do ((input word (ash input -8))
@@ -827,10 +839,9 @@
                   (:little-endian i)
                   (:big-endian (octet-swap i bits))) ; signed or unsigned OK
                 bytes file))))
-    (let ((et (!specialized-array-element-type vector)))
-      (cond
-        ((listp et)
-         (destructuring-bind (type-id bits) et
+    (cond
+        ((listp element-type)
+         (destructuring-bind (type-id bits) element-type
            (dump-unsigned-vector
             (ecase type-id
               (signed-byte
@@ -857,10 +868,12 @@
           "Unportably dumping (ARRAY (UNSIGNED-BYTE 8)) ~S" vector)
          (dump-unsigned-vector sb!vm:simple-array-unsigned-byte-8-widetag 1 8))
         (t
-         (error "Won't dump specialized array ~S" vector))))))
+         (error "Won't dump specialized array ~S" vector)))))
 
 #-sb-xc-host
 (defun dump-specialized-vector (vector file &key data-only)
+  ;; The DATA-ONLY option was for the now-obsolete trace-table,
+  ;; but it seems like a good option to keep around.
   (declare (type (simple-unboxed-array (*)) vector))
   (let* ((length (length vector))
          (widetag (%other-pointer-widetag vector))
