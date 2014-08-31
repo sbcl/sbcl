@@ -911,6 +911,9 @@ implementation it is ~S." *default-package-use-list*)
                       (setf (package-%locally-nicknamed-by actual)
                             (delete package (package-%locally-nicknamed-by actual)))))
                   (setf (package-%local-nicknames package) nil)
+                  ;; FIXME: lacking a way to advise UNINTERN that this package
+                  ;; is pending deletion, a large package conses successively
+                  ;; many smaller tables for no good reason.
                   (do-symbols (sym package)
                     (unintern sym package))
                   (with-package-names (names)
