@@ -97,12 +97,12 @@ As per the Common Lisp standard,
 
 See SB-EXT:SEED-RANDOM-STATE for a SBCL extension to this functionality."
   (/show0 "entering MAKE-RANDOM-STATE")
-  (check-type state (or boolean random-state))
   (seed-random-state state))
 
 (defun fallback-random-seed ()
   ;; When /dev/urandom is not available, we make do with time and pid
   ;; Thread ID and/or address of a CONS cell would be even better, but...
+  ;; [ADDRESS-BASED-COUNTER-VAL in 'target-sxhash' could be used here]
   (/show0 "No /dev/urandom, using randomness from time and pid")
   (+ (get-internal-real-time)
      (ash (sb!unix:unix-getpid) 32)))
@@ -157,7 +157,8 @@ This particular SBCL version uses the popular MT19937 PRNG algorithm, and its
 internal state only effectively contains about 19937 bits of information.
 http://www.math.sci.hiroshima-u.ac.jp/~m-mat/MT/emt.html
 "
-  (etypecase state
+  (named-let seed-random-state ((state state))
+   (etypecase state
     ;; Easy standard cases
     (null
      (/show0 "copying *RANDOM-STATE*")
@@ -236,7 +237,7 @@ http://www.math.sci.hiroshima-u.ac.jp/~m-mat/MT/emt.html
                           i))) ;; non-linear
          (incf i) (when (>= i mt19937-n) (setf (aref s 3) (aref s (+ 2 mt19937-n)) i 1)))
        (setf (aref s 3) #x80000000) ;; MSB is 1; assuring non-zero initial array
-       (%make-random-state :state s)))))
+       (%make-random-state :state s))))))
 
 ;;;; random entries
 

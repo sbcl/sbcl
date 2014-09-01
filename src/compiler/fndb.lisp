@@ -405,11 +405,16 @@
 (defknown random ((or (float (0.0)) (integer 1)) &optional random-state)
   (or (float 0.0) (integer 0))
   (explicit-check))
-(defknown make-random-state (&optional
+(defknown make-random-state (&optional (or random-state (member nil t)))
+  random-state (flushable))
+;; The arg type specifier is for documentation only- EXPLICIT-CHECK prevails.
+;; It feels almost wrong to state it at all.
+(defknown seed-random-state (&optional ; SBCL extension
                              (or (member nil t) random-state unsigned-byte
                                  (simple-array (unsigned-byte 8) (*))
                                  (simple-array (unsigned-byte 32) (*))))
-  random-state (flushable))
+  random-state (flushable explicit-check))
+
 (defknown random-state-p (t) boolean (movable foldable flushable))
 
 ;;;; from the "Characters" chapter:
