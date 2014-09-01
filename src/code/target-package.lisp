@@ -655,46 +655,39 @@ REMOVE-PACKAGE-LOCAL-NICKNAME, and the DEFPACKAGE option :LOCAL-NICKNAMES."
 ;;; is bound to the index, or NIL if it is not present. SYMBOL-VAR
 ;;; is bound to the symbol. LENGTH and HASH are the length and sxhash
 ;;; of STRING. ENTRY-HASH is the entry-hash of the string and length.
+;;; If the symbol is found, then FORMS are executed; otherwise not.
 
-(defmacro with-symbol ((index-var symbol-var table string length sxhash
-                                  entry-hash)
-                       &body forms)
-  (let ((vec (gensym)) (hash (gensym)) (len (gensym)) (h2 (gensym))
+(defmacro with-symbol (((symbol-var &optional (index-var (gensym))) table
+                       string length sxhash entry-hash) &body forms)
+  (let ((vec (gensym)) (hash-vec (gensym)) (len (gensym)) (h2 (gensym))
         (name (gensym)) (ehash (gensym)))
     `(let* ((,vec (package-hashtable-table ,table))
             (,len (1- (length ,vec)))
-            (,hash (the hash-vector (svref ,vec ,len)))
+            (,hash-vec (the hash-vector (svref ,vec ,len)))
+            (,index-var (rem (the hash ,sxhash) ,len))
             (,h2 (1+ (the index (rem (the hash ,sxhash)
                                       (the index (- ,len 2)))))))
-       (declare (type index ,len ,h2))
-       (prog ((,index-var (rem (the hash ,sxhash) ,len))
-              ,symbol-var ,ehash)
-         (declare (type (or index null) ,index-var))
-         LOOP
-         (setq ,ehash (aref ,hash ,index-var))
-         (cond ((eql ,ehash ,entry-hash)
-                (setq ,symbol-var (svref ,vec ,index-var))
-                (unless (eql ,symbol-var 0)
-                  (let ((,name (symbol-name (truly-the symbol ,symbol-var))))
-                    (when (and (= (length ,name) ,length)
-                               (string= ,string ,name
-                                        :end1 ,length :end2 ,length))
-                      (go DOIT)))))
-               ((zerop ,ehash)
-                (setq ,index-var nil)
-                (go DOIT)))
-         (setq ,index-var (+ ,index-var ,h2))
-         (when (>= ,index-var ,len)
-           (setq ,index-var (- ,index-var ,len)))
-         (go LOOP)
-         DOIT
-         (return (progn ,@forms))))))
+       (declare (type index ,len ,h2 ,index-var))
+       (loop
+        (let ((,ehash (aref ,hash-vec ,index-var)))
+          (cond ((eql ,ehash ,entry-hash)
+                 (let ((,symbol-var (svref ,vec ,index-var)))
+                   (unless (eql ,symbol-var 0)
+                     (let ((,name (symbol-name (truly-the symbol ,symbol-var))))
+                       (when (and (= (length ,name) ,length)
+                                  (string= ,string ,name
+                                           :end1 ,length :end2 ,length))
+                         (return (progn ,@forms)))))))
+                 ((zerop ,ehash)
+                  (return))))
+        (setq ,index-var (+ ,index-var ,h2))
+        (when (>= ,index-var ,len)
+          (setq ,index-var (- ,index-var ,len)))))))
 
 ;;; Delete the entry for STRING in TABLE. The entry must exist.
 ;;; Deletion stores 0 for the symbol and 1 for the hash tombstone.
-;;; Formerly this logic stored NIL instead of 0 for the symbol,
-;;; being vulnerable to a rare concurrency bug because many strings
-;;  have the same ENTRY-HASH value as NIL:
+;;; Storing NIL for the symbol, as used to be done, is vulnerable to a rare
+;;; concurrency bug because many strings have the same ENTRY-HASH as NIL:
 ;;;  (entry-hash 3 (sxhash "NIL")) => 177 and
 ;;;  (entry-hash 2 (sxhash "3M")) => 177
 ;;; Suppose, in the former approach, that "3M" is interned,
@@ -722,7 +715,7 @@ REMOVE-PACKAGE-LOCAL-NICKNAME, and the DEFPACKAGE option :LOCAL-NICKNAMES."
          (ehash (entry-hash length hash)))
     (declare (type index length)
              (type hash hash))
-    (with-symbol (index symbol table string length hash ehash)
+    (with-symbol ((symbol index) table string length hash ehash)
       ;; It is suboptimal to grab the vectors again, but not broken,
       ;; because we have exclusive use of the table for writing.
       (let* ((symvec (package-hashtable-table table))
@@ -1034,14 +1027,12 @@ implementation it is ~S." *default-package-use-list*)
   (let* ((hash (%sxhash-simple-substring string length))
          (ehash (entry-hash length hash)))
     (declare (type hash hash ehash))
-    (with-symbol (found symbol (package-internal-symbols package)
-                        string length hash ehash)
-      (when found
-        (return-from find-symbol* (values symbol :internal))))
-    (with-symbol (found symbol (package-external-symbols package)
-                        string length hash ehash)
-      (when found
-        (return-from find-symbol* (values symbol :external))))
+    (with-symbol ((symbol) (package-internal-symbols package)
+                  string length hash ehash)
+      (return-from find-symbol* (values symbol :internal)))
+    (with-symbol ((symbol) (package-external-symbols package)
+                  string length hash ehash)
+      (return-from find-symbol* (values symbol :external)))
     (let* ((tables (package-tables package))
            (n (length tables)))
       (unless (eql n 0)
@@ -1051,18 +1042,17 @@ implementation it is ~S." *default-package-use-list*)
                (start (if (< mru n) mru 0))
                (i start))
           (loop
-             (with-symbol (found symbol
-                                 (locally (declare (optimize (safety 0)))
-                                   (svref tables i))
-                                 string length hash ehash)
-               (when found
-                 (setf (package-mru-table-index package) i)
-                 (return-from find-symbol* (values symbol :inherited))))
+             (with-symbol ((symbol) (locally (declare (optimize (safety 0)))
+                                             (svref tables i))
+                           string length hash ehash)
+               (setf (package-mru-table-index package) i)
+               (return-from find-symbol* (values symbol :inherited)))
              (if (< (decf i) 0) (setq i (1- n)))
              (if (= i start) (return)))))))
   (values nil nil))
 
 ;;; Similar to FIND-SYMBOL, but only looks for an external symbol.
+;;; Return the symbol and T if found, otherwise two NILs.
 ;;; This is used for fast name-conflict checking in this file and symbol
 ;;; printing in the printer.
 (defun find-external-symbol (string package)
@@ -1072,9 +1062,10 @@ implementation it is ~S." *default-package-use-list*)
          (ehash (entry-hash length hash)))
     (declare (type index length)
              (type hash hash))
-    (with-symbol (found symbol (package-external-symbols package)
-                        string length hash ehash)
-      (values symbol found))))
+    (with-symbol ((symbol) (package-external-symbols package)
+                  string length hash ehash)
+      (return-from find-external-symbol (values symbol t))))
+  (values nil nil))
 
 (defun print-symbol-with-prefix (stream symbol colon at)
   #!+sb-doc
