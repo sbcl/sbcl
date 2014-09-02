@@ -24,7 +24,8 @@
                   #!+sb-thread *stop-for-gc-pending*
                   #!+sb-dynamic-core sb!vm::*required-runtime-c-symbols*
                   *load-verbose*
-                  *posix-argv*))
+                  *posix-argv*
+                  *full-posix-argv*))
 
 (declaim (ftype (function * *)
                 assert-error assert-prompt check-type-error

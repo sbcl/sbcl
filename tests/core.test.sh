@@ -65,7 +65,7 @@ run_sbcl <<EOF
   (save-lisp-and-die "$tmpcore" :executable t)
 EOF
 chmod u+x "$tmpcore"
-./"$tmpcore" > "$tmpoutput" --no-userinit --no-sysinit --noprint <<EOF 
+./"$tmpcore" > "$tmpoutput" --no-userinit --no-sysinit --noprint <<EOF
   (exit :code 71)
 EOF
 status=$?
@@ -90,7 +90,7 @@ run_sbcl <<EOF
   (save-lisp-and-die "$tmpcore" :executable t)
 EOF
 chmod u+x "$tmpcore"
-./"$tmpcore" --no-userinit <<EOF 
+./"$tmpcore" --no-userinit <<EOF
   (save-lisp-and-die "$tmpcore" :executable t :save-runtime-options t)
 EOF
 chmod u+x "$tmpcore"
@@ -101,6 +101,16 @@ EOF
 status=$?
 if [ $status != 42 ]; then
     echo "saving runtime options from executable failed"
+    exit 1
+fi
+./"$tmpcore" --no-userinit --version --eval '(exit)' <<EOF
+  (when (equal *full-posix-argv* '("./$tmpcore" "--no-userinit"
+                                   "--version" "--eval" "(exit)"))
+    (exit :code 42))
+EOF
+status=$?
+if [ $status != 42 ]; then
+    echo "saving all runtime options from executable failed"
     exit 1
 fi
 

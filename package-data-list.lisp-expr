@@ -590,7 +590,8 @@ like *STACK-TOP-HINT* and unsupported stuff like *TRACED-FUN-LIST*."
       :use ("CL" "SB!ALIEN" "SB!INT" "SB!SYS" "SB!GRAY")
       :export ( ;; Information about how the program was invoked is
                ;; nonstandard but very useful.
-               "*POSIX-ARGV*" "*CORE-PATHNAME*" "*RUNTIME-PATHNAME*"
+               "*POSIX-ARGV*" "*FULL-POSIX-ARGV*"
+               "*CORE-PATHNAME*" "*RUNTIME-PATHNAME*"
                "POSIX-GETENV" "POSIX-ENVIRON"
 
                ;; Customizing initfile locations

@@ -611,9 +611,12 @@ created by calling the following generic function:
 @node Command-line arguments
 @subsection Command-line arguments
 @vindex @sbext{@earmuffs{posix-argv}}
+@vindex @sbext{@earmuffs{full-posix-argv}}
 
-The UNIX command line can be read from the variable
-@code{sb-ext:*posix-argv*}.
+The UNIX command line with all options processed by SBCL removed can
+be read from the variable @code{sb-ext:*posix-argv*}.  The full UNIX
+command line with all SBCL options still included can be read from the
+variable @code{sb-ext:*full-posix-argv*}
 
 @node Querying the process environment
 @subsection Querying the process environment
