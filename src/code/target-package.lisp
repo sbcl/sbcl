@@ -1626,32 +1626,8 @@ PACKAGE."
       (setf (package-tables pkg)
             (map 'vector #'package-external-symbols (package-%use-list pkg)))))
 
-  ;; FIXME: These assignments are also done at toplevel in
-  ;; boot-extensions.lisp. They should probably only be done once.
-  (/show0 "setting up *CL-PACKAGE* and *KEYWORD-PACKAGE*")
-  (setq *cl-package* (find-package "COMMON-LISP"))
-  (setq *keyword-package* (find-package "KEYWORD"))
-
   (/show0 "about to MAKUNBOUND *!INITIAL-SYMBOLS*")
   (%makunbound '*!initial-symbols*)       ; (so that it gets GCed)
-
-  ;; Make some other packages that should be around in the cold load.
-  ;; The COMMON-LISP-USER package is required by the ANSI standard,
-  ;; but not completely specified by it, so in the cross-compilation
-  ;; host Lisp it could contain various symbols, USE-PACKAGEs, or
-  ;; nicknames that we don't want in our target SBCL. For that reason,
-  ;; we handle it specially, not dumping the host Lisp version at
-  ;; genesis time..
-  (aver (not (find-package "COMMON-LISP-USER")))
-  ;; ..but instead making our own from scratch here.
-  (/show0 "about to MAKE-PACKAGE COMMON-LISP-USER")
-  (make-package "COMMON-LISP-USER"
-                :nicknames '("CL-USER")
-                :use '("COMMON-LISP"
-                       ;; ANSI encourages us to put extension packages
-                       ;; in the USE list of COMMON-LISP-USER.
-                       "SB!ALIEN" "SB!ALIEN" "SB!DEBUG"
-                       "SB!EXT" "SB!GRAY" "SB!PROFILE"))
 
   ;; For the kernel core image wizards, set the package to *CL-PACKAGE*.
   ;;

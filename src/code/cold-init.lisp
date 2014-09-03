@@ -81,7 +81,10 @@
 
   (/show0 "entering !COLD-INIT")
 
+  ;; Putting data in a synchronized hashtable (*PACKAGE-NAMES*)
+  ;; requires that the main thread be properly initialized.
   (show-and-call thread-init-or-reinit)
+  (show-and-call !package-cold-init)
 
   ;; Anyone might call RANDOM to initialize a hash value or something;
   ;; and there's nothing which needs to be initialized in order for
@@ -93,8 +96,6 @@
 
   (show-and-call !character-database-cold-init)
   (show-and-call !character-name-database-cold-init)
-
-  (show-and-call !package-cold-init)
 
   ;; All sorts of things need INFO and/or (SETF INFO).
   (/show0 "about to SHOW-AND-CALL !GLOBALDB-COLD-INIT")

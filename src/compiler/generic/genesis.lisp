@@ -1111,10 +1111,14 @@ core and return a descriptor to it."
                  ;; propagate the current state into the target.
                  (dolist (nickname
                           (cond ((string= pkg-name "COMMON-LISP") '("CL"))
+                                ((string= pkg-name "COMMON-LISP-USER")
+                                 '("CL-USER"))
                                 ((string= pkg-name "KEYWORD") '())
                                 (t (package-nicknames (find-package pkg-name))))
                           result)
                    (cold-push (base-string-to-core nickname) result))))
+             (find-cold-package (name)
+               (cadr (find-package-cell name)))
              (find-package-cell (name)
                (or (assoc (if (string= name "CL") "COMMON-LISP" name)
                           target-pkg-list :test #'string=)
@@ -1123,14 +1127,18 @@ core and return a descriptor to it."
                (let ((res *nil-descriptor*))
                  (dolist (x list res) (cold-push x res)))))
       ;; pass 1: make all proto-packages
-      (init-cold-package "COMMON-LISP")
-      (init-cold-package "KEYWORD")
       (dolist (pd package-data-list)
         (init-cold-package (sb-cold:package-data-name pd)
                            #!+sb-doc(sb-cold::package-data-doc pd)))
+      ;; MISMATCH needs !HAIRY-DATA-VECTOR-REFFER-INIT to have been done,
+      ;; and FIND-PACKAGE calls MISMATCH - which it shouldn't - but until
+      ;; that is fixed, doing this in genesis allows packages to be
+      ;; completely sane, modulo the naming, extremely early in cold-init.
+      (cold-set '*keyword-package* (find-cold-package "KEYWORD"))
+      (cold-set '*cl-package* (find-cold-package "COMMON-LISP"))
       ;; pass 2: set the 'use' lists and collect the 'used-by' lists
       (dolist (pd package-data-list)
-        (let ((this (cadr (find-package-cell (sb-cold:package-data-name pd))))
+        (let ((this (find-cold-package (sb-cold:package-data-name pd)))
               (use nil))
           (dolist (that (sb-cold:package-data-use pd))
             (let ((cell (find-package-cell that)))
@@ -1234,6 +1242,8 @@ core and return a descriptor to it."
   (or (get symbol 'cold-intern-info)
       (let ((pkg-info (gethash (package-name package) *cold-package-symbols*))
             (handle (allocate-symbol (symbol-name symbol) :gspace gspace)))
+        ;; maintain reverse map from target descriptor to host symbol
+        (setf (gethash (descriptor-bits handle) *cold-symbols*) symbol)
         (unless pkg-info
           (error "No target package descriptor for ~S" package))
         (record-accessibility
@@ -1246,8 +1256,6 @@ core and return a descriptor to it."
                 (cold-set handle handle))
                ((assoc symbol sb-cold:*symbol-values-for-genesis*)
                 (cold-set-symbol-global-value handle (cdr it))))
-        ;; maintain reverse map from target descriptor to host symbol
-        (setf (gethash (descriptor-bits handle) *cold-symbols*) symbol)
         (setf (get symbol 'cold-intern-info) handle))))
 
 (defun record-accessibility (accessibility symbol-descriptor target-pkg-info
@@ -3380,7 +3388,7 @@ initially undefined function references:~2%")
            ;; This avoids having to track any symbols created prior to
            ;; creation of packages, since packages are primordial.
            (target-cl-pkg-info
-            (dolist (name (list* "COMMON-LISP" "KEYWORD"
+            (dolist (name (list* "COMMON-LISP" "COMMON-LISP-USER" "KEYWORD"
                                  (mapcar #'sb-cold:package-data-name
                                          pkg-metadata))
                           (gethash "COMMON-LISP" *cold-package-symbols*))
@@ -3402,7 +3410,17 @@ initially undefined function references:~2%")
       ;; Prepare for cold load.
       (initialize-non-nil-symbols)
       (initialize-layouts)
-      (initialize-packages pkg-metadata)
+      (initialize-packages
+       ;; docstrings are set in src/cold/warm. It would work to do it here,
+       ;; but seems preferable not to saddle Genesis with such responsibility.
+       (list* (sb-cold:make-package-data :name "COMMON-LISP" :doc nil)
+              (sb-cold:make-package-data :name "KEYWORD" :doc nil)
+              (sb-cold:make-package-data :name "COMMON-LISP-USER" :doc nil
+               :use '("COMMON-LISP"
+                      ;; ANSI encourages us to put extension packages
+                      ;; in the USE list of COMMON-LISP-USER.
+                      "SB!ALIEN" "SB!DEBUG" "SB!EXT" "SB!GRAY" "SB!PROFILE"))
+              pkg-metadata))
       (initialize-static-fns)
 
       ;; Initialize the *COLD-SYMBOLS* system with the information
