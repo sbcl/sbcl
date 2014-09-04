@@ -40,9 +40,6 @@
 ;;; In case we get an error trying to parse a symbol, we want to rebind the
 ;;; above stuff so it's cool.
 
-;;; FIXME: These forward declarations should be moved somewhere earlier,
-;;; or discarded.
-(declaim (special *package* *read-base*))
 
 ;;;; reader errors
 
