@@ -105,14 +105,24 @@
 
 (defun named-object-print-function (instance stream
                                     &optional (extra nil extra-p))
+  ;; It is better to avoid this function if INSTANCE could have a name
+  ;; that is not its proper name. Also note that since the intended use
+  ;; is within PRINT-OBJECT, STREAM should not be T or NIL.
   (let ((name (slot-value-or-default instance 'name)))
     (print-unreadable-object (instance stream :type t :identity (not name))
       (if extra-p
           (format stream "~S ~:S" name extra)
-          (format stream "~S" name)))))
+          (prin1 name stream)))))
 
 (defmethod print-object ((class class) stream)
-  (named-object-print-function class stream))
+  ;; Use a similar concept as in OUTPUT-FUN.
+  (if (slot-boundp class 'name)
+      (let* ((name (class-name class))
+             (proper-p (and (symbolp name) (eq (find-class name nil) class))))
+        (print-unreadable-object (class stream :type t :identity (not proper-p))
+          (prin1 name stream)))
+      ;; "#<CLASS #<unbound slot> {122D1141}>" is ugly. Don't show that.
+      (print-unreadable-object (class stream :type t :identity t))))
 
 (defmethod print-object ((slotd slot-definition) stream)
   (named-object-print-function slotd stream))

@@ -275,7 +275,7 @@
 (with-test (:name :bug-350)
   (handler-case
       (with-timeout 10
-        (print (ash 1 1000000)))
+        (print (ash 1 1000000) (make-broadcast-stream)))
     (timeout ()
       (print 'timeout!))))
 
@@ -288,7 +288,7 @@
 
 ;;; a spot of random-testing for rational printing
 (defvar *seed-state* (make-random-state))
-(print *seed-state*) ; so that we can reproduce errors
+(write *seed-state* :pretty nil) ; so that we can reproduce errors
 (let ((seed (make-random-state *seed-state*)))
   (loop repeat 42
      do (let ((n (random (ash 1 1000) seed))
@@ -655,5 +655,22 @@
   (assert (equal "1/10" (eval '(format nil "~2r" 1/2))))
   (assert-error (eval '(format nil "~r" 1.32)) sb-format:format-error)
   (assert-error (eval '(format nil "~c" 1.32)) sb-format:format-error))
+
+;; Setup for test of print-object on a class with no proper name.
+;; There are various PRINT-OBJECT tests strewn throughout, all of which
+;; are not in the obvious place to me, except for perhaps 'clos.impure'
+;; which is also not the right place because that file concerns CLOS
+;; behavior in general, not to mention being far too noisy in its output.
+(defclass fruit () (a))
+(defvar *fruit1* (find-class 'fruit))
+(setf (find-class 'fruit) nil)
+(defclass fruit () (n o))
+(defvar *fruit2* (find-class 'fruit))
+(setf (find-class 'fruit) nil)
+(defclass fruit () (x))
+(with-test (:name (print-object :improper-class-name))
+  (assert (string/= (write-to-string *fruit1*) (write-to-string *fruit2*)))
+  (assert (string/= (write-to-string (find-class 'fruit))
+                    (write-to-string *fruit1*))))
 
 ;;; success
