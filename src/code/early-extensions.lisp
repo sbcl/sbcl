@@ -215,11 +215,6 @@
       (and (consp x)
            (list-of-length-at-least-p (cdr x) (1- n)))))
 
-(declaim (inline singleton-p))
-(defun singleton-p (list)
-  (and (consp list)
-       (null (rest list))))
-
 ;;; Is X is a positive prime integer?
 (defun positive-primep (x)
   ;; This happens to be called only from one place in sbcl-0.7.0, and

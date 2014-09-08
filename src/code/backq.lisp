@@ -33,6 +33,11 @@
   (svref #(unquote unquote-nsplice unquote-splice) (comma-kind x)))
 (defun comma-splicing-p (comma) (not (zerop (comma-kind comma))))
 
+(declaim (inline singleton-p))
+(defun singleton-p (list)
+  (and (consp list)
+       (null (rest list))))
+
 #+sb-xc-host
 (progn
   ;; tell the host how to dump it
@@ -241,8 +246,8 @@
                    (let ((exp (car subform)))
                      (if (atom exp) ; or it's a self-evaluating atom
                          (atom-const-p exp)
-                         (and (eq (car exp) 'quote) (consp (cdr exp))
-                              (not (cddr exp))))))) ; or (QUOTE <thing>)
+                         ;; or (QUOTE <thing>)
+                         (and (eq (car exp) 'quote) (singleton-p (cdr exp)))))))
              (atom-const-p (atom) ; is known to be an atom
                (typep atom '(or (not symbol) (member t nil) keyword)))
              (const-val (subform) ; given that it is known CONST-P
