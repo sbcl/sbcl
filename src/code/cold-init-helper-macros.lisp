@@ -72,7 +72,7 @@
   (def !defvar defvar))
 
 (defun !delayed-cold-set-symbol-value (symbol value)
-  (assert (or (typep value '(or (member t nil) keyword integer
+  (assert (or (typep value '(or (member t nil) keyword integer string
                                 (cons (eql quote) (cons t null))))))
   ;; Obfuscate the reference into SB-COLD to avoid "bad package for target"
   (let ((list (find-symbol "*SYMBOL-VALUES-FOR-GENESIS*" "SB-COLD")))

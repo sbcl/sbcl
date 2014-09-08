@@ -84,7 +84,25 @@
   ;; Putting data in a synchronized hashtable (*PACKAGE-NAMES*)
   ;; requires that the main thread be properly initialized.
   (show-and-call thread-init-or-reinit)
+  ;; Printing of symbols requires that packages be filled in, because
+  ;; OUTPUT-SYMBOL calls FIND-SYMBOL to determine accessibility.
   (show-and-call !package-cold-init)
+  ;; Fill in the printer's character attribute tables now.
+  ;; If Genesis could write constant arrays into a target core,
+  ;; that would be nice, and would tidy up some other things too.
+  (show-and-call !printer-cold-init)
+  #!-win32
+  (progn
+    (setq *error-output* (!make-cold-stderr-stream)
+          *standard-output* *error-output*
+          *trace-output* *error-output*
+          *readtable* (make-readtable)
+          *previous-case* nil
+          *previous-readtable-case* nil
+          *print-length* 6 *print-level* 3)
+    (write-string "COLD-INIT... ")
+    (prin1 `(package = ,(package-name *package*)))
+    (terpri))
 
   ;; Anyone might call RANDOM to initialize a hash value or something;
   ;; and there's nothing which needs to be initialized in order for
@@ -230,6 +248,7 @@
   (setf *readtable* (copy-readtable *standard-readtable*))
   (setf sb!debug:*debug-readtable* (copy-readtable *standard-readtable*))
   (sb!pretty:!pprint-cold-init)
+  (setq *print-level* nil *print-length* nil) ; restore defaults
 
   ;; the ANSI-specified initial value of *PACKAGE*
   (setf *package* (find-package "COMMON-LISP-USER"))

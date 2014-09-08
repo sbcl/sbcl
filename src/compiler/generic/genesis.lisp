@@ -1217,6 +1217,7 @@ core and return a descriptor to it."
              (etypecase value
                (symbol (cold-intern value))
                (number (number-to-core value))
+               (string (base-string-to-core value))
                (cons (cold-cons (target-representation (car value))
                                 (target-representation (cdr value)))))))
     (cold-set descriptor (target-representation value))))
