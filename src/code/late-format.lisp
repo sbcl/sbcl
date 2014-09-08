@@ -650,6 +650,7 @@
 
 (def-complex-format-directive #\newline (colonp atsignp params directives)
   (when (and colonp atsignp)
+    ;; FIXME: this is not an error!
     (error 'format-error
            :complaint "both colon and atsign modifiers used simultaneously"))
   (values (expand-bind-defaults () params
