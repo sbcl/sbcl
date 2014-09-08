@@ -40,14 +40,6 @@
   (generate-fixnum-test value)
   (inst jmp (if not-p :nz :z) target))
 
-;; avoid code-deletion notes
-(defmacro !n-fixnum-tag-bits-case (1-clause other-clause)
-  (assert (eq (car 1-clause) 1))
-  (assert (eq (car other-clause) t))
-  `(progn ,@(if (= n-fixnum-tag-bits 1)
-                (cdr 1-clause)
-                (cdr other-clause))))
-
 ;;; General FIXME: it's fine that we wire these to use rAX which has
 ;;; the shortest encoding, but for goodness sake can we pass the TN
 ;;; from the VOP like every other backend does? Freely referencing the
@@ -59,7 +51,7 @@
 ;; Numerics including fixnum, excluding short-float. (INTEGER,RATIONAL)
 (defun %test-fixnum-and-headers (value target not-p headers)
   (let ((drop-through (gen-label)))
-    (!n-fixnum-tag-bits-case
+    (case n-fixnum-tag-bits
      (1 (%lea-for-lowtag-test eax-tn value other-pointer-lowtag)
         (inst test al-tn 1)
         (inst jmp :nz (if not-p drop-through target)) ; inverted
@@ -83,7 +75,7 @@
 (defun %test-fixnum-immediate-and-headers (value target not-p immediate
                                            headers)
   (let ((drop-through (gen-label)))
-    (!n-fixnum-tag-bits-case
+    (case n-fixnum-tag-bits
      (1 (%lea-for-lowtag-test eax-tn value other-pointer-lowtag)
         (inst test al-tn 1)
         (inst jmp :nz (if not-p drop-through target)) ; inverted
@@ -317,17 +309,18 @@
         (if not-p
             (values not-target target)
             (values target not-target))
-      (!n-fixnum-tag-bits-case
-       (1 (%lea-for-lowtag-test eax-tn value other-pointer-lowtag)
-          (inst test al-tn fixnum-tag-mask) ; 0th bit = 1 => fixnum
-          (inst jmp :nz yep)
-          (inst test al-tn lowtag-mask))
-       (t
-        (move-qword-to-eax value)
-        (inst test al-tn fixnum-tag-mask)
-        (inst jmp :e yep)
-        (inst and al-tn lowtag-mask)
-        (inst cmp al-tn other-pointer-lowtag)))
+      #.(case n-fixnum-tag-bits
+          (1 '(progn
+               (%lea-for-lowtag-test eax-tn value other-pointer-lowtag)
+               (inst test al-tn fixnum-tag-mask) ; 0th bit = 1 => fixnum
+               (inst jmp :nz yep)
+               (inst test al-tn lowtag-mask)))
+          (t '(progn
+               (move-qword-to-eax value)
+               (inst test al-tn fixnum-tag-mask)
+               (inst jmp :e yep)
+               (inst and al-tn lowtag-mask)
+               (inst cmp al-tn other-pointer-lowtag))))
       (inst jmp :ne nope)
       (inst cmp (make-ea-for-object-slot value 0 other-pointer-lowtag)
             (+ (ash 1 n-widetag-bits) bignum-widetag))

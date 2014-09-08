@@ -1318,7 +1318,7 @@
 ;;; set the PREDICATE attribute for each translated function when the
 ;;; VOP is conditional, causing IR1 conversion to ensure that a call
 ;;; to the translated is always used in a predicate position.
-(defun !set-up-fun-translation (parse n-template)
+(defun set-up-fun-translation (parse n-template)
   (declare (type vop-parse parse))
   (mapcar (lambda (name)
             `(let ((info (fun-info-or-lose ',name)))
@@ -1635,7 +1635,7 @@
          (setf (gethash ',name *backend-template-names*) ,n-res)
          (setf (template-type ,n-res)
                (specifier-type (template-type-specifier ,n-res)))
-         ,@(!set-up-fun-translation parse n-res))
+         ,@(set-up-fun-translation parse n-res))
        ',name)))
 
 ;;;; emission macros
