@@ -331,3 +331,13 @@
   (assert (eq (handler-case (read-from-string "#*101||1")
                 (sb-int:simple-reader-error () :win))
               :win)))
+
+(with-test (:name :sharp-colon-number)
+  (assert-error (read-from-string "#:42")) ; unacceptable
+  (assert-error (read-from-string "#:-42"))
+  (dolist (str '("#:|42|" ; a bunch of acceptable ways to write #:|42|
+                 "#:||42" "#:4|2|" "#:42||" "#:\\42" "#:4\\2"))
+    (assert (string= (symbol-name (read-from-string str)) "42")))
+  (assert (read-from-string "#:4a")) ; ok
+  (let ((*read-base* 16))
+    (assert-error (read-from-string "#:4a")))) ; not ok

@@ -4,6 +4,8 @@ changes relative to sbcl-1.2.3:
     lists.  (lp#721135)
   * bug fix: VALIDATE-SUPERCLASS returns T when the superclass is the
     universal superclass (lp#1332983)
+  * bug fix: reading an uninterned symbol whose print name has the
+    syntax of an integer signals an error. (lp#310062)
 
 changes in sbcl-1.2.3 relative to sbcl-1.2.2:
   * enhancement: DOCUMENTATION works on instances of

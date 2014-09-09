@@ -450,15 +450,33 @@
 (defun sharp-colon (stream sub-char numarg)
   (ignore-numarg sub-char numarg)
   (multiple-value-bind (buffer escapep colon) (read-extended-token stream)
-    (declare (ignore escapep))
     (unless *read-suppress*
       (casify-read-buffer buffer)
       (let ((token (copy-token-buf-string buffer)))
-        (if colon
-            (simple-reader-error
-             stream "The symbol following #: contains a package marker: ~S"
-             token)
-            (make-symbol token))))))
+        (cond (colon
+               (simple-reader-error
+                stream "The symbol following #: contains a package marker: ~S"
+                token))
+              ;; We'd like to signal errors on tokens that look like numbers,
+              ;; but doing that is actually nontrivial. None of the possible
+              ;; ways to test for numeric syntax are great:
+              ;; - using SYMBOL-QUOTEP to see if it says that the symbol would
+              ;;   print using escapes could produce false positives
+              ;;   because it's seldom wrong to use vertical bars.
+              ;; - calling READ-FROM-STRING to see if it returns a number
+              ;;   would demand a new string stream.
+              ;; - a potential number with _ and/or ^ should not be allowed.
+              ;; An acceptable rough cut is to use PARSE-INTEGER even though it
+              ;; won't help to reject ratios or floating point syntax.
+              ((and (not escapep)
+                    (multiple-value-bind (num end)
+                        (parse-integer token :radix *read-base* :junk-allowed t)
+                      (and num (= end (length token)))))
+               (simple-reader-error
+                stream "The symbol following #: has numeric syntax: ~S"
+                token))
+              (t
+               (make-symbol token)))))))
 
 (defvar *read-eval* t
   #!+sb-doc
