@@ -50,6 +50,13 @@
           (rename-package package name (cons cold-name nicknames)))
         #+sb-package-locks (sb-ext:unlock-package package)))))
 
+;; Reinstate the pre-cold-init variable-defining macros.
+(macrolet ((def (wrapper real-name)
+             `(defmacro ,wrapper (&rest args) `(,',real-name ,@args))))
+  (def sb-impl::!defglobal defglobal)
+  (def sb-impl::!defparameter defparameter)
+  (def sb-impl::!defvar defvar))
+
 ;; This macro is never defined for the target Lisp,
 ;; only the cross-compilation host (see "src/code/specializable-array")
 ;; but it is needed to read x86-64/insts.lisp and other things.
