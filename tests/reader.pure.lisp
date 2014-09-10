@@ -308,7 +308,6 @@
 ;; instead of using dx allocation or a recyclable resource:
 ;;  - most obviously, a 128-character buffer per invocation of READ
 ;;  - calling SUBSEQ for package names
-;;  - multiple-value-call in WITH-CHAR-MACRO-RESULT
 ;;  - the initial cons cell in READ-LIST
 (with-test (:name :read-does-not-cons-per-se)
   (flet ((test-reading (string)

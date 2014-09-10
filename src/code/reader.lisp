@@ -127,19 +127,6 @@
   `(let ((x ,val))
      (if (fdefn-p x) (fdefn-name x) x)))
 
-;;; Call the macro function for CHAR on STREAM, bind RESULT-VAR to
-;;; its result, and execute BODY.
-(defmacro !with-char-macro-result ((result-var supplied-p-var)
-                                   (stream char) &body body)
-  (with-unique-names (proc)
-    `(dx-flet ((,proc (&optional (,result-var nil ,supplied-p-var) &rest junk)
-                 (declare (ignore junk)) ; is this ANSI-specified?
-                 ,@body))
-       (multiple-value-call #',proc
-         (let ((entry (get-raw-cmt-entry ,char *readtable*)))
-           (funcall (!cmt-entry-to-function entry #'read-token)
-                    ,stream ,char))))))
-
 ;;; The character attribute table is a BASE-CHAR-CODE-LIMIT vector
 ;;; of (unsigned-byte 8) plus a hashtable to handle higher character codes.
 
@@ -660,7 +647,7 @@ standard Lisp readtable when NIL."
 ;;; as an alist, so maybe we should. -- WHN 19991202
 (defvar *sharp-equal-alist* ())
 
-(declaim (special *standard-input*))
+(declaim (ftype (sfunction (t t) (values t t)) read-maybe-nothing))
 
 ;;; Like READ-PRESERVING-WHITESPACE, but doesn't check the read buffer
 ;;; for being set up properly.
@@ -673,7 +660,8 @@ standard Lisp readtable when NIL."
          (cond ((eq char +EOF+) (return eof-value))
                ((whitespace[2]p char))
                (t
-                (!with-char-macro-result (result result-p) (stream char)
+                (multiple-value-bind (result-p result)
+                    (read-maybe-nothing stream char)
                   ;; Repeat if macro returned nothing.
                   (when result-p
                     (return (unless *read-suppress* result))))))))
@@ -694,13 +682,18 @@ standard Lisp readtable when NIL."
   (check-for-recursive-read stream recursive-p 'read-preserving-whitespace)
   (%read-preserving-whitespace stream eof-error-p eof-value recursive-p))
 
-;;; Return NIL or a list with one thing, depending.
-;;;
+;;; Read from STREAM given starting CHAR, returning T and the resulting
+;;; object, unless CHAR is a macro yielding no value, then NIL and NIL,
 ;;; for functions that want comments to return so that they can look
 ;;; past them. We assume CHAR is not whitespace.
 (defun read-maybe-nothing (stream char)
-  (!with-char-macro-result (retval retval-p) (stream char)
-    (if retval-p (list retval))))
+  (multiple-value-call
+   (lambda (&optional (result nil supplied-p) &rest junk)
+     (declare (ignore junk)) ; is this ANSI-specified?
+     (values supplied-p result))
+   (funcall (!cmt-entry-to-function
+             (get-raw-cmt-entry char *readtable*) #'read-token)
+            stream char)))
 
 (defun read (&optional (stream *standard-input*)
                        (eof-error-p t)
@@ -735,8 +728,10 @@ standard Lisp readtable when NIL."
                 (retlist ()))
                ((char= char endchar)
                 (unless *read-suppress* (nreverse retlist)))
-             (setq retlist (nconc (read-maybe-nothing input-stream char)
-                                  retlist)))))
+             (multiple-value-bind (winp obj)
+                 (read-maybe-nothing input-stream char)
+               (when winp
+                 (push obj retlist))))))
     (declare (inline %read-delimited-list))
     (if recursive-p
         (%read-delimited-list endchar input-stream)
@@ -792,9 +787,7 @@ standard Lisp readtable when NIL."
                                "Nothing appears before . in list.")))
                        ((whitespace[2]p nextchar)
                         (setq nextchar (flush-whitespace stream))))
-                 (rplacd listtail
-                             ;; Return list containing last thing.
-                         (car (read-after-dot stream nextchar)))
+                 (rplacd listtail (read-after-dot stream nextchar))
                  ;; Check for improper ". ,@" or ". ,." now rather than
                  ;; in the #\` reader. The resulting QUASIQUOTE macro might
                  ;; never be exapanded, but nonetheless could be erroneous.
@@ -808,11 +801,10 @@ standard Lisp readtable when NIL."
                     ;; Put back NEXTCHAR so that we can read it normally.
                 (t (unread-char nextchar stream)))))
       ;; Next thing is not an isolated dot.
-      (let ((listobj (read-maybe-nothing stream firstchar)))
+      (multiple-value-bind (winp obj) (read-maybe-nothing stream firstchar)
         ;; allows the possibility that a comment was read
-        (when listobj
-          (rplacd listtail listobj)
-          (setq listtail listobj))))))
+        (when winp
+          (setq listtail (cdr (rplacd listtail (list obj)))))))))
 
 (defun read-after-dot (stream firstchar)
   ;; FIRSTCHAR is non-whitespace!
@@ -823,18 +815,17 @@ standard Lisp readtable when NIL."
              (return-from read-after-dot nil)
              (simple-reader-error stream "Nothing appears after . in list.")))
       ;; See whether there's something there.
-      (setq lastobj (read-maybe-nothing stream char))
-      (when lastobj (return t)))
+      (multiple-value-bind (winp obj) (read-maybe-nothing stream char)
+        (when winp (return (setq lastobj obj)))))
     ;; At least one thing appears after the dot.
     ;; Check for more than one thing following dot.
-    (do ((lastchar (flush-whitespace stream)
-                   (flush-whitespace stream)))
-        ((char= lastchar #\) ) lastobj) ;success!
-      ;; Try reading virtual whitespace.
-      (if (and (read-maybe-nothing stream lastchar)
-               (not *read-suppress*))
-          (simple-reader-error stream
-                               "More than one object follows . in list.")))))
+    (loop
+     (let ((char (flush-whitespace stream)))
+       (cond ((char= #\) char) (return lastobj)) ;success!
+             ;; Try reading virtual whitespace.
+             ((and (read-maybe-nothing stream char) (not *read-suppress*))
+              (simple-reader-error
+               stream "More than one object follows . in list.")))))))
 
 (defun read-string (stream closech)
   ;; This accumulates chars until it sees same char that invoked it.
