@@ -96,9 +96,6 @@
   (declare (character char) (readtable readtable))
   (if (typep char 'base-char)
       (svref (character-macro-array readtable) (char-code char))
-      ;; Note: DEFAULT here is NIL, not #'UNDEFINED-MACRO-CHAR, so
-      ;; that everything above the base-char range is a non-macro
-      ;; constituent by default.
       (values (gethash char (character-macro-hash-table readtable) nil))))
 
 ;; As above but get the entry for SUB-CHAR in a dispatching macro table.
@@ -130,10 +127,8 @@
   `(let ((x ,val))
      (if (fdefn-p x) (fdefn-name x) x)))
 
-;;; the value represented by whatever is stored in the character macro
-;;; table. As per ANSI #'GET-MACRO-CHARACTER and #'SET-MACRO-CHARACTER,
-;;; a function value represents itself, and a NIL value represents the
-;;; default behavior.
+;;; Call the macro function for CHAR on STREAM, bind RESULT-VAR to
+;;; its result, and execute BODY.
 (defmacro !with-char-macro-result ((result-var supplied-p-var)
                                    (stream char) &body body)
   (with-unique-names (proc)
@@ -144,10 +139,6 @@
          (let ((entry (get-raw-cmt-entry ,char *readtable*)))
            (funcall (!cmt-entry-to-function entry #'read-token)
                     ,stream ,char))))))
-
-(defun undefined-macro-char (stream char)
-  (unless *read-suppress*
-    (simple-reader-error stream "undefined read-macro character ~S" char)))
 
 ;;; The character attribute table is a BASE-CHAR-CODE-LIMIT vector
 ;;; of (unsigned-byte 8) plus a hashtable to handle higher character codes.
