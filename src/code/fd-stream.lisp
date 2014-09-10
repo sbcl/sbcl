@@ -2262,16 +2262,6 @@
   (declare (type simple-string name))
   (concatenate 'simple-string name ".bak"))
 
-;;; Ensure that the given arg is one of the given list of valid
-;;; things. Allow the user to fix any problems.
-(defun ensure-one-of (item list what)
-  (unless (member item list)
-    (error 'simple-type-error
-           :datum item
-           :expected-type `(member ,@list)
-           :format-control "~@<~S is ~_invalid for ~S; ~_need one of~{ ~S~}~:>"
-           :format-arguments (list item what list))))
-
 ;;; Rename NAMESTRING to ORIGINAL. First, check whether we have write
 ;;; access, since we don't want to trash unwritable files even if we
 ;;; technically can. We return true if we succeed in renaming.
@@ -2340,11 +2330,6 @@
                        (if (eq (pathname-version pathname) :newest)
                            :new-version
                            :error)))
-               (ensure-one-of if-exists
-                              '(:error :new-version :rename
-                                :rename-and-delete :overwrite
-                                :append :supersede nil)
-                              :if-exists)
                (case if-exists
                  ((:new-version :error nil)
                   (setf mask (logior mask sb!unix:o_excl)))
@@ -2367,9 +2352,6 @@
                        nil)
                       (t
                        :create))))
-        (ensure-one-of if-does-not-exist
-                       '(:error :create nil)
-                       :if-does-not-exist)
         (cond ((and if-exists-given
                     truename
                     (eq if-exists :new-version))
@@ -2509,6 +2491,9 @@
 ;;; This is called when the cold load is first started up, and may also
 ;;; be called in an attempt to recover from nested errors.
 (defun stream-cold-init-or-reset ()
+  ;; FIXME: on gencgc the 4 standard fd-streams {stdin,stdout,stderr,tty}
+  ;; and these synonym streams are baked into +pseudo-static-generation+.
+  ;; Is that inadvertent?
   (stream-reinit)
   (setf *terminal-io* (make-synonym-stream '*tty*))
   (setf *standard-output* (make-synonym-stream '*stdout*))
@@ -2596,6 +2581,7 @@
     #!+win32
     (setf *tty* (make-two-way-stream *stdin* *stdout*))
     #!-win32
+    ;; FIXME: what is this call to COERCE doing? XC can't dump non-base-strings.
     (let* ((ttyname #.(coerce "/dev/tty" 'simple-base-string))
            (tty (sb!unix:unix-open ttyname sb!unix:o_rdwr #o666)))
       (setf *tty*
