@@ -1073,7 +1073,7 @@ c_level_backtrace(const char* header, int depth)
     {
         if ((n++)>depth)
             return;
-        fprintf(stderr, "[#%02d]: ebp = 0x%p, ret = 0x%p\n",n,
+        fprintf(stderr, "[#%02d]: ebp = %p, ret = %p\n",n,
                 frame, ((void**)frame)[1]);
     }
 }
@@ -1251,7 +1251,7 @@ try_recommit:
     AVER(VirtualAlloc(PTR_ALIGN_DOWN(fault_address,os_vm_page_size),
                       os_vm_page_size,
                       MEM_COMMIT, PAGE_EXECUTE_READWRITE)
-         ||(fprintf(stderr,"Unable to recommit addr %p eip 0x%p\n",
+         ||(fprintf(stderr,"Unable to recommit addr %p eip %p\n",
                     fault_address, (void*)win32_context->Rip) &&
             (c_level_backtrace("BT",5),
              fake_foreign_function_call(ctx),
@@ -1315,9 +1315,9 @@ signal_internal_error_or_lose(os_context_t *ctx,
         return;
     }
 
-    fprintf(stderr, "Exception Code: 0x%p.\n",
+    fprintf(stderr, "Exception Code: %p.\n",
             (void*)(intptr_t)exception_record->ExceptionCode);
-    fprintf(stderr, "Faulting IP: 0x%p.\n",
+    fprintf(stderr, "Faulting IP: %p.\n",
             (void*)(intptr_t)exception_record->ExceptionAddress);
     if (exception_record->ExceptionCode == EXCEPTION_ACCESS_VIOLATION) {
         MEMORY_BASIC_INFORMATION mem_info;
@@ -1326,7 +1326,7 @@ signal_internal_error_or_lose(os_context_t *ctx,
             fprintf(stderr, "page status: 0x%lx.\n", mem_info.State);
         }
 
-        fprintf(stderr, "Was writing: %p, where: 0x%p.\n",
+        fprintf(stderr, "Was writing: %p, where: %p.\n",
                 (void*)exception_record->ExceptionInformation[0],
                 fault_address);
     }

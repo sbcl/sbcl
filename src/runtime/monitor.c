@@ -138,7 +138,7 @@ dump_cmd(char **ptr)
 
     while (count-- > 0) {
 #ifndef LISP_FEATURE_ALPHA
-        printf("0x%p: ", (os_vm_address_t) addr);
+        printf("%p: ", (os_vm_address_t) addr);
 #else
         printf("0x%08X: ", (u32) addr);
 #endif
@@ -199,13 +199,13 @@ regs_cmd(char **ptr)
 {
     struct thread *thread=arch_os_get_current_thread();
 
-    printf("CSP\t=\t0x%p   ", access_control_stack_pointer(thread));
+    printf("CSP\t=\t%p   ", access_control_stack_pointer(thread));
 #if !defined(LISP_FEATURE_X86) && !defined(LISP_FEATURE_X86_64)
-    printf("CFP\t=\t0x%p   ", access_control_frame_pointer(thread));
+    printf("CFP\t=\t%p   ", access_control_frame_pointer(thread));
 #endif
 
 #ifdef reg_BSP
-    printf("BSP\t=\t0x%p\n", get_binding_stack_pointer(thread));
+    printf("BSP\t=\t%p\n", get_binding_stack_pointer(thread));
 #else
     /* printf("BSP\t=\t0x%08lx\n",
            (unsigned long)SymbolValue(BINDING_STACK_POINTER)); */
@@ -215,7 +215,7 @@ regs_cmd(char **ptr)
 #ifdef LISP_FEATURE_GENCGC
     /* printf("DYNAMIC\t=\t0x%08lx\n", DYNAMIC_SPACE_START); */
 #else
-    printf("STATIC\t=\t0x%p   ",
+    printf("STATIC\t=\t%p   ",
            SymbolValue(STATIC_SPACE_FREE_POINTER, thread));
     printf("RDONLY\t=\t0x%08lx   ",
            (unsigned long)SymbolValue(READ_ONLY_SPACE_FREE_POINTER, thread));
@@ -275,10 +275,10 @@ search_cmd(char **ptr)
     start = end = addr;
     lastcount = count;
 
-    printf("searching for 0x%x at 0x%p\n", val, (void*)(uword_t)end);
+    printf("searching for 0x%x at %p\n", val, (void*)(uword_t)end);
 
     while (search_for_type(val, &end, &count)) {
-        printf("found 0x%x at 0x%p:\n", val, (void*)(uword_t)end);
+        printf("found 0x%x at %p:\n", val, (void*)(uword_t)end);
         obj = *end;
         addr = end;
         end += 2;

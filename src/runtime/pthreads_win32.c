@@ -1524,7 +1524,7 @@ void pthread_np_lose(int trace_depth, const char* fmt, ...)
         {
             if ((n++)>trace_depth)
                 return;
-            fprintf(stderr, "[#%02d]: ebp = 0x%p, ret = 0x%p\n",n,
+            fprintf(stderr, "[#%02d]: ebp = %p, ret = %p\n",n,
                     frame, ((void**)frame)[1]);
         }
     ExitProcess(0);

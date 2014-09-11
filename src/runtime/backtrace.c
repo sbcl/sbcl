@@ -561,7 +561,7 @@ backtrace_from_fp(void *fp, int nframes)
                    (uword_t) ra);
         } else
 #endif
-        printf("Foreign fp = 0x%p, ra = 0x%p",
+        printf("Foreign fp = %p, ra = %p",
                (void*) next_fp,
                (void*) ra);
     }
