@@ -118,7 +118,14 @@
       :output sb-sys:*stdout*
       :input #-win32 devnull #+win32 sb-sys:*stdin*))))
 
+(defun clear-test-status ()
+  (with-open-file (stream "test-status.lisp-expr"
+                          :direction :output
+                          :if-exists :supersede)
+    (write-line "NIL" stream)))
+
 (defun run-impure-in-child-sbcl (test-file test-code)
+  (clear-test-status)
   (run-in-child-sbcl
     `((load "test-util")
       (load "assertoid")
@@ -222,6 +229,7 @@
 
 (defun sh-test (file)
   ;; What? No SB-POSIX:EXECV?
+  (clear-test-status)
   `(let ((process (sb-ext:run-program "/bin/sh"
                                       (list (native-namestring ,file))
                                       :output *error-output*)))
