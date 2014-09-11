@@ -86,7 +86,7 @@
 Form: ARG1   Context: EVAL
 Form: ARG2   Context: EVAL
 Form: ARG3   Context: EVAL
-(LIST ARG1 ARG2 ARG3)")))
+\(LIST ARG1 ARG2 ARG3)")))
 
 (test-util:with-test (:name (:walk list cons))
   (assert (string=-modulo-tabspace
@@ -100,7 +100,7 @@ Form: (LIST 3 4 5)   Context: EVAL
 Form: 3   Context: EVAL
 Form: 4   Context: EVAL
 Form: 5   Context: EVAL
-(LIST (CONS 1 2) (LIST 3 4 5))")))
+\(LIST (CONS 1 2) (LIST 3 4 5))")))
 
 (test-util:with-test (:name (:walk progn 1))
   (assert (string=-modulo-tabspace
@@ -111,7 +111,7 @@ Form: (FOO)   Context: EVAL
 Form: 'GLOBAL-FOO   Context: EVAL
 Form: (BAR 1)   Context: EVAL
 Form: 'GLOBAL-BAR   Context: EVAL
-(PROGN (FOO) (BAR 1))")))
+\(PROGN (FOO) (BAR 1))")))
 
 (test-util:with-test (:name (:walk block))
   (assert (string=-modulo-tabspace
@@ -121,7 +121,7 @@ Form: 'GLOBAL-BAR   Context: EVAL
 Form: A   Context: EVAL
 Form: B   Context: EVAL
 Form: C   Context: EVAL
-(BLOCK BLOCK-NAME A B C)")))
+\(BLOCK BLOCK-NAME A B C)")))
 
 (test-util:with-test (:name (:walk block list))
   (assert (string=-modulo-tabspace
@@ -132,7 +132,7 @@ Form: (LIST A)   Context: EVAL
 Form: A   Context: EVAL
 Form: B   Context: EVAL
 Form: C   Context: EVAL
-(BLOCK BLOCK-NAME (LIST A) B C)")))
+\(BLOCK BLOCK-NAME (LIST A) B C)")))
 
 (test-util:with-test (:name (:walk catch list))
   (assert (string=-modulo-tabspace
@@ -144,7 +144,7 @@ Form: (LIST A)   Context: EVAL
 Form: A   Context: EVAL
 Form: B   Context: EVAL
 Form: C   Context: EVAL
-(CATCH CATCH-TAG (LIST A) B C)")))
+\(CATCH CATCH-TAG (LIST A) B C)")))
 
 ;;; This is a fairly simple MACROLET case. While walking the body of the
 ;;; macro, X should be lexically bound. In the body of the MACROLET form
@@ -167,7 +167,7 @@ Form: ''INNER   Context: EVAL
 Form: X   Context: EVAL
 Form: (FOO 1)   Context: EVAL
 Form: 'INNER   Context: EVAL
-(MACROLET ((FOO (X)
+\(MACROLET ((FOO (X)
              (LIST X)
              ''INNER))
   X
@@ -220,7 +220,7 @@ Form: X   Context: EVAL; lexically bound
 Form: Y   Context: EVAL
 Form: (FOO 1)   Context: EVAL
 Form: 1   Context: EVAL
-(FLET ((FOO (X)
+\(FLET ((FOO (X)
          (LIST X Y))
        (BAR (X)
          (LIST X Y)))
@@ -254,7 +254,7 @@ Form: X   Context: EVAL; lexically bound
 Form: Y   Context: EVAL; lexically bound
 Form: (FOO 1)   Context: EVAL
 Form: 1   Context: EVAL
-(LET ((Y 2))
+\(LET ((Y 2))
   (FLET ((FOO (X)
            (LIST X Y))
          (BAR (X)
@@ -279,7 +279,7 @@ Form: (FOO X)   Context: EVAL
 Form: X   Context: EVAL; lexically bound
 Form: (FOO 1)   Context: EVAL
 Form: 1   Context: EVAL
-(LABELS ((FOO (X)
+\(LABELS ((FOO (X)
            (BAR X))
          (BAR (X)
            (FOO X)))
@@ -298,7 +298,7 @@ Form: (FOO X)   Context: EVAL
 Form: 'GLOBAL-FOO   Context: EVAL
 Form: (FOO 1)   Context: EVAL
 Form: 1   Context: EVAL
-(FLET ((FOO (X)
+\(FLET ((FOO (X)
          (FOO X)))
   (FOO 1))")))
 
@@ -323,7 +323,7 @@ Form: (FOO X)   Context: EVAL
 Form: X   Context: EVAL; lexically bound
 Form: (BAR 1)   Context: EVAL
 Form: 1   Context: EVAL
-(FLET ((FOO (X)
+\(FLET ((FOO (X)
          (FOO X)))
   (FLET ((BAR (X)
            (FOO X)))
@@ -342,7 +342,7 @@ Form: (LET ()
         (DECLARE (SPECIAL A B))
         (TAGBODY))   Context: EVAL
 Form: (TAGBODY)   Context: EVAL
-(PROG () (DECLARE (SPECIAL A B)))")))
+\(PROG () (DECLARE (SPECIAL A B)))")))
 
 (test-util:with-test (:name (:walk let special 1))
   (assert (string=-modulo-tabspace
@@ -359,7 +359,7 @@ Form: (FOO A)   Context: EVAL
 Form: 'GLOBAL-FOO   Context: EVAL
 Form: B   Context: EVAL; lexically bound; declared special
 Form: C   Context: EVAL; lexically bound
-(LET (A B C)
+\(LET (A B C)
   (DECLARE (SPECIAL A B))
   (FOO A)
   B
@@ -380,7 +380,7 @@ Form: (FOO A)   Context: EVAL
 Form: 'GLOBAL-FOO   Context: EVAL
 Form: B   Context: EVAL; lexically bound; declared special
 Form: C   Context: EVAL; lexically bound
-(LET (A B C)
+\(LET (A B C)
   (DECLARE (SPECIAL A) (SPECIAL B))
   (FOO A)
   B
@@ -403,7 +403,7 @@ Form: (FOO A)   Context: EVAL
 Form: 'GLOBAL-FOO   Context: EVAL
 Form: B   Context: EVAL; lexically bound; declared special
 Form: C   Context: EVAL; lexically bound
-(LET (A B C)
+\(LET (A B C)
   (DECLARE (SPECIAL A))
   (DECLARE (SPECIAL B))
   (FOO A)
@@ -434,7 +434,7 @@ Form: (FOO A)   Context: EVAL
 Form: 'GLOBAL-FOO   Context: EVAL
 Form: B   Context: EVAL; lexically bound; declared special
 Form: C   Context: EVAL; lexically bound
-(LET (A B C)
+\(LET (A B C)
   (DECLARE (SPECIAL A))
   (DECLARE (SPECIAL B))
   (LET ((A 1))
@@ -452,7 +452,7 @@ Form: C   Context: EVAL; lexically bound
 Form: A   Context: EVAL
 Form: (FOO A)   Context: EVAL
 Form: 'GLOBAL-FOO   Context: EVAL
-(EVAL-WHEN NIL A (FOO A))")))
+\(EVAL-WHEN NIL A (FOO A))")))
 
 (test-util:with-test (:name (:walk eval-when 2))
   (assert (string=-modulo-tabspace
@@ -465,7 +465,7 @@ Form: 'GLOBAL-FOO   Context: EVAL
 Form: A   Context: EVAL
 Form: (FOO A)   Context: EVAL
 Form: 'GLOBAL-FOO   Context: EVAL
-(EVAL-WHEN (:EXECUTE :COMPILE-TOPLEVEL :LOAD-TOPLEVEL) A (FOO A))")))
+\(EVAL-WHEN (:EXECUTE :COMPILE-TOPLEVEL :LOAD-TOPLEVEL) A (FOO A))")))
 
 (test-util:with-test (:name (:walk multiple-value-bind))
   (assert (string=-modulo-tabspace
@@ -478,7 +478,7 @@ Form: 'GLOBAL-FOO   Context: EVAL
 Form: (LIST A B)   Context: EVAL
 Form: A   Context: EVAL; lexically bound
 Form: B   Context: EVAL; lexically bound
-(MULTIPLE-VALUE-BIND (A B) (FOO A B) (LIST A B))")))
+\(MULTIPLE-VALUE-BIND (A B) (FOO A B) (LIST A B))")))
 
 (test-util:with-test (:name (:walk multiple-value-bind special))
   (assert (string=-modulo-tabspace
@@ -493,7 +493,7 @@ Form: 'GLOBAL-FOO   Context: EVAL
 Form: (LIST A B)   Context: EVAL
 Form: A   Context: EVAL; lexically bound; declared special
 Form: B   Context: EVAL; lexically bound
-(MULTIPLE-VALUE-BIND (A B) (FOO A B) (DECLARE (SPECIAL A)) (LIST A B))")))
+\(MULTIPLE-VALUE-BIND (A B) (FOO A B) (DECLARE (SPECIAL A)) (LIST A B))")))
 
 (test-util:with-test (:name (:walk progn function))
   (assert (string=-modulo-tabspace
@@ -501,7 +501,7 @@ Form: B   Context: EVAL; lexically bound
              (take-it-out-for-a-test-walk (progn (function foo))))
            "Form: (PROGN #'FOO)   Context: EVAL
 Form: #'FOO   Context: EVAL
-(PROGN #'FOO)")))
+\(PROGN #'FOO)")))
 
 (test-util:with-test (:name (:walk progn go))
   (assert (string=-modulo-tabspace
@@ -511,7 +511,7 @@ Form: #'FOO   Context: EVAL
 Form: A   Context: EVAL
 Form: B   Context: EVAL
 Form: (GO A)   Context: EVAL
-(PROGN A B (GO A))")))
+\(PROGN A B (GO A))")))
 
 (test-util:with-test (:name (:walk if 1))
   (assert (string=-modulo-tabspace
@@ -521,7 +521,7 @@ Form: (GO A)   Context: EVAL
 Form: A   Context: EVAL
 Form: B   Context: EVAL
 Form: C   Context: EVAL
-(IF A B C)")))
+\(IF A B C)")))
 
 (test-util:with-test (:name (:walk if 2))
   (assert (string=-modulo-tabspace
@@ -531,7 +531,7 @@ Form: C   Context: EVAL
 Form: A   Context: EVAL
 Form: B   Context: EVAL
 Form: NIL   Context: EVAL; bound: NIL
-(IF A B)")))
+\(IF A B)")))
 
 (test-util:with-test (:name (:walk lambda))
   (assert (string=-modulo-tabspace
@@ -544,7 +544,7 @@ Form: A   Context: EVAL; lexically bound
 Form: B   Context: EVAL; lexically bound
 Form: 1   Context: EVAL
 Form: 2   Context: EVAL
-((LAMBDA (A B) (LIST A B)) 1 2)")))
+\((LAMBDA (A B) (LIST A B)) 1 2)")))
 
 (test-util:with-test (:name (:walk lambda special))
   (assert (string=-modulo-tabspace
@@ -560,7 +560,7 @@ Form: A   Context: EVAL; lexically bound; declared special
 Form: B   Context: EVAL; lexically bound
 Form: 1   Context: EVAL
 Form: 2   Context: EVAL
-((LAMBDA (A B) (DECLARE (SPECIAL A)) (LIST A B)) 1 2)")))
+\((LAMBDA (A B) (DECLARE (SPECIAL A)) (LIST A B)) 1 2)")))
 
 (test-util:with-test (:name (:walk let list))
   (assert (string=-modulo-tabspace
@@ -576,7 +576,7 @@ Form: (LIST A B C)   Context: EVAL
 Form: A   Context: EVAL; lexically bound
 Form: B   Context: EVAL; lexically bound
 Form: C   Context: EVAL; lexically bound
-(LET ((A A) (B A) (C B))
+\(LET ((A A) (B A) (C B))
   (LIST A B C))")))
 
 (test-util:with-test (:name (:walk let* list))
@@ -592,7 +592,7 @@ Form: (LIST A B C)   Context: EVAL
 Form: A   Context: EVAL; lexically bound
 Form: B   Context: EVAL; lexically bound
 Form: C   Context: EVAL; lexically bound
-(LET* ((A A) (B A) (C B))
+\(LET* ((A A) (B A) (C B))
   (LIST A B C))")))
 
 (test-util:with-test (:name (:walk let special list))
@@ -611,7 +611,7 @@ Form: (LIST A B C)   Context: EVAL
 Form: A   Context: EVAL; lexically bound; declared special
 Form: B   Context: EVAL; lexically bound; declared special
 Form: C   Context: EVAL; lexically bound
-(LET ((A A) (B A) (C B))
+\(LET ((A A) (B A) (C B))
   (DECLARE (SPECIAL A B))
   (LIST A B C))")))
 
@@ -660,7 +660,7 @@ Form: (LET ()
         (FOO A B))   Context: EVAL
 Form: (FOO A B)   Context: EVAL
 Form: 'GLOBAL-FOO   Context: EVAL
-(LET ((A 1) (B 2))
+\(LET ((A 1) (B 2))
   (FOO BAR)
   (LET ()
     (DECLARE (SPECIAL A))
@@ -675,7 +675,7 @@ Form: #'FOO   Context: EVAL
 Form: A   Context: EVAL
 Form: B   Context: EVAL
 Form: C   Context: EVAL
-(MULTIPLE-VALUE-CALL #'FOO A B C)")))
+\(MULTIPLE-VALUE-CALL #'FOO A B C)")))
 
 (test-util:with-test (:name (:walk multiple-value-prog1))
   (assert (string=-modulo-tabspace
@@ -685,7 +685,7 @@ Form: C   Context: EVAL
 Form: A   Context: EVAL
 Form: B   Context: EVAL
 Form: C   Context: EVAL
-(MULTIPLE-VALUE-PROG1 A B C)")))
+\(MULTIPLE-VALUE-PROG1 A B C)")))
 
 (test-util:with-test (:name (:walk progn 2))
   (assert (string=-modulo-tabspace
@@ -695,7 +695,7 @@ Form: C   Context: EVAL
 Form: A   Context: EVAL
 Form: B   Context: EVAL
 Form: C   Context: EVAL
-(PROGN A B C)")))
+\(PROGN A B C)")))
 
 (test-util:with-test (:name (:walk progv))
   (assert (string=-modulo-tabspace
@@ -707,7 +707,7 @@ Form: VALS   Context: EVAL
 Form: A   Context: EVAL
 Form: B   Context: EVAL
 Form: C   Context: EVAL
-(PROGV VARS VALS A B C)")))
+\(PROGV VARS VALS A B C)")))
 
 (test-util:with-test (:name (:walk quote))
   (assert (string=-modulo-tabspace
@@ -724,7 +724,7 @@ Form: C   Context: EVAL
 Form: A   Context: EVAL
 Form: B   Context: EVAL
 Form: C   Context: EVAL
-(RETURN-FROM BLOCK-NAME A B C)")))
+\(RETURN-FROM BLOCK-NAME A B C)")))
 
 
 (test-util:with-test (:name (:walk setq 1))
@@ -734,7 +734,7 @@ Form: C   Context: EVAL
            "Form: (SETQ A 1)   Context: EVAL
 Form: A   Context: SET
 Form: 1   Context: EVAL
-(SETQ A 1)")))
+\(SETQ A 1)")))
 (makunbound 'a)
 
 (test-util:with-test (:name (:walk setq 2))
@@ -753,7 +753,7 @@ Form: 'GLOBAL-BAR   Context: EVAL
 Form: (SETQ C 3)   Context: EVAL
 Form: C   Context: SET
 Form: 3   Context: EVAL
-(SETQ A (FOO 1) B (BAR 2) C 3)")))
+\(SETQ A (FOO 1) B (BAR 2) C 3)")))
 (makunbound 'a)
 (makunbound 'b)
 (makunbound 'c)
@@ -763,11 +763,8 @@ Form: 3   Context: EVAL
            (with-output-to-string (*standard-output*)
              (take-it-out-for-a-test-walk (tagbody a b c (go a))))
            "Form: (TAGBODY A B C (GO A))   Context: EVAL
-Form: A   Context: QUOTE
-Form: B   Context: QUOTE
-Form: C   Context: QUOTE
 Form: (GO A)   Context: EVAL
-(TAGBODY A B C (GO A))")))
+\(TAGBODY A B C (GO A))")))
 
 (test-util:with-test (:name (:walk the))
   (assert (string=-modulo-tabspace
@@ -778,7 +775,7 @@ Form: (FOO-FORM A B C)   Context: EVAL
 Form: A   Context: EVAL
 Form: B   Context: EVAL
 Form: C   Context: EVAL
-(THE FOO (FOO-FORM A B C))")))
+\(THE FOO (FOO-FORM A B C))")))
 
 (test-util:with-test (:name (:walk throw))
   (assert (string=-modulo-tabspace
@@ -787,7 +784,7 @@ Form: C   Context: EVAL
            "Form: (THROW TAG-FORM A)   Context: EVAL
 Form: TAG-FORM   Context: EVAL
 Form: A   Context: EVAL
-(THROW TAG-FORM A)")))
+\(THROW TAG-FORM A)")))
 
 (test-util:with-test (:name (:walk unwind-protect))
   (assert (string=-modulo-tabspace
@@ -799,7 +796,7 @@ Form: 'GLOBAL-FOO   Context: EVAL
 Form: D   Context: EVAL
 Form: E   Context: EVAL
 Form: F   Context: EVAL
-(UNWIND-PROTECT (FOO A B) D E F)")))
+\(UNWIND-PROTECT (FOO A B) D E F)")))
 
 (defmacro flet-1 (a b)
   (declare (ignore a b))
@@ -833,7 +830,7 @@ Form: 1   Context: EVAL
 Form: 2   Context: EVAL
 Form: (FOO 1 2)   Context: EVAL
 Form: 'GLOBAL-FOO   Context: EVAL
-(FLET ((FLET-1 (A B)
+\(FLET ((FLET-1 (A B)
          NIL
          (FLET-1 A B)
          (LIST A B)))
@@ -865,7 +862,7 @@ Form: 1   Context: EVAL
 Form: 2   Context: EVAL
 Form: (FOO 1 2)   Context: EVAL
 Form: 'GLOBAL-FOO   Context: EVAL
-(LABELS ((LABEL-1 (A B)
+\(LABELS ((LABEL-1 (A B)
            NIL
            (LABEL-1 A B)
            (LIST A B)))
@@ -890,7 +887,7 @@ Form: (A B)   Context: EVAL
 Form: B   Context: EVAL
 Form: (FOO 1 2)   Context: EVAL
 Form: 'GLOBAL-FOO   Context: EVAL
-(MACROLET ((MACROLET-1 (A B)
+\(MACROLET ((MACROLET-1 (A B)
              (LIST A B)))
   (MACROLET-1 A B)
   (FOO 1 2))")))
@@ -910,7 +907,7 @@ Form: A   Context: EVAL; lexically bound
 Form: (FOO 1)   Context: EVAL
 Form: (INNER-FOO-EXPANDED 1)   Context: EVAL
 Form: 1   Context: EVAL
-(MACROLET ((FOO (A)
+\(MACROLET ((FOO (A)
              `(INNER-FOO-EXPANDED ,A)))
   (FOO 1))")))
 
@@ -938,7 +935,7 @@ Form: A   Context: EVAL; lexically bound
 Form: (BAR 2)   Context: EVAL
 Form: (INNER-BAR-EXPANDED 2)   Context: EVAL
 Form: 2   Context: EVAL
-(PROGN
+\(PROGN
   (BAR 1)
   (MACROLET ((BAR (A)
                `(INNER-BAR-EXPANDED ,A)))
@@ -973,7 +970,7 @@ Form: S   Context: EVAL; lexically bound
 Form: (BAR 2)   Context: EVAL
 Form: (INNER-BAR-EXPANDED 2)   Context: EVAL
 Form: 2   Context: EVAL
-(PROGN
+\(PROGN
   (BAR 1)
   (MACROLET ((BAR (S)
                (BAR S)
@@ -999,7 +996,7 @@ Form: A   Context: EVAL
 Form: (FOO A)   Context: EVAL
 Form: 'GLOBAL-FOO   Context: EVAL
 Form: NIL   Context: EVAL; bound: NIL
-(COND (A B) ((FOO BAR) A (FOO A)))")))
+\(COND (A B) ((FOO BAR) A (FOO A)))")))
 
 (test-util:with-test (:name (:walk let lambda))
   (assert (string=-modulo-tabspace
@@ -1020,6 +1017,24 @@ Form: NIL   Context: EVAL; bound: NIL
                         (member 'x the-lexical-variables))
                    (error "Walker didn't do lexical variables of a closure properly."))))
            "")))
+
+(test-util:with-test (:name (:walk setq :macro))
+  (assert (string=-modulo-tabspace
+           (with-output-to-string (*standard-output*)
+             (take-it-out-for-a-test-walk
+              (macrolet ((x () 'y))
+                (setq (x) 3))))
+           "Form: (MACROLET ((X ()
+                   'Y))
+        (SETQ (X) 3))   Context: EVAL
+Form: 'Y   Context: EVAL
+Form: (SETQ (X) 3)   Context: EVAL
+Form: (X)   Context: SET
+Form: 3   Context: EVAL
+\(MACROLET ((X ()
+             'Y))
+  (SETQ (X) 3))"
+)))
 
 ;;;; more tests
 

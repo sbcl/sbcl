@@ -235,8 +235,7 @@
 ;;; function, variable bindings, declarations in effect etc. This
 ;;; information is inherently lexical, so the walker passes it around
 ;;; in the actual environment the walker passes to macroexpansion
-;;; functions. This is what makes the NESTED-WALK-FORM facility work
-;;; properly.
+;;; functions.
 (defmacro walker-environment-bind ((var env &rest key-args)
                                       &body body)
   `(with-augmented-environment
@@ -425,6 +424,7 @@
 (define-walker-template lambda               walk-lambda)
 (define-walker-template let                  walk-let)
 (define-walker-template let*                 walk-let*)
+(define-walker-template load-time-value      walk-load-time-value)
 (define-walker-template locally              walk-locally)
 (define-walker-template macrolet             walk-macrolet)
 (define-walker-template multiple-value-call  (nil eval repeat (eval)))
@@ -473,6 +473,7 @@
 ;;;        either MACROEXPAND or MACROEXPAND-1 and start over.
 ;;;     3. Otherwise, assume it is a function call. "
 (defun walk-form-internal (form context env)
+  (declare (type (member :eval :set) context))
   ;; First apply the walk-function to perform whatever translation
   ;; the user wants to this form. If the second value returned
   ;; by walk-function is T then we don't recurse...
@@ -484,7 +485,9 @@
          (walk-no-more-p newform)
          ((not (eq form newform))
           (walk-form-internal newform context env))
-         ((not (consp newform))
+         ((and (not (consp newform))
+               (or (eql context :eval)
+                   (eql context :set)))
           (let ((symmac (car (variable-symbol-macro-p newform env))))
             (if symmac
                 (let* ((newnewform (walk-form-internal (cddr symmac)
@@ -499,6 +502,7 @@
                       resultform
                       `(the ,type ,resultform)))
                 newform)))
+         ((eql context :set) newform)
          (t
           (let* ((fn (car newform))
                  (template (get-walker-template fn newform)))
@@ -519,7 +523,6 @@
                           (if *walk-form-expand-macros-p* newnewform newform)
                           newnewnewform)))
                    ((and (symbolp fn)
-                         (not (fboundp fn))
                          (special-operator-p fn))
                     ;; This shouldn't happen, since this walker is now
                     ;; maintained as part of SBCL, so it should know
@@ -749,6 +752,20 @@
       (relist*
        form let/let* walked-bindings walked-body))))
 
+(defun walk-load-time-value (form context env)
+  (destructuring-bind (ltv val &optional read-only-p) form
+    (declare (ignore ltv))
+    (relist form
+            'load-time-value
+            ;; this is wrong: VAL is handled differently depending on
+            ;; whether we're in EVAL, COMPILE or COMPILE-FILE, and
+            ;; (after macroexpansion) is evaluated in the null lexical
+            ;; environment.  The macro semantics are the same in each
+            ;; case, but VAR-LEXICAL-P can be tricked into giving the
+            ;; wrong answer.
+            (walk-form-internal val context env)
+            (walk-form-internal read-only-p context env))))
+
 (defun walk-locally (form context old-env)
   (declare (ignore context))
   (walker-environment-bind (new-env old-env)
@@ -825,25 +842,6 @@
                                   context
                                   sequentialp)))))
 
-(defun walk-bindings-2 (bindings walked-bindings context env)
-  (and bindings
-       (let ((binding (car bindings))
-             (walked-binding (car walked-bindings)))
-         (recons bindings
-                 (if (symbolp binding)
-                     binding
-                     (relist* binding
-                              (car walked-binding)
-                              (cadr walked-binding)
-                              (walk-template (cddr binding)
-                                             '(eval)
-                                             context
-                                             env)))
-                 (walk-bindings-2 (cdr bindings)
-                                  (cdr walked-bindings)
-                                  context
-                                  env)))))
-
 (defun walk-lambda (form context old-env)
   (walker-environment-bind (new-env old-env)
     (let* ((arglist (cadr form))
@@ -918,9 +916,9 @@
 (defun walk-tagbody-1 (form context env)
   (and form
        (recons form
-               (walk-form-internal (car form)
-                                   (if (symbolp (car form)) 'quote context)
-                                   env)
+               (if (or (symbolp (car form)) (integerp (car form)))
+                   (walk-template (car form) 'quote context env)
+                   (walk-form-internal (car form) context env))
                (walk-tagbody-1 (cdr form) context env))))
 
 (defun walk-macrolet (form context old-env)
