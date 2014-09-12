@@ -16,22 +16,21 @@
 ;;; in this component.
 (defvar *component-being-compiled*)
 
-;;; DO-PACKED-TNS (TN-Var Component [Result]) Declaration* Form*
+;;; DO-PACKED-TNS (TN-Var Component [Result]) Form*
 ;;;
 ;;; Iterate over all packed TNs allocated in COMPONENT.
 (defmacro do-packed-tns ((tn component &optional result) &body body)
-  (let ((n-component (gensym)))
-    `(let ((,n-component (component-info ,component)))
-       (do ((,tn (ir2-component-normal-tns ,n-component) (tn-next ,tn)))
-           ((null ,tn))
-         ,@body)
-       (do ((,tn (ir2-component-restricted-tns ,n-component) (tn-next ,tn)))
-           ((null ,tn))
-         ,@body)
-       (do ((,tn (ir2-component-wired-tns ,n-component) (tn-next ,tn)))
-           ((null ,tn)
-            ,result)
-         ,@body))))
+  (with-unique-names (n-component tns more-tns outer inner)
+    `(prog* ((,n-component (component-info ,component))
+             (,tn       (ir2-component-normal-tns ,n-component))
+             (,tns      (ir2-component-restricted-tns ,n-component))
+             (,more-tns (ir2-component-wired-tns ,n-component)))
+       (when ,tn (go ,inner))
+       ,outer (when (eq ,tns :done) (return ,result))
+              (shiftf ,tn ,tns ,more-tns :done)
+              (unless ,tn (go ,outer))
+       ,inner (progn ,@body)
+              (if (setq ,tn (tn-next ,tn)) (go ,inner) (go ,outer)))))
 
 (defun set-ir2-physenv-live-tns (value instance)
   (setf (ir2-physenv-live-tns instance) value))
