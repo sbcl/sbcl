@@ -1197,12 +1197,14 @@ code to be loaded.
 (defun loop-do-repeat ()
   (loop-disallow-conditional :repeat)
   (let* ((form (loop-get-form))
-         (type (cond ((not (realp form))
+         (count (and (constantp form) ; FIXME: lexical environment constants
+                     (sb!int:constant-form-value form)))
+         (type (cond ((not (realp count))
                       'integer)
-                     ((plusp form)
-                      `(mod ,(1+ (ceiling form))))
+                     ((plusp count)
+                      `(mod ,(1+ (ceiling count))))
                      (t
-                      `(integer ,(ceiling form))))))
+                      `(integer ,(ceiling count))))))
     (let ((var (loop-make-var (gensym "LOOP-REPEAT-") `(ceiling ,form) type)))
       (push `(if (<= ,var 0) (go end-loop) (decf ,var)) *loop-before-loop*)
       (push `(if (<= ,var 0) (go end-loop) (decf ,var)) *loop-after-body*)

@@ -396,3 +396,15 @@
    (compile nil `(lambda ()
                    (loop for i to 10 sum i of-type (and fixnum string))))
    warning))
+
+(with-test (:name :loop-repeat-const)
+  ;; without explicit constant-folding in LOOP-DO-REPEAT, the type of this loop's
+  ;; counter is INTEGER which unfortunately resulted in generic math throughout,
+  ;; since a FOR/THEN clause interacts badly with type inference.
+  ;; [if there is no FOR/THEN, the compiler understands the code better,
+  ;; and is able to infer a lower bound on decrementing from (+ 1 5)]
+  (assert-no-signal
+   (compile nil '(lambda ()
+                   (declare (optimize speed))
+                   (loop repeat (+ 1 5) for baz = 'this then 'that
+                         do (print baz))))))
