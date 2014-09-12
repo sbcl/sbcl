@@ -532,7 +532,7 @@
 ;;; for the read-only case, but switched at one point to always
 ;;; updating it. This generally speeds up the compiler nicely, but
 ;;; sometimes it causes an infinite loop in the updating machinery,
-;;; We cheat by switching of the fast path if it seems we're looping
+;;; We cheat by switching off the fast path if it seems we're looping
 ;;; longer then expected.
 (defun propagate-live-tns (block1 block2 fastp)
   (declare (type ir2-block block1 block2))
@@ -583,6 +583,7 @@
 
 ;;; Do backward global flow analysis to find all TNs live at each
 ;;; block boundary.
+(defparameter *max-fast-propagate-live-tn-passes* 10)
 (defun lifetime-flow-analysis (component)
   ;; KLUDGE: This is the second part of the FASTP kludge in
   ;; propagate-live-tns: we pass fastp for ten first attempts,
@@ -603,13 +604,16 @@
 
           (dolist (b (block-succ block))
             (when (and (block-start b)
-                       (propagate-live-tns last (block-info b) (< i 10)))
+                       (propagate-live-tns
+                        last (block-info b)
+                        (< i *max-fast-propagate-live-tn-passes*)))
               (setq did-something t)))
 
           (do ((b (ir2-block-prev last) (ir2-block-prev b))
                (prev last b))
               ((not (eq (ir2-block-block b) block)))
-            (when (propagate-live-tns b prev (< i 10))
+            (when (propagate-live-tns b prev
+                                      (< i *max-fast-propagate-live-tn-passes*))
               (setq did-something t)))))
 
       (unless did-something (return))))
