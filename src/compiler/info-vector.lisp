@@ -117,8 +117,7 @@
 
 (declaim (inline make-info-forwarding-pointer
                  info-forwarding-pointer-target
-                 info-value-moved-p
-                 increment-count)
+                 info-value-moved-p)
          (ftype (sfunction (t) simple-vector) info-env-rehash)
          (ftype (sfunction (t t) simple-vector) %wait-for-rehash))
 
