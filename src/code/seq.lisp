@@ -918,8 +918,11 @@ many elements are copied."
         ((csubtypep type (specifier-type 'vector))
          (concat-to-simple* output-type-spec sequences))
         ((and (csubtypep type (specifier-type 'sequence))
-              (find-class output-type-spec nil))
-         (coerce (concat-to-simple* 'vector sequences) output-type-spec))
+              (awhen (find-class output-type-spec nil)
+                (apply #'sb!sequence:concatenate
+                       (sb!mop:class-prototype
+                        (sb!pcl:ensure-class-finalized it))
+                       sequences))))
         (t
          (bad-sequence-type-error output-type-spec))))))
 
@@ -946,6 +949,7 @@ many elements are copied."
                   result))))
   (def %concatenate-to-string character)
   (def %concatenate-to-base-string base-char))
+
 
 ;;;; MAP
 

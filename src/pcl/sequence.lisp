@@ -728,6 +728,31 @@
   (let ((result (copy-seq sequence)))
     (sequence:nreverse result)))
 
+(defgeneric sequence:concatenate (result-prototype &rest sequences)
+  #+sb-doc
+  (:documentation
+   "Implements CL:CONCATENATE for extended sequences.
+
+    RESULT-PROTOTYPE corresponds to the RESULT-TYPE of CL:CONCATENATE
+    but receives a prototype instance of an extended sequence class
+    instead of a type specifier. By dispatching on RESULT-PROTOTYPE,
+    methods on this generic function specify how extended sequence
+    classes act when they are specified as the result type in a
+    CL:CONCATENATE call. RESULT-PROTOTYPE may not be fully initialized
+    and thus should only be used for dispatch and to determine its
+    class."))
+
+(defmethod sequence:concatenate ((result-prototype sequence) &rest sequences)
+  (let* ((lengths (mapcar #'length sequences))
+         (result (sequence:make-sequence-like
+                  result-prototype (reduce #'+ lengths))))
+    (loop with index = 0
+       for sequence in sequences
+       for length in lengths do
+         (replace result sequence :start1 index)
+         (incf index length))
+    result))
+
 (defgeneric sequence:reduce
     (function sequence &key from-end start end initial-value)
   (:argument-precedence-order sequence function))
