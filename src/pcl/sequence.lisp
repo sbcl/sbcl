@@ -1103,3 +1103,76 @@
           ((>= i length) sequence)
         (funcall setelt (aref vector i) sequence state)
         (setq state (funcall step sequence state from-end))))))
+
+(defgeneric sequence:merge (result-prototype sequence1 sequence2 predicate &key key)
+  #+sb-doc
+  (:documentation
+   "Implements CL:MERGE for extended sequences.
+
+    RESULT-PROTOTYPE corresponds to the RESULT-TYPE of CL:MERGE but
+    receives a prototype instance of an extended sequence class
+    instead of a type specifier. By dispatching on RESULT-PROTOTYPE,
+    methods on this generic function specify how extended sequence
+    classes act when they are specified as the result type in a
+    CL:MERGE call. RESULT-PROTOTYPE may not be fully initialized and
+    thus should only be used for dispatch and to determine its class.
+
+    Another difference to CL:MERGE is that PREDICATE is a function,
+    not a function designator."))
+
+(defmethod sequence:merge ((result-prototype sequence)
+                           (sequence1 sequence) (sequence2 sequence)
+                           (predicate function) &key key)
+  (let ((key-function (when key
+                        (%coerce-callable-to-fun key)))
+        (result (sequence:make-sequence-like
+                 result-prototype (+ (length sequence1) (length sequence2))))
+        endp1 elt1 key1 endp2 elt2 key2)
+    (sequence:with-sequence-iterator-functions
+        (step-result endp-result elt-result setelt-result index-result copy-result) (result) ; TODO allow nil and fewer number of elements
+      (sequence:with-sequence-iterator-functions
+          (step1 endp1 elt1 setelt1 index1 copy1) (sequence1)
+        (sequence:with-sequence-iterator-functions
+            (step2 endp2 elt2 setelt2 index2 copy2) (sequence2)
+          (labels ((pop/no-key1 ()
+                     (unless (setf endp1 (endp1))
+                       (setf elt1 (elt1))))
+                   (pop/no-key2 ()
+                     (unless (setf endp2 (endp2))
+                       (setf elt2 (elt2))))
+                   (pop/key1 ()
+                     (unless (setf endp1 (endp1))
+                       (setf key1 (funcall (truly-the function key-function)
+                                           (setf elt1 (elt1))))))
+                   (pop/key2 ()
+                     (unless (setf endp2 (endp2))
+                       (setf key2 (funcall (truly-the function key-function)
+                                           (setf elt2 (elt2))))))
+                   (pop-one/no-key ()
+                     (if (funcall predicate elt2 elt1) ; see comment in MERGE-LIST*
+                         (prog1 elt2 (step2) (pop/no-key2))
+                         (prog1 elt1 (step1) (pop/no-key1))))
+                   (pop-one/key ()
+                     (if (funcall predicate key2 key1)
+                         (prog1 elt2 (step2) (pop/key2))
+                         (prog1 elt1 (step1) (pop/key1)))))
+            (declare (truly-dynamic-extent #'pop/no-key1 #'pop/no-key2
+                                           #'pop/key1 #'pop/key2
+                                           #'pop-one/no-key #'pop-one/key))
+            ;; Populate ENDP{1,2}, ELT{1,2} and maybe KEY{1,2}.
+            (cond (key-function (pop/key1) (pop/key2))
+                  (t (pop/no-key1) (pop/no-key2)))
+            (loop with pop-one = (if key-function #'pop-one/key #'pop-one/no-key) do
+                 (cond
+                   (endp2 ; batch-replace rest of SEQUENCE1 if SEQUENCE2 exhausted
+                    (unless endp1
+                      (replace result sequence1 :start1 (index-result) :start2 (index1)))
+                    (return))
+                   (endp1
+                    (unless endp2
+                      (replace result sequence2 :start1 (index-result) :start2 (index2)))
+                    (return))
+                   (t
+                    (setelt-result (funcall pop-one))
+                    (step-result))))))))
+    result))

@@ -430,16 +430,10 @@
              (merge-vectors vector-1 length-1 vector-2 length-2
                             result predicate key aref))))
       ((and (csubtypep type (specifier-type 'sequence))
-            (find-class result-type nil))
-       (let* ((vector-1 (coerce sequence1 'vector))
-              (vector-2 (coerce sequence2 'vector))
-              (length-1 (length vector-1))
-              (length-2 (length vector-2))
-              (temp (make-array (+ length-1 length-2)))
-              (result (make-sequence result-type (+ length-1 length-2))))
-         (declare (vector vector-1 vector-2) (fixnum length-1 length-2))
-         (merge-vectors vector-1 length-1 vector-2 length-2
-                        temp predicate key aref)
-         (replace result temp)
-         result))
+            (awhen (find-class result-type nil)
+              (let ((predicate-function (%coerce-callable-to-fun predicate)))
+                (sb!sequence:merge
+                 (sb!mop:class-prototype
+                  (sb!pcl:ensure-class-finalized it))
+                 sequence1 sequence2 predicate-function :key key)))))
       (t (bad-sequence-type-error result-type)))))
