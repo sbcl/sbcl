@@ -461,8 +461,24 @@ performance penalty @xref{Iterator Protocol}.
 @findex @cl{copy-seq}
 @findex @sequence{adjust-sequence}
 
-In addition to the mandatory functions above, methods on the following
-sequence functions can be defined:
+In addition to the mandatory functions above, methods on the sequence
+functions listed below can be defined.
+
+There are two noteworthy irregularities:
+@itemize
+@item
+The function @code{sb-sequence:emptyp} does not have a counterpart in
+the @code{cl} package. It is intended to be used instead of
+@code{length} when working with lazy or infinite sequences.
+
+@item
+The functions @code{map}, @code{concatenate} and @code{merge} receive a
+type designator specifying the type of the constructed sequence as their
+first argument. However, the corresponding generic functions
+@code{sb-sequence:map}, @code{sb-sequence:concatenate} and
+@code{sb-sequence:merge} receive a prototype instance of the requested
+@code{sequence} subclass instead.
+@end itemize
 
 @include fun-sb-sequence-emptyp.texinfo
 
@@ -486,6 +502,9 @@ sequence functions can be defined:
 @code{sb-sequence:fill}
 
 @item
+@include fun-sb-sequence-map.texinfo
+
+@item
 @code{sb-sequence:nsubstitute}, @code{sb-sequence:nsubstitute-if},
 @code{sb-sequence:nsubstitute-if-not}, @code{sb-sequence:substitute},
 @code{sb-sequence:substitute-if}, @code{sb-sequence:substitute-if-not}
@@ -495,6 +514,9 @@ sequence functions can be defined:
 
 @item
 @code{sb-sequence:nreverse}, @code{sb-sequence:reverse}
+
+@item
+@include fun-sb-sequence-concatenate.texinfo
 
 @item
 @code{sb-sequence:reduce}
@@ -514,6 +536,9 @@ sequence functions can be defined:
 
 @item
 @code{sb-sequence:sort}, @code{sb-sequence:stable-sort}
+
+@item
+@include fun-sb-sequence-merge.texinfo
 @end itemize
 
 In the spirit of @code{dolist}, generic sequences can be traversed using
