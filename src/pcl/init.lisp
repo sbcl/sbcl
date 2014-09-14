@@ -32,7 +32,7 @@
   (let ((instance-or-nil (maybe-call-ctor class initargs)))
     (when instance-or-nil
       (return-from make-instance instance-or-nil)))
-  (unless (class-finalized-p class) (finalize-inheritance class))
+  (ensure-class-finalized class)
   (let ((class-default-initargs (class-default-initargs class)))
     (when class-default-initargs
       (setf initargs (default-initargs initargs class-default-initargs)))
@@ -338,4 +338,3 @@
       (when (and invalid-keys error-p)
         (error 'initarg-error :class class :initargs invalid-keys)))
     invalid-keys))
-

@@ -265,12 +265,11 @@
             (coerce-error))))
         ((and (csubtypep type (specifier-type 'sequence))
               (find-class output-type-spec nil))
-         (let ((class (find-class output-type-spec)))
-           (unless (sb!mop:class-finalized-p class)
-             (sb!mop:finalize-inheritance class))
+         (let ((prototype (sb!mop:class-prototype
+                           (sb!pcl:ensure-class-finalized
+                            (find-class output-type-spec)))))
            (sb!sequence:make-sequence-like
-            (sb!mop:class-prototype class)
-            (length object) :initial-contents object)))
+            prototype (length object) :initial-contents object)))
         ((csubtypep type (specifier-type 'function))
          (coerce-to-fun object))
         (t

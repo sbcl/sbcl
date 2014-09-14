@@ -463,11 +463,10 @@
 (defun install-optimized-constructor (ctor)
   (with-world-lock ()
     (let* ((class-or-name (ctor-class-or-name ctor))
-           (class (if (symbolp class-or-name)
-                      (find-class class-or-name)
-                      class-or-name)))
-      (unless (class-finalized-p class)
-        (finalize-inheritance class))
+           (class (ensure-class-finalized
+                   (if (symbolp class-or-name)
+                       (find-class class-or-name)
+                       class-or-name))))
       ;; We can have a class with an invalid layout here.  Such a class
       ;; cannot have a LAYOUT-INVALID of (:FLUSH ...) or (:OBSOLETE
       ;; ...), because part of the deal is that those only happen from

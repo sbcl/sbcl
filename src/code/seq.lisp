@@ -412,16 +412,14 @@
                       (make-array length :element-type etype)))))
              (t (sequence-type-too-hairy (type-specifier type)))))
           ((and (csubtypep type (specifier-type 'sequence))
-                (find-class adjusted-type nil))
-           (let* ((class (find-class adjusted-type nil)))
-             (unless (sb!mop:class-finalized-p class)
-               (sb!mop:finalize-inheritance class))
-             (if iep
-                 (sb!sequence:make-sequence-like
-                  (sb!mop:class-prototype class) length
-                  :initial-element initial-element)
-                 (sb!sequence:make-sequence-like
-                  (sb!mop:class-prototype class) length))))
+                (awhen (find-class adjusted-type nil)
+                  (let ((prototype (sb!mop:class-prototype
+                                    (sb!pcl:ensure-class-finalized it))))
+                    (if iep
+                        (sb!sequence:make-sequence-like
+                         prototype length :initial-element initial-element)
+                        (sb!sequence:make-sequence-like
+                         prototype length))))))
           (t (bad-sequence-type-error (type-specifier type))))))
 
 ;;;; SUBSEQ

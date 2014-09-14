@@ -491,9 +491,8 @@
 ;;; care of this for non-standard-classes.
 (defmethod allocate-instance ((class standard-class) &rest initargs)
   (declare (ignore initargs))
-  (unless (class-finalized-p class)
-    (finalize-inheritance class))
-  (allocate-standard-instance (class-wrapper class)))
+  (allocate-standard-instance
+   (class-wrapper (ensure-class-finalized class))))
 
 (defmethod allocate-instance ((class structure-class) &rest initargs)
   (declare (ignore initargs))

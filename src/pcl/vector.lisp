@@ -156,6 +156,12 @@
       (finalize-inheritance class)
       t)))
 
+(declaim (ftype (sfunction (class) class) ensure-class-finalized))
+(defun ensure-class-finalized (class)
+  (unless (class-finalized-p class)
+    (finalize-inheritance class))
+  class)
+
 (defun can-optimize-access (form required-parameters env)
   (destructuring-bind (op var-form slot-name-form &optional new-value) form
     (let ((type (ecase op
