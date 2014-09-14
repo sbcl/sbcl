@@ -1639,70 +1639,52 @@
 
     instance))
 
-(flet ((cpl-maybe-finalize (class)
-         (unless (class-finalized-p class)
-           (finalize-inheritance class))
-         (class-precedence-list class)))
+(defun check-new-class-not-metaobject (new-class)
+  (dolist (class (class-precedence-list
+                  (ensure-class-finalized new-class)))
+    (macrolet
+        ((check-metaobject (class-name)
+           `(when (eq class (find-class ',class-name))
+              (change-class-to-metaobject-violation
+               ',class-name nil '((:amop :initialization ,class-name))))))
+      (check-metaobject class)
+      (check-metaobject generic-function)
+      (check-metaobject method)
+      (check-metaobject slot-definition))))
 
-  (defmethod change-class ((instance standard-object) (new-class standard-class)
-                           &rest initargs)
-    (with-world-lock ()
-      (dolist (class (cpl-maybe-finalize new-class))
-        (macrolet
-            ((frob (class-name)
-               `(when (eq class (find-class ',class-name))
-                  (error 'metaobject-initialization-violation
-                         :format-control "~@<Cannot ~S objects into ~S metaobjects.~@:>"
-                         :format-arguments (list 'change-class ',class-name)
-                         :references (list '(:amop :initialization ,class-name))))))
-          (frob class)
-          (frob generic-function)
-          (frob method)
-          (frob slot-definition)))
-     (%change-class instance new-class initargs)))
+(defmethod change-class ((instance standard-object) (new-class standard-class)
+                         &rest initargs)
+  (with-world-lock ()
+    (check-new-class-not-metaobject new-class)
+    (%change-class instance new-class initargs)))
 
- (defmethod change-class ((instance forward-referenced-class)
-                          (new-class standard-class) &rest initargs)
-   (with-world-lock ()
-     (dolist (class (cpl-maybe-finalize new-class)
-              (error 'metaobject-initialization-violation
-                     :format-control
-                     "~@<Cannot ~S ~S objects into non-~S objects.~@:>"
-                     :format-arguments
-                     (list 'change-class 'forward-referenced-class 'class)
-                     :references
-                     (list '(:amop :generic-function ensure-class-using-class)
-                           '(:amop :initialization class))))
-       (when (eq class (find-class 'class))
-         (return nil)))
-     (%change-class instance new-class initargs)))
+(defmethod change-class ((instance forward-referenced-class)
+                         (new-class standard-class) &rest initargs)
+  (with-world-lock ()
+    (dolist (class (class-precedence-list
+                    (ensure-class-finalized new-class))
+             (change-class-to-metaobject-violation
+              '(not class) 'forward-referenced-class
+              '((:amop :generic-function ensure-class-using-class)
+                (:amop :initialization class))))
+      (when (eq class (find-class 'class))
+        (return nil)))
+    (%change-class instance new-class initargs)))
 
-  (defmethod change-class ((instance t)
-                           (new-class forward-referenced-class) &rest initargs)
-    (error 'metaobject-initialization-violation
-           :format-control "~@<Cannot ~S objects into ~S objects.~@:>"
-           :format-arguments (list 'change-class 'forward-referenced-class)
-           :references
-           (list '(:amop :generic-function ensure-class-using-class)
-                 '(:amop :initialization class))))
+(defmethod change-class ((instance t)
+                         (new-class forward-referenced-class) &rest initargs)
+  (declare (ignore initargs))
+  (change-class-to-metaobject-violation
+   'forward-referenced-class nil
+   '((:amop :generic-function ensure-class-using-class)
+     (:amop :initialization class))))
 
- (defmethod change-class ((instance funcallable-standard-object)
-                          (new-class funcallable-standard-class)
-                          &rest initargs)
-   (with-world-lock ()
-     (dolist (class (cpl-maybe-finalize new-class))
-       (macrolet
-           ((frob (class-name)
-              `(when (eq class (find-class ',class-name))
-                 (error 'metaobject-initialization-violation
-                        :format-control "~@<Cannot ~S objects into ~S metaobjects.~@:>"
-                        :format-arguments (list 'change-class ',class-name)
-                        :references (list '(:amop :initialization ,class-name))))))
-         (frob class)
-         (frob generic-function)
-         (frob method)
-         (frob slot-definition)))
-     (%change-class instance new-class initargs))))
+(defmethod change-class ((instance funcallable-standard-object)
+                         (new-class funcallable-standard-class)
+                         &rest initargs)
+  (with-world-lock ()
+    (check-new-class-not-metaobject new-class)
+    (%change-class instance new-class initargs)))
 
 (defmethod change-class ((instance standard-object)
                          (new-class funcallable-standard-class)

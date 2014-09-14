@@ -41,6 +41,13 @@
     (reference-condition simple-error)
   ())
 
+(defun change-class-to-metaobject-violation (to-name
+                                             &optional from-name references)
+  (error 'metaobject-initialization-violation
+         :format-control "~@<Cannot ~S~@[ ~S~] objects into ~S metaobjects.~@:>"
+         :format-arguments (list 'change-class from-name to-name)
+         :references references))
+
 (macrolet ((def (name args control)
                `(defmethod ,name ,args
                  (declare (ignore initargs))
