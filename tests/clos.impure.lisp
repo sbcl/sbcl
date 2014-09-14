@@ -204,7 +204,11 @@
                        to-class   to-initargs
                        expected-slots)
       spec
-    (let ((from (apply #'make-instance from-class from-initargs)))
+    (let ((from (typecase from-class
+                  (symbol
+                   (apply #'make-instance from-class from-initargs))
+                  ((cons (eql :class) (cons symbol))
+                   (find-class (second from-class))))))
       (flet ((change ()
                (apply #'change-class from to-class to-initargs))
              ;; These local functions make ASSERT produce better error
@@ -239,6 +243,7 @@
   ((foo :initarg :foo) (bar :initarg :bar)))
 (defclass change-class.smoke.5 ()
   ((a :initarg :a) (b :initarg :b) (c :initarg :c)))
+(defclass change-class.smoke.6 () ())
 
 (with-test (:name (change-class :smoke))
   (mapc
@@ -273,7 +278,17 @@
 
      ;; Original test by Espen Johnsen
      (change-class.smoke.1 (:foo 1)         change-class.smoke.4 (:bar 2)
-      ((foo 1) (bar 2))))))
+      ((foo 1) (bar 2)))
+
+     ;; Cannot change objects into metaobjects.
+     (change-class.smoke.6 ()               class                ()
+      error)
+     (change-class.smoke.6 ()               generic-function     ()
+      error)
+     (change-class.smoke.6 ()               method               ()
+      error)
+     (change-class.smoke.6 ()               slot-definition      ()
+      error))))
 
 ;; Test for type-checking
 
@@ -352,7 +367,7 @@
       ((foo :baz)))
      (change-class.initforms.2 (:foo :baz) change-class.initforms.4 (:foo :fez)
       ((foo :fez))))))
-(change-class (make-instance 'change-class.initforms.1) 'change-class.initforms.3)
+
 ;; Test for FORWARD-REFERENCED-CLASS
 
 (defclass change-class.forward-referenced.1 () ())
@@ -363,8 +378,27 @@
 (with-test (:name (change-class sb-pcl:forward-referenced-class))
   (mapc
    #'change-class-test-case
-   '((change-class.forward-referenced.1 () change-class.forward-referenced.3 ()
-      error))))
+   '(;; Changing instances of "ordinary classes" to classes which are
+     ;; instances of FORWARD-REFERENCED-CLASS is not allowed.
+     (change-class.forward-referenced.1          () change-class.forward-referenced.3 ()
+      error)
+
+     ;; Changing instances of FORWARD-REFERENCED-CLASS into
+     ;; non-CLASSes and in particular non-CLASS metaobjects is not
+     ;; allowed.
+     ((:class change-class.forward-referenced.3) () change-class.forward-referenced.1 ()
+      error)
+     ((:class change-class.forward-referenced.3) () generic-function                  ()
+      error)
+     ((:class change-class.forward-referenced.3) () method                            ()
+      error)
+     ((:class change-class.forward-referenced.3) () slot-definition                   ()
+      error)
+
+     ;; Changing instances of FORWARD-REFERENCED-CLASS into CLASS is
+     ;; allowed but destructive. Therefore has to be final test case.
+     ((:class change-class.forward-referenced.3) () standard-class                    ()
+      ()))))
 
 ;; Test for FUNCALLABLE-STANDARD-CLASS
 
