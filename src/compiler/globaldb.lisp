@@ -437,8 +437,8 @@
 ;; Call FUNCTION once for each Name in globaldb that has information associated
 ;; with it, passing the function the Name as its only argument.
 ;;
-(defun call-with-each-globaldb-name (function)
-  (let ((function (%coerce-callable-to-fun function)))
+(defun call-with-each-globaldb-name (fun-designator)
+  (let ((function (coerce fun-designator 'function)))
     (dolist (package (list-all-packages))
       (do-symbols (symbol package)
         (when (eq (symbol-package symbol) package)
@@ -550,6 +550,12 @@
 ;;; This specifies whether this function may be expanded inline. If
 ;;; null, we don't care.
 (define-info-type (:function :inlinep) :type-spec inlinep)
+
+;;; Track how many times IR2 converted a call to this function as a full call
+;;; that was not in the scope of a local or global notinline declaration.
+;;; Useful for finding functions that were supposed to have been converted
+;;; through some kind of transformation but were not.
+(define-info-type (:function :static-full-call-count) :type-spec list)
 
 ;;; a macro-like function which transforms a call to this function
 ;;; into some other Lisp form. This expansion is inhibited if inline

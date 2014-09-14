@@ -84,10 +84,39 @@
 (setf (sb!int:info :function :kind 'sb!int:quasiquote) :macro
       (sb!int:info :function :macro-function 'sb!int:quasiquote)
       (cl:macro-function 'sb!int:quasiquote))
+(setq sb!c::*track-full-called-fnames-p* nil) ; Change this as desired
 (progn ; Should be: sb-xc:with-compilation-unit () ... but
   ;; leaving aside the question of building in any host - which shouldn't
   ;; matter - building SBCL in SBCL can hang in a way I haven't tracked down.
   (load "src/cold/compile-cold-sbcl.lisp"))
+
+(when sb!c::*track-full-called-fnames-p*
+  (let (possibly-suspicious likely-suspicious)
+    (sb!c::call-with-each-globaldb-name
+     (lambda (name)
+       (let* ((cell (sb!int:info :function :static-full-call-count name))
+              (inlinep (eq (sb!int:info :function :inlinep name) :inline))
+              (info (sb!int:info :function :info name)))
+         (if (and cell
+                  (or inlinep
+                      (and info (sb!c::fun-info-templates info))
+                      (sb!int:info :function :compiler-macro-function name)
+                      (sb!int:info :function :source-transform name)))
+             (if inlinep
+                 ;; A full call to an inline function almost always indicates
+                 ;; an out-of-order definition. If not an inline function,
+                 ;; the call could be due to an inapplicable transformation.
+                 (push (cons name cell) likely-suspicious)
+                 (push (cons name cell) possibly-suspicious))))))
+    (flet ((show (label list)
+             (format t "~%~A suspicious calls:~:{~%~*~4d ~0@*~S~*~@{~%     ~S~}~}~%"
+                     label (sort list #'> :key #'cadr))))
+      ;; Called inlines not in the presence of a declaration to the contrary
+      ;; indicate that perhaps the function definition appeared too late.
+      (show "Likely" likely-suspicious)
+      ;; Failed transforms are considered not quite as suspicious
+      ;; because it could either be too late, or that the transform failed.
+      (show "Possibly" possibly-suspicious))))
 
 ;; After cross-compiling, show me a list of types that checkgen
 ;; would have liked to use primitive traps for but couldn't.

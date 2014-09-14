@@ -1153,8 +1153,9 @@
 ;;; calls instead of primitives, sending the system off into infinite
 ;;; space. Having a report on all full calls generated makes it easier
 ;;; to figure out what form caused the problem this time.
+(declaim (type (or boolean (eql :detailed)) *track-full-called-fnames-p*))
+(defvar *track-full-called-fnames-p* nil)
 #!+sb-show (defvar *show-full-called-fnames-p* nil)
-#!+sb-show (defvar *full-called-fnames* (make-hash-table :test 'equal))
 
 ;;; Do some checks (and store some notes relevant for future checks)
 ;;; on a full call:
@@ -1167,8 +1168,19 @@
          (fname (lvar-fun-name lvar t)))
     (declare (type (or symbol cons) fname))
 
-    #!+sb-show (unless (gethash fname *full-called-fnames*)
-                 (setf (gethash fname *full-called-fnames*) t))
+    (when *track-full-called-fnames-p*
+      ;; If the full call was wanted, don't record it.
+      (unless (let ((*lexenv* (node-lexenv node)))
+                (fun-lexically-notinline-p fname))
+        (let ((cell (info :function :static-full-call-count fname)))
+          (if (not cell)
+              (setf cell (list 1)
+                    (info :function :static-full-call-count fname) cell)
+              (incf (car cell)))
+          (when (and (eq *track-full-called-fnames-p* :detailed)
+                     (boundp 'sb!xc:*compile-file-pathname*))
+            (pushnew sb!xc:*compile-file-pathname* (cdr cell) :test #'equal)))))
+
     #!+sb-show (when *show-full-called-fnames-p*
                  (/show "converting full call to named function" fname)
                  (/show (basic-combination-args node))
