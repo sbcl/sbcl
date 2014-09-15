@@ -454,30 +454,17 @@
     (read-n-bytes *fasl-input-stream* vector 0 bytes)
     vector))
 
-(define-fop (fop-eval 53)
+(define-fop (fop-eval 53) ; This seems to be unused
   (if *skip-until*
       (pop-stack)
       (let ((result (eval (pop-stack))))
-        ;; FIXME: CMU CL had this code here:
-        ;;   (when *load-print*
-        ;;     (load-fresh-line)
-        ;;     (prin1 result)
-        ;;     (terpri))
-        ;; Unfortunately, this dependence on the *LOAD-PRINT* global
-        ;; variable is non-ANSI, so for now we've just punted printing in
-        ;; fasl loading.
         result)))
 
-(define-fop (fop-eval-for-effect 54 :pushp nil)
+(define-fop (fop-eval-for-effect 54 :pushp nil) ; This seems to be unused
   (if *skip-until*
       (pop-stack)
-      (let ((result (eval (pop-stack))))
-        ;; FIXME: See the comment about *LOAD-PRINT* in FOP-EVAL.
-        (declare (ignore result))
-        #+nil (when *load-print*
-                (load-fresh-line)
-                (prin1 result)
-                (terpri)))))
+      (progn (eval (pop-stack))
+             nil)))
 
 (define-fop (fop-funcall 55)
   (let ((arg (read-byte-arg)))
@@ -623,10 +610,6 @@ a bug.~@:>")
       (setf (%simple-fun-arglist fun) arglist)
       (setf (%simple-fun-type fun) type)
       (setf (%simple-fun-info fun) info)
-      ;; FIXME: See the comment about *LOAD-PRINT* in FOP-EVAL.
-      #+nil (when *load-print*
-              (load-fresh-line)
-              (format t "~S defined~%" fun))
       fun)))
 
 ;;;; Some Dylan FOPs used to live here. By 1 November 1998 the code
