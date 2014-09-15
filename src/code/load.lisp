@@ -195,6 +195,19 @@
 (defun fop-stack-empty-p ()
   (eql 0 (svref *fop-stack* 0)))
 
+;; Ensure that N arguments can be popped from the FOP stack.
+;; Return the stack and the pointer to the first argument.
+;; Update the new top-of-stack to reflect that all N have been popped.
+(defun fop-stack-pop-n (n)
+  (declare (index n))
+  (let* ((stack *fop-stack*)
+         (top (the index (svref stack 0)))
+         (new-top (- top n)))
+    (if (minusp new-top) ; 0 is ok at this point
+        (error "FOP stack underflow")
+        (progn (setf (svref stack 0) new-top)
+               (values stack (1+ new-top))))))
+
 (defun pop-fop-stack ()
   (let* ((stack *fop-stack*)
          (top (svref stack 0)))
@@ -225,27 +238,6 @@
      ,(if pushp
           `(push-fop-stack (progn ,@forms))
           `(progn ,@forms))))
-
-;;; Call FUN with N arguments popped from STACK.
-(defmacro call-with-popped-args (fun n)
-  ;; N's integer value must be known at macroexpansion time.
-  (declare (type index n))
-  (with-unique-names (n-stack old-top new-top)
-    (let ((argtmps (make-gensym-list n)))
-      `(let* ((,n-stack *fop-stack*)
-              (,old-top (svref ,n-stack 0))
-              (,new-top (- ,old-top ,n))
-              ,@(loop for i from 1 upto n collecting
-                      `(,(nth (1- i) argtmps)
-                        (aref ,n-stack (+ ,new-top ,i)))))
-         (declare (simple-vector ,n-stack))
-         (setf (svref ,n-stack 0) ,new-top)
-        ;; (For some applications it might be appropriate to FILL the
-        ;; popped area with NIL here, to avoid holding onto garbage. For
-        ;; sbcl-0.8.7.something, though, it shouldn't matter, because
-        ;; we're using this only to pop stuff off *FOP-STACK*, and the
-        ;; entire *FOP-STACK* can be GCed as soon as LOAD returns.)
-        (,fun ,@argtmps)))))
 
 ;;;; Conditions signalled on invalid fasls (wrong fasl version, etc),
 ;;;; so that user code (esp. ASDF) can reasonably handle attempts to
