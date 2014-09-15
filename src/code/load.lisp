@@ -76,6 +76,10 @@
          ((zerop ,n-cnt) ,n-res)
        (declare (type index ,n-pos ,n-cnt)))))
 
+;;; FIXME: why do all of these reading functions and macros declare
+;;; (SPEED 0)?  was there some bug in the compiler which has since
+;;; been fixed?  --njf, 2004-09-08
+
 ;;; Read a signed integer.
 (defmacro fast-read-s-integer (n)
   (declare (optimize (speed 0)))
@@ -97,6 +101,12 @@
       `(with-fast-read-byte ((unsigned-byte 8) *fasl-input-stream*)
          (fast-read-u-integer ,n))))
 
+;; FIXME: on x86-64, these functions exceed 600, 900, and 1200 bytes of code
+;; respectively. Either don't inline them, or make a "really" fast inline case
+;; that punts if inapplicable. e.g. if the fast-read-byte buffer will not be
+;; refilled, then SAP-REF-WORD could work to read 8 bytes.
+;; But this would only be feasible on machines that are little-endian
+;; and that allow unaligned reads. (like x86)
 (declaim (inline read-byte-arg read-halfword-arg read-word-arg))
 (defun read-byte-arg ()
   (declare (optimize (speed 0)))
