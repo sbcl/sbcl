@@ -8,6 +8,21 @@
 ;;; NIL if we're executing normally.
 (defvar *skip-until* nil)
 
+;;; Bind STACK-VAR and PTR-VAR to the start of a subsequence of
+;;; the fop stack of length COUNT, then execute BODY.
+;;; Within the body, FOP-STACK-REF is used in lieu of SVREF
+;;; to elide bounds checking.
+;;; This should be named WITH-FOP-STACK, except that's already taken.
+(defmacro !with-fop-stack-reffer ((stack-var ptr-var count) &body body)
+  `(multiple-value-bind (,stack-var ,ptr-var)
+       (truly-the (values simple-vector index) (fop-stack-pop-n ,count))
+     (macrolet ((fop-stack-ref (i)
+                  `(locally
+                       #-sb-xc-host
+                       (declare (optimize (sb!c::insert-array-bounds-checks 0)))
+                     (svref ,',stack-var ,i))))
+       ,@body)))
+
 ;;; Define NAME as a fasl operation, with op-code FOP-CODE. PUSHP
 ;;; describes what the body does to the fop stack:
 ;;;   T
@@ -30,26 +45,23 @@
   (aver (member pushp '(nil t)))
   (aver (member stackp '(nil t)))
   (aver (or stackp (and (not pushp) (not arglist))))
-  `(progn
-     (defun ,name ()
-       ,(cond
-         ((not stackp)
-          `(progn ,@forms))
-         ((null arglist)
-          `(with-fop-stack ,pushp ,@forms))
-         (t
-          (with-unique-names (stack ptr)
-            `(multiple-value-bind (,stack ,ptr)
-                 (truly-the (values simple-vector index)
-                            (fop-stack-pop-n ,(length arglist)))
-               (multiple-value-bind ,arglist
-                   (locally
-                     #-sb-xc-host
-                     (declare (optimize (sb!c::insert-array-bounds-checks 0)))
-                    (values ,@(loop for i below (length arglist)
-                                    collect `(svref ,stack (+ ,ptr ,i)))))
-                 (with-fop-stack ,pushp ,@forms)))))))
-     (%define-fop ',name ,fop-code)))
+  ;; This is almost WITH-FOP-STACK, except I don't want to use that because
+  ;; with 1 exception there is no use of POP-STACK within a DEFINE-FOP,
+  ;; and it is of little merit to locally rename PUSH-FOP-STACK as PUSH-STACK.
+  (let ((guts `(macrolet ((pop-stack () `(pop-fop-stack)))
+                 ,@(if pushp `((push-fop-stack (progn ,@forms))) forms))))
+    `(progn
+       (defun ,name ()
+         ,(cond ((not stackp) `(progn ,@forms))
+                ((null arglist) guts)
+                (t
+                 (with-unique-names (stack ptr)
+                   `(!with-fop-stack-reffer (,stack ,ptr ,(length arglist))
+                      (multiple-value-bind ,arglist
+                          (values ,@(loop for i below (length arglist)
+                                          collect `(fop-stack-ref (+ ,ptr ,i))))
+                        ,guts))))))
+       (%define-fop ',name ,fop-code))))
 
 (defun %define-fop (name code)
   (let ((oname (svref *fop-names* code)))
@@ -361,19 +373,26 @@
 
 ;;;; loading lists
 
-(define-fop (fop-list 15)
-  ;; FIXME: perform underflow check once only
-  (do ((res () (cons (pop-stack) res))
-       (n (read-byte-arg) (1- n)))
-      ((zerop n) res)
-    (declare (type index n))))
+(defun fop-list-from-stack (n)
+  ;; N is 0-255 when called from FOP-LIST,
+  ;; but it is as large as ARRAY-RANK-LIMIT in FOP-ARRAY.
+  (declare (type (unsigned-byte 16) n)
+           (optimize (speed 3)))
+  (!with-fop-stack-reffer (stack ptr n)
+    (do* ((i (+ ptr n) (1- i))
+          (res () (cons (fop-stack-ref i) res)))
+         ((= i ptr) res)
+      (declare (type index i)))))
 
-(define-fop (fop-list* 16 (lastcdr))
-  ;; FIXME: perform underflow check once only
-  (do ((res lastcdr (cons (pop-stack) res))
-       (n (read-byte-arg) (1- n)))
-      ((zerop n) res)
-    (declare (type index n))))
+(define-fop (fop-list 15) (fop-list-from-stack (read-byte-arg)))
+(define-fop (fop-list* 16)
+  (let ((n (read-byte-arg))) ; N is the number of cons cells (0 is ok)
+    (!with-fop-stack-reffer (stack ptr (1+ n))
+      (do* ((i (+ ptr n) (1- i))
+            (res (fop-stack-ref (+ ptr n))
+                 (cons (fop-stack-ref i) res)))
+           ((= i ptr) res)
+        (declare (type index i))))))
 
 (macrolet ((frob (name op fun n)
              (let ((args (make-gensym-list n)))
@@ -433,13 +452,7 @@
          (res (make-array-header sb!vm:simple-array-widetag rank)))
     (declare (simple-array vec)
              (type (unsigned-byte #.(- sb!vm:n-word-bits sb!vm:n-widetag-bits)) rank))
-    (set-array-header res vec length nil 0
-                      (do ((i rank (1- i))
-                           (dimensions () (cons (pop-stack) dimensions)))
-                          ((zerop i) dimensions)
-                        (declare (type index i)))
-                      nil
-                      t)
+    (set-array-header res vec length nil 0 (fop-list-from-stack rank) nil t)
     res))
 
 (defglobal **saetp-bits-per-length**
@@ -476,23 +489,19 @@
       (eval expr)))
 
 (define-fop (fop-eval-for-effect 54 (expr) :pushp nil) ; This seems to be unused
-  (if *skip-until*
-      nil
-      (progn (eval expr)
-             nil)))
+  (unless *skip-until*
+    (eval expr))
+  nil)
 
 (defun fop-funcall* ()
  (let ((argc (read-byte-arg)))
-   (multiple-value-bind (stack ptr) (fop-stack-pop-n (1+ argc))
-     (declare (type simple-vector stack) (type index ptr))
-     #-sb-xc-host
-     (declare (optimize (sb!c::insert-array-bounds-checks 0)))
+   (!with-fop-stack-reffer (stack ptr (1+ argc))
      (unless *skip-until*
        (do ((i (+ ptr argc))
             (args))
-           ((= i ptr) (apply (svref stack i) args))
+           ((= i ptr) (apply (fop-stack-ref i) args))
          (declare (type index i))
-         (push (svref stack i) args)
+         (push (fop-stack-ref i) args)
          (decf i))))))
 
 (define-fop (fop-funcall 55) (fop-funcall*))
@@ -692,14 +701,14 @@ a bug.~@:>")
 ;;; ensuring that the stack stays balanced when skipping.
 (define-fop (fop-drop-if-skipping 153 () :pushp nil)
   (when *skip-until*
-    (pop-stack))
+    (fop-stack-pop-n 1))
   (values))
 
 ;;; If skipping, push a dummy value on the stack. Needed for
 ;;; ensuring that the stack stays balanced when skipping.
 (define-fop (fop-push-nil-if-skipping 154 () :pushp nil)
   (when *skip-until*
-    (push-stack nil))
+    (push-fop-stack nil))
   (values))
 
 ;;; Stop skipping if the top of the stack matches *SKIP-UNTIL*

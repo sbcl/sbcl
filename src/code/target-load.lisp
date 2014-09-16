@@ -216,6 +216,7 @@
       (setf (%code-debug-info code) (pop-stack))
       (dotimes (i box-num)
         (declare (fixnum i))
+        ;; FIXME: check for stack underflow once only
         (setf (code-header-ref code (decf index)) (pop-stack)))
       (without-gcing
         (read-n-bytes *fasl-input-stream*
