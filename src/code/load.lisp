@@ -192,6 +192,7 @@
 (defvar *fop-stack*)
 (declaim (simple-vector *fop-stack*))
 
+(declaim (inline fop-stack-empty-p))
 (defun fop-stack-empty-p ()
   (eql 0 (svref *fop-stack* 0)))
 
@@ -450,12 +451,7 @@
   (when (check-fasl-header stream)
     (catch 'fasl-group-end
       (reset-fop-table)
-      (let ((*skip-until* nil)
-            ;; FOP numbers are in 'fop.lisp' but that file need this file,
-            ;; so figure out the secret code at runtime instead of compile-time
-            ;; which avoids one unnecessary bootstrap headache.
-            (funcall-for-effect (get 'sb!fasl::fop-funcall-for-effect
-                                     'sb!fasl::fop-code)))
+      (let ((*skip-until* nil))
         (declare (special *skip-until*))
         (loop
           (let ((byte (read-byte stream)))
@@ -477,10 +473,16 @@
                           ptr (svref *fop-table* 0)
                           (unless (eql ptr 0) (aref stack ptr)))
                   (terpri *trace-output*)))
-              (when (and print (eq byte funcall-for-effect)
-                         (eql (svref *fop-stack* 0) 0)) ; (presumed) end of TLF
-                (load-fresh-line)
-                (prin1 result)))))))))
+              #-sb-xc-host
+              (macrolet ((terminator-opcode ()
+                           (or (get 'sb!fasl::fop-funcall-for-effect
+                                    'sb!fasl::fop-code)
+                               (error "Missing FOP definition?"))))
+                (when (and print
+                           (eq byte (terminator-opcode))
+                           (fop-stack-empty-p)) ; (presumed) end of TLF
+                  (load-fresh-line)
+                  (prin1 result))))))))))
 
 (defun load-as-fasl (stream verbose print)
   (when (zerop (file-length stream))
