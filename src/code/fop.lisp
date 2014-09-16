@@ -481,27 +481,22 @@
       (progn (eval expr)
              nil)))
 
-(define-fop (fop-funcall 55)
-  (let ((arg (read-byte-arg)))
-    (if *skip-until*
-        (fop-stack-pop-n (1+ arg))
-        (if (zerop arg)
-            (funcall (pop-stack))
-            (do ((args () (cons (pop-stack) args))
-                 (n arg (1- n)))
-                ((zerop n) (apply (pop-stack) args))
-              (declare (type index n)))))))
+(defun fop-funcall* ()
+ (let ((argc (read-byte-arg)))
+   (multiple-value-bind (stack ptr) (fop-stack-pop-n (1+ argc))
+     (declare (type simple-vector stack) (type index ptr))
+     #-sb-xc-host
+     (declare (optimize (sb!c::insert-array-bounds-checks 0)))
+     (unless *skip-until*
+       (do ((i (+ ptr argc))
+            (args))
+           ((= i ptr) (apply (svref stack i) args))
+         (declare (type index i))
+         (push (svref stack i) args)
+         (decf i))))))
 
-(define-fop (fop-funcall-for-effect 56 () :pushp nil)
-  (let ((arg (read-byte-arg)))
-    (if *skip-until*
-        (fop-stack-pop-n (1+ arg))
-        (if (zerop arg)
-            (funcall (pop-stack))
-            (do ((args () (cons (pop-stack) args))
-                 (n arg (1- n)))
-                ((zerop n) (apply (pop-stack) args))
-              (declare (type index n)))))))
+(define-fop (fop-funcall 55) (fop-funcall*))
+(define-fop (fop-funcall-for-effect 56 () :pushp nil) (fop-funcall*))
 
 ;;;; fops for fixing up circularities
 
