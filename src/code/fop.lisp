@@ -31,36 +31,23 @@
 ;;;   NIL
 ;;;     The body might pop the fop stack. The result of the body is
 ;;;     discarded.
-;;; STACKP describes whether or not the body interacts with the fop stack.
-;; [It should be possible to eliminate :stackp and :pushp by always exposing
-;; the POP and PUSH macros - there seems to be little harm in doing so -
-;; and pushing the result if and only if the body returns exactly one value.
-;; Some fops redundantly use (VALUES) at the end of the body, having said
-;; :pushp nil, where the former seems actually the right way to go about it.
-;; Meanwhile, this style of lambda list is the least inconvenient change
-;; that can be made to achieve what I want.]
-(defmacro define-fop ((name fop-code &optional arglist
-                            &key (stackp t) (pushp stackp))
-                      &body forms)
+;;;
+;;; I think the macro syntax would be aesthetically more pleasing as
+;;;   (DEFINE-FOP code (name &OPTIONAL (args) (pushp t)) . body)
+;;;
+(defmacro define-fop ((name fop-code &optional arglist (pushp t)) &body forms)
   (aver (member pushp '(nil t)))
-  (aver (member stackp '(nil t)))
-  (aver (or stackp (and (not pushp) (not arglist))))
-  ;; This is almost WITH-FOP-STACK, except I don't want to use that because
-  ;; with 1 exception there is no use of POP-STACK within a DEFINE-FOP,
-  ;; and it is of little merit to locally rename PUSH-FOP-STACK as PUSH-STACK.
-  (let ((guts `(macrolet ((pop-stack () `(pop-fop-stack)))
-                 ,@(if pushp `((push-fop-stack (progn ,@forms))) forms))))
+  (let ((guts (if pushp `((push-fop-stack (progn ,@forms))) forms)))
     `(progn
        (defun ,name ()
-         ,(cond ((not stackp) `(progn ,@forms))
-                ((null arglist) guts)
-                (t
-                 (with-unique-names (stack ptr)
-                   `(!with-fop-stack-reffer (,stack ,ptr ,(length arglist))
-                      (multiple-value-bind ,arglist
-                          (values ,@(loop for i below (length arglist)
-                                          collect `(fop-stack-ref (+ ,ptr ,i))))
-                        ,guts))))))
+         ,@(if (null arglist)
+               guts
+               (with-unique-names (stack ptr)
+                 `((!with-fop-stack-reffer (,stack ,ptr ,(length arglist))
+                     (multiple-value-bind ,arglist
+                         (values ,@(loop for i below (length arglist)
+                                         collect `(fop-stack-ref (+ ,ptr ,i))))
+                       ,@guts))))))
        (%define-fop ',name ,fop-code))))
 
 (defun %define-fop (name code)
@@ -161,15 +148,15 @@
 ;;; into fasl files for debugging purposes. There's no shortage of
 ;;; unused fop codes, so we add this second NOP, which reads 4
 ;;; arbitrary bytes and discards them.
-(define-fop (fop-nop4 137 () :stackp nil)
+(define-fop (fop-nop4 137 () nil)
   (let ((arg (read-arg 4)))
     (declare (ignorable arg))
     #!+sb-show
     (when *show-fop-nop4-p*
       (format *debug-io* "~&/FOP-NOP4 ARG=~W=#X~X~%" arg arg))))
 
-(define-fop (fop-nop 0 () :stackp nil))
-(define-fop (fop-pop 1 (x) :pushp nil) (push-fop-table x))
+(define-fop (fop-nop 0 () nil))
+(define-fop (fop-pop 1 (x) nil) (push-fop-table x))
 (define-fop (fop-push 2) (ref-fop-table (read-word-arg)))
 (define-fop (fop-byte-push 3) (ref-fop-table (read-byte-arg)))
 
@@ -188,23 +175,27 @@
 
 (define-cloned-fops (fop-struct 48 (layout)) (fop-small-struct 49)
   (let* ((size (clone-arg))
-         (res (%make-instance size)))
+         (res (%make-instance size)) ; number of words excluding header
+         (n-data-words (1- size))) ; ... and excluding layout
     (declare (type index size))
-    (let* ((nuntagged (layout-n-untagged-slots layout))
-           (ntagged (- size nuntagged)))
-      (setf (%instance-ref res 0) layout)
-      (dotimes (n (1- ntagged))
-        (declare (type index n))
-        (setf (%instance-ref res (1+ n)) (pop-stack)))
-      (dotimes (n nuntagged)
-        (declare (type index n))
-        (setf (%raw-instance-ref/word res (- nuntagged n 1)) (pop-stack))))
+    (!with-fop-stack-reffer (stack ptr n-data-words)
+      (let* ((nuntagged (layout-n-untagged-slots layout))
+             (ntagged (- size nuntagged))
+             (ptr (+ ptr n-data-words)))
+        (setf (%instance-ref res 0) layout)
+        (dotimes (n (1- ntagged))
+          (declare (type index n))
+          (setf (%instance-ref res (1+ n)) (fop-stack-ref (decf ptr))))
+        (dotimes (n nuntagged)
+          (declare (type index n))
+          (setf (%raw-instance-ref/word res (- nuntagged n 1))
+                (fop-stack-ref (decf ptr))))))
     res))
 
 (define-fop (fop-layout 45 (name inherits depthoid length nuntagged))
   (find-and-init-or-check-layout name length inherits depthoid nuntagged))
 
-(define-fop (fop-end-group 64 () :stackp nil)
+(define-fop (fop-end-group 64 () nil)
   (/show0 "THROWing FASL-GROUP-END")
   (throw 'fasl-group-end t))
 
@@ -212,11 +203,11 @@
 ;;; 82 until GENESIS learned how to work with host symbols and
 ;;; packages directly instead of piggybacking on the host code.
 
-(define-fop (fop-verify-table-size 62 () :stackp nil)
+(define-fop (fop-verify-table-size 62 () nil)
   (let ((expected-index (read-word-arg)))
     (unless (= (get-fop-table-index) expected-index)
       (bug "fasl table of improper size"))))
-(define-fop (fop-verify-empty-stack 63 () :stackp nil)
+(define-fop (fop-verify-empty-stack 63 () nil)
   (unless (fop-stack-empty-p)
     (bug "fasl stack not empty when it should be")))
 
@@ -290,7 +281,7 @@
 (define-fop (fop-package 14 (pkg-designator))
   (find-undeleted-package-or-lose pkg-designator))
 
-(define-cloned-fops (fop-named-package-save 156 () :stackp nil)
+(define-cloned-fops (fop-named-package-save 156 () nil)
                     (fop-small-named-package-save 157)
   (let* ((arg (clone-arg))
          (package-name (make-string arg)))
@@ -488,7 +479,7 @@
       expr
       (eval expr)))
 
-(define-fop (fop-eval-for-effect 54 (expr) :pushp nil) ; This seems to be unused
+(define-fop (fop-eval-for-effect 54 (expr) nil) ; This seems to be unused
   (unless *skip-until*
     (eval expr))
   nil)
@@ -505,21 +496,21 @@
          (decf i))))))
 
 (define-fop (fop-funcall 55) (fop-funcall*))
-(define-fop (fop-funcall-for-effect 56 () :pushp nil) (fop-funcall*))
+(define-fop (fop-funcall-for-effect 56 () nil) (fop-funcall*))
 
 ;;;; fops for fixing up circularities
 
-(define-fop (fop-rplaca 200 (val) :pushp nil)
+(define-fop (fop-rplaca 200 (val) nil)
   (let ((obj (ref-fop-table (read-word-arg)))
         (idx (read-word-arg)))
     (setf (car (nthcdr idx obj)) val)))
 
-(define-fop (fop-rplacd 201 (val) :pushp nil)
+(define-fop (fop-rplacd 201 (val) nil)
   (let ((obj (ref-fop-table (read-word-arg)))
         (idx (read-word-arg)))
     (setf (cdr (nthcdr idx obj)) val)))
 
-(define-fop (fop-svset 202 (val) :pushp nil)
+(define-fop (fop-svset 202 (val) nil)
   (let* ((obi (read-word-arg))
          (obj (ref-fop-table obi))
          (idx (read-word-arg)))
@@ -527,7 +518,7 @@
         (setf (%instance-ref obj idx) val)
         (setf (svref obj idx) val))))
 
-(define-fop (fop-structset 204 (val) :pushp nil)
+(define-fop (fop-structset 204 (val) nil)
   (setf (%instance-ref (ref-fop-table (read-word-arg))
                        (read-word-arg))
         val))
@@ -546,10 +537,10 @@
 ;;; putting the implementation and version in required fields in the
 ;;; fasl file header.)
 
-(define-fop (fop-code 58 () :stackp nil)
+(define-fop (fop-code 58 () nil)
   (load-code (read-word-arg) (read-word-arg)))
 
-(define-fop (fop-small-code 59 () :stackp nil)
+(define-fop (fop-small-code 59 () nil)
   (load-code (read-byte-arg) (read-halfword-arg)))
 
 (define-fop (fop-fdefinition 60 (name)) ; should probably be 'fop-fdefn'
@@ -563,7 +554,7 @@
   (sb!vm:sanctify-for-execution component)
   component)
 
-(define-fop (fop-fset 74 (name fn) :pushp nil)
+(define-fop (fop-fset 74 (name fn) nil)
   ;; Ordinary, not-for-cold-load code shouldn't need to mess with this
   ;; at all, since it's only used as part of the conspiracy between
   ;; the cross-compiler and GENESIS to statically link FDEFINITIONs
@@ -582,7 +573,7 @@ bug.~:@>")
   ;; something.)
   (setf (fdefinition name) fn))
 
-(define-fop (fop-note-debug-source 174 (debug-source) :pushp nil)
+(define-fop (fop-note-debug-source 174 (debug-source) nil)
   (warn "~@<FOP-NOTE-DEBUG-SOURCE seen in ordinary load (not cold load) -- ~
 very strange!  If you didn't do something to cause this, please report it as ~
 a bug.~@:>")
@@ -593,7 +584,7 @@ a bug.~@:>")
         (file-write-date (sb!c::debug-source-namestring debug-source))))
 
 ;;; Modify a slot in a CONSTANTS object.
-(define-cloned-fops (fop-alter-code 140 (code value) :pushp nil)
+(define-cloned-fops (fop-alter-code 140 (code value) nil)
                     (fop-byte-alter-code 141)
   (setf (code-header-ref code (clone-arg)) value)
   (values))
@@ -686,33 +677,33 @@ a bug.~@:>")
 ;;; for ones that a) funcall/eval b) start skipping. This needs to
 ;;; be done to ensure that the fop table gets populated correctly
 ;;; regardless of the execution path.
-(define-fop (fop-skip 151 (position) :pushp nil)
+(define-fop (fop-skip 151 (position) nil)
   (unless *skip-until*
     (setf *skip-until* position))
   (values))
 
 ;;; As before, but only start skipping if the top of the FOP stack is NIL.
-(define-fop (fop-skip-if-false 152 (position condition) :pushp nil)
+(define-fop (fop-skip-if-false 152 (position condition) nil)
   (unless (or condition *skip-until*)
     (setf *skip-until* position))
   (values))
 
 ;;; If skipping, pop the top of the stack and discard it. Needed for
 ;;; ensuring that the stack stays balanced when skipping.
-(define-fop (fop-drop-if-skipping 153 () :pushp nil)
+(define-fop (fop-drop-if-skipping 153 () nil)
   (when *skip-until*
     (fop-stack-pop-n 1))
   (values))
 
 ;;; If skipping, push a dummy value on the stack. Needed for
 ;;; ensuring that the stack stays balanced when skipping.
-(define-fop (fop-push-nil-if-skipping 154 () :pushp nil)
+(define-fop (fop-push-nil-if-skipping 154 () nil)
   (when *skip-until*
     (push-fop-stack nil))
   (values))
 
 ;;; Stop skipping if the top of the stack matches *SKIP-UNTIL*
-(define-fop (fop-maybe-stop-skipping 155 (label) :pushp nil)
+(define-fop (fop-maybe-stop-skipping 155 (label) nil)
   (when (eql *skip-until* label)
     (setf *skip-until* nil))
   (values))
