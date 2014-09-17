@@ -1,7 +1,7 @@
 ;;; -*-  Lisp -*-
 
 (defsystem :sb-bsd-sockets
-  :version "0.58"
+  :version "0.59"
   :defsystem-depends-on (sb-grovel)
   #+sb-building-contrib :pathname
   #+sb-building-contrib #p"SYS:CONTRIB;SB-BSD-SOCKETS;"

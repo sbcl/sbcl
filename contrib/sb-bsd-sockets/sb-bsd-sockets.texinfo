@@ -120,20 +120,33 @@ issues:
 @itemize
 
 @item
-Internet addresses are represented by vectors of (unsigned-byte 8) -
-viz. #(127 0 0 1). Ports are just integers: 6010. No conversion
+IPv4 Internet addresses are represented by vectors of
+@code{(unsigned-byte 8)} - viz. @code{#(127 0 0 1)}. Ports are just
+integers: 6010. No conversion between network- and host-order data is
+needed from the user of this package.
+
+@item
+IPv6 Internet addresses are represented by vectors of 16
+@code{(unsigned-byte 8)} - viz. @code{#(0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+1)}. Ports are just integers. As for IPv4 addresses, no conversion
 between network- and host-order data is needed from the user of this
 package.
 
 @item
-Socket addresses are represented by the two values for address and
-port, so for example, (socket-connect s #(192 168 1 1) 80).
+Socket addresses are represented by the two values for address and port,
+so for example, @code{(socket-connect socket #(192 168 1 1) 80)} for
+IPv4 and @code{(socket-connect socket #(0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1)
+80)} for IPv6.
 
 @end itemize
 
 @include class-sb-bsd-sockets-inet-socket.texinfo
 
+@include class-sb-bsd-sockets-inet6-socket.texinfo
+
 @include fun-sb-bsd-sockets-make-inet-address.texinfo
+
+@include fun-sb-bsd-sockets-make-inet6-address.texinfo
 
 @include fun-sb-bsd-sockets-get-protocol-by-name.texinfo
 
