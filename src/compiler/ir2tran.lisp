@@ -1153,7 +1153,8 @@
 ;;; calls instead of primitives, sending the system off into infinite
 ;;; space. Having a report on all full calls generated makes it easier
 ;;; to figure out what form caused the problem this time.
-(declaim (type (or boolean (eql :detailed)) *track-full-called-fnames-p*))
+(declaim (type (or boolean (member :detailed :very-detailed))
+               *track-full-called-fnames-p*))
 (defvar *track-full-called-fnames-p* nil)
 #!+sb-show (defvar *show-full-called-fnames-p* nil)
 
@@ -1168,7 +1169,7 @@
          (fname (lvar-fun-name lvar t)))
     (declare (type (or symbol cons) fname))
 
-    (when *track-full-called-fnames-p*
+    (awhen *track-full-called-fnames-p*
       ;; If the full call was wanted, don't record it.
       (unless (let ((*lexenv* (node-lexenv node)))
                 (fun-lexically-notinline-p fname))
@@ -1177,9 +1178,12 @@
               (setf cell (list 1)
                     (info :function :static-full-call-count fname) cell)
               (incf (car cell)))
-          (when (and (eq *track-full-called-fnames-p* :detailed)
-                     (boundp 'sb!xc:*compile-file-pathname*))
-            (pushnew sb!xc:*compile-file-pathname* (cdr cell) :test #'equal)))))
+          (cond ((and (eq it :detailed) (boundp 'sb!xc:*compile-file-pathname*))
+                 (pushnew sb!xc:*compile-file-pathname* (cdr cell)
+                          :test #'equal))
+                ((eq it :very-detailed)
+                 (pushnew (component-name *component-being-compiled*)
+                          (cdr cell) :test #'equalp))))))
 
     #!+sb-show (when *show-full-called-fnames-p*
                  (/show "converting full call to named function" fname)
