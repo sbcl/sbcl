@@ -616,27 +616,26 @@ Form: C   Context: EVAL; lexically bound
   (LIST A B C))")))
 
 ;;;; Bug in LET* walking!
-(test-util:with-test (:name (:walk let* special list :hairy-specials)
-                      :fails-on :sbcl)
+(test-util:with-test (:name (:walk let* special list :hairy-specials))
   (assert
    (string=-modulo-tabspace
-         (with-output-to-string (*standard-output*)
-           (take-it-out-for-a-test-walk (let* ((a a) (b a) (c b))
-                                          (declare (special a b))
-                                          (list a b c))))
-         "Form: (LET* ((A A) (B A) (C B))
-                  (DECLARE (SPECIAL A B))
-                  (LIST A B C))   Context: EVAL
-          Form: A   Context: EVAL
-          Form: A   Context: EVAL; lexically bound; declared special
-          Form: B   Context: EVAL; lexically bound; declared special
-          Form: (LIST A B C)   Context: EVAL
-          Form: A   Context: EVAL; lexically bound; declared special
-          Form: B   Context: EVAL; lexically bound; declared special
-          Form: C   Context: EVAL; lexically bound
-          (LET* ((A A) (B A) (C B))
-            (DECLARE (SPECIAL A B))
-            (LIST A B C))")))
+    (with-output-to-string (*standard-output*)
+      (take-it-out-for-a-test-walk (let* ((a a) (b a) (c b))
+                                     (declare (special a b))
+                                     (list a b c))))
+    "Form: (LET* ((A A) (B A) (C B))
+             (DECLARE (SPECIAL A B))
+             (LIST A B C))   Context: EVAL
+     Form: A   Context: EVAL
+     Form: A   Context: EVAL; lexically bound; declared special
+     Form: B   Context: EVAL; lexically bound; declared special
+     Form: (LIST A B C)   Context: EVAL
+     Form: A   Context: EVAL; lexically bound; declared special
+     Form: B   Context: EVAL; lexically bound; declared special
+     Form: C   Context: EVAL; lexically bound
+     (LET* ((A A) (B A) (C B))
+       (DECLARE (SPECIAL A B))
+       (LIST A B C))")))
 
 (test-util:with-test (:name (:walk let special 5))
   (assert (string=-modulo-tabspace
@@ -1035,6 +1034,28 @@ Form: 3   Context: EVAL
              'Y))
   (SETQ (X) 3))"
 )))
+
+(test-util:with-test (:name (:walk let* special list :hairier-specials))
+  (assert
+   (string=-modulo-tabspace
+    (with-output-to-string (*standard-output*)
+      (take-it-out-for-a-test-walk (let* ((a a) (b a) (c b) (b c))
+                                     (declare (special a b))
+                                     (list a b c))))
+    "Form: (LET* ((A A) (B A) (C B) (B C))
+        (DECLARE (SPECIAL A B))
+        (LIST A B C))   Context: EVAL
+Form: A   Context: EVAL
+Form: A   Context: EVAL; lexically bound; declared special
+Form: B   Context: EVAL; lexically bound
+Form: C   Context: EVAL; lexically bound
+Form: (LIST A B C)   Context: EVAL
+Form: A   Context: EVAL; lexically bound; declared special
+Form: B   Context: EVAL; lexically bound; declared special
+Form: C   Context: EVAL; lexically bound
+\(LET* ((A A) (B A) (C B) (B C))
+  (DECLARE (SPECIAL A B))
+  (LIST A B C))")))
 
 ;;;; more tests
 

@@ -726,14 +726,8 @@
            (error "can't understand something in the arglist ~S" arglist))))
 
 (defun walk-let (form context env)
-  (walk-let/let* form context env nil))
-
-(defun walk-let* (form context env)
-  (walk-let/let* form context env t))
-
-(defun walk-let/let* (form context old-env sequentialp)
-  (walker-environment-bind (new-env old-env)
-    (let* ((let/let* (car form))
+  (walker-environment-bind (new-env env)
+    (let* ((let (car form))
            (bindings (cadr form))
            (body (cddr form))
            walked-bindings
@@ -742,15 +736,79 @@
               body
               (lambda (real-body real-env)
                 (setf walked-bindings
-                      (walk-bindings-1 bindings
-                                       old-env
-                                       new-env
-                                       context
-                                       sequentialp))
+                      (walk-bindings-1 bindings env new-env context))
                 (walk-repeat-eval real-body real-env))
               new-env)))
-      (relist*
-       form let/let* walked-bindings walked-body))))
+      (relist* form let walked-bindings walked-body))))
+
+(defun let*-binding-name (binding)
+  (if (symbolp binding)
+      binding
+      (car binding)))
+
+(defun let*-binding-init (binding)
+  (if (or (symbolp binding)
+          (null (cdr binding)))
+      'no-init
+      (cadr binding)))
+
+(defun let*-bindings (bindings &aux names inits (seen (make-hash-table)))
+  (dolist (binding (reverse bindings) (values names inits))
+    (let ((name (let*-binding-name binding)))
+      (push (cons name (gethash name seen)) names)
+      (setf (gethash name seen) t)
+      (push (let*-binding-init binding) inits))))
+
+(defun walk-let* (form context env)
+  (walker-environment-bind (new-env env)
+    (let ((let* (car form))
+          (bindings (cadr form))
+          (body (cddr form)))
+      (multiple-value-bind (names inits) (let*-bindings bindings)
+        (multiple-value-bind (newbody decls doc) (parse-body body :doc-string-allowed nil)
+          (declare (ignore newbody))
+          (aver (null doc))
+          (labels ((maybe-process-and-munge-declaration (name declaration env)
+                     (if (walked-var-declaration-p (car declaration))
+                         (case (car declaration)
+                           (special (if (find name (cdr declaration))
+                                        (progn
+                                          (note-declaration `(special ,(var-lexical-p name env)) env)
+                                          (cons 'special (remove name (cdr declaration))))
+                                        declaration))
+                           (t (if (eql name (cadr declaration))
+                                  (progn
+                                    (note-declaration `(,(car declaration)
+                                                         ,(var-lexical-p name env)
+                                                         ,@(cddr declaration))
+                                                      env)
+                                    nil)
+                                  declaration)))
+                         declaration))
+                   (walk-let*-bindings (bindings names inits)
+                     (when bindings
+                       (recons bindings
+                               (let ((name (car names))
+                                     (init (car inits)))
+                                 (prog1
+                                     (if (eql init 'no-init)
+                                         (prog1 (car bindings)
+                                           (note-var-binding (car name) new-env))
+                                         (prog1
+                                             (relist (car bindings)
+                                                     (caar bindings)
+                                                     (walk-form-internal init context new-env))
+                                           (note-var-binding (car name) new-env)))
+                                   (unless (cdr name)
+                                     (setf decls (mapcar (lambda (d)
+                                                           (cons 'declare
+                                                                 (mapcar (lambda (dd) (maybe-process-and-munge-declaration (car name) dd new-env))
+                                                                         (cdr d))))
+                                                         decls)))))
+                               (walk-let*-bindings (cdr bindings) (cdr names) (cdr inits))))))
+            (relist* form let*
+                     (walk-let*-bindings bindings names inits)
+                     (walk-declarations body (lambda (form env) (walk-repeat-eval form env)) new-env))))))))
 
 (defun walk-load-time-value (form context env)
   (destructuring-bind (ltv val &optional read-only-p) form
@@ -766,9 +824,9 @@
             (walk-form-internal val context env)
             (walk-form-internal read-only-p context env))))
 
-(defun walk-locally (form context old-env)
+(defun walk-locally (form context env)
   (declare (ignore context))
-  (walker-environment-bind (new-env old-env)
+  (walker-environment-bind (new-env env)
     (let* ((locally (car form))
            (body (cdr form))
            (walked-body
@@ -808,39 +866,24 @@
                body
                (lambda (real-body real-env)
                  (setq walked-bindings
-                       (walk-bindings-1 bindings
-                                        old-env
-                                        new-env
-                                        context
-                                        nil))
+                       (walk-bindings-1 bindings old-env new-env context))
                  (walk-repeat-eval real-body real-env))
                new-env)))
       (relist* form mvb walked-bindings mv-form walked-body))))
 
-(defun walk-bindings-1 (bindings old-env new-env context sequentialp)
+(defun walk-bindings-1 (bindings old-env new-env context)
   (and bindings
        (let ((binding (car bindings)))
          (recons bindings
                  (if (symbolp binding)
                      (prog1 binding
                        (note-var-binding binding new-env))
-                     (prog1 (relist* binding
-                                     (car binding)
-                                     (walk-form-internal (cadr binding)
-                                                         context
-                                                         (if sequentialp
-                                                             new-env
-                                                             old-env))
-                                     ;; Save cddr for DO/DO*; it is
-                                     ;; the next value form. Don't
-                                     ;; walk it now, though.
-                                     (cddr binding))
-                            (note-var-binding (car binding) new-env)))
-                 (walk-bindings-1 (cdr bindings)
-                                  old-env
-                                  new-env
-                                  context
-                                  sequentialp)))))
+                     (prog1 (relist binding
+                                    (car binding)
+                                    (walk-form-internal
+                                     (cadr binding) context old-env))
+                       (note-var-binding (car binding) new-env)))
+                 (walk-bindings-1 (cdr bindings) old-env new-env context)))))
 
 (defun walk-lambda (form context old-env)
   (walker-environment-bind (new-env old-env)

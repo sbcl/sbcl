@@ -10,6 +10,9 @@ changes relative to sbcl-1.2.3:
     universal superclass (lp#1332983)
   * bug fix: reading an uninterned symbol whose print name has the
     syntax of an integer signals an error. (lp#310062)
+  * bug fix: the walker is less likely to be confused when walking LET* forms
+    with special bindings and use of those bindings and others of the same
+    name.
 
 changes in sbcl-1.2.3 relative to sbcl-1.2.2:
   * enhancement: DOCUMENTATION works on instances of
