@@ -54,17 +54,17 @@
     ;; TRAVERSE will walk across more cons cells than RECURSE will descend.
     ;; That's why this isn't just one self-recursive function.
     (labels ((traverse (accumulator x length-limit)
-             (declare (fixnum length-limit))
-             (cond ((atom x) (sb!int:mix (sxhash x) accumulator))
-                   ((zerop length-limit) accumulator)
-                   (t (traverse (sb!int:mix (recurse (car x) 4) accumulator)
-                                (cdr x) (1- length-limit)))))
-           (recurse (x depthoid) ; depthoid = a blend of level and length
-             (declare (fixnum depthoid))
-             (cond ((atom x) (sxhash x))
-                   ((zerop depthoid) #xdeadbeef)
-                   (t (sb!int:mix (recurse (car x) (1- depthoid))
-                                  (recurse (cdr x) (1- depthoid)))))))
+               (declare (fixnum length-limit))
+               (cond ((atom x) (sb!int:mix (sxhash x) accumulator))
+                     ((zerop length-limit) accumulator)
+                     (t (traverse (sb!int:mix (recurse (car x) 4) accumulator)
+                                  (cdr x) (1- length-limit)))))
+             (recurse (x depthoid) ; depthoid = a blend of level and length
+               (declare (fixnum depthoid))
+               (cond ((atom x) (sxhash x))
+                     ((zerop depthoid) #xdedbeef) ; assume 29 bits in +fixnum
+                     (t (sb!int:mix (recurse (car x) (1- depthoid))
+                                    (recurse (cdr x) (1- depthoid)))))))
       (traverse 0 name 10))))
 
 ;;; Given any non-negative integer, return a prime number >= to it.
