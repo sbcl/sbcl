@@ -400,3 +400,11 @@
                 (with-testing-restart (:condition-restart-p nil)
                   (invoke-restart-interactively
                    (find-restart 'testing-restart (make-condition 'condition))))))))
+
+(defun case-failure-example (x) (etypecase x (function 1) (symbol 2)))
+;; The :report method should not print "wanted one of #'SYMBOL"
+(with-test (:name :case-failure-report-pprint-silliness)
+  (handler-case (foo 3)
+    (condition (c)
+      (let ((str (write-to-string c :escape nil :pretty t)))
+        (assert (not (search "#'SYMBOL" str)))))))

@@ -72,8 +72,8 @@
    (possibilities :reader case-failure-possibilities :initarg :possibilities))
   (:report
     (lambda (condition stream)
-      (format stream "~@<~S fell through ~S expression. ~
-                      ~:_Wanted one of ~:S.~:>"
+      (format stream "~@<~S fell through ~S expression.~@[ ~
+                      ~:_Wanted one of (~/pprint-fill/).~]~:>"
               (type-error-datum condition)
               (case-failure-name condition)
               (case-failure-possibilities condition)))))
