@@ -20,13 +20,14 @@
 (with-test (:name :disassemble)
 ;;; DISASSEMBLE shouldn't fail on closures or unpurified functions
   (defun disassemble-fun (x) x)
-  (disassemble 'disassemble-fun)
+  (disassemble 'disassemble-fun))
 
+(with-test (:name :disassemble-closure)
   (let ((x 1)) (defun disassemble-closure (y) (if y (setq x y) x)))
-  (disassemble 'disassemble-closure)
+  (disassemble 'disassemble-closure))
 
-  #+sb-eval
-  (progn
+#+sb-eval
+(with-test (:name :disassemble-interpreted)
     ;; Nor should it fail on interpreted functions
     (let ((sb-ext:*evaluator-mode* :interpret))
       (eval `(defun disassemble-eval (x) x))
@@ -38,6 +39,7 @@
     ;; is not installed.)"
     (assert (sb-eval:interpreted-function-p #'disassemble-eval)))
 
+(with-test (:name :disassemble-generic)
   ;; nor should it fail on generic functions or other funcallable instances
   (defgeneric disassemble-generic (x))
   (disassemble 'disassemble-generic)
