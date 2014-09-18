@@ -62,7 +62,8 @@
              (recurse (x depthoid) ; depthoid = a blend of level and length
                (declare (fixnum depthoid))
                (cond ((atom x) (sxhash x))
-                     ((zerop depthoid) #xdedbeef) ; assume 29 bits in +fixnum
+                     ((zerop depthoid)
+                      #.(logand sb!xc:most-positive-fixnum #36Rglobaldbsxhashoid))
                      (t (sb!int:mix (recurse (car x) (1- depthoid))
                                     (recurse (cdr x) (1- depthoid)))))))
       (traverse 0 name 10))))
