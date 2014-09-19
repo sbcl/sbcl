@@ -13,6 +13,8 @@ changes relative to sbcl-1.2.3:
   * bug fix: the walker is less likely to be confused when walking LET* forms
     with special bindings and use of those bindings and others of the same
     name.
+  * bug fix: a rare bug affecting 32-bit platforms resulting in a
+    fatal condition with the message "Globaldb rehash failure" has been fixed.
 
 changes in sbcl-1.2.3 relative to sbcl-1.2.2:
   * enhancement: DOCUMENTATION works on instances of
