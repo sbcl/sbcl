@@ -537,10 +537,10 @@
 ;;; putting the implementation and version in required fields in the
 ;;; fasl file header.)
 
-(define-fop (fop-code 58 () nil)
+(define-fop (fop-code 58)
   (load-code (read-word-arg) (read-word-arg)))
 
-(define-fop (fop-small-code 59 () nil)
+(define-fop (fop-small-code 59)
   (load-code (read-byte-arg) (read-halfword-arg)))
 
 (define-fop (fop-fdefinition 60 (name)) ; should probably be 'fop-fdefn'

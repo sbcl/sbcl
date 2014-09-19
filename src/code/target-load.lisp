@@ -209,15 +209,12 @@
 #!-x86
 (defun load-code (box-num code-length)
   (declare (fixnum box-num code-length))
-  (with-fop-stack t
-    (let ((code (sb!c:allocate-code-object box-num code-length))
-          (index (+ sb!vm:code-constants-offset box-num)))
-      (declare (type index index))
-      (setf (%code-debug-info code) (pop-stack))
-      (dotimes (i box-num)
-        (declare (fixnum i))
-        ;; FIXME: check for stack underflow once only
-        (setf (code-header-ref code (decf index)) (pop-stack)))
+  (let ((code (sb!c:allocate-code-object box-num code-length)))
+    (!with-fop-stack-reffer (stack ptr (1+ box-num))
+      (setf (%code-debug-info code) (fop-stack-ref (+ ptr box-num)))
+      (loop for i of-type index from sb!vm:code-constants-offset
+            for j of-type index from ptr below (+ ptr box-num)
+            do (setf (code-header-ref code i) (fop-stack-ref j)))
       (without-gcing
         (read-n-bytes *fasl-input-stream*
                       (code-instructions code)
@@ -236,15 +233,11 @@
 #!+x86
 (defun load-code (box-num code-length)
   (declare (fixnum box-num code-length))
-  (with-fop-stack t
-    (let ((stuff (list (pop-stack))))
-      (dotimes (i box-num)
-        (declare (fixnum i))
-        (push (pop-stack) stuff))
-      (let* ((dbi (car (last stuff))))  ; debug-info
-
-        (setq stuff (nreverse stuff))
-
+  (!with-fop-stack-reffer (stack ptr (1+ box-num))
+    (let* ((dbi (fop-stack-ref (+ ptr box-num))) ; debug-info
+           (stuff (cons dbi (loop for i of-type index
+                                  downfrom (+ ptr box-num -1) to ptr
+                                  collect (fop-stack-ref i)))))
         ;; FIXME: *LOAD-CODE-VERBOSE* should probably be #!+SB-SHOW.
         (when *load-code-verbose*
           (format t "stuff: ~S~%" stuff)
@@ -271,7 +264,7 @@
                           (code-instructions code)
                           0
                           code-length))
-          code)))))
+          code))))
 
 ;;;; linkage fixups
 
