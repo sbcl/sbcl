@@ -26,7 +26,7 @@
 ;; The lock-free logic differs from each of the preceding reference algorithms.
 ;; The Java algorithm is truly lock-free: death of any thread will never impede
 ;; progress in other threads. The CCL algorithm is only quasi-lock-free, as is
-;; ours. Were a rehashing thread to terminate abnormally whole holding the
+;; ours. Were a rehashing thread to terminate abnormally while holding the
 ;; rehash mutex, all other threads will likely starve at some point.
 ;;
 ;; Unlike the CCL algorithm, we allow reading/writing concurrently with rehash.
@@ -421,14 +421,14 @@
 ;;; The inner alist key is a number identifying a type of info.
 ;;; If it were actually an alist, it would look like this:
 ;;;
-;;;  ((nil  (1 . #<fdefn SB-MOP:STANDARD-INSTANCE-ACCESS>) (2 . :FUNCTION) ...)
-;;;   (SETF (1 . #<fdefn (SETF SB-MOP:STANDARD-INSTANCE-ACCESS)>) ...)
-;;;   (CAS  (1 . #<fdefn (CAS SB-MOP:STANDARD-INSTANCE-ACCESS)>) ...)
+;;;  ((nil  (63 . #<fdefn SB-MOP:STANDARD-INSTANCE-ACCESS>) (1 . :FUNCTION) ...)
+;;;   (SETF (63 . #<fdefn (SETF SB-MOP:STANDARD-INSTANCE-ACCESS)>) ...)
+;;;   (CAS  (63 . #<fdefn (CAS SB-MOP:STANDARD-INSTANCE-ACCESS)>) ...)
 ;;;   ...)
 ;;;
 ;;; Note:
 ;;; * The root name is exogenous to the vector - it is not stored.
-;;; * The type-number for (:FUNCTION :DEFINITION) is 1, :KIND is 2, etc.
+;;; * The type-number for (:FUNCTION :DEFINITION) is 63, :KIND is 1, etc.
 ;;; * Names which are lists of length other than 2, or improper lists,
 ;;;   or whose elements are not both symbols, are disqualified.
 
