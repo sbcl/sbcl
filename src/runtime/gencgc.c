@@ -69,8 +69,10 @@ page_index_t  gc_find_freeish_pages(page_index_t *restart_page_ptr, sword_t nbyt
  * GC parameters
  */
 
-/* Generations 0-5 are normal collected generations, 6 is only used as
- * scratch space by the collector, and should never get collected.
+/* As usually configured, generations 0-5 are normal collected generations,
+   6 is pseudo-static (the objects in which are never moved nor reclaimed),
+   and 7 is scratch space used when collecting a generation without promotion,
+   wherein it is moved to generation 7 and back again.
  */
 enum {
     SCRATCH_GENERATION = PSEUDO_STATIC_GENERATION+1,
