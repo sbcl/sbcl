@@ -12,6 +12,12 @@
 
 (in-package sb-vm)
 
+(test-util:with-test (:name :unparse-alien-niladic-function)
+  (let* ((type (parse-alien-type '(function long) nil))
+         (val (make-alien-value :sap (int-sap #x4000) :type type)))
+    (assert (not (search "#'" (write-to-string type :pretty t))))
+    (assert (not (search "#'" (write-to-string val :pretty t))))))
+
 ;; This test shows (well, sorta) that call_into_lisp didn't read beyond
 ;; the Nth item in its argument vector with N being the specified argc.
 ;; As it happens, we zeroize the unused passing registers, so can check for that.

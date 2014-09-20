@@ -2418,6 +2418,7 @@ package is deprecated in favour of SB-MOP."
       :export ("OUTPUT-PRETTY-OBJECT"
                "PRETTY-STREAM" "PRETTY-STREAM-P"
                "PPRINT-DISPATCH-TABLE"
+               "*PPRINT-QUOTE-WITH-SYNTACTIC-SUGAR*"
                "!PPRINT-COLD-INIT"))
 
    #s(sb-cold:package-data
