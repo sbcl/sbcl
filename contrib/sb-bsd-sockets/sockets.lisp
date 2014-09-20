@@ -55,12 +55,13 @@ directly instantiated.")))
                                     ((:datagram) sockint::sock-dgram)
                                     ((:stream) sockint::sock-stream))
                                   proto-num))))
-      (when (= fd -1) (socket-error "socket"))
-      (setf (slot-value socket 'file-descriptor) fd
-            (slot-value socket 'protocol) proto-num
-            (slot-value socket 'type) type)
-      (sb-ext:finalize socket (lambda () (sockint::close fd))
-                       :dont-save t)))
+    (socket-error-case ("socket" fd)
+        (progn
+          (setf (slot-value socket 'file-descriptor) fd
+                (slot-value socket 'protocol) proto-num
+                (slot-value socket 'type) type)
+          (sb-ext:finalize socket (lambda () (sockint::close fd))
+                           :dont-save t)))))
 
 
 
@@ -75,9 +76,9 @@ directly instantiated.")))
 (defmacro with-socket-addr ((sockaddr-var size-of-sockaddr-var
                             &optional sockaddr-args)
                             socket &body body)
-  `(call-with-socket-addr ,socket ,sockaddr-args
-                          (lambda (,sockaddr-var ,size-of-sockaddr-var) ; TODO dx-let
-                            ,@body)))
+  `(sb-int:dx-flet ((with-socket-addr-thunk (,sockaddr-var ,size-of-sockaddr-var)
+                      ,@body))
+     (call-with-socket-addr ,socket ,sockaddr-args #'with-socket-addr-thunk)))
 
 (defmacro with-socket-fd-and-addr ((fd-var sockaddr-var size-of-sockaddr-var
                                    &optional sockaddr-args)
@@ -92,48 +93,39 @@ directly instantiated.")))
 ;; we deliberately redesign the "bind" interface: instead of passing a
 ;; sockaddr_something as second arg, we pass the elements of one as
 ;; multiple arguments.
-
 (defmethod socket-bind ((socket socket) &rest address)
   (with-socket-fd-and-addr (fd sockaddr size address) socket
-    (when (= (sockint::bind fd sockaddr size) -1)
-      (socket-error "bind"))))
+    (socket-error-case ("bind" (sockint::bind fd sockaddr size)))))
 
 
 
 (defmethod socket-accept ((socket socket))
   (with-socket-fd-and-addr (fd sockaddr size) socket
-    (let ((new-fd (sockint::accept fd sockaddr size)))
-      (cond
-        ((and (= new-fd -1)
-              (member (socket-errno)
-                      (list sockint::EAGAIN sockint::EINTR)))
-         nil)
-        ((= new-fd -1) (socket-error "accept"))
-        (t (multiple-value-call #'values
-                  (let ((socket (make-instance (class-of socket)
-                                               :type (socket-type socket)
-                                               :protocol (socket-protocol socket)
-                                               :descriptor new-fd)))
-                    (sb-ext:finalize socket (lambda () (sockint::close new-fd))
-                                     :dont-save t))
-                  (bits-of-sockaddr socket sockaddr)))))))
+    (socket-error-case ("accept" (sockint::accept fd sockaddr size) new-fd)
+        (multiple-value-call #'values
+          (let ((socket (make-instance (class-of socket)
+                                       :type (socket-type socket)
+                                       :protocol (socket-protocol socket)
+                                       :descriptor new-fd)))
+            (sb-ext:finalize socket (lambda () (sockint::close new-fd))
+                             :dont-save t))
+          (bits-of-sockaddr socket sockaddr))
+      (:interrupted nil))))
 
 (defmethod socket-connect ((socket socket) &rest peer)
   (with-socket-fd-and-addr (fd sockaddr size peer) socket
-    (when (= (sockint::connect fd sockaddr size) -1)
-      (socket-error "connect"))))
+    (socket-error-case ("connect" (sockint::connect fd sockaddr size))
+        socket)))
 
 (defmethod socket-peername ((socket socket))
   (with-socket-fd-and-addr (fd sockaddr size) socket
-    (when (= (sockint::getpeername fd sockaddr size) -1)
-      (socket-error "getpeername"))
-    (bits-of-sockaddr socket sockaddr)))
+    (socket-error-case ("getpeername" (sockint::getpeername fd sockaddr size))
+        (bits-of-sockaddr socket sockaddr))))
 
 (defmethod socket-name ((socket socket))
   (with-socket-fd-and-addr (fd sockaddr size) socket
-    (when (= (sockint::getsockname fd sockaddr size) -1)
-      (socket-error "getsockname"))
-    (bits-of-sockaddr socket sockaddr)))
+    (socket-error-case ("getsockname" (sockint::getsockname fd sockaddr size))
+        (bits-of-sockaddr socket sockaddr))))
 
 ;;; There are a whole bunch of interesting things you can do with a
 ;;; socket that don't really map onto "do stream io", especially in
@@ -169,24 +161,21 @@ directly instantiated.")))
       ;; types that aren't (unsigned-byte 8).
       (let ((copy-buffer (sb-alien:make-alien (array (sb-alien:unsigned 8) 1) length)))
         (unwind-protect
-            (sb-alien:with-alien ((sa-len sockint::socklen-t size))
-              (let ((len
-                     (sockint::recvfrom fd copy-buffer length
-                                        flags sockaddr (sb-alien:addr sa-len))))
-                (cond
-                  ((and (= len -1)
-                        (member (socket-errno)
-                                (list sockint::EAGAIN sockint::EINTR)))
-                   nil)
-                  ((= len -1) (socket-error "recvfrom"))
-                  (t (loop for i from 0 below (min len length)
-                           do (setf (elt buffer i)
-                                    (cond
-                                      ((or (eql element-type 'character) (eql element-type 'base-char))
-                                       (code-char (sb-alien:deref (sb-alien:deref copy-buffer) i)))
-                                      (t (sb-alien:deref (sb-alien:deref copy-buffer) i)))))
+             (sb-alien:with-alien ((sa-len sockint::socklen-t size))
+               (socket-error-case ("recvfrom"
+                                   (sockint::recvfrom fd copy-buffer length
+                                                      flags sockaddr (sb-alien:addr sa-len))
+                                   len)
+                   (progn
+                     (loop for i from 0 below (min len length)
+                        do (setf (elt buffer i)
+                                 (cond
+                                   ((or (eql element-type 'character) (eql element-type 'base-char))
+                                    (code-char (sb-alien:deref (sb-alien:deref copy-buffer) i)))
+                                   (t (sb-alien:deref (sb-alien:deref copy-buffer) i)))))
                      (apply #'values buffer len (multiple-value-list
-                                                 (bits-of-sockaddr socket sockaddr)))))))
+                                                 (bits-of-sockaddr socket sockaddr))))
+                 (:interrupted nil)))
           (sb-alien:free-alien copy-buffer))))))
 
 (defmacro with-vector-sap ((name vector) &body body)
@@ -229,18 +218,13 @@ directly instantiated.")))
                                          flags sockaddr sa-len)))
                     (sockint::send (socket-file-descriptor socket)
                                    buffer-sap length flags)))))
-    (cond
-      ((and (= len -1)
-            (member (socket-errno)
-                    (list sockint::EAGAIN sockint::EINTR)))
-       nil)
-      ((= len -1)
-       (socket-error "sendto"))
-      (t len))))
+    (socket-error-case ("sendto" len)
+        len
+      (:interrupted nil))))
 
 (defmethod socket-listen ((socket socket) backlog)
-  (when (= (sockint::listen (socket-file-descriptor socket) backlog) -1)
-    (socket-error "listen")))
+  (socket-error-case
+      ("listen" (sockint::listen (socket-file-descriptor socket) backlog))))
 
 (defmethod socket-open-p ((socket socket))
   (if (slot-boundp socket 'stream)
@@ -277,8 +261,8 @@ directly instantiated.")))
             (drop-it t))
            (t
             (handler-case
-                (when (minusp (sockint::close fd))
-                  (socket-error "close"))
+                (socket-error-case ("close" (sockint::close fd)
+                                            result (minusp result)))
               (bad-file-descriptor-error ()
                 (drop-it))
               (:no-error (r)
@@ -291,8 +275,8 @@ directly instantiated.")))
                 (:input sockint::SHUT_RD)
                 (:output sockint::SHUT_WR)
                 (:io sockint::SHUT_RDWR))))
-    (when (minusp (sockint::shutdown fd how))
-      (socket-error "shutdown"))))
+    (socket-error-case ("shutdown" (sockint::shutdown fd how)
+                                   result (minusp result)))))
 
 (defmethod socket-make-stream ((socket socket)
                                &key input output
@@ -414,10 +398,8 @@ request an input stream and get an output stream in response\)."
     (error condition :errno sb-unix:unix-errno  :syscall where)))
 
 #+sbcl
-(defun socket-error (where)
+(defun socket-error (where &optional (errno (socket-errno)))
   ;; FIXME: Our Texinfo documentation extractor needs at least this to
   ;; spit out the signature. Real documentation would be better...
   ""
-  (let* ((errno (socket-errno))
-         (condition (condition-for-errno errno)))
-    (error condition :errno errno  :syscall where)))
+  (error (condition-for-errno errno) :errno errno :syscall where))

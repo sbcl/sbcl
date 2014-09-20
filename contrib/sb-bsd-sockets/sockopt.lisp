@@ -50,15 +50,16 @@ Code for options that not every system has should be conditionalised:
         ,@(when documentation (list (concatenate 'string documentation " " info)))
         ,(if supportedp
              `(sb-alien:with-alien ((size sb-alien:int)
-                                      (buffer ,buffer-type))
-                  (setf size (sb-alien:alien-size ,buffer-type :bytes))
-                  (if (= -1 (sockint::getsockopt (socket-file-descriptor socket)
-                                                 ,find-level ,number
-                                                 (sb-alien:addr buffer)
-                                                 #+win32 size
-                                                 #-win32 (sb-alien:addr size)))
-                      (socket-error "getsockopt")
-                      (,mangle-return buffer size)))
+                                    (buffer ,buffer-type))
+                (setf size (sb-alien:alien-size ,buffer-type :bytes))
+                (socket-error-case
+                    ("getsockopt"
+                     (sockint::getsockopt (socket-file-descriptor socket)
+                                          ,find-level ,number
+                                          (sb-alien:addr buffer)
+                                          #+win32 size
+                                          #-win32 (sb-alien:addr size)))
+                    (,mangle-return buffer size)))
              `(error 'unsupported-operator
                :format-control "Socket option ~S is not supported in this platform."
                :format-arguments (list ',lisp-name))))
@@ -68,13 +69,15 @@ Code for options that not every system has should be conditionalised:
                   (setf buffer ,(if mangle-arg
                                     `(,mangle-arg new-val)
                                     `new-val))
-                  (when (= -1 (sockint::setsockopt (socket-file-descriptor socket)
-                                                   ,find-level ,number
-                                                   (,mangle-setf-buffer buffer)
-                                                   ,(if (eql buffer-type 'sb-alien:c-string)
-                                                        `(length new-val)
-                                                        `(sb-alien:alien-size ,buffer-type :bytes))))
-                    (socket-error "setsockopt")))
+                  (socket-error-case
+                      ("setsockopt"
+                       (sockint::setsockopt
+                        (socket-file-descriptor socket)
+                        ,find-level ,number
+                        (,mangle-setf-buffer buffer)
+                        ,(if (eql buffer-type 'sb-alien:c-string)
+                             `(length new-val)
+                             `(sb-alien:alien-size ,buffer-type :bytes))))))
              `(error 'unsupported-operator
                :format-control "Socket option ~S is not supported on this platform."
                :format-arguments (list ',lisp-name)))))))
@@ -186,4 +189,3 @@ Code for options that not every system has should be conditionalised:
 
 NIL
 |#
-

@@ -7,7 +7,6 @@
   #+sb-building-contrib #p"SYS:CONTRIB;SB-BSD-SOCKETS;"
   :components
   ((:file "defpackage")
-   (:file "split" :depends-on ("defpackage"))
    (:file "win32-lib" :if-feature :win32)
    (:sb-grovel-constants-file "constants"
     :package :sockint
@@ -17,11 +16,12 @@
     :package :sockint
     :depends-on ("defpackage" "win32-lib")
     :if-feature :win32)
+   (:file "util" :depends-on ("defpackage" "constants"))
    (:file "protocol" :depends-on ("defpackage"))
    (:file "win32-sockets" :depends-on ("protocol" "win32-constants")
     :if-feature :win32)
-   (:file "sockets" :depends-on ("protocol" "constants" "win32-sockets"))
-   (:file "sockopt" :depends-on ("sockets"))
+   (:file "sockets" :depends-on ("util" "constants" "protocol" "win32-sockets"))
+   (:file "sockopt" :depends-on ("util" "sockets"))
    (:file "inet" :depends-on ("protocol" "sockets"))
    (:file "inet4" :depends-on ("protocol" "sockets"))
    (:file "local" :depends-on ("protocol" "sockets"))
