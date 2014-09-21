@@ -210,7 +210,7 @@
 (defun load-code (box-num code-length)
   (declare (fixnum box-num code-length))
   (let ((code (sb!c:allocate-code-object box-num code-length)))
-    (!with-fop-stack-reffer (stack ptr (1+ box-num))
+    (with-fop-stack (stack ptr (1+ box-num))
       (setf (%code-debug-info code) (fop-stack-ref (+ ptr box-num)))
       (loop for i of-type index from sb!vm:code-constants-offset
             for j of-type index from ptr below (+ ptr box-num)
@@ -233,7 +233,7 @@
 #!+x86
 (defun load-code (box-num code-length)
   (declare (fixnum box-num code-length))
-  (!with-fop-stack-reffer (stack ptr (1+ box-num))
+  (with-fop-stack (stack ptr (1+ box-num))
     (let* ((dbi (fop-stack-ref (+ ptr box-num))) ; debug-info
            (stuff (cons dbi (loop for i of-type index
                                   downfrom (+ ptr box-num -1) to ptr

@@ -12,8 +12,7 @@
 ;;; the fop stack of length COUNT, then execute BODY.
 ;;; Within the body, FOP-STACK-REF is used in lieu of SVREF
 ;;; to elide bounds checking.
-;;; This should be named WITH-FOP-STACK, except that's already taken.
-(defmacro !with-fop-stack-reffer ((stack-var ptr-var count) &body body)
+(defmacro with-fop-stack ((stack-var ptr-var count) &body body)
   `(multiple-value-bind (,stack-var ,ptr-var)
        (truly-the (values simple-vector index) (fop-stack-pop-n ,count))
      (macrolet ((fop-stack-ref (i)
@@ -43,7 +42,7 @@
          ,@(if (null arglist)
                guts
                (with-unique-names (stack ptr)
-                 `((!with-fop-stack-reffer (,stack ,ptr ,(length arglist))
+                 `((with-fop-stack (,stack ,ptr ,(length arglist))
                      (multiple-value-bind ,arglist
                          (values ,@(loop for i below (length arglist)
                                          collect `(fop-stack-ref (+ ,ptr ,i))))
@@ -133,9 +132,6 @@
 
 ;;;; miscellaneous fops
 
-;;; FIXME: POP-STACK should be called something more mnemonic. (POP-FOP-STACK?
-;;; But that would conflict with PUSH-FOP-TABLE. Something, anyway..)
-
 ;;; Setting this variable causes execution of a FOP-NOP4 to produce
 ;;; output to *DEBUG-IO*. This can be handy when trying to follow the
 ;;; progress of FASL loading.
@@ -178,7 +174,7 @@
          (res (%make-instance size)) ; number of words excluding header
          (n-data-words (1- size))) ; ... and excluding layout
     (declare (type index size))
-    (!with-fop-stack-reffer (stack ptr n-data-words)
+    (with-fop-stack (stack ptr n-data-words)
       (let* ((nuntagged (layout-n-untagged-slots layout))
              (ntagged (- size nuntagged))
              (ptr (+ ptr n-data-words)))
@@ -369,7 +365,7 @@
   ;; but it is as large as ARRAY-RANK-LIMIT in FOP-ARRAY.
   (declare (type (unsigned-byte 16) n)
            (optimize (speed 3)))
-  (!with-fop-stack-reffer (stack ptr n)
+  (with-fop-stack (stack ptr n)
     (do* ((i (+ ptr n) (1- i))
           (res () (cons (fop-stack-ref i) res)))
          ((= i ptr) res)
@@ -378,7 +374,7 @@
 (define-fop (fop-list 15) (fop-list-from-stack (read-byte-arg)))
 (define-fop (fop-list* 16)
   (let ((n (read-byte-arg))) ; N is the number of cons cells (0 is ok)
-    (!with-fop-stack-reffer (stack ptr (1+ n))
+    (with-fop-stack (stack ptr (1+ n))
       (do* ((i (+ ptr n) (1- i))
             (res (fop-stack-ref (+ ptr n))
                  (cons (fop-stack-ref i) res)))
@@ -486,7 +482,7 @@
 
 (defun fop-funcall* ()
  (let ((argc (read-byte-arg)))
-   (!with-fop-stack-reffer (stack ptr (1+ argc))
+   (with-fop-stack (stack ptr (1+ argc))
      (unless *skip-until*
        (do ((i (+ ptr argc))
             (args))

@@ -2055,13 +2055,25 @@ core and return a descriptor to it."
   ;; modified.
   (copy-seq *fop-funs*))
 
+(defun pop-fop-stack ()
+  (let* ((stack *fop-stack*)
+         (top (svref stack 0)))
+    (declare (type index top))
+    (when (eql 0 top)
+      (error "FOP stack empty"))
+    (setf (svref stack 0) (1- top))
+    (svref stack top)))
+
 ;;; Cause a fop to have a special definition for cold load.
 ;;;
 ;;; This is similar to DEFINE-FOP, but unlike DEFINE-FOP, this version
 ;;;   (1) looks up the code for this name (created by a previous
-;;        DEFINE-FOP) instead of creating a code, and
+;;;       DEFINE-FOP) instead of creating a code, and
 ;;;   (2) stores its definition in the *COLD-FOP-FUNS* vector,
 ;;;       instead of storing in the *FOP-FUNS* vector.
+;;; FIXME: as with DEFINE-FOP, the STACKP option is basically useless.
+;;; There is no harm in exposing POP-STACK in all cases, so the only choice
+;;; is whether or not to automatically push the result of FORMS.
 (defmacro define-cold-fop ((name &key (pushp t) (stackp t)) &rest forms)
   (aver (member pushp '(nil t)))
   (aver (member stackp '(nil t)))
@@ -2072,7 +2084,8 @@ core and return a descriptor to it."
     `(progn
        (defun ,fname ()
          ,@(if stackp
-               `((with-fop-stack ,pushp ,@forms))
+               `((macrolet ((pop-stack () `(pop-fop-stack)))
+                   ,@(if pushp `((push-fop-stack (progn ,@forms))) forms)))
                forms))
        (setf (svref *cold-fop-funs* ,code) #',fname))))
 
@@ -2380,15 +2393,13 @@ core and return a descriptor to it."
 ;;;; cold fops for loading numbers
 
 (defmacro define-cold-number-fop (fop)
-  `(define-cold-fop (,fop :stackp nil)
+  `(define-cold-fop (,fop)
      ;; Invoke the ordinary warm version of this fop to push the
      ;; number.
      (,fop)
      ;; Replace the warm fop result with the cold image of the warm
      ;; fop result.
-     (with-fop-stack t
-       (let ((number (pop-stack)))
-         (number-to-core number)))))
+     (number-to-core (pop-stack))))
 
 (define-cold-number-fop fop-single-float)
 (define-cold-number-fop fop-double-float)

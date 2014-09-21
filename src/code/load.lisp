@@ -209,15 +209,6 @@
         (progn (setf (svref stack 0) new-top)
                (values stack (1+ new-top))))))
 
-(defun pop-fop-stack ()
-  (let* ((stack *fop-stack*)
-         (top (svref stack 0)))
-    (declare (type index top))
-    (when (eql 0 top)
-      (error "FOP stack empty"))
-    (setf (svref stack 0) (1- top))
-    (svref stack top)))
-
 (defun push-fop-stack (value)
   (let* ((stack *fop-stack*)
          (next (1+ (the index (svref stack 0)))))
@@ -228,17 +219,6 @@
     (setf (svref stack 0) next
           (svref stack next) value)))
 
-;;; Define a local macro to pop from the stack. Push the result of evaluation
-;;; if PUSHP.
-(defmacro with-fop-stack (pushp &body forms)
-  (aver (member pushp '(nil t)))
-  `(macrolet ((pop-stack ()
-                `(pop-fop-stack))
-              (push-stack (value)
-                `(push-fop-stack ,value)))
-     ,(if pushp
-          `(push-fop-stack (progn ,@forms))
-          `(progn ,@forms))))
 
 ;;;; Conditions signalled on invalid fasls (wrong fasl version, etc),
 ;;;; so that user code (esp. ASDF) can reasonably handle attempts to
