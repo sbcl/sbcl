@@ -25,5 +25,4 @@
 ;;; a vector that maps type codes to layouts, used for quickly finding
 ;;; the layouts of built-in classes
 (defglobal **built-in-class-codes** #()) ; initialized in cold load
-(defglobal **null-classoid-layout** nil)
 (declaim (type simple-vector **built-in-class-codes**))

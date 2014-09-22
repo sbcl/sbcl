@@ -101,23 +101,27 @@
 #!-sb-fluid (declaim (inline layout-of))
 (defun layout-of (x)
   (declare (optimize (speed 3) (safety 0)))
+  ;; This used to delay reference to **BUILT-IN-CLASS-CODES** and the layout of
+  ;; NULL, but those both work fine as LOAD-TIME-VALUE forms, with a kludge
+  ;; in (DEF!STRUCT (TN)) due to ineptness at dealing with cyclic defstructs:
+  ;; - Cold-init L-T-V forms execute after all layouts have been made,
+  ;;   which is mostly ok, but ...
+  ;; - A bunch of toplevel forms in <target>/vm.lisp call MAKE-RANDOM-TN
+  ;;   accepting the default value NIL for the global-conflicts slot.
+  ;; - MAKE-RANDOM-TN can't inline the complete check for
+  ;;   (OR GLOBAL-CONFLICTS NULL). It relies on %TYPEP for the classoid part.
+  ;; - By the time of the call to %TYPEP, GLOBAL-CONFLICTS is known to be a
+  ;;   classoid, so SPECIFIER-TYPE is fine, and %%TYPEP gets called.
+  ;; - %%TYPEP sees that it has a classoid as its second arg, so it invokes
+  ;;   (CLASSOID-TYPEP (LAYOUT-OF OBJECT) TYPE OBJECT)
+  ;; - The problem: (LAYOUT-OF NIL), as inlined into %%TYPEP, returns garbage,
+  ;;   not a LAYOUT, because the relevant branch of the COND below has not
+  ;;   had its L-T-V form fixed up soon enough.
   (cond ((%instancep x) (%instance-layout x))
         ((funcallable-instance-p x) (%funcallable-instance-layout x))
-        ((null x)
-         ;; Note: was #.((CLASS-LAYOUT (SB!XC:FIND-CLASS 'NULL))).
-         ;; I (WHN 19990209) replaced this with an expression evaluated at
-         ;; run time in order to make it easier to build the cross-compiler.
-         ;;
-         ;; KLUDGE: Since there's a DEFTRANSFORM for FIND-CLASSOID on
-         ;; constant names which creates non-cold-loadable code, we
-         ;; can't just use (CLASSOID-LAYOUT (FIND-CLASSOID 'NULL))
-         ;; here. The original (WHN 19991004) solution was to locally
-         ;; notinline FIND-CLASSOID. However, the full call to
-         ;; FIND-CLASSOID caused suboptimal register allocation in PCL
-         ;; dfuns. So instead we now use a special variable which is
-         ;; initialized during cold init. -- JES, 2006-07-04
-         **null-classoid-layout**)
-        (t (svref **built-in-class-codes** (widetag-of x)))))
+        ((null x) (load-time-value (find-layout 'null) t))
+        (t
+         (svref (load-time-value **built-in-class-codes** t) (widetag-of x)))))
 
 #!-sb-fluid (declaim (inline classoid-of))
 (defun classoid-of (object)
