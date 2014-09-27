@@ -200,7 +200,7 @@
 ;; Return the stack and the pointer to the first argument.
 ;; Update the new top-of-stack to reflect that all N have been popped.
 (defun fop-stack-pop-n (n)
-  (declare (index n))
+  (declare (type index n))
   (let* ((stack *fop-stack*)
          (top (the index (svref stack 0)))
          (new-top (- top n)))
@@ -428,6 +428,7 @@
   ;;   For a compiled file, what is printed might not reflect precisely the
   ;;   contents of the source file, but some information is generally printed."
   ;;
+  (declare (ignorable print))
   (when (check-fasl-header stream)
     (catch 'fasl-group-end
       (reset-fop-table)
@@ -445,6 +446,7 @@
                       byte (aref *fop-names* byte)))
             ;; Actually execute the fop.
             (let ((result (funcall (the function (svref *fop-funs* byte)))))
+              (declare (ignorable result))
               #!+sb-show
               (when *show-fops-p*
                 (let* ((stack *fop-stack*)
