@@ -175,7 +175,7 @@
  (:structure in6-addr ("struct in6_addr"
                        ((array (unsigned 8)) addr "unsigned char" "s6_addr[16]")))
  (:structure sockaddr-in6 ("struct sockaddr_in6"
-                           #+darwin ((unsigned 8) len "__uint8_t" "sin_len")
+                           #+darwin ((unsigned 8) len "__uint8_t" "sin6_len")
                            (integer family "sa_family_t" "sin6_family")
                            ;; Like in IN-ADDR, port and addr could be
                            ;; in-port-t and in6-addr-t, but then we'd
