@@ -1,5 +1,5 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
-changes relative to sbcl-1.2.3:
+changes in sbcl-1.2.4 relative to sbcl-1.2.3:
   * enhancement: the sequence functions MAP, CONCATENATE and MERGE now call
     the new generic functions SEQUENCE:MAP, SEQUENCE:CONCATENATE and
     SEQUENCE:MERGE respectively when the specified result type designates an
