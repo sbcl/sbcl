@@ -602,7 +602,7 @@
                     (let ((dd (layout-info layout)))
                       (and dd
                            (not (dd-default-constructor dd))
-                           (let ((ctors (sb!kernel::dd-constructors dd)))
+                           (let ((ctors (dd-constructors dd)))
                              (or (not ctors) (equal ctors '((nil))))))))
                    (hierarchy-check
                     ;; Use DATA-VECTOR-REF directly, since that's what SVREF in

@@ -1658,7 +1658,7 @@ forms that explicitly control this kind of evaluation.")
               (t
                (format *debug-io* "~&Non-continuable error, cannot start stepping.~%"))))))
 
-(defmacro def-step-command (command-name restart-name)
+(defmacro !def-step-command (command-name restart-name)
   `(!def-debug-command ,command-name ()
      (if (typep *debug-condition* 'step-condition)
          (let ((restart (find-restart ',restart-name *debug-condition*)))
@@ -1666,9 +1666,9 @@ forms that explicitly control this kind of evaluation.")
            (invoke-restart restart))
          (format *debug-io* "~&Not currently single-stepping. (Use START to activate the single-stepper)~%"))))
 
-(def-step-command "STEP" step-into)
-(def-step-command "NEXT" step-next)
-(def-step-command "STOP" step-continue)
+(!def-step-command "STEP" step-into)
+(!def-step-command "NEXT" step-next)
+(!def-step-command "STOP" step-continue)
 
 (!def-debug-command-alias "S" "STEP")
 (!def-debug-command-alias "N" "NEXT")

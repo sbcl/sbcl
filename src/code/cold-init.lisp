@@ -25,21 +25,33 @@
 ;;; FIXME: Are there other tables that need to have entries removed?
 ;;; What about symbols of the form DEF!FOO?
 (defun !unintern-init-only-stuff ()
-  ;; FIXME: I can't see how this wouldn't converge in 1 pass to a fixed point
-  (do ((any-changes? nil nil))
-      (nil)
-    (dolist (package (list-all-packages))
-      (do-symbols (symbol package)
-        (let ((name (symbol-name symbol)))
-          (when (or (string= name "!" :end1 1 :end2 1)
-                    (and (>= (length name) 2)
-                         (string= name "*!" :end1 2 :end2 2)))
-            (/show0 "uninterning cold-init-only symbol..")
-            (/primitive-print name)
-            (unintern symbol package)
-            (setf any-changes? t)))))
-    (unless any-changes?
-      (return))))
+  (flet ((uninternable-p (symbol)
+           (let ((name (symbol-name symbol)))
+             (or (and (>= (length name) 1) (char= (char name 0) #\!))
+                 (and (>= (length name) 2)
+                      (string= name "*!" :end1 2 :end2 2))))))
+    ;; A structure constructor name, in particular !MAKE-SAETP,
+    ;; can't be uninterned if referenced by a defstruct-description.
+    ;; So loop over all structure classoids and clobber any
+    ;; symbol that should be uninternable.
+    (maphash (lambda (classoid layout)
+               (when (structure-classoid-p classoid)
+                 (let ((dd (layout-info layout)))
+                   (setf (dd-constructors dd)
+                         (delete-if (lambda (x)
+                                      (and (consp x) (uninternable-p (car x))))
+                                    (dd-constructors dd))))))
+             (classoid-subclasses (find-classoid t)))
+    ;; Todo: perform one pass, then a full GC, then a final pass to confirm
+    ;; it worked. It shoud be an error if any uninternable symbols remain,
+    ;; but at present there are about 10 other "!" symbols with referers.
+    (with-package-iterator (iter (list-all-packages) :internal :external)
+      (loop (multiple-value-bind (winp symbol accessibility package) (iter)
+              (declare (ignore accessibility))
+              (unless winp
+                (return))
+              (when (uninternable-p symbol)
+                (unintern symbol package)))))))
 
 ;;;; putting ourselves out of our misery when things become too much to bear
 
