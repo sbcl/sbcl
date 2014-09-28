@@ -2071,34 +2071,27 @@ core and return a descriptor to it."
 ;;;       DEFINE-FOP) instead of creating a code, and
 ;;;   (2) stores its definition in the *COLD-FOP-FUNS* vector,
 ;;;       instead of storing in the *FOP-FUNS* vector.
-;;; FIXME: as with DEFINE-FOP, the STACKP option is basically useless.
-;;; There is no harm in exposing POP-STACK in all cases, so the only choice
-;;; is whether or not to automatically push the result of FORMS.
-(defmacro define-cold-fop ((name &key (pushp t) (stackp t)) &rest forms)
+(defmacro define-cold-fop ((name &key (pushp t)) &rest forms)
   (aver (member pushp '(nil t)))
-  (aver (member stackp '(nil t)))
   (let ((code (get name 'fop-code))
         (fname (symbolicate "COLD-" name)))
     (unless code
       (error "~S is not a defined FOP." name))
     `(progn
        (defun ,fname ()
-         ,@(if stackp
-               `((macrolet ((pop-stack () `(pop-fop-stack)))
-                   ,@(if pushp `((push-fop-stack (progn ,@forms))) forms)))
-               forms))
+         (macrolet ((pop-stack () `(pop-fop-stack)))
+           ,@(if pushp `((push-fop-stack (progn ,@forms))) forms)))
        (setf (svref *cold-fop-funs* ,code) #',fname))))
 
-(defmacro clone-cold-fop ((name &key (pushp t) (stackp t))
+(defmacro clone-cold-fop ((name &key (pushp t))
                           (small-name)
                           &rest forms)
   (aver (member pushp '(nil t)))
-  (aver (member stackp '(nil t)))
   `(progn
     (macrolet ((clone-arg () '(read-word-arg)))
-      (define-cold-fop (,name :pushp ,pushp :stackp ,stackp) ,@forms))
+      (define-cold-fop (,name :pushp ,pushp) ,@forms))
     (macrolet ((clone-arg () '(read-byte-arg)))
-      (define-cold-fop (,small-name :pushp ,pushp :stackp ,stackp) ,@forms))))
+      (define-cold-fop (,small-name :pushp ,pushp) ,@forms))))
 
 ;;; Cause a fop to be undefined in cold load.
 (defmacro not-cold-fop (name)
@@ -2255,7 +2248,7 @@ core and return a descriptor to it."
 
 ;;;; cold fops for loading packages
 
-(clone-cold-fop (fop-named-package-save :stackp nil)
+(clone-cold-fop (fop-named-package-save :pushp nil)
                 (fop-small-named-package-save)
   (let* ((size (clone-arg))
          (name (make-string size)))
