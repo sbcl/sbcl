@@ -80,14 +80,19 @@ maintained."
 
 ;;; These macros handle the special cases of T and NIL for input and
 ;;; output streams.
+;;; It is unfortunate that the names connote synonym-streams being involved.
+;;; Perhaps {IN,OUT}-STREAM-FROM-DESIGNATOR would have been better.
+;;; And shouldn't the high-security feature check that if either NIL or T
+;;; is given, the designated stream has the right directionality?
+;;; Nothing prevents *TERMINAL-IO* from being bound to an output-only stream.
 ;;;
 ;;; FIXME: Shouldn't these be functions instead of macros?
-(defmacro in-synonym-of (stream &optional check-type)
+(defmacro in-synonym-of (stream)
   (let ((svar (gensym)))
     `(let ((,svar ,stream))
        (cond ((null ,svar) *standard-input*)
              ((eq ,svar t) *terminal-io*)
-             (t ,@(when check-type `((enforce-type ,svar ,check-type))) ;
+             (t
                 #!+high-security
                 (unless (input-stream-p ,svar)
                   (error 'simple-type-error
@@ -96,12 +101,12 @@ maintained."
                          :format-control "~S isn't an input stream"
                          :format-arguments (list ,svar)))
                 ,svar)))))
-(defmacro out-synonym-of (stream &optional check-type)
+(defmacro out-synonym-of (stream)
   (let ((svar (gensym)))
     `(let ((,svar ,stream))
        (cond ((null ,svar) *standard-output*)
              ((eq ,svar t) *terminal-io*)
-             (t ,@(when check-type `((check-type ,svar ,check-type)))
+             (t
                 #!+high-security
                 (unless (output-stream-p ,svar)
                   (error 'simple-type-error
