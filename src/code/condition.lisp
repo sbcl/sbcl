@@ -393,7 +393,7 @@
         (lambda (new-value condition)
           (condition-writer-function condition new-value slot-name))))
 
-(defvar *define-condition-hooks* nil)
+(!defvar *define-condition-hooks* nil)
 
 (defun %set-condition-report (name report)
   (setf (condition-classoid-report (find-classoid name))
@@ -449,9 +449,8 @@
                          (when (functionp (third (assoc initarg e-def-initargs)))
                            (return t))))
                (push slot (condition-classoid-hairy-slots class)))))))
-      (when (boundp '*define-condition-hooks*)
-        (dolist (fun *define-condition-hooks*)
-          (funcall fun class))))
+      (dolist (fun *define-condition-hooks*)
+        (funcall fun class)))
     name))
 
 (defmacro define-condition (name (&rest parent-types) (&rest slot-specs)

@@ -125,7 +125,7 @@
 
 ;;; A list of hooks designating functions of one argument, the
 ;;; classoid, to be called when a defstruct is evaluated.
-(defvar *defstruct-hooks* nil)
+(!defvar *defstruct-hooks* nil)
 
 ;;; the part of %DEFSTRUCT which makes sense only on the target SBCL
 ;;;
@@ -142,10 +142,8 @@
     (setf (fdocumentation (dd-name dd) 'structure)
           (dd-doc dd)))
 
-  ;; the BOUNDP test here is to get past cold-init.
-  (when (boundp '*defstruct-hooks*)
-    (dolist (fun *defstruct-hooks*)
-      (funcall fun (find-classoid (dd-name dd)))))
+  (dolist (fun *defstruct-hooks*)
+    (funcall fun (find-classoid (dd-name dd))))
 
   (/show0 "leaving %TARGET-DEFSTRUCT")
   (values))
