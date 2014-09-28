@@ -162,10 +162,6 @@
   (print-option nil :type (member nil :print-function :print-object))
   ;; the argument to the PRINT-FUNCTION or PRINT-OBJECT option.
   ;; NIL if the option was given with no argument.
-  ;; FIXME: a random sexpr such as (LAMBDA (...) (INSANE-HAIR ...))
-  ;; is preserved in a fasl file, which is weird, because like most
-  ;; other "source code" it should disappear. Perhaps this struct
-  ;; merits separation into its parse-time and run-time aspects.
   (printer-fname nil :type (or cons symbol))
 
   ;; The number of untagged slots at the end.
@@ -254,41 +250,6 @@
 ;;;; the legendary DEFSTRUCT macro itself (both CL:DEFSTRUCT and its
 ;;;; close personal friend SB!XC:DEFSTRUCT)
 
-;;; Return a list of forms to install PRINT and MAKE-LOAD-FORM funs,
-;;; mentioning them in the expansion so that they can be compiled.
-(defun class-method-definitions (defstruct)
-  (let ((name (dd-name defstruct))
-        (print-option (dd-print-option defstruct)))
-    `(,@(when print-option
-          (let* ((x (sb!xc:gensym "OBJECT"))
-                 (s (sb!xc:gensym "STREAM"))
-                 (fname (dd-printer-fname defstruct))
-                 (depthp (eq print-option :print-function)))
-            ;; Giving empty :PRINT-OBJECT or :PRINT-FUNCTION options
-            ;; leaves FNAME eq to NIL. The user-level effect is
-            ;; to generate a PRINT-OBJECT method specialized for the type,
-            ;; implementing the default #S structure-printing behavior.
-            (unless fname
-              (setf fname 'default-structure-print depthp t))
-            ;; It would be nice to expand into DEFMETHOD, not DEF!METHOD
-            ;; if only because it pprints correctly [or we can go adding
-            ;; pprint dispatch entries for DEF!everything]
-            ;; But alas, building PCL needs it to be DEF!METHOD still.
-            `((def!method print-object ((,x ,name) ,s)
-                (funcall #',fname ,x ,s
-                         ,@(if depthp `(*current-level-in-print*)))))))
-        (locally
-        ;; KLUDGE: There's a FIND-CLASS DEFTRANSFORM for constant
-        ;; class names which creates fast but non-cold-loadable,
-        ;; non-compact code. In this context, we'd rather have
-        ;; compact, cold-loadable code. -- WHN 19990928
-        (declare (notinline find-classoid))
-        ,@(let ((pure (dd-pure defstruct)))
-            (cond ((eq pure t)
-                   `((setf (layout-pure (classoid-layout
-                                         (find-classoid ',name)))
-                           t)))))))))
-
 (sb!xc:defmacro delay-defstruct-functions (name forms)
   ;; KLUDGE: If DEFSTRUCT is not at the top-level,
   ;; (typep x 'name) and similar forms can't get optimized
@@ -311,7 +272,30 @@
   (let* ((dd (parse-defstruct-name-and-options-and-slot-descriptions
               name-and-options slot-descriptions))
          (inherits (if (dd-class-p dd) (inherits-for-structure dd)))
-         (name (dd-name dd)))
+         (name (dd-name dd))
+         (print-method
+          (when (dd-print-option dd)
+            (let* ((x (sb!xc:gensym "OBJECT"))
+                   (s (sb!xc:gensym "STREAM"))
+                   (fname (dd-printer-fname dd))
+                   (depthp (eq (dd-print-option dd) :print-function)))
+              ;; Giving empty :PRINT-OBJECT or :PRINT-FUNCTION options
+              ;; leaves FNAME eq to NIL. The user-level effect is
+              ;; to generate a PRINT-OBJECT method specialized for the type,
+              ;; implementing the default #S structure-printing behavior.
+              (cond ((not fname)
+                     (setf fname 'default-structure-print depthp t))
+                    ((not (symbolp fname))
+                     ;; Don't dump the source form into the DD constant;
+                     ;; just indicate that there was an expression there.
+                     (setf (dd-printer-fname dd) t)))
+              ;; It would be nice to expand into DEFMETHOD, not DEF!METHOD
+              ;; if only because it pprints correctly [or we can go adding
+              ;; pprint dispatch entries for DEF!everything]
+              ;; But alas, building PCL needs it to be DEF!METHOD still.
+              `((def!method print-object ((,x ,name) ,s)
+                (funcall #',fname ,x ,s
+                         ,@(if depthp `(*current-level-in-print*)))))))))
     `(progn
                 ;; Note we intentionally enforce package locks and
                 ;; call %DEFSTRUCT first, and especially before
@@ -338,7 +322,13 @@
                              ,@(accessor-definitions dd)))
                 ;; This must be in the same lexical environment
                      ,@(constructor-definitions dd)
-                     ,@(class-method-definitions dd)
+                     ,@(when (eq (dd-pure dd) t)
+                         ;; Seems like %TARGET-DEFSTRUCT should do this
+                         `((locally
+                            (declare (notinline find-classoid))
+                            (setf (layout-pure (classoid-layout
+                                                (find-classoid ',name))) t))))
+                     ,@print-method
                 ;; Various other operations only make sense on the target SBCL.
                      (%target-defstruct ',dd))))
             `((eval-when (:compile-toplevel :load-toplevel :execute)
@@ -942,9 +932,7 @@ unless :NAMED is also specified.")))
 
 ;;; Do miscellaneous (LOAD EVAL) time actions for the structure
 ;;; described by DD. Create the class and LAYOUT, checking for
-;;; incompatible redefinition. Define those functions which are
-;;; sufficiently stereotyped that we can implement them as standard
-;;; closures.
+;;; incompatible redefinition.
 (defun %defstruct (dd inherits source-location)
   (declare (type defstruct-description dd))
 
@@ -1907,9 +1895,7 @@ unless :NAMED is also specified.")))
              `(defun ,predicate (,object-gensym)
                 (typep ,object-gensym ',class-name)))
 
-         (when (boundp '*defstruct-hooks*)
-           (dolist (fun *defstruct-hooks*)
-             (funcall fun (find-classoid ',(dd-name dd)))))))))
+         (aver (null *defstruct-hooks*))))))
 
 ;;;; finalizing bootstrapping
 

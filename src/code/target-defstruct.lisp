@@ -129,10 +129,6 @@
 
 ;;; the part of %DEFSTRUCT which makes sense only on the target SBCL
 ;;;
-;;; (The "static" in the name is because it needs to be done not only
-;;; in ordinary toplevel %DEFSTRUCT, but also in cold init as early as
-;;; possible, to simulate static linking of structure functions as
-;;; nearly as possible.)
 (defun %target-defstruct (dd)
   (declare (type defstruct-description dd))
 
