@@ -2,30 +2,17 @@
 ;;; work until later in init.
 #+sb-show (print "/hello, world!")
 
-;;; Until PRINT-OBJECT and other machinery is set up, we want limits
-;;; on printing to avoid infinite output.  (Don't forget to undo these
-;;; tweaks after the printer is set up. It'd be cleaner to use LET to
-;;; make sure that happens automatically, but LET is implemented in
-;;; terms of the compiler, and the compiler isn't initialized yet.)
-(setq *print-length* 10)
-(setq *print-level* 5)
-(setq *print-circle* t)
-
 ;;; Do warm init without compiling files.
 (defvar *compile-files-p* nil)
 #+sb-show (print "/about to LOAD warm.lisp (with *compile-files-p* = NIL)")
-(load "src/cold/warm.lisp")
+(let ((*print-length* 10)
+      (*print-level* 5)
+      (*print-circle* t))
+  (load "src/cold/warm.lisp"))
 
 ;;; Unintern no-longer-needed stuff before the possible PURIFY in
 ;;; SAVE-LISP-AND-DIE.
 #-sb-fluid (sb-impl::!unintern-init-only-stuff)
-
-;;; Now that the whole system is built, we don't need to hobble the
-;;; printer any more, so we can restore printer control variables to
-;;; their ANSI defaults.
-(setq *print-length* nil)
-(setq *print-level* nil)
-(setq *print-circle* nil)
 
 (sb-int:/show "done with warm.lisp, about to GC :FULL T")
 (sb-ext:gc :full t)
@@ -52,12 +39,14 @@
 #+sb-show (setf sb-int:*/show* nil)
 ;;; The system is complete now, all standard functions are
 ;;; defined.
+;;; The call to CTYPE-OF-CACHE-CLEAR is probably redundant.
+;;; SAVE-LISP-AND-DIE calls DEINIT which calls DROP-ALL-HASH-CACHES.
 (sb-kernel::ctype-of-cache-clear)
 (setq sb-c::*flame-on-necessarily-undefined-thing* t)
 
 ;;; Clean up stray symbols from the CL-USER package.
-(do-symbols (symbol "CL-USER")
-  (when (eq (symbol-package symbol) (find-package "CL-USER"))
-    (unintern symbol "CL-USER")))
+(with-package-iterator (iter "CL-USER" :internal :external)
+  (loop (multiple-value-bind (winp symbol) (iter)
+          (if winp (unintern symbol "CL-USER") (return)))))
 
 (sb-ext:save-lisp-and-die "output/sbcl.core")
