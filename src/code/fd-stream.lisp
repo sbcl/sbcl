@@ -1630,7 +1630,7 @@
                         for byte of-type character = (aref string i)
                         for bits = (char-code byte)
                         sum (setf (aref char-length i)
-                                  (the index ,out-size-expr)))
+                                  (the index ,out-size-expr)) of-type index)
                      (let* ((byte (code-char 0))
                             (bits (char-code byte)))
                        (declare (ignorable byte bits))
