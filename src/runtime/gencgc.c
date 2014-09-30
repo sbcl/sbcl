@@ -2409,7 +2409,7 @@ do_the_wipe()
         generations[page_table[i].gen].bytes_allocated -= page_table[i].bytes_used;
         page_table[i].gen = new_space;
     }
-    if (verbosefixes >= 1 && lisp_pointers_wiped > 0 || verbosefixes >= 2) {
+    if ((verbosefixes >= 1 && lisp_pointers_wiped > 0) || verbosefixes >= 2) {
         fprintf(stderr, "Cra25a: wiped %d words (%d lisp_pointers) in %d pages, cannot wipe %d pages \n"
                 , words_wiped, lisp_pointers_wiped, pages_considered, n_pages_cannot_wipe);
     }
@@ -2434,11 +2434,18 @@ set_page_consi_bit(page_index_t pageindex, lispobj *mark_which_pointer)
 
     int size = (sizetab[widetag_of(mark_which_pointer[0])])(mark_which_pointer);
     if (size == 1 &&
-        (fixnump(*mark_which_pointer)
-        || is_lisp_pointer(*mark_which_pointer)
-        || lowtag_of(*mark_which_pointer) == 9
-         )) {
+        (fixnump(*mark_which_pointer) ||
+         is_lisp_pointer(*mark_which_pointer) ||
+         lowtag_of(*mark_which_pointer) == 9 ||
+         lowtag_of(*mark_which_pointer) == 2)) {
         size = 2;
+    }
+    // print additional debug info for now.
+    if (size % 2 != 0) {
+        fprintf(stderr, "WIPE ERROR !dword, size %d, lowtag %d, world 0x%lld\n",
+                size,
+                lowtag_of(*mark_which_pointer),
+                (long long)*mark_which_pointer);
     }
     gc_assert(size % 2 == 0);
     lispobj *begin = page_address(pageindex);
