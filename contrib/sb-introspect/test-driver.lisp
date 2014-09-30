@@ -308,39 +308,6 @@
     (tai 42s0 :immediate nil)
   t)
 
-;;; Skip the whole damn test on GENCGC PPC -- the combination is just
-;;; to flaky for this to make too much sense.  GENCGC SPARC almost
-;;; certainly exhibits the same behavior patterns (or antipatterns) as
-;;; GENCGC PPC.
-;;;
-;;; -- It appears that this test can also fail due to systematic issues
-;;; (possibly with the C compiler used) which we cannot detect based on
-;;; *features*.  Until this issue has been fixed, I am marking this test
-;;; as failing on Windows to allow installation of the contrib on
-;;; affected builds, even if the underlying issue is (possibly?) not even
-;;; strictly related to windows.  C.f. lp1057631.  --DFL
-;;;
-(deftest* (allocation-information.4
-           ;; Ignored as per the comment above, even though it seems
-           ;; unlikely that this is the right condition.
-           :fails-on (or :win32 (and (or :ppc :sparc) :gencgc)))
-    #+gencgc
-    (tai #'cons :heap
-         ;; FIXME: This is the canonical GENCGC result. On PPC we sometimes get
-         ;; :LARGE T, which doesn't seem right -- but ignore that for now.
-         ;; Also the :write-protected value NIL, indicating that the page
-         ;; has been written, seems ok to me, so ignore that too.
-         `(:space :dynamic :generation ,sb-vm:+pseudo-static-generation+
-           :boxed t :pinned nil :large nil)
-         :ignore (list :page :write-protected #+ppc :large))
-    #-gencgc
-    (tai :cons :heap
-         ;; FIXME: Figure out what's the right cheney-result. SPARC at least
-         ;; has exhibited both :READ-ONLY and :DYNAMIC, which seems wrong.
-         '()
-         :ignore '(:space))
-  t)
-
 #+sb-thread
 (deftest allocation-information.thread.1
     (let ((x (list 1 2 3)))

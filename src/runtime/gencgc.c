@@ -182,6 +182,16 @@ static boolean conservative_stack = 1;
 page_index_t page_table_pages;
 struct page *page_table;
 
+/* In GC cards that have conservative pointers to them, should we wipe out
+ * dwords in there that are not used, so that they do not act as false
+ * root to other things in the heap from then on? This is a new feature
+ * but in testing it is both reliable and no noticeable slowdown. */
+int do_wipe_p = 1;
+
+/* a value that we use to wipe out unused words in GC cards that
+ * live alongside conservatively to pointed words. */
+lispobj wipe_with = 0x424242;
+
 static inline boolean page_allocated_p(page_index_t page) {
     return (page_table[page].allocated != FREE_PAGE_FLAG);
 }
@@ -871,6 +881,8 @@ gc_alloc_new_region(sword_t nbytes, int page_type_flag, struct alloc_region *all
         page_table[first_page].gen = gc_alloc_generation;
         page_table[first_page].large_object = 0;
         page_table[first_page].scan_start_offset = 0;
+        // wiping should have free()ed and :=NULL
+        gc_assert(page_table[first_page].dontmove_dwords == NULL);
     }
 
     gc_assert(page_table[first_page].allocated == page_type_flag);
@@ -1239,7 +1251,7 @@ gc_alloc_large(sword_t nbytes, int page_type_flag, struct alloc_region *alloc_re
         next_page++;
     }
 
-    gc_assert((byte_cnt-orig_first_page_bytes_used) == nbytes);
+    gc_assert((byte_cnt-orig_first_page_bytes_used) == (size_t)nbytes);
 
     bytes_allocated += nbytes;
     generations[gc_alloc_generation].bytes_allocated += nbytes;
@@ -1409,7 +1421,7 @@ gc_alloc_with_region(sword_t nbytes,int page_type_flag, struct alloc_region *my_
 {
     void *new_free_pointer;
 
-    if (nbytes>=large_object_size)
+    if ((size_t)nbytes>=large_object_size)
         return gc_alloc_large(nbytes, page_type_flag, my_region);
 
     /* Check whether there is room in the current alloc region. */
@@ -2051,13 +2063,20 @@ search_dynamic_space(void *pointer)
  * address) which should prevent us from moving the referred-to thing?
  * This is called from preserve_pointers() */
 static int
-possibly_valid_dynamic_space_pointer(lispobj *pointer, page_index_t addr_page_index)
+possibly_valid_dynamic_space_pointer_s(lispobj *pointer,
+                                       page_index_t addr_page_index,
+                                       lispobj **store_here)
 {
     lispobj *start_addr;
 
     /* Find the object start address. */
-    if ((start_addr = search_dynamic_space(pointer)) == NULL) {
+    start_addr = search_dynamic_space(pointer);
+
+    if (start_addr == NULL) {
         return 0;
+    }
+    if (store_here) {
+        *store_here = start_addr;
     }
 
     /* If the containing object is a code object, presume that the
@@ -2075,13 +2094,14 @@ possibly_valid_dynamic_space_pointer(lispobj *pointer, page_index_t addr_page_in
         (lowtag_of((lispobj)pointer) == LIST_POINTER_LOWTAG))
         return 0;
 
-    return looks_like_valid_lisp_pointer_p(pointer, start_addr);
+    return looks_like_valid_lisp_pointer_p((lispobj)pointer, start_addr);
 }
 
 #endif  // defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64)
 
 static int
-valid_conservative_root_p(void *addr, page_index_t addr_page_index)
+valid_conservative_root_p(void *addr, page_index_t addr_page_index,
+                          lispobj **begin_ptr)
 {
 #ifdef GENCGC_IS_PRECISE
     /* If we're in precise gencgc (non-x86oid as of this writing) then
@@ -2097,9 +2117,7 @@ valid_conservative_root_p(void *addr, page_index_t addr_page_index)
     if ((addr_page_index == -1)
         || page_free_p(addr_page_index)
         || (page_table[addr_page_index].bytes_used == 0)
-        || (page_table[addr_page_index].gen != from_space)
-        /* Skip if already marked dont_move. */
-        || (page_table[addr_page_index].dont_move != 0))
+        || (page_table[addr_page_index].gen != from_space))
         return 0;
     gc_assert(!(page_table[addr_page_index].allocated&OPEN_REGION_PAGE_FLAG));
 
@@ -2116,11 +2134,33 @@ valid_conservative_root_p(void *addr, page_index_t addr_page_index)
      * expensive but important, since it vastly reduces the
      * probability that random garbage will be bogusly interpreted as
      * a pointer which prevents a page from moving. */
-    if (!possibly_valid_dynamic_space_pointer(addr, addr_page_index))
+    if (!possibly_valid_dynamic_space_pointer_s(addr, addr_page_index,
+                                                begin_ptr))
         return 0;
 #endif
 
     return 1;
+}
+
+boolean
+in_dontmove_dwordindex_p(page_index_t page_index, int dword_in_page)
+{
+    if (page_table[page_index].dontmove_dwords) {
+        return page_table[page_index].dontmove_dwords[dword_in_page];
+    } else {
+        return 0;
+    }
+}
+boolean
+in_dontmove_nativeptr_p(page_index_t page_index, lispobj *native_ptr)
+{
+    if (page_table[page_index].dontmove_dwords) {
+        lispobj *begin = page_address(page_index);
+        int dword_in_page = (native_ptr - begin) / 2;
+        return in_dontmove_dwordindex_p(page_index, dword_in_page);
+    } else {
+        return 0;
+    }
 }
 
 /* Adjust large bignum and vector objects. This will adjust the
@@ -2289,6 +2329,126 @@ maybe_adjust_large_object(lispobj *where)
     return;
 }
 
+/*
+ * Why is this restricted to protected objects only?
+ * Because the rest of the page has been scavenged already,
+ * and since that leaves forwarding pointers in the unprotected
+ * areas you cannot scavenge it again until those are gone.
+ */
+void
+scavenge_pages_with_conservative_pointers_to_them_protected_objects_only()
+{
+    page_index_t i;
+    for (i = 0; i < last_free_page; i++) {
+        if (!page_table[i].dontmove_dwords) {
+            continue;
+        }
+        lispobj *begin = page_address(i);
+        unsigned int dword;
+
+        lispobj *scavme_begin = NULL;
+        for (dword = 0; dword < GENCGC_CARD_BYTES / N_WORD_BYTES / 2; dword++) {
+            if (in_dontmove_dwordindex_p(i, dword)) {
+                if (!scavme_begin) {
+                    scavme_begin = begin + dword * 2;
+                }
+            } else {
+                // contiguous area stopped
+                if (scavme_begin) {
+                    scavenge(scavme_begin, (begin + dword * 2) - scavme_begin);
+                }
+                scavme_begin = NULL;
+            }
+        }
+        if (scavme_begin) {
+            scavenge(scavme_begin, (begin + dword * 2) - scavme_begin);
+        }
+    }
+}
+
+int verbosefixes = 0;
+void
+do_the_wipe()
+{
+    page_index_t i;
+    lispobj *begin;
+    int words_wiped = 0;
+    int lisp_pointers_wiped = 0;
+    int pages_considered = 0;
+    int n_pages_cannot_wipe = 0;
+
+    for (i = 0; i < last_free_page; i++) {
+        if (!page_table[i].dont_move) {
+            continue;
+        }
+        pages_considered++;
+        if (!page_table[i].dontmove_dwords) {
+            n_pages_cannot_wipe++;
+            continue;
+        }
+        begin = page_address(i);
+        unsigned int dword;
+        for (dword = 0; dword < GENCGC_CARD_BYTES / N_WORD_BYTES / 2; dword++) {
+            if (!in_dontmove_dwordindex_p(i, dword)) {
+                if (is_lisp_pointer(*(begin + dword * 2))) {
+                    lisp_pointers_wiped++;
+                }
+                if (is_lisp_pointer(*(begin + dword * 2 + 1))) {
+                    lisp_pointers_wiped++;
+                }
+                *(begin + dword * 2) = wipe_with;
+                *(begin + dword * 2 + 1) = wipe_with;
+                words_wiped += 2;
+            }
+        }
+        free(page_table[i].dontmove_dwords);
+        page_table[i].dontmove_dwords = NULL;
+
+        // move the page to newspace
+        generations[new_space].bytes_allocated += page_table[i].bytes_used;
+        generations[page_table[i].gen].bytes_allocated -= page_table[i].bytes_used;
+        page_table[i].gen = new_space;
+    }
+    if (verbosefixes >= 1 && lisp_pointers_wiped > 0 || verbosefixes >= 2) {
+        fprintf(stderr, "Cra25a: wiped %d words (%d lisp_pointers) in %d pages, cannot wipe %d pages \n"
+                , words_wiped, lisp_pointers_wiped, pages_considered, n_pages_cannot_wipe);
+    }
+}
+
+void
+set_page_consi_bit(page_index_t pageindex, lispobj *mark_which_pointer)
+{
+    struct page *page = &page_table[pageindex];
+
+    if (!do_wipe_p)
+      return;
+
+    gc_assert(mark_which_pointer);
+    if (page->dontmove_dwords == NULL) {
+        const int n_dwords_in_card = GENCGC_CARD_BYTES / N_WORD_BYTES / 2;
+        const int malloc_size = sizeof(in_use_marker_t) * n_dwords_in_card;
+        page->dontmove_dwords = malloc(malloc_size);
+        gc_assert(page->dontmove_dwords);
+        bzero(page->dontmove_dwords, malloc_size);
+    }
+
+    int size = (sizetab[widetag_of(mark_which_pointer[0])])(mark_which_pointer);
+    if (size == 1 &&
+        (fixnump(*mark_which_pointer)
+        || is_lisp_pointer(*mark_which_pointer)
+        || lowtag_of(*mark_which_pointer) == 9
+         )) {
+        size = 2;
+    }
+    gc_assert(size % 2 == 0);
+    lispobj *begin = page_address(pageindex);
+    int begin_dword = (mark_which_pointer - begin) / 2;
+    int dword;
+    for (dword = begin_dword; dword < begin_dword + size / 2; dword++) {
+        page->dontmove_dwords[dword] = 1;
+    }
+}
+
 /* Take a possible pointer to a Lisp object and mark its page in the
  * page_table so that it will not be relocated during a GC.
  *
@@ -2309,8 +2469,9 @@ preserve_pointer(void *addr)
     page_index_t first_page;
     page_index_t i;
     unsigned int region_allocation;
+    lispobj *begin_ptr = NULL;
 
-    if (!valid_conservative_root_p(addr, addr_page_index))
+    if (!valid_conservative_root_p(addr, addr_page_index, &begin_ptr))
         return;
 
     /* (Now that we know that addr_page_index is in range, it's
@@ -2362,6 +2523,20 @@ preserve_pointer(void *addr)
         /* Check whether this is the last page in this contiguous block.. */
         if (page_ends_contiguous_block_p(i, from_space))
             break;
+    }
+
+    /* Do not do this for multi-page objects.  Those pages do not need
+     * object wipeout anyway.
+     */
+    if (i == first_page) {
+        /* We need the pointer to the beginning of the object
+         * We might have gotten it above but maybe not, so make sure
+         */
+        if (begin_ptr == NULL) {
+            possibly_valid_dynamic_space_pointer_s(addr, first_page,
+                                                   &begin_ptr);
+        }
+        set_page_consi_bit(first_page, begin_ptr);
     }
 
     /* Check that the page is now static. */
@@ -3382,6 +3557,10 @@ move_pinned_pages_to_newspace()
         if (page_table[i].dont_move &&
             /* dont_move is cleared lazily, so validate the space as well. */
             page_table[i].gen == from_space) {
+            if (page_table[i].dontmove_dwords && do_wipe_p) {
+                // do not move to newspace after all, this will be word-wiped
+                continue;
+            }
             page_table[i].gen = new_space;
             /* And since we're moving the pages wholesale, also adjust
              * the generation allocation counters. */
@@ -3437,8 +3616,10 @@ garbage_collect_generation(generation_index_t generation, int raise)
     /* Before any pointers are preserved, the dont_move flags on the
      * pages need to be cleared. */
     for (i = 0; i < last_free_page; i++)
-        if(page_table[i].gen==from_space)
+        if(page_table[i].gen==from_space) {
             page_table[i].dont_move = 0;
+            gc_assert(page_table[i].dontmove_dwords == NULL);
+        }
 
     /* Un-write-protect the old-space pages. This is essential for the
      * promoted pages as they may contain pointers into the old-space
@@ -3653,6 +3834,8 @@ garbage_collect_generation(generation_index_t generation, int raise)
      * objects may be moved in - it is handled separately below. */
     scavenge_generations(generation+1, PSEUDO_STATIC_GENERATION);
 
+    scavenge_pages_with_conservative_pointers_to_them_protected_objects_only();
+
     /* Finally scavenge the new_space generation. Keep going until no
      * more objects are moved into the new generation */
     scavenge_newspace_generation(new_space);
@@ -3663,6 +3846,7 @@ garbage_collect_generation(generation_index_t generation, int raise)
      * this debugging code is just stale, but I haven't tried to
      * figure it out. It should be figured out and then either made to
      * work or just deleted. */
+
 #define RESCAN_CHECK 0
 #if RESCAN_CHECK
     /* As a check re-scavenge the newspace once; no new objects should
@@ -3688,6 +3872,7 @@ garbage_collect_generation(generation_index_t generation, int raise)
 
     scan_weak_hash_tables();
     scan_weak_pointers();
+    do_the_wipe();
 
     /* Flush the current regions, updating the tables. */
     gc_alloc_update_all_page_tables();
@@ -4521,6 +4706,8 @@ static void
 prepare_for_final_gc ()
 {
     page_index_t i;
+
+    do_wipe_p = 0;
     for (i = 0; i < last_free_page; i++) {
         page_table[i].large_object = 0;
         if (page_table[i].gen == PSEUDO_STATIC_GENERATION) {

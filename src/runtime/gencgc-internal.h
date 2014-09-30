@@ -42,6 +42,8 @@ int gencgc_handle_wp_violation(void *);
   typedef unsigned short page_bytes_t;
 #endif
 
+typedef boolean in_use_marker_t;
+
 /* Note that this structure is also used from Lisp-side in
  * src/code/room.lisp, and the Lisp-side structure layout is currently
  * not groveled from C code but hardcoded. Any changes to the
@@ -105,6 +107,7 @@ struct page {
      * allocation region pages - this allows the space of an object to
      * be easily determined. */
     generation_index_t gen;
+    in_use_marker_t *dontmove_dwords;
 };
 
 
@@ -131,11 +134,15 @@ void gc_set_region_empty(struct alloc_region *region);
  */
 
 static inline boolean
-space_matches_p(lispobj obj, generation_index_t space)
+space_matches_p(lispobj obj, generation_index_t space,
+                page_index_t *store_page_index_here)
 {
     if (obj >= DYNAMIC_SPACE_START) {
         page_index_t page_index=((pointer_sized_uint_t)obj
                                  - DYNAMIC_SPACE_START) / GENCGC_CARD_BYTES;
+        if (store_page_index_here) {
+            *store_page_index_here = page_index;
+        }
         return ((page_index < page_table_pages) &&
                 (page_table[page_index].gen == space));
     } else {
@@ -143,16 +150,12 @@ space_matches_p(lispobj obj, generation_index_t space)
     }
 }
 
-static inline boolean
-from_space_p(lispobj obj)
-{
-    return space_matches_p(obj,from_space);
-}
+boolean from_space_p(lispobj obj);
 
 static inline boolean
 new_space_p(lispobj obj)
 {
-    return space_matches_p(obj,new_space);
+    return space_matches_p(obj, new_space, NULL);
 }
 
 extern page_index_t last_free_page;
