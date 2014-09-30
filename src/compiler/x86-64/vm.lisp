@@ -11,10 +11,6 @@
 
 (in-package "SB!VM")
 
-;;; the size of an INTEGER representation of a SYSTEM-AREA-POINTER, i.e.
-;;; size of a native memory address
-(deftype sap-int () '(unsigned-byte 64))
-
 ;;;; register specs
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
