@@ -2532,6 +2532,7 @@ preserve_pointer(void *addr)
             break;
     }
 
+#if defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64)
     /* Do not do this for multi-page objects.  Those pages do not need
      * object wipeout anyway.
      */
@@ -2545,6 +2546,7 @@ preserve_pointer(void *addr)
         }
         set_page_consi_bit(first_page, begin_ptr);
     }
+#endif
 
     /* Check that the page is now static. */
     gc_assert(page_table[addr_page_index].dont_move != 0);
@@ -3149,7 +3151,7 @@ verify_space(lispobj *start, size_t words)
                  *   FIXME: Add a variable to enable this
                  * dynamically. */
                 /*
-                if (!possibly_valid_dynamic_space_pointer((lispobj *)thing, page_index)) {
+                if (!possibly_valid_dynamic_space_pointer_s((lispobj *)thing, page_index, NULL)) {
                     lose("ptr %p to invalid object %p\n", thing, start);
                 }
                 */
