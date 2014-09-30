@@ -183,4 +183,18 @@
   (assert (sb-kernel::args-type-keyp (sb-c::info :function :type 'foo)))
   (assert (sb-kernel::args-type-allowp (sb-c::info :function :type 'foo))))
 
+(fmakunbound 'foo)
+(with-test (:name (defmethod symbol-macrolet))
+  (symbol-macrolet ((cnm (call-next-method)))
+    (defmethod foo ((x number)) (1+ cnm)))
+  (defmethod foo ((x t)) 3)
+  (assert (= (foo t) 3))
+  (assert (= (foo 3) 4)))
 
+(fmakunbound 'foo)
+(define-symbol-macro magic-cnm (call-next-method))
+(with-test (:name (defmethod define-symbol-macro))
+  (defmethod foo ((x number)) (1- magic-cnm))
+  (defmethod foo ((x t)) 3)
+  (assert (= (foo t) 3))
+  (assert (= (foo 3) 2)))

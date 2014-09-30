@@ -83,6 +83,51 @@
             '(progn `(f ,(if x (progn y) nil) . `(,b ,,(the t z)))))
   t)
 
+;;; Symbol macros
+(define-symbol-macro global-symbol-macro xxx)
+
+(deftest macroexpand-all.7
+    (equalp (macroexpand-all 'global-symbol-macro) 'xxx)
+  t)
+(deftest macroexpand-all.8
+    (symbol-macrolet ((global-symbol-macro yyy))
+      (macrolet ((frob (&environment env form)
+                   `',(macroexpand-all form env)))
+        (equalp (frob global-symbol-macro) 'yyy)))
+  t)
+(deftest macroexpand-all.9
+    (let ((global-symbol-macro 3))
+      (macrolet ((frob (&environment env form)
+                   `',(macroexpand-all form env)))
+        (equalp (frob global-symbol-macro) 'global-symbol-macro)))
+  t)
+(deftest macroexpand-all.10
+    (macrolet ((frob (&environment env form)
+                 `',(macroexpand-all form env)))
+      (equalp (frob (let ((anything 1)) global-symbol-macro))
+              '(let ((anything 1)) xxx)))
+  t)
+(deftest macroexpand-all.11
+    (macrolet ((frob (&environment env form)
+                 `',(macroexpand-all form env)))
+      (equalp (frob (let ((global-symbol-macro global-symbol-macro))
+                      global-symbol-macro))
+              '(let ((global-symbol-macro xxx)) global-symbol-macro)))
+  t)
+(deftest macroexpand-all.12
+    (macrolet ((frob (&environment env form)
+                 `',(macroexpand-all form env)))
+      (equalp (frob (symbol-macrolet ((global-symbol-macro 3))
+                      global-symbol-macro))
+              '(symbol-macrolet ((global-symbol-macro 3)) 3)))
+  t)
+(deftest macroexpand-all.13
+    (symbol-macrolet ((x y))
+      (macrolet ((frob (&environment env form)
+                   `',(macroexpand-all form env)))
+        (equalp (frob (+ x x))
+                '(+ y y))))
+  t)
 ;;;; DECLARATION-INFORMATION
 
 (defmacro dinfo (thing &environment env)

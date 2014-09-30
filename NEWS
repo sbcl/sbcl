@@ -1,9 +1,11 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
-changes in sbcl-1.2.5 relative to sbcl-1.2.4:
+changes relative to sbcl-1.2.4:
   * enhancement: sb-bsd-sockets now has basic support for IPv6
   * bug fix: conservatively pointed to pages wipe out unused dwords so
     that they cannot act as false roots in turn.
+  * bug fix: the walker's handling of lexical variable and symbol-macro
+    bindings is improved (lp#375326, lp#1368305)
 
 changes in sbcl-1.2.4 relative to sbcl-1.2.3:
   * enhancement: the sequence functions MAP, CONCATENATE and MERGE now call

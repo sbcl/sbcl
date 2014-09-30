@@ -285,12 +285,24 @@
 (defun var-lexical-p (var env)
   (let ((entry (member var (env-lexical-variables env) :key #'car :test #'eq)))
     (when (eq (cadar entry) :lexical-var)
-      entry)))
+      (return-from var-lexical-p entry)))
+  ;; if we're finding something in the real lexenv, we don't have a
+  ;; bound declaration and so we specifically don’t want to return
+  ;; a special object that declarations can attach to, just the name.
+  (and env (find var (mapcar #'car (sb!c::lexenv-vars env)))))
 
 (defun variable-symbol-macro-p (var env)
-  (let ((entry (member var (env-lexical-variables env) :key #'car :test #'eq)))
-    (when (eq (cadar entry) 'sb!sys:macro)
-      entry)))
+  ;; FIXME: crufty return convention
+  (let ((entry (or (member var (env-lexical-variables env) :key #'car :test #'eq)
+                   (and env (member var (sb!c::lexenv-vars env) :key #'car :test #'eq)))))
+    (when (and (consp (cdar entry)) (eq (cadar entry) 'sb!sys:macro))
+      (return-from variable-symbol-macro-p entry))
+    (unless entry
+      (when (var-globally-symbol-macro-p var)
+        (list (list* var 'sb!sys:macro (info :variable :macro-expansion var)))))))
+
+(defun var-globally-symbol-macro-p (var)
+  (eq (info :variable :kind var) :macro))
 
 (defun walked-var-declaration-p (declaration)
   (member declaration '(sb!pcl::%class sb!pcl::%variable-rebinding special)))
