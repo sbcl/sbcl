@@ -190,7 +190,7 @@ int do_wipe_p = 1;
 
 /* a value that we use to wipe out unused words in GC cards that
  * live alongside conservatively to pointed words. */
-lispobj wipe_with = 0x424242;
+const lispobj wipe_with = 0;
 
 static inline boolean page_allocated_p(page_index_t page) {
     return (page_table[page].allocated != FREE_PAGE_FLAG);
