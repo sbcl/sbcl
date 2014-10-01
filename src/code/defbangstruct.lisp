@@ -323,7 +323,7 @@
 ;;; STRUCTURE-OBJECTs defined by ordinary, post-warm-init programs, so
 ;;; it's only put into STRUCTURE-OBJECTs which inherit from
 ;;; STRUCTURE!OBJECT.)
-(def!struct (structure!object (:constructor nil)))
+(def!struct (structure!object (:constructor nil) (:copier nil) (:predicate ni)))
 
 ;;;; hooking this all into the standard MAKE-LOAD-FORM system
 
