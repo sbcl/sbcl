@@ -865,6 +865,7 @@ size_base_string(lispobj *where)
     return nwords;
 }
 
+#ifdef SIMPLE_CHARACTER_STRING_WIDETAG
 static sword_t
 scav_character_string(lispobj *where, lispobj object)
 {
@@ -915,6 +916,7 @@ size_character_string(lispobj *where)
 
     return nwords;
 }
+#endif
 
 static lispobj
 trans_vector(lispobj object)
@@ -1911,8 +1913,8 @@ scav_lose(lispobj *where, lispobj object)
 static lispobj
 trans_lose(lispobj object)
 {
-    lose("no transport function for object 0x%08x (widetag 0x%x)\n",
-         (uword_t)object,
+    lose("no transport function for object %p (widetag 0x%x)\n",
+         (void*)object,
          widetag_of(*(lispobj*)native_pointer(object)));
     return NIL; /* bogus return value to satisfy static type checking */
 }
@@ -1920,8 +1922,8 @@ trans_lose(lispobj object)
 static sword_t
 size_lose(lispobj *where)
 {
-    lose("no size function for object at 0x%08x (widetag 0x%x)\n",
-         (uword_t)where,
+    lose("no size function for object at %p (widetag 0x%x)\n",
+         (void*)where,
          widetag_of(*where));
     return 1; /* bogus return value to satisfy static type checking */
 }
