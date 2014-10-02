@@ -360,10 +360,10 @@ If CHARACTER does not have a known block, returns :NO-BLOCK"
 from the name currently assigned to CHARACTER. Otherwise, returns NIL.
 This property has been officially obsoleted by the Unicode standard, and
 is only included for backwards compatibility."
-  (let* ((char-code (+ #x110000 (char-code character)))
+  (let* ((char-code (char-code character))
          (h-code (cdr (binary-search char-code
-                                     (car **unicode-character-name-database**)
-                                     :key #'car))))
+                                   (car **unicode-1-character-name-database**)
+                                   :key #'car))))
     (when h-code
       ;; Remove UNICODE1_ prefix
       (subseq (huffman-decode h-code **unicode-character-name-huffman-tree**) 9))))

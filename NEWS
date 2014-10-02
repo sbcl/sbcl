@@ -2,6 +2,11 @@
 
 changes relative to sbcl-1.2.4:
   * enhancement: sb-bsd-sockets now has basic support for IPv6
+  * enhancement: An sb-unicode package has been added, containing
+    many functions related to handling Unicode text
+  * enhancement: The reader now normalizes symbols to Normalization
+    Form KC (NFKC). This behavior can be disabled with
+    SB-EXT:READTABLE-NORMALIZATION
   * bug fix: conservatively pointed to pages wipe out unused dwords so
     that they cannot act as false roots in turn.
   * bug fix: the walker's handling of lexical variable and symbol-macro

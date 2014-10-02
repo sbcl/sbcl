@@ -1290,6 +1290,7 @@ possibly temporarily, because it might be used internally."
                "**CHARACTER-CASE-PAGES**"
                "**CHARACTER-COLLATIONS**"
                "**UNICODE-CHARACTER-NAME-DATABASE**"
+               "**UNICODE-1-CHARACTER-NAME-DATABASE**"
                "**UNICODE-CHARACTER-NAME-HUFFMAN-TREE**"
 
                ;; Character database access

@@ -23,6 +23,7 @@
 
 (progn
  (defvar **unicode-character-name-database**)
+ (defvar **unicode-1-character-name-database**)
  (defvar **unicode-character-name-huffman-tree**))
 
 (defun sorted-position (item list)
@@ -174,41 +175,71 @@
                                         table) key)))
                         table))))
 
-              ,(with-open-file (stream (file "ucd-names" "lisp-expr")
-                                       :direction :input
-                                       :element-type 'character)
-                               (let ((names (make-hash-table)))
-                                 (loop
-                                       for code-point = (read stream nil nil)
-                                       for char-name = (string-upcase (read stream nil nil))
-                                       while code-point
-                                       do (setf (gethash code-point names) char-name))
-                                 (let ((tree
-                                         (make-huffman-tree
-                                          (let (list)
-                                            (maphash (lambda (code name)
-                                                       (declare (ignore code))
-                                                       (push name list))
-                                                     names)
-                                            list)))
-                                       (code->name
-                                        (make-array (hash-table-count names)
-                                                    :fill-pointer 0))
-                                       (name->code nil))
-                                   (maphash (lambda (code name)
-                                              (vector-push
-                                               (cons code (huffman-encode name tree))
-                                               code->name))
-                                            names)
-                                   (setf name->code
-                                         (sort (copy-seq code->name) #'< :key #'cdr))
-                                   (setf code->name
-                                         (sort (copy-seq name->code) #'< :key #'car))
-                                   (setf names nil)
-                                   `(defun !character-name-database-cold-init ()
-                                      (setq **unicode-character-name-database**
-                                            (cons ',code->name ',name->code)
-                                            **unicode-character-name-huffman-tree** ',tree))))))))))
+              ,(with-open-file
+                (stream (file "ucd-names" "lisp-expr")
+                        :direction :input
+                        :element-type 'character)
+                (with-open-file (u1-stream (file "ucd1-names" "lisp-expr")
+                                         :direction :input
+                                         :element-type 'character)
+                  (let ((names (make-hash-table))
+                        (u1-names (make-hash-table)))
+                    (loop
+                       for code-point = (read stream nil nil)
+                       for char-name = (string-upcase (read stream nil nil))
+                       while code-point
+                       do (setf (gethash code-point names) char-name))
+                    (loop
+                       for code-point = (read u1-stream nil nil)
+                       for char-name = (string-upcase (read u1-stream nil nil))
+                       while code-point
+                       do (setf (gethash code-point u1-names) char-name))
+
+                    (let ((tree
+                           (make-huffman-tree
+                            (let (list)
+                              (progn
+                                (maphash (lambda (code name)
+                                           (declare (ignore code))
+                                           (push name list))
+                                         names)
+                                (maphash (lambda (code u1-name)
+                                           (declare (ignore code))
+                                           (push u1-name list))
+                                         u1-names))
+                              list)))
+                          (code->name
+                           (make-array (hash-table-count names)
+                                       :fill-pointer 0))
+                          (name->code nil)
+                          (code->u1-name
+                           (make-array (hash-table-count u1-names)
+                                       :fill-pointer 0))
+                          (u1-name->code nil))
+                      (maphash (lambda (code name)
+                                 (vector-push
+                                  (cons code (huffman-encode name tree))
+                                  code->name))
+                               names)
+                      (maphash (lambda (code name)
+                                 (vector-push
+                                  (cons code (huffman-encode name tree))
+                                  code->u1-name)) u1-names)
+                      (setf name->code
+                            (sort (copy-seq code->name) #'< :key #'cdr))
+                      (setf code->name
+                            (sort (copy-seq name->code) #'< :key #'car))
+                      (setf u1-name->code
+                            (sort (copy-seq code->u1-name) #'< :key #'cdr))
+                      (setf code->u1-name
+                            (sort (copy-seq u1-name->code) #'< :key #'car))
+                      (setf names nil u1-names nil)
+                      `(defun !character-name-database-cold-init ()
+                         (setq **unicode-character-name-database**
+                               (cons ',code->name ',name->code)
+                               **unicode-character-name-huffman-tree** ',tree
+                               **unicode-1-character-name-database**
+                               (cons ',code->u1-name ',u1-name->code))))))))))))
 
   (frob))
 #+sb-xc-host (!character-name-database-cold-init)
@@ -444,16 +475,18 @@ name is that string, if one exists. Otherwise, NIL is returned."
                                        **unicode-character-name-huffman-tree**)))
         (when encoding
           (let* ((char-code
-                  (car (binary-search encoding
-                                      (cdr **unicode-character-name-database**)
-                                      :key #'cdr)))
+                  (or
+                   (car (binary-search encoding
+                                       (cdr **unicode-character-name-database**)
+                                       :key #'cdr))
+                   (car (binary-search encoding
+                                       (cdr **unicode-1-character-name-database**)
+                                       :key #'cdr))))
                  (name-string (string name))
                  (name-length (length name-string)))
             (cond
               (char-code
-               (if (>= char-code #x110000)
-                   (code-char (- char-code #x110000))
-                   (code-char char-code)))
+               (code-char char-code))
               ((and (> name-length 1)
                     (char-equal (char name-string 0) #\U)
                     (loop for i from
