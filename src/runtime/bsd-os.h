@@ -73,6 +73,7 @@ typedef ucontext_t os_context_t;
 
 typedef struct sigcontext os_context_t;
 #define SIG_MEMORY_FAULT SIGSEGV
+#define SIG_STOP_FOR_GC (SIGUSR2)
 #if defined(LISP_FEATURE_X86)
 extern int openbsd_use_fxsave;
 #endif

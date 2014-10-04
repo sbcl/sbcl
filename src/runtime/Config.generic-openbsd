@@ -19,3 +19,8 @@ CFLAGS += -fno-pie
 LINKFLAGS += -nopie
 LDFLAGS += -nopie
 endif
+
+ifdef LISP_FEATURE_SB_THREAD
+CFLAGS += -pthread
+OS_LIBS += -pthread
+endif
