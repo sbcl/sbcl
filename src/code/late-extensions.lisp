@@ -210,7 +210,7 @@ DIFF defaults to 1.
 
 EXPERIMENTAL: Interface subject to change."
   sb!vm:n-word-bits most-positive-word
-  most-positive-fixnum most-negative-fixnum)
+  sb!xc:most-positive-fixnum sb!xc:most-negative-fixnum)
   (expand-atomic-frob 'atomic-incf place diff env))
 
 (defmacro atomic-decf (&environment env place &optional (diff 1))
@@ -240,14 +240,14 @@ DIFF defaults to 1.
 
 EXPERIMENTAL: Interface subject to change."
   sb!vm:n-word-bits most-positive-word
-  most-negative-fixnum most-positive-fixnum)
+  sb!xc:most-negative-fixnum sb!xc:most-positive-fixnum)
   (expand-atomic-frob 'atomic-decf place diff env))
 
 ;; Interpreter stubs for ATOMIC-INCF.
 #!+(or x86 x86-64 ppc)
 (defun %array-atomic-incf/word (array index diff)
   (declare (type (simple-array word (*)) array)
-           (fixnum index)
+           (type fixnum index)
            (type sb!vm:signed-word diff))
   (%array-atomic-incf/word array index diff))
 
@@ -273,7 +273,7 @@ EXPERIMENTAL: Interface subject to change."
   ;; (We should define a CASser for SYMBOL-GLOBAL-VALUE)
   (macrolet ((def-frob (name op)
                `(defun ,name (symbol delta)
-                  (declare (symbol symbol) (fixnum delta))
+                  (declare (type symbol symbol) (type fixnum delta))
                   (loop (let ((old (truly-the
                                     fixnum
                                     (locally (declare (optimize (safety 0)))
@@ -288,7 +288,7 @@ EXPERIMENTAL: Interface subject to change."
   ;; Atomically frob the CAR or CDR of a cons.
   (macrolet ((def-frob (name op slot)
                `(defun ,name (cell delta)
-                  (declare (cons cell) (fixnum delta))
+                  (declare (type cons cell) (type fixnum delta))
                   (loop (let ((old (the fixnum (,slot cell))))
                           (when (eq (cas (,slot cell) old
                                          (modular ,op old delta)) old)
@@ -384,7 +384,7 @@ See also DEFGLOBAL which assigns the VALUE at compile-time too."
              (awhen (funcall test)
                (return-from %%wait-for it)))
            (tick (sec usec)
-             (declare (fixnum sec usec))
+             (declare (type fixnum sec usec))
              ;; TICK is microseconds
              (+ usec (* 1000000 sec)))
            (get-tick ()
@@ -424,7 +424,7 @@ See also DEFGLOBAL which assigns the VALUE at compile-time too."
                                 (- timeout-tick now)
                                 sleep-ticks)
                             sleep-ticks)))
-                 (declare (fixnum sleep))
+                 (declare (type fixnum sleep))
                  (cond ((plusp sleep)
                         ;; microseconds to seconds and nanoseconds
                         (multiple-value-bind (sec nsec)
