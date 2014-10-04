@@ -209,7 +209,8 @@
                                         (loop repeat (random 128)
                                               do (setf ** *)))))))
     (write-string "; ")
-    (dotimes (i #+win32 2000 #-win32 15000)
+    (dotimes (i #+(or win32 openbsd) 2000
+                #-(or win32 openbsd) 15000)
       (when (zerop (mod i 200))
         (write-char #\.)
         (force-output))
@@ -653,6 +654,9 @@
 ;; timer.impure.lisp.
 (with-test (:name (make-thread :interrupt-with make-thread :bug-1180102)
             :skipped-on '(not :sb-thread))
+  (fresh-line)
+  (write-string "; ")
+  (force-output)
   (dotimes (i 100)
     (let ((threads '())
           (parent *current-thread*))
@@ -664,4 +668,6 @@
                   (lambda () (push (make-thread (lambda ())) threads)))))
               threads)
         (push (make-thread (lambda ())) threads))
-      (mapc #'join-thread threads))))
+      (mapc #'join-thread threads))
+    (write-char #\.)
+    (force-output)))

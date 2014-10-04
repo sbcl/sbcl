@@ -17,10 +17,15 @@
        (pushnew ',name sb-rt::*expected-failures*))
      (deftest ,name ,form ,@results)))
 
+;; XXX something like clock_getres(CLOCK_REALTIME, ...) would be better
+(defvar *minimum-sleep*
+  #+openbsd 0.01
+  #-openbsd 0.0001)
+
 (defun test-frlocks (&key (reader-count 100) (read-count 1000000)
                           (outer-read-pause 0) (inner-read-pause 0)
-                          (writer-count 10) (write-count 10000)
-                          (outer-write-pause 0.0001) (inner-write-pause 0))
+                          (writer-count 10) (write-count (/ 1 *minimum-sleep*))
+                          (outer-write-pause *minimum-sleep*) (inner-write-pause 0))
     (let ((rw (make-frlock))
           (a 0)
           (b 0)
