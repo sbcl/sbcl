@@ -325,9 +325,11 @@
                                   `(,(car k)
                                      (find-keyword-lvar ,tail ',(cdr k))))
                                 keys))
-                (append (nset-difference (mapcar #'car (binds)) all-dummies)
-                        (mapcar #'car keys))
-                (intersection (mapcar #'car (binds)) (cdr all-dummies)))))))
+                (sort (append (nset-difference (mapcar #'car (binds)) all-dummies)
+                               (mapcar #'car keys))
+                      #'string<)
+                (sort (intersection (mapcar #'car (binds)) (cdr all-dummies))
+                      #'string<))))))
 ) ; EVAL-WHEN
 
 ;;;; DEFTRANSFORM
