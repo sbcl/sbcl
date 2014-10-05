@@ -91,7 +91,7 @@ clear_pseudo_atomic_interrupted(struct thread *thread)
          : "memory");
 }
 
-#undef LISPOBJ_SUFFIX
+#undef LISPOBJ_ASM_SUFFIX
 
 #elif defined(LISP_FEATURE_ARM)
 static inline int
