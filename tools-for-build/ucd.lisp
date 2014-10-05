@@ -511,19 +511,23 @@ Length should be adjusted when the standard changes.")
 ;;; characters which change case to single characters.
 ;;; Also, fix misassigned age values, which are not constant across blocks
 (defun second-pass ()
-  (loop for code-point being the hash-keys in *case-mapping*
-     using (hash-value (upper . lower))
-     for misc-index = (ucd-misc (gethash code-point *ucd-entries*))
-     for (gc bidi ccc digit decomp flags script lb age) = (aref *misc-table* misc-index)
-     when (logbitp 7 flags) do
-       (when (or (not (atom upper)) (not (atom lower))
-                 (and (= gc 0)
-                      (not (equal (car (gethash lower *case-mapping*)) code-point)))
-                 (and (= gc 1)
-                      (not (equal (cdr (gethash upper *case-mapping*)) code-point))))
-         (let* ((new-flags (clear-flag 7 flags))
-                (new-misc (hash-misc gc bidi ccc digit decomp new-flags script lb age)))
-           (setf (ucd-misc (gethash code-point *ucd-entries*)) new-misc)))))
+  (let ((case-mapping
+         (sort (loop for code-point being the hash-keys in *case-mapping*
+                    using (hash-value value)
+                    collect (cons code-point value))
+               #'< :key #'car)))
+    (loop for (code-point upper . lower) in case-mapping
+       for misc-index = (ucd-misc (gethash code-point *ucd-entries*))
+       for (gc bidi ccc digit decomp flags script lb age) = (aref *misc-table* misc-index)
+       when (logbitp 7 flags) do
+         (when (or (not (atom upper)) (not (atom lower))
+                   (and (= gc 0)
+                        (not (equal (car (gethash lower *case-mapping*)) code-point)))
+                   (and (= gc 1)
+                        (not (equal (cdr (gethash upper *case-mapping*)) code-point))))
+           (let* ((new-flags (clear-flag 7 flags))
+                  (new-misc (hash-misc gc bidi ccc digit decomp new-flags script lb age)))
+             (setf (ucd-misc (gethash code-point *ucd-entries*)) new-misc))))))
 
 (defun fixup-casefolding ()
   (with-open-file (s (make-pathname :name "CaseFolding" :type "txt"
@@ -541,15 +545,20 @@ Length should be adjusted when the standard changes.")
                   (push (cons cp fold) *different-casefolds*))))))))
 
 (defun fixup-ages ()
-  (loop for code-point being the hash-keys in *age-table* using (hash-value true-age)
-     for misc-index = (ucd-misc (gethash code-point *ucd-entries*))
-     for (gc bidi ccc digit decomp flags script lb age) = (aref *misc-table* misc-index)
-     unless (= age true-age) do
-       (let* ((new-misc (hash-misc gc bidi ccc digit decomp flags script lb true-age))
-              (new-ucd (make-ucd
-                        :misc new-misc
-                        :decomp (ucd-decomp (gethash code-point *ucd-entries*)))))
-         (setf (gethash code-point *ucd-entries*) new-ucd))))
+  (let ((age (sort
+              (loop for code-point being the hash-keys in *age-table*
+                 using (hash-value true-age)
+                      collect (cons code-point true-age))
+              #'< :key #'car)))
+    (loop for (code-point . true-age) in age
+       for misc-index = (ucd-misc (gethash code-point *ucd-entries*))
+       for (gc bidi ccc digit decomp flags script lb age) = (aref *misc-table* misc-index)
+       unless (= age true-age) do
+         (let* ((new-misc (hash-misc gc bidi ccc digit decomp flags script lb true-age))
+                (new-ucd (make-ucd
+                          :misc new-misc
+                          :decomp (ucd-decomp (gethash code-point *ucd-entries*)))))
+           (setf (gethash code-point *ucd-entries*) new-ucd)))))
 
 (defun slurp-ucd ()
   (with-open-file (*standard-input*
@@ -828,11 +837,13 @@ Used to look up block data.")
                           :direction :output
                           :element-type '(unsigned-byte 8)
                           :if-exists :supersede :if-does-not-exist :create)
-    (maphash (lambda (k v)
-               (write-codepoint (car k) stream)
-               (write-codepoint (cdr k) stream)
-               (write-codepoint v stream))
-             *compositions*)))
+    (let (comp)
+      (maphash (lambda (k v) (push (cons k v) comp)) *compositions*)
+      (setq comp (sort comp #'< :key #'cdr))
+      (loop for (k . v) in comp
+         do (write-codepoint (car k) stream)
+           (write-codepoint (cdr k) stream)
+           (write-codepoint v stream)))))
 
 (defun output-case-data ()
   (let (casing-pages points-with-case)
@@ -869,14 +880,26 @@ Used to look up block data.")
                           :element-type '(unsigned-byte 8)
                           :if-exists :supersede :if-does-not-exist :create)
     (flet ((length-tag (list1 list2)
-             ;; takes two lists of UB32 (with the caveate that list1[0] needs its
-             ;; high 8 bits free (codepoints always have that) and do
+             ;; takes two lists of UB32 (with the caveat that list1[0]
+             ;; needs its high 8 bits free (codepoints always have
+             ;; that) and do
              (let* ((l1 (length list1)) (l2 (length list2))
                     (tag (dpb l1 (byte 4 28) (dpb l2 (byte 5 23) (car list1)))))
                (assert (<= l1 3))
                (write-4-byte tag stream)
                (map nil #'(lambda (l) (write-4-byte l stream)) (append (cdr list1) list2)))))
-      (maphash #'length-tag *collation-table*)))
+      (let (coll)
+        (maphash (lambda (k v) (push (cons k v) coll)) *collation-table*)
+        (labels ((sorter (o1 o2)
+                   (cond
+                     ((null o1) t)
+                     ((null o2) nil)
+                     (t (or (< (car o1) (car o2))
+                            (and (= (car o1) (car o2))
+                                 (sorter (cdr o1) (cdr o2))))))))
+          (setq coll (sort coll #'sorter :key #'car)))
+        (loop for (k . v) in coll
+           do (length-tag k v)))))
   (with-open-file (*standard-output*
                    (make-pathname :name "other-collation-info"
                                   :type "lisp-expr"
