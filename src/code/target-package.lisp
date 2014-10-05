@@ -575,10 +575,6 @@ REMOVE-PACKAGE-LOCAL-NICKNAME, and the DEFPACKAGE option :LOCAL-NICKNAMES."
   (mapcar #'find-undeleted-package-or-lose
           (if (listp thing) thing (list thing))))
 
-;;; Make a package name into a simple-string.
-(defun package-namify (n)
-  (stringify-package-designator n))
-
 ;;; ANSI specifies (in the definition of DELETE-PACKAGE) that PACKAGE-NAME
 ;;; returns NIL (not an error) for a deleted package, so this is a special
 ;;; case where we want to use bare %FIND-PACKAGE-OR-LOSE instead of
@@ -740,7 +736,7 @@ REMOVE-PACKAGE-LOCAL-NICKNAME, and the DEFPACKAGE option :LOCAL-NICKNAMES."
 (defun %enter-new-nicknames (package nicknames)
   (declare (type list nicknames))
   (dolist (n nicknames)
-    (let* ((n (package-namify n))
+    (let* ((n (stringify-package-designator n))
            (found (with-package-names (names)
                     (or (gethash n names)
                         (progn
@@ -786,7 +782,7 @@ implementation it is ~S." *default-package-use-list*)
        ;; Check for race, signal the error outside the lock.
        (when (and (not clobber) (find-package name))
          (go :restart))
-       (let* ((name (package-namify name))
+       (let* ((name (stringify-package-designator name))
               (package
                (internal-make-package
                 :%name name
@@ -822,7 +818,7 @@ implementation it is ~S." *default-package-use-list*)
   "Changes the name and nicknames for a package."
   (prog () :restart
      (let ((package (find-undeleted-package-or-lose package-designator))
-           (name (package-namify name))
+           (name (stringify-package-designator name))
            (found (find-package name))
            (nicks (mapcar #'string nicknames)))
        (unless (or (not found) (eq found package))
