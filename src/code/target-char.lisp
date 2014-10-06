@@ -575,7 +575,7 @@ that digit stands, else returns NIL."
 is either numeric or alphabetic."
   (let ((gc (ucd-general-category char)))
     (or (< gc 5)
-        (= gc 12))))
+        (= gc 13))))
 
 (defun char= (character &rest more-characters)
   #!+sb-doc
