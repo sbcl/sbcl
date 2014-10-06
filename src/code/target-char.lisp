@@ -26,14 +26,6 @@
  (defvar **unicode-1-character-name-database**)
  (defvar **unicode-character-name-huffman-tree**))
 
-(defun sorted-position (item list)
-  (let ((index 0))
-    (dolist (i list)
-      (cond
-        ((= item i) (return-from sorted-position index))
-        ((< item i) (return-from sorted-position nil))
-        (t (incf index))))) nil)
-
 (defun pack-3-codepoints (first &optional (second 0) (third 0))
   (declare (type (unsigned-byte 21) first second third))
   (sb!c::mask-signed-field 63 (logior first (ash second 21) (ash third 42))))
@@ -114,18 +106,9 @@
 
                   (setf **character-cases**
                         (let* ((table
-                                (make-array (* 64 (1+ (aref **character-case-pages**
-                                                            (1- (length **character-case-pages**)))))) #+nil
-                                (make-hash-table ;; 64 characters in each page
-                                 :size (* 64 (length **character-case-pages**))
-                                 :hash-function
-                                 (lambda (key)
-                                   (let ((page (sorted-position
-                                                (ash key -6)
-                                                **character-case-pages**)))
-                                     (if page
-                                         (+ (ash page 6) (ldb (byte 6 0) key))
-                                         0)))))
+                                (make-array
+                                 (* 64 (1+ (aref **character-case-pages**
+                                                 (1- (length **character-case-pages**)))))))
                                (info ,case-data) (index 0)
                                (length (length info)))
                           (labels ((read-codepoint ()
