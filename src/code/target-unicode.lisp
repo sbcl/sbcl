@@ -815,13 +815,13 @@ disappears when accents are placed on top of it. and NIL otherwise"
 
 (defun char-uppercase (char)
   (if (has-case-p char)
-      (let ((cp (car (gethash (char-code char) **character-cases**))))
+      (let ((cp (car (lookup-char-case-info char))))
         (if (atom cp) (list (code-char cp)) (mapcar #'code-char cp)))
       (list char)))
 
 (defun char-lowercase (char)
   (if (has-case-p char)
-      (let ((cp (cdr (gethash (char-code char) **character-cases**))))
+      (let ((cp (cdr (lookup-char-case-info char))))
         (if (atom cp) (list (code-char cp)) (mapcar #'code-char cp)))
       (list char)))
 

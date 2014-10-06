@@ -63,8 +63,7 @@
                (decompositions (read-ub8-vector (file "decomp" "dat")))
                (primary-compositions (read-ub8-vector (file "comp" "dat")))
                (case-data (read-ub8-vector (file "case" "dat")))
-               (case-pages (with-open-file (s (file "casepages" "lisp-expr"))
-                             (read s)))
+               (case-pages (read-ub8-vector (file "casepages" "dat")))
                (collations (read-ub8-vector (file "collation" "dat"))))
 
            `(progn
@@ -75,7 +74,7 @@
               (defglobal **character-high-pages** ,(coerce-it ucd-high-pages))
               (defglobal **character-low-pages** ,(coerce-it ucd-low-pages))
               (defglobal **character-decompositions** ,(coerce-it decompositions))
-              (defglobal **character-case-pages** ',case-pages)
+              (defglobal **character-case-pages** ,(coerce-it case-pages))
               (defglobal **character-primary-compositions** ,(coerce-it primary-compositions))
               (defglobal **character-cases** ,(coerce-it case-data))
               (defglobal **character-collations** ,(coerce-it collations))
@@ -99,7 +98,7 @@
                         (make-ubn-vector ,ucd-high-pages 2)
                         **character-low-pages**
                         (make-ubn-vector ,ucd-low-pages 2)
-                        **character-case-pages** ',case-pages
+                        **character-case-pages** ,case-pages
                         **character-decompositions**
                         (make-ubn-vector ,decompositions 3))
 
@@ -115,6 +114,8 @@
 
                   (setf **character-cases**
                         (let* ((table
+                                (make-array (* 64 (1+ (aref **character-case-pages**
+                                                            (1- (length **character-case-pages**)))))) #+nil
                                 (make-hash-table ;; 64 characters in each page
                                  :size (* 64 (length **character-case-pages**))
                                  :hash-function
@@ -146,7 +147,8 @@
                                for key = (read-codepoint)
                                for upper = (read-length-tagged)
                                for lower = (read-length-tagged)
-                               do (setf (gethash key table) (cons upper lower))))
+                               for page = (aref **character-case-pages** (ash key -6))
+                               do (setf (aref table (+ (ash page 6) (ldb (byte 6 0) key))) (cons upper lower))))
                           table))
 
                   (setf **character-collations**
@@ -369,11 +371,12 @@
 ;;; index, are the decomposition of the character. This proceduce does not
 ;;; apply to Hangul syllables, which have their own decomposition algorithm.
 ;;;
-;;; Case information is stored in **CHARACTER-CASES**, a hash table that maps a
-;;; character's codepoint to (cons uppercase lowercase). Uppercase and
-;;; lowercase are either a single codepoint, which is the upper- or lower-case
-;;; of the given character, or a list of codepoints which taken as a whole are
-;;; the upper- or lower-case. These case lists are only used in Unicode case
+;;; Case information is stored in **CHARACTER-CASES**, an array that
+;;; indirectly maps a character's codepoint to (cons uppercase
+;;; lowercase). Uppercase and lowercase are either a single codepoint,
+;;; which is the upper- or lower-case of the given character, or a
+;;; list of codepoints which taken as a whole are the upper- or
+;;; lower-case. These case lists are only used in Unicode case
 ;;; transformations, not in Common Lisp ones.
 ;;;
 ;;; Similarly, composition information is stored in **CHARACTER-COMPOSITIONS**,
@@ -644,11 +647,18 @@ is either numeric or alphabetic."
 ;;; EQUAL-CHAR-CODE is used by the following functions as a version of CHAR-INT
 ;;;  which loses font, bits, and case info.
 
+(declaim (inline lookup-char-case-info))
+(defun lookup-char-case-info (character)
+  (let ((code (char-code character)))
+    (aref **character-cases**
+          (+ (ash (aref **character-case-pages** (ash code -6)) 6)
+             (ldb (byte 6 0) code)))))
+
 (defmacro equal-char-code (character)
   (let ((ch (gensym)))
     `(let ((,ch ,character))
       (if (both-case-p ,ch)
-          (cdr (gethash (char-code ,ch) **character-cases**))
+          (cdr (lookup-char-case-info ,ch))
           (char-code ,ch)))))
 
 (defun two-arg-char-equal (c1 c2)
@@ -768,14 +778,14 @@ Case is ignored."
   "Return CHAR converted to upper-case if that is possible. Don't convert
 lowercase eszet (U+DF)."
   (if (lower-case-p char)
-      (code-char (car (gethash (char-code char) **character-cases**)))
+      (code-char (car (lookup-char-case-info char)))
       char))
 
 (defun char-downcase (char)
   #!+sb-doc
   "Return CHAR converted to lower-case if that is possible."
   (if (upper-case-p char)
-      (code-char (cdr (gethash (char-code char) **character-cases**)))
+      (code-char (cdr (lookup-char-case-info char)))
       char))
 
 (defun digit-char (weight &optional (radix 10))

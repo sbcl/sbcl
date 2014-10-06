@@ -866,6 +866,19 @@ Used to look up block data.")
            (if (atom lower) (write-codepoint lower stream)
                (map 'nil (lambda (c) (write-codepoint c stream)) lower))))
     (setf casing-pages (sort casing-pages #'<))
+    (assert (< (length casing-pages) 256))
+    (let* ((size (1+ (reduce #'max casing-pages)))
+           (array (make-array size :initial-element 255))
+           (page -1))
+      (dolist (entry casing-pages)
+        (setf (aref array entry) (incf page)))
+      (with-open-file (stream (make-pathname :name "casepages" :type "dat"
+                                             :defaults *output-directory*)
+                              :direction :output
+                              :element-type '(unsigned-byte 8)
+                              :if-exists :supersede :if-does-not-exist :create)
+        (dotimes (i size)
+          (write-byte (aref array i) stream))))
     (with-open-file (stream (make-pathname :name "casepages" :type "lisp-expr"
                                            :defaults *output-directory*)
                             :direction :output
