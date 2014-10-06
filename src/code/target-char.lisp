@@ -767,14 +767,14 @@ Case is ignored."
   #!+sb-doc
   "Return CHAR converted to upper-case if that is possible. Don't convert
 lowercase eszet (U+DF)."
-  (if (both-case-p char)
+  (if (lower-case-p char)
       (code-char (car (gethash (char-code char) **character-cases**)))
       char))
 
 (defun char-downcase (char)
   #!+sb-doc
   "Return CHAR converted to lower-case if that is possible."
-  (if (both-case-p char)
+  (if (upper-case-p char)
       (code-char (cdr (gethash (char-code char) **character-cases**)))
       char))
 
