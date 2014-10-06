@@ -120,7 +120,7 @@
                                  :hash-function
                                  (lambda (key)
                                    (let ((page (sorted-position
-                                                (ash key 6)
+                                                (ash key -6)
                                                 **character-case-pages**)))
                                      (if page
                                          (+ (ash page 6) (ldb (byte 6 0) key))
