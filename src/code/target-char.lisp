@@ -39,7 +39,7 @@
                                         :directory
                                         '(:relative :up :up "output")
                                         :name name :type type)
-                                       "~/lisp/impl/sbcl/src/code/"))
+                                       sb!xc:*compile-file-truename*))
                     (read-ub8-vector (pathname)
                       (with-open-file (stream pathname
                                               :direction :input
