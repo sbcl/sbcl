@@ -389,3 +389,9 @@
                             (type simple-string s))
                    (search "foo" s)))
    sb-ext:compiler-note))
+
+(with-test (:name :concatenate-two-constants)
+  (assert (equal (funcall
+                  (lambda () (declare (optimize (speed 3)))
+                    (concatenate 'string "a" "b")))
+                 "ab")))

@@ -1264,8 +1264,9 @@
                      (.pos. ,non-constant-start)
                      (.string. (make-string .length. :element-type ',element-type)))
                 (declare (type index .length. .pos.)
-                         (muffle-conditions compiler-note))
-                ,@(loop with first-constants = t
+                         (muffle-conditions compiler-note)
+                         (ignorable .pos.))
+                ,@(loop with constants = -1
                         for first = t then nil
                         for value in lvar-values
                         for var in vars
@@ -1280,11 +1281,11 @@
                                           ;; Without truly-the we get massive numbers
                                           ;; of pointless error traps.
                                           `(setf (aref .string.
-                                                       (truly-the index ,(if first-constants
-                                                                             i
+                                                       (truly-the index ,(if constants
+                                                                             (incf constants)
                                                                              `(+ .pos. ,i))))
                                                  ,c))
-                                  ,(unless first-constants
+                                  ,(unless constants
                                      `(incf (truly-the index .pos.) ,(length value)))))
                               (t
                                (prog1
@@ -1295,12 +1296,12 @@
                                          t)
                                         ,var
                                       (replace .string. ,var
-                                               ,@(cond ((not first-constants)
+                                               ,@(cond ((not constants)
                                                         '(:start1 .pos.))
                                                        ((plusp non-constant-start)
                                                         `(:start1 ,non-constant-start))))
                                       (incf (truly-the index .pos.) (length ,var)))
-                                 (setf first-constants nil)))))
+                                 (setf constants nil)))))
                 .string.))
             lvars)))))
 
