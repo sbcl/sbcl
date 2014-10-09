@@ -2041,28 +2041,36 @@ constant shift greater than word length")))
      ;; quite a lot of hairy code.
      (give-up-ir1-transform))))
 
+;; These transforms were exceptionally noisy in an unhelpful way.
+;; Reading the output would not induce the speed-conscious programmer to think
+;; "I'd better code this multiply as (* (* B 2) 9) instead of (* B 18)
+;;  so that the LEA transform kicks in".
 (deftransform * ((x y)
                  ((unsigned-byte 64) (constant-arg (unsigned-byte 64)))
-                 (unsigned-byte 64))
+                 (unsigned-byte 64)
+                 :important nil)
   "recode as leas, shifts and adds"
   (let ((y (lvar-value y)))
     (*-transformer y)))
 (deftransform sb!vm::*-mod64
     ((x y) ((unsigned-byte 64) (constant-arg (unsigned-byte 64)))
-     (unsigned-byte 64))
+     (unsigned-byte 64)
+     :important nil)
   "recode as leas, shifts and adds"
   (let ((y (lvar-value y)))
     (*-transformer y)))
 
 (deftransform * ((x y)
                  (fixnum (constant-arg (unsigned-byte 64)))
-                 fixnum)
+                 fixnum
+                 :important nil)
   "recode as leas, shifts and adds"
   (let ((y (lvar-value y)))
     (*-transformer y)))
 (deftransform sb!vm::*-modfx
     ((x y) (fixnum (constant-arg (unsigned-byte 64)))
-     fixnum)
+     fixnum
+     :important nil)
   "recode as leas, shifts and adds"
   (let ((y (lvar-value y)))
     (*-transformer y)))

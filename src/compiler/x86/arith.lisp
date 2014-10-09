@@ -1974,6 +1974,8 @@ constant shift greater than word length")))
     ;; pentium-class machines.
     (t (optimize-multiply class width 'x y))))
 
+;; x86-64 considers these transforms to be totally unimportant
+;; but the situation is not as clear with x86
 (deftransform * ((x y)
                  ((unsigned-byte 32) (constant-arg (unsigned-byte 32)))
                  (unsigned-byte 32))
