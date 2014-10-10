@@ -311,3 +311,13 @@
     (type-error (condition)
       (assert (search (string 'no-such-condition)
                       (princ-to-string condition))))))
+
+;; Using an undefined condition type in a HANDLER-BIND clause should
+;; signal an ERROR at runtime. Bug 1378939 was about landing in LDB
+;; because of infinite recursion in SIGNAL instead.
+(with-test (:name (handler-bind :undefined-condition-type
+                   :bug-1378939))
+  (assert-error
+   (handler-bind
+       ((no-such-condition-class #'print))
+     (error "does not matter"))))

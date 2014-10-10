@@ -11,6 +11,8 @@ changes relative to sbcl-1.2.4:
     that they cannot act as false roots in turn.
   * bug fix: the walker's handling of lexical variable and symbol-macro
     bindings is improved (lp#375326, lp#1368305)
+  * bug fix: HANDLER-{BIND,CASE} no longer drop into ldb when a clause
+    contains an undefined condition type; regression in 1.1.19 (lp#1378939)
 
 changes in sbcl-1.2.4 relative to sbcl-1.2.3:
   * enhancement: the sequence functions MAP, CONCATENATE and MERGE now call

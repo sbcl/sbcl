@@ -86,11 +86,17 @@
     (loop
       (unless handler-clusters
         (return))
-      (let ((cluster (pop handler-clusters)))
-        (dolist (handler cluster)
-          (when (typep condition (car handler))
-            (let ((*handler-clusters* handler-clusters))
-              (funcall (cdr handler) condition))))))
+       (let* ((cluster (pop handler-clusters))
+              ;; Remove CLUSTER from *HANDLER-CLUSTERS*: if a
+              ;; condition is signaled in either the type test,
+              ;; i.e. (the function (car handler)), or the handler,
+              ;; (the function (cdr handler)), the recursive SIGNAL
+              ;; call should not consider CLUSTER as doing so would
+              ;; lead to infinite recursive SIGNAL calls.
+              (*handler-clusters* handler-clusters))
+         (dolist (handler cluster)
+           (when (typep condition (car handler))
+             (funcall (cdr handler) condition)))))
     nil))
 
 (defun error (datum &rest arguments)
