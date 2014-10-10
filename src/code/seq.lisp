@@ -1441,6 +1441,7 @@ many elements are copied."
 
 (sb!xc:defmacro list-delete (pred)
   `(let ((handle (cons nil sequence)))
+     (declare (truly-dynamic-extent handle))
      (do ((current (nthcdr start sequence) (cdr current))
           (previous (nthcdr start handle))
           (index start (1+ index))
@@ -1457,6 +1458,7 @@ many elements are copied."
 (sb!xc:defmacro list-delete-from-end (pred)
   `(let* ((reverse (nreverse (the list sequence)))
           (handle (cons nil reverse)))
+     (declare (truly-dynamic-extent handle))
      (do ((current (nthcdr (- (the fixnum length) (the fixnum end)) reverse)
                    (cdr current))
           (previous (nthcdr (- (the fixnum length) (the fixnum end)) handle))
@@ -1928,6 +1930,7 @@ many elements are copied."
 (defun list-delete-duplicates* (list test test-not key from-end start end)
   (declare (fixnum start))
   (let ((handle (cons nil list)))
+    (declare (truly-dynamic-extent handle))
     (do ((current (nthcdr start list) (cdr current))
          (previous (nthcdr start handle))
          (index start (1+ index)))

@@ -560,6 +560,14 @@
                    (:no-error (res)
                      (1- res))))))
 
+(defun list-delete-some-stuff ()
+  ;; opaque-identity hides the fact that we are calling a destructive function
+  ;; on a constant, which is technically illegal. But no deletion occurs,
+  ;; so it's innocuous.
+  (delete 'a (opaque-identity '(x y)))
+  (delete 'a (opaque-identity '(x y)) :from-end t)
+  (delete-duplicates (opaque-identity '(x y))))
+
 (defvar *a-cons* (cons nil nil))
 
 (with-test (:name (:no-consing :dx-closures) :skipped-on '(not :stack-allocatable-closures))
@@ -578,6 +586,7 @@
   (assert-no-consing (nested-evil-dx-used *a-cons*))
   (assert-no-consing (mapcar-negate nil))
   (assert-no-consing (mapcan-reverse nil))
+  (assert-no-consing (list-delete-some-stuff))
   (assert-no-consing (multiple-dx-uses)))
 
 (with-test (:name (:no-consing :dx-value-cell))
