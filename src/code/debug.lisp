@@ -154,7 +154,7 @@ Other commands:
     deeply nested input syntax, and now the reader is confused.)")
 
 (defmacro with-debug-io-syntax (() &body body)
-  (let ((thunk (gensym "THUNK")))
+  (let ((thunk (sb!xc:gensym "THUNK")))
     `(dx-flet ((,thunk ()
                        ,@body))
        (funcall-with-debug-io-syntax #',thunk))))
