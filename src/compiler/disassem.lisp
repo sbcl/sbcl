@@ -73,6 +73,7 @@
                       (:print-object (lambda (self stream)
                                        (print-unreadable-object
                                          (self stream :type t :identity t)))))
+  (serial-number 0 :type fixnum)
   (printers nil :type list)
   (labellers nil :type list)
   (prefilters nil :type list))
@@ -474,12 +475,10 @@
        ,args-var)))
 
 (defun gen-printer-def-forms-def-form (base-name
-                                       uniquified-name
                                        def
                                        &optional
                                        (evalp t))
   (declare (type symbol base-name))
-  (declare (type (or symbol string) uniquified-name))
   (destructuring-bind
       (format-name
        (&rest field-defs)
@@ -493,19 +492,14 @@
               (args ,(gen-args-def-form field-defs format-var evalp))
               (funcache *disassem-fun-cache*))
          (multiple-value-bind (printer-fun printer-defun)
-             (find-printer-fun ',uniquified-name
-                               ',format-name
-                               ,(if (eq printer-form :default)
+             (find-printer-fun ,(if (eq printer-form :default)
                                      `(format-default-printer ,format-var)
                                      (maybe-quote evalp printer-form))
                                args funcache)
            (multiple-value-bind (labeller-fun labeller-defun)
-               (find-labeller-fun ',uniquified-name args funcache)
+               (find-labeller-fun args funcache)
              (multiple-value-bind (prefilter-fun prefilter-defun)
-                 (find-prefilter-fun ',uniquified-name
-                                     ',format-name
-                                     args
-                                     funcache)
+                 (find-prefilter-fun args funcache)
                (multiple-value-bind (mask id)
                    (compute-mask-id args)
                  (values
@@ -1007,7 +1001,10 @@
        (cond (,cache-var
               (values (cached-fun-name ,cache-var) nil))
              (t
-              (let* ((,name-var (symbolicate "CACHED-FUN--" ,stem))
+              (let* ((,name-var
+                      (symbolicate
+                       ,stem
+                       (write-to-string (incf (fun-cache-serial-number cache)))))
                      (,funstate-var (make-funstate ,args))
                      (,cache-var
                       (make-cached-fun :name ,name-var
@@ -1020,19 +1017,14 @@
                              (push ,,cache-var
                                    (,',cache-slot ',,cache)))))))))))
 
-(defun find-printer-fun (%name %format-name printer-source args cache)
-  (declare (type (or string symbol) %name))
+(defun find-printer-fun (printer-source args cache)
   (if (null printer-source)
       (values nil nil)
       (let ((printer-source (preprocess-printer printer-source args)))
         (!with-cached-fun
            (name funstate cache fun-cache-printers args
                  :constraint printer-source
-                 :stem (concatenate 'string
-                                    (string %name)
-                                    "-"
-                                    (symbol-name %format-name)
-                                    "-PRINTER"))
+                 :stem "INST-PRINTER-")
          (make-printer-defun printer-source funstate name)))))
 
 (defun make-printer-defun (source funstate fun-name)
@@ -1394,14 +1386,14 @@
           (t
            (pd-error "bogus test-form: ~S" test)))))
 
-(defun find-labeller-fun (%name args cache)
+(defun find-labeller-fun (args cache)
   (let ((labelled-fields
          (mapcar #'arg-name (remove-if-not #'arg-use-label args))))
     (if (null labelled-fields)
         (values nil nil)
         (!with-cached-fun
             (name funstate cache fun-cache-labellers args
-             :stem (concatenate 'string "LABELLER-" (string %name))
+             :stem "INST-LABELLER-"
              :constraint labelled-fields)
           (let ((labels-form 'labels))
             (dolist (arg args)
@@ -1432,19 +1424,14 @@
                  (let* ,(make-arg-temp-bindings funstate)
                    ,labels-form))))))))
 
-(defun find-prefilter-fun (%name %format-name args cache)
-  (declare (type (or symbol string) %name %format-name))
+(defun find-prefilter-fun (args cache)
   (let ((filtered-args (mapcar #'arg-name
                                (remove-if-not #'arg-prefilter args))))
     (if (null filtered-args)
         (values nil nil)
         (!with-cached-fun
             (name funstate cache fun-cache-prefilters args
-             :stem (concatenate 'string
-                                (string %name)
-                                "-"
-                                (string %format-name)
-                                "-PREFILTER")
+             :stem "INST-PREFILTER-"
              :constraint filtered-args)
           (collect ((forms))
             (dolist (arg args)
