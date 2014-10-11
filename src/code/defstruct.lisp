@@ -435,6 +435,7 @@
       (dolist (slot (dd-slots defstruct))
         (let ((name (dsd-accessor-name slot))
               (index (dsd-index slot))
+              (new-value '(value))
               (slot-type `(and ,(dsd-type slot)
                                ,(dd-element-type defstruct))))
           (let ((inherited (accessor-inherited-data name defstruct)))
@@ -447,9 +448,9 @@
                         (the ,slot-type (elt structure ,index))))
                (unless (dsd-read-only slot)
                  (stuff
-                  `(defun (setf ,name) (new-value structure)
-                    (declare (type ,ltype structure) (type ,slot-type new-value))
-                    (setf (elt structure ,index) new-value)))))
+                  `(defun (setf ,name) (,(car new-value) structure)
+                    (declare (type ,ltype structure) (type ,slot-type . ,new-value))
+                    (setf (elt structure ,index) . ,new-value)))))
               ((not (= (cdr inherited) index))
                (style-warn "~@<Non-overwritten accessor ~S does not access ~
                             slot with name ~S (accessing an inherited slot ~
