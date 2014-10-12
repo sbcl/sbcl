@@ -2549,4 +2549,26 @@
   (assert (equal (skip-n-passthrough 2 5 'a 'b 'c 'd 'e 'f 'g 'h)
                  '(start c d e f g end))))
 
+(test-util:with-test (:name :macro-policy)
+  (flet ((count-notes ()
+          (let ((count 0))
+            (handler-bind ((compiler-note
+                            (lambda (c)
+                              c
+                              (incf count)
+                              (muffle-warning))))
+              (multiple-value-bind (fasl warnings errors)
+                  (compile-file "macro-policy-test.lisp"
+                               :print nil :verbose nil)
+                (ignore-errors (delete-file fasl))
+                (assert (and (not warnings) (not errors)))
+                count)))))
+    (let* ((baseline (count-notes))
+           (test (progv '(*frob-macro-policy*) '(t) (count-notes)))
+           (baseline-again (count-notes)))
+      (assert (/= 0 baseline))
+      (assert (= 0 test))
+      ;; macro-policy is rebound inside compile-file
+      (assert (= baseline-again baseline)))))
+
 ;;; success

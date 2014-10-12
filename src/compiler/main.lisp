@@ -1278,10 +1278,21 @@ necessary, since type inference may take arbitrarily long to converge.")
 ;;; compilation. Normally just evaluate in the appropriate
 ;;; environment, but also compile if outputting a CFASL.
 (defun eval-compile-toplevel (body path)
-  (eval-tlf `(progn ,@body) (source-path-tlf-number path) *lexenv*)
-  (when *compile-toplevel-object*
-    (let ((*compile-object* *compile-toplevel-object*))
-      (convert-and-maybe-compile `(progn ,@body) path))))
+  (flet ((frob ()
+           (eval-tlf `(progn ,@body) (source-path-tlf-number path) *lexenv*)
+           (when *compile-toplevel-object*
+             (let ((*compile-object* *compile-toplevel-object*))
+               (convert-and-maybe-compile `(progn ,@body) path)))))
+    (if (null *macro-policy*)
+        (frob)
+        (let* ((*lexenv*
+                (make-lexenv :policy (process-optimize-decl (macro-policy-decls nil)
+                                                            (lexenv-policy *lexenv*))
+                             :default *lexenv*))
+               ;; In case a null lexenv is created, it needs to get the newly
+               ;; effective global policy, not the policy currently in *POLICY*.
+               (*policy* (lexenv-policy *lexenv*)))
+          (frob)))))
 
 ;;; Process a top level FORM with the specified source PATH.
 ;;;  * If this is a magic top level form, then do stuff.
@@ -1631,6 +1642,7 @@ necessary, since type inference may take arbitrarily long to converge.")
         (sb!xc:*compile-file-pathname* nil) ; really bound in
         (sb!xc:*compile-file-truename* nil) ; SUB-SUB-COMPILE-FILE
         (*policy* *policy*)
+        (*macro-policy* *macro-policy*)
         (*code-coverage-records* (make-hash-table :test 'equal))
         (*code-coverage-blocks* (make-hash-table :test 'equal))
         (*handled-conditions* *handled-conditions*)

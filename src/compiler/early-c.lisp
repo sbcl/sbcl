@@ -109,6 +109,7 @@
 (defvar *handled-conditions*)
 (defvar *disabled-package-locks*)
 (defvar *policy*)
+(defvar *macro-policy* nil)
 (defvar *dynamic-counts-tn*)
 (defvar *elsewhere*)
 (defvar *event-info*)

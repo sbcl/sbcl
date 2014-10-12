@@ -181,6 +181,7 @@ invoked. In that case it will store into PLACE and start over."
         (parse-defmacro lambda-list whole body name 'define-compiler-macro
                         :environment environment)
       (let ((def `(lambda (,whole ,environment)
+                    ,@(sb!c:macro-policy-decls t)
                     ,@local-decs
                     ,body))
             (debug-name (sb!c::debug-name 'compiler-macro-function name)))

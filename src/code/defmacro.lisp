@@ -46,6 +46,7 @@
                      ;; vice versa.
                      #-sb-xc-host named-lambda #-sb-xc-host (defmacro ,name)
                      (,whole ,environment)
+                      ,@(sb!c:macro-policy-decls t)
                       ,@local-decs
                       ,new-body))
               (debug-name (sb!c::debug-name 'macro-function name)))

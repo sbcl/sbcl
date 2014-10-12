@@ -292,6 +292,7 @@ of SBCL which maintained the CMU-CL-style split into two packages.)"
                "KNOWN-CALL-LOCAL" "KNOWN-RETURN"
                "LAMBDA-WITH-LEXENV" "LEXENV-FIND"
                "LOCATION=" "LTN-ANNOTATE"
+               "MACRO-POLICY-DECLS"
                "MAKE-ALIAS-TN" "MAKE-CATCH-BLOCK"
                "MAKE-CLOSURE" "MAKE-CONSTANT-TN"
                "MAKE-FIXUP-NOTE"
@@ -745,6 +746,7 @@ like *STACK-TOP-HINT* and unsupported stuff like *TRACED-FUN-LIST*."
                ;; ..and inspector of compiler policy
                "DESCRIBE-COMPILER-POLICY"
                "RESTRICT-COMPILER-POLICY"
+               "SET-MACRO-POLICY"
 
                ;; a special form for breaking out of our "declarations
                ;; are assertions" default

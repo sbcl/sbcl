@@ -338,6 +338,7 @@ Evaluate the FORMS in the specified SITUATIONS (any of :COMPILE-TOPLEVEL,
                     ,(compile-in-lexenv
                       nil
                       `(lambda (,whole ,environment)
+                         ,@(macro-policy-decls t)
                          ,@local-decls
                          ,body)
                       lexenv))))))))
