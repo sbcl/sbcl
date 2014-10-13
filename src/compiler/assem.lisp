@@ -1216,12 +1216,16 @@
                    (inherited-labels
                     (multiple-value-bind (expansion expanded)
                         (,macroexpand '..inherited-labels.. env)
-                      (if expanded expansion nil)))
-                   (new-labels (append labels
-                                       (set-difference visible-labels
-                                                       inherited-labels)))
-                   (nested-labels (set-difference (append inherited-labels new-labels)
-                                                  visible-labels)))
+                      (if expanded (copy-list expansion) nil)))
+                   (new-labels
+                    (sort (append labels
+                                  (set-difference visible-labels
+                                                  inherited-labels))
+                          #'string<))
+                   (nested-labels
+                    (sort (set-difference (append inherited-labels new-labels)
+                                          visible-labels)
+                          #'string<)))
               (when (intersection labels inherited-labels)
                 (error "duplicate nested labels: ~S"
                        (intersection labels inherited-labels)))
