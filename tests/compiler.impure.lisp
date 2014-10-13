@@ -2571,4 +2571,25 @@
       ;; macro-policy is rebound inside compile-file
       (assert (= baseline-again baseline)))))
 
+(test-util:with-test (:name :redef-macro-same-file)
+  (let* ((lisp "compiler-impure-tmp.lisp")
+         (fasl (compile-file-pathname lisp)))
+    (unwind-protect
+         (let ((redef-count 0))
+           (with-open-file (f lisp :direction :output)
+             (dolist (form '((defmacro glork (x) `(car ,x))
+                             (define-compiler-macro glorpy (x) `(+ ,x 1))
+                             (defmacro glork (x) `(first ,x))
+                             (define-compiler-macro glorpy (x) `(+ ,x 2))))
+               (print form f)))
+           (multiple-value-bind (fasl warn fail)
+               (handler-bind ((sb-int:same-file-redefinition-warning
+                               (lambda (c) c (incf redef-count))))
+                 (let ((*error-output* (make-broadcast-stream)))
+                   (compile-file lisp :print nil :verbose nil)))
+             (declare (ignore fasl))
+             (assert (and warn (not fail) (= redef-count 2)))))
+      (ignore-errors (delete-file lisp))
+      (ignore-errors (delete-file fasl)))))
+
 ;;; success

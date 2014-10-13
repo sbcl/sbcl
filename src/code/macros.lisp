@@ -185,12 +185,15 @@ invoked. In that case it will store into PLACE and start over."
                     ,@local-decs
                     ,body))
             (debug-name (sb!c::debug-name 'compiler-macro-function name)))
-        `(eval-when (:compile-toplevel :load-toplevel :execute)
+        `(progn
+          (eval-when (:compile-toplevel)
+           (sb!c::%compiler-defmacro :compiler-macro-function ',name t))
+          (eval-when (:compile-toplevel :load-toplevel :execute)
            (sb!c::%define-compiler-macro ',name
                                          #',def
                                          ',lambda-list
                                          ,doc
-                                         ',debug-name))))))
+                                         ',debug-name)))))))
 
 ;;; FIXME: This will look remarkably similar to those who have already
 ;;; seen the code for %DEFMACRO in src/code/defmacro.lisp.  Various

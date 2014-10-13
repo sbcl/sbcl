@@ -906,13 +906,31 @@
     (arithmetic-error reference-condition)
   ())
 
+;; per CLHS: "The consequences are unspecified if functions are ...
+;; multiply defined in the same file." so we are within reason to do any
+;; unspecified behavior at compile-time and/or time, but the compiler was
+;; annoyingly mum about genuinely inadvertent duplicate macro definitions.
+;; Redefinition is henceforth a style-warning, and for compatibility it does
+;; not cause the ERRORP value from COMPILE-TIME to be T.
+;; Nor do we cite section 3.2.2.3 as the governing prohibition.
+(defun report-duplicate-definition (condition stream)
+  (format stream "~@<Duplicate definition for ~S found in  one file.~@:>"
+          (slot-value condition 'name)))
+
 (define-condition duplicate-definition (reference-condition warning)
   ((name :initarg :name :reader duplicate-definition-name))
-  (:report (lambda (c s)
-             (format s "~@<Duplicate definition for ~S found in ~
-                        one file.~@:>"
-                     (duplicate-definition-name c))))
+  (:report report-duplicate-definition)
   (:default-initargs :references (list '(:ansi-cl :section (3 2 2 3)))))
+;; To my thinking, DUPLICATE-DEFINITION should be the ancestor condition,
+;; and not fatal. But changing the meaning of that concept would be a bad idea,
+;; so instead there is a new condition for the softer variant, which does not
+;; inherit from the former.
+(define-condition same-file-redefinition-warning (style-warning)
+  ;; Slot readers aren't proper generic functions until CLOS is built,
+  ;; so this doesn't get a reader because you can't pick the same name,
+  ;; and it wouldn't do any good to pick a different name that nothing knows.
+  ((name :initarg :name))
+  (:report report-duplicate-definition))
 
 (define-condition constant-modified (reference-condition warning)
   ((fun-name :initarg :fun-name :reader constant-modified-fun-name))

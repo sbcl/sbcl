@@ -1124,6 +1124,7 @@ possibly temporarily, because it might be used internally."
                "*PRINT-CONDITION-REFERENCES*"
 
                "DUPLICATE-DEFINITION" "DUPLICATE-DEFINITION-NAME"
+               "SAME-FILE-REDEFINITION-WARNING"
                "PACKAGE-AT-VARIANCE"
                "PACKAGE-AT-VARIANCE-ERROR"
                "ARRAY-INITIAL-ELEMENT-MISMATCH"

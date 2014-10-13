@@ -51,6 +51,13 @@
                       ,new-body))
               (debug-name (sb!c::debug-name 'macro-function name)))
           `(progn
+             #-sb-xc-host
+             ;; Getting  this to cross-compile with the check enabled
+             ;; would require %COMPILER-DEFMACRO to be defined earlier,
+             ;; but symmetry suggests it be near %COMPILER-DEFUN,
+             ;; which isn't soon enough. So leave it out.
+             (eval-when (:compile-toplevel)
+               (sb!c::%compiler-defmacro :macro-function ',name t))
              (eval-when (:compile-toplevel :load-toplevel :execute)
                (sb!c::%defmacro ',name #',def ',lambda-list ,doc ',debug-name
                                 (sb!c:source-location)))))))))
