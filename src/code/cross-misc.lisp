@@ -83,53 +83,6 @@
        (or (not (typep x 'simple-array))
            (/= (array-rank x) 1))))
 
-;;; GENESIS needs these at cross-compile time. The target
-;;; implementation of these is reasonably efficient by virtue of its
-;;; ability to peek into the internals of the package implementation;
-;;; this reimplementation is portable but slow.
-(defun package-internal-symbol-count (package)
-  (let ((result 0))
-    (declare (type fixnum result))
-    (do-symbols (i package)
-      ;; KLUDGE: The ANSI Common Lisp specification warns that
-      ;; DO-SYMBOLS may execute its body more than once for symbols
-      ;; that are inherited from multiple packages, and we currently
-      ;; make no attempt to correct for that here. (The current uses
-      ;; of this function at cross-compile time don't really care if
-      ;; the count is a little too high.) -- WHN 19990826
-      (multiple-value-bind (symbol status)
-          (find-symbol (symbol-name i) package)
-        (declare (ignore symbol))
-        (when (member status '(:internal :inherited))
-          (incf result))))
-    result))
-(defun package-external-symbol-count (package)
-  (let ((result 0))
-    (declare (type fixnum result))
-    (do-external-symbols (i package)
-      (declare (ignorable i))
-      (incf result))
-    result))
-
-;;; In the target Lisp, INTERN* is the primitive and INTERN is
-;;; implemented in terms of it. This increases efficiency by letting
-;;; us reuse a fixed-size buffer; the alternative would be
-;;; particularly painful because we don't implement DYNAMIC-EXTENT. In
-;;; the host Lisp, this is only used at cold load time, and we don't
-;;; care as much about efficiency, so it's fine to treat the host
-;;; Lisp's INTERN as primitive and implement INTERN* in terms of it.
-(defun intern* (nameoid length package &key no-copy)
-  (declare (ignore no-copy))
-  (intern (replace (make-string length) nameoid :end2 length) package))
-
-;;; In the target Lisp this is implemented by reading a fixed slot in
-;;; the symbol. In portable ANSI Common Lisp the same criteria can be
-;;; met (more slowly, and with the extra property of repeatability
-;;; between runs) by just calling SXHASH.
-(defun symbol-hash (symbol)
-  (declare (type symbol symbol))
-  (sxhash symbol))
-
 (defvar sb!xc:*gensym-counter* 0)
 
 (defun sb!xc:gensym (&optional (thing "G"))
