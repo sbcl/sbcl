@@ -622,7 +622,7 @@ is either numeric or alphabetic."
 (macrolet ((def (name test doc)
              (declare (ignorable doc))
              `(defun ,name (character &rest more-characters)
-                #!+sb-doc
+                #!+sb-doc ,doc
                 (if more-characters
                     (do ((c character (nth i more-characters))
                          (i 0 (1+ i)))
