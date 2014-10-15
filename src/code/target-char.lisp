@@ -572,18 +572,6 @@ is either numeric or alphabetic."
     (or (< gc 5)
         (= gc 13))))
 
-(defun char/= (character &rest more-characters)
-  #!+sb-doc
-  "Return T if no two of the arguments are the same character."
-  (declare (truly-dynamic-extent more-characters))
-  (do* ((head character (car list))
-        (list more-characters (cdr list)))
-       ((null list) t)
-    (declare (type character head))
-    (dolist (c list)
-      (declare (type character c))
-      (when (eq head c) (return-from char/= nil)))))
-
 ;;; EQUAL-CHAR-CODE is used by the following functions as a version of CHAR-INT
 ;;;  which loses font, bits, and case info.
 
@@ -631,19 +619,24 @@ is either numeric or alphabetic."
 (defun two-arg-char-not-equal (c1 c2)
   (/= (equal-char-code c1) (equal-char-code c2)))
 
-(defun char-not-equal (character &rest more-characters)
-  #!+sb-doc
-  "Return T if no two of the arguments are the same character.
-Case is ignored."
-  (declare (truly-dynamic-extent more-characters))
-  (do* ((head character (car list))
-        (list more-characters (cdr list)))
-       ((null list) t)
-    (unless (do* ((l list (cdr l)))
-                 ((null l) t)
-              (if (two-arg-char-equal head (car l))
-                  (return nil)))
-      (return nil))))
+(macrolet ((def (name test doc)
+             (declare (ignorable doc))
+             `(defun ,name (character &rest more-characters)
+                #!+sb-doc
+                (if more-characters
+                    (do ((c character (nth i more-characters))
+                         (i 0 (1+ i)))
+                        ((>= i (length more-characters)) t)
+                      (do-rest-arg ((c2) more-characters i)
+                        (when ,test
+                          (return-from ,name nil))))
+                    ;; CHAR-NOT-EQUAL has explicit check attribute
+                    (progn (the character character) t)))))
+  (def char/= (eq c (the character c2))
+       "Return T if no two of the arguments are the same character.")
+  (def char-not-equal (two-arg-char-equal c c2)
+       "Return T if no two of the arguments are the same character.
+Case is ignored."))
 
 (defun two-arg-char-lessp (c1 c2)
   (< (equal-char-code c1) (equal-char-code c2)))

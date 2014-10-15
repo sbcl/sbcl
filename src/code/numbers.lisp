@@ -789,7 +789,6 @@
       (return (do-rest-arg ((n) more-numbers (1+ i))
                 (the number n)))))) ; for effect
 
-;; FIXME: macroize the guts of inequalities /=, CHAR/=, CHAR-NOT-EQUAL
 (defun /= (number &rest more-numbers)
   #!+sb-doc
   "Return T if no two of its arguments are numerically equal, NIL otherwise."
@@ -799,9 +798,8 @@
             (i 0 (1+ i)))
           ((>= i (length more-numbers))
            t)
-        (do ((j i (1+ j)))
-            ((>= j (length more-numbers)))
-          (when (= n (nth j more-numbers))
+        (do-rest-arg ((n2) more-numbers i)
+          (when (= n n2)
             (return-from /= nil))))
       t))
 
