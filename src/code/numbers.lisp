@@ -810,12 +810,12 @@
              `(defun ,op (number &rest more-numbers)
                 #!+sb-doc ,doc
                 (let ((n1 number))
-                  (declare (number n1))
+                  (declare (real n1))
                   (do-rest-arg ((n2 i) more-numbers 0 t)
                     (if (,op n1 n2)
                         (setf n1 n2)
                         (return (do-rest-arg ((n) more-numbers (1+ i))
-                                  (the number n))))))))) ; for effect
+                                  (the real n))))))))) ; for effect
   (def <  "Return T if its arguments are in strictly increasing order, NIL otherwise.")
   (def >  "Return T if its arguments are in strictly decreasing order, NIL otherwise.")
   (def <= "Return T if arguments are in strictly non-decreasing order, NIL otherwise.")
@@ -826,22 +826,20 @@
   "Return the greatest of its arguments; among EQUALP greatest, return
 the first."
   (let ((n number))
-    (declare (number n))
-    (dotimes (i (length more-numbers) n)
-      (let ((arg (nth i more-numbers)))
-        (when (> arg n)
-          (setf n arg))))))
+    (declare (real n))
+    (do-rest-arg ((arg) more-numbers 0 n)
+      (when (> arg n)
+        (setf n arg)))))
 
 (defun min (number &rest more-numbers)
   #!+sb-doc
   "Return the least of its arguments; among EQUALP least, return
 the first."
   (let ((n number))
-    (declare (number n))
-    (dotimes (i (length more-numbers) n)
-      (let ((arg (nth i more-numbers)))
-        (when (< arg n)
-          (setf n arg))))))
+    (declare (real n))
+    (do-rest-arg ((arg) more-numbers 0 n)
+      (when (< arg n)
+        (setf n arg)))))
 
 (eval-when (:compile-toplevel :execute)
 

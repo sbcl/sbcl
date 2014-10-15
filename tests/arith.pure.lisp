@@ -71,6 +71,26 @@
 (assert (null (ignore-errors (max 3 #'max))))
 (assert (= (max -3 0) 0))
 
+(with-test (:name :numeric-inequality-&rest-arguments)
+  (dolist (f '(= < <= > >=))
+    ;; 1 arg
+    (assert-error (funcall f 'feep) type-error)
+    (unless (eq f '=)
+      ;; = accepts complex numbers
+      (assert-error (funcall f #c(0s0 1s0)) type-error))
+    ;; 2 arg
+    (assert-error (funcall f 3 'feep) type-error)
+    (assert-error (funcall f 'feep 3) type-error)
+    ;; 3 arg
+    (assert-error (funcall f 0 0 'feep) type-error)
+    (assert-error (funcall f 0 1 'feep) type-error)
+    (assert-error (funcall f 1 0 'feep) type-error)
+    ;; 4 arg
+    (assert-error (funcall f 0 0 0 'feep) type-error))
+  ;; Also MIN,MAX operate only on REAL
+  (dolist (f '(min max))
+    (assert-error (funcall f #c(1s0 -2s0)) type-error)))
+
 ;;; (CEILING x 2^k) was optimized incorrectly
 (loop for divisor in '(-4 4)
       for ceiler = (compile nil `(lambda (x)

@@ -13,6 +13,9 @@ changes relative to sbcl-1.2.4:
     bindings is improved (lp#375326, lp#1368305)
   * bug fix: HANDLER-{BIND,CASE} no longer drop into ldb when a clause
     contains an undefined condition type; regression in 1.1.19 (lp#1378939)
+  * bug fix: in interpreted code, inequality predicates did not type-check
+    arguments that weren't examined, and a 1-argument use of MIN or MAX
+    accepted a complex number. (lp#1373702)
 
 changes in sbcl-1.2.4 relative to sbcl-1.2.3:
   * enhancement: the sequence functions MAP, CONCATENATE and MERGE now call

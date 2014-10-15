@@ -84,22 +84,6 @@
     ;; 4 arg
     (assert-error (funcall f #\a #\a #\a 'feep) type-error)))
 
-;; Not sure where these should go, but they're the same
-;; as the above, essentially.
-(with-test (:name :numeric-inequality-&rest-arguments)
-  (dolist (f '(= < <= > >=))
-    ;; 1 arg
-    (assert-error (funcall f 'feep) type-error)
-    ;; 2 arg
-    (assert-error (funcall f 3 'feep) type-error)
-    (assert-error (funcall f 'feep 3) type-error)
-    ;; 3 arg
-    (assert-error (funcall f 0 0 'feep) type-error)
-    (assert-error (funcall f 0 1 'feep) type-error)
-    (assert-error (funcall f 1 0 'feep) type-error)
-    ;; 4 arg
-    (assert-error (funcall f 0 0 0 'feep) type-error)))
-
 (dotimes (i 256)
   (let* ((char (code-char i))
          (graphicp (graphic-char-p char))
