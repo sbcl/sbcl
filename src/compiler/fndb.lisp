@@ -1219,9 +1219,11 @@
 ;;; xxx-TO-STRING functions are not foldable because they depend on
 ;;; the dynamic environment, the state of the pretty printer dispatch
 ;;; table, and probably other run-time factors.
-  (deffrob write-to-string () simple-string (flushable explicit-check)))
+  (deffrob write-to-string () simple-string
+           (unsafely-flushable explicit-check)))
 
 (defknown (prin1-to-string princ-to-string) (t) simple-string (flushable))
+(defknown sb!impl::stringify-object (t) simple-string)
 
 (defknown write-char (character &optional stream-designator) character
   (explicit-check)
