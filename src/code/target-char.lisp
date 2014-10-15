@@ -572,14 +572,6 @@ is either numeric or alphabetic."
     (or (< gc 5)
         (= gc 13))))
 
-(defun char= (character &rest more-characters)
-  #!+sb-doc
-  "Return T if all of the arguments are the same character."
-  (declare (truly-dynamic-extent more-characters))
-  (dolist (c more-characters t)
-    (declare (type character c))
-    (unless (eq c character) (return nil))))
-
 (defun char/= (character &rest more-characters)
   #!+sb-doc
   "Return T if no two of the arguments are the same character."
@@ -591,50 +583,6 @@ is either numeric or alphabetic."
     (dolist (c list)
       (declare (type character c))
       (when (eq head c) (return-from char/= nil)))))
-
-(defun char< (character &rest more-characters)
-  #!+sb-doc
-  "Return T if the arguments are in strictly increasing alphabetic order."
-  (declare (truly-dynamic-extent more-characters))
-  (do* ((c character (car list))
-        (list more-characters (cdr list)))
-       ((null list) t)
-    (unless (< (char-int c)
-               (char-int (car list)))
-      (return nil))))
-
-(defun char> (character &rest more-characters)
-  #!+sb-doc
-  "Return T if the arguments are in strictly decreasing alphabetic order."
-  (declare (truly-dynamic-extent more-characters))
-  (do* ((c character (car list))
-        (list more-characters (cdr list)))
-       ((null list) t)
-    (unless (> (char-int c)
-               (char-int (car list)))
-      (return nil))))
-
-(defun char<= (character &rest more-characters)
-  #!+sb-doc
-  "Return T if the arguments are in strictly non-decreasing alphabetic order."
-  (declare (truly-dynamic-extent more-characters))
-  (do* ((c character (car list))
-        (list more-characters (cdr list)))
-       ((null list) t)
-    (unless (<= (char-int c)
-                (char-int (car list)))
-      (return nil))))
-
-(defun char>= (character &rest more-characters)
-  #!+sb-doc
-  "Return T if the arguments are in strictly non-increasing alphabetic order."
-  (declare (truly-dynamic-extent more-characters))
-  (do* ((c character (car list))
-        (list more-characters (cdr list)))
-       ((null list) t)
-    (unless (>= (char-int c)
-                (char-int (car list)))
-      (return nil))))
 
 ;;; EQUAL-CHAR-CODE is used by the following functions as a version of CHAR-INT
 ;;;  which loses font, bits, and case info.
@@ -680,16 +628,6 @@ is either numeric or alphabetic."
   (or (eq char x)
       (eq reverse-case-char x)))
 
-(defun char-equal (character &rest more-characters)
-  #!+sb-doc
-  "Return T if all of the arguments are the same character.
-Case is ignored."
-  (declare (truly-dynamic-extent more-characters))
-  (do ((clist more-characters (cdr clist)))
-      ((null clist) t)
-    (unless (two-arg-char-equal (car clist) character)
-      (return nil))))
-
 (defun two-arg-char-not-equal (c1 c2)
   (/= (equal-char-code c1) (equal-char-code c2)))
 
@@ -710,58 +648,55 @@ Case is ignored."
 (defun two-arg-char-lessp (c1 c2)
   (< (equal-char-code c1) (equal-char-code c2)))
 
-(defun char-lessp (character &rest more-characters)
-  #!+sb-doc
-  "Return T if the arguments are in strictly increasing alphabetic order.
-Case is ignored."
-  (declare (truly-dynamic-extent more-characters))
-  (do* ((c character (car list))
-        (list more-characters (cdr list)))
-       ((null list) t)
-    (unless (two-arg-char-lessp c (car list))
-      (return nil))))
-
 (defun two-arg-char-greaterp (c1 c2)
   (> (equal-char-code c1) (equal-char-code c2)))
-
-(defun char-greaterp (character &rest more-characters)
-  #!+sb-doc
-  "Return T if the arguments are in strictly decreasing alphabetic order.
-Case is ignored."
-  (declare (truly-dynamic-extent more-characters))
-  (do* ((c character (car list))
-        (list more-characters (cdr list)))
-       ((null list) t)
-    (unless (two-arg-char-greaterp c (car list))
-      (return nil))))
 
 (defun two-arg-char-not-greaterp (c1 c2)
   (<= (equal-char-code c1) (equal-char-code c2)))
 
-(defun char-not-greaterp (character &rest more-characters)
-  #!+sb-doc
-  "Return T if the arguments are in strictly non-decreasing alphabetic order.
-Case is ignored."
-  (declare (truly-dynamic-extent more-characters))
-  (do* ((c character (car list))
-        (list more-characters (cdr list)))
-       ((null list) t)
-    (unless (two-arg-char-not-greaterp c (car list))
-      (return nil))))
-
 (defun two-arg-char-not-lessp (c1 c2)
   (>= (equal-char-code c1) (equal-char-code c2)))
 
-(defun char-not-lessp (character &rest more-characters)
-  #!+sb-doc
-  "Return T if the arguments are in strictly non-increasing alphabetic order.
-Case is ignored."
-  (declare (truly-dynamic-extent more-characters))
-  (do* ((c character (car list))
-        (list more-characters (cdr list)))
-       ((null list) t)
-    (unless (two-arg-char-not-lessp c (car list))
-      (return nil))))
+(macrolet ((def (op test doc)
+             (declare (ignorable doc))
+             `(defun ,op (character &rest more-characters)
+                #!+sb-doc ,doc
+                (let ((c1 character))
+                  (declare (character c1))
+                  (do-rest-arg ((c2 i) more-characters 0 t)
+                     (if ,test
+                         (setq c1 c2)
+                         (return (do-rest-arg ((c) more-characters (1+ i))
+                                   (the character c))))))))) ; for effect
+  ;; case-sensitive
+  (def char= (eq c1 (the character c2))
+    "Return T if all of the arguments are the same character.")
+  (def char< (< (char-int c1) (char-int c2))
+    "Return T if the arguments are in strictly increasing alphabetic order.")
+  (def char> (> (char-int c1) (char-int c2))
+    "Return T if the arguments are in strictly decreasing alphabetic order.")
+  (def char<= (<= (char-int c1) (char-int c2))
+    "Return T if the arguments are in strictly non-decreasing alphabetic order.")
+  (def char>= (>= (char-int c1) (char-int c2))
+    "Return T if the arguments are in strictly non-increasing alphabetic order.")
+
+  ;; case-insensitive
+  (def char-equal (two-arg-char-equal c1 c2)
+    "Return T if all of the arguments are the same character.
+Case is ignored.")
+  (def char-lessp (two-arg-char-lessp c1 c2)
+    "Return T if the arguments are in strictly increasing alphabetic order.
+Case is ignored.")
+  (def char-greaterp (two-arg-char-greaterp c1 c2)
+    "Return T if the arguments are in strictly decreasing alphabetic order.
+Case is ignored.")
+  (def char-not-greaterp (two-arg-char-not-greaterp c1 c2)
+    "Return T if the arguments are in strictly non-decreasing alphabetic order.
+Case is ignored.")
+  (def char-not-lessp (two-arg-char-not-lessp c1 c2)
+    "Return T if the arguments are in strictly non-increasing alphabetic order.
+Case is ignored."))
+
 
 ;;;; miscellaneous functions
 

@@ -237,3 +237,18 @@ maintained."
          (unwind-protect
               (locally ,@body)
            (setf (ansi-stream-in-index ,f-stream) ,f-index))))))
+
+(defmacro do-rest-arg (((var &optional index) rest-var
+                        &optional (start 0) result)
+                       &body body)
+  ;; If the &REST arg never needs to be reified, this is slightly quicker
+  ;; than using a DX list.
+  (let ((index (or index (sb!xc:gensym "INDEX"))))
+    `(let ((,index ,start))
+       (loop
+        (cond ((< (truly-the index ,index) (length ,rest-var))
+               (let ((,var (nth ,index ,rest-var)))
+                 ,@body)
+               (incf ,index))
+              (t
+               (return ,result)))))))

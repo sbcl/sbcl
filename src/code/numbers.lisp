@@ -784,10 +784,12 @@
   #!+sb-doc
   "Return T if all of its arguments are numerically equal, NIL otherwise."
   (declare (number number))
-  (dotimes (i (length more-numbers) t)
-    (unless (= number (nth i more-numbers))
-      (return nil))))
+  (do-rest-arg ((n i) more-numbers 0 t)
+    (unless (= number n)
+      (return (do-rest-arg ((n) more-numbers (1+ i))
+                (the number n)))))) ; for effect
 
+;; FIXME: macroize the guts of inequalities /=, CHAR/=, CHAR-NOT-EQUAL
 (defun /= (number &rest more-numbers)
   #!+sb-doc
   "Return T if no two of its arguments are numerically equal, NIL otherwise."
@@ -804,16 +806,16 @@
       t))
 
 (macrolet ((def (op doc)
-             #!-sb-doc (declare (ignore doc))
+             (declare (ignorable doc))
              `(defun ,op (number &rest more-numbers)
                 #!+sb-doc ,doc
-                (let ((n number))
-                  (declare (number n))
-                  (dotimes (i (length more-numbers) t)
-                    (let ((arg (nth i more-numbers)))
-                      (if (,op n arg)
-                        (setf n arg)
-                        (return-from ,op nil))))))))
+                (let ((n1 number))
+                  (declare (number n1))
+                  (do-rest-arg ((n2 i) more-numbers 0 t)
+                    (if (,op n1 n2)
+                        (setf n1 n2)
+                        (return (do-rest-arg ((n) more-numbers (1+ i))
+                                  (the number n))))))))) ; for effect
   (def <  "Return T if its arguments are in strictly increasing order, NIL otherwise.")
   (def >  "Return T if its arguments are in strictly decreasing order, NIL otherwise.")
   (def <= "Return T if arguments are in strictly non-decreasing order, NIL otherwise.")
