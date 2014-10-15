@@ -388,9 +388,27 @@ distinct from the global value. Can also be SETF."
 ;;;; GENSYM and friends
 
 (defun %make-symbol-name (prefix counter)
-  (with-output-to-string (s)
-    (write-string prefix s)
-    (%output-integer-in-base counter 10 s)))
+  (declare (string prefix))
+  (if (typep counter '(and fixnum unsigned-byte))
+      (let ((s ""))
+        (declare (simple-string s))
+        (labels ((recurse (depth n)
+                   (multiple-value-bind (q r) (truncate n 10)
+                     (if (plusp q)
+                         (recurse (1+ depth) q)
+                         (let ((et (if (or (base-string-p prefix)
+                                           (every #'base-char-p prefix))
+                                       'base-char 'character)))
+                           (setq s (make-string (+ (length prefix) depth)
+                                                :element-type et))
+                           (replace s prefix)))
+                     (setf (char s (- (length s) depth))
+                           (code-char (+ (char-code #\0) r)))
+                     s)))
+          (recurse 1 counter)))
+      (with-output-to-string (s)
+        (write-string prefix s)
+        (%output-integer-in-base counter 10 s))))
 
 (defvar *gensym-counter* 0
   #!+sb-doc
@@ -405,20 +423,13 @@ distinct from the global value. Can also be SETF."
    if it is a number, of this symbol. The default value of the number is
    the current value of *gensym-counter* which is incremented each time
    it is used."
-  (let ((old *gensym-counter*))
-    (unless (numberp thing)
-      (let ((new (etypecase old
-                   (index (1+ old))
-                   (unsigned-byte (1+ old)))))
-        (declare (optimize (speed 3) (safety 0) (inhibit-warnings 3)))
-        (setq *gensym-counter* new)))
-    (multiple-value-bind (prefix int)
-        (etypecase thing
-          (simple-string (values thing old))
-          (unsigned-byte (values "G" thing))
-          (string (values (coerce thing 'simple-string) old)))
-      (declare (simple-string prefix))
-      (make-symbol (%make-symbol-name prefix int)))))
+  (multiple-value-bind (prefix int)
+      (if (integerp thing)
+          (values "G" thing)
+          (values thing (let ((old *gensym-counter*))
+                          (setq *gensym-counter* (1+ old))
+                          old)))
+    (make-symbol (%make-symbol-name prefix int))))
 
 (defvar *gentemp-counter* 0)
 (declaim (type unsigned-byte *gentemp-counter*))
