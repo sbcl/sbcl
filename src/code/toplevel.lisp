@@ -174,19 +174,19 @@ means to wait indefinitely.")
                                                     (load-time-value 1f9 t))))))))
     (declare (inline split-float))
     (typecase seconds
-      ((single-float 0f0 #.(float most-positive-fixnum 1f0))
+      ((single-float 0f0 #.(float sb!xc:most-positive-fixnum 1f0))
        (split-float))
-      ((double-float 0d0 #.(float most-positive-fixnum 1d0))
+      ((double-float 0d0 #.(float sb!xc:most-positive-fixnum 1d0))
        (split-float))
       (ratio
        (multiple-value-bind (quot rem) (truncate (numerator seconds)
                                                  (denominator seconds))
          (values quot
                  (* rem
-                    (if (typep 1000000000 'fixnum)
-                        (truncate 1000000000 (denominator seconds))
-                        ;; Can't truncate a bignum by a fixnum without consing
-                        (* 10 (truncate 100000000 (denominator seconds))))))))
+                    #.(if (sb!xc:typep 1000000000 'fixnum)
+                          '(truncate 1000000000 (denominator seconds))
+                          ;; Can't truncate a bignum by a fixnum without consing
+                          '(* 10 (truncate 100000000 (denominator seconds))))))))
       (t
        (multiple-value-bind (sec frac)
            (truncate seconds)
