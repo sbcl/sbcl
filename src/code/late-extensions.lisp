@@ -479,7 +479,7 @@ returns NIL each time."
                   (let ((,time-left (- ,deadline (get-internal-real-time))))
                     (if (plusp ,time-left)
                         (* (coerce ,time-left 'single-float)
-                           ,(/ 1.0 internal-time-units-per-second))
+                           (load-time-value (/ 1.0f0 internal-time-units-per-second) t))
                         0)))))
          ,@body))))
 
