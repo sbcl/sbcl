@@ -186,10 +186,17 @@
   (defun %instance-length (instance)
     (aver (or (typep instance 'structure!object)
               (xc-dumpable-structure-instance-p instance)))
-    ;; This seems strangely incompatible- INSTANCE-LENGTH should return an odd number
-    ;; so that including the header word (not counted), it comes out even.
-    ;; Except that on the xc host you can't access a slot beyond the layout-length,
-    ;; whereas on the target you can if there is a slack word - it reads as NIL.
+    ;; INSTANCE-LENGTH tells you how many data words the backend is able to
+    ;; physically access in this structure. Since every structure occupies
+    ;; an even number of words, the storage slots comprise an odd number
+    ;; of words after subtracting 1 for the header.
+    ;; And in fact the fasl dumper / loader do write and read potentially
+    ;; one cell beyond the instance's LAYOUT-LENGTH if it was not odd.
+    ;; I'm not sure whether that is a good or bad thing.
+    ;; But be that as it may, in the cross-compiler you must not access
+    ;; more cells than there are in the declared structure because there
+    ;; is no lower level storage that you can peek at.
+    ;; So INSTANCE-LENGTH is exactly the same as LAYOUT-LENGTH on the host.
     (layout-length (classoid-layout (find-classoid (type-of instance)))))
   (defun %instance-ref (instance index)
     (aver (or (typep instance 'structure!object)
