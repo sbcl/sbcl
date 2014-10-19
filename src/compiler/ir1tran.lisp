@@ -1601,7 +1601,7 @@
             ;; Kludge: EVAL calls this function to deal with LOCALLY.
               (process-it)))))
     (advise-if-repeated-optimize-qualities
-     (lexenv-policy lexenv) optimize-qualities)  
+     (lexenv-policy lexenv) optimize-qualities)
     (values lexenv result-type *post-binding-variable-lexenv*)))
 
 (defun %processing-decls (decls vars fvars ctran lvar binding-form-p fun)

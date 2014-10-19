@@ -1244,9 +1244,7 @@ unless :NAMED is also specified.")))
   ;; the object as indicated in the header, so the pad word needs to be
   ;; included in that length to guarantee proper alignment of raw double float
   ;; slots, necessary for (at least) the SPARC backend.
-  (let ((layout-length (dd-layout-length dd)))
-    (declare (type index layout-length))
-    (+ layout-length (mod (1+ layout-length) 2))))
+  (logior (dd-layout-length dd) 1))
 
 ;;; This is called when we are about to define a structure class. It
 ;;; returns a (possibly new) class object and the layout which should
