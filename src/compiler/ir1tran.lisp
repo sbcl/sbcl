@@ -1504,6 +1504,7 @@
   (declare (type list raw-spec vars fvars))
   (declare (type lexenv res))
   (let ((spec (canonized-decl-spec raw-spec))
+        (optimize-qualities)
         (result-type *wild-type*))
     (values
      (case (first spec)
@@ -1518,9 +1519,10 @@
         (process-ignore-decl spec vars fvars)
         res)
        (optimize
-        (make-lexenv
-         :default res
-         :policy (process-optimize-decl spec (lexenv-policy res))))
+        (multiple-value-bind (new-policy specified-qualities)
+            (process-optimize-decl spec (lexenv-policy res))
+          (setq optimize-qualities specified-qualities)
+          (make-lexenv :default res :policy new-policy)))
        (muffle-conditions
         (make-lexenv
          :default res
@@ -1557,7 +1559,8 @@
           (if fn
               (funcall fn res spec vars fvars)
               res))))
-     result-type)))
+     result-type
+     optimize-qualities)))
 
 ;;; Use a list of DECLARE forms to annotate the lists of LAMBDA-VAR
 ;;; and FUNCTIONAL structures which are being bound. In addition to
@@ -1574,23 +1577,31 @@
                       (lexenv *lexenv*) (binding-form-p nil) (context :compile))
   (declare (list decls vars fvars))
   (let ((result-type *wild-type*)
+        (optimize-qualities)
         (*post-binding-variable-lexenv* nil))
     (dolist (decl decls)
       (dolist (spec (rest decl))
-        (progv
+        (flet
+            ((process-it ()
+               (unless (consp spec)
+                 (compiler-error "malformed declaration specifier ~S in ~S"
+                                 spec decl))
+               (multiple-value-bind (new-env new-result-type new-qualities)
+                   (process-1-decl spec lexenv vars fvars binding-form-p context)
+                 (setq lexenv new-env
+                       optimize-qualities (nconc new-qualities optimize-qualities))
+                 (unless (eq new-result-type *wild-type*)
+                   (setq result-type
+                         (values-type-intersection result-type new-result-type))))))
+          (if (eq context :compile)
+              (let ((*current-path* (or (get-source-path spec)
+                                        (get-source-path decl)
+                                        *current-path*)))
+                (process-it))
             ;; Kludge: EVAL calls this function to deal with LOCALLY.
-            (when (eq context :compile) (list '*current-path*))
-            (when (eq context :compile) (list (or (get-source-path spec)
-                                                  (get-source-path decl)
-                                                  *current-path*)))
-          (unless (consp spec)
-            (compiler-error "malformed declaration specifier ~S in ~S" spec decl))
-          (multiple-value-bind (new-env new-result-type)
-              (process-1-decl spec lexenv vars fvars binding-form-p context)
-            (setq lexenv new-env)
-            (unless (eq new-result-type *wild-type*)
-              (setq result-type
-                    (values-type-intersection result-type new-result-type)))))))
+              (process-it)))))
+    (advise-if-repeated-optimize-qualities
+     (lexenv-policy lexenv) optimize-qualities)  
     (values lexenv result-type *post-binding-variable-lexenv*)))
 
 (defun %processing-decls (decls vars fvars ctran lvar binding-form-p fun)

@@ -207,6 +207,14 @@ EXPERIMENTAL INTERFACE: Subject to change."
 (defun set-macro-policy (list)
   (setq *macro-policy* (process-optimize-decl `(optimize ,@list) nil)))
 
+;; Turn the macro policy into either the decl-specs of a declaration expression
+;; if WRAP-P is nil, or the whole declaration expression if WRAP-P is T.
+;; Note that despite it being a style-warning to insert a duplicate OPTIMIZE
+;; quality, we need no precaution against that even though users may write
+;;  (DEFMACRO FOO (X) (DECLARE (OPTIMIZE (SAFETY 1))) ...)
+;; The expansion of that, and DEFINE-COMPILER-MACRO and MACROLET as well,
+;; inserts the macro policy immediately within the containing lambda,
+;; but the user's declarations are inside of a nested LET inside the lambda.
 (defun macro-policy-decls (wrap-p)
   (if *macro-policy*
       (let ((expr `(optimize ,@(mapcar (lambda (x) (list (car x) (cdr x)))

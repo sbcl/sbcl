@@ -34,9 +34,11 @@
 ;;; Return a new POLICY containing the policy information represented
 ;;; by the optimize declaration SPEC. Any parameters not specified are
 ;;; defaulted from the POLICY argument.
-(declaim (ftype (function (list policy) policy) process-optimize-decl))
+(declaim (ftype (function (list policy) (values policy list))
+                process-optimize-decl))
 (defun process-optimize-decl (spec policy)
-  (let ((result nil))
+  (let ((result nil)
+        (specified-qualities))
     ;; Add new entries from SPEC.
     (dolist (q-and-v-or-just-q (cdr spec))
       (multiple-value-bind (quality raw-value)
@@ -59,14 +61,18 @@
                (when (eql quality 'inhibit-warnings)
                  (compiler-style-warn "~S is deprecated: use ~S instead"
                                       quality 'muffle-conditions))
-               (push (cons quality raw-value)
-                     result)))))
+               (let* ((pair (cons quality raw-value))
+                      (found (member quality result :key #'car)))
+                 (push pair specified-qualities)
+                 (if found
+                     (rplaca found pair)
+                     (push pair result)))))))
     ;; Add any nonredundant entries from old POLICY.
     (dolist (old-entry policy)
       (unless (assq (car old-entry) result)
         (push old-entry result)))
     ;; Voila.
-    (sort-policy result)))
+    (values (sort-policy result) specified-qualities)))
 
 (declaim (ftype (function (list list) list)
                 process-handle-conditions-decl))
@@ -293,7 +299,11 @@
         (freeze-type
          (map-args #'process-freeze-type-declaration))
         (optimize
-         (setq *policy* (process-optimize-decl form *policy*)))
+         (multiple-value-bind (new-policy specified-qualities)
+             (process-optimize-decl form *policy*)
+           (setq *policy* new-policy)
+           (advise-if-repeated-optimize-qualities
+            new-policy specified-qualities)))
         (muffle-conditions
          (setq *handled-conditions*
                (process-muffle-conditions-decl form *handled-conditions*)))
@@ -312,3 +322,16 @@
            (compiler-warn "unrecognized declaration ~S" raw-form))))))
   #+sb-xc (/show0 "returning from PROCLAIM")
   (values))
+
+(defun advise-if-repeated-optimize-qualities (new-policy specified-qualities)
+  (let (dups)
+    (dolist (quality-and-value specified-qualities)
+      (let* ((quality (car quality-and-value))
+             (current (assq quality new-policy)))
+        (when (and (not (eql (cdr quality-and-value) (cdr current)))
+                   (not (assq quality dups)))
+          (push `(,quality ,(cdr current)) dups))))
+    (when dups
+      (compiler-style-warn
+       "Repeated OPTIMIZE qualit~@P. Using ~{~S~^ and ~}"
+       (length dups) dups))))

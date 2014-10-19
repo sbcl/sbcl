@@ -7,6 +7,8 @@ changes relative to sbcl-1.2.4:
   * enhancement: The reader now normalizes symbols to Normalization
     Form KC (NFKC). This behavior can be disabled with
     SB-EXT:READTABLE-NORMALIZATION
+  * enhancement: a style-warning is signaled if OPTIMIZE declarations
+    multiply specify a quality with differing values. (lp#310267)
   * bug fix: conservatively pointed to pages wipe out unused dwords so
     that they cannot act as false roots in turn.
   * bug fix: the walker's handling of lexical variable and symbol-macro

@@ -5352,3 +5352,32 @@
           (assert (eq result (if (>= (length expect) 4) 'foo 'bar)))
           (assert (equal (subseq expect 0 (min 4 (length expect)))
                          (nreverse list))))))))
+
+;; lp# 310267
+(with-test (:name :optimize-quality-multiply-specified)
+  (let ((*error-output* (make-broadcast-stream)))
+    (let ((sb-c::*policy* sb-c::*policy*)) ; to keep this test pure
+      (assert-signal (proclaim '(optimize space debug (space 0)))
+                     style-warning))
+    (assert-signal
+     (compile nil '(lambda () (declare (optimize speed (speed 0))) 5))
+     style-warning)
+    (assert-signal
+     (compile nil '(lambda () (declare (optimize speed) (optimize (speed 0))) 5))
+     style-warning)
+    (assert-signal
+     (compile nil '(lambda ()
+                     (declare (optimize speed)) (declare (optimize (speed 0)))
+                     5))
+     style-warning))
+
+  ;; these are OK
+  (assert-no-signal (proclaim '(optimize (space 3) space)))
+  (assert-no-signal
+   (compile nil '(lambda () (declare (optimize speed (speed 3))) 5)))
+  (assert-no-signal
+   (compile nil '(lambda () (declare (optimize speed) (optimize (speed 3))) 5)))
+  (assert-no-signal
+   (compile nil '(lambda ()
+                   (declare (optimize speed)) (declare (optimize (speed 3)))
+                   5))))
