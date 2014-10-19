@@ -115,6 +115,9 @@
             :set-trans (setf %array-available-elements)
             :set-known ())
   (data :type array
+        ;; FIXME: terrible name for the accessor.
+        ;; It is in general just an ARRAY,
+        ;; and should be named %ARRAY-DATA.
         :ref-trans %array-data-vector
         :ref-known (flushable foldable)
         :set-trans (setf %array-data-vector)
