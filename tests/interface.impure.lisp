@@ -407,4 +407,24 @@
                   (assert (= (traced-gf 3) 4)))))
     (assert (= (length output) 0))))
 
+(with-test (:name (apropos :inherited :bug-1364413))
+  (let* ((package (make-package "BUGGALO" :use nil))
+         (symbol (intern "BUGGALO" package)))
+    (export (list symbol) package)
+    (let ((inherits (make-package "BUGGALO-INHERITS" :use (list package))))
+      (assert (= (length (apropos-list "BUGGALO" package)) 1))
+      (assert (= (length (apropos-list "BUGGALO" inherits)) 1))
+      (delete-package inherits))
+    (delete-package package)))
+
+(with-test (:name (apropos :inherited :external-only :bug-1364413))
+  (let* ((package (make-package "BUGGALO" :use nil))
+         (symbol (intern "BUGGALO" package)))
+    (export (list symbol) package)
+    (let ((inherits (make-package "BUGGALO-INHERITS" :use (list package))))
+      (assert (= (length (apropos-list "BUGGALO" package t)) 1))
+      (assert (= (length (apropos-list "BUGGALO" inherits t)) 0))
+      (delete-package inherits))
+    (delete-package package)))
+
 ;;;; success

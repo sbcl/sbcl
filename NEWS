@@ -18,6 +18,8 @@ changes relative to sbcl-1.2.4:
   * bug fix: in interpreted code, inequality predicates did not type-check
     arguments that weren't examined, and a 1-argument use of MIN or MAX
     accepted a complex number. (lp#1373702)
+  * bug fix: APROPOS and APROPOS-LIST handle inherited symbols correctly.
+    (lp#1364413, thanks to Zach Beane)
 
 changes in sbcl-1.2.4 relative to sbcl-1.2.3:
   * enhancement: the sequence functions MAP, CONCATENATE and MERGE now call
