@@ -1560,11 +1560,12 @@ PACKAGE."
                                                             package))
                                   :external)))
                      (search string (symbol-name symbol) :test #'char-equal))
-            (push symbol result)))
+            (pushnew symbol result)))
         (sort result #'string-lessp))
-      (mapcan (lambda (package)
-                (apropos-list string-designator package external-only))
-              (sort (list-all-packages) #'string-lessp :key #'package-name))))
+      (delete-duplicates
+       (mapcan (lambda (package)
+                 (apropos-list string-designator package external-only))
+               (sort (list-all-packages) #'string-lessp :key #'package-name)))))
 
 (defun apropos (string-designator &optional package external-only)
   #!+sb-doc

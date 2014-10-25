@@ -427,4 +427,6 @@
       (delete-package inherits))
     (delete-package package)))
 
+(with-test (:name (apropos :once-only))
+  (assert (= (length (apropos-list "UPDATE-INSTANCE-FOR-REDEFINED-CLASS")) 1)))
 ;;;; success
