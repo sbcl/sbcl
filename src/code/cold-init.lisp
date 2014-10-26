@@ -241,7 +241,7 @@
   #!-(and win32 (not sb-thread))
   (show-and-call signal-cold-init-or-reinit)
   (/show0 "enabling internal errors")
-  (setf (extern-alien "internal_errors_enabled" boolean) t)
+  (setf (extern-alien "internal_errors_enabled" int) 1)
 
   (show-and-call float-cold-init-or-reinit)
 
@@ -364,7 +364,7 @@ process to continue normally."
     (thread-init-or-reinit)
     #!-(and win32 (not sb-thread))
     (signal-cold-init-or-reinit)
-    (setf (extern-alien "internal_errors_enabled" boolean) t)
+    (setf (extern-alien "internal_errors_enabled" int) 1)
     (float-cold-init-or-reinit))
   (gc-reinit)
   (foreign-reinit)
