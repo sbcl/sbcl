@@ -33,10 +33,6 @@
 ;;; be sure to update the duplicated definition in "src/code/print.lisp"
 (defglobal *standard-readtable* nil)
 
-(defvar *old-package* nil
-  #!+sb-doc
-  "the value of *PACKAGE* at the start of the last read, or NIL")
-
 ;;; In case we get an error trying to parse a symbol, we want to rebind the
 ;;; above stuff so it's cool.
 
