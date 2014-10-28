@@ -1,6 +1,6 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
-changes relative to sbcl-1.2.4:
+changes in sbcl-1.2.5 relative to sbcl-1.2.4:
   * enhancement: sb-bsd-sockets now has basic support for IPv6
   * enhancement: An sb-unicode package has been added, containing
     many functions related to handling Unicode text
