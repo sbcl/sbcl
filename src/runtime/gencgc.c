@@ -2590,10 +2590,10 @@ update_page_write_prot(page_index_t page)
 
     for (j = 0; j < num_words; j++) {
         void *ptr = *(page_addr+j);
-        page_index_t index = find_page_index(ptr);
+        page_index_t index;
 
         /* Check that it's in the dynamic space */
-        if (index != -1)
+        if (is_lisp_pointer(ptr) && (index = find_page_index(ptr)) != -1)
             if (/* Does it point to a younger or the temp. generation? */
                 (page_allocated_p(index)
                  && (page_table[index].bytes_used != 0)
