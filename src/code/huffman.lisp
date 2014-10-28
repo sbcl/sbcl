@@ -35,11 +35,11 @@
       (maphash (lambda (char weight)
                  (push (make-huffman-node (string char) weight) alist))
                weight-table)
-      alist)))
+      (sort alist #'string< :key #'huffman-node-key))))
 
 (defun make-huffman-tree (corpus)
   (labels ((merge-table (table)
-             (setf table (sort table #'< :key #'huffman-node-weight))
+             (setf table (stable-sort table #'< :key #'huffman-node-weight))
              (push (make-huffman-pair (pop table) (pop table))
                    table)
              (if (second table)
