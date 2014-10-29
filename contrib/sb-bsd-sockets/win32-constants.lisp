@@ -117,74 +117,69 @@
  ;; FIXME: We should probably grovel the windows SOCKET type and use it in
  ;; these instead of int...
 
- ;; KLUDGE: For historical reasons many of these prepend win32- to the symbol
- ;; names. Life for Windows users of SBCL is already hard enough, so rather
- ;; than break compatibility for those who directly use these, win32-sockets.lisp
- ;; wraps them with prefixless wrappers.
- (:function win32-bind
-            ("bind" int
-             (sockfd int)
-             (my-addr (* t))  ; KLUDGE: sockaddr-in or sockaddr-un?
-             (addrlen socklen-t)))
+ (:function bind ("bind" int
+                  (sockfd int)
+                  (my-addr (* t))  ; KLUDGE: sockaddr-in or sockaddr-un?
+                  (addrlen socklen-t)))
 
- (:function win32-listen ("listen" int
+ (:function listen ("listen" int
                     (socket int)
                     (backlog int)))
 
- (:function win32-accept ("accept" int
+ (:function accept ("accept" int
                     (socket int)
                     (my-addr (* t)) ; KLUDGE: sockaddr-in or sockaddr-un?
                     (addrlen int :in-out)))
 
- (:function win32-getpeername ("getpeername" int
+ (:function getpeername ("getpeername" int
                          (socket int)
                          (her-addr (* t)) ; KLUDGE: sockaddr-in or sockaddr-un?
                          (addrlen socklen-t :in-out)))
 
- (:function win32-getsockname ("getsockname" int
+ (:function getsockname ("getsockname" int
                          (socket int)
                          (my-addr (* t)) ; KLUDGE: sockaddr-in or sockaddr-un?
                          (addrlen socklen-t :in-out)))
 
- (:function win32-connect ("connect" int
-                           (socket int)
-                           (his-addr (* t)) ; KLUDGE: sockaddr-in or sockaddr-un?
-                           (addrlen socklen-t)))
+ (:function connect ("connect" int
+                     (socket int)
+                     (his-addr (* t)) ; KLUDGE: sockaddr-in or sockaddr-un?
+                     (addrlen socklen-t)))
 
- (:function win32-close ("closesocket" int
-                         (fd int)))
+ (:function close ("closesocket" int
+                   (fd int)))
 
  (:function shutdown ("shutdown" int
                       (socket int) ; KLUDGE: should be SOCKET, not int.
                       (how int)))
 
- (:function win32-recvfrom ("recvfrom" int
-                            (socket int)
-                            (buf (* t))
-                            (len integer)
-                            (flags int)
-                            (sockaddr (* t)) ; KLUDGE: sockaddr-in or sockaddr-un?
-                            (socklen (* socklen-t))))
+ (:function recvfrom ("recvfrom" int
+                      (socket int)
+                      (buf (* t))
+                      (len integer)
+                      (flags int)
+                      (sockaddr (* t)) ; KLUDGE: sockaddr-in or sockaddr-un?
+                      (socklen (* socklen-t))))
 
- (:function win32-recv ("recv" int
-                        (socket int)
-                        (buf (* t))
-                        (len integer)
-                        (flags integer)))
+ (:function recv ("recv" int
+                  (socket int)
+                  (buf (* t))
+                  (len integer)
+                  (flags integer)))
 
- (:function win32-send ("send" int
-                        (socket int)
-                        (buf (* t))
-                        (len int)
-                        (flags int)))
+ (:function send ("send" int
+                  (socket int)
+                  (buf (* t))
+                  (len int)
+                  (flags int)))
 
- (:function win32-sendto ("sendto" int
-                          (socket int)
-                          (buf (* t))
-                          (len int)
-                          (flags int)
-                          (sockaddr (* t)) ; KLUDGE: sockaddr-in or sockaddr-un?
-                          (socklen socklen-t)))
+ (:function sendto ("sendto" int
+                    (socket int)
+                    (buf (* t))
+                    (len int)
+                    (flags int)
+                    (sockaddr (* t)) ; KLUDGE: sockaddr-in or sockaddr-un?
+                    (socklen socklen-t)))
 
  (:function gethostbyname ("gethostbyname" (* hostent) (name c-string)))
 
@@ -193,26 +188,26 @@
                                            (len int)
                                            (af int)))
 
-;;; should be using getaddrinfo instead?
+;;; FIXME should be using getaddrinfo instead?
 
- (:function win32-setsockopt ("setsockopt" int
+ (:function setsockopt ("setsockopt" int
                         (socket int)
                         (level int)
                         (optname int)
                         (optval (* t))
                         (optlen int))) ;;; should be socklen-t!
 
- (:function win32-getsockopt ("getsockopt" int
+ (:function getsockopt ("getsockopt" int
                         (socket int)
                         (level int)
                         (optname int)
                         (optval (* t))
                         (optlen int :in-out))) ;;; should be socklen-t!
 
- (:function win32-ioctl ("ioctlsocket"  int
-                         (socket int)
-                         (cmd int)
-                         (argp (unsigned 32) :in-out)))
+ (:function ioctl ("ioctlsocket" int
+                   (socket int)
+                   (cmd int)
+                   (argp (unsigned 32) :in-out)))
 
 
 ;;; Win32 specific cruft

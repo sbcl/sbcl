@@ -126,7 +126,16 @@ After final deprecation the interface is deleted entirely.
 
 @subsection Early Deprecation
 
-No interfaces are currently in early deprecation.
+@itemize
+
+@item @strong{SOCKINT::WIN32-*}
+
+Deprecated in favor of the corresponding prefix-less functions
+(e.g. @code{sockint::bind} replaces @code{sockint::win32-bind}) as of
+1.2.10 in March 2015. Expected to move into late deprecation in August
+2015.
+
+@end itemize
 
 @subsection Late Deprecation
 
@@ -250,6 +259,11 @@ Affected symbols: @code{sb-thread::spinlock},
 Use the mutex API instead, or implement spinlocks suiting your needs
 on top of @code{sb-ext:compare-and-swap},
 @code{sb-ext:spin-loop-hint}, etc.
+
+@item @strong{SOCKINT::HANDLE->FD}, @strong{SOCKINT::FD->HANDLE}
+
+Internally deprecated in 2012. Declared deprecated as of 1.2.10 in March
+2015. Expected to move into final deprecation in August 2015.
 
 @end itemize
 

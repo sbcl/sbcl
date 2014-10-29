@@ -1168,6 +1168,19 @@
 ;;; deprecated.texinfo.
 ;;;
 ;;; EARLY:
+;;; - SOCKINT::WIN32-BIND                          since 1.2.10 (03/2015) -> Late: 08/2015
+;;; - SOCKINT::WIN32-GETSOCKNAME                   since 1.2.10 (03/2015) -> Late: 08/2015
+;;; - SOCKINT::WIN32-LISTEN                        since 1.2.10 (03/2015) -> Late: 08/2015
+;;; - SOCKINT::WIN32-RECV                          since 1.2.10 (03/2015) -> Late: 08/2015
+;;; - SOCKINT::WIN32-RECVFROM                      since 1.2.10 (03/2015) -> Late: 08/2015
+;;; - SOCKINT::WIN32-SEND                          since 1.2.10 (03/2015) -> Late: 08/2015
+;;; - SOCKINT::WIN32-SENDTO                        since 1.2.10 (03/2015) -> Late: 08/2015
+;;; - SOCKINT::WIN32-CLOSE                         since 1.2.10 (03/2015) -> Late: 08/2015
+;;; - SOCKINT::WIN32-CONNECT                       since 1.2.10 (03/2015) -> Late: 08/2015
+;;; - SOCKINT::WIN32-GETPEERNAME                   since 1.2.10 (03/2015) -> Late: 08/2015
+;;; - SOCKINT::WIN32-IOCTL                         since 1.2.10 (03/2015) -> Late: 08/2015
+;;; - SOCKINT::WIN32-SETSOCKOPT                    since 1.2.10 (03/2015) -> Late: 08/2015
+;;; - SOCKINT::WIN32-GETSOCKOPT                    since 1.2.10 (03/2015) -> Late: 08/2015
 ;;;
 ;;; LATE:
 ;;; - SB-THREAD::GET-MUTEX                         since 1.2.10 (03/2015) -> Final: 08/2015
@@ -1184,6 +1197,8 @@
 ;;; - SB-EXT:QUIT                                  since 1.2.10 (03/2015) -> Final: 08/2015
 ;;; - SB-UNIX:UNIX-EXIT                            since 1.2.10 (03/2015) -> Final: 08/2015
 ;;; - SB-DEBUG:*SHOW-ENTRY-POINT-DETAILS*          since 1.2.10 (03/2015) -> Final: 08/2015
+;;; - SOCKINT::HANDLE->FD                          since 1.2.10 (03/2015) -> Final: 04/2015
+;;; - SOCKINT::FD->HANDLE                          since 1.2.10 (03/2015) -> Final: 04/2015
 ;;;
 ;;; FINAL:
 ;;; - SB-SYS:OUTPUT-RAW-BYTES                      since 1.2.10 (03/2015) -> Remove: 04/2015

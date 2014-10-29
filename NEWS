@@ -10,7 +10,10 @@ changes relative to sbcl-1.2.9:
     SB-THREAD::{GET-MUTEX,SPINLOCK,MAKE-SPINLOCK,WITH-SPINLOCK,
     WITH-RECURSIVE-SPINLOCK,GET-SPINLOCK,RELEASE-SPINLOCK,SPINLOCK-VALUE,
     SPINLOCK-NAME,SETF SPINLOCK-NAME},SB-C::MERGE-TAIL-CALLS
-    (policy),SB-EXT:QUIT,SB-UNIX:UNIX-EXIT,SB-DEBUG:*SHOW-ENTRY-POINT-DETAILS*
+    (policy),SB-EXT:QUIT,SB-UNIX:UNIX-EXIT,SB-DEBUG:*SHOW-ENTRY-POINT-DETAILS*,
+    SOCKINT::{HANDLE->FD,FD->HANDLE}
+  * minor incompatible change: all SOCKINT::WIN32-* functions have been
+    deprecated with EARLY deprecation state
   * minor incompatible change: performing introspection via the system-internal
     SB-INT:INFO function could expose that :TYPE :TRANSLATOR is not necessarily
     a function, as it always was before. (Affects swank-fancy-inspector)
