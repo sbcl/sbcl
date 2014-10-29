@@ -137,7 +137,7 @@ offending thread using THREAD-ERROR-THREAD."))
 to be joined. The offending thread can be accessed using
 THREAD-ERROR-THREAD."))
 
-(define-deprecated-function :late "1.0.29.17" join-thread-error-thread thread-error-thread
+(define-deprecated-function :final "1.2.10" join-thread-error-thread thread-error-thread
     (condition)
   (thread-error-thread condition))
 
@@ -150,7 +150,7 @@ THREAD-ERROR-THREAD."))
    "Signalled when interrupting a thread fails because the thread has already
 exited. The offending thread can be accessed using THREAD-ERROR-THREAD."))
 
-(define-deprecated-function :late "1.0.29.17" interrupt-thread-error-thread thread-error-thread
+(define-deprecated-function :final "1.2.10" interrupt-thread-error-thread thread-error-thread
     (condition)
   (thread-error-thread condition))
 
@@ -642,7 +642,7 @@ HOLDING-MUTEX-P."
                      (decode-timeout timeout))
                (go :again)))))))
 
-(define-deprecated-function :early "1.0.37.33" get-mutex (grab-mutex)
+(define-deprecated-function :late "1.2.10" get-mutex (grab-mutex)
     (mutex &optional new-owner (waitp t) (timeout nil))
   (declare (ignorable waitp timeout))
   (let ((new-owner (or new-owner *current-thread*)))

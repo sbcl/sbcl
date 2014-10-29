@@ -126,12 +126,16 @@ After final deprecation the interface is deleted entirely.
 
 @subsection Early Deprecation
 
+No interfaces are currently in early deprecation.
+
+@subsection Late Deprecation
+
 @itemize
 
 @item @strong{SB-EXT:QUIT}
 
 Deprecated in favor of @code{sb-ext:exit} as of 1.0.56.55 in May 2012.
-Expected to move into late deprecation in May 2013.
+Expected to move into final deprecation in August 2015.
 
 The design of @code{sb-ext:quit} proved too broken to fix in a
 backwards-compatible manner, so it had to be deprecated and replaced.
@@ -182,8 +186,8 @@ legacy SBCLs using the following conditionalization:
 @sp 1
 @item @strong{SB-UNIX:UNIX-EXIT}
 
-Deprecated as of 1.0.56.55 in May 2012. Expected to move into late
-deprecation in May 2013.
+Deprecated as of 1.0.56.55 in May 2012. Expected to move into final
+deprecation in August 2015.
 
 When the SBCL process termination was refactored as part of changes that
 led to @code{sb-ext:quit} being deprecated, @code{sb-unix:unix-exit}
@@ -213,7 +217,7 @@ appropriate arguments.
 @item @strong{SB-C::MERGE-TAIL-CALLS Compiler Policy}
 
 Deprecated as of 1.0.53.74 in November 2011. Expected to move into
-late deprecation in November 2012.
+final deprecation in August 2015.
 
 This compiler policy was never functional: SBCL has always merged tail
 calls when it could, regardless of this policy setting. (It was also
@@ -229,8 +233,8 @@ structure the code to avoid the tail position instead.
 @sp 1
 @item @strong{Spinlock API}
 
-Deprecated as of 1.0.53.11 in August 2011. Expected to move into late
-deprecation in August 2012.
+Deprecated as of 1.0.53.11 in August 2011. Expected to move into final
+deprecation in August 2015.
 
 Spinlocks were an internal interface, but had a number of external users
 and were hence deprecated instead of being simply deleted.
@@ -249,15 +253,14 @@ on top of @code{sb-ext:compare-and-swap},
 
 @end itemize
 
-@subsection Late Deprecation
+@subsection Final Deprecation
 
 @itemize
 
 @item @strong{SB-THREAD:JOIN-THREAD-ERROR-THREAD and SB-THREAD:INTERRUPT-THREAD-ERROR-THREAD}
 
 Deprecated in favor of @code{sb-thread:thread-error-thread} as of
-1.0.29.17 in June 2009. Expected to move into final deprecation in
-June 2012.
+1.0.29.17 in June 2009. Expected to be removed in April 2015.
 
 @strong{Remedy}
 
@@ -283,8 +286,7 @@ For code that needs to support legacy SBCLs, use e.g.:
 @item @strong{SB-INTROSPECT:FUNCTION-ARGLIST}
 
 Deprecated in favor of @code{sb-introspect:function-lambda-list} as of
-1.0.24.5 in January 2009. Expected to move into final deprecation in
-January 2012.
+1.0.24.5 in January 2009. Expected to be removed in April 2015.
 
 Renamed for consistency and aesthetics. Functions have lambda-lists,
 not arglists.
@@ -310,7 +312,7 @@ For code that needs to support legacy SBCLs, use e.g.:
 
 Deprecated in favor of @code{sb-ext:*stack-allocate-dynamic-extent*}
 as of 1.0.19.7 in August 2008, and are expected to be removed in
-August 2012.
+April 2015.
 
 Affected symbols: @code{sb-c::stack-allocate-dynamic-extent},
 @code{sb-c::stack-allocate-vector}, and
@@ -340,8 +342,8 @@ control in modern SBCLs.
 @sp 1
 @item @strong{SB-SYS:OUTPUT-RAW-BYTES}
 
-Deprecated as of 1.0.8.16 in June 2007. Expected to move into final
-deprecation in June 2012.
+Deprecated as of 1.0.8.16 in June 2007. Expected to be removed in April
+2015.
 
 Internal interface with some external users. Never officially
 supported, deemed unnecessary in presence of @code{write-sequence} and
@@ -354,10 +356,6 @@ or @code{:default} -- the latter allowing both binary and
 character IO -- in conjunction with @code{write-sequence}.
 
 @end itemize
-
-@subsection Final Deprecation
-
-No interfaces are currently in final deprecation.
 
 @section Historical Interfaces
 

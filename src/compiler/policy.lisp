@@ -78,11 +78,11 @@ EXPERIMENTAL INTERFACE: Subject to change."
 (defun policy-quality-deprecation-warning (quality)
   (case quality
     ((stack-allocate-dynamic-extent stack-allocate-vector stack-allocate-value-cells)
-     (deprecation-warning :late "1.0.19.7" quality '*stack-allocate-dynamic-extent*
+     (deprecation-warning :final "1.2.10" quality '*stack-allocate-dynamic-extent*
                           :runtime-error nil)
      t)
     ((merge-tail-calls)
-     (deprecation-warning :early "1.0.53.74" quality nil :runtime-error nil)
+     (deprecation-warning :late "1.2.10" quality nil :runtime-error nil)
      t)
     (otherwise
      nil)))

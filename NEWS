@@ -1,4 +1,17 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
+changes relative to sbcl-1.2.9:
+  * incompatible change: the following functions have been moved to the FINAL
+    deprecation state: SB-SYS:OUTPUT-RAW-BYTES,
+    SB-C::STACK-ALLOCATE-{DYNAMIC-EXTENT,VECTOR,VALUE-CELLS},
+    SB-INTROSPECT:FUNCTION-ARGLIST,
+    SB-THREAD:{JOIN-THREAD-ERROR-THREAD,INTERRUPT-THREAD-ERROR-THREAD}
+  * incompatible change: the following things have been moved to the LATE
+    deprecation state:
+    SB-THREAD::{GET-MUTEX,SPINLOCK,MAKE-SPINLOCK,WITH-SPINLOCK,
+    WITH-RECURSIVE-SPINLOCK,GET-SPINLOCK,RELEASE-SPINLOCK,SPINLOCK-VALUE,
+    SPINLOCK-NAME,SETF SPINLOCK-NAME},SB-C::MERGE-TAIL-CALLS
+    (policy),SB-EXT:QUIT,SB-UNIX:UNIX-EXIT,SB-DEBUG:*SHOW-ENTRY-POINT-DETAILS*
+
 changes in sbcl-1.2.9 relative to sbcl-1.2.8:
   * minor incompatible change and bug fix: unboxed numeric constants
     on x86oids are arranged in memory differently, and the disassembler
