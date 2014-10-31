@@ -24,11 +24,18 @@
   (let ((n (length args)))
     (unless (<= n 3)
       (error "Update (DEFUN INTERNAL-ERROR) for ~D error arguments" n)))
-  `(setf (svref *internal-errors* ,(error-number-or-lose name))
+  `(progn
+     (setf (svref *internal-errors* ,(error-number-or-lose name))
          (lambda (name ,@args)
            (declare (optimize (sb!c::verify-arg-count 0)) (ignorable name))
-           ,@body)))
+           ,@body))
+     ;; general KLUDGE: refer to each error symbol. Can't just return ',NAME
+     ;; - the compiler knows an effectless form when it sees one.
+     (locally (declare (notinline string)) (string ',name))))
 ) ; EVAL-WHEN
+
+;; special KLUDGE for UNKNOWN-ERROR, which has no DEFERR at all
+(locally (declare (notinline string)) (string 'unknown-error))
 
 (deferr undefined-fun-error (fdefn-or-symbol)
   (error 'undefined-function

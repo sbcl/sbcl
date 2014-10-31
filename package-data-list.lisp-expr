@@ -1682,7 +1682,6 @@ is a good idea, but see SB-SYS re. blurring of boundaries."
                "OBJECT-NOT-NUMBER-ERROR" "OBJECT-NOT-RATIO-ERROR"
                "OBJECT-NOT-RATIONAL-ERROR" "OBJECT-NOT-REAL-ERROR"
                "OBJECT-NOT-SAP-ERROR" "OBJECT-NOT-SIGNED-BYTE-32-ERROR"
-               ;; FIXME: 32/64-bit issues
                "OBJECT-NOT-SIGNED-BYTE-64-ERROR"
                "OBJECT-NOT-SIMPLE-ARRAY-COMPLEX-DOUBLE-FLOAT-ERROR"
                #!+long-float
@@ -1715,7 +1714,6 @@ is a good idea, but see SB-SYS re. blurring of boundaries."
                "OBJECT-NOT-SIMPLE-ARRAY-UNSIGNED-BYTE-31-ERROR"
                "OBJECT-NOT-SIMPLE-ARRAY-UNSIGNED-BYTE-32-ERROR"
                "OBJECT-NOT-SIMPLE-ARRAY-UNSIGNED-BYTE-4-ERROR"
-               ;; FIXME: 32/64-bit issues
                "OBJECT-NOT-SIMPLE-ARRAY-UNSIGNED-BYTE-63-ERROR"
                "OBJECT-NOT-SIMPLE-ARRAY-UNSIGNED-BYTE-64-ERROR"
                "OBJECT-NOT-SIMPLE-ARRAY-UNSIGNED-BYTE-7-ERROR"
@@ -1734,7 +1732,6 @@ is a good idea, but see SB-SYS re. blurring of boundaries."
                "OBJECT-NOT-INSTANCE-ERROR" "OBJECT-NOT-SYMBOL-ERROR"
                "OBJECT-NOT-TYPE-ERROR"
                "OBJECT-NOT-UNSIGNED-BYTE-32-ERROR"
-               ;; FIXME: 32/64-bit issues
                "OBJECT-NOT-UNSIGNED-BYTE-64-ERROR"
                "OBJECT-NOT-VECTOR-ERROR"
                "OBJECT-NOT-VECTOR-NIL-ERROR"
@@ -1763,7 +1760,6 @@ is a good idea, but see SB-SYS re. blurring of boundaries."
                "SEQUENCE-OF-CHECKED-LENGTH-GIVEN-TYPE"
                "SET-ARRAY-HEADER" "SET-HEADER-DATA" "SHIFT-TOWARDS-END"
                "SHIFT-TOWARDS-START" "SHRINK-VECTOR" "%SHRINK-VECTOR"
-               ;; FIXME: 32/64-bit issues
                "SIGNED-BYTE-32-P" "SIGNED-BYTE-64-P"
                "SIMPLE-RANK-1-ARRAY-*-P"
                "SIMPLE-ARRAY-COMPLEX-DOUBLE-FLOAT-P"
@@ -1825,7 +1821,6 @@ is a good idea, but see SB-SYS re. blurring of boundaries."
                "UNION-TYPE-TYPES" "UNKNOWN-ERROR"
                "UNKNOWN-KEY-ARG-ERROR" "UNKNOWN-TYPE" "UNKNOWN-TYPE-P"
                "UNKNOWN-TYPE-SPECIFIER" "UNSEEN-THROW-TAG-ERROR"
-               ;; FIXME: 32/64-bit issues
                "UNSIGNED-BYTE-32-P" "UNSIGNED-BYTE-64-P"
                "UPDATE-OBJECT-LAYOUT-OR-INVALID"
                "VALUE-CELL-REF" "VALUE-CELL-SET" "VALUES-SPECIFIER-TYPE"
@@ -1859,7 +1854,7 @@ is a good idea, but see SB-SYS re. blurring of boundaries."
                "WITH-CIRCULARITY-DETECTION"
                "WITH-WORLD-LOCK"
 
-               ;; bit bash fillers (FIXME: 32/64-bit issues)
+               ;; bit bash fillers
                "UB1-BASH-FILL" "SYSTEM-AREA-UB1-FILL"
                "UB2-BASH-FILL" "SYSTEM-AREA-UB2-FILL"
                "UB4-BASH-FILL" "SYSTEM-AREA-UB4-FILL"
@@ -1868,7 +1863,7 @@ is a good idea, but see SB-SYS re. blurring of boundaries."
                "UB32-BASH-FILL" "SYSTEM-AREA-UB32-FILL"
                "UB64-BASH-FILL" "SYSTEM-AREA-UB64-FILL"
 
-               ;; bit bash copiers (FIXME: 32/64-bit issues)
+               ;; bit bash copiers
                "UB1-BASH-COPY" "SYSTEM-AREA-UB1-COPY"
                "COPY-UB1-TO-SYSTEM-AREA" "COPY-UB1-FROM-SYSTEM-AREA"
                "UB2-BASH-COPY" "SYSTEM-AREA-UB2-COPY"
@@ -2948,7 +2943,6 @@ structure representations"
                "OFFSET-STATIC-SYMBOL"
                "OTHER-IMMEDIATE-0-LOWTAG"
                "OTHER-IMMEDIATE-1-LOWTAG"
-               ;; FIXME: 32/64-bit issues
                "OTHER-IMMEDIATE-2-LOWTAG"
                "OTHER-IMMEDIATE-3-LOWTAG"
                "OTHER-POINTER-LOWTAG"
