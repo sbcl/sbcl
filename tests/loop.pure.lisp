@@ -408,3 +408,11 @@
                    (declare (optimize speed))
                    (loop repeat (+ 1 5) for baz = 'this then 'that
                          do (print baz))))))
+
+(with-test (:name :loop-default-init-type)
+  (assert-no-signal (compile nil
+                             '(lambda (list)
+                               (declare (optimize speed))
+                               (loop for a of-type (simple-vector 4) in list
+                                     collect (aref a 2))))
+                    sb-ext:compiler-note))

@@ -915,7 +915,7 @@ code to be loaded.
              (loop-make-var (cdr name) nil tcdr)))))
   name)
 
-;;; Find a suitable type for  default initialization
+;;; Find a suitable type for default initialization
 (defun type-for-default-init (type &optional step-var-p)
   (multiple-value-bind (init empty-type)
       (loop-typed-init type step-var-p)
@@ -927,8 +927,11 @@ code to be loaded.
             type)
            ((sb!xc:typep init type)
             type)
+           ((sb!xc:typep init '(simple-array * (*)))
+            ;; type-of lets the size in
+            `(or (simple-array ,(array-element-type init) (*)) ,type))
            (t
-            `(or ,(type-of init) ,type)))
+            `(or ,(sb!xc:type-of init) ,type)))
      init)))
 
 (defun loop-declare-var (name dtype &key step-var-p initialization
