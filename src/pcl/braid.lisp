@@ -565,16 +565,12 @@
 
 (defun ensure-non-standard-class (name classoid &optional existing-class)
   (flet
-      ((ensure (metaclass &optional (slots nil slotsp))
+      ((ensure (metaclass slots)
          (let ((supers (mapcar #'classoid-name (classoid-direct-superclasses classoid))))
-           (if slotsp
-               (ensure-class-using-class existing-class name
-                                         :metaclass metaclass :name name
-                                         :direct-superclasses supers
-                                         :direct-slots slots)
-               (ensure-class-using-class existing-class name
-                                         :metaclass metaclass :name name
-                                         :direct-superclasses supers))))
+           (ensure-class-using-class existing-class name
+                                     :metaclass metaclass :name name
+                                     :direct-superclasses supers
+                                     :direct-slots slots)))
        (slot-initargs-from-structure-slotd (slotd)
          (let ((accessor (structure-slotd-accessor-symbol slotd)))
            `(:name ,(structure-slotd-name slotd)
