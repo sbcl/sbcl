@@ -239,7 +239,7 @@
                   (inst mov alloc-tn temp-reg-tn)
                   (inst add alloc-tn (constantize size))))
            (inst cmp alloc-tn end-addr)
-           (inst jmp :g NOT-INLINE)
+           (inst jmp :a NOT-INLINE)
            (inst mov free-pointer alloc-tn)
            (if lowtag
                (inst lea alloc-tn (make-ea :byte :base temp-reg-tn :disp lowtag))
