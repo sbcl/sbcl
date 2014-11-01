@@ -2091,7 +2091,7 @@ lisp_memory_fault_error(os_context_t *context, os_vm_address_t addr)
     */
     current_memory_fault_address = addr;
     /* To allow debugging memory faults in signal handlers and such. */
-    corruption_warning_and_maybe_lose("Memory fault at %x (pc=%p, sp=%p)",
+    corruption_warning_and_maybe_lose("Memory fault at %p (pc=%p, sp=%p)",
                                       addr,
                                       *os_context_pc_addr(context),
 #ifdef ARCH_HAS_STACK_POINTER
