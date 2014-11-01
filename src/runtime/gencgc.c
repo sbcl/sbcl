@@ -1167,8 +1167,6 @@ gc_alloc_update_page_tables(int page_type_flag, struct alloc_region *alloc_regio
     gc_set_region_empty(alloc_region);
 }
 
-static inline void *gc_quick_alloc(word_t nbytes);
-
 /* Allocate a possibly large object. */
 void *
 gc_alloc_large(sword_t nbytes, int page_type_flag, struct alloc_region *alloc_region)
@@ -1454,28 +1452,6 @@ gc_alloc_with_region(sword_t nbytes,int page_type_flag, struct alloc_region *my_
     gc_alloc_update_page_tables(page_type_flag, my_region);
     gc_alloc_new_region(nbytes, page_type_flag, my_region);
     return gc_alloc_with_region(nbytes, page_type_flag, my_region,0);
-}
-
-/* these are only used during GC: all allocation from the mutator calls
- * alloc() -> gc_alloc_with_region() with the appropriate per-thread
- * region */
-
-static inline void *
-gc_quick_alloc(word_t nbytes)
-{
-    return gc_general_alloc(nbytes, BOXED_PAGE_FLAG, ALLOC_QUICK);
-}
-
-static inline void *
-gc_alloc_unboxed(word_t nbytes)
-{
-    return gc_general_alloc(nbytes, UNBOXED_PAGE_FLAG, 0);
-}
-
-static inline void *
-gc_quick_alloc_unboxed(word_t nbytes)
-{
-    return gc_general_alloc(nbytes, UNBOXED_PAGE_FLAG, ALLOC_QUICK);
 }
 
 /* Copy a large object. If the object is in a large object region then
@@ -2593,7 +2569,7 @@ update_page_write_prot(page_index_t page)
         page_index_t index;
 
         /* Check that it's in the dynamic space */
-        if (is_lisp_pointer(ptr) && (index = find_page_index(ptr)) != -1)
+        if (is_lisp_pointer((lispobj)ptr) && (index = find_page_index(ptr)) != -1)
             if (/* Does it point to a younger or the temp. generation? */
                 (page_allocated_p(index)
                  && (page_table[index].bytes_used != 0)
@@ -3742,7 +3718,7 @@ garbage_collect_generation(generation_index_t generation, int raise)
     if (gencgc_verbose > 1) {
         sword_t num_dont_move_pages = count_dont_move_pages();
         fprintf(stderr,
-                "/non-movable pages due to conservative pointers = %d (%d bytes)\n",
+                "/non-movable pages due to conservative pointers = %ld (%lu bytes)\n",
                 num_dont_move_pages,
                 npage_bytes(num_dont_move_pages));
     }
