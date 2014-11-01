@@ -196,8 +196,15 @@
                            ;; The number of words is later converted
                            ;; to bytes, make sure it fits.
                            (and index
-                                (unsigned-byte #.(- sb!vm:n-word-bits
-                                                    sb!vm:word-shift))))
+                                (mod #.(- (expt 2
+                                                (- sb!vm:n-word-bits
+                                                   sb!vm:word-shift
+                                                   ;; all the allocation routines expect a signed word
+                                                   1))
+                                          ;; The size is double-word aligned, which is done by adding
+                                          ;; (1- (/ sb-vm:n-word-bits 2)) and then masking.
+                                          ;; Make sure addition doesn't overflow.
+                                          3))))
     (simple-array * (*))
     (flushable movable))
 
