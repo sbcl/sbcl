@@ -72,6 +72,8 @@
   ;; functions, but the argument is ignored. NIL means unspecified
   ;; (the default.)
 
+  ;; report state
+  (report 'trace :type symbol)
   ;; current environment forms
   (condition nil)
   (break nil)
@@ -225,6 +227,15 @@
             (multiple-value-list (funcall (cdr ele) frame)))
     (terpri)))
 
+;;; Handle PRINT and PRINT-AFTER options when REPORT style is NIL
+(defun trace-print-unadorned (frame forms)
+  (dolist (ele forms)
+    (fresh-line)
+    (let ((values (multiple-value-list (funcall (cdr ele) frame))))
+      (when values
+        (format t "~{~A~^, ~}~%"
+                (multiple-value-list (funcall (cdr ele) frame)))))))
+
 ;;; Test a BREAK option, and if true, break.
 (defun trace-maybe-break (info break where frame)
   (when (and break (funcall (cdr break) frame))
@@ -271,13 +282,17 @@
                (*standard-output* (make-string-output-stream))
                (*in-trace* t))
            (fresh-line)
-           (print-trace-indentation)
-           (if (trace-info-encapsulated info)
-               (prin1 `(,(trace-info-what info)
-                        ,@(mapcar #'ensure-printable-object args)))
-               (print-frame-call frame *standard-output*))
-           (terpri)
-           (trace-print frame (trace-info-print info))
+           (ecase (trace-info-report info)
+             (trace
+              (print-trace-indentation)
+              (if (trace-info-encapsulated info)
+                  (prin1 `(,(trace-info-what info)
+                            ,@(mapcar #'ensure-printable-object args)))
+                  (print-frame-call frame *standard-output*))
+              (terpri)
+              (trace-print frame (trace-info-print info)))
+             ((nil)
+              (trace-print-unadorned frame (trace-info-print info))))
            (write-sequence (get-output-stream-string *standard-output*)
                            *trace-output*)
            (finish-output *trace-output*))
@@ -309,17 +324,21 @@
               (*standard-output* (make-string-output-stream))
               (*in-trace* t))
           (fresh-line)
-          (let ((*print-pretty* t))
-            (pprint-logical-block (*standard-output* nil)
-              (print-trace-indentation)
-              (pprint-indent :current 2)
-              (format t "~S returned" (trace-info-what info))
-              (dolist (v *trace-values*)
-                (write-char #\space)
-                (pprint-newline :linear)
-                (prin1 (ensure-printable-object v))))
-            (terpri))
-          (trace-print frame (trace-info-print-after info))
+          (ecase (trace-info-report info)
+            (trace
+             (let ((*print-pretty* t))
+               (pprint-logical-block (*standard-output* nil)
+                 (print-trace-indentation)
+                 (pprint-indent :current 2)
+                 (format t "~S returned" (trace-info-what info))
+                 (dolist (v *trace-values*)
+                   (write-char #\space)
+                   (pprint-newline :linear)
+                   (prin1 (ensure-printable-object v))))
+               (terpri)
+               (trace-print frame (trace-info-print-after info))))
+            ((nil)
+             (trace-print-unadorned frame (trace-info-print-after info))))
           (write-sequence (get-output-stream-string *standard-output*)
                           *trace-output*)
           (finish-output *trace-output*))
@@ -383,6 +402,7 @@
                     :methods (trace-info-methods info)
                     :condition (coerce-form (trace-info-condition info) loc)
                     :break (coerce-form (trace-info-break info) loc)
+                    :report (trace-info-report info)
                     :print (coerce-form-list (trace-info-print info) loc)
                     :break-after (coerce-form (trace-info-break-after info) nil)
                     :condition-after
@@ -459,7 +479,13 @@
       (let ((option (first current))
             (value (cons (second current) nil)))
         (case option
-          (:report (error "stub: The :REPORT option is not yet implemented."))
+          (:report
+           (case (car value)
+             ((nil trace)
+              (setf (trace-info-report info) (car value)))
+             (t
+              (error "stub: The :REPORT ~S option is not yet implemented."
+                     (car value)))))
           (:condition (setf (trace-info-condition info) value))
           (:condition-after
            (setf (trace-info-condition info) (cons nil nil))
