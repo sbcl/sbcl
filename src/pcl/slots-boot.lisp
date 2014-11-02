@@ -172,7 +172,6 @@
 
 (defun make-optimized-std-reader-method-function
     (fsc-p slotd slot-name location)
-  (declare #.*optimize-speed*)
   (set-fun-name
    (etypecase location
      (fixnum
@@ -206,7 +205,6 @@
    `(reader ,slot-name)))
 
 (defun make-optimized-std-writer-method-function (fsc-p slotd slot-name location)
-  (declare #.*optimize-speed*)
   ;; The (WHEN SLOTD ...) gunk is for building early slot definitions.
   (let* ((class (when slotd (slot-definition-class slotd)))
          (safe-p (when slotd (safe-p class)))
@@ -277,7 +275,6 @@
 
 (defun make-optimized-std-boundp-method-function
     (fsc-p slotd slot-name location)
-  (declare #.*optimize-speed*)
   (set-fun-name
    (etypecase location
      (fixnum (if fsc-p
@@ -363,7 +360,6 @@
                (slot-definition-location slotd))))))
 
 (defun make-optimized-std-slot-value-using-class-method-function (fsc-p slotd)
-  (declare #.*optimize-speed*)
   (let ((location (slot-definition-location slotd))
         (slot-name (slot-definition-name slotd)))
     (etypecase location
@@ -398,7 +394,6 @@
 
 (defun make-optimized-std-setf-slot-value-using-class-method-function
     (fsc-p slotd)
-  (declare #.*optimize-speed*)
   (let* ((location (slot-definition-location slotd))
          (class (slot-definition-class slotd))
          (typecheck
@@ -437,7 +432,6 @@
 
 (defun make-optimized-std-slot-boundp-using-class-method-function
     (fsc-p slotd)
-  (declare #.*optimize-speed*)
   (let ((location (slot-definition-location slotd)))
     (etypecase location
       (fixnum

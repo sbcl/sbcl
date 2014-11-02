@@ -2343,4 +2343,14 @@
                                     ()))))))
     (sb-pcl::map-all-classes #'mapper)))
 
+(defclass slot-value-using-class-a () ())
+(defclass slot-value-using-class-b () (x))
+
+(with-test (:name :svuc-with-bad-slotd)
+  (let* ((a (make-instance 'slot-value-using-class-a))
+         (b (make-instance 'slot-value-using-class-b))
+         (slotd (car (sb-mop:class-slots (class-of b)))))
+    (assert-error (sb-mop:slot-value-using-class (class-of a) a slotd))
+    (assert-error (setf (sb-mop:slot-value-using-class (class-of a) a slotd) t))))
+
 ;;;; success
