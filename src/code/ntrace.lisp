@@ -15,11 +15,6 @@
 ;;; package? That would let us get rid of a whole lot of stupid
 ;;; prefixes..
 
-(defvar *trace-values* nil
-  #+sb-doc
-  "This is bound to the returned values when evaluating :BREAK-AFTER and
-   :PRINT-AFTER forms.")
-
 (defvar *trace-indentation-step* 2
   #+sb-doc
   "the increase in trace indentation at each call level")
@@ -170,25 +165,23 @@
           (let ((fun (sb-di:preprocess-for-eval exp loc)))
             (declare (type function fun))
             (cons exp
-                  (lambda (frame)
+                  (lambda (frame &rest args)
+                    (declare (ignore args))
                     (let ((*current-frame* frame))
                       (funcall fun frame)))))
-          (let* ((bod (ecase loc
-                        ((nil) exp)
-                        (:encapsulated
-                         `(locally (declare (disable-package-locks sb-debug:arg arg-list))
-                           (flet ((sb-debug:arg (n)
-                                    (declare (special arg-list))
-                                    (elt arg-list n)))
-                             (declare (ignorable #'sb-debug:arg)
-                                      (enable-package-locks sb-debug:arg arg-list))
-                             ,exp)))))
-                 (fun (coerce `(lambda () ,bod) 'function)))
+          (let* ((body `(locally (declare (disable-package-locks sb-debug:arg))
+                          (flet ((sb-debug:arg (n)
+                                   (elt args n)))
+                            (declare (ignorable #'sb-debug:arg)
+                                     (enable-package-locks sb-debug:arg))
+                            ,exp)))
+                 (fun (coerce `(lambda (&rest args) (declare (ignorable args))
+                                 ,body) 'function)))
             (cons exp
-                  (lambda (frame)
+                  (lambda (frame &rest args)
                     (declare (ignore frame))
                     (let ((*current-frame* nil))
-                      (funcall fun)))))))))
+                      (apply fun args)))))))))
 
 (defun coerce-form-list (forms loc)
   (mapcar (lambda (x) (coerce-form x loc)) forms))
@@ -216,18 +209,18 @@
       (return t))))
 
 ;;; Handle PRINT and PRINT-AFTER options.
-(defun trace-print (frame forms)
+(defun trace-print (frame forms &rest args)
   (dolist (ele forms)
     (fresh-line)
     (print-trace-indentation)
     (format t "~@<~S ~_= ~:[; No values~;~:*~{~S~^, ~}~]~:>"
             (car ele)
-            (multiple-value-list (funcall (cdr ele) frame)))
+            (multiple-value-list (apply (cdr ele) frame args)))
     (terpri)))
 
 ;;; Test a BREAK option, and if true, break.
-(defun trace-maybe-break (info break where frame)
-  (when (and break (funcall (cdr break) frame))
+(defun trace-maybe-break (info break where frame &rest args)
+  (when (and break (apply (cdr break) frame args))
     (sb-di:flush-frames-above frame)
     (let ((*stack-top-hint* frame))
       (break "breaking ~A traced call to ~S:"
@@ -263,7 +256,7 @@
          (setq conditionp
                (and (not *in-trace*)
                     (or (not condition)
-                        (funcall (cdr condition) frame))
+                        (apply (cdr condition) frame args))
                     (or (not wherein)
                         (trace-wherein-p frame wherein)))))
        (when conditionp
@@ -277,11 +270,12 @@
                         ,@(mapcar #'ensure-printable-object args)))
                (print-frame-call frame *standard-output*))
            (terpri)
-           (trace-print frame (trace-info-print info))
+           (apply #'trace-print frame (trace-info-print info) args)
            (write-sequence (get-output-stream-string *standard-output*)
                            *trace-output*)
            (finish-output *trace-output*))
-         (trace-maybe-break info (trace-info-break info) "before" frame)))
+         (apply #'trace-maybe-break info (trace-info-break info) "before"
+                frame args)))
      (lambda (frame cookie)
        (declare (ignore frame))
        (push (cons cookie conditionp) *traced-entries*)))))
@@ -294,7 +288,7 @@
 ;;; succeeded before printing anything.
 (declaim (ftype (function (trace-info) function) trace-end-breakpoint-fun))
 (defun trace-end-breakpoint-fun (info)
-  (lambda (frame bpt *trace-values* cookie)
+  (lambda (frame bpt values cookie)
     (declare (ignore bpt))
     (unless (eq cookie (caar *traced-entries*))
       (setf *traced-entries*
@@ -304,7 +298,7 @@
       (when (and (not (trace-info-untraced info))
                  (or (cdr entry)
                      (let ((cond (trace-info-condition-after info)))
-                       (and cond (funcall (cdr cond) frame)))))
+                       (and cond (apply #'funcall (cdr cond) frame values)))))
         (let ((sb-kernel:*current-level-in-print* 0)
               (*standard-output* (make-string-output-stream))
               (*in-trace* t))
@@ -314,19 +308,17 @@
               (print-trace-indentation)
               (pprint-indent :current 2)
               (format t "~S returned" (trace-info-what info))
-              (dolist (v *trace-values*)
+              (dolist (v values)
                 (write-char #\space)
                 (pprint-newline :linear)
                 (prin1 (ensure-printable-object v))))
             (terpri))
-          (trace-print frame (trace-info-print-after info))
+          (apply #'trace-print frame (trace-info-print-after info) values)
           (write-sequence (get-output-stream-string *standard-output*)
                           *trace-output*)
           (finish-output *trace-output*))
-        (trace-maybe-break info
-                           (trace-info-break-after info)
-                           "after"
-                           frame)))))
+        (apply #'trace-maybe-break info (trace-info-break-after info) "after"
+               frame values)))))
 
 ;;; This function is called by the trace encapsulation. It calls the
 ;;; breakpoint hook functions with NIL for the breakpoint and cookie,

@@ -873,4 +873,33 @@
          (position (+ (search call printed) (length call))))
     (assert (eql position (search "((#))" printed :start2 position)))))
 
-(write-line "/debug.impure.lisp done")
+
+(defvar *x* nil)
+(defun foo (a) a)
+
+(with-test (:name :trace-debug-arg)
+  (trace foo :print-after (setf *x* (sb-debug:arg 0)))
+  (foo 1)
+  (assert (eql *x* 1))
+
+  (trace foo :print (setf *x* (sb-debug:arg 0)))
+  (foo 2)
+  (assert (eql *x* 2))
+
+  (trace foo :condition (eql (setf *x* (sb-debug:arg 0)) 0))
+  (foo 3)
+  (assert (eql *x* 3))
+
+  (trace foo :condition-after (setf *x* (sb-debug:arg 0)))
+  (foo 4)
+  (assert (eql *x* 4))
+
+  (trace foo :break (and (setf *x* (sb-debug:arg 0)) nil))
+  (foo 5)
+  (assert (eql *x* 5))
+
+  (trace foo :break-all (and (setf *x* (sb-debug:arg 0)) nil))
+  (foo 6)
+  (assert (eql *x* 6))
+  (trace foo :break-after (and (setf *x* (sb-debug:arg 0)) nil))
+  (foo 7))
