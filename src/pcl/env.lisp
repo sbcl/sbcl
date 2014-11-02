@@ -195,27 +195,34 @@
   (declare (ignore object env))
   :sb-just-dump-it-normally)
 
+;; Note that it is possible to produce structure dumping code which yields
+;; illegal slot values in the resurrected structure, violating the assumption
+;; throughout the compiler that slot readers are always safe unless
+;; dictated otherwise by the SAFE-P flag in the DSD.
+;; * (defstruct S a (b (error "Must supply me") :type symbol))
+;; * (defmethod make-load-form ((x S) &optional e) (m-l-f-s-s x :slot-names '(a)))
+;; After these definitions, a dumped S will have 0 in slot B.
+;;
 (defun make-load-form-saving-slots (object &key (slot-names nil slot-names-p) environment)
   (declare (ignore environment))
-  (let ((class (class-of object)))
-    (collect ((inits))
-      (dolist (slot (class-slots class))
-        (let ((slot-name (slot-definition-name slot)))
-          (when (or (memq slot-name slot-names)
-                    (and (not slot-names-p)
-                         (eq :instance (slot-definition-allocation slot))))
-            (if (slot-boundp-using-class class object slot)
-                (let ((value (slot-value-using-class class object slot)))
-                  (if (typep object 'structure-object)
-                      ;; low-level but less noisy initializer form
-                      ;; FIXME: why not go class->layout->info == dd?
-                      (let* ((dd (find-defstruct-description
-                                  (class-name class)))
-                             (dsd (find slot-name (dd-slots dd)
-                                        :key #'dsd-name)))
-                        (inits `(,(slot-setter-lambda-form dd dsd)
-                                 ',value ,object)))
-                      (inits `(setf (slot-value ,object ',slot-name) ',value))))
-                (inits `(slot-makunbound ,object ',slot-name))))))
-      (values `(allocate-instance (find-class ',(class-name class)))
-              `(progn ,@(inits))))))
+  (if (typep object 'structure-object)
+      (values `(allocate-instance (find-class ',(class-name (class-of object))))
+              `(setf ,@(sb-kernel::structure-obj-slot-saving-forms
+                        object slot-names slot-names-p)))
+      (let* ((class (class-of object))
+             (inits
+              (mapcan
+               (lambda (slot)
+                 (let ((slot-name (slot-definition-name slot)))
+                   (when (if slot-names-p
+                             (memq slot-name slot-names)
+                             (eq :instance (slot-definition-allocation slot)))
+                     (list (if (slot-boundp-using-class class object slot)
+                               `(setf (slot-value ,object ',slot-name)
+                                      ',(slot-value-using-class class object slot))
+                               ;; Why is this needed? Is it not specified that
+                               ;; everything defaults to unbound?
+                               `(slot-makunbound ,object ',slot-name))))))
+               (class-slots class))))
+        (values `(allocate-instance (find-class ',(class-name class)))
+                `(progn ,@inits)))))

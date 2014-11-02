@@ -2004,6 +2004,13 @@ SPEED and COMPILATION-SPEED optimization values, and the
                 (sb!xc:make-load-form constant (make-null-lexenv))
               (error (condition)
                 (compiler-error condition))))
+      #-sb-xc-host
+      (when (and (not namep)
+                 (listp creation-form) ; skip if already a magic keyword
+                 (typep constant 'structure-object)
+                 (sb!kernel::canonical-slot-saving-forms-p
+                  constant creation-form init-form))
+        (setq creation-form :sb-just-dump-it-normally))
       (case creation-form
         (:sb-just-dump-it-normally
          (fasl-validate-structure constant *compile-object*)

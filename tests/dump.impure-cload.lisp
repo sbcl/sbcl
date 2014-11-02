@@ -134,3 +134,123 @@
   (assert (not (eq *base-string* *character-string*)))
   (assert (typep *base-string* 'base-string))
   (assert (typep *character-string* '(vector character))))
+
+;; Preparation for more MAKE-LOAD-FORM tests
+(eval-when (:compile-toplevel :load-toplevel :execute)
+
+  (defstruct airport
+    name code
+    (latitude nil :type double-float)
+    (longitude nil :type double-float))
+
+  (defmethod make-load-form ((self airport) &optional env)
+    (make-load-form-saving-slots self :environment env))
+
+  (defun compute-airports (n)
+    (let ((a (make-array n)))
+      (dotimes (i n a)
+        (setf (aref a i) (make-airport :code (format nil "~36,3,'0R" i)
+                                       :name (format nil "airport~d" i)
+                                       :latitude (+ 40 (/ i 1000.0d0))
+                                       :longitude (+  100 (/ i 1000.0d0)))))))
+  (defstruct s1
+    (w 0 :type sb-ext:word)
+    (sf 0f0 :type single-float)
+    (df 0d0 :type double-float)
+    (csf #c(0f0 0f0) :type (complex single-float))
+    (cdf #c(0d0 0d0) :type (complex double-float))
+    (kids nil)
+    (friends nil))
+
+  (defstruct s2
+    (id)
+    (friends)
+    (parent))
+
+  (defmethod make-load-form ((self s1) &optional env)
+    (declare (ignore env))
+    (ecase (s1-w self)
+      (1
+       ;; return gratuitously modified expressions
+       (multiple-value-bind (alloc init)
+           (make-load-form-saving-slots self)
+         (values (list 'progn alloc) (list 'progn init))))
+      (2
+       ;; omit the (complex double-float) slot
+       (make-load-form-saving-slots self
+                                    ;; nonexistent names are ignored
+                                    :slot-names '(w sf df csf bogus
+                                                  kids friends)))
+      (3
+       (make-load-form-saving-slots self)))) ; normal
+
+  (defmethod make-load-form ((self s2) &optional env)
+    (declare (ignore env))
+    (make-load-form-saving-slots self))
+
+  (defun compute-tangled-stuff ()
+    (flet ((circular-list (x)
+             (let ((list (list x)))
+               (rplacd list list))))
+      (let* ((a (make-s1 :w 1
+                         :sf 1.25f-9
+                         :df 1048d50
+                         :csf #c(8.45f1 -9.35f2)
+                         :cdf #c(-5.430005d10 2.875d0)))
+             (b (make-s1 :w 2
+                         :sf 2f0
+                         :df 3d0
+                         :csf #c(4f0 5f0)
+                         :cdf #c(6d0 7d0)))
+             (c (make-s1 :w 3
+                         :sf -2f0
+                         :df -3d0
+                         :csf #c(-4f0 -5f0)
+                         :cdf #c(-6d0 -7d0)))
+             (k1 (make-s2 :id 'b-kid1 :parent b))
+             (k2 (make-s2 :id 'c-kid1 :parent c)))
+        (setf (s2-friends k1) (list k2)
+              (s2-friends k2) (list k1))
+        (setf (s1-kids b) (list k1 (make-s2 :id 'b-kid2 :parent b))
+              (s1-kids c) (list k2)
+              (s1-friends a) (list* b c (circular-list a))
+              (s1-friends b) (list a c)
+              (s1-friends c) (list a b))
+        (list a b c))))
+
+) ; end EVAL-WHEN
+
+(with-test (:name :load-form-canonical-p)
+  (let ((foo (make-foo :x 'x :y 'y)))
+    (multiple-value-bind (create init)
+        (make-load-form-saving-slots foo)
+      (assert (sb-kernel::canonical-slot-saving-forms-p foo create init)))
+    (multiple-value-bind (create init)
+        ;; specifying all slots is still canonical
+        (make-load-form-saving-slots foo :slot-names '(y x))
+      (assert (sb-kernel::canonical-slot-saving-forms-p foo create init)))
+    (multiple-value-bind (create init)
+        (make-load-form-saving-slots foo :slot-names '(x))
+      (assert (not (sb-kernel::canonical-slot-saving-forms-p
+                    foo create init))))))
+
+;; A huge constant vector. This took 9 seconds to compile (on a MacBook Pro)
+;; prior to the optimization for using :SB-JUST-DUMP-IT-NORMALLY.
+;; This assertion is simply whether it comes out correctly, not the time taken.
+(defparameter *airport-vector* #.(compute-airports 4000))
+
+;; a tangled forest of structures,
+(defparameter *metadata* '#.(compute-tangled-stuff))
+
+(test-util:with-test (:name :make-load-form-huge-vector)
+  (assert (equalp (compute-airports (length *airport-vector*))
+                  *airport-vector*)))
+
+(test-util:with-test (:name :make-load-form-circular-hair)
+  (let ((testcase (compute-tangled-stuff)))
+    ;; MAKE-LOAD-FORM discards the value of the CDF slot of one structure.
+    ;; This probably isn't something "reasonable" to do, but it indicates
+    ;; that :JUST-DUMP-IT-NORMALLY was correctly not used.
+    (setf (s1-cdf (second testcase)) #c(0d0 0d0))
+    (assert (string= (write-to-string testcase :circle t :pretty nil)
+                     (write-to-string *metadata* :circle t :pretty nil)))))
