@@ -1126,6 +1126,7 @@ handle_breakpoint_trap(os_context_t *ctx, struct thread* self)
     /* Before any other trap handler: gc_safepoint ensures that
        inner alloc_sap for passing the context won't trap on
        pseudo-atomic. */
+    /* Now that there is no alloc_sap, I don't know what happens here. */
     if (trap == trap_PendingInterrupt) {
         /* Done everything needed for this trap, except EIP
            adjustment */
@@ -1274,8 +1275,6 @@ signal_internal_error_or_lose(os_context_t *ctx,
      */
 
     if (internal_errors_enabled) {
-        lispobj context_sap;
-        lispobj exception_record_sap;
 
         asm("fnclex");
         /* We're making the somewhat arbitrary decision that having
@@ -1290,10 +1289,9 @@ signal_internal_error_or_lose(os_context_t *ctx,
         fake_foreign_function_call(ctx);
 
         WITH_GC_AT_SAFEPOINTS_ONLY() {
-            /* Allocate the SAP objects while the "interrupts" are still
-             * disabled. */
-            context_sap = alloc_sap(ctx);
-            exception_record_sap = alloc_sap(exception_record);
+            DX_ALLOC_SAP(context_sap, ctx);
+            DX_ALLOC_SAP(exception_record_sap, exception_record);
+
 #if defined(LISP_FEATURE_SB_THREAD)
             thread_sigmask(SIG_SETMASK, &ctx->sigmask, NULL);
 #endif

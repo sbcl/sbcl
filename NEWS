@@ -2,6 +2,7 @@
 changes relative to sbcl-1.2.5:
   * bug fix: SB-DEBUG:ARG now works in all TRACE options which evaluate forms.
    (lp#1357826)
+  * bug fix: GC memory corruption during internal memory handling.
 
 changes in sbcl-1.2.5 relative to sbcl-1.2.4:
   * enhancement: sb-bsd-sockets now has basic support for IPv6

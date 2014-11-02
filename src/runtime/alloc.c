@@ -125,34 +125,6 @@ alloc_unboxed(int type, int words)
     return result;
 }
 
-static lispobj
-alloc_vector(int type, int length, int size, int page_type_flag)
-{
-    struct vector *result;
-
-    result = (struct vector *)
-        pa_alloc(ALIGNED_SIZE((2 + (length*size + 31) / 32) * sizeof(lispobj)),
-                 page_type_flag);
-
-    result->header = type;
-    result->length = make_fixnum(length);
-
-    return make_lispobj(result,OTHER_POINTER_LOWTAG);
-}
-
-lispobj
-alloc_cons(lispobj car, lispobj cdr)
-{
-    struct cons *ptr =
-        (struct cons *)pa_alloc(ALIGNED_SIZE(sizeof(struct cons)),
-                                BOXED_PAGE_FLAG);
-
-    ptr->car = car;
-    ptr->cdr = cdr;
-
-    return make_lispobj(ptr, LIST_POINTER_LOWTAG);
-}
-
 lispobj
 alloc_number(sword_t n)
 {
@@ -167,30 +139,6 @@ alloc_number(sword_t n)
 
         return make_lispobj(ptr, OTHER_POINTER_LOWTAG);
     }
-}
-
-lispobj
-alloc_base_string(char *str)
-{
-    int len = strlen(str);
-    lispobj result = alloc_vector(SIMPLE_BASE_STRING_WIDETAG, len+1, 8,
-                                  UNBOXED_PAGE_FLAG);
-    struct vector *vec = (struct vector *)native_pointer(result);
-
-    vec->length = make_fixnum(len);
-    strcpy((char *)vec->data, str);
-
-    return result;
-}
-
-lispobj
-alloc_sap(void *ptr)
-{
-    struct sap *sap;
-    sap=(struct sap *)
-        alloc_unboxed((int)SAP_WIDETAG, sizeof(struct sap)/sizeof(lispobj) -1);
-    sap->pointer = ptr;
-    return make_lispobj(sap,OTHER_POINTER_LOWTAG);
 }
 
 lispobj

@@ -15,16 +15,22 @@
 #include "sbcl.h"
 #include "runtime.h"
 #include "gc-internal.h"
+#include "genesis/sap.h"
 
 #ifdef LISP_FEATURE_GENCGC
 extern lispobj *general_alloc(sword_t bytes, int page_type_flag);
 #endif
 
-extern lispobj alloc_cons(lispobj car, lispobj cdr);
 extern lispobj alloc_number(sword_t n);
-extern lispobj alloc_string(char *str);
-extern lispobj alloc_sap(void *ptr);
-extern lispobj alloc_base_string(char *str);
 extern lispobj alloc_code_object(unsigned boxed, unsigned unboxed);
+
+#define DX_ALLOC_SAP(var_name, ptr)                                        \
+lispobj var_name;                                                          \
+struct sap _dx_##var_name __attribute__ ((aligned (16)));                  \
+do {                                                                       \
+    _dx_##var_name.header = (1 << 8) | SAP_WIDETAG;                        \
+    _dx_##var_name.pointer = (char *)(ptr);                                \
+    var_name = make_lispobj(&_dx_##var_name.header, OTHER_POINTER_LOWTAG); \
+} while (0)
 
 #endif /* _ALLOC_H_ */

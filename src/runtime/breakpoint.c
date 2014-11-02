@@ -126,14 +126,14 @@ static long compute_offset(os_context_t *context, lispobj code)
 
 void handle_breakpoint(os_context_t *context)
 {
-    lispobj code, context_sap;
+    lispobj code;
+    DX_ALLOC_SAP(context_sap, context);
 
     fake_foreign_function_call(context);
 
 #ifndef LISP_FEATURE_SB_SAFEPOINT
     unblock_gc_signals(0, 0);
 #endif
-    context_sap = alloc_sap(context);
     code = find_code(context);
 
 #ifndef LISP_FEATURE_WIN32
@@ -152,15 +152,16 @@ void handle_breakpoint(os_context_t *context)
 
 void *handle_fun_end_breakpoint(os_context_t *context)
 {
-    lispobj code, context_sap, lra;
+    lispobj code, lra;
     struct code *codeptr;
+    DX_ALLOC_SAP(context_sap, context);
 
     fake_foreign_function_call(context);
 
 #ifndef LISP_FEATURE_SB_SAFEPOINT
     unblock_gc_signals(0, 0);
 #endif
-    context_sap = alloc_sap(context);
+
     code = find_code(context);
     codeptr = (struct code *)native_pointer(code);
 

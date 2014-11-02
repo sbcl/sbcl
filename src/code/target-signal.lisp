@@ -172,14 +172,15 @@
 
 #!+(and sb-safepoint-strictly (not win32))
 (defun signal-handler-callback (run-handler signal args)
-  (sb!thread::initial-thread-function-trampoline
-   (sb!thread::make-signal-handling-thread :name "signal handler"
-                                           :signal-number signal)
-   nil (lambda ()
-         (let* ((info (sap-ref-sap args 0))
-                (context (sap-ref-sap args sb!vm:n-word-bytes)))
-           (funcall run-handler signal info context)))
-   nil nil nil nil))
+  ;; SAPs are dx allocated, close over the values, not the SAPs.
+  (let ((info (sap-ref-sap args 0))
+        (context (sap-ref-sap args sb!vm:n-word-bytes)))
+    (sb!thread::initial-thread-function-trampoline
+     (sb!thread::make-signal-handling-thread :name "signal handler"
+                                             :signal-number signal)
+     nil (lambda ()
+           (funcall run-handler signal info context))
+     nil nil nil nil)))
 
 
 ;;;; default LISP signal handlers
@@ -213,43 +214,47 @@
   (declare (ignore signal info))
   (declare (type system-area-pointer context))
   (/show "in Lisp-level SIGINT handler" (sap-int context))
-  (flet ((interrupt-it ()
-           ;; This seems wrong to me on multi-threaded builds.  The
-           ;; closed-over signal context belongs to a SIGINT handler.
-           ;; But this function gets run through INTERRUPT-THREAD,
-           ;; i.e. in in a SIGPIPE handler, at a different point in time
-           ;; or even a different thread.  How do we know that the
-           ;; SIGINT's context structure from the other thread is still
-           ;; alive and meaningful?  Why do we care?  If we even need
-           ;; the context and PC, shouldn't they come from the SIGPIPE's
-           ;; context? --DFL
-           (with-alien ((context (* os-context-t) context))
-             (with-interrupts
-               (let ((int (make-condition 'interactive-interrupt
-                                          :context context
-                                          :address (sap-int (sb!vm:context-pc context)))))
-                 ;; First SIGNAL, so that handlers can run.
-                 (signal int)
-                 ;; Then enter the debugger like BREAK.
-                 (%break 'sigint int))))))
-    #!+sb-safepoint
-    (let ((target (sb!thread::foreground-thread)))
-      ;; Note that INTERRUPT-THREAD on *CURRENT-THREAD* doesn't actually
-      ;; interrupt right away, because deferrables are blocked.  Rather,
-      ;; the kernel would arrange for the SIGPIPE to hit when the SIGINT
-      ;; handler is done.  However, on safepoint builds, we don't use
-      ;; SIGPIPE and lack an appropriate mechanism to handle pending
-      ;; thruptions upon exit from signal handlers (and this situation is
-      ;; unlike WITHOUT-INTERRUPTS, which handles pending interrupts
-      ;; explicitly at the end).  Only as long as safepoint builds pretend
-      ;; to cooperate with signals -- that is, as long as SIGINT-HANDLER
-      ;; is used at all -- detect this situation and work around it.
-      (if (eq target sb!thread:*current-thread*)
-          (interrupt-it)
-          (sb!thread:interrupt-thread target #'interrupt-it)))
-    #!-sb-safepoint
-    (sb!thread:interrupt-thread (sb!thread::foreground-thread)
-                                #'interrupt-it)))
+  ;; Copy CONTEXT, since the SAP is stack allocated and it's going
+  ;; to be passed to another thread. See the below comment on the
+  ;; general idea whether it's a good thing to do at all.
+  (let ((context (int-sap (sap-int context))))
+    (flet ((interrupt-it ()
+             ;; This seems wrong to me on multi-threaded builds.  The
+             ;; closed-over signal context belongs to a SIGINT handler.
+             ;; But this function gets run through INTERRUPT-THREAD,
+             ;; i.e. in in a SIGPIPE handler, at a different point in time
+             ;; or even a different thread.  How do we know that the
+             ;; SIGINT's context structure from the other thread is still
+             ;; alive and meaningful?  Why do we care?  If we even need
+             ;; the context and PC, shouldn't they come from the SIGPIPE's
+             ;; context? --DFL
+             (with-alien ((context (* os-context-t) context))
+               (with-interrupts
+                 (let ((int (make-condition 'interactive-interrupt
+                                            :context context
+                                            :address (sap-int (sb!vm:context-pc context)))))
+                   ;; First SIGNAL, so that handlers can run.
+                   (signal int)
+                   ;; Then enter the debugger like BREAK.
+                   (%break 'sigint int))))))
+      #!+sb-safepoint
+      (let ((target (sb!thread::foreground-thread)))
+        ;; Note that INTERRUPT-THREAD on *CURRENT-THREAD* doesn't actually
+        ;; interrupt right away, because deferrables are blocked.  Rather,
+        ;; the kernel would arrange for the SIGPIPE to hit when the SIGINT
+        ;; handler is done.  However, on safepoint builds, we don't use
+        ;; SIGPIPE and lack an appropriate mechanism to handle pending
+        ;; thruptions upon exit from signal handlers (and this situation is
+        ;; unlike WITHOUT-INTERRUPTS, which handles pending interrupts
+        ;; explicitly at the end).  Only as long as safepoint builds pretend
+        ;; to cooperate with signals -- that is, as long as SIGINT-HANDLER
+        ;; is used at all -- detect this situation and work around it.
+        (if (eq target sb!thread:*current-thread*)
+            (interrupt-it)
+            (sb!thread:interrupt-thread target #'interrupt-it)))
+      #!-sb-safepoint
+      (sb!thread:interrupt-thread (sb!thread::foreground-thread)
+                                  #'interrupt-it))))
 
 #!-sb-wtimer
 (defun sigalrm-handler (signal info context)

@@ -820,7 +820,7 @@ undo_fake_foreign_function_call(os_context_t *context)
 void
 interrupt_internal_error(os_context_t *context, boolean continuable)
 {
-    lispobj context_sap;
+    DX_ALLOC_SAP(context_sap, context);
 
     fake_foreign_function_call(context);
 
@@ -831,12 +831,9 @@ interrupt_internal_error(os_context_t *context, boolean continuable)
         lose("internal error too early in init, can't recover\n");
     }
 
-    /* Allocate the SAP object while the interrupts are still
-     * disabled. */
 #ifndef LISP_FEATURE_SB_SAFEPOINT
     unblock_gc_signals(0, 0);
 #endif
-    context_sap = alloc_sap(context);
 
 #if !defined(LISP_FEATURE_WIN32) || defined(LISP_FEATURE_SB_THREAD)
     thread_sigmask(SIG_SETMASK, os_context_sigmask_addr(context), 0);
@@ -1110,7 +1107,6 @@ interrupt_handle_now(int signal, siginfo_t *info, os_context_t *context)
          * Yeah, but non-gencgc platforms don't really wrap allocation
          * in PA. MG - 2005-08-29  */
 
-        lispobj info_sap, context_sap;
 
 #ifndef LISP_FEATURE_SB_SAFEPOINT
         /* Leave deferrable signals blocked, the handler itself will
@@ -1120,8 +1116,8 @@ interrupt_handle_now(int signal, siginfo_t *info, os_context_t *context)
         WITH_GC_AT_SAFEPOINTS_ONLY()
 #endif
         { // the block is needed for WITH_GC_AT_SAFEPOINTS_ONLY() to work
-            context_sap = alloc_sap(context);
-            info_sap = alloc_sap(info);
+            DX_ALLOC_SAP(context_sap, context);
+            DX_ALLOC_SAP(info_sap, info);
 
             FSHOW_SIGNAL((stderr,"/calling Lisp-level handler\n"));
 
@@ -2113,12 +2109,12 @@ lisp_memory_fault_error(os_context_t *context, os_vm_address_t addr)
 static void
 unhandled_trap_error(os_context_t *context)
 {
-    lispobj context_sap;
+    DX_ALLOC_SAP(context_sap, context);
     fake_foreign_function_call(context);
 #ifndef LISP_FEATURE_SB_SAFEPOINT
     unblock_gc_signals(0, 0);
 #endif
-    context_sap = alloc_sap(context);
+
 #if !defined(LISP_FEATURE_WIN32) || defined(LISP_FEATURE_SB_THREAD)
     thread_sigmask(SIG_SETMASK, os_context_sigmask_addr(context), 0);
 #endif
