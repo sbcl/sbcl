@@ -18,6 +18,7 @@
   (equalp (make-inet-address "242.1.211.3")  #(242 1 211 3))
   t)
 
+#-win32
 (deftest make-inet6-address.1
     (equalp (make-inet6-address "ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff")
             #(255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255))
@@ -90,11 +91,13 @@
       (:no-error nil))
   t)
 
+#-win32
 (deftest make-inet6-socket.smoke
   (let ((s (make-instance 'inet6-socket :type :stream :protocol (get-protocol-by-name "tcp"))))
     (and (> (socket-file-descriptor s) 1) t))
   t)
 
+#-win32
 (deftest make-inet6-socket.keyword
   (let ((s (make-instance 'inet6-socket :type :stream :protocol :tcp)))
     (and (> (socket-file-descriptor s) 1) t))
@@ -126,6 +129,7 @@
       (socket-close s2)))
   t)
 
+#-win32
 (deftest inet6-socket-bind
     (let* ((tcp (get-protocol-by-name "tcp"))
            (address (make-inet6-address "::1"))
