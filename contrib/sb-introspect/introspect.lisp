@@ -504,6 +504,7 @@ value."
 
 (defun find-function-callees (function)
   "Return functions called by FUNCTION."
+  (declare (sb-kernel:simple-fun function))
   (let ((callees '()))
     (map-code-constants
      (sb-kernel:fun-code-header function)
