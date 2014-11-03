@@ -183,3 +183,13 @@
     (check 'sb-kernel:redefinition-with-defmethod
            'sb-kernel:redefinition-warning
            'sb-kernel::new-location)))
+
+;; Do a quick test of FIND-SLOT-CELL for all slots of all classes with slots
+(with-test (:name :sanity-check-find-slot-cell)
+  (do-all-symbols (s)
+    (let ((class (find-class s nil)))
+      (when (and class (ignore-errors (sb-mop:class-slots class)))
+        (let ((layout (sb-kernel:find-layout s)))
+          (dolist (slot-name (mapcar #'sb-mop:slot-definition-name
+                                     (sb-mop:class-slots class)))
+            (assert (sb-pcl::find-slot-cell layout slot-name))))))))

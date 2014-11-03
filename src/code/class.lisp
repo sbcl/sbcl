@@ -202,7 +202,8 @@
   (slot-list nil :type list)
   ;; Information about slots in the class to PCL: this provides fast
   ;; access to slot-definitions and locations by name, etc.
-  (slot-table #(nil) :type simple-vector)
+  ;; See MAKE-SLOT-TABLE in pcl/slots-boot.lisp for further details.
+  (slot-table #(1 nil) :type simple-vector)
   ;; True IFF the layout belongs to a standand-instance or a
   ;; standard-funcallable-instance.
   ;; Old comment was:

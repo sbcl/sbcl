@@ -598,6 +598,10 @@
 ;;;   It would also be nice to have STANDARD-INSTANCE-STRUCTURE-P
 ;;;   generic instead of checking versus STANDARD-CLASS and
 ;;;   FUNCALLABLE-STANDARD-CLASS.
+;;;
+;;;   Uh, the comments above talking about how FIND-SLOT-DEFINITION
+;;;   does something with slot vectors has no basis in reality.
+;;;   Probably the comments need fixing, rather than the code.
 
 (defun find-slot-definition (class slot-name &optional errorp)
   (unless (class-finalized-p class)
@@ -615,26 +619,34 @@
 
 (defun find-slot-cell (wrapper slot-name)
   (declare (symbol slot-name))
+  (declare (optimize (sb-c::insert-array-bounds-checks 0)))
   (let* ((vector (layout-slot-table wrapper))
-         (index (rem (sxhash slot-name) (length vector))))
-    (declare (simple-vector vector) (index index)
-             (optimize (sb-c::insert-array-bounds-checks 0)))
-    (do ((plist (the list (svref vector index)) (cdr plist)))
-        ((not (consp plist)))
-      (let ((key (car plist)))
-        (setf plist (cdr plist))
-        (when (eq key slot-name)
-          (return (car plist)))))))
+         (modulus (truly-the index (svref vector 0)))
+         (index (rem (sxhash slot-name) modulus))
+         (probe (svref vector (1+ index))))
+    (declare (simple-vector vector) (index index))
+    (cond ((fixnump probe)
+           (do* ((count (svref vector (1- (truly-the index probe))))
+                 (end (truly-the index (+ probe count)))
+                 (j probe (1+ j)))
+                ((>= j end))
+             (declare (index count j))
+             (when (eq (svref vector j) slot-name)
+               (return (svref vector (truly-the index (+ j count)))))))
+          ((eq (car (truly-the list probe)) slot-name)
+           (cdr probe)))))
 
 (defun make-slot-table (class slots &optional bootstrap)
-  (let* ((n (+ (length slots) 2))
+  (if (not slots)
+      (return-from make-slot-table #(1 nil)))
+  (let* ((n (+ (logior (length slots) 1) 2)) ; an odd divisor is preferred
          (vector (make-array n :initial-element nil)))
     (flet ((add-to-vector (name slot)
              (declare (symbol name)
                       (optimize (sb-c::insert-array-bounds-checks 0)))
              (let ((index (rem (sxhash name) n)))
                (setf (svref vector index)
-                     (list* name
+                     (acons name
                             (cons (when (or bootstrap
                                             (and (standard-class-p class)
                                                  (slot-accessor-std-p slot 'all)))
@@ -651,4 +663,34 @@
             (add-to-vector (slot-definition-name slot) slot))
           (dolist (slot slots)
             (add-to-vector (early-slot-definition-name slot) slot))))
-    vector))
+    ;; The VECTOR as computed above implements a hash table with chaining.
+    ;; Rather than store chains using cons cells, chains can be stored in the
+    ;; vector itself at the end, with the table entry pointing to another
+    ;; index in the vector. The chain length is stored first, then all keys,
+    ;; then all values. The resulting structure takes less memory than
+    ;; linked lists, and can be scanned faster. As an exception, for lists
+    ;; of length 1, the table cell holds a (key . value) pair directly.
+    (let* ((final-n
+            (+ 1 n
+               ;; number of additional cells needed to represent linked lists
+               ;; as length-prefixed subsequences in the final vector.
+               (loop for cell across vector
+                     for count = (length cell)
+                     sum (if (<= count 1) 0 (1+ (* count 2))))))
+           (final-vector (make-array final-n))
+           (data-index (1+ n))) ; after the hashtable portion of the vector
+      (setf (aref final-vector 0) n) ; the modulus
+      (dotimes (i n final-vector)
+        (let ((alist (aref vector i)))
+          (if (not (cdr alist)) ; store it in the final vector as-is
+              (setf (aref final-vector (1+ i)) (car alist))
+              (let ((count (length alist)))
+                ;; Probed cell holds the index of the first symbol.
+                ;; The symbol count precedes the first symbol cell.
+                (setf (aref final-vector (1+ i)) (1+ data-index)
+                      (aref final-vector data-index) count)
+                (dolist (cell alist)
+                  (setf (aref final-vector (incf data-index)) (car cell)))
+                (dolist (cell alist)
+                  (setf (aref final-vector (incf data-index)) (cdr cell)))
+                (incf data-index))))))))
