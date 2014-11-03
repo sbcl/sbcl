@@ -595,10 +595,6 @@
 ;;; without additional GF calls.
 ;;;
 ;;; Notes:
-;;;   It would be probably better to store the vector in wrapper
-;;;   instead: one less memory indirection, one less CLOS slot
-;;;   access to get at it.
-;;;
 ;;;   It would also be nice to have STANDARD-INSTANCE-STRUCTURE-P
 ;;;   generic instead of checking versus STANDARD-CLASS and
 ;;;   FUNCALLABLE-STANDARD-CLASS.
