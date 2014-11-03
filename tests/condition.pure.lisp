@@ -334,3 +334,11 @@
      (compile nil '(lambda () (handler-bind
                                   ((no-such-condition-class #'print)))))
      warning)))
+
+;; Empty bindings in HANDLER-BIND pushed an empty cluster onto
+;; *HANDLER-CLUSTERS* which was not expected by SIGNAL (and wasteful).
+(with-test (:name (handler-bind :empty-bindings :bug-1388707))
+  (multiple-value-bind (value condition)
+      (ignore-errors (handler-bind () (error "Foo")))
+    (assert (null value))
+    (assert (typep condition 'simple-error))))

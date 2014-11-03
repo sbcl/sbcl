@@ -657,13 +657,17 @@ evaluated as a PROGN."
                     (local-function-handler type (second handler)))
                    (t
                     (push (apply #'entry-form binding) cluster-entries))))))
-      (mapc #'process-binding bindings)
-      `(dx-flet (,@(reverse local-functions))
-         (let ((*handler-clusters*
-                (list* (list ,@(nreverse cluster-entries)) *handler-clusters*)))
-           #!+stack-allocatable-fixed-objects
-           (declare (truly-dynamic-extent *handler-clusters*))
-           (progn ,form))))))
+      (cond
+        ((not bindings)
+         form)
+        (t
+         (mapc #'process-binding bindings)
+         `(dx-flet (,@(reverse local-functions))
+            (let ((*handler-clusters*
+                   (list* (list ,@(nreverse cluster-entries)) *handler-clusters*)))
+              #!+stack-allocatable-fixed-objects
+              (declare (truly-dynamic-extent *handler-clusters*))
+              (progn ,form))))))))
 
 (defmacro-mundanely handler-bind (bindings &body forms)
   #!+sb-doc
