@@ -161,3 +161,25 @@
 (with-test (:name (:bug-1332983 :validate-superclass stream t))
   (assert
    (sb-mop:validate-superclass (find-class 'stream) (find-class 't))))
+
+(with-test (:name (:bug-1049423 :duplicate-effective-slots))
+  (flet ((check (descendant-name ancestor-name slot-name)
+           (let ((kid (find-class descendant-name))
+                 (par (find-class ancestor-name)))
+             (assert (find par (sb-mop:class-precedence-list kid)))
+             ;; each specifies SLOT-NAME as a slot name
+             (find slot-name (sb-mop:class-direct-slots kid)
+                   :key 'sb-mop:slot-definition-name)
+             (find slot-name (sb-mop:class-direct-slots par)
+                   :key 'sb-pcl:slot-definition-name)
+             ;; there is only one effective slot of that name
+             (assert (= 1 (count slot-name (sb-mop:class-slots kid)
+                                 :key 'sb-pcl:slot-definition-name))))))
+    ;; metaclass = structure-class
+    ;; FUN-TYPE inherits CTYPE
+    (check 'sb-kernel:fun-type 'sb-kernel:ctype 'sb-kernel::class-info)
+    ;; metaclass = condition-class
+    ;; REDEFINITION-WITH-DEFMETHOD inherits REDEFINITION-WARNING
+    (check 'sb-kernel:redefinition-with-defmethod
+           'sb-kernel:redefinition-warning
+           'sb-kernel::new-location)))

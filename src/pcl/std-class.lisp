@@ -657,14 +657,6 @@
               (null c))))
     slotd))
 
-(defmethod compute-slots ((class condition-class))
-  (mapcan (lambda (superclass)
-            (mapcar (lambda (dslotd)
-                      (compute-effective-slot-definition
-                       class (slot-definition-name dslotd) (list dslotd)))
-                    (class-direct-slots superclass)))
-          (reverse (slot-value class '%class-precedence-list))))
-
 (defmethod compute-slots :around ((class condition-class))
   (let ((eslotds (call-next-method)))
     (mapc #'finalize-internal-slot-functions eslotds)
@@ -1119,9 +1111,14 @@
                                                  (cdr direct)))
             (nreverse name-dslotds-alist))))
 
+;; It seems to me that this should be one method defined on SLOT-CLASS.
 (defmethod compute-slots ((class standard-class))
   (std-compute-slots class))
 (defmethod compute-slots ((class funcallable-standard-class))
+  (std-compute-slots class))
+(defmethod compute-slots ((class structure-class))
+  (std-compute-slots class))
+(defmethod compute-slots ((class condition-class))
   (std-compute-slots class))
 
 (defun std-compute-slots-around (class eslotds)
@@ -1168,17 +1165,6 @@
 (defmethod compute-slots :around ((class funcallable-standard-class))
   (let ((eslotds (call-next-method)))
     (std-compute-slots-around class eslotds)))
-
-(defmethod compute-slots ((class structure-class))
-  (mapcan (lambda (superclass)
-            (mapcar (lambda (dslotd)
-                      (compute-effective-slot-definition
-                       class
-                       (slot-definition-name dslotd)
-                       (list dslotd)))
-                    (class-direct-slots superclass)))
-          (reverse (slot-value class '%class-precedence-list))))
-
 (defmethod compute-slots :around ((class structure-class))
   (let ((eslotds (call-next-method)))
     (mapc #'finalize-internal-slot-functions eslotds)
