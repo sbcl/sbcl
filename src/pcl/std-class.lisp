@@ -24,7 +24,7 @@
 (in-package "SB-PCL")
 
 (defmethod slot-accessor-function ((slotd effective-slot-definition) type)
-  (let ((info (slot-definition-info slotd)))
+  (let ((info (the slot-info (slot-definition-info slotd))))
     (ecase type
       (reader (slot-info-reader info))
       (writer (slot-info-writer info))
@@ -33,7 +33,7 @@
 (defmethod (setf slot-accessor-function) (function
                                           (slotd effective-slot-definition)
                                           type)
-  (let ((info (slot-definition-info slotd)))
+  (let ((info (the slot-info (slot-definition-info slotd))))
     (ecase type
       (reader (setf (slot-info-reader info) function))
       (writer (setf (slot-info-writer info) function))
@@ -49,12 +49,10 @@
     (declare (type fixnum flags))
     (if (eq type 'all)
         (eql +slotd-all-function-std-p+ flags)
-        (let ((mask (ecase type
-                      (reader +slotd-reader-function-std-p+)
-                      (writer +slotd-writer-function-std-p+)
-                      (boundp +slotd-boundp-function-std-p+))))
-          (declare (type fixnum mask))
-          (not (zerop (the fixnum (logand mask flags))))))))
+        (logtest flags (ecase type
+                        (reader +slotd-reader-function-std-p+)
+                        (writer +slotd-writer-function-std-p+)
+                        (boundp +slotd-boundp-function-std-p+))))))
 
 (defmethod (setf slot-accessor-std-p) (value
                                        (slotd effective-slot-definition)
@@ -66,9 +64,7 @@
         (flags (slot-value slotd 'accessor-flags)))
     (declare (type fixnum mask flags))
     (setf (slot-value slotd 'accessor-flags)
-          (if value
-              (the fixnum (logior mask flags))
-              (the fixnum (logand (the fixnum (lognot mask)) flags)))))
+          (logior (logandc2 flags mask) (if value mask 0))))
   value)
 
 (defmethod initialize-internal-slot-functions

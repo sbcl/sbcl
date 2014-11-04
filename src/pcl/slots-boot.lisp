@@ -141,7 +141,7 @@
        (writer (slot-definition-internal-writer-function slotd))
        (boundp (make-structure-slot-boundp-function slotd))))
     ((condition-class-p class)
-     (let ((info (slot-definition-info slotd)))
+     (let ((info (the slot-info (slot-definition-info slotd))))
        (ecase name
          (reader (slot-info-reader info))
          (writer (slot-info-writer info))
