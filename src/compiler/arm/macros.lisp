@@ -234,7 +234,7 @@
                   (composite-immediate-instruction add ,result-tn ,result-tn ,size)
                   (inst add ,result-tn ,result-tn ,size))
               (inst cmp ,result-tn ,flag-tn)
-              (inst b :gt ALLOC)
+              (inst b :hi ALLOC)
               (inst load-from-label ,flag-tn ,flag-tn FIXUP)
               (storew ,result-tn ,flag-tn)
 
