@@ -110,21 +110,23 @@
 (declaim (ftype (sfunction (t symbol) t) slot-value))
 (defun slot-value (object slot-name)
   (let* ((wrapper (valid-wrapper-of object))
-         (cell (or (find-slot-cell wrapper slot-name)
-                   (return-from slot-value
-                     (values (slot-missing (wrapper-class* wrapper) object slot-name
-                                           'slot-value)))))
+         (cell (find-slot-cell wrapper slot-name))
          (location (car cell))
          (value
           (cond ((fixnump location)
                  (if (std-instance-p object)
                      (standard-instance-access object location)
                      (funcallable-standard-instance-access object location)))
-                ((consp location)
-                 (cdr location))
                 ((not location)
                  (return-from slot-value
-                   (funcall (slot-info-reader (cdr cell)) object)))
+                   (if cell
+                       (funcall (slot-info-reader (cdr cell)) object)
+                       (values (slot-missing (wrapper-class* wrapper) object
+                                             slot-name 'slot-value)))))
+                ;; this next test means CONSP, but the transform that weakens
+                ;; CONSP to LISTP isn't working here for some reason.
+                ((listp location)
+                 (cdr location))
                 (t
                  (bug "Bogus slot cell in SLOT-VALUE: ~S" cell)))))
     (if (eq +slot-unbound+ value)
@@ -156,10 +158,10 @@
                (setf (standard-instance-access object location) new-value)
                (setf (funcallable-standard-instance-access object location)
                      new-value)))
-          ((consp location)
-           (setf (cdr location) new-value))
           ((not location)
            (funcall (slot-info-writer info) new-value object))
+          ((listp location) ; forcibly transform CONSP to LISTP
+           (setf (cdr location) new-value))
           (t
            (bug "Bogus slot-cell in SET-SLOT-VALUE: ~S" cell))))
   new-value)
@@ -202,11 +204,11 @@
                           (cas (standard-instance-access object location) old-value new-value)
                           (cas (funcallable-standard-instance-access object location)
                                old-value new-value)))
-                     ((consp location)
-                      (cas (cdr location) old-value new-value))
                      ((not location)
                       ;; FIXME: (CAS SLOT-VALUE-USING-CLASS)...
                       (error "Cannot compare-and-swap slot ~S on: ~S" slot-name object))
+                     ((listp location) ; forcibly transform CONSP to LISTP
+                      (cas (cdr location) old-value new-value))
                      (t
                       (bug "Bogus slot-cell in (CAS SLOT-VALUE): ~S" cell)))))
       (if (and (eq +slot-unbound+ old)
@@ -216,22 +218,22 @@
 
 (defun slot-boundp (object slot-name)
   (let* ((wrapper (valid-wrapper-of object))
-         (cell (or (find-slot-cell wrapper slot-name)
-                   (return-from slot-boundp
-                     (and (slot-missing (wrapper-class* wrapper) object slot-name
-                                        'slot-boundp)
-                          t))))
+         (cell (find-slot-cell wrapper slot-name))
          (location (car cell))
          (value
           (cond ((fixnump location)
                  (if (std-instance-p object)
                      (standard-instance-access object location)
                      (funcallable-standard-instance-access object location)))
-                ((consp location)
-                 (cdr location))
                 ((not location)
                  (return-from slot-boundp
-                   (funcall (slot-info-boundp (cdr cell)) object)))
+                   (if cell
+                       (funcall (slot-info-boundp (cdr cell)) object)
+                       (and (slot-missing (wrapper-class* wrapper) object
+                                          slot-name 'slot-boundp)
+                            t))))
+                ((listp location) ; forcibly transform CONSP to LISTP
+                 (cdr location))
                 (t
                  (bug "Bogus slot cell in SLOT-VALUE: ~S" cell)))))
     (not (eq +slot-unbound+ value))))
@@ -252,17 +254,23 @@
                (setf (standard-instance-access object location) +slot-unbound+)
                (setf (funcallable-standard-instance-access object location)
                      +slot-unbound+)))
-          ((consp location)
-           (setf (cdr location) +slot-unbound+))
-          ((not cell)
-           (slot-missing (wrapper-class* wrapper) object slot-name 'slot-makunbound))
           ((not location)
-           (let ((class (wrapper-class* wrapper)))
-             (slot-makunbound-using-class class object (find-slot-definition class slot-name))))
+           (if cell
+               (let ((class (wrapper-class* wrapper)))
+                 (slot-makunbound-using-class class object
+                                              (find-slot-definition class slot-name)))
+               (slot-missing (wrapper-class* wrapper) object slot-name
+                             'slot-makunbound)))
+          ((listp location) ; forcibly transform CONSP to LISTP
+           (setf (cdr location) +slot-unbound+))
           (t
            (bug "Bogus slot-cell in SLOT-MAKUNBOUND: ~S" cell))))
   object)
 
+;; I guess we don't care enough to use the hash-based lookup mechanism here.
+;; Also note that CLHS "encourages" implementors to base this on
+;; SLOT-EXISTS-P-USING-CLASS, whereas 88-002R made no such claim,
+;; however Appendix D of AMOP sketches out such an implementation.
 (defun slot-exists-p (object slot-name)
   (let ((class (class-of object)))
     (not (null (find-slot-definition class slot-name)))))
