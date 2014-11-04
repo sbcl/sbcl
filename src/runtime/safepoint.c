@@ -972,6 +972,8 @@ signal_handler_callback(lispobj run_handler, int signo, void *info, void *ctx)
 {
     init_thread_data scribble;
     void *args[2];
+    DX_ALLOC_SAP(args_sap, args);
+
     args[0] = info;
     args[1] = ctx;
 
@@ -979,7 +981,7 @@ signal_handler_callback(lispobj run_handler, int signo, void *info, void *ctx)
 
     odxprint(misc, "callback from signal handler thread for: %d\n", signo);
     funcall3(StaticSymbolFunction(SIGNAL_HANDLER_CALLBACK),
-             run_handler, make_fixnum(signo), alloc_sap(args));
+             run_handler, make_fixnum(signo), args_sap);
 
     detach_os_thread(&scribble);
     return;
