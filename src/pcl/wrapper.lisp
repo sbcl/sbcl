@@ -104,6 +104,15 @@
 (declaim (inline wrapper-class*))
 (defun wrapper-class* (wrapper)
   (or (wrapper-class wrapper)
+      ;; FIXME: this branch seems unreachable.
+      ;; It would be nice to eliminate WRAPPER-CLASS* if we can show that it
+      ;; is only a holdover from an earlier way of bootstrapping that resulted
+      ;; in the temporary absence of a PCL-CLASS for some non-standard-class.
+      ;; Certainly no test gets here [changing it to (BUG "got here") worked].
+      ;; Note however that
+      ;;  (CLASSOID-PCL-CLASS (FIND-CLASSOID 'STANDARD-INSTANCE)) => NIL
+      ;; which can be resolved by just ensuring one time that it has a CLASS.
+      ;; And nothing else seems to be problematic.
       (let ((classoid (layout-classoid wrapper)))
         (ensure-non-standard-class
          (classoid-name classoid)
