@@ -1312,8 +1312,9 @@ gc_heap_exhausted_error_or_lose (sword_t available, sword_t requested)
         if (SymbolValue(INTERRUPTS_ENABLED,thread) == NIL)
             corruption_warning_and_maybe_lose
                 ("Signalling HEAP-EXHAUSTED in a WITHOUT-INTERRUPTS.");
-        funcall2(StaticSymbolFunction(HEAP_EXHAUSTED_ERROR),
-                 alloc_number(available), alloc_number(requested));
+        /* available and requested should be double word aligned, thus
+           they can passed as fixnums and shifted later. */
+        funcall2(StaticSymbolFunction(HEAP_EXHAUSTED_ERROR), available, requested);
         lose("HEAP-EXHAUSTED-ERROR fell through");
     }
 }

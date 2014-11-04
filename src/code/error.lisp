@@ -200,7 +200,7 @@ PROCEED WITH CAUTION."))))
          (format stream
                  ;; no pretty-printing, because that will use a lot of heap.
                  "Heap exhausted (no more space for allocation).
-There are still ~D bytes available; the request was for ~D bytes.
+~D bytes available, ~D requested.
 
 PROCEED WITH CAUTION."
                  *heap-exhausted-error-available-bytes*

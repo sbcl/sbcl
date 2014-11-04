@@ -330,9 +330,14 @@
 (defvar *heap-exhausted-error-requested-bytes*)
 
 (defun heap-exhausted-error (available requested)
+  ;; Double word aligned bytes, can be passed as fixnums to avoid
+  ;; allocating bignums on the C side.
+  (declare (fixnum available requested))
   (infinite-error-protect
-   (let ((*heap-exhausted-error-available-bytes* available)
-         (*heap-exhausted-error-requested-bytes* requested))
+   (let ((*heap-exhausted-error-available-bytes*
+           (ash available sb!vm:n-fixnum-tag-bits))
+         (*heap-exhausted-error-requested-bytes*
+           (ash requested sb!vm:n-fixnum-tag-bits)))
      (error *heap-exhausted-error-condition*))))
 
 (defun undefined-alien-variable-error ()
