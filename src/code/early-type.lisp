@@ -362,7 +362,7 @@
 ;;; things such as SIMPLE-BASE-STRING.
 (defstruct (array-type (:include ctype
                                  (class-info (type-class-or-lose 'array)))
-                       (:constructor %make-array-type
+                       (:constructor make-array-type
                         (dimensions &key complexp element-type
                                     specialized-element-type))
                        (:copier nil))
@@ -375,7 +375,6 @@
   (element-type (missing-arg) :type ctype :read-only t)
   ;; the element type as it is specialized in this implementation
   (specialized-element-type *wild-type* :type ctype :read-only t))
-(define-cached-synonym make-array-type)
 
 ;;; A MEMBER-TYPE represent a use of the MEMBER type specifier. We
 ;;; bother with this at this level because MEMBER types are fairly
@@ -475,9 +474,8 @@
 ;;;   2. There are never any UNION-TYPE components.
 (defstruct (union-type (:include compound-type
                                  (class-info (type-class-or-lose 'union)))
-                       (:constructor %make-union-type (enumerable types))
+                       (:constructor make-union-type (enumerable types))
                        (:copier nil)))
-(define-cached-synonym make-union-type)
 
 ;;; An INTERSECTION-TYPE represents a use of the AND type specifier
 ;;; which we couldn't canonicalize to something simpler. Canonical form:

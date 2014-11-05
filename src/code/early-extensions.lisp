@@ -730,16 +730,6 @@
                    forms
                    `((,memoizer ,@forms)))))))))
 
-(defmacro define-cached-synonym
-    (name &optional (original (symbolicate "%" name)))
-  (let ((cached-name (symbolicate "%%" name "-CACHED")))
-    `(progn
-       (defun-cached (,cached-name :hash-bits 8 :hash-function #'sxhash)
-           ((args equal))
-         (apply #',original args))
-       (defun ,name (&rest args)
-         (,cached-name args)))))
-
 ;;; FIXME: maybe not the best place
 ;;;
 ;;; FIXME: think of a better name -- not only does this not have the
