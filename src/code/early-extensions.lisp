@@ -674,14 +674,7 @@
                          (t
                            ,@(when *profile-hash-cache* ; count evictions
                                `((incf (aref ,statistics-name 2))))
-                             ;; Use one bit of randomness to pick a victim.
-                           (setf (svref ,cache ; [revisit- PVK says pick idx1]
-                                     (if #-sb-xc-host
-                                         (logbitp 4 (sb!kernel:get-lisp-obj-address
-                                                     ,(car arg-vars)))
-                                         #+sb-xc-host (zerop (random 2))
-                                         idx1 idx2))
-                              ,entry))))
+                           (setf (svref ,cache idx1) ,entry))))
                  (values ,@result-temps))))))
     `(progn
        (pushnew ',var-name *cache-vector-symbols*)

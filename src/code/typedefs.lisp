@@ -59,6 +59,11 @@
          ',name))))
 
 
+#+sb-xc-host
+(defun ctype-random ()
+  (setq *ctype-lcg-state*
+        (logand #x8fffff (+ (* 1103515245 *ctype-lcg-state*) 12345))))
+
 ;;; the base class for the internal representation of types
 (def!struct (ctype (:conc-name type-)
                    (:constructor nil)
@@ -81,11 +86,13 @@
   (enumerable nil :read-only t)
   ;; an arbitrary hash code used in EQ-style hashing of identity
   ;; (since EQ hashing can't be done portably)
-  ;; In host lisp, use integers that are likely to be host fixnums,
-  ;; but don't declare the slot-type as such, in case not.
-  ;; In the target, use scrambled bits from the allocation pointer instead.
+  ;; - in the host lisp, generate a hash value using a known, simple
+  ;;   random number generator (rather than the host lisp's
+  ;;   implementation of RANDOM)
+  ;; - in the target, use scrambled bits from the allocation pointer
+  ;;   instead.
   (hash-value
-   #+sb-xc-host (random #.(ash 1 23) *ctype-hash-state*)
+   #+sb-xc-host (ctype-random)
    #-sb-xc-host (sb!impl::quasi-random-address-based-hash *ctype-hash-state*)
               :type (and #-sb-xc-host fixnum unsigned-byte)
               :read-only t)

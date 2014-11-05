@@ -18,7 +18,8 @@
 ;; By initializing the state and type-class storage vector at once,
 ;; it is obvious that either both have been made or neither one has been.
 #-sb-xc
-(progn (defvar *ctype-hash-state* (make-random-state))
+(progn (defvar *ctype-lcg-state* 1)
+       (defvar *ctype-hash-state* (make-random-state))
        (defvar *type-classes* (make-array 20 :fill-pointer 0)))
 #+sb-xc
 (macrolet ((def ()
