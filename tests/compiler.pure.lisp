@@ -5381,3 +5381,13 @@
    (compile nil '(lambda ()
                    (declare (optimize speed)) (declare (optimize (speed 3)))
                    5))))
+
+(with-test (:name :truncate-type-derivation)
+  (assert (=
+           4
+           (funcall
+            (compile nil
+                     '(lambda (a b)
+                       (truncate a
+                        (the (rational (1) (3)) b))))
+            10 5/2))))

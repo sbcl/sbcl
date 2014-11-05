@@ -957,7 +957,7 @@
           (bot-range (interval-range-info bot)))
       (cond ((null bot-range)
              ;; The denominator contains zero, so anything goes!
-             (make-interval :low nil :high nil))
+             (make-interval))
             ((eq bot-range '-)
              ;; Denominator is negative so flip the sign, compute the
              ;; result, and flip it back.
@@ -966,8 +966,9 @@
              ;; Split top into two positive and negative parts, and
              ;; divide each separately
              (destructuring-bind (top- top+) (interval-split 0 top t t)
-               (interval-merge-pair (interval-div top- bot)
-                                    (interval-div top+ bot))))
+               (or (interval-merge-pair (interval-div top- bot)
+                                        (interval-div top+ bot))
+                   (make-interval))))
             ((eq top-range '-)
              ;; Top is negative so flip the sign, divide, and flip the
              ;; sign of the result.
