@@ -715,7 +715,7 @@
 
 (defclass dependent-update-mixin (plist-mixin) ())
 
-(defparameter *early-class-predicates*
+(defparameter *!early-class-predicates*
   '((specializer specializerp)
     (standard-specializer standard-specializer-p)
     (exact-class-specializer exact-class-specializer-p)

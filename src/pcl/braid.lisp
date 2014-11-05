@@ -509,11 +509,13 @@
 
 ;;; FIXME: find a better name.
 (defun !bootstrap-class-predicates (early-p)
-  (let ((*early-p* early-p))
-    (dolist (ecp *early-class-predicates*)
+  (let ((*early-p* early-p)
+        (source-loc (sb-c:source-location)))
+    (dolist (ecp *!early-class-predicates*)
       (let ((class-name (car ecp))
             (predicate-name (cadr ecp)))
-        (make-class-predicate (find-class class-name) predicate-name)))))
+        (!make-class-predicate (find-class class-name) predicate-name
+                               source-loc)))))
 
 (defun !bootstrap-built-in-classes ()
 
@@ -612,9 +614,9 @@
 (pushnew 'ensure-deffoo-class sb-kernel::*defstruct-hooks*)
 (pushnew 'ensure-deffoo-class sb-kernel::*define-condition-hooks*)
 
-;;; FIXME: only needed during bootstrap
-(defun make-class-predicate (class name)
-  (let* ((gf (ensure-generic-function name :lambda-list '(object)))
+(defun !make-class-predicate (class name source-location)
+  (let* ((gf (ensure-generic-function name :lambda-list '(object)
+                                      :definition-source source-location))
          (mlist (if (eq **boot-state** 'complete)
                     (early-gf-methods gf)
                     (generic-function-methods gf))))
