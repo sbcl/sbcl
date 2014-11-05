@@ -572,50 +572,65 @@
 ;;; This cache is sized extremely generously, which has payoff
 ;;; elsewhere: it improves the TYPE= and CSUBTYPEP functions,
 ;;; since EQ types are an immediate win.
+;;;
+;;; KLUDGE: why isn't this a MACROLET?  "lexical environment too
+;;; hairy"
+(defmacro !values-specifier-type-body (arg)
+  `(let ((u (uncross ,arg)))
+     (or (info :type :builtin u)
+         (let ((spec (typexpand u)))
+           (cond
+             ((and (not (eq spec u))
+                   (info :type :builtin spec)))
+             ((and (consp spec) (symbolp (car spec))
+                   (info :type :builtin (car spec))
+                   (let ((expander (info :type :expander (car spec))))
+                     (and expander (values-specifier-type (funcall expander spec))))))
+             ((eq (info :type :kind spec) :instance)
+              (find-classoid spec))
+             ((typep spec 'classoid)
+              (if (typep spec 'built-in-classoid)
+                  (or (built-in-classoid-translation spec) spec)
+                  spec))
+             (t
+              (when (and (atom spec)
+                         (member spec '(and or not member eql satisfies values)))
+                (error "The symbol ~S is not valid as a type specifier." spec))
+              (let ((fun (info :type :translator (if (consp spec) (car spec) spec))))
+                (cond (fun
+                       (funcall fun (if (atom spec) (list spec) spec)))
+                      ((or (and (consp spec) (symbolp (car spec))
+                                (not (info :type :builtin (car spec))))
+                           (and (symbolp spec) (not (info :type :builtin spec))))
+                       (when (and *type-system-initialized*
+                                  (not (eq (info :type :kind spec)
+                                           :forthcoming-defclass-type)))
+                         (signal 'parse-unknown-type :specifier spec))
+                       ;; (The RETURN-FROM here inhibits caching; this
+                       ;; does not only make sense from a compiler
+                       ;; diagnostics point of view but is also
+                       ;; indispensable for proper workingness of
+                       ;; VALID-TYPE-SPECIFIER-P.)
+                       (return-from values-specifier-type
+                         (make-unknown-type :specifier spec)))
+                      (t
+                       (error "bad thing to be a type specifier: ~S"
+                              spec))))))))))
+#+sb-xc-host
+(let ((table (make-hash-table :test 'equal)))
+  (defun values-specifier-type (specifier)
+    (multiple-value-bind (type yesp) (gethash specifier table)
+      (if yesp
+          type
+          (setf (gethash specifier table)
+                (!values-specifier-type-body specifier)))))
+  (defun values-specifier-type-cache-clear ()
+    (clrhash table)))
+#-sb-xc-host
 (defun-cached (values-specifier-type
-               :hash-function #'sxhash
-               :hash-bits 10)
-              ((orig equal-but-no-car-recursion))
-  (let ((u (uncross orig)))
-    (or (info :type :builtin u)
-        (let ((spec (typexpand u)))
-          (cond
-           ((and (not (eq spec u))
-                 (info :type :builtin spec)))
-           ((and (consp spec) (symbolp (car spec))
-                 (info :type :builtin (car spec))
-                 (let ((expander (info :type :expander (car spec))))
-                   (and expander (values-specifier-type (funcall expander spec))))))
-           ((eq (info :type :kind spec) :instance)
-            (find-classoid spec))
-           ((typep spec 'classoid)
-            (if (typep spec 'built-in-classoid)
-                (or (built-in-classoid-translation spec) spec)
-                spec))
-           (t
-            (when (and (atom spec)
-                       (member spec '(and or not member eql satisfies values)))
-              (error "The symbol ~S is not valid as a type specifier." spec))
-            (let ((fun (info :type :translator (if (consp spec) (car spec) spec))))
-              (cond (fun
-                     (funcall fun (if (atom spec) (list spec) spec)))
-                    ((or (and (consp spec) (symbolp (car spec))
-                              (not (info :type :builtin (car spec))))
-                         (and (symbolp spec) (not (info :type :builtin spec))))
-                     (when (and *type-system-initialized*
-                                (not (eq (info :type :kind spec)
-                                         :forthcoming-defclass-type)))
-                       (signal 'parse-unknown-type :specifier spec))
-                     ;; (The RETURN-FROM here inhibits caching; this
-                     ;; does not only make sense from a compiler
-                     ;; diagnostics point of view but is also
-                     ;; indispensable for proper workingness of
-                     ;; VALID-TYPE-SPECIFIER-P.)
-                     (return-from values-specifier-type
-                       (make-unknown-type :specifier spec)))
-                    (t
-                     (error "bad thing to be a type specifier: ~S"
-                            spec))))))))))
+               :hash-function #'sxhash :hash-bits 10)
+    ((orig equal-but-no-car-recursion))
+  (!values-specifier-type-body orig))
 
 ;;; This is like VALUES-SPECIFIER-TYPE, except that we guarantee to
 ;;; never return a VALUES type.
