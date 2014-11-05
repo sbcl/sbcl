@@ -201,7 +201,7 @@
                ;; situation, since we don't have anything approaching a test-case
                ;; for the bug.
                (let ((new-state (layout-invalid (layout-of instance))))
-                 (unless (neq t new-state)
+                 (when (eq new-state t)
                    (cerror "Nevermind and recurse." 'bug
                            :format-control "~@<~4IProblem forcing cache flushes. Please report ~
                                                to sbcl-devel.~
