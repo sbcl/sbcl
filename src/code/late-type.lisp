@@ -859,7 +859,7 @@
 ;;; simplified into the canonical form, thus is not a UNION-TYPE
 ;;; unless we find no other way to represent the result.
 (defun-cached (type-union2 :hash-function #'type-cache-hash
-                           :hash-bits 8
+                           :hash-bits 11
                            :memoizer memoize)
               ((type1 eq) (type2 eq))
   ;; KLUDGE: This was generated from TYPE-INTERSECTION2 by Ye Olde Cut And
@@ -923,7 +923,7 @@
                        nil))))))))
 
 (defun-cached (type-intersection2 :hash-function #'type-cache-hash
-                                  :hash-bits 9
+                                  :hash-bits 11
                                   :memoizer memoize
                                   :values 1)
               ((type1 eq) (type2 eq))
@@ -1061,7 +1061,7 @@
 
 (defun type-intersection (&rest input-types)
   (%type-intersection input-types))
-(defun-cached (%type-intersection :hash-bits 8 :hash-function #'sxhash)
+(defun-cached (%type-intersection :hash-bits 10 :hash-function #'type-list-cache-hash)
     ((input-types equal))
   (let ((simplified-types (simplify-intersections input-types)))
     (declare (type list simplified-types))
@@ -1094,7 +1094,7 @@
 
 (defun type-union (&rest input-types)
   (%type-union input-types))
-(defun-cached (%type-union :hash-bits 8 :hash-function #'sxhash)
+(defun-cached (%type-union :hash-bits 8 :hash-function #'type-list-cache-hash)
     ((input-types equal))
   (let ((simplified-types (simplify-unions input-types)))
     (cond
