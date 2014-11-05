@@ -186,7 +186,7 @@ struct page *page_table;
  * dwords in there that are not used, so that they do not act as false
  * root to other things in the heap from then on? This is a new feature
  * but in testing it is both reliable and no noticeable slowdown. */
-int do_wipe_p = 1;
+int do_wipe_p = 0;
 
 /* a value that we use to wipe out unused words in GC cards that
  * live alongside conservatively to pointed words. */
