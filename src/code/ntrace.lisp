@@ -628,8 +628,8 @@ The following options are defined:
 
 :CONDITION, :BREAK and :PRINT forms are evaluated in a context which
 mocks up the lexical environment of the called function, so that
-SB-DEBUG:VAR and SB-DEBUG:ARG can be used. The -AFTER and -ALL forms
-are evaluated in the null environment."
+SB-DEBUG:VAR and SB-DEBUG:ARG can be used.
+The -AFTER and -ALL forms can use SB-DEBUG:ARG."
   (if specs
       (expand-trace specs)
       '(%list-traced-funs)))
