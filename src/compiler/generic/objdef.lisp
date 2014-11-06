@@ -35,7 +35,7 @@
 
 ;;;; the primitive objects themselves
 
-(define-primitive-object (cons :type cons
+(!define-primitive-object (cons :type cons
                                :lowtag list-pointer-lowtag
                                :alloc-trans cons)
   (car :ref-trans car :set-trans sb!c::%rplaca :init :arg
@@ -43,17 +43,17 @@
   (cdr :ref-trans cdr :set-trans sb!c::%rplacd :init :arg
        :cas-trans %compare-and-swap-cdr))
 
-(define-primitive-object (instance :lowtag instance-pointer-lowtag
+(!define-primitive-object (instance :lowtag instance-pointer-lowtag
                                    :widetag instance-header-widetag
                                    :alloc-trans %make-instance)
   (slots :rest-p t))
 
-(define-primitive-object (bignum :lowtag other-pointer-lowtag
+(!define-primitive-object (bignum :lowtag other-pointer-lowtag
                                  :widetag bignum-widetag
                                  :alloc-trans sb!bignum::%allocate-bignum)
   (digits :rest-p t :c-type #!-alpha "sword_t" #!+alpha "u32"))
 
-(define-primitive-object (ratio :type ratio
+(!define-primitive-object (ratio :type ratio
                                 :lowtag other-pointer-lowtag
                                 :widetag ratio-widetag
                                 :alloc-trans %make-ratio)
@@ -67,22 +67,22 @@
                :init :arg))
 
 #!+#.(cl:if (cl:= sb!vm:n-word-bits 32) '(and) '(or))
-(define-primitive-object (single-float :lowtag other-pointer-lowtag
+(!define-primitive-object (single-float :lowtag other-pointer-lowtag
                                        :widetag single-float-widetag)
   (value :c-type "float"))
 
-(define-primitive-object (double-float :lowtag other-pointer-lowtag
+(!define-primitive-object (double-float :lowtag other-pointer-lowtag
                                        :widetag double-float-widetag)
   #!-x86-64 (filler)
   (value :c-type "double" :length #!-x86-64 2 #!+x86-64 1))
 
 #!+long-float
-(define-primitive-object (long-float :lowtag other-pointer-lowtag
+(!define-primitive-object (long-float :lowtag other-pointer-lowtag
                                      :widetag long-float-widetag)
   #!+sparc (filler)
   (value :c-type "long double" :length #!+x86 3 #!+sparc 4))
 
-(define-primitive-object (complex :type complex
+(!define-primitive-object (complex :type complex
                                   :lowtag other-pointer-lowtag
                                   :widetag complex-widetag
                                   :alloc-trans %make-complex)
@@ -95,7 +95,7 @@
         :ref-trans %imagpart
         :init :arg))
 
-(define-primitive-object (array :lowtag other-pointer-lowtag
+(!define-primitive-object (array :lowtag other-pointer-lowtag
                                 :widetag t)
   ;; FILL-POINTER of an ARRAY is in the same place as LENGTH of a
   ;; VECTOR -- see SHRINK-VECTOR.
@@ -139,7 +139,7 @@
                   :set-known ())
   (dimensions :rest-p t))
 
-(define-primitive-object (vector :type vector
+(!define-primitive-object (vector :type vector
                                  :lowtag other-pointer-lowtag
                                  :widetag t)
   ;; FILL-POINTER of an ARRAY is in the same place as LENGTH of a
@@ -149,7 +149,7 @@
   (data :rest-p t :c-type #!-alpha "uword_t" #!+alpha "u32"))
 
 ;;; The header contains the size of slots and constants in words.
-(define-primitive-object (code :type code-component
+(!define-primitive-object (code :type code-component
                                :lowtag other-pointer-lowtag
                                :widetag t)
   ;; This is the size of instructions in bytes, not aligned.
@@ -170,7 +170,7 @@
               :set-trans (setf %code-debug-info))
   (constants :rest-p t))
 
-(define-primitive-object (fdefn :type fdefn
+(!define-primitive-object (fdefn :type fdefn
                                 :lowtag other-pointer-lowtag
                                 :widetag fdefn-widetag)
   (name :ref-trans fdefn-name)
@@ -179,7 +179,7 @@
 
 ;;; a simple function (as opposed to hairier things like closures
 ;;; which are also subtypes of Common Lisp's FUNCTION type)
-(define-primitive-object (simple-fun :type function
+(!define-primitive-object (simple-fun :type function
                                      :lowtag fun-pointer-lowtag
                                      :widetag simple-fun-header-widetag)
   #!-(or x86 x86-64) (self :ref-trans %simple-fun-self
@@ -236,10 +236,10 @@
              :set-trans (setf %simple-fun-debug-fun))
   (code :rest-p t :c-type "unsigned char"))
 
-(define-primitive-object (return-pc :lowtag other-pointer-lowtag :widetag t)
+(!define-primitive-object (return-pc :lowtag other-pointer-lowtag :widetag t)
   (return-point :c-type "unsigned char" :rest-p t))
 
-(define-primitive-object (closure :lowtag fun-pointer-lowtag
+(!define-primitive-object (closure :lowtag fun-pointer-lowtag
                                   :widetag closure-header-widetag)
   ;; %CLOSURE-FUN should never be invoked on x86[-64].
   ;; The above remark at %SIMPLE-FUN-SELF is relevant in its sentiment,
@@ -249,7 +249,7 @@
   #!+(or x86 x86-64) (fun :init :arg)
   (info :rest-p t))
 
-(define-primitive-object (funcallable-instance
+(!define-primitive-object (funcallable-instance
                           :lowtag fun-pointer-lowtag
                           :widetag funcallable-instance-header-widetag
                           :alloc-trans %make-funcallable-instance)
@@ -258,7 +258,7 @@
             :set-known () :set-trans (setf %funcallable-instance-function))
   (info :rest-p t))
 
-(define-primitive-object (value-cell :lowtag other-pointer-lowtag
+(!define-primitive-object (value-cell :lowtag other-pointer-lowtag
                                      :widetag value-cell-header-widetag
                                      ;; FIXME: We also have an explicit VOP
                                      ;; for this. Is this needed as well?
@@ -270,18 +270,18 @@
          :init :arg))
 
 #!+alpha
-(define-primitive-object (sap :lowtag other-pointer-lowtag
+(!define-primitive-object (sap :lowtag other-pointer-lowtag
                               :widetag sap-widetag)
   (padding)
   (pointer :c-type "char *" :length 2))
 
 #!-alpha
-(define-primitive-object (sap :lowtag other-pointer-lowtag
+(!define-primitive-object (sap :lowtag other-pointer-lowtag
                               :widetag sap-widetag)
   (pointer :c-type "char *"))
 
 
-(define-primitive-object (weak-pointer :type weak-pointer
+(!define-primitive-object (weak-pointer :type weak-pointer
                                        :lowtag other-pointer-lowtag
                                        :widetag weak-pointer-widetag
                                        :alloc-trans make-weak-pointer)
@@ -294,11 +294,11 @@
 
 ;;;; other non-heap data blocks
 
-(define-primitive-object (binding)
+(!define-primitive-object (binding)
   value
   symbol) ;; on sb-thread, this is actually a tls-index
 
-(define-primitive-object (unwind-block)
+(!define-primitive-object (unwind-block)
   (current-uwp :c-type #!-alpha "struct unwind_block *" #!+alpha "u32")
   (current-cont :c-type #!-alpha "lispobj *" #!+alpha "u32")
   #!-(or x86 x86-64) current-code
@@ -306,7 +306,7 @@
   #!+win32 next-seh-frame
   #!+win32 seh-frame-handler)
 
-(define-primitive-object (catch-block)
+(!define-primitive-object (catch-block)
   (current-uwp :c-type #!-alpha "struct unwind_block *" #!+alpha "u32")
   (current-cont :c-type #!-alpha "lispobj *" #!+alpha "u32")
   #!-(or x86 x86-64) current-code
@@ -318,7 +318,7 @@
 
 ;;;; symbols
 
-(define-primitive-object (symbol :lowtag other-pointer-lowtag
+(!define-primitive-object (symbol :lowtag other-pointer-lowtag
                                  :widetag symbol-header-widetag
                                  :alloc-trans %make-symbol
                                  :type symbol)
@@ -355,7 +355,7 @@
   #!+(and sb-thread (not x86-64))
   (tls-index :ref-known (flushable) :ref-trans symbol-tls-index))
 
-(define-primitive-object (complex-single-float
+(!define-primitive-object (complex-single-float
                           :lowtag other-pointer-lowtag
                           :widetag complex-single-float-widetag)
   #!+x86-64
@@ -365,7 +365,7 @@
   #!-x86-64
   (imag :c-type "float"))
 
-(define-primitive-object (complex-double-float
+(!define-primitive-object (complex-double-float
                           :lowtag other-pointer-lowtag
                           :widetag complex-double-float-widetag)
   (filler)
@@ -373,7 +373,7 @@
   (imag :c-type "double" :length #!-x86-64 2 #!+x86-64 1))
 
 #!+sb-simd-pack
-(define-primitive-object (simd-pack
+(!define-primitive-object (simd-pack
                           :lowtag other-pointer-lowtag
                           :widetag simd-pack-widetag)
   (tag :ref-trans %simd-pack-tag
@@ -386,7 +386,7 @@
 ;;; in c-land.  However, we need sight of so many parts of it from Lisp that
 ;;; it makes sense to define it here anyway, so that the GENESIS machinery
 ;;; can take care of maintaining Lisp and C versions.
-(define-primitive-object (thread)
+(!define-primitive-object (thread)
   ;; no_tls_value_marker is borrowed very briefly at thread startup to
   ;; pass the address of initial-function into new_thread_trampoline.
   ;; tls[0] = NO_TLS_VALUE_MARKER_WIDETAG because a the tls index slot
@@ -481,7 +481,7 @@
   ;; KLUDGE: On alpha, until STEPPING we have been lucky and the 32
   ;; bit slots came in pairs. However the C compiler will align
   ;; interrupt_contexts on a double word boundary. This logic should
-  ;; be handled by DEFINE-PRIMITIVE-OBJECT.
+  ;; be handled by !DEFINE-PRIMITIVE-OBJECT.
   #!+alpha
   (padding)
   (interrupt-contexts :c-type "os_context_t *" :rest-p t))

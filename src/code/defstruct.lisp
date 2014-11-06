@@ -1703,7 +1703,7 @@ unless :NAMED is also specified.")))
 ;;;; STANDARD-INSTANCE, and GENERIC-FUNCTION into mutated structures
 ;;;; instead of just implementing them as primitive objects. (This
 ;;;; reduced-functionality macro seems pretty close to the
-;;;; functionality of DEFINE-PRIMITIVE-OBJECT..)
+;;;; functionality of !DEFINE-PRIMITIVE-OBJECT..)
 
 ;;; The complete list of alternate-metaclass DEFSTRUCTs:
 ;;;   CONDITION SB-EVAL:INTERPRETED-FUNCTION

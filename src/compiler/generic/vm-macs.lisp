@@ -56,7 +56,7 @@
 
 (defvar *primitive-objects* nil)
 
-(defun %define-primitive-object (primobj)
+(defun !%define-primitive-object (primobj)
   (let ((name (primitive-object-name primobj)))
     (setf *primitive-objects*
           (cons primobj
@@ -66,7 +66,7 @@
 
 (defvar *!late-primitive-object-forms* nil)
 
-(defmacro define-primitive-object
+(defmacro !define-primitive-object
           ((name &key lowtag widetag alloc-trans (type t))
            &rest slot-specs)
   (collect ((slots) (specials) (constants) (forms) (inits))
@@ -130,7 +130,7 @@
                   ,lowtag ',(inits))))
       `(progn
          (eval-when (:compile-toplevel :load-toplevel :execute)
-           (%define-primitive-object
+           (!%define-primitive-object
             ',(make-primitive-object :name name
                                      :widetag widetag
                                      :lowtag lowtag

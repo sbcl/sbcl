@@ -229,7 +229,7 @@
           (funcall setter (tnify i) tmp))))
     (move-lvar-result node block locs lvar)))
 
-;;; :SET-TRANS (in objdef.lisp DEFINE-PRIMITIVE-OBJECT) doesn't quite
+;;; :SET-TRANS (in objdef.lisp !DEFINE-PRIMITIVE-OBJECT) doesn't quite
 ;;; cut it for symbols, where under certain compilation options
 ;;; (e.g. #!+SB-THREAD) we have to do something complicated, rather
 ;;; than simply set the slot.  So we build the IR2 converting function
