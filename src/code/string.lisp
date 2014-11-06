@@ -168,8 +168,6 @@
                  (char-loop character base-char))))))
     (not (%sp-string-compare string1 start1 end1 string2 start2 end2))))
 
-;; TODO If STRING/= is used for a conditional branch and not for the mismatch
-;;      index, it should be transformed to NOT STRING=.
 (defun string/=* (string1 string2 start1 end1 start2 end2)
   (with-two-strings string1 string2 start1 end1 offset1 start2 end2
     (let ((comparison (%sp-string-compare string1 start1 end1

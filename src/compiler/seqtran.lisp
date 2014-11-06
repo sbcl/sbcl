@@ -811,8 +811,17 @@
                   (sb!impl::%sp-string-compare
                    string1 start1 (or end1 (length string1))
                    string2 start2 (or end2 (length string2)))))))
-  (def string=* not)
+  (def string=* not) ; FIXME: this xform looks counterproductive.
   (def string/=* identity))
+
+(deftransform string/=* ((str1 str2 start1 end1 start2 end2) * * :node node
+                         :important nil)
+  ;; An IF node doesn't care about the mismatch index.
+  ;; Transforming to (not (string= ..)) would lead to internal confusion
+  ;; due to incorrect typing: STRING/= can't return T, so return 0 for true.
+  (if (if-p (node-dest node))
+      `(if (string=* str1 str2 start1 end1 start2 end2) nil 0)
+      (give-up-ir1-transform)))
 
 (deftransform string ((x) (symbol)) '(symbol-name x))
 
