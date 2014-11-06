@@ -536,7 +536,9 @@ of specialized arrays is supported."
 (defun vector (&rest objects)
   #!+sb-doc
   "Construct a SIMPLE-VECTOR from the given objects."
-  (coerce (the list objects) 'simple-vector))
+  (let ((v (make-array (length objects))))
+    (do-rest-arg ((x i) objects 0 v)
+      (setf (aref v i) x))))
 
 
 ;;;; accessor/setter functions
@@ -828,12 +830,14 @@ of specialized arrays is supported."
   #!+sb-doc
   "Return the bit from the BIT-ARRAY at the specified SUBSCRIPTS."
   (declare (type (array bit) bit-array)
+           (truly-dynamic-extent subscripts)
            (optimize (safety 1)))
   (row-major-aref bit-array (%array-row-major-index bit-array subscripts)))
 
 (defun (setf bit) (new-value bit-array &rest subscripts)
   (declare (type (array bit) bit-array)
            (type bit new-value)
+           (truly-dynamic-extent subscripts)
            (optimize (safety 1)))
   (setf (row-major-aref bit-array
                         (%array-row-major-index bit-array subscripts))
@@ -843,6 +847,7 @@ of specialized arrays is supported."
   #!+sb-doc
   "Return the bit from SIMPLE-BIT-ARRAY at the specified SUBSCRIPTS."
   (declare (type (simple-array bit) simple-bit-array)
+           (truly-dynamic-extent subscripts)
            (optimize (safety 1)))
   (row-major-aref simple-bit-array
                   (%array-row-major-index simple-bit-array subscripts)))
@@ -850,6 +855,7 @@ of specialized arrays is supported."
 (defun (setf sbit) (new-value bit-array &rest subscripts)
   (declare (type (simple-array bit) bit-array)
            (type bit new-value)
+           (truly-dynamic-extent subscripts)
            (optimize (safety 1)))
   (setf (row-major-aref bit-array
                         (%array-row-major-index bit-array subscripts))
