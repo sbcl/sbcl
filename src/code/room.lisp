@@ -207,51 +207,53 @@
       (cond
           ;; Pick off arrays, as they're the only plausible cause for
           ;; a non-nil, non-ROOM-INFO object as INFO.
-          ((specialized-array-element-type-properties-p info)
-           (reconstitute-vector (tagged-object other-pointer-lowtag) info))
+        ((specialized-array-element-type-properties-p info)
+         (reconstitute-vector (tagged-object other-pointer-lowtag) info))
 
-          ((null info)
-           (error "Unrecognized widetag #x~2,'0X in reconstitute-object"
-                  widetag))
+        ((null info)
+         (error "Unrecognized widetag #x~2,'0X in reconstitute-object"
+                widetag))
 
-          ((eq (room-info-kind info) :list)
+        (t
+         (case (room-info-kind info)
+          (:list
            (values (tagged-object list-pointer-lowtag)
                    list-pointer-lowtag
                    (* 2 n-word-bytes)))
 
-          ((eq (room-info-kind info) :closure)
+          (:closure
            (values (tagged-object fun-pointer-lowtag)
                    widetag
                    (boxed-size header-value)))
 
-          ((eq (room-info-kind info) :instance)
+          (:instance
            (values (tagged-object instance-pointer-lowtag)
                    widetag
                    (boxed-size header-value)))
 
-          ((eq (room-info-kind info) :other)
+          (:other
            (values (tagged-object other-pointer-lowtag)
                    widetag
                    (boxed-size header-value)))
 
-          ((eq (room-info-kind info) :small-other)
+          (:small-other
            (values (tagged-object other-pointer-lowtag)
                    widetag
                    (boxed-size (logand header-value #xff))))
 
-          ((eq (room-info-kind info) :vector-nil)
+          (:vector-nil
            (values (tagged-object other-pointer-lowtag)
                    simple-array-nil-widetag
                    (* 2 n-word-bytes)))
 
-          ((eq (room-info-kind info) :weak-pointer)
+          (:weak-pointer
            (values (tagged-object other-pointer-lowtag)
                    weak-pointer-widetag
                    (round-to-dualword
                     (* weak-pointer-size
                        n-word-bytes))))
 
-          ((eq (room-info-kind info) :code)
+          (:code
            (values (tagged-object other-pointer-lowtag)
                    code-header-widetag
                    (round-to-dualword
@@ -263,7 +265,7 @@
 
           (t
            (error "Unrecognized room-info-kind ~S in reconstitute-object"
-                  (room-info-kind info)))))))
+                  (room-info-kind info)))))))))
 
 ;;; Iterate over all the objects in the contiguous block of memory
 ;;; with the low address at START and the high address just before
