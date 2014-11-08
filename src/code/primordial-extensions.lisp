@@ -282,20 +282,6 @@
 ;;; which are appropriately compared using the function given by the
 ;;; EQX argument instead of EQL.
 ;;;
-;;; Note: Be careful when using this macro, since it's easy to
-;;; unintentionally pessimize your code. A good time to use this macro
-;;; is when the values defined will be fed into optimization
-;;; transforms and never actually appear in the generated code; this
-;;; is especially common when defining BYTE expressions. Unintentional
-;;; pessimization can result when the values defined by this macro are
-;;; actually used in generated code: because of the way that the
-;;; dump/load system works, you'll typically get one copy of consed
-;;; structure for each object file which contains code referring to
-;;; the value, plus perhaps one more copy bound to the SYMBOL-VALUE of
-;;; the constant. If you don't want that to happen, you should
-;;; probably use DEFPARAMETER instead; or if you truly desperately
-;;; need to avoid runtime indirection through a symbol, you might be
-;;; able to do something with LOAD-TIME-VALUE or MAKE-LOAD-FORM.
 (defmacro defconstant-eqx (symbol expr eqx &optional doc)
   `(def!constant ,symbol
      (%defconstant-eqx-value ',symbol ,expr ,eqx)
