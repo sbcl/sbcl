@@ -698,6 +698,25 @@
   (:generator 4
     (inst mov (make-ea-for-raw-slot object instance-length :index index) value)))
 
+(define-vop (raw-instance-atomic-incf/word)
+  (:translate %raw-instance-atomic-incf/word)
+  (:policy :fast-safe)
+  (:args (object :scs (descriptor-reg))
+         (index :scs (any-reg))
+         (diff :scs (unsigned-reg) :target result))
+  (:arg-types * tagged-num unsigned-num)
+  (:temporary (:sc unsigned-reg) tmp)
+  (:results (result :scs (unsigned-reg)))
+  (:result-types unsigned-num)
+  (:generator 5
+    (loadw tmp object 0 instance-pointer-lowtag)
+    (inst shr tmp n-widetag-bits)
+    (inst shl tmp n-fixnum-tag-bits)
+    (inst sub tmp index)
+    (inst xadd (make-ea-for-raw-slot object tmp :scale (ash 1 (- word-shift n-fixnum-tag-bits)))
+          diff :lock)
+    (move result diff)))
+
 (define-vop (raw-instance-atomic-incf-c/word)
   (:translate %raw-instance-atomic-incf/word)
   (:policy :fast-safe)

@@ -8,6 +8,8 @@ changes relative to sbcl-1.2.5:
     metaclass was structure-class or condition-class. (lp#1049423)
   * bug fix: HANDLER-BIND with empty bindings works again; regression in
     1.2.5. (lp#1388707)
+  * bug fix: ATOMIC-INCF works on structure slots in interpreted code.
+    (lp#1381867)
 
 changes in sbcl-1.2.5 relative to sbcl-1.2.4:
   * enhancement: sb-bsd-sockets now has basic support for IPv6

@@ -245,11 +245,12 @@ EXPERIMENTAL: Interface subject to change."
 
 ;; Interpreter stubs for ATOMIC-INCF.
 #!+(or x86 x86-64 ppc)
-(defun %array-atomic-incf/word (array index diff)
-  (declare (type (simple-array word (*)) array)
-           (type fixnum index)
-           (type sb!vm:signed-word diff))
-  (%array-atomic-incf/word array index diff))
+(progn
+  ;; argument types are declared in vm-fndb
+  (defun %array-atomic-incf/word (array index diff)
+    (%array-atomic-incf/word array index diff))
+  (defun %raw-instance-atomic-incf/word (instance index diff)
+    (%raw-instance-atomic-incf/word instance index diff)))
 
 ;; This code would be more concise if workable versions
 ;; of +-MODFX, --MODFX were defined generically.
