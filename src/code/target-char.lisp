@@ -525,24 +525,35 @@ NIL."
 argument is an alphabetic character, A-Z or a-z; otherwise NIL."
   (< (ucd-general-category char) 5))
 
+(declaim (inline both-case-index-p))
+(defun both-case-index-p (misc-index)
+  (declare (type (unsigned-byte 16) misc-index))
+  (logbitp 7 (aref **character-misc-database** (+ 5 misc-index))))
+
 (defun both-case-p (char)
   #!+sb-doc
   "The argument must be a character object. BOTH-CASE-P returns T if the
 argument is an alphabetic character and if the character exists in both upper
 and lower case. For ASCII, this is the same as ALPHA-CHAR-P."
-  (logbitp 7 (aref **character-misc-database** (+ 5 (misc-index char)))))
+  (both-case-index-p (misc-index char)))
 
 (defun upper-case-p (char)
   #!+sb-doc
   "The argument must be a character object; UPPER-CASE-P returns T if the
 argument is an upper-case character, NIL otherwise."
-  (and (both-case-p char) (= (ucd-general-category char) 0)))
+  (let ((index (misc-index char)))
+    (and
+     (both-case-index-p index)
+     (= (aref **character-misc-database** index) 0))))
 
 (defun lower-case-p (char)
   #!+sb-doc
   "The argument must be a character object; LOWER-CASE-P returns T if the
 argument is a lower-case character, NIL otherwise."
-  (and (both-case-p char) (= (ucd-general-category char) 1)))
+  (let ((index (misc-index char)))
+    (and
+     (both-case-index-p index)
+     (= (aref **character-misc-database** index) 1))))
 
 (defun digit-char-p (char &optional (radix 10.))
   #!+sb-doc
