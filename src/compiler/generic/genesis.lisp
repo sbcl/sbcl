@@ -1419,38 +1419,48 @@ core and return a descriptor to it."
   ;; Inasmuch as the "offending" things are compiled by ordinary target code
   ;; and not cold-init, I think we should use an ordinary DEFPACKAGE for
   ;; the added-on bits. What I've done is somewhat of a fragile kludge.
-  (with-package-iterator (iter '("SB!PCL" "SB!MOP" "SB!GRAY" "SB!SEQUENCE"
-                                 "SB!PROFILE" "SB!EXT" "SB!VM"
-                                 "SB!C" "SB!FASL" "SB!DEBUG")
-                               :external)
-    (loop
-     (multiple-value-bind (foundp sym accessibility package) (iter)
-       (declare (ignore accessibility))
-       (cond ((not foundp) (return))
-             ((eq (symbol-package sym) package) (cold-intern sym))))))
+  (let (syms)
+    (with-package-iterator (iter '("SB!PCL" "SB!MOP" "SB!GRAY" "SB!SEQUENCE"
+                                   "SB!PROFILE" "SB!EXT" "SB!VM"
+                                   "SB!C" "SB!FASL" "SB!DEBUG")
+                                 :external)
+      (loop
+         (multiple-value-bind (foundp sym accessibility package) (iter)
+           (declare (ignore accessibility))
+           (cond ((not foundp) (return))
+                 ((eq (symbol-package sym) package) (push sym syms))))))
+    (setf syms (stable-sort syms #'string<))
+    (dolist (sym syms)
+      (cold-intern sym)))
 
-  (let ((cold-pkg-inits *nil-descriptor*))
-    (maphash
-     (lambda (pkg-name pkg-info)
-       (unless (member pkg-name '("COMMON-LISP" "KEYWORD") :test 'string=)
-         (let ((host-pkg (find-package pkg-name))
-               (sb-xc-pkg (find-package "SB-XC")))
-           ;; Scan for symbols present in this package whose home is not this,
-           ;; but skip any present symbol whose home package is SB-XC because
-           ;; on the target, no symbol will be imported from SB-XC.
-           (with-package-iterator (iter host-pkg :internal :external)
-             (loop
-              (multiple-value-bind (foundp sym accessibility) (iter)
-                (unless foundp (return))
-                (unless (or (eq (symbol-package sym) host-pkg)
-                            (eq (symbol-package sym) sb-xc-pkg))
-                  (record-accessibility
-                   accessibility (cold-intern sym) pkg-info sym host-pkg)))))))
-       (cold-push (cold-cons (car pkg-info)
-                             (cold-cons (vector-to-core (cadr pkg-info))
-                                        (vector-to-core (cddr pkg-info))))
-                  cold-pkg-inits))
-     *cold-package-symbols*)
+  (let ((cold-pkg-inits *nil-descriptor*)
+        cold-package-symbols-list)
+    (maphash (lambda (name info)
+               (push (cons name info) cold-package-symbols-list))
+             *cold-package-symbols*)
+    (setf cold-package-symbols-list
+          (sort cold-package-symbols-list #'string< :key #'car))
+    (dolist (pkgcons cold-package-symbols-list)
+      (destructuring-bind (pkg-name . pkg-info) pkgcons
+        (unless (member pkg-name '("COMMON-LISP" "KEYWORD") :test 'string=)
+          (let ((host-pkg (find-package pkg-name))
+                (sb-xc-pkg (find-package "SB-XC"))
+                syms)
+            (with-package-iterator (iter host-pkg :internal :external)
+              (loop (multiple-value-bind (foundp sym accessibility) (iter)
+                      (unless foundp (return))
+                      (unless (or (eq (symbol-package sym) host-pkg)
+                                  (eq (symbol-package sym) sb-xc-pkg))
+                        (push (cons sym accessibility) syms)))))
+            (setq syms (sort syms #'string< :key #'car))
+            (dolist (symcons syms)
+              (destructuring-bind (sym . accessibility) symcons
+                (record-accessibility accessibility (cold-intern sym)
+                                      pkg-info sym host-pkg)))))
+        (cold-push (cold-cons (car pkg-info)
+                              (cold-cons (vector-to-core (cadr pkg-info))
+                                         (vector-to-core (cddr pkg-info))))
+                   cold-pkg-inits)))
     (cold-set 'sb!impl::*!initial-symbols* cold-pkg-inits))
 
   (attach-fdefinitions-to-symbols)
