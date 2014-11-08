@@ -105,7 +105,7 @@
 
 (defun make-structure-slot-boundp-function (slotd)
   (declare (ignore slotd))
-  (lambda (object)
+  (named-lambda always-bound (object)
     (declare (ignore object))
     t))
 

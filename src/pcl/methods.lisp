@@ -52,6 +52,7 @@
                `(defmethod ,name ,args
                  (declare (ignore initargs))
                  (error 'metaobject-initialization-violation
+                  ;; FIXME: I'm pretty sure this wants to be "~~@<~A~~@:>"
                   :format-control ,(format nil "~@<~A~@:>" control)
                   :format-arguments (list ',name)
                   :references (list '(:amop :initialization method))))))
@@ -1424,6 +1425,14 @@
                         (make-dfun-lambda-list nargs applyp)
                         (make-fast-method-call-lambda-list nargs applyp))))
       (multiple-value-bind (cfunction constants)
+          ;; FIXME: this pessimizes fngen by naming the lambda,
+          ;; which will never be EQUAL to another structurally similar
+          ;; lambda having a different name.
+          ;; To do it right, we really want dynamically named closures
+          ;; that on backtrace show the closure's name, not the simple-fun's.
+          ;; JES's patch for STORE-CLOSURE-DEBUG-POINTER and a patch
+          ;; of mine to add an extra "closure name" slot - which is never
+          ;; loaded by the simple-fun - would achieve the desired effect.
           (get-fun1 `(named-lambda (gf-dispatch ,name)
                       ,arglist
                       ,@(unless function-p
