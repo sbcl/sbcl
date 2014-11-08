@@ -312,6 +312,19 @@
        (string= (simple-condition-format-control c)
                 "Can't specify both :INITIAL-ELEMENT and :INITIAL-CONTENTS")))))
 
+(with-test (:name :make-array-sanity-check-dims-first)
+  ;; A full call to %MAKE-ARRAY will signal a TYPE-ERROR on these inputs
+  ;; instead of trying to consume a massive amount of memory.
+  ;; Additionally, the relevent IR1 transform should give up.
+  (locally
+    (declare (notinline make-array))
+    (assert-error (make-array `(-1 -1 ,(- (ash array-dimension-limit -2) 4)))
+                  type-error))
+  (locally
+    (declare (inline make-array))
+    (assert-error (make-array `(-1 -1 ,(- (ash array-dimension-limit -2) 4)))
+                  type-error)))
+
 (with-test (:name :make-array-size-overflow)
   ;; 1-bit fixnum tags make array limits overflow the word length
   ;; when converted to bytes

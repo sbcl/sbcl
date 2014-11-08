@@ -373,8 +373,11 @@
                       adjustable fill-pointer
                       displaced-to displaced-index-offset)
   (declare (ignore element-type))
-  (binding* ((dimensions (if (listp dimensions) dimensions (list dimensions)))
-             (array-rank (length (the list dimensions)))
+  (binding* (((array-rank dimension-0)
+              (if (listp dimensions)
+                  (values (length dimensions)
+                          (if dimensions (car dimensions) 1))
+                  (values 1 dimensions)))
              ((initialize initial-data)
               (validate-array-initargs initial-element-p initial-element
                                        initial-contents-p initial-contents
@@ -383,29 +386,41 @@
                           (not adjustable)
                           (null displaced-to))))
     (declare (type array-rank array-rank))
+    (declare (type index dimension-0))
     (cond ((and displaced-index-offset (null displaced-to))
            (error "can't specify :DISPLACED-INDEX-OFFSET without :DISPLACED-TO"))
           ((and simple (= array-rank 1))
-           ;; it's a (SIMPLE-ARRAY * (*))
-           (let* ((length (car dimensions))
-                  (array (allocate-vector-with-widetag widetag length n-bits)))
-             (declare (type index length))
-             (when initial-element-p
-               (fill array initial-element))
-             (when initial-contents-p
-               (unless (= length (length initial-contents))
-                 (error "There are ~W elements in the :INITIAL-CONTENTS, but ~
-                       the vector length is ~W."
-                        (length initial-contents)
-                        length))
-               (replace array initial-contents))
-             array))
+           (let ((vector ; a (SIMPLE-ARRAY * (*))
+                  (allocate-vector-with-widetag widetag dimension-0 n-bits)))
+             ;; presence of at most one :INITIAL-thing keyword was ensured above
+             (cond (initial-element-p
+                    (fill vector initial-element))
+                   (initial-contents-p
+                    (let ((content-length (length initial-contents)))
+                      (unless (= dimension-0 content-length)
+                        (error "There are ~W elements in the :INITIAL-CONTENTS, but ~
+                                the vector length is ~W."
+                               content-length dimension-0)))
+                    (replace vector initial-contents)))
+             vector))
           ((and (arrayp displaced-to)
                 (/= (array-underlying-widetag displaced-to) widetag))
            (error "Array element type of :DISPLACED-TO array does not match specified element type"))
           (t
-           ;; it's either a complex array or a multidimensional array.
-           (let* ((total-size (reduce #'* dimensions))
+           ;; it's non-simple or multidimensional, or both.
+           (when fill-pointer
+             (unless (= array-rank 1)
+               (error "Only vectors can have fill pointers."))
+             (when (and (integerp fill-pointer) (> fill-pointer dimension-0))
+               ;; FIXME: should be TYPE-ERROR?
+               (error "invalid fill-pointer ~W" fill-pointer)))
+           (let* ((total-size
+                   (if (consp dimensions)
+                       (the index (reduce (lambda (a b) (* a (the index b)))
+                                          dimensions))
+                       ;; () is considered to have dimension-0 = 1.
+                       ;; It avoids the REDUCE lambda being called with no args.
+                       dimension-0))
                   (data (or displaced-to
                             (data-vector-from-inits
                              dimensions total-size nil widetag n-bits
@@ -416,25 +431,16 @@
                                 (simple sb!vm:simple-array-widetag)
                                 (t sb!vm:complex-array-widetag))
                           array-rank)))
-             (cond (fill-pointer
-                    (unless (= array-rank 1)
-                      (error "Only vectors can have fill pointers."))
-                    (let ((length (car dimensions)))
-                      (declare (fixnum length))
-                      (setf (%array-fill-pointer array)
-                            (cond ((eq fill-pointer t)
-                                   length)
-                                  ((not (<= fill-pointer length))
-                                     ;; FIXME: should be TYPE-ERROR?
-                                     (error "invalid fill-pointer ~W"
-                                            fill-pointer))
-                                  (t
-                                   fill-pointer))))
-                    (setf (%array-fill-pointer-p array) t))
-                   (t
-                    (setf (%array-fill-pointer array) total-size)
-                    (setf (%array-fill-pointer-p array) nil)))
+             (if fill-pointer
+                 (setf (%array-fill-pointer-p array) t
+                       (%array-fill-pointer array)
+                       (if (eq fill-pointer t) dimension-0 fill-pointer))
+                 (setf (%array-fill-pointer-p array) nil
+                       (%array-fill-pointer array) total-size))
              (setf (%array-available-elements array) total-size)
+             ;; Terrible name for this slot - we displace to the
+             ;; target array's header, if any, not the "ultimate"
+             ;; vector in the chain of displacements.
              (setf (%array-data-vector array) data)
              (setf (%array-displaced-from array) nil)
              (cond (displaced-to
@@ -447,10 +453,11 @@
                       (%save-displaced-array-backpointer array data)))
                    (t
                     (setf (%array-displaced-p array) nil)))
-             (let ((axis 0))
-               (dolist (dim dimensions)
-                 (setf (%array-dimension array axis) dim)
-                 (incf axis)))
+             (if (listp dimensions)
+                 (let ((dims dimensions)) ; avoid "prevents use of assertion"
+                   (dotimes (axis array-rank)
+                     (setf (%array-dimension array axis) (pop dims))))
+                 (setf (%array-dimension array 0) dimension-0))
              array)))))
 
 (defun make-array (dimensions &rest args
@@ -528,8 +535,14 @@ of specialized arrays is supported."
                   (allocate-vector-with-widetag widetag total-size n-bits)
                   (make-array total-size :element-type element-type))))
     (ecase initialize
-     (:initial-element (fill (the vector data) initial-data))
-     (:initial-contents (fill-data-vector data dimensions initial-data))
+     (:initial-element
+      (fill (the vector data) initial-data))
+     (:initial-contents
+      ;; DIMENSIONS can be supplied as a list or integer now
+      (dx-let ((list-of-dims (list dimensions))) ; ok if already a list
+        (fill-data-vector data
+                          (if (listp dimensions) dimensions list-of-dims)
+                          initial-data)))
      ((nil)))
     data))
 

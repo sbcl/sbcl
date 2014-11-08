@@ -668,7 +668,7 @@
                                     (lvar-value element-type)))))
       (when (contains-unknown-type-p element-type-ctype)
         (give-up-ir1-transform))
-      (unless (every #'integerp dims)
+      (unless (every (lambda (x) (typep x '(integer 0))) dims)
         (give-up-ir1-transform
          "The dimension list contains something other than an integer: ~S"
          dims))
