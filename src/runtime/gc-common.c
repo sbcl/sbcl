@@ -2671,8 +2671,12 @@ maybe_gc(os_context_t *context)
 {
     lispobj gc_happened;
     struct thread *thread = arch_os_get_current_thread();
+    boolean were_in_lisp = !foreign_function_call_active_p(thread);
 
-    fake_foreign_function_call(context);
+    if (were_in_lisp) {
+        fake_foreign_function_call(context);
+    }
+
     /* SUB-GC may return without GCing if *GC-INHIBIT* is set, in
      * which case we will be running with no gc trigger barrier
      * thing for a while.  But it shouldn't be long until the end
@@ -2748,7 +2752,16 @@ maybe_gc(os_context_t *context)
         }
 #endif
     }
-    undo_fake_foreign_function_call(context);
+
+    if (were_in_lisp) {
+        undo_fake_foreign_function_call(context);
+    } else {
+        /* Otherwise done by undo_fake_foreign_function_call. And
+         something later wants them to be blocked. What a nice
+         interface.*/
+        block_blockable_signals(0, 0);
+    }
+    
     FSHOW((stderr, "/maybe_gc: returning\n"));
     return (gc_happened != NIL);
 }
