@@ -21,10 +21,10 @@
 (deftype char-code ()
   `(integer 0 (,sb!xc:char-code-limit)))
 
-(progn
- (defvar **unicode-character-name-database**)
- (defvar **unicode-1-character-name-database**)
- (defvar **unicode-character-name-huffman-tree**))
+
+(defvar **unicode-character-name-database**)
+(defvar **unicode-1-character-name-database**)
+(defvar **unicode-character-name-huffman-tree**)
 
 (declaim (inline pack-3-codepoints))
 (defun pack-3-codepoints (first &optional (second 0) (third 0))
@@ -74,7 +74,8 @@
                     ,(init-global '**character-decompositions** '(unsigned-byte 21))
                     ,(init-global '**character-case-pages** '(unsigned-byte 8))
                     ,(init-global '**character-primary-compositions** 'hash-table)
-                    ,(init-global '**character-cases** t)
+                    ,(init-global '**character-cases** '(unsigned-byte 32))
+                    ,(init-global '**character-unicode-cases** t)
                     ,(init-global '**character-collations** 'hash-table)
                     (defun !character-database-cold-init ()
                       (flet ((make-ubn-vector (raw-bytes n)
@@ -111,35 +112,51 @@
                                         (aref info (+ (* 3 i) 2))))
                                 table))
 
-                        (setf **character-cases**
-                              (let* ((table
-                                         (make-array
-                                          (* 64 (1+ (aref **character-case-pages**
-                                                          (1- (length **character-case-pages**)))))))
-                                     (info ,case-data) (index 0)
-                                     (length (length info)))
-                                (labels ((read-codepoint ()
-                                           (let* ((b1 (aref info index))
-                                                  (b2 (aref info (incf index)))
-                                                  (b3 (aref info (incf index))))
-                                             (incf index)
-                                             (dpb b1 (byte 8 16)
-                                                  (dpb b2 (byte 8 8) b3))))
-                                         (read-length-tagged ()
-                                           (let ((len (aref info index)) ret)
-                                             (incf index)
-                                             (if (zerop len) (read-codepoint)
-                                                 (progn
-                                                   (dotimes (i len)
-                                                     (push (read-codepoint) ret))
-                                                   (nreverse ret))))))
-                                  (loop until (>= index length)
-                                        for key = (read-codepoint)
-                                        for upper = (read-length-tagged)
-                                        for lower = (read-length-tagged)
-                                        for page = (aref **character-case-pages** (ash key -6))
-                                        do (setf (aref table (+ (ash page 6) (ldb (byte 6 0) key))) (cons upper lower))))
-                                table))
+                        (let* ((unicode-table
+                                 (make-array
+                                  (* 64 (1+ (aref **character-case-pages**
+                                                  (1- (length **character-case-pages**)))))))
+                               (table (make-array
+                                       (* 2 (length unicode-table))
+                                       :element-type '(unsigned-byte 32)))
+                               (info ,case-data)
+                               (index 0)
+                               (length (length info)))
+                          (labels ((read-codepoint ()
+                                     (let* ((b1 (aref info index))
+                                            (b2 (aref info (incf index)))
+                                            (b3 (aref info (incf index))))
+                                       (incf index)
+                                       (dpb b1 (byte 8 16)
+                                            (dpb b2 (byte 8 8) b3))))
+                                   (read-length-tagged ()
+                                     (let ((len (aref info index)) ret)
+                                       (incf index)
+                                       (cond ((zerop len)
+                                              (read-codepoint))
+                                             (t
+                                              (dotimes (i len)
+                                                (push (read-codepoint) ret))
+                                              (nreverse ret))))))
+                            (loop until (>= index length)
+                                  for key = (read-codepoint)
+                                  for upper = (read-length-tagged)
+                                  for lower = (read-length-tagged)
+                                  for page = (aref **character-case-pages** (ash key -6))
+                                  for i = (+ (ash page 6) (ldb (byte 6 0) key))
+                                  do
+                                  (setf (aref unicode-table i) (cons upper lower))
+                                  when (and (atom upper)
+                                            (atom lower)
+                                            ;; Some characters are only equal under unicode rules,
+                                            ;; e.g. #\MICRO_SIGN and #\GREEK_CAPITAL_LETTER_MU
+                                            (both-case-index-p (misc-index (code-char lower)))
+                                            (both-case-index-p (misc-index (code-char upper))))
+                                  do
+                                  (setf (aref table (* i 2)) lower
+                                        (aref table (1+ (* i 2))) upper)))
+                          (setf **character-unicode-cases** unicode-table)
+                          (setf **character-cases** table))
 
                         (setf **character-collations**
                               (let* ((table (make-hash-table))
@@ -362,13 +379,17 @@
 ;;; index, are the decomposition of the character. This proceduce does not
 ;;; apply to Hangul syllables, which have their own decomposition algorithm.
 ;;;
-;;; Case information is stored in **CHARACTER-CASES**, an array that
+;;; Case information is stored in **CHARACTER-UNICODE-CASES**, an array that
 ;;; indirectly maps a character's codepoint to (cons uppercase
 ;;; lowercase). Uppercase and lowercase are either a single codepoint,
 ;;; which is the upper- or lower-case of the given character, or a
 ;;; list of codepoints which taken as a whole are the upper- or
 ;;; lower-case. These case lists are only used in Unicode case
 ;;; transformations, not in Common Lisp ones.
+;;;
+;;; **CHARACTER-CASES** is similar to the above but it stores codes in
+;;; a flat array twice as large, and it includes only the standard casing rules,
+;;; so there's always just two characters.
 ;;;
 ;;; Similarly, composition information is stored in **CHARACTER-COMPOSITIONS**,
 ;;; which is a hash table of codepoints indexed by (+ (ash codepoint1 21)
@@ -586,19 +607,37 @@ is either numeric or alphabetic."
 ;;; EQUAL-CHAR-CODE is used by the following functions as a version of CHAR-INT
 ;;;  which loses font, bits, and case info.
 
-(declaim (inline lookup-char-case-info))
-(defun lookup-char-case-info (character)
-  (let ((code (char-code character)))
-    (aref **character-cases**
-          (+ (ash (aref **character-case-pages** (ash code -6)) 6)
+;;; Return a cons with (upper-case . lower-case), where it either can
+;;; be a character code or a list of character codes if the character
+;;; donwcases or upcases into multiple characters.
+(declaim (inline char-case-info))
+(defun char-case-info (character)
+  (let* ((code (char-code character))
+         (page (aref **character-case-pages** (ash code -6))))
+    ;; Pages with 255 means the character is not both-case.
+    ;; **character-cases** has 0 for those characters.
+    (aref **character-unicode-cases**
+          (+ (ash page 6)
              (ldb (byte 6 0) code)))))
 
-(defmacro equal-char-code (character)
-  (let ((ch (gensym)))
-    `(let ((,ch ,character))
-      (if (both-case-p ,ch)
-          (cdr (lookup-char-case-info ,ch))
-          (char-code ,ch)))))
+;;; Returns the downcased code or the character code
+(declaim (inline equal-char-code))
+(defun equal-char-code (char)
+  (let* ((code (char-code char))
+         (shifted (ash code -6))
+         (page (if (>= shifted (length **character-case-pages**))
+                   (return-from equal-char-code code)
+                   (aref **character-case-pages** shifted))))
+    (if (= page 255)
+        code
+        (let ((down-code
+                (aref **character-cases**
+                      (* (+ (ash page 6)
+                            (ldb (byte 6 0) code))
+                         2))))
+          (if (zerop down-code)
+              code
+              down-code)))))
 
 (defun two-arg-char-equal (c1 c2)
   (flet ((base-char-equal-p ()
@@ -607,9 +646,9 @@ is either numeric or alphabetic."
                   (sum (logxor code1 code2)))
              (when (eql sum #x20)
                (let ((sum (+ code1 code2)))
-                 (or (and (> sum 161) (< sum 213))
-                     (and (> sum 415) (< sum 461))
-                     (and (> sum 463) (< sum 477))))))))
+                 (or (and (< 161 sum 213))
+                     (and (< 415 sum 461))
+                     (and (< 463 sum 477))))))))
     (declare (inline base-char-equal-p))
     (or (eq c1 c2)
         #!-sb-unicode
@@ -708,16 +747,39 @@ Case is ignored."))
   #!+sb-doc
   "Return CHAR converted to upper-case if that is possible. Don't convert
 lowercase eszet (U+DF)."
-  (if (lower-case-p char)
-      (code-char (car (lookup-char-case-info char)))
-      char))
+  (let* ((code (char-code char))
+         (shifted (ash code -6))
+         (page (if (>= shifted (length **character-case-pages**))
+                   (return-from char-upcase char)
+                   (aref **character-case-pages** shifted))))
+    (if (= page 255)
+        char
+        (let ((code
+                (aref **character-cases**
+                      (1+ (* (+ (ash page 6)
+                                (ldb (byte 6 0) code))
+                             2)))))
+          (if (zerop code)
+              char
+              (code-char code))))))
 
 (defun char-downcase (char)
   #!+sb-doc
   "Return CHAR converted to lower-case if that is possible."
-  (if (upper-case-p char)
-      (code-char (cdr (lookup-char-case-info char)))
-      char))
+  (let* ((code (char-code char))
+         (shifted (ash code -6))
+         (page (if (< shifted (length **character-case-pages**))
+                   (aref **character-case-pages** shifted)
+                   (return-from char-downcase char))))
+    (if (= page 255)
+        char
+        (let ((code
+                (aref **character-cases**
+                      (* 2 (+ (ash page 6)
+                              (ldb (byte 6 0) code))))))
+          (if (zerop code)
+              char
+              (code-char code))))))
 
 (defun digit-char (weight &optional (radix 10))
   #!+sb-doc

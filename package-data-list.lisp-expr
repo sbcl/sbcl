@@ -1017,7 +1017,7 @@ possibly temporarily, because it might be used internally."
                "TWO-ARG-CHAR-EQUAL" "TWO-ARG-CHAR-NOT-EQUAL"
                "TWO-ARG-CHAR-LESSP" "TWO-ARG-CHAR-NOT-LESSP"
                "TWO-ARG-CHAR-GREATERP" "TWO-ARG-CHAR-NOT-GREATERP"
-               "CHAR-EQUAL-CONSTANT" "LOOKUP-CHAR-CASE-INFO"
+               "CHAR-EQUAL-CONSTANT" "CHAR-CASE-INFO"
                ;; FIXME: potential SB!EXT exports
                "CHARACTER-CODING-ERROR"
                "CHARACTER-DECODING-ERROR" "CHARACTER-DECODING-ERROR-OCTETS"
