@@ -546,7 +546,9 @@ sigtrap_handler(int signal, siginfo_t *siginfo, os_context_t *context)
     unsigned int code;
 
     code=*((u32 *)(*os_context_pc_addr(context)));
-    if (code == ((3 << 26) | (0x18 << 21) | (reg_NL3 << 16))) {
+    if (code == ((3 << 26) | (0x18 << 21) | (reg_NL3 << 16))||
+        /* trap instruction from do_pending_interrupt */
+        code == 0x7fe00008) {
         arch_clear_pseudo_atomic_interrupted(context);
         arch_skip_instruction(context);
         /* interrupt or GC was requested in PA; now we're done with the

@@ -774,7 +774,7 @@ CSYMBOL(fun_end_breakpoint_end):
 	SET_SIZE(ppc_flush_cache_line)
 
         GFUNCDEF(do_pending_interrupt)
-	twllei	reg_ZERO, trap_PendingInterrupt
+	trap
 	blr
 /* King Nato's branch has a nop here. Do we need this? */
 	SET_SIZE(do_pending_interrupt)
