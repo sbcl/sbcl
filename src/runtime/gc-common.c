@@ -2761,7 +2761,7 @@ maybe_gc(os_context_t *context)
          interface.*/
         block_blockable_signals(0, 0);
     }
-    
+
     FSHOW((stderr, "/maybe_gc: returning\n"));
     return (gc_happened != NIL);
 }

@@ -150,7 +150,9 @@
                                             (atom lower)
                                             ;; Some characters are only equal under unicode rules,
                                             ;; e.g. #\MICRO_SIGN and #\GREEK_CAPITAL_LETTER_MU
+                                            #!+sb-unicode
                                             (both-case-index-p (misc-index (code-char lower)))
+                                            #!+sb-unicode
                                             (both-case-index-p (misc-index (code-char upper))))
                                   do
                                   (setf (aref table (* i 2)) lower
