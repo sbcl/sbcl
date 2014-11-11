@@ -440,8 +440,12 @@ standard Lisp readtable when NIL."
                            (return char))))))
         ;; CLOS stream
           (loop (let ((char (read-char stream nil +EOF+)))
+                  ;; (THE) should not be needed if DONE-P, but it was not
+                  ;; being derived to return a character, causing an extra
+                  ;; check in consumers of flush-whitespace despite the
+                  ;; promise to return a character or else signal EOF.
                   (cond ((eq char +EOF+) (error 'end-of-file :stream stream))
-                        ((done-p) (return char)))))))))
+                        ((done-p) (return (the character char))))))))))
 
 ;;;; temporary initialization hack
 
@@ -664,7 +668,7 @@ standard Lisp readtable when NIL."
 ;;; as an alist, so maybe we should. -- WHN 19991202
 (defvar *sharp-equal-alist* ())
 
-(declaim (ftype (sfunction (t t) (values t t)) read-maybe-nothing))
+(declaim (ftype (sfunction (t t) (values bit t)) read-maybe-nothing))
 
 ;;; Like READ-PRESERVING-WHITESPACE, but doesn't check the read buffer
 ;;; for being set up properly.
@@ -680,7 +684,7 @@ standard Lisp readtable when NIL."
                 (multiple-value-bind (result-p result)
                     (read-maybe-nothing stream char)
                   ;; Repeat if macro returned nothing.
-                  (when result-p
+                  (unless (zerop result-p)
                     (return (unless *read-suppress* result))))))))
       (let ((*sharp-equal-alist* nil))
         (with-read-buffer ()
@@ -699,15 +703,15 @@ standard Lisp readtable when NIL."
   (check-for-recursive-read stream recursive-p 'read-preserving-whitespace)
   (%read-preserving-whitespace stream eof-error-p eof-value recursive-p))
 
-;;; Read from STREAM given starting CHAR, returning T and the resulting
-;;; object, unless CHAR is a macro yielding no value, then NIL and NIL,
+;;; Read from STREAM given starting CHAR, returning 1 and the resulting
+;;; object, unless CHAR is a macro yielding no value, then 0 and NIL,
 ;;; for functions that want comments to return so that they can look
-;;; past them. We assume CHAR is not whitespace.
+;;; past them. CHAR must not be whitespace.
 (defun read-maybe-nothing (stream char)
   (multiple-value-call
    (lambda (&optional (result nil supplied-p) &rest junk)
      (declare (ignore junk)) ; is this ANSI-specified?
-     (values supplied-p result))
+     (values (if supplied-p 1 0) result))
    (funcall (!cmt-entry-to-function
              (get-raw-cmt-entry char *readtable*) #'read-token)
             stream char)))
@@ -731,29 +735,6 @@ standard Lisp readtable when NIL."
           (unread-char next-char stream))))
     result))
 
-;;; (This is a COMMON-LISP exported symbol.)
-(defun read-delimited-list (endchar &optional
-                                    (input-stream *standard-input*)
-                                    recursive-p)
-  #!+sb-doc
-  "Read Lisp values from INPUT-STREAM until the next character after a
-   value's representation is ENDCHAR, and return the objects as a list."
-  (check-for-recursive-read input-stream recursive-p 'read-delimited-list)
-  (flet ((%read-delimited-list (endchar input-stream)
-           (do ((char (flush-whitespace input-stream)
-                      (flush-whitespace input-stream))
-                (retlist ()))
-               ((char= char endchar)
-                (unless *read-suppress* (nreverse retlist)))
-             (multiple-value-bind (winp obj)
-                 (read-maybe-nothing input-stream char)
-               (when winp
-                 (push obj retlist))))))
-    (declare (inline %read-delimited-list))
-    (if recursive-p
-        (%read-delimited-list endchar input-stream)
-        (with-read-buffer ()
-          (%read-delimited-list endchar input-stream)))))
 
 ;;;; basic readmacro definitions
 ;;;;
@@ -787,28 +768,43 @@ standard Lisp readtable when NIL."
   ;; Don't return anything.
   (values))
 
-(defun read-list (stream ignore)
-  (declare (ignore ignore))
-  (let* ((thelist (list nil))
-         (listtail thelist))
-    (declare (dynamic-extent thelist))
-    (do ((firstchar (flush-whitespace stream) (flush-whitespace stream)))
-        ((char= firstchar #\) ) (cdr thelist))
-      (when (char= firstchar #\.)
+(macrolet
+    ((with-list-reader ((streamvar delimiter) &body body)
+       `(let* ((thelist (list nil))
+               (listtail thelist)
+               (collectp (if *read-suppress* 0 -1)))
+          (declare (dynamic-extent thelist))
+          (loop (let ((firstchar (flush-whitespace ,streamvar)))
+                  (when (eq firstchar ,delimiter)
+                    (return (cdr thelist)))
+                  ,@body))))
+     (read-list-item (streamvar)
+       `(multiple-value-bind (winp obj)
+            (read-maybe-nothing ,streamvar firstchar)
+          ;; allow for a character macro return to return nothing
+          (unless (zerop (logand winp collectp))
+            (setq listtail
+                  (cdr (rplacd (truly-the cons listtail) (list obj))))))))
+
+  ;;; The character macro handler for left paren
+  (defun read-list (stream ignore)
+    (declare (ignore ignore))
+    (with-list-reader (stream #\))
+      (when (eq firstchar #\.)
         (let ((nextchar (read-char stream t)))
           (cond ((token-delimiterp nextchar)
                  (cond ((eq listtail thelist)
-                        (unless *read-suppress*
+                        (unless (zerop collectp)
                           (simple-reader-error
-                               stream
-                               "Nothing appears before . in list.")))
+                           stream "Nothing appears before . in list.")))
                        ((whitespace[2]p nextchar)
                         (setq nextchar (flush-whitespace stream))))
-                 (rplacd listtail (read-after-dot stream nextchar))
+                 (rplacd (truly-the cons listtail)
+                         (read-after-dot stream nextchar collectp))
                  ;; Check for improper ". ,@" or ". ,." now rather than
                  ;; in the #\` reader. The resulting QUASIQUOTE macro might
                  ;; never be exapanded, but nonetheless could be erroneous.
-                 (when (and (plusp *backquote-depth*) (not *read-suppress*))
+                 (unless (zerop (logand *backquote-depth* collectp))
                    (let ((lastcdr (cdr (last listtail))))
                      (when (and (comma-p lastcdr) (comma-splicing-p lastcdr))
                        (simple-reader-error
@@ -818,29 +814,42 @@ standard Lisp readtable when NIL."
                     ;; Put back NEXTCHAR so that we can read it normally.
                 (t (unread-char nextchar stream)))))
       ;; Next thing is not an isolated dot.
-      (multiple-value-bind (winp obj) (read-maybe-nothing stream firstchar)
-        ;; allows the possibility that a comment was read
-        (when winp
-          (setq listtail (cdr (rplacd listtail (list obj)))))))))
+      (read-list-item stream)))
 
-(defun read-after-dot (stream firstchar)
+  ;;; (This is a COMMON-LISP exported symbol.)
+  (defun read-delimited-list (endchar &optional
+                                      (input-stream *standard-input*)
+                                      recursive-p)
+  #!+sb-doc
+  "Read Lisp values from INPUT-STREAM until the next character after a
+   value's representation is ENDCHAR, and return the objects as a list."
+    (check-for-recursive-read input-stream recursive-p 'read-delimited-list)
+    (flet ((%read-delimited-list ()
+             (with-list-reader (input-stream endchar)
+               (read-list-item input-stream))))
+      (if recursive-p
+          (%read-delimited-list)
+          (with-read-buffer () (%read-delimited-list)))))) ; end MACROLET
+
+(defun read-after-dot (stream firstchar collectp)
   ;; FIRSTCHAR is non-whitespace!
   (let ((lastobj ()))
     (do ((char firstchar (flush-whitespace stream)))
-        ((char= char #\) )
-         (if *read-suppress*
+        ((eq char #\))
+         (if (zerop collectp)
              (return-from read-after-dot nil)
              (simple-reader-error stream "Nothing appears after . in list.")))
       ;; See whether there's something there.
       (multiple-value-bind (winp obj) (read-maybe-nothing stream char)
-        (when winp (return (setq lastobj obj)))))
+        (unless (zerop winp) (return (setq lastobj obj)))))
     ;; At least one thing appears after the dot.
     ;; Check for more than one thing following dot.
     (loop
      (let ((char (flush-whitespace stream)))
-       (cond ((char= #\) char) (return lastobj)) ;success!
+       (cond ((eq char #\)) (return lastobj)) ;success!
              ;; Try reading virtual whitespace.
-             ((and (read-maybe-nothing stream char) (not *read-suppress*))
+             ((not (zerop (logand (read-maybe-nothing stream char)
+                                  (truly-the fixnum collectp))))
               (simple-reader-error
                stream "More than one object follows . in list.")))))))
 

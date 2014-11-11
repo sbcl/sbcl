@@ -47,6 +47,7 @@
   ;; tell the cross-compiler that it can do :just-dump-it-normally
   (setf (get 'comma :sb-xc-allow-dumping-instances) t))
 
+(declaim (type (and fixnum unsigned-byte) *backquote-depth*))
 (defvar *backquote-depth* 0 #!+sb-doc "how deep we are into backquotes")
 (defvar *bq-error* "Comma not inside a backquote.")
 

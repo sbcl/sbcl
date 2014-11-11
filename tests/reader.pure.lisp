@@ -336,6 +336,8 @@
     (test-reading "COMMON-LISP-USER::A-SYMBOL")
     (test-reading "()")
     (test-reading "#\\-") ; should not copy the token buffer
+    ;; *READ-SUPPRESS* avoids creation of lists
+    (test-reading "#-sbcl(a (b c (d (e) (f) g)) h i j . x . y baz) 5")
     ))
 
 

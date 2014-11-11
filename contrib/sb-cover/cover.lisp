@@ -501,7 +501,9 @@ The source locations are stored in SOURCE-MAP."
                                "Nothing appears before . in list.")))
                            ((sb-impl::whitespace[2]p nextchar)
                             (setq nextchar (sb-impl::flush-whitespace stream))))
-                     (rplacd listtail (sb-impl::read-after-dot stream nextchar))
+                     (rplacd listtail
+                             (sb-impl::read-after-dot
+                              stream nextchar (if *read-suppress* 0 -1)))
                      (return (cdr thelist)))
                     ;; Put back NEXTCHAR so that we can read it normally.
                     (t (unread-char nextchar stream)))))
@@ -509,7 +511,7 @@ The source locations are stored in SOURCE-MAP."
           (sb-int:binding*
               ((start (file-position stream))
                ((winp obj) (sb-impl::read-maybe-nothing stream firstchar))
-               (listobj (if winp (list obj)))
+               (listobj (if (not (zerop winp)) (list obj)))
                (end (file-position stream)))
             ;; allows the possibility that a comment was read
             (when listobj
