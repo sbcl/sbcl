@@ -10,6 +10,8 @@ changes relative to sbcl-1.2.5:
     1.2.5. (lp#1388707)
   * bug fix: ATOMIC-INCF works on structure slots in interpreted code.
     (lp#1381867)
+  * bug fix: MAKE-ARRAY properly handles character types like (eql #\a) and
+    (member #\a #\c). (lp#1392068)
 
 changes in sbcl-1.2.5 relative to sbcl-1.2.4:
   * enhancement: sb-bsd-sockets now has basic support for IPv6

@@ -273,27 +273,38 @@
                      (handler-case (specifier-type type)
                        (parse-unknown-type ()
                          (return (result sb!vm:simple-vector-widetag))))))
-               (if (union-type-p ctype)
-                   (let ((types (union-type-types ctype)))
-                     (cond ((not (every #'numeric-type-p types))
-                            (result sb!vm:simple-vector-widetag))
-                           ((csubtypep ctype (specifier-type 'integer))
-                            (integer-interval-widetag
-                             (reduce #'min types :key #'numeric-type-low)
-                             (reduce #'max types :key #'numeric-type-high)))
-                           ((csubtypep ctype (specifier-type 'double-float))
-                            (result sb!vm:simple-array-double-float-widetag))
-                           ((csubtypep ctype (specifier-type 'single-float))
-                            (result sb!vm:simple-array-single-float-widetag))
-                           #!+long-float
-                           ((csubtypep ctype (specifier-type 'long-float))
-                            (result sb!vm:simple-array-long-float-widetag))
-                           (t
-                            (result sb!vm:simple-vector-widetag))))
-                   (let ((expansion (type-specifier ctype)))
-                     (if (equal expansion type)
-                         (result sb!vm:simple-vector-widetag)
-                         (%vector-widetag-and-n-bits expansion))))))))))))
+               (typecase ctype
+                 (union-type
+                  (let ((types (union-type-types ctype)))
+                    (cond ((not (every #'numeric-type-p types))
+                           (result sb!vm:simple-vector-widetag))
+                          ((csubtypep ctype (specifier-type 'integer))
+                           (integer-interval-widetag
+                            (reduce #'min types :key #'numeric-type-low)
+                            (reduce #'max types :key #'numeric-type-high)))
+                          ((csubtypep ctype (specifier-type 'double-float))
+                           (result sb!vm:simple-array-double-float-widetag))
+                          ((csubtypep ctype (specifier-type 'single-float))
+                           (result sb!vm:simple-array-single-float-widetag))
+                          #!+long-float
+                          ((csubtypep ctype (specifier-type 'long-float))
+                           (result sb!vm:simple-array-long-float-widetag))
+                          (t
+                           (result sb!vm:simple-vector-widetag)))))
+                 (character-set-type
+                  #!-sb-unicode (result sb!vm:simple-base-string-widetag)
+                  #!+sb-unicode
+                  (if (loop for (start . end)
+                            in (character-set-type-pairs ctype)
+                            always (and (< start base-char-code-limit)
+                                        (< end base-char-code-limit)))
+                      (result sb!vm:simple-base-string-widetag)
+                      (result sb!vm:simple-character-string-widetag)))
+                 (t
+                  (let ((expansion (type-specifier ctype)))
+                    (if (equal expansion type)
+                        (result sb!vm:simple-vector-widetag)
+                        (%vector-widetag-and-n-bits expansion)))))))))))))
 
 (defun %complex-vector-widetag (widetag)
   (macrolet ((make-case ()

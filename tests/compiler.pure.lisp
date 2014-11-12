@@ -3351,7 +3351,10 @@
                      '(complex (member 10s0 20s0))
                      '(or integer double-float)
                      '(mod 1)
+                     '(member #\a #\b)
+                     '(eql #\a)
                      #+sb-unicode 'extended-char
+                     #+sb-unicode '(eql #\cyrillic_small_letter_yu)
                      sb-kernel::*specialized-array-element-types*))
     (when et
       (let* ((v (make-array 3 :element-type et))
