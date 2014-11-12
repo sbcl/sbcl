@@ -361,9 +361,8 @@ from the name currently assigned to CHARACTER. Otherwise, returns NIL.
 This property has been officially obsoleted by the Unicode standard, and
 is only included for backwards compatibility."
   (let* ((char-code (char-code character))
-         (h-code (cdr (binary-search char-code
-                                   (car **unicode-1-character-name-database**)
-                                   :key #'car))))
+         (h-code (double-vector-binary-search char-code
+                                              **unicode-1-char-name-database**)))
     (when h-code
       ;; Remove UNICODE1_ prefix
       (subseq (huffman-decode h-code **unicode-character-name-huffman-tree**) 9))))

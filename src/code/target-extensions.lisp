@@ -59,6 +59,25 @@ exit(3) directly will circumvent these hooks.")
                         elt))))))
     (recurse 0 (length seq))))
 
+(defun double-vector-binary-search (value vector)
+  (declare (simple-vector vector)
+           (optimize speed)
+           (integer value))
+  (labels ((recurse (start end)
+             (declare (type index start end))
+             (when (< start end)
+               (let* ((i (+ start (truncate (- end start) 2)))
+                      (elt (svref vector (truly-the index (* 2 i)))))
+                 (declare (integer elt)
+                          (index i))
+                 (cond ((< value elt)
+                        (recurse start i))
+                       ((> value elt)
+                        (recurse (1+ i) end))
+                       (t
+                        (svref vector (truly-the index (1+ (* 2 i))))))))))
+    (recurse 0 (truncate (length vector) 2))))
+
 
 ;;; like LISTEN, but any whitespace in the input stream will be flushed
 (defun listen-skip-whitespace (&optional (stream *standard-input*))

@@ -173,3 +173,7 @@
   (frob digit-char-p "0123456789")
   (frob both-case-p "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
   (frob alphanumericp "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"))
+
+(with-test (:name :name-char-short-string)
+  (name-char "")
+  (name-char "A"))
