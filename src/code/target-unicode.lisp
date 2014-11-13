@@ -364,8 +364,7 @@ is only included for backwards compatibility."
          (h-code (double-vector-binary-search char-code
                                               **unicode-1-char-name-database**)))
     (when h-code
-      ;; Remove UNICODE1_ prefix
-      (subseq (huffman-decode h-code **unicode-character-name-huffman-tree**) 9))))
+      (huffman-decode h-code **unicode-character-name-huffman-tree**))))
 
 (defun age (character)
   #!+sb-doc
@@ -1531,7 +1530,7 @@ it defaults to 80 characters"
       (read stream)))
 
 (defun unpack-collation-key (key)
-  (declare ((simple-array (unsigned-byte 32) (*)) key))
+  (declare (type (simple-array (unsigned-byte 32) (*)) key))
   (loop for value across key
         collect
         (list (ldb (byte 16 16) value)

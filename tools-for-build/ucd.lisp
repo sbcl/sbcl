@@ -498,12 +498,8 @@ Length should be adjusted when the standard changes.")
         (encode-ucd-line (cdr split-line) code-point)
       (setf (gethash code-point *ucd-entries*) encoding
             (gethash code-point *unicode-names*) name)
-            ;; The prefix UNICODE1_ is appended because there are characters c, d
-            ;; such that Unicode-1-name(c) = name(d) and c /= d
       (when unicode-1-name
-        (setf
-         (gethash code-point *unicode-1-names*)
-         (concatenate 'string "UNICODE1_" unicode-1-name))))))
+        (setf (gethash code-point *unicode-1-names*) unicode-1-name)))))
 
 ;;; this fixes up the case conversion discrepancy between CL and
 ;;; Unicode: CL operators depend on char-downcase / char-upcase being
