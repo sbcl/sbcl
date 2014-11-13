@@ -1531,105 +1531,117 @@ it defaults to 80 characters"
       (read stream)))
 
 (defun unpack-collation-key (key)
-  (loop for value across key collect
-       (list (ldb (byte 16 16) value)
-             (ldb (byte 11 5) value)
-             (ldb (byte 5 0) value))))
+  (declare ((simple-array (unsigned-byte 32) (*)) key))
+  (loop for value across key
+        collect
+        (list (ldb (byte 16 16) value)
+              (ldb (byte 11 5) value)
+              (ldb (byte 5 0) value))))
 
-(defun variable-p (unpacked-key)
-  (<= 1 (car unpacked-key) **maximum-variable-primary-element**))
+(defun variable-p (x)
+  (<= 1 x **maximum-variable-primary-element**))
 
-(defun collation-key (char1 &optional char2 char3 &rest overflow)
-  ;; There are never more than three characters in a contraction, right?
-  (when overflow (return-from collation-key nil))
-  ;; hack around the inability of the cross-compiler to deal with characters
-  (when (not char2) (setf char2 (code-char 0)))
-  (when (not char3) (setf char3 (code-char 0)))
-  (let ((packed-key (gethash (pack-3-codepoints
-                              (char-code char1)
-                              (char-code char2)
-                              (char-code char3))
-                             **character-collations**)))
-    (if packed-key (unpack-collation-key packed-key)
-        (when (char= (code-char 0) char2 char3)
-          (let* ((cp (char-code char1))
-                 (base
-                  (if (proplist-p char1 :unified-ideograph)
-                     (if (or (<= #x4E00 cp #x9FFF)
-                             (<= #xF900 cp #xFAFF))
-                         #xFB40 #xFB80) #xFBC0))
-                 (a (+ base (ash cp -15)))
-                 (b (logior #.(ash 1 15) (logand cp #x7FFFF))))
-            (list (list a #x20 #x2) (list b 0 0)))))))
-
-(defun generic-apply (fn args)
-  (apply fn (coerce args 'list)))
+(defun collation-key (string start end)
+  (let (char1
+        (char2 (code-char 0))
+        (char3 (code-char 0)))
+    (case (- end start)
+      (1 (setf char1 (char string start)))
+      (2 (setf char1 (char string start)
+               char2 (char string (+ start 1))))
+      (3 (setf char1 (char string start)
+               char2 (char string (+ start 1))
+               char3 (char string (+ start 2))))
+      (t
+       ;; There are never more than three characters in a contraction, right?
+       (return-from collation-key nil)))
+    (let ((packed-key (gethash (pack-3-codepoints
+                                (char-code char1)
+                                (char-code char2)
+                                (char-code char3))
+                               **character-collations**)))
+      (if packed-key
+          (unpack-collation-key packed-key)
+          (when (char= (code-char 0) char2 char3)
+            (let* ((cp (char-code char1))
+                   (base
+                     (cond ((not (proplist-p char1 :unified-ideograph))
+                            #xFBC0)
+                           ((or (<= #x4E00 cp #x9FFF)
+                                (<= #xF900 cp #xFAFF))
+                            #xFB40)
+                           (t
+                            #xFB80)))
+                   (a (+ base (ash cp -15)))
+                   (b (logior #.(ash 1 15) (logand cp #x7FFFF))))
+              (list (list a #x20 #x2) (list b 0 0))))))))
 
 (defun sort-key (string)
-   (let* ((str (normalize-string string :nfd))
-          (i 0) (len (length str)) max-match new-i
-          sort-key)
-     (loop while (< i len) do
+  (let* ((str (normalize-string string :nfd))
+         (i 0) (len (length str)) max-match new-i
+         sort-key
+         after-variable)
+    (loop while (< i len)
+          do
           (loop for offset from 1 to 3
-               for index = (+ i offset)
-               while (<= index len)
-               when (generic-apply #'collation-key (subseq str i index))
-             do (setf max-match
-                      (generic-apply #'collation-key (subseq str i index))
-                      new-i index))
+                for index = (+ i offset)
+                while (<= index len)
+                do
+                (let ((key (collation-key str i index)))
+                  (when key
+                    (setf max-match key
+                          new-i index))))
           (loop for index from new-i below len
-             for char = (char str index)
-             until (eql 0 (combining-class char))
-             unless (and (>= (- index new-i) 1)
-                         ;; Combiners are sorted, we only have to look back
-                         ;; one step (see canonically-compose)
-                         (>= (combining-class (char str (1- index)))
-                             (combining-class char)))
-             do (rotatef (char str new-i) (char str index))
-               (if (generic-apply #'collation-key (subseq str i (1+ new-i)))
-                   (setf max-match
-                         (generic-apply #'collation-key (subseq str i (1+ new-i)))
-                         new-i (1+ new-i))
-                   (rotatef (char str new-i) (char str index))))
+                for char = (char str index)
+                for previous-combining-class = combining-class
+                for combining-class = (combining-class char)
+                until (eql combining-class 0)
+                unless (and (>= (- index new-i) 1)
+                            ;; Combiners are sorted, we only have to look back
+                            ;; one step (see canonically-compose)
+                            (>= (combining-class (char str (1- index)))
+                                combining-class))
+                do
+                (rotatef (char str new-i) (char str index))
+                (let ((key (collation-key str i (1+ new-i))))
+                  (if key
+                      (setf max-match key
+                            new-i (1+ new-i))
+                      (rotatef (char str new-i) (char str index)))))
           (loop for key in max-match do (push key sort-key))
           (setf i new-i))
-     (setf
-      sort-key
-      (let (after-variable)
-        (mapcar
-         #'(lambda (key)
-             (destructuring-bind (k1 k2 k3) key
-               (cond
-                 ((= k1 k2 k3 0) (list k1 k2 k3 0))
-                 ((and (/= k1 0) (variable-p key))
-                  (setf after-variable t)
-                  (list 0 0 0 k1))
-                 ((/= k1 0) (setf after-variable nil)
-                  (list k1 k2 k3 #xFFFF))
-                 ((and (= k1 0) (/= k3 0))
-                  (if after-variable
-                      (list 0 0 0 0)
-                      (list k1 k2 k3 #xFFFF))))))
-         (nreverse sort-key))))
-     (let (primary secondary tertiary quatenary)
-       (loop for (k1 k2 k3 k4) in sort-key do
-            (when (/= k1 0) (push k1 primary))
-            (when (/= k2 0) (push k2 secondary))
-            (when (/= k3 0) (push k3 tertiary))
-            (when (/= k4 0) (push k4 quatenary)))
-       (setf primary (nreverse primary)
-             secondary (nreverse secondary)
-             tertiary (nreverse tertiary)
-             quatenary (nreverse quatenary))
-       (concatenate 'vector primary (list 0) secondary (list 0)
-                    tertiary (list 0) quatenary))))
+    (macrolet ((push-non-zero (obj place)
+                 `(when (/= ,obj 0)
+                    (push ,obj ,place))))
+      (let (primary secondary tertiary quatenary)
+        (loop for (k1 k2 k3) in (nreverse sort-key)
+              do
+              (cond
+                ((= k1 k2 k3 0))
+                ((variable-p k1)
+                 (setf after-variable t)
+                 (push k1 quatenary))
+                ((/= k1 0)
+                 (setf after-variable nil)
+                 (push k1 primary)
+                 (push-non-zero k2 secondary)
+                 (push-non-zero k3 tertiary)
+                 (push #xFFFF quatenary))
+                ((/= k3 0)
+                 (unless after-variable
+                   (push-non-zero k2 secondary)
+                   (push k3 tertiary)
+                   (push #xFFFF quatenary)))))
+        (concatenate 'vector
+                     (nreverse primary) #(0) (nreverse secondary) #(0)
+                     (nreverse tertiary) #(0) (nreverse quatenary))))))
 
 (defun vector< (vector1 vector2)
   (loop for i across vector1
-     for j across vector2
-     do
-       (cond ((< i j) (return-from vector< t))
-             ((> i j) (return-from vector< nil))))
+        for j across vector2
+        do
+        (cond ((< i j) (return-from vector< t))
+              ((> i j) (return-from vector< nil))))
   ;; If there's no differences, shortest vector wins
   (< (length vector1) (length vector2)))
 
@@ -1664,9 +1676,7 @@ with variable-weight characters, as described in UTS #10"
          (s2 (subseq string2 start2 end2))
          (k1 (sort-key s1)) (k2 (sort-key s2)))
     (if (equalp k1 k2)
-        (flet ((to-codepoints (str)
-                 (map 'vector #'char-code (normalize-string str :nfd))))
-          (vector< (to-codepoints s1) (to-codepoints s2)))
+        (string< (normalize-string s1 :nfd) (normalize-string s2 :nfd))
         (vector< k1 k2))))
 
 (defun unicode<= (string1 string2 &key (start1 0) end1 (start2 0) end2)
