@@ -12,6 +12,8 @@ changes relative to sbcl-1.2.5:
     (lp#1381867)
   * bug fix: MAKE-ARRAY properly handles character types like (eql #\a) and
     (member #\a #\c). (lp#1392068)
+  * bug fix: READ sometimes accidentally preserved a whitespace character
+    after a token when it should not have. (lp#327790)
 
 changes in sbcl-1.2.5 relative to sbcl-1.2.4:
   * enhancement: sb-bsd-sockets now has basic support for IPv6

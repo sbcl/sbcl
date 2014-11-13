@@ -91,6 +91,7 @@
 (assert (eq
          (handler-case (with-input-from-string (s "cl:") (read s))
            (end-of-file (c)
+             (declare (ignore c))
              'good))
          'good))
 
@@ -220,6 +221,35 @@
                   (read-preserving-whitespace s))))
   (assert (null (with-input-from-string (s "(1 2 3)")
                  (read s)))))
+
+;;; System code that asks whether %READ-PRESERVING-WHITESPACE hit EOF
+;;; mistook NIL as an object returned normally for NIL the default eof mark.
+(with-test (:name :read-preserving-whitespace-file-position)
+  (multiple-value-bind (obj pos1) (read-from-string "NIL A")
+    (declare (ignore obj))
+    (multiple-value-bind (obj pos2) (read-from-string "NNN A")
+      (declare (ignore obj))
+      (assert (= pos1 pos2 4))))
+  ;; This also affected *READ-SUPPRESS*. The root cause is the same,
+  ;; but the rationale for why the change is valid is slightly subtle
+  ;; on account of the vague if not weird implication regarding READ
+  ;; that there might actually be differences in non-preservation of
+  ;; whitespace based on *READ-SUPPRESS*. CLHS entry for READ:
+  ;;  "When *read-suppress* is false, read throws away the delimiting
+  ;;   character required by certain printed representations if it is a
+  ;;   whitespace[2] character; but read preserves the character (using
+  ;;   unread-char) if it is syntactically meaningful, because it could
+  ;;   be the start of the next expression."
+  ;; Why would it mention *read-supress* at all, unless the expectation
+  ;; is that when suppressing you might /not/ throw away a space?
+  ;; But it isn't "when-and-only-when" so we're certainly legal to
+  ;; make the behavior identical regardless of *read-suppress*.
+  (dolist (test '("#-q 1 2" "#+sbcl 1 2")) ; Two tests from lp#327790.
+    (flet ((try (*read-suppress*)
+             (with-input-from-string (s test)
+               (read s)
+               (file-position s))))
+      (assert (= (try nil) (try t))))))
 
 ;;; EOF-ERROR-P defaults to true. Reported by Bruno Haible on
 ;;; cmucl-imp 2004-10-18.

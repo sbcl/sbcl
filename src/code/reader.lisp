@@ -723,17 +723,18 @@ standard Lisp readtable when NIL."
   #!+sb-doc
   "Read the next Lisp value from STREAM, and return it."
   (check-for-recursive-read stream recursive-p 'read)
-  (let ((result (%read-preserving-whitespace stream eof-error-p eof-value
-                                             recursive-p)))
+  (let* ((local-eof-val (load-time-value *eof-object* t))
+         (result (%read-preserving-whitespace
+                  stream eof-error-p local-eof-val recursive-p)))
     ;; This function generally discards trailing whitespace. If you
     ;; don't want to discard trailing whitespace, call
     ;; CL:READ-PRESERVING-WHITESPACE instead.
-    (unless (or (eql result eof-value) recursive-p)
+    (unless (or (eql result local-eof-val) recursive-p)
       (let ((next-char (read-char stream nil +EOF+)))
         (unless (or (eq next-char +EOF+)
                     (whitespace[2]p next-char))
           (unread-char next-char stream))))
-    result))
+    (if (eq result local-eof-val) eof-value result)))
 
 
 ;;;; basic readmacro definitions
