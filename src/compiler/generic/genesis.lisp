@@ -1607,7 +1607,7 @@ core and return a descriptor to it."
 (defun attach-fdefinitions-to-symbols ()
   (let ((hashtable (make-hash-table :test #'eq)))
     ;; Collect fdefinitions that go with one symbol, e.g. CAR and (SETF CAR),
-    ;; using the hosts's code for manipulating a packed info-vector.
+    ;; using the host's code for manipulating a packed info-vector.
     (maphash (lambda (warm-name cold-fdefn)
                (sb!c::with-globaldb-name (key1 key2) warm-name
                  :hairy (error "Hairy fdefn name in genesis: ~S" warm-name)
@@ -1617,7 +1617,8 @@ core and return a descriptor to it."
                         (gethash key1 hashtable sb!c::+nil-packed-infos+)
                         key2 sb!c::+fdefn-type-num+ cold-fdefn))))
               *cold-fdefn-objects*)
-    ;; Emit in the same order symbols reside in core, for no particular reason.
+    ;; Emit in the same order symbols reside in core to avoid
+    ;; sensitivity to the iteration order of host's maphash.
     (loop for (warm-sym . info)
           in (sort (sb!impl::%hash-table-alist hashtable) #'<
                    :key (lambda (x) (descriptor-bits (cold-intern (car x)))))

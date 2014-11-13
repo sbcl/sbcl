@@ -677,7 +677,7 @@
    generic-function
    (types-from-args generic-function classes 'class-eq)))
 
-(defun proclaim-incompatible-superclasses (classes)
+(defun !proclaim-incompatible-superclasses (classes)
   (setq classes (mapcar (lambda (class)
                           (if (symbolp class)
                               (find-class class)
@@ -697,7 +697,7 @@
           (return-from superclasses-compatible-p nil))))))
 
 (mapc
- #'proclaim-incompatible-superclasses
+ #'!proclaim-incompatible-superclasses
  '(;; superclass class
    (system-class std-class structure-class) ; direct subclasses of pcl-class
    (standard-class funcallable-standard-class)
@@ -752,7 +752,6 @@
     (declare (ignore applyp metatypes nkeys))
     (let ((types-rev nil))
       (dotimes-fixnum (i nreq)
-        i
         (unless arguments
           (error-need-at-least-n-args (generic-function-name generic-function)
                                       nreq))

@@ -44,13 +44,33 @@
              (classoid-subclasses (find-classoid t)))
     ;; Todo: perform one pass, then a full GC, then a final pass to confirm
     ;; it worked. It shoud be an error if any uninternable symbols remain,
-    ;; but at present there are about 10 other "!" symbols with referers.
+    ;; but at present there are about 13 other "!" symbols with referers.
     (with-package-iterator (iter (list-all-packages) :internal :external)
       (loop (multiple-value-bind (winp symbol accessibility package) (iter)
               (declare (ignore accessibility))
               (unless winp
                 (return))
               (when (uninternable-p symbol)
+                ;; Uninternable symbols which are referenced by other stuff
+                ;; can't disappear from the image, but we don't need to preserve
+                ;; their functions, so FMAKUNBOUND them. This doesn't have
+                ;; the intended effect if the function shares a code-component
+                ;; with non-cold-init lambdas, such as in !CONSTANTP-COLD-INIT
+                ;; and !GLOBALDB-COLD-INIT. Though the cold-init function is
+                ;; never called post-build, it is not discarded. Also, I suspect
+                ;; that the following loop should print nothing, but it does:
+#|                
+                (sb-vm::map-allocated-objects
+                  (lambda (obj type size)
+                    (declare (ignore size))
+                    (when (= type sb-vm:code-header-widetag)
+                      (let ((name (sb-c::debug-info-name
+                                   (sb-kernel:%code-debug-info obj))))
+                        (when (and (stringp name) (search "COLD-INIT-FORMS" name))
+                          (print obj)))))
+                  :dynamic)
+|#
+                (fmakunbound symbol)
                 (unintern symbol package)))))))
 
 ;;;; putting ourselves out of our misery when things become too much to bear
