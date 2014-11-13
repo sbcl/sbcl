@@ -723,7 +723,7 @@ standard Lisp readtable when NIL."
   #!+sb-doc
   "Read the next Lisp value from STREAM, and return it."
   (check-for-recursive-read stream recursive-p 'read)
-  (let* ((local-eof-val (load-time-value *eof-object* t))
+  (let* ((local-eof-val (load-time-value (cons nil nil) t))
          (result (%read-preserving-whitespace
                   stream eof-error-p local-eof-val recursive-p)))
     ;; This function generally discards trailing whitespace. If you

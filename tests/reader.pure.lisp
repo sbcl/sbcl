@@ -249,7 +249,15 @@
              (with-input-from-string (s test)
                (read s)
                (file-position s))))
-      (assert (= (try nil) (try t))))))
+      (assert (= (try nil) (try t)))))
+  ;; Check that conversion from local eof-object to user-specified eof
+  ;; object is nearly perfectly immune to false positives.
+  ;; The only remaining confusion is that
+  ;;   (read-from-string "#.(code-header-ref (fun-code-header #'read) 6)")
+  ;; returns NIL instead of (NIL) [subject to change depending on
+  ;; what 6 should be] but that is too ridiculous to worry about.
+  (assert (eq (read-from-string "#.sb-impl::*eof-object*")
+              sb-impl::*eof-object*)))
 
 ;;; EOF-ERROR-P defaults to true. Reported by Bruno Haible on
 ;;; cmucl-imp 2004-10-18.

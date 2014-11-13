@@ -59,7 +59,7 @@
                 ;; and !GLOBALDB-COLD-INIT. Though the cold-init function is
                 ;; never called post-build, it is not discarded. Also, I suspect
                 ;; that the following loop should print nothing, but it does:
-#|                
+#|
                 (sb-vm::map-allocated-objects
                   (lambda (obj type size)
                     (declare (ignore size))
