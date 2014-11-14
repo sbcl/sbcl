@@ -510,6 +510,7 @@ GNAME(fpu_restore):
 /*
  * the undefined-function trampoline
  */
+#if !defined(LISP_FEATURE_READ_ONLY_TRAMPS)
 	.text
 	.align	align_16byte,0x90
 	.globl GNAME(undefined_tramp)
@@ -523,6 +524,7 @@ GNAME(undefined_tramp):
         .byte   sc_DescriptorReg # eax in the Descriptor-reg SC
 	ret
 	SIZE(GNAME(undefined_tramp))
+#endif
 
 /* KLUDGE: FIND-ESCAPED-FRAME (SYS:SRC;CODE;DEBUG-INT.LISP) needs
  * to know the name of the function immediately following the
@@ -536,6 +538,7 @@ GNAME(undefined_tramp):
  * closure itself. So we grab the closure out of the fdefn pointed to,
  * then jump to the simple-fun that the closure points to.
  */
+#if !defined(LISP_FEATURE_READ_ONLY_TRAMPS)
 	.text
 	.align	align_16byte,0x90
 	.globl GNAME(closure_tramp)
@@ -545,6 +548,7 @@ GNAME(closure_tramp):
 	movl	FDEFN_FUN_OFFSET(%eax),%eax
 	jmp	*CLOSURE_FUN_OFFSET(%eax)
 	SIZE(GNAME(closure_tramp))
+#endif
 
 	.text
 	.align	align_16byte,0x90
