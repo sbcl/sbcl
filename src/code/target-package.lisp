@@ -598,8 +598,6 @@ REMOVE-PACKAGE-LOCAL-NICKNAME, and the DEFPACKAGE option :LOCAL-NICKNAMES."
                    (ash sxhash -8) (ash sxhash -16) (ash sxhash -19))
            255)))
 
-;;; FIXME: should be wrapped in EVAL-WHEN (COMPILE EXECUTE)
-
 ;;; Add a symbol to a package hashtable. The symbol is assumed
 ;;; not to be present.
 (defun add-symbol (table symbol)
