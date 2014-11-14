@@ -502,7 +502,10 @@
 ;;; debug-info slot is :BOGUS-LRA, then the REAL-LRA-SLOT contains the
 ;;; real component to continue executing, as opposed to the bogus
 ;;; component which appeared in some frame's LRA location.
-(defconstant real-lra-slot sb!vm:code-constants-offset)
+(defconstant real-lra-slot
+  ;; X86 stores a fixup vector at the first constant slot
+  #!-x86 sb!vm:code-constants-offset
+  #!+x86 (1+ sb!vm:code-constants-offset))
 
 ;;; These are magically converted by the compiler.
 (defun current-sp () (current-sp))
@@ -3200,9 +3203,12 @@ register."
 ;;;; MAKE-BOGUS-LRA (used for :FUN-END breakpoints)
 
 (defconstant bogus-lra-constants
-  #!-(or x86 x86-64) 2 #!+(or x86 x86-64) 3)
+  #!-(or x86 x86-64) 2 #!+x86-64 3
+  ;; One more for a fixup vector
+  #!+x86 4)
+
 (defconstant known-return-p-slot
-  (+ sb!vm:code-constants-offset #!-(or x86 x86-64) 1 #!+(or x86 x86-64) 2))
+  (+ sb!vm:code-constants-offset (1- bogus-lra-constants)))
 
 ;;; Make a bogus LRA object that signals a breakpoint trap when
 ;;; returned to. If the breakpoint trap handler returns, REAL-LRA is
@@ -3218,7 +3224,7 @@ register."
           (trap-loc (static-foreign-symbol-sap "fun_end_breakpoint_trap"))
           (length (sap- src-end src-start))
           (code-object
-           (sb!c:allocate-code-object (1+ bogus-lra-constants) length))
+            (sb!c:allocate-code-object bogus-lra-constants length))
           (dst-start (code-instructions code-object)))
      (declare (type system-area-pointer
                     src-start src-end dst-start trap-loc)
