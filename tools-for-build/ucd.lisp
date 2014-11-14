@@ -748,11 +748,12 @@ Length should be adjusted when the standard changes.")
   (with-open-file (s (make-pathname :name "BidiMirroring" :type "txt"
                                     :defaults *unicode-character-database*))
     (loop for line = (read-line s nil nil) while line
-       unless (eql 0 (position #\# line))
-       collect
-         (mapcar
-          #'(lambda (c) (parse-codepoints c :singleton-list nil))
-          (split-string (subseq line 0 (position #\# line)) #\;))))
+          when (and (plusp (length line))
+                    (char/= (char line 0) #\#))
+          collect
+          (mapcar
+           #'(lambda (c) (parse-codepoints c :singleton-list nil))
+           (split-string (subseq line 0 (position #\# line)) #\;))))
   "List of BIDI mirroring glyph pairs")
 
 (defparameter *block-ranges*
