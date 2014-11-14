@@ -173,11 +173,6 @@
 (declaim (ftype (sfunction (integer) hash) sxhash-bignum))
 (declaim (ftype (sfunction (t) hash) sxhash-instance))
 
-;; FIXME: a feature of this implementation is (SXHASH "FOO") = (SXHASH 'FOO)
-;;  but that is not a requirement. (in fact it is false of "NIL" and NIL)
-;;  A consequence is that tables of symbols and/or strings, or more
-;;  complex structures such as (FOO "X") and ("FOO" X),
-;;  have more collisions than they should.
 (defun sxhash (x)
   ;; profiling SXHASH is hard, but we might as well try to make it go
   ;; fast, in case it is the bottleneck somewhere.  -- CSR, 2003-03-14

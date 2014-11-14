@@ -73,7 +73,43 @@ distinct from the global value. Can also be SETF."
     (%makunbound symbol)
     symbol))
 
-;;; Return the built-in hash value for SYMBOL.
+;; Compute a symbol's hash. Also used by FIND-SYMBOL which requires that a hash
+;; be a pure function of the name and not a semi-opaque property of the symbol.
+;; The hash of all symbols named "NIL" must be the same, so not to pessimize
+;; FIND-SYMBOL by special-casing the finding of CL:NIL with an extra "or"
+;; in the hash-equality test. i.e. We can't recognize that CL:NIL was the
+;; object sought (having an exceptional hash) until it has been found.
+(defun compute-symbol-hash (string length)
+  (declare (simple-string string) (index length))
+  (if (and (= length 3)
+           (locally
+            ;; SXHASH-SUBSTRING is unsafe, so this is too. but do we know that
+            ;; length is ok, or is it an accident that it can scan too far?
+            (declare (optimize (safety 0)))
+            (string-dispatch (simple-base-string (simple-array character (*)))
+                             string
+              (and (char= (schar string 0) #\N)
+                   (char= (schar string 1) #\I)
+                   (char= (schar string 2) #\L)))))
+      ;; FIXME: hardwire this. See similar comment at
+      ;;   (deftransform sxhash ((x) (symbol))
+      (return-from compute-symbol-hash (symbol-hash nil)))
+  ;; And make a symbol's hash not the same as (sxhash name) in general.
+  (let ((sxhash (logand (lognot (%sxhash-simple-substring string length))
+                        sb!xc:most-positive-fixnum)))
+    (if (zerop sxhash) #x55AA sxhash))) ; arbitrary substitute for 0
+
+;; Return SYMBOL's hash, a strictly positive fixnum, computing it if not stored.
+;; The inlined code for (SXHASH symbol) only calls ENSURE-SYMBOL-HASH if
+;; needed, however this is ok to call even if the hash is already nonzero.
+(defun ensure-symbol-hash (symbol)
+  (let ((hash (symbol-hash symbol)))
+    (if (zerop hash)
+        (let ((name (symbol-name symbol)))
+          (%set-symbol-hash symbol (compute-symbol-hash name (length name))))
+      hash)))
+
+;;; Interpreter stub: Return whatever is in the SYMBOL-HASH slot of SYMBOL.
 (defun symbol-hash (symbol)
   (symbol-hash symbol))
 

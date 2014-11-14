@@ -365,7 +365,7 @@
 (defun classoid-cell-test-get-lotsa-symbols ()
   (remove-if-not
    #'symbolp
-   (package-hashtable-table
+   (package-hashtable-cells
     (package-internal-symbols (find-package "SB-C")))))
 
 ;; Make every symbol in the test set have a classoid-cell

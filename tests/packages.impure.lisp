@@ -727,7 +727,7 @@ if a restart was invoked."
 ;; (In fact we allow INTERN, but that's beside the point)
 (with-test (:name :with-package-iterator-and-mutation)
   (flet ((table-size (pkg)
-           (length (sb-impl::package-hashtable-table
+           (length (sb-impl::package-hashtable-cells
                     (sb-impl::package-internal-symbols pkg)))))
     (let* ((p (make-package (string (gensym))))
            (initial-table-size (table-size p))

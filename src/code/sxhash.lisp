@@ -118,14 +118,7 @@
             ;; SYMBOL-HASH (which contains NIL itself) is a negative
             ;; fixnum.
             (if (= 0 result)
-                (let ((sxhash (%sxhash-simple-string (symbol-name x))))
-                  ;; We could do a (logior sxhash #x10000000) to
-                  ;; ensure that we never store a 0 in the
-                  ;; slot. However, it's such an unlikely event
-                  ;; (1/5e8?) that it makes more sense to optimize for
-                  ;; the common case...
-                  (%set-symbol-hash x sxhash)
-                  sxhash)
+                (ensure-symbol-hash x)
                 result)))))
 
 (deftransform psxhash ((x &optional depthoid) (character &optional t))

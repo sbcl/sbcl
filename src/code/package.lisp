@@ -35,10 +35,10 @@
 
 (def!struct (package-hashtable
              (:constructor %make-package-hashtable
-                           (table size &aux (free size)))
+                           (cells size &aux (free size)))
              (:copier nil))
   ;; The general-vector of symbols, with a hash-vector in its last cell.
-  (table (missing-arg) :type simple-vector)
+  (cells (missing-arg) :type simple-vector)
   ;; The total number of entries allowed before resizing.
   ;;
   ;; FIXME: CAPACITY would be a more descriptive name. (This is
@@ -167,6 +167,9 @@
   (values (logior (ash access-types 3) #b11) 0 #()
           (package-listify pkg-designator-list)))
 
+(declaim (inline pkg-symbol-valid-p))
+(defun pkg-symbol-valid-p (x) (not (fixnump x)))
+
 ;; The STATE parameter is comprised of 4 packed fields
 ;;  [0:1] = substate {0=internal,1=external,2=inherited,3=initial}
 ;;  [2]   = package with inherited symbols has shadowing symbols
@@ -220,7 +223,7 @@
        (this-package ()
          (truly-the sb!xc:package (car pkglist)))
        (start (next-state new-table)
-         (let ((symbols (package-hashtable-table new-table)))
+         (let ((symbols (package-hashtable-cells new-table)))
            (package-iter-step (logior (mask-field (byte 3 3) start-state)
                                       next-state)
                               ;; assert that physical length was nonzero
@@ -232,7 +235,7 @@
         (macrolet ((scan (&optional (guard t))
                    `(loop
                      (let ((sym (aref sym-vec (decf index))))
-                       (when (and (not (eql sym 0)) ,guard)
+                       (when (and (pkg-symbol-valid-p sym) ,guard)
                          (return (values start-state index sym-vec pkglist sym
                                          (aref #(:internal :external :inherited)
                                                (logand start-state 3))))))
