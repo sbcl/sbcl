@@ -277,7 +277,10 @@
     ;; never figured out but which were apparently acceptable in CMU
     ;; CL. Eventually, it would be great to just get rid of all
     ;; warnings and remove support for this flag. -- WHN 19990323)
-    :ignore-failure-p))
+    :ignore-failure-p
+    ;; meaning: Build this file, but don't put it on the list for
+    ;; genesis to include in the cold core.
+    :not-genesis))
 
 (defparameter *stems-and-flags* (read-from-file "build-order.lisp-expr"))
 

@@ -44,8 +44,9 @@
           ;; to appear in subsequently forked children.
           (let ((*compile-for-effect-only* t))
             (target-compile-stem stem flags))
-          (push (stem-object-path stem flags :target-compile)
-                reversed-target-object-file-names)))
+          (unless (find :not-target flags)
+            (push (stem-object-path stem flags :target-compile)
+                  reversed-target-object-file-names))))
       (loop (if (plusp subprocess-count) (wait) (return)))
       (nreverse reversed-target-object-file-names))))
 
@@ -56,7 +57,8 @@
           (let ((reversed-target-object-file-names nil))
             (do-stems-and-flags (stem flags)
               (unless (position :not-target flags)
-                (push (target-compile-stem stem flags)
-                      reversed-target-object-file-names)
+                (let ((filename (target-compile-stem stem flags)))
+                  (unless (position :not-genesis flags)
+                    (push filename reversed-target-object-file-names)))
                 #!+sb-show (warn-when-cl-snapshot-diff *cl-snapshot*)))
             (nreverse reversed-target-object-file-names))))
