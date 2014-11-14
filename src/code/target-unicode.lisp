@@ -566,11 +566,26 @@ disappears when accents are placed on top of it. and NIL otherwise"
   (let ((compatibility (ecase kind
                          (:compatibility t)
                          (:canonical nil))))
-    (let ((chars)
-          (length 0))
+    (let (chars
+          (length 0)
+          previous-char
+          (previous-combining-class 0))
       (dx-flet ((callback (char)
-                  (push char chars)
-                  (incf length)))
+                  (let ((combining-class (combining-class char)))
+                    (incf length)
+                    (cond ((< 0 combining-class previous-combining-class)
+                           ;; Ensure it's sorted
+                           (loop for cons on chars
+                                 for next-char = (cadr cons)
+                                 when (or (not next-char)
+                                          (<= 0 (combining-class next-char) combining-class))
+                                 do (setf (cdr cons)
+                                          (cons char (cdr cons)))
+                                    (return)))
+                          (t
+                           (push char chars)
+                           (setf previous-char char
+                                 previous-combining-class combining-class))))))
         (loop for char across string
               do
               (decompose-char char compatibility #'callback))
@@ -579,21 +594,6 @@ disappears when accents are placed on top of it. and NIL otherwise"
                 for i from 0
                 do (setf (schar result i) char))
           result)))))
-
-(defun sort-combiners (string)
-  (let (result (start 0) first-cc first-non-cc)
-    (tagbody
-     again
-       (setf first-cc (position 0 string :key #'combining-class :test #'/= :start start))
-       (when first-cc
-         (setf first-non-cc (position 0 string :key #'combining-class :test #'= :start first-cc)))
-       (push (subseq string start first-cc) result)
-       (when first-cc
-         (push (stable-sort (subseq string first-cc first-non-cc) #'< :key #'combining-class) result))
-       (when first-non-cc
-         (setf start first-non-cc first-cc nil first-non-cc nil)
-         (go again)))
-    (apply 'concatenate 'string (nreverse result))))
 
 (defun composition-hangul-syllable-type (cp)
   (cond
@@ -680,58 +680,41 @@ disappears when accents are placed on top of it. and NIL otherwise"
     (push l so-fars)))
 
 (defun canonically-compose (string)
-  (labels ()
-    (let* ((result (list (list 0 (length string) string)))
-           (previous-starter-index (position 0 string :key #'combining-class))
-           (i (and previous-starter-index (1+ previous-starter-index))))
-      (when (or (not i) (= i (length string)))
-        (return-from canonically-compose string))
-      (tagbody
-       again
-         (when (and (>= (- i previous-starter-index) 2)
-                    ;; test for Blocked (Unicode 3.11 para. D115)
-                    ;;
-                    ;; (assumes here that string has sorted combiners,
-                    ;; so can look back just one step)
-                    (>= (combining-class (lref result (1- i)))
-                        (combining-class (lref result i))))
-           (when (= (combining-class (lref result i)) 0)
-             (setf previous-starter-index i))
-           (incf i)
-           (go next))
+  (let* ((result (list (list 0 (length string) string)))
+         (previous-starter-index (position 0 string :key #'combining-class))
+         (i (and previous-starter-index (1+ previous-starter-index))))
+    (when (or (not i) (= i (length string)))
+      (return-from canonically-compose string))
+    (tagbody
+     again
+       (when (and (>= (- i previous-starter-index) 2)
+                  ;; test for Blocked (Unicode 3.11 para. D115)
+                  ;;
+                  ;; (assumes here that string has sorted combiners,
+                  ;; so can look back just one step)
+                  (>= (combining-class (lref result (1- i)))
+                      (combining-class (lref result i))))
+         (when (= (combining-class (lref result i)) 0)
+           (setf previous-starter-index i))
+         (incf i)
+         (go next))
 
-         (let ((comp (primary-composition (lref result previous-starter-index)
-                                          (lref result i))))
-           (cond
-             (comp
-              (setf (lref result previous-starter-index) comp)
-              (setf result (ldelete result i)))
-             (t
-              (when (= (combining-class (lref result i)) 0)
-                (setf previous-starter-index i))
-              (incf i))))
-       next
-         (unless (= i (llength result))
-           (go again)))
-      (if (= i (length string))
-          string
-          (lstring result)))))
-
-(defun quick-normalization-check (string no-prop &optional maybe-prop)
-  (let ((prev-cc 0))
-    (loop for c across string
-       for cp = (char-code c)
-       for cc = (combining-class c)
-       do
-         (unless (<= #x100000 cp #x10FFFF)
-           (if (or
-                (and (> prev-cc cc) (/= cc 0))
-                (proplist-p c no-prop)
-                (and maybe-prop
-                     (proplist-p c maybe-prop)))
-               (return-from quick-normalization-check nil)
-               (setf prev-cc cc))))
-    string))
+       (let ((comp (primary-composition (lref result previous-starter-index)
+                                        (lref result i))))
+         (cond
+           (comp
+            (setf (lref result previous-starter-index) comp)
+            (setf result (ldelete result i)))
+           (t
+            (when (= (combining-class (lref result i)) 0)
+              (setf previous-starter-index i))
+            (incf i))))
+     next
+       (unless (= i (llength result))
+         (go again)))
+    (if (= i (length string))
+        string
+        (lstring result))))
 
 (defun normalize-string (string &optional (form :nfd))
   #!+sb-doc
@@ -751,27 +734,19 @@ disappears when accents are placed on top of it. and NIL otherwise"
     ((array character (*))
      (ecase form
        ((:nfc)
-        (or
-         (quick-normalization-check string :nfc-qc :nfc-qc-maybe)
-         (canonically-compose (sort-combiners (decompose-string string)))))
+        (canonically-compose (decompose-string string)))
        ((:nfd)
-        (or
-         (quick-normalization-check string :nfd-qc)
-         (sort-combiners (decompose-string string))))
+        (decompose-string string))
        ((:nfkc)
-        (or
-         (quick-normalization-check string :nfkc-qc :nfkc-qc-maybe)
-         (canonically-compose (sort-combiners (decompose-string string :compatibility)))))
+        (canonically-compose (decompose-string string :compatibility)))
        ((:nfkd)
-        (or
-         (quick-normalization-check string :nfkd-qc)
-         (sort-combiners (decompose-string string :compatibility))))))
+        (decompose-string string :compatibility))))
     ((array nil (*)) string)))
 
 (defun normalized-p (string &optional (form :nfd))
   #!+sb-doc
   "Tests if STRING is normalized to FORM"
-  ;; This is fast because of the quick check
+  ;; FIXME: can be optimized
   (string= string (normalize-string string form)))
 
 
