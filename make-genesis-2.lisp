@@ -11,7 +11,15 @@
                      :direction :input)
     (read s)))
 (host-cload-stem "src/compiler/generic/genesis" nil)
+
+(defparameter *preload-object-file*
+  (or #!+read-only-tramps
+      (stem-remap-target
+       "obj/from-xc/src/assembly/target/tramps.assem-obj")
+      nil))
+
 (sb!vm:genesis :object-file-names *target-object-file-names*
+               :preload-file *preload-object-file*
                :c-header-dir-name "output/genesis-2"
                :symbol-table-file-name "src/runtime/sbcl.nm"
                :core-file-name "output/cold-sbcl.core"

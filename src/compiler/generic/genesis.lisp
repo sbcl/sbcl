@@ -1803,6 +1803,13 @@ core and return a descriptor to it."
             (write-wordindexed fdefn
                                sb!vm:fdefn-raw-addr-slot
                                (make-random-descriptor
+                                #!+read-only-tramps
+                                (or (lookup-assembler-reference 'sb!vm::undefined-tramp)
+                                    ;; Our preload for the tramps
+                                    ;; doesn't happen during host-1,
+                                    ;; so substitute a usable value.
+                                    0)
+                                #!-read-only-tramps
                                 (cold-foreign-symbol-address "undefined_tramp"))))
           fdefn))))
 
@@ -1846,6 +1853,9 @@ core and return a descriptor to it."
                           (bug "FSET got closure-header-widetag")
                           (/show0 "/static-fset (closure)")
                           (make-random-descriptor
+                           #!+read-only-tramps
+                           (lookup-assembler-reference 'sb!vm::closure-tramp)
+                           #!-read-only-tramps
                            (cold-foreign-symbol-address "closure_tramp")))))
     fdefn))
 
@@ -3684,6 +3694,7 @@ initially undefined function references:~2%")
 ;;; perhaps eventually in SB-LD or SB-BOOT.
 (defun sb!vm:genesis (&key
                       object-file-names
+                      preload-file
                       symbol-table-file-name
                       core-file-name
                       map-file-name
@@ -3783,6 +3794,14 @@ initially undefined function references:~2%")
            *cold-assembler-routines*
            (*deferred-known-fun-refs* nil)
            #!+x86 (*load-time-code-fixups* (make-hash-table)))
+
+      ;; If we're given a preload file, it contains tramps and whatnot
+      ;; that must be loaded before we create any FDEFNs.  It can in
+      ;; theory be loaded any time between binding
+      ;; *COLD-ASSEMBLER-ROUTINES* above and calling
+      ;; INITIALIZE-STATIC-FNS below.
+      (when preload-file
+        (cold-load preload-file))
 
       ;; Prepare for cold load.
       (initialize-non-nil-symbols)
