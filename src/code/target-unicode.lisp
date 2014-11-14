@@ -514,7 +514,8 @@ disappears when accents are placed on top of it. and NIL otherwise"
                      (+ 4 (misc-index char)))))
     (values (clear-flag 7 value) (logbitp 7 value))))
 
-(defun char-decomposition (char length)
+(defun char-decomposition (char length callback)
+  (declare (function callback))
   ;; Caller should have gotten length from char-decomposition-info
   (let* ((cp (char-code char))
          (cp-high (ash cp -8))
@@ -522,70 +523,62 @@ disappears when accents are placed on top of it. and NIL otherwise"
          (high-page (aref **character-high-pages** cp-high))
          (index (unless (logbitp 15 high-page) ;; Hangul syllable
                   (aref **character-low-pages**
-                        (+ 1 (* 2 (+ (ldb (byte 8 0) cp) (ash high-page 8)))))))
-         (entry (when index (loop for i from 0 below length
-                               collecting (aref decompositions (+ i index)))))
-         (result (make-string length)))
-    (if (= length 1)
-        (string (code-char (car entry)))
-        (progn
-          (if (<= #xac00 cp #xd7a3)
-              ;; see Unicode 6.2, section 3-12
-              (let* ((sbase #xac00)
-                     (lbase #x1100)
-                     (vbase #x1161)
-                     (tbase #x11a7)
-                     (lcount 19)
-                     (vcount 21)
-                     (tcount 28)
-                     (ncount (* vcount tcount))
-                     (scount (* lcount ncount))
-                     (sindex (- cp sbase))
-                     (lindex (floor sindex ncount))
-                     (vindex (floor (mod sindex ncount) tcount))
-                     (tindex (mod sindex tcount)))
-                (declare (ignore scount))
-                (setf (char result 0) (code-char (+ lbase lindex)))
-                (setf (char result 1) (code-char (+ vbase vindex)))
-                (if (> tindex 0)
-                  (setf (char result 2) (code-char (+ tbase tindex)))
-                  (setf result (subseq result 0 2)))) ; Remove trailing #\Nul
-              (loop for i from 0 for code in entry
-                 do (setf (char result i) (code-char code))))
-          result))))
+                        (+ 1 (* 2 (+ (ldb (byte 8 0) cp) (ash high-page 8))))))))
+    (cond ((= length 1)
+           (funcall callback (code-char (aref decompositions index))))
+          ((<= #xac00 cp #xd7a3)
+           ;; see Unicode 6.2, section 3-12
+           (let* ((sbase #xac00)
+                  (lbase #x1100)
+                  (vbase #x1161)
+                  (tbase #x11a7)
+                  (vcount 21)
+                  (tcount 28)
+                  (ncount (* vcount tcount))
+                  (sindex (- cp sbase))
+                  (lindex (floor sindex ncount))
+                  (vindex (floor (mod sindex ncount) tcount))
+                  (tindex (mod sindex tcount)))
+             (funcall callback (code-char (+ lbase lindex)))
+             (funcall callback (code-char (+ vbase vindex)))
+             (when (> tindex 0)
+               (funcall callback  (code-char (+ tbase tindex))))))
 
-(defun decompose-char (char)
-  (let ((info (char-decomposition-info char)))
-    (if (= info 0)
-        (string char)
-        (char-decomposition char info))))
+          (t
+           (loop for i below length
+                 do
+                 (funcall callback (code-char (aref decompositions (+ index i)))))))))
+
+(defun decompose-char (char compatibility callback)
+  (declare (function callback))
+  (multiple-value-bind (info compat) (char-decomposition-info char)
+    (if (and (plusp info)
+             (or compatibility
+                 (not compat)))
+        (if compatibility
+            (dx-flet ((callback (char)
+                        (decompose-char char t callback)))
+              (char-decomposition char info #'callback))
+            (char-decomposition char info callback))
+        (funcall callback char))))
 
 (defun decompose-string (string &optional (kind :canonical))
-  (declare (type (member :canonical :compatibility) kind))
-  (flet ((canonical (char)
-           (multiple-value-bind (len compat) (char-decomposition-info char)
-             (and (/= len 0) (not compat))))
-         (compat (char)
-           (/= 0 (char-decomposition-info char))))
-    (let (result
-          (fun (ecase kind
-                 (:canonical #'canonical)
-                 (:compatibility #'compat))))
-      (do* ((start 0 (1+ end))
-            (end (position-if fun string :start start)
-                 (position-if fun string :start start)))
-           ((null end) (push (subseq string start end) result))
-        (unless (= start end)
-          (push (subseq string start end) result))
-        ;; FIXME: this recursive call to DECOMPOSE-STRING is necessary
-        ;; for correctness given our direct encoding of the
-        ;; decomposition data in UnicodeData.txt.  It would, however,
-        ;; be straightforward enough to perform the recursion in table
-        ;; construction, and then have this simply revert to a single
-        ;; lookup.  (Wait for tests to be hooked in, then implement).
-        (push (decompose-string (decompose-char (char string end)) kind)
-              result))
-      (apply 'concatenate 'string (nreverse result)))))
+  (let ((compatibility (ecase kind
+                         (:compatibility t)
+                         (:canonical nil))))
+    (let ((chars)
+          (length 0))
+      (dx-flet ((callback (char)
+                  (push char chars)
+                  (incf length)))
+        (loop for char across string
+              do
+              (decompose-char char compatibility #'callback))
+        (let ((result (make-string length)))
+          (loop for char in (nreverse chars)
+                for i from 0
+                do (setf (schar result i) char))
+          result)))))
 
 (defun sort-combiners (string)
   (let (result (start 0) first-cc first-non-cc)
@@ -734,7 +727,8 @@ disappears when accents are placed on top of it. and NIL otherwise"
            (if (or
                 (and (> prev-cc cc) (/= cc 0))
                 (proplist-p c no-prop)
-                (proplist-p c maybe-prop))
+                (and maybe-prop
+                     (proplist-p c maybe-prop)))
                (return-from quick-normalization-check nil)
                (setf prev-cc cc))))
     string))

@@ -295,8 +295,50 @@ Length should be adjusted when the standard changes.")
                     0 ,(gethash code-point *line-break-class-table* 0)
                     ,(gethash code-point *age-table* 0)))
                 (unallocated-index (apply #'hash-misc unallocated-misc))
-                (unallocated-ucd (make-ucd :misc unallocated-index :decomp 0)))
+                (unallocated-ucd (make-ucd :misc unallocated-index)))
            (setf (gethash code-point *ucd-entries*) unallocated-ucd)))))
+
+(defun expand-decomposition (decomposition)
+  (loop for cp in decomposition
+        for ucd = (gethash cp *ucd-entries*)
+        for length = (elt (aref *misc-table* (ucd-misc ucd)) 4)
+        if (and (not (logbitp 7 length))
+                (plusp length))
+        append (expand-decomposition (ucd-decomp ucd))
+        else
+        collect cp))
+
+;;; Recursively expand canonical decompositions
+(defun fixup-decompositions ()
+  (loop for did-something = nil
+        do
+        (loop for code being the hash-key of *ucd-entries*
+              using (hash-value ucd)
+              when (and (ucd-decomp ucd)
+                        (not (logbitp 7 (elt (aref *misc-table* (ucd-misc ucd)) 4))))
+              do
+              (let ((expanded (expand-decomposition (ucd-decomp ucd))))
+                (unless (equal expanded (ucd-decomp ucd))
+                  (setf (ucd-decomp ucd) expanded
+                        did-something t))))
+        while did-something)
+  (loop for i below (hash-table-count *ucd-entries*)
+        for ucd = (gethash i *ucd-entries*)
+        for decomp = (ucd-decomp ucd)
+        do
+        (setf (ucd-decomp ucd)
+              (cond ((not (consp decomp)) 0)
+                    ((logbitp 7 (elt (aref *misc-table* (ucd-misc ucd)) 4))
+                     (prog1 (length *decompositions*)
+                       (loop for cp in decomp
+                             do (vector-push-extend cp *decompositions*))))
+                    (t
+                     (let ((misc-entry (copy-list (aref *misc-table* (ucd-misc ucd)))))
+                       (setf (elt misc-entry 4) (length decomp)
+                             (ucd-misc ucd) (apply #'hash-misc misc-entry))
+                       (prog1 (length *decompositions*)
+                         (loop for cp in decomp
+                               do (vector-push-extend cp *decompositions*)))))))))
 
 (defun fixup-compositions ()
   (flet ((fixup (k v)
@@ -403,27 +445,27 @@ Length should be adjusted when the standard changes.")
                                    (and (= gc-index 1) upper-index)))
                (bidi-mirrored-p (string= bidi-mirrored "Y"))
                (decomposition-info 0)
-               (decomposition-index 0)
                (eaw-index (gethash code-point *east-asian-width-table*))
                (script-index (gethash code-point *script-table* 0))
                (line-break-index (gethash code-point *line-break-class-table* 0))
-               (age-index (gethash code-point *age-table* 0)))
+               (age-index (gethash code-point *age-table* 0))
+               decomposition)
           (when (and (not cl-both-case-p)
                      (< gc-index 2))
             (format t "~A~%" name))
 
           (when (string/= "" decomposition-type-and-mapping)
-            (let* ((compatibility-p (position #\> decomposition-type-and-mapping))
-                   (decomposition
+            (let* ((compatibility-p (position #\> decomposition-type-and-mapping)))
+              (setf decomposition
                     (parse-codepoints
                      (subseq decomposition-type-and-mapping
-                             (if compatibility-p (1+ compatibility-p) 0)))))
+                             (if compatibility-p (1+ compatibility-p) 0))))
               (when (assoc code-point *decomposition-corrections*)
                 (setf decomposition
                       (list (cdr (assoc code-point *decomposition-corrections*)))))
               (setf decomposition-info
                     (logior (length decomposition) (if compatibility-p 128 0)))
-              (unless (logbitp 7 decomposition-info)
+              (unless compatibility-p
                 ;; Primary composition excludes:
                 ;; * singleton decompositions;
                 ;; * decompositions of non-starters;
@@ -441,12 +483,7 @@ Length should be adjusted when the standard changes.")
                   (setf (gethash (cons (first decomposition)
                                        (second decomposition))
                                  *compositions*)
-                        code-point)))
-              (setf decomposition-index
-                    (prog1
-                        (fill-pointer *decompositions*)
-                      (loop for i in decomposition do
-                           (vector-push-extend i *decompositions*))))))
+                        code-point)))))
           ;; Hangul decomposition; see Unicode 6.2 section 3-12
           (when (= code-point #xd7a3)
             ;; KLUDGE: The decomposition-length for Hangul syllables in the
@@ -480,7 +517,7 @@ Length should be adjusted when the standard changes.")
                                         decomposition-info flags script-index
                                         line-break-index age-index))
                  (result (make-ucd :misc misc-index
-                                   :decomp decomposition-index)))
+                                   :decomp decomposition)))
             (when (and (> (length name) 7)
                        (string= ", Last>" name :start2 (- (length name) 7)))
               ;; We can still do this despite East Asian Width being in the
@@ -571,6 +608,7 @@ Length should be adjusted when the standard changes.")
   (complete-misc-table)
   (fixup-casefolding)
   (fixup-ages)
+  (fixup-decompositions)
   nil)
 
 
@@ -732,11 +770,13 @@ Used to look up block data.")
 
 ;;; Output code
 (defun write-codepoint (code-point stream)
+  (declare (type (unsigned-byte 32) code-point))
   (write-byte (ldb (byte 8 16) code-point) stream)
   (write-byte (ldb (byte 8 8) code-point) stream)
   (write-byte (ldb (byte 8 0) code-point) stream))
 
 (defun write-4-byte (value stream)
+  (declare (type (unsigned-byte 32) value))
   (write-byte (ldb (byte 8 24) value) stream)
   (write-byte (ldb (byte 8 16) value) stream)
   (write-byte (ldb (byte 8 8) value) stream)
@@ -799,6 +839,7 @@ Used to look up block data.")
                  (gethash (logior low-page (ash high-page 8)) *ucd-entries*)
                  uniq-ucd-entries :test #'equalp))
            (flet ((write-2-byte (int stream)
+                    (declare (type (unsigned-byte 16) int))
                     (write-byte (ldb (byte 8 8) int) stream)
                     (write-byte (ldb (byte 8 0) int) stream)))
              (case (length uniq-ucd-entries)
