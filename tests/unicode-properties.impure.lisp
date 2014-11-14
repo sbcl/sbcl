@@ -35,9 +35,9 @@ is replaced with replacement."
 
 (defun test-line (line)
   (destructuring-bind (%cp %name %gc ccc %bidi decomp-map
-                       %decimal-digit %digit %numeric
-                       %bidi-mirrored %old-name old-comment
-                       simple-up simple-down simple-title)
+                           %decimal-digit %digit %numeric
+                           %bidi-mirrored %old-name old-comment
+                           simple-up simple-down simple-title)
       (split-string line #\;)
     (declare (ignore decomp-map old-comment simple-up
                      simple-down simple-title))
@@ -57,8 +57,35 @@ is replaced with replacement."
                        (substitute #\_ #\Space %old-name)))
            (char-from-name (name-char name))
            (char-from-old-name
-            (when old-name
-              (name-char (concatenate 'string "UNICODE1_" old-name))))
+            ;; Exclude all the renaming conflicts, including the mass-rename of Georgian
+            (when (and old-name
+                       (not
+                        (member old-name
+                                '("BELL"
+                                  "LATIN_CAPITAL_LETTER_YOGH"
+                                  "LATIN_SMALL_LETTER_YOGH"
+                                  "CYRILLIC_CAPITAL_LETTER_E"
+                                  "CYRILLIC_CAPITAL_LETTER_I"
+                                  "CYRILLIC_SMALL_LETTER_E"
+                                  "CYRILLIC_SMALL_LETTER_I"
+                                  "DOUBLE_VERTICAL_BAR"
+                                  "HANGUL_LETTER_CIEUC"
+                                  "HANGUL_LETTER_KIYEOK"
+                                  "HANGUL_LETTER_PIEUP"
+                                  "PARENTHESIZED_HANGUL_CIEUC"
+                                  "PARENTHESIZED_HANGUL_KIYEOK"
+                                  "PARENTHESIZED_HANGUL_PIEUP"
+                                  "CIRCLED_HANGUL_CIEUC"
+                                  "CIRCLED_HANGUL_KIYEOK"
+                                  "CIRCLED_HANGUL_PIEUP"
+                                  "HALFWIDTH_HANGUL_LETTER_CIEUC"
+                                  "HALFWIDTH_HANGUL_LETTER_KIYEOK"
+                                  "HALFWIDTH_HANGUL_LETTER_PIEUP"
+                                  "SQUARED_MV")
+                                :test #'string=))
+                       (or (< (length old-name) 14)
+                           (string/= old-name "GEORGIAN_SMALL" :end1 14)))
+              (name-char old-name)))
            (decimal-digit (parse-integer %decimal-digit :junk-allowed t))
            (digit (parse-integer %digit :junk-allowed t))
            (numeric (if (string= %numeric "") nil (read-from-string %numeric)))

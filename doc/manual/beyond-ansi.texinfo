@@ -724,7 +724,9 @@ by giving its hexadecimal codepoint preceded by a ``U'', an optional
 character directly into your source code if it can be encoded in your
 file. If a character had an assigned name in Unicode 1.0 that was
 distinct from its current name, you may also use that name (with spaces
-replaced by underscares) prefixed by ``UNICODE1_'' to specify the character.
+replaced by underscares) to specify the character, unless the name is
+already associated with a codepoint in the latest Unicode standard (such
+as ``BELL'').
 
 For example, you can specify the codepoint U+00E1 (``Latin
 Small Letter A With Acute'') as
@@ -732,7 +734,7 @@ Small Letter A With Acute'') as
 @item
 @code{#\LATIN_SMALL_LETTER_A_WITH_ACUTE}
 @item
-@code{#\UNICODE1_LATIN_SMALL_LETTER_A_ACUTE}
+@code{#\LATIN_SMALL_LETTER_A_ACUTE}
 @item
 @code{#\á} assuming a Unicode source file
 @item
