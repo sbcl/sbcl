@@ -324,7 +324,7 @@ Examples:
          :format-control "~A: malloc() of ~S bytes failed."
          :format-arguments (list (strerror errno) bytes)))
 
-;;; Allocate a block of memory at least BITS bits long and return a
+;;; Allocate a block of memory at least BYTES bytes long and return a
 ;;; system area pointer to it.
 #!-sb-fluid (declaim (inline %make-alien))
 (defun %make-alien (bytes)
