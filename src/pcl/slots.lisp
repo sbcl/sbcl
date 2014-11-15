@@ -267,13 +267,11 @@
            (bug "Bogus slot-cell in SLOT-MAKUNBOUND: ~S" cell))))
   object)
 
-;; I guess we don't care enough to use the hash-based lookup mechanism here.
-;; Also note that CLHS "encourages" implementors to base this on
+;; Note that CLHS "encourages" implementors to base this on
 ;; SLOT-EXISTS-P-USING-CLASS, whereas 88-002R made no such claim,
 ;; however Appendix D of AMOP sketches out such an implementation.
 (defun slot-exists-p (object slot-name)
-  (let ((class (class-of object)))
-    (not (null (find-slot-definition class slot-name)))))
+  (not (null (find-slot-cell (valid-wrapper-of object) slot-name))))
 
 (defvar *unbound-slot-value-marker* (make-unprintable-object "unbound slot"))
 

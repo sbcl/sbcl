@@ -172,12 +172,21 @@
   (:metaclass dynamic-slot-subclass))
 (assert (= 42 (slot-value *three* 'slot4)))
 
+(test-util:with-test (:name :slot-exists-p-before-removal)
+  (let ((i (make-instance 'test-class-3)))
+    (dolist (s '(slot1 slot2 slot3 slot4)) (assert (slot-exists-p i s)))))
+
 ;;; Test redefinition removing a dynamic slot
 (defclass test-class-3 (test-class-1)
   ((slot2 :initarg :slot2 :initform t :allocation :dynamic)
    (slot3 :initarg :slot3))
   (:metaclass dynamic-slot-subclass))
 (assert (equal (list :slot-missing 'slot4) (slot-value *three* 'slot4)))
+
+(test-util:with-test (:name :slot-exists-p-after-removal)
+  (let ((i (make-instance 'test-class-3)))
+    (assert (not (slot-exists-p i 'slot4)))
+    (dolist (s '(slot1 slot2 slot3)) (assert (slot-exists-p i s)))))
 
 ;;; Test redefinition making a dynamic slot local
 ;;;
