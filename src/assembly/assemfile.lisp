@@ -93,6 +93,24 @@
        (setf (reg-spec-temp reg) (make-symbol (symbol-name name)))))
     reg))
 
+(defun expand-one-export-spec (export)
+  (if (symbolp export)
+      `(list ',export ,export 0)
+      (destructuring-bind
+          (name (operator base-label offset))
+          export
+        ;; KLUDGE: Presume that all compound export specs are of the
+        ;; form (NAME (OPERATOR BASE-LABEL OFFSET)), where OPERATOR is
+        ;; + or -, BASE-LABEL is a LABEL in the present scope, and
+        ;; OFFSET evaluates to an integer.  Ideally, we should be
+        ;; smarter about this.
+        `(list ',name ,base-label (,operator ,offset)))))
+
+(defun expand-export-option (exports)
+  (loop
+    for export in exports
+    collect `(push ,(expand-one-export-spec export) *entry-points*)))
+
 (defun emit-assemble (name options regs code)
   (collect ((decls))
     (loop
@@ -110,6 +128,7 @@
        (sb!assem:assemble (*code-segment* ',name)
          ,name
          (push (list ',name ,name 0) *entry-points*)
+         ,@(expand-export-option (cdr (assoc :export options)))
          ,@code
          ,@(generate-return-sequence
             (or (cadr (assoc :return-style options)) :raw))
