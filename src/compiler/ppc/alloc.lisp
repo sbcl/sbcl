@@ -116,7 +116,9 @@
   (:translate make-fdefn)
   (:generator 37
     (with-fixed-allocation (result pa-flag temp fdefn-widetag fdefn-size)
-      (inst lr temp  (make-fixup "undefined_tramp" :foreign))
+      (inst lr temp
+            #!-read-only-tramps (make-fixup "undefined_tramp" :foreign)
+            #!+read-only-tramps (make-fixup 'undefined-tramp :assembly-routine))
       (storew name result fdefn-name-slot other-pointer-lowtag)
       (storew null-tn result fdefn-fun-slot other-pointer-lowtag)
       (storew temp result fdefn-raw-addr-slot other-pointer-lowtag))))
