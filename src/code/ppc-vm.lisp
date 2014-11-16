@@ -20,6 +20,8 @@
   (without-gcing
    (let ((sap (%primitive code-instructions code)))
      (ecase kind
+       (:absolute
+        (setf (sap-ref-32 sap offset) fixup))
        (:b
         (error "Can't deal with CALL fixups, yet."))
        (:ba

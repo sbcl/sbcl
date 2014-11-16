@@ -2233,6 +2233,8 @@ core and return a descriptor to it."
        ;; needs to be corresponding code in ppc-vm.lisp
        (:ppc
         (ecase kind
+          (:absolute
+           (setf (bvref-32 gspace-bytes gspace-byte-offset) value))
           (:ba
            (setf (bvref-32 gspace-bytes gspace-byte-offset)
                  (dpb (ash value -2) (byte 24 2)
