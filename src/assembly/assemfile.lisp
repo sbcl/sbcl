@@ -15,7 +15,7 @@
 ;;; If non-NIL, emit assembly code. If NIL, emit VOP templates.
 (defvar *emit-assembly-code-not-vops-p* nil)
 
-;;; a list of (NAME . LABEL) for every entry point
+;;; a list of (NAME LABEL OFFSET) for every entry point
 (defvar *entry-points* nil)
 
 ;;; Set this to NIL to inhibit assembly-level optimization. (For
@@ -109,7 +109,7 @@
        ,@(decls)
        (sb!assem:assemble (*code-segment* ',name)
          ,name
-         (push (cons ',name ,name) *entry-points*)
+         (push (list ',name ,name 0) *entry-points*)
          ,@code
          ,@(generate-return-sequence
             (or (cadr (assoc :return-style options)) :raw))
