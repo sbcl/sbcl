@@ -111,6 +111,10 @@
     for export in exports
     collect `(push ,(expand-one-export-spec export) *entry-points*)))
 
+(defun expand-align-option (align)
+  (when align
+    `((emit-alignment ,align))))
+
 (defun emit-assemble (name options regs code)
   (collect ((decls))
     (loop
@@ -126,6 +130,7 @@
                    regs)
        ,@(decls)
        (sb!assem:assemble (*code-segment* ',name)
+         ,@(expand-align-option (cadr (assoc :align options)))
          ,name
          (push (list ',name ,name 0) *entry-points*)
          ,@(expand-export-option (cdr (assoc :export options)))
