@@ -1391,6 +1391,12 @@ bootstrapping.
                    nmethods (length cnm-args) cnm-args omethods
                    (length orig-args) orig-args)))))))
 
+;; FIXME: replacing this entire mess with DESTRUCTURING-BIND would correct
+;; problems similar to those already solved by a correct implementation
+;; of DESTRUCTURING-BIND, such as incorrect binding order:
+;; e.g. (macroexpand-1 '(bind-args ((&optional (x nil xsp)) args) (form)))
+;;      -> (LET* ((.ARGS-TAIL. ARGS) (XSP (NOT (NULL .ARGS-TAIL.))) (X ...)))
+;; It's mostly irrelevant unless a method uses CALL-NEXT-METHOD though.
 (defmacro bind-args ((lambda-list args) &body body)
   (let ((args-tail '.args-tail.)
         (key '.key.)
