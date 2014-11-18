@@ -17,6 +17,10 @@
 (defmacro truly-the (type expr)
   `(the ,type ,expr))
 
+(defmacro named-lambda (name args &body body)
+  (declare (ignore name))
+  `#'(lambda ,args ,@body))
+
 ;;; Interrupt control isn't an issue in the cross-compiler: we don't
 ;;; use address-dependent (and thus GC-dependent) hashes, and we only
 ;;; have a single thread of control.

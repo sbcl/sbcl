@@ -47,7 +47,9 @@
 
 (defglobal *raw-slot-data-list*
   (macrolet ((make-comparer (accessor-name)
-               `(lambda (index x y)
+               ;; Not a symbol, because there aren't any so-named functions.
+               `(named-lambda ,(string (symbolicate accessor-name "="))
+                    (index x y)
                   (declare (optimize speed (safety 0)))
                   (= (,accessor-name x index)
                      (,accessor-name y index)))))
