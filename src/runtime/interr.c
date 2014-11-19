@@ -167,7 +167,7 @@ describe_internal_error(os_context_t *context)
     len = *ptr++;
     printf("Internal error #%d \"%s\" at %p\n", *ptr,
            internal_error_descriptions[*ptr],
-           *os_context_pc_addr(context));
+           (void*)*os_context_pc_addr(context));
     ptr++;
     len--;
     while (len > 0) {

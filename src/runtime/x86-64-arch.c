@@ -67,7 +67,7 @@ context_eflags_addr(os_context_t *context)
      * gregs[], but it's conditional on __USE_GNU and not defined, so
      * we need to do this nasty absolute index magic number thing
      * instead. */
-    return &context->uc_mcontext.gregs[17];
+    return (os_context_register_t*)&context->uc_mcontext.gregs[17];
 #elif defined LISP_FEATURE_FREEBSD || defined(__DragonFly__)
     return &context->uc_mcontext.mc_rflags;
 #elif defined LISP_FEATURE_DARWIN

@@ -86,7 +86,8 @@ int arch_os_thread_cleanup(struct thread *thread) {
 os_context_register_t *
 os_context_register_addr(os_context_t *context, int offset)
 {
-#define RCASE(name) case reg_ ## name: return &context->uc_mcontext.gregs[REG_ ## name];
+#define RCASE(name) case reg_ ## name: return \
+ (os_context_register_t*)&context->uc_mcontext.gregs[REG_ ## name];
     switch(offset) {
         RCASE(RAX)
         RCASE(RCX)
@@ -106,28 +107,28 @@ os_context_register_addr(os_context_t *context, int offset)
         RCASE(R15)
       default:
         if(offset<NGREG)
-            return &context->uc_mcontext.gregs[offset/2+4];
+            return (os_context_register_t*)&context->uc_mcontext.gregs[offset/2+4];
         else return 0;
     }
-    return &context->uc_mcontext.gregs[offset];
+    return (os_context_register_t*)&context->uc_mcontext.gregs[offset];
 }
 
 os_context_register_t *
 os_context_pc_addr(os_context_t *context)
 {
-    return &context->uc_mcontext.gregs[REG_RIP]; /*  REG_EIP */
+    return (os_context_register_t*)&context->uc_mcontext.gregs[REG_RIP]; /*  REG_EIP */
 }
 
 os_context_register_t *
 os_context_sp_addr(os_context_t *context)
 {
-    return &context->uc_mcontext.gregs[REG_RSP];
+    return (os_context_register_t*)&context->uc_mcontext.gregs[REG_RSP];
 }
 
 os_context_register_t *
 os_context_fp_addr(os_context_t *context)
 {
-    return &context->uc_mcontext.gregs[REG_RBP];
+    return (os_context_register_t*)&context->uc_mcontext.gregs[REG_RBP];
 }
 
 unsigned long

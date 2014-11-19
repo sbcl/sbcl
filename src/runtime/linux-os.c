@@ -64,6 +64,8 @@
 /* Prototype for personality(2). Done inline here since the header file
  * for this isn't available on old versions of glibc. */
 int personality (unsigned long);
+#else
+#include <sys/personality.h>
 #endif
 
 size_t os_vm_page_size;
