@@ -114,6 +114,7 @@ copy_code_object(lispobj object, sword_t nwords)
 boolean
 from_space_p(lispobj obj)
 {
+    extern boolean in_dontmove_nativeptr_p(page_index_t, lispobj*);
     page_index_t page_index;
 
     if (space_matches_p(obj, from_space, &page_index)) {
