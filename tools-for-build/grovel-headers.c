@@ -332,6 +332,8 @@ main(int argc, char *argv[])
     defconstant("pollout", POLLOUT);
     defconstant("pollpri", POLLPRI);
     defconstant("pollhup", POLLHUP);
+    defconstant("pollnval", POLLNVAL);
+    defconstant("pollerr", POLLERR);
     DEFTYPE("nfds-t", nfds_t);
 #ifndef LISP_FEATURE_ANDROID
     printf(";;; langinfo\n");

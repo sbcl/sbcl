@@ -1,5 +1,8 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 changes relative to sbcl-1.2.5:
+  * enhancement: SERVE-EVENTS uses the poll() system call in lieu of
+    select() if the OS has the former. Previously poll() was used
+    only if waiting on exactly one file descriptor.
   * bug fix: SB-DEBUG:ARG now works in all TRACE options which evaluate forms.
    (lp#1357826)
   * bug fix: GC memory corruption during internal memory handling.

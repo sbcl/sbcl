@@ -2678,6 +2678,9 @@ no guarantees of interface stability."
                "UNIX-OFFSET"
                "FD-TYPE"
 
+               ;; Most of this is random detritus worthy of deletion,
+               ;; and the ordering is not alphabetical or anything sane.
+
                ;; stuff with a one-to-one mapping to Unix constructs
                "D-INO" "D-NAME" "D-NAMLEN" "D-OFF" "D-RECLEN" "DEV-T" "DIRECT"
                "EXECGRP" "EXECOTH" "EXECOWN" "F-DUPFD" "F-GETFD" "F-GETFL"
@@ -2709,7 +2712,8 @@ no guarantees of interface stability."
                "UNIX-IOCTL"
                "UNIX-ISATTY" "UNIX-LSEEK" "UNIX-LSTAT" "UNIX-MKDIR"
                "UNIX-OPEN" "UNIX-OPENDIR" "UNIX-PATHNAME" "UNIX-PID"
-               "UNIX-PIPE" "UNIX-SIMPLE-POLL" "UNIX-READ" "UNIX-READDIR" "UNIX-READLINK" "UNIX-REALPATH"
+               "UNIX-PIPE" "UNIX-POLL" "UNIX-SIMPLE-POLL"
+               "UNIX-READ" "UNIX-READDIR" "UNIX-READLINK" "UNIX-REALPATH"
                "UNIX-RENAME" "UNIX-SELECT" "UNIX-STAT" "UNIX-UID"
                "UNIX-UNLINK" "UNIX-WRITE"
                "WINSIZE"
@@ -2741,6 +2745,8 @@ no guarantees of interface stability."
                "ESRCH" "ESUCCESS" "ETIMEDOUT" "ETOOMANYREFS" "ETXTBSY"
                "EUSERS" "EVICEERR" "EVICEOP" "EWOULDBLOCK" "EXDEV"
 
+               "POLLFD" "POLLIN" "POLLOUT" "POLLHUP" "POLLNVAL" "POLLERR"
+               "FD" "EVENTS" "REVENTS"
                "FD-ISSET" "FD-SET" "LTCHARS" "UNIX-FAST-SELECT"
                "UNIX-KILL" "CODESET"
                "FD-ZERO" "FD-CLR" "UNIX-RESOLVE-LINKS"

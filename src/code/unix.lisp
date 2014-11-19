@@ -620,6 +620,15 @@ avoiding atexit(3) hooks, etc. Otherwise exit(2) is called."
               (events  short)           ; requested events
               (revents short)))         ; returned events
 
+  (defun unix-poll (pollfds nfds to-msec)
+    (declare (fixnum nfds to-msec))
+    (when (and (minusp to-msec) (not *interrupts-enabled*))
+      (note-dangerous-wait "poll(2)"))
+    ;; FAST-SELECT doesn't use WITH-RESTARTED-SYSCALL so this doesn't either
+    (int-syscall ("poll" (* (struct pollfd)) int int)
+                 (alien-sap pollfds) nfds to-msec))
+
+  ;; "simple" poll operates on a single descriptor only
   (defun unix-simple-poll (fd direction to-msec)
     (declare (fixnum fd to-msec))
     (when (and (minusp to-msec) (not *interrupts-enabled*))

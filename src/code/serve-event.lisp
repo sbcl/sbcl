@@ -17,7 +17,8 @@
   ;; Reading or writing...
   (direction nil :type (member :input :output))
   ;; File descriptor this handler is tied to.
-  (descriptor 0 :type (mod #.sb!unix:fd-setsize))
+  (descriptor 0 :type #!-os-provides-poll (mod #.sb!unix:fd-setsize)
+                      #!+os-provides-poll (and fixnum unsigned-byte))
   ;; T iff this handler is running.
   ;;
   ;; FIXME: unused. At some point this used to be set to T
@@ -28,6 +29,20 @@
   (function nil :type function)
   ;; T if this descriptor is bogus.
   bogus)
+
+(defstruct (pollfds (:constructor make-pollfds (list)))
+  (list)
+  ;; If using poll() we maintain, in addition to a list of HANDLER,
+  ;; an (ALIEN (* STRUCT POLLFD)) to avoid creating it repeatedly.
+  ;; The C array is created only when SUB-SUB-SERVE-EVENT needs it,
+  ;; not on each call to ADD/REMOVE-FD-HANDLER.
+  ;; If using select(), the C array is not used.
+  #!+os-provides-poll (fds) ;
+  ;; N-FDS is less than or equal to the length of the C array,
+  ;; which is created potentially oversized.
+  #!+os-provides-poll (n-fds)
+  ;; map from index in LIST to index into alien FDS
+  #!+os-provides-poll (map))
 
 (def!method print-object ((handler handler) stream)
   (print-unreadable-object (handler stream :type t)
@@ -48,20 +63,40 @@
   ;; starting to recursively modify it could lose...
   `(without-interrupts ,@forms))
 
+;; Deallocating the pollfds is a no-op if not using poll()
+#!-os-provides-poll (declaim (inline deallocate-pollfds))
+
+;; Free the cached C structures, if allocated.
+;; Must be called within the extent of WITH-DESCRIPTOR-HANDLERS.
+(defun deallocate-pollfds ()
+  #!+os-provides-poll
+  (awhen *descriptor-handlers*
+    (when (pollfds-fds it)
+      (free-alien (pollfds-fds it)))
+    (setf (pollfds-fds it) nil
+          (pollfds-n-fds it) nil
+          (pollfds-map it) nil)))
+
 (defun list-all-descriptor-handlers ()
   (with-descriptor-handlers
-    (copy-list *descriptor-handlers*)))
+    (awhen *descriptor-handlers*
+      (copy-list (pollfds-list it)))))
 
+;; With the poll() interface it requires more care to maintain
+;; a correspondence betwen the Lisp and C representations.
+#!-os-provides-poll
 (defun select-descriptor-handlers (function)
   (declare (function function))
   (with-descriptor-handlers
-    (remove-if-not function *descriptor-handlers*)))
+    (awhen *descriptor-handlers*
+      (remove-if-not function (pollfds-list it)))))
 
 (defun map-descriptor-handlers (function)
   (declare (function function))
   (with-descriptor-handlers
-    (dolist (handler *descriptor-handlers*)
-      (funcall function handler))))
+    (awhen *descriptor-handlers*
+      (dolist (handler (pollfds-list it))
+        (funcall function handler)))))
 
 ;;; Add a new handler to *descriptor-handlers*.
 (defun add-fd-handler (fd direction function)
@@ -72,32 +107,51 @@
   (unless (member direction '(:input :output))
     ;; FIXME: should be TYPE-ERROR?
     (error "Invalid direction ~S, must be either :INPUT or :OUTPUT" direction))
+  ;; lp#316068 - generate a more specific error than "X is not (MOD n)"
+  #!-os-provides-poll
   (unless (<= 0 fd (1- sb!unix:fd-setsize))
     (error "Cannot add an FD handler for ~D: not under FD_SETSIZE limit." fd))
   (let ((handler (make-handler direction fd function)))
     (with-descriptor-handlers
-      (push handler *descriptor-handlers*))
+      (deallocate-pollfds)
+      (let ((handlers *descriptor-handlers*))
+        (if (not handlers)
+            (setf *descriptor-handlers* (make-pollfds (list handler)))
+            (push handler (pollfds-list handlers)))))
     handler))
+
+(macrolet ((filter-handlers (newval-form)
+             `(with-descriptor-handlers
+                (deallocate-pollfds)
+                (let* ((holder *descriptor-handlers*)
+                       (handlers (if holder (pollfds-list holder)))
+                       (list ,newval-form))
+                  ;; The case of "no handlers" is *DESCRIPTOR-HANDLERS* = NIL,
+                  ;; like it starts as. So we set it back to NIL rather than
+                  ;; an empty struct if no handlers remain.
+                  (if list
+                      ;; Since this macro is only for deletion of handlers,
+                      ;; if LIST is not nil then HOLDER was too.
+                      (setf (pollfds-list holder) list)
+                      (setf *descriptor-handlers* nil))))))
 
 ;;; Remove an old handler from *descriptor-handlers*.
 (defun remove-fd-handler (handler)
   #!+sb-doc
   "Removes HANDLER from the list of active handlers."
-  (with-descriptor-handlers
-    (setf *descriptor-handlers*
-          (delete handler *descriptor-handlers*))))
+  (filter-handlers (delete handler handlers)))
 
 ;;; Search *descriptor-handlers* for any reference to fd, and nuke 'em.
 (defun invalidate-descriptor (fd)
   #!+sb-doc
   "Remove any handlers referring to FD. This should only be used when attempting
   to recover from a detected inconsistency."
-  (with-descriptor-handlers
-    (setf *descriptor-handlers*
-          (delete fd *descriptor-handlers*
-                  :key #'handler-descriptor))))
+  (filter-handlers (delete fd handlers :key #'handler-descriptor)))
 
 ;;; Add the handler to *descriptor-handlers* for the duration of BODY.
+;;; Note: this makes the poll() interface not super efficient because
+;;; it discards the cached C array of (struct pollfd), as it must do
+;;; each time the list of Lisp HANDLER structs is touched.
 (defmacro with-fd-handler ((fd direction function) &rest body)
   #!+sb-doc
   "Establish a handler with SYSTEM:ADD-FD-HANDLER for the duration of BODY.
@@ -114,28 +168,31 @@
 
 ;;; First, get a list and mark bad file descriptors. Then signal an error
 ;;; offering a few restarts.
-(defun handler-descriptors-error ()
-  (let ((bogus-handlers nil))
-    (dolist (handler (list-all-descriptor-handlers))
-      (unless (or (handler-bogus handler)
-                  (sb!unix:unix-fstat (handler-descriptor handler)))
-        (setf (handler-bogus handler) t)
-        (push handler bogus-handlers)))
-    (when bogus-handlers
+(defun handler-descriptors-error
+  #!+os-provides-poll (&optional (bogus-handlers nil handlers-supplied-p))
+  #!-os-provides-poll (&aux bogus-handlers handlers-supplied-p)
+  (if handlers-supplied-p
+      (dolist (handler bogus-handlers)
+        ;; no fstat() - the kernel deemed them bogus already
+        (setf (handler-bogus handler) t))
+      (dolist (handler (list-all-descriptor-handlers))
+        (unless (or (handler-bogus handler)
+                    (sb!unix:unix-fstat (handler-descriptor handler)))
+          (setf (handler-bogus handler) t)
+          (push handler bogus-handlers))))
+  (when bogus-handlers
       (restart-case (error "~S ~[have~;has a~:;have~] bad file descriptor~:P."
                            bogus-handlers (length bogus-handlers))
         (remove-them ()
           :report "Remove bogus handlers."
-          (with-descriptor-handlers
-            (setf *descriptor-handlers*
-                  (delete-if #'handler-bogus *descriptor-handlers*))))
+          (filter-handlers (delete-if #'handler-bogus handlers)))
         (retry-them ()
           :report "Retry bogus handlers."
           (dolist (handler bogus-handlers)
             (setf (handler-bogus handler) nil)))
         (continue ()
-          :report "Go on, leaving handlers marked as bogus."))))
-  nil)
+          :report "Go on, leaving handlers marked as bogus.")))
+  nil))
 
 
 ;;;; SERVE-ALL-EVENTS, SERVE-EVENT, and friends
@@ -194,8 +251,8 @@ waiting."
              ;; Loop around SUB-SERVE-EVENT till done.
              (dx-let ((usable (list nil)))
                (dx-flet ((usable! (fd)
-                                  (declare (ignore fd))
-                                  (setf (car usable) t)))
+                           (declare (ignore fd))
+                           (setf (car usable) t)))
                  (with-fd-handler (fd direction #'usable!)
                    (loop
                      (sub-serve-event to-sec to-usec signalp)
@@ -264,9 +321,10 @@ happens. Server returns T if something happened and NIL otherwise. Timeout
 
 ;;; Handles the work of the above, except for periodic polling. Returns
 ;;; true if something of interest happened.
+#!-os-provides-poll
 (defun sub-sub-serve-event (to-sec to-usec)
   (with-alien ((read-fds (struct sb!unix:fd-set))
-                        (write-fds (struct sb!unix:fd-set)))
+               (write-fds (struct sb!unix:fd-set)))
     (sb!unix:fd-zero read-fds)
     (sb!unix:fd-zero write-fds)
     (let ((count 0))
@@ -331,3 +389,159 @@ happens. Server returns T if something happened and NIL otherwise. Timeout
                  :next)
                t))))))
 
+;; Return an pointer to an array of (struct pollfd).
+;; This isn't done via WITH-ALIEN for 2 reasons:
+;; 1. WITH-ALIEN can't make variable-length arrays
+;; 2. it's slightly nontrivial to condense the :input and :output masks
+;; Making USE-SCRATCHPAD-P an optional argument is a KLUDGE, but it allows
+;; picking which method of file descriptor de-duplication is used,
+;; so that both can be exercised by tests.
+#!+os-provides-poll
+(defun compute-pollfds (handlers &optional
+                                 (n-handlers (length handlers))
+                                 (use-scratchpad-p (>= n-handlers 15)))
+  ;; Assuming that all fds in HANDLERS are unique and none are bogus,
+  ;; either of which could be untrue,
+  ;; allocate the maximum length C array we'd need.
+  ;; Since interrupts are disabled inside WITH-DESCRIPTOR-HANDLERS,
+  ;; and *DESCRIPTOR-HANDLERS* is per-thread, double traversal is ok.
+  (let* ((fds (make-alien (struct sb!unix:pollfd) n-handlers))
+         (map (make-array n-handlers :initial-element nil))
+         (n-fds 0)
+         (handler-index -1))
+    (labels ((flag-bit (handler)
+               (ecase (handler-direction handler)
+                 (:input sb!unix:pollin)
+                 (:output sb!unix:pollout)))
+             (set-flag (handler)
+               (let ((fd-index n-fds))
+                 (incf n-fds)
+                 (setf (slot (deref fds fd-index) 'sb!unix:fd)
+                       (handler-descriptor handler)
+                       (slot (deref fds fd-index) 'sb!unix:events)
+                       (flag-bit handler))
+                 fd-index))
+             (or-flag (index handler)
+               (setf (slot (deref fds index) 'sb!unix:events)
+                     (logior (slot (deref fds index) 'sb!unix:events)
+                             (flag-bit handler)))))
+      ;; Now compute unique non-bogus file descriptors.
+      (if use-scratchpad-p
+          ;; This is O(N), but wastes space if there are, say, 16 descriptors
+          ;; numbered 1 through 15 and then 1025.
+          (let ((scratchpad ; direct map from file descriptor to position in FDS
+                 (make-array (1+ (loop for handler in handlers
+                                       maximize (handler-descriptor handler)))
+                             :initial-element nil)))
+            (dolist (handler handlers)
+              (incf handler-index)
+              (unless (handler-bogus handler)
+                (let* ((fd (handler-descriptor handler))
+                       (fd-index (svref scratchpad fd)))
+                  (if fd-index
+                      (or-flag fd-index handler)
+                      (setf fd-index (set-flag handler)
+                            (svref scratchpad fd) fd-index))
+                  (setf (svref map handler-index) fd-index)))))
+          ;; This is O(N^2) but fast for small inputs.
+          (dolist (handler handlers)
+            (incf handler-index)
+            (unless (handler-bogus handler)
+              (let ((dup-of (position (handler-descriptor handler)
+                                      handlers :key (lambda (x)
+                                                      (unless (handler-bogus x)
+                                                        (handler-descriptor x)))
+                                               :end handler-index))
+                    (fd-index nil))
+                (if dup-of ; fd already got an index into pollfds
+                    (or-flag (setq fd-index (svref map dup-of)) handler)
+                    (setq fd-index (set-flag handler)))
+                (setf (svref map handler-index) fd-index))))))
+    (values fds n-fds map)))
+
+;;; Handles the work of the above, except for periodic polling. Returns
+;;; true if something of interest happened.
+#!+os-provides-poll
+(defun sub-sub-serve-event (to-sec to-usec)
+  (let (list fds count map)
+    (with-descriptor-handlers
+      (let ((handlers *descriptor-handlers*))
+        (when handlers
+          (setq list  (pollfds-list handlers)
+                fds   (pollfds-fds handlers)
+                count (pollfds-n-fds handlers)
+                map   (pollfds-map handlers))
+          (when (and list (not fds)) ; make the C array
+            (multiple-value-setq (fds count map) (compute-pollfds list))
+            (setf (pollfds-fds handlers)   fds
+                  (pollfds-n-fds handlers) count
+                  (pollfds-map handlers)   map)))))
+    ;; poll() wants the timeout in milliseconds.
+    (let ((to-millisec
+           (if (or (null to-sec) (null to-usec))
+               -1
+               (ceiling (+ (* to-sec 1000000) to-usec) 1000))))
+      ;; Next, wait for something to happen.
+      (multiple-value-bind (value err)
+          (if list
+              (sb!unix:unix-poll fds count to-millisec)
+              ;; If invoked with no descriptors only for the effect of waiting
+              ;; until the timeout, make a valid pointer to a (struct pollfd).
+              (with-alien ((a (struct sb!unix:pollfd)))
+                (sb!unix:unix-poll a 0 to-millisec)))
+        ;; From here down is mostly the same as the code
+        ;; for #!-os-provides-poll.
+        ;;
+        ;; Now see what it was (if anything)
+        (cond ((not value)
+               ;; Interrupted or one of the file descriptors is bad.
+               ;; FIXME: Check for other errnos. Why do we return true
+               ;; when interrupted?
+               (case err
+                 (#.sb!unix:ebadf
+                  ;; poll() should never return EBADF, but I'm afraid that by
+                  ;; removing this, someone will find a broken OS which does.
+                  (handler-descriptors-error))
+                 ((#.sb!unix:eintr #.sb!unix:eagain)
+                  t)
+                 (otherwise
+                  (with-simple-restart (continue "Ignore failure and continue.")
+                    (simple-perror "Unix system call poll() failed"
+                                   :errno err)))))
+              ((plusp value)
+               ;; Got something. Scan the 'revents' fields of the pollfds
+               ;; to decide what to call.
+               ;; The #!-os-provides-poll code looks at *DESCRIPTOR-HANDLERS*
+               ;; again at this point, which seems wrong, but not terribly wrong
+               ;; because at worst there will be a a zero bit for a handler's
+               ;; descriptor. But I can't see how it would make sense here to
+               ;; look again because if anything changed, then the map of
+               ;; handler to index into the C array was necessarily clobbered.
+               (loop for handler in list
+                     for fd-index across map
+                     for revents = (slot (deref fds fd-index) 'sb!unix:revents)
+                     when (logtest revents sb!unix:pollnval)
+                     collect handler into bad
+                     ;; James Knight says that if POLLERR is set, user code
+                     ;; _should_ attempt to perform I/O to observe the error.
+                     ;; So we trigger either handler direction.
+                     else when (logtest revents
+                                        (ecase (handler-direction handler)
+                                          ;; POLLHUP implies read will not block
+                                          (:input (logior sb!unix:pollin
+                                                          sb!unix:pollhup
+                                                          sb!unix:pollerr))
+                                          (:output (logior sb!unix:pollout
+                                                           sb!unix:pollerr))))
+                     collect handler into good
+                     finally
+                  (return
+                    (if bad
+                        (handler-descriptors-error bad)
+                        (dolist (handler good t)
+                          (with-simple-restart (remove-fd-handler "Remove ~S" handler)
+                            (funcall (handler-function handler)
+                                     (handler-descriptor handler))
+                            (go :next))
+                          (remove-fd-handler handler)
+                          :next))))))))))
