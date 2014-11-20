@@ -416,7 +416,7 @@
     (sb!c:with-source-location (source-location)
       (setf (layout-source-location layout)
             source-location))
-    (let ((class (find-classoid name)))
+    (let ((class (find-classoid name))) ; FIXME: rename to 'classoid'
       (setf (condition-classoid-slots class) slots
             (condition-classoid-direct-default-initargs class) direct-default-initargs
             (fdocumentation name 'type) documentation)
@@ -432,7 +432,8 @@
 
       ;; Compute effective slots and set up the class and hairy slots
       ;; (subsets of the effective slots.)
-      (setf (condition-classoid-hairy-slots class) '())
+      (setf (condition-classoid-class-slots class) '()
+            (condition-classoid-hairy-slots class) '())
       (let ((eslots (compute-effective-slots class))
             (e-def-initargs
              (reduce #'append

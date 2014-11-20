@@ -404,7 +404,26 @@
 (defun case-failure-example (x) (etypecase x (function 1) (symbol 2)))
 ;; The :report method should not print "wanted one of #'SYMBOL"
 (with-test (:name :case-failure-report-pprint-silliness)
-  (handler-case (foo 3)
+  (handler-case (case-failure-example 3)
     (condition (c)
       (let ((str (write-to-string c :escape nil :pretty t)))
         (assert (not (search "#'SYMBOL" str)))))))
+
+(define-condition a-condition-with-a-classy-slot ()
+  ((a :allocation :class :initform 'foo)))
+
+(defvar *a-classy-classoid*
+  (sb-kernel:find-classoid 'a-condition-with-a-classy-slot))
+;; precondition to the test
+(assert (= (length (sb-kernel::condition-classoid-class-slots
+                    *a-classy-classoid*))
+           1))
+
+(define-condition a-condition-with-a-classy-slot ()
+  ((b :allocation :class :initform 'baz)
+   (a :allocation :class :initform 'foo)))
+
+(with-test (:name :condition-classoid-redef-with-class-slot)
+  (assert (= (length (sb-kernel::condition-classoid-class-slots
+                      *a-classy-classoid*))
+             2)))
