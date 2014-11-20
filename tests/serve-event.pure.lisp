@@ -16,6 +16,7 @@
 ;; Tests for SERVE-EVENT are somewhat lacking,
 ;; although RUN-PROGRAM exercises some multiplexed I/O.
 ;; At any rate, this tests that the utility function COMPUTE-POLLFDS is sane.
+#+os-provides-poll ; can't use :skipped-on. (sb-unix symbols don't exist)
 (test-util:with-test (:name :compute-pollfds)
   (labels ((try (list how)
              (multiple-value-bind (pollfds count map)
