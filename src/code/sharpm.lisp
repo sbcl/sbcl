@@ -266,16 +266,12 @@
                       (unless (eq old new)
                         (setf (aref data i) new))))))
                ((typep tree 'instance)
-                (let* ((n-untagged (layout-n-untagged-slots (%instance-layout tree)))
-                       (n-tagged (- (%instance-length tree) n-untagged)))
-                  ;; N-TAGGED includes the layout as well (at index 0), which
-                  ;; we don't grovel.
-                  (do ((i 1 (1+ i)))
-                      ((= i n-tagged))
-                    (let* ((old (%instance-ref tree i))
-                           (new (circle-subst old-new-alist old)))
-                      (unless (eq old new)
-                        (setf (%instance-ref tree i) new))))))
+                ;; We don't grovel slot index 0, the layout.
+                (do-instance-tagged-slot (i tree :start 1)
+                  (let* ((old (%instance-ref tree i))
+                         (new (circle-subst old-new-alist old)))
+                    (unless (eq old new)
+                      (setf (%instance-ref tree i) new)))))
                ((typep tree 'funcallable-instance)
                 (do ((i 1 (1+ i))
                      (end (- (1+ (get-closure-length tree)) sb!vm:funcallable-instance-info-offset)))

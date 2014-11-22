@@ -68,6 +68,7 @@
     (move-lvar-result node block locs lvar)))
 
 (defun emit-inits (node block name object lowtag instance-length inits args)
+  #!+interleaved-raw-slots (declare (ignore instance-length))
   #!-raw-instance-init-vops
   (declare (ignore instance-length))
   (let ((unbound-marker-tn nil)
@@ -101,7 +102,9 @@
                                       (setf arg-tn tmp)))
                                   (vop ,(sb!kernel::raw-slot-data-init-vop rsd)
                                        node block
-                                       object arg-tn instance-length slot)))))
+                                       object arg-tn
+                                       #!-interleaved-raw-slots instance-length
+                                       slot)))))
                           #!+raw-instance-init-vops
                           sb!kernel::*raw-slot-data-list*
                           #!-raw-instance-init-vops

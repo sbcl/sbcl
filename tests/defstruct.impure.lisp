@@ -473,6 +473,47 @@
 (with-test (:name (:defstruct-raw-slot-gc :full))
   (check-manyraws *manyraw*))
 
+(macrolet ((def-it ()
+             `(defstruct (huge-manyraw (:include manyraw))
+                ,@(loop for n from 1 to 130
+                        for s = (write-to-string n)
+                        when (zerop (random 10))
+                        collect `(,(sb-int:symbolicate "WORD-SLOT-" s)
+                                  ,n :type sb-ext:word)
+                        collect `(,(sb-int:symbolicate "SLOT-" s) ,s))
+                (df 8.207880688335944d-304 :type double-float)
+                (aaa 'aaa)
+                (sf 1.5679403e-38 :type single-float)
+                (cdf #c(9d0 -2d10) :type (complex double-float))
+                (bbb 'bbb)
+                (csf #c(2f1 2f0) :type (complex single-float))
+                (ccc 'ccc)
+                (w1 #xffee :type sb-ext:word)
+                (w2 #xeeee :type sb-ext:word))))
+  (def-it))
+
+(defun check-huge-manyraw (s)
+  (assert (and (eql (huge-manyraw-df s) 8.207880688335944d-304)
+               (eql (huge-manyraw-aaa s) 'aaa)
+               (eql (huge-manyraw-sf s) 1.5679403e-38)
+               (eql (huge-manyraw-cdf s) #c(9d0 -2d10))
+               (eql (huge-manyraw-bbb s) 'bbb)
+               (eql (huge-manyraw-csf s) #c(2f1 2f0))
+               (eql (huge-manyraw-ccc s) 'ccc)
+               (eql (huge-manyraw-w1 s) #xffee)
+               (eql (huge-manyraw-w2 s) #xeeee)))
+  (dolist (slot (sb-kernel:dd-slots
+                 (sb-kernel:layout-info (sb-kernel:layout-of s))))
+    (let ((name (string (sb-kernel:dsd-name slot))))
+      (cond ((eql (mismatch name "SLOT-") 5)
+             (let ((n (parse-integer name :start 5)))
+               (assert (string= (funcall (sb-kernel:dsd-accessor-name slot) s)
+                                (write-to-string n)))))
+            ((eql (mismatch name "WORD-SLOT-") 10)
+             (let ((n (parse-integer name :start 10)))
+               (assert (= (funcall (sb-kernel:dsd-accessor-name slot) s)
+                          n))))))))
+
 ;;; fasl dumper and loader also have special handling of raw slots, so
 ;;; dump all of them into a fasl
 (defmethod make-load-form ((self manyraw) &optional env)
@@ -481,7 +522,9 @@
 (with-open-file (s "tmp-defstruct.manyraw.lisp"
                  :direction :output
                  :if-exists :supersede)
-  (write-string "(defun dumped-manyraws () '#.*manyraw*)" s))
+  (write-string "(defun dumped-manyraws () '#.*manyraw*)" s)
+  (terpri s)
+  (write-string "(defun dumped-huge-manyraw () '#.(make-huge-manyraw))" s))
 (compile-file "tmp-defstruct.manyraw.lisp")
 (delete-file "tmp-defstruct.manyraw.lisp")
 
@@ -492,7 +535,9 @@
 ;;; re-read the dumped structures and check them
 (load "tmp-defstruct.manyraw.fasl")
 (with-test (:name (:defstruct-raw-slot load))
-  (check-manyraws (dumped-manyraws)))
+  (check-manyraws (dumped-manyraws))
+  (check-huge-manyraw (make-huge-manyraw))
+  (assert (equalp (make-huge-manyraw) (dumped-huge-manyraw))))
 
 
 ;;;; miscellaneous old bugs

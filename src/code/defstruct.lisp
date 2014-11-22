@@ -165,7 +165,7 @@
   (printer-fname nil :type (or cons symbol))
 
   ;; The number of untagged slots at the end.
-  (raw-length 0 :type index)
+  #!-interleaved-raw-slots (raw-length 0 :type index)
   ;; the value of the :PURE option, or :UNSPECIFIED. This is only
   ;; meaningful if DD-CLASS-P = T.
   (pure :unspecified :type (member t nil :unspecified)))
@@ -782,23 +782,29 @@ unless :NAMED is also specified.")))
 ;;; Allocate storage for a DSD in DD. This is where we decide whether
 ;;; a slot is raw or not. Raw objects are aligned on the unit of their size.
 (defun allocate-1-slot (dd dsd)
-  (let ((rsd
-         (if (eq (dd-type dd) 'structure)
-             (structure-raw-slot-data (dsd-type dsd))
-             nil)))
-    (cond
-      ((null rsd)
-        (setf (dsd-index dsd) (dd-length dd))
-        (incf (dd-length dd)))
-      (t
-        (let* ((words (raw-slot-data-n-words rsd))
-               (alignment (raw-slot-data-alignment rsd))
-               (off (rem (dd-raw-length dd) alignment)))
-          (unless (zerop off)
-            (incf (dd-raw-length dd) (- alignment off)))
-          (setf (dsd-raw-type dsd) (raw-slot-data-raw-type rsd))
-          (setf (dsd-index dsd) (dd-raw-length dd))
-          (incf (dd-raw-length dd) words)))))
+  (let ((rsd (if (eq (dd-type dd) 'structure)
+                 (structure-raw-slot-data (dsd-type dsd))
+                 nil)))
+    (cond ((null rsd)
+           (setf (dsd-index dsd) (dd-length dd))
+           (incf (dd-length dd)))
+          (t
+           (setf (dsd-raw-type dsd) (raw-slot-data-raw-type rsd))
+           (let ((words (raw-slot-data-n-words rsd))
+                 (alignment (raw-slot-data-alignment rsd)))
+             #!-interleaved-raw-slots
+             (let ((off (rem (dd-raw-length dd) alignment)))
+               (unless (zerop off)
+                 (incf (dd-raw-length dd) (- alignment off)))
+               (setf (dsd-index dsd) (dd-raw-length dd))
+               (incf (dd-raw-length dd) words))
+             #!+interleaved-raw-slots
+             (let ((len (dd-length dd)))
+               (setf (dd-length dd)
+                     ;; this formula works but can it be made less unclear?
+                     (- len (nth-value 1 (ceiling (1- len) alignment))))
+               (setf (dsd-index dsd) (dd-length dd))
+               (incf (dd-length dd) words))))))
   (values))
 
 (defun typed-structure-info-or-lose (name)
@@ -863,6 +869,7 @@ unless :NAMED is also specified.")))
                   (cons included-name mc))))
         (when (eq (dd-pure dd) :unspecified)
           (setf (dd-pure dd) (dd-pure included-structure)))
+        #!-interleaved-raw-slots
         (setf (dd-raw-length dd) (dd-raw-length included-structure)))
 
       (setf (dd-inherited-accessor-alist dd)
@@ -1234,7 +1241,7 @@ unless :NAMED is also specified.")))
 
 (declaim (inline dd-layout-length))
 (defun dd-layout-length (dd)
-  (+ (dd-length dd) (dd-raw-length dd)))
+  (+ (dd-length dd) #!-interleaved-raw-slots (dd-raw-length dd)))
 
 (declaim (ftype (sfunction (defstruct-description) index) dd-instance-length))
 (defun dd-instance-length (dd)
@@ -1245,6 +1252,18 @@ unless :NAMED is also specified.")))
   ;; included in that length to guarantee proper alignment of raw double float
   ;; slots, necessary for (at least) the SPARC backend.
   (logior (dd-layout-length dd) 1))
+
+(defun dd-bitmap (dd)
+  ;; The bitmap stores a 1 for each untagged word,
+  ;; including any internal padding words for alignment.
+  ;; The 0th bit is initialized to 0 because the LAYOUT is a tagged
+  ;; slot that is not present in DD-SLOTS.
+  ;; All other bits start as 1 and are cleared if the word is tagged.
+  ;; A final padding word, if any, is regarded as tagged.
+  (let ((bitmap (ldb (byte (dd-length dd) 0) -2)))
+    (dolist (slot (dd-slots dd) bitmap)
+      (when (eql t (dsd-raw-type slot))
+        (setf (ldb (byte 1 (dsd-index slot)) bitmap) 0)))))
 
 ;;; This is called when we are about to define a structure class. It
 ;;; returns a (possibly new) class object and the layout which should
@@ -1284,8 +1303,11 @@ unless :NAMED is also specified.")))
                                    :inherits inherits
                                    :depthoid (length inherits)
                                    :length (dd-layout-length info)
-                                   :n-untagged-slots (dd-raw-length info)
-                                   :info info))
+                                   :info info
+                                   . #!-interleaved-raw-slots
+                                     (:n-untagged-slots (dd-raw-length info))
+                                     #!+interleaved-raw-slots
+                                     (:untagged-bitmap (dd-bitmap info))))
           (old-layout (or compiler-layout old-layout)))
       (cond
        ((not old-layout)
@@ -1304,7 +1326,7 @@ unless :NAMED is also specified.")))
                                  (layout-length new-layout)
                                  (layout-inherits new-layout)
                                  (layout-depthoid new-layout)
-                                 (layout-n-untagged-slots new-layout))
+                                 (layout-raw-slot-metadata new-layout))
         (values class new-layout old-layout))
        (t
         (let ((old-info (layout-info old-layout)))

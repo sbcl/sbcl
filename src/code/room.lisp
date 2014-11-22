@@ -745,8 +745,7 @@
                     (eq (cdr obj) object))
             (maybe-call fun obj)))
          (instance
-          (dotimes (i (- (%instance-length obj)
-                         (layout-n-untagged-slots (%instance-layout obj))))
+          (do-instance-tagged-slot (i obj)
             (when (eq (%instance-ref obj i) object)
               (maybe-call fun obj)
               (return))))

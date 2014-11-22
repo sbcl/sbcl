@@ -810,6 +810,9 @@ core and return a descriptor to it."
 
 ;;; Make a simple-vector on the target that holds the specified
 ;;; OBJECTS, and return its descriptor.
+;;; Oops, this function was renamed (by me) for the wrong reason - that it
+;;; was unharmonious with other -TO-CORE functions, however X-TO-CORE
+;;; should accept an argument of type X which this doesn't (FIXME).
 (defun vector-to-core (objects &optional (gspace *dynamic*))
   (let* ((size (length objects))
          (result (allocate-vector-object gspace sb!vm:n-word-bits size
@@ -1001,10 +1004,11 @@ core and return a descriptor to it."
                    (descriptor-bits des)))))
       (res))))
 
+(defvar *simple-vector-0-descriptor*)
 (declaim (ftype (function (symbol descriptor descriptor descriptor descriptor)
                           descriptor)
                 make-cold-layout))
-(defun make-cold-layout (name length inherits depthoid nuntagged)
+(defun make-cold-layout (name length inherits depthoid metadata)
   (let ((result (allocate-structure-object *dynamic*
                                            target-layout-length
                                            *layout-layout*)))
@@ -1019,7 +1023,16 @@ core and return a descriptor to it."
     (cold-set-layout-slot result 'length length)
     (cold-set-layout-slot result 'info *nil-descriptor*)
     (cold-set-layout-slot result 'pure *nil-descriptor*)
-    (cold-set-layout-slot result 'n-untagged-slots nuntagged)
+    #!-interleaved-raw-slots
+    (cold-set-layout-slot result 'n-untagged-slots metadata)
+    #!+interleaved-raw-slots
+    (progn
+      (cold-set-layout-slot result 'untagged-bitmap metadata)
+      ;; Nothing in cold-init needs to call EQUALP on a structure with raw slots,
+      ;; but for type-correctness this slot needs to be a simple-vector.
+      (unless (boundp '*simple-vector-0-descriptor*)
+        (setq *simple-vector-0-descriptor* (vector-to-core nil)))
+      (cold-set-layout-slot result 'equalp-tests *simple-vector-0-descriptor*))
     (cold-set-layout-slot result 'source-location *nil-descriptor*)
     (cold-set-layout-slot result '%for-std-class-b (make-fixnum-descriptor 0))
     (cold-set-layout-slot result 'slot-list *nil-descriptor*)
@@ -1030,7 +1043,7 @@ core and return a descriptor to it."
                 (descriptor-fixnum length)
                 (listify-cold-inherits inherits)
                 (descriptor-fixnum depthoid)
-                (descriptor-fixnum nuntagged)))
+                (descriptor-fixnum metadata)))
     (setf (gethash (descriptor-bits result) *cold-layout-names*) name)
 
     result))
@@ -1039,7 +1052,7 @@ core and return a descriptor to it."
   (clrhash *cold-layouts*)
   ;; This assertion is due to the fact that MAKE-COLD-LAYOUT does not
   ;; know how to set any raw slots.
-  (aver (= 0 (layout-n-untagged-slots (find-layout 'layout))))
+  (aver (= 0 (layout-raw-slot-metadata (find-layout 'layout))))
   (setq *layout-layout* *nil-descriptor*)
   (flet ((chill-layout (name &rest inherits)
            ;; Check that the number of specified INHERITS matches
@@ -1052,7 +1065,7 @@ core and return a descriptor to it."
               (number-to-core (layout-length warm-layout))
               (vector-to-core inherits)
               (number-to-core (layout-depthoid warm-layout))
-              (number-to-core (layout-n-untagged-slots warm-layout))))))
+              (number-to-core (layout-raw-slot-metadata warm-layout))))))
     (let* ((t-layout   (chill-layout 't))
            (s-o-layout (chill-layout 'structure-object t-layout))
            (s!o-layout (chill-layout 'structure!object t-layout s-o-layout)))
@@ -2137,25 +2150,33 @@ core and return a descriptor to it."
   (let* ((size (clone-arg)) ; n-words including layout, excluding header
          (layout (pop-stack))
          (result (allocate-structure-object *dynamic* size layout))
-         (nuntagged
+         (metadata
           (descriptor-fixnum
            (read-wordindexed
             layout
             (+ sb!vm:instance-slots-offset
-               (target-layout-index 'n-untagged-slots)))))
-         (ntagged (- size nuntagged)))
+               (target-layout-index
+                #!-interleaved-raw-slots 'n-untagged-slots
+                #!+interleaved-raw-slots 'untagged-bitmap)))))
+         #!-interleaved-raw-slots (ntagged (- size metadata))
+         )
+    #!+interleaved-raw-slots
+    (unless (= metadata 0)
+      (error "Interleaved raw slots not (yet) known to work in genesis."))
+
     (do ((index 1 (1+ index)))
         ((eql index size))
       (declare (fixnum index))
       (write-wordindexed result
                          (+ index sb!vm:instance-slots-offset)
-                         (if (>= index ntagged)
+                         (if #!-interleaved-raw-slots (>= index ntagged)
+                             #!+interleaved-raw-slots (logbitp index metadata)
                              (descriptor-word-sized-integer (pop-stack))
                              (pop-stack))))
     result))
 
 (define-cold-fop (fop-layout)
-  (let* ((nuntagged-des (pop-stack))
+  (let* ((metadata-des (pop-stack))
          (length-des (pop-stack))
          (depthoid-des (pop-stack))
          (cold-inherits (pop-stack))
@@ -2175,17 +2196,18 @@ core and return a descriptor to it."
            old-length
            old-inherits-list
            old-depthoid
-           old-nuntagged)
+           old-metadata)
           old
         (declare (type descriptor old-layout-descriptor))
-        (declare (type index old-length old-nuntagged))
-        (declare (type fixnum old-depthoid))
+        (declare (type index old-length))
         (declare (type list old-inherits-list))
+        (declare (type fixnum old-depthoid))
+        (declare (type unsigned-byte old-metadata))
         (aver (eq name old-name))
         (let ((length (descriptor-fixnum length-des))
               (inherits-list (listify-cold-inherits cold-inherits))
               (depthoid (descriptor-fixnum depthoid-des))
-              (nuntagged (descriptor-fixnum nuntagged-des)))
+              (metadata (descriptor-fixnum metadata-des)))
           (unless (= length old-length)
             (error "cold loading a reference to class ~S when the compile~%~
                     time length was ~S and current length is ~S"
@@ -2206,16 +2228,16 @@ core and return a descriptor to it."
                    name
                    depthoid
                    old-depthoid))
-          (unless (= nuntagged old-nuntagged)
+          (unless (= metadata old-metadata)
             (error "cold loading a reference to class ~S when the compile~%~
-                    time number of untagged slots was ~S and is currently ~S"
+                    time raw-slot-metadata was ~S and is currently ~S"
                    name
-                   nuntagged
-                   old-nuntagged)))
+                   metadata
+                   old-metadata)))
         old-layout-descriptor)
       ;; Make a new definition from scratch.
       (make-cold-layout name length-des cold-inherits depthoid-des
-                        nuntagged-des))))
+                        metadata-des))))
 
 ;;;; cold fops for loading symbols
 
@@ -3062,13 +3084,31 @@ core and return a descriptor to it."
     (format t "struct ~A {~%" (cstring (dd-name dd)))
     (format t "    lispobj header;~%")
     (format t "    lispobj layout;~%")
-    (dolist (slot (dd-slots dd))
-      (when (eq t (dsd-raw-type slot))
-        (format t "    lispobj ~A;~%" (cstring (dsd-name slot)))))
-    (unless (oddp (+ (dd-length dd) (dd-raw-length dd)))
-      (format t "    lispobj raw_slot_padding;~%"))
-    (dotimes (n (dd-raw-length dd))
-      (format t "    lispobj raw~D;~%" (- (dd-raw-length dd) n 1)))
+    #!-interleaved-raw-slots
+    (progn
+      ;; Note: if the structure has no raw slots, but has an even number of
+      ;; ordinary slots (incl. layout, sans header), then the last slot gets
+      ;; named 'raw_slot_paddingN' (not 'paddingN')
+      ;; The choice of name is mildly disturbing, but harmless.
+      (dolist (slot (dd-slots dd))
+        (when (eq t (dsd-raw-type slot))
+          (format t "    lispobj ~A;~%" (cstring (dsd-name slot)))))
+      (unless (oddp (+ (dd-length dd) (dd-raw-length dd)))
+        (format t "    lispobj raw_slot_padding;~%"))
+      (dotimes (n (dd-raw-length dd))
+        (format t "    lispobj raw~D;~%" (- (dd-raw-length dd) n 1))))
+    #!+interleaved-raw-slots
+    (let ((index 1))
+      (dolist (slot (dd-slots dd))
+        (cond ((eq t (dsd-raw-type slot))
+               (loop while (< index (dsd-index slot))
+                     do
+                     (format t "    lispobj raw_slot_padding~A;~%" index)
+                     (incf index))
+               (format t "    lispobj ~A;~%" (cstring (dsd-name slot)))
+               (incf index))))
+      (unless (oddp (dd-length dd))
+        (format t "    lispobj end_padding;~%")))
     (format t "};~2%")
     (format t "#endif /* LANGUAGE_ASSEMBLY */~2%")))
 

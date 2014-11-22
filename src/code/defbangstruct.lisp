@@ -181,7 +181,9 @@
                 ;; but we must also have cross-compiled it for real.
                 (sb!kernel::compiler-layout-ready-p name)
                 ;; and I don't know anything about raw slots
-                (zerop (layout-n-untagged-slots
+                ;; Coincidentally, in either representation of
+                ;; raw-slot-metadata, 0 represents no untagged slots.
+                (zerop (layout-raw-slot-metadata
                         (info :type :compiler-layout name)))))))
   (defun %instance-length (instance)
     (aver (or (typep instance 'structure!object)

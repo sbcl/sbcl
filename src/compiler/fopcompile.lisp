@@ -227,9 +227,7 @@
                          ;; it we bind *dump-only-valid-structures* to
                          ;; NIL.
                          (fasl-validate-structure value *compile-object*)
-                         (dotimes (i (- (%instance-length value)
-                                        (layout-n-untagged-slots
-                                         (%instance-ref value 0))))
+                         (do-instance-tagged-slot (i value)
                            (grovel (%instance-ref value i))))
                         (:ignore-it)
                         (t

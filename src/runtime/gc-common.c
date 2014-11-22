@@ -669,20 +669,92 @@ scav_boxed(lispobj *where, lispobj object)
     return 1;
 }
 
+#ifdef LISP_FEATURE_INTERLEAVED_RAW_SLOTS
+boolean positive_bignum_logbitp(int index, struct bignum* bignum)
+{
+  /* If the bignum in the layout has another pointer to it (besides the layout)
+     acting as a root, and which is scavenged first, then transporting the
+     bignum causes the layout to see a FP, as would copying an instance whose
+     layout that is. This is a nearly impossible scenario to create organically
+     in Lisp, because mostly nothing ever looks again at that exact (EQ) bignum
+     except for a few things that would cause it to be pinned anyway,
+     such as it being kept in a local variable during structure manipulation.
+     See 'interleaved-raw.impure.lisp' for a way to trigger this */
+  if (forwarding_pointer_p((lispobj*)bignum)) {
+      lispobj *forwarded = forwarding_pointer_value((lispobj*)bignum);
+#if 0
+      fprintf(stderr, "GC bignum_logbitp(): fwd from %p to %p\n",
+              (void*)bignum, (void*)forwarded);
+#endif
+      bignum = (struct bignum*)native_pointer((lispobj)forwarded);
+  }
+
+  int len = HeaderValue(bignum->header);
+  int word_index = index / N_WORD_BITS;
+  int bit_index = index % N_WORD_BITS;
+  if (word_index >= len) {
+      // just return 0 since the marking logic does not allow negative bignums
+      return 0;
+  } else {
+      return (bignum->digits[word_index] >> bit_index) & 1;
+  }
+}
+
+// Helper function for stepping through the tagged slots of an instance in
+// scav_instance and verify_space (which, as it happens, is not useful).
+void
+instance_scan_interleaved(void (*proc)(),
+                          lispobj *instance_ptr,
+                          sword_t n_words,
+                          lispobj *layout_obj)
+{
+  struct layout *layout = (struct layout*)layout_obj;
+  lispobj untagged_metadata = layout->untagged_bitmap;
+  sword_t index;
+
+  /* This code would be more efficient if the Lisp stored an additional format
+     of the same metadata - a vector of ranges of slot offsets to scan.
+     Each pair of vector elements would demarcate the start and end of a range
+     of offsets to be passed to the proc().  The vector could be either
+     (unsigned-byte 8) or (unsigned-byte 16) for compactness.
+     On the other hand, this may not be a bottleneck as-is */
+
+  ++instance_ptr; // was supplied as the address of the header word
+  if (untagged_metadata == 0) {
+      proc(instance_ptr, n_words);
+  } else if (fixnump(untagged_metadata)) {
+      unsigned long bitmap = fixnum_value(untagged_metadata);
+      for (index = 0; index < n_words ; index++, bitmap >>= 1)
+          if (!(bitmap & 1))
+              proc(instance_ptr + index, 1);
+  } else { /* huge bitmap */
+      struct bignum * bitmap;
+      bitmap = (struct bignum*)native_pointer(untagged_metadata);
+      for (index = 0; index < n_words ; index++)
+          if (!positive_bignum_logbitp(index, bitmap))
+              proc(instance_ptr + index, 1);
+  }
+}
+#endif
+
 static sword_t
 scav_instance(lispobj *where, lispobj object)
 {
-    lispobj nuntagged;
     sword_t ntotal = HeaderValue(object);
     lispobj layout = ((struct instance *)where)->slots[0];
 
     if (!layout)
         return 1;
-    if (forwarding_pointer_p(native_pointer(layout)))
-        layout = (lispobj) forwarding_pointer_value(native_pointer(layout));
+    layout = (lispobj)native_pointer(layout);
+    if (forwarding_pointer_p((lispobj*)layout))
+        layout = (lispobj)native_pointer((lispobj)forwarding_pointer_value((lispobj*)layout));
 
-    nuntagged = ((struct layout *)native_pointer(layout))->n_untagged_slots;
+#ifdef LISP_FEATURE_INTERLEAVED_RAW_SLOTS
+    instance_scan_interleaved(scavenge, where, ntotal, (lispobj*)layout);
+#else
+    lispobj nuntagged = ((struct layout*)layout)->n_untagged_slots;
     scavenge(where + 1, ntotal - fixnum_value(nuntagged));
+#endif
 
     return ntotal + 1;
 }

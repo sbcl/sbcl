@@ -138,8 +138,42 @@
     (setf (fdocumentation (dd-name dd) 'structure)
           (dd-doc dd)))
 
-  (dolist (fun *defstruct-hooks*)
-    (funcall fun (find-classoid (dd-name dd))))
+  (let* ((classoid (find-classoid (dd-name dd)))
+         (layout (classoid-layout classoid)))
+    (declare (ignorable layout))
+    #!+interleaved-raw-slots
+    ;; Make a vector of EQUALP slots comparators, indexed by (1- word-index).
+    ;; This has to be assigned to something regardless of whether there are
+    ;; raw slots just in case someone mutates a layout which had raw
+    ;; slots into one which does not - although that would probably crash
+    ;; unless no instances exist or all raw slots miraculously contained
+    ;; bits which were the equivalent of valid Lisp descriptors.
+    ;;
+    ;; It's not worth adding a #-interleaved-raw-slots case to this optimization
+    ;; because every architecture can be made to use the new approach.
+    (setf (layout-equalp-tests layout)
+          (if (zerop (layout-untagged-bitmap layout))
+              #()
+              ;; The initial element of NIL means "do not compare".
+              ;; Ignored words (comparator = NIL) fall into two categories:
+              ;; - pseudo-ignored, which get compared by their
+              ;;   predecessor word, as for complex-double-float,
+              ;; - internal padding words which are truly ignored.
+              ;; Other words are compared as tagged if the comparator is 0,
+              ;; or as untagged if the comparator is a type-specific function.
+              (let ((comparators (make-array (1- (dd-length dd))
+                                             :initial-element nil)))
+                (dolist (slot (dd-slots dd) comparators)
+                  ;; -1 because LAYOUT (slot index 0) has no comparator stored.
+                  (setf (aref comparators (1- (dsd-index slot)))
+                        (let ((raw-type (dsd-raw-type slot)))
+                          (if (eq raw-type t)
+                              0 ; means recurse using EQUALP
+                              (raw-slot-data-comparer
+                               (raw-slot-data-or-lose raw-type)))))))))
+
+    (dolist (fun *defstruct-hooks*)
+      (funcall fun classoid)))
 
   (/show0 "leaving %TARGET-DEFSTRUCT")
   (values))
@@ -149,33 +183,51 @@
   #!+sb-doc
   "Return a copy of STRUCTURE with the same (EQL) slot values."
   (declare (type structure-object structure))
-  (let* ((layout (%instance-layout structure))
-         (res (%make-instance (%instance-length structure)))
-         (len (layout-length layout))
-         (nuntagged (layout-n-untagged-slots layout)))
-
-    (declare (type index len))
+  (let ((layout (%instance-layout structure)))
     (when (layout-invalid layout)
       (error "attempt to copy an obsolete structure:~%  ~S" structure))
-
-    ;; Copy ordinary slots and layout.
-    (dotimes (i (- len nuntagged))
-      (declare (type index i))
-      (setf (%instance-ref res i)
-            (%instance-ref structure i)))
-
-    ;; Copy raw slots.
-    (dotimes (i nuntagged)
-      (declare (type index i))
-      (setf (%raw-instance-ref/word res i)
-            (%raw-instance-ref/word structure i)))
-
-    res))
-
+    (let ((res (%make-instance (%instance-length structure)))
+          (len (layout-length layout)))
+      (declare (type index len))
+      #!-interleaved-raw-slots
+      (let ((nuntagged (layout-n-untagged-slots layout)))
+        ;; Copy ordinary slots including the layout.
+        (dotimes (i (- len nuntagged))
+          (declare (type index i))
+          (setf (%instance-ref res i) (%instance-ref structure i)))
+        ;; Copy raw slots.
+        (dotimes (i nuntagged)
+          (declare (type index i))
+          (setf (%raw-instance-ref/word res i)
+                (%raw-instance-ref/word structure i))))
+      #!+interleaved-raw-slots
+      (let ((metadata (layout-untagged-bitmap layout)))
+        ;; With interleaved slots, the only difference between %instance-ref
+        ;; and %raw-instance-ref/word is the storage class of the VOP operands.
+        ;; Since x86(-64) doesn't partition the register set, the bitmap test
+        ;; could be skipped if we wanted to copy everything as raw.
+        (macrolet ((copy-loop (raw-p &optional step)
+                     `(dotimes (i (layout-length layout))
+                        (if ,raw-p
+                            (setf (%raw-instance-ref/word res i)
+                                  (%raw-instance-ref/word structure i))
+                            (setf (%instance-ref res i)
+                                  (%instance-ref structure i)))
+                        ,step)))
+          (cond ((zerop metadata) ; no untagged slots.
+                 (dotimes (i len)
+                   (setf (%instance-ref res i) (%instance-ref structure i))))
+                ;; The fixnum case uses fixnum operations for ODPP and ASH.
+                ((fixnump metadata) ; shift and mask is faster than logbitp
+                 (copy-loop (oddp metadata) (setq metadata (ash metadata -1))))
+                (t ; bignum - use LOGBITP to avoid consing more bignums
+                 (copy-loop (logbitp i metadata))))))
+      res)))
 
 
 ;; Do an EQUALP comparison on the raw slots (only, not the normal slots) of a
 ;; structure.
+#!-interleaved-raw-slots
 (defun raw-instance-slots-equalp (layout x y)
   ;; This implementation sucks, but hopefully EQUALP on raw structures
   ;; won't be a major bottleneck for anyone. It'd be tempting to do

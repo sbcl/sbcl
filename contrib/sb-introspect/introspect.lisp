@@ -907,13 +907,11 @@ Experimental: interface subject to change."
          (call (realpart object))
          (call (realpart object)))
         (sb-vm::instance
-         (let* ((len (sb-kernel:%instance-length object))
-                (nuntagged (if (typep object 'structure-object)
-                               (sb-kernel:layout-n-untagged-slots
-                                (sb-kernel:%instance-layout object))
-                               0)))
-           (dotimes (i (- len nuntagged))
-             (call (sb-kernel:%instance-ref object i))))
+         (if (typep object 'structure-object)
+             (sb-kernel:do-instance-tagged-slot (i object)
+               (call (sb-kernel:%instance-ref object i)))
+             (dotimes (i (sb-kernel:%instance-length object))
+               (call (sb-kernel:%instance-ref object i))))
          #+sb-thread
          (when (typep object 'sb-thread:thread)
            (cond ((eq object sb-thread:*current-thread*)

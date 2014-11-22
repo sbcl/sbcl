@@ -13,6 +13,75 @@
 ;;; have any defstructs that use raw slots.  %COMPILER-DEFSTRUCT needs the
 ;;; raw-slot-data-list both at compile-time and load-time.
 
+;;; STRUCTURE-OBJECT supports two different strategies to place raw slots
+;;; (containing "just bits", not Lisp descriptors) within it in a way
+;;; that GC has knowledge of. No backend supports both strategies though.
+
+;;; The older strategy is "non-interleaved".
+;;; Consider a structure of 3 tagged slots (A,B,C) and 2 raw slots,
+;;; where (for simplicity) each raw slot takes space equal to one Lisp word.
+;;; (In general raw slots can take >1 word)
+;;; Lisp code arranges so that raw slots are last.
+;;; Word offsets are listed on the left
+;;;    0 : header = (instance-length << 8) | instance-header-widetag
+;;;    1 : dsd-index 0 = ptr to LAYOUT
+;;;    2 : dsd-index 1 = tagged slot A
+;;;    3 : dsd-index 2 = ... B
+;;;    4 : dsd-index 3 = ... C
+;;;    5 : filler
+;;;    6 : dsd-index 1 = second raw slot
+;;;    7 : dsd-index 0 = first raw slot
+;;;
+;;; Note that numbering of raw slots with respect to their DSD-INDEX
+;;; restarts at 0, so there are two "spaces" of dsd-indices, the non-raw
+;;; and the raw space. Also note that filler was added in the middle, so
+;;; that adding INSTANCE-LENGTH to the object's address always gets you
+;;; to exactly the 0th raw slot. The filler can't be squeezed out, because
+;;; all Lisp objects must consume an even number of words, and the length
+;;; of an instance reflects the number of physical - not logical - words
+;;; that follow the instance header.
+;;;
+;;; This strategy for placement of raw slots is easy for GC because GC's
+;;; view of an instance is simply some number of boxed words followed by
+;;; some number of ignored words.
+;;; However, this strategy presents a difficulty for Lisp in that a raw
+;;; slot at a given index is not at a fixed offset relative to the base of
+;;; the object - it is fixed relative to the _last_ word of the object.
+;;; This has to do with the requirement that structure accessors defined by
+;;; a parent type work correctly on a descendant type, while preserving the
+;;; simple-for-GC aspect. If another DEFSTRUCT says to :INCLUDE the above,
+;;; adding two more tagged slots D and E, the slot named D occupies word 5
+;;; ('filler' above), E occupies word 6, and the two raw slots shift down.
+;;; To read raw slot at index N requires adding to the object pointer
+;;; the number of words represented by instance-length and subtracting the
+;;; raw slot index.
+;;; Aside from instance-length, the only additional piece of information
+;;; that GC needs to know to scavenge a structure is the number of raw slots,
+;;; which is obtained from the object's layout in the N-UNTAGGED-SLOTS slot.
+
+;;; Assuming that it is more important to simplify runtime access than
+;;; to simplify GC, we can use the newer strategy, "interleaved" raw slots.
+;;; Interleaving freely intermingles tagged data with untagged data
+;;; following the layout.  This permits descendant structures to add
+;;; slots of any kind to the end without changing any physical placement
+;;; that was already determined, and eliminates the runtime computation
+;;; of the offset to raw slots. It is also generally easier to understand.
+;;; The trade-off is that GC (and a few other things - structure dumping,
+;;; EQUALP checking, to name a few) have to be able to determine for each
+;;; slot whether it is a Lisp descriptor or just bits. This is done
+;;; with the LAYOUT-UNTAGGED-BITMAP of an object's layout.
+;;; The bitmap stores a '1' for each bit representing a raw word,
+;;; and could be a BIGNUM given a spectacularly huge structure.
+
+;;; Also note that in both strategies there are possibly some alignment
+;;; concerns which must be accounted for when DEFSTRUCT lays out slots,
+;;; by injecting padding words appropriately.
+;;; For example COMPLEX-DOUBLE-FLOAT *should* be aligned to twice the
+;;; alignment of a DOUBLE-FLOAT. It is not, as things stand,
+;;; but this is considered a minor bug.
+;;; Interleaving is supported only on x86-64, but porting should be
+;;; straightforward, because if anything the VOPs become simpler.
+
 ;; To utilize a word-sized slot in a defstruct without having to resort to
 ;; writing (myslot :type (unsigned-byte #.sb!vm:n-word-bits)), or even
 ;; worse (:type #+sb-xc-host <sometype> #-sb-xc-host <othertype>),
@@ -20,6 +89,20 @@
 ;; 'signed-word' is here for companionship - slots of that type are not raw.
 (def!type sb!vm:word () `(unsigned-byte ,sb!vm:n-word-bits))
 (def!type sb!vm:signed-word () `(signed-byte ,sb!vm:n-word-bits))
+
+;; These definitions pertain to how a LAYOUT stores the raw-slot metadata,
+;; and we need them before 'class.lisp' is compiled (why, I'm can't remember).
+;; LAYOUT-RAW-SLOT-METADATA is an abstraction over whichever kind of
+;; metadata we have - it will be one or the other.
+#!-interleaved-raw-slots
+(progn (deftype layout-raw-slot-metadata-type () 'index)
+       (defmacro layout-raw-slot-metadata (x) `(layout-n-untagged-slots ,x)))
+;; It would be possible to represent an unlimited number of trailing untagged
+;; slots (maybe) without consing a bignum if we wished to allow signed integers
+;; for the raw slot bitmap, but that's probably confusing and pointless, so...
+#!+interleaved-raw-slots
+(progn (deftype layout-raw-slot-metadata-type () 'unsigned-byte)
+       (defmacro layout-raw-slot-metadata (x) `(layout-untagged-bitmap ,x)))
 
 ;; information about how a slot of a given DSD-RAW-TYPE is to be accessed
 (eval-when (:compile-toplevel :load-toplevel :execute)
@@ -116,3 +199,52 @@
 
 (defun raw-slot-words (type)
   (raw-slot-data-n-words (raw-slot-data-or-lose type)))
+
+;; DO-INSTANCE-TAGGED-SLOT will iterate over the slots of THING that
+;; contain tagged objects. INDEX-VAR is bound to successive slot-indices,
+;; and is usually used as the second argument to %INSTANCE-REF.
+;; START, if supplied, should be either 0 or 1 to include,
+;; or respectively exclude, the object's layout slot.
+;; END, if supplied, represents the upper bound of the scan and should be
+;; the LAYOUT-LENGTH of the object; it defaults to %INSTANCE-LENGTH if
+;; unsupplied, will therefore possibly include one word that can, in theory,
+;; covertly hold one tagged object more than indicated by LAYOUT-LENGTH
+;; depending on ODDP of LAYOUT-LENGTH.
+;; END works correctly whether or not the backend supports slot interleaving,
+;; but it is probably a bug if anyone uses the padding slot for storage.
+;; LAYOUT is optional and somewhat unnecessary, but since some uses of
+;; this macro already have a layout in hand, it can be supplied.
+;; [If the compiler were smarter about doing fewer memory accesses,
+;; there would be no need at all for the LAYOUT - if it had already been
+;; accessed, it shouldn't be another memory read]
+;; Note also that THING is usually a STRUCTURE-OBJECT, not a condition or
+;; standard-object. Iterating over a CONDITION means iterating over the
+;; slots comprising the primitive representation, not the manifest slots.
+;; Similarly for STANDARD-OBJECT. Additionally, in the latter case
+;; it would be a bug to specify LAYOUT-LENGTH as the :END parameter.
+(defmacro do-instance-tagged-slot ((index-var thing
+                                    &key (start 0) end layout) &body body)
+  (with-unique-names (instance limit bitmap)
+    (declare (ignorable bitmap))
+    (unless layout
+      (setq layout `(%instance-layout ,instance)))
+    (unless end
+      (setq end `(%instance-length ,instance)))
+    `(let ((,instance ,thing))
+       ;; If the macro is given both :LAYOUT and :END, it never uses
+       ;; the local rebinding of INSTANCE, which is ok.
+       (declare (ignorable ,instance))
+       #!+interleaved-raw-slots
+       (let ((,bitmap (layout-untagged-bitmap ,layout)))
+         (do ((,index-var ,start (1+ ,index-var))
+              (,limit ,end))
+             ((>= ,index-var ,limit))
+           (declare (index ,index-var))
+           (unless (logbitp ,index-var ,bitmap)
+             ,@body)))
+       #!-interleaved-raw-slots
+       (do ((,index-var ,start (1+ ,index-var))
+            (,limit (- ,end (layout-n-untagged-slots ,layout))))
+           ((>= ,index-var ,limit))
+         (declare (index ,index-var))
+         ,@body))))

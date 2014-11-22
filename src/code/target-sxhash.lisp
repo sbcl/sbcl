@@ -340,18 +340,28 @@
   (declare (type structure-object key))
   (declare (type (integer 0 #.+max-hash-depthoid+) depthoid))
   (let* ((layout (%instance-layout key)) ; i.e. slot #0
-         (length (layout-length layout))
+         ;; Is there some reason the name of the layout's classoid
+         ;; should be preferred as the seed, instead of using the CLOS-HASH
+         ;; just like SXHASH does?
          (classoid (layout-classoid layout))
          (name (classoid-name classoid))
          (result (mix (sxhash name) (the fixnum 79867))))
     (declare (type fixnum result))
-    (dotimes (i (min depthoid (- length 1 (layout-n-untagged-slots layout))))
-      (declare (type fixnum i))
-      (let ((j (1+ i))) ; skipping slot #0, which is for LAYOUT
-        (declare (type fixnum j))
-        (mixf result
-              (psxhash (%instance-ref key j)
-                       (1- depthoid)))))
+    (when (plusp depthoid)
+      (let ((max-iterations depthoid)
+            (depthoid (1- depthoid)))
+        ;; skipping slot #0, which is for LAYOUT
+        (do-instance-tagged-slot (i key :layout layout
+                                        :start 1 :end (layout-length layout))
+          (mixf result (psxhash (%instance-ref key i) depthoid))
+          (if (zerop (decf max-iterations)) (return)))))
+    ;; [The following comment blurs some issues: indeed it would take
+    ;; a second loop in the non-interleaved-slots code; that loop might
+    ;; never execute because depthoid "cuts off", although that's an arbitrary
+    ;; choice and could be decided otherwise; and efficiency would likely
+    ;; demand that we store some additional metadata in the LAYOUT indicating
+    ;; how to mix the bits in, because floating-point +/-zeros have to
+    ;; be considered EQUALP]
     ;; KLUDGE: Should hash untagged slots, too.  (Although +max-hash-depthoid+
     ;; is pretty low currently, so they might not make it into the hash
     ;; value anyway.)
