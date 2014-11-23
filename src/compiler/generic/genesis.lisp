@@ -3083,7 +3083,9 @@ core and return a descriptor to it."
     (format t "#ifndef LANGUAGE_ASSEMBLY~2%")
     (format t "struct ~A {~%" (cstring (dd-name dd)))
     (format t "    lispobj header;~%")
-    (format t "    lispobj layout;~%")
+    ;; "self layout" slots are named '_layout' instead of 'layout' so that
+    ;; classoid's expressly declared layout isn't renamed as a special-case.
+    (format t "    lispobj _layout;~%")
     #!-interleaved-raw-slots
     (progn
       ;; Note: if the structure has no raw slots, but has an even number of
@@ -3561,6 +3563,7 @@ initially undefined function references:~2%")
                             (string-downcase
                              (string (sb!vm:primitive-object-name obj)))))))
         (dolist (class '(hash-table
+                         classoid
                          layout
                          sb!c::compiled-debug-info
                          sb!c::compiled-debug-fun

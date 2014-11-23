@@ -3164,3 +3164,46 @@ scavenge_interrupt_contexts(struct thread *th)
     }
 }
 #endif /* x86oid targets */
+
+// The following accessors, which take a valid native pointer as input
+// and return a Lisp string, are designed to be foolproof during GC,
+// hence all the forwarding checks.
+
+#if defined(LISP_FEATURE_SB_LDB)
+#include "genesis/classoid.h"
+struct vector * symbol_name(lispobj * sym)
+{
+  if (forwarding_pointer_p(sym))
+    sym = native_pointer((lispobj)forwarding_pointer_value(sym));
+  if (lowtag_of(((struct symbol*)sym)->name) != OTHER_POINTER_LOWTAG)
+      return NULL;
+  lispobj * name = native_pointer(((struct symbol*)sym)->name);
+  if (forwarding_pointer_p(name))
+      name = native_pointer((lispobj)forwarding_pointer_value(name));
+  return (struct vector*)name;
+}
+struct vector * classoid_name(lispobj * classoid)
+{
+  if (forwarding_pointer_p(classoid))
+      classoid = native_pointer((lispobj)forwarding_pointer_value(classoid));
+  lispobj sym = ((struct classoid*)classoid)->name;
+  return lowtag_of(sym) != OTHER_POINTER_LOWTAG ? NULL
+    : symbol_name(native_pointer(sym));
+}
+struct vector * layout_classoid_name(lispobj * layout)
+{
+  if (forwarding_pointer_p(layout))
+      layout = native_pointer((lispobj)forwarding_pointer_value(layout));
+  lispobj classoid = ((struct layout*)layout)->classoid;
+  return lowtag_of(classoid) != INSTANCE_POINTER_LOWTAG ? NULL
+    : classoid_name(native_pointer(classoid));
+}
+struct vector * instance_classoid_name(lispobj * instance)
+{
+  if (forwarding_pointer_p(instance))
+      instance = native_pointer((lispobj)forwarding_pointer_value(instance));
+  lispobj layout = ((struct instance*)instance)->slots[0];
+  return lowtag_of(layout) != INSTANCE_POINTER_LOWTAG ? NULL
+    : layout_classoid_name(native_pointer(layout));
+}
+#endif

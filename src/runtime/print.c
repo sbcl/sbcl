@@ -437,14 +437,40 @@ static void print_list(lispobj obj)
     }
 }
 
+// takes native pointer as input
+char * simple_base_stringize(struct vector * string)
+{
+  if (widetag_of(string->header) == SIMPLE_BASE_STRING_WIDETAG)
+      return (char*)string->data;
+  int length = string->length;
+  char * newstring = malloc(length+1);
+  uint32_t * data = (uint32_t*)string->data;
+  int i;
+  for(i=0;i<length;++i)
+      newstring[i] = data[i] < 128 ? data[i] : '?';
+  newstring[length] = 0;
+  return newstring;
+}
+
 static void brief_struct(lispobj obj)
 {
     struct instance *instance = (struct instance *)native_pointer(obj);
     if (!is_valid_lisp_addr((os_vm_address_t)instance)) {
         printf("(invalid address)");
     } else {
-        printf("#<ptr to 0x%08lx instance>",
-               (unsigned long) instance->slots[0]);
+        extern struct vector * instance_classoid_name(lispobj*);
+        struct vector * classoid_name;
+        classoid_name = instance_classoid_name((lispobj*)instance);
+        if ( classoid_name ) {
+          char * namestring = simple_base_stringize(classoid_name);
+          printf("#<ptr to 0x%08lx %s instance>",
+                 (unsigned long) instance->slots[0], namestring);
+          if ( namestring != (char*)classoid_name->data )
+              free(namestring);
+        } else {
+          printf("#<ptr to 0x%08lx instance>",
+                 (unsigned long) instance->slots[0]);
+        }
     }
 }
 
@@ -462,6 +488,38 @@ static void print_struct(lispobj obj)
             print_obj(buffer, instance->slots[i]);
         }
     }
+}
+
+static void show_string(struct vector * string)
+{
+  int ucs4_p = 0;
+  int i, len = fixnum_value(string->length);
+
+#ifdef SIMPLE_CHARACTER_STRING_WIDETAG
+  if (widetag_of(string->header) == SIMPLE_CHARACTER_STRING_WIDETAG) {
+      ucs4_p = 1;
+      putchar('u'); /* an arbitrary notational convention */
+  }
+#endif
+  putchar('"');
+  for (i=0 ; i<len ; i++) {
+      // hopefully the compiler will optimize out the ucs4_p test
+      // when the runtime is built without Unicode support
+      int ch;
+      if (ucs4_p)
+          ch = i[(uint32_t*)string->data];
+      else
+          ch = i[(char*)string->data];
+      if (ch >= 32 && ch < 127) {
+          if (ch == '"' || ch == '\\')
+              putchar('\\');
+          putchar(ch);
+      } else {
+          printf(ch > 0xffff ? "\\U%08X" : ch > 0xff ? "\\u%04X" : "\\x%02X",
+                 ch);
+      }
+  }
+  putchar('"');
 }
 
 static void brief_otherptr(lispobj obj)
@@ -493,39 +551,11 @@ static void brief_otherptr(lispobj obj)
             break;
 
         case SIMPLE_BASE_STRING_WIDETAG:
-            vector = (struct vector *)ptr;
-            putchar('"');
-            for (charptr = (char *)vector->data; *charptr != '\0'; charptr++) {
-                if (*charptr == '"')
-                    putchar('\\');
-                putchar(*charptr);
-            }
-            putchar('"');
-            break;
-
-#ifdef LISP_FEATURE_SB_UNICODE
+#ifdef SIMPLE_CHARACTER_STRING_WIDETAG
         case SIMPLE_CHARACTER_STRING_WIDETAG:
-            vector = (struct vector *)ptr;
-            fputs("u\"", stdout);
-            {
-                int i, ch, len = fixnum_value(vector->length);
-                uint32_t *chars = (uint32_t*)vector->data;
-                for (i=0 ; i<len ; i++) {
-                    ch = chars[i];
-                    if (ch >= 32 && ch < 127) {
-                        if (ch == '"' || ch == '\\')
-                            putchar('\\');
-                        putchar(ch);
-                    } else {
-                      // ambiguous, e.g. #\xaaa is either #\GUJARATI_LETTER_PA
-                      // or #\FEMININE_ORDINAL_INDICATOR + #\a. oh well.
-                      printf("\\x%x", ch);
-                    }
-                }
-            }
-            putchar('"');
-            break;
 #endif
+            show_string((struct vector*)ptr);
+            break;
 
         default:
             printf("#<ptr to ");
@@ -580,7 +610,7 @@ static void print_otherptr(lispobj obj)
         u32 length;
 #endif
         int count, type, index;
-        char *cptr, buffer[16];
+        char buffer[16];
 
         ptr = (lispobj*) native_pointer(obj);
         if (ptr == NULL) {
@@ -678,14 +708,10 @@ static void print_otherptr(lispobj obj)
 
             case SIMPLE_BASE_STRING_WIDETAG:
 #ifdef SIMPLE_CHARACTER_STRING_WIDETAG
-        case SIMPLE_CHARACTER_STRING_WIDETAG: /* FIXME */
+            case SIMPLE_CHARACTER_STRING_WIDETAG:
 #endif
                 NEWLINE_OR_RETURN;
-                cptr = (char *)(ptr+1);
-                putchar('"');
-                while (length-- > 0)
-                    putchar(*cptr++);
-                putchar('"');
+                show_string((struct vector*)native_pointer(obj));
                 break;
 
             case SIMPLE_VECTOR_WIDETAG:
