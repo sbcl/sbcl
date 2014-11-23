@@ -245,93 +245,76 @@
 
 ;;; default PRINT-OBJECT method
 
-(defun %print-structure-sans-layout-info (name stream)
-  ;; KLUDGE: during PCL build debugging, we can sometimes
-  ;; attempt to print out a PCL object (with null LAYOUT-INFO).
-  (pprint-logical-block (stream nil :prefix "#<" :suffix ">")
+(defun %default-structure-pretty-print (structure stream name dd)
+  (pprint-logical-block (stream nil :prefix "#S(" :suffix ")")
     (prin1 name stream)
-    (write-char #\space stream)
-    (write-string "(no LAYOUT-INFO)" stream)))
-
-(defun %print-structure-sans-slots (name stream)
-  ;; the structure type doesn't count as a component for *PRINT-LEVEL*
-  ;; processing. We can likewise elide the logical block processing,
-  ;; since all we have to print is the type name. -- CSR, 2004-10-05
-  (write-string "#S(" stream)
-  (prin1 name stream)
-  (write-char #\) stream))
-
-(defun %default-structure-pretty-print (structure stream)
-  (let* ((layout (%instance-layout structure))
-         (name (classoid-name (layout-classoid layout)))
-         (dd (layout-info layout)))
-    (cond ((not dd)
-           (%print-structure-sans-layout-info name stream))
-          ((not (dd-slots dd))
-           (%print-structure-sans-slots name stream))
-          (t
-           (pprint-logical-block (stream nil :prefix "#S(" :suffix ")")
-             (prin1 name stream)
-             (let ((remaining-slots (dd-slots dd)))
-               (when remaining-slots
-                 (write-char #\space stream)
+    (let ((remaining-slots (dd-slots dd)))
+      (when remaining-slots
+        (write-char #\space stream)
                  ;; CMU CL had (PPRINT-INDENT :BLOCK 2 STREAM) here,
                  ;; but I can't see why. -- WHN 20000205
-                 (pprint-newline :linear stream)
-                 (loop
-                   (pprint-pop)
-                   (let ((slot (pop remaining-slots)))
-                     (write-char #\: stream)
-                     (output-symbol-name (symbol-name (dsd-name slot)) stream)
-                     (write-char #\space stream)
-                     (pprint-newline :miser stream)
-                     (output-object (funcall (fdefinition (dsd-accessor-name slot))
-                                             structure)
-                                    stream)
-                     (when (null remaining-slots)
-                       (return))
-                     (write-char #\space stream)
-                     (pprint-newline :linear stream))))))))))
+        (pprint-newline :linear stream)
+        (loop (pprint-pop)
+              (let ((slot (pop remaining-slots)))
+                (write-char #\: stream)
+                (output-symbol-name (symbol-name (dsd-name slot)) stream)
+                (write-char #\space stream)
+                (pprint-newline :miser stream)
+                (output-object (funcall (dsd-accessor-name slot) structure)
+                               stream)
+                (when (null remaining-slots)
+                  (return))
+                (write-char #\space stream)
+                (pprint-newline :linear stream)))))))
 
-(defun %default-structure-ugly-print (structure stream)
-  (let* ((layout (%instance-layout structure))
-         (name (classoid-name (layout-classoid layout)))
-         (dd (layout-info layout)))
-    (cond ((not dd)
-           (%print-structure-sans-layout-info name stream))
-          ((not (dd-slots dd))
-           (%print-structure-sans-slots name stream))
-          (t
-           (descend-into (stream)
-             (write-string "#S(" stream)
-             (prin1 name stream)
-             (do ((index 0 (1+ index))
-                  (remaining-slots (dd-slots dd) (cdr remaining-slots)))
-                 ((or (null remaining-slots)
-                      (and (not *print-readably*)
-                           *print-length*
-                           (>= index *print-length*)))
-                  (if (null remaining-slots)
-                      (write-string ")" stream)
-                      (write-string " ...)" stream)))
-               (declare (type index index))
-               (write-string " :" stream)
-               (let ((slot (first remaining-slots)))
-                 (output-symbol-name (symbol-name (dsd-name slot)) stream)
-                 (write-char #\space stream)
-                 (output-object
-                  (funcall (fdefinition (dsd-accessor-name slot))
-                           structure)
-                  stream))))))))
+(defun %default-structure-ugly-print (structure stream name dd)
+  (descend-into (stream)
+    (write-string "#S(" stream)
+    (prin1 name stream)
+    (do ((index 0 (1+ index))
+         (limit (or (and (not *print-readably*) *print-length*)
+                    most-positive-fixnum))
+         (remaining-slots (dd-slots dd) (cdr remaining-slots)))
+        ((or (null remaining-slots) (>= index limit))
+         (write-string (if remaining-slots " ...)" ")") stream))
+      (declare (type index index))
+      (write-string " :" stream)
+      (let ((slot (first remaining-slots)))
+        (output-symbol-name (symbol-name (dsd-name slot)) stream)
+        (write-char #\space stream)
+        (output-object (funcall (dsd-accessor-name slot) structure)
+                       stream)))))
 
 (defun default-structure-print (structure stream depth)
   (declare (ignore depth))
-  (cond ((funcallable-instance-p structure)
-         (print-unreadable-object (structure stream :identity t :type t)))
-        (*print-pretty*
-         (%default-structure-pretty-print structure stream))
-        (t
-         (%default-structure-ugly-print structure stream))))
+  (if (funcallable-instance-p structure)
+      (print-unreadable-object (structure stream :identity t :type t))
+      (let* ((layout (%instance-layout structure))
+             (dd (layout-info layout))
+             (name (classoid-name (layout-classoid layout))))
+        (cond ((not dd)
+               ;; FIXME? this branch may be unnecessary as a consequence
+               ;; of change f02bee325920166b69070e4735a8a3f295f8edfd which
+               ;; stopped the badness is a stronger way. It should be the case
+               ;; that absence of a DD can't happen unless the classoid is absent.
+               ;; KLUDGE: during PCL build debugging, we can sometimes
+               ;; attempt to print out a PCL object (with null LAYOUT-INFO).
+               (pprint-logical-block (stream nil :prefix "#<" :suffix ">")
+               (prin1 name stream)
+               (write-char #\space stream)
+               (write-string "(no LAYOUT-INFO)" stream)))
+              ((not (dd-slots dd))
+               ;; the structure type doesn't count as a component for *PRINT-LEVEL*
+               ;; processing. We can likewise elide the logical block processing,
+               ;; since all we have to print is the type name. -- CSR, 2004-10-05
+               (write-string "#S(" stream)
+               (prin1 name stream)
+               (write-char #\) stream))
+              (t
+               (funcall (if *print-pretty*
+                            #'%default-structure-pretty-print
+                            #'%default-structure-ugly-print)
+                        structure stream name dd))))))
 
 (def!method print-object ((x structure-object) stream)
   (default-structure-print x stream *current-level-in-print*))

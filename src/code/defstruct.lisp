@@ -212,7 +212,7 @@
   ;; the same name as an inherited accessor (which we don't want to
   ;; shadow)") but that behavior doesn't seem to be specified by (or
   ;; even particularly consistent with) ANSI, so it's gone in SBCL.)
-  (accessor-name nil)
+  (accessor-name nil :type symbol)
   default                       ; default value expression
   (type t)                      ; declared type specifier
   (safe-p t :type boolean)      ; whether the slot is known to be
