@@ -11,7 +11,7 @@ static inline os_context_t *arch_os_get_context(void **void_context)
 }
 
 #if __DARWIN_UNIX03
-#define CONTEXT_ADDR_FROM_STEM(stem) &context->uc_mcontext->__ss.__##stem
+#define CONTEXT_ADDR_FROM_STEM(stem) (os_context_register_t*)&context->uc_mcontext->__ss.__##stem
 #else
 #define CONTEXT_ADDR_FROM_STEM(stem) &context->uc_mcontext->ss.stem
 #endif /* __DARWIN_UNIX03 */
