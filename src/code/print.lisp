@@ -138,24 +138,57 @@ variable: an unreadable object representing the error is printed instead.")
 
 ;;; keyword variables shared by WRITE and WRITE-TO-STRING, and
 ;;; the bindings they map to.
-(eval-when (:compile-toplevel :load-toplevel)
-  (defvar *printer-keyword-variables*
-    '(:escape *print-escape*
-      :radix *print-radix*
-      :base *print-base*
-      :circle *print-circle*
-      :pretty *print-pretty*
-      :level *print-level*
-      :length *print-length*
-      :case *print-case*
-      :array *print-array*
-      :gensym *print-gensym*
-      :readably *print-readably*
-      :right-margin *print-right-margin*
-      :miser-width *print-miser-width*
-      :lines *print-lines*
-      :pprint-dispatch *print-pprint-dispatch*
-      :suppress-errors *suppress-print-errors*)))
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (defun compiler-expand-write-mumble (fn form object keys)
+    (do (streamvar bind ignore)
+        ((not (cdr keys))
+         (if keys
+             form ; Odd number of keys, fail by returning the original form
+             (let* ((objvar (copy-symbol 'object))
+                    (bind `((,objvar ,object) ,@(nreverse bind)))
+                    (ignore (when ignore `((declare (ignore ,@ignore))))))
+               (case fn
+                 (write
+                  `(let ,bind ,@ignore
+                     (output-object ,objvar
+                                    ,(if streamvar
+                                         `(out-synonym-of ,streamvar)
+                                         '*standard-output*))
+                     ,objvar))
+                 (write-to-string
+                  (if (cdr bind)
+                      `(let ,bind ,@ignore (stringify-object ,objvar))
+                      `(stringify-object ,object)))))))
+      (let* ((key (pop keys))
+             (value (pop keys))
+             (variable
+              (cond ((getf '(:escape *print-escape*
+                             :radix *print-radix*
+                             :base *print-base*
+                             :circle *print-circle*
+                             :pretty *print-pretty*
+                             :level *print-level*
+                             :length *print-length*
+                             :case *print-case*
+                             :array *print-array*
+                             :gensym *print-gensym*
+                             :readably *print-readably*
+                             :right-margin *print-right-margin*
+                             :miser-width *print-miser-width*
+                             :lines *print-lines*
+                             :pprint-dispatch *print-pprint-dispatch*
+                             :suppress-errors *suppress-print-errors*)
+                           key))
+                    ((and (eq key :stream) (eq fn 'write))
+                     (or streamvar (setq streamvar (copy-symbol 'stream))))
+                    (t
+                     (return form)))))
+        (when (assoc variable bind)
+          ;; First key has precedence, but we still need to execute the
+          ;; argument, and in the right order.
+          (setf variable (gensym "IGNORE"))
+          (push variable ignore))
+        (push (list variable value) bind)))))
 
 (defun write (object &key
                      ((:stream stream) *standard-output*)
@@ -186,31 +219,7 @@ variable: an unreadable object representing the error is printed instead.")
 
 ;;; Optimize common case of constant keyword arguments
 (define-compiler-macro write (&whole form object &rest keys)
-  (let (bind ignore)
-    (do ()
-        ((not (cdr keys))
-         ;; Odd number of keys, punt
-         (when keys
-           (return-from write form)))
-      (let* ((key (pop keys))
-             (value (pop keys))
-             (variable (or (getf *printer-keyword-variables* key)
-                           (when (eq :stream key)
-                             'stream)
-                           (return-from write form))))
-        (when (assoc variable bind)
-          ;; First key has precedence, but we still need to execute the
-          ;; argument, and in the right order.
-          (setf variable (gensym "IGNORE"))
-          (push variable ignore))
-        (push (list variable value) bind)))
-    (unless (assoc 'stream bind)
-      (push (list 'stream '*standard-output*) bind))
-    (once-only ((object object))
-      `(let ,(nreverse bind)
-         ,@(when ignore `((declare (ignore ,@ignore))))
-         (output-object ,object (out-synonym-of stream))
-         ,object))))
+  (compiler-expand-write-mumble 'write form object keys))
 
 (defun prin1 (object &optional stream)
   #!+sb-doc
@@ -275,28 +284,7 @@ variable: an unreadable object representing the error is printed instead.")
 
 ;;; Optimize common case of constant keyword arguments
 (define-compiler-macro write-to-string (&whole form object &rest keys)
-  (let (bind ignore)
-    (do ()
-        ((not (cdr keys))
-         ;; Odd number of keys, punt
-         (when keys
-           (return-from write-to-string form)))
-      (let* ((key (pop keys))
-             (value (pop keys))
-             (variable (or (getf *printer-keyword-variables* key)
-                           (return-from write-to-string form))))
-        (when (assoc variable bind)
-          ;; First key has precedence, but we still need to execute the
-          ;; argument, and in the right order.
-          (setf variable (gensym "IGNORE"))
-          (push variable ignore))
-        (push (list variable value) bind)))
-    (if bind
-        (once-only ((object object))
-          `(let ,(nreverse bind)
-             ,@(when ignore `((declare (ignore ,@ignore))))
-             (stringify-object ,object)))
-        `(stringify-object ,object))))
+  (compiler-expand-write-mumble 'write-to-string form object keys))
 
 (defun prin1-to-string (object)
   #!+sb-doc

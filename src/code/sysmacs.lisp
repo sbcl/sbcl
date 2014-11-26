@@ -101,6 +101,17 @@ maintained."
                          :format-control "~S isn't an input stream"
                          :format-arguments (list ,svar)))
                 ,svar)))))
+;; As noted above, this code is a tad wasteful for probably not a huge
+;; performance gain. On the other hand, where STREAM is known to be of type
+;; STREAM, it produces shorter code. But we could shorten the general case:
+#|
+   (lambda (x)
+    (block nil
+     (symbol-value
+      (case x ((nil) '*standard-output*)
+              ((t) '*terminal-io*)
+              (t (return x))))))
+|#
 (defmacro out-synonym-of (stream)
   (let ((svar (gensym)))
     `(let ((,svar ,stream))
