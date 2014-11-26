@@ -62,22 +62,22 @@
         required)))
 
 (defun make-dlap-lambda-list (nargs applyp)
-  (let* ((required (make-dfun-required-args nargs))
-         (lambda-list (if applyp
-                          (append required '(&more .more-context. .more-count.))
-                          required)))
+  (let ((required (make-dfun-required-args nargs)))
     ;; Return the full lambda list, the required arguments, a form
     ;; that will generate a rest-list, and a list of the &MORE
     ;; parameters used.
-    (values lambda-list
-            required
-            (when applyp
-              '((sb-c::%listify-rest-args
-                 .more-context.
-                 (the (and unsigned-byte fixnum)
-                   .more-count.))))
-            (when applyp
-              '(.more-context. .more-count.)))))
+    ;; Beware of deep voodoo! The DEFKNOWN for %LISTIFY-REST-ARGS says that its
+    ;; second argument is INDEX, but the THE form below is "weaker" on account
+    ;; of the vop operand restrictions or something that I don't understand.
+    ;; Which is to say, PCL compilation reliably broke when changed to INDEX.
+    (if applyp
+        (values (append required '(&more .more-context. .more-count.))
+                required
+                '((sb-c:%listify-rest-args
+                   .more-context. (the (and unsigned-byte fixnum)
+                                    .more-count.)))
+                '(.more-context. .more-count.))
+        (values required required nil nil))))
 
 (defun make-emf-call (nargs applyp fn-variable &optional emf-type)
   (let ((required (make-dfun-required-args nargs)))
@@ -92,7 +92,7 @@
        ;; the type of the EMF.
        :rest-arg ,(if applyp
                       ;; Creates a list from the &MORE arguments.
-                      '((sb-c::%listify-rest-args
+                      '((sb-c:%listify-rest-args ; See above re. voodoo
                          .dfun-more-context.
                          (the (and unsigned-byte fixnum)
                            .dfun-more-count.)))
