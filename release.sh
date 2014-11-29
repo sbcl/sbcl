@@ -315,9 +315,9 @@ echo TODO:
 echo 
 echo perform administrative tasks:
 echo 
-echo \* https://sourceforge.net/project/admin/?group_id=1373
-echo \* In the File Manager interface, click on \"information\" for the
-echo \ \ source tarball and select as default download for all OSes.
+echo \* visit https://sourceforge.net/projects/sbcl/files/
+echo \* select sbcl -> $VERSION -> "view details" for the source
+echo \ \ tarball, "Select all" and Save
 echo \* mail sbcl-announce
 echo \* check and send sbcl-$VERSION-bugmail.txt to edit@bugs.launchpad.net
 echo \ \ '(sign: C-c RET s p)'
