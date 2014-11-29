@@ -492,6 +492,20 @@
                 (w2 #xeeee :type sb-ext:word))))
   (def-it))
 
+(defstruct (hugest-manyraw (:include huge-manyraw))
+  (another-slot '(whocares)))
+(defmethod make-load-form ((self hugest-manyraw) &optional e)
+  (declare (ignore e))
+  (make-load-form-saving-slots
+   self
+   :slot-names
+   ;; skip the slot named A so that the optimization that turns
+   ;; MAKE-LOAD-FORM-SAVING-SLOTS into :SB-JUST-DUMP-IT-NORMALLY
+   ;; (change 4bf626e745d5d2e34630ec4dd67b7c17bd9b8f28) can not be used.
+   (delete 'a (mapcar 'sb-kernel:dsd-name
+                      (sb-kernel:dd-slots
+                       (sb-kernel:find-defstruct-description 'hugest-manyraw))))))
+
 (defun check-huge-manyraw (s)
   (assert (and (eql (huge-manyraw-df s) 8.207880688335944d-304)
                (eql (huge-manyraw-aaa s) 'aaa)
@@ -524,7 +538,8 @@
                  :if-exists :supersede)
   (write-string "(defun dumped-manyraws () '#.*manyraw*)" s)
   (terpri s)
-  (write-string "(defun dumped-huge-manyraw () '#.(make-huge-manyraw))" s))
+  (write-string "(defun dumped-huge-manyraw () '#.(make-huge-manyraw))" s)
+  (write-string "(defun dumped-hugest-manyraw () '#.(make-hugest-manyraw))" s))
 (compile-file "tmp-defstruct.manyraw.lisp")
 (delete-file "tmp-defstruct.manyraw.lisp")
 
@@ -537,7 +552,9 @@
 (with-test (:name (:defstruct-raw-slot load))
   (check-manyraws (dumped-manyraws))
   (check-huge-manyraw (make-huge-manyraw))
-  (assert (equalp (make-huge-manyraw) (dumped-huge-manyraw))))
+  (assert (equalp (make-huge-manyraw) (dumped-huge-manyraw)))
+  ;; make-load-form omits slot A. it reads as 0
+  (assert (equalp (make-hugest-manyraw :a 0) (dumped-hugest-manyraw))))
 
 
 ;;;; miscellaneous old bugs
