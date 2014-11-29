@@ -571,7 +571,7 @@ GNAME(fun_end_breakpoint_guts):
 	   count of one. */
 	movl	%esp,%ebx	# Setup ebx - the ofp.
 	subl	$4,%esp		# Allocate one stack slot for the return value
-	movl	$4,%ecx		# Setup ecx for one return value.
+	movl	$(1 << N_FIXNUM_TAG_BITS),%ecx		# Setup ecx for one return value.
 	movl	$(NIL),%edi	# default second value
 	movl	$(NIL),%esi	# default third value
 		

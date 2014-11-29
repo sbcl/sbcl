@@ -438,14 +438,9 @@ GNAME(fun_end_breakpoint_guts):
 	   count of one. */
 	mov	%rsp,%rbx	# Setup ebx - the ofp.
 	sub	$8,%rsp		# Allocate one stack slot for the return value
-	mov	$8,%rcx		# Setup ecx for one return value.
-#if defined(LISP_FEATURE_DARWIN)
+	mov	$(1 << N_FIXNUM_TAG_BITS),%rcx		# Setup ecx for one return value.
 	mov	GSYM(NIL),%rdi	# default second value
 	mov	GSYM(NIL),%rsi	# default third value
-#else
-	mov	$NIL,%rdi	# default second value
-	mov	$NIL,%rsi	# default third value
-#endif
 multiple_value_return:
 	
 	.globl  GNAME(fun_end_breakpoint_trap)

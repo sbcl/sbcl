@@ -707,12 +707,13 @@ CSYMBOL(funcallable_instance_tramp) = . + 1
 
 	/* Due to pointer verification in MAKE-LISP-OBJ, this must
 	include its header data (the offset from the start of the
-	code-object to the LRA).  The code-object header is five
-	words, there are two words of constants, and the instruction
-	space is doubleword-aligned, making an offset of eight.
+	code-object to the LRA).  The code-object header is 4
+	words, there are 1 word of constants, and the instruction
+	space is doubleword-aligned, making an offset of six.
 	This is header data for a widetag, so shift left eight bits
 	and add. */
-	.long RETURN_PC_HEADER_WIDETAG + 0x800
+        /* FIXME: the above is full of magic numbers. */
+	.long RETURN_PC_HEADER_WIDETAG + 0x600
 
 	/* We are receiving unknown multiple values, thus must deal
 	with the single-value and multiple-value cases separately. */
@@ -724,11 +725,11 @@ CSYMBOL(funcallable_instance_tramp) = . + 1
 	reg_LRA (where the LRA is stored by the return sequence) to
 	obtain a tagged pointer to the enclosing code component.  Both
 	values are tagged OTHER_POINTER_LOWTAG, so we just have to
-	account for the eight words (see calculation for
+	account for the six words (see calculation for
 	RETURN_PC_HEADER_WIDETAG, above) between the two addresses.
 	Restoring reg_CODE doesn't appear to be strictly necessary
 	here, but let's observe the niceties.*/
-	addi reg_CODE, reg_LRA, -32
+	addi reg_CODE, reg_LRA, -24
 
 	/* Multiple values are stored relative to reg_OCFP, which we
 	set to be the current top-of-stack. */
@@ -751,7 +752,7 @@ CSYMBOL(funcallable_instance_tramp) = . + 1
 fun_end_breakpoint_multiple_values:
 	/* Compute the correct value for reg_CODE.  See the
 	explanation for the single-value case, above. */
-	addi reg_CODE, reg_LRA, -32
+	addi reg_CODE, reg_LRA, -24
 
 	/* The actual magic trap. */
 CSYMBOL(fun_end_breakpoint_trap):

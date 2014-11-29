@@ -274,7 +274,7 @@ funcallable_instance_tramp = . + 1
 	.align	8
 	.global	fun_end_breakpoint_guts
 fun_end_breakpoint_guts:
-	.word	RETURN_PC_HEADER_WIDETAG + 0x800
+	.word	RETURN_PC_HEADER_WIDETAG + 0x600
 	b	1f
 	nop
 	mov	reg_CSP, reg_OCFP

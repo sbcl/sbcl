@@ -3192,65 +3192,76 @@ register."
         (reg-arg-offsets '#.sb!vm::*register-arg-offsets*)
         (results nil))
     (without-gcing
-     (dotimes (arg-num nargs)
-       (push (if reg-arg-offsets
-                 (make-lisp-obj
-                  (sb!vm:context-register scp (pop reg-arg-offsets)))
-               (stack-ref ocfp arg-num))
-             results)))
+      (dotimes (arg-num nargs)
+        (push (if reg-arg-offsets
+                  (make-lisp-obj
+                   (sb!vm:context-register scp (pop reg-arg-offsets)))
+                  (stack-ref ocfp (+ arg-num
+                                     #!+(or x86 x86-64) sb!vm::sp->fp-offset)))
+              results)))
     (nreverse results)))
 
 ;;;; MAKE-BOGUS-LRA (used for :FUN-END breakpoints)
 
 (defconstant bogus-lra-constants
-  #!-(or x86 x86-64) 2 #!+x86-64 3
+  #!-(or x86-64 x86) 1
+  #!+x86-64 2
   ;; One more for a fixup vector
-  #!+x86 4)
-
-(defconstant known-return-p-slot
-  (+ sb!vm:code-constants-offset (1- bogus-lra-constants)))
+  #!+x86 3)
 
 ;;; Make a bogus LRA object that signals a breakpoint trap when
 ;;; returned to. If the breakpoint trap handler returns, REAL-LRA is
 ;;; returned to. Three values are returned: the bogus LRA object, the
 ;;; code component it is part of, and the PC offset for the trap
 ;;; instruction.
-(defun make-bogus-lra (real-lra &optional known-return-p)
+(defun make-bogus-lra (real-lra)
   (without-gcing
-   ;; These are really code labels, not variables: but this way we get
-   ;; their addresses.
-   (let* ((src-start (static-foreign-symbol-sap "fun_end_breakpoint_guts"))
-          (src-end (static-foreign-symbol-sap "fun_end_breakpoint_end"))
-          (trap-loc (static-foreign-symbol-sap "fun_end_breakpoint_trap"))
-          (length (sap- src-end src-start))
-          (code-object
-            (sb!c:allocate-code-object bogus-lra-constants length))
-          (dst-start (code-instructions code-object)))
-     (declare (type system-area-pointer
-                    src-start src-end dst-start trap-loc)
-              (type index length))
-     (setf (%code-debug-info code-object) :bogus-lra)
-     #!-(or x86 x86-64)
-     (setf (code-header-ref code-object real-lra-slot) real-lra)
-     #!+(or x86 x86-64)
-     (multiple-value-bind (offset code) (compute-lra-data-from-pc real-lra)
-       (setf (code-header-ref code-object real-lra-slot) code)
-       (setf (code-header-ref code-object (1+ real-lra-slot)) offset))
-     (setf (code-header-ref code-object known-return-p-slot)
-           known-return-p)
-     (system-area-ub8-copy src-start 0 dst-start 0 length)
-     #!-(or x86 x86-64)
-     (sb!vm:sanctify-for-execution code-object)
-     #!+(or x86 x86-64)
-     (values dst-start code-object (sap- trap-loc src-start))
-     #!-(or x86 x86-64)
-     (let ((new-lra (make-lisp-obj (+ (sap-int dst-start)
-                                      sb!vm:other-pointer-lowtag))))
-       ;; We used to set the header value of the LRA here to the
-       ;; offset from the enclosing component to the LRA header, but
-       ;; MAKE-LISP-OBJ actually checks the value before we get a
-       ;; chance to set it, so it's now done in arch-assem.S.
-       (values new-lra code-object (sap- trap-loc src-start))))))
+    ;; These are really code labels, not variables: but this way we get
+    ;; their addresses.
+    (let* ((src-start (static-foreign-symbol-sap "fun_end_breakpoint_guts"))
+           (src-end (static-foreign-symbol-sap "fun_end_breakpoint_end"))
+           (trap-loc (static-foreign-symbol-sap "fun_end_breakpoint_trap"))
+           (length (sap- src-end src-start))
+           (code-object
+             (sb!c:allocate-code-object bogus-lra-constants length))
+           (dst-start (code-instructions code-object)))
+      (declare (type system-area-pointer
+                     src-start src-end dst-start trap-loc)
+               (type index length))
+      (setf (%code-debug-info code-object) :bogus-lra)
+      #!-(or x86 x86-64)
+      (setf (code-header-ref code-object real-lra-slot) real-lra
+            ;; Set up the widetag and header of LRA
+            ;; The header contains the same thing as the code object header,
+            ;; the number of boxed words, which include slots and
+            ;; constants and it has to be double word aligned.
+            ;;
+            ;; It used to be a part of the fun_end_breakpoint_guts
+            ;; but its position and value depend on the offsets
+            ;; and alignment of code object slots.
+            (sap-ref-word dst-start (- sb!vm:n-word-bits))
+            (+ sb!vm:return-pc-header-widetag
+               (logandc2 (+ code-constants-offset
+                            bogus-lra-constants
+                            2)
+                         3)))
+      #!+(or x86 x86-64)
+      (multiple-value-bind (offset code) (compute-lra-data-from-pc real-lra)
+        (setf (code-header-ref code-object real-lra-slot) code)
+        (setf (code-header-ref code-object (1+ real-lra-slot)) offset))
+      (system-area-ub8-copy src-start 0 dst-start 0 length)
+      #!-(or x86 x86-64)
+      (sb!vm:sanctify-for-execution code-object)
+      #!+(or x86 x86-64)
+      (values dst-start code-object (sap- trap-loc src-start))
+      #!-(or x86 x86-64)
+      (let ((new-lra (make-lisp-obj (+ (sap-int dst-start)
+                                       sb!vm:other-pointer-lowtag))))
+        ;; We used to set the header value of the LRA here to the
+        ;; offset from the enclosing component to the LRA header, but
+        ;; MAKE-LISP-OBJ actually checks the value before we get a
+        ;; chance to set it, so it's now done in arch-assem.S.
+        (values new-lra code-object (sap- trap-loc src-start))))))
 
 ;;;; miscellaneous
 

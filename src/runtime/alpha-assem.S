@@ -330,7 +330,7 @@ funcallable_instance_tramp = . + 1
 	.set	noreorder
 	.globl	fun_end_breakpoint_guts
 fun_end_breakpoint_guts:
-	.long	RETURN_PC_HEADER_WIDETAG + 0x800
+	.long	RETURN_PC_HEADER_WIDETAG + 0x600
 	br	zero, fun_end_breakpoint_trap
 	nop
 	mov	reg_CSP, reg_OCFP

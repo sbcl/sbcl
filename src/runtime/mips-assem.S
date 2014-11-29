@@ -455,7 +455,7 @@ funcallable_instance_tramp = . + 1
 	.align  3 /* minimum alignment for a lisp object */
 	LEAF(fun_end_breakpoint_guts)
 	.set    noreorder
-	.word   RETURN_PC_HEADER_WIDETAG + 0x800
+	.word   RETURN_PC_HEADER_WIDETAG + 0x600
 	b       multiple_value_return
 	 nop
 	.set    reorder
