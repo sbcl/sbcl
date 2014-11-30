@@ -184,40 +184,53 @@
 ;;; number of keys and presence of values in the cache is known
 ;;; beforehand.
 (defun emit-cache-lookup (cache-var layout-vars miss-tag value-var)
-  (let ((line-size (power-of-two-ceiling (+ (length layout-vars)
-                                            (if value-var 1 0)))))
-    (with-unique-names (n-index n-vector n-depth n-pointer n-mask
-                       MATCH-WRAPPERS EXIT-WITH-HIT)
-      `(let* ((,n-index (hash-layout-or ,(car layout-vars) (go ,miss-tag)))
-              (,n-vector (cache-vector ,cache-var))
-              (,n-mask (cache-mask ,cache-var)))
-         (declare (index ,n-index))
+  (with-unique-names (probe n-vector n-depth n-mask
+                      MATCH-WRAPPERS EXIT-WITH-HIT)
+    (let* ((num-keys (length layout-vars))
+           (pointer
+            ;; We don't need POINTER if the cache has 1 key and no value,
+            ;; or if FOLD-INDEX-ADDRESSING is supported, in which case adding
+            ;; a constant to the base index for each cell-ref yields better code.
+            #-(or x86 x86-64)
+            (when (or (> num-keys 1) value-var) (make-symbol "PTR")))
+           (line-size (power-of-two-ceiling (+ num-keys (if value-var 1 0)))))
+      `(let ((,n-mask (cache-mask ,cache-var))
+             (,probe (hash-layout-or ,(car layout-vars) (go ,miss-tag))))
+         (declare (index ,probe))
          ,@(mapcar (lambda (layout-var)
-                     `(mixf ,n-index (hash-layout-or ,layout-var (go ,miss-tag))))
+                     `(mixf ,probe (hash-layout-or ,layout-var (go ,miss-tag))))
                    (cdr layout-vars))
          ;; align with cache lines
-         (setf ,n-index (logand ,n-index ,n-mask))
+         (setf ,probe (logand ,probe ,n-mask))
          (let ((,n-depth (cache-depth ,cache-var))
-               (,n-pointer ,n-index))
-           (declare (index ,n-depth ,n-pointer))
+               (,n-vector (cache-vector ,cache-var))
+               ,@(when pointer `((,pointer ,probe))))
+           (declare (index ,n-depth ,@(when pointer (list pointer))))
            (tagbody
             ,MATCH-WRAPPERS
-              (when (and ,@(mapcar
-                            (lambda (layout-var)
-                              `(prog1
-                                   (eq ,layout-var (svref ,n-vector ,n-pointer))
-                                 (incf ,n-pointer)))
-                            layout-vars))
-                ,@(when value-var
-                    `((setf ,value-var (non-empty-or (svref ,n-vector ,n-pointer)
-                                                     (go ,miss-tag)))))
-                (go ,EXIT-WITH-HIT))
-              (if (zerop ,n-depth)
-                  (go ,miss-tag)
-                  (decf ,n-depth))
-              (setf ,n-index (next-cache-index ,n-mask ,n-index ,line-size)
-                    ,n-pointer ,n-index)
-              (go ,MATCH-WRAPPERS)
+            (when (and ,@(loop for layout-var in layout-vars
+                               for i from 0
+                               collect
+                             (if pointer
+                                 `(prog1 (eq ,layout-var
+                                             (svref ,n-vector ,pointer))
+                                    (incf ,pointer))
+                                 `(eq ,layout-var
+                                      (svref ,n-vector
+                                             (the index (+ ,probe ,i)))))))
+              ,@(when value-var
+                 `((setf ,value-var
+                         (non-empty-or (svref ,n-vector
+                                              ,(or pointer
+                                                   `(the index
+                                                         (+ ,probe ,num-keys))))
+                                       (go ,miss-tag)))))
+              (go ,EXIT-WITH-HIT))
+            (when (zerop ,n-depth) (go ,miss-tag))
+            (decf ,n-depth)
+            (setf ,probe (next-cache-index ,n-mask ,probe ,line-size))
+            ,@(if pointer `((setf ,pointer ,probe)))
+            (go ,MATCH-WRAPPERS)
             ,EXIT-WITH-HIT))))))
 
 ;;; Probes CACHE for LAYOUTS.

@@ -266,6 +266,9 @@
     (values
      (emit-reader/writer reader/writer 1-or-2-class class-slot-p))))
 
+;; If CACHED-INDEX-P is false, then the slot location is a constant and
+;; the cache holds layouts eligible to use that index.
+;; If true, then the cache is a map of layout -> index.
 (defun emit-one-or-n-index-reader/writer (reader/writer
                                           cached-index-p
                                           class-slot-p)
@@ -304,6 +307,14 @@
                                                     .more-count.))
       `(funcall ,miss-fn ,@args)))
 
+;; (cache-emf, return-value):
+;;  NIL / NIL : GF has a single EMF. Invoke it when layouts are in cache.
+;;  NIL / T   : GF has a single EMF. Return T when layouts are in cache.
+;;  T   / NIL : Look for the EMF for argument layouts. Invoke it when in cache.
+;;  T   / T   : Look for the EMF for argument layouts. Return it when in cache.
+;;
+;;  METATYPES must be acceptable to EMIT-FETCH-WRAPPER.
+;;  APPLYP says whether there is a &MORE context.
 (defun emit-checking-or-caching (cached-emf-p return-value-p metatypes applyp)
   (multiple-value-bind (lambda-list args rest-arg more-arg)
       (make-dlap-lambda-list (length metatypes) applyp)
@@ -355,7 +366,9 @@
       ,miss-tag
         (return ,miss-form))))
 
-(defun emit-fetch-wrapper (metatype argument miss-tag &optional slot)
+;; SLOTS-VAR, if supplied, is the variable to update with instance-slots
+;; by side-effect of fetching the wrapper for ARGUMENT.
+(defun emit-fetch-wrapper (metatype argument miss-tag &optional slots-var)
   (ecase metatype
     ((standard-instance)
      ;; This branch may run on non-pcl instances (structures). The
@@ -368,27 +381,28 @@
      ;; instance-slots-layout instead of for-std-class-p, as if there
      ;; are no layouts there are no slots to worry about.
      (with-unique-names (wrapper)
-       `(cond
-          ((std-instance-p ,argument)
-           (let ((,wrapper (std-instance-wrapper ,argument)))
-             ,@(when slot
-                     `((when (layout-for-std-class-p ,wrapper)
-                         (setq ,slot (std-instance-slots ,argument)))))
-             ,wrapper))
-          ((fsc-instance-p ,argument)
-           (let ((,wrapper (fsc-instance-wrapper ,argument)))
-             ,@(when slot
-                     `((when (layout-for-std-class-p ,wrapper)
-                         (setq ,slot (fsc-instance-slots ,argument)))))
-             ,wrapper))
-          (t (go ,miss-tag)))))
+       `(cond ((std-instance-p ,argument)
+               ,(if slots-var
+                    `(let ((,wrapper (std-instance-wrapper ,argument)))
+                       (when (layout-for-std-class-p ,wrapper)
+                         (setq ,slots-var (std-instance-slots ,argument)))
+                       ,wrapper)
+                    `(std-instance-wrapper ,argument)))
+              ((fsc-instance-p ,argument)
+               ,(if slots-var
+                    `(let ((,wrapper (fsc-instance-wrapper ,argument)))
+                       (when (layout-for-std-class-p ,wrapper)
+                         (setq ,slots-var (fsc-instance-slots ,argument)))
+                       ,wrapper)
+                    `(fsc-instance-wrapper ,argument)))
+               (t (go ,miss-tag)))))
     ;; Sep92 PCL used to distinguish between some of these cases (and
     ;; spuriously exclude others).  Since in SBCL
     ;; WRAPPER-OF/LAYOUT-OF/BUILT-IN-OR-STRUCTURE-WRAPPER are all
     ;; equivalent and inlined to each other, we can collapse some
     ;; spurious differences.
     ((class system-instance structure-instance condition-instance)
-     (when slot
+     (when slots-var
        (bug "SLOT requested for metatype ~S, but it isn't going to happen."
             metatype))
      `(layout-of ,argument))
