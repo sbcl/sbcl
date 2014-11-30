@@ -163,8 +163,10 @@
                              &key probe hit miss)
   (with-unique-names (test miss-fn len key-index step)
     (once-only ((storage storage) (key key) (table table)
-                (hashval (or hash
-                             `(funcall (info-env-hash-function ,table) ,key))))
+                (hashval
+                 `(the fixnum
+                       ,(or hash
+                            `(funcall (info-env-hash-function ,table) ,key)))))
       `(macrolet ((key-index () ; expose key+value indices to invoking code
                     ',key-index)
                   (value-index ()
