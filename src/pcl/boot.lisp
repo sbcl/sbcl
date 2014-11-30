@@ -1498,9 +1498,9 @@ bootstrapping.
                    ;; like :LOAD-TOPLEVEL.
                    ((not (listp form)) form)
                    ((eq (car form) 'call-next-method)
-                    (setq call-next-method-p (if (cdr form)
-                                                 t
-                                                 :simple))
+                    ;; hierarchy: nil -> :simple -> T.
+                    (unless (eq call-next-method-p t)
+                      (setq call-next-method-p (if (cdr form) t :simple)))
                     form)
                    ((eq (car form) 'next-method-p)
                     (setq next-method-p-p t)

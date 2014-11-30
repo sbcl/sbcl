@@ -301,5 +301,17 @@
     (assert (typep child1 'bug-728650-child-1))
     (assert (eq 'provided-by-child-1 (slot-value child1 'value)))))
 
+(defclass test-fancy-cnm () ((a :initarg :a)))
+(defmethod initialize-instance :around ((self test-fancy-cnm) &rest args)
+  ;; WALK-METHOD-LAMBDA would get to the second form of CALL-NEXT-METHOD
+  ;; and set the CALL-NEXT-METHOD-P flag to :SIMPLE
+  ;; even though it had already been set to T by the earlier call.
+  (if t
+      (call-next-method self :a `(expect-this ,(getf args :a)))
+      (call-next-method)))
+(defun fancy-cnm-in-ii-test (x) (make-instance 'test-fancy-cnm :a x))
+(with-test (:name :bug-1397454)
+  (assert (equal (slot-value (fancy-cnm-in-ii-test 'hi) 'a)
+                 '(expect-this hi))))
 
 ;;;; success
