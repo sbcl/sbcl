@@ -397,7 +397,11 @@
             (sb!kernel:code-header-ref code
                                        (+ woffs
                                           sb!vm:simple-fun-type-slot))))
-      (format stream ".~A ~S~:A" 'entry name args)
+      ;; if the function's name conveys its args, don't show ARGS too
+      (format stream ".~A ~S~:[~:A~;~]" 'entry name
+              (and (typep name '(cons (eql lambda) (cons list)))
+                   (equal args (second name)))
+              args)
       (note (lambda (stream)
               (format stream "~:S" type)) ; use format to print NIL as ()
             dstate)))
@@ -872,13 +876,23 @@
 
 (defun add-fun-header-hooks (segment)
   (declare (type segment segment))
-  (do ((fun (sb!kernel:code-header-ref (seg-code segment)
-                                       sb!vm:code-entry-points-slot)
+  (do ((fun (awhen (seg-code segment) (sb!kernel:%code-entry-points it))
             (fun-next fun))
        (length (seg-length segment)))
       ((null fun))
     (let ((offset (code-offs-to-segment-offs (fun-offset fun) segment)))
       (when (<= 0 offset length)
+        ;; Up to 2 words of zeros might be present to align the next
+        ;; simple-fun. Limit on OFFSET is to avoid incorrect triggering
+        ;; in case of unexpected weirdness. FIXME: verify all zero bytes
+        (when (< 0 offset (ash sb!vm:n-word-bytes 1))
+          (push (make-offs-hook
+                 :fun (lambda (stream dstate)
+                         (when stream
+                           (format stream ".SKIP ~D" offset))
+                          (incf (dstate-next-offs dstate) offset))
+                 :offset 0) ; at 0 bytes into this seg, skip OFFSET bytes
+                (seg-hooks segment)))
         (push (make-offs-hook :offset offset :fun #'fun-header-hook)
               (seg-hooks segment))))))
 
@@ -1564,7 +1578,7 @@
 (defun disassemble-code-component (code-component &key
                                                   (stream *standard-output*)
                                                   (use-labels t))
-  (declare (type (or null sb!kernel:code-component compiled-function)
+  (declare (type (or sb!kernel:code-component compiled-function)
                  code-component)
            (type stream stream)
            (type (member t nil) use-labels))
