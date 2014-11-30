@@ -1919,7 +1919,9 @@
               #!+sb-safepoint
               (let ((first-node (block-start-node block)))
                 (unless (or (and (bind-p first-node)
-                                 (xep-p (bind-lambda first-node)))
+                                 ;; Bind-nodes already have safepoints
+                                 (eq (bind-lambda first-node)
+                                     (lambda-home (bind-lambda first-node))))
                             (and (valued-node-p first-node)
                                  (node-lvar first-node)
                                  (eq (lvar-fun-name
