@@ -280,12 +280,13 @@ bootstrapping.
   (:default-initargs :references (list '(:ansi-cl :section (3 4 2)))))
 
 (defun check-gf-lambda-list (lambda-list)
-  (flet ((ensure (arg ok)
-           (unless ok
+  (flet ((symbol-or-singleton-p (arg)
+           (typep arg '(or symbol (cons symbol null))))
+         (complain (arg)
              (error 'generic-function-lambda-list-error
                     :format-control
                     "~@<invalid ~S ~_in the generic function lambda list ~S~:>"
-                    :format-arguments (list arg lambda-list)))))
+                    :format-arguments (list arg lambda-list))))
     (multiple-value-bind (required optional restp rest keyp keys allowp
                           auxp aux morep more-context more-count)
         (parse-lambda-list lambda-list)
@@ -295,20 +296,14 @@ bootstrapping.
       (declare (ignore aux)) ; since we require AUXP=NIL
       (declare (ignore more-context more-count)) ; safely ignored unless MOREP
       ;; no defaults allowed for &OPTIONAL arguments
-      (dolist (i optional)
-        (ensure i (or (symbolp i)
-                      (and (consp i) (symbolp (car i)) (null (cdr i))))))
+      (dolist (arg optional)
+        (or (symbol-or-singleton-p arg) (complain arg)))
       ;; no defaults allowed for &KEY arguments
       (when keyp
-        (dolist (i keys)
-          (ensure i (or (symbolp i)
-                        (and (consp i)
-                             (or (symbolp (car i))
-                                 (and (consp (car i))
-                                      (symbolp (caar i))
-                                      (symbolp (cadar i))
-                                      (null (cddar i))))
-                             (null (cdr i)))))))
+        (dolist (arg keys)
+          (or (symbol-or-singleton-p arg)
+              (typep arg '(cons (cons symbol (cons symbol null)) null))
+              (complain arg))))
       ;; no &AUX allowed
       (when auxp
         (error "&AUX is not allowed in a generic function lambda list: ~S"

@@ -69,8 +69,8 @@
 ;;;; using DEF!METHOD to do this.)
 
 (defmethod print-object ((method standard-method) stream)
-  (print-unreadable-object (method stream :type t :identity t)
-    (if (slot-boundp method '%generic-function)
+  (if (slot-boundp method '%generic-function)
+      (print-unreadable-object (method stream :type t :identity t)
         (let ((generic-function (method-generic-function method)))
           (format stream "~S ~{~S ~}~:S"
                   (and generic-function
@@ -78,14 +78,12 @@
                   (method-qualifiers method)
                   (if generic-function
                       (unparse-specializers generic-function (method-specializers method))
-                      (method-specializers method))))
-        ;; FIXME: Why do we do CALL-NEXT-METHOD in this method (and
-        ;; in the PRINT-OBJECT STANDARD-ACCESSOR-METHOD method too)?
-        (call-next-method))))
+                      (method-specializers method)))))
+      (call-next-method)))
 
 (defmethod print-object ((method standard-accessor-method) stream)
-  (print-unreadable-object (method stream :type t :identity t)
-    (if (slot-boundp method '%generic-function)
+  (if (slot-boundp method '%generic-function)
+      (print-unreadable-object (method stream :type t :identity t)
         (let ((generic-function (method-generic-function method)))
           (format stream "~S, slot:~S, ~:S"
                   (and generic-function
@@ -93,8 +91,8 @@
                   (accessor-method-slot-name method)
                   (if generic-function
                       (unparse-specializers generic-function (method-specializers method))
-                      (method-specializers method))))
-        (call-next-method))))
+                      (method-specializers method)))))
+      (call-next-method)))
 
 (defmethod print-object ((mc standard-method-combination) stream)
   (print-unreadable-object (mc stream :type t :identity t)
@@ -104,15 +102,20 @@
             (slot-value-or-default mc 'options))))
 
 (defun named-object-print-function (instance stream
-                                    &optional (extra nil extra-p))
-  ;; It is better to avoid this function if INSTANCE could have a name
-  ;; that is not its proper name. Also note that since the intended use
-  ;; is within PRINT-OBJECT, STREAM should not be T or NIL.
-  (let ((name (slot-value-or-default instance 'name)))
-    (print-unreadable-object (instance stream :type t :identity (not name))
-      (if extra-p
-          (format stream "~S ~:S" name extra)
-          (prin1 name stream)))))
+                                    &optional (properly-named-p t)
+                                              (extra nil extra-p))
+  (cond ((slot-boundp instance 'name) ; case (1): named
+         (let ((name (slot-value instance 'name)))
+           (print-unreadable-object
+               (instance stream :type t :identity (not properly-named-p))
+             (if extra-p
+                 (format stream "~S ~:S" name extra)
+                 (prin1 name stream)))))
+        ((not extra-p) ; case (2): empty body to avoid an extra space
+         (print-unreadable-object (instance stream :type t :identity t)))
+        (t ; case (3). no name, but extra data - show #<unbound slot> and data
+         (print-unreadable-object (instance stream :type t :identity t)
+           (format stream "~S ~:S" *unbound-slot-value-marker* extra)))))
 
 (defmethod print-object ((class class) stream)
   ;; Use a similar concept as in OUTPUT-FUN.
@@ -128,12 +131,17 @@
   (named-object-print-function slotd stream))
 
 (defmethod print-object ((generic-function standard-generic-function) stream)
-  (named-object-print-function
+  (multiple-value-call 'named-object-print-function
     generic-function
     stream
+    (and (slot-boundp generic-function 'name)
+         (let ((name (slot-value generic-function 'name)))
+           (and (legal-fun-name-p name)
+                (fboundp name)
+                (eq (fdefinition name) generic-function))))
     (if (slot-boundp generic-function 'methods)
         (list (length (generic-function-methods generic-function)))
-        "?")))
+        (values))))
 
 (defmethod print-object ((cache cache) stream)
   (print-unreadable-object (cache stream :type t :identity t)

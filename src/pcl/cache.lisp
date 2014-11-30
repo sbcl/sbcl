@@ -108,12 +108,10 @@
   (let* ((vector (cache-vector cache))
          (size (length vector))
          (line-size (cache-line-size cache))
-         (total-lines (/ size line-size))
-         (free-lines (loop for i from 0 by line-size below size
-                           unless (eq (svref vector i) '..empty..)
-                           count t)))
-    (values (- total-lines free-lines) total-lines
-            (cache-depth cache) (cache-limit cache))))
+         (total-lines (/ size line-size)))
+    (values (loop for i from 0 by line-size below size
+                  count (neq (svref vector i) '..empty..))
+            total-lines (cache-depth cache) (cache-limit cache))))
 
 ;;; Don't allocate insanely huge caches: this is 4096 lines for a
 ;;; value cache with 8-15 keys -- probably "big enough for anyone",
