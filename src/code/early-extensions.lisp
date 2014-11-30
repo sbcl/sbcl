@@ -823,17 +823,12 @@
 ;;; linking the way that true toplevel DEFUNs do, but at least they do
 ;;; the linking eventually, so as long as #'FOO and #'BAR aren't
 ;;; needed until "cold toplevel forms" have executed, it's OK.
-(defmacro cold-fset (name lambda)
+(defmacro !cold-fset (name lambda)
   (style-warn
    "~@<COLD-FSET ~S not cross-compiled at top level: demoting to ~
 (SETF FDEFINITION)~:@>"
    name)
-  ;; We convert the LAMBDA expression to the corresponding NAMED-LAMBDA
-  ;; expression so that the compiler can use NAME in debug names etc.
-  (destructuring-bind (lambda-symbol &rest lambda-rest) lambda
-    (assert (eql lambda-symbol 'lambda)) ; else dunno how to do conversion
-    `(setf (fdefinition ',name)
-           (named-lambda ,name ,@lambda-rest))))
+  `(setf (fdefinition ',name) ,lambda))
 
 ;;;; ONCE-ONLY
 ;;;;

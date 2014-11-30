@@ -1043,10 +1043,23 @@
            (let ((defined-fun-res (get-defined-fun name (second lambda-expression)))
                  (res (ir1-convert-lambda lambda-expression
                                           :maybe-add-debug-catch t
-                                          :source-name name)))
+                                          :source-name name))
+                 (info (info :function :info name)))
              (assert-global-function-definition-type name res)
              (push res (defined-fun-functionals defined-fun-res))
-             (unless (eq (defined-fun-inlinep defined-fun-res) :notinline)
+             (unless (or
+                      (eq (defined-fun-inlinep defined-fun-res) :notinline)
+                      ;; Don't treat recursive stubs like CAR as self-calls
+                      ;; Maybe just use the fact that it is a known function?
+                      ;; Though a known function may be used
+                      ;; because of some other attributues but
+                      ;; still wants to get optimized self calls
+                      (and info
+                           (or (fun-info-templates info)
+                               (fun-info-transforms info)
+                               (fun-info-ltn-annotate info)
+                               (fun-info-ir2-convert info)
+                               (fun-info-optimizer info))))
                (substitute-leaf-if
                 (lambda (ref)
                   (policy ref (> recognize-self-calls 0)))

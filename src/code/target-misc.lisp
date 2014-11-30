@@ -18,7 +18,6 @@
 ;;; Underlying SIMPLE-FUN
 (defun %fun-fun (function)
   (declare (function function))
-  (declare (optimize (sb!c::recognize-self-calls 3))) ; not working - why?
   ;; It's too bad that TYPECASE isn't able to generate equivalent code.
   (case (fun-subtype function)
     (#.sb!vm:simple-fun-header-widetag

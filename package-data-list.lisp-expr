@@ -1265,7 +1265,7 @@ possibly temporarily, because it might be used internally."
                ;; hackery to help set up for cold init
                "!BEGIN-COLLECTING-COLD-INIT-FORMS"
                "!COLD-INIT-FORMS"
-               "COLD-FSET"
+               "!COLD-FSET"
                "!DEFUN-FROM-COLLECTED-COLD-INIT-FORMS"
 
                ;; catch tags
