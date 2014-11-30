@@ -683,10 +683,8 @@ bootstrapping.
                                 (return t))
                                ((eq p '&aux)
                                 (return nil))))))
-          (multiple-value-bind
-                (walked-lambda call-next-method-p closurep
-                               next-method-p-p setq-p
-                               parameters-setqd)
+          (multiple-value-bind (walked-lambda call-next-method-p setq-p
+                                parameters-setqd)
               (walk-method-lambda method-lambda
                                   required-parameters
                                   env
@@ -720,11 +718,9 @@ bootstrapping.
                              (,lambda-list .method-args. .next-methods.
                                            :call-next-method-p
                                            ,(when call-next-method-p t)
-                                           :next-method-p-p ,next-method-p-p
                                            :setq-p ,setq-p
                                            :parameters-setqd ,parameters-setqd
                                            :method-cell ,method-cell
-                                           :closurep ,closurep
                                            :applyp ,applyp)
                            ,@walked-declarations
                            (locally
@@ -958,18 +954,22 @@ bootstrapping.
        ,@body)))
 
 (defmacro bind-simple-lexical-method-functions
-    ((method-args next-methods (&key call-next-method-p next-method-p-p setq-p
-                                     parameters-setqd closurep applyp method-cell))
+    ((method-args next-methods (&key call-next-method-p setq-p
+                                     parameters-setqd applyp method-cell))
      &body body
      &environment env)
   (declare (ignore parameters-setqd))
-  (if (not (or call-next-method-p setq-p closurep next-method-p-p applyp))
-      `(locally
-           ,@body)
+  (if (not (or call-next-method-p setq-p applyp))
+      ;; always provide the lexical function NEXT-METHOD-P.
+      ;; I would think this to be a good candidate for declaring INLINE
+      ;; but that's not the way it was done before.
+      `(flet ((next-method-p () (not (null (car ,next-methods)))))
+         (declare (ignorable #'next-method-p))
+         ,@body)
       `(let ((.next-method. (car ,next-methods))
              (,next-methods (cdr ,next-methods)))
          (declare (ignorable .next-method. ,next-methods))
-         (flet (,@(and call-next-method-p
+         (flet (,@(when call-next-method-p
                     `((call-next-method (&rest cnm-args)
                        (declare (dynamic-extent cnm-args))
                        ,@(if (safe-code-p env)
@@ -986,9 +986,8 @@ bootstrapping.
                            (apply #'call-no-next-method
                                   ',method-cell
                                   (or cnm-args ,method-args))))))
-                ,@(and next-method-p-p
-                    '((next-method-p ()
-                       (not (null .next-method.))))))
+                (next-method-p () (not (null .next-method.))))
+           (declare (ignorable #'next-method-p))
            ,@body))))
 
 (defun call-no-next-method (method-cell &rest args)
@@ -1313,16 +1312,19 @@ bootstrapping.
                                       setq-p
                                       parameters-setqd
                                       method-cell
-                                      next-method-p-p
-                                      closurep
                                       applyp))
      &body body
      &environment env)
-  (let* ((rebindings (when (or setq-p call-next-method-p)
+  (let* ((next-method-p-def
+          `((next-method-p ()
+              (declare (optimize (sb-c:insert-step-conditions 0)))
+              (not (null ,next-method-call)))))
+         (rebindings (when (or setq-p call-next-method-p)
                        (mapcar (lambda (x) (list x x)) parameters-setqd))))
-    (if (not (or call-next-method-p setq-p closurep next-method-p-p applyp))
-        `(locally
-             ,@body)
+    (if (not (or call-next-method-p setq-p applyp))
+        `(flet ,next-method-p-def
+           (declare (ignorable #'next-method-p))
+           ,@body)
         `(flet (,@(when call-next-method-p
                     `((call-next-method (&rest cnm-args)
                         (declare (dynamic-extent cnm-args)
@@ -1337,10 +1339,8 @@ bootstrapping.
                                                      ,rest-arg)
                             ,method-cell
                             cnm-args))))
-                  ,@(when next-method-p-p
-                      `((next-method-p ()
-                         (declare (optimize (sb-c:insert-step-conditions 0)))
-                         (not (null ,next-method-call))))))
+                ,@next-method-p-def)
+           (declare (ignorable #'next-method-p))
            (let ,rebindings
              ,@body)))))
 
@@ -1480,32 +1480,19 @@ bootstrapping.
   (let (;; flag indicating that CALL-NEXT-METHOD should be in the
         ;; method definition
         (call-next-method-p nil)
-        ;; flag indicating that #'CALL-NEXT-METHOD was seen in the
-        ;; body of a method
-        (closurep nil)
-        ;; flag indicating that NEXT-METHOD-P should be in the method
-        ;; definition
-        (next-method-p-p nil)
         ;; a list of all required parameters whose bindings might be
         ;; modified in the method body.
         (parameters-setqd nil))
     (flet ((walk-function (form context env)
-             (cond ((not (eq context :eval)) form)
-                   ;; FIXME: Jumping to a conclusion from the way it's used
-                   ;; above, perhaps CONTEXT should be called SITUATION
-                   ;; (after the term used in the ANSI specification of
-                   ;; EVAL-WHEN) and given modern ANSI keyword values
-                   ;; like :LOAD-TOPLEVEL.
-                   ((not (listp form)) form)
-                   ((eq (car form) 'call-next-method)
+             (unless (and (eq context :eval) (consp form))
+               (return-from walk-function form))
+             (case (car form)
+               (call-next-method
                     ;; hierarchy: nil -> :simple -> T.
                     (unless (eq call-next-method-p t)
                       (setq call-next-method-p (if (cdr form) t :simple)))
                     form)
-                   ((eq (car form) 'next-method-p)
-                    (setq next-method-p-p t)
-                    form)
-                   ((memq (car form) '(setq multiple-value-setq))
+               ((setq multiple-value-setq)
                     ;; The walker will split (SETQ A 1 B 2) to
                     ;; separate (SETQ A 1) and (SETQ B 2) forms, so we
                     ;; only need to handle the simple case of SETQ
@@ -1526,25 +1513,19 @@ bootstrapping.
                           ;; executed.
                           (pushnew var parameters-setqd :test #'eq))))
                     form)
-                   ((and (eq (car form) 'function)
-                         (cond ((eq (cadr form) 'call-next-method)
-                                (setq call-next-method-p t)
-                                (setq closurep t)
-                                form)
-                               ((eq (cadr form) 'next-method-p)
-                                (setq next-method-p-p t)
-                                (setq closurep t)
-                                form)
-                               (t nil))))
-                   ((and (memq (car form)
-                               '(slot-value set-slot-value slot-boundp))
-                         (constantp (caddr form) env))
+               (function
+                (when (equal (cdr form) '(call-next-method))
+                  (setq call-next-method-p t))
+                form)
+               ((slot-value set-slot-value slot-boundp)
+                (if (constantp (third form) env)
                     (let ((fun (ecase (car form)
                                  (slot-value #'optimize-slot-value)
                                  (set-slot-value #'optimize-set-slot-value)
                                  (slot-boundp #'optimize-slot-boundp))))
-                        (funcall fun form slots required-parameters env)))
-                   (t form))))
+                      (funcall fun form slots required-parameters env))
+                    form))
+               (t form))))
 
       (let ((walked-lambda (walk-form method-lambda env #'walk-function)))
         ;;; FIXME: the walker's rewriting of the source code causes
@@ -1555,8 +1536,6 @@ bootstrapping.
                     walked-lambda
                     method-lambda)
                 call-next-method-p
-                closurep
-                next-method-p-p
                 (not (null parameters-setqd))
                 parameters-setqd)))))
 
