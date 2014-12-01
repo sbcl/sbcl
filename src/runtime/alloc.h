@@ -26,11 +26,11 @@ extern lispobj alloc_code_object(unsigned boxed, unsigned unboxed);
 
 #define DX_ALLOC_SAP(var_name, ptr)                                        \
 lispobj var_name;                                                          \
-struct sap _dx_##var_name __attribute__ ((aligned (16)));                  \
+struct sap _dx_##var_name __attribute__ ((aligned (N_WORD_BYTES * 2)));                  \
 do {                                                                       \
     _dx_##var_name.header = (1 << 8) | SAP_WIDETAG;                        \
     _dx_##var_name.pointer = (char *)(ptr);                                \
-    var_name = make_lispobj(&_dx_##var_name.header, OTHER_POINTER_LOWTAG); \
+    var_name = make_lispobj(&_dx_##var_name, OTHER_POINTER_LOWTAG); \
 } while (0)
 
 #endif /* _ALLOC_H_ */

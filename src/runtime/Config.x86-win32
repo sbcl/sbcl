@@ -38,7 +38,11 @@ GC_SRC = gencgc.c
 
 CFLAGS = -g -Wall -O3 \
         -fno-omit-frame-pointer -march=i686 -DWINVER=0x0501 \
-        -D__W32API_USE_DLLIMPORT__
+        -D__W32API_USE_DLLIMPORT__ \
+	-mpreferred-stack-boundary=2
+# We assume Windows ABI 4-byte alignment, but GCC decided to change to
+# 16-byte alignment
+
 ASFLAGS = $(CFLAGS)
 
 CPP = cpp

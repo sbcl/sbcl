@@ -1,4 +1,7 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
+changes relative to sbcl-1.2.6:
+  * bug fix: restore error handling on Windows x86.
+
 changes in sbcl-1.2.6 relative to sbcl-1.2.5:
   * enhancement: SERVE-EVENTS uses the poll() system call in lieu of
     select() if the OS has the former. Previously poll() was used
