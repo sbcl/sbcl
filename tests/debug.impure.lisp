@@ -827,6 +827,19 @@
       (unless (zerop (length problems))
         (error problems)))))
 
+;; The test named :GF-dispatch-backtrace depends on the fact that renaming
+;; a closure works, and that the debugger can extract a closure name.
+;; First things first: verify that a closure can be named.
+(defun make-adder (x)
+  (sb-impl::set-closure-name (lambda (y) (+ x y)) `(adder ,x)))
+(with-test (:name :closure-renaming-really-works)
+  (let ((f1 (make-adder 5))
+        (expect "#<CLOSURE (ADDER 5)"))
+    (assert (= (mismatch (write-to-string (make-adder 5)) expect)
+               (length expect)))
+    (assert (and (eq (sb-impl::set-closure-name f1 "ADD5") f1)
+                 (string= (sb-impl::%fun-name f1) "ADD5")))))
+
 (defgeneric gf-dispatch-test/gf (x y)
   (:method (x y)
     (+ x y)))

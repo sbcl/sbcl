@@ -370,12 +370,14 @@
   ;; the environment is properly initialized, i.e. arguments moved
   ;; from their passing locations, etc. This is the start of the
   ;; function as far as the debugger is concerned.
-  (environment-start nil :type (or label null)))
+  (environment-start nil :type (or label null))
+  (closure-save-tn nil :type (or tn null)))
 (defprinter (ir2-physenv)
   closure
   old-fp
   return-pc
-  return-pc-pass)
+  return-pc-pass
+  closure-save-tn)
 
 ;;; A RETURN-INFO is used by GTN to represent the return strategy and
 ;;; locations for all the functions in a given TAIL-SET. It is stored

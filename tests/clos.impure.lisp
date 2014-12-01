@@ -2353,4 +2353,18 @@
     (assert-error (sb-mop:slot-value-using-class (class-of a) a slotd))
     (assert-error (setf (sb-mop:slot-value-using-class (class-of a) a slotd) t))))
 
+;; A test that the *FGENS* cache works.
+;; This is not a test in the CLOS problem domain, but in the implementation
+;; of discriminating functions.
+(defgeneric f (x y) (:method (x y) (+ x y)))
+(defgeneric g (x y) (:method (x y) (* x y)))
+(with-test (:name :fgens-sharing)
+  (let ((count0 (hash-table-count sb-pcl::*fgens*))
+        (foo (f 1 2))
+        (count1 (hash-table-count sb-pcl::*fgens*))
+        (bar (g 1 2))
+        (count2 (hash-table-count sb-pcl::*fgens*)))
+    (declare (ignore foo bar))
+    (assert (= count0 count1 count2))))
+
 ;;;; success

@@ -1424,16 +1424,10 @@
                         (make-dfun-lambda-list nargs applyp)
                         (make-fast-method-call-lambda-list nargs applyp))))
       (multiple-value-bind (cfunction constants)
-          ;; FIXME: this pessimizes fngen by naming the lambda,
-          ;; which will never be EQUAL to another structurally similar
-          ;; lambda having a different name.
-          ;; To do it right, we really want dynamically named closures
-          ;; that on backtrace show the closure's name, not the simple-fun's.
-          ;; JES's patch for STORE-CLOSURE-DEBUG-POINTER and a patch
-          ;; of mine to add an extra "closure name" slot - which is never
-          ;; loaded by the simple-fun - would achieve the desired effect.
-          (get-fun1 `(named-lambda (gf-dispatch ,name)
-                      ,arglist
+          ;; We don't want NAMED-LAMBDA for any expressions handed to FNGEN,
+          ;; because name mismatches will render the hashing ineffective.
+          (get-fun1 `(lambda ,arglist
+                      (declare (optimize (sb-c::store-closure-debug-pointer 3)))
                       ,@(unless function-p
                           `((declare (ignore .pv. .next-method-call.))))
                       (locally (declare #.*optimize-speed*)
@@ -1460,7 +1454,7 @@
                 (setf alist-tail new)))
             (let ((function (apply cfunction (mapcar #'cdr (cdr alist)))))
               (if function-p
-                  function
+                  (set-fun-name function `(gf-dispatch ,name))
                   (make-fast-method-call
                    :function (set-fun-name function `(sdfun-method ,name))
                    :arg-info fmc-arg-info))))))))))

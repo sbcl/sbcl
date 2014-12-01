@@ -1254,6 +1254,15 @@
              (vop xep-allocate-frame node block start-label nil)))
       (if (ir2-physenv-closure env)
           (let ((closure (make-normal-tn *backend-t-primitive-type*)))
+            (when (policy fun (> store-closure-debug-pointer 1))
+              ;; Save the closure pointer on the stack.
+              (let ((closure-save (make-representation-tn
+                                   *backend-t-primitive-type*
+                                   (sc-number-or-lose 'sb!vm::control-stack))))
+                (vop setup-closure-environment node block start-label
+                     closure-save)
+                (setf (ir2-physenv-closure-save-tn env) closure-save)
+                (component-live-tn closure-save)))
             (vop setup-closure-environment node block start-label closure)
             (let ((n -1))
               (dolist (loc (ir2-physenv-closure env))
@@ -1295,12 +1304,22 @@
     (aver (member (functional-kind fun)
                   '(nil :external :optional :toplevel :cleanup)))
 
-    (when (xep-p fun)
-      (init-xep-environment node block fun)
-      #!+sb-dyncount
-      (when *collect-dynamic-statistics*
-        (vop count-me node block *dynamic-counts-tn*
-             (block-number (ir2-block-block block)))))
+    (cond ((xep-p fun)
+           (init-xep-environment node block fun)
+           #!+sb-dyncount
+           (when *collect-dynamic-statistics*
+             (vop count-me node block *dynamic-counts-tn*
+                  (block-number (ir2-block-block block)))))
+          ((policy fun (> store-closure-debug-pointer 1))
+           ;; Propagate the location of the closure pointer from the
+           ;; enclosing functions. (FIXME: Should make sure that this
+           ;; handles closures inside closures correctly). [remark by JES]
+           (let* ((entry-fun (lambda-entry-fun fun)))
+             (when entry-fun
+               (let ((2env (physenv-info (lambda-physenv fun)))
+                     (entry-2env (physenv-info (lambda-physenv entry-fun))))
+                 (setf (ir2-physenv-closure-save-tn 2env)
+                       (ir2-physenv-closure-save-tn entry-2env)))))))
 
     (emit-move node
                block

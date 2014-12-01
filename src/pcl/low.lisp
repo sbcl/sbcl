@@ -191,6 +191,8 @@ comparison.")
     #+sb-eval
     (sb-eval:interpreted-function
      (setf (sb-eval:interpreted-function-name fun) new-name))
+    (closure
+     (setq fun (sb-impl::set-closure-name fun new-name)))
     (funcallable-instance ;; KLUDGE: probably a generic function...
      (cond ((if (eq **boot-state** 'complete)
                 (typep fun 'generic-function) ; FIXME: inefficient forward-ref

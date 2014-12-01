@@ -628,7 +628,8 @@ the current thread are replaced with dummy objects which can safely escape."
          (kind (sb!di:debug-fun-kind debug-fun)))
     (multiple-value-bind (name args info)
         (clean-frame-call frame
-                          (sb!di:debug-fun-name debug-fun)
+                          (or (sb!di:debug-fun-closure-name debug-fun frame)
+                              (sb!di:debug-fun-name debug-fun))
                           method-frame-style
                           (when kind (list kind)))
       (let ((args (if (and (consp args) replace-dynamic-extent-objects)

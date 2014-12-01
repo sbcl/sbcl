@@ -1236,6 +1236,29 @@ register."
     (bogus-debug-fun
      (bogus-debug-fun-%name debug-fun))))
 
+;; Return the name of the closure, if named, otherwise nil.
+(defun debug-fun-closure-name (debug-fun frame)
+  (if (typep debug-fun 'compiled-debug-fun)
+      (let* ((compiler-debug-fun
+              (compiled-debug-fun-compiler-debug-fun debug-fun))
+             (closure-save
+              (sb!c::compiled-debug-fun-closure-save compiler-debug-fun)))
+        (when closure-save
+          (let ((closure-name
+                 (sb!impl::closure-name
+                  (sub-access-debug-var-slot (frame-pointer frame)
+                                             closure-save))))
+            (if closure-name
+                ;; The logic in CLEAN-FRAME-CALL is based on the frame name,
+                ;; so if the simple-fun is named (XEP mumble) then the closure
+                ;; needs to pretend to be named similarly.
+                (let ((simple-fun-name
+                       (sb!di:debug-fun-name debug-fun)))
+                  (if (and (listp simple-fun-name)
+                           (eq (car simple-fun-name) 'sb!c::xep))
+                      `(sb!c::xep ,closure-name)
+                      closure-name))))))))
+
 ;;; Return a DEBUG-FUN that represents debug information for FUN.
 (defun fun-debug-fun (fun)
   (declare (type function fun))

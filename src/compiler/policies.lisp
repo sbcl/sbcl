@@ -142,3 +142,7 @@ When enabled, no safepoints will be inserted explicitly.  Note that
 this declaration does not prevent out-of-line function calls, which
 will encounter safepoints unless the target function has also been
 compiled with this declaration in effect.")
+
+(define-optimization-quality store-closure-debug-pointer
+    0
+  ("no" "no" "yes" "yes"))

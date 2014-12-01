@@ -51,6 +51,68 @@
 (defun %fun-type (function)
   (%simple-fun-type (%fun-fun function)))
 
+(defglobal *closure-name-marker* (make-symbol ".CLOSURE-NAME."))
+(defun closure-name (closure)
+  (declare (closure closure))
+  (let ((len (get-closure-length closure)))
+    (if (and (>= len 4)
+             ;; The number of closure-values is 1- the len.
+             ;; The index of the last value is 1- that.
+             ;; The index of the name-marker is 1- that.
+             ;; (closure index 0 is the first closed-over value)
+             (eq (%closure-index-ref closure (- len 3))
+                 (load-time-value *closure-name-marker* t)))
+        (values (%closure-index-ref closure (- len 2)) t)
+        (values nil nil))))
+
+;; Add 2 "slots" to the payload of a closure, one for the magic symbol
+;; signifying that there is a name, and one for the name itself.
+(defun nameify-closure (closure)
+  (declare (closure closure))
+  (let* ((physical-len (get-closure-length closure)) ; excluding header
+         ;; subtract 1 because physical-len includes the trampoline word.
+         (new-n-closure-vals (+ 2 (1- physical-len)))
+         ;; Closures and funcallable-instances are pretty much the same to GC.
+         ;; They're both varying-length boxed-payload objects.
+         ;; But funcallable-instance has <tramp, function, info>
+         ;; where closure has <tramp, info> so subtract 1 more word.
+         (copy (%make-funcallable-instance (1- new-n-closure-vals))))
+    (with-pinned-objects (closure copy)
+      ;; change the widetag from funcallable-instance to closure.
+      (setf (sap-ref-word (int-sap (get-lisp-obj-address copy))
+                          (- sb!vm:fun-pointer-lowtag))
+            (logior (ash (+ physical-len 2) 8) sb!vm:closure-header-widetag))
+      (macrolet ((word (obj index)
+                   `(sap-ref-lispobj (int-sap (get-lisp-obj-address ,obj))
+                                     (+ (- sb!vm:fun-pointer-lowtag)
+                                        (ash ,index sb!vm:word-shift)))))
+        (loop for i from 1 to physical-len
+              do (setf (word copy i) (word closure i)))
+        (setf (word copy (1+ physical-len))
+              (load-time-value *closure-name-marker* t))))
+    copy))
+
+;; Rename a closure. Doing so changes its identity unless it was already named.
+;; To do this without allocating a new closure, we'd need an interface that
+;; requests a placeholder from the outset. One possibility is that
+;; (NAMED-LAMBDA NIL (x) ...) would allocate the name, initially stored as nil.
+;; In that case, the simple-fun's debug-info could also contain a bit that
+;; indicates that all closures over it are named, eliminating the storage
+;; and check for *closure-name-marker* in the closure values.
+(defun set-closure-name (closure new-name)
+  (declare (closure closure))
+  (unless (nth-value 1 (closure-name closure))
+    (setq closure (nameify-closure closure)))
+  ;; There are no closure slot setters, and in fact SLOT-SET
+  ;; does not exist in a variant that takes a non-constant index.
+  (with-pinned-objects (closure)
+    (setf (sap-ref-lispobj (int-sap (get-lisp-obj-address closure))
+                           (+ (- sb!vm:fun-pointer-lowtag)
+                              (ash (get-closure-length closure)
+                                   sb!vm:word-shift)))
+          new-name))
+  closure)
+
 ;;; a SETFable function to return the associated debug name for FUN
 ;;; (i.e., the third value returned from CL:FUNCTION-LAMBDA-EXPRESSION),
 ;;; or NIL if there's none
@@ -60,7 +122,13 @@
     (sb!eval:interpreted-function
      (sb!eval:interpreted-function-debug-name function))
     (t
-     (%simple-fun-name (%fun-fun function)))))
+     (let (name namedp)
+       (if (and (closurep function)
+                (progn
+                  (multiple-value-setq (name namedp) (closure-name function))
+                  namedp))
+           name
+           (%simple-fun-name (%fun-fun function)))))))
 
 (defun (setf %fun-name) (new-value function)
   (typecase function
@@ -68,8 +136,15 @@
     (sb!eval:interpreted-function
      (setf (sb!eval:interpreted-function-debug-name function) new-value))
     ;; FIXME: Eliding general funcallable-instances for now.
+    ;; This does not set the name of an un-named closure because doing so
+    ;; is not a side-effecting operation that it ought to be.
+    ;; In contrast, SB-PCL::SET-FUN-NAME specifically says that only if the
+    ;; argument fun is a funcallable instance must it retain its identity.
+    ;; That function *is* allowed to cons a new closure to name it.
     ((or simple-fun closure)
-     (setf (%simple-fun-name (%fun-fun function)) new-value)))
+     (if (and (closurep function) (nth-value 1 (closure-name function)))
+         (set-closure-name function new-value)
+         (setf (%simple-fun-name (%fun-fun function)) new-value))))
   new-value)
 
 (defun %fun-doc (function)

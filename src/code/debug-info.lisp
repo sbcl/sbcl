@@ -178,7 +178,8 @@
   ;; initialized (arguments moved from passing locations, etc.)
   (start-pc (missing-arg) :type index)
   ;; The start of elsewhere code for this function (if any.)
-  (elsewhere-pc (missing-arg) :type index))
+  (elsewhere-pc (missing-arg) :type index)
+  (closure-save nil :type (or sc-offset null)))
 
 ;;;; minimal debug function
 
