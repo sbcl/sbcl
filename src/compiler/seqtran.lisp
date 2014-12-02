@@ -13,6 +13,24 @@
 
 ;;;; mapping onto lists: the MAPFOO functions
 
+;; This expander allows a compiler-macro for FN to take effect by eliding
+;; a LET binding of it.  Attempting to self-optimize like that isn't the usual
+;; SBCL way, however this is a countermeasure to an inhibition of a later
+;; optimization, and it is not an onerous change to the expander.
+;; We've gone to the trouble of inlining MAPfoo, but the inlined code
+;; prevented use of a compiler-macro because %FUNCALL (as opposed to FUNCALL)
+;; is not recognized. "Fixing" the compiler to understand %FUNCALL being
+;; the same isn't enough: the funarg must be a literal form because we can't
+;; know that a variable arg is a never-modified binding of 'F or #'F
+;; until IR1 has figured that out, at which point it is too late.
+;; [However, see lp# 632368 which asks for something like that.]
+;;
+;; Also, you might think there to be a subtle difference in behavior from
+;; delaying the reference to #'F versus referencing it once. But there is no
+;; difference - either way will use the #<fdefn> of F in the call.
+;; Of course, it would be ridiculously unportable to to rely on the
+;; fact that F can be changed (for its next call) while funcalling it.
+;;
 (defun mapfoo-transform (fn arglists accumulate take-car)
   (collect ((do-clauses)
             (args-to-fn)
@@ -26,11 +44,17 @@
           (tests `(endp ,v))
           (args-to-fn (if take-car `(car ,v) v))))
 
-      (let* ((fn-sym (gensym))  ; for ONCE-ONLY-ish purposes
-             (call `(%funcall ,fn-sym . ,(args-to-fn)))
-             (endtest `(or ,@(tests))))
-
-        `(let ((,fn-sym (%coerce-callable-to-fun ,fn)))
+      (binding* (((fn-binding call)
+                  (if (typep fn
+                             '(or (cons (eql function)
+                                        (cons (satisfies legal-fun-name-p) null))
+                                  (cons (eql quote) (cons symbol null))))
+                      (values nil `(funcall ,fn . ,(args-to-fn)))
+                      (let ((fn-sym (sb!xc:gensym))) ; for ONCE-ONLY-ish purposes
+                        (values `((,fn-sym (%coerce-callable-to-fun ,fn)))
+                                `(%funcall ,fn-sym . ,(args-to-fn))))))
+                 (endtest `(or ,@(tests))))
+        `(let ,fn-binding
            ,(ecase accumulate
              (:nconc
               (let ((temp (gensym))

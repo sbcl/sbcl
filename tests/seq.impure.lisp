@@ -1296,4 +1296,13 @@
 (with-test (:name :abstract-base-sequence-satisfies-sequencep)
   (assert (typep (sb-pcl::class-prototype (find-class 'sequence)) 'sequence)))
 
+(defvar *macro-invocations* 0)
+;; in case someone adds more tests after this, don't mess up OPAQUE-IDENTITY
+(defun opaque-id-again (x) x)
+(define-compiler-macro opaque-id-again (x) (incf *macro-invocations*) x)
+(with-test (:name :mapfoo-admits-compiler-macros)
+  (let ((f (compile nil '(lambda (l) (mapcar #'opaque-id-again l)))))
+    (declare (ignore f))
+    (assert (plusp *macro-invocations*))))
+
 ;;; success
