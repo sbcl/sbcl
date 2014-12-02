@@ -17,10 +17,10 @@
 (defglobal *wild-type* -1)
 (defglobal *empty-type* -1)
 (defglobal *universal-type* -1)
-(defvar *universal-fun-type*)
-(defvar *instance-type*)
-(defvar *funcallable-instance-type*)
-(defvar *extended-sequence-type*)
+(defglobal *universal-fun-type* -1)
+(defglobal *instance-type* -1)
+(defglobal *funcallable-instance-type* -1)
+(defglobal *extended-sequence-type* -1)
 
 ;;; a vector that maps type codes to layouts, used for quickly finding
 ;;; the layouts of built-in classes
