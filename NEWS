@@ -1,6 +1,8 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 changes relative to sbcl-1.2.6:
   * bug fix: restore error handling on Windows x86.
+  * bug fix: MAKE-SEQUENCE detects type errors in its :INITIAL-ELEMENT
+    at compile-time when possible. (lp#330299)
 
 changes in sbcl-1.2.6 relative to sbcl-1.2.5:
   * enhancement: SERVE-EVENTS uses the poll() system call in lieu of

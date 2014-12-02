@@ -1071,7 +1071,84 @@
                   (type (integer 0 #.sb!xc:array-dimension-limit) j i))
          (setf (aref ,dst (1- j)) (aref ,src (1- i))))))
 
-;;; SUBSEQ, COPY-SEQ
+;;; MAKE-SEQUENCE, SUBSEQ, COPY-SEQ
+
+(deftransform make-sequence ((result-type size &key initial-element) * *)
+  (multiple-value-bind (spec type)
+      (and (constant-lvar-p result-type)
+           (let ((spec (lvar-value result-type)))
+             (values spec (ir1-transform-specifier-type spec))))
+    (unless type
+      (give-up-ir1-transform))
+    (multiple-value-bind (elt-type dim complexp)
+        (cond ((and (union-type-p type)
+                    (csubtypep type (specifier-type 'string)))
+               (let* ((types (union-type-types type))
+                      (first (first types)))
+                 (when (array-type-p first)
+                   (let ((dim (first (array-type-dimensions first)))
+                         (complexp (array-type-complexp first)))
+                     ;; Require sameness of dim and complexp. Give up on
+                     ;;   (OR (VECTOR CHARACTER) (VECTOR BASE-CHAR 2))
+                     ;; which eventually fails in the call to the function.
+                     (when (every (lambda (x)
+                                    (and (array-type-p x)
+                                         (eql (first (array-type-dimensions x))
+                                              dim)
+                                         (eq (array-type-complexp x) complexp)))
+                                  (rest types))
+                       (values
+                        `(or ,@(mapcar
+                                (lambda (x)
+                                  (type-specifier (array-type-element-type x)))
+                                types))
+                        dim complexp))))))
+              ((and (array-type-p type)
+                    (csubtypep type (specifier-type 'vector)))
+               (when (contains-unknown-type-p (array-type-element-type type))
+                 (give-up-ir1-transform "~S is an unknown vector type" spec))
+               (values (let ((et (array-type-element-type type)))
+                         ;; VECTOR means (VECTOR T)
+                         (if (type= et *wild-type*) 't (type-specifier et)))
+                       (first (array-type-dimensions type))
+                       (array-type-complexp type))))
+      ;; Don't transform if size is present in the specifier
+      ;; and the SIZE argument is not known to be equal.
+      (if (and (or (eq '* dim)
+                   (and dim (constant-lvar-p size) (eql (lvar-value size) dim)))
+               ;; not sure what it would mean to make it non-simple
+               (neq complexp t))
+          `(make-array size :element-type ',elt-type
+                       ,@(when initial-element
+                           `(:initial-element initial-element)))
+          ;; no transform, but we can detect some style issues
+          (progn
+            (when dim ; was a recognizable vector subtype
+              (let* ((elt-ctype (specifier-type elt-type))
+                     (saetp (find-saetp-by-ctype elt-ctype)))
+                (cond ((not initial-element)
+                       (let ((default-initial-element
+                               (sb!vm:saetp-initial-element-default saetp)))
+                         (unless (ctypep default-initial-element elt-ctype)
+                           ;; As with MAKE-ARRAY, this is merely undefined
+                           ;; behavior, not an error.
+                           (compiler-style-warn
+                            "The default initial element ~S is not a ~S."
+                            default-initial-element elt-type))))
+                      ;; In would be possible in some cases,
+                      ;; like :INITIAL-ELEMENT (IF X #\x #\y) in a call
+                      ;; to MAKE-SEQUENCE '(VECTOR (MEMBER #\A #\B))
+                      ;; to detect erroneous non-constants initializers,
+                      ;; but it is not important enough to bother with.
+                      ((and (constant-lvar-p initial-element)
+                            (not (ctypep (lvar-value initial-element)
+                                         elt-ctype)))
+                       ;; MAKE-ARRAY considers this a warning, not an error.
+                       (compiler-warn "~S ~S is not a ~S"
+                                      :initial-element
+                                      (lvar-value initial-element)
+                                      elt-type)))))
+            (give-up-ir1-transform))))))
 
 (deftransform subseq ((seq start &optional end)
                       (vector t &optional t)

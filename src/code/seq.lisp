@@ -401,11 +401,6 @@
                   (unless (or (eq type-length '*)
                               (= type-length length))
                     (sequence-type-length-mismatch-error type length))
-                  ;; FIXME: These calls to MAKE-ARRAY can't be
-                  ;; open-coded, as the :ELEMENT-TYPE argument isn't
-                  ;; constant.  Probably we ought to write a
-                  ;; DEFTRANSFORM for MAKE-SEQUENCE.  -- CSR,
-                  ;; 2002-07-22
                   (if iep
                       (make-array length :element-type etype
                                   :initial-element initial-element)

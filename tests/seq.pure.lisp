@@ -395,3 +395,29 @@
                   (lambda () (declare (optimize (speed 3)))
                     (concatenate 'string "a" "b")))
                  "ab")))
+
+(with-test (:name :bug-330299-make-sequence-transform)
+  ;; test case from bug report.
+  ;; erroneous situation is caught by MAKE-ARRAY
+  (assert-signal
+   (compile nil
+            '(lambda (size)
+               (make-sequence 'bit-vector size :initial-element #\0))))
+  ;; This is transformed, but MAKE-ARRAY does *not* consider it a problem
+  ;; since #\x is in the upgraded array type. That's too bad, because
+  ;; it's still poor style.
+  #+nil
+  (assert-signal
+   (compile nil
+            '(lambda (size)
+               (make-sequence '(member #\a #\b) size :initial-element #\x))))
+  ;; additional tests where the transform gives up but warns
+  (assert-signal
+   (compile nil
+            '(lambda (n)
+               (make-sequence '(vector (integer 1 15) 5) n
+                              :initial-element #\x))))
+  (assert-signal
+   (compile nil
+            '(lambda (n)
+               (make-sequence '(vector (integer 1 15) 5) n)))))
