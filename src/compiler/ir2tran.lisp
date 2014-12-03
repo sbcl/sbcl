@@ -1153,10 +1153,9 @@
 ;;; calls instead of primitives, sending the system off into infinite
 ;;; space. Having a report on all full calls generated makes it easier
 ;;; to figure out what form caused the problem this time.
-(declaim (type (or boolean (member :detailed :very-detailed))
-               *track-full-called-fnames-p*))
-(defvar *track-full-called-fnames-p* nil)
-#!+sb-show (defvar *show-full-called-fnames-p* nil)
+(declaim (type (member :minimal :detailed :very-detailed :maximal)
+               *track-full-called-fnames*))
+(defvar *track-full-called-fnames* :minimal)
 
 ;;; Do some checks (and store some notes relevant for future checks)
 ;;; on a full call:
@@ -1169,23 +1168,31 @@
          (fname (lvar-fun-name lvar t)))
     (declare (type (or symbol cons) fname))
 
-    (awhen *track-full-called-fnames-p*
-      ;; If the full call was wanted, don't record it.
-      (unless (let ((*lexenv* (node-lexenv node)))
-                (fun-lexically-notinline-p fname))
-        (let ((cell (info :function :static-full-call-count fname)))
-          (if (not cell)
-              (setf cell (list 1)
-                    (info :function :static-full-call-count fname) cell)
-              (incf (car cell)))
-          (cond ((and (eq it :detailed) (boundp 'sb!xc:*compile-file-pathname*))
-                 (pushnew sb!xc:*compile-file-pathname* (cdr cell)
-                          :test #'equal))
-                ((eq it :very-detailed)
-                 (pushnew (component-name *component-being-compiled*)
-                          (cdr cell) :test #'equalp))))))
+    (let* ((inlineable-p (not (let ((*lexenv* (node-lexenv node)))
+                                (fun-lexically-notinline-p fname))))
+           (inlineable-bit (if inlineable-p 1 0))
+           (cell (info :function :emitted-full-calls fname)))
+      (if (not cell)
+          ;; The low bit indicates whether any not-NOTINLINE call was seen.
+          ;; Refer to %COMPILER-DEFMACRO for the pertinent logic.
+          (setf cell (list (logior 2 inlineable-bit))
+                (info :function :emitted-full-calls fname) cell)
+          (incf (car cell) (+ 2 (if (oddp (car cell)) 0 inlineable-bit))))
+      ;; If the full call was wanted, don't record anything.
+      ;; (This was originally for debugging SBCL self-compilation)
+      (when inlineable-p
+        (case *track-full-called-fnames*
+          (:detailed
+           (when (boundp 'sb!xc:*compile-file-pathname*)
+             (pushnew sb!xc:*compile-file-pathname* (cdr cell)
+                      :test #'equal)))
+          (:very-detailed
+           (pushnew (component-name *component-being-compiled*)
+                    (cdr cell) :test #'equalp)))))
 
-    #!+sb-show (when *show-full-called-fnames-p*
+    ;; Special mode, usually only for the cross-compiler
+    ;; and only with the feature enabled.
+    #!+sb-show (when (eq *track-full-called-fnames* :maximal)
                  (/show "converting full call to named function" fname)
                  (/show (basic-combination-args node))
                  (/show (policy node speed) (policy node safety))

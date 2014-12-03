@@ -205,6 +205,7 @@ invoked. In that case it will store into PLACE and start over."
                (name definition lambda-list doc debug-name)
              ,@(unless set-p
                  '((declare (ignore lambda-list doc debug-name))))
+             (sb!c::warn-if-compiler-macro-dependency-problem name)
              ;; FIXME: warn about incompatible lambda list with
              ;; respect to parent function?
              (setf (sb!xc:compiler-macro-function name) definition)

@@ -16,7 +16,9 @@
 (defmacro fruitbat (arg)
   `(cons ,arg ,(+ (random-eyes arg) 100)))
 
-(define-compiler-macro foo (&whole form x)
+;; Here we're just going to assert that no efficiency note is
+;; produced regarding the fact that FOO-EXPANDER uses GENERIC+.
+(define-compiler-macro foo-expander (&whole form x)
   (if (constantp x)
       (+ (eval x) 19)
       form))

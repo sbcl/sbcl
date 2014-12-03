@@ -1,5 +1,8 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 changes relative to sbcl-1.2.6:
+  * enhancement: a STYLE-WARNING is produced if a compiler-macro is defined
+    for a function after at least one ordinary (not inlined) call to that
+    function was compiled, indicating a likely compilation order problem.
   * bug fix: restore error handling on Windows x86.
   * bug fix: MAKE-SEQUENCE detects type errors in its :INITIAL-ELEMENT
     at compile-time when possible. (lp#330299)

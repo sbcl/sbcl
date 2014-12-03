@@ -84,17 +84,17 @@
 (setf (sb!int:info :function :kind 'sb!int:quasiquote) :macro
       (sb!int:info :function :macro-function 'sb!int:quasiquote)
       (cl:macro-function 'sb!int:quasiquote))
-(setq sb!c::*track-full-called-fnames-p* nil) ; Change this as desired
+(setq sb!c::*track-full-called-fnames* :minimal) ; Change this as desired
 (progn ; Should be: sb-xc:with-compilation-unit () ... but
   ;; leaving aside the question of building in any host - which shouldn't
   ;; matter - building SBCL in SBCL can hang in a way I haven't tracked down.
   (load "src/cold/compile-cold-sbcl.lisp"))
 
-(when sb!c::*track-full-called-fnames-p*
+(when sb!c::*track-full-called-fnames*
   (let (possibly-suspicious likely-suspicious)
     (sb!c::call-with-each-globaldb-name
      (lambda (name)
-       (let* ((cell (sb!int:info :function :static-full-call-count name))
+       (let* ((cell (sb!int:info :function :emitted-full-calls name))
               (inlinep (eq (sb!int:info :function :inlinep name) :inline))
               (info (sb!int:info :function :info name)))
          (if (and cell

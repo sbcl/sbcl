@@ -558,3 +558,39 @@ has written, having proved that it is unreachable."))
             (push context (undefined-warning-warnings res)))
           (incf (undefined-warning-count res))))))
   (values))
+
+;; The compiler tracks full calls that were emitted so that it is possible
+;; to detect a definition of a compiler-macro occuring after the first
+;; compile-time observed use of (vs. actual call of) that function name.
+;;
+;; The call count is not reset if the function gets redefined (where the
+;; macro could briefly be out-of-sync), but this choice is deliberate.
+;; We're not trying to find and report all possible ways that users can
+;; introduce semantic glitches, only trying to signal something that is
+;; otherwise not always obvious in a totally working built-from-scratch
+;; user system, absent any interactive changes.
+;;
+;; Note on implementation: originally I thought about doing something
+;; based on whether the name got an APPROXIMATE-FUN-TYPE and the :WHERE-FROM
+;; was :ASSUMED - which together imply that the function did not exist *and*
+;; that it was not a NOTINLINE call, however that proved to be fragile.
+;; The current approach is reliable, at a cost of ~3 words per function.
+;;
+;; FIXME: do the same thing for inline functions!
+;;
+(defun warn-if-compiler-macro-dependency-problem (name)
+  (unless (sb!xc:compiler-macro-function name)
+    (let ((cell (info :function :emitted-full-calls name)))
+      (when (and cell (oddp (car cell)))
+        ;; Show the total number of calls, because otherwise the warning
+        ;; would be worded rather obliquely: "N calls were compiled
+        ;; not in the scope of a notinline declaration" which is, to me,
+        ;; worse than matter-of-factly stating that N calls were compiled.
+        ;; This is why I don't bother collecting both statistics.
+        ;; It's the tail wagging the dog: the message dictates what to track.
+        (compiler-style-warn
+                "~@<~@(~R~) call~:P to ~S ~2:*~[~;was~:;were~] ~
+compiled before a compiler-macro was defined for it. A declaration of ~
+NOTINLINE at the call site will eliminate this warning, ~
+as will defining the compiler-macro before its first potential use.~@:>"
+                (ash (car cell) -1) name)))))

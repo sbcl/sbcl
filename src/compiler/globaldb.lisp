@@ -556,7 +556,7 @@
 ;;; that was not in the scope of a local or global notinline declaration.
 ;;; Useful for finding functions that were supposed to have been converted
 ;;; through some kind of transformation but were not.
-(define-info-type (:function :static-full-call-count) :type-spec list)
+(define-info-type (:function :emitted-full-calls) :type-spec list)
 
 ;;; a macro-like function which transforms a call to this function
 ;;; into some other Lisp form. This expansion is inhibited if inline
