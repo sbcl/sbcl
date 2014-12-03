@@ -5394,3 +5394,6 @@
                        (truncate a
                         (the (rational (1) (3)) b))))
             10 5/2))))
+
+(with-test (:name :constantp-on-a-literal-function-works)
+  (assert (constantp `(the (function (list) t) ,#'car))))

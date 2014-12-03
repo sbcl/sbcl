@@ -153,9 +153,11 @@ constantness of the FORM in ENVIRONMENT."
                    ,body))))
       `(progn
          (setf (gethash ',operator **special-form-constantp-tests**)
-               (cons (lambda (,form ,environment ,envp)
+               (cons (named-lambda ,(format nil "CONSTANTP-TEST-~A" operator)
+                                   (,form ,environment ,envp)
                        ,(frob test))
-                     (lambda (,form ,environment ,envp)
+                     (named-lambda ,(format nil "CONSTANTP-EVAL-~A" operator)
+                                   (,form ,environment ,envp)
                        ,(frob eval))))))))
 
 (!cold-init-forms
@@ -182,10 +184,20 @@ constantness of the FORM in ENVIRONMENT."
    :eval (constant-form-value* protected-form))
 
  (defconstantp the (type form)
+   ;; We can't call TYPEP because the form might be (THE (FUNCTION (t) t) #<fn>)
+   ;; which is valid for declaration but not for discrimination.
+   ;; Instead use %%TYPEP in non-strict mode. FIXME:
+   ;; (1) CAREFUL-SPECIFIER-TYPE should never fail. See lp#1395910.
+   ;; (2) CONTAINS-UNKNOWN-TYPE-P should grovel into ARRAY-TYPE-ELEMENT-TYPE
+   ;; so that (C-U-T-P (SPECIFIER-TYPE '(OR (VECTOR BAD) FUNCTION))) => T
+   ;; and then we can parse, check for unknowns, and get rid of HANDLER-CASE.
    :test (and (constantp* form)
               (handler-case
                   ;; in case the type-spec is malformed!
-                  (typep (constant-form-value* form) type)
+                  (let ((parsed (careful-specifier-type type)))
+                    (and parsed
+                         (sb!kernel::%%typep (constant-form-value* form)
+                                             parsed nil)))
                 (error () nil)))
    :eval (constant-form-value* form))
 
