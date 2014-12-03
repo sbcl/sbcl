@@ -512,6 +512,12 @@
     (assert (sb-kernel:type= (sb-kernel:array-type-specialized-element-type intersection)
                              sb-kernel:*universal-type*))))
 
+(with-test (:name :parse-safely)
+  (dolist (x '(array integer cons))
+    (assert (handler-case (sb-kernel:specifier-type `(,x . 0))
+              (type-error () t)
+              (error (c) (print c) nil)))))
+
 (with-test (:name :unparse-safely)
   (let* ((intersection (sb-kernel:type-intersection
                         (sb-kernel:specifier-type '(vector (or bit character)))

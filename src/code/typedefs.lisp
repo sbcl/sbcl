@@ -47,7 +47,7 @@
         (parse-body body :doc-string-allowed nil)
       `(progn
          (!cold-init-forms
-          (let ((fun (lambda (,whole)
+          (let ((fun (named-lambda ,(format nil "~A-TYPE-PARSE" name) (,whole)
                        (block ,name
                          (destructuring-bind ,wholeless-arglist
                              (rest ,whole)  ; discarding NAME
