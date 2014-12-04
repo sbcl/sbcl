@@ -215,7 +215,7 @@ of SBCL which maintained the CMU-CL-style split into two packages.)"
                "*BACKEND-T-PRIMITIVE-TYPE*"
 
                "*CODE-SEGMENT*"
-               "*COUNT-VOP-USAGES*" "*ELSEWHERE*" "*FREE-FUNS*"
+               "*ELSEWHERE*" "*FREE-FUNS*"
                "*LEXENV*"
                "*SUPPRESS-VALUES-DECLARATION*"
 

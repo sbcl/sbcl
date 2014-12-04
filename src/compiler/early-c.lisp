@@ -101,7 +101,6 @@
 (defvar *compiler-note-count*)
 (defvar *compiler-trace-output*)
 (defvar *constraint-universe*)
-(defvar *count-vop-usages*)
 (defvar *current-path*)
 (defvar *current-component*)
 (defvar *delayed-ir1-transforms*)
@@ -116,7 +115,6 @@
 (defvar *event-note-threshold*)
 (defvar *failure-p*)
 (defvar *fixup-notes*)
-(defvar *in-pack*)
 #!+inline-constants
 (progn
   (defvar *constant-segment*)
