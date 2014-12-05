@@ -1467,31 +1467,6 @@
                                     (declare (ignore b))
                                     (mask-field (byte 10 0) (cut-test a))))))
              469)))
-
-(defun f-with-macro (arg) (list arg))
-(defun map-f-with-macro (l) (mapcar #'f-with-macro l))
-(defun just-call-f (x) (declare (notinline f)) (f x))
-
-(defun g-with-macro (arg) (list arg))
-(defun map-g-with-macro (l)
-  (declare (notinline g-with-macro))
-  (mapcar #'g-with-macro l))
-
-(declaim (notinline h-with-macro))
-(defun h-with-macro (arg) (list arg))
-(defun map-h-with-macro (l) (mapcar #'h-with-macro l))
-
-(test-util:with-test (:name :compiler-macro-order-bug)
-  ;; There is one explicit NOTINLINE, but we still get a warning.
-  (assert-signal
-    (define-compiler-macro f-with-macro (arg) `(list ,arg)))
-  ;; There is a local notinline decl, so no warning about a compiler-macro.
-  (assert-no-signal
-    (define-compiler-macro g-with-macro (arg) `(list ,arg)))
-  ;; There is a global notinline proclamation.
-  (assert-no-signal
-    (define-compiler-macro h-with-macro (arg) `(list ,arg))))
-
 
 ;;;; tests not in the problem domain, but of the consistency of the
 ;;;; compiler machinery itself
@@ -2594,26 +2569,5 @@
       (assert (= 0 test))
       ;; macro-policy is rebound inside compile-file
       (assert (= baseline-again baseline)))))
-
-(test-util:with-test (:name :redef-macro-same-file)
-  (let* ((lisp "compiler-impure-tmp.lisp")
-         (fasl (compile-file-pathname lisp)))
-    (unwind-protect
-         (let ((redef-count 0))
-           (with-open-file (f lisp :direction :output)
-             (dolist (form '((defmacro glork (x) `(car ,x))
-                             (define-compiler-macro glorpy (x) `(+ ,x 1))
-                             (defmacro glork (x) `(first ,x))
-                             (define-compiler-macro glorpy (x) `(+ ,x 2))))
-               (print form f)))
-           (multiple-value-bind (fasl warn fail)
-               (handler-bind ((sb-int:same-file-redefinition-warning
-                               (lambda (c) c (incf redef-count))))
-                 (let ((*error-output* (make-broadcast-stream)))
-                   (compile-file lisp :print nil :verbose nil)))
-             (declare (ignore fasl))
-             (assert (and warn (not fail) (= redef-count 2)))))
-      (ignore-errors (delete-file lisp))
-      (ignore-errors (delete-file fasl)))))
 
 ;;; success

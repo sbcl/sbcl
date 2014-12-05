@@ -229,11 +229,15 @@
 (defun process-inline-declaration (name kind)
   ;; since implicitly it is a function, also scrubs *FREE-FUNS*
   (proclaim-as-fun-name name)
-  (setf (info :function :inlinep name)
-        (ecase kind
+  ;; Check for problems before touching globaldb,
+  ;; so that the report function can see the old value.
+  (let ((newval
+         (ecase kind
           (inline :inline)
           (notinline :notinline)
           (maybe-inline :maybe-inline))))
+    (warn-if-inline-failed/proclaim name newval)
+    (setf (info :function :inlinep name) newval)))
 
 (defun process-declaration-declaration (name form)
   (unless (symbolp name)

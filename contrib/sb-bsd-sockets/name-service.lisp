@@ -50,7 +50,7 @@
                    :aliases aliases
                    :addresses addresses)))
 
-(declaim (inline naturalize-unsigned-byte-8-array))
+(declaim (inline naturalize-unsigned-byte-8-array)) ; FIXME: out-of-order
 (defun naturalize-unsigned-byte-8-array (array length)
   (let ((addr (make-array length :element-type '(unsigned-byte 8))))
     (dotimes (i length)

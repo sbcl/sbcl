@@ -1777,4 +1777,8 @@ the restart does not exist."))
                              expansion.~@:>"
                      (compiler-macro-keyword-argument condition)))))
 
+;; After (or if) we deem this the optimal name for this condition,
+;; it should be exported from SB-EXT so that people can muffle it.
+(define-condition sb!c:inlining-dependency-failure (simple-style-warning) ())
+
 (/show0 "condition.lisp end of file")

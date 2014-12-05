@@ -576,12 +576,10 @@ has written, having proved that it is unreachable."))
 ;; that it was not a NOTINLINE call, however that proved to be fragile.
 ;; The current approach is reliable, at a cost of ~3 words per function.
 ;;
-;; FIXME: do the same thing for inline functions!
-;;
 (defun warn-if-compiler-macro-dependency-problem (name)
   (unless (sb!xc:compiler-macro-function name)
-    (let ((cell (info :function :emitted-full-calls name)))
-      (when (and cell (oddp (car cell)))
+    (let ((status (car (info :function :emitted-full-calls name))))
+      (when (and (integerp status) (oddp status))
         ;; Show the total number of calls, because otherwise the warning
         ;; would be worded rather obliquely: "N calls were compiled
         ;; not in the scope of a notinline declaration" which is, to me,
@@ -591,6 +589,91 @@ has written, having proved that it is unreachable."))
         (compiler-style-warn
                 "~@<~@(~R~) call~:P to ~S ~2:*~[~;was~:;were~] ~
 compiled before a compiler-macro was defined for it. A declaration of ~
-NOTINLINE at the call site will eliminate this warning, ~
+NOTINLINE at the call site~:P will eliminate this warning, ~
 as will defining the compiler-macro before its first potential use.~@:>"
-                (ash (car cell) -1) name)))))
+                (ash status -2) name)))))
+
+;; Inlining failure scenario 1 [at time of proclamation]:
+;; Full call to F is emitted not in the scope of a NOTINLINE, with no definition
+;; of F available, and then it's proclaimed INLINE. If F was defined already,
+;; it would have been used, unless the expansion limit was hit.
+;;
+(defun warn-if-inline-failed/proclaim (name new-inlinep)
+  (when (eq new-inlinep :inline)
+    (let ((status (car (info :function :emitted-full-calls name))))
+      (when (and (integerp status)
+                 (not (logtest 2 status))
+                 (oddp status)
+                 ;; Warn only if the the compiler did not have the expansion.
+                 (not (info :function :inline-expansion-designator name))
+                 ;; and if nothing was previously known about inline status
+                 ;; so that repeated proclamations don't warn. NIL is a valid
+                 ;; value for :inlinep in the globaldb so use the 2nd result.
+                 (not (nth-value 1 (info :function :inlinep name))))
+        (compiler-style-warn
+         'inlining-dependency-failure
+         :format-control
+         "~@<Proclaiming ~S to be INLINE, but ~R call~:P to it ~
+~:*~[~;was~:;were~] previously compiled. A declaration of NOTINLINE ~
+at the call site~:P will eliminate this warning, as will proclaiming ~
+and defining the function before its first potential use.~@:>"
+         :format-arguments (list name (ash status -2)))))))
+
+;; Inlining failure scenario 2 [at time of call]:
+;; F is not defined, but either proclaimed INLINE and not declared
+;; locally notinline, or expressly declared locally inline.
+;; Warn about emitting a full call at that time.
+;;
+;; It could be friendlier to present this warning as one summary
+;; at the end of a compilation unit, but that is not as important as
+;; just getting the warning across.
+;; [The point of deferring a warning is that some future event can resolve it
+;; - like an undefined function becoming defined - but there's nothing
+;; that can resolve absence of a definition at a point when it was needed]
+;;
+;; Should we regard it as more serious if the inline-ness of the global
+;; function was lexically declared? Is "Inline F here" stronger than
+;; "It would generally be a good idea to inline F everywhere"?
+;;
+;; Don't be too put off by the above concerns though. It's not customary
+;; to write (DECLAIM INLINE) after the function, or so far separated from it
+;; that intervening callers know it to be proclaimed inline, and would have
+;; liked to have a definition, but didn't.
+;;
+(defun warn-if-inline-failed/call (name lexenv count-cell)
+  ;; Do nothing if the inline expansion is known - it wasn't used
+  ;; because of the expansion limit, which is a different problem.
+  (unless (or (logtest 2 (car count-cell)) ; warn at most once per name
+              (info :function :inline-expansion-designator name))
+    ;; This function is only called by PONDER-FULL-CALL when NAME
+    ;; is not lexically NOTINLINE, so therefore if it is globally INLINE,
+    ;; there was no local declaration to the contrary.
+    (when (or (eq (info :function :inlinep name) :inline)
+              (let ((fun (let ((*lexenv* lexenv))
+                           (lexenv-find name funs :test #'equal))))
+                (and fun
+                     (defined-fun-p fun)
+                     (eq (defined-fun-inlinep fun) :inline))))
+      ;; Set a bit saying that a warning about the call was generated,
+      ;; which suppresses the warning about either a later
+      ;; call or a later proclamation.
+      (setf (car count-cell) (logior (car count-cell) 2))
+      ;; While there could be a different style-warning for
+      ;;   "You should put the DEFUN after the DECLAIM"
+      ;; if they appeared reversed, it's not ideal to warn as soon as that.
+      ;; It's only a problem if something failed to be inlined in account of it.
+      (compiler-style-warn
+       'inlining-dependency-failure
+       :format-control
+       (if (info :function :assumed-type name)
+           "~@<Call to ~S could not be inlined because no definition ~
+for it was seen prior to its first use.~:@>"
+         ;; This message sort of implies that source form is the
+         ;; only reasonable representation in which an inline definition
+         ;; could have been saved, which isn't in general true - it could
+         ;; be saved as a parsed AST - but I don't really know how else to
+         ;; phrase this. And it happens to be true in SBCL, so it's not wrong.
+           "~@<Call to ~S could not be inlined because its source code ~
+was not saved. A global INLINE or SB-EXT:MAYBE-INLINE proclamation must be ~
+in effect to save function definitions for inlining.~:@>")
+       :format-arguments (list name)))))

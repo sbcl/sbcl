@@ -83,3 +83,12 @@ which can be found at <http://sbcl.sourceforge.net/>.~:@>"
 (deftype package-lock-violation () nil)
 (deftype package-locked-error () nil)
 (deftype symbol-package-locked-error () nil)
+
+;; It goes without saying that SBCL's self-compile has cyclic dependencies,
+;; so naturally the cross-compiler needs to signal this warning.
+;; However, there is an inconsequential difference between this and the
+;; regular definition: SIMPLE-STYLE-WARNING is not ansi ANSI-specified class,
+;; so this one inherits from SIMPLE-CONDITION and STYLE-WARNING,
+;; both of which are specified to exist.
+(define-condition sb!c:inlining-dependency-failure
+    (simple-condition style-warning) ())

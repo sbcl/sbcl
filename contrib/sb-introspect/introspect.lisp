@@ -532,7 +532,7 @@ value."
                       do (pushnew e referrers)))))))
     referrers))
 
-(declaim (inline map-code-constants))
+(declaim (inline map-code-constants)) ; FIXME: out-of-order
 (defun map-code-constants (code fn)
   "Call FN for each constant in CODE's constant pool."
   (check-type code sb-kernel:code-component)
@@ -552,7 +552,7 @@ list of the symbols :dynamic, :static, or :read-only."
          (funcall fn obj size)))
      space)))
 
-(declaim (inline map-caller-code-components))
+(declaim (inline map-caller-code-components)) ; FIXME: out-of-order
 (defun map-caller-code-components (function spaces fn)
   "Call FN for each code component with a fdefn for FUNCTION in its
 constant pool."

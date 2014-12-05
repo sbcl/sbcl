@@ -748,19 +748,19 @@ cons cells and LIST-TYPE is :normal, :dotted, or :cyclic"
 ;;; SEQ-HINT is a seq-type dependent hint. Used by SEQ-TYPE :array
 ;;; to hold the reverse-dimensions of the orignal array.
 
-(declaim (inline parts-components))
+(declaim (inline parts-components)) ; FIXME: out-of-order
 (defun parts-components (parts)
   (first parts))
 
-(declaim (inline parts-count))
+(declaim (inline parts-count)) ; FIXME: out-of-order
 (defun parts-count (parts)
   (second parts))
 
-(declaim (inline parts-seq-type))
+(declaim (inline parts-seq-type)) ; FIXME: out-of-order
 (defun parts-seq-type (parts)
   (third parts))
 
-(declaim (inline parts-seq-hint))
+(declaim (inline parts-seq-hint)) ; FIXME: out-of-order
 (defun parts-seq-hint (parts)
   (fourth parts))
 

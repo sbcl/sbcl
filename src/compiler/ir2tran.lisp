@@ -1174,13 +1174,16 @@
            (cell (info :function :emitted-full-calls fname)))
       (if (not cell)
           ;; The low bit indicates whether any not-NOTINLINE call was seen.
-          ;; Refer to %COMPILER-DEFMACRO for the pertinent logic.
-          (setf cell (list (logior 2 inlineable-bit))
+          ;; The next-lowest bit is magic. Refer to %COMPILER-DEFMACRO
+          ;; and WARN-IF-INLINE-FAILED/CALL for the pertinent logic.
+          (setf cell (list (logior 4 inlineable-bit))
                 (info :function :emitted-full-calls fname) cell)
-          (incf (car cell) (+ 2 (if (oddp (car cell)) 0 inlineable-bit))))
+          (incf (car cell) (+ 4 (if (oddp (car cell)) 0 inlineable-bit))))
       ;; If the full call was wanted, don't record anything.
       ;; (This was originally for debugging SBCL self-compilation)
       (when inlineable-p
+        (unless *failure-p*
+          (warn-if-inline-failed/call fname (node-lexenv node) cell))
         (case *track-full-called-fnames*
           (:detailed
            (when (boundp 'sb!xc:*compile-file-pathname*)
