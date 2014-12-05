@@ -1237,17 +1237,19 @@ many elements are copied."
                 ;; seq.lisp, and moving remaining target-only stuff
                 ;; from the old seq.lisp into target-seq.lisp.
                 (define-compiler-macro ,name (pred first-seq &rest more-seqs)
-                  (let ((elements (make-gensym-list (1+ (length more-seqs))))
-                        (blockname (sb!xc:gensym "BLOCK"))
-                        (wrapper (sb!xc:gensym "WRAPPER")))
-                    (once-only ((pred pred))
-                      `(block ,blockname
+                  (binding* ((elements
+                              (make-gensym-list (1+ (length more-seqs))))
+                             (blockname (sb!xc:gensym "BLOCK"))
+                             (wrapper (sb!xc:gensym "WRAPPER"))
+                             ((bind call)
+                              (funarg-bind/call-forms pred elements)))
+                    `(let ,bind
+                       (block ,blockname
                          (flet ((,wrapper (,@elements)
                                   (declare (optimize (sb!c::check-tag-existence 0)))
-                                  (let ((pred-value (funcall ,pred ,@elements)))
+                                  (let ((pred-value ,call))
                                     (,',found-test pred-value
-                                                   (return-from ,blockname
-                                                     ,',found-result)))))
+                                      (return-from ,blockname ,',found-result)))))
                            (declare (inline ,wrapper)
                                     (dynamic-extent #',wrapper))
                            (map nil #',wrapper ,first-seq

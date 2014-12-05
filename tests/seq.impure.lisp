@@ -1301,8 +1301,9 @@
 (defun opaque-id-again (x) x)
 (define-compiler-macro opaque-id-again (x) (incf *macro-invocations*) x)
 (with-test (:name :mapfoo-admits-compiler-macros)
-  (let ((f (compile nil '(lambda (l) (mapcar #'opaque-id-again l)))))
-    (declare (ignore f))
-    (assert (plusp *macro-invocations*))))
+  (compile nil '(lambda (l) (mapcar #'opaque-id-again l)))
+  (assert (= *macro-invocations* 1))
+  (compile nil '(lambda (l) (some #'opaque-id-again l)))
+  (assert (= *macro-invocations* 2)))
 
 ;;; success

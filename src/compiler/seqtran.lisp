@@ -44,15 +44,7 @@
           (tests `(endp ,v))
           (args-to-fn (if take-car `(car ,v) v))))
 
-      (binding* (((fn-binding call)
-                  (if (typep fn
-                             '(or (cons (eql function)
-                                        (cons (satisfies legal-fun-name-p) null))
-                                  (cons (eql quote) (cons symbol null))))
-                      (values nil `(funcall ,fn . ,(args-to-fn)))
-                      (let ((fn-sym (sb!xc:gensym))) ; for ONCE-ONLY-ish purposes
-                        (values `((,fn-sym (%coerce-callable-to-fun ,fn)))
-                                `(%funcall ,fn-sym . ,(args-to-fn))))))
+      (binding* (((fn-binding call) (funarg-bind/call-forms fn (args-to-fn)))
                  (endtest `(or ,@(tests))))
         `(let ,fn-binding
            ,(ecase accumulate

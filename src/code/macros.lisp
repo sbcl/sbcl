@@ -548,3 +548,13 @@ invoked. In that case it will store into PLACE and start over."
   form, or (VALUES NIL the-ERROR-that-was-caught) if an ERROR was handled."
   `(handler-case (progn ,@forms)
      (error (condition) (values nil condition))))
+
+;; A macroexpander helper. Not sure where else to put this.
+(defun funarg-bind/call-forms (funarg arg-forms)
+  (if (typep funarg
+             '(or (cons (eql function) (cons (satisfies legal-fun-name-p) null))
+                  (cons (eql quote) (cons symbol null))))
+      (values nil `(funcall ,funarg . ,arg-forms))
+    (let ((fn-sym (sb!xc:gensym))) ; for ONCE-ONLY-ish purposes
+      (values `((,fn-sym (%coerce-callable-to-fun ,funarg)))
+              `(sb!c::%funcall ,fn-sym . ,arg-forms)))))
