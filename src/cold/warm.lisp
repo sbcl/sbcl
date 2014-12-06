@@ -208,11 +208,24 @@
                             (load output-truename))
                     (error "LOAD of ~S failed." output-truename))
                   (sb-int:/show "done loading" output-truename))))))))
-  (with-compilation-unit ()
-    (do-srcs pcl-srcs))
-  (when *compile-files-p*
-    (format t "~&; Done with PCL compilation~2%"))
-  (do-srcs other-srcs)))
+
+   (let* ((ppd (copy-pprint-dispatch))
+          (sb-debug:*debug-print-variable-alist*
+           (list (cons '*print-pprint-dispatch* ppd)))
+          (*print-pprint-dispatch* ppd))
+     (set-pprint-dispatch
+      'sb-thread:thread (lambda (stream obj)
+                          (declare (ignore obj))
+                          (write-string "#<main-thread>" stream)))
+     (set-pprint-dispatch
+      'restart (lambda (stream obj)
+                 (print-unreadable-object (obj stream :type t :identity t)
+                   (write (restart-name obj) :stream stream))))
+     (with-compilation-unit ()
+       (do-srcs pcl-srcs))
+     (when *compile-files-p*
+       (format t "~&; Done with PCL compilation~2%"))
+     (do-srcs other-srcs))))
 
 ;;;; setting package documentation
 
