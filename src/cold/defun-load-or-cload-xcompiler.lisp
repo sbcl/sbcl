@@ -15,6 +15,7 @@
     (and (probe-file pathname) (read-from-file pathname)))
   (defun save-initial-symbol-values ()
     (with-open-file (f pathname :direction :output :if-exists :supersede)
+      (declare (special *symbol-values-for-genesis*)) ; non-toplevel DEFVAR
       (write *symbol-values-for-genesis* :stream f :readably t))))
 
 ;;; Either load or compile-then-load the cross-compiler into the
