@@ -32,6 +32,7 @@
 ;;; Set this to NIL to suppress output from /SHOW-related forms.
 #!+sb-show (defvar */show* t)
 
+#!+sb-show
 (defun cannot-/show (string)
   (declare (type simple-string string))
   #+sb-xc-host (error "can't /SHOW: ~A" string)
@@ -39,25 +40,11 @@
   ;; cold init. That happens to me often enough that it's really
   ;; annoying for it to cause a hard failure -- which at that point is
   ;; hard to recover from -- instead of just diagnostic output.
-  ;;
-  ;; FIXME: The following is what we'd like to have. However,
-  ;; including it as is causes compilation of make-host-2 to fail,
-  ;; with "caught WARNING: defining setf macro for AREF when (SETF
-  ;; AREF) was previously treated as a function" during compilation of
-  ;; defsetfs.lisp
-  ;;
-  ;; #-sb-xc-host (%primitive print
-  ;;                          (concatenate 'simple-string "/can't /SHOW:" string))
-  ;;
-  ;; because the CONCATENATE is transformed to an expression involving
-  ;; (SETF AREF). Not declaring the argument as a SIMPLE-STRING (or
-  ;; otherwise inhibiting the transform; e.g. with (SAFETY 3)) would
-  ;; help, but full calls to CONCATENATE don't work this early in
-  ;; cold-init, because they now need the full assistance of the type
-  ;; system. So (KLUDGE):
-  #-sb-xc-host (%primitive print "/can't /SHOW:")
-  #-sb-xc-host (%primitive print string)
-  (values))
+  #-sb-xc-host
+  (progn (%primitive print
+          (concatenate 'simple-base-string
+                       "/can't /SHOW:" (the simple-base-string string)))
+         t))
 
 ;;; Should /SHOW output be suppressed at this point?
 ;;;
@@ -66,31 +53,14 @@
 ;;; /SHOW is inherently invalid.
 #!+sb-show
 (defun suppress-/show-p ()
-  (cond (;; protection against /SHOW too early in cold init for
+         ;; protection against /SHOW too early in cold init for
          ;; (FORMAT *TRACE-OUTPUT* ..) to work, part I: Obviously
          ;; we need *TRACE-OUTPUT* bound.
-         (not (boundp '*trace-output*))
-         (cannot-/show "*TRACE-OUTPUT* isn't bound. (Try /SHOW0.)")
-         t)
-        (;; protection against /SHOW too early in cold init for
-         ;; (FORMAT *TRACE-OUTPUT* ..) to work, part II: In a virtuoso
-         ;; display of name mnemonicity, *READTABLE* is used by the
-         ;; printer to decide which case convention to use when
-         ;; writing symbols, so we need it bound.
-         (not (boundp '*readtable*))
-         (cannot-/show "*READTABLE* isn't bound. (Try /SHOW0.)")
-         t)
-        (;; more protection against /SHOW too early in cold init, part III
-         (not (boundp '*/show*))
-         (cannot-/show "*/SHOW* isn't bound. (Try initializing it earlier.)")
-         t)
-        (;; ordinary, healthy reason to suppress /SHOW, no error
-         ;; output needed
-         (not */show*)
-         t)
-        (t
-         ;; Let the /SHOW go on.
-         nil)))
+  (if (not (boundp '*trace-output*))
+      (cannot-/show "*TRACE-OUTPUT* isn't bound. (Try /SHOW0.)")
+         ;; ordinary, healthy reason to suppress /SHOW, no error
+         ;; output needed. Assume by default _not_ to suppress.
+      (and (boundp '*/show*) (not */show*))))
 
 ;;; shorthand for a common idiom in output statements used in
 ;;; debugging: (/SHOW "Case 2:" X Y) becomes a pretty-printed version

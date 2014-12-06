@@ -111,17 +111,18 @@
 (defun !cold-init ()
   #!+sb-doc "Give the world a shove and hope it spins."
 
+  #!+sb-show
+  (sb!int::cannot-/show "Test of CANNOT-/SHOW [don't worry - this is expected]")
   (/show0 "entering !COLD-INIT")
+  (setq *readtable* (make-readtable)
+        *previous-case* nil
+        *previous-readtable-case* nil
+        *print-length* 6 *print-level* 3)
   #!-win32
-  (progn
-    (setq *error-output* (!make-cold-stderr-stream)
-          *standard-output* *error-output*
-          *trace-output* *error-output*
-          *readtable* (make-readtable)
-          *previous-case* nil
-          *previous-readtable-case* nil
-          *print-length* 6 *print-level* 3)
-    (write-string "COLD-INIT... "))
+  (write-string "COLD-INIT... "
+                (setq *error-output* (!make-cold-stderr-stream)
+                      *standard-output* *error-output*
+                      *trace-output* *error-output*))
 
   ;; Putting data in a synchronized hashtable (*PACKAGE-NAMES*)
   ;; requires that the main thread be properly initialized.
@@ -184,13 +185,17 @@
   (/show0 "doing cold toplevel forms and fixups")
   (/show0 "(LISTP *!REVERSED-COLD-TOPLEVELS*)=..")
   (/hexstr (if (listp *!reversed-cold-toplevels*) "true" "NIL"))
-  (/show0 "about to calculate (LENGTH *!REVERSED-COLD-TOPLEVELS*)")
-  (/show0 "(LENGTH *!REVERSED-COLD-TOPLEVELS*)=..")
-  #!+sb-show (let ((r-c-tl-length (length *!reversed-cold-toplevels*)))
-               (/show0 "(length calculated..)")
-               (let ((hexstr (hexstr r-c-tl-length)))
-                 (/show0 "(hexstr calculated..)")
-                 (/primitive-print hexstr)))
+  #!-win32
+  (progn (write `("Length(TLFs)= " ,(length *!reversed-cold-toplevels*)))
+         (terpri))
+  #!+win32
+  (progn (/show0 "about to calculate (LENGTH *!REVERSED-COLD-TOPLEVELS*)")
+         (/show0 "(LENGTH *!REVERSED-COLD-TOPLEVELS*)=..")
+         #!+sb-show (let ((r-c-tl-length (length *!reversed-cold-toplevels*)))
+                      (/show0 "(length calculated..)")
+                      (let ((hexstr (hexstr r-c-tl-length)))
+                        (/show0 "(hexstr calculated..)")
+                        (/primitive-print hexstr))))
   (let (#!+sb-show (index-in-cold-toplevels 0)
         (really-note-if-setf-fun-and-macro #'sb!c::note-if-setf-fun-and-macro)
         (really-assign-setf-macro #'sb!impl::assign-setf-macro)
@@ -422,6 +427,7 @@ process to continue normally."
               addr (ash addr -4))))
     str))
 
+;; But: you almost never need this. Just use WRITE in all its glory.
 #!+sb-show
 (defun cold-print (x)
   (labels ((%cold-print (obj depthoid)
