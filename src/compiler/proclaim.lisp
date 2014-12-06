@@ -274,10 +274,8 @@
            decl-spec))))
 
 (defun sb!xc:proclaim (raw-form)
-  #+sb-xc
-  (progn #!-win32 (progn (write `(proclaiming ,raw-form)) (terpri))
-         #!+win32 (progn (/show0 "entering PROCLAIM, RAW-FORM=..")
-                         (/hexstr raw-form)))
+  #+sb-xc (/show0 "entering PROCLAIM, RAW-FORM=..")
+  #+sb-xc (/hexstr raw-form)
   (destructuring-bind (&whole form &optional kind &rest args)
       (canonized-decl-spec raw-form)
     (labels ((map-names (names function &rest extra-args)
