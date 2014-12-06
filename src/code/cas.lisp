@@ -236,6 +236,7 @@ been defined. (See SB-EXT:CAS for more information.)
                   ,(error "No COMPARE-AND-SWAP-VOPS on a threaded build?")
                   #!-sb-thread
                   (let ((current (,ref ,@lambda-list)))
+                    ;; Shouldn't this be inside a WITHOUT-INTERRUPTS ?
                     (when (eq current old)
                       ,(if set
                            `(,set ,@lambda-list new)
@@ -248,3 +249,38 @@ been defined. (See SB-EXT:CAS for more information.)
   (def %compare-and-swap-symbol-value (symbol) symbol-value)
   (def %compare-and-swap-svref (vector index) svref))
 
+;; Atomic increment/decrement ops on tagged storage cells (as contrasted with
+;; specialized arrays and raw structure slots) are defined in terms of CAS.
+
+;; This code would be more concise if workable versions
+;; of +-MODFX, --MODFX were defined generically.
+#-sb-xc-host
+(macrolet ((modular (fun a b)
+             #!+(or x86 x86-64)
+             `(,(let ((*package* (find-package "SB!VM")))
+                  (symbolicate fun "-MODFX"))
+                ,a ,b)
+             #!-(or x86 x86-64)
+             ;; algorithm of https://graphics.stanford.edu/~seander/bithacks
+             `(let ((res (logand (,fun ,a ,b)
+                                 (ash sb!ext:most-positive-word
+                                      (- sb!vm:n-fixnum-tag-bits))))
+                    (m (ash 1 (1- sb!vm:n-fixnum-bits))))
+                (- (logxor res m) m))))
+
+  ;; Atomically frob the CAR or CDR of a cons, or a symbol-value.
+  ;; The latter will be a global value because the ATOMIC-INCF/DECF
+  ;; macros work on a symbol only if it is known global.
+  (macrolet ((def-frob (name op type slot)
+               `(defun ,name (place delta)
+                  (declare (type ,type place) (type fixnum delta))
+                  (loop (let ((old (the fixnum (,slot place))))
+                          (when (eq (cas (,slot place) old
+                                         (modular ,op old delta)) old)
+                            (return old)))))))
+    (def-frob %atomic-inc-symbol-global-value + symbol symbol-value)
+    (def-frob %atomic-dec-symbol-global-value - symbol symbol-value)
+    (def-frob %atomic-inc-car + cons car)
+    (def-frob %atomic-dec-car - cons car)
+    (def-frob %atomic-inc-cdr + cons cdr)
+    (def-frob %atomic-dec-cdr - cons cdr)))

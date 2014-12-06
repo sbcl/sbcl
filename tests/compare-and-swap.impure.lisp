@@ -475,11 +475,13 @@
 (with-test (:name :symbol-value-cas-expansion)
   (multiple-value-bind (vars vals old new cas-form read-form)
       (get-cas-expansion `(symbol-value t))
+    (declare (ignore old new cas-form))
     (assert (not vars))
     (assert (not vals))
     (assert (eq t (eval read-form))))
   (multiple-value-bind (vars vals old new cas-form read-form)
       (get-cas-expansion `(symbol-value *))
+    (declare (ignore old new cas-form))
     (let ((* :foo))
       (assert (eq :foo
                   (eval `(let (,@(mapcar 'list vars vals))

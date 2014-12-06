@@ -252,53 +252,6 @@ EXPERIMENTAL: Interface subject to change."
   (defun %raw-instance-atomic-incf/word (instance index diff)
     (%raw-instance-atomic-incf/word instance index diff)))
 
-;; This code would be more concise if workable versions
-;; of +-MODFX, --MODFX were defined generically.
-(macrolet ((modular (fun a b)
-             #!+(or x86 x86-64)
-             `(,(let ((*package* (find-package "SB!VM")))
-                  (symbolicate fun "-MODFX"))
-                ,a ,b)
-             #!-(or x86 x86-64)
-             ;; algorithm of https://graphics.stanford.edu/~seander/bithacks
-             `(let ((res (logand (,fun ,a ,b)
-                                 (ash sb!ext:most-positive-word
-                                      (- sb!vm:n-fixnum-tag-bits))))
-                    (m (ash 1 (1- sb!vm:n-fixnum-bits))))
-                (- (logxor res m) m))))
-
-  ;; Atomically frob a global variable.
-  ;; There is a quasi-bug that "can't happen" - the CAS operation will swap
-  ;; a thread-local value, however this function should only be called with
-  ;; a symbol that is known not to be thread-locally bindable.
-  ;; (We should define a CASser for SYMBOL-GLOBAL-VALUE)
-  (macrolet ((def-frob (name op)
-               `(defun ,name (symbol delta)
-                  (declare (type symbol symbol) (type fixnum delta))
-                  (loop (let ((old (truly-the
-                                    fixnum
-                                    (locally (declare (optimize (safety 0)))
-                                      (symbol-global-value symbol)))))
-                          (when (eq (%compare-and-swap-symbol-value
-                                     symbol old (modular ,op old delta))
-                                    old)
-                            (return old)))))))
-    (def-frob %atomic-inc-symbol-global-value +)
-    (def-frob %atomic-dec-symbol-global-value -))
-
-  ;; Atomically frob the CAR or CDR of a cons.
-  (macrolet ((def-frob (name op slot)
-               `(defun ,name (cell delta)
-                  (declare (type cons cell) (type fixnum delta))
-                  (loop (let ((old (the fixnum (,slot cell))))
-                          (when (eq (cas (,slot cell) old
-                                         (modular ,op old delta)) old)
-                            (return old)))))))
-    (def-frob %atomic-inc-car + car)
-    (def-frob %atomic-dec-car - car)
-    (def-frob %atomic-inc-cdr + cdr)
-    (def-frob %atomic-dec-cdr - cdr)))
-
 (defun spin-loop-hint ()
   #!+sb-doc
   "Hints the processor that the current thread is spin-looping."
