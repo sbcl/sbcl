@@ -74,8 +74,13 @@
              (let ((approx-type (info :function :assumed-type source-name)))
                (when (and approx-type (fun-type-p defined-ftype))
                  (valid-approximate-type approx-type defined-ftype))
-               (setf (info :function :type source-name) defined-ftype)
-               (setf (info :function :assumed-type source-name) nil))
+               ;; globaldb can't enforce invariants such as :assumed-type and
+               ;; :type being mutually exclusive. For that reason it would have
+               ;; made sense to use a single info-type holding either a true
+               ;; function type or an approximate-fun-type. Regardless, it is
+               ;; slightly preferable to clear the old before setting the new.
+               (clear-info :function :assumed-type source-name)
+               (setf (info :function :type source-name) defined-ftype))
              (setf (info :function :where-from source-name) :defined))
             ((:declared :defined-method)
              (let ((declared-ftype (info :function :type source-name)))
