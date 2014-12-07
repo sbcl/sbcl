@@ -225,7 +225,10 @@
     ;; But if splicing is required then we're going to construct the interim
     ;; list no matter what. It could theoretically be avoided by doing:
     ;;  (MULTIPLE-VALUE-CALL #'VECTOR ... (VALUES-LIST <splice>) ...)
-    (if (or (listp original) (some #'qq-subform-splicing-p list))
+    (if (or (listp original)
+            ;; The target compiler open-codes SOME but the cross-compiler
+            ;; seems not to without (THE LIST) to help it out.
+            (some #'qq-subform-splicing-p (the list list)))
         (qq-fold-suffix list dotted-p (vectorp input))
         (values list dotted-p))))
 
