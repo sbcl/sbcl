@@ -119,11 +119,18 @@
 (defun emit-constant (value)
   (constant-tn (find-constant value) t))
 
+(defun %return-is-boxed (node)
+  (declare (type creturn node))
+  (let* ((fun (return-lambda node))
+         (returns (tail-set-info (lambda-tail-set fun))))
+    (or (xep-p fun)
+        (eq (return-info-kind returns) :unknown))))
+
 (defun boxed-ref-p (ref)
   (let ((dest (lvar-dest (ref-lvar ref))))
     (cond ((and (basic-combination-p dest) (eq :full (basic-combination-kind dest)))
            t)
-          ;; Other cases?
+          ((and (return-p dest) (%return-is-boxed dest)))
           (t
            nil))))
 
