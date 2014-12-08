@@ -201,6 +201,7 @@
               value))))
      (null
       (lambda (instance)
+        (declare (ignore instance))
         (instance-structure-protocol-error slotd 'slot-value-using-class))))
    `(reader ,slot-name)))
 
@@ -237,6 +238,7 @@
                        (cons
                         (if safe-p
                             (lambda (nv instance)
+                              (declare (ignore instance))
                               (setf (cdr location) nv))
                             (lambda (nv instance)
                               (check-obsolete-instance instance)
@@ -293,6 +295,7 @@
              (not (eq (cdr location) +slot-unbound+))))
      (null
       (lambda (instance)
+        (declare (ignore instance))
         (instance-structure-protocol-error slotd 'slot-boundp-using-class))))
    `(boundp ,slot-name)))
 

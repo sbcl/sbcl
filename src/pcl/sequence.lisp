@@ -1130,10 +1130,13 @@
         endp1 elt1 key1 endp2 elt2 key2)
     (sequence:with-sequence-iterator-functions
         (step-result endp-result elt-result setelt-result index-result copy-result) (result) ; TODO allow nil and fewer number of elements
+      (declare (ignorable #'endp-result #'elt-result #'copy-result))
       (sequence:with-sequence-iterator-functions
           (step1 endp1 elt1 setelt1 index1 copy1) (sequence1)
+          (declare (ignorable #'setelt1 #'copy1))
         (sequence:with-sequence-iterator-functions
             (step2 endp2 elt2 setelt2 index2 copy2) (sequence2)
+          (declare (ignorable #'setelt2 #'copy2))
           (labels ((pop/no-key1 ()
                      (unless (setf endp1 (endp1))
                        (setf elt1 (elt1))))
