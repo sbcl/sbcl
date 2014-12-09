@@ -885,7 +885,7 @@
         ;; Up to 2 words of zeros might be present to align the next
         ;; simple-fun. Limit on OFFSET is to avoid incorrect triggering
         ;; in case of unexpected weirdness. FIXME: verify all zero bytes
-        (when (< 0 offset (ash sb!vm:n-word-bytes 1))
+        (when (< 0 offset (* sb!vm:n-word-bytes 2))
           (push (make-offs-hook
                  :fun (lambda (stream dstate)
                          (when stream
@@ -1283,7 +1283,8 @@
 ;;; instructions for FUNCTION.
 (defun get-fun-segments (function)
   (declare (type compiled-function function))
-  (let* ((code (fun-code function))
+  (let* ((function (fun-self function))
+         (code (fun-code function))
          (fun-map (code-fun-map code))
          (fname (sb!kernel:%simple-fun-name function))
          (sfcache (make-source-form-cache)))

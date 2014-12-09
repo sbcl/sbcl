@@ -222,7 +222,7 @@
                  (print-unreadable-object (obj stream :type t :identity t)
                    (write (restart-name obj) :stream stream))))
      (with-compilation-unit ()
-       (let ((*compile-print* nil))                            
+       (let ((*compile-print* nil))
          (do-srcs pcl-srcs)))
      (when *compile-files-p*
        (format t "~&; Done with PCL compilation~2%"))
