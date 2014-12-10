@@ -416,3 +416,11 @@
                                (loop for a of-type (simple-vector 4) in list
                                      collect (aref a 2))))
                     sb-ext:compiler-note))
+
+(with-test (:name :with-destructuring)
+  (assert (= (loop with ((a . b)) = '((1 . 2))
+                   return (+ a b))
+             3))
+  (assert (= (loop with (((a) b)) = '(((1) 3))
+                   return (+ a b))
+             4)))

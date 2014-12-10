@@ -557,23 +557,37 @@ code to be loaded.
                            specified-type required-type)))
         specified-type)))
 
-(defun subst-gensyms-for-nil (tree)
-  (declare (special *ignores*))
-  (cond
-    ((null tree) (car (push (gensym "LOOP-IGNORED-VAR-") *ignores*)))
-    ((atom tree) tree)
-    (t (cons (subst-gensyms-for-nil (car tree))
-             (subst-gensyms-for-nil (cdr tree))))))
+;;; Transform the LOOP kind of destructuring into the DESTRUCTURING-BIND kind
+;;; basically by adding &optional and ignored &rest dotted list
+(defun transform-destructuring (tree)
+  (let (ignores)
+    (labels ((transform (tree)
+               (do ((result (list '&optional))
+                    (cdr tree (cdr cdr)))
+                   (())
+                 (cond ((null cdr)
+                        (return (nreconc result
+                                         (car (push (gensym "LOOP-IGNORED-")
+                                                    ignores)))))
+                       ((atom cdr)
+                        (return (nreconc result cdr)))
+                       ((consp (car cdr))
+                        (push (list (transform (car cdr))) result))
+                       ((null (car cdr))
+                        (push (car (push (gensym "LOOP-IGNORED-")
+                                         ignores))
+                              result))
+                       (t
+                        (push (car cdr) result))))))
+      (values (transform tree) ignores))))
 
 (sb!int:defmacro-mundanely loop-destructuring-bind
-    (lambda-list arg-list &rest body)
-  (let ((*ignores* nil))
-    (declare (special *ignores*))
-    (let ((d-var-lambda-list (subst-gensyms-for-nil lambda-list)))
-      `(destructuring-bind (&optional ,@d-var-lambda-list)
-           ,arg-list
-         (declare (ignore ,@*ignores*))
-         ,@body))))
+    (lambda-list args &rest body)
+  (multiple-value-bind (d-lambda-list ignores)
+      (transform-destructuring lambda-list)
+    `(destructuring-bind ,d-lambda-list ,args
+       (declare (ignore ,@ignores))
+       ,@body)))
 
 (defun loop-build-destructuring-bindings (crocks forms)
   (if crocks

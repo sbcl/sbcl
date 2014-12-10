@@ -12,6 +12,7 @@ changes relative to sbcl-1.2.6:
     at compile-time when possible. (lp#330299)
   * bug fix: parsing of malformed type specifiers no longer results
     in a memory-fault-error.
+  * bug fix: LOOP properly destructures nested lists in WITH.
 
 changes in sbcl-1.2.6 relative to sbcl-1.2.5:
   * enhancement: SERVE-EVENTS uses the poll() system call in lieu of
