@@ -834,11 +834,13 @@ Users Manual for details about the PROCESS structure.
                                       output cookie
                                       :direction :output
                                       :if-exists if-output-exists
+                                      :if-does-not-exist :create
                                       :external-format external-format)
                (with-fd-and-stream-for ((stderr error-stream)  :error
                                         error cookie
                                         :direction :output
                                         :if-exists if-error-exists
+                                        :if-does-not-exist :create
                                         :external-format external-format)
                  (with-open-pty ((pty-name pty-stream) (pty cookie))
                    ;; Make sure we are not notified about the child
