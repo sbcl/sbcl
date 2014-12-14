@@ -574,6 +574,9 @@
 
 ;;;; allocating images of primitive objects in the cold core
 
+(defun write-header-word (des header-data widetag)
+  (write-memory des (make-other-immediate-descriptor header-data widetag)))
+
 ;;; There are three kinds of blocks of memory in the type system:
 ;;; * Boxed objects (cons cells, structures, etc): These objects have no
 ;;;   header as all slots are descriptors.
@@ -581,37 +584,33 @@
 ;;;   the length.
 ;;; * Vector objects: There is a header word with the type, then a word for
 ;;;   the length, then the data.
-(defun allocate-boxed-object (gspace length lowtag)
+(defun allocate-object (gspace length lowtag)
   #!+sb-doc
   "Allocate LENGTH words in GSPACE and return a new descriptor of type LOWTAG
   pointing to them."
   (allocate-cold-descriptor gspace (ash length sb!vm:word-shift) lowtag))
-(defun allocate-unboxed-object (gspace element-bits length type)
+(defun allocate-header+object (gspace length widetag)
   #!+sb-doc
-  "Allocate LENGTH units of ELEMENT-BITS bits plus a header word in GSPACE and
+  "Allocate LENGTH words plus a header word in GSPACE and
   return an ``other-pointer'' descriptor to them. Initialize the header word
-  with the resultant length and TYPE."
-  (let* ((bytes (/ (* element-bits length) sb!vm:n-byte-bits))
-         (des (allocate-cold-descriptor gspace
-                                        (+ bytes sb!vm:n-word-bytes)
-                                        sb!vm:other-pointer-lowtag)))
-    (write-memory des
-                  (make-other-immediate-descriptor (ash bytes
-                                                        (- sb!vm:word-shift))
-                                                   type))
+  with the resultant length and WIDETAG."
+  (let ((des (allocate-cold-descriptor gspace
+                                       (ash (1+ length) sb!vm:word-shift)
+                                       sb!vm:other-pointer-lowtag)))
+    (write-header-word des length widetag)
     des))
-(defun allocate-vector-object (gspace element-bits length type)
+(defun allocate-vector-object (gspace element-bits length widetag)
   #!+sb-doc
   "Allocate LENGTH units of ELEMENT-BITS size plus a header plus a length slot in
   GSPACE and return an ``other-pointer'' descriptor to them. Initialize the
-  header word with TYPE and the length slot with LENGTH."
-  ;; FIXME: Here and in ALLOCATE-UNBOXED-OBJECT, BYTES is calculated using
-  ;; #'/ instead of #'CEILING, which seems wrong.
+  header word with WIDETAG and the length slot with LENGTH."
+  ;; ALLOCATE-COLD-DESCRIPTOR will take any rational number of bytes
+  ;; and round up to a double-word. This doesn't need to use CEILING.
   (let* ((bytes (/ (* element-bits length) sb!vm:n-byte-bits))
          (des (allocate-cold-descriptor gspace
                                         (+ bytes (* 2 sb!vm:n-word-bytes))
                                         sb!vm:other-pointer-lowtag)))
-    (write-memory des (make-other-immediate-descriptor 0 type))
+    (write-header-word des 0 widetag)
     (write-wordindexed des
                        sb!vm:vector-length-slot
                        (make-fixnum-descriptor length))
@@ -624,16 +623,13 @@
   ;; even: size 4 => request to allocate 5 => rounds up to 6, logior => 5
   ;; odd : size 5 => request to allocate 6 => no rounding up, logior => 5
   ;; In each case, the length of the memory block is even.
-  ;; ALLOCATE-BOXED-OBJECT performs the rounding. It must be supplied
+  ;; ALLOCATE-OBJECT performs the rounding. It must be supplied
   ;; the number of words minimally needed, counting the header itself.
   ;; The number written into the header (%INSTANCE-LENGTH) is always odd.
-  (let ((des (allocate-boxed-object gspace
-                                    (1+ layout-length)
-                                    sb!vm:instance-pointer-lowtag)))
-    (write-memory des
-                  (make-other-immediate-descriptor
-                   (logior layout-length 1)
-                   sb!vm:instance-header-widetag))
+  (let ((des (allocate-object gspace (1+ layout-length)
+                              sb!vm:instance-pointer-lowtag)))
+    (write-header-word des (logior layout-length 1)
+                       sb!vm:instance-header-widetag)
     (write-wordindexed des sb!vm:instance-slots-offset layout)
     des))
 
@@ -667,10 +663,8 @@ core and return a descriptor to it."
   #!+sb-doc
   "Copy a bignum to the cold core."
   (let* ((words (ceiling (1+ (integer-length n)) sb!vm:n-word-bits))
-         (handle (allocate-unboxed-object *dynamic*
-                                          sb!vm:n-word-bits
-                                          words
-                                          sb!vm:bignum-widetag)))
+         (handle
+          (allocate-header+object *dynamic* words sb!vm:bignum-widetag)))
     (declare (fixnum words))
     (do ((index 1 (1+ index))
          (remainder n (ash remainder (- sb!vm:n-word-bits))))
@@ -689,7 +683,7 @@ core and return a descriptor to it."
 (defun number-pair-to-core (first second type)
   #!+sb-doc
   "Makes a number pair of TYPE (ratio or complex) and fills it in."
-  (let ((des (allocate-unboxed-object *dynamic* sb!vm:n-word-bits 2 type)))
+  (let ((des (allocate-header+object *dynamic* 2 type)))
     (write-wordindexed des 1 first)
     (write-wordindexed des 2 second)
     des))
@@ -726,8 +720,7 @@ core and return a descriptor to it."
      (make-random-descriptor (logior (ash (single-float-bits x) 32)
                                      sb!vm::single-float-widetag))
      #!-#.(cl:if (cl:= sb!vm:n-word-bits 64) '(and) '(or))
-     (let ((des (allocate-unboxed-object *dynamic*
-                                         sb!vm:n-word-bits
+     (let ((des (allocate-header+object *dynamic*
                                          (1- sb!vm:single-float-size)
                                          sb!vm:single-float-widetag)))
        (write-wordindexed des
@@ -735,15 +728,14 @@ core and return a descriptor to it."
                           (make-random-descriptor (single-float-bits x)))
        des))
     (double-float
-     (let ((des (allocate-unboxed-object *dynamic*
-                                         sb!vm:n-word-bits
+     (let ((des (allocate-header+object *dynamic*
                                          (1- sb!vm:double-float-size)
                                          sb!vm:double-float-widetag)))
        (write-double-float-bits des sb!vm:double-float-value-slot x)))))
 
 (defun complex-single-float-to-core (num)
   (declare (type (complex single-float) num))
-  (let ((des (allocate-unboxed-object *dynamic* sb!vm:n-word-bits
+  (let ((des (allocate-header+object *dynamic*
                                       (1- sb!vm:complex-single-float-size)
                                       sb!vm:complex-single-float-widetag)))
     #!-x86-64
@@ -761,7 +753,7 @@ core and return a descriptor to it."
 
 (defun complex-double-float-to-core (num)
   (declare (type (complex double-float) num))
-  (let ((des (allocate-unboxed-object *dynamic* sb!vm:n-word-bits
+  (let ((des (allocate-header+object *dynamic*
                                       (1- sb!vm:complex-double-float-size)
                                       sb!vm:complex-double-float-widetag)))
     (write-double-float-bits des sb!vm:complex-double-float-real-slot
@@ -792,9 +784,7 @@ core and return a descriptor to it."
 
 (declaim (ftype (function (sb!vm:word) descriptor) sap-int-to-core))
 (defun sap-int-to-core (sap-int)
-  (let ((des (allocate-unboxed-object *dynamic*
-                                      sb!vm:n-word-bits
-                                      (1- sb!vm:sap-size)
+  (let ((des (allocate-header+object *dynamic* (1- sb!vm:sap-size)
                                       sb!vm:sap-widetag)))
     (write-wordindexed des
                        sb!vm:sap-pointer-slot
@@ -803,7 +793,7 @@ core and return a descriptor to it."
 
 ;;; Allocate a cons cell in GSPACE and fill it in with CAR and CDR.
 (defun cold-cons (car cdr &optional (gspace *dynamic*))
-  (let ((dest (allocate-boxed-object gspace 2 sb!vm:list-pointer-lowtag)))
+  (let ((dest (allocate-object gspace 2 sb!vm:list-pointer-lowtag)))
     (write-memory dest car)
     (write-wordindexed dest 1 cdr)
     dest))
@@ -901,14 +891,10 @@ core and return a descriptor to it."
 ;;; Allocate (and initialize) a symbol.
 (defun allocate-symbol (name &key (gspace *dynamic*))
   (declare (simple-string name))
-  (let ((symbol (allocate-unboxed-object gspace
-                                         sb!vm:n-word-bits
-                                         (1- sb!vm:symbol-size)
-                                         sb!vm:symbol-header-widetag)))
+  (let ((symbol (allocate-header+object gspace (1- sb!vm:symbol-size)
+                                        sb!vm:symbol-header-widetag)))
     (write-wordindexed symbol sb!vm:symbol-value-slot *unbound-marker*)
-    (write-wordindexed symbol
-                       sb!vm:symbol-hash-slot
-                       (make-fixnum-descriptor 0))
+    (write-wordindexed symbol sb!vm:symbol-hash-slot (make-fixnum-descriptor 0))
     (write-wordindexed symbol sb!vm:symbol-info-slot *nil-descriptor*)
     (write-wordindexed symbol sb!vm:symbol-name-slot
                        (base-string-to-core name *dynamic*))
@@ -1291,11 +1277,7 @@ core and return a descriptor to it."
 ;;; It might be nice to put NIL on a readonly page by itself to prevent unsafe
 ;;; code from destroying the world with (RPLACx nil 'kablooey)
 (defun make-nil-descriptor (target-cl-pkg-info)
-  (let* ((des (allocate-unboxed-object
-               *static*
-               sb!vm:n-word-bits
-               sb!vm:symbol-size
-               0))
+  (let* ((des (allocate-header+object *static* sb!vm:symbol-size 0))
          (result (make-descriptor (descriptor-high des)
                                   (+ (descriptor-low des)
                                      (* 2 sb!vm:n-word-bytes)
@@ -1558,13 +1540,10 @@ core and return a descriptor to it."
   (/noshow0 "/cold-fdefinition-object")
   (let ((warm-name (warm-fun-name cold-name)))
     (or (gethash warm-name *cold-fdefn-objects*)
-        (let ((fdefn (allocate-boxed-object (or *cold-fdefn-gspace* *dynamic*)
-                                            (1- sb!vm:fdefn-size)
-                                            sb!vm:other-pointer-lowtag)))
-
+        (let ((fdefn (allocate-header+object (or *cold-fdefn-gspace* *dynamic*)
+                                             (1- sb!vm:fdefn-size)
+                                             sb!vm:fdefn-widetag)))
           (setf (gethash warm-name *cold-fdefn-objects*) fdefn)
-          (write-memory fdefn (make-other-immediate-descriptor
-                               (1- sb!vm:fdefn-size) sb!vm:fdefn-widetag))
           (write-wordindexed fdefn sb!vm:fdefn-name-slot cold-name)
           (unless leave-fn-raw
             (write-wordindexed fdefn sb!vm:fdefn-fun-slot
@@ -2384,12 +2363,10 @@ core and return a descriptor to it."
 (define-cold-fop (fop-array)
   (let* ((rank (read-word-arg))
          (data-vector (pop-stack))
-         (result (allocate-boxed-object *dynamic*
-                                        (+ sb!vm:array-dimensions-offset rank)
-                                        sb!vm:other-pointer-lowtag)))
-    (write-memory result
-                  (make-other-immediate-descriptor rank
-                                                   sb!vm:simple-array-widetag))
+         (result (allocate-object *dynamic*
+                                  (+ sb!vm:array-dimensions-offset rank)
+                                  sb!vm:other-pointer-lowtag)))
+    (write-header-word result rank sb!vm:simple-array-widetag)
     (write-wordindexed result sb!vm:array-fill-pointer-slot *nil-descriptor*)
     (write-wordindexed result sb!vm:array-data-slot data-vector)
     (write-wordindexed result sb!vm:array-displacement-slot *nil-descriptor*)
@@ -2569,9 +2546,7 @@ core and return a descriptor to it."
                                                    sb!vm:word-shift)
                                               code-size)
                                            sb!vm:other-pointer-lowtag)))
-       (write-memory des
-                     (make-other-immediate-descriptor
-                      header-n-words sb!vm:code-header-widetag))
+       (write-header-word des header-n-words sb!vm:code-header-widetag)
        (write-wordindexed des
                           sb!vm:code-code-size-slot
                           (make-fixnum-descriptor code-size))
@@ -2735,9 +2710,7 @@ core and return a descriptor to it."
                                                 sb!vm:word-shift)
                                            length)
                                         sb!vm:other-pointer-lowtag)))
-    (write-memory des
-                  (make-other-immediate-descriptor
-                   header-n-words sb!vm:code-header-widetag))
+    (write-header-word des header-n-words sb!vm:code-header-widetag)
     (write-wordindexed des
                        sb!vm:code-code-size-slot
                        (make-fixnum-descriptor length))
