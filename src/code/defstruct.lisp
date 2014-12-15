@@ -1251,6 +1251,15 @@ unless :NAMED is also specified.")))
   ;; the object as indicated in the header, so the pad word needs to be
   ;; included in that length to guarantee proper alignment of raw double float
   ;; slots, necessary for (at least) the SPARC backend.
+  ;; On backends with interleaved raw slots, the convention of having the
+  ;; header possibly "lie" about an extra word is more of a bug than a feature.
+  ;; Because the structure base is aligned, double-word raw slots are properly
+  ;; aligned, and won't change alignment in descendant object types. It would
+  ;; be correct to store the true instance length even though GC preserves
+  ;; the extra data word (as it does for odd-length SIMPLE-VECTOR), treating
+  ;; the total physical length as rounded-to-even. But having two different
+  ;; conventions would be even more unnecessarily confusing, so we use
+  ;; the not-sensible convention even when it does not make sense.
   (logior (dd-layout-length dd) 1))
 
 (defun dd-bitmap (dd)
