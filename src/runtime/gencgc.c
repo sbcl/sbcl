@@ -4193,7 +4193,7 @@ gc_free_heap(void)
             gc_assert(page_free_p(page));
             gc_assert(page_table[page].bytes_used == 0);
             page_start = (sword_t *)page_address(page);
-            for (i=0; i<GENCGC_CARD_BYTES/sizeof(sword_t); i++) {
+            for (i=0; i<(long)(GENCGC_CARD_BYTES/sizeof(sword_t)); i++) {
                 if (page_start[i] != 0) {
                     lose("free region not zero at %x\n", page_start + i);
                 }

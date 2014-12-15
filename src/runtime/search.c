@@ -43,7 +43,7 @@ static int strcmp_ucs4_ascii(uint32_t* a, char* b)
   // Lisp terminates UCS4 strings with NULL bytes - probably to no avail
   // since null-terminated UCS4 isn't a common convention for any foreign ABI -
   // but length has been pre-checked, so hitting an ASCII null is a win.
-  while (a[i] == b[i])
+  while (a[i] == ((unsigned char*)b)[i])
     if (b[i] == 0)
       return 0;
     else
