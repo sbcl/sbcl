@@ -1988,8 +1988,8 @@ install_handler(int signal, void handler(int, siginfo_t*, os_context_t*),
 
     block_blockable_signals(0, &old);
 
-    FSHOW((stderr, "/interrupt_low_level_handlers[signal]=%x\n",
-           (unsigned int)interrupt_low_level_handlers[signal]));
+    FSHOW((stderr, "/interrupt_low_level_handlers[signal]=%p\n",
+           interrupt_low_level_handlers[signal]));
     if (interrupt_low_level_handlers[signal]==0) {
         if (ARE_SAME_HANDLER(handler, SIG_DFL) ||
             ARE_SAME_HANDLER(handler, SIG_IGN))
