@@ -1221,7 +1221,14 @@
 
 (format t "mutex finalization test done~%")
 
-(with-test (:name :backtrace)
+;; You have to shoehorn this arbitrary sexpr into a feature expression
+;; to have the test summary show that a test was disabled.
+#+gencgc
+(unless (eql (extern-alien "verify_gens" int)
+             (1+ sb-vm:+highest-normal-generation+))
+  (pushnew :verify-gens *features*))
+
+(with-test (:name :backtrace :skipped-on ':verify-gens)
   ;; Printing backtraces from several threads at once used to hang the
   ;; whole SBCL process (discovered by accident due to a timer.impure
   ;; test misbehaving). The cause was that packages weren't even
