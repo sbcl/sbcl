@@ -584,21 +584,21 @@ argument is a lower-case character, NIL otherwise."
   #!+sb-doc
   "If char is a digit in the specified radix, returns the fixnum for which
 that digit stands, else returns NIL."
-  (let ((m (- (char-code char) 48)))
-    (declare (fixnum m))
-    (cond ((and (<= radix 10.) (<= m 79.))
-           ;; Special-case ASCII digits in decimal and smaller radices.
-           (if (and (>= m 0) (< m radix))  m  nil))
-          ;; Digits 0 - 9 are used as is, since radix is larger.
-          ((and (>= m 0) (< m 10)) m)
-          ;; Check for upper case A - Z.
-          ((and (>= (setq m (- m 7)) 10) (< m radix)) m)
-          ;; Also check lower case a - z.
-          ((and (>= (setq m (- m 32)) 10) (< m radix)) m)
-          ;; Else, fail.
-          (t (let ((number (ucd-decimal-digit char)))
-               (when (and number (< number radix))
-                 number))))))
+  (if (<= (char-code char) 127)
+      (let ((weight (- (char-code char) 48)))
+        (cond ((minusp weight) nil)
+              ((<= radix 10.)
+               ;; Special-case ASCII digits in decimal and smaller radices.
+               (if (< weight radix) weight nil))
+              ;; Digits 0 - 9 are used as is, since radix is larger.
+              ((< weight 10) weight)
+              ;; Check for upper case A - Z.
+              ((and (>= (decf weight 7) 10) (< weight radix)) weight)
+              ;; Also check lower case a - z.
+              ((and (>= (decf weight 32) 10) (< weight radix)) weight)))
+      (let ((number (ucd-decimal-digit char)))
+        (when (and number (< (truly-the fixnum number) radix))
+          number))))
 
 (defun alphanumericp (char)
   #!+sb-doc
