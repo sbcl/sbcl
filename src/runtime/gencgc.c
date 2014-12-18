@@ -4573,7 +4573,8 @@ gencgc_handle_wp_violation(void* fault_addr)
     page_index_t page_index = find_page_index(fault_addr);
 
 #if QSHOW_SIGNALS
-    FSHOW((stderr, "heap WP violation? fault_addr=%p, page_index=%d\n",
+    FSHOW((stderr,
+           "heap WP violation? fault_addr=%p, page_index="PAGE_INDEX_FMT"\n",
            fault_addr, page_index));
 #endif
 

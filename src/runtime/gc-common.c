@@ -3206,4 +3206,19 @@ struct vector * instance_classoid_name(lispobj * instance)
   return lowtag_of(layout) != INSTANCE_POINTER_LOWTAG ? NULL
     : layout_classoid_name(native_pointer(layout));
 }
+void safely_show_lstring(struct vector * string, int quotes, FILE *s)
+{
+  extern void show_lstring(struct vector*, int, FILE*);
+  if (forwarding_pointer_p((lispobj*)string))
+      string = (struct vector*)forwarding_pointer_value((lispobj*)string);
+  if (
+#ifdef SIMPLE_CHARACTER_STRING_WIDETAG
+      widetag_of(string->header) == SIMPLE_CHARACTER_STRING_WIDETAG ||
+#endif
+      widetag_of(string->header) == SIMPLE_BASE_STRING_WIDETAG)
+    show_lstring(string, quotes, s);
+  else {
+    fprintf(s, "#<[widetag=%02X]>", widetag_of(string->header));
+  }
+}
 #endif

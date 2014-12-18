@@ -490,7 +490,7 @@ static void print_struct(lispobj obj)
     }
 }
 
-static void show_string(struct vector * string)
+void show_lstring(struct vector * string, int quotes, FILE *s)
 {
   int ucs4_p = 0;
   int i, len = fixnum_value(string->length);
@@ -498,10 +498,11 @@ static void show_string(struct vector * string)
 #ifdef SIMPLE_CHARACTER_STRING_WIDETAG
   if (widetag_of(string->header) == SIMPLE_CHARACTER_STRING_WIDETAG) {
       ucs4_p = 1;
-      putchar('u'); /* an arbitrary notational convention */
+      if (quotes)
+          putc('u', s); /* an arbitrary notational convention */
   }
 #endif
-  putchar('"');
+  if (quotes) putc('"', s);
   for (i=0 ; i<len ; i++) {
       // hopefully the compiler will optimize out the ucs4_p test
       // when the runtime is built without Unicode support
@@ -511,15 +512,15 @@ static void show_string(struct vector * string)
       else
           ch = i[(char*)string->data];
       if (ch >= 32 && ch < 127) {
-          if (ch == '"' || ch == '\\')
-              putchar('\\');
-          putchar(ch);
+          if (quotes && (ch == '"' || ch == '\\'))
+              putc('\\', s);
+          putc(ch, s);
       } else {
-          printf(ch > 0xffff ? "\\U%08X" : ch > 0xff ? "\\u%04X" : "\\x%02X",
-                 ch);
+          fprintf(s, ch > 0xffff ? "\\U%08X" :
+                     ch > 0xff ? "\\u%04X" : "\\x%02X", ch);
       }
   }
-  putchar('"');
+  if (quotes) putc('"', s);
 }
 
 static void brief_otherptr(lispobj obj)
@@ -527,8 +528,6 @@ static void brief_otherptr(lispobj obj)
     lispobj *ptr, header;
     int type;
     struct symbol *symbol;
-    struct vector *vector;
-    char *charptr;
 
     ptr = (lispobj *) native_pointer(obj);
 
@@ -542,19 +541,15 @@ static void brief_otherptr(lispobj obj)
     switch (type) {
         case SYMBOL_HEADER_WIDETAG:
             symbol = (struct symbol *)ptr;
-            vector = (struct vector *)native_pointer(symbol->name);
-            for (charptr = (char *)vector->data; *charptr != '\0'; charptr++) {
-                if (*charptr == '"')
-                    putchar('\\');
-                putchar(*charptr);
-            }
+            show_lstring((struct vector *)native_pointer(symbol->name),
+                         0, stdout);
             break;
 
         case SIMPLE_BASE_STRING_WIDETAG:
 #ifdef SIMPLE_CHARACTER_STRING_WIDETAG
         case SIMPLE_CHARACTER_STRING_WIDETAG:
 #endif
-            show_string((struct vector*)ptr);
+            show_lstring((struct vector*)ptr, 1, stdout);
             break;
 
         default:
@@ -711,7 +706,7 @@ static void print_otherptr(lispobj obj)
             case SIMPLE_CHARACTER_STRING_WIDETAG:
 #endif
                 NEWLINE_OR_RETURN;
-                show_string((struct vector*)native_pointer(obj));
+                show_lstring((struct vector*)native_pointer(obj), 1, stdout);
                 break;
 
             case SIMPLE_VECTOR_WIDETAG:
