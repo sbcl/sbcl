@@ -375,10 +375,15 @@ struct generation generations[NUM_GENERATIONS];
  * data can be avoided. */
 generation_index_t gencgc_oldest_gen_to_gc = HIGHEST_NORMAL_GENERATION;
 
+/* META: Is nobody aside from me bothered by this especially misleading
+ * use of the word "last"?  It could mean either "ultimate" or "prior",
+ * but in fact means neither. It is the *FIRST* page that should be grabbed
+ * for more space, so it is min free page, or 1+ the max used page. */
 /* The maximum free page in the heap is maintained and used to update
  * ALLOCATION_POINTER which is used by the room function to limit its
  * search of the heap. XX Gencgc obviously needs to be better
  * integrated with the Lisp code. */
+
 page_index_t last_free_page;
 
 #ifdef LISP_FEATURE_SB_THREAD
@@ -2565,6 +2570,9 @@ update_page_write_prot(page_index_t page)
     /* Scan the page for pointers to younger generations or the
      * top temp. generation. */
 
+    /* This is conservative: any word satisfying is_lisp_pointer() is
+     * assumed to be a pointer despite that it might be machine code
+     * or part of an unboxed array */
     for (j = 0; j < num_words; j++) {
         void *ptr = *(page_addr+j);
         page_index_t index;
