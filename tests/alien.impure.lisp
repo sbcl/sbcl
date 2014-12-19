@@ -413,4 +413,22 @@
                              (read-line f)))
                       (delete-file namestring))))))))
 
+;; Previously, the error signaled by (MACROEXPANDing the) redefinition
+;; of an alien structure itself signaled an error. Ensure that the
+;; error is signaled and prints properly.
+(sb-alien:define-alien-type nil
+    (sb-alien:struct alien-structure-redefinition (bar sb-alien:int)))
+
+(with-test (:name (:alien-structure-redefinition :condition-printable))
+  (handler-case
+      (macroexpand
+       '(sb-alien:define-alien-type nil
+         (sb-alien:struct alien-structure-redefinition (bar sb-alien:c-string))))
+    (error (condition)
+      (princ-to-string condition))
+    (:no-error (&rest values)
+      (declare (ignore values))
+      (error "~@<Alien structure type redefinition failed to signal an ~
+              error~@:>"))))
+
 ;;; success

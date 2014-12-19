@@ -1033,7 +1033,8 @@
                            (unparse-alien-type old)
                            `(,(unparse-alien-record-kind kind)
                               ,name
-                              ,@(mapcar #'unparse-alien-record-field new-fields)))
+                             ,@(let ((*record-types-already-unparsed* '()))
+                                 (mapcar #'unparse-alien-record-field new-fields))))
                    (frob-type old new-fields alignment bits))
                  (if old-fields
                      old
