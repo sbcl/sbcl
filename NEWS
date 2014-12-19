@@ -7,6 +7,8 @@ changes relative to sbcl-1.2.6:
     function was compiled, indicating a likely compilation order problem.
     Likewise a warning ensues if a call is compiled to a function
     that is subsequently proclaimed INLINE.
+  * enhancement: always lose() when something goes wrong while saving a core
+    (instead of just printing an error on stderr in some situations).
   * bug fix: restore error handling on Windows x86.
   * bug fix: MAKE-SEQUENCE detects type errors in its :INITIAL-ELEMENT
     at compile-time when possible. (lp#330299)

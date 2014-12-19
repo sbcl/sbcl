@@ -85,8 +85,8 @@ write_bytes_to_file(FILE * file, char *addr, long bytes, int compression)
                 addr += count;
             }
             else {
-                perror("error writing to save file");
-                bytes = 0;
+                perror("error writing to core file");
+                lose("core file is incomplete or corrupt\n");
             }
         }
 #ifdef LISP_FEATURE_SB_CORE_COMPRESSION
@@ -118,7 +118,8 @@ write_bytes_to_file(FILE * file, char *addr, long bytes, int compression)
                 if (count > 0) {
                     written += count;
                 } else {
-                    lose("unable to write to core file\n");
+                    perror("error writing to core file");
+                    lose("core file is incomplete or corrupt\n");
                 }
             }
         } while (stream.avail_out == 0);
@@ -135,7 +136,10 @@ write_bytes_to_file(FILE * file, char *addr, long bytes, int compression)
 #endif
     }
 
-    fflush(file);
+    if (fflush(file) != 0) {
+      perror("error writing to core file");
+      lose("core file is incomplete or corrupt\n");
+    }
 };
 
 
