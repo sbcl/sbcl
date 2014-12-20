@@ -324,38 +324,25 @@ static void print_fixnum(lispobj obj)
 static void brief_otherimm(lispobj obj)
 {
     int type, c;
-    char buffer[10];
+    char * charname = 0;
 
     type = widetag_of(obj);
     switch (type) {
         case CHARACTER_WIDETAG:
-            c = (obj>>8)&0xff;
+            c = obj>>8; // no mask. show whatever's there
+            printf("#\\");
             switch (c) {
-                case '\0':
-                    printf("#\\Null");
-                    break;
-                case '\n':
-                    printf("#\\Newline");
-                    break;
-                case '\b':
-                    printf("#\\Backspace");
-                    break;
-                case '\177':
-                    printf("#\\Delete");
-                    break;
+                case '\0': charname = "Nul"; break;
+                case '\n': charname = "Newline"; break;
+                case '\b': charname = "Backspace"; break;
+                case '\177': charname = "Delete"; break;
                 default:
-                    strcpy(buffer, "#\\");
-                    if (c >= 128) {
-                        strcat(buffer, "m-");
-                        c -= 128;
-                    }
-                    if (c < 32) {
-                        strcat(buffer, "c-");
-                        c += '@';
-                    }
-                    printf("%s%c", buffer, c);
-                    break;
+                  if (c < 32) printf("^%c", c+64);
+                  else if (c < 128) printf("%c", c);
+                  else printf("U+%X", c);
             }
+            if (charname)
+                fputs(charname, stdout);
             break;
 
         case UNBOUND_MARKER_WIDETAG:
@@ -541,6 +528,8 @@ static void brief_otherptr(lispobj obj)
     switch (type) {
         case SYMBOL_HEADER_WIDETAG:
             symbol = (struct symbol *)ptr;
+            if (symbol->package == NIL)
+                printf("#:");
             show_lstring((struct vector *)native_pointer(symbol->name),
                          0, stdout);
             break;
@@ -625,13 +614,21 @@ static void print_otherptr(lispobj obj)
             return;
         }
 
+        if (unprintable_array_types[type/8] & (1<<(type % 8)))
+            return;
         switch (type) {
             case BIGNUM_WIDETAG:
                 ptr += count;
                 NEWLINE_OR_RETURN;
                 printf("0x");
                 while (count-- > 0)
-                    printf("%08lx", (unsigned long) *--ptr);
+                    printf(
+#if N_WORD_BITS == 32
+                           "%08lx%s",
+#else
+                           "%016lx%s",
+#endif
+                           (unsigned long) *--ptr, (count?"_":""));
                 break;
 
             case RATIO_WIDETAG:
@@ -720,6 +717,7 @@ static void print_otherptr(lispobj obj)
                 }
                 break;
 
+            // FIXME: This case looks unreachable. print_struct() does it
             case INSTANCE_HEADER_WIDETAG:
                 NEWLINE_OR_RETURN;
                 printf("length = %ld", (long) count);
@@ -728,64 +726,6 @@ static void print_otherptr(lispobj obj)
                     sprintf(buffer, "%d: ", index++);
                     print_obj(buffer, *ptr++);
                 }
-                break;
-
-            case SIMPLE_ARRAY_WIDETAG:
-            case SIMPLE_BIT_VECTOR_WIDETAG:
-            case SIMPLE_ARRAY_UNSIGNED_BYTE_2_WIDETAG:
-            case SIMPLE_ARRAY_UNSIGNED_BYTE_4_WIDETAG:
-            case SIMPLE_ARRAY_UNSIGNED_BYTE_7_WIDETAG:
-            case SIMPLE_ARRAY_UNSIGNED_BYTE_8_WIDETAG:
-            case SIMPLE_ARRAY_UNSIGNED_BYTE_15_WIDETAG:
-            case SIMPLE_ARRAY_UNSIGNED_BYTE_16_WIDETAG:
-
-            case SIMPLE_ARRAY_UNSIGNED_FIXNUM_WIDETAG:
-
-            case SIMPLE_ARRAY_UNSIGNED_BYTE_31_WIDETAG:
-            case SIMPLE_ARRAY_UNSIGNED_BYTE_32_WIDETAG:
-#ifdef SIMPLE_ARRAY_UNSIGNED_BYTE_63_WIDETAG
-            case SIMPLE_ARRAY_UNSIGNED_BYTE_63_WIDETAG:
-#endif
-#ifdef SIMPLE_ARRAY_UNSIGNED_BYTE_64_WIDETAG
-            case SIMPLE_ARRAY_UNSIGNED_BYTE_64_WIDETAG:
-#endif
-#ifdef SIMPLE_ARRAY_SIGNED_BYTE_8_WIDETAG
-            case SIMPLE_ARRAY_SIGNED_BYTE_8_WIDETAG:
-#endif
-#ifdef SIMPLE_ARRAY_SIGNED_BYTE_16_WIDETAG
-            case SIMPLE_ARRAY_SIGNED_BYTE_16_WIDETAG:
-#endif
-
-            case SIMPLE_ARRAY_FIXNUM_WIDETAG:
-
-#ifdef SIMPLE_ARRAY_SIGNED_BYTE_32_WIDETAG
-            case SIMPLE_ARRAY_SIGNED_BYTE_32_WIDETAG:
-#endif
-#ifdef SIMPLE_ARRAY_SIGNED_BYTE_64_WIDETAG
-            case SIMPLE_ARRAY_SIGNED_BYTE_64_WIDETAG:
-#endif
-            case SIMPLE_ARRAY_SINGLE_FLOAT_WIDETAG:
-            case SIMPLE_ARRAY_DOUBLE_FLOAT_WIDETAG:
-#ifdef SIMPLE_ARRAY_LONG_FLOAT_WIDETAG
-            case SIMPLE_ARRAY_LONG_FLOAT_WIDETAG:
-#endif
-#ifdef SIMPLE_ARRAY_COMPLEX_SINGLE_FLOAT_WIDETAG
-            case SIMPLE_ARRAY_COMPLEX_SINGLE_FLOAT_WIDETAG:
-#endif
-#ifdef SIMPLE_ARRAY_COMPLEX_DOUBLE_FLOAT_WIDETAG
-            case SIMPLE_ARRAY_COMPLEX_DOUBLE_FLOAT_WIDETAG:
-#endif
-#ifdef SIMPLE_ARRAY_COMPLEX_LONG_FLOAT_WIDETAG
-            case SIMPLE_ARRAY_COMPLEX_LONG_FLOAT_WIDETAG:
-#endif
-            case COMPLEX_BASE_STRING_WIDETAG:
-#ifdef COMPLEX_CHARACTER_STRING_WIDETAG
-        case COMPLEX_CHARACTER_STRING_WIDETAG:
-#endif
-            case COMPLEX_VECTOR_NIL_WIDETAG:
-            case COMPLEX_BIT_VECTOR_WIDETAG:
-            case COMPLEX_VECTOR_WIDETAG:
-            case COMPLEX_ARRAY_WIDETAG:
                 break;
 
             case CODE_HEADER_WIDETAG:
