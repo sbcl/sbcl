@@ -384,8 +384,8 @@
   or with one argument, negate the first argument."
   (if more-numbers
       (let ((result number))
-        (dotimes (i (length more-numbers) result)
-          (setf result (- result (nth i more-numbers)))))
+        (do-rest-arg ((n) more-numbers 0 result)
+          (setf result (- result n))))
       (- number)))
 
 (defun / (number &rest more-numbers)
@@ -394,8 +394,8 @@
   With one argument, return reciprocal."
   (if more-numbers
       (let ((result number))
-        (dotimes (i (length more-numbers) result)
-          (setf result (/ result (nth i more-numbers)))))
+        (do-rest-arg ((n) more-numbers 0 result)
+          (setf result (/ result n))))
       (/ number)))
 
 (defun 1+ (number)

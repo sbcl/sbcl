@@ -4389,6 +4389,11 @@
     (if context
         `(%rest-ref ,n ,list ,context ,count)
         `(car (nthcdr ,n ,list)))))
+(define-source-transform fast-&rest-nth (n list)
+  (multiple-value-bind (context count) (possible-rest-arg-context list)
+    (if context
+        `(%rest-ref ,n ,list ,context ,count t)
+        (bug "no &REST context for FAST-REST-NTH"))))
 
 (define-source-transform elt (seq n)
   (if (policy *lexenv* (= safety 3))
@@ -4450,10 +4455,12 @@
       `(%more-arg-values context 0 count)
       `(values-list list)))
 
-(deftransform %rest-ref ((n list context count))
+(deftransform %rest-ref ((n list context count &optional length-checked-p))
   (cond ((rest-var-more-context-ok list)
-         `(and (< (the index n) count)
-               (%more-arg context n)))
+         (if (and (constant-lvar-p length-checked-p)
+                  (lvar-value length-checked-p))
+             `(%more-arg context n)
+             `(and (< (the index n) count) (%more-arg context n))))
         ((and (constant-lvar-p n) (zerop (lvar-value n)))
          `(car list))
         (t

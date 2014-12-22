@@ -249,16 +249,18 @@ maintained."
               (locally ,@body)
            (setf (ansi-stream-in-index ,f-stream) ,f-index))))))
 
-(defmacro do-rest-arg (((var &optional index) rest-var
+;; This is an internal-use-only macro.
+(defmacro do-rest-arg (((var &optional index-var) rest-var
                         &optional (start 0) result)
                        &body body)
   ;; If the &REST arg never needs to be reified, this is slightly quicker
   ;; than using a DX list.
-  (let ((index (or index (sb!xc:gensym "INDEX"))))
+  (let ((index (sb!xc:gensym "INDEX")))
     `(let ((,index ,start))
        (loop
         (cond ((< (truly-the index ,index) (length ,rest-var))
-               (let ((,var (nth ,index ,rest-var)))
+               (let ((,var (sb!c::fast-&rest-nth ,index ,rest-var))
+                     ,@(if index-var `((,index-var ,index))))
                  ,@body)
                (incf ,index))
               (t
