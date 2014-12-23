@@ -35,13 +35,14 @@
                           (:constructor make-pretty-stream (target))
                           (:copier nil))
   ;; Where the output is going to finally go.
-  (target (missing-arg) :type stream)
+  (target (missing-arg) :type stream :read-only t)
   ;; Line length we should format to. Cached here so we don't have to keep
   ;; extracting it from the target stream.
   (line-length (or *print-right-margin*
                    (sb!impl::line-length target)
                    default-line-length)
-               :type column)
+               :type column
+               :read-only t)
   ;; If non-nil, a function to call before performing OUT or SOUT
   (char-out-oneshot-hook nil :type (or null function))
   ;; A simple string holding all the text that has been output but not yet

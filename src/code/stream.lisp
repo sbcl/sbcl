@@ -755,10 +755,13 @@
                                        (sout #'broadcast-sout)
                                        (misc #'broadcast-misc))
                              (:constructor %make-broadcast-stream
-                                           (&rest streams))
-                             (:copier nil))
+                                           (streams))
+                             (:copier nil)
+                             (:predicate nil))
   ;; a list of all the streams we broadcast to
   (streams () :type list :read-only t))
+
+(declaim (freeze-type broadcast-stream))
 
 (defun make-broadcast-stream (&rest streams)
   (dolist (stream streams)
@@ -766,7 +769,7 @@
       (error 'type-error
              :datum stream
              :expected-type '(satisfies output-stream-p))))
-  (apply #'%make-broadcast-stream streams))
+  (%make-broadcast-stream streams))
 
 (macrolet ((out-fun (name fun &rest args)
              `(defun ,name (stream ,@args)
@@ -857,6 +860,9 @@
                            (:copier nil))
   ;; This is the symbol, the value of which is the stream we are synonym to.
   (symbol nil :type symbol :read-only t))
+
+(declaim (freeze-type synonym-stream))
+
 (def!method print-object ((x synonym-stream) stream)
   (print-unreadable-object (x stream :type t :identity t)
     (format stream ":SYMBOL ~S" (synonym-stream-symbol x))))
@@ -913,9 +919,11 @@
                       (sout #'two-way-sout)
                       (misc #'two-way-misc))
             (:constructor %make-two-way-stream (input-stream output-stream))
-            (:copier nil))
+            (:copier nil)
+            (:predicate nil))
   (input-stream (missing-arg) :type stream :read-only t)
   (output-stream (missing-arg) :type stream :read-only t))
+
 (defprinter (two-way-stream) input-stream output-stream)
 
 (defun make-two-way-stream (input-stream output-stream)
@@ -933,7 +941,7 @@
     (error 'type-error
            :datum input-stream
            :expected-type '(satisfies input-stream-p)))
-  (funcall #'%make-two-way-stream input-stream output-stream))
+  (%make-two-way-stream input-stream output-stream))
 
 (macrolet ((out-fun (name fun &rest args)
              `(defun ,name (stream ,@args)
@@ -991,10 +999,14 @@
                       (bin #'concatenated-bin)
                       (n-bin #'concatenated-n-bin)
                       (misc #'concatenated-misc))
-            (:constructor %make-concatenated-stream (&rest streams))
-            (:copier nil))
+            (:constructor %make-concatenated-stream (streams))
+            (:copier nil)
+            (:predicate nil))
   ;; The car of this is the substream we are reading from now.
   (streams nil :type list))
+
+(declaim (freeze-type concatenated-stream))
+
 (def!method print-object ((x concatenated-stream) stream)
   (print-unreadable-object (x stream :type t :identity t)
     (format stream
@@ -1010,7 +1022,7 @@
       (error 'type-error
              :datum stream
              :expected-type '(satisfies input-stream-p))))
-  (apply #'%make-concatenated-stream streams))
+  (%make-concatenated-stream streams))
 
 (macrolet ((in-fun (name fun)
              `(defun ,name (stream eof-error-p eof-value)
@@ -1086,8 +1098,12 @@
                       (misc #'echo-misc)
                       (n-bin #'echo-n-bin))
             (:constructor %make-echo-stream (input-stream output-stream))
-            (:copier nil))
+            (:copier nil)
+            (:predicate nil))
   (unread-stuff nil :type boolean))
+
+(declaim (freeze-type echo-stream))
+
 (def!method print-object ((x echo-stream) stream)
   (print-unreadable-object (x stream :type t :identity t)
     (format stream
@@ -1108,7 +1124,7 @@
     (error 'type-error
            :datum input-stream
            :expected-type '(satisfies input-stream-p)))
-  (funcall #'%make-echo-stream input-stream output-stream))
+  (%make-echo-stream input-stream output-stream))
 
 (macrolet ((in-fun (name in-fun out-fun &rest args)
              `(defun ,name (stream ,@args)
@@ -1167,15 +1183,16 @@
 (defstruct (string-input-stream
              (:include ansi-stream
                        (in #'string-inch)
-                       (bin #'ill-bin)
-                       (n-bin #'ill-bin)
                        (misc #'string-in-misc))
-             (:constructor internal-make-string-input-stream
+             (:constructor %make-string-input-stream
                            (string current end))
-             (:copier nil))
+             (:copier nil)
+             (:predicate nil))
   (string (missing-arg) :type simple-string :read-only t)
   (current (missing-arg) :type index)
   (end (missing-arg) :type index))
+
+(declaim (freeze-type string-input-stream))
 
 (defun string-inch (stream eof-error-p eof-value)
   (declare (type string-input-stream stream))
@@ -1258,18 +1275,17 @@
   ;; adjustable string but (- END START) is 100 characters. We should use
   ;; SUBSEQ instead of coercing the whole string. And if STRING is non-simple
   ;; but has element type CHARACTER, wouldn't it work to just use the
-  ;; underlying simple-string since INTERNAL-MAKE- accepts bounding indices
-  ;; that can be fudged to deal with any offset?
+  ;; underlying simple-string since %MAKE-STRING-INPUT-STREAM accepts bounding
+  ;; indices that can be fudged to deal with any offset?
   ;; And (for unicode builds) if the input is BASE-STRING, we should use
   ;; MAKE-ARRAY and REPLACE to coerce just the specified piece.
   (let* ((string (coerce string '(simple-array character (*)))))
     ;; Why WITH-ARRAY-DATA, since the array is already simple?
     ;; because it's a nice abstract way to check the START and END.
     (with-array-data ((string string) (start start) (end end))
-      (internal-make-string-input-stream
+      (%make-string-input-stream
        string ;; now simple
-       start
-       end))))
+       start end))))
 
 ;;;; STRING-OUTPUT-STREAM stuff
 ;;;;
@@ -1290,13 +1306,13 @@
                       (sout #'string-sout)
                       (misc #'string-out-misc))
             (:constructor make-string-output-stream
-                          (&key (element-type 'character)
-                           &aux (buffer
-                                 (make-string
-                                  *string-output-stream-buffer-initial-size*))))
-            (:copier nil))
+                          (&key (element-type 'character)))
+            (:copier nil)
+            (:predicate nil))
   ;; The string we throw stuff in.
-  (buffer (missing-arg) :type (simple-array character (*)))
+  (buffer (make-string
+           *string-output-stream-buffer-initial-size*)
+   :type (simple-array character (*)))
   ;; Chains of buffers to use
   (prev nil :type list)
   (next nil :type list)
@@ -1309,7 +1325,10 @@
   ;; end of the stream.
   (index-cache 0 :type index)
   ;; Requested element type
-  (element-type 'character :type type-specifier))
+  (element-type 'character :type type-specifier
+                           :read-only t))
+
+(declaim (freeze-type string-output-stream))
 
 #!+sb-doc
 (setf (fdocumentation 'make-string-output-stream 'function)
@@ -1593,9 +1612,12 @@ benefit of the function GET-OUTPUT-STREAM-STRING.")
                       (sout #'fill-pointer-sout)
                       (misc #'fill-pointer-misc))
             (:constructor make-fill-pointer-output-stream (string))
-            (:copier nil))
+            (:copier nil)
+            (:predicate nil))
   ;; a string with a fill pointer where we stuff the stuff we write
   (string (missing-arg) :type string-with-fill-pointer :read-only t))
+
+(declaim (freeze-type fill-pointer-output-stream))
 
 (defun fill-pointer-ouch (stream character)
   (let* ((buffer (fill-pointer-output-stream-string stream))
@@ -1704,7 +1726,9 @@ benefit of the function GET-OUTPUT-STREAM-STRING.")
                       (misc #'case-frob-misc))
             (:constructor %make-case-frob-stream (target out sout))
             (:copier nil))
-  (target (missing-arg) :type stream))
+  (target (missing-arg) :type stream :read-only t))
+
+(declaim (freeze-type case-frob-stream))
 
 (defun make-case-frob-stream (target kind)
   #!+sb-doc
