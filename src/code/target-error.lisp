@@ -44,9 +44,6 @@
 ;;; by RESTART-BIND.
 (defvar *restart-clusters* '())
 
-(declaim (inline restart-test-function
-                 restart-associated-conditions
-                 (setf restart-associated-conditions)))
 (defstruct (restart (:constructor make-restart
                         ;; Having TEST-FUNCTION at the end allows
                         ;; to not replicate its default value in RESTART-BIND.
@@ -80,11 +77,12 @@
       "Return the name of the given restart object.")
 
 (defun restart-report (restart stream)
-  (funcall (or (restart-report-function restart)
-               (lambda (stream)
-                 (format stream "~S" (or (restart-name restart)
-                                         restart))))
-           stream))
+  (if (restart-report-function restart)
+      (funcall (truly-the function (restart-report-function restart))
+               stream)
+      (prin1 (or (restart-name restart)
+                 restart)
+             stream)))
 
 (defvar *restart-test-stack* nil)
 

@@ -472,8 +472,13 @@ evaluated as a PROGN."
                (warn "Unnamed restart does not have a report function: ~
                       ~S" binding))
              `(make-restart ',name ,function
-                            ,report-function
-                            ,interactive-function
+                            ,@(and (or report-function
+                                       interactive-function
+                                       test-function)
+                                   `(,report-function))
+                            ,@(and (or interactive-function
+                                       test-function)
+                                   `(,interactive-function))
                             ,@(and test-function
                                    `(,test-function))))))
     `(let ((*restart-clusters*
@@ -614,6 +619,7 @@ evaluated as a PROGN."
         ,(if (= (length forms) 1) (car forms) `(progn ,@forms))
       (,restart-name ()
         :report (lambda (,stream)
+                  (declare (type stream ,stream))
                   (format ,stream ,format-string ,@format-arguments))
         (values nil t)))))
 
