@@ -648,13 +648,6 @@
   (declare (type stream-designator stream))
   (%write-string string stream start end))
 
-;;; A wrapper function for all those (MACROLET OUT-FUN) definitions,
-;;; which cannot deal with keyword arguments. %WRITE-STRING cannot
-;;; replace this, as this needs to deal with simple-strings as well.
-(declaim (inline write-string-no-key))
-(defun write-string-no-key (string stream start end)
-  (write-string string stream :start start :end end))
-
 (defun write-line (string &optional (stream *standard-output*)
                    &key (start 0) end)
   (declare (type string string))
@@ -777,7 +770,7 @@
                   (,fun ,(car args) stream ,@(cdr args))))))
   (out-fun broadcast-out write-char char)
   (out-fun broadcast-bout write-byte byte)
-  (out-fun broadcast-sout write-string-no-key string start end))
+  (out-fun broadcast-sout %write-string string start end))
 
 (defun broadcast-misc (stream operation &optional arg1 arg2)
   (let ((streams (broadcast-stream-streams stream)))
@@ -874,7 +867,7 @@
                   (,fun ,(car args) syn ,@(cdr args))))))
   (out-fun synonym-out write-char ch)
   (out-fun synonym-bout write-byte n)
-  (out-fun synonym-sout write-string-no-key string start end))
+  (out-fun synonym-sout %write-string string start end))
 
 ;;; For the input methods, we just call the corresponding function on the
 ;;; synonymed stream. These functions deal with getting input out of
@@ -947,7 +940,7 @@
                   (,fun ,(car args) syn ,@(cdr args))))))
   (out-fun two-way-out write-char ch)
   (out-fun two-way-bout write-byte n)
-  (out-fun two-way-sout write-string-no-key string start end))
+  (out-fun two-way-sout %write-string string start end))
 
 (macrolet ((in-fun (name fun &rest args)
              `(defun ,name (stream ,@args)
