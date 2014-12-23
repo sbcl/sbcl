@@ -797,27 +797,23 @@
       (:charpos
        (dolist (stream streams 0)
          (let ((charpos (charpos stream)))
-           (if charpos (return charpos)))))
+           (when charpos
+             (return charpos)))))
       (:line-length
        (let ((min nil))
          (dolist (stream streams min)
            (let ((res (line-length stream)))
              (when res (setq min (if min (min res min) res)))))))
       (:element-type
-       #+nil ; old, arguably more logical, version
-       (let (res)
-         (dolist (stream streams (if (> (length res) 1) `(and ,@res) t))
-           (pushnew (stream-element-type stream) res :test #'equal)))
-       ;; ANSI-specified version (under System Class BROADCAST-STREAM)
-       (let ((res t))
-         (do ((streams streams (cdr streams)))
-             ((null streams) res)
-           (when (null (cdr streams))
-             (setq res (stream-element-type (car streams)))))))
+       (let ((last (last streams)))
+         (if last
+             (stream-element-type (car last))
+             t)))
       (:external-format
-       (let ((res :default))
-         (dolist (stream streams res)
-           (setq res (stream-external-format stream)))))
+       (let ((last (last streams)))
+         (if last
+             (stream-external-format (car last))
+             :default)))
       (:file-length
        (let ((last (last streams)))
          (if last
@@ -828,13 +824,15 @@
            (let ((res (or (eql arg1 :start) (eql arg1 0))))
              (dolist (stream streams res)
                (setq res (file-position stream arg1))))
-           (let ((res 0))
-             (dolist (stream streams res)
-               (setq res (file-position stream))))))
+           (let ((last (last streams)))
+             (if last
+                 (file-position (car last))
+                 0))))
       (:file-string-length
-       (let ((res 1))
-         (dolist (stream streams res)
-           (setq res (file-string-length stream arg1)))))
+       (let ((last (last streams)))
+         (if last
+             (file-string-length (car last) arg1)
+             1)))
       (:close
        (set-closed-flame stream))
       (t
