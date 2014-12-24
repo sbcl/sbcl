@@ -79,9 +79,12 @@
 (defvar *random-state*)
 (defun !random-cold-init ()
   (/show0 "entering !RANDOM-COLD-INIT")
-  (setf *random-state* (%make-random-state))
+  (setf *random-state* (%make-random-state (init-random-state)))
   (/show0 "returning from !RANDOM-COLD-INIT"))
 
+;;; Q: Why is there both MAKE-RANDOM-STATE and SEED-RANDOM-STATE?
+;;; A: Because the DEFKNOWN for MAKE-RANDOM-STATE is more restricted
+;;;    and doesn't accept numerical state.
 (defun make-random-state (&optional state)
   #!+sb-doc
   "Make a random state object. The optional STATE argument specifies a seed
@@ -162,10 +165,10 @@ http://www.math.sci.hiroshima-u.ac.jp/~m-mat/MT/emt.html
     ;; Easy standard cases
     (null
      (/show0 "copying *RANDOM-STATE*")
-     (%make-random-state :state (copy-seq (random-state-state *random-state*))))
+     (%make-random-state (copy-seq (random-state-state *random-state*))))
     (random-state
      (/show0 "copying the provided RANDOM-STATE")
-     (%make-random-state :state (copy-seq (random-state-state state))))
+     (%make-random-state (copy-seq (random-state-state state))))
     ;; Standard case, less easy: try to randomly initialize a state.
     ((eql t)
      (/show0 "getting randomness from the operating system")
@@ -198,7 +201,7 @@ http://www.math.sci.hiroshima-u.ac.jp/~m-mat/MT/emt.html
     ;; Small ones get passed to init-random-state, as before.
     ((unsigned-byte 32)
      (/show0 "getting random seed from 32-bit word")
-     (%make-random-state :state (init-random-state state)))
+     (%make-random-state (init-random-state state)))
     ;; Larger ones ones get trivially chopped into an array of (unsigned-byte 32)
     ((unsigned-byte)
      (/show0 "getting random seed from bignum (converting to 32-bit-word vector)")
@@ -237,7 +240,7 @@ http://www.math.sci.hiroshima-u.ac.jp/~m-mat/MT/emt.html
                           i))) ;; non-linear
          (incf i) (when (>= i mt19937-n) (setf (aref s 3) (aref s (+ 2 mt19937-n)) i 1)))
        (setf (aref s 3) #x80000000) ;; MSB is 1; assuring non-zero initial array
-       (%make-random-state :state s))))))
+       (%make-random-state s))))))
 
 ;;;; random entries
 

@@ -44,7 +44,7 @@
                              (print-unreadable-object (x s)
                                (write-string (unprintable-object-string x) s))))
             (:copier nil))
-  string)
+  (string nil :read-only t))
 
 ;;; Used internally, but it would be nice to provide something
 ;;; like this for users as well.

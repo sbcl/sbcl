@@ -786,10 +786,10 @@ implementation it is ~S." *default-package-use-list*)
          (go :restart))
        (let* ((name (stringify-package-designator name))
               (package
-               (internal-make-package
-                :%name name
-                :internal-symbols (make-package-hashtable internal-symbols)
-                :external-symbols (make-package-hashtable external-symbols))))
+               (%make-package
+                name
+                (make-package-hashtable internal-symbols)
+                (make-package-hashtable external-symbols))))
 
          ;; Do a USE-PACKAGE for each thing in the USE list so that checking for
          ;; conflicting exports among used packages is done.

@@ -745,7 +745,7 @@ IF-NOT-OWNER is :FORCE)."
 ;;;; Waitqueues/condition variables
 
 #!+(or (not sb-thread) sb-futex)
-(defstruct (waitqueue (:constructor %make-waitqueue))
+(defstruct (waitqueue (:constructor make-waitqueue (&key name)))
   #!+sb-doc
   "Waitqueue type."
   (name nil :type (or null thread-name))
@@ -754,7 +754,7 @@ IF-NOT-OWNER is :FORCE)."
 
 #!+(and sb-thread (not sb-futex))
 (progn
-  (defstruct (waitqueue (:constructor %make-waitqueue))
+  (defstruct (waitqueue (:constructor make-waitqueue (&key name)))
     #!+sb-doc
     "Waitqueue type."
     (name nil :type (or null thread-name))
@@ -816,14 +816,11 @@ IF-NOT-OWNER is :FORCE)."
   (print-unreadable-object (waitqueue stream :type t :identity t)
     (format stream "~@[~A~]" (waitqueue-name waitqueue))))
 
-(defun make-waitqueue (&key name)
-  #!+sb-doc
-  "Create a waitqueue."
-  (%make-waitqueue :name name))
-
 #!+sb-doc
 (setf (fdocumentation 'waitqueue-name 'function)
-      "The name of the waitqueue. Setfable.")
+      "The name of the waitqueue. Setfable."
+      (fdocumentation 'make-waitqueue 'function)
+      "Create a waitqueue.")
 
 #!+(and sb-thread sb-futex)
 (define-structure-slot-addressor waitqueue-token-address
@@ -1011,7 +1008,8 @@ must be held by this thread during this call."
 
 ;;;; Semaphores
 
-(defstruct (semaphore (:constructor %make-semaphore (name %count)))
+(defstruct (semaphore (:constructor make-semaphore
+                          (&key name ((:count %count) 0))))
   #!+sb-doc
   "Semaphore type. The fact that a SEMAPHORE is a STRUCTURE-OBJECT
 should be considered an implementation detail, and may change in the
@@ -1024,7 +1022,9 @@ future."
 
 #!+sb-doc
 (setf (fdocumentation 'semaphore-name 'function)
-      "The name of the semaphore INSTANCE. Setfable.")
+      "The name of the semaphore INSTANCE. Setfable."
+      (fdocumentation 'make-semaphore 'function)
+      "Create a semaphore with the supplied COUNT and NAME.")
 
 (defstruct (semaphore-notification (:constructor make-semaphore-notification ())
                                    (:copier nil))
@@ -1062,11 +1062,6 @@ WAIT-ON-SEMAPHORE or TRY-SEMAPHORE."
   "Returns the current count of the semaphore INSTANCE."
   (barrier (:read))
   (semaphore-%count instance))
-
-(defun make-semaphore (&key name (count 0))
-  #!+sb-doc
-  "Create a semaphore with the supplied COUNT and NAME."
-  (%make-semaphore name count))
 
 (defun wait-on-semaphore (semaphore &key timeout notification)
   #!+sb-doc

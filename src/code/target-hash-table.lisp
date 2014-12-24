@@ -376,23 +376,22 @@ Examples:
            (kv-vector (make-array (* 2 size+1)
                                   :initial-element +empty-ht-slot+))
            (table (%make-hash-table
-                   :test test
-                   :test-fun test-fun
-                   :hash-fun hash-fun
-                   :rehash-size rehash-size
-                   :rehash-threshold rehash-threshold
-                   :rehash-trigger size
-                   :table kv-vector
-                   :weakness weakness
-                   :index-vector index-vector
-                   :next-vector next-vector
-                   :hash-vector
+                   test
+                   test-fun
+                   hash-fun
+                   rehash-size
+                   rehash-threshold
+                   size
+                   kv-vector
+                   weakness
+                   index-vector
+                   next-vector
                    (unless (eq test 'eq)
                      (make-array size+1
                                  :element-type '(unsigned-byte
                                                  #.sb!vm:n-word-bits)
                                  :initial-element +magic-hash-vector-value+))
-                   :synchronized-p synchronized)))
+                   synchronized)))
       (declare (type index size+1 scaled-size length))
       ;; Set up the free list, all free. These lists are 0 terminated.
       (do ((i 1 (1+ i)))

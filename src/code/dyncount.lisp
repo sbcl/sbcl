@@ -99,7 +99,6 @@ comments from CMU CL:
 (deftype count-vector () '(simple-array double-float (2)))
 (defstruct (vop-stats
             (:constructor %make-vop-stats (name))
-            (:constructor make-vop-stats-key)
             (:copier nil))
   (name (missing-arg) :type simple-string)
   (data (make-array 2 :element-type 'double-float) :type count-vector))

@@ -70,8 +70,11 @@ types for the Common Lisp expression reader."
    (make-array base-char-code-limit
                :element-type '(unsigned-byte 8)
                :initial-element +char-attr-constituent+)
-   :type attribute-table)
-  (character-attribute-hash-table (make-hash-table) :type hash-table)
+   :type attribute-table
+   :read-only t)
+  (character-attribute-hash-table (make-hash-table)
+   :type hash-table
+   :read-only t)
   ;; The CHARACTER-MACRO-TABLE is a vector of BASE-CHAR-CODE-LIMIT
   ;; functions. One of these functions called with appropriate
   ;; arguments whenever any non-WHITESPACE character is encountered
@@ -80,7 +83,11 @@ types for the Common Lisp expression reader."
   ;; number-symbol reader.
   (character-macro-array
    (make-array base-char-code-limit :initial-element nil)
-   :type (simple-vector #.base-char-code-limit))
-  (character-macro-hash-table (make-hash-table) :type hash-table)
+   :type (simple-vector #.base-char-code-limit)
+   :read-only t)
+  (character-macro-hash-table (make-hash-table) :type hash-table
+   :read-only t)
   (%readtable-case :upcase :type (member :upcase :downcase :preserve :invert))
   (%readtable-normalization #!+sb-unicode t #!-sb-unicode nil :type boolean))
+
+(declaim (freeze-type readtable))

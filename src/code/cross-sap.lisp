@@ -15,14 +15,12 @@
 ;;; SYSTEM-AREA-POINTER is not a primitive type in ANSI Common Lisp,
 ;;; so we need a compound type to represent it in the host Common Lisp
 ;;; at cross-compile time:
-(defstruct (system-area-pointer (:constructor make-sap)
+(defstruct (system-area-pointer (:constructor int-sap (int))
                                 (:conc-name "SAP-"))
   ;; the integer representation of the address
-  (int (error "missing SAP-INT argument") :type sap-int :read-only t))
+  (int nil :type sap-int :read-only t))
 
 ;;; cross-compilation-host analogues of target-CMU CL primitive SAP operations
-(defun int-sap (int)
-  (make-sap :int int))
 (defun sap+ (sap offset)
   (declare (type system-area-pointer sap) (type sap-int offset))
   (make-sap :int (+ (sap-int sap) offset)))

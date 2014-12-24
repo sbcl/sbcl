@@ -13,32 +13,44 @@
 (in-package "SB!IMPL")
 
 ;;; HASH-TABLE is implemented as a STRUCTURE-OBJECT.
-(sb!xc:defstruct (hash-table (:constructor %make-hash-table))
+(sb!xc:defstruct (hash-table (:constructor %make-hash-table
+                               (test
+                                test-fun
+                                hash-fun
+                                rehash-size
+                                rehash-threshold
+                                rehash-trigger
+                                table
+                                weakness
+                                index-vector
+                                next-vector
+                                hash-vector
+                                synchronized-p)))
   ;; The type of hash table this is. Only used for printing and as
   ;; part of the exported interface.
-  (test (missing-arg) :type symbol :read-only t)
+  (test nil :type symbol :read-only t)
   ;; The function used to compare two keys. Returns T if they are the
   ;; same and NIL if not.
-  (test-fun (missing-arg) :type function :read-only t)
+  (test-fun nil :type function :read-only t)
   ;; The function used to compute the hashing of a key. Returns two
   ;; values: the index hashing and T if that might change with the
   ;; next GC.
-  (hash-fun (missing-arg) :type function :read-only t)
+  (hash-fun nil :type function :read-only t)
   ;; How much to grow the hash table by when it fills up. If an index,
   ;; then add that amount. If a floating point number, then multiply
   ;; it by that.
-  (rehash-size (missing-arg) :type (or index (single-float (1.0)))
+  (rehash-size nil :type (or index (single-float (1.0)))
                :read-only t)
   ;; How full the hash table has to get before we rehash
-  (rehash-threshold (missing-arg) :type (single-float (0.0) 1.0) :read-only t)
+  (rehash-threshold nil :type (single-float (0.0) 1.0) :read-only t)
   ;; The number of entries before a rehash, just one less than the
   ;; size of the next-vector, hash-vector, and half the size of the
   ;; kv-vector.
-  (rehash-trigger (missing-arg) :type index)
+  (rehash-trigger nil :type index)
   ;; The current number of entries in the table.
   (number-entries 0 :type index)
   ;; The Key-Value pair vector.
-  (table (missing-arg) :type simple-vector)
+  (table nil :type simple-vector)
   ;; This slot is used to link weak hash tables during GC. When the GC
   ;; isn't running it is always NIL.
   (next-weak-hash-table nil :type null)
@@ -54,11 +66,11 @@
   (cache nil :type (or null index))
   ;; The index vector. This may be larger than the hash size to help
   ;; reduce collisions.
-  (index-vector (missing-arg) :type (simple-array sb!vm:word (*)))
+  (index-vector nil :type (simple-array sb!vm:word (*)))
   ;; This table parallels the KV vector, and is used to chain together
   ;; the hash buckets and the free list. A slot will only ever be in
   ;; one of these lists.
-  (next-vector (missing-arg) :type (simple-array sb!vm:word (*)))
+  (next-vector nil :type (simple-array sb!vm:word (*)))
   ;; This table parallels the KV table, and can be used to store the
   ;; hash associated with the key, saving recalculation. Could be
   ;; useful for EQL, and EQUAL hash tables. This table is not needed

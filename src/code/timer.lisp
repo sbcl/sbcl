@@ -80,17 +80,14 @@
 
 (defstruct (priority-queue
              (:conc-name %pqueue-)
-             (:constructor %make-priority-queue))
+             (:constructor make-priority-queue
+               (&key ((:key keyfun) #'identity) (element-type t)
+                &aux (contents (make-array 100
+                                           :adjustable t
+                                           :fill-pointer 0
+                                           :element-type element-type)))))
   contents
   keyfun)
-
-(defun make-priority-queue (&key (key #'identity) (element-type t))
-  (let ((contents (make-array 100
-                              :adjustable t
-                              :fill-pointer 0
-                              :element-type element-type)))
-    (%make-priority-queue :keyfun key
-                          :contents contents)))
 
 (def!method print-object ((object priority-queue) stream)
   (print-unreadable-object (object stream :type t :identity t)
@@ -136,7 +133,8 @@
 
 (defstruct (timer
              (:conc-name %timer-)
-             (:constructor %make-timer))
+             (:constructor make-timer
+                 (function &key name (thread sb!thread:*current-thread*))))
   #!+sb-doc
   "Timer type. Do not rely on timers being structs as it may change in
 future versions."
@@ -157,10 +155,9 @@ future versions."
           ;; body is empty => there is only one space between type and
           ;; identity
           ))))
-
-(defun make-timer (function &key name (thread sb!thread:*current-thread*))
   #!+sb-doc
-  "Create a timer that runs FUNCTION when triggered.
+(setf (fdocumentation 'make-timer 'function)
+      "Create a timer that runs FUNCTION when triggered.
 
 If a THREAD is supplied, FUNCTION is run in that thread. If THREAD is
 T, a new thread is created for FUNCTION each time the timer is
@@ -168,8 +165,7 @@ triggered. If THREAD is NIL, FUNCTION is run in an unspecified thread.
 
 When THREAD is not T, INTERRUPT-THREAD is used to run FUNCTION and the
 ordering guarantees of INTERRUPT-THREAD apply. FUNCTION runs with
-interrupts disabled but WITH-INTERRUPTS is allowed."
-  (%make-timer :name name :function function :thread thread))
+interrupts disabled but WITH-INTERRUPTS is allowed.")
 
 (defun timer-name (timer)
   #!+sb-doc
