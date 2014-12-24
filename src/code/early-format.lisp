@@ -53,3 +53,14 @@
 
 ;;; Used by the expander stuff. List of (symbol . offset) for simple args.
 (defvar *simple-args*)
+
+(defun print-symbol-with-prefix (stream symbol colon at)
+  #!+sb-doc
+  "For use with ~/: Write SYMBOL to STREAM as if it is not accessible from
+  the current package."
+  (declare (ignore colon at))
+  ;; Only keywords should be accessible from the keyword package, and
+  ;; keywords are always printed with colons, so this guarantees that the
+  ;; symbol will not be printed without a prefix.
+  (let ((*package* *keyword-package*))
+    (write symbol :stream stream :escape t)))

@@ -1067,17 +1067,6 @@ implementation it is ~S." *default-package-use-list*)
       (return-from find-external-symbol (values symbol t))))
   (values nil nil))
 
-(defun print-symbol-with-prefix (stream symbol colon at)
-  #!+sb-doc
-  "For use with ~/: Write SYMBOL to STREAM as if it is not accessible from
-  the current package."
-  (declare (ignore colon at))
-  ;; Only keywords should be accessible from the keyword package, and
-  ;; keywords are always printed with colons, so this guarantees that the
-  ;; symbol will not be printed without a prefix.
-  (let ((*package* *keyword-package*))
-    (write symbol :stream stream :escape t)))
-
 (define-condition name-conflict (reference-condition package-error)
   ((function :initarg :function :reader name-conflict-function)
    (datum :initarg :datum :reader name-conflict-datum)
