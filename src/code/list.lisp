@@ -485,34 +485,29 @@
 (defun nconc (&rest lists)
    #!+sb-doc
    "Concatenates the lists given as arguments (by changing them)"
-   (declare (truly-dynamic-extent lists) (optimize speed))
+   (declare (optimize speed))
    (flet ((fail (object)
             (error 'type-error
                    :datum object
                    :expected-type 'list)))
-     (do ((top lists (cdr top)))
-         ((null top) nil)
-       (let ((top-of-top (car top)))
-         (typecase top-of-top
+     (do-rest-arg ((result index) lists)
+         (typecase result
            (cons
-            (let* ((result top-of-top)
-                   (splice result))
-              (do ((elements (cdr top) (cdr elements)))
-                  ((endp elements))
-                (let ((ele (car elements)))
+            (let ((splice result))
+              (do-rest-arg ((ele index) lists (1+ index))
                   (typecase ele
                     (cons (rplacd (last splice) ele)
                           (setf splice ele))
                     (null (rplacd (last splice) nil))
-                    (atom (if (cdr elements)
+                    (atom (if (< (1+ index) (length lists))
                               (fail ele)
-                              (rplacd (last splice) ele))))))
+                              (rplacd (last splice) ele)))))
               (return result)))
            (null)
            (atom
-            (if (cdr top)
-                (fail top-of-top)
-                (return top-of-top))))))))
+            (if (< (1+ index) (length lists))
+                (fail result)
+                (return result)))))))
 
 (defun nreconc (x y)
   #!+sb-doc
