@@ -1713,7 +1713,7 @@ forms that explicitly control this kind of evaluation.")
     ;;   * The values that the binding stack pointer should have after the
     ;;     unwind.
     (let* ((block (sap-int/fixnum (find-enclosing-catch-block frame)))
-           (unbind-to (sap-int/fixnum (find-binding-stack-pointer frame))))
+           (unbind-to (find-binding-stack-pointer frame)))
       ;; This VOP will run the neccessary cleanup forms, reset the fp, and
       ;; then call the supplied function.
       (sb!vm::%primitive sb!vm::unwind-to-frame-and-call
@@ -1735,38 +1735,16 @@ forms that explicitly control this kind of evaluation.")
                                    tag)
     (throw tag thunk)))
 
+#!+unwind-to-frame-and-call-vop
 (defun find-binding-stack-pointer (frame)
-  #!-stack-grows-downward-not-upward
-  (declare (ignore frame))
-  #!-stack-grows-downward-not-upward
-  (error "Not implemented on this architecture")
-  #!+stack-grows-downward-not-upward
-  (let ((bsp (sb!vm::binding-stack-pointer-sap))
-        (unbind-to nil)
-        (fp (sb!di::frame-pointer frame))
-        (start (int-sap (ldb (byte #.sb!vm:n-word-bits 0)
-                             (ash sb!vm:*binding-stack-start*
-                                  sb!vm:n-fixnum-tag-bits)))))
-    ;; Walk the binding stack looking for an entry where the symbol is
-    ;; an unbound-symbol marker and the value is equal to the frame
-    ;; pointer.  These entries are inserted into the stack by the
-    ;; BIND-SENTINEL VOP and removed by UNBIND-SENTINEL (inserted into
-    ;; the function during IR2). If an entry wasn't found, the
-    ;; function that the frame corresponds to wasn't compiled with a
-    ;; high enough debug setting, and can't be restarted / returned
-    ;; from.
-    (loop until (sap= bsp start)
-          do (progn
-               (setf bsp (sap+ bsp
-                               (- (* sb!vm:binding-size sb!vm:n-word-bytes))))
-               (let ((symbol (sap-ref-word bsp (* sb!vm:binding-symbol-slot
-                                                  sb!vm:n-word-bytes)))
-                     (value (sap-ref-sap bsp (* sb!vm:binding-value-slot
-                                                sb!vm:n-word-bytes))))
-                 (when (eql symbol sb!vm:unbound-marker-widetag)
-                   (when (sap= value fp)
-                     (setf unbind-to bsp))))))
-    unbind-to))
+  (let* ((debug-fun (sb!di:frame-debug-fun frame))
+         (compiled-debug-fun (and
+                              (typep debug-fun 'sb!di::compiled-debug-fun)
+                              (sb!di::compiled-debug-fun-compiler-debug-fun debug-fun)))
+         (bsp-save-offset (and compiled-debug-fun
+                               (sb!c::compiled-debug-fun-bsp-save compiled-debug-fun))))
+    (when bsp-save-offset
+      (sb!di::sub-access-debug-var-slot (sb!di::frame-pointer frame) bsp-save-offset))))
 
 (defun find-enclosing-catch-block (frame)
   ;; Walk the catch block chain looking for the first entry with an address

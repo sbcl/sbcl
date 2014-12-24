@@ -179,7 +179,9 @@
   (start-pc (missing-arg) :type index)
   ;; The start of elsewhere code for this function (if any.)
   (elsewhere-pc (missing-arg) :type index)
-  (closure-save nil :type (or sc-offset null)))
+  (closure-save nil :type (or sc-offset null))
+  #!+unwind-to-frame-and-call-vop
+  (bsp-save nil :type (or sc-offset null)))
 
 ;;;; minimal debug function
 

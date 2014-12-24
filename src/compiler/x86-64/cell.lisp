@@ -489,9 +489,6 @@
     (loadw symbol bsp binding-symbol-slot)
     (inst test symbol symbol)
     (inst jmp :z SKIP)
-    ;; Bind stack debug sentinels have the unbound marker in the symbol slot
-    (inst cmp symbol unbound-marker-widetag)
-    (inst jmp :eq SKIP)
     (loadw value bsp binding-value-slot)
     #!-sb-thread
     (storew value symbol symbol-value-slot other-pointer-lowtag)
@@ -508,27 +505,6 @@
     (store-binding-stack-pointer bsp)
 
     DONE))
-
-(define-vop (bind-sentinel)
-  (:temporary (:sc unsigned-reg) bsp)
-  (:generator 1
-     (load-binding-stack-pointer bsp)
-     (inst add bsp (* binding-size n-word-bytes))
-     (storew unbound-marker-widetag bsp (- binding-symbol-slot binding-size))
-     (storew rbp-tn bsp (- binding-value-slot binding-size))
-     (store-binding-stack-pointer bsp)))
-
-(define-vop (unbind-sentinel)
-  (:temporary (:sc unsigned-reg) bsp)
-  (:generator 1
-     (load-binding-stack-pointer bsp)
-     (storew 0 bsp (- binding-value-slot binding-size))
-     (storew 0 bsp (- binding-symbol-slot binding-size))
-     (inst sub bsp (* binding-size n-word-bytes))
-     (store-binding-stack-pointer bsp)))
-
-
-
 
 ;;;; closure indexing
 

@@ -1342,13 +1342,18 @@
                block
                (ir2-physenv-return-pc-pass env)
                (ir2-physenv-return-pc env))
-
     #!+unwind-to-frame-and-call-vop
     (when (and (lambda-allow-instrumenting fun)
                (not (lambda-inline-expanded fun))
-               (lambda-return fun)
-               (policy fun (>= insert-debug-catch 2)))
-      (vop sb!vm::bind-sentinel node block))
+               (policy fun (>= insert-debug-catch 1)))
+      (let ((temp (make-normal-tn *backend-t-primitive-type*))
+            (bsp-save-tn (make-representation-tn
+                          *backend-t-primitive-type*
+                          (sc-number-or-lose 'sb!vm::control-stack)) ))
+        (vop current-binding-pointer node block temp)
+        (emit-move node block temp bsp-save-tn)
+        (setf (ir2-physenv-bsp-save-tn env) bsp-save-tn)
+        (component-live-tn bsp-save-tn)))
 
     (let ((lab (gen-label)))
       (setf (ir2-physenv-environment-start env) lab)
@@ -1378,11 +1383,6 @@
          (old-fp (ir2-physenv-old-fp env))
          (return-pc (ir2-physenv-return-pc env))
          (returns (tail-set-info (lambda-tail-set fun))))
-    #!+unwind-to-frame-and-call-vop
-    (when (and (lambda-allow-instrumenting fun)
-               (not (lambda-inline-expanded fun))
-               (policy fun (>= insert-debug-catch 2)))
-      (vop sb!vm::unbind-sentinel node block))
     (cond
      ((and (eq (return-info-kind returns) :fixed)
            (not (xep-p fun)))

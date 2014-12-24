@@ -371,7 +371,10 @@
   ;; from their passing locations, etc. This is the start of the
   ;; function as far as the debugger is concerned.
   (environment-start nil :type (or label null))
-  (closure-save-tn nil :type (or tn null)))
+  (closure-save-tn nil :type (or tn null))
+  #!+unwind-to-frame-and-call-vop
+  (bsp-save-tn nil :type (or tn null)))
+
 (defprinter (ir2-physenv)
   closure
   old-fp

@@ -56,14 +56,17 @@ more reliable bactracing across foreign calls.")
   ("no" "maybe" "yes" "yes"))
 
 (define-optimization-quality insert-debug-catch
-    (if (> debug (max speed space))
-        3
-        0)
+    (cond ((and (= debug 3)
+                (> debug speed))
+           3)
+          ((and (> debug 0)
+                (>= debug speed))
+           1)
+          (t
+           0))
   ("no" "maybe" "yes" "yes")
   "Enables possibility of returning from stack frames with the debugger.
-Enabling this option causes apparent tail calls to no longer be in a tail
-position -- effectively disabling tail-merging, hence causing apparently tail
-recursive functions to no longer execute in constant stack space")
+The default value 1 doesn't prevent tail call optimization, while >1 does.")
 
 (define-optimization-quality recognize-self-calls
     (if (> (max speed space) debug)

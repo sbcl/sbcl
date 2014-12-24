@@ -171,10 +171,10 @@
          (declare (optimize (speed 2) (debug 1))) ; tail call elimination
          (#:undefined-function 42))
        (not-optimized ()
-         (declare (optimize (speed 1) (debug 2))) ; no tail call elimination
+         (declare (optimize (speed 1) (debug 3))) ; no tail call elimination
          (#:undefined-function 42))
        (test (fun)
-         (declare (optimize (speed 1) (debug 2))) ; no tail call elimination
+         (declare (optimize (speed 1) (debug 3))) ; no tail call elimination
          (funcall fun)))
 
   (with-test (:name (:undefined-function :bug-346)
@@ -232,10 +232,10 @@
          (declare (optimize (speed 2) (debug 1))) ; tail call elimination
          (/ 42 0))
        (not-optimized ()
-         (declare (optimize (speed 1) (debug 2))) ; no tail call elimination
+         (declare (optimize (speed 1) (debug 3))) ; no tail call elimination
          (/ 42 0))
        (test (fun)
-         (declare (optimize (speed 1) (debug 2))) ; no tail call elimination
+         (declare (optimize (speed 1) (debug 3))) ; no tail call elimination
          (funcall fun)))
   (with-test (:name (:divide-by-zero :bug-346)
               :fails-on :alpha)  ; bug 346

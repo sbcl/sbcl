@@ -9,6 +9,7 @@ changes relative to sbcl-1.2.6:
     that is subsequently proclaimed INLINE.
   * enhancement: always lose() when something goes wrong while saving a core
     (instead of just printing an error on stderr in some situations).
+  * enhancement: frames in the debugger are now restartable by default.
   * bug fix: restore error handling on Windows x86.
   * bug fix: MAKE-SEQUENCE detects type errors in its :INITIAL-ELEMENT
     at compile-time when possible. (lp#330299)
@@ -17,6 +18,7 @@ changes relative to sbcl-1.2.6:
   * bug fix: LOOP properly destructures nested lists in WITH.
   * bug fix: MACROEXPANDing the redefinition of an alien structure type no
     longer signals the wrong error.
+  * bug fix: PROGV doesn't get confused by forced DEBUG 3 (lp#1405456).
 
 changes in sbcl-1.2.6 relative to sbcl-1.2.5:
   * enhancement: SERVE-EVENTS uses the poll() system call in lieu of

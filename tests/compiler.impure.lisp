@@ -1467,6 +1467,16 @@
                                     (declare (ignore b))
                                     (mask-field (byte 10 0) (cut-test a))))))
              469)))
+
+(with-test (:name :progv-debug-3)
+  (unwind-protect
+       (sb-ext:restrict-compiler-policy 'debug 3)
+    (assert (funcall (compile nil `(lambda (*v*)
+                                     (declare (special *v*))
+                                     (progv '(*v*) '())
+                                     (boundp '*v*)))
+                     1))
+    (sb-ext:restrict-compiler-policy 'debug 0)))
 
 ;;;; tests not in the problem domain, but of the consistency of the
 ;;;; compiler machinery itself

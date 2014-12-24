@@ -390,26 +390,6 @@
     (store-binding-stack-pointer bsp)
 
     DONE))
-
-(define-vop (bind-sentinel)
-  (:temporary (:sc unsigned-reg) bsp)
-  (:generator 1
-     (load-binding-stack-pointer bsp)
-     (inst add bsp (* binding-size n-word-bytes))
-     (storew unbound-marker-widetag bsp (- binding-symbol-slot binding-size))
-     (storew ebp-tn bsp (- binding-value-slot binding-size))
-     (store-binding-stack-pointer bsp)))
-
-(define-vop (unbind-sentinel)
-  (:temporary (:sc unsigned-reg) bsp)
-  (:generator 1
-     (load-binding-stack-pointer bsp)
-     (storew 0 bsp (- binding-value-slot binding-size))
-     (storew 0 bsp (- binding-symbol-slot binding-size))
-     (inst sub bsp (* binding-size n-word-bytes))
-     (store-binding-stack-pointer bsp)))
-
-
 
 ;;;; closure indexing
 
