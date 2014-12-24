@@ -1804,6 +1804,11 @@ core and return a descriptor to it."
                                 offset-within-code-object))
          (gspace-byte-address (gspace-byte-address
                                (descriptor-gspace code-object))))
+    ;; There's just a ton of code here that gets deleted,
+    ;; inhibiting the view of the the forest through the trees.
+    ;; Use of #+sbcl would say "probable bug in read-time conditional"
+    #+#.(cl:if (cl:member :sbcl cl:*features*) '(and) '(or))
+    (declare (sb-ext:muffle-conditions sb-ext:code-deletion-note))
     (ecase +backend-fasl-file-implementation+
       ;; See CMU CL source for other formerly-supported architectures
       ;; (and note that you have to rewrite them to use BVREF-X
@@ -3568,3 +3573,35 @@ initially undefined function references:~2%")
 
         (when core-file-name
           (write-initial-core-file core-file-name))))))
+
+;; This generalization of WARM-FUN-NAME will do in a pinch
+;; to view strings and things in a gspace.
+(defun warmelize (descriptor)
+  (labels ((recurse (x)
+            (when (eql (descriptor-bits x) (descriptor-bits *nil-descriptor*))
+              (return-from recurse nil))
+            (ecase (descriptor-lowtag x)
+              (#.sb!vm:list-pointer-lowtag
+               (cons (recurse (cold-car x)) (recurse (cold-cdr x))))
+              (#.sb!vm:fun-pointer-lowtag
+               (let ((name (read-wordindexed x sb!vm:simple-fun-name-slot)))
+                 `(function ,(recurse name))))
+              (#.sb!vm:other-pointer-lowtag
+               (let ((widetag (logand (descriptor-bits (read-wordindexed x 0))
+                                      sb!vm:widetag-mask)))
+                 (ecase widetag
+                   (#.sb!vm:symbol-header-widetag
+                    ;; this is only approximate, as it disregards package
+                    (intern (recurse (read-wordindexed x sb!vm:symbol-name-slot))))
+                   (#.sb!vm:simple-base-string-widetag
+                    (let* ((len (descriptor-fixnum (read-wordindexed x 1)))
+                           (str (make-string len))
+                           (bytes (gspace-bytes (descriptor-gspace x))))
+                      (dotimes (i len str)
+                        (setf (aref str i)
+                              (code-char
+                               (bvref bytes
+                                      (+ (descriptor-byte-offset x)
+                                         (* sb!vm:vector-data-offset sb!vm:n-word-bytes)
+                                         i)))))))))))))
+    (recurse descriptor)))
