@@ -14,6 +14,8 @@
 
 (sb!xc:defstruct (random-state (:constructor %make-random-state
                                    (state))
+                               ;; Needed for reading #S(random-state)
+                               (:constructor %%make-random-state)
                                (:copier nil)) ; since shallow copy is wrong
   (state (init-random-state)
    :type (simple-array (unsigned-byte 32) (627))

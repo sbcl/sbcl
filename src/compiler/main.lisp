@@ -979,24 +979,24 @@ necessary, since type inference may take arbitrarily long to converge.")
 ;;; actually compile something. If *BLOCK-COMPILE* is T, then we still
 ;;; convert the form, but delay compilation, pushing the result on
 ;;; *TOPLEVEL-LAMBDAS* instead.
-(defun convert-and-maybe-compile (form path)
+(defun convert-and-maybe-compile (form path &optional (expand t))
   (declare (list path))
   (let ((*top-level-form-noted* (note-top-level-form form t)))
     ;; Don't bother to compile simple objects that just sit there.
     (when (and form (or (symbolp form) (consp form)))
-      (if (fopcompilable-p form)
-         (let ((*fopcompile-label-counter* 0))
-           (fopcompile form path nil))
-         (with-ir1-namespace
-           (let ((*lexenv* (make-lexenv
-                            :policy *policy*
-                            :handled-conditions *handled-conditions*
-                            :disabled-package-locks *disabled-package-locks*))
-                 (tll (ir1-toplevel form path nil)))
-             (if (eq *block-compile* t)
-                 (push tll *toplevel-lambdas*)
-                 (compile-toplevel (list tll) nil))
-             nil))))))
+      (if (fopcompilable-p form expand)
+          (let ((*fopcompile-label-counter* 0))
+            (fopcompile form path nil expand))
+          (with-ir1-namespace
+            (let ((*lexenv* (make-lexenv
+                             :policy *policy*
+                             :handled-conditions *handled-conditions*
+                             :disabled-package-locks *disabled-package-locks*))
+                  (tll (ir1-toplevel form path nil)))
+              (if (eq *block-compile* t)
+                  (push tll *toplevel-lambdas*)
+                  (compile-toplevel (list tll) nil))
+              nil))))))
 
 ;;; Macroexpand FORM in the current environment with an error handler.
 ;;; We only expand one level, so that we retain all the intervening
@@ -1375,7 +1375,7 @@ necessary, since type inference may take arbitrarily long to converge.")
                    (cond ((eq expanded form)
                           (when compile-time-too
                             (eval-compile-toplevel (list form) path))
-                          (convert-and-maybe-compile form path))
+                          (convert-and-maybe-compile form path nil))
                          (t
                           (process-toplevel-form expanded
                                                  path

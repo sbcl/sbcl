@@ -17,7 +17,25 @@
 ;;; that we can compile some simple toplevel forms directly to them,
 ;;; including very common operations like the forms that DEFVARs and
 ;;; DECLAIMs macroexpand into.
-(defun fopcompilable-p (form)
+;;;
+;;; FIXME: The expexnasion problem.
+;;; FOPCOMPILE and FOPCOMPILABLE-P cause multiple expansion of macros,
+;;; which may be problematic with side-effecting macros. When
+;;; FOPCOMPILABLE-P succeeds, FOPCOMPILE is called, resulting in
+;;; double macroexpansion. When FOPCOMPILABLE-P fails,
+;;; IR1-CONVERT-FUNCTOID expands already expanded macros for a second
+;;; time.
+;;; And an edge case, when the top-level call has a complier-macro
+;;; which returns &whole it gets expanded three times, two times by
+;;; FOPCOMPILABLE-P and FOPCOMPILE, and one time by
+;;; PROCESS-TOPLEVEL-FORM, because unlike other macros, the expanded
+;;; form is still a macro-form. That's what the EXPAND optional
+;;; parameter solves, PROCESS-TOPLEVEL-FORM passes NIL, expanding
+;;; compiler macros at most once.
+;;; The instances of double expansion still remain, e.g. (fun (macro)),
+;;; since PROCESS-TOPLEVEL-FORM only expands the macros at the first
+;;; position.
+(defun fopcompilable-p (form &optional (expand t))
   ;; We'd like to be able to handle
   ;;   -- simple funcalls, nested recursively, e.g.
   ;;      (SET '*PACKAGE* (FIND-PACKAGE "CL-USER"))
@@ -38,105 +56,113 @@
   #+sb-xc-host
   (declare (ignore form))
   #-sb-xc-host
-  (or (and (self-evaluating-p form)
-           (constant-fopcompilable-p form))
-      (and (symbolp form)
-           (multiple-value-bind (macroexpansion macroexpanded-p)
+  (flet ((expand (form)
+           (if expand
                (%macroexpand form *lexenv*)
-             (if macroexpanded-p
-                 (fopcompilable-p macroexpansion)
-                 ;; Punt on :ALIEN variables
-                 (let ((kind (info :variable :kind form)))
-                   (member kind '(:special :constant :global :unknown))))))
-      (and (listp form)
-           (ignore-errors (list-length form))
-           (let ((macroexpansion (expand-compiler-macro form)))
-             (if (neq macroexpansion form)
-                 (return-from fopcompilable-p (fopcompilable-p macroexpansion))
-                 t))
-           (multiple-value-bind (macroexpansion macroexpanded-p)
-               (%macroexpand form *lexenv*)
-             (if macroexpanded-p
-                 (fopcompilable-p macroexpansion)
-                 (destructuring-bind (operator &rest args) form
-                   (case operator
-                     ;; Special operators that we know how to cope with
-                     ((progn)
-                      (every #'fopcompilable-p args))
-                     ((quote)
-                      (and (= (length args) 1)
-                           (constant-fopcompilable-p (car args))))
-                     ((function)
-                      (and (= (length args) 1)
-                           ;; #'(LAMBDA ...), #'(NAMED-LAMBDA ...), etc. These
-                           ;; are not fopcompileable as such, but we can compile
-                           ;; the lambdas with the real compiler, and the rest
-                           ;; of the expression with the fop-compiler.
-                           (or (and (lambda-form-p (car args))
-                                    ;; The lambda might be closing over some
-                                    ;; variable, punt. As a further improvement,
-                                    ;; we could analyze the lambda body to
-                                    ;; see whether it really closes over any
-                                    ;; variables. One place where even simple
-                                    ;; analysis would be useful are the PCL
-                                    ;; slot-definition type-check-functions
-                                    ;;   -- JES, 2007-01-13
-                                    (notany (lambda (binding)
-                                              (lambda-var-p (cdr binding)))
-                                            (lexenv-vars *lexenv*)))
-                               ;; #'FOO, #'(SETF FOO), etc
-                               (legal-fun-name-p (car args)))))
-                     ((if)
-                      (and (<= 2 (length args) 3)
-                           (every #'fopcompilable-p args)))
-                     ;; Allow SETQ only on special or global variables
-                     ((setq)
-                      (loop for (name value) on args by #'cddr
-                            always (and (symbolp name)
-                                        (member (info :variable :kind name)
-                                                '(:special :global))
-                                        (fopcompilable-p value))))
-                     ;; The real toplevel form processing has already been
-                     ;; done, so EVAL-WHEN handling will be easy.
-                     ((eval-when)
-                      (and (>= (length args) 1)
-                           (eq (set-difference (car args)
-                                               '(:compile-toplevel
-                                                 compile
-                                                 :load-toplevel
-                                                 load
-                                                 :execute
-                                                 eval))
-                               nil)
-                           (every #'fopcompilable-p (cdr args))))
-                     ;; A LET or LET* that introduces only lexical
-                     ;; bindings might be fopcompilable, depending on
-                     ;; whether something closes over the bindings.
-                     ;; (And whether there are declarations in the body,
-                     ;; see below)
-                     ((let let*)
-                      (let-fopcompilable-p operator args))
-                     ((locally)
-                      (every #'fopcompilable-p args))
-                     (otherwise
-                      ;; ordinary function calls
-                      (and (symbolp operator)
-                           ;; If a LET/LOCALLY tries to introduce
-                           ;; declarations, we'll detect it here, and
-                           ;; disallow fopcompilation.  This is safe,
-                           ;; since defining a function/macro named
-                           ;; DECLARE would violate a package lock.
-                           (not (eq operator 'declare))
-                           (not (special-operator-p operator))
-                           (not (macro-function operator)) ; redundant check
-                           ;; We can't FOP-FUNCALL with more than 255
-                           ;; parameters. (We could theoretically use
-                           ;; APPLY, but then we'd need to construct
-                           ;; the parameter list for APPLY without
-                           ;; calling LIST, which is probably more
-                           ;; trouble than it's worth).
-                           (<= (length args) 255)
-                           (every #'fopcompilable-p args))))))))))
+               (values form nil)))
+         (expand-cm (form)
+           (if expand
+               (expand-compiler-macro form)
+               (values form nil))))
+    (or (and (self-evaluating-p form)
+             (constant-fopcompilable-p form))
+        (and (symbolp form)
+             (multiple-value-bind (macroexpansion macroexpanded-p)
+                 (expand form)
+               (if macroexpanded-p
+                   (fopcompilable-p macroexpansion)
+                   ;; Punt on :ALIEN variables
+                   (let ((kind (info :variable :kind form)))
+                     (member kind '(:special :constant :global :unknown))))))
+        (and (listp form)
+             (ignore-errors (list-length form))
+             (let ((macroexpansion (expand-cm form)))
+               (if (neq macroexpansion form)
+                   (return-from fopcompilable-p (fopcompilable-p macroexpansion))
+                   t))
+             (multiple-value-bind (macroexpansion macroexpanded-p)
+                 (expand form)
+               (if macroexpanded-p
+                   (fopcompilable-p macroexpansion)
+                   (destructuring-bind (operator &rest args) form
+                     (case operator
+                       ;; Special operators that we know how to cope with
+                       ((progn)
+                        (every #'fopcompilable-p args))
+                       ((quote)
+                        (and (= (length args) 1)
+                             (constant-fopcompilable-p (car args))))
+                       ((function)
+                        (and (= (length args) 1)
+                             ;; #'(LAMBDA ...), #'(NAMED-LAMBDA ...), etc. These
+                             ;; are not fopcompileable as such, but we can compile
+                             ;; the lambdas with the real compiler, and the rest
+                             ;; of the expression with the fop-compiler.
+                             (or (and (lambda-form-p (car args))
+                                      ;; The lambda might be closing over some
+                                      ;; variable, punt. As a further improvement,
+                                      ;; we could analyze the lambda body to
+                                      ;; see whether it really closes over any
+                                      ;; variables. One place where even simple
+                                      ;; analysis would be useful are the PCL
+                                      ;; slot-definition type-check-functions
+                                      ;;   -- JES, 2007-01-13
+                                      (notany (lambda (binding)
+                                                (lambda-var-p (cdr binding)))
+                                              (lexenv-vars *lexenv*)))
+                                 ;; #'FOO, #'(SETF FOO), etc
+                                 (legal-fun-name-p (car args)))))
+                       ((if)
+                        (and (<= 2 (length args) 3)
+                             (every #'fopcompilable-p args)))
+                       ;; Allow SETQ only on special or global variables
+                       ((setq)
+                        (loop for (name value) on args by #'cddr
+                              always (and (symbolp name)
+                                          (member (info :variable :kind name)
+                                                  '(:special :global))
+                                          (fopcompilable-p value))))
+                       ;; The real toplevel form processing has already been
+                       ;; done, so EVAL-WHEN handling will be easy.
+                       ((eval-when)
+                        (and (>= (length args) 1)
+                             (eq (set-difference (car args)
+                                                 '(:compile-toplevel
+                                                   compile
+                                                   :load-toplevel
+                                                   load
+                                                   :execute
+                                                   eval))
+                                 nil)
+                             (every #'fopcompilable-p (cdr args))))
+                       ;; A LET or LET* that introduces only lexical
+                       ;; bindings might be fopcompilable, depending on
+                       ;; whether something closes over the bindings.
+                       ;; (And whether there are declarations in the body,
+                       ;; see below)
+                       ((let let*)
+                        (let-fopcompilable-p operator args))
+                       ((locally)
+                        (every #'fopcompilable-p args))
+                       (otherwise
+                        ;; ordinary function calls
+                        (and (symbolp operator)
+                             ;; If a LET/LOCALLY tries to introduce
+                             ;; declarations, we'll detect it here, and
+                             ;; disallow fopcompilation.  This is safe,
+                             ;; since defining a function/macro named
+                             ;; DECLARE would violate a package lock.
+                             (not (eq operator 'declare))
+                             (not (special-operator-p operator))
+                             (not (macro-function operator)) ; redundant check
+                             ;; We can't FOP-FUNCALL with more than 255
+                             ;; parameters. (We could theoretically use
+                             ;; APPLY, but then we'd need to construct
+                             ;; the parameter list for APPLY without
+                             ;; calling LIST, which is probably more
+                             ;; trouble than it's worth).
+                             (<= (length args) 255)
+                             (every #'fopcompilable-p args)))))))))))
 
 (defun let-fopcompilable-p (operator args)
   (when (>= (length args) 1)
@@ -240,153 +266,163 @@
 ;;; FOR-VALUE-P is true if the value will be used (i.e., pushed onto
 ;;; FOP stack), or NIL if any value will be discarded. FOPCOMPILABLE-P
 ;;; has already ensured that the form can be fopcompiled.
-(defun fopcompile (form path for-value-p)
-  (cond ((self-evaluating-p form)
-         (fopcompile-constant form for-value-p))
-        ((symbolp form)
-         (multiple-value-bind (macroexpansion macroexpanded-p)
-             (%macroexpand form *lexenv*)
-           (if macroexpanded-p
-               ;; Symbol macro
-               (fopcompile macroexpansion path for-value-p)
-               (let ((kind (info :variable :kind form)))
-                 (cond
-                   ((eq :special kind)
-                    ;; Special variable
-                    (fopcompile `(symbol-value ',form) path for-value-p))
+;;;
+;;; See the expansion problem FIXME above fopcompilable-p.
+(defun fopcompile (form path for-value-p &optional (expand t))
+  (flet ((expand (form)
+           (if expand
+               (%macroexpand form *lexenv*)
+               (values form nil)))
+         (expand-cm (form)
+           (if expand
+               (expand-compiler-macro form)
+               (values form nil))))
+    (cond ((self-evaluating-p form)
+           (fopcompile-constant form for-value-p))
+          ((symbolp form)
+           (multiple-value-bind (macroexpansion macroexpanded-p)
+               (expand form)
+             (if macroexpanded-p
+                 ;; Symbol macro
+                 (fopcompile macroexpansion path for-value-p)
+                 (let ((kind (info :variable :kind form)))
+                   (cond
+                     ((eq :special kind)
+                      ;; Special variable
+                      (fopcompile `(symbol-value ',form) path for-value-p))
 
-                   ((member kind '(:global :constant))
-                    ;; Global variable or constant.
-                    (fopcompile `(symbol-global-value ',form) path for-value-p))
-                   (t
-                    ;; Lexical
-                    (let* ((lambda-var (cdr (assoc form (lexenv-vars *lexenv*))))
-                           (handle (when lambda-var
-                                     (lambda-var-fop-value lambda-var))))
-                      (if handle
-                          (when for-value-p
-                            (sb!fasl::dump-push handle *compile-object*))
-                          (progn
-                            ;; Undefined variable. Signal a warning, and
-                            ;; treat it as a special variable reference, like
-                            ;; the real compiler does -- do not elide even if
-                            ;; the value is unused.
-                            (note-undefined-reference form :variable)
-                            (fopcompile `(symbol-value ',form)
-                                        path
-                                        for-value-p))))))))))
-        ((listp form)
-         (let ((macroexpansion (expand-compiler-macro form)))
-           (if (neq macroexpansion form)
-               ;; could expand into an atom, so start from the top
-               (return-from fopcompile
-                 (fopcompile macroexpansion path for-value-p))))
-         (multiple-value-bind (macroexpansion macroexpanded-p)
-             (%macroexpand form *lexenv*)
-           (if macroexpanded-p
-               (fopcompile macroexpansion path for-value-p)
-               (destructuring-bind (operator &rest args) form
-                 (case operator
-                   ;; The QUOTE special operator is worth handling: very
-                   ;; easy and very common at toplevel.
-                   ((quote)
-                    (fopcompile-constant (second form) for-value-p))
-                   ;; A FUNCTION needs to be compiled properly, but doesn't
-                   ;; need to prevent the fopcompilation of the whole form.
-                   ;; We just compile it, and emit an instruction for pushing
-                   ;; the function handle on the FOP stack.
-                   ((function)
-                    (fopcompile-function (second form) path for-value-p))
-                   ;; KLUDGE! SB!C:SOURCE-LOCATION calls are normally handled
-                   ;; by a compiler-macro. But if SPACE > DEBUG we choose not
-                   ;; to record locations, which is strange because the main
-                   ;; compiler does not have similar logic afaict.
-                   ((source-location)
-                    (if (policy *policy* (and (> space 1)
-                                              (> space debug)))
-                        (fopcompile-constant nil for-value-p)
-                        (fopcompile (let ((*current-path* path))
-                                      (make-definition-source-location))
-                                    path
-                                    for-value-p)))
-                   ((if)
-                    (fopcompile-if args path for-value-p))
-                   ((progn locally)
-                    (loop for (arg . next) on args
-                          do (fopcompile arg
-                                         path (if next
-                                                  nil
-                                                  for-value-p))))
-                   ((setq)
-                    (loop for (name value . next) on args by #'cddr
-                          do (fopcompile `(set ',name ,value) path
-                                         (if next
-                                             nil
-                                             for-value-p))))
-                   ((eval-when)
-                    (destructuring-bind (situations &body body) args
-                      (if (or (member :execute situations)
-                              (member 'eval situations))
-                          (fopcompile (cons 'progn body) path for-value-p)
-                          (fopcompile nil path for-value-p))))
-                   ((let let*)
-                    (let ((orig-lexenv *lexenv*)
-                          (*lexenv* (make-lexenv :default *lexenv*)))
-                      (loop for binding in (car args)
-                            for name = (if (consp binding)
-                                           (first binding)
-                                           binding)
-                            for value = (if (consp binding)
-                                            (second binding)
-                                            nil)
-                            do (let ((*lexenv* (if (eql operator 'let)
-                                                   orig-lexenv
-                                                   *lexenv*)))
-                                 (fopcompile value path t))
-                            do (let ((obj (sb!fasl::dump-pop *compile-object*)))
-                                 (setf *lexenv*
-                                       (make-lexenv
-                                        :vars (list (cons name
-                                                          (make-lambda-var
-                                                           :%source-name name
-                                                           :fop-value obj)))))))
-                      (fopcompile (cons 'progn (cdr args)) path for-value-p)))
-                   ;; Otherwise it must be an ordinary funcall.
-                   (otherwise
-                    (cond
-                      ;; Special hack: there's already a fop for
-                      ;; find-undeleted-package-or-lose, so use it.
-                      ;; (We could theoretically do the same for
-                      ;; other operations, but I don't see any good
-                      ;; candidates in a quick read-through of
-                      ;; src/code/fop.lisp.)
-                      ((and (eq operator
-                                'sb!int:find-undeleted-package-or-lose)
-                            (= 1 (length args))
-                            for-value-p)
-                       (fopcompile (first args) path t)
-                       (sb!fasl::dump-fop 'sb!fasl::fop-package
-                                          *compile-object*))
-                      (t
-                       (when (eq (info :function :where-from operator) :assumed)
-                         (note-undefined-reference operator :function))
-                       (fopcompile-constant operator t)
-                       (dolist (arg args)
-                         (fopcompile arg path t))
-                       (if for-value-p
-                           (sb!fasl::dump-fop 'sb!fasl::fop-funcall
-                                              *compile-object*)
-                           (sb!fasl::dump-fop 'sb!fasl::fop-funcall-for-effect
-                                              *compile-object*))
-                       (let ((n-args (length args)))
-                         ;; stub: FOP-FUNCALL isn't going to be usable
-                         ;; to compile more than this, since its count
-                         ;; is a single byte. Maybe we should just punt
-                         ;; to the ordinary compiler in that case?
-                         (aver (<= n-args 255))
-                         (sb!fasl::dump-byte n-args *compile-object*))))))))))
-        (t
-         (bug "looks unFOPCOMPILEable: ~S" form))))
+                     ((member kind '(:global :constant))
+                      ;; Global variable or constant.
+                      (fopcompile `(symbol-global-value ',form) path for-value-p))
+                     (t
+                      ;; Lexical
+                      (let* ((lambda-var (cdr (assoc form (lexenv-vars *lexenv*))))
+                             (handle (when lambda-var
+                                       (lambda-var-fop-value lambda-var))))
+                        (if handle
+                            (when for-value-p
+                              (sb!fasl::dump-push handle *compile-object*))
+                            (progn
+                              ;; Undefined variable. Signal a warning, and
+                              ;; treat it as a special variable reference, like
+                              ;; the real compiler does -- do not elide even if
+                              ;; the value is unused.
+                              (note-undefined-reference form :variable)
+                              (fopcompile `(symbol-value ',form)
+                                          path
+                                          for-value-p))))))))))
+          ((listp form)
+           (let ((macroexpansion (expand-cm form)))
+             (if (neq macroexpansion form)
+                 ;; could expand into an atom, so start from the top
+                 (return-from fopcompile
+                   (fopcompile macroexpansion path for-value-p))))
+           (multiple-value-bind (macroexpansion macroexpanded-p)
+               (expand form)
+             (if macroexpanded-p
+                 (fopcompile macroexpansion path for-value-p)
+                 (destructuring-bind (operator &rest args) form
+                   (case operator
+                     ;; The QUOTE special operator is worth handling: very
+                     ;; easy and very common at toplevel.
+                     ((quote)
+                      (fopcompile-constant (second form) for-value-p))
+                     ;; A FUNCTION needs to be compiled properly, but doesn't
+                     ;; need to prevent the fopcompilation of the whole form.
+                     ;; We just compile it, and emit an instruction for pushing
+                     ;; the function handle on the FOP stack.
+                     ((function)
+                      (fopcompile-function (second form) path for-value-p))
+                     ;; KLUDGE! SB!C:SOURCE-LOCATION calls are normally handled
+                     ;; by a compiler-macro. But if SPACE > DEBUG we choose not
+                     ;; to record locations, which is strange because the main
+                     ;; compiler does not have similar logic afaict.
+                     ((source-location)
+                      (if (policy *policy* (and (> space 1)
+                                                (> space debug)))
+                          (fopcompile-constant nil for-value-p)
+                          (fopcompile (let ((*current-path* path))
+                                        (make-definition-source-location))
+                                      path
+                                      for-value-p)))
+                     ((if)
+                      (fopcompile-if args path for-value-p))
+                     ((progn locally)
+                      (loop for (arg . next) on args
+                            do (fopcompile arg
+                                           path (if next
+                                                    nil
+                                                    for-value-p))))
+                     ((setq)
+                      (loop for (name value . next) on args by #'cddr
+                            do (fopcompile `(set ',name ,value) path
+                                           (if next
+                                               nil
+                                               for-value-p))))
+                     ((eval-when)
+                      (destructuring-bind (situations &body body) args
+                        (if (or (member :execute situations)
+                                (member 'eval situations))
+                            (fopcompile (cons 'progn body) path for-value-p)
+                            (fopcompile nil path for-value-p))))
+                     ((let let*)
+                      (let ((orig-lexenv *lexenv*)
+                            (*lexenv* (make-lexenv :default *lexenv*)))
+                        (loop for binding in (car args)
+                              for name = (if (consp binding)
+                                             (first binding)
+                                             binding)
+                              for value = (if (consp binding)
+                                              (second binding)
+                                              nil)
+                              do (let ((*lexenv* (if (eql operator 'let)
+                                                     orig-lexenv
+                                                     *lexenv*)))
+                                   (fopcompile value path t))
+                              do (let ((obj (sb!fasl::dump-pop *compile-object*)))
+                                   (setf *lexenv*
+                                         (make-lexenv
+                                          :vars (list (cons name
+                                                            (make-lambda-var
+                                                             :%source-name name
+                                                             :fop-value obj)))))))
+                        (fopcompile (cons 'progn (cdr args)) path for-value-p)))
+                     ;; Otherwise it must be an ordinary funcall.
+                     (otherwise
+                      (cond
+                        ;; Special hack: there's already a fop for
+                        ;; find-undeleted-package-or-lose, so use it.
+                        ;; (We could theoretically do the same for
+                        ;; other operations, but I don't see any good
+                        ;; candidates in a quick read-through of
+                        ;; src/code/fop.lisp.)
+                        ((and (eq operator
+                                  'sb!int:find-undeleted-package-or-lose)
+                              (= 1 (length args))
+                              for-value-p)
+                         (fopcompile (first args) path t)
+                         (sb!fasl::dump-fop 'sb!fasl::fop-package
+                                            *compile-object*))
+                        (t
+                         (when (eq (info :function :where-from operator) :assumed)
+                           (note-undefined-reference operator :function))
+                         (fopcompile-constant operator t)
+                         (dolist (arg args)
+                           (fopcompile arg path t))
+                         (if for-value-p
+                             (sb!fasl::dump-fop 'sb!fasl::fop-funcall
+                                                *compile-object*)
+                             (sb!fasl::dump-fop 'sb!fasl::fop-funcall-for-effect
+                                                *compile-object*))
+                         (let ((n-args (length args)))
+                           ;; stub: FOP-FUNCALL isn't going to be usable
+                           ;; to compile more than this, since its count
+                           ;; is a single byte. Maybe we should just punt
+                           ;; to the ordinary compiler in that case?
+                           (aver (<= n-args 255))
+                           (sb!fasl::dump-byte n-args *compile-object*))))))))))
+          (t
+           (bug "looks unFOPCOMPILEable: ~S" form)))))
 
 (defun fopcompile-function (form path for-value-p)
   (flet ((dump-fdefinition (name)
