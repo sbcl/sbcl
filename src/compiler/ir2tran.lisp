@@ -1269,22 +1269,21 @@
             (t
              ;; No more args, so normal entry.
              (vop xep-allocate-frame node block start-label nil)))
-      (if (ir2-physenv-closure env)
-          (let ((closure (make-normal-tn *backend-t-primitive-type*)))
-            (when (policy fun (> store-closure-debug-pointer 1))
-              ;; Save the closure pointer on the stack.
-              (let ((closure-save (make-representation-tn
-                                   *backend-t-primitive-type*
-                                   (sc-number-or-lose 'sb!vm::control-stack))))
-                (vop setup-closure-environment node block start-label
-                     closure-save)
-                (setf (ir2-physenv-closure-save-tn env) closure-save)
-                (component-live-tn closure-save)))
-            (vop setup-closure-environment node block start-label closure)
-            (let ((n -1))
-              (dolist (loc (ir2-physenv-closure env))
-                (vop closure-ref node block closure (incf n) (cdr loc)))))
-          (vop setup-environment node block start-label)))
+      (when (ir2-physenv-closure env)
+        (let ((closure (make-normal-tn *backend-t-primitive-type*)))
+          (when (policy fun (> store-closure-debug-pointer 1))
+            ;; Save the closure pointer on the stack.
+            (let ((closure-save (make-representation-tn
+                                 *backend-t-primitive-type*
+                                 (sc-number-or-lose 'sb!vm::control-stack))))
+              (vop setup-closure-environment node block start-label
+                   closure-save)
+              (setf (ir2-physenv-closure-save-tn env) closure-save)
+              (component-live-tn closure-save)))
+          (vop setup-closure-environment node block start-label closure)
+          (let ((n -1))
+            (dolist (loc (ir2-physenv-closure env))
+              (vop closure-ref node block closure (incf n) (cdr loc)))))))
 
     (unless (eq (functional-kind fun) :toplevel)
       (let ((vars (lambda-vars fun))

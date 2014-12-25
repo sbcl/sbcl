@@ -355,15 +355,6 @@
 
 ;;;; XEP hackery:
 
-;;; We don't need to do anything special for regular functions.
-;;;
-(define-vop (setup-environment)
-  (:info label)
-  (:ignore label)
-  (:generator 0
-    ;; Don't bother doing anything.
-    ))
-
 ;;; Get the lexical environment from its passing location.
 (define-vop (setup-closure-environment)
   (:temporary (:sc descriptor-reg :offset lexenv-offset :target closure
