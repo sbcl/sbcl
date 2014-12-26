@@ -2138,6 +2138,9 @@ handle_trap(os_context_t *context, int trap)
 #endif
     case trap_Error:
     case trap_Cerror:
+#ifdef LISP_FEATURE_X86_64
+    case trap_InvalidArgCount:
+#endif
         FSHOW((stderr, "/<trap error/cerror %d>\n", trap));
         interrupt_internal_error(context, trap==trap_Cerror);
         break;

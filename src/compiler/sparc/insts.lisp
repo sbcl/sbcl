@@ -1219,8 +1219,7 @@ about function addresses and register values.")
       (#.fun-end-breakpoint-trap
        (nt "Function end breakpoint trap"))
       (#.object-not-instance-trap
-       (nt "Object not instance trap"))
-    )))
+       (nt "Object not instance trap")))))
 
 (define-instruction unimp (segment data)
   (:declare (type (unsigned-byte 22) data))

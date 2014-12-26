@@ -2928,7 +2928,9 @@
       (#.single-step-around-trap
        (nt "single-step trap (around)"))
       (#.single-step-before-trap
-       (nt "single-step trap (before)")))))
+       (nt "single-step trap (before)"))
+      (#.invalid-arg-count-trap
+       (nt "Invalid argument count trap")))))
 
 (define-instruction break (segment code)
   (:declare (type (unsigned-byte 8) code))
