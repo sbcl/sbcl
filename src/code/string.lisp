@@ -27,7 +27,7 @@
          (error 'simple-type-error
                 :datum x
                 :expected-type 'string-designator
-                :format-control "~S cannot be coerced to a string."
+                :format-control "~S is not a string designator."
                 :format-arguments (list x)))))
 
 ;;; %CHECK-VECTOR-SEQUENCE-BOUNDS is used to verify that the START and
