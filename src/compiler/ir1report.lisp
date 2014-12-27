@@ -587,11 +587,17 @@ has written, having proved that it is unreachable."))
         ;; This is why I don't bother collecting both statistics.
         ;; It's the tail wagging the dog: the message dictates what to track.
         (compiler-style-warn
-                "~@<~@(~D~) call~:P to ~/sb-impl:print-symbol-with-prefix/ ~2:*~[~;was~:;were~] ~
+         #+sb-xc-host
+         "~@<~@(~D~) call~:P to ~/sb!impl:print-symbol-with-prefix/ ~2:*~[~;was~:;were~] ~
 compiled before a compiler-macro was defined for it. A declaration of ~
 NOTINLINE at the call site~:P will eliminate this warning, ~
 as will defining the compiler-macro before its first potential use.~@:>"
-                (ash status -2) name)))))
+         #-sb-xc-host
+         "~@<~@(~D~) call~:P to ~/sb-impl:print-symbol-with-prefix/ ~2:*~[~;was~:;were~] ~
+compiled before a compiler-macro was defined for it. A declaration of ~
+NOTINLINE at the call site~:P will eliminate this warning, ~
+as will defining the compiler-macro before its first potential use.~@:>"
+         (ash status -2) name)))))
 
 ;; Inlining failure scenario 1 [at time of proclamation]:
 ;; Full call to F is emitted not in the scope of a NOTINLINE, with no definition
@@ -613,6 +619,12 @@ as will defining the compiler-macro before its first potential use.~@:>"
         (compiler-style-warn
          'inlining-dependency-failure
          :format-control
+         #+sb-xc-host
+         "~@<Proclaiming ~/sb!impl:print-symbol-with-prefix/ to be INLINE, but ~D call~:P to it ~
+~:*~[~;was~:;were~] previously compiled. A declaration of NOTINLINE ~
+at the call site~:P will eliminate this warning, as will proclaiming ~
+and defining the function before its first potential use.~@:>"
+         #-sb-xc-host
          "~@<Proclaiming ~/sb-impl:print-symbol-with-prefix/ to be INLINE, but ~D call~:P to it ~
 ~:*~[~;was~:;were~] previously compiled. A declaration of NOTINLINE ~
 at the call site~:P will eliminate this warning, as will proclaiming ~
@@ -666,6 +678,10 @@ and defining the function before its first potential use.~@:>"
        'inlining-dependency-failure
        :format-control
        (if (info :function :assumed-type name)
+           #+sb-xc-host
+           "~@<Call to ~/sb!impl:print-symbol-with-prefix/ could not be inlined because no definition ~
+for it was seen prior to its first use.~:@>"
+           #-sb-xc-host
            "~@<Call to ~/sb-impl:print-symbol-with-prefix/ could not be inlined because no definition ~
 for it was seen prior to its first use.~:@>"
          ;; This message sort of implies that source form is the
@@ -673,6 +689,11 @@ for it was seen prior to its first use.~:@>"
          ;; could have been saved, which isn't in general true - it could
          ;; be saved as a parsed AST - but I don't really know how else to
          ;; phrase this. And it happens to be true in SBCL, so it's not wrong.
+           #+sb-xc-host
+           "~@<Call to ~/sb!impl:print-symbol-with-prefix/ could not be inlined because its source code ~
+was not saved. A global INLINE or SB-EXT:MAYBE-INLINE proclamation must be ~
+in effect to save function definitions for inlining.~:@>"
+           #-sb-xc-host
            "~@<Call to ~/sb-impl:print-symbol-with-prefix/ could not be inlined because its source code ~
 was not saved. A global INLINE or SB-EXT:MAYBE-INLINE proclamation must be ~
 in effect to save function definitions for inlining.~:@>")

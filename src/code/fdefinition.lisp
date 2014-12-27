@@ -40,6 +40,13 @@
   (declare (type fdefn fdefn))
   (fdefn-makunbound fdefn))
 
+#!-sb-fluid (declaim (inline symbol-fdefn))
+;; Return SYMBOL's fdefinition, if any, or NIL. SYMBOL must already
+;; have been verified to be a symbol by the caller.
+(defun symbol-fdefn (symbol)
+  (declare (optimize (safety 0)))
+  (info-vector-fdefn (symbol-info-vector (uncross symbol))))
+
 ;; Return the fdefn object for NAME, or NIL if there is no fdefn.
 ;; Signal an error if name isn't valid.
 ;; Assume that exists-p implies LEGAL-FUN-NAME-P.
@@ -108,13 +115,6 @@
   (maybe-clobber-ftype name)
   (let ((fdefn (find-or-create-fdefn name)))
     (setf (fdefn-fun fdefn) function)))
-
-#!-sb-fluid (declaim (inline symbol-fdefn))
-;; Return SYMBOL's fdefinition, if any, or NIL. SYMBOL must already
-;; have been verified to be a symbol by the caller.
-(defun symbol-fdefn (symbol)
-  (declare (optimize (safety 0)))
-  (info-vector-fdefn (symbol-info-vector (uncross symbol))))
 
 ;; CALLABLE is a function-designator, not an extended-function-designator,
 ;; i.e. it is a function or symbol, and not a generalized function name.

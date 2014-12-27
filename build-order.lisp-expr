@@ -35,14 +35,13 @@
 (
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
  ;;; miscellaneous
+ ;; This comes as early as possible, so that we catch the source locations
+ ;; for everything.
+ ("src/code/early-source-location")
  ("src/code/cross-early" :not-target)
 
  ;; This comes early because it's useful for debugging everywhere.
  ("src/code/show")
-
- ;; This comes as early as possible, so that we catch the source locations
- ;; for everything.
- ("src/code/early-source-location")
 
  ("src/code/early-constants")
 

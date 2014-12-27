@@ -558,6 +558,7 @@
 ;;;; Searching constraints
 
 ;;; Add the indicated test constraint to TARGET.
+(declaim (inline precise-add-test-constraint))
 (defun precise-add-test-constraint (fun x y not-p constraints target)
   (if (and (eq 'eql fun) (lambda-var-p y) (not not-p))
       (add-eql-var-var-constraint x y constraints target)
@@ -571,7 +572,7 @@
          (precise-add-test-constraint fun x y not-p constraints target))))
 ;;; Add complementary constraints to the consequent and alternative
 ;;; blocks of IF. We do nothing if X is NIL.
-(declaim (inline precise-add-test-constraint quick-add-complement-constraints))
+(declaim (inline quick-add-complement-constraints))
 (defun precise-add-complement-constraints (fun x y not-p constraints
                                            consequent-constraints
                                            alternative-constraints)

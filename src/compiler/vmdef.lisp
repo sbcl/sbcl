@@ -198,6 +198,13 @@
 
 ;;; Return a function type specifier describing TEMPLATE's type computed
 ;;; from the operand type restrictions.
+#!-sb-fluid (declaim (inline template-conditional-p))
+(defun template-conditional-p (template)
+  (declare (type template template))
+  (let ((rtypes (template-result-types template)))
+    (or (eq rtypes :conditional)
+        (eq (car rtypes) :conditional))))
+
 (defun template-type-specifier (template)
   (declare (type template template))
   (flet ((convert (types more-types)
@@ -224,10 +231,3 @@
                  ,(if (= (length results) 1)
                       (first results)
                       `(values ,@results))))))
-
-#!-sb-fluid (declaim (inline template-conditional-p))
-(defun template-conditional-p (template)
-  (declare (type template template))
-  (let ((rtypes (template-result-types template)))
-    (or (eq rtypes :conditional)
-        (eq (car rtypes) :conditional))))

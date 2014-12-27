@@ -176,7 +176,7 @@
     (declare (type index size))
     (with-fop-stack (stack ptr n-data-words)
       (let ((ptr (+ ptr n-data-words)))
-        (declare (index ptr))
+        (declare (type index ptr))
         (setf (%instance-ref res 0) layout)
         #!-interleaved-raw-slots
         (let* ((nuntagged (layout-n-untagged-slots layout))

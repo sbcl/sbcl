@@ -21,13 +21,7 @@
 ;;; coalesced. -- JES, 2008-01-02
 (defconstant +code-coverage-unmarked+ '%code-coverage-unmarked%)
 
-(defvar *source-location-thunks* nil)
-
-;; Will be redefined in src/code/source-location.lisp.
-(defun source-location ()
-  nil)
-
-;; Will be redefined in src/code/source-location.lisp
+;;; Will be redefined in src/code/source-location.lisp
 #-sb-xc-host
 (define-compiler-macro source-location ()
   (when (and (boundp '*source-info*)
@@ -38,6 +32,12 @@
                        ,(when (boundp '*current-path*)
                               (source-path-tlf-number (symbol-value '*current-path*))))))
       form)))
+
+(defvar *source-location-thunks* nil)
+
+;; Will be redefined in src/code/source-location.lisp.
+(defun source-location ()
+  nil)
 
 ;; If the whole source location tracking machinery has been loaded
 ;; (detected by the type of SOURCE-LOCATION), execute BODY. Otherwise

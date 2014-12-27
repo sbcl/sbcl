@@ -54,7 +54,7 @@
   ;; supporting in the future are LOCALLY (with declarations),
   ;; MACROLET, SYMBOL-MACROLET and THE.
   #+sb-xc-host
-  (declare (ignore form))
+  (declare (ignore form expand))
   #-sb-xc-host
   (flet ((expand (form)
            (if expand
