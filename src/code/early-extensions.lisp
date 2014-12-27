@@ -1177,7 +1177,7 @@
                                    :identity ,identity)
            ,@(nreverse reversed-prints))))))
 
-(defun print-symbol-with-prefix (stream symbol colon at)
+(defun print-symbol-with-prefix (stream symbol &optional colon at)
   #!+sb-doc
   "For use with ~/: Write SYMBOL to STREAM as if it is not accessible from
   the current package."
