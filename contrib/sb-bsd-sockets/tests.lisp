@@ -131,23 +131,29 @@
 
 #-win32
 (deftest inet6-socket-bind
-    (let* ((tcp (get-protocol-by-name "tcp"))
-           (address (make-inet6-address "::1"))
-           (s1 (make-instance 'inet6-socket :type :stream :protocol tcp))
-           (s2 (make-instance 'inet6-socket :type :stream :protocol tcp)))
-      (unwind-protect
-           ;; Given the functions we've got so far, if you can think of a
-           ;; better way to make sure the bind succeeded than trying it
-           ;; twice, let me know
-           (progn
+  (let* ((tcp (get-protocol-by-name "tcp"))
+         (address (make-inet6-address "::1"))
+         (s1 (make-instance 'inet6-socket :type :stream :protocol tcp))
+         (s2 (make-instance 'inet6-socket :type :stream :protocol tcp)))
+    (unwind-protect
+         ;; Given the functions we've got so far, if you can think of a
+         ;; better way to make sure the bind succeeded than trying it
+         ;; twice, let me know
+         (handler-case
              (socket-bind s1 address 0)
+           (socket-error ()
+             ;; This may mean no IPv6 support, can't fail a test
+             ;; because of that
+             t)
+           (:no-error (x)
+             (declare (ignore x))
              (handler-case
                  (let ((port (nth-value 1 (socket-name s1))))
                    (socket-bind s2 address port)
                    nil)
-               (address-in-use-error () t)))
-        (socket-close s1)
-        (socket-close s2)))
+               (address-in-use-error () t))))
+      (socket-close s1)
+      (socket-close s2)))
   t)
 
 (deftest* (simple-sockopt-test)
