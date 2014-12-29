@@ -312,8 +312,8 @@
                                  16
                                  32)))
               (flags (unsigned 8))
-              (gen (signed 8))
-              (conservative-words signed)))
+              (has-dontmove-dwords (unsigned 8))
+              (gen (signed 8))))
   (declaim (inline find-page-index))
   (define-alien-routine "find_page_index" long (index signed))
   (define-alien-variable "last_free_page" sb!kernel::page-index-t)

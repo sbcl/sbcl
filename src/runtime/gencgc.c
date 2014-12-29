@@ -182,11 +182,14 @@ static boolean conservative_stack = 1;
 page_index_t page_table_pages;
 struct page *page_table;
 
+in_use_marker_t *page_table_dontmove_dwords;
+size_t page_table_dontmove_dwords_size_in_bytes;
+
 /* In GC cards that have conservative pointers to them, should we wipe out
  * dwords in there that are not used, so that they do not act as false
  * root to other things in the heap from then on? This is a new feature
  * but in testing it is both reliable and no noticeable slowdown. */
-int do_wipe_p = 0;
+int do_wipe_p = 1;
 
 /* a value that we use to wipe out unused words in GC cards that
  * live alongside conservatively to pointed words. */
@@ -821,6 +824,15 @@ set_generation_alloc_start_page(generation_index_t generation, int page_type_fla
     }
 }
 
+const int n_dwords_in_card = GENCGC_CARD_BYTES / N_WORD_BYTES / 2;
+in_use_marker_t *
+dontmove_dwords(page_index_t page)
+{
+    if (page_table[page].has_dontmove_dwords)
+        return &page_table_dontmove_dwords[page * n_dwords_in_card];
+    return NULL;
+}
+
 /* Find a new region with room for at least the given number of bytes.
  *
  * It starts looking at the current generation's alloc_start_page. So
@@ -887,7 +899,7 @@ gc_alloc_new_region(sword_t nbytes, int page_type_flag, struct alloc_region *all
         page_table[first_page].large_object = 0;
         page_table[first_page].scan_start_offset = 0;
         // wiping should have free()ed and :=NULL
-        gc_assert(page_table[first_page].dontmove_dwords == NULL);
+        gc_assert(dontmove_dwords(first_page) == NULL);
     }
 
     gc_assert(page_table[first_page].allocated == page_type_flag);
@@ -2127,16 +2139,16 @@ valid_conservative_root_p(void *addr, page_index_t addr_page_index,
 boolean
 in_dontmove_dwordindex_p(page_index_t page_index, int dword_in_page)
 {
-    if (page_table[page_index].dontmove_dwords) {
-        return page_table[page_index].dontmove_dwords[dword_in_page];
-    } else {
-        return 0;
-    }
+    in_use_marker_t *marker;
+    marker = dontmove_dwords(page_index);
+    if (marker)
+        return marker[dword_in_page];
+    return 0;
 }
 boolean
 in_dontmove_nativeptr_p(page_index_t page_index, lispobj *native_ptr)
 {
-    if (page_table[page_index].dontmove_dwords) {
+    if (dontmove_dwords(page_index)) {
         lispobj *begin = page_address(page_index);
         int dword_in_page = (native_ptr - begin) / 2;
         return in_dontmove_dwordindex_p(page_index, dword_in_page);
@@ -2322,7 +2334,7 @@ scavenge_pages_with_conservative_pointers_to_them_protected_objects_only()
 {
     page_index_t i;
     for (i = 0; i < last_free_page; i++) {
-        if (!page_table[i].dontmove_dwords) {
+        if (!dontmove_dwords(i)) {
             continue;
         }
         lispobj *begin = page_address(i);
@@ -2364,7 +2376,7 @@ do_the_wipe()
             continue;
         }
         pages_considered++;
-        if (!page_table[i].dontmove_dwords) {
+        if (!dontmove_dwords(i)) {
             n_pages_cannot_wipe++;
             continue;
         }
@@ -2383,16 +2395,18 @@ do_the_wipe()
                 words_wiped += 2;
             }
         }
-        free(page_table[i].dontmove_dwords);
-        page_table[i].dontmove_dwords = NULL;
+        page_table[i].has_dontmove_dwords = 0;
 
         // move the page to newspace
         generations[new_space].bytes_allocated += page_table[i].bytes_used;
         generations[page_table[i].gen].bytes_allocated -= page_table[i].bytes_used;
         page_table[i].gen = new_space;
     }
+#ifndef LISP_FEATURE_WIN32
+    madvise(page_table_dontmove_dwords, page_table_dontmove_dwords_size_in_bytes, MADV_DONTNEED);
+#endif
     if ((verbosefixes >= 1 && lisp_pointers_wiped > 0) || verbosefixes >= 2) {
-        fprintf(stderr, "Cra25a: wiped %d words (%d lisp_pointers) in %d pages, cannot wipe %d pages \n"
+        fprintf(stderr, "gencgc: wiped %d words (%d lisp_pointers) in %d pages, cannot wipe %d pages \n"
                 , words_wiped, lisp_pointers_wiped, pages_considered, n_pages_cannot_wipe);
     }
 }
@@ -2406,14 +2420,11 @@ set_page_consi_bit(page_index_t pageindex, lispobj *mark_which_pointer)
       return;
 
     gc_assert(mark_which_pointer);
-    if (page->dontmove_dwords == NULL) {
-        const int n_dwords_in_card = GENCGC_CARD_BYTES / N_WORD_BYTES / 2;
-        const int malloc_size = sizeof(in_use_marker_t) * n_dwords_in_card;
-        page->dontmove_dwords = malloc(malloc_size);
-        gc_assert(page->dontmove_dwords);
-        bzero(page->dontmove_dwords, malloc_size);
+    if (!page->has_dontmove_dwords) {
+        page->has_dontmove_dwords = 1;
+        bzero(dontmove_dwords(pageindex),
+              sizeof(in_use_marker_t) * n_dwords_in_card);
     }
-
     int size = (sizetab[widetag_of(mark_which_pointer[0])])(mark_which_pointer);
     if (size == 1 &&
         (fixnump(*mark_which_pointer) ||
@@ -2422,7 +2433,6 @@ set_page_consi_bit(page_index_t pageindex, lispobj *mark_which_pointer)
          lowtag_of(*mark_which_pointer) == 2)) {
         size = 2;
     }
-    // print additional debug info for now.
     if (size % 2 != 0) {
         fprintf(stderr, "WIPE ERROR !dword, size %d, lowtag %d, world 0x%lld\n",
                 size,
@@ -2433,8 +2443,9 @@ set_page_consi_bit(page_index_t pageindex, lispobj *mark_which_pointer)
     lispobj *begin = page_address(pageindex);
     int begin_dword = (mark_which_pointer - begin) / 2;
     int dword;
+    in_use_marker_t *marker = dontmove_dwords(pageindex);
     for (dword = begin_dword; dword < begin_dword + size / 2; dword++) {
-        page->dontmove_dwords[dword] = 1;
+        marker[dword] = 1;
     }
 }
 
@@ -3557,7 +3568,7 @@ move_pinned_pages_to_newspace()
         if (page_table[i].dont_move &&
             /* dont_move is cleared lazily, so validate the space as well. */
             page_table[i].gen == from_space) {
-            if (page_table[i].dontmove_dwords && do_wipe_p) {
+            if (dontmove_dwords(i) && do_wipe_p) {
                 // do not move to newspace after all, this will be word-wiped
                 continue;
             }
@@ -3618,7 +3629,7 @@ garbage_collect_generation(generation_index_t generation, int raise)
     for (i = 0; i < last_free_page; i++)
         if(page_table[i].gen==from_space) {
             page_table[i].dont_move = 0;
-            gc_assert(page_table[i].dontmove_dwords == NULL);
+            gc_assert(dontmove_dwords(i) == NULL);
         }
 
     /* Un-write-protect the old-space pages. This is essential for the
@@ -4268,6 +4279,19 @@ gc_init(void)
      * unnecessary and did hurt startup time. */
     page_table = calloc(page_table_pages, sizeof(struct page));
     gc_assert(page_table);
+    size_t total_size = sizeof(in_use_marker_t *) * n_dwords_in_card * page_table_pages;
+    /* We use mmap directly here so that we can use a minimum of
+       system calls per page during GC.
+       All we need here now is a madvise(DONTNEED) at the end of GC. */
+    page_table_dontmove_dwords = os_validate(NULL, total_size);
+    /* We do not need to zero, in fact we shouldn't.  Pages actually
+       used are zeroed before use. */
+    if (page_table_dontmove_dwords == MAP_FAILED) {
+        perror("mmap page_table_dontmove_dwords");
+        page_table_dontmove_dwords = NULL;
+    }
+    gc_assert(page_table_dontmove_dwords);
+    page_table_dontmove_dwords_size_in_bytes = total_size;
 
     gc_init_tables();
     scavtab[WEAK_POINTER_WIDETAG] = scav_weak_pointer;

@@ -102,12 +102,21 @@ struct page {
         /* Cleared if the page is known to contain only zeroes. */
         need_to_zero :1;
 
+    /* If a page has a conservative pointer to it it will have
+       an associated map of words that are in use, for wiping.
+       This bit can differ from dont_move because not all pages
+       that are pinned are going through word-wise wiping,
+       at this time those are multi-page object's pages. */
+    /* I am starting a new 8-bit word here because 32 bit overflew the old
+       one.  Might be worth reviting by somebody with lots of platforms
+       at hand.
+     */
+    signed char has_dontmove_dwords;
     /* the generation that this page belongs to. This should be valid
      * for all pages that may have objects allocated, even current
      * allocation region pages - this allows the space of an object to
      * be easily determined. */
     generation_index_t gen;
-    in_use_marker_t *dontmove_dwords;
 };
 
 
@@ -157,6 +166,8 @@ new_space_p(lispobj obj)
 {
     return space_matches_p(obj, new_space, NULL);
 }
+
+boolean in_dontmove_nativeptr_p(page_index_t page_index, lispobj *native_ptr);
 
 extern page_index_t last_free_page;
 extern boolean gencgc_partial_pickup;
