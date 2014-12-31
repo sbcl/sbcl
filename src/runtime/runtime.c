@@ -637,8 +637,8 @@ main(int argc, char *argv[], char *envp[])
     }
     dyndebug_init();
     arch_init();
-    gc_init();
     validate();
+    gc_init();
 
     setup_locale();
 

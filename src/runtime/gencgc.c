@@ -4286,10 +4286,7 @@ gc_init(void)
     page_table_dontmove_dwords = os_validate(NULL, total_size);
     /* We do not need to zero, in fact we shouldn't.  Pages actually
        used are zeroed before use. */
-    if (page_table_dontmove_dwords == MAP_FAILED) {
-        perror("mmap page_table_dontmove_dwords");
-        page_table_dontmove_dwords = NULL;
-    }
+
     gc_assert(page_table_dontmove_dwords);
     page_table_dontmove_dwords_size_in_bytes = total_size;
 

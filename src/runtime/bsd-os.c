@@ -158,12 +158,11 @@ os_validate(os_vm_address_t addr, os_vm_size_t len)
             curaddr += curlen;
             len -= curlen;
         }
-    } else {
+    } else
 #endif
-     addr = mmap(addr, len, OS_VM_PROT_ALL, flags, -1, 0);
-#ifdef __NetBSD__
+    {
+        addr = mmap(addr, len, OS_VM_PROT_ALL, flags, -1, 0);
     }
-#endif
 
     if (addr == MAP_FAILED) {
         perror("mmap");
