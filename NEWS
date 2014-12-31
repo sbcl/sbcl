@@ -1,5 +1,5 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
-changes relative to sbcl-1.2.6:
+changes in sbcl-1.2.7 relative to sbcl-1.2.6:
   * optimization: returning constant values refers to preboxed constants
     more reliably. (lp#1398785)
   * enhancement: a STYLE-WARNING is produced if a compiler-macro is defined
