@@ -309,9 +309,8 @@
          (format-print-integer stream (next-arg) colonp atsignp ,base mincol
                                padchar commachar commainterval))
        (let ((*print-base* ,base)
-             (*print-radix* nil)
-             (*print-escape* nil))
-         (output-object (next-arg) stream))))
+             (*print-radix* nil))
+         (princ (next-arg) stream))))
 ) ; EVAL-WHEN
 
 (def-format-interpreter #\D (colonp atsignp params)
@@ -518,7 +517,8 @@
     (number
      (format-write-field stream (decimal-string number) w 1 0 #\space t))
     (t
-     (format-princ stream number nil nil w 1 0 pad))))
+     (let ((*print-base* 10))
+      (format-princ stream number nil nil w 1 0 pad)))))
 
 ;;; We return true if we overflowed, so that ~G can output the overflow char
 ;;; instead of spaces.
@@ -594,7 +594,8 @@
               (format-write-field stream
                                   (decimal-string number)
                                   w 1 0 #\space t)))
-      (format-princ stream number nil nil w 1 0 pad)))
+      (let ((*print-base* 10))
+        (format-princ stream number nil nil w 1 0 pad))))
 
 (defun format-exponent-marker (number)
   (if (typep number *read-default-float-format*)
@@ -689,7 +690,8 @@
               (format-write-field stream
                                   (decimal-string number)
                                   w 1 0 #\space t)))
-      (format-princ stream number nil nil w 1 0 pad)))
+      (let ((*print-base* 10))
+        (format-princ stream number nil nil w 1 0 pad))))
 
 ;;; Raymond Toy writes: same change as for format-exp-aux
 (defun format-general-aux (stream number w d e k ovf pad marker atsign)
@@ -750,9 +752,10 @@
           (dotimes (i (- n pointplace))
             (write-char #\0 stream))
           (write-string str stream)))
-      (format-write-field stream
-                          (decimal-string number)
-                          w 1 0 #\space t)))
+      (let ((*print-base* 10))
+        (format-write-field stream
+                            (princ-to-string number)
+                            w 1 0 #\space t))))
 
 ;;;; FORMAT interpreters and support functions for line/page breaks etc.
 

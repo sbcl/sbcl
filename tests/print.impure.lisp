@@ -673,4 +673,31 @@
   (assert (string/= (write-to-string (find-class 'fruit))
                     (write-to-string *fruit1*))))
 
+(with-test (:name :format-readably)
+  (let ((*print-readably* t))
+    (assert (format nil "~$" #'format))
+    (assert (format nil "~d" #'format))
+    (assert (format nil "~x" #'format))
+    (assert (format nil "~b" #'format))
+    (assert (format nil "~3r" #'format))
+    (locally
+        (declare (notinline format))
+      (assert (format nil "~$" #'format))
+      (assert (format nil "~d" #'format))
+      (assert (format nil "~x" #'format))
+      (assert (format nil "~b" #'format))
+      (assert (format nil "~3r" #'format)))))
+
+(with-test (:name :format-print-base)
+  (let ((*print-base* 3))
+    (assert (equal (format nil "~g" '(123)) "(123)"))
+    (assert (equal (format nil "~f" '(123)) "(123)"))
+    (assert (equal (format nil "~e" '(123)) "(123)"))
+    (assert (equal (format nil "~$" '(123)) "(123)"))
+    (locally
+        (declare (notinline format))
+      (assert (equal (format nil "~g" '(123)) "(123)"))
+      (assert (equal (format nil "~f" '(123)) "(123)"))
+      (assert (equal (format nil "~e" '(123)) "(123)"))
+      (assert (equal (format nil "~$" '(123)) "(123)")))))
 ;;; success

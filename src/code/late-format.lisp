@@ -490,9 +490,8 @@
                                ,base ,mincol ,padchar ,commachar
                                ,commainterval))
       `(let ((*print-base* ,base)
-             (*print-radix* nil)
-             (*print-escape* nil))
-         (output-object ,(expand-next-arg) stream))))
+             (*print-radix* nil))
+         (princ ,(expand-next-arg) stream))))
 
 (def-format-directive #\D (colonp atsignp params)
   (expand-format-integer 10 colonp atsignp params))

@@ -1190,6 +1190,10 @@
   (any explicit-check)
   :derive-type #'result-type-first-arg)
 
+(defknown output-object (t stream)
+  null
+  (any explicit-check))
+
 (defknown (pprint) (t &optional stream-designator) (values)
   (explicit-check))
 
