@@ -113,7 +113,7 @@
   "Convert GMP integer in the buffer of a pre-allocated bignum."
   (declare (optimize (speed 3) (space 3) (safety 0))
            (type bignum-type b)
-           (type bignum-index count))
+           (type bignum-length count))
   (if (zerop count)
       0
       (the unsigned-byte (%normalize-bignum b count))))
@@ -123,7 +123,7 @@
 bignum."
   (declare (optimize (speed 3) (space 3) (safety 0))
            (type bignum-type b)
-           (type bignum-index count))
+           (type bignum-length count))
   (negate-bignum-in-place b)
   (the (integer * 0) (%normalize-bignum b count)))
 
@@ -136,12 +136,12 @@ pre-allocated bignum. The allocated bignum-length must be (1+ COUNT)."
   (declare (optimize (speed 3) (space 3) (safety 0))
            (type (alien (* unsigned-long)) z)
            (type bignum-type b)
-           (type bignum-index count))
+           (type bignum-length count))
   (dotimes (i count (%normalize-bignum b (1+ count)))
     (%bignum-set b i (deref z i))))
 
 (declaim (inline blength bassert)
-         (ftype (function (integer) (values bignum-index &optional)) blength)
+         (ftype (function (integer) (values bignum-length &optional)) blength)
          (ftype (function (integer) (values bignum &optional)) bassert))
 
 (defun blength (a)
@@ -391,7 +391,7 @@ pre-allocated bignum. The allocated bignum-length must be (1+ COUNT)."
                      ,@inits
                      ,@body
                      (let ,resinits
-                       (declare (type bignum-index ,@sizes))
+                       (declare (type bignum-length ,@sizes))
                        ,@checks
                        (let ,resallocs
                        ;; copy GMP limbs into result bignum

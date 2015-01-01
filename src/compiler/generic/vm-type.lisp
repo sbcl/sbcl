@@ -28,9 +28,6 @@
 (sb!xc:deftype short-float (&optional low high)
   `(single-float ,low ,high))
 
-;;; an index into an integer
-(sb!xc:deftype bit-index () `(integer 0 ,sb!xc:most-positive-fixnum))
-
 ;;; worst-case values for float attributes
 (sb!xc:deftype float-exponent ()
   #!-long-float 'double-float-exponent
@@ -72,7 +69,15 @@
 ;;; FIXME: see also DEFCONSTANT MAXIMUM-BIGNUM-LENGTH in
 ;;; src/code/bignum.lisp.  -- CSR, 2004-07-19
 (sb!xc:deftype bignum-index ()
-  '(integer 0 #.(1- (ash 1 (- sb!vm:n-word-bits sb!vm:n-widetag-bits)))))
+  '(mod #.(1- (ash 1 (- sb!vm:n-word-bits sb!vm:n-widetag-bits)))))
+(sb!xc:deftype bignum-length ()
+  '(unsigned-byte #.(- sb!vm:n-word-bits sb!vm:n-widetag-bits)))
+
+;;; an index into an integer
+(sb!xc:deftype bit-index ()
+  `(integer 0 #.(* (1- (ash 1 (- sb!vm:n-word-bits sb!vm:n-widetag-bits)))
+                   sb!vm:n-word-bits)))
+
 
 ;;;; hooks into the type system
 

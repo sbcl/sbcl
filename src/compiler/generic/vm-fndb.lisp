@@ -302,13 +302,13 @@
 
 ;;;; bignum operations
 
-(defknown %allocate-bignum (bignum-index) bignum-type
+(defknown %allocate-bignum (bignum-length) bignum-type
   (flushable))
 
-(defknown %bignum-length (bignum-type) bignum-index
+(defknown %bignum-length (bignum-type) bignum-length
   (foldable flushable movable))
 
-(defknown %bignum-set-length (bignum-type bignum-index) bignum-type
+(defknown %bignum-set-length (bignum-type bignum-length) bignum-type
   ())
 
 (defknown %bignum-ref (bignum-type bignum-index) bignum-element-type
