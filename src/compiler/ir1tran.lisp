@@ -1396,7 +1396,7 @@
 
 ;;; Process an ignore/ignorable declaration, checking for various losing
 ;;; conditions.
-(defun process-ignore-decl (spec vars fvars)
+(defun process-ignore-decl (spec vars fvars lexenv)
   (declare (list spec vars fvars))
   (dolist (name (rest spec))
     (let ((var (find-in-bindings-or-fbindings name vars fvars)))
@@ -1413,12 +1413,18 @@
                   (:special "a special variable")
                   (:global "a global lexical variable")
                   (:alien "a global alien variable")
-                  (t "an unknown variable"))
+                  (t (if (assoc name (lexenv-vars lexenv))
+                         "a variable from outer scope"
+                         "an unknown variable")))
                 name)
                (values
-                (if (info :function :kind (second name))
-                    "a global function"
-                    "an unknown function")
+                (cond ((assoc (second name) (lexenv-funs lexenv)
+                              :test #'equal)
+                       "a function from outer scope")
+                      ((info :function :kind (second name))
+                       "a global function")
+                      (t
+                       "an unknown function"))
                 (second name)))))
         ((and (consp var) (eq (car var) 'macro))
          ;; Just ignore the IGNORE decl: we don't currently signal style-warnings
@@ -1527,7 +1533,7 @@
        ((inline notinline maybe-inline)
         (process-inline-decl spec res fvars))
        ((ignore ignorable)
-        (process-ignore-decl spec vars fvars)
+        (process-ignore-decl spec vars fvars res)
         res)
        (optimize
         (multiple-value-bind (new-policy specified-qualities)

@@ -1,4 +1,7 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
+changes relative to sbcl-1.2.7:
+  * enhancement: better error and warning messages. (lp#1314767, lp#736383)
+
 changes in sbcl-1.2.7 relative to sbcl-1.2.6:
   * optimization: returning constant values refers to preboxed constants
     more reliably. (lp#1398785)
