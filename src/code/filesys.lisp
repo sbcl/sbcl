@@ -179,7 +179,7 @@
              (incf dst)))
          result)))
     (pattern
-     (with-output-to-string (s)
+     (with-simple-output-to-string (s)
        (dolist (piece (pattern-pieces thing))
          (etypecase piece
            (simple-string

@@ -1616,3 +1616,19 @@ lines and columns."
                               list))
              (sorted (stable-sort wrapped comparator :key #'cdr)))
         (map-into sorted #'car sorted))))
+
+;;; Just like WITH-OUTPUT-TO-STRING but doesn't close the stream,
+;;; producing more compact code.
+(defmacro with-simple-output-to-string
+    ((var &optional string)
+     &body body)
+  (multiple-value-bind (forms decls)
+      (parse-body body :doc-string-allowed nil)
+    (if string
+        `(let ((,var (sb!impl::make-fill-pointer-output-stream ,string)))
+           ,@decls
+           ,@forms)
+        `(let ((,var (make-string-output-stream)))
+           ,@decls
+           ,@forms
+           (get-output-stream-string ,var)))))

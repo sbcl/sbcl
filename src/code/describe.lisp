@@ -75,7 +75,7 @@
          (limit (truncate (- *print-right-margin* reserve) columns)))
     (flet ((trunc (&optional end)
              (let ((line-end (- limit 2)))
-               (with-output-to-string (s)
+               (with-simple-output-to-string (s)
                  (write-string line s :end (if end
                                                (min end line-end)
                                                line-end))

@@ -284,7 +284,7 @@
               (make-pathname :defaults pathname
                              :directory (substitute :back :up directory))))))
     (coerce
-     (with-output-to-string (s)
+     (with-simple-output-to-string (s)
        (when absolutep
          (write-string (case device
                          (:unc +unc-file-name-prefix+)

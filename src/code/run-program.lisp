@@ -620,7 +620,7 @@ status slot."
                collect (coerce arg 'simple-string)))
         #+win32
         (t
-         (with-output-to-string (str)
+         (with-simple-output-to-string (str)
            (loop for (arg . rest) on args
                  do
                  (cond ((find-if (lambda (c) (find c '(#\Space #\Tab #\")))

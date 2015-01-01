@@ -39,10 +39,10 @@
   manual for details."
   (etypecase destination
     (null
-     (with-output-to-string (stream)
+     (with-simple-output-to-string (stream)
        (%format stream control-string format-arguments)))
     (string
-     (with-output-to-string (stream destination)
+     (with-simple-output-to-string (stream destination)
        (%format stream control-string format-arguments)))
     ((member t)
      (%format *standard-output* control-string format-arguments)
@@ -1150,7 +1150,7 @@
                      (len (or (sb!impl::line-length stream) 72)))
                     (format-directive-params first-semi)
                   (setf newline-string
-                        (with-output-to-string (stream)
+                        (with-simple-output-to-string (stream)
                           (setf args
                                 (interpret-directive-list stream
                                                           (pop segments)
@@ -1159,7 +1159,7 @@
                   (setf extra-space extra)
                   (setf line-len len)))
               (dolist (segment segments)
-                (push (with-output-to-string (stream)
+                (push (with-simple-output-to-string (stream)
                         (setf args
                               (interpret-directive-list stream segment
                                                         orig-args args)))

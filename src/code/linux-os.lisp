@@ -29,7 +29,7 @@
   (or *software-version*
       (setf *software-version*
             (string-trim '(#\newline)
-                         (with-output-to-string (stream)
+                         (sb!kernel:with-simple-output-to-string (stream)
                            (run-program "/bin/uname" `("-r")
                                         :output stream))))))
 

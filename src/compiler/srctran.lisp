@@ -4551,6 +4551,13 @@
        (funcall control *standard-output* ,@arg-names)
        nil)))
 
+(deftransform format ((stream control &rest args) (null function &rest t))
+  (let ((arg-names (make-gensym-list (length args))))
+    `(lambda (stream control ,@arg-names)
+       (declare (ignore stream))
+       (with-simple-output-to-string (stream)
+         (funcall control stream ,@arg-names)))))
+
 (deftransform pathname ((pathspec) (pathname) *)
   'pathspec)
 

@@ -2531,7 +2531,7 @@
     (with-available-buffers-lock ()
       (aver (not (boundp '*available-buffers*)))
       (setf *available-buffers* nil)))
-  (with-output-to-string (*error-output*)
+  (with-simple-output-to-string (*error-output*)
     (multiple-value-bind (in out err)
         #!-win32 (values 0 1 2)
         #!+win32 (sb!win32::get-std-handles)

@@ -2096,7 +2096,8 @@ is a good idea, but see SB-SYS re. blurring of boundaries."
                "%SP-STRING-COMPARE" "%SETNTH" "%SETELT"
                "%SET-ROW-MAJOR-AREF" "%SET-FILL-POINTER"
                "%SET-FDEFINITION" "%SCHARSET"
-               "%RPLACD" "%RPLACA" "%PUT" "%CHARSET"))
+               "%RPLACD" "%RPLACA" "%PUT" "%CHARSET"
+               "WITH-SIMPLE-OUTPUT-TO-STRING"))
 
    #s(sb-cold:package-data
       :name "SB!THREAD"

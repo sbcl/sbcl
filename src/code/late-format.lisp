@@ -1247,7 +1247,7 @@
          (block nil
            ,@(when newline-segment-p
                `((setf newline-segment
-                       (with-output-to-string (stream)
+                       (with-simple-output-to-string (stream)
                          ,@(expand-directive-list (pop segments))))
                  ,(expand-bind-defaults
                       ((extra 0)
@@ -1255,7 +1255,7 @@
                       (format-directive-params first-semi)
                     `(setf extra-space ,extra line-len ,line-len))))
            ,@(mapcar (lambda (segment)
-                       `(push (with-output-to-string (stream)
+                       `(push (with-simple-output-to-string (stream)
                                 ,@(expand-directive-list segment))
                               segments))
                      segments))
