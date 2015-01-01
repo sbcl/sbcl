@@ -1294,7 +1294,8 @@
   (bignum-buffer-integer-length bignum (%bignum-length bignum)))
 
 (defun bignum-logbitp (index bignum)
-  (declare (type bignum-type bignum))
+  (declare (type bignum-type bignum)
+           (type bignum-index index))
   (let ((len (%bignum-length bignum)))
     (declare (type bignum-length len))
     (multiple-value-bind (word-index bit-index)
