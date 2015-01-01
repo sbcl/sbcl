@@ -242,8 +242,7 @@ export DEVNULL
 . ./find-gnumake.sh
 find_gnumake
 
-. ./generate-version.sh
-generate_version
+./generate-version.sh
 
 # Now that we've done our option parsing and found various
 # dependencies, write them out to a file to be sourced by other
