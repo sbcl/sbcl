@@ -46,6 +46,13 @@ CFLAGS += -fno-omit-frame-pointer
 
 GC_SRC = gencgc.c
 
+# Hardened GCC enables PIE by default
+ifneq ($(shell $(CC) -dumpspecs 2>/dev/null | grep -e nopie),)
+CFLAGS += -fno-pie
+LINKFLAGS += -nopie
+LDFLAGS += -nopie
+endif
+
 # Nothing to do for after-grovel-headers.
 .PHONY: after-grovel-headers
 after-grovel-headers:
