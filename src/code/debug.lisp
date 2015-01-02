@@ -572,22 +572,21 @@ thread, NIL otherwise."
           (cons :more info)))
 
 (defun clean-fast-method (name args style info)
+  (declare (type (member :minimal :normal :full) style))
   (multiple-value-bind (cname cargs)
-      (ecase style
-        (:minimal
-         (let ((gf-name (second name))
-               (real-args (cddr args)))
-           (if (and (fboundp gf-name)
-                    (notany #'sb!impl::unprintable-object-p real-args)
-                    (let ((methods (compute-applicable-methods
-                                    (fdefinition gf-name) real-args)))
-                      (and methods (not (cdr methods)))))
-               (values gf-name real-args)
-               (values (cons :method (cdr name)) real-args))))
-        (:normal
-         (values (cons :method (cdr name)) (cddr args)))
-        (:full
-         (values name args)))
+      ;; Make no attempt to simplify the display if ARGS could not be found
+      ;; due to low (OPTIMIZE (DEBUG)) quality in the method.
+      (if (or (eq style :full) (not (listp args)))
+          (values name args)
+          (let ((gf-name (second name))
+                (real-args (the list (cddr args)))) ; strip .PV. and .N-M-CALL.
+            (if (and (eq style :minimal)
+                     (fboundp gf-name)
+                     (notany #'sb!impl::unprintable-object-p real-args)
+                     (singleton-p (compute-applicable-methods
+                                   (fdefinition gf-name) real-args)))
+                (values gf-name real-args)
+                (values (cons :method (cdr name)) real-args))))
     (values cname cargs (cons :fast-method info))))
 
 (defun clean-frame-call (frame name method-frame-style info)

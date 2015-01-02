@@ -916,3 +916,11 @@
   (assert (eql *x* 6))
   (trace foo :break-after (and (setf *x* (sb-debug:arg 0)) nil))
   (foo 7))
+
+(defun frobbleize (arg) (sb-debug:print-backtrace) 'win)
+(defmethod low-debug-method ((self t))
+  (declare (optimize (debug 0)))
+  (frobbleize 'me) ; make this not a tail call, so it remains on stack
+  5)
+(with-test (:name :clean-fast-method-frame-lossage)
+  (low-debug-method 42)) ; no need to assert. it either crashes or doesn't
