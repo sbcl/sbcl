@@ -4278,7 +4278,8 @@ gc_init(void)
      * unnecessary and did hurt startup time. */
     page_table = calloc(page_table_pages, sizeof(struct page));
     gc_assert(page_table);
-    size_t total_size = sizeof(in_use_marker_t *) * n_dwords_in_card * page_table_pages;
+    size_t total_size = sizeof(in_use_marker_t) * n_dwords_in_card *
+      page_table_pages;
     /* We use mmap directly here so that we can use a minimum of
        system calls per page during GC.
        All we need here now is a madvise(DONTNEED) at the end of GC. */

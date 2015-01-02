@@ -42,7 +42,7 @@ int gencgc_handle_wp_violation(void *);
   typedef unsigned short page_bytes_t;
 #endif
 
-typedef boolean in_use_marker_t;
+typedef char in_use_marker_t;
 
 /* Note that this structure is also used from Lisp-side in
  * src/code/room.lisp, and the Lisp-side structure layout is currently
