@@ -372,11 +372,8 @@ scav_code_header(lispobj *where, lispobj object)
 
         function_ptr = (struct simple_fun *) native_pointer(entry_point);
         gc_assert(widetag_of(function_ptr->header)==SIMPLE_FUN_HEADER_WIDETAG);
-
-        scavenge(&function_ptr->name, 1);
-        scavenge(&function_ptr->arglist, 1);
-        scavenge(&function_ptr->type, 1);
-        scavenge(&function_ptr->info, 1);
+        scavenge(SIMPLE_FUN_SCAV_START(function_ptr),
+                 SIMPLE_FUN_SCAV_NWORDS(function_ptr));
     }
 
     return n_words;

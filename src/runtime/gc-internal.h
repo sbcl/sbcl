@@ -79,6 +79,9 @@ NWORDS(uword_t x, uword_t n_bits)
 #define FUN_RAW_ADDR_OFFSET (offsetof(struct simple_fun, code) - FUN_POINTER_LOWTAG)
 #endif
 
+#define SIMPLE_FUN_SCAV_START(fun_ptr) &fun_ptr->name
+#define SIMPLE_FUN_SCAV_NWORDS(fun_ptr) ((lispobj*)fun_ptr->code - &fun_ptr->name)
+
 /* values for the *_alloc_* parameters, also see the commentary for
  * struct page in gencgc-internal.h.  FIXME: Perhaps these constants
  * should be there, or at least defined on gencgc only? */

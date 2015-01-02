@@ -3251,9 +3251,8 @@ verify_space(lispobj *start, size_t words)
                                 (struct simple_fun *) native_pointer(fheaderl);
                             gc_assert(widetag_of(fheaderp->header) ==
                                       SIMPLE_FUN_HEADER_WIDETAG);
-                            verify_space(&fheaderp->name, 1);
-                            verify_space(&fheaderp->arglist, 1);
-                            verify_space(&fheaderp->type, 1);
+                            verify_space(SIMPLE_FUN_SCAV_START(fheaderp),
+                                         SIMPLE_FUN_SCAV_NWORDS(fheaderp));
                             fheaderl = fheaderp->next;
                         }
                         count = nwords;
