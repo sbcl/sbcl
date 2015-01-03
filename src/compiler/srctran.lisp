@@ -4351,6 +4351,8 @@
          (info (when (lambda-var-p var) (lambda-var-arg-info var)))
          (restp (when info (eq :rest (arg-info-kind info)))))
     (flet ((ref-good-for-more-context-p (ref)
+             (when (not (node-lvar ref)) ; ref that goes nowhere is ok
+               (return-from ref-good-for-more-context-p t))
              (let ((dest (principal-lvar-end (node-lvar ref))))
                (and (combination-p dest)
                     ;; If the destination is to anything but these, we're going to

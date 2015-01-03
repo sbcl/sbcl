@@ -750,7 +750,7 @@
   (foldable flushable call))
 (defknown endp (list) boolean (foldable flushable movable))
 (defknown list-length (list) (or index null) (foldable unsafely-flushable))
-(defknown nth (unsigned-byte list) t (foldable flushable))
+(defknown (nth fast-&rest-nth) (unsigned-byte list) t (foldable flushable))
 (defknown nthcdr (unsigned-byte list) t (foldable unsafely-flushable))
 
 (defknown last (list &optional unsigned-byte) t (foldable flushable))

@@ -363,15 +363,9 @@
                 #!+sb-doc
                 ,doc
                 (if numbers
-                    ;; FIXME: using NTH here produces
-                    ;; "caught STYLE-WARNING:
-                    ;;  The binding of RESULT is not a NUMBER"
-                    ;; Same warning occurs in -, /, =, /=, etc
-                    (do ((result (nth 0 numbers) (,op result (nth i numbers)))
-                         (i 1 (1+ i)))
-                        ((>= i (length numbers))
-                         result)
-                      (declare (number result)))
+                    (let ((result (the number (sb!c::fast-&rest-nth 0 numbers))))
+                      (do-rest-arg ((n) numbers 1 result)
+                        (setq result (,op result n))))
                     ,init))))
   (define-arith + 0
     "Return the sum of its arguments. With no args, returns 0.")
