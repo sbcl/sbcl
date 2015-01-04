@@ -155,8 +155,8 @@
 (encode-universal-time 0 0 23 31 12 1899 1)
 
 ;;; DISASSEMBLE shouldn't fail on purified functions
-(disassemble 'cl:+)
-(disassemble 'sb-ext:run-program)
+(disassemble 'cl:+ :stream (make-broadcast-stream))
+(disassemble 'sb-ext:run-program :stream (make-broadcast-stream))
 
 ;;; minimal test of GC: see stress-gc.{sh,lisp} for a more
 ;;; comprehensive test.
@@ -170,10 +170,12 @@
 (with-test (:name :bug-814702)
   (disassemble (lambda (x)
                  (= #C(2.0f0 3.0f0)
-                    (the (complex single-float) x))))
+                    (the (complex single-float) x)))
+               :stream (make-broadcast-stream))
   (disassemble (lambda (x y)
                  (= (the (complex single-float) x)
-                    (the (complex single-float) y)))))
+                    (the (complex single-float) y)))
+               :stream (make-broadcast-stream)))
 
 #+x86-64
 ;; The labeler for LEA would choke on an illegal encoding
@@ -181,7 +183,8 @@
 (with-test (:name :x86-lea-disassemble-illegal-op)
   (let ((a (coerce '(#x48 #x8D #xC4) '(array (unsigned-byte 8) (3)))))
     (sb-sys:with-pinned-objects (a)
-      (sb-disassem::disassemble-memory (sb-sys:sap-int (sb-sys:vector-sap a)) 3))))
+      (sb-disassem::disassemble-memory (sb-sys:sap-int (sb-sys:vector-sap a)) 3
+                                       :stream (make-broadcast-stream)))))
 
 ;; Assert that disassemblies of identically-acting functions are identical
 ;; if address printing is turned off. Should work on any backend, I think.
@@ -200,6 +203,19 @@
   (let ((string1 (disassembly-text '(lambda (x) (car x))))
         (string2 (disassembly-text '(lambda (y) (car y)))))
     (assert (string= string1 string2)))))
+
+(with-test (:name :disassemble-assembly-routine)
+  (let ((code
+         (block nil
+           (sb-vm::map-allocated-objects
+            (lambda (obj type size)
+              (declare (ignore size))
+              (when (= type sb-vm:code-header-widetag)
+                (return obj)))
+            :read-only))))
+    (assert code) ; found something to disassemble
+    (sb-disassem:disassemble-code-component code
+     :stream (make-broadcast-stream))))
 
 ;;; Check that SLEEP called with ratios (with no common factors with
 ;;; 1000000000, and smaller than 1/1000000000) works more or less as

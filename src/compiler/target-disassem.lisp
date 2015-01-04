@@ -1353,7 +1353,7 @@
            (type offset start-offset)
            (type disassem-length length))
   (let ((segments nil))
-    (when code
+    (when (sb!kernel:%code-debug-info code)
       (let ((fun-map (code-fun-map code))
             (sfcache (make-source-form-cache)))
         (let ((last-offset 0)
@@ -1389,7 +1389,7 @@
                        (- (code-inst-area-length code) last-offset)
                        last-debug-fun))))))
     (if (null segments)
-        (make-code-segment code start-offset length)
+        (list (make-code-segment code start-offset length))
         (nreverse segments))))
 
 ;;; Compute labels for all the memory segments in SEGLIST and adds
