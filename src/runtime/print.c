@@ -461,6 +461,23 @@ static void brief_struct(lispobj obj)
     }
 }
 
+#include "genesis/layout.h"
+static boolean untagged_slot_p(struct layout * layout,
+                               int slot_index)
+{
+#ifdef LISP_FEATURE_INTERLEAVED_RAW_SLOTS
+  extern boolean positive_bignum_logbitp(int,struct bignum*);
+  lispobj bitmap = layout->untagged_bitmap;
+  return fixnump(bitmap)
+         ? (fixnum_value(bitmap) >> slot_index) & 1
+         : positive_bignum_logbitp(slot_index,
+                                   (struct bignum*)native_pointer(bitmap));
+#else
+  return slot_index >= (fixnum_value(layout->length)|1)
+    - fixnum_value(layout->n_untagged_slots);
+#endif
+}
+
 static void print_struct(lispobj obj)
 {
     struct instance *instance = (struct instance *)native_pointer(obj);
@@ -469,10 +486,16 @@ static void print_struct(lispobj obj)
     if (!is_valid_lisp_addr((os_vm_address_t)instance)) {
         printf("(invalid address)");
     } else {
-        print_obj("type: ", ((struct instance *)native_pointer(obj))->slots[0]);
+        lispobj layout_obj =  ((struct instance *)native_pointer(obj))->slots[0];
+        print_obj("type: ", layout_obj);
+        struct layout * layout = (struct layout*)native_pointer(layout_obj);
         for (i = 1; i < HeaderValue(instance->header); i++) {
             sprintf(buffer, "slot %d: ", i);
-            print_obj(buffer, instance->slots[i]);
+            if (layout==NULL || untagged_slot_p(layout, i)) {
+                newline(NULL);
+                printf("\n\t    %s0x%"OBJ_FMTX" [raw]", buffer, instance->slots[i]);
+            } else
+                print_obj(buffer, instance->slots[i]);
         }
     }
 }
