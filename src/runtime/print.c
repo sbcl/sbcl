@@ -338,8 +338,7 @@ static void brief_otherimm(lispobj obj)
                 case '\177': charname = "Delete"; break;
                 default:
                   if (c < 32) printf("^%c", c+64);
-                  else if (c < 128) printf("%c", c);
-                  else printf("U+%X", c);
+                  else printf(c < 128 ? "%c" : "U+%X", c);
             }
             if (charname)
                 fputs(charname, stdout);
@@ -370,7 +369,7 @@ static void print_otherimm(lispobj obj)
             break;
 
         default:
-            printf(": data=%ld", (long) (obj>>8)&0xffffff);
+            printf(": data=%"OBJ_FMTX, (obj>>8));
             break;
     }
 }
@@ -473,8 +472,14 @@ static boolean untagged_slot_p(struct layout * layout,
          : positive_bignum_logbitp(slot_index,
                                    (struct bignum*)native_pointer(bitmap));
 #else
-  return slot_index >= (fixnum_value(layout->length)|1)
-    - fixnum_value(layout->n_untagged_slots);
+  // STANDARD-OBJECT has layout-length = number of defined slots, but
+  // the primitive object always occupies 4 physical words. The guard on
+  // n_untagged_slots ensures that for classes with no slots, we don't
+  // wrongly show all words of the primitive object as untagged,
+  // because the second half of the expression reduces to slot_index>=1.
+  return layout->n_untagged_slots > 0
+         && slot_index >= (fixnum_value(layout->length)|1)
+                          - fixnum_value(layout->n_untagged_slots);
 #endif
 }
 
@@ -595,9 +600,9 @@ static char *ratio_slots[] = {"numer: ", "denom: ", NULL};
 static char *complex_slots[] = {"real: ", "imag: ", NULL};
 static char *code_slots[] = {"words: ", "entry: ", "debug: ", NULL};
 static char *fn_slots[] = {
-    "self: ", "next: ", "name: ", "arglist: ", "type: ", NULL};
+    "self: ", "next: ", "name: ", "arglist: ", "type: ", "info: ", NULL};
 static char *closure_slots[] = {"fn: ", NULL};
-static char *funcallable_instance_slots[] = {"fn: ", "lexenv: ", "layout: ", NULL};
+static char *funcallable_instance_slots[] = {"raw_fn: ", "fn: ", "layout: ", NULL};
 static char *weak_pointer_slots[] = {"value: ", NULL};
 static char *fdefn_slots[] = {"name: ", "function: ", "raw_addr: ", NULL};
 static char *value_cell_slots[] = {"value: ", NULL};
@@ -756,12 +761,14 @@ static void print_otherptr(lispobj obj)
                 break;
 
             case SIMPLE_FUN_HEADER_WIDETAG:
-                print_slots(fn_slots, 5, ptr);
+                print_slots(fn_slots, 6, ptr);
                 break;
 
+#if !defined(LISP_FEATURE_X86) && !defined(LISP_FEATURE_X86_64)
             case RETURN_PC_HEADER_WIDETAG:
                 print_obj("code: ", obj - (count * 4));
                 break;
+#endif
 
             case CLOSURE_HEADER_WIDETAG:
                 print_slots(closure_slots, count, ptr);
