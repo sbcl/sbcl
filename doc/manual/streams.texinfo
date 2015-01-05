@@ -33,8 +33,8 @@ of the Franz Allegro simple-streams proposal.
 @menu
 * External Formats::
 * Bivalent Streams::
-* Gray Streams::                
-* Simple Streams::              
+* Gray Streams::
+* Simple Streams::
 @end menu
 
 @node External Formats
@@ -71,7 +71,7 @@ for example:
 @end lisp
 will read the first line of @var{pathname}, replacing any invalid utf-8
 sequences with question marks.
- 
+
 @node Bivalent Streams
 @section Bivalent Streams
 
@@ -106,10 +106,10 @@ suitably.
 * Gray Streams classes::
 * Methods common to all streams::
 * Input stream methods::
-* Output stream methods::
-* Binary stream methods::
 * Character input stream methods::
+* Output stream methods::
 * Character output stream methods::
+* Binary stream methods::
 * Gray Streams examples::
 @end menu
 
@@ -189,15 +189,6 @@ fundamental-output-stream:
 @include fun-sb-gray-stream-force-output.texinfo
 @include fun-sb-gray-stream-write-sequence.texinfo
 
-@node Binary stream methods
-@subsection Binary stream methods
-
-The following generic functions are available for subclasses of
-fundamental-binary-stream:
-
-@include fun-sb-gray-stream-read-byte.texinfo
-@include fun-sb-gray-stream-write-byte.texinfo
-
 @node Character output stream methods
 @subsection Character output stream methods
 
@@ -212,6 +203,15 @@ fundamental-character-output-stream:
 @include fun-sb-gray-stream-terpri.texinfo
 @include fun-sb-gray-stream-write-char.texinfo
 @include fun-sb-gray-stream-write-string.texinfo
+
+@node Binary stream methods
+@subsection Binary stream methods
+
+The following generic functions are available for subclasses of
+fundamental-binary-stream:
+
+@include fun-sb-gray-stream-read-byte.texinfo
+@include fun-sb-gray-stream-write-byte.texinfo
 
 @include gray-streams-examples.texinfo
 
