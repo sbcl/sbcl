@@ -259,6 +259,8 @@
   EXIT
 
   ;; Here EAX points to catch block containing symbol pointed to by EDX.
+  ;; An extra RET gets stuffed after the JMP, but oh well. You can't just change
+  ;; the :return-style to :none because that also affects the call sequence.
   (inst jmp (make-fixup 'unwind :assembly-routine)))
 
 ;;;; non-local exit noise

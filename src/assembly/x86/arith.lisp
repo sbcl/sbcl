@@ -422,5 +422,4 @@
   ;; Restore the temporary registers and return.
   (inst pop tmp)
   (inst pop y)
-  (inst pop k)
-  (inst ret))
+  (inst pop k))

@@ -39,7 +39,7 @@
 (defun generate-return-sequence (style)
   (ecase style
     (:raw
-     `(inst ret))
+     `((inst ret)))
     (:full-call
      `((inst clc)
        (inst ret)))

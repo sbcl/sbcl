@@ -25,8 +25,7 @@
                `(define-assembly-routine (,(symbolicate "ALLOC-SIGNED-BIGNUM-IN-" reg)) ()
                   (inst push ,tn)
                   (with-fixed-allocation (,tn bignum-widetag (+ bignum-digits-offset 1))
-                    (popw ,tn bignum-digits-offset other-pointer-lowtag))
-                  (inst ret)))))
+                    (popw ,tn bignum-digits-offset other-pointer-lowtag))))))
   (def eax)
   (def ebx)
   (def ecx)
@@ -49,8 +48,7 @@
                   (inst ret)
                   ONE-WORD-BIGNUM
                   (with-fixed-allocation (,tn bignum-widetag (+ bignum-digits-offset 1))
-                    (popw ,tn bignum-digits-offset other-pointer-lowtag))
-                  (inst ret)))))
+                    (popw ,tn bignum-digits-offset other-pointer-lowtag))))))
   (def eax)
   (def ebx)
   (def ecx)
@@ -65,8 +63,7 @@
      ((:temp ,arg-tn descriptor-reg ,(intern (format nil "~A-OFFSET" arg-tn))))
      (pseudo-atomic
       (allocation ,arg-tn (pad-data-block ,(intern (format nil "~A-SIZE" obj))))
-      (inst lea ,arg-tn (make-ea :byte :base ,arg-tn :disp ,lowtag)))
-     (inst ret)))
+      (inst lea ,arg-tn (make-ea :byte :base ,arg-tn :disp ,lowtag)))))
 
 #+sb-assembling
 (macrolet ((frob-cons-routines ()
@@ -129,8 +126,7 @@
                ;; No need for barriers on x86/x86-64 on unlock.
                (store-symbol-value 0 *tls-index-lock*)
                ;; Restore OTHER.
-               (inst pop other))
-              (inst ret))))))
+               (inst pop other)))))))
   (def eax)
   (def ebx)
   (def ecx)

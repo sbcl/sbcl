@@ -26,8 +26,7 @@
             ((:temp number unsigned-reg ,(symbolicate reg "-OFFSET")))
           (inst push number)
           (with-fixed-allocation (number bignum-widetag (+ bignum-digits-offset 1))
-            (popw number bignum-digits-offset other-pointer-lowtag))
-          (inst ret))))
+            (popw number bignum-digits-offset other-pointer-lowtag)))))
   (def rax)
   (def rcx)
   (def rdx)
@@ -55,8 +54,7 @@
           (inst ret)
           ONE-WORD-BIGNUM
           (with-fixed-allocation (number bignum-widetag (+ bignum-digits-offset 1))
-            (popw number bignum-digits-offset other-pointer-lowtag))
-          (inst ret))))
+            (popw number bignum-digits-offset other-pointer-lowtag)))))
   (def rax)
   (def rcx)
   (def rdx)
@@ -121,8 +119,7 @@
                ;; No need for barriers on x86/x86-64 on unlock.
                (store-symbol-value 0 *tls-index-lock*)
                ;; Restore OTHER.
-               (inst pop other))
-              (inst ret))))))
+               (inst pop other)))))))
   (def rax)
   (def rcx)
   (def rdx)
