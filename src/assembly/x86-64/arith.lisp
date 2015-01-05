@@ -363,3 +363,99 @@
     (move rdi y)
     (inst mov rcx (make-fixup 'generic-= :assembly-routine))
     (inst call rcx)))
+
+#+sb-assembling
+(define-assembly-routine (logcount)
+                         ((:arg arg (descriptor-reg any-reg) rdx-offset)
+                          (:temp mask unsigned-reg rcx-offset)
+                          (:temp temp unsigned-reg rax-offset))
+  (inst push temp) ; save RAX
+  (let ((result arg))
+    ;; See the comments below for how the algorithm works. The tricks
+    ;; used can be found for example in AMD's software optimization
+    ;; guide or at "http://www.hackersdelight.org/HDcode/pop.cc" in the
+    ;; function "pop1", for 32-bit words. The extension to 64 bits is
+    ;; straightforward.
+    ;; Calculate 2-bit sums. Note that the value of a two-digit binary
+    ;; number is the sum of the right digit and twice the left digit.
+    ;; Thus we can calculate the sum of the two digits by shifting the
+    ;; left digit to the right position and doing a two-bit subtraction.
+    ;; This subtraction will never create a borrow and thus can be made
+    ;; on all 32 2-digit numbers at once.
+    (move temp arg)
+    (inst shr result 1)
+    (inst mov mask #x5555555555555555)
+    (inst and result mask)
+    (inst sub temp result)
+    ;; Calculate 4-bit sums by straightforward shift, mask and add.
+    ;; Note that we shift the source operand of the MOV and not its
+    ;; destination so that the SHR and the MOV can execute in the same
+    ;; clock cycle.
+    (inst mov result temp)
+    (inst shr temp 2)
+    (inst mov mask #x3333333333333333)
+    (inst and result mask)
+    (inst and temp mask)
+    (inst add result temp)
+    ;; Calculate 8-bit sums. Since each sum is at most 8, which fits
+    ;; into 4 bits, we can apply the mask after the addition, saving one
+    ;; instruction.
+    (inst mov temp result)
+    (inst shr result 4)
+    (inst add result temp)
+    (inst mov mask #x0f0f0f0f0f0f0f0f)
+    (inst and result mask)
+    ;; Add all 8 bytes at once by multiplying with #256r11111111.
+    ;; We need to calculate only the lower 8 bytes of the product.
+    ;; Of these the most significant byte contains the final result.
+    ;; Note that there can be no overflow from one byte to the next
+    ;; as the sum is at most 64 which needs only 7 bits.
+    (inst mov mask #x0101010101010101)
+    (inst imul result mask)
+    (inst shr result 56))
+  (inst pop temp)) ; restore RAX
+
+;; To perform logcount on small integers, we test whether to use the
+;; builtin opcode, or an assembly routine. I benchmarked this against
+;; an approach that always used the assembly routine via "call [addr]"
+;; where the contents of the address reflected one implementation
+;; or the other, chosen at startup - and this is faster.
+#-sb-assembling
+(macrolet
+    ((def-it (name cost arg-sc arg-type)
+      `(define-vop (,name)
+         (:translate logcount)
+         (:note ,(format nil "inline ~a logcount" arg-type))
+         (:policy :fast-safe)
+         (:args (arg :scs (,arg-sc)))
+         (:arg-types ,arg-type)
+         (:results (result :scs (unsigned-reg)))
+         (:result-types positive-fixnum)
+         ;; input/output of assembly routine
+         (:temporary (:sc unsigned-reg :offset rdx-offset
+                          :from (:argument 0) :to (:result 0)) rdx)
+         ;; Assembly routine clobbers RAX and RCX but only needs to save RAX,
+         ;; as this vop clobbers RCX in the call. If changed to "CALL [ADDR]"
+         ;; be sure to update the subroutine to push and pop RCX.
+         (:temporary (:sc unsigned-reg :offset rcx-offset) rcx)
+         (:generator ,cost
+           ;; FIXME: As I've got no way to set the cpuid feature bits,
+           ;; don't try testing here whether to use popcnt, until it has been
+           ;; verified that the __cpuid() intrinsic works for win32.
+           #!-win32
+           (progn
+             ;; POPCNT = ECX bit 23 = bit 7 of byte index 2
+             (inst test
+                   (make-ea :byte :disp (make-fixup "cpuid_fn1_ecx" :foreign 2))
+                   #x80)
+             (inst jmp :nz fast))
+           (move rdx arg)
+           (inst mov rcx (make-fixup 'logcount :assembly-routine))
+           (inst call rcx)
+           (move result rdx)
+           #!-win32 (inst jmp done)
+           fast
+           #!-win32 (inst popcnt result arg)
+           done))))
+  (def-it unsigned-byte-64-count 14 unsigned-reg unsigned-num)
+  (def-it positive-fixnum-count 13 any-reg positive-fixnum))

@@ -39,8 +39,33 @@
 #define BREAKPOINT_WIDTH 2
 #endif
 
+unsigned int cpuid_fn1_ecx;
+
+// Wikipedia says that this doesn't work in MSVC, and I don't have a way to test it
+#ifndef LISP_FEATURE_WIN32
+static void cpuid(unsigned info, unsigned *eax, unsigned *ebx, unsigned *ecx, unsigned *edx)
+{
+  __asm__("cpuid;"                                            /* assembly code */
+          :"=a" (*eax), "=b" (*ebx), "=c" (*ecx), "=d" (*edx) /* outputs */
+          :"a" (info)                                         /* input: info into eax */
+           /* clobbers: none */
+          );
+}
+#endif
+
 void arch_init(void)
-{}
+{
+#ifndef LISP_FEATURE_WIN32
+  unsigned int eax, ebx, ecx, edx;
+  int i;
+
+  cpuid(0, &eax, &ebx, &ecx, &edx);
+  if (eax >= 1) { // see if we can execute basic id function 1
+      cpuid(1, &eax, &ebx, &ecx, &edx);
+      cpuid_fn1_ecx = ecx;
+  }
+#endif
+}
 
 #ifndef _WIN64
 os_vm_address_t

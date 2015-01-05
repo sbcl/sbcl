@@ -1204,14 +1204,14 @@
 (sb!disassem:define-instruction-format (F3-escape-reg-reg/mem 32
                                         :include F3-escape
                                         :default-printer
-                                        '(:name :tab reg "," reg/mem))
+                                        '(:name :tab reg ", " reg/mem))
   (reg/mem :fields (list (byte 2 30) (byte 3 24)) :type 'sized-reg/mem)
   (reg     :field  (byte 3 27) :type 'reg))
 
 (sb!disassem:define-instruction-format (rex-F3-escape-reg-reg/mem 40
                                         :include rex-F3-escape
                                         :default-printer
-                                        '(:name :tab reg "," reg/mem))
+                                        '(:name :tab reg ", " reg/mem))
   (reg/mem :fields (list (byte 2 38) (byte 3 32)) :type 'sized-reg/mem)
   (reg     :field  (byte 3 35) :type 'reg))
 
