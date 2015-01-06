@@ -448,14 +448,23 @@
              (inst test
                    (make-ea :byte :disp (make-fixup "cpuid_fn1_ecx" :foreign 2))
                    #x80)
-             (inst jmp :nz fast))
+             (inst jmp :z slow)
+             ;; Intel's implementation of POPCNT on some models treats it as
+             ;; a 2-operand ALU op in the manner of ADD,SUB,etc which means that
+             ;; it falsely appears to need data from the destination register.
+             ;; The workaround is to clear the destination.
+             ;; See http://stackoverflow.com/questions/25078285
+             (unless (location= result arg)
+               ;; We only break the spurious dep. chain if result isn't the same
+               ;; register as arg. (If they're location=, don't trash the arg!)
+               (inst xor result result))
+             (inst popcnt result arg)
+             (inst jmp done))
+         slow
            (move rdx arg)
            (inst mov rcx (make-fixup 'logcount :assembly-routine))
            (inst call rcx)
            (move result rdx)
-           #!-win32 (inst jmp done)
-           fast
-           #!-win32 (inst popcnt result arg)
-           done))))
+         done))))
   (def-it unsigned-byte-64-count 14 unsigned-reg unsigned-num)
   (def-it positive-fixnum-count 13 any-reg positive-fixnum))

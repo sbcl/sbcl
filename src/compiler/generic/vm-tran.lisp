@@ -456,9 +456,22 @@
              (end-1 (truncate (truly-the index (1- length))
                               sb!vm:n-word-bits)))
             ((>= index end-1)
+             ;; "(mod (1- length) ...)" is the bit index within the word
+             ;; of the array index of the ultimate bit to be examined.
+             ;; "1+" it is the number of bits in that word.
+             ;; But I don't get why people are allowed to store random data that
+             ;; we mask off, as if we could accomodate all possible ways that
+             ;; unsafe code can spew bits where they don't belong.
+             ;; Does it have to do with %shrink-vector, perhaps?
+             ;; Some rationale would be nice...
              (let* ((extra (1+ (mod (1- length) sb!vm:n-word-bits)))
                     (mask (ash #.(1- (ash 1 sb!vm:n-word-bits))
                                (- extra sb!vm:n-word-bits)))
+                    ;; The above notwithstanding, for big-endian wouldn't it
+                    ;; be possible to write this expression as a single shift?
+                    ;;  (LOGAND MOST-POSITIVE-WORD (ASH most-positive-word (- n-word-bits extra)))
+                    ;; rather than a right-shift to fill in zeros on the left
+                    ;; then by a left-shift to left-align the 1s?
                     (bits (logand (ash mask
                                        ,(ecase sb!c:*backend-byte-order*
                                                (:little-endian 0)
