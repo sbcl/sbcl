@@ -415,6 +415,19 @@
     (inst shr result 56))
   (inst pop temp)) ; restore RAX
 
+(defun emit-foreign-logbitp (index foreign-symbol temp-reg) ; result in Z flag
+  (declare (ignorable temp-reg))
+  (multiple-value-bind (byte bit) (floor index 8)
+    #!-sb-dynamic-core
+    (inst test
+          (make-ea :byte :disp (make-fixup foreign-symbol :foreign byte))
+          (ash 1 bit))
+    #!+sb-dynamic-core
+    (progn
+      (inst mov temp-reg
+            (make-ea :qword :disp (make-fixup foreign-symbol :foreign-dataref)))
+      (inst test (make-ea :byte :base temp-reg :disp byte) (ash 1 bit)))))
+
 ;; To perform logcount on small integers, we test whether to use the
 ;; builtin opcode, or an assembly routine. I benchmarked this against
 ;; an approach that always used the assembly routine via "call [addr]"
@@ -445,9 +458,7 @@
            #!-win32
            (progn
              ;; POPCNT = ECX bit 23 = bit 7 of byte index 2
-             (inst test
-                   (make-ea :byte :disp (make-fixup "cpuid_fn1_ecx" :foreign 2))
-                   #x80)
+             (emit-foreign-logbitp 23 "cpuid_fn1_ecx" rdx)
              (inst jmp :z slow)
              ;; Intel's implementation of POPCNT on some models treats it as
              ;; a 2-operand ALU op in the manner of ADD,SUB,etc which means that
