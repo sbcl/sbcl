@@ -214,6 +214,24 @@
            (list (cons '*print-pprint-dispatch* ppd)))
           (*print-pprint-dispatch* ppd))
      (set-pprint-dispatch
+      'sb-kernel:layout (lambda (stream obj)
+                          (print-unreadable-object (obj stream :type t)
+                            (write (sb-int:awhen (sb-kernel:layout-classoid obj)
+                                     (sb-kernel:classoid-name sb-int:it))
+                                   :stream stream))))
+     (set-pprint-dispatch
+      'sb-kernel:classoid (lambda (stream obj)
+                            (print-unreadable-object (obj stream :type t)
+                              (write (sb-kernel:classoid-name obj) :stream stream))))
+     (set-pprint-dispatch
+      'package (lambda (stream obj)
+                 (print-unreadable-object (obj stream :type t)
+                   (write (package-name obj) :stream stream))))
+     (set-pprint-dispatch
+      'pathname (lambda (stream obj)
+                  (write-string "#P" stream)
+                  (write (namestring obj) :stream stream)))
+     (set-pprint-dispatch
       'sb-thread:thread (lambda (stream obj)
                           (declare (ignore obj))
                           (write-string "#<main-thread>" stream)))
