@@ -963,7 +963,25 @@ necessary, since type inference may take arbitrarily long to converge.")
     (with-source-paths
       (find-source-paths form current-index)
       (process-toplevel-form
-       form `(original-source-start 0 ,current-index) nil))))
+       form `(original-source-start 0 ,current-index) nil)))
+  ;; It's easy to get into a situation where cold-init crashes and the only
+  ;; backtrace you get from ldb is TOP-LEVEL-FORM, which means you're anywhere
+  ;; within the 23000 or so blobs of code deferred until cold-init.
+  ;; Seeing each file finish narrows things down without the noise of :sb-show,
+  ;; but this hack messes up form positions, so it's not on unless asked for.
+  #+nil ; change to #+sb-xc-host if desired
+  (let ((file-info (get-toplevelish-file-info info)))
+    (declare (ignorable file-info))
+    (let* ((forms (file-info-forms file-info))
+           (form
+            `(write-string
+              ,(format nil "Completed TLFs: ~A~%" (file-info-name file-info))))
+           (index
+            (+ (fill-pointer forms) (file-info-source-root file-info))))
+      (with-source-paths
+        (find-source-paths form index)
+        (process-toplevel-form
+         form `(original-source-start 0 ,index) nil)))))
 
 ;;; Return the INDEX'th source form read from INFO and the position
 ;;; where it was read.
