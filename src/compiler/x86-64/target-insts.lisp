@@ -28,6 +28,11 @@
 ;;; register implies a size.
 ;;;
 (defun print-mem-ref (mode value width stream dstate)
+  ;; :COMPUTE is used for the LEA instruction - it informs this function
+  ;; that the address is not a memory reference below which is confined
+  ;; the disassembly - the heuristic for detecting the start of unboxed data.
+  ;; LEA is sometimes used to compute the start of a local function for
+  ;; allocate-closures, and it points to valid instructions, not data.
   (declare (type (member :ref :sized-ref :compute) mode)
            (type list value)
            (type (member nil :byte :word :dword :qword) width)
@@ -77,16 +82,17 @@
                          1 (sb!disassem::note-code-constant-absolute
                             addr dstate width))
                         (sb!disassem:maybe-note-assembler-routine
-                         addr nil dstate))))))
+                         addr nil dstate)
+                        ;; lacking anything better, show the absolute address
+                        (sb!disassem:note (format nil "[#x~x]" addr) dstate))))))
             (firstp
-             (progn
                (sb!disassem:princ16 offset stream)
                (or (minusp offset)
                    (nth-value 1
                               (sb!disassem::note-code-constant-absolute offset dstate))
                    (sb!disassem:maybe-note-assembler-routine offset
                                                              nil
-                                                             dstate))))
+                                                             dstate)))
             (t
              (princ offset stream)))))))
   (write-char #\] stream)
@@ -132,6 +138,11 @@
 ;; For each reference, record its length so that it will subsequently
 ;; display the proper number of bytes.
 
+;; FIXME: I really think it ought to be possible to cut down to 2 passes
+;; from the current three passes that are made over each segment
+;; (one to determine opcode bounds, one to label, one to display).
+;; If, on the labeling pass, we just stop looking at bytes when encountering
+;; an address that intersects a known unboxed data ref, then we're done.
 (defun determine-opcode-bounds (seglist dstate)
   (flet ((mem-ref (displacement size more-segments)
            (let ((seg (dstate-segment dstate))
@@ -175,7 +186,9 @@
         ;; It's probably zero-fill. "ADD [RAX],AL" encodes as {0,0}
         ;; and is the most likely reason to chop one byte and stop.
         (unless (< last-inst-end-ofs (seg-opcodes-length seg))
-          (setf (seg-opcodes-length seg) last-inst-start-ofs)))))
+          (let ((n-skip (- (seg-opcodes-length seg) last-inst-start-ofs)))
+            (setf (seg-opcodes-length seg) last-inst-start-ofs
+                  (seg-opcode-trailer-length seg) n-skip))))))
   (setf (dstate-get-prop dstate :rip-relative-mem-ref-hook) nil))
 
 (defun disassemble-unboxed-data (segment stream dstate)
@@ -192,8 +205,14 @@
              (incf (dstate-cur-offs dstate) nbytes)))
       ;; Demarcate just before the first byte of 0-fill (if any) rather than at
       ;; the first location which was referenced as data, because it looks
-      ;; nicer to have no incomplete instructions prior to that.
+      ;; nicer to have no incomplete instructions prior to that,
+      ;; though some may spuriously decode as a legal sequence of zero bytes.
+      ;; e.g. on x86-64 the shortest valid sequence is two zeros, so we'll never
+      ;; decode one zero as an instruction, but will instead show it as a pad.
       (format stream "~&; Unboxed data:")
+      (let ((n-skip (seg-opcode-trailer-length segment)))
+        (when (plusp n-skip)
+          (hexdump n-skip)))
       ;; The way to guarantee we have the exact 'data-start' is to track refs
       ;; from all disassembly segments to all others. This is not trivial,
       ;; so not implemented.

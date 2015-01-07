@@ -264,6 +264,9 @@
   ;; Length of the memory range excluding any trailing untagged data.
   ;; Defaults to 'length' but could be shorter.
   (opcodes-length 0 :type disassem-length)
+  ;; The number of pad bytes after opcodes-length that should be dumped
+  ;; as raw bytes prior to displaying raw bytes that are genuinely data.
+  (opcode-trailer-length 0 :type disassem-length)
   (virtual-location 0 :type address)
   (storage-info nil :type (or null storage-info))
   ;; For backends which support unboxed constants within the segment,
@@ -1682,7 +1685,13 @@
 
 (defstruct code-constant-raw value)
 (def!method print-object ((self code-constant-raw) stream)
-  (format stream "#x~8,'0x" (code-constant-raw-value self)))
+  ;; A raw code constant is never a Lisp object, so if it is a cons,
+  ;; then it's the address of raw data- mnemonic is that (x) is like [x].
+  ;; Ideally we would want to show is as [Label] and then label the
+  ;; corresponding unboxed data.
+  (if (listp (code-constant-raw-value self))
+      (format stream "[#x~x]" (car (code-constant-raw-value self)))
+      (format stream "#x~8,'0x" (code-constant-raw-value self))))
 
 (defun get-code-constant-absolute (addr dstate &optional width)
   (declare (type address addr))
