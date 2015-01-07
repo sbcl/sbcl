@@ -458,7 +458,10 @@
            #!-win32
            (progn
              ;; POPCNT = ECX bit 23 = bit 7 of byte index 2
-             (emit-foreign-logbitp 23 "cpuid_fn1_ecx" rdx)
+             ;; this use of 'rcx' is as the temporary register for performing
+             ;; a reference to foreign data with dynamic core. It has to be
+             ;; a register that conflicts with 'arg' lest we clobber it.
+             (emit-foreign-logbitp 23 "cpuid_fn1_ecx" rcx)
              (inst jmp :z slow)
              ;; Intel's implementation of POPCNT on some models treats it as
              ;; a 2-operand ALU op in the manner of ADD,SUB,etc which means that

@@ -57,7 +57,6 @@ void arch_init(void)
 {
 #ifndef LISP_FEATURE_WIN32
   unsigned int eax, ebx, ecx, edx;
-  int i;
 
   cpuid(0, &eax, &ebx, &ecx, &edx);
   if (eax >= 1) { // see if we can execute basic id function 1
