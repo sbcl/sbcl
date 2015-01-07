@@ -88,3 +88,8 @@
         (when (< start other-start)
           (setf stop (min stop other-start))))
       stop))
+
+;; The lowest index that you can pass to %INSTANCE-REF accessing
+;; a slot of data that is not the instance-layout.
+;; To get a layout, you must call %INSTANCE-LAYOUT - don't assume index 0.
+(def!constant instance-data-start 1)

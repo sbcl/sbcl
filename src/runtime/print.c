@@ -449,13 +449,13 @@ static void brief_struct(lispobj obj)
         classoid_name = instance_classoid_name((lispobj*)instance);
         if ( classoid_name ) {
           char * namestring = simple_base_stringize(classoid_name);
-          printf("#<ptr to 0x%08lx %s instance>",
-                 (unsigned long) instance->slots[0], namestring);
+          printf("#<ptr to %p %s instance>",
+                 (void*)instance_layout((lispobj*)instance), namestring);
           if ( namestring != (char*)classoid_name->data )
               free(namestring);
         } else {
-          printf("#<ptr to 0x%08lx instance>",
-                 (unsigned long) instance->slots[0]);
+          printf("#<ptr to %p instance>",
+                 (void*)instance_layout((lispobj*)instance));
         }
     }
 }
@@ -491,10 +491,10 @@ static void print_struct(lispobj obj)
     if (!is_valid_lisp_addr((os_vm_address_t)instance)) {
         printf("(invalid address)");
     } else {
-        lispobj layout_obj =  ((struct instance *)native_pointer(obj))->slots[0];
+        lispobj layout_obj =  instance_layout(native_pointer(obj));
         print_obj("type: ", layout_obj);
         struct layout * layout = (struct layout*)native_pointer(layout_obj);
-        for (i = 1; i < HeaderValue(instance->header); i++) {
+        for (i=INSTANCE_DATA_START; i<instance_length(instance->header); i++) {
             sprintf(buffer, "slot %d: ", i);
             if (layout==NULL || untagged_slot_p(layout, i)) {
                 newline(NULL);

@@ -1269,7 +1269,8 @@ unless :NAMED is also specified.")))
   ;; slot that is not present in DD-SLOTS.
   ;; All other bits start as 1 and are cleared if the word is tagged.
   ;; A final padding word, if any, is regarded as tagged.
-  (let ((bitmap (ldb (byte (dd-length dd) 0) -2)))
+  (let ((bitmap (ldb (byte (dd-length dd) 0)
+                     (ash -1 sb!vm:instance-data-start))))
     (dolist (slot (dd-slots dd) bitmap)
       (when (eql t (dsd-raw-type slot))
         (setf (ldb (byte 1 (dsd-index slot)) bitmap) 0)))))

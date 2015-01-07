@@ -266,8 +266,8 @@
                       (unless (eq old new)
                         (setf (aref data i) new))))))
                ((typep tree 'instance)
-                ;; We don't grovel slot index 0, the layout.
-                (do-instance-tagged-slot (i tree :start 1)
+                ;; We don't grovel the layout.
+                (do-instance-tagged-slot (i tree)
                   (let* ((old (%instance-ref tree i))
                          (new (circle-subst old-new-alist old)))
                     (unless (eq old new)

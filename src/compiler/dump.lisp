@@ -1276,16 +1276,17 @@
     (error "attempt to dump invalid structure:~%  ~S~%How did this happen?"
            struct))
   (note-potential-circularity struct file)
-  (aver (%instance-ref struct 0))
   (do* ((length (%instance-length struct))
+        (layout (%instance-layout struct))
         #!-interleaved-raw-slots
-        (ntagged (- length (layout-n-untagged-slots (%instance-ref struct 0))))
+        (ntagged (- length (layout-n-untagged-slots layout)))
         #!+interleaved-raw-slots
-        (bitmap (layout-untagged-bitmap (%instance-ref struct 0)))
+        (bitmap (layout-untagged-bitmap layout))
         (circ (fasl-output-circularity-table file))
         ;; last slot first on the stack, so that the layout is on top:
         (index (1- length) (1- index)))
-      ((minusp index)
+      ((< index sb!vm:instance-data-start)
+       (dump-non-immediate-object layout file)
        (dump-fop* length fop-small-struct fop-struct file))
     (let* ((obj #!-interleaved-raw-slots
                 (if (>= index ntagged)
@@ -1296,23 +1297,23 @@
                     (%raw-instance-ref/word struct index)
                     (%instance-ref struct index)))
            (ref (gethash obj circ)))
-      (cond (ref
-             (aver (not (zerop index)))
-             (push (make-circularity :type :struct-set
-                                     :object struct
-                                     :index index
-                                     :value obj
-                                     :enclosing-object ref)
-                   *circularities-detected*)
-             (sub-dump-object nil file))
-            (t
-             (sub-dump-object obj file))))))
+      (sub-dump-object (cond (ref
+                              (push (make-circularity :type :struct-set
+                                                      :object struct
+                                                      :index index
+                                                      :value obj
+                                                      :enclosing-object ref)
+                                    *circularities-detected*)
+                              nil)
+                             (t obj))
+                       file))))
 
 (defun dump-layout (obj file)
   (when (layout-invalid obj)
     (compiler-error "attempt to dump reference to obsolete class: ~S"
                     (layout-classoid obj)))
   (let ((name (classoid-name (layout-classoid obj))))
+    ;; Q: Shouldn't we aver that NAME is the proper name for its classoid?
     (unless name
       (compiler-error "dumping anonymous layout: ~S" obj))
     (dump-object name file))

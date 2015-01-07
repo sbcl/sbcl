@@ -372,18 +372,19 @@ length and have identical components. Other arrays must be EQ to be EQUAL."
                   #!+interleaved-raw-slots
                   (let ((metadata (layout-untagged-bitmap layout-x)))
                     (if (zerop metadata)
-                        (loop for i of-type index from 1
+                        (loop for i of-type index from sb!vm:instance-data-start
                               below (layout-length layout-x)
                               always (slot-ref-equalp))
                         (let ((comparators (layout-equalp-tests layout-x)))
                           (unless (= (length comparators)
-                                     (1- (layout-length layout-x)))
+                                     (- (layout-length layout-x) sb!vm:instance-data-start))
                             (bug "EQUALP got incomplete instance layout"))
                           ;; See remark at the source code for %TARGET-DEFSTRUCT
                           ;; explaining how to use the vector of comparators.
-                          (loop for i of-type index from 1
+                          (loop for i of-type index from sb!vm:instance-data-start
                                 below (layout-length layout-x)
-                                for test = (data-vector-ref comparators (1- i))
+                                for test = (data-vector-ref
+                                            comparators (- i sb!vm:instance-data-start))
                                 always (cond ((eql test 0) (slot-ref-equalp))
                                              ((functionp test)
                                               (funcall test i x y))

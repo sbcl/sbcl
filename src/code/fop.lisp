@@ -172,12 +172,15 @@
 (define-cloned-fops (fop-struct 48 (layout)) (fop-small-struct 49)
   (let* ((size (clone-arg))
          (res (%make-instance size)) ; number of words excluding header
-         (n-data-words (1- size))) ; ... and excluding layout
+         ;; Compute count of elements to pop from stack, sans layout.
+         ;; If instance-data-start is 0, then size is the count,
+         ;; otherwise subtract 1 because the layout consumes a slot.
+         (n-data-words (- size sb!vm:instance-data-start)))
     (declare (type index size))
     (with-fop-stack (stack ptr n-data-words)
       (let ((ptr (+ ptr n-data-words)))
         (declare (type index ptr))
-        (setf (%instance-ref res 0) layout)
+        (setf (%instance-layout res) layout)
         #!-interleaved-raw-slots
         (let* ((nuntagged (layout-n-untagged-slots layout))
                (ntagged (- size nuntagged)))
@@ -190,7 +193,7 @@
                   (fop-stack-ref (decf ptr)))))
         #!+interleaved-raw-slots
         (let ((metadata (layout-untagged-bitmap layout)))
-          (do ((i 1 (1+ i)))
+          (do ((i sb!vm:instance-data-start (1+ i)))
               ((>= i size))
             (declare (type index i))
             (let ((val (fop-stack-ref (decf ptr))))

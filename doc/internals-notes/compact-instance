@@ -1,0 +1,165 @@
+The following outlines an approach by which the core image size of
+a particularly memory-hungry application can be reduced by about 100MB,
+with a corresponding reduction in runtime object allocation of course.
+This represents 10% of the space consumed by all structure-objects
+within pseudo-static space of this core image.
+The idea is to squash one word out of all structures
+by storing their instance-layout in their header words.
+
+There are (at least) two plausible ways to do this as detailed below.
+
+Alternative A [as proposed on sbcl-devel]
+=============
+If all layouts are aligned on a 256-byte boundary, then the lowest byte
+of a descriptor known to be a layout pointer is arbitrary,
+in the same way that the low 3 or 4 bits of a descriptor can be recovered
+from the object pointed to.
+
+Suppose than an instance's layout is at memory address #x1000CBAD00,
+so that its tagged pointer is #x1000CBAD03.
+
+Existing in-memory representation:
+  word 0 : #x000000NN59 ; header. #x59 is the widetag, NN is the length
+  word 1 : #x1000CBAD03 ; pointer to LAYOUT
+  word 2 : first user-specified slot
+  word 3 : second user-specified slot
+  ...
+
+Alternative representation A:
+  word 0 : #x1000CBAD59 ; header
+  word 1 : first user-specified slot
+  word 2 : second user-specified slot
+  ...
+
+Word 0 is a "strange" interior pointer that has the correct widetag
+for an INSTANCE, from which can be obtained a LAYOUT by subtracting #x56.
+This approach is slightly inefficient in that %INSTANCE-LENGTH can only
+be determined by following the LAYOUT and reading a slot from it.
+It is therefore inappropriate for the legacy raw-slot implementation,
+in which %INSTANCE-LENGTH plays an important role in slot access.
+
+Alternative B [applicable only to 64-bit architecture]
+=============
+If all layouts are located in low memory (< 4GB), then the upper 4 bytes
+of an instance header can convey the tagged pointer, with room to spare.
+
+Suppose now that the layout has tagged pointer #x20CBAD03.
+Alternative representation B:
+  word 0 : #x20CBAD03zzzzNN59 ; header
+  word 1 : first user-specified slot
+  word 2 : second user-specified slot
+  ...
+
+"zzzzNN" indicate the three bytes that may be used for length.
+Two bytes are adequate for all practical purposes.
+
+Alternative B requires no funny pointer arithmetic, only a small
+change when reading INSTANCE-LAYOUT to look in the high 4 bytes
+(half-Lisp-word) when accessing the zeroth word.
+And of course, it needs a segregated dynamic heap in low memory.
+
+While it is possible to implement a range of low addresses managed
+by the existing generational GC, for various reasons it is attractive to
+implement this in a non-moving GC. For one thing, type checks would be
+able to reference a LAYOUT as a 32-bit immediate operand to CMP,
+provided that the containing function also keeps the layout object
+live by a reference from its code header, which is not a problem.
+
+Compatibility
+=============
+In either approach, there is a quesion of what to report for %INSTANCE-LENGTH.
+Existing code assumes that (%INSTANCE-REF 0) is equivalent to %INSTANCE-LAYOUT.
+It is possible to preserve that appearance, so that %INSTANCE-REF 1 returns
+what is in "word 1" depicted above, and so on, but this consistency actually
+imparts an unacceptable degree of inefficiency to the %INSTANCE-REF vop,
+as well as making the meaning of %INSTANCE-LENGTH unusual for Lisp.
+It is inefficient because the vop for non-constant index would have to test
+for index 0 and access it differently. It is unconventional because it
+allows access to one more index than implied by the length.
+For example, suppose an %INSTANCE-LENGTH is 3 (4 physical words in the
+object). This means that you should only be able to supply indices
+of 0, 1, or 2; but in fact the last user-visible slot would be index 3
+in the above schemes because word 0 is stashed in a "hidden" place.
+The three slots of data are indexed in Lisp as 1, 2, 3 instead of 0, 1, 2.
+Hence, the non-adherence to a standard meaning of LENGTH.
+
+If the length in the header instead indicated 4, this would be strange
+for GC, and would require change there. Or, it could indicate 3, and Lisp
+could add 1 to it upon reading the value.  This is all quite messy
+and adds to the already-confusing bit of housekeeping necessary
+with regard to this LENGTH field.
+[Technically, the interleaved-raw-slot backend feature would be happier
+if we never had to adhere to the round-to-odd convention either.
+See the ample commentary at the 1 line DD-INSTANCE-LENGTH function]
+
+To best straighten out this conundrum, we shall:
+(A) deem that %INSTANCE-LAYOUT be the only abstraction for getting
+    the layout, and
+(B) define a new constant SB-VM:INSTANCE-DATA-START which is the
+    index of the first user-visible data slot.
+The latter constant is either 1 or 0 depending on the presence
+of the compact-header feature. Iteration over defined slots is performed
+by scanning from INSTANCE-DATA-START to %INSTANCE-LENGTH.
+And SB-VM:INSTANCE-SLOTS-OFFSET does not change. This is the constant
+that when added to an index as specified by Lisp to the INSTANCE-REF
+function, gets the proper physical index into the object.
+So with or without the feature, INSTANCE-REF 0 gets physical word
+index 1 relative to the object base.
+
+Compactifying STANDARD-OBJECT
+=============================
+The above shrinks every structure by 1 word, which in reality means that
+structures which had one word of waste shrink by 2, and structures with
+no wasted cells gain one padding word.
+But a STANDARD-OBJECT has exactly 4 physical slots:
+  <header, layout, slot-vector, hash-code>
+suggesting that it would acquire one word of slack, and not shrink.
+
+We can do better than that:
+1) suppose the clos-hash were stored in the 0th cell of the slot-vector.
+There's nothing about the standard instance protocol that precludes this.
+And it is a win: the "primitive" CLOS object would be
+  <compact-header, slot-vector>
+and the slot-vector would in turn either gain 2 physical slots,
+or gain no physical slots depending on whether it had a padding word.
+So once again we have each object netting either -2 cells or -0 cells
+of memory, considering the primitive object plus its data vector.
+This is exactly the same advantage as for STRUCTURE-OBJECT.
+Moreover, we gain a beautiful advantange: atomic update of
+the LAYOUT and SLOTS with CMPXCHG16B (for CHANGE-CLASS etc) which
+at present can not be done, as they do not satisfy that instruction's
+strict memory alignment requirement.
+
+2) Supposing we don't store the clos-hash at all, but use a non-moving GC.
+Then the clos-hash of a standard-object is just a mixing of its address.
+Each CLOS primitive object will shrink by exactly 2 words.
+
+Unifying PCL instance access
+============================
+STANDARD-INSTANCE-ACCESS and FUNCALLABLE-STANDARD-INSTANCE-ACCESS
+can be made to emit identical assembly code, which simplifies
+or eliminates some tests throughout the logic for PCL in deciding
+what metaclass of instance is in hand (funcallable or not)
+when getting the slot vector and layout.
+
+1) By placing the layout of a funcallable instance to its header word,
+the assembly code for reading a layout of an object that is either a
+standard-instance or funcallable-instance would mask off the lowtag
+(essentially converting the descriptor to a native pointer),
+and then read the layout from the high half of the header word.
+
+2) By placing the slot vector of a funcallable instance so that
+it becomes the first slot after the trampoline slot,
+access to the slot vector of either kind of instance can
+be done with "mov result, [ptr+5]" from the tagged pointer.
+This relies on the fact that the difference between the lowtags
+is exactly 8 and that the instance-pointer-lowtag is 3.
+Therefore, in the case of standard instance, [ptr+5] reads the
+physical word which is one word after the header,
+and in the case of funcallable-standard-instance,
+[ptr+5] reads the physical word which is 2 words after the header,
+skipping over the trampoline word.
+
+3) By placing a layout in every header of all 3 subtypes of FUNCTION,
+then LAYOUT-OF can consistently access the layout in the same way
+for any object that has either FUN-POINTER- or INSTANCE-POINTER-LOWTAG.

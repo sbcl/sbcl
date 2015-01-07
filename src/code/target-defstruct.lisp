@@ -142,7 +142,7 @@
          (layout (classoid-layout classoid)))
     (declare (ignorable layout))
     #!+interleaved-raw-slots
-    ;; Make a vector of EQUALP slots comparators, indexed by (1- word-index).
+    ;; Make a vector of EQUALP slots comparators, indexed by (- word-index data-start).
     ;; This has to be assigned to something regardless of whether there are
     ;; raw slots just in case someone mutates a layout which had raw
     ;; slots into one which does not - although that would probably crash
@@ -161,11 +161,15 @@
               ;; - internal padding words which are truly ignored.
               ;; Other words are compared as tagged if the comparator is 0,
               ;; or as untagged if the comparator is a type-specific function.
-              (let ((comparators (make-array (1- (dd-length dd))
-                                             :initial-element nil)))
+              (let ((comparators
+                     ;; If data-start is 1, subtract 1 because we don't need
+                     ;; a comparator for the LAYOUT slot.
+                     (make-array (- (dd-length dd) sb!vm:instance-data-start)
+                                 :initial-element nil)))
                 (dolist (slot (dd-slots dd) comparators)
                   ;; -1 because LAYOUT (slot index 0) has no comparator stored.
-                  (setf (aref comparators (1- (dsd-index slot)))
+                  (setf (aref comparators
+                              (- (dsd-index slot) sb!vm:instance-data-start))
                         (let ((raw-type (dsd-raw-type slot)))
                           (if (eq raw-type t)
                               0 ; means recurse using EQUALP
@@ -202,12 +206,16 @@
                 (%raw-instance-ref/word structure i))))
       #!+interleaved-raw-slots
       (let ((metadata (layout-untagged-bitmap layout)))
+        ;; Don't assume that %INSTANCE-REF can access the layout.
+        (setf (%instance-layout res) (%instance-layout structure))
         ;; With interleaved slots, the only difference between %instance-ref
         ;; and %raw-instance-ref/word is the storage class of the VOP operands.
         ;; Since x86(-64) doesn't partition the register set, the bitmap test
         ;; could be skipped if we wanted to copy everything as raw.
         (macrolet ((copy-loop (raw-p &optional step)
-                     `(dotimes (i (layout-length layout))
+                     `(do ((i sb!vm:instance-data-start (1+ i)))
+                          ((>= i len))
+                        (declare (index i))
                         (if ,raw-p
                             (setf (%raw-instance-ref/word res i)
                                   (%raw-instance-ref/word structure i))
@@ -215,8 +223,7 @@
                                   (%instance-ref structure i)))
                         ,step)))
           (cond ((zerop metadata) ; no untagged slots.
-                 (dotimes (i len)
-                   (setf (%instance-ref res i) (%instance-ref structure i))))
+                 (copy-loop nil))
                 ;; The fixnum case uses fixnum operations for ODPP and ASH.
                 ((fixnump metadata) ; shift and mask is faster than logbitp
                  (copy-loop (oddp metadata) (setq metadata (ash metadata -1))))

@@ -1034,12 +1034,19 @@ core and return a descriptor to it."
 
     result))
 
+;; This is called to backpatch two small sets of objects:
+;;  - layouts which are made before layout-of-layout is made (4 of them)
+;;  - packages, which are made before layout-of-package is made (all of them)
+(defun patch-instance-layout (thing layout)
+  ;; Layout pointer is in the word following the header
+  (write-wordindexed thing sb!vm:instance-slots-offset layout))
+
 (defun initialize-layouts ()
   (clrhash *cold-layouts*)
   ;; This assertion is due to the fact that MAKE-COLD-LAYOUT does not
   ;; know how to set any raw slots.
   (aver (= 0 (layout-raw-slot-metadata (find-layout 'layout))))
-  (setq *layout-layout* *nil-descriptor*)
+  (setq *layout-layout* (make-fixnum-descriptor 0))
   (flet ((chill-layout (name &rest inherits)
            ;; Check that the number of specified INHERITS matches
            ;; the length of the layout's inherits in the cross-compiler.
@@ -1058,8 +1065,7 @@ core and return a descriptor to it."
       (setf *layout-layout*
             (chill-layout 'layout t-layout s-o-layout s!o-layout))
       (dolist (layout (list t-layout s-o-layout s!o-layout *layout-layout*))
-        (write-wordindexed layout sb!vm:instance-slots-offset
-                           *layout-layout*))
+        (patch-instance-layout layout *layout-layout*))
       (setf *package-layout*
             (chill-layout 'package ; *NOT* SB!XC:PACKAGE, or you lose
                           t-layout s-o-layout s!o-layout)))))
@@ -1088,8 +1094,7 @@ core and return a descriptor to it."
              (init-cold-package (name &optional docstring)
                (let ((cold-package (car (gethash name *cold-package-symbols*))))
                  ;; patch in the layout
-                 (write-wordindexed cold-package sb!vm:instance-slots-offset
-                                    *package-layout*)
+                 (patch-instance-layout cold-package *package-layout*)
                  ;; Initialize string slots
                  (set-slot cold-package '%name (base-string-to-core name))
                  (set-slot cold-package '%nicknames (chill-nicknames name))

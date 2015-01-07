@@ -78,6 +78,8 @@
                          index offset))
 
 ;;; The layout is stored in slot 0.
+;;; *** These next two transforms should be the only code, aside from
+;;;     some parts of the C runtime, with knowledge of the layout index.
 (define-source-transform %instance-layout (x)
   `(truly-the layout (%instance-ref ,x 0)))
 (define-source-transform %set-instance-layout (x val)

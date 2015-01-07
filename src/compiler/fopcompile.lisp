@@ -253,6 +253,8 @@
                          ;; it we bind *dump-only-valid-structures* to
                          ;; NIL.
                          (fasl-validate-structure value *compile-object*)
+                         ;; The above FIXME notwithstanding,
+                         ;; there's never a need to grovel a layout.
                          (do-instance-tagged-slot (i value)
                            (grovel (%instance-ref value i))))
                         (:ignore-it)

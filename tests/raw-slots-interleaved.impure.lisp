@@ -114,6 +114,7 @@
 (with-test (:name :tagged-slot-iterator-macro)
   (setf (sb-kernel:%instance-ref *afoo* 10) 'magic)
   (let (l)
+    (push `(0 ,(sb-kernel:%instance-layout *afoo*)) l)
     (sb-kernel:do-instance-tagged-slot (i *afoo*)
       (push `(,i ,(sb-kernel:%instance-ref *afoo* i)) l))
     (assert (oddp (sb-kernel:%instance-length *afoo*)))

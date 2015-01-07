@@ -185,9 +185,11 @@
                 ;; raw-slot-metadata, 0 represents no untagged slots.
                 (zerop (layout-raw-slot-metadata
                         (info :type :compiler-layout name)))))))
-  (defun %instance-length (instance)
+  (defun %instance-layout (instance)
     (aver (or (typep instance 'structure!object)
               (xc-dumpable-structure-instance-p instance)))
+    (classoid-layout (find-classoid (type-of instance))))
+  (defun %instance-length (instance)
     ;; INSTANCE-LENGTH tells you how many data words the backend is able to
     ;; physically access in this structure. Since every structure occupies
     ;; an even number of words, the storage slots comprise an odd number
@@ -199,18 +201,23 @@
     ;; more cells than there are in the declared structure because there
     ;; is no lower level storage that you can peek at.
     ;; So INSTANCE-LENGTH is exactly the same as LAYOUT-LENGTH on the host.
-    (layout-length (classoid-layout (find-classoid (type-of instance)))))
+    (layout-length (%instance-layout instance)))
   (defun %instance-ref (instance index)
-    (aver (or (typep instance 'structure!object)
-              (xc-dumpable-structure-instance-p instance)))
-    (let* ((class (find-classoid (type-of instance)))
-           (layout (classoid-layout class)))
-      (if (zerop index)
-          layout
+    (let ((layout (%instance-layout instance)))
+      ;; with compact headers, 0 is an ordinary slot index.
+      ;; without, it's the layout.
+      (if (eql index (1- sb!vm:instance-data-start))
+          (error "XC Host should use %INSTANCE-LAYOUT, not %INSTANCE-REF 0")
           (let* ((dd (layout-info layout))
-                 (dsd (elt (dd-slots dd) (1- index)))
+                 ;; If data starts at 1, then subtract 1 from index.
+                 ;; otherwise use the index as-is.
+                 (dsd (elt (dd-slots dd)
+                           (- index sb!vm:instance-data-start)))
                  (accessor-name (dsd-accessor-name dsd)))
-            (declare (type symbol accessor-name))
+            ;; Why AVER these: because it is slightly abstraction-breaking
+            ;; to assume that the slot-index N is the NTH item in the DSDs.
+            ;; The target Lisp never assumes that.
+            (aver (and (eql (dsd-index dsd) index) (eq (dsd-raw-type dsd) t)))
             (funcall accessor-name instance)))))
   ;; I believe this approach is technically nonportable because CLHS says that
   ;;  "The mechanism by which defstruct arranges for slot accessors to be usable
@@ -218,14 +225,14 @@
   ;;   functions, setf expanders, or some other implementation-dependent
   ;;   mechanism ..."
   ;; As it happens, many implementations provide both functions and expanders.
+  ;; But ... this seems never to be needed.
   (defun %instance-set (instance index new-value)
-    (aver (typep instance 'structure!object))
-    (let* ((class (find-classoid (type-of instance)))
-           (layout (classoid-layout class)))
-      (if (zerop index)
+    (aver (typep instance 'structure!object)) ; a stronger condition than above
+    (let ((layout (%instance-layout instance)))
+      (if (< index sb!vm:instance-data-start)
           (error "can't set %INSTANCE-REF FOO 0 in cross-compilation host")
           (let* ((dd (layout-info layout))
-                 (dsd (elt (dd-slots dd) (1- index)))
+                 (dsd (elt (dd-slots dd) (- index sb!vm:instance-data-start)))
                  (accessor-name (dsd-accessor-name dsd)))
             (declare (type symbol accessor-name))
             (funcall (fdefinition `(setf ,accessor-name))

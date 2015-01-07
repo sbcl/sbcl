@@ -494,13 +494,41 @@ trans_fun_header(lispobj object)
  * instances
  */
 
+static lispobj
+trans_instance(lispobj object)
+{
+    lispobj header;
+    uword_t length;
+
+    gc_assert(is_lisp_pointer(object));
+
+    header = *((lispobj *) native_pointer(object));
+    length = instance_length(header) + 1;
+    length = CEILING(length, 2);
+
+    return copy_object(object, length);
+}
+
+static sword_t
+size_instance(lispobj *where)
+{
+    lispobj header;
+    uword_t length;
+
+    header = *where;
+    length = instance_length(header) + 1;
+    length = CEILING(length, 2);
+
+    return length;
+}
+
 static sword_t
 scav_instance_pointer(lispobj *where, lispobj object)
 {
     lispobj copy, *first_pointer;
 
     /* Object is a pointer into from space - not a FP. */
-    copy = trans_boxed(object);
+    copy = trans_instance(object);
 
 #ifdef LISP_FEATURE_GENCGC
     gc_assert(copy != object);
@@ -735,19 +763,19 @@ instance_scan_interleaved(void (*proc)(),
 #endif
 
 static sword_t
-scav_instance(lispobj *where, lispobj object)
+scav_instance(lispobj *where, lispobj header)
 {
-    sword_t ntotal = HeaderValue(object);
-    lispobj layout = ((struct instance *)where)->slots[0];
+    sword_t ntotal = instance_length(header);
+    lispobj* layout = (lispobj*)instance_layout(where);
 
     if (!layout)
         return 1;
-    layout = (lispobj)native_pointer(layout);
-    if (forwarding_pointer_p((lispobj*)layout))
-        layout = (lispobj)native_pointer((lispobj)forwarding_pointer_value((lispobj*)layout));
+    layout = native_pointer((lispobj)layout);
+    if (forwarding_pointer_p(layout))
+        layout = native_pointer((lispobj)forwarding_pointer_value(layout));
 
 #ifdef LISP_FEATURE_INTERLEAVED_RAW_SLOTS
-    instance_scan_interleaved(scavenge, where, ntotal, (lispobj*)layout);
+    instance_scan_interleaved(scavenge, where, ntotal, layout);
 #else
     lispobj nuntagged = ((struct layout*)layout)->n_untagged_slots;
     scavenge(where + 1, ntotal - fixnum_value(nuntagged));
@@ -2305,7 +2333,7 @@ gc_init_tables(void)
     transother[UNBOUND_MARKER_WIDETAG] = trans_immediate;
     transother[NO_TLS_VALUE_MARKER_WIDETAG] = trans_immediate;
     transother[WEAK_POINTER_WIDETAG] = trans_weak_pointer;
-    transother[INSTANCE_HEADER_WIDETAG] = trans_boxed;
+    transother[INSTANCE_HEADER_WIDETAG] = trans_instance;
     transother[FDEFN_WIDETAG] = trans_boxed;
 
     /* size table, initialized the same way as scavtab */
@@ -2451,7 +2479,7 @@ gc_init_tables(void)
     sizetab[UNBOUND_MARKER_WIDETAG] = size_immediate;
     sizetab[NO_TLS_VALUE_MARKER_WIDETAG] = size_immediate;
     sizetab[WEAK_POINTER_WIDETAG] = size_weak_pointer;
-    sizetab[INSTANCE_HEADER_WIDETAG] = size_boxed;
+    sizetab[INSTANCE_HEADER_WIDETAG] = size_instance;
     sizetab[FDEFN_WIDETAG] = size_boxed;
 }
 
@@ -3208,7 +3236,7 @@ struct vector * instance_classoid_name(lispobj * instance)
 {
   if (forwarding_pointer_p(instance))
       instance = native_pointer((lispobj)forwarding_pointer_value(instance));
-  lispobj layout = ((struct instance*)instance)->slots[0];
+  lispobj layout = instance_layout(instance);
   return lowtag_of(layout) != INSTANCE_POINTER_LOWTAG ? NULL
     : layout_classoid_name(native_pointer(layout));
 }

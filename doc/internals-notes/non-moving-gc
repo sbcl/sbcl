@@ -1,0 +1,95 @@
+Non-moving GC
+=============
+For a few types of objects, evidence suggests that
+either they are almost immediately known to be long-lived (a PACKAGE, e.g.),
+of very fleeting in lifetime (gensyms during compilation, e.g).
+At least four types of objects share this aspect:
+- LAYOUT
+- FDEFN
+- PACKAGE
+- SYMBOL, but only certain symbols, those which appear
+  (by their name) to be special variables
+
+In addition, these objects seem to have in common the property that speed
+of allocation is relatively unimportant, and which therefore are indifferent
+to an allocator which is somewhat more expensive than a "pointer bump".
+
+Taking each in turn:
+A LAYOUT is created when augmenting the type system (via DEFSTRUCT,DEFCLASS)
+which has so much overhead in and of itself, that speed of creation of
+the LAYOUT is insignificant.  We also expect changes to the type system
+to be few and far between (in comparison to operations on the objects of that
+type) such that reclamation of the metadata by GC is nearly irrelevant as
+to whether or when it happens.
+
+An FDEFN is created for function linkage, which entails compilation,
+which entails tons of overhead. (While it's certainly possible to create
+FDEFNs outside of the compiler/loader, it would be unusual)
+Morever, it was not even possible to delete FDEFN objects prior to the
+rewrite of globaldb, which is to say, FDEFNs were *actually* immortal.
+
+A PACKAGE is generally expected to be long-lived, and again speed of
+allocation is irrelevant.
+
+And finally, interned symbol usually live as long as their package does.
+
+For most of those objects, immobile placement does not seem to lead
+to too much heap fragmentation in the immobile space.
+
+Prior to dumping a core image, we could allow motion on the otherwise
+non-moving heap to squash the waste out. But this renders infeasible
+the possibility of wiring in 32-bit immediate operands in assembly code
+unless all code-components store their fixups for later use.
+And indeed, assembly code makes frequent reference to SYMBOLs, FDEFNs,
+and LAYOUTs, so there is something to be said for wiring them in.
+
+Card marking
+============
+For FDEFNs and SYMBOLs, we can avoid OS-based write-protection while
+incurring less of a penalty than was suggested by Paul Khuong's sw-write-barrier
+branch. If symbols that "look like" special variables are immobile,
+then a card-marking scheme can be used with a cost of only 1 instruction
+for known symbols.
+   LOCK BTS [someplace], N ; set the "card dirty" bit
+   MOV [addr], val         ; write it
+Some fairly intricate cooperation with the fasloader will be required to
+compute the absolute address of the mark bit, but not much more tricky
+than the logic to assign symbol TLS indices at load time.
+[And this doesn't help any with (SET SYM VAL) or with (PROGV)]
+
+We need two bits per card: one bit for whether the card is dirty,
+and one bit for whether the card was ever the target of a preserve_pointer()
+or the target of the effective address of a MOV instruction if that is
+where the stop-for-gc signal occurred.
+[This is the downside of not loading the symbol into a register]
+In the latter case we can't clear the dirty bit even if the card seems clean,
+because in the instruction sequence above, the second operation writes
+the card in a way that would be accidentally invisible to GC if the dirty
+bit were cleared after the first instruction.
+
+
+Additional tweaks
+=================
+
+1. If PACKAGEs and FDEFNs are both in low space (using the non-moving GC),
+one 8-byte pointer slot in a SYMBOL can be made into 2 4-byte pointers
+so that SYMBOL-FDEFN becomes a mere slot reference.
+This is an utterly trivial change to the vops, and to the GC scavenge
+function for a symbol.
+
+2. Non-moving GC could be used for non-toplevel CODE objects.
+This might allow all functions within the same file to use the
+ordinary x86 CALL instruction, under control of an optimize policy
+(because it would be difficult to trace/redefine/encapsulate)
+
+3. If a closure header needs only 2 bytes for the length (probably true),
+there is 1 byte available for a generation# and there are 4 bytes for the
+layout of FUNCTION. The same is true for funcallable-instance and FUNCTION.
+Note that the generation# for a SIMPLE-FUN will be stored in
+the CODE-COMPONENT object, not the SIMPLE-FUN.
+
+[unrelated]
+4. A build-time selection that limits array-total-size to 2^31 on 64-bit
+would allow a vector length to be stuffed into the vector header,
+which saves space for small vectors. A vector of length 3 would shrink
+from 6 physical words to 4 words - a 33% savings.

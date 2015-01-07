@@ -3193,8 +3193,8 @@ verify_space(lispobj *start, size_t words)
 
                 case INSTANCE_HEADER_WIDETAG:
                     {
-                        sword_t ntotal = HeaderValue(thing);
-                        lispobj layout = ((struct instance *)start)->slots[0];
+                        sword_t ntotal = instance_length(thing);
+                        lispobj layout = instance_layout(start);
                         if (!layout) {
                             count = 1;
                             break;

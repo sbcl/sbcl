@@ -357,28 +357,24 @@
                     ;; functions don't work on general instances, only on
                     ;; STRUCTURE!OBJECTs.
                     ;;
+                    ;; Behold the wonderfully clear sense of this-
+                    ;;  WHEN (EMIT-MAKE-LOAD-FORM VALUE)
+                    ;; meaning "when you're _NOT_ using a custom load-form"
+                    ;;
                     ;; FIXME: What about funcallable instances with
                     ;; user-defined MAKE-LOAD-FORM methods?
                     (when (emit-make-load-form value)
-                      ;; "#+sb-xc-host 0" is actually necessary.
-                      ;; DO-INSTANCE-TAGGED-SLOT does not work here
-                      ;; due to a build order issue.
-                      #!+interleaved-raw-slots
-                      (let ((bitmap #+sb-xc-host 0
-                                    #-sb-xc-host (layout-untagged-bitmap
-                                                  (%instance-ref value 0))))
-                        (dotimes (i (%instance-length value))
-                          (unless (logbitp i bitmap)
-                            (grovel (%instance-ref value i)))))
-                      #!-interleaved-raw-slots
-                      (dotimes (i (- (%instance-length value)
-                                     #+sb-xc-host 0
-                                     #-sb-xc-host (layout-n-untagged-slots
-                                                   (%instance-ref value 0))))
+                      #+sb-xc-host
+                      (aver (zerop (layout-raw-slot-metadata
+                                    (%instance-layout value))))
+                      (do-instance-tagged-slot (i value)
                         (grovel (%instance-ref value i)))))
+                   ;; The cross-compiler can dump certain instances that are not
+                   ;; subtypes of STRUCTURE!OBJECT, as long as it has processed
+                   ;; the defstruct.
                    #+sb-xc-host
                    ((satisfies sb!kernel::xc-dumpable-structure-instance-p)
-                    (dotimes (i (%instance-length value))
+                    (do-instance-tagged-slot (i value)
                       (grovel (%instance-ref value i))))
                    (t
                     (compiler-error

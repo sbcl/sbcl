@@ -200,51 +200,43 @@
 (defun raw-slot-words (type)
   (raw-slot-data-n-words (raw-slot-data-or-lose type)))
 
-;; DO-INSTANCE-TAGGED-SLOT will iterate over the slots of THING that
-;; contain tagged objects. INDEX-VAR is bound to successive slot-indices,
+;; DO-INSTANCE-TAGGED-SLOT iterates over the manifest slots of THING
+;; that contain tagged objects. (The LAYOUT does not count as a manifest slot).
+;; INDEX-VAR is bound to successive slot-indices,
 ;; and is usually used as the second argument to %INSTANCE-REF.
-;; START, if supplied, should be either 0 or 1 to include,
-;; or respectively exclude, the object's layout slot.
-;; END, if supplied, represents the upper bound of the scan and should be
-;; the LAYOUT-LENGTH of the object; it defaults to %INSTANCE-LENGTH if
-;; unsupplied, will therefore possibly include one word that can, in theory,
-;; covertly hold one tagged object more than indicated by LAYOUT-LENGTH
-;; depending on ODDP of LAYOUT-LENGTH.
-;; END works correctly whether or not the backend supports slot interleaving,
-;; but it is probably a bug if anyone uses the padding slot for storage.
+;; EXCLUDE-PADDING, if T, skips a final word that may be present
+;; at the end of the structure due to alignment requirements.
 ;; LAYOUT is optional and somewhat unnecessary, but since some uses of
 ;; this macro already have a layout in hand, it can be supplied.
 ;; [If the compiler were smarter about doing fewer memory accesses,
 ;; there would be no need at all for the LAYOUT - if it had already been
 ;; accessed, it shouldn't be another memory read]
-;; Note also that THING is usually a STRUCTURE-OBJECT, not a condition or
-;; standard-object. Iterating over a CONDITION means iterating over the
-;; slots comprising the primitive representation, not the manifest slots.
-;; Similarly for STANDARD-OBJECT. Additionally, in the latter case
-;; it would be a bug to specify LAYOUT-LENGTH as the :END parameter.
-(defmacro do-instance-tagged-slot ((index-var thing
-                                    &key (start 0) end layout) &body body)
-  (with-unique-names (instance limit bitmap)
+;; * CAUTION: with a STANDARD-OBJECT you MUST NOT specify :EXCLUDE-PADDING T
+;;   because that equates to using LAYOUT-LENGTH rather than %INSTANCE-LENGTH
+;;   to compute the upper bound, but LAYOUT-LENGTH of a STANDARD-OBJECT
+;;   is not pertinent to the number of storage cells in the primitive object.
+;;
+(defmacro do-instance-tagged-slot ((index-var thing &key (layout nil layout-p)
+                                                         exclude-padding)
+                                   &body body)
+  (with-unique-names (instance n-layout limit bitmap)
     (declare (ignorable bitmap))
-    (unless layout
-      (setq layout `(%instance-layout ,instance)))
-    (unless end
-      (setq end `(%instance-length ,instance)))
-    `(let ((,instance ,thing))
-       ;; If the macro is given both :LAYOUT and :END, it never uses
-       ;; the local rebinding of INSTANCE, which is ok.
-       (declare (ignorable ,instance))
-       #!+interleaved-raw-slots
-       (let ((,bitmap (layout-untagged-bitmap ,layout)))
-         (do ((,index-var ,start (1+ ,index-var))
-              (,limit ,end))
+    (let ((end-expr (if exclude-padding
+                        `(layout-length ,n-layout)
+                        `(%instance-length ,instance))))
+      `(let* (,@(if (and layout-p exclude-padding) nil `((,instance ,thing)))
+              (,n-layout ,(or layout `(%instance-layout ,instance))))
+         #!+interleaved-raw-slots
+         (do ((,bitmap (layout-untagged-bitmap ,n-layout))
+              (,index-var sb!vm:instance-data-start (1+ ,index-var))
+              (,limit ,end-expr))
              ((>= ,index-var ,limit))
            (declare (type index ,index-var))
            (unless (logbitp ,index-var ,bitmap)
-             ,@body)))
-       #!-interleaved-raw-slots
-       (do ((,index-var ,start (1+ ,index-var))
-            (,limit (- ,end (layout-n-untagged-slots ,layout))))
-           ((>= ,index-var ,limit))
-         (declare (type index ,index-var))
-         ,@body))))
+             ,@body))
+         #!-interleaved-raw-slots
+         (do ((,index-var 1 (1+ ,index-var))
+              (,limit (- ,end-expr (layout-n-untagged-slots ,n-layout))))
+             ((>= ,index-var ,limit))
+           (declare (type index ,index-var))
+           ,@body)))))
