@@ -41,9 +41,29 @@
     (inst or  header type)
     (inst shr header n-fixnum-tag-bits)
     (pseudo-atomic
-     (allocation result bytes node)
-     (inst lea result (make-ea :qword :base result :disp other-pointer-lowtag))
+     (allocation result bytes node nil other-pointer-lowtag)
      (storew header result 0 other-pointer-lowtag))))
+
+(define-vop (make-array-header/c)
+  (:translate make-array-header)
+  (:policy :fast-safe)
+  (:arg-types (:constant t) (:constant t))
+  (:info type rank)
+   (:results (result :scs (descriptor-reg) :from :eval))
+  (:node-var node)
+  (:generator 12
+    (let* ((header-size (+ rank
+                           (1- array-dimensions-offset)))
+           (bytes (logandc2 (+ (* (1+ header-size) n-word-bytes)
+                               lowtag-mask)
+                            lowtag-mask))
+           (header (logior (ash header-size
+                                n-widetag-bits)
+                           type)))
+     (pseudo-atomic
+      (allocation result bytes node nil other-pointer-lowtag)
+      (storew header result 0 other-pointer-lowtag)))))
+
 
 ;;;; additional accessors and setters for the array header
 (define-full-reffer %array-dimension *
