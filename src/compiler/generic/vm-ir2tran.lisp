@@ -210,7 +210,12 @@
                                    (push
                                     `(,(sb!vm:saetp-typecode s)
                                        (lambda (index tn)
-                                         #!+(or x86 x86-64)
+                                         #!+x86-64
+                                         (vop ,(symbolicate "DATA-VECTOR-SET-WITH-OFFSET/"
+                                                            (sb!vm:saetp-primitive-type-name s)
+                                                            "-C")
+                                              node block result tn index 0 tn)
+                                         #!+x86
                                          (vop ,(symbolicate "DATA-VECTOR-SET-WITH-OFFSET/"
                                                             (sb!vm:saetp-primitive-type-name s))
                                               node block result index tn 0 tn)
@@ -224,7 +229,10 @@
                          ,@(nreverse clauses)))))
                (frob)))
            (tnify (index)
-             (emit-constant index)))
+             #!-x86-64
+             (emit-constant index)
+             #!+x86-64
+             index))
       (let ((setter (compute-setter))
             (length (length initial-contents)))
         (dotimes (i length)

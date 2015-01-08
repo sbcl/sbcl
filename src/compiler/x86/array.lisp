@@ -189,7 +189,7 @@
                  (inst shl ecx ,(1- (integer-length bits)))))
            (inst shr result :cl)
            (inst and result ,(1- (ash 1 bits)))))
-       (define-vop (,(symbolicate 'data-vector-ref-c-with-offset/ type))
+       (define-vop (,(symbolicate 'data-vector-ref-with-offset/ type "-C"))
          (:translate data-vector-ref-with-offset)
          (:policy :fast-safe)
          (:args (object :scs (descriptor-reg)))
@@ -253,7 +253,7 @@
               (inst mov result (tn-value value)))
              (unsigned-reg
               (move result value)))))
-       (define-vop (,(symbolicate 'data-vector-set-c-with-offset/ type))
+       (define-vop (,(symbolicate 'data-vector-set-with-offset/ type "-C"))
          (:translate data-vector-set-with-offset)
          (:policy :fast-safe)
          (:args (object :scs (descriptor-reg))
