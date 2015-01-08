@@ -423,6 +423,31 @@
         `(locally (declare (notinline list vector))
            (make-array ,new-dimensions ,@keyargs)))))
 
+(define-source-transform coerce (x type &environment env)
+  (if (and (sb!xc:constantp type env)
+           (proper-list-p x)
+           (memq (car x) '(sb!impl::|List| list
+                           sb!impl::|Vector| vector)))
+      (let* ((type (constant-form-value type env))
+             (length (1- (length x)))
+             ;; Special case, since strings are unions
+             (string-p (member type '(string simple-string)))
+             (ctype (or string-p
+                        (careful-values-specifier-type type))))
+        (if (or string-p
+                (and (array-type-p ctype)
+                     (csubtypep ctype (specifier-type '(array * (*))))
+                     (proper-list-of-length-p (array-type-dimensions ctype) 1)
+                     (or (eq (car (array-type-dimensions ctype)) '*)
+                         (eq (car (array-type-dimensions ctype)) length))))
+            `(make-array ,length
+                         :element-type ',(if string-p
+                                             'character
+                                             (nth-value 1 (simplify-vector-type ctype)))
+                         :initial-contents ,x)
+            (values nil t)))
+      (values nil t)))
+
 ;;; This baby is a bit of a monster, but it takes care of any MAKE-ARRAY
 ;;; call which creates a vector with a known element type -- and tries
 ;;; to do a good job with all the different ways it can happen.
