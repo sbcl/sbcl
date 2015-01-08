@@ -923,6 +923,10 @@
                        (:displaced-index-offset index))
     array (flushable))
 
+(defknown sb!impl::fill-data-vector (vector list sequence)
+  t
+  (explicit-check))
+
 (defknown vector (&rest t) simple-vector (flushable))
 
 (defknown aref (array &rest index) t (foldable))
