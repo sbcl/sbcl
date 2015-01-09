@@ -49,7 +49,7 @@
   (:policy :fast-safe)
   (:arg-types (:constant t) (:constant t))
   (:info type rank)
-   (:results (result :scs (descriptor-reg) :from :eval))
+  (:results (result :scs (descriptor-reg) :from :eval))
   (:node-var node)
   (:generator 12
     (let* ((header-size (+ rank
