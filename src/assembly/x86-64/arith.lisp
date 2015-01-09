@@ -170,10 +170,12 @@
 ;;;; comparison
 
 (macrolet ((define-cond-assem-rtn (name translate static-fn test)
-               (declare (ignorable translate static-fn))
-             #+sb-assembling
              `(define-assembly-routine (,name
-                                        (:return-style :none))
+                                        (:translate ,translate)
+                                        (:policy :safe)
+                                        (:save-p t)
+                                        (:conditional ,test)
+                                        (:cost 10))
                   ((:arg x (descriptor-reg any-reg) rdx-offset)
                    (:arg y (descriptor-reg any-reg) rdi-offset)
 
@@ -210,39 +212,16 @@
                     (:l `((inst mov y (1+ nil-value))
                           (inst cmp y x)))
                     (:g `((inst cmp x (1+ nil-value)))))
-                (inst pop rbp-tn)
-                (inst ret))
-             #-sb-assembling
-             `(define-vop (,name)
-                (:translate ,translate)
-                (:policy :safe)
-                (:save-p t)
-                (:args (x :scs (descriptor-reg any-reg) :target rdx)
-                       (y :scs (descriptor-reg any-reg) :target rdi))
-
-                (:temporary (:sc unsigned-reg :offset rdx-offset
-                                 :from (:argument 0))
-                            rdx)
-                (:temporary (:sc unsigned-reg :offset rdi-offset
-                                 :from (:argument 1))
-                            rdi)
-
-                (:temporary (:sc unsigned-reg :offset rcx-offset
-                                 :from :eval)
-                            rcx)
-                (:conditional ,test)
-                (:generator 10
-                   (move rdx x)
-                   (move rdi y)
-                   (inst mov rcx (make-fixup ',name :assembly-routine))
-                   (inst call rcx)))))
-
+                (inst pop rbp-tn))))
   (define-cond-assem-rtn generic-< < two-arg-< :l)
   (define-cond-assem-rtn generic-> > two-arg-> :g))
 
-#+sb-assembling
 (define-assembly-routine (generic-eql
-                          (:return-style :none))
+                          (:translate eql)
+                          (:policy :safe)
+                          (:save-p t)
+                          (:conditional :e)
+                          (:cost 10))
                          ((:arg x (descriptor-reg any-reg) rdx-offset)
                           (:arg y (descriptor-reg any-reg) rdi-offset)
 
@@ -274,37 +253,14 @@
   (inst call (make-ea :qword
                       :disp (+ nil-value (static-fun-offset 'eql))))
   (inst cmp x (+ nil-value (static-symbol-offset t)))
-  (inst pop rbp-tn)
-  (inst ret))
+  (inst pop rbp-tn))
 
-#-sb-assembling
-(define-vop (generic-eql)
-  (:translate eql)
-  (:policy :safe)
-  (:save-p t)
-  (:args (x :scs (descriptor-reg any-reg) :target rdx)
-         (y :scs (descriptor-reg any-reg) :target rdi))
-
-  (:temporary (:sc unsigned-reg :offset rdx-offset
-               :from (:argument 0))
-              rdx)
-  (:temporary (:sc unsigned-reg :offset rdi-offset
-               :from (:argument 1))
-              rdi)
-
-  (:temporary (:sc unsigned-reg :offset rcx-offset
-               :from :eval)
-              rcx)
-  (:conditional :e)
-  (:generator 10
-    (move rdx x)
-    (move rdi y)
-    (inst mov rcx (make-fixup 'generic-eql :assembly-routine))
-    (inst call rcx)))
-
-#+sb-assembling
 (define-assembly-routine (generic-=
-                          (:return-style :none))
+                          (:translate =)
+                          (:policy :safe)
+                          (:save-p t)
+                          (:conditional :e)
+                          (:cost 10))
                          ((:arg x (descriptor-reg any-reg) rdx-offset)
                           (:arg y (descriptor-reg any-reg) rdi-offset)
 
@@ -336,33 +292,7 @@
   (inst call (make-ea :qword
                       :disp (+ nil-value (static-fun-offset 'two-arg-=))))
   (inst cmp x (+ nil-value (static-symbol-offset t)))
-  (inst pop rbp-tn)
-  (inst ret))
-
-#-sb-assembling
-(define-vop (generic-=)
-  (:translate =)
-  (:policy :safe)
-  (:save-p t)
-  (:args (x :scs (descriptor-reg any-reg) :target rdx)
-         (y :scs (descriptor-reg any-reg) :target rdi))
-
-  (:temporary (:sc unsigned-reg :offset rdx-offset
-               :from (:argument 0))
-              rdx)
-  (:temporary (:sc unsigned-reg :offset rdi-offset
-               :from (:argument 1))
-              rdi)
-
-  (:temporary (:sc unsigned-reg :offset rcx-offset
-               :from :eval)
-              rcx)
-  (:conditional :e)
-  (:generator 10
-    (move rdx x)
-    (move rdi y)
-    (inst mov rcx (make-fixup 'generic-= :assembly-routine))
-    (inst call rcx)))
+  (inst pop rbp-tn))
 
 #+sb-assembling
 (define-assembly-routine (logcount)

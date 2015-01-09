@@ -125,8 +125,7 @@
          (vop (make-symbol "VOP")))
     (unless (member return-style '(:raw :full-call :none))
       (error "unknown return-style for ~S: ~S" name return-style))
-    (multiple-value-bind
-        (call-sequence call-temps)
+    (multiple-value-bind (call-sequence call-temps)
         (generate-call-sequence name return-style vop)
       `(define-vop ,(if (atom name) (list name) name)
          (:args ,@(mapcar #'arg-or-res-spec args))
@@ -145,7 +144,6 @@
                                    :to (:eval 3))
                                   ,(reg-spec-name temp)))
                    temps)
-         ,@call-temps
          (:vop-var ,vop)
          ,@(let ((index -1))
              (mapcar (lambda (res)
@@ -157,11 +155,19 @@
                                     ,(reg-spec-temp res)))
                      results))
          (:results ,@(mapcar #'arg-or-res-spec results))
-         (:ignore ,@(mapcar #'reg-spec-name temps)
-                  ,@(apply #'append
-                           (mapcar #'cdr
-                                   (remove :ignore call-temps
-                                           :test #'neq :key #'car))))
+         ;; call-temps are allowed to inject random clauses into the vop
+         ;; definition, including one or more :IGNORE options, which made
+         ;; little sense because for one thing it is stylistically wrong -
+         ;; DEFINE-VOP itself considers only the last of a repeated option.
+         ;; More to the point, nobody needs the ability to ignore more TNs
+         ;; than were auto-ignored. Indeed, we want to un-ignore some,
+         ;; which is achieved by putting an empty :IGNORE in call-temps.
+         ;; Instead of unioning the :IGNOREs, call-temps always prevails.
+         (:ignore ,@(mapcar #'reg-spec-name temps))
+         ,@call-temps
+         ;; This too is a tad sleazy - because of how VOP parsing works,
+         ;; any :SAVE-P specified in options supersedes one from call-temps.
+         ;; It would be wiser to signal an error about duplicate options.
          ,@(remove-if (lambda (x)
                         (member x '(:return-style :cost)))
                       options
