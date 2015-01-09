@@ -23,7 +23,8 @@
 ;;; value, which again simplifies the return path.
 ;;;    -- AB, 2006/Feb/05.
 
-(defun generate-call-sequence (name style vop)
+(defun generate-call-sequence (name style vop options)
+  (declare (ignore options))
   (ecase style
     ((:raw :none)
      (values

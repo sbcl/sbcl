@@ -126,7 +126,7 @@
     (unless (member return-style '(:raw :full-call :none))
       (error "unknown return-style for ~S: ~S" name return-style))
     (multiple-value-bind (call-sequence call-temps)
-        (generate-call-sequence name return-style vop)
+        (generate-call-sequence name return-style vop options)
       `(define-vop ,(if (atom name) (list name) name)
          (:args ,@(mapcar #'arg-or-res-spec args))
          ,@(let ((index -1))
@@ -155,21 +155,16 @@
                                     ,(reg-spec-temp res)))
                      results))
          (:results ,@(mapcar #'arg-or-res-spec results))
-         ;; call-temps are allowed to inject random clauses into the vop
-         ;; definition, including one or more :IGNORE options, which made
-         ;; little sense because for one thing it is stylistically wrong -
-         ;; DEFINE-VOP itself considers only the last of a repeated option.
-         ;; More to the point, nobody needs the ability to ignore more TNs
-         ;; than were auto-ignored. Indeed, we want to un-ignore some,
-         ;; which is achieved by putting an empty :IGNORE in call-temps.
-         ;; Instead of unioning the :IGNOREs, call-temps always prevails.
-         (:ignore ,@(mapcar #'reg-spec-name temps))
+         ;; This formerly unioned in the contents of an :ignore clause from
+         ;; the value of the 'call-temps' variable, for no good reason afaict.
+         (:ignore ,@(set-difference (mapcar #'reg-spec-name temps)
+                                    (cdr (assoc :call-temps options))))
          ,@call-temps
          ;; This too is a tad sleazy - because of how VOP parsing works,
          ;; any :SAVE-P specified in options supersedes one from call-temps.
          ;; It would be wiser to signal an error about duplicate options.
          ,@(remove-if (lambda (x)
-                        (member x '(:return-style :cost)))
+                        (member x '(:return-style :cost :call-temps)))
                       options
                       :key #'car)
          (:generator ,cost

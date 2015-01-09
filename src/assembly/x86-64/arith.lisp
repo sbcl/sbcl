@@ -175,7 +175,8 @@
                                         (:policy :safe)
                                         (:save-p t)
                                         (:conditional ,test)
-                                        (:cost 10))
+                                        (:cost 10)
+                                        (:call-temps rcx))
                   ((:arg x (descriptor-reg any-reg) rdx-offset)
                    (:arg y (descriptor-reg any-reg) rdi-offset)
 
@@ -221,7 +222,8 @@
                           (:policy :safe)
                           (:save-p t)
                           (:conditional :e)
-                          (:cost 10))
+                          (:cost 10)
+                          (:call-temps rcx))
                          ((:arg x (descriptor-reg any-reg) rdx-offset)
                           (:arg y (descriptor-reg any-reg) rdi-offset)
 
@@ -260,7 +262,8 @@
                           (:policy :safe)
                           (:save-p t)
                           (:conditional :e)
-                          (:cost 10))
+                          (:cost 10)
+                          (:call-temps rcx))
                          ((:arg x (descriptor-reg any-reg) rdx-offset)
                           (:arg y (descriptor-reg any-reg) rdi-offset)
 

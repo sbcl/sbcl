@@ -11,7 +11,8 @@
 
 (in-package "SB!VM")
 
-(defun generate-call-sequence (name style vop)
+(defun generate-call-sequence (name style vop options)
+  (declare (ignore options))
   (ecase style
     ((:none :raw)
      (let ((fixup-address (make-symbol "FIXUP-ADDRESS")))
