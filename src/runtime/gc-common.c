@@ -111,25 +111,6 @@ copy_code_object(lispobj object, sword_t nwords)
     return gc_general_copy_object(object, nwords, CODE_PAGE_FLAG);
 }
 
-boolean
-from_space_p(lispobj obj)
-{
-    extern boolean in_dontmove_nativeptr_p(page_index_t, lispobj*);
-    page_index_t page_index;
-
-    if (space_matches_p(obj, from_space, &page_index)) {
-        lispobj *native = native_pointer(obj);
-        if (in_dontmove_nativeptr_p(page_index, native)) {
-            // pretend it is not in oldspace to protect it from being moved
-            return 0;
-        } else {
-            return 1;
-        }
-    } else {
-        return 0;
-    }
-}
-
 static sword_t scav_lose(lispobj *where, lispobj object); /* forward decl */
 
 /* FIXME: Most calls end up going to some trouble to compute an

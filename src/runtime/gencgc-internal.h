@@ -159,8 +159,24 @@ space_matches_p(lispobj obj, generation_index_t space,
     }
 }
 
-boolean from_space_p(lispobj obj);
+static boolean
+from_space_p(lispobj obj)
+{
+    extern boolean in_dontmove_nativeptr_p(page_index_t, lispobj*);
+    page_index_t page_index;
 
+    if (space_matches_p(obj, from_space, &page_index)) {
+        lispobj *native = native_pointer(obj);
+        if (in_dontmove_nativeptr_p(page_index, native)) {
+            // pretend it is not in oldspace to protect it from being moved
+            return 0;
+        } else {
+            return 1;
+        }
+    } else {
+        return 0;
+    }
+}
 static inline boolean
 new_space_p(lispobj obj)
 {
