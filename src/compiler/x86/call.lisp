@@ -22,6 +22,16 @@
                      (nth n *register-arg-offsets*))
       (make-wired-tn *backend-t-primitive-type* control-stack-sc-number n)))
 
+(defun standard-arg-location-sc (n)
+  (declare (type unsigned-byte n))
+  (if (< n register-arg-count)
+      (make-sc-offset descriptor-reg-sc-number
+                      (nth n *register-arg-offsets*))
+      (make-sc-offset control-stack-sc-number n)))
+
+(defconstant arg-count-sc (make-sc-offset any-reg-sc-number ecx-offset))
+(defconstant closure-sc (make-sc-offset descriptor-reg-sc-number eax-offset))
+
 ;;; Make a passing location TN for a local call return PC.
 ;;;
 ;;; Always wire the return PC location to the stack in its standard
@@ -271,8 +281,7 @@
                               ancestor-frame-set/system-area-pointer))))
 
 (define-vop (xep-allocate-frame)
-  (:info start-lab copy-more-arg-follows)
-  (:vop-var vop)
+  (:info start-lab)
   (:generator 1
     (emit-alignment n-lowtag-bits)
     (emit-label start-lab)
@@ -283,18 +292,15 @@
 
     ;; The start of the actual code.
     ;; Save the return-pc.
-    (popw ebp-tn (frame-word-offset return-pc-save-offset))
+    (popw ebp-tn (frame-word-offset return-pc-save-offset))))
 
-    ;; If copy-more-arg follows it will allocate the correct stack
-    ;; size. The stack is not allocated first here as this may expose
-    ;; args on the stack if they take up more space than the frame!
-    (unless copy-more-arg-follows
-      ;; The args fit within the frame so just allocate the frame.
-      (inst lea esp-tn
+(define-vop (xep-setup-sp)
+  (:generator 1
+    (inst lea esp-tn
             (make-ea :dword :base ebp-tn
                      :disp (- (* n-word-bytes
                                  (- (max 3 (sb-allocated-size 'stack))
-                                    sp->fp-offset))))))))
+                                    sp->fp-offset)))))))
 
 ;;; This is emitted directly before either a known-call-local, call-local,
 ;;; or a multiple-call-local. All it does is allocate stack space for the
@@ -1419,19 +1425,28 @@
 ;;; Signal wrong argument count error if NARGS isn't equal to COUNT.
 (define-vop (verify-arg-count)
   (:policy :fast-safe)
-  (:translate sb!c::%verify-arg-count)
   (:args (nargs :scs (any-reg)))
-  (:arg-types positive-fixnum (:constant t))
-  (:info count)
+  (:arg-types positive-fixnum (:constant t) (:constant t))
+  (:info min max)
   (:vop-var vop)
   (:save-p :compute-only)
   (:generator 3
     (let ((err-lab
            (generate-error-code vop 'invalid-arg-count-error nargs)))
-      (if (zerop count)
-          (inst test nargs nargs)  ; smaller instruction
-        (inst cmp nargs (fixnumize count)))
-      (inst jmp :ne err-lab))))
+      (cond ((not min)
+             (if (zerop max)
+                 (inst test nargs nargs)
+                 (inst cmp nargs (fixnumize max)))
+             (inst jmp :ne err-lab))
+            (max
+             (when (plusp min)
+               (inst cmp nargs (fixnumize min))
+               (inst jmp :b err-lab))
+             (inst cmp nargs (fixnumize max))
+             (inst jmp :a err-lab))
+            ((plusp min)
+             (inst cmp nargs (fixnumize min))
+             (inst jmp :b err-lab))))))
 
 ;;; Various other error signallers.
 (macrolet ((def (name error translate &rest args)

@@ -155,9 +155,15 @@
   (declare (type functional fun))
   (etypecase fun
     (clambda
-     (let ((nargs (length (lambda-vars fun)))
-           (n-supplied (gensym))
-           (temps (make-gensym-list (length (lambda-vars fun)))))
+     (let* ((n-supplied (gensym))
+            (nargs (length (lambda-vars fun)))
+            (temps (make-gensym-list nargs)))
+       #!+precise-arg-count-error
+       `(lambda (,n-supplied ,@temps)
+          (declare (type index ,n-supplied)
+                   (ignore ,n-supplied))
+          (%funcall ,fun ,@temps))
+       #!-precise-arg-count-error
        `(lambda (,n-supplied ,@temps)
           (declare (type index ,n-supplied))
           ,(if (policy *lexenv* (zerop verify-arg-count))
@@ -177,6 +183,23 @@
                and n from min
                do (entries `((eql ,n-supplied ,n)
                              (%funcall ,(force ep) ,@(subseq temps 0 n)))))
+         #!+precise-arg-count-error
+         `(lambda (,n-supplied ,@temps)
+            (declare (type index ,n-supplied))
+            (cond
+              ,@(butlast (entries))
+              (t
+               ;; Arg-checking is performed before this step,
+               ;; arranged by INIT-XEP-ENVIRONMENT,
+               ;; perform the last action unconditionally,
+               ;; and without this the function derived type will be bad.
+               ,(if more
+                    (with-unique-names (n-context n-count)
+                      `(multiple-value-bind (,n-context ,n-count)
+                           (%more-arg-context ,n-supplied ,max)
+                         (%funcall ,more ,@temps ,n-context ,n-count)))
+                    (cadar (last (entries)))))))
+         #!-precise-arg-count-error
          `(lambda (,n-supplied ,@temps)
             (declare (type index ,n-supplied))
             (cond

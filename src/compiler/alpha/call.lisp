@@ -24,6 +24,15 @@
       (make-wired-tn *backend-t-primitive-type*
                      control-stack-arg-scn n)))
 
+(defun standard-arg-location-sc (n)
+  (declare (type unsigned-byte n))
+  (if (< n register-arg-count)
+      (make-sc-offset register-arg-scn
+                      (nth n *register-arg-offsets*))
+      (make-sc-offset control-stack-arg-scn n)))
+
+(defconstant arg-count-sc (make-sc-offset immediate-arg-scn nargs-offset))
+(defconstant closure-sc (make-sc-offset descriptor-reg-sc-number lexenv-offset))
 
 ;;; Make a passing location TN for a local call return PC. If standard
 ;;; is true, then use the standard (full call) location, otherwise use
@@ -142,9 +151,7 @@
     (storew value frame-pointer (tn-offset variable-home-tn))))
 
 (define-vop (xep-allocate-frame)
-  (:info start-lab copy-more-arg-follows)
-  (:ignore copy-more-arg-follows)
-  (:vop-var vop)
+  (:info start-lab)
   (:temporary (:scs (non-descriptor-reg)) temp)
   (:generator 1
     ;; Make sure the function is aligned, and drop a label pointing to
@@ -162,8 +169,11 @@
       (inst compute-code-from-lip code-tn lip-tn entry-point temp)
       ;; ### We should also save it on the stack so that the garbage
       ;; collector won't forget about us if we call anyone else.
-      )
-    ;; Build our stack frames.
+      )))
+
+(define-vop (xep-setup-sp)
+  (:vop-var vop)
+  (:generator 1
     (inst lda
           csp-tn
           (* n-word-bytes (sb-allocated-size 'control-stack))
@@ -1189,6 +1199,7 @@ default-value-8
     (inst subq csp-tn count context)))
 
 ;;; Signal wrong argument count error if NARGS isn't equal to COUNT.
+#!-precise-arg-count-error
 (define-vop (verify-arg-count)
   (:policy :fast-safe)
   (:translate sb!c::%verify-arg-count)
@@ -1205,6 +1216,37 @@ default-value-8
              (inst bne nargs err-lab))
             (t
              (inst subq nargs (fixnumize count) temp)
+             (inst bne temp err-lab))))))
+
+#!+precise-arg-count-error
+(define-vop (verify-arg-count)
+  (:policy :fast-safe)
+  (:args (nargs :scs (any-reg)))
+  (:arg-types positive-fixnum (:constant t) (:constant t))
+  (:info min max)
+  (:temporary (:scs (any-reg) :type fixnum) temp)
+  (:vop-var vop)
+  (:save-p :compute-only)
+  (:generator 3
+    (let ((err-lab
+            (generate-error-code vop invalid-arg-count-error nargs)))
+      (cond ((not min)
+             (cond ((zerop max)
+                    (inst bne nargs err-lab))
+                   (t
+                    (inst subq nargs (fixnumize count) temp)
+                    (inst bne temp err-lab))))
+            (max
+             (when (plusp min)
+               (inst li (fixnumize min) temp)
+               (inst cmpult nargs temp temp)
+               (inst bne temp err-lab))
+             (inst li (fixnumize max) temp)
+             (inst cmpult temp nargs temp)
+             (inst bne temp err-lab))
+            ((plusp min)
+             (inst li (fixnumize min) temp)
+             (inst cmpult nargs temp temp)
              (inst bne temp err-lab))))))
 
 ;;; various other error signalers

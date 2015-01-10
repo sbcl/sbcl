@@ -481,7 +481,26 @@ thread, NIL otherwise."
     (dolist (element (sb!di:debug-fun-lambda-list debug-fun))
       (funcall thunk element))))
 
+;;; Since arg-count checking happens before any of the stack locations
+;;; and registers are overwritten all the arguments, including the
+;;; extra ones, can be precisely recovered.
+#!+precise-arg-count-error
+(defun arg-count-error-frame-args (frame)
+  (let* ((escaped (sb!di::compiled-frame-escaped frame))
+         (pointer (sb!di::frame-pointer frame))
+         (arg-count (sb!di::sub-access-debug-var-slot
+                     pointer sb!c:arg-count-sc escaped)))
+    (loop for i below arg-count
+          collect  (sb!di::sub-access-debug-var-slot
+                    pointer
+                    (sb!c:standard-arg-location-sc i)
+                    escaped))))
+
 (defun frame-args-as-list (frame)
+  #!+precise-arg-count-error
+  (when (sb!di::tl-invalid-arg-count-error-p frame)
+    (return-from frame-args-as-list
+      (arg-count-error-frame-args frame)))
   (handler-case
       (let ((location (sb!di:frame-code-location frame))
             (reversed-result nil))
@@ -489,67 +508,65 @@ thread, NIL otherwise."
           (map-frame-args
            (lambda (element)
              (lambda-list-element-dispatch element
-               :required ((push (frame-call-arg element location frame) reversed-result))
-               :optional ((push (frame-call-arg (second element) location frame)
-                                reversed-result))
-               :keyword ((push (second element) reversed-result)
-                         (push (frame-call-arg (third element) location frame)
-                               reversed-result))
-               :deleted ((push (frame-call-arg element location frame) reversed-result))
-               :rest ((lambda-var-dispatch (second element) location
-                        nil
-                        (let ((rest (sb!di:debug-var-value (second element) frame)))
-                          (if (listp rest)
-                              (setf reversed-result (append (reverse rest) reversed-result))
-                              (push (make-unprintable-object "unavailable &REST argument")
-                                    reversed-result))
-                          (return-from enumerating))
-                        (push (make-unprintable-object
-                               "unavailable &REST argument")
-                              reversed-result)))
-              :more ((lambda-var-dispatch (second element) location
-                         nil
-                         (let ((context (sb!di:debug-var-value (second element) frame))
-                               (count (sb!di:debug-var-value (third element) frame)))
-                           (setf reversed-result
-                                 (append (reverse
-                                          (multiple-value-list
-                                           (sb!c::%more-arg-values context 0 count)))
-                                         reversed-result))
-                           (return-from enumerating))
-                         (push (make-unprintable-object "unavailable &MORE argument")
-                               reversed-result)))))
+                                           :required ((push (frame-call-arg element location frame) reversed-result))
+                                           :optional ((push (frame-call-arg (second element) location frame)
+                                                            reversed-result))
+                                           :keyword ((push (second element) reversed-result)
+                                                     (push (frame-call-arg (third element) location frame)
+                                                           reversed-result))
+                                           :deleted ((push (frame-call-arg element location frame) reversed-result))
+                                           :rest ((lambda-var-dispatch (second element) location
+                                                                       nil
+                                                                       (let ((rest (sb!di:debug-var-value (second element) frame)))
+                                                                         (if (listp rest)
+                                                                             (setf reversed-result (append (reverse rest) reversed-result))
+                                                                             (push (make-unprintable-object "unavailable &REST argument")
+                                                                                   reversed-result))
+                                                                         (return-from enumerating))
+                                                                       (push (make-unprintable-object
+                                                                              "unavailable &REST argument")
+                                                                             reversed-result)))
+                                           :more ((lambda-var-dispatch (second element) location
+                                                                       nil
+                                                                       (let ((context (sb!di:debug-var-value (second element) frame))
+                                                                             (count (sb!di:debug-var-value (third element) frame)))
+                                                                         (setf reversed-result
+                                                                               (append (reverse
+                                                                                        (multiple-value-list
+                                                                                         (sb!c::%more-arg-values context 0 count)))
+                                                                                       reversed-result))
+                                                                         (return-from enumerating))
+                                                                       (push (make-unprintable-object "unavailable &MORE argument")
+                                                                             reversed-result)))))
            frame))
         (nreverse reversed-result))
     (sb!di:lambda-list-unavailable ()
       (make-unprintable-object "unavailable lambda list"))))
 
-(defun interrupted-frame-error (frame)
-  (when (and (sb!di::compiled-frame-p frame)
-             (sb!di::compiled-frame-escaped frame))
-    (let ((error-number (sb!vm:internal-error-args
-                         (sb!di::compiled-frame-escaped frame))))
-      (when (array-in-bounds-p sb!c:*backend-internal-errors* error-number)
-        (cdr (svref sb!c:*backend-internal-errors* error-number))))))
-
 (defun clean-xep (frame name args info)
   (values (second name)
+          #!-precise-arg-count-error
           (if (consp args)
               (let* ((count (first args))
                      (real-args (rest args)))
                 (if (and (integerp count)
-                         (eq (interrupted-frame-error frame)
-                             'invalid-arg-count-error))
+                         (sb!di::tl-invalid-arg-count-error-p frame))
                     ;; So, this is a cheap trick -- but makes backtraces for
                     ;; too-many-arguments-errors much, much easier to to
-                    ;; understand. FIXME: For :EXTERNAL frames at least we
-                    ;; should be able to get the actual arguments, really.
+                    ;; understand.
                     (loop repeat count
                           for arg = (if real-args
                                         (pop real-args)
                                         (make-unprintable-object "unknown"))
                           collect arg)
                     real-args))
+              args)
+          ;; Clip arg-count.
+          #!+precise-arg-count-error
+          (if (and (consp args)
+                   ;; ARG-COUNT-ERROR-FRAME-ARGS doesn't include arg-count
+                   (not (sb!di::tl-invalid-arg-count-error-p frame)))
+              (rest args)
               args)
           (if (eq (car name) 'sb!c::tl-xep)
               (cons :tl info)

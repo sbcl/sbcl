@@ -186,17 +186,20 @@
       (let* ((index 0)
              (error-number (sb!c:read-var-integer vector index)))
         (/hexstr error-number)
-        (collect ((sc-offsets))
-          (loop
-           (/show0 "INDEX=..")
-           (/hexstr index)
-           (when (>= index length)
-             (return))
-           (let ((sc-offset (sb!c:read-var-integer vector index)))
-             (/show0 "SC-OFFSET=..")
-             (/hexstr sc-offset)
-             (sc-offsets sc-offset)))
-          (values error-number (sc-offsets)))))))
+        (if (and (= error-number #.(error-number-or-lose 'invalid-arg-count-error))
+                 (= length 1))
+            (values error-number '(#.arg-count-sc))
+            (collect ((sc-offsets))
+              (loop
+               (/show0 "INDEX=..")
+               (/hexstr index)
+               (when (>= index length)
+                 (return))
+               (let ((sc-offset (sb!c:read-var-integer vector index)))
+                 (/show0 "SC-OFFSET=..")
+                 (/hexstr sc-offset)
+                 (sc-offsets sc-offset)))
+              (values error-number (sc-offsets))))))))
 
 
 ;;; the current alien stack pointer; saved/restored for non-local exits

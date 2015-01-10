@@ -221,6 +221,12 @@
 
 ;;;; INTERNAL-ERROR signal handler
 
+;;; Backtrace code may want to know the error that caused
+;;; interruption, but there are other means to get code interrupted
+;;; and inspecting code around PC for the error number may yield wrong
+;;; results.
+(defvar *current-internal-error* nil)
+
 (defun internal-error (context continuable)
   (declare (type system-area-pointer context))
   (declare (ignore continuable))
@@ -259,7 +265,8 @@
          (multiple-value-bind (name sb!debug:*stack-top-hint*)
              (find-interrupted-name-and-frame)
            (/show0 "back from FIND-INTERRUPTED-NAME")
-           (let ((fp (int-sap (sb!vm:context-register alien-context
+           (let ((*current-internal-error* error-number)
+                 (fp (int-sap (sb!vm:context-register alien-context
                                                       sb!vm::cfp-offset)))
                  (handler (and (< -1 error-number (length *internal-errors*))
                                (svref *internal-errors* error-number))))

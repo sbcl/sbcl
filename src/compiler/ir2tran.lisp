@@ -1251,6 +1251,23 @@
 
 ;;;; entering functions
 
+#!+precise-arg-count-error
+(defun xep-verify-arg-count (node block fun arg-count-location)
+  (when (policy fun (plusp verify-arg-count))
+    (let* ((ef (functional-entry-fun fun))
+           (optional (optional-dispatch-p ef))
+           (min (and optional
+                     (optional-dispatch-min-args ef)))
+           (max (cond ((not optional)
+                       (1- (length (lambda-vars fun))))
+                      ((and optional
+                            (not (optional-dispatch-more-entry ef)))
+                       (optional-dispatch-max-args ef)))))
+      (vop verify-arg-count node block
+           arg-count-location
+           min
+           max))))
+
 ;;; Do all the stuff that needs to be done on XEP entry:
 ;;; -- Create frame.
 ;;; -- Copy any more arg.
@@ -1260,15 +1277,24 @@
 (defun init-xep-environment (node block fun)
   (declare (type bind node) (type ir2-block block) (type clambda fun))
   (let ((start-label (entry-info-offset (leaf-info fun)))
-        (env (physenv-info (node-physenv node))))
+        (env (physenv-info (node-physenv node)))
+        arg-count-tn)
     (let ((ef (functional-entry-fun fun)))
+      (vop xep-allocate-frame node block start-label)
+      ;; Arg verification needs to be done before the stack pointer is adjusted
+      ;; so that the extra arguments are still present when the error is signalled
+      (unless (eq (functional-kind fun) :toplevel)
+        (setf arg-count-tn (make-arg-count-location))
+        #!+precise-arg-count-error
+        (xep-verify-arg-count node block fun arg-count-tn))
       (cond ((and (optional-dispatch-p ef) (optional-dispatch-more-entry ef))
-             ;; Special case the xep-allocate-frame + copy-more-arg case.
-             (vop xep-allocate-frame node block start-label t)
+             ;; COPY-MORE-ARG should handle SP adjustemnt, but it
+             ;; isn't done on all targets.
+             #!-precise-arg-count-error
+             (vop xep-setup-sp node block)
              (vop copy-more-arg node block (optional-dispatch-max-args ef)))
             (t
-             ;; No more args, so normal entry.
-             (vop xep-allocate-frame node block start-label nil)))
+             (vop xep-setup-sp node block)))
       (when (ir2-physenv-closure env)
         (let ((closure (make-normal-tn *backend-t-primitive-type*)))
           (when (policy fun (> store-closure-debug-pointer 1))
@@ -1284,13 +1310,11 @@
           (let ((n -1))
             (dolist (loc (ir2-physenv-closure env))
               (vop closure-ref node block closure (incf n) (cdr loc)))))))
-
     (unless (eq (functional-kind fun) :toplevel)
       (let ((vars (lambda-vars fun))
             (n 0))
         (when (leaf-refs (first vars))
-          (emit-move node block (make-arg-count-location)
-                     (leaf-info (first vars))))
+          (emit-move node block arg-count-tn (leaf-info (first vars))))
         (dolist (arg (rest vars))
           (when (leaf-refs arg)
             (let ((pass (standard-arg-location n))

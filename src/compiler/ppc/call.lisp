@@ -22,6 +22,15 @@
                      (elt *register-arg-offsets* n))
       (make-wired-tn *backend-t-primitive-type* control-stack-arg-scn n)))
 
+(defun standard-arg-location-sc (n)
+  (declare (type unsigned-byte n))
+  (if (< n register-arg-count)
+      (make-sc-offset register-arg-scn
+                      (nth n *register-arg-offsets*))
+      (make-sc-offset control-stack-arg-scn n)))
+
+(defconstant arg-count-sc (make-sc-offset immediate-arg-scn nargs-offset))
+(defconstant closure-sc (make-sc-offset descriptor-reg-sc-number lexenv-offset))
 
 ;;; Make a passing location TN for a local call return PC.  If
 ;;; standard is true, then use the standard (full call) location,
@@ -140,9 +149,7 @@
     (storew value frame-pointer (tn-offset variable-home-tn))))
 
 (define-vop (xep-allocate-frame)
-  (:info start-lab copy-more-arg-follows)
-  (:ignore copy-more-arg-follows)
-  (:vop-var vop)
+  (:info start-lab)
   (:temporary (:scs (non-descriptor-reg)) temp)
   (:generator 1
     ;; Make sure the function is aligned, and drop a label pointing to this
@@ -153,17 +160,20 @@
     (inst simple-fun-header-word)
     (dotimes (i (1- simple-fun-code-offset))
       (inst word 0))
-    (let* ((entry-point (gen-label)))
+    (let ((entry-point (gen-label)))
       (emit-label entry-point)
-      (inst compute-code-from-lip code-tn lip-tn entry-point temp))
       ;; FIXME alpha port has a ### note here saying we should "save it
       ;; on the stack" so that GC sees it. No idea what "it" is -dan 20020110
-    ;; Build our stack frames.
+      (inst compute-code-from-lip code-tn lip-tn entry-point temp))))
+
+(define-vop (xep-setup-sp)
+  (:vop-var vop)
+  (:generator 1
     (inst addi csp-tn cfp-tn
           (* n-word-bytes (sb-allocated-size 'control-stack)))
     (let ((nfp-tn (current-nfp-tn vop)))
       (when nfp-tn
-        (let* ((nbytes (bytes-needed-for-non-descriptor-stack-frame)))
+        (let ((nbytes (bytes-needed-for-non-descriptor-stack-frame)))
           (when (> nbytes number-stack-displacement)
             (inst stwu nsp-tn nsp-tn (- nbytes))
             (inst addi nfp-tn nsp-tn number-stack-displacement)))))))
@@ -1190,6 +1200,7 @@ default-value-8
     (inst subi count supplied (fixnumize fixed))
     (inst sub context csp-tn count)))
 
+#!-precise-arg-count-error
 (define-vop (verify-arg-count)
   (:policy :fast-safe)
   (:translate sb!c::%verify-arg-count)
@@ -1200,6 +1211,24 @@ default-value-8
   (:save-p :compute-only)
   (:generator 3
    (inst twi :ne nargs (fixnumize count))))
+
+#!+precise-arg-count-error
+(define-vop (verify-arg-count)
+  (:policy :fast-safe)
+  (:args (nargs :scs (any-reg)))
+  (:arg-types positive-fixnum (:constant t) (:constant t))
+  (:info min max)
+  (:vop-var vop)
+  (:save-p :compute-only)
+  (:generator 3
+    (cond ((not min)
+           (inst twi :ne nargs (fixnumize max)))
+          (max
+           (when (plusp min)
+             (inst twi :llt nargs (fixnumize min)))
+           (inst twi :lgt nargs (fixnumize max)))
+          ((plusp min)
+           (inst twi :llt nargs (fixnumize min))))))
 
 ;;; Signal various errors.
 (macrolet ((frob (name error translate &rest args)

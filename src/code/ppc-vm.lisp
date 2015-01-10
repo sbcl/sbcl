@@ -117,14 +117,15 @@
   (declare (type (alien (* os-context-t)) context))
   (let* ((pc (context-pc context))
          (bad-inst (sap-ref-32 pc 0))
-         (op (ldb (byte 16 16) bad-inst)))
+         (op (ldb (byte 16 16) bad-inst))
+         (regnum (ldb (byte 5 0) op)))
     (declare (type system-area-pointer pc))
     (cond ((= op (logior (ash 3 10) (ash 6 5)))
            (args-for-unimp-inst context))
+          #!-precise-arg-count-error
           ((and (= (ldb (byte 6 10) op) 3)
                 (= (ldb (byte 5 5) op) 24))
-           (let* ((regnum (ldb (byte 5 0) op))
-                  (prev (sap-ref-32 (int-sap (- (sap-int pc) 4)) 0)))
+           (let ((prev (sap-ref-32 (int-sap (- (sap-int pc) 4)) 0)))
              (if (and (= (ldb (byte 6 26) prev) 3)
                       (= (ldb (byte 5 21) prev) 0))
                  (values (ldb (byte 16 0) prev)
@@ -133,7 +134,24 @@
                  (values #.(error-number-or-lose
                             'invalid-arg-count-error)
                          (list (make-sc-offset any-reg-sc-number regnum))))))
-
+          #!+precise-arg-count-error
+          ((and (= (ldb (byte 6 10) op) 3) ;; twi
+                (or (= regnum #.(sc-offset-offset arg-count-sc))
+                    (= (ldb (byte 5 5) op) 24))) ;; :ne
+           ;; Type errors are encoded as
+           ;; twi 0 value-register error-code
+           ;; twi :ne temp-register x
+           (let ((prev (sap-ref-32 (int-sap (- (sap-int pc) 4)) 0)))
+             (if (and (= (ldb (byte 5 5) op) 24) ;; is the condition :ne?
+                      (= (ldb (byte 6 26) prev) 3) ;; is it twi?
+                      (= (ldb (byte 5 21) prev) 0)) ;; is it non-trapping?
+                 (values (ldb (byte 16 0) prev)
+                         (list (make-sc-offset any-reg-sc-number
+                                               (ldb (byte 5 16) prev))))
+                 ;; arg-count errors are encoded as
+                 ;; twi {:ne :llt :lgt} nargs arg-count
+                 (values #.(error-number-or-lose 'invalid-arg-count-error)
+                         '(#.arg-count-sc)))))
           (t
            (values #.(error-number-or-lose 'unknown-error) nil)))))
 

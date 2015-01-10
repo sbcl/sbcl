@@ -22,6 +22,15 @@
                      (elt *register-arg-offsets* n))
       (make-wired-tn *backend-t-primitive-type* control-stack-arg-scn n)))
 
+(defun standard-arg-location-sc (n)
+  (declare (type unsigned-byte n))
+  (if (< n register-arg-count)
+      (make-sc-offset register-arg-scn
+                      (nth n *register-arg-offsets*))
+      (make-sc-offset control-stack-arg-scn n)))
+
+(defconstant arg-count-sc (make-sc-offset immediate-arg-scn nargs-offset))
+(defconstant closure-sc (make-sc-offset descriptor-reg-sc-number lexenv-offset))
 
 ;;; Make a passing location TN for a local call return PC.  If
 ;;; standard is true, then use the standard (full call) location,
@@ -145,8 +154,7 @@
     (storew value frame-pointer (tn-offset variable-home-tn))))
 
 (define-vop (xep-allocate-frame)
-  (:info start-lab copy-more-arg-follows)
-  (:vop-var vop)
+  (:info start-lab)
   (:temporary (:scs (non-descriptor-reg)) temp)
   (:temporary (:scs (interior-reg)) lip)
   (:generator 1
@@ -158,18 +166,21 @@
     (inst simple-fun-header-word)
     (dotimes (i (1- simple-fun-code-offset))
       (inst word 0))
-    (inst compute-code code-tn lip start-lab temp)
-    ;; Build our stack frames.
-    (unless copy-more-arg-follows
-      (composite-immediate-instruction
+    (inst compute-code code-tn lip start-lab temp)))
+
+(define-vop (xep-setup-sp)
+  (:temporary (:scs (non-descriptor-reg)) temp)
+  (:vop-var vop)
+  (:generator 1
+    (composite-immediate-instruction
        add temp cfp-tn
        (* n-word-bytes (sb-allocated-size 'control-stack)))
-      (store-csp temp)
-      (let ((nfp-tn (current-nfp-tn vop)))
-        (when nfp-tn
-          (let* ((nbytes (bytes-needed-for-non-descriptor-stack-frame)))
-            (inst sub nfp-tn nsp-tn nbytes)
-            (move nsp-tn nfp-tn)))))))
+    (store-csp temp)
+    (let ((nfp-tn (current-nfp-tn vop)))
+      (when nfp-tn
+        (let ((nbytes (bytes-needed-for-non-descriptor-stack-frame)))
+          (inst sub nfp-tn nsp-tn nbytes)
+          (move nsp-tn nfp-tn))))))
 
 (define-vop (allocate-frame)
   (:results (res :scs (any-reg))
@@ -568,17 +579,26 @@
 
 (define-vop (verify-arg-count)
   (:policy :fast-safe)
-  (:translate sb!c::%verify-arg-count)
   (:args (nargs :scs (any-reg)))
-  (:arg-types positive-fixnum (:constant t))
-  (:info count)
+  (:arg-types positive-fixnum (:constant t) (:constant t))
+  (:info min max)
   (:vop-var vop)
   (:save-p :compute-only)
   (:generator 3
     (let ((err-lab
            (generate-error-code vop 'invalid-arg-count-error nargs)))
-      (inst cmp nargs (fixnumize count))
-      (inst b :ne err-lab))))
+      (cond ((not min)
+             (inst cmp nargs (fixnumize max))
+             (inst b :ne err-lab))
+            (max
+             (when (plusp min)
+               (inst cmp nargs (fixnumize min))
+               (inst b :lo err-lab))
+             (inst cmp nargs (fixnumize max))
+             (inst b :hi err-lab))
+            ((plusp min)
+             (inst cmp nargs (fixnumize min))
+             (inst b :lo err-lab))))))
 
 ;;; Signal various errors.
 (macrolet ((frob (name error translate &rest args)
@@ -900,11 +920,19 @@
                       (:load-nargs
                        ,@(if variable
                              `((load-csp nargs-pass)
+                               ;; The variable args are on the stack
+                               ;; and become the frame, but there may
+                               ;; be <3 args and 2 stack slots are
+                               ;; assumed allocate on the call. So
+                               ;; need to ensure there are at least 2
+                               ;; slots. This just adds 2 more.
+                               (inst add r0 nargs-pass (* 2 n-word-bytes))
                                (inst sub nargs-pass nargs-pass new-fp)
+                               (store-csp r0)
                                ,@(let ((index -1))
                                    (mapcar #'(lambda (name)
                                                `(loadw ,name new-fp
-                                                       ,(incf index)))
+                                                    ,(incf index)))
                                            *register-arg-names*))
                                (storew cfp-tn new-fp ocfp-save-offset))
                              '((inst mov nargs-pass (fixnumize nargs)))))

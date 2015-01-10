@@ -23,6 +23,15 @@
                      (elt *register-arg-offsets* n))
       (make-wired-tn *backend-t-primitive-type* control-stack-arg-scn n)))
 
+(defun standard-arg-location-sc (n)
+  (declare (type unsigned-byte n))
+  (if (< n register-arg-count)
+      (make-sc-offset register-arg-scn
+                      (nth n *register-arg-offsets*))
+      (make-sc-offset control-stack-arg-scn n)))
+
+(defconstant arg-count-sc (make-sc-offset immediate-arg-scn nargs-offset))
+(defconstant closure-sc (make-sc-offset descriptor-reg-sc-number lexenv-offset))
 
 ;;; Make a passing location TN for a local call return PC.  If
 ;;; standard is true, then use the standard (full call) location,
@@ -143,9 +152,7 @@
     (storew value frame-pointer (tn-offset variable-home-tn))))
 
 (define-vop (xep-allocate-frame)
-  (:info start-lab copy-more-arg-follows)
-  (:ignore copy-more-arg-follows)
-  (:vop-var vop)
+  (:info start-lab)
   (:temporary (:scs (non-descriptor-reg)) temp)
   (:generator 1
     ;; Make sure the function is aligned, and drop a label pointing to this
@@ -158,8 +165,11 @@
       (inst word 0))
     ;; The start of the actual code.
     ;; Fix CODE, cause the function object was passed in.
-    (inst compute-code-from-fn code-tn code-tn start-lab temp)
-    ;; Build our stack frames.
+    (inst compute-code-from-fn code-tn code-tn start-lab temp)))
+
+(define-vop (xep-setup-sp)
+  (:vop-var vop)
+  (:generator 1
     (inst add csp-tn cfp-tn
           (* n-word-bytes (sb-allocated-size 'control-stack)))
     (let ((nfp-tn (current-nfp-tn vop)))
@@ -1169,7 +1179,7 @@ default-value-8
 
 
 ;;; Signal wrong argument count error if Nargs isn't = to Count.
-;;;
+#!-precise-arg-count-error
 (define-vop (verify-arg-count)
   (:policy :fast-safe)
   (:translate sb!c::%verify-arg-count)
@@ -1187,6 +1197,37 @@ default-value-8
           (inst b :ne err-lab :pn)
           (inst b :ne err-lab))
       (inst nop))))
+
+#!+precise-arg-count-error
+(define-vop (verify-arg-count)
+  (:policy :fast-safe)
+  (:args (nargs :scs (any-reg)))
+  (:arg-types positive-fixnum (:constant t) (:constant t))
+  (:info min max)
+  (:vop-var vop)
+  (:save-p :compute-only)
+  (:generator 3
+    (macrolet ((b (cond)
+                 `(progn
+                    ,(if (member :sparc-v9 *backend-subfeatures*)
+                         ;; Assume we don't take the branch
+                         `(inst b ,cond err-lab :pn)
+                         `(inst b ,cond err-lab))
+                    (inst nop))))
+     (let ((err-lab
+             (generate-error-code vop 'invalid-arg-count-error nargs)))
+       (cond ((not min)
+              (inst cmp nargs (fixnumize max))
+              (b :ne))
+             (max
+              (when (plusp min)
+                (inst cmp nargs (fixnumize min))
+                (b :leu))
+              (inst cmp nargs (fixnumize max))
+              (b :geu))
+             ((plusp min)
+              (inst cmp nargs (fixnumize min))
+              (b :leu)))))))
 
 ;;; Signal various errors.
 (macrolet ((frob (name error translate &rest args)
