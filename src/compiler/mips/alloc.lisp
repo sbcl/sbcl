@@ -142,7 +142,7 @@
   (:temporary (:sc non-descriptor-reg :offset nl4-offset) pa-flag)
   (:generator 100
     (inst li ndescr (lognot lowtag-mask))
-    (inst addu boxed boxed-arg (fixnumize (1+ code-code-size-slot)))
+    (inst addu boxed boxed-arg (fixnumize (1+ code-constants-offset)))
     (inst and boxed ndescr)
     (inst srl unboxed unboxed-arg word-shift)
     (inst addu unboxed unboxed lowtag-mask)
