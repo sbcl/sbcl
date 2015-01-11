@@ -708,7 +708,7 @@ elif [ "$sbcl_arch" = "arm" ]; then
     printf ' :ash-right-vops :multiply-high-vops :symbol-info-vops' >> $ltf
     printf ' :stack-allocatable-lists :stack-allocatable-fixed-objects' >> $ltf
     printf ' :stack-allocatable-vectors :stack-allocatable-closures' >> $ltf
-    printf ' :precise-arg-count-error' >> $ltf
+    printf ' :precise-arg-count-error :unwind-to-frame-and-call-vop' >> $ltf
 else
     # Nothing need be done in this case, but sh syntax wants a placeholder.
     echo > /dev/null

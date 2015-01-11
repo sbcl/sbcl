@@ -228,3 +228,59 @@
   (:generator 0
     (emit-return-pc label)
     (note-this-location vop :non-local-entry)))
+
+(define-vop (unwind-to-frame-and-call)
+  (:args (ofp :scs (descriptor-reg))
+         (uwp :scs (descriptor-reg))
+         (function :scs (descriptor-reg) :to :load :target saved-function))
+  (:arg-types system-area-pointer system-area-pointer t)
+  (:temporary (:sc unsigned-reg) temp)
+  (:temporary (:sc descriptor-reg :offset r8-offset) saved-function)
+  (:temporary (:sc unsigned-reg :offset r0-offset) block)
+  (:temporary (:sc descriptor-reg :offset lexenv-offset) lexenv)
+  (:temporary (:scs (interior-reg)) lip)
+  (:temporary (:sc descriptor-reg :offset nargs-offset) nargs)
+  (:vop-var vop)
+  (:generator 22
+    (let ((uwp-label (gen-label))
+          (entry-label (gen-label)))
+      ;; Store the function into a non-stack location, since we'll be
+      ;; unwinding the stack and destroying register contents before we
+      ;; use it.  It turns out that R8 is preserved as part of the
+      ;; normal multiple-value handling of an unwind, so use that.
+      (move saved-function function)
+
+      ;; Allocate space for magic UWP block.
+      (load-csp block)
+      (inst add temp block (* unwind-block-size n-word-bytes))
+      (store-csp temp)
+
+      ;; Set up magic catch / UWP block.
+
+      (loadw temp uwp sap-pointer-slot other-pointer-lowtag)
+      (storew temp block unwind-block-current-uwp-slot)
+      (loadw temp ofp sap-pointer-slot other-pointer-lowtag)
+      (storew temp block unwind-block-current-cont-slot)
+      ;; Don't need to save code at unwind-block-current-code-slot since
+      ;; it's not going to be used and will be overwritten after the
+      ;; function call
+
+      (inst compute-lra temp lip entry-label)
+      (storew temp block catch-block-entry-pc-slot)
+
+      ;; Run any required UWPs.
+      (assemble (*elsewhere* vop)
+        (emit-label uwp-label)
+        (inst word (make-fixup 'unwind :assembly-routine)))
+      (inst load-from-label pc-tn lr-tn uwp-label)
+
+      (emit-label ENTRY-LABEL)
+      ;; KLUDGE: either COMPUTE-LRA computes or UNWIND jumps one
+      ;; instruction further.
+      (inst mov nargs 0)
+      (inst mov nargs 0)
+
+      (move lexenv saved-function)
+
+      (loadw saved-function lexenv closure-fun-slot fun-pointer-lowtag)
+      (lisp-jump saved-function))))

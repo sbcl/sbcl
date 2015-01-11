@@ -1776,7 +1776,10 @@ forms that explicitly control this kind of evaluation.")
                                                   (* sb!vm:catch-block-previous-catch-slot
                                                      sb!vm::n-word-bytes))
                                 when (or (zerop (sap-int block))
-                                         (sap> block frame-pointer))
+                                         #!+stack-grows-downward-not-upward
+                                         (sap> block frame-pointer)
+                                         #!-stack-grows-downward-not-upward
+                                         (sap< block frame-pointer))
                                 return block)))
     enclosing-block))
 
@@ -1791,7 +1794,10 @@ forms that explicitly control this kind of evaluation.")
                               then (sap-ref-sap uwp-block
                                                 sb!vm:unwind-block-current-uwp-slot)
                               when (or (zerop (sap-int uwp-block))
-                                       (sap> uwp-block frame-pointer))
+                                       #!+stack-grows-downward-not-upward
+                                       (sap> uwp-block frame-pointer)
+                                       #!-stack-grows-downward-not-upward
+                                       (sap< uwp-block frame-pointer))
                               return uwp-block)))
     enclosing-uwp))
 
