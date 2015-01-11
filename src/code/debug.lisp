@@ -1728,8 +1728,8 @@ forms that explicitly control this kind of evaluation.")
     ;;   * The catch block that should be active after the unwind
     ;;   * The values that the binding stack pointer should have after the
     ;;     unwind.
-    (let* ((block (sap-int/fixnum (find-enclosing-catch-block frame)))
-           (unbind-to (find-binding-stack-pointer frame)))
+    (let ((block (sap-int/fixnum (find-enclosing-catch-block frame)))
+          (unbind-to (find-binding-stack-pointer frame)))
       ;; This VOP will run the neccessary cleanup forms, reset the fp, and
       ;; then call the supplied function.
       (sb!vm::%primitive sb!vm::unwind-to-frame-and-call
@@ -1753,14 +1753,16 @@ forms that explicitly control this kind of evaluation.")
 
 #!+unwind-to-frame-and-call-vop
 (defun find-binding-stack-pointer (frame)
-  (let* ((debug-fun (sb!di:frame-debug-fun frame))
-         (compiled-debug-fun (and
-                              (typep debug-fun 'sb!di::compiled-debug-fun)
-                              (sb!di::compiled-debug-fun-compiler-debug-fun debug-fun)))
-         (bsp-save-offset (and compiled-debug-fun
-                               (sb!c::compiled-debug-fun-bsp-save compiled-debug-fun))))
-    (when bsp-save-offset
-      (sb!di::sub-access-debug-var-slot (sb!di::frame-pointer frame) bsp-save-offset))))
+  (let ((debug-fun (sb!di:frame-debug-fun frame)))
+    (if (eq (sb!di:debug-fun-kind debug-fun) :external)
+        sb!kernel::*interr-current-bsp*
+        (let* ((compiled-debug-fun (and
+                                    (typep debug-fun 'sb!di::compiled-debug-fun)
+                                    (sb!di::compiled-debug-fun-compiler-debug-fun debug-fun)))
+               (bsp-save-offset (and compiled-debug-fun
+                                     (sb!c::compiled-debug-fun-bsp-save compiled-debug-fun))))
+          (when bsp-save-offset
+            (sb!di::sub-access-debug-var-slot (sb!di::frame-pointer frame) bsp-save-offset))))))
 
 (defun find-enclosing-catch-block (frame)
   ;; Walk the catch block chain looking for the first entry with an address
@@ -1840,7 +1842,11 @@ forms that explicitly control this kind of evaluation.")
 
 (defun frame-has-debug-tag-p (frame)
   #!+unwind-to-frame-and-call-vop
-  (not (null (find-binding-stack-pointer frame)))
+  ;; XEPs do not bind anything, nothing to restore
+  (and (if (eq (sb!di:debug-fun-kind (sb!di:frame-debug-fun frame)) :external)
+           sb!kernel::*interr-current-bsp*
+           (find-binding-stack-pointer frame))
+       t)
   #!-unwind-to-frame-and-call-vop
   (find 'sb!c:debug-catch-tag (sb!di::frame-catches frame) :key #'car))
 

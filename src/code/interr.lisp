@@ -227,84 +227,94 @@
 ;;; results.
 (defvar *current-internal-error* nil)
 
+;;; This is needed for restarting XEPs, which do not bind anything but
+;;; also do not save their own BSP, and we need to discard the
+;;; bindings made by the error handling machinery.
+#!+unwind-to-frame-and-call-vop
+(defvar *interr-current-bsp* nil)
+
 (defun internal-error (context continuable)
   (declare (type system-area-pointer context))
   (declare (ignore continuable))
   (/show0 "entering INTERNAL-ERROR, CONTEXT=..")
   (/hexstr context)
-  (infinite-error-protect
-   (/show0 "about to bind ALIEN-CONTEXT")
-   (let* ((alien-context (locally
-                             (declare (optimize (inhibit-warnings 3)))
-                           (sap-alien context (* os-context-t))))
-          #!+c-stack-is-control-stack
-          (*saved-fp-and-pcs*
-           (cons (cons (%make-lisp-obj (sb!vm:context-register
-                                        alien-context
-                                        sb!vm::cfp-offset))
-                       (sb!vm:context-pc alien-context))
-                 (when (boundp '*saved-fp-and-pcs*)
-                   *saved-fp-and-pcs*))))
-     (declare (truly-dynamic-extent *saved-fp-and-pcs*))
-     (/show0 "about to bind ERROR-NUMBER and ARGUMENTS")
-     (multiple-value-bind (error-number arguments)
-         (sb!vm:internal-error-args alien-context)
+  (let (#!+unwind-to-frame-and-call-vop
+        (*interr-current-bsp*
+          ;; Needs to be done before anything is bound
+          (%primitive sb!c:current-binding-pointer)))
+   (infinite-error-protect
+    (/show0 "about to bind ALIEN-CONTEXT")
+    (let* ((alien-context (locally
+                              (declare (optimize (inhibit-warnings 3)))
+                            (sap-alien context (* os-context-t))))
+           #!+c-stack-is-control-stack
+           (*saved-fp-and-pcs*
+             (cons (cons (%make-lisp-obj (sb!vm:context-register
+                                          alien-context
+                                          sb!vm::cfp-offset))
+                         (sb!vm:context-pc alien-context))
+                   (when (boundp '*saved-fp-and-pcs*)
+                     *saved-fp-and-pcs*))))
+      (declare (truly-dynamic-extent *saved-fp-and-pcs*))
+      (/show0 "about to bind ERROR-NUMBER and ARGUMENTS")
+      (multiple-value-bind (error-number arguments)
+          (sb!vm:internal-error-args alien-context)
 
-       ;; There's a limit to how much error reporting we can usefully
-       ;; do before initialization is complete, but try to be a little
-       ;; bit helpful before we die.
-       (/show0 "back from INTERNAL-ERROR-ARGS, ERROR-NUMBER=..")
-       (/hexstr error-number)
-       (/show0 "cold/low ARGUMENTS=..")
-       (/hexstr arguments)
-       (unless *cold-init-complete-p*
-         (%primitive print "can't recover from error in cold init, halting")
-         (%primitive sb!c:halt))
+        ;; There's a limit to how much error reporting we can usefully
+        ;; do before initialization is complete, but try to be a little
+        ;; bit helpful before we die.
+        (/show0 "back from INTERNAL-ERROR-ARGS, ERROR-NUMBER=..")
+        (/hexstr error-number)
+        (/show0 "cold/low ARGUMENTS=..")
+        (/hexstr arguments)
+        (unless *cold-init-complete-p*
+          (%primitive print "can't recover from error in cold init, halting")
+          (%primitive sb!c:halt))
 
-       (with-interrupt-bindings
-         (multiple-value-bind (name sb!debug:*stack-top-hint*)
-             (find-interrupted-name-and-frame)
-           (/show0 "back from FIND-INTERRUPTED-NAME")
-           (let ((*current-internal-error* error-number)
-                 (fp (int-sap (sb!vm:context-register alien-context
-                                                      sb!vm::cfp-offset)))
-                 (handler (and (< -1 error-number (length *internal-errors*))
-                               (svref *internal-errors* error-number))))
-             (cond ((and (functionp handler)
-                         (internal-error-args-ok arguments handler))
-                    (macrolet ((arg (n)
-                                 `(sb!di::sub-access-debug-var-slot
-                                   fp (nth ,n arguments) alien-context)))
-                      (ecase (length arguments)
-                        (0 (funcall handler name))
-                        (1 (funcall handler name (arg 0)))
-                        (2 (funcall handler name (arg 0) (arg 1)))
-                        (3 (funcall handler name (arg 0) (arg 1) (arg 2))))))
-                   ((typep handler '(or symbol cons))
-                    (error 'type-error
-                           :datum (sb!di::sub-access-debug-var-slot
-                                   fp (first arguments) alien-context)
-                           :expected-type handler))
-                   ((eql handler 0) ; if (DEFERR x) was inadvertently omitted
-                    (error 'simple-error
-                           :format-control
-                           "unknown internal error, ~D, args=~S"
-                           :format-arguments
-                           (list error-number
-                                 (mapcar (lambda (sc-offset)
-                                           (sb!di::sub-access-debug-var-slot
-                                            fp sc-offset alien-context))
-                                         arguments))))
-                   (t ; wtf?
-                    (error 'simple-error
-                           :format-control "internal error ~D: ~A; args=~S"
-                           :format-arguments
-                           (list error-number
-                                 handler
-                                 (mapcar (lambda (sc-offset)
-                                           (sb!di::sub-access-debug-var-slot
-                                            fp sc-offset alien-context))
-                                         arguments))))))))))))
+        (with-interrupt-bindings
+          (multiple-value-bind (name sb!debug:*stack-top-hint*)
+              (find-interrupted-name-and-frame)
+            (/show0 "back from FIND-INTERRUPTED-NAME")
+            (let ((*current-internal-error* error-number)
+                  (fp (int-sap (sb!vm:context-register alien-context
+                                                       sb!vm::cfp-offset)))
+                  (handler (and (< -1 error-number (length *internal-errors*))
+                                (svref *internal-errors* error-number))))
+              (cond ((and (functionp handler)
+                          (internal-error-args-ok arguments handler))
+                     (macrolet ((arg (n)
+                                  `(sb!di::sub-access-debug-var-slot
+                                    fp (nth ,n arguments) alien-context)))
+                       (ecase (length arguments)
+                         (0 (funcall handler name))
+                         (1 (funcall handler name (arg 0)))
+                         (2 (funcall handler name (arg 0) (arg 1)))
+                         (3 (funcall handler name (arg 0) (arg 1) (arg 2))))))
+                    ((typep handler '(or symbol cons))
+                     (error 'type-error
+                            :datum (sb!di::sub-access-debug-var-slot
+                                    fp (first arguments) alien-context)
+                            :expected-type handler))
+                    ((eql handler 0) ; if (DEFERR x) was inadvertently omitted
+                     (error 'simple-error
+                            :format-control
+                            "unknown internal error, ~D, args=~S"
+                            :format-arguments
+                            (list error-number
+                                  (mapcar (lambda (sc-offset)
+                                            (sb!di::sub-access-debug-var-slot
+                                             fp sc-offset alien-context))
+                                          arguments))))
+                    (t                  ; wtf?
+                     (error 'simple-error
+                            :format-control "internal error ~D: ~A; args=~S"
+                            :format-arguments
+                            (list error-number
+                                  handler
+                                  (mapcar (lambda (sc-offset)
+                                            (sb!di::sub-access-debug-var-slot
+                                             fp sc-offset alien-context))
+                                          arguments)))))))))))))
 
 (defun control-stack-exhausted-error ()
   (let ((sb!debug:*stack-top-hint* nil))

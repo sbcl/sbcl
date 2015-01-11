@@ -1247,9 +1247,7 @@ register."
 (defun tl-invalid-arg-count-error-p (frame)
   (and (eq (interrupted-frame-error frame)
            'invalid-arg-count-error)
-       (eq (sb!c::compiled-debug-fun-kind
-            (compiled-debug-fun-compiler-debug-fun
-             (frame-debug-fun frame)))
+       (eq (debug-fun-kind (frame-debug-fun frame))
            :external)))
 
 ;; Return the name of the closure, if named, otherwise nil.
