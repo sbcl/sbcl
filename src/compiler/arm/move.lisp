@@ -14,6 +14,20 @@
 (defun lowest-set-bit-index (integer-value)
   (max 0 (1- (integer-length (logand integer-value (- integer-value))))))
 
+(defun repeating-pattern-p (val)
+  (declare (type (unsigned-byte 32) val))
+  (and (= (ldb (byte 16 0) val)
+          (ldb (byte 16 16) val))
+       (not (encodable-immediate (ldb (byte 16 16) val)))))
+
+;;; This should be put into composite-immediate-instruction, but that
+;;; macro is too scary.
+(defun load-repeating-pattern (dest val)
+  (declare (type (signed-byte 32) val))
+  (inst mov dest (ldb (byte 8 0) val))
+  (inst orr dest dest (mask-field (byte 8 8) val))
+  (inst orr dest dest (lsl dest 16)))
+
 (defun load-immediate-word (y val)
   (cond ((let ((unsigned (ldb (byte 32 0) val)))
            (when (encodable-immediate unsigned)
@@ -25,6 +39,8 @@
              t)))
         ((< val 0)
          (composite-immediate-instruction bic y y val :first-op mvn :first-no-source t :invert-y t))
+        ((repeating-pattern-p val)
+         (load-repeating-pattern y val))
         (t
          (composite-immediate-instruction orr y y val :first-op mov :first-no-source t))))
 
