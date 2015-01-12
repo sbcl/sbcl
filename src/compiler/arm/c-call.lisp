@@ -224,7 +224,8 @@
       (inst load-from-label temp lip call-into-c-fixup)
       (sc-case function
         (sap-reg (move cfunc function))
-        (sap-stack (loadw cfunc cur-nfp (tn-offset function))))
+        (sap-stack
+         (load-stack-offset cfunc cur-nfp function)))
       (inst blx temp)
       (when cur-nfp
         (load-stack-tn cur-nfp nfp-save)))))

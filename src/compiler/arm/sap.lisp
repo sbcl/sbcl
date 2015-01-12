@@ -69,7 +69,7 @@
       (sap-reg
        (move y x))
       (sap-stack
-       (storew x fp (tn-offset y))))))
+       (store-stack-offset x fp y)))))
 
 (define-move-vop move-sap-arg :move-arg
   (descriptor-reg sap-reg) (sap-reg))

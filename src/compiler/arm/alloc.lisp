@@ -126,8 +126,10 @@
                     fun-pointer-lowtag
                     :flag-tn pa-flag
                     :stack-allocate-p stack-allocate-p)
-        (inst mov pa-flag (ash (1- size) n-widetag-bits))
-        (inst orr pa-flag pa-flag closure-header-widetag)
+        (load-immediate-word pa-flag
+                             (logior
+                              (ash (1- size) n-widetag-bits)
+                              closure-header-widetag))
         (storew pa-flag result 0 fun-pointer-lowtag)
         (storew function result closure-fun-slot fun-pointer-lowtag)))))
 

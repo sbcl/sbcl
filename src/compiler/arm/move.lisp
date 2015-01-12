@@ -99,8 +99,7 @@
    (sap-stack) (sap-reg)
    (signed-stack) (signed-reg)
    (unsigned-stack) (unsigned-reg))
-  (let ((nfp (current-nfp-tn vop)))
-    (loadw y nfp (tn-offset x))))
+  (load-stack-offset y (current-nfp-tn vop) x))
 
 (define-move-fun (store-stack 5) (vop x y)
   ((any-reg descriptor-reg) (control-stack))
@@ -111,8 +110,7 @@
    (sap-reg) (sap-stack)
    (signed-reg) (signed-stack)
    (unsigned-reg) (unsigned-stack))
-  (let ((nfp (current-nfp-tn vop)))
-    (storew x nfp (tn-offset y))))
+  (store-stack-offset x (current-nfp-tn vop) y))
 
 
 ;;;; The Move VOP:
@@ -149,7 +147,7 @@
       ((any-reg descriptor-reg)
        (move y x))
       (control-stack
-       (storew x fp (tn-offset y))))))
+       (store-stack-offset x fp y)))))
 ;;;
 (define-move-vop move-arg :move-arg
   (any-reg descriptor-reg)
@@ -317,7 +315,7 @@
       ((signed-reg unsigned-reg)
        (move y x))
       ((signed-stack unsigned-stack)
-       (storew x fp (tn-offset y))))))
+       (store-stack-offset x fp y)))))
 (define-move-vop move-word-arg :move-arg
   (descriptor-reg any-reg signed-reg unsigned-reg) (signed-reg unsigned-reg))
 

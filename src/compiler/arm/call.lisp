@@ -143,7 +143,8 @@
   (:policy :fast-safe)
   (:generator 4
     (aver (sc-is variable-home-tn control-stack))
-    (loadw value frame-pointer (tn-offset variable-home-tn))))
+    (load-stack-offset value frame-pointer variable-home-tn)))
+
 (define-vop (ancestor-frame-set)
   (:args (frame-pointer :scs (descriptor-reg))
          (value :scs (descriptor-reg any-reg)))
@@ -151,7 +152,7 @@
   (:policy :fast-safe)
   (:generator 4
     (aver (sc-is variable-home-tn control-stack))
-    (storew value frame-pointer (tn-offset variable-home-tn))))
+    (store-stack-offset value frame-pointer variable-home-tn)))
 
 (define-vop (xep-allocate-frame)
   (:info start-lab)
@@ -581,24 +582,32 @@
   (:policy :fast-safe)
   (:args (nargs :scs (any-reg)))
   (:arg-types positive-fixnum (:constant t) (:constant t))
+  (:temporary (:sc unsigned-reg :offset nl2-offset) temp)
   (:info min max)
   (:vop-var vop)
   (:save-p :compute-only)
   (:generator 3
     (let ((err-lab
            (generate-error-code vop 'invalid-arg-count-error nargs)))
-      (cond ((not min)
-             (inst cmp nargs (fixnumize max))
-             (inst b :ne err-lab))
-            (max
-             (when (plusp min)
-               (inst cmp nargs (fixnumize min))
-               (inst b :lo err-lab))
-             (inst cmp nargs (fixnumize max))
-             (inst b :hi err-lab))
-            ((plusp min)
-             (inst cmp nargs (fixnumize min))
-             (inst b :lo err-lab))))))
+      (flet ((maybe-load-immediate (x)
+               (let ((x (fixnumize x)))
+                (cond ((encodable-immediate x)
+                       x)
+                      (t
+                       (load-immediate-word temp x)
+                       temp)))))
+       (cond ((not min)
+              (inst cmp nargs (maybe-load-immediate max))
+              (inst b :ne err-lab))
+             (max
+              (when (plusp min)
+                (inst cmp nargs (maybe-load-immediate min))
+                (inst b :lo err-lab))
+              (inst cmp nargs (maybe-load-immediate max))
+              (inst b :hi err-lab))
+             ((plusp min)
+              (inst cmp nargs (maybe-load-immediate min))
+              (inst b :lo err-lab)))))))
 
 ;;; Signal various errors.
 (macrolet ((frob (name error translate &rest args)
@@ -983,7 +992,7 @@
                  `((sc-case name
                      (descriptor-reg (move name-pass name))
                      (control-stack
-                      (loadw name-pass cfp-tn (tn-offset name))
+                      (load-stack-tn name-pass name)
                       (do-next-filler))
                      (constant
                       (load-constant vop name name-pass)
@@ -995,7 +1004,7 @@
                  `((sc-case arg-fun
                      (descriptor-reg (move lexenv arg-fun))
                      (control-stack
-                      (loadw lexenv cfp-tn (tn-offset arg-fun))
+                      (load-stack-tn lexenv arg-fun)
                       (do-next-filler))
                      (constant
                       (load-constant vop arg-fun lexenv)

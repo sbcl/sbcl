@@ -131,20 +131,44 @@
 ;;;; Stack TN's
 
 ;;; Move a stack TN to a register and vice-versa.
+(defun load-stack-offset (reg stack stack-tn &optional (predicate :al))
+  (let ((offset (* (tn-offset stack-tn) n-word-bytes)))
+    (cond ((or (tn-p offset)
+               (typep offset '(unsigned-byte 12)))
+           (inst ldr predicate reg (@ stack offset)))
+          (t
+           (load-immediate-word reg offset)
+           (inst ldr predicate reg (@ stack reg))))))
+
 (defmacro load-stack-tn (reg stack &optional (predicate :al))
   `(let ((reg ,reg)
          (stack ,stack))
-     (let ((offset (tn-offset stack)))
-       (sc-case stack
-         ((control-stack)
-          (loadw reg cfp-tn offset 0 ,predicate))))))
+     (sc-case stack
+       ((control-stack)
+        (load-stack-offset reg cfp-tn stack ,predicate)))))
+
+(defun store-stack-offset (reg stack stack-tn &optional (predicate :al))
+  (let ((offset (* (tn-offset stack-tn) n-word-bytes)))
+    (cond ((or (typep offset '(unsigned-byte 12))
+               (tn-p offset))
+           (inst str predicate reg (@ stack offset)))
+          (t
+           (let ((low (ldb (byte 12 0) offset))
+                 (high (mask-field (byte 20 12) offset)))
+             ;; KLUDGE:
+             ;; Have to do this because it is used in move vops
+             ;; which do not have temporary registers.
+             ;; The debugger will be not happy.
+             (composite-immediate-instruction add stack stack high)
+             (inst str predicate reg (@ stack low))
+             (composite-immediate-instruction sub stack stack high))))))
+
 (defmacro store-stack-tn (stack reg &optional (predicate :al))
   `(let ((stack ,stack)
          (reg ,reg))
-     (let ((offset (tn-offset stack)))
-       (sc-case stack
-         ((control-stack)
-          (storew reg cfp-tn offset 0 ,predicate))))))
+     (sc-case stack
+       ((control-stack)
+        (store-stack-offset reg cfp-tn stack ,predicate)))))
 
 (defmacro maybe-load-stack-tn (reg reg-or-stack)
   "Move the TN Reg-Or-Stack into Reg if it isn't already there."
@@ -156,7 +180,7 @@
           ((any-reg descriptor-reg)
            (move ,n-reg ,n-stack))
           ((control-stack)
-           (loadw ,n-reg cfp-tn (tn-offset ,n-stack))))))))
+           (load-stack-offset ,n-reg cfp-tn ,n-stack)))))))
 
 ;;;; Storage allocation:
 

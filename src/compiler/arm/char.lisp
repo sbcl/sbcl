@@ -62,7 +62,7 @@
       (character-reg
        (move y x))
       (character-stack
-       (storew x fp (tn-offset y))))))
+       (store-stack-offset x fp y)))))
 (define-move-vop move-character-arg :move-arg
   (any-reg character-reg) (character-reg))
 
