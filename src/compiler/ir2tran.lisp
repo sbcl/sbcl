@@ -1337,6 +1337,30 @@
 ;;; If not an XEP, all we do is move the return PC from its passing
 ;;; location, since in a local call, the caller allocates the frame
 ;;; and sets up the arguments.
+
+#!+unwind-to-frame-and-call-vop
+(defun save-bsp (node block env)
+  ;; Save BSP on stack so that the binding environment can be restored
+  ;; when restarting frames.
+  ;; This is done inside functions, which leaves XEPs without saved
+  ;; BSP, though the code in XEPs doesn't bind any variables, it can
+  ;; call arbitrary code through the SATISFIES declaration.
+  ;; And functions called by SATISFIES are not inlined, except for
+  ;; source transforms, but these usually do not bind anything.
+  ;; Thus when restarting it needs to check that the interrupt was in
+  ;; the XEP itself.
+  ;;
+  ;; It could be saved from the XEP, but some functions have both
+  ;; external and internal entry points, so it will be saved twice.
+  (let ((temp (make-normal-tn *backend-t-primitive-type*))
+        (bsp-save-tn (make-representation-tn
+                      *backend-t-primitive-type*
+                      (sc-number-or-lose 'sb!vm::control-stack))))
+    (vop current-binding-pointer node block temp)
+    (emit-move node block temp bsp-save-tn)
+    (setf (ir2-physenv-bsp-save-tn env) bsp-save-tn)
+    (component-live-tn bsp-save-tn)))
+
 (defun ir2-convert-bind (node block)
   (declare (type bind node) (type ir2-block block))
   (let* ((fun (bind-lambda node))
@@ -1369,14 +1393,7 @@
     (when (and (lambda-allow-instrumenting fun)
                (not (lambda-inline-expanded fun))
                (policy fun (>= insert-debug-catch 1)))
-      (let ((temp (make-normal-tn *backend-t-primitive-type*))
-            (bsp-save-tn (make-representation-tn
-                          *backend-t-primitive-type*
-                          (sc-number-or-lose 'sb!vm::control-stack)) ))
-        (vop current-binding-pointer node block temp)
-        (emit-move node block temp bsp-save-tn)
-        (setf (ir2-physenv-bsp-save-tn env) bsp-save-tn)
-        (component-live-tn bsp-save-tn)))
+      (save-bsp node block env))
 
     (let ((lab (gen-label)))
       (setf (ir2-physenv-environment-start env) lab)

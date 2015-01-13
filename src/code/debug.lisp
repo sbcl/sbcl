@@ -1755,7 +1755,11 @@ forms that explicitly control this kind of evaluation.")
 (defun find-binding-stack-pointer (frame)
   (let ((debug-fun (sb!di:frame-debug-fun frame)))
     (if (eq (sb!di:debug-fun-kind debug-fun) :external)
-        sb!kernel::*interr-current-bsp*
+        ;; XEPs do not bind anything, nothing to restore.
+        ;; But they may call other code through SATISFIES
+        ;; declaration, check that the interrupt is actually in the XEP.
+        (and (sb!di::compiled-frame-escaped frame)
+             sb!kernel::*interr-current-bsp*)
         (let* ((compiled-debug-fun (and
                                     (typep debug-fun 'sb!di::compiled-debug-fun)
                                     (sb!di::compiled-debug-fun-compiler-debug-fun debug-fun)))
@@ -1849,10 +1853,7 @@ forms that explicitly control this kind of evaluation.")
 (defun frame-has-debug-tag-p (frame)
   #!+unwind-to-frame-and-call-vop
   ;; XEPs do not bind anything, nothing to restore
-  (and (if (eq (sb!di:debug-fun-kind (sb!di:frame-debug-fun frame)) :external)
-           sb!kernel::*interr-current-bsp*
-           (find-binding-stack-pointer frame))
-       t)
+  (find-binding-stack-pointer frame)
   #!-unwind-to-frame-and-call-vop
   (find 'sb!c:debug-catch-tag (sb!di::frame-catches frame) :key #'car))
 

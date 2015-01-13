@@ -56,14 +56,21 @@ more reliable bactracing across foreign calls.")
   ("no" "maybe" "yes" "yes"))
 
 (define-optimization-quality insert-debug-catch
-    (cond ((and (= debug 3)
-                (> debug speed))
-           3)
-          ((and (> debug 0)
-                (>= debug speed))
-           1)
-          (t
-           0))
+  ;; It's more expansive to be enabled by default without
+  ;; UNWIND-TO-FRAME-AND-CALL
+  #!-unwind-to-frame-and-call-vop
+  (if (> debug (max speed space))
+      3
+      0)
+  #!+unwind-to-frame-and-call-vop
+  (cond ((and (= debug 3)
+              (> debug speed))
+         3)
+        ((and (> debug 0)
+              (>= debug speed))
+         1)
+        (t
+         0))
   ("no" "maybe" "yes" "yes")
   "Enables possibility of returning from stack frames with the debugger.
 The default value 1 doesn't prevent tail call optimization, while >1 does.")
