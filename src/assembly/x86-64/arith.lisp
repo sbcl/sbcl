@@ -415,3 +415,62 @@
          done))))
   (def-it unsigned-byte-64-count 14 unsigned-reg unsigned-num)
   (def-it positive-fixnum-count 13 any-reg positive-fixnum))
+
+;;; EQL for integers that are either fixnum or bignum
+
+;; The restriction on use of this assembly routine can't be expressed a
+;; constraints on vop args: it may be called when at *least* one arg
+;; is known to be an integer; the other can be anything.
+;
+;; Logic: we succeed quickly in the EQ case when possible.
+;; Otherwise, check if both are OTHER-POINTER objects, failing if not.
+;; Given that at least one is an integer, and both are OTHER-POINTERs,
+;; then if their widetags match, both are BIGNUMs to be compared word-for-word.
+;;
+;; If you call this with two other-pointer objects with
+;; the same widetag, but not bignum-widetag, the behavior is undefined.
+;;
+(define-assembly-routine (%eql/integer
+                          (:translate %eql/integer)
+                          ;; :safe would imply signaling an error
+                          ;; if the args are not integer, which this doesn't.
+                          (:policy :fast-safe)
+                          (:conditional :e)
+                          (:cost 10)
+                          (:call-temps rcx))
+                         ((:arg x (descriptor-reg any-reg) rdx-offset)
+                          (:arg y (descriptor-reg any-reg) rdi-offset)
+                          (:temp rcx unsigned-reg rcx-offset)
+                          (:temp rax unsigned-reg rax-offset))
+  (inst cmp x y)
+  (inst jmp :e done) ; Z condition flag contains the answer
+  ;; check that both have other-pointer-lowtag
+  (inst lea (reg-in-size rax :dword)
+        (make-ea :dword :base x :disp (- other-pointer-lowtag)))
+  (inst lea (reg-in-size rcx :dword)
+        (make-ea :dword :base y :disp (- other-pointer-lowtag)))
+  (inst or (reg-in-size rax :dword) (reg-in-size rcx :dword))
+  (inst test (reg-in-size rax :byte) lowtag-mask)
+  (inst jmp :ne done)
+  ;; Compare the entire header word, ensuring that if at least one
+  ;; argument is a bignum, then both are.
+  (inst mov rcx (make-ea :qword :base x :disp (- other-pointer-lowtag)))
+  (inst cmp rcx (make-ea :qword :base y :disp (- other-pointer-lowtag)))
+  (inst jmp :ne done)
+  (inst shr rcx n-widetag-bits)
+  ;; can you have 0 payload words? probably not, but let's be safe here.
+  (inst jrcxz done)
+  loop
+  (inst mov rax (make-ea :qword :base x :disp (- other-pointer-lowtag)
+                         :index rcx :scale 8))
+  (inst cmp rax (make-ea :qword :base y :disp (- other-pointer-lowtag)
+                         :index rcx :scale 8))
+  ;; These next 3 instructions are the equivalent of "LOOPNZ LOOP"
+  ;; but had significantly better performance for me, consistent with claims
+  ;; of most optimization guides saying that LOOP was deliberately pessimized
+  ;; because of its use in timing-related code in the win32 kernel.
+  (inst jmp :ne done)
+  (inst dec rcx)
+  (inst jmp :ne loop)
+  ;; If the Z flag is set, the integers were EQL
+  done)

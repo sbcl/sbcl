@@ -242,6 +242,10 @@
       (if (or (typep obj2 'fixnum)
               (not (typep obj2 'number)))
           nil
+          ;; I would think that we could do slightly better here by testing that
+          ;; both objs are OTHER-POINTER-P with equal %OTHER-POINTER-WIDETAGs.
+          ;; Then dispatch on obj2 and elide the TYPEP on obj1 using TRULY-THE.
+          ;; Also would need to deal with immediate single-float for 64-bit.
           (macrolet ((foo (&rest stuff)
                        `(typecase obj2
                           ,@(mapcar (lambda (foo)
@@ -257,8 +261,8 @@
              #!+long-float
              (long-float eql)
              (bignum
-              (lambda (x y)
-                (zerop (bignum-compare x y))))
+              #!-integer-eql-vop (lambda (x y) (zerop (bignum-compare x y)))
+              #!+integer-eql-vop eql) ; will become %eql/integer
              (ratio
               (lambda (x y)
                 (and (eql (numerator x) (numerator y))

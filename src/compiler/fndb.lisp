@@ -74,7 +74,8 @@
                 sb!xc:packagep functionp compiled-function-p not)
   (t) boolean (movable foldable flushable))
 
-(defknown (eq eql) (t t) boolean (movable foldable flushable commutative))
+(defknown (eq eql %eql/integer) (t t) boolean
+  (movable foldable flushable commutative))
 (defknown (equal equalp) (t t) boolean (foldable flushable recursive))
 
 #!+(or x86 x86-64 arm)

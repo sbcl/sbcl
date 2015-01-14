@@ -1321,12 +1321,12 @@ constant shift greater than word length")))
   (define-conditional-vop > :g :a :le :be))
 
 (define-vop (fast-if-eql/signed fast-conditional/signed)
-  (:translate eql)
+  (:translate eql %eql/integer)
   (:generator 6
     (inst cmp x y)))
 
 (define-vop (fast-if-eql-c/signed fast-conditional-c/signed)
-  (:translate eql)
+  (:translate eql %eql/integer)
   (:generator 5
     (cond ((and (sc-is x signed-reg) (zerop y))
            (inst test x x))  ; smaller instruction
@@ -1334,12 +1334,12 @@ constant shift greater than word length")))
            (inst cmp x (constantize y))))))
 
 (define-vop (fast-if-eql/unsigned fast-conditional/unsigned)
-  (:translate eql)
+  (:translate eql %eql/integer)
   (:generator 6
     (inst cmp x y)))
 
 (define-vop (fast-if-eql-c/unsigned fast-conditional-c/unsigned)
-  (:translate eql)
+  (:translate eql %eql/integer)
   (:generator 5
     (cond ((and (sc-is x unsigned-reg) (zerop y))
            (inst test x x))  ; smaller instruction
@@ -1362,7 +1362,7 @@ constant shift greater than word length")))
          (y :scs (any-reg control-stack)))
   (:arg-types tagged-num tagged-num)
   (:note "inline fixnum comparison")
-  (:translate eql)
+  (:translate eql %eql/integer)
   (:generator 4
     (inst cmp x y)))
 
@@ -1380,7 +1380,7 @@ constant shift greater than word length")))
   (:info y)
   (:conditional :e)
   (:policy :fast-safe)
-  (:translate eql)
+  (:translate eql %eql/integer)
   (:generator 2
     (cond ((and (sc-is x any-reg descriptor-reg) (zerop y))
            (inst test x x))  ; smaller instruction
