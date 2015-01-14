@@ -287,18 +287,21 @@
     (when vop
       (note-this-location vop :internal-error))
     (inst byte kind)                       ; eg trap_Xyyy
-    (with-adjustable-vector (vector)       ; interr arguments
-      (write-var-integer code vector)
-      (dolist (tn values)
+    (case kind
+      (#.invalid-arg-count-trap) ; there is no "payload" in this trap kind
+      (t
+       (with-adjustable-vector (vector)       ; interr arguments
+         (write-var-integer code vector)
+         (dolist (tn values)
         ;; classic CMU CL comment:
         ;;   zzzzz jrd here. tn-offset is zero for constant
         ;;   tns.
-        (write-var-integer (make-sc-offset (sc-number (tn-sc tn))
-                                           (or (tn-offset tn) 0))
-                           vector))
-      (inst byte (length vector))
-      (dotimes (i (length vector))
-        (inst byte (aref vector i))))))
+           (write-var-integer (make-sc-offset (sc-number (tn-sc tn))
+                                              (or (tn-offset tn) 0))
+                              vector))
+         (inst byte (length vector))
+         (dotimes (i (length vector))
+           (inst byte (aref vector i))))))))
 
 (defun error-call (vop error-code &rest values)
   #!+sb-doc
@@ -312,8 +315,13 @@
   (assemble (*elsewhere*)
     (let ((start-lab (gen-label)))
       (emit-label start-lab)
-      (emit-error-break vop error-trap (error-number-or-lose error-code) values)
-       start-lab)))
+      (emit-error-break vop
+                        (case error-code ; should be named ERROR-SYMBOL really
+                          (invalid-arg-count-error invalid-arg-count-trap)
+                          (t error-trap))
+                        (error-number-or-lose error-code)
+                        values)
+      start-lab)))
 
 
 ;;;; PSEUDO-ATOMIC

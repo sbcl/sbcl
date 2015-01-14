@@ -5397,3 +5397,8 @@
 
 (with-test (:name :constantp-on-a-literal-function-works)
   (assert (constantp `(the (function (list) t) ,#'car))))
+
+(with-test (:name :arg-count-error)
+  (assert (eq :win (handler-case (funcall (intern "CONS") 1 2 3)
+                     (sb-int:simple-program-error () :win)
+                     (condition () :lose)))))

@@ -1339,17 +1339,7 @@
   (:vop-var vop)
   (:save-p :compute-only)
   (:generator 3
-    (let ((err-lab
-            #!+ud2-breakpoints
-            (generate-error-code vop 'invalid-arg-count-error)
-            #!-ud2-breakpoints
-            (assemble (*elsewhere*)
-              (let ((label (gen-label)))
-                (emit-label label)
-                (inst int 3)
-                (note-this-location vop :internal-error)
-                (inst byte invalid-arg-count-trap)
-                label))))
+    (let ((err-lab (generate-error-code vop 'invalid-arg-count-error)))
       (cond ((not min)
              (if (zerop max)
                  (inst test nargs nargs)
