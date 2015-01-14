@@ -335,7 +335,7 @@
 
 (with-test (:name :unlocked-package)
   (dolist (form (append *legal-forms* *illegal-forms*))
-    (with-error-info ("~Unlocked form: ~S~%" form)
+    (with-error-info ("Unlocked form: ~S~%" form)
       (eval form))))
 
 ;;; Locked. Errors for all illegal forms, none for legal.
