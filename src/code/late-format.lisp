@@ -221,32 +221,48 @@
 (sb!xc:defmacro formatter (control-string)
   `#',(%formatter control-string))
 
-(defun %formatter (control-string)
+
+(defun %formatter (control-string &optional (arg-count 0) (need-retval t))
+  ;; ARG-COUNT is supplied only when the use of this formatter is in a literal
+  ;; call to FORMAT, in which case we can possibly elide &optional parsing.
+  ;; But we can't in general, because FORMATTER may be called by users
+  ;; to obtain functions that may be invoked in random wrong ways.
+  ;; NEED-RETVAL signifies that the caller wants back the list of
+  ;; unconsumed arguments. This is the default assumption.
   (block nil
     (catch 'need-orig-args
       (let* ((*simple-args* nil)
              (*only-simple-args* t)
-             (guts (expand-control-string control-string))
-             (args nil))
+             (guts (expand-control-string control-string)) ; can throw
+             (required nil)
+             (optional nil))
         (dolist (arg *simple-args*)
-          (push `(,(car arg)
-                  (error
-                   'format-error
-                   :complaint "required argument missing"
-                   :control-string ,control-string
-                   :offset ,(cdr arg)))
-                args))
-        (return `(lambda (stream &optional ,@args &rest args)
-                   (declare (ignorable stream))
+          (cond ((plusp arg-count)
+                 (push (car arg) required)
+                 (decf arg-count))
+                (t
+                 (push `(,(car arg)
+                         (args-exhausted ,control-string ,(cdr arg)))
+                       optional))))
+        (return `(lambda (stream ,@required
+                                 ,@(if optional '(&optional)) ,@optional
+                                 &rest args)
+                   (declare (ignorable stream args))
                    ,guts
-                   args))))
+                   ,(and need-retval 'args)))))
     (let ((*orig-args-available* t)
           (*only-simple-args* nil))
       `(lambda (stream &rest orig-args)
          (declare (ignorable stream))
          (let ((args orig-args))
            ,(expand-control-string control-string)
-           args)))))
+           ,(and need-retval 'args))))))
+
+(defun args-exhausted (control-string offset)
+  (error 'format-error
+         :complaint "required argument missing"
+         :control-string control-string
+         :offset offset))
 
 (defun expand-control-string (string)
   (let* ((string (etypecase string

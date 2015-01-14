@@ -4535,10 +4535,19 @@
                       :policy (>= speed space))
   (unless (constant-lvar-p control)
     (give-up-ir1-transform "The control string is not a constant."))
-  (let ((arg-names (make-gensym-list (length args))))
+  (let* ((argc (length args))
+         (arg-names (make-gensym-list argc))
+         (control (lvar-value control))
+         ;; Expanding the control string now avoids deferring to FORMATTER
+         ;; so that we don't need an internal-only variant of it that
+         ;; passes through extra args to %FORMATTER.
+         (expr (handler-case ; in case %formatter wants to signal an error
+                   (sb!format::%formatter control argc nil)
+                 ;; otherwise, let the macro complain
+                 (sb!format:format-error () `(formatter ,control)))))
     `(lambda (dest control ,@arg-names)
        (declare (ignore control))
-       (format dest (formatter ,(lvar-value control)) ,@arg-names))))
+       (format dest ,expr ,@arg-names))))
 
 (deftransform format ((stream control &rest args) (stream function &rest t))
   (let ((arg-names (make-gensym-list (length args))))

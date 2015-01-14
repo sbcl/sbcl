@@ -1259,6 +1259,7 @@
                   (or string function) &rest t)
   (or string null)
   (explicit-check))
+(defknown sb!format::args-exhausted (string integer) nil)
 
 (defknown (y-or-n-p yes-or-no-p) (&optional string &rest t) boolean
   (explicit-check))
