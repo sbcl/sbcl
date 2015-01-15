@@ -1325,7 +1325,7 @@
                              (member string simple-string base-string simple-base-string))
                             &rest sequence)
                            * :node node)
-  (let ((vars (loop for x in lvars collect (sb!xc:gensym)))
+  (let ((vars (make-gensym-list (length lvars)))
         (type (lvar-value result-type)))
     (if (policy node (<= speed space))
         ;; Out-of-line

@@ -2006,7 +2006,8 @@
         (args (basic-combination-args node)))
 
     (unless (and (ref-p ref) (constant-reference-p ref)
-                 (singleton-p args))
+                 (singleton-p args)
+                 (not (node-to-be-deleted-p ref)))
       (return-from ir1-optimize-mv-call))
 
     (multiple-value-bind (min max)

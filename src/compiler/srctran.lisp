@@ -4573,6 +4573,64 @@
        (with-simple-output-to-string (stream)
          (funcall control stream ,@arg-names)))))
 
+(defun concatenate-format-p (control args)
+  (and
+   (loop for directive in control
+         always
+         (or (stringp directive)
+             (and (sb!format::format-directive-p directive)
+                  (let ((char (sb!format::format-directive-character directive))
+                        (params (sb!format::format-directive-params directive)))
+                    (or
+                     (and
+                      (or (char-equal char #\a)
+                          (char-equal char #\s))
+                      (null params)
+                      (pop args))
+                     (and
+                      (or (eql char #\~)
+                          (eql char #\%))
+                      (null (sb!format::format-directive-colonp directive))
+                      (null (sb!format::format-directive-atsignp directive))
+                      (or (null params)
+                          (typep params
+                                 '(cons (cons (eql 1) unsigned-byte) null)))))))))
+   (null args)))
+
+(deftransform format ((stream control &rest args) (null (constant-arg string) &rest string))
+  (let ((tokenized
+          (handler-case
+              (sb!format::tokenize-control-string (lvar-value control))
+            (sb!format:format-error ()
+              (give-up-ir1-transform)))))
+    (unless (concatenate-format-p tokenized args)
+      (give-up-ir1-transform))
+    (let ((arg-names (make-gensym-list (length args))))
+      `(lambda (stream control ,@arg-names)
+         (declare (ignore stream control))
+         (concatenate
+          'string
+          ,@(loop for directive in tokenized
+                  for char = (and (not (stringp directive))
+                                  (sb!format::format-directive-character directive))
+                  nconc
+                  (cond ((not char)
+                         (list directive))
+                        ((char-equal char #\a)
+                         (list (pop arg-names)))
+                        ((char-equal char #\s)
+                         (list "\"" (pop arg-names) "\""))
+                        (t
+                         (let ((n (or (cdar (sb!format::format-directive-params directive))
+                                      1)))
+                           (and (plusp n)
+                                (list
+                                 (make-string n
+                                              :initial-element
+                                              (if (eql char #\%)
+                                                  #\Newline
+                                                  char)))))))))))))
+
 (deftransform pathname ((pathspec) (pathname) *)
   'pathspec)
 

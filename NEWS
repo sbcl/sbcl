@@ -3,6 +3,8 @@ changes relative to sbcl-1.2.7:
   * enhancement: better error and warning messages. (lp#1314767, lp#736383)
   * enhancement: backtrace for invalid argument count produces the exact
     supplied arguments including the extra ones, on x86, x86-64 and ARM.
+  * optimization: FORMAT NIL with only ~a or ~s and string arguments is
+    transformed into CONCATENATE.
   * bug fix: CLOS methods compiled with (OPTIMIZE (DEBUG 0))
     no longer cause debugger failure when printing a backtrace
 
