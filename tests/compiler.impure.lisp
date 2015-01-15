@@ -2580,4 +2580,11 @@
       ;; macro-policy is rebound inside compile-file
       (assert (= baseline-again baseline)))))
 
+(in-package :cl-user)
+
+(with-test (:name :merge-lambdas-dead-return)
+  (let ((fasl (compile-file "merge-lambdas.lisp"
+                            :print nil :verbose nil)))
+    (ignore-errors (delete-file fasl))))
+
 ;;; success

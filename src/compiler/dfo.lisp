@@ -503,20 +503,27 @@
   (let* ((result-lambda (first lambdas))
          (result-return (lambda-return result-lambda)))
     (cond
-     (result-return
+      ((null (rest lambdas)))
+      ((and result-return
+            ;; KLUDGE: why is the node deleted but clambda still has a return?
+            ;; see a test-case for this in tests/merge-lambdas.lisp
+            ;; But now it can only be exercised with block
+            ;; compilation, which doesn't seem to work anyway.
+            (not (node-to-be-deleted-p
+                  (ctran-use (node-prev
+                              (lvar-uses (return-result result-return)))))))
+       ;; Make sure the result's return node starts a block so that we
+       ;; can splice code in before it.
+       (let ((prev (node-prev
+                    (lvar-uses (return-result result-return)))))
+         (when (ctran-use prev)
+           (node-ends-block (ctran-use prev))))
 
-      ;; Make sure the result's return node starts a block so that we
-      ;; can splice code in before it.
-      (let ((prev (node-prev
-                   (lvar-uses (return-result result-return)))))
-        (when (ctran-use prev)
-          (node-ends-block (ctran-use prev))))
-
-      (dolist (lambda (rest lambdas))
-        (merge-1-toplevel-lambda result-lambda lambda)))
-     (t
-      (dolist (lambda (rest lambdas))
-        (setf (functional-entry-fun lambda) nil)
-        (delete-component (lambda-component lambda)))))
+       (dolist (lambda (rest lambdas))
+         (merge-1-toplevel-lambda result-lambda lambda)))
+      (t
+       (dolist (lambda (rest lambdas))
+         (setf (functional-entry-fun lambda) nil)
+         (delete-component (lambda-component lambda)))))
 
     (values (lambda-component result-lambda) result-lambda)))

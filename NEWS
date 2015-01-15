@@ -12,6 +12,7 @@ changes relative to sbcl-1.2.7:
     are safe regardless of lexical policy.
   * bug fix: CLOS methods compiled with (OPTIMIZE (DEBUG 0))
     no longer cause debugger failure when printing a backtrace
+  * bug fix: more resilience to deleted code. (lp#1308328, lp#1390544)
 
 changes in sbcl-1.2.7 relative to sbcl-1.2.6:
   * optimization: returning constant values refers to preboxed constants
