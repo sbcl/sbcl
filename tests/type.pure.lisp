@@ -405,7 +405,7 @@
 ;;; doesn't overshoot the mark.
 (with-test (:name (:typep :fixnum-if-unsigned-byte))
   (let ((f (compile nil
-                    (lambda (x)
+                    '(lambda (x)
                       (declare (type (unsigned-byte #.sb-vm:n-word-bits) x))
                       (typep x (quote fixnum))))))
     (assert (not (funcall f (1+ most-positive-fixnum))))

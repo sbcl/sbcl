@@ -67,7 +67,7 @@
 
 (with-test (:name :supplied-p-order)
   (assert-no-signal
-   (compile nil (lambda ()
+   (compile nil '(lambda ()
                   (destructuring-bind (&optional (x nil xp)) '()
                     (declare (ignore x xp))
                     nil)))

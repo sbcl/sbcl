@@ -836,7 +836,7 @@
            4294967280))
 
 ;;; bug in modular arithmetic and type specifiers
-(assert (= (funcall (compile nil (lambda (x) (logand x x 0)))
+(assert (= (funcall (compile nil '(lambda (x) (logand x x 0)))
                     -1)
            0))
 
@@ -1959,7 +1959,7 @@
 ;;; the initialization forms.
 (assert (eq :good
             (funcall (compile 'nil
-                              (lambda ()
+                              '(lambda ()
                                 (let ((x :bad))
                                   (declare (special x))
                                   (let ((x :good))
@@ -1973,7 +1973,7 @@
 ;;; thought was legitimate.
 (with-test (:name :overlarge-immediate-in-ash-vop)
   (compile 'nil
-           (LAMBDA (B)
+           '(LAMBDA (B)
              (DECLARE (TYPE (INTEGER -2 14) B))
              (DECLARE (IGNORABLE B))
              (ASH (IMAGPART B) 57))))
