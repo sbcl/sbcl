@@ -51,3 +51,21 @@ echo //doing warm init - load and dump phase
 --core output/cold-sbcl.core \
 --lose-on-corruption \
 --no-sysinit --no-userinit < make-target-2-load.lisp
+
+echo //checking for leftover cold-init symbols
+./src/runtime/sbcl \
+--core output/sbcl.core \
+--lose-on-corruption \
+--noinform \
+--no-sysinit --no-userinit \
+--eval '(let (l)
+  (sb-vm::map-allocated-objects
+   (lambda (obj type size)
+     (declare (ignore type size))
+     (when (and (symbolp obj) (search "!"  (string obj)))
+       (push obj l)))
+   :dynamic)
+  (format t "Found ~D:~%" (1- (length l)))
+  (write (remove (quote sb-sys:structure!object) l))
+  (terpri))' \
+--quit
