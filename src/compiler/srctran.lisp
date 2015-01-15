@@ -4583,8 +4583,7 @@
                         (params (sb!format::format-directive-params directive)))
                     (or
                      (and
-                      (or (char-equal char #\a)
-                          (char-equal char #\s))
+                      (char-equal char #\a)
                       (null params)
                       (pop args))
                      (and
@@ -4613,23 +4612,21 @@
           ,@(loop for directive in tokenized
                   for char = (and (not (stringp directive))
                                   (sb!format::format-directive-character directive))
-                  nconc
+                  when
                   (cond ((not char)
-                         (list directive))
+                         directive)
                         ((char-equal char #\a)
-                         (list (pop arg-names)))
-                        ((char-equal char #\s)
-                         (list "\"" (pop arg-names) "\""))
+                         (pop arg-names))
                         (t
                          (let ((n (or (cdar (sb!format::format-directive-params directive))
                                       1)))
                            (and (plusp n)
-                                (list
-                                 (make-string n
-                                              :initial-element
-                                              (if (eql char #\%)
-                                                  #\Newline
-                                                  char)))))))))))))
+                                (make-string n
+                                             :initial-element
+                                             (if (eql char #\%)
+                                                 #\Newline
+                                                 char))))))
+                  collect it))))))
 
 (deftransform pathname ((pathspec) (pathname) *)
   'pathspec)

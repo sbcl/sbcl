@@ -700,4 +700,10 @@
       (assert (equal (format nil "~f" '(123)) "(123)"))
       (assert (equal (format nil "~e" '(123)) "(123)"))
       (assert (equal (format nil "~$" '(123)) "(123)")))))
+
+(with-test (:name :format-concatenate)
+  (assert (equal
+           (funcall (compile nil `(lambda (x) (format nil "~s" (the string x))))
+                    "\\")
+           (prin1-to-string "\\"))))
 ;;; success
