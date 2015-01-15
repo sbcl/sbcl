@@ -57,6 +57,7 @@
                     "BOOLE-XOR"
                     "CALL-ARGUMENTS-LIMIT"
                     "CHAR-CODE-LIMIT"
+                    "DEFMETHOD"
                     "DOUBLE-FLOAT-EPSILON"
                     "DOUBLE-FLOAT-NEGATIVE-EPSILON"
                     "INTERNAL-TIME-UNITS-PER-SECOND"

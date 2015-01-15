@@ -23,7 +23,6 @@
                                        "~&/done with DEFMETHOD ~S~%"
                                        ',(first args))))
                           *delayed-def!method-args*)
-                (defmacro def!method (&rest args) `(defmethod ,@args))
                 ;; We're no longer needed, ordinary DEFMETHOD is enough now.
                 (makunbound '*delayed-def!method-args*))))
   (force-delayed-def!methods))

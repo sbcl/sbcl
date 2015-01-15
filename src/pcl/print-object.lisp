@@ -165,3 +165,7 @@
   (print-unreadable-object (ctor stream :type t)
     (format stream "~S ~:S" (ctor-class-or-name ctor) (ctor-initargs ctor)))
   ctor)
+
+(defmethod print-object ((obj class-precedence-description) stream)
+  (print-unreadable-object (obj stream :type t)
+    (format stream "~D" (cpd-count obj))))

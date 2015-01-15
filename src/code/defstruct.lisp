@@ -289,11 +289,7 @@
                      ;; Don't dump the source form into the DD constant;
                      ;; just indicate that there was an expression there.
                      (setf (dd-printer-fname dd) t)))
-              ;; It would be nice to expand into DEFMETHOD, not DEF!METHOD
-              ;; if only because it pprints correctly [or we can go adding
-              ;; pprint dispatch entries for DEF!everything]
-              ;; But alas, building PCL needs it to be DEF!METHOD still.
-              `((def!method print-object ((,x ,name) ,s)
+              `((sb!xc:defmethod print-object ((,x ,name) ,s)
                 (funcall #',fname ,x ,s
                          ,@(if depthp `(*current-level-in-print*)))))))))
     `(progn

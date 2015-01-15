@@ -1103,7 +1103,7 @@
                        (:test (setq test (second option)))
                        (t
                         (error "bad option: ~S" (first option)))))))))))
-    `(def!method print-object ((structure ,name) ,stream)
+    `(sb!xc:defmethod print-object ((structure ,name) ,stream)
        (pprint-logical-block (,stream nil)
          (print-unreadable-object (structure
                                    ,stream

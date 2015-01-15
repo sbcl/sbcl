@@ -12,3 +12,5 @@
 #+sb-xc-host
 (defmacro def!method (&rest args)
   `(defmethod ,@args))
+
+(defmacro sb!xc:defmethod (&rest args) `(def!method ,@args))

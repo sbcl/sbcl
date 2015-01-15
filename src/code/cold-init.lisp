@@ -28,8 +28,13 @@
   (flet ((uninternable-p (symbol)
            (let ((name (symbol-name symbol)))
              (or (and (>= (length name) 1) (char= (char name 0) #\!))
-                 (and (>= (length name) 2)
-                      (string= name "*!" :end1 2 :end2 2))))))
+                 (and (>= (length name) 2) (string= name "*!" :end1 2))
+                 (memq symbol
+                       ;; DEF!METHOD need no longer be accessible,
+                       ;; but *DELAYED-DEF!METHOD-ARGS* remains,
+                       ;; due to a reference from pcl/methods.lisp.
+                       ;; It would be nice to fix that.
+                       '(def!method))))))
     ;; A structure constructor name, in particular !MAKE-SAETP,
     ;; can't be uninterned if referenced by a defstruct-description.
     ;; So loop over all structure classoids and clobber any
