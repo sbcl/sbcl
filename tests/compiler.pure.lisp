@@ -5402,3 +5402,11 @@
   (assert (eq :win (handler-case (funcall (intern "CONS") 1 2 3)
                      (sb-int:simple-program-error () :win)
                      (condition () :lose)))))
+
+(with-test (:name :mv-conversion)
+  (compile nil '(lambda (a)
+                 (tagbody (go 0)
+                    (list (unwind-protect a))
+                    (multiple-value-call #'list
+                      (values (catch 'ct5 (go 0))))
+                  0))))
