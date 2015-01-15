@@ -1449,55 +1449,76 @@
             "sequence type not known at compile time")))))
 
 ;;; %FIND-POSITION-IF and %FIND-POSITION-IF-NOT for LIST data
+(defun %find/position-if-list-expansion (sense from-end start end node)
+  (declare (ignore from-end))
+  ;; Circularity detection slows things down. It is permissible not to.
+  ;; In fact, FIND is given as an archetypal example of a function that
+  ;; "should be prepared to signal an error" but might not [CLHS 1.4.2].
+  ;; We relax the definition of "safe" from safety=3 to >=2.
+  (let ((safe (policy node (>= safety 2)))
+        ;; The secondary value is inconsequential when flowing into a non-MV
+        ;; combination, so we avoid counting loop iterations if possible.
+        ;; This is limited in power, but good enough, for want of a proper
+        ;; dead-code-elimination phase of the compiler.
+        (indexed
+         (not (and (lvar-single-value-p (node-lvar node))
+                   (constant-lvar-p start)
+                   (eql (lvar-value start) 0)
+                   (constant-lvar-p end)
+                   (null (lvar-value end))))))
+    `(let ((find nil)
+           (position nil))
+       (flet ((bounds-error ()
+                (sequence-bounding-indices-bad-error sequence start end)))
+         (if (and end (> start end))
+             (bounds-error)
+           (do ((slow sequence (cdr slow))
+                ,@(when safe '((fast (cdr sequence) (cddr fast))))
+                ,@(when indexed '((index 0 (+ index 1)))))
+               ((cond ((null slow)
+                       (,@(if indexed
+                              '(if (and end (> end index)) (bounds-error))
+                              '(progn))
+                        (return (values find position))))
+                      ,@(when indexed
+                          '(((and end (>= index end))
+                             (return (values find position)))))
+                      ,@(when safe
+                          '(((eq slow fast)
+                             (circular-list-error sequence)))))
+                (bug "never"))
+             (declare (list slow ,@(and safe '(fast)))
+                      ;; If you have as many as INDEX conses on a 32-bit build,
+                      ;; then you've either used up 4GB of memory (impossible)
+                      ;; or you're stuck in a circular list in unsafe code.
+                      ;; Correspondingly larger limit for 64-bit.
+                      ,@(and indexed '((index index))))
+             (,@(if indexed '(when (>= index start)) '(progn))
+               (let ((element (car slow)))
+                 ;; This hack of dealing with non-NIL FROM-END for list data
+                 ;; by iterating forward through the list and keeping track of
+                 ;; the last time we found a match might be more screwy than
+                 ;; what the user expects, but it seems to be allowed by the
+                 ;; ANSI standard. (And if the user is screwy enough to ask
+                 ;; for FROM-END behavior on list data, turnabout is fair play.)
+                 ;;
+                 ;; It's also not enormously efficient, calling PREDICATE
+                 ;; and KEY more often than necessary; but all the alternatives
+                 ;; seem to have their own efficiency problems.
+                 (,sense (funcall predicate (funcall key element))
+                   (if from-end
+                       (setf find element position ,(and indexed 'index))
+                       (return (values element ,(and indexed 'index)))))))))))))
+
 (macrolet ((def (name condition)
              `(deftransform ,name ((predicate sequence from-end start end key)
                                    (function list t t t function)
                                    *
+                                   :node node
                                    :policy (> speed space))
                 "expand inline"
-                `(let ((find nil)
-                       (position nil))
-                   (flet ((bounds-error ()
-                            (sequence-bounding-indices-bad-error sequence start end)))
-                     (if (and end (> start end))
-                         (bounds-error)
-                         (do ((slow sequence (cdr slow))
-                              (fast (cdr sequence) (cddr fast))
-                              (index 0 (+ index 1)))
-                             ((cond ((null slow)
-                                     (if (and end (> end index))
-                                         (bounds-error)
-                                         (return (values find position))))
-                                    ((and end (>= index end))
-                                     (return (values find position)))
-                                    ((eq slow fast)
-                                     (circular-list-error sequence)))
-                              (bug "never"))
-                           (declare (list slow fast))
-                           (when (>= index start)
-                             (let* ((element (car slow))
-                                    (key-i (funcall key element)))
-                               (,',condition (funcall predicate key-i)
-                                             ;; This hack of dealing with non-NIL
-                                             ;; FROM-END for list data by iterating
-                                             ;; forward through the list and keeping
-                                             ;; track of the last time we found a
-                                             ;; match might be more screwy than what
-                                             ;; the user expects, but it seems to be
-                                             ;; allowed by the ANSI standard. (And
-                                             ;; if the user is screwy enough to ask
-                                             ;; for FROM-END behavior on list data,
-                                             ;; turnabout is fair play.)
-                                             ;;
-                                             ;; It's also not enormously efficient,
-                                             ;; calling PREDICATE and KEY more often
-                                             ;; than necessary; but all the
-                                             ;; alternatives seem to have their own
-                                             ;; efficiency problems.
-                                             (if from-end
-                                                 (setf find element
-                                                       position index)
-                                                 (return (values element index)))))))))))))
+                (%find/position-if-list-expansion ',condition
+                                                  from-end start end node))))
   (def %find-position-if when)
   (def %find-position-if-not unless))
 

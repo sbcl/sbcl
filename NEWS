@@ -5,6 +5,11 @@ changes relative to sbcl-1.2.7:
     supplied arguments including the extra ones, on x86, x86-64 and ARM.
   * optimization: FORMAT NIL with only ~a and string arguments is transformed
     into CONCATENATE.
+  * optimization: POSITION and FIND when inlined into code that is compiled
+    with qualities of safety < 2 and speed > space will no longer signal
+    an error on circular lists, but will potentially loop forever if given
+    no :END constraint. As was always the case, calls that are not inlined
+    are safe regardless of lexical policy.
   * bug fix: CLOS methods compiled with (OPTIMIZE (DEBUG 0))
     no longer cause debugger failure when printing a backtrace
 

@@ -211,37 +211,32 @@
 (with-test (:name :bug-452008)
   ;; FIND & POSITION on lists should check bounds and (in safe code) detect
   ;; circular and dotted lists.
-  (macrolet ((test (type lambda)
-               `(let ((got (handler-case
-                               (funcall (compile nil ',lambda))
-                             (,type () :error)
-                             (:no-error (res)
-                               (list :no-error res)))))
-                  (let ((*print-circle* t))
-                    (format t "test: ~S~%" ',lambda))
-                  (unless (eq :error got)
-                    (error "wanted an error, got ~S for~%  ~S"
-                           (second got) ',lambda)))))
-    (test sb-kernel:bounding-indices-bad-error
-          (lambda ()
-            (find :foo '(1 2 3 :foo) :start 1 :end 5 :from-end t)))
-    (test sb-kernel:bounding-indices-bad-error
-          (lambda ()
-            (position :foo '(1 2 3 :foo) :start 1 :end 5 :from-end t)))
-    (test sb-kernel:bounding-indices-bad-error
-          (lambda ()
-            (find :foo '(1 2 3 :foo) :start 3 :end 0 :from-end t)))
-    (test sb-kernel:bounding-indices-bad-error
-          (lambda ()
-            (position :foo '(1 2 3 :foo) :start 3 :end 0 :from-end t)))
-    (test type-error
-          (lambda ()
-            (let ((list (list 1 2 3 :foo)))
-              (find :bar (nconc list list)))))
-    (test type-error
-          (lambda ()
-            (let ((list (list 1 2 3 :foo)))
-              (position :bar (nconc list list)))))))
+  (dolist (policy '(((speed 3) (safety 2)) ; transformed and safe
+                    ((speed 3) (safety 1)) ; transformed and unsafe
+                    ((speed 0) (safety 0)))) ; untransformed - safe regardless
+    (flet ((test (type expr)
+             (let ((lambda `(lambda () (declare (optimize ,@policy)) ,expr)))
+               #+nil(let ((*print-circle* t)) (format t "~&test: ~S~%" lambda))
+               (let ((got (handler-case (funcall (compile nil lambda))
+                            (error (e) (if (typep e type) :error :lose))
+                            (:no-error (res) (list :no-error res)))))
+                 (unless (eq :error got)
+                   (error "wanted an error, got ~S~%" got))))))
+      (test 'sb-kernel:bounding-indices-bad-error
+            '(find :foo '(1 2 3 :foo) :start 1 :end 5 :from-end t))
+      (test 'sb-kernel:bounding-indices-bad-error
+            '(position :foo '(1 2 3 :foo) :start 1 :end 5 :from-end t))
+      (test 'sb-kernel:bounding-indices-bad-error
+            '(find :foo '(1 2 3 :foo) :start 3 :end 0 :from-end t))
+      (test 'sb-kernel:bounding-indices-bad-error
+            '(position :foo '(1 2 3 :foo) :start 3 :end 0 :from-end t))
+      (unless (equal policy '((speed 3) (safety 1)))
+        (test 'type-error
+              '(let ((list (list 1 2 3 :foo)))
+                 (find :bar (nconc list list))))
+        (test 'type-error
+              '(let ((list (list 1 2 3 :foo)))
+                 (position :bar (nconc list list))))))))
 
 (with-test (:name :bug-554385)
   ;; FIND-IF shouldn't look through the entire list.
