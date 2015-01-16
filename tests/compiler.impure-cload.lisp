@@ -580,3 +580,6 @@
                      (sb-kernel::case-failure-possibilities c)))
                  ;; In order as originally written, and no dups.
                  '(a b c d e f g h i))))
+
+(defparameter *circular-cons-with-a-vector-cdr*
+  #1=#((a .  #1#)))

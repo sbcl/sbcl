@@ -647,41 +647,46 @@
 (defun dump-list (list file)
   (aver (and list
              (not (gethash list (fasl-output-circularity-table file)))))
-  (do* ((l list (cdr l))
-        (n 0 (1+ n))
-        (circ (fasl-output-circularity-table file)))
-       ((atom l)
-        (cond ((null l)
-               (terminate-undotted-list n file))
-              (t
-               (sub-dump-object l file)
-               (terminate-dotted-list n file))))
-    (declare (type index n))
-    (let ((ref (gethash l circ)))
-      (when ref
-        (push (make-circularity :type :rplacd
-                                :object list
-                                :index (1- n)
-                                :value l
-                                :enclosing-object ref)
-              *circularities-detected*)
-        (terminate-undotted-list n file)
-        (return)))
+  (let ((circ (fasl-output-circularity-table file)))
+   (flet ((cdr-circularity (obj n)
+            (let ((ref (gethash obj circ)))
+              (when ref
+                (push (make-circularity :type :rplacd
+                                        :object list
+                                        :index (1- n)
+                                        :value obj
+                                        :enclosing-object ref)
+                      *circularities-detected*)
+                (terminate-undotted-list n file)
+                t))))
+     (do* ((l list (cdr l))
+           (n 0 (1+ n)))
+          ((atom l)
+           (cond ((null l)
+                  (terminate-undotted-list n file))
+                 (t
+                  (cond ((cdr-circularity l n))
+                        (t
+                         (sub-dump-object l file)
+                         (terminate-dotted-list n file))))))
+       (declare (type index n))
+       (when (cdr-circularity l n)
+         (return))
 
-    (setf (gethash l circ) list)
+       (setf (gethash l circ) list)
 
-    (let* ((obj (car l))
-           (ref (gethash obj circ)))
-      (cond (ref
-             (push (make-circularity :type :rplaca
-                                     :object list
-                                     :index n
-                                     :value obj
-                                     :enclosing-object ref)
-                   *circularities-detected*)
-             (sub-dump-object nil file))
-            (t
-             (sub-dump-object obj file))))))
+       (let* ((obj (car l))
+              (ref (gethash obj circ)))
+         (cond (ref
+                (push (make-circularity :type :rplaca
+                                        :object list
+                                        :index n
+                                        :value obj
+                                        :enclosing-object ref)
+                      *circularities-detected*)
+                (sub-dump-object nil file))
+               (t
+                (sub-dump-object obj file))))))))
 
 (defun terminate-dotted-list (n file)
   (declare (type index n) (type fasl-output file))
