@@ -560,8 +560,11 @@
 
 ;;; a macro-like function which transforms a call to this function
 ;;; into some other Lisp form. This expansion is inhibited if inline
-;;; expansion is inhibited
-(define-info-type (:function :source-transform) :type-spec (or function null))
+;;; expansion is inhibited.
+;;; As an exception, a cons of two atoms represents structure metadata
+;;; which is recognized and transformed in a stylized way.
+(define-info-type (:function :source-transform)
+  :type-spec (or function null (cons atom atom)))
 
 ;;; the macroexpansion function for this macro
 (define-info-type (:function :macro-function) :type-spec (or function null))
@@ -577,8 +580,6 @@
 ;;; structure containing the info used to special-case compilation.
 (define-info-type (:function :info) :type-spec (or fun-info null))
 
-(define-info-type (:function :structure-accessor)
-  :type-spec (or defstruct-description null))
 
 ;;;; ":VARIABLE" subsection - Data pertaining to globally known variables.
 

@@ -1089,7 +1089,13 @@
         (let* ((name (leaf-source-name var))
                (transform (info :function :source-transform name)))
           (if transform
-              (multiple-value-bind (transformed pass) (funcall transform form)
+              (multiple-value-bind (transformed pass)
+                  (if (functionp transform)
+                      (funcall transform form)
+                      (let ((result (slot-access-transform
+                                     (if (consp name) :write :read)
+                                     (cdr form) transform)))
+                        (values result (null result))))
                 (cond (pass
                        (ir1-convert-maybe-predicate start next result form var))
                       (t

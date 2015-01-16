@@ -87,7 +87,8 @@ EXPERIMENTAL: Interface subject to change."
              (funcall it expanded environment))
 
             ;; Structure accessor
-            ((info :function :structure-accessor name)
+            ((let ((info (info :function :source-transform name)))
+               (and (consp info) info))
              (expand-structure-slot-cas it name expanded))
 
             ;; CAS function
@@ -108,9 +109,10 @@ EXPERIMENTAL: Interface subject to change."
                          `(funcall #'(cas ,name) ,old ,new ,@args)
                          `(,name ,@args))))))))))
 
-(defun expand-structure-slot-cas (dd name place)
-  (let* ((structure (dd-name dd))
-         (slotd (find name (dd-slots dd) :key #'dsd-accessor-name))
+(defun expand-structure-slot-cas (info name place)
+  (let* ((dd (car info))
+         (structure (dd-name dd))
+         (slotd (cdr info))
          (index (dsd-index slotd))
          (type (dsd-type slotd)))
     (unless (eq t (dsd-raw-type slotd))

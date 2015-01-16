@@ -127,7 +127,6 @@
             :macro-function
             :inline-expansion-designator
             :source-transform
-            :structure-accessor
             :assumed-type)))
   (values))
 

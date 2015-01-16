@@ -142,10 +142,13 @@
         (t
          (when (cdr args)
            (invalid-place))
-         (let ((dd (info :function :structure-accessor op)))
-           (if dd
-               (let* ((structure (dd-name dd))
-                      (slotd (find op (dd-slots dd) :key #'dsd-accessor-name))
+         ;; Without the SYMBOLP check this would erroneously allow
+         ;;   (ATOMIC-INCF ((SETF STRUCT-SLOT) x))
+         (let ((info (and (symbolp op) (info :function :source-transform op))))
+           (if (consp info)
+               (let* ((dd (car info))
+                      (structure (dd-name dd))
+                      (slotd (cdr info))
                       (index (dsd-index slotd))
                       (type (dsd-type slotd)))
                  (declare (ignorable structure index))

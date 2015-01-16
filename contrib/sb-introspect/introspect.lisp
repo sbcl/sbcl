@@ -316,12 +316,14 @@ If an unsupported TYPE is requested, the function will return NIL.
         (when (symbolp name)
           (find-vop-source name)))
        ((:source-transform)
-        (let ((transform-fun (sb-int:info :function :source-transform name))
-              (accessor (sb-int:info :function :structure-accessor
-                                     (if (typep name '(cons (eql setf)
-                                                       (cons symbol null)))
-                                         (second name)
-                                         name))))
+        (let* ((transform-fun
+                (or (sb-int:info :function :source-transform name)
+                    (and (typep name '(cons (eql setf) (cons symbol null)))
+                         (sb-int:info :function :source-transform
+                                      (second name)))))
+               ;; A cons for the :source-transform is essentially the same
+               ;; info that was formerly in :structure-accessor.
+               (accessor (and (consp transform-fun) (cdr transform-fun))))
           ;; Structure accessors have source transforms, but the
           ;; returned locations will neither show the actual place
           ;; where it's defined, nor is really interesting.

@@ -221,6 +221,11 @@
   ;;
   ;; If this object describes a raw slot, this value is the type of the
   ;; value that the raw slot holds.
+  ;; Note: if there were more than about 5 raw types - and there aren't -
+  ;; this could be made more efficient by storing either a raw-type-id
+  ;; as an integer index to a vector of the raw types (presently a list,
+  ;; but easily a vector), or actually just the RSD object (raw-slot-data).
+  ;; Doing so would avoid some frequent re-scanning of the RSD list.
   (raw-type t :type (member t single-float double-float
                             #!+long-float long-float
                             complex-single-float complex-double-float
@@ -975,36 +980,39 @@ unless :NAMED is also specified.")))
         `(,(raw-slot-data-accessor-name (raw-slot-data-or-lose raw-type))
           ,instance-name ,(dsd-index dsd)))))
 
-;;; Return source transforms for the reader and writer functions of
-;;; the slot described by DSD. They should be inline expanded, but
-;;; source transforms work faster.
-(defun slot-accessor-transforms (dd dsd)
-  (let ((accessor-place-form (%accessor-place-form dd dsd
-                                                   `(the ,(dd-name dd) instance)))
-        (dsd-type (dsd-type dsd))
-        (value-the (if (dsd-safe-p dsd) 'truly-the 'the)))
-    (values (sb!c:source-transform-lambda (instance)
-              `(,value-the ,dsd-type ,(subst instance 'instance
-                                             accessor-place-form)))
-            (sb!c:source-transform-lambda (new-value instance)
-              (destructuring-bind (accessor-name &rest accessor-args)
-                  accessor-place-form
-                (once-only ((new-value new-value)
-                            (instance instance))
-                  `(,(info :setf :inverse accessor-name)
-                    ,@(subst instance 'instance accessor-args)
-                    (the ,dsd-type ,new-value))))))))
+;;; Return the transformation of conceptual FUNCTION (either :READ or :WRITE)
+;;; applied to ARGS, given SLOT-KEY which is a cons of a DD and a DSD.
+;;; Return NIL on failure.
+(defun slot-access-transform (function args slot-key)
+  (when (consp args) ; need at least one arg
+    (let* ((dd (car slot-key))
+           (dsd (cdr slot-key))
+           ;; optimistically compute PLACE before checking length of ARGS
+           ;; because we expect success, and this unifies the two cases.
+           ;; :WRITE has the arg order of (SETF fn), i.e. newval is first,
+           ;; so if more than one arg exists, take the second as the INSTANCE.
+           (place
+            (%accessor-place-form
+             dd dsd `(the ,(dd-name dd)
+                          ,(car (if (consp (cdr args)) (cdr args) args)))))
+           (type-spec (dsd-type dsd)))
+      (ecase function
+        (:read
+         (when (singleton-p args)
+           (if (eq type-spec t)
+               place
+               `(,(if (dsd-safe-p dsd) 'truly-the 'the) ,type-spec ,place))))
+        (:write
+         (when (singleton-p (cdr args))
+           (once-only ((new (first args)))
+             ;; instance setters take newval last.
+             `(,(info :setf :inverse (car place)) ,@(cdr place)
+               ,(if (eq type-spec t) new `(the ,type-spec ,new))))))))))
 
-;;; Return a LAMBDA form which can be used to set a slot.
+;;; Return a LAMBDA form which can be used to set a slot
 (defun slot-setter-lambda-form (dd dsd)
-  ;; KLUDGE: Evaluating the results of SLOT-ACCESSOR-TRANSFORMS needs
-  ;; a lexenv.
-  (let ((sb!c:*lexenv* (if (boundp 'sb!c:*lexenv*)
-                           sb!c:*lexenv*
-                           (sb!c::make-null-lexenv))))
-    `(lambda (new-value instance)
-       ,(funcall (nth-value 1 (slot-accessor-transforms dd dsd))
-                 '(dummy new-value instance)))))
+  `(lambda (newval instance)
+     ,(slot-access-transform :write '(newval instance) (cons dd dsd))))
 
 ;;; Blow away all the compiler info for the structure CLASS. Iterate
 ;;; over this type, clearing the compiler structure type info, and
@@ -1135,14 +1143,12 @@ unless :NAMED is also specified.")))
           (let ((inherited (accessor-inherited-data accessor-name dd)))
             (cond
               ((not inherited)
-               (setf (info :function :structure-accessor accessor-name) dd)
-               (multiple-value-bind (reader-designator writer-designator)
-                   (slot-accessor-transforms dd dsd)
+               (let ((slot-key (cons dd dsd)))
                  (setf (info :function :source-transform accessor-name)
-                       reader-designator)
+                       slot-key)
                  (unless (dsd-read-only dsd)
                    (setf (info :function :source-transform `(setf ,accessor-name))
-                         writer-designator))))
+                         slot-key))))
               ((not (= (cdr inherited) (dsd-index dsd)))
                (style-warn "~@<Non-overwritten accessor ~S does not access ~
                             slot with name ~S (accessing an inherited slot ~
