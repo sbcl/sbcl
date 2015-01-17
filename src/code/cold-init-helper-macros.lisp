@@ -61,7 +61,8 @@
 ;;;    (!defun-from-cold-init-forms !some-cold-init-fun)
 ;;; or the less respectable (defvar *foo*) and a random SETQ in !COLD-INIT.
 ;;; Each is like its namesake, but also arranges so that genesis knows
-;;; the initial toplevel value, which must be a constant of a restricted type.
+;;; the initialization form, on which it calls EVAL and dumps as a constant
+;;; when writing out the cold core image.
 (macrolet ((def (wrapper real-name)
              `(defmacro ,wrapper (sym value &optional (doc nil doc-p))
                 `(progn (eval-when (:compile-toplevel)
@@ -71,12 +72,11 @@
   (def !defparameter defparameter)
   (def !defvar defvar))
 
-(defun !delayed-cold-set-symbol-value (symbol value)
-  (assert (or (typep value '(or (member t nil) keyword number string
-                                (cons (eql quote) (cons t null))))))
+(defun !delayed-cold-set-symbol-value (symbol value-form)
   ;; Obfuscate the reference into SB-COLD to avoid "bad package for target"
   (let ((list (find-symbol "*SYMBOL-VALUES-FOR-GENESIS*" "SB-COLD")))
-    (set list (acons symbol (if (consp value) (second value) value)
+    (set list (acons symbol
+                     (cons value-form (package-name *package*))
                      (delete symbol (symbol-value list) :key #'car)))))
 
 ;;; FIXME: Consider renaming this file asap.lisp,

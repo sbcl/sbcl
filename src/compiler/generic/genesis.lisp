@@ -800,10 +800,9 @@ core and return a descriptor to it."
 
 ;;; Make a simple-vector on the target that holds the specified
 ;;; OBJECTS, and return its descriptor.
-;;; Oops, this function was renamed (by me) for the wrong reason - that it
-;;; was unharmonious with other -TO-CORE functions, however X-TO-CORE
-;;; should accept an argument of type X which this doesn't (FIXME).
-(defun vector-to-core (objects &optional (gspace *dynamic*))
+;;; This is really "vectorify-list-into-core" but that's too wordy,
+;;; so historically it was "vector-in-core" which is a fine name.
+(defun vector-in-core (objects &optional (gspace *dynamic*))
   (let* ((size (length objects))
          (result (allocate-vector-object gspace sb!vm:n-word-bits size
                                          sb!vm:simple-vector-widetag)))
@@ -1017,7 +1016,7 @@ core and return a descriptor to it."
       ;; Nothing in cold-init needs to call EQUALP on a structure with raw slots,
       ;; but for type-correctness this slot needs to be a simple-vector.
       (unless (boundp '*simple-vector-0-descriptor*)
-        (setq *simple-vector-0-descriptor* (vector-to-core nil)))
+        (setq *simple-vector-0-descriptor* (vector-in-core nil)))
       (cold-set-layout-slot result 'equalp-tests *simple-vector-0-descriptor*))
     (cold-set-layout-slot result 'source-location *nil-descriptor*)
     (cold-set-layout-slot result '%for-std-class-b (make-fixnum-descriptor 0))
@@ -1056,7 +1055,7 @@ core and return a descriptor to it."
              (make-cold-layout
               name
               (number-to-core (layout-length warm-layout))
-              (vector-to-core inherits)
+              (vector-in-core inherits)
               (number-to-core (layout-depthoid warm-layout))
               (number-to-core (layout-raw-slot-metadata warm-layout))))))
     (let* ((t-layout   (chill-layout 't))
@@ -1213,18 +1212,23 @@ core and return a descriptor to it."
             (bug "~A in bad package for target: ~A" symbol result))
           result))))
 
-;;; Assign target representation of VALUE to DESCRIPTOR.
-;;; The VALUE should not have shared substructure in a way that matters,
-;;; because sharing detection is not performed. It must not have cycles.
-(defun cold-set-symbol-global-value (descriptor value)
+;;; Dump the target representation of HOST-VALUE,
+;;; the type of which is in a restrictive set.
+(defun host-constant-to-core (host-value)
+  ;; rough check for no shared substructure and/or circularity.
+  ;; of course this would be wrong if it were a string containing "#1="
+  (when (search "#1=" (write-to-string host-value :circle t :readably t))
+    (warn "Strange constant to core from Genesis: ~S" host-value))
   (labels ((target-representation (value)
              (etypecase value
                (symbol (cold-intern value))
                (number (number-to-core value))
                (string (base-string-to-core value))
                (cons (cold-cons (target-representation (car value))
-                                (target-representation (cdr value)))))))
-    (cold-set descriptor (target-representation value))))
+                                (target-representation (cdr value))))
+               (simple-vector
+                (vector-in-core (map 'list #'target-representation value))))))
+    (target-representation host-value)))
 
 ;;; Return a handle on an interned symbol. If necessary allocate the
 ;;; symbol and record its home package.
@@ -1260,7 +1264,10 @@ core and return a descriptor to it."
                 (setq access :external)
                 (cold-set handle handle))
                ((assoc symbol sb-cold:*symbol-values-for-genesis*)
-                (cold-set-symbol-global-value handle (cdr it))))
+                (cold-set handle
+                          (host-constant-to-core
+                           (let ((*package* (find-package (cddr it))))
+                             (eval (cadr it)))))))
         (setf (get symbol 'cold-intern-info) handle))))
 
 (defun record-accessibility (accessibility symbol-descriptor target-pkg-info
@@ -1458,8 +1465,8 @@ core and return a descriptor to it."
                 (record-accessibility accessibility (cold-intern sym)
                                       pkg-info sym host-pkg)))))
         (cold-push (cold-cons (car pkg-info)
-                              (cold-cons (vector-to-core (cadr pkg-info))
-                                         (vector-to-core (cddr pkg-info))))
+                              (cold-cons (vector-in-core (cadr pkg-info))
+                                         (vector-in-core (cddr pkg-info))))
                    cold-pkg-inits)))
     (cold-set 'sb!impl::*!initial-symbols* cold-pkg-inits))
 
@@ -1623,7 +1630,7 @@ core and return a descriptor to it."
               (cold-intern warm-sym) sb!vm:symbol-info-slot
               ;; Each vector will have one fixnum, possibly the symbol SETF,
               ;; and one or two #<fdefn> objects in it.
-              (vector-to-core
+              (vector-in-core
                      (map 'list (lambda (elt)
                                   (etypecase elt
                                     (symbol (cold-intern elt))

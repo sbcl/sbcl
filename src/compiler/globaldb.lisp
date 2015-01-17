@@ -121,7 +121,8 @@
 ;;; compiler as we can make it, i.e. identical in most ways, including
 ;;; this one. -- WHN 2001-08-19
 (declaim (type (simple-vector #.(ash 1 type-number-bits)) *info-types*))
-(defglobal *info-types* (make-array (ash 1 type-number-bits) :initial-element nil))
+(!defglobal *info-types*
+            (make-array (ash 1 type-number-bits) :initial-element nil))
 
 (defstruct (type-info
             #-no-ansi-print-object
@@ -795,9 +796,6 @@
 ;;; load time to the same state they have currently.
 (!cold-init-forms
   (/show0 "beginning *INFO-TYPES* initialization")
-  #-sb-xc-host
-  ;; Host already has this array, do not clobber it
-  (setq *info-types* (make-array (ash 1 type-number-bits) :initial-element nil))
   (mapc (lambda (x)
           (register-info-metadata (first x) (second x) (third x) (fourth x)))
         '#.(loop for info-type across *info-types*
