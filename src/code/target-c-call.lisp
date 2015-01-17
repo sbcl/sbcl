@@ -48,9 +48,6 @@
 
 
 (defun default-c-string-external-format ()
-  #!+sb-xc
-  :latin-1
-  #!-sb-xc
   (or *default-c-string-external-format*
       (setf *default-c-string-external-format*
             (sb!impl::default-external-format))))

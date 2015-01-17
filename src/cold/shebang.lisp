@@ -23,6 +23,12 @@
 (defvar *shebang-features*)
 
 (defun feature-in-list-p (feature list)
+  (labels ((sane-expr-p (x)
+             (typecase x
+               (symbol (and (string/= x "SB-XC") (string/= x "SB-XC-HOST")))
+               (cons (every #'sane-expr-p (cdr x))))))
+    (unless (sane-expr-p feature)
+      (error "Target feature expression ~S looks screwy" feature)))
   (etypecase feature
     (symbol (member feature list :test #'eq))
     (cons (flet ((subfeature-in-list-p (subfeature)
