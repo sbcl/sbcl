@@ -623,6 +623,10 @@
                     (flet ((#!+little-endian start-bit
                             #!+big-endian end-bit (x)
                              (declare (word x))
+                             #!+(or x86-64 x86)
+                             (truly-the (mod #.n-word-bits)
+                                 (%primitive unsigned-word-find-first-bit x))
+                             #!-(or x86-64 x86)
                              (- #!+big-endian sb!vm:n-word-bits
                                 (integer-length (logand x (- x)))
                                 #!+little-endian 1))
