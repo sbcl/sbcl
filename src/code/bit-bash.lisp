@@ -640,7 +640,10 @@
                                           (ash word-offset +bit-position-base-shift+)))))
                            (get-word (offset)
                              (,@frob (%vector-raw-bits vector offset))))
-                      (declare (inline start-bit end-bit get-word))
+                      ;; Inline FOUND makes the code smaller, as well as faster,
+                      ;; because it becomes clear that there is no establishing
+                      ;; of an exit point and hence no call to UNWIND.
+                      (declare (inline start-bit end-bit found get-word))
                       (if from-end
                           ;; Back to front
                           (let* ((word-offset last-word)
