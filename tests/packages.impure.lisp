@@ -11,6 +11,12 @@
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
 
+(with-test (:name :packages-sanely-nicknamed)
+  (dolist (p (list-all-packages))
+    (let* ((nicks (package-nicknames p))
+           (check (remove-duplicates nicks :test 'string=)))
+      (assert (= (length check) (length nicks))))))
+
 (make-package "FOO")
 (defvar *foo* (find-package (coerce "FOO" 'base-string)))
 (rename-package "FOO" (make-array 0 :element-type nil))

@@ -1607,7 +1607,9 @@ PACKAGE."
               (package-%locally-nicknamed-by pkg) nil
               (package-source-location pkg) nil
               (gethash (package-%name pkg) names) pkg)
-        (%enter-new-nicknames pkg (package-%nicknames pkg))
+        (let ((nicks (package-%nicknames pkg)))
+          (setf (package-%nicknames pkg) nil) ; each is pushed in again
+          (%enter-new-nicknames pkg nicks))
         #!+sb-package-locks
         (setf (package-lock pkg) nil
               (package-%implementation-packages pkg) nil))))
