@@ -34,7 +34,9 @@
                        ;; but *DELAYED-DEF!METHOD-ARGS* remains,
                        ;; due to a reference from pcl/methods.lisp.
                        ;; It would be nice to fix that.
-                       '(def!method))))))
+                       '(def!method
+                         sb!c::sb!pcl sb!c::sb!impl sb!c::sb!kernel
+                         sb!c::sb!c sb!c::sb!int))))))
     ;; A structure constructor name, in particular !MAKE-SAETP,
     ;; can't be uninterned if referenced by a defstruct-description.
     ;; So loop over all structure classoids and clobber any

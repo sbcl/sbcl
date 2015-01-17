@@ -1212,6 +1212,17 @@ core and return a descriptor to it."
             (bug "~A in bad package for target: ~A" symbol result))
           result))))
 
+(defvar *uninterned-symbol-table* (make-hash-table :test #'equal))
+;; This coalesces references to uninterned symbols, which is allowed because
+;; "similar-as-constant" is defined by string comparison, and since we only have
+;; base-strings during Genesis, there is no concern about upgraded array type.
+;; There is a subtlety of whether coalescing may occur across files
+;; - the target compiler doesn't and couldn't - but here it doesn't matter.
+(defun get-uninterned-symbol (name)
+  (or (gethash name *uninterned-symbol-table*)
+      (let ((cold-symbol (allocate-symbol name)))
+        (setf (gethash name *uninterned-symbol-table*) cold-symbol))))
+
 ;;; Dump the target representation of HOST-VALUE,
 ;;; the type of which is in a restrictive set.
 (defun host-constant-to-core (host-value)
@@ -1221,7 +1232,9 @@ core and return a descriptor to it."
     (warn "Strange constant to core from Genesis: ~S" host-value))
   (labels ((target-representation (value)
              (etypecase value
-               (symbol (cold-intern value))
+               (symbol (if (symbol-package value)
+                           (cold-intern value)
+                           (get-uninterned-symbol (string value))))
                (number (number-to-core value))
                (string (base-string-to-core value))
                (cons (cold-cons (target-representation (car value))
@@ -2263,17 +2276,11 @@ core and return a descriptor to it."
                 (fop-keyword-small-symbol-save)
   (push-fop-table (cold-load-symbol (clone-arg) *keyword-package*)))
 
-(defvar *uninterned-symbol-table* (make-hash-table :test #'equal))
 (clone-cold-fop (fop-uninterned-symbol-save)
                 (fop-uninterned-small-symbol-save)
-  (let* ((size (clone-arg))
-         (name (make-string size)))
+  (let ((name (make-string (clone-arg))))
     (read-string-as-bytes *fasl-input-stream* name)
-    (let ((symbol-des (gethash name *uninterned-symbol-table*)))
-      (unless symbol-des
-        (setf symbol-des (allocate-symbol name)
-              (gethash name *uninterned-symbol-table*) symbol-des))
-      (push-fop-table symbol-des))))
+    (push-fop-table (get-uninterned-symbol name))))
 
 ;;;; cold fops for loading packages
 

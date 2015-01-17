@@ -595,7 +595,7 @@
            (let* ((n-bits (sb!vm:saetp-n-bits saetp))
                   (basher-name (format nil "UB~D-BASH-FILL" n-bits))
                   (basher (or (find-symbol basher-name
-                                           (load-time-value (find-package :sb!kernel)))
+                                           (load-time-value (find-package "SB!KERNEL")))
                               (abort-ir1-transform
                                "Unknown fill basher, please report to sbcl-devel: ~A"
                                basher-name)))

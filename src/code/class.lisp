@@ -1073,13 +1073,9 @@ between the ~A definition and the ~A definition"
 ;;; :DIRECT-SUPERCLASSES (default to head of CPL)
 ;;;     List of the direct superclasses of this class.
 ;;;
-;;; FIXME: This doesn't seem to be needed after cold init (and so can
-;;; probably be uninterned at the end of cold init).
-(defvar *built-in-classes*)
-(!cold-init-forms
-  (/show0 "setting *BUILT-IN-CLASSES*")
-  (setq
-   *built-in-classes*
+;;; NB: not to be confused with SB-PCL::*BUILT-IN-CLASSES*
+(!defvar *!built-in-classes*
+   ;; To me these data would look nicer with commas instead of "#."
    '((t :state :read-only :translation t)
      (character :enumerable t
                 :codes (#.sb!vm:character-widetag)
@@ -1093,6 +1089,7 @@ between the ~A definition and the ~A definition"
      (weak-pointer :codes (#.sb!vm:weak-pointer-widetag)
       :prototype-form (make-weak-pointer (find-package "CL")))
      (code-component :codes (#.sb!vm:code-header-widetag))
+     ;; should this be #!-(or x86 x86-64) ?
      (lra :codes (#.sb!vm:return-pc-header-widetag))
      (fdefn :codes (#.sb!vm:fdefn-widetag)
             :prototype-form (make-fdefn "42"))
@@ -1421,13 +1418,13 @@ between the ~A definition and the ~A definition"
      (string-stream
       :state :read-only
       :depth 4
-      :inherits (stream)))))
+      :inherits (stream))))
 
 ;;; See also src/code/class-init.lisp where we finish setting up the
 ;;; translations for built-in types.
 (!cold-init-forms
-  (dolist (x *built-in-classes*)
-    #-sb-xc-host (/show0 "at head of loop over *BUILT-IN-CLASSES*")
+  (dolist (x *!built-in-classes*)
+    #-sb-xc-host (/show0 "at head of loop over *!BUILT-IN-CLASSES*")
     (destructuring-bind
         (name &key
               (translation nil trans-p)
@@ -1477,7 +1474,7 @@ between the ~A definition and the ~A definition"
                                           depthoid
                                           0)
            :invalidate nil)))))
-  (/show0 "done with loop over *BUILT-IN-CLASSES*"))
+  (/show0 "done with loop over *!BUILT-IN-CLASSES*"))
 
 ;;; Define temporary PCL STANDARD-CLASSes. These will be set up
 ;;; correctly and the Lisp layout replaced by a PCL wrapper after PCL
@@ -1525,7 +1522,7 @@ between the ~A definition and the ~A definition"
 ;;; Now that we have set up the class heterarchy, seal the sealed
 ;;; classes. This must be done after the subclasses have been set up.
 (!cold-init-forms
-  (dolist (x *built-in-classes*)
+  (dolist (x *!built-in-classes*)
     (destructuring-bind (name &key (state :sealed) &allow-other-keys) x
       (setf (classoid-state (find-classoid name)) state))))
 
@@ -1592,7 +1589,7 @@ between the ~A definition and the ~A definition"
                   (declare (notinline find-classoid))
                   (classoid-layout (find-classoid 'random-class))))
                (res (make-array 256 :initial-element initial-element)))
-          (dolist (x *built-in-classes* res)
+          (dolist (x *!built-in-classes* res)
             (destructuring-bind (name &key codes &allow-other-keys)
                                 x
               (let ((layout (classoid-layout (find-classoid name))))
