@@ -88,7 +88,7 @@
 ;;; If the desirability of the transformation depends on the current
 ;;; OPTIMIZE parameters, then the POLICY macro should be used to
 ;;; determine when to pass.
-(defmacro source-transform-lambda (lambda-list &body body)
+(defmacro define-source-transform (fun-name lambda-list &body body)
   (with-unique-names (whole-var n-env name)
     (multiple-value-bind (body decls)
         (parse-defmacro lambda-list whole-var body "source transform" "form"
@@ -98,13 +98,11 @@
                                       (return-from ,name
                                         (values nil t)))
                         :wrap-block nil)
-      `(lambda (,whole-var &aux (,n-env *lexenv*))
-         ,@decls
-         (block ,name
-           ,body)))))
-(defmacro define-source-transform (name lambda-list &body body)
-  `(setf (info :function :source-transform ',name)
-         (source-transform-lambda ,lambda-list ,@body)))
+      `(setf (info :function :source-transform ',fun-name)
+             (lambda (,whole-var &aux (,n-env *lexenv*))
+               ,@decls
+               (block ,name
+                 ,body))))))
 
 ;;;; boolean attribute utilities
 ;;;;
