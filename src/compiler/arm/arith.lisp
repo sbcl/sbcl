@@ -503,14 +503,9 @@
     (inst and temp mask (lsr num 4))
     (inst and num num mask)
     (inst add num num temp)
-    (load-immediate-word mask #x00ff00ff)
-    (inst and temp mask (lsr num 8))
-    (inst and num num mask)
-    (inst add num num temp)
-    (load-immediate-word mask #x0000ffff)
-    (inst and temp mask (lsr num 16))
-    (inst and num num mask)
-    (inst add res num temp)))
+    (inst add num num (lsr num 8))
+    (inst add num num (lsr num 16))
+    (inst and res num #xff)))
 
 ;;; Modular functions
 (define-modular-fun lognot-mod32 (x) lognot :untagged nil 32)
