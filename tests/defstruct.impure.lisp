@@ -1186,7 +1186,8 @@ redefinition."
            (a 42 :type fixnum)))))
 
 (with-test (:name (:boa-supplied-p &optional))
-  (handler-bind ((warning #'error))
+  (handler-bind ((sb-c:inlining-dependency-failure #'muffle-warning)
+                 (warning #'error))
     (eval `(defstruct (boa-supplied-p.1 (:constructor make-boa-supplied-p.1
                                             (&optional (bar t barp))))
              bar
@@ -1199,7 +1200,8 @@ redefinition."
     (assert (eq t (boa-supplied-p.1-barp b2)))))
 
 (with-test (:name (:boa-supplied-p &key))
-  (handler-bind ((warning #'error))
+  (handler-bind ((sb-c:inlining-dependency-failure #'muffle-warning)
+                 (warning #'error))
     (eval `(defstruct (boa-supplied-p.2 (:constructor make-boa-supplied-p.2
                                             (&key (bar t barp))))
              bar
