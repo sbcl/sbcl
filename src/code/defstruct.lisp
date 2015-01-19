@@ -178,18 +178,6 @@
 (defun dd-class-p (dd)
   (if (member (dd-type dd) '(structure funcallable-structure)) t nil))
 
-;;; a type name which can be used when declaring things which operate
-;;; on structure instances
-(defun dd-declarable-type (dd)
-  (if (dd-class-p dd)
-      ;; Native classes are known to the type system, and we can
-      ;; declare them as types.
-      (dd-name dd)
-      ;; Structures layered on :TYPE LIST or :TYPE VECTOR aren't part
-      ;; of the type system, so all we can declare is the underlying
-      ;; LIST or VECTOR type.
-      (dd-type dd)))
-
 (defun dd-layout-or-lose (dd)
   (compiler-layout-or-lose (dd-name dd)))
 
@@ -1105,10 +1093,11 @@ unless :NAMED is also specified.")))
 ;;; Do (COMPILE LOAD EVAL)-time actions for the normal (not
 ;;; ALTERNATE-LAYOUT) DEFSTRUCT described by DD.
 ;;; This includes generation of a style-warning about previously compiled
-;;; calls to the accessors and/or predicate thet weren't inlined.
+;;; calls to the accessors and/or predicate that weren't inlined.
 (defun %compiler-defstruct (dd inherits)
   (declare (type defstruct-description dd))
 
+  (aver (dd-class-p dd)) ; LIST and VECTOR representation are not allowed
   (let ((check-inlining
          ;; Why use the secondary result of INFO, not the primary?
          ;; Because when DEFSTRUCT is evaluated, not via the file-compiler,
@@ -1122,37 +1111,26 @@ unless :NAMED is also specified.")))
         (fnames))
     (%compiler-set-up-layout dd inherits)
 
-    (let ((copier-name (dd-copier-name dd))
-          (dtype (dd-declarable-type dd)))
-      (when copier-name
-        (sb!xc:proclaim `(ftype (sfunction (,dtype) ,dtype) ,copier-name))))
+    (awhen (dd-copier-name dd)
+      (let ((dtype (dd-name dd)))
+        (sb!xc:proclaim `(ftype (sfunction (,dtype) ,dtype) ,it))))
 
     (let ((predicate-name (dd-predicate-name dd)))
       (when predicate-name
         ;; Provide inline expansion (or not).
-        (ecase (dd-type dd)
-          ((structure funcallable-structure)
-           (when check-inlining
-             (push predicate-name fnames))
-           ;; Let the predicate be inlined.
-           (setf (info :function :inline-expansion-designator predicate-name)
-                 (lambda ()
+        (when check-inlining
+          (push predicate-name fnames))
+        ;; Let the predicate be inlined.
+        (setf (info :function :inline-expansion-designator predicate-name)
+              ;; The memory saved by this strange representation has got to be
+              ;; miniscule, if anything. Can we just store in the obvious way?
+              (lambda ()
                    `(lambda (x)
                       ;; This dead simple definition works because the
                       ;; type system knows how to generate inline type
                       ;; tests for instances.
                       (typep x ',(dd-name dd))))
-                 (info :function :inlinep predicate-name)
-                 :inline))
-          ;; FIXME: this branch is unreachable because %COMPILER-DEFSTRUCT
-          ;; is never called for representation types of LIST or VECTOR.
-          ((list vector)
-           ;; Just punt. We could provide inline expansions for :TYPE
-           ;; LIST and :TYPE VECTOR predicates too, but it'd be a
-           ;; little messier and we don't bother. (Does anyone use
-           ;; typed DEFSTRUCTs at all, let alone for high
-           ;; performance?)
-           (sb!xc:proclaim `(ftype (sfunction (t) boolean) ,predicate-name))))))
+              (info :function :inlinep predicate-name) :inline)))
 
     (dolist (dsd (dd-slots dd))
       (let ((accessor-name (dsd-accessor-name dsd)))
