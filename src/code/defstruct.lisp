@@ -1104,13 +1104,26 @@ unless :NAMED is also specified.")))
 
 ;;; Do (COMPILE LOAD EVAL)-time actions for the normal (not
 ;;; ALTERNATE-LAYOUT) DEFSTRUCT described by DD.
+;;; This includes generation of a style-warning about previously compiled
+;;; calls to the accessors and/or predicate thet weren't inlined.
 (defun %compiler-defstruct (dd inherits)
   (declare (type defstruct-description dd))
-  (%compiler-set-up-layout dd inherits)
 
-  (let ((dtype (dd-declarable-type dd)))
+  (let ((check-inlining
+         ;; Why use the secondary result of INFO, not the primary?
+         ;; Because when DEFSTRUCT is evaluated, not via the file-compiler,
+         ;; the first thing to happen is %DEFSTRUCT, which sets up FIND-CLASS.
+         ;; Due to :COMPILER-LAYOUT's defaulting expression in globaldb,
+         ;; it has a value - the layout of the classoid - that we don't want.
+         ;; Also, since structures are technically not redefineable,
+         ;; I don't worry about failure to inline a function that was
+         ;; formerly not known as an accessor but now is.
+         (null (nth-value 1 (info :type :compiler-layout (dd-name dd)))))
+        (fnames))
+    (%compiler-set-up-layout dd inherits)
 
-    (let ((copier-name (dd-copier-name dd)))
+    (let ((copier-name (dd-copier-name dd))
+          (dtype (dd-declarable-type dd)))
       (when copier-name
         (sb!xc:proclaim `(ftype (sfunction (,dtype) ,dtype) ,copier-name))))
 
@@ -1119,6 +1132,8 @@ unless :NAMED is also specified.")))
         ;; Provide inline expansion (or not).
         (ecase (dd-type dd)
           ((structure funcallable-structure)
+           (when check-inlining
+             (push predicate-name fnames))
            ;; Let the predicate be inlined.
            (setf (info :function :inline-expansion-designator predicate-name)
                  (lambda ()
@@ -1129,6 +1144,8 @@ unless :NAMED is also specified.")))
                       (typep x ',(dd-name dd))))
                  (info :function :inlinep predicate-name)
                  :inline))
+          ;; FIXME: this branch is unreachable because %COMPILER-DEFSTRUCT
+          ;; is never called for representation types of LIST or VECTOR.
           ((list vector)
            ;; Just punt. We could provide inline expansions for :TYPE
            ;; LIST and :TYPE VECTOR predicates too, but it'd be a
@@ -1139,22 +1156,45 @@ unless :NAMED is also specified.")))
 
     (dolist (dsd (dd-slots dd))
       (let ((accessor-name (dsd-accessor-name dsd)))
+        ;; Why this WHEN guard here, if there is neither a standards-specified
+        ;; nor implementation-specific way to skip defining an accessor? Dunno.
+        ;; And furthermore, by ignoring a package lock, it's possible to name
+        ;; an accessor NIL: (defstruct (x (:conc-name "N")) IL)
+        ;; making this test kinda bogus in two different ways.
         (when accessor-name
           (let ((inherited (accessor-inherited-data accessor-name dd)))
             (cond
               ((not inherited)
-               (let ((slot-key (cons dd dsd)))
+               (let ((writer `(setf ,accessor-name))
+                     (slot-key (cons dd dsd)))
+                 (when check-inlining
+                   (push accessor-name fnames))
                  (setf (info :function :source-transform accessor-name)
                        slot-key)
                  (unless (dsd-read-only dsd)
-                   (setf (info :function :source-transform `(setf ,accessor-name))
-                         slot-key))))
+                   (when check-inlining
+                     (push writer fnames))
+                   (setf (info :function :source-transform writer) slot-key))))
               ((not (= (cdr inherited) (dsd-index dsd)))
                (style-warn "~@<Non-overwritten accessor ~S does not access ~
                             slot with name ~S (accessing an inherited slot ~
                             instead).~:@>"
                            accessor-name
-                           (dsd-name dsd))))))))))
+                           (dsd-name dsd))))))))
+
+    (awhen (remove-if-not #'sb!c::emitted-full-call-count fnames)
+      (sb!c:compiler-style-warn
+       'sb!c:inlining-dependency-failure
+       ;; This message omits the http://en.wikipedia.org/wiki/Serial_comma
+       :format-control
+       (!uncross-format-control
+        "~@<Previously compiled call~P to ~
+~{~/sb!impl:print-symbol-with-prefix/~^~#[~; and~:;,~] ~} ~
+could not be inlined because the structure definition for ~
+~/sb!impl:print-symbol-with-prefix/ was not yet seen. To avoid this warning, ~
+DEFSTRUCT should precede references to the affected functions, ~
+or they must be declared locally notinline at each call site.~@:>")
+       :format-arguments (list (length it) (nreverse it) (dd-name dd))))))
 
 ;;;; redefinition stuff
 

@@ -3,6 +3,8 @@ changes relative to sbcl-1.2.7:
   * enhancement: better error and warning messages. (lp#1314767, lp#736383)
   * enhancement: backtrace for invalid argument count produces the exact
     supplied arguments including the extra ones, on x86, x86-64 and ARM.
+  * enhancement: a STYLE-WARNING is signaled for DEFSTRUCT accessors which
+    are used before the structure is defined; similarly for the predicate.
   * optimization: FORMAT NIL with only ~a and string arguments is transformed
     into CONCATENATE.
   * optimization: POSITION and FIND when inlined into code that is compiled

@@ -57,10 +57,17 @@
   (def sb-impl::!defparameter defparameter)
   (def sb-impl::!defvar defvar))
 
+(export '(sb-int::def!method
+          sb-int::!coerce-to-specialized
+          sb-int::!uncross-format-control)
+        'sb-int)
+
+(setf (macro-function 'sb-int:def!method) (macro-function 'defmethod))
+
 ;; This macro is never defined for the target Lisp,
 ;; only the cross-compilation host (see "src/code/specializable-array")
 ;; but it is needed to read x86-64/insts.lisp and other things.
-(export 'sb-int::!coerce-to-specialized 'sb-int)
 (defmacro sb-int:!coerce-to-specialized (a type)
   (declare (ignore type))
   a)
+(defmacro sb-int:!uncross-format-control (s) s)

@@ -121,3 +121,12 @@
                    (cons rcr-car rcr-cdr)))))
       (clrhash inside?)
       (rcr form))))
+
+(defmacro !uncross-format-control (string)
+  #+sb-xc-host string
+  #-sb-xc-host
+  (let ((p 0))
+    (loop (setq p (search "~/sb!" string :start2 p))
+          (unless p
+            (return string))
+          (setf (char string (incf p 4)) #\-))))

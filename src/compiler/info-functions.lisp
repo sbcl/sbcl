@@ -333,3 +333,19 @@ return NIL. Can be set with SETF when ENV is NIL."
         (push (cons type new-value)
               (info :random-documentation :stuff name))))
   new-value)
+
+;; Return the number of calls to NAME that IR2 emitted as full calls,
+;; not counting calls via #'F that went untracked.
+;; Return 0 if the answer is nonzero but a warning was already signaled
+;; about any full calls were emitted. This return convention satisfies the
+;; intended use of this statistic - to decide whether to generate a warning
+;; about failure to inline NAME, which is shown at most once per name
+;; to avoid unleashing a flood of identical warnings.
+(defun emitted-full-call-count (name)
+  (let ((status (car (info :function :emitted-full-calls name))))
+     (and (integerp status)
+          ;; Bit 0 tells whether any call was NOT in the presence of
+          ;; a 'notinline' declaration, thus eligible to be inline.
+          ;; Bit 1 tells whether any warning was emitted yet.
+          (= (logand status 3) #b01)
+          (ash status -2)))) ; the call count as tracked by IR2

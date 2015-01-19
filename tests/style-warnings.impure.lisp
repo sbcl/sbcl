@@ -68,6 +68,13 @@
 (with-test (:name :inline-failure-2b)
   (defun baz (arg) (declare (inline zippy)) (zippy arg)))
 
+(locally (declare (muffle-conditions style-warning))
+  (defun foofy1 (x) (and (somestruct-p x) 'hi)))
+
+(test-util:with-test (:name :structure-pred-inline-failure)
+ (assert-signal (defstruct somestruct a b)
+                sb-c:inlining-dependency-failure))
+
 (test-util:with-test (:name :redef-macro-same-file)
   (let* ((lisp "compiler-impure-tmp.lisp")
          (fasl (compile-file-pathname lisp)))

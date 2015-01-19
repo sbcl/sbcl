@@ -587,16 +587,12 @@ has written, having proved that it is unreachable."))
         ;; This is why I don't bother collecting both statistics.
         ;; It's the tail wagging the dog: the message dictates what to track.
         (compiler-style-warn
-         #+sb-xc-host
+         ;; Grammar note - starting a sentence with a numeral is wrong.
+         (!uncross-format-control
          "~@<~@(~D~) call~:P to ~/sb!impl:print-symbol-with-prefix/ ~2:*~[~;was~:;were~] ~
 compiled before a compiler-macro was defined for it. A declaration of ~
 NOTINLINE at the call site~:P will eliminate this warning, ~
-as will defining the compiler-macro before its first potential use.~@:>"
-         #-sb-xc-host
-         "~@<~@(~D~) call~:P to ~/sb-impl:print-symbol-with-prefix/ ~2:*~[~;was~:;were~] ~
-compiled before a compiler-macro was defined for it. A declaration of ~
-NOTINLINE at the call site~:P will eliminate this warning, ~
-as will defining the compiler-macro before its first potential use.~@:>"
+as will defining the compiler-macro before its first potential use.~@:>")
          (ash status -2) name)))))
 
 ;; Inlining failure scenario 1 [at time of proclamation]:
@@ -606,10 +602,8 @@ as will defining the compiler-macro before its first potential use.~@:>"
 ;;
 (defun warn-if-inline-failed/proclaim (name new-inlinep)
   (when (eq new-inlinep :inline)
-    (let ((status (car (info :function :emitted-full-calls name))))
-      (when (and (integerp status)
-                 (not (logtest 2 status))
-                 (oddp status)
+    (let ((warning-count (emitted-full-call-count name)))
+      (when (and warning-count
                  ;; Warn only if the the compiler did not have the expansion.
                  (not (info :function :inline-expansion-designator name))
                  ;; and if nothing was previously known about inline status
@@ -619,17 +613,12 @@ as will defining the compiler-macro before its first potential use.~@:>"
         (compiler-style-warn
          'inlining-dependency-failure
          :format-control
-         #+sb-xc-host
+         (!uncross-format-control
          "~@<Proclaiming ~/sb!impl:print-symbol-with-prefix/ to be INLINE, but ~D call~:P to it ~
 ~:*~[~;was~:;were~] previously compiled. A declaration of NOTINLINE ~
 at the call site~:P will eliminate this warning, as will proclaiming ~
-and defining the function before its first potential use.~@:>"
-         #-sb-xc-host
-         "~@<Proclaiming ~/sb-impl:print-symbol-with-prefix/ to be INLINE, but ~D call~:P to it ~
-~:*~[~;was~:;were~] previously compiled. A declaration of NOTINLINE ~
-at the call site~:P will eliminate this warning, as will proclaiming ~
-and defining the function before its first potential use.~@:>"
-         :format-arguments (list name (ash status -2)))))))
+and defining the function before its first potential use.~@:>")
+         :format-arguments (list name warning-count))))))
 
 ;; Inlining failure scenario 2 [at time of call]:
 ;; F is not defined, but either proclaimed INLINE and not declared
@@ -678,23 +667,16 @@ and defining the function before its first potential use.~@:>"
        'inlining-dependency-failure
        :format-control
        (if (info :function :assumed-type name)
-           #+sb-xc-host
+           (!uncross-format-control
            "~@<Call to ~/sb!impl:print-symbol-with-prefix/ could not be inlined because no definition ~
-for it was seen prior to its first use.~:@>"
-           #-sb-xc-host
-           "~@<Call to ~/sb-impl:print-symbol-with-prefix/ could not be inlined because no definition ~
-for it was seen prior to its first use.~:@>"
+for it was seen prior to its first use.~:@>")
          ;; This message sort of implies that source form is the
          ;; only reasonable representation in which an inline definition
          ;; could have been saved, which isn't in general true - it could
          ;; be saved as a parsed AST - but I don't really know how else to
          ;; phrase this. And it happens to be true in SBCL, so it's not wrong.
-           #+sb-xc-host
+           (!uncross-format-control
            "~@<Call to ~/sb!impl:print-symbol-with-prefix/ could not be inlined because its source code ~
 was not saved. A global INLINE or SB-EXT:MAYBE-INLINE proclamation must be ~
-in effect to save function definitions for inlining.~:@>"
-           #-sb-xc-host
-           "~@<Call to ~/sb-impl:print-symbol-with-prefix/ could not be inlined because its source code ~
-was not saved. A global INLINE or SB-EXT:MAYBE-INLINE proclamation must be ~
-in effect to save function definitions for inlining.~:@>")
+in effect to save function definitions for inlining.~:@>"))
        :format-arguments (list name)))))
