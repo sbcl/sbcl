@@ -357,19 +357,52 @@
 ;;; If necessary recurse to check the cons type.
 (defun source-transform-cons-typep (object type)
   (let* ((car-type (cons-type-car-type type))
-         (cdr-type (cons-type-cdr-type type)))
-    (let ((car-test-p (not (type= car-type *universal-type*)))
-          (cdr-test-p (not (type= cdr-type *universal-type*))))
-      (if (and (not car-test-p) (not cdr-test-p))
-          `(consp ,object)
-          (once-only ((n-obj object))
-            `(and (consp ,n-obj)
-                  ,@(if car-test-p
-                        `((typep (car ,n-obj)
-                                 ',(type-specifier car-type))))
-                  ,@(if cdr-test-p
-                        `((typep (cdr ,n-obj)
-                                 ',(type-specifier cdr-type))))))))))
+         (cdr-type (cons-type-cdr-type type))
+         (car-test-p (not (type= car-type *universal-type*)))
+         (cdr-test-p (not (type= cdr-type *universal-type*))))
+    (if (and (not car-test-p) (not cdr-test-p))
+        `(consp ,object)
+        ;; CONSP can be safely weakened to LISTP if either of the CAR
+        ;; or CDR test (or both) can distinguish LIST from CONS
+        ;; by never returning T when given an input of NIL.
+        (labels ((safely-weakened (ctype)
+                   (typecase ctype
+                     (member-type
+                      (not (member nil (member-type-members ctype))))
+                     (classoid
+                      ;; can't weaken if the specifier is (CONS SYMBOL)
+                      (not (ctypep nil ctype)))
+                     ;; these are disjoint from NIL
+                     ((or cons-type numeric-type array-type character-set-type)
+                      t)
+                     (intersection-type
+                      ;; at least one of them must not spuriously return T
+                      (some #'safely-weakened (compound-type-types ctype)))
+                     (union-type
+                      ;; require that none spuriously return T
+                      (every #'safely-weakened (compound-type-types ctype)))
+                     (hairy-type
+                      ;; hack - (CONS KEYWORD) is weakenable
+                      ;; because NIL is not a keyword.
+                      (equal (hairy-type-specifier ctype)
+                             '(satisfies keywordp))))))
+          (let* ((n-obj (sb!xc:gensym))
+                 (car-test
+                  (and car-test-p
+                       `((typep (car ,n-obj) ',(type-specifier car-type)))))
+                 (cdr-test
+                  (and cdr-test-p
+                       `((typep (cdr ,n-obj) ',(type-specifier cdr-type))))))
+            `(let ((,n-obj ,object))
+               ;; Being paranoid, perform the safely weakenable test first
+               ;; so that the other part doesn't execute on an object that
+               ;; it would not have gotten, were the CONSP test not weakened.
+               ,(cond ((and car-test-p (safely-weakened car-type))
+                       `(and (listp ,n-obj) ,@car-test ,@cdr-test))
+                      ((and cdr-test-p (safely-weakened cdr-type))
+                       `(and (listp ,n-obj) ,@cdr-test ,@car-test))
+                      (t
+                       `(and (consp ,n-obj) ,@car-test ,@cdr-test)))))))))
 
 (defun source-transform-character-set-typep (object type)
   (let ((pairs (character-set-type-pairs type)))
