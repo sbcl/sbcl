@@ -41,21 +41,26 @@
 
 unsigned int cpuid_fn1_ecx;
 
-// Wikipedia says that this doesn't work in MSVC, and I don't have a way to test it
-#ifndef LISP_FEATURE_WIN32
 static void cpuid(unsigned info, unsigned *eax, unsigned *ebx, unsigned *ecx, unsigned *edx)
 {
+#ifdef _MSC_VER
+  int regs[4];
+  __cpuid(regs, info);
+  *eax = regs[0];
+  *ebx = regs[1];
+  *ecx = regs[2];
+  *edx = regs[3];
+#else
   __asm__("cpuid;"                                            /* assembly code */
           :"=a" (*eax), "=b" (*ebx), "=c" (*ecx), "=d" (*edx) /* outputs */
           :"a" (info)                                         /* input: info into eax */
            /* clobbers: none */
           );
-}
 #endif
+}
 
 void arch_init(void)
 {
-#ifndef LISP_FEATURE_WIN32
   unsigned int eax, ebx, ecx, edx;
 
   cpuid(0, &eax, &ebx, &ecx, &edx);
@@ -63,7 +68,6 @@ void arch_init(void)
       cpuid(1, &eax, &ebx, &ecx, &edx);
       cpuid_fn1_ecx = ecx;
   }
-#endif
 }
 
 #ifndef _WIN64

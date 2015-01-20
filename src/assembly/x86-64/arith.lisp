@@ -385,10 +385,6 @@
          ;; be sure to update the subroutine to push and pop RCX.
          (:temporary (:sc unsigned-reg :offset rcx-offset) rcx)
          (:generator ,cost
-           ;; FIXME: As I've got no way to set the cpuid feature bits,
-           ;; don't try testing here whether to use popcnt, until it has been
-           ;; verified that the __cpuid() intrinsic works for win32.
-           #!-win32
            (progn
              ;; POPCNT = ECX bit 23 = bit 7 of byte index 2
              ;; this use of 'rcx' is as the temporary register for performing
