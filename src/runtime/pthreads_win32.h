@@ -90,6 +90,13 @@ pthread_t pthread_self(void);
 typedef DWORD pthread_key_t;
 int pthread_key_create(pthread_key_t *key, void (*destructor)(void*));
 
+/* When using the MinGW-w64 runtime with winpthreads, <signal.h> includes
+   <pthread_signal.h>, which defines pthread_sigmask as a macro that expands to
+   literal 0. Because of that, pthread_sigmask declarations/definitions are
+   syntax errors when <signal.h> is included before this header, and calls to
+   this function will silently do the wrong thing. Undefine the macro to avoid
+   these issues. */
+#undef pthread_sigmask
 #define SIG_BLOCK 1
 #define SIG_UNBLOCK 2
 #define SIG_SETMASK 3
