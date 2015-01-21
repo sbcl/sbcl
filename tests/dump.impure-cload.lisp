@@ -20,10 +20,10 @@
 ;;; an infinite loop. Douglas Crosher reported a patch 27 Dec 1999.
 ;;; The patch was tested on SBCL by Martin Atzmueller 2 Nov 2000, and
 ;;; merged in sbcl-0.6.8.11.
-(defun q-dg1999-1 () (dolist (x '#1=("A" "B" . #1#)) x))
-(defun q-dg1999-2 () (dolist (x '#1=("C" "D" . #1#)) x))
-(defun q-dg1999-3 () (dolist (x '#1=("E" "F" . #1#)) x))
-(defun q-dg1999-4 () (dolist (x '#1=("C" "D" . #1#)) x))
+(defun q-dg1999-1 () (dolist (x '#1=("A" "B" . #1#)) (progn x)))
+(defun q-dg1999-2 () (dolist (x '#1=("C" "D" . #1#)) (progn x)))
+(defun q-dg1999-3 () (dolist (x '#1=("E" "F" . #1#)) (progn x)))
+(defun q-dg1999-4 () (dolist (x '#1=("C" "D" . #1#)) (progn x)))
 (defun useful-dg1999 (keys)
   (declare (type list keys))
   (loop
@@ -138,6 +138,9 @@
 ;; Preparation for more MAKE-LOAD-FORM tests
 (eval-when (:compile-toplevel :load-toplevel :execute)
 
+ (locally
+  ;; this file's global SPEED proclamation generates a lot of unwanted noise
+  (declare (optimize (speed 1)))
   (defstruct airport
     name code
     (latitude nil :type double-float)
@@ -218,7 +221,7 @@
               (s1-friends c) (list a b))
         (list a b c))))
 
-) ; end EVAL-WHEN
+)) ; end EVAL-WHEN
 
 (with-test (:name :load-form-canonical-p)
   (let ((foo (make-foo :x 'x :y 'y)))
@@ -243,11 +246,12 @@
 (defparameter *metadata* '#.(compute-tangled-stuff))
 
 (test-util:with-test (:name :make-load-form-huge-vector)
-  (assert (equalp (compute-airports (length *airport-vector*))
+  (assert (equalp (compute-airports (length (the vector *airport-vector*)))
                   *airport-vector*)))
 
 (test-util:with-test (:name :make-load-form-circular-hair)
   (let ((testcase (compute-tangled-stuff)))
+    (declare (optimize (speed 1)))
     ;; MAKE-LOAD-FORM discards the value of the CDF slot of one structure.
     ;; This probably isn't something "reasonable" to do, but it indicates
     ;; that :JUST-DUMP-IT-NORMALLY was correctly not used.
@@ -262,6 +266,7 @@
      (children :initarg :children :accessor node-children)))
 
   (defmethod print-object ((self twp) stream)
+    (declare (optimize (speed 0))) ; silence noise
     (format stream "#<Node ~A~@[->~A~]>"
             (node-name self)
             (handler-case (mapcar 'node-name (node-children self))
@@ -277,10 +282,11 @@
      ;; initialization form
      `(setf (node-parent ',x) ',(slot-value x 'parent))))
 
-  (defun make-tree-from-spec (specs)
+  (defun make-tree-from-spec (node-class specs)
     (let ((tree (make-hash-table)))
       (dolist (node-name (remove-duplicates (apply #'append specs)))
-        (setf (gethash node-name tree) (make-instance 'twp :name node-name)))
+        (setf (gethash node-name tree)
+              (make-instance node-class :name node-name)))
       (dolist (node-spec specs)
         (let ((par (gethash (car node-spec) tree))
               (kids (mapcar (lambda (x) (gethash x tree)) (cdr node-spec))))
@@ -301,6 +307,7 @@
 
 (defvar *x*
   #.(make-tree-from-spec
+      'twp
       '((root a b c f)
         (a x y)
         (b p q r s)
@@ -308,3 +315,41 @@
 
 (with-test (:name :tree-with-parent-hand-made-load-form)
   (verify-tree *x*))
+
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (defclass twp2 (twp) ())
+  (defmethod make-load-form ((x twp2) &optional environment)
+    (declare (ignore environment))
+    (make-load-form-saving-slots x))
+  (defvar *call-tracker* nil)
+  (defun call-tracker (f &rest args)
+    (push f *call-tracker*)
+    (apply (the function f) args))
+  (defvar *track-funs*
+     'sb-c::(fopcompile-allocate-instance
+             fopcompile-constant-init-forms
+             compile-make-load-form-init-forms))
+  (dolist (f *track-funs*)
+    (sb-int:encapsulate f 'track #'call-tracker)))
+
+;; Same as *X* but the MAKE-LOAD-FORM method is different
+(defvar *y*
+  #.(make-tree-from-spec
+      'twp2
+      '((root a b c f)
+        (a x y)
+        (b p q r s)
+        (c d e g))))
+
+(eval-when (:compile-toplevel)
+  (dolist (f *track-funs*)
+    (sb-int:unencapsulate f 'track))
+  (assert (= 14 (count #'sb-c::fopcompile-allocate-instance
+                       *call-tracker*)))
+  (assert (= 14 (count #'sb-c::fopcompile-constant-init-forms
+                       *call-tracker*)))
+  (assert (not (find #'sb-c::compile-make-load-form-init-forms
+                     *call-tracker*))))
+
+(with-test (:name :tree-with-parent-m-l-f-s-s)
+  (verify-tree *y*))

@@ -491,3 +491,83 @@
     ;; with EMIT-MAKE-LOAD-FORM.
     (let ((sb!fasl::*dump-only-valid-structures* nil))
       (dump-object form *compile-object*))))
+
+;; Return CLASS if CREATION-FORM is `(allocate-instance (find-class ',CLASS))
+(defun canonical-instance-maker-form-p (creation-form)
+  (let ((arg (and (typep creation-form
+                         '(cons (eql allocate-instance) (cons t null)))
+                  (cadr creation-form))))
+    (when (and arg (typep arg '(cons (eql find-class) (cons t null))))
+      (let ((class (cadr arg)))
+        (when (typep class '(cons (eql quote) (cons symbol null)))
+          (cadr class))))))
+
+;; If FORM can be implemented by FOP-ALLOCATE-INSTANCE,
+;; then fopcompile it and return a table index, otherwise return NIL.
+(defun fopcompile-allocate-instance (form)
+  (let ((class-name (canonical-instance-maker-form-p form)))
+    (when class-name
+      (let ((file *compile-object*))
+        (dump-object class-name file)
+        (sb!fasl::dump-fop 'sb!fasl::fop-allocate-instance file)
+        (let ((index (sb!fasl::fasl-output-table-free file)))
+          (setf (sb!fasl::fasl-output-table-free file) (1+ index))
+          index)))))
+
+;; If FORM is one that we recognize as coming from MAKE-LOAD-FORM-SAVING-SLOTS,
+;; then return 3 values: the instance being affected, a slot name, and a value.
+;; Otherwise return three NILs.
+(defun trivial-load-form-initform-args (form)
+  (multiple-value-bind (args const)
+      ;; these expressions suck, but here goes...
+      (cond ((typep form
+                    '(cons
+                      (eql setf)
+                      (cons (cons (eql slot-value)
+                                  (cons instance
+                                        (cons (cons (eql quote) (cons symbol null))
+                                              null)))
+                            (cons (cons (eql quote) (cons t null)) null))))
+             (values (cdadr form) (second (third form))))
+            ((typep form
+                    '(cons
+                      (eql slot-makunbound)
+                      (cons instance
+                            (cons (cons (eql quote) (cons symbol null)) null))))
+             ;; FIXME: could define SB-PCL:+SLOT-UNBOUND+ much earlier,
+             ;; and put the symbol in the kernel package or something.
+             (values (cdr form) 'sb!pcl::..slot-unbound..)))
+    (if args
+        (values (car args) (cadadr args) const)
+        (values nil nil nil))))
+
+;; If FORMS contains exactly one PROGN with an expected shape,
+;; then dump it using fops and return T. Otherwise return NIL.
+(defun fopcompile-constant-init-forms (forms)
+  ;; It should be possible to extend this to allow FORMS to have
+  ;; any number of forms in the requisite shape.
+  (when (and (singleton-p forms)
+             (typep (car forms)
+                    '(cons (eql progn) (satisfies list-length))))
+    (let ((forms (cdar forms))
+          (instance)
+          (slot-names)
+          (values))
+      (dolist (form forms
+               (let ((file *compile-object*))
+                 (mapc (lambda (x) (dump-object x file)) (nreverse values))
+                 (dump-object (cons (length slot-names) (nreverse slot-names))
+                              file)
+                 (dump-object instance file)
+                 (sb!fasl::dump-fop 'sb!fasl::fop-initialize-instance file)
+                 t))
+        (multiple-value-bind (obj slot val)
+            (trivial-load-form-initform-args form)
+          (unless (if instance
+                      (eq obj instance)
+                      (typep (setq instance obj) 'instance))
+            (return nil))
+          ;; invoke recursive MAKE-LOAD-FORM stuff as necessary
+          (find-constant val)
+          (push slot slot-names)
+          (push val values))))))

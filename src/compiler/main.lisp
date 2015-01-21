@@ -2049,8 +2049,8 @@ SPEED and COMPILATION-SPEED optimization values, and the
                  (catch constant
                    (fasl-note-handle-for-constant
                     constant
-                    (compile-load-time-value
-                     creation-form)
+                    (or (fopcompile-allocate-instance creation-form)
+                        (compile-load-time-value creation-form))
                     *compile-object*)
                    nil)
                (compiler-error "circular references in creation form for ~S"
@@ -2062,7 +2062,8 @@ SPEED and COMPILATION-SPEED optimization values, and the
                        (loop for (name form) on (cdr info) by #'cddr
                          collect name into names
                          collect form into forms
-                         finally (compile-make-load-form-init-forms forms))
+                         finally (or (fopcompile-constant-init-forms forms)
+                                     (compile-make-load-form-init-forms forms)))
                        nil)))
                (when circular-ref
                  (setf (cdr circular-ref)

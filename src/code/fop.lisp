@@ -205,6 +205,31 @@
 (define-fop (fop-layout 45 (name inherits depthoid length metadata))
   (find-and-init-or-check-layout name length inherits depthoid metadata))
 
+;; Allocate a CLOS object. This is used when the compiler detects that
+;; MAKE-LOAD-FORM returned a simple use of MAKE-LOAD-FORM-SAVING-SLOTS,
+;; or possibly a hand-written equivalent (however unlikely).
+(define-fop (fop-allocate-instance 50 (name) nil)
+  (let ((instance (allocate-instance (find-class (the symbol name)))))
+    (push-fop-table instance)
+    instance))
+
+;; Fill in object slots as dictated by the second return value from
+;; MAKE-LOAD-FORM-SAVING-SLOTS.
+;; This wants a 'count' as the first item in the SLOT-NAMES argument
+;; rather than using read-arg because many calls of this might share
+;; the list, which must be constructed into the fop-table no matter what.
+(define-fop (fop-initialize-instance 51 (slot-names obj) nil)
+  (let ((n-slots (pop slot-names)))
+    (multiple-value-bind (stack ptr) (fop-stack-pop-n n-slots)
+      (dotimes (i n-slots)
+        (let ((val (svref stack (+ ptr i)))
+              (slot-name (pop slot-names)))
+          (if (eq val 'sb!pcl::..slot-unbound..)
+              ;; SLOT-MAKUNBOUND-USING-CLASS might do something nonstandard.
+              (slot-makunbound obj slot-name)
+              ;; FIXME: the DEFSETF for this isn't defined until warm load
+              (sb!pcl::set-slot-value obj slot-name val)))))))
+
 (define-fop (fop-end-group 64 () nil)
   (/show0 "THROWing FASL-GROUP-END")
   (throw 'fasl-group-end t))

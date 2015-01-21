@@ -359,13 +359,7 @@
 ;; or otherwise examined. So instead we scan the code and detect whether it is
 ;; identical to what was returned from a trivial use of M-L-F-S-S.
 (defun canonical-slot-saving-forms-p (struct creation-form init-form)
-  ;; check that creation-form is `(allocate-instance (find-class ',class))
-  (and (typep creation-form
-              '(cons (eql allocate-instance)
-                     (cons (cons (eql find-class)
-                                 (cons (cons (eql quote) (cons symbol null))
-                                       null))
-                           null)))
+  (and (sb!c::canonical-instance-maker-form-p creation-form)
        (typep init-form '(cons (eql setf)))
        (eq (cadr (cadr (cadr creation-form))) (class-name (class-of struct)))
        (= (length (dd-slots (layout-info (%instance-layout struct))))
