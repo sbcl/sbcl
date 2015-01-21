@@ -2066,7 +2066,8 @@ SPEED and COMPILATION-SPEED optimization values, and the
                        nil)))
                (when circular-ref
                  (setf (cdr circular-ref)
-                       (append (cdr circular-ref) (cdr info))))))))))))
+                       (append (cdr circular-ref) (cdr info)))))))
+         nil)))))
 
 
 ;;;; Host compile time definitions

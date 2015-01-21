@@ -254,3 +254,57 @@
     (setf (s1-cdf (second testcase)) #c(0d0 0d0))
     (assert (string= (write-to-string testcase :circle t :pretty nil)
                      (write-to-string *metadata* :circle t :pretty nil)))))
+
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (defclass twp ()
+    ((node-name :initarg :name :accessor node-name)
+     (parent :accessor node-parent :initform nil)
+     (children :initarg :children :accessor node-children)))
+
+  (defmethod print-object ((self twp) stream)
+    (format stream "#<Node ~A~@[->~A~]>"
+            (node-name self)
+            (handler-case (mapcar 'node-name (node-children self))
+              (unbound-slot () nil))))
+
+  (defmethod make-load-form ((x twp) &optional environment)
+    (declare (ignore environment))
+    (values
+     ;; creation form
+     `(make-instance ',(class-of x)
+                     ,@(if (slot-boundp x 'children)
+                           `(:children ',(slot-value x 'children))))
+     ;; initialization form
+     `(setf (node-parent ',x) ',(slot-value x 'parent))))
+
+  (defun make-tree-from-spec (specs)
+    (let ((tree (make-hash-table)))
+      (dolist (node-name (remove-duplicates (apply #'append specs)))
+        (setf (gethash node-name tree) (make-instance 'twp :name node-name)))
+      (dolist (node-spec specs)
+        (let ((par (gethash (car node-spec) tree))
+              (kids (mapcar (lambda (x) (gethash x tree)) (cdr node-spec))))
+          (dolist (kid kids)
+            (assert (not (node-parent kid)))
+            (setf (slot-value kid 'parent) par))
+          (setf (slot-value par 'children) kids)))
+      (values (gethash 'root tree)))))
+
+(defun verify-tree (node)
+  (dolist (kid (if (slot-boundp node 'children) (node-children node) nil))
+    (unless (eq (node-parent kid) node)
+      (error "Node ~S shoud have ~S as parent but has ~S~%"
+             (node-name kid)
+             (node-name node)
+             (node-parent kid)))
+    (verify-tree kid)))
+
+(defvar *x*
+  #.(make-tree-from-spec
+      '((root a b c f)
+        (a x y)
+        (b p q r s)
+        (c d e g))))
+
+(with-test (:name :tree-with-parent-hand-made-load-form)
+  (verify-tree *x*))
