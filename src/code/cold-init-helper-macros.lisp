@@ -17,13 +17,13 @@
 ;;; cold load stuff.
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
-  (defvar *cold-init-forms*))
+  (defvar *!cold-init-forms*))
 
 (defmacro !begin-collecting-cold-init-forms ()
   #+sb-xc '(eval-when (:compile-toplevel :execute)
-             (when (boundp '*cold-init-forms*)
-               (warn "discarding old *COLD-INIT-FORMS* value"))
-             (setf *cold-init-forms* nil))
+             (when (boundp '*!cold-init-forms*)
+               (warn "discarding old *!COLD-INIT-FORMS* value"))
+             (setf *!cold-init-forms* nil))
   #-sb-xc nil)
 
 ;;; Note: Unlike the analogous COLD-INIT macro in CMU CL, this macro
@@ -34,8 +34,8 @@
   ;; will presumably be executed at the appropriate stage of cold load
   ;; (i.e. basically as soon as possible).
   #+sb-xc (progn
-            (setf *cold-init-forms*
-                  (nconc *cold-init-forms* (copy-list forms)))
+            (setf *!cold-init-forms*
+                  (nconc *!cold-init-forms* (copy-list forms)))
             nil)
   ;; In the cross-compilation host Lisp, cold load might not be a
   ;; meaningful concept and in any case would have happened long ago,
@@ -46,10 +46,10 @@
 (defmacro !defun-from-collected-cold-init-forms (name)
   #+sb-xc `(progn
              (defun ,name ()
-               ,@*cold-init-forms*
+               ,@*!cold-init-forms*
                (values))
              (eval-when (:compile-toplevel :execute)
-               (makunbound '*cold-init-forms*)))
+               (makunbound '*!cold-init-forms*)))
   #-sb-xc (declare (ignore name)))
 
 ;;; !DEFGLOBAL, !DEFPARAMETER and !DEFVAR are named by analogy
