@@ -131,6 +131,24 @@
     (dump-byte (logand n #xff) fasl-output))
   (values))
 
+(defun dump-fop+operands (fasl-output opcode arg1 &optional (arg2 0 arg2p))
+  (declare (type (unsigned-byte 8) opcode) (type word arg1 arg2))
+  (multiple-value-bind (modifier1 modifier2)
+      (flet ((fop-opcode-modifier (arg)
+               ;; The compiler should be able to figure that 32-bit builds
+               ;; can not use the 8-byte size, I think.
+               (if (< arg #x10000)
+                   (if (< arg #x100) 0 1)
+                   (if (< arg (ash 1 32)) 2 3))))
+        (declare (inline fop-opcode-modifier))
+        (values (fop-opcode-modifier arg1)
+                (if arg2p (fop-opcode-modifier arg2) 0)))
+    (dump-byte (logior opcode (ash modifier2 2) modifier1) fasl-output)
+    ;; special-case code optimized for each size might improve speed here
+    (dump-integer-as-n-bytes arg1 (ash 1 modifier1) fasl-output)
+    (when arg2p
+      (dump-integer-as-n-bytes arg2 (ash 1 modifier2) fasl-output))))
+
 ;;; Setting this variable to an (UNSIGNED-BYTE 32) value causes
 ;;; DUMP-FOP to use it as a counter and emit a FOP-NOP4 with the
 ;;; counter value before every ordinary fop. This can make it easier
@@ -147,38 +165,34 @@
 ;;;
 ;;; FIXME: Compiler macros, frozen classes, inlining, and similar
 ;;; optimizations should be conditional on #!+SB-FROZEN.
-(defmacro dump-fop (fs file)
-  (let* ((fs (eval fs))
-         (val (get fs 'fop-code)))
-    (if val
+(defmacro dump-fop (fs-expr file &rest args)
+  (let* ((fs (eval fs-expr))
+         (val (get fs 'opcode))
+         (fop-argc
+          (if val
+              (if (>= val +2-operand-fops+) 2 (sbit *fop-argp* (ash val -2)))
+              0))
+         (supplied-argc (length args)))
+    (cond
+      ((not val)
+       (error "compiler bug: ~S is not a legal fasload operator." fs-expr))
+      ((not (eql supplied-argc fop-argc))
+       (error "~S takes ~D argument~:P" fs fop-argc))
+      (t
       `(progn
          #!+sb-show
          (when *fop-nop4-count*
            (dump-byte ,(get 'fop-nop4 'fop-code) ,file)
            (dump-integer-as-n-bytes (mod (incf *fop-nop4-count*) (expt 2 32))
                                     4 ,file))
-         (dump-byte ',val ,file))
-      (error "compiler bug: ~S is not a legal fasload operator." fs))))
-
-;;; Dump a FOP-CODE along with an integer argument, choosing the FOP
-;;; based on whether the argument will fit in a single byte.
-;;;
-;;; FIXME: This, like DUMP-FOP, should be a function with a
-;;; compiler-macro expansion.
-(defmacro dump-fop* (n byte-fop word-fop file)
-  (once-only ((n-n n)
-              (n-file file))
-    `(cond ((< ,n-n 256)
-            (dump-fop ',byte-fop ,n-file)
-            (dump-byte ,n-n ,n-file))
-           (t
-            (dump-fop ',word-fop ,n-file)
-            (dump-word ,n-n ,n-file)))))
+         ,(if (zerop fop-argc)
+              `(dump-byte ,val ,file)
+              `(dump-fop+operands ,file ,val ,@args)))))))
 
 ;;; Push the object at table offset Handle on the fasl stack.
 (defun dump-push (handle fasl-output)
   (declare (type index handle) (type fasl-output fasl-output))
-  (dump-fop* handle fop-byte-push fop-push fasl-output)
+  (dump-fop 'fop-push fasl-output handle)
   (values))
 
 ;;; Pop the object currently on the fasl stack top into the table, and
@@ -531,7 +545,7 @@
      (dump-integer-as-n-bytes n #.sb!vm:n-word-bytes file))
     (t
      (let ((bytes (ceiling (1+ (integer-length n)) 8)))
-       (dump-fop* bytes fop-small-integer fop-integer file)
+       (dump-fop 'fop-integer file bytes)
        (dump-integer-as-n-bytes n bytes file)))))
 
 (defun dump-float (x file)
@@ -616,7 +630,7 @@
   (cond ((cdr (assoc pkg (fasl-output-packages file) :test #'eq)))
         (t
          (let ((s (package-name pkg)))
-           (dump-fop* (length s) fop-small-named-package-save fop-named-package-save file)
+           (dump-fop 'fop-named-package-save file (length s))
            #+sb-xc-host
            (dump-base-chars-of-string (coerce s 'simple-base-string) file)
            #-sb-xc-host
@@ -796,7 +810,7 @@
        (length (length v))
        (circ (fasl-output-circularity-table file)))
       ((= index length)
-       (dump-fop* length fop-small-vector fop-vector file))
+       (dump-fop 'fop-vector file length))
     (let* ((obj (aref v index))
            (ref (gethash obj circ)))
       (cond (ref
@@ -895,14 +909,7 @@
 ;;; Dump characters and string-ish things.
 
 (defun dump-character (char file)
-  (let ((code (sb!xc:char-code char)))
-    (cond
-      ((< code 256)
-       (dump-fop 'fop-short-character file)
-       (dump-byte code file))
-      (t
-       (dump-fop 'fop-character file)
-       (dump-word code file)))))
+  (dump-fop 'fop-character file (sb!xc:char-code char)))
 
 (defun dump-base-chars-of-string (s fasl-output)
   (declare #+sb-xc-host (type simple-string s)
@@ -917,7 +924,7 @@
 (defun dump-simple-base-string (s file)
   #+sb-xc-host (declare (type simple-string s))
   #-sb-xc-host (declare (type simple-base-string s))
-  (dump-fop* (length s) fop-small-base-string fop-base-string file)
+  (dump-fop 'fop-base-string file (length s))
   (dump-base-chars-of-string s file)
   (values))
 
@@ -939,10 +946,8 @@
         (setq pkg sb!int:*cl-package*)))
 
     (cond ((null pkg)
-           (dump-fop* pname-length
-                      fop-uninterned-small-symbol-save
-                      fop-uninterned-symbol-save
-                      file))
+           (dump-fop 'fop-uninterned-symbol-save
+                     file pname-length))
           ;; CMU CL had FOP-SYMBOL-SAVE/FOP-SMALL-SYMBOL-SAVE fops which
           ;; used the current value of *PACKAGE*. Unfortunately that's
           ;; broken w.r.t. ANSI Common Lisp semantics, so those are gone
@@ -952,27 +957,12 @@
           ;;        fop-small-symbol-save
           ;;        fop-symbol-save file))
           ((eq pkg sb!int:*cl-package*)
-           (dump-fop* pname-length
-                      fop-lisp-small-symbol-save
-                      fop-lisp-symbol-save
-                      file))
+           (dump-fop 'fop-lisp-symbol-save file pname-length))
           ((eq pkg sb!int:*keyword-package*)
-           (dump-fop* pname-length
-                      fop-keyword-small-symbol-save
-                      fop-keyword-symbol-save
-                      file))
-          ((< pname-length 256)
-           (dump-fop* (dump-package pkg file)
-                      fop-small-symbol-in-byte-package-save
-                      fop-small-symbol-in-package-save
-                      file)
-           (dump-byte pname-length file))
+           (dump-fop 'fop-keyword-symbol-save file pname-length))
           (t
-           (dump-fop* (dump-package pkg file)
-                      fop-symbol-in-byte-package-save
-                      fop-symbol-in-package-save
-                      file)
-           (dump-word pname-length file)))
+           (dump-fop 'fop-symbol-in-package-save file
+                     (dump-package pkg file) pname-length)))
 
     #+sb-xc-host (dump-base-chars-of-string pname file)
     #-sb-xc-host (#!+sb-unicode dump-characters-of-string
@@ -1110,6 +1100,7 @@
           (dump-push info-handle fasl-output)
           (push info-handle (fasl-output-debug-info fasl-output))))
 
+      ;; FIXME: probably wants to be a 2-operand FOP
       (let ((num-consts (- header-length sb!vm:code-constants-offset)))
         (cond ((and (< num-consts #x100) (< code-length #x10000))
                (dump-fop 'fop-small-code fasl-output)
@@ -1173,7 +1164,7 @@
   (declare (type fasl-output file))
   (dump-push code-handle file)
   (dump-push entry-handle file)
-  (dump-fop* offset fop-byte-alter-code fop-alter-code file)
+  (dump-fop 'fop-alter-code file offset)
   (values))
 
 ;;; Dump the code, constants, etc. for component. We pass in the
@@ -1292,7 +1283,7 @@
         (index (1- length) (1- index)))
       ((< index sb!vm:instance-data-start)
        (dump-non-immediate-object layout file)
-       (dump-fop* length fop-small-struct fop-struct file))
+       (dump-fop 'fop-struct file length))
     (let* ((obj #!-interleaved-raw-slots
                 (if (>= index ntagged)
                     (%raw-instance-ref/word struct (- length index 1))

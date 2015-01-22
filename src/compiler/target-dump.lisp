@@ -25,7 +25,7 @@
 #!+sb-unicode
 (defun dump-simple-character-string (s file)
   (declare (type (simple-array character (*)) s))
-  (dump-fop* (length s) fop-small-character-string fop-character-string file)
+  (dump-fop 'fop-character-string file (length s))
   (dump-characters-of-string s file)
   (values))
 

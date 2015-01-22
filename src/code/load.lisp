@@ -147,7 +147,7 @@
 (defun reset-fop-table ()
   (setf (svref *fop-table* 0) 0))
 
-(defun push-fop-table (thing)
+(defun push-fop-table (thing) ; and return THING
   (let* ((table *fop-table*)
          (index (+ (the index (aref table 0)) 1)))
     (declare (fixnum index)
@@ -418,6 +418,7 @@
 ;;; Return true if we successfully load a group from the stream, or
 ;;; NIL if EOF was encountered while trying to read from the stream.
 ;;; Dispatch to the right function for each fop.
+(defconstant +2-operand-fops+ #xF0) ; start of the range
 (defun load-fasl-group (stream print)
   ;;
   ;; PRINT causes most tlf-equivalent forms to print their primary value.
@@ -429,42 +430,61 @@
   ;;   contents of the source file, but some information is generally printed."
   ;;
   (declare (ignorable print))
-  (when (check-fasl-header stream)
-    (catch 'fasl-group-end
-      (reset-fop-table)
-      (let ((*skip-until* nil))
-        (declare (special *skip-until*))
-        (loop
-          (let ((byte (read-byte stream)))
-            ;; Do some debugging output.
-            #!+sb-show
-            (when *show-fops-p*
-              (format *trace-output* "~&~6x : [~D,~D] ~2,'0x(~A)"
-                      (1- (file-position stream))
-                      (svref *fop-stack* 0) ; stack pointer
-                      (svref *fop-table* 0) ; table pointer
-                      byte (aref *fop-names* byte)))
-            ;; Actually execute the fop.
-            (let ((result (funcall (the function (svref *fop-funs* byte)))))
-              (declare (ignorable result))
-              #!+sb-show
-              (when *show-fops-p*
-                (let* ((stack *fop-stack*)
-                       (ptr (svref stack 0)))
-                  (format *trace-output* " -- ~[<empty>,~D~:;[~:*~D,~D] ~S~]"
-                          ptr (svref *fop-table* 0)
-                          (unless (eql ptr 0) (aref stack ptr)))
-                  (terpri *trace-output*)))
-              #-sb-xc-host
-              (macrolet ((terminator-opcode ()
-                           (or (get 'sb!fasl::fop-funcall-for-effect
-                                    'sb!fasl::fop-code)
-                               (error "Missing FOP definition?"))))
-                (when (and print
-                           (eq byte (terminator-opcode))
-                           (fop-stack-empty-p)) ; (presumed) end of TLF
-                  (load-fresh-line)
-                  (prin1 result))))))))))
+  (unless (check-fasl-header stream)
+    (return-from load-fasl-group))
+  (catch 'fasl-group-end
+    (reset-fop-table)
+    (let ((*skip-until* nil))
+      (declare (special *skip-until*))
+      (loop
+       (let ((byte (the (unsigned-byte 8) (read-byte stream))))
+         ;; Do some debugging output.
+         #!+sb-show
+         (when *show-fops-p*
+           (format *trace-output* "~&~6x : [~D,~D] ~2,'0x(~A)"
+                   (1- (file-position stream))
+                   (svref *fop-stack* 0) ; stack pointer
+                   (svref *fop-table* 0) ; table pointer
+                   byte (aref *fop-names* byte)))
+         ;; Actually execute the fop.
+         (let ((result
+                (let ((function (svref *fop-funs* byte)))
+                  (cond ((not (functionp function))
+                         (error "corrupt fasl file: FOP code #x~x" byte))
+                        ((zerop (sbit *fop-argp* (ash byte -2))) ; no operands
+                         (funcall function))
+                        (t
+                         (let (arg1 arg2) ; See !%DEFINE-FOP for encoding
+                           (with-fast-read-byte ((unsigned-byte 8) stream)
+                             (setq arg1 (fast-read-var-u-integer
+                                         (ash 1 (logand byte 3))))
+                             (when (>= byte +2-operand-fops+)
+                               (setq arg2 (fast-read-var-u-integer
+                                           (ash 1 (ldb (byte 2 2) byte))))))
+                           #!+sb-show
+                           (when *show-fops-p*
+                             (format *trace-output* "{~D~@[,~D~]}" arg1 arg2))
+                           (if arg2
+                               (funcall function arg1 arg2)
+                               (funcall function arg1))))))))
+           (declare (ignorable result))
+           #!+sb-show
+           (when *show-fops-p*
+             (let* ((stack *fop-stack*)
+                    (ptr (svref stack 0)))
+               (format *trace-output* " -- ~[<empty>,~D~:;[~:*~D,~D] ~S~]"
+                       ptr (svref *fop-table* 0)
+                       (unless (eql ptr 0) (aref stack ptr)))
+               (terpri *trace-output*)))
+           #-sb-xc-host
+           (macrolet ((terminator-opcode ()
+                        (or (get 'fop-funcall-for-effect 'opcode)
+                            (error "Missing FOP definition?"))))
+             (when (and print
+                        (eq byte (terminator-opcode))
+                        (fop-stack-empty-p)) ; (presumed) end of TLF
+               (load-fresh-line)
+               (prin1 result)))))))))
 
 (defun load-as-fasl (stream verbose print)
   (when (zerop (file-length stream))

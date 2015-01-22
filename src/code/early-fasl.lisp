@@ -136,12 +136,13 @@
 ;;; a vector indexed by a FaslOP that yields the FOP's name
 (defvar *fop-names* (make-array 256 :initial-element nil))
 
-;;; a vector indexed by a FaslOP that yields a function of 0 arguments
-;;; which will perform the operation
-(defvar *fop-funs*
-  (make-array 256
-              :initial-element (lambda ()
-                                 (error "corrupt fasl file: losing FOP"))))
+;;; a vector indexed by a FaslOP that yields a function which performs
+;;; the operation. Most functions take 0 arguments - they only manipulate
+;;; the fop stack. But if the fop is defined to receive an argument (or two)
+;;; then loader's main loop is responsible for supplying it.
+(defvar *fop-funs* (make-array 256 :initial-element 0))
+(declaim (type (simple-bit-vector 64) *fop-argp*))
+(defglobal *fop-argp* (make-array 64 :element-type 'bit :initial-element 0))
 
 ;;;; variables
 

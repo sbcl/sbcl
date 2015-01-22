@@ -36,64 +36,49 @@
 ;;;
 (defmacro define-fop ((name fop-code &optional arglist (pushp t)) &body forms)
   (aver (member pushp '(nil t)))
-  (let ((guts (if pushp `((push-fop-stack (progn ,@forms))) forms)))
+  (binding* (((operands stack-args)
+              (if (consp (car arglist))
+                  (ecase (caar arglist)
+                    (:operands (values (cdar arglist) (cdr arglist))))
+                  (values nil arglist)))
+             (guts (if pushp `((push-fop-stack (progn ,@forms))) forms)))
+    (assert (<= (length operands) 2))
     `(progn
-       (defun ,name ()
-         ,@(if (null arglist)
+       (defun ,name ,operands
+         ,@(if (null stack-args)
                guts
                (with-unique-names (stack ptr)
-                 `((with-fop-stack (,stack ,ptr ,(length arglist))
-                     (multiple-value-bind ,arglist
-                         (values ,@(loop for i below (length arglist)
+                 `((with-fop-stack (,stack ,ptr ,(length stack-args))
+                     (multiple-value-bind ,stack-args
+                         (values ,@(loop for i below (length stack-args)
                                          collect `(fop-stack-ref (+ ,ptr ,i))))
                        ,@guts))))))
-       (%define-fop ',name ,fop-code))))
+       (%define-fop ',name ,fop-code ,(length operands)))))
 
-(defun %define-fop (name code)
-  (let ((oname (svref *fop-names* code)))
-    (when (and oname (not (eq oname name)))
-      (error "multiple names for fop code ~D: ~S and ~S" code name oname)))
-  ;; KLUDGE: It's mnemonically suboptimal to use 'FOP-CODE as the name of the
-  ;; tag which associates names with codes when it's also used as one of
-  ;; the names. Perhaps the fops named FOP-CODE and FOP-SMALL-CODE could
-  ;; be renamed to something more mnemonic? -- WHN 19990902
-  (let ((ocode (get name 'fop-code)))
-    (when (and ocode (/= ocode code))
-      (error "multiple codes for fop name ~S: ~D and ~D" name code ocode)))
-  (setf (svref *fop-names* code) name
-        (get name 'fop-code) code
-        (svref *fop-funs* code) (symbol-function name))
+(defun %define-fop (name code n-operands)
+  (declare (type (mod 3) n-operands)) ; 0, 1, or 2 are allowed
+  (let ((n-slots (expt 4 n-operands)))
+    (unless (zerop (mod code n-slots))
+      (error "Opcode for fop ~S must be a multiple of ~D" name n-slots))
+    (loop for opcode from code below (+ code n-slots)
+          when (functionp (svref *fop-funs* opcode))
+          do (let ((oname (svref *fop-names* opcode)))
+               (when (and oname (not (eq oname name)))
+                 (error "fop ~S with opcode ~D conflicts with fop ~S."
+                        name opcode oname))))
+    (let ((existing-opcode (get name 'opcode)))
+      (when (and existing-opcode (/= existing-opcode code))
+        (error "multiple codes for fop name ~S: ~D and ~D"
+               name code existing-opcode)))
+    (setf (get name 'opcode) code)
+    ;; The low 2 bits of the opcode comprise the length modifier if there is
+    ;; exactly one operand. Such opcodes are aligned in blocks of 4.
+    ;; 2-operand fops occupy 16 slots in a reserved range of the function table.
+    (loop for opcode from code below (+ code n-slots)
+          do (setf (svref *fop-names* opcode) name
+                   (svref *fop-funs* opcode) (symbol-function name)
+                   (sbit *fop-argp* (ash opcode -2)) (signum n-operands))))
   name)
-
-;;; Define a pair of fops which are identical except that one reads
-;;; a four-byte argument while the other reads a one-byte argument. The
-;;; argument can be accessed by using the CLONE-ARG macro.
-;;;
-;;; KLUDGE: It would be nice if the definition here encapsulated which
-;;; value ranges went with which fop variant, and chose the correct
-;;; fop code to use. Currently, since such logic isn't encapsulated,
-;;; we see callers doing stuff like
-;;;     (cond ((and (< num-consts #x100) (< total-length #x10000))
-;;;            (dump-fop 'sb!impl::fop-small-code file)
-;;;            (dump-byte num-consts file)
-;;;            (dump-integer-as-n-bytes total-length 2 file))
-;;;           (t
-;;;            (dump-fop 'sb!impl::fop-code file)
-;;;            (dump-word num-consts file)
-;;;            (dump-word total-length file))))
-;;; in several places. It would be cleaner if this could be replaced with
-;;; something like
-;;;     (dump-fop file fop-code num-consts total-length)
-;;; Some of this logic is already in DUMP-FOP*, but that still requires the
-;;; caller to know that it's a 1-byte-arg/4-byte-arg cloned fop pair, and to
-;;; know both the 1-byte-arg and the 4-byte-arg fop names. -- WHN 19990902
-(defmacro define-cloned-fops ((name code &rest options)
-                              (small-name small-code) &body forms)
-  `(progn
-     (macrolet ((clone-arg () '(read-word-arg)))
-       (define-fop (,name ,code ,@options) ,@forms))
-     (macrolet ((clone-arg () '(read-byte-arg)))
-       (define-fop (,small-name ,small-code ,@options) ,@forms))))
 
 ;;; a helper function for reading string values from FASL files: sort
 ;;; of like READ-SEQUENCE specialized for files of (UNSIGNED-BYTE 8),
@@ -153,11 +138,10 @@
 
 (define-fop (fop-nop 0 () nil))
 (define-fop (fop-pop 1 (x) nil) (push-fop-table x))
-(define-fop (fop-push 2) (ref-fop-table (read-word-arg)))
-(define-fop (fop-byte-push 3) (ref-fop-table (read-byte-arg)))
+(define-fop (fop-empty-list 2) nil)
+(define-fop (fop-truth 3) t)
+(define-fop (fop-push 4 ((:operands index))) (ref-fop-table index))
 
-(define-fop (fop-empty-list 4) ())
-(define-fop (fop-truth 5) t)
 ;;; CMU CL had FOP-POP-FOR-EFFECT as fop 65, but it was never used and seemed
 ;;; to have no possible use.
 (define-fop (fop-misc-trap 66)
@@ -166,12 +150,11 @@
   #-sb-xc-host
   (%primitive sb!c:make-unbound-marker))
 
-(define-cloned-fops (fop-character 68) (fop-short-character 69)
-  (code-char (clone-arg)))
+(define-fop (fop-character 76 ((:operands char-code)))
+  (code-char char-code))
 
-(define-cloned-fops (fop-struct 48 (layout)) (fop-small-struct 49)
-  (let* ((size (clone-arg))
-         (res (%make-instance size)) ; number of words excluding header
+(define-fop (fop-struct 48 ((:operands size) layout))
+  (let* ((res (%make-instance size)) ; number of words excluding header
          ;; Compute count of elements to pop from stack, sans layout.
          ;; If instance-data-start is 0, then size is the count,
          ;; otherwise subtract 1 because the layout consumes a slot.
@@ -208,7 +191,7 @@
 ;; Allocate a CLOS object. This is used when the compiler detects that
 ;; MAKE-LOAD-FORM returned a simple use of MAKE-LOAD-FORM-SAVING-SLOTS,
 ;; or possibly a hand-written equivalent (however unlikely).
-(define-fop (fop-allocate-instance 50 (name) nil)
+(define-fop (fop-allocate-instance 68 (name) nil)
   (let ((instance (allocate-instance (find-class (the symbol name)))))
     (push-fop-table instance)
     instance))
@@ -218,7 +201,7 @@
 ;; This wants a 'count' as the first item in the SLOT-NAMES argument
 ;; rather than using read-arg because many calls of this might share
 ;; the list, which must be constructed into the fop-table no matter what.
-(define-fop (fop-initialize-instance 51 (slot-names obj) nil)
+(define-fop (fop-initialize-instance 69 (slot-names obj) nil)
   (let ((n-slots (pop slot-names)))
     (multiple-value-bind (stack ptr) (fop-stack-pop-n n-slots)
       (dotimes (i n-slots)
@@ -254,12 +237,9 @@
 
 (declaim (freeze-type undefined-package))
 
-(defun aux-fop-intern (smallp package)
+(defun aux-fop-intern (size package)
   (declare (optimize speed))
-  (let* ((size (if smallp
-                   (read-byte-arg)
-                   (read-word-arg)))
-         (buffer (make-string size)))
+  (let ((buffer (make-string size)))
     #+sb-xc-host
     (read-string-as-bytes *fasl-input-stream* buffer size)
     #-sb-xc-host
@@ -280,46 +260,34 @@
                                    package
                                    :no-copy t))))))
 
-(macrolet ((def (name code smallp package-form)
-             `(define-fop (,name ,code)
-                (aux-fop-intern ,smallp ,package-form))))
+(define-fop (fop-lisp-symbol-save        80 ((:operands namelen)))
+  (aux-fop-intern namelen *cl-package*))
+(define-fop (fop-keyword-symbol-save     84 ((:operands namelen)))
+  (aux-fop-intern namelen *keyword-package*))
 
-  (def fop-lisp-symbol-save          75 nil *cl-package*)
-  (def fop-lisp-small-symbol-save    76 t   *cl-package*)
-  (def fop-keyword-symbol-save       77 nil *keyword-package*)
-  (def fop-keyword-small-symbol-save 78 t   *keyword-package*)
-
+;; But srsly? Most of the space is wasted by UCS4 encoding of ASCII.
+;; An extra word per symbol for the package is nothing by comparison.
   ;; FIXME: Because we don't have FOP-SYMBOL-SAVE any more, an
   ;; enormous number of symbols will fall through to this case,
   ;; probably resulting in bloated fasl files. A new
   ;; FOP-SYMBOL-IN-LAST-PACKAGE-SAVE/FOP-SMALL-SYMBOL-IN-LAST-PACKAGE-SAVE
   ;; cloned fop pair could undo some of this bloat.
-  (def fop-symbol-in-package-save             8 nil
-    (ref-fop-table (read-word-arg)))
-  (def fop-small-symbol-in-package-save       9 t
-    (ref-fop-table (read-word-arg)))
-  (def fop-symbol-in-byte-package-save       10 nil
-    (ref-fop-table (read-byte-arg)))
-  (def fop-small-symbol-in-byte-package-save 11 t
-    (ref-fop-table (read-byte-arg))))
+(define-fop (fop-symbol-in-package-save 240 ((:operands pkg-index namelen)))
+  (aux-fop-intern namelen (ref-fop-table pkg-index)))
 
-(define-cloned-fops (fop-uninterned-symbol-save 12)
-                    (fop-uninterned-small-symbol-save 13)
-  (let* ((arg (clone-arg))
-         (res (make-string arg)))
+(define-fop (fop-uninterned-symbol-save 96 ((:operands namelen)))
+  (let ((res (make-string namelen)))
     #!-sb-unicode
     (read-string-as-bytes *fasl-input-stream* res)
     #!+sb-unicode
     (read-string-as-unsigned-byte-32 *fasl-input-stream* res)
     (push-fop-table (make-symbol res))))
 
-(define-fop (fop-package 14 (pkg-designator))
+(define-fop (fop-package 44 (pkg-designator))
   (find-undeleted-package-or-lose pkg-designator))
 
-(define-cloned-fops (fop-named-package-save 156 () nil)
-                    (fop-small-named-package-save 157)
-  (let* ((arg (clone-arg))
-         (package-name (make-string arg)))
+(define-fop (fop-named-package-save 156 ((:operands length)) nil)
+  (let ((package-name (make-string length)))
     #+sb-xc-host
     (read-string-as-bytes *fasl-input-stream* package-name)
     #-sb-xc-host
@@ -350,14 +318,14 @@
               result))
       (declare (fixnum index byte bits)))))
 
-(define-cloned-fops (fop-integer 33) (fop-small-integer 34)
-  (load-s-integer (clone-arg)))
+(define-fop (fop-integer 36 ((:operands n-bytes)))
+  (load-s-integer n-bytes))
 
-(define-fop (fop-word-integer 35)
+(define-fop (fop-word-integer 34)
   (with-fast-read-byte ((unsigned-byte 8) *fasl-input-stream*)
     (fast-read-s-integer #.sb!vm:n-word-bytes)))
 
-(define-fop (fop-byte-integer 36)
+(define-fop (fop-byte-integer 35)
   (with-fast-read-byte ((unsigned-byte 8) *fasl-input-stream*)
     (fast-read-s-integer 1)))
 
@@ -410,7 +378,7 @@
          ((= i ptr) res)
       (declare (type index i)))))
 
-(define-fop (fop-list 15) (fop-list-from-stack (read-byte-arg)))
+(define-fop (fop-list 33) (fop-list-from-stack (read-byte-arg)))
 (define-fop (fop-list* 16)
   (let ((n (read-byte-arg))) ; N is the number of cons cells (0 is ok)
     (with-fop-stack (stack ptr (1+ n))
@@ -444,35 +412,34 @@
 
 ;;;; fops for loading arrays
 
-(define-cloned-fops (fop-base-string 37) (fop-small-base-string 38)
-  (let* ((arg (clone-arg))
-         (res (make-string arg :element-type 'base-char)))
+(define-fop (fop-base-string 100 ((:operands length)))
+  (let ((res (make-string length :element-type 'base-char)))
     (read-base-string-as-bytes *fasl-input-stream* res)
     res))
 
 #!+sb-unicode
+;; FIXME: can save space by UTF-8 encoding, or use 1 bit to indicate pure ASCII
+;; in the fasl even though the result will be a non-base string.
 (progn
   #+sb-xc-host
-  (define-cloned-fops (fop-character-string 161) (fop-small-character-string 162)
+  (define-fop (fop-character-string 160 ((:operands length)))
     (bug "CHARACTER-STRING FOP encountered"))
 
   #-sb-xc-host
-  (define-cloned-fops (fop-character-string 161) (fop-small-character-string 162)
-    (let* ((arg (clone-arg))
-           (res (make-string arg)))
+  (define-fop (fop-character-string 160 ((:operands length)))
+    (let ((res (make-string length)))
       (read-string-as-unsigned-byte-32 *fasl-input-stream* res)
       res)))
 
-(define-cloned-fops (fop-vector 39) (fop-small-vector 40)
-  (let* ((size (clone-arg))
-         (res (make-array size)))
+(define-fop (fop-vector 92 ((:operands size)))
+  (let ((res (make-array size)))
     (declare (fixnum size))
     (unless (zerop size)
       (multiple-value-bind (stack ptr) (fop-stack-pop-n size)
         (replace res stack :start2 ptr)))
     res))
 
-(define-fop (fop-array 83 (vec))
+(define-fop (fop-array 89 (vec))
   (let* ((rank (read-word-arg))
          (length (length vec))
          (res (make-array-header sb!vm:simple-array-widetag rank)))
@@ -619,12 +586,11 @@ a bug.~@:>")
         (file-write-date (sb!c::debug-source-namestring debug-source))))
 
 ;;; Modify a slot in a CONSTANTS object.
-(define-cloned-fops (fop-alter-code 140 (code value) nil)
-                    (fop-byte-alter-code 141)
-  (setf (code-header-ref code (clone-arg)) value)
+(define-fop (fop-alter-code 140 ((:operands index) code value) nil)
+  (setf (code-header-ref code index) value)
   (values))
 
-(define-fop (fop-fun-entry 142 (code-object name arglist type info))
+(define-fop (fop-fun-entry 139 (code-object name arglist type info))
   #+sb-xc-host ; since xc host doesn't know how to compile %PRIMITIVE
   (error "FOP-FUN-ENTRY can't be defined without %PRIMITIVE.")
   #-sb-xc-host

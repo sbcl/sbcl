@@ -2106,25 +2106,18 @@ core and return a descriptor to it."
 ;;;       instead of storing in the *FOP-FUNS* vector.
 (defmacro define-cold-fop ((name &key (pushp t)) &rest forms)
   (aver (member pushp '(nil t)))
-  (let ((code (get name 'fop-code))
-        (fname (symbolicate "COLD-" name)))
+  (let* ((code (get name 'opcode))
+         (argp (plusp (sbit *fop-argp* (ash code -2))))
+         (fname (symbolicate "COLD-" name)))
     (unless code
       (error "~S is not a defined FOP." name))
     `(progn
-       (defun ,fname ()
-         (macrolet ((pop-stack () `(pop-fop-stack)))
+       (defun ,fname ,(if argp '(.arg.) '())
+         (macrolet ((pop-stack () `(pop-fop-stack))
+                    ,@(if argp '((clone-arg () '.arg.))))
            ,@(if pushp `((push-fop-stack (progn ,@forms))) forms)))
-       (setf (svref *cold-fop-funs* ,code) #',fname))))
-
-(defmacro clone-cold-fop ((name &key (pushp t))
-                          (small-name)
-                          &rest forms)
-  (aver (member pushp '(nil t)))
-  `(progn
-    (macrolet ((clone-arg () '(read-word-arg)))
-      (define-cold-fop (,name :pushp ,pushp) ,@forms))
-    (macrolet ((clone-arg () '(read-byte-arg)))
-      (define-cold-fop (,small-name :pushp ,pushp) ,@forms))))
+       ,@(loop for i from code to (logior code (if argp 3 0))
+               collect `(setf (svref *cold-fop-funs* ,i) #',fname)))))
 
 ;;; Cause a fop to be undefined in cold load.
 (defmacro not-cold-fop (name)
@@ -2148,14 +2141,13 @@ core and return a descriptor to it."
 
 (define-cold-fop (fop-misc-trap) *unbound-marker*)
 
-(define-cold-fop (fop-short-character)
-  (make-character-descriptor (read-byte-arg)))
+(define-cold-fop (fop-character)
+  (make-character-descriptor (clone-arg)))
 
 (define-cold-fop (fop-empty-list) nil)
 (define-cold-fop (fop-truth) t)
 
-(clone-cold-fop (fop-struct)
-                (fop-small-struct)
+(define-cold-fop (fop-struct)
   (let* ((size (clone-arg)) ; n-words including layout, excluding header
          (layout (pop-stack))
          (result (allocate-structure-object *dynamic* size layout))
@@ -2257,35 +2249,29 @@ core and return a descriptor to it."
     (read-string-as-bytes *fasl-input-stream* string)
     (intern string package)))
 
-(macrolet ((frob (name pname-len package-len)
-             `(define-cold-fop (,name)
-                (let ((index (read-arg ,package-len)))
-                  (push-fop-table
-                   (cold-load-symbol (read-arg ,pname-len)
-                                     (ref-fop-table index)))))))
-  (frob fop-symbol-in-package-save #.sb!vm:n-word-bytes #.sb!vm:n-word-bytes)
-  (frob fop-small-symbol-in-package-save 1 #.sb!vm:n-word-bytes)
-  (frob fop-symbol-in-byte-package-save #.sb!vm:n-word-bytes 1)
-  (frob fop-small-symbol-in-byte-package-save 1 1))
+;; I don't feel like hacking up DEFINE-COLD-FOP any more than necessary,
+;; so this code is handcrafted to accept two operands.
+(flet ((fop-cold-symbol-in-package-save (index pname-len)
+         (push-fop-stack
+          (push-fop-table (cold-load-symbol pname-len (ref-fop-table index))))))
+  (dotimes (i 16)
+    (setf (svref *cold-fop-funs* (+ (get 'fop-symbol-in-package-save 'opcode) i))
+          #'fop-cold-symbol-in-package-save)))
 
-(clone-cold-fop (fop-lisp-symbol-save)
-                (fop-lisp-small-symbol-save)
+(define-cold-fop (fop-lisp-symbol-save)
   (push-fop-table (cold-load-symbol (clone-arg) *cl-package*)))
 
-(clone-cold-fop (fop-keyword-symbol-save)
-                (fop-keyword-small-symbol-save)
+(define-cold-fop (fop-keyword-symbol-save)
   (push-fop-table (cold-load-symbol (clone-arg) *keyword-package*)))
 
-(clone-cold-fop (fop-uninterned-symbol-save)
-                (fop-uninterned-small-symbol-save)
+(define-cold-fop (fop-uninterned-symbol-save)
   (let ((name (make-string (clone-arg))))
     (read-string-as-bytes *fasl-input-stream* name)
     (push-fop-table (get-uninterned-symbol name))))
 
 ;;;; cold fops for loading packages
 
-(clone-cold-fop (fop-named-package-save :pushp nil)
-                (fop-small-named-package-save)
+(define-cold-fop (fop-named-package-save :pushp nil)
   (let* ((size (clone-arg))
          (name (make-string size)))
     (read-string-as-bytes *fasl-input-stream* name)
@@ -2340,20 +2326,17 @@ core and return a descriptor to it."
 
 ;;;; cold fops for loading vectors
 
-(clone-cold-fop (fop-base-string)
-                (fop-small-base-string)
+(define-cold-fop (fop-base-string)
   (let* ((len (clone-arg))
          (string (make-string len)))
     (read-string-as-bytes *fasl-input-stream* string)
     (base-string-to-core string)))
 
 #!+sb-unicode
-(clone-cold-fop (fop-character-string)
-                (fop-small-character-string)
+(define-cold-fop (fop-character-string)
   (bug "CHARACTER-STRING dumped by cross-compiler."))
 
-(clone-cold-fop (fop-vector)
-                (fop-small-vector)
+(define-cold-fop (fop-vector)
   (let* ((size (clone-arg))
          (result (allocate-vector-object *dynamic*
                                          sb!vm:n-word-bits
@@ -2430,12 +2413,16 @@ core and return a descriptor to it."
 
 (define-cold-number-fop fop-single-float)
 (define-cold-number-fop fop-double-float)
-(define-cold-number-fop fop-integer)
-(define-cold-number-fop fop-small-integer)
 (define-cold-number-fop fop-word-integer)
 (define-cold-number-fop fop-byte-integer)
 (define-cold-number-fop fop-complex-single-float)
 (define-cold-number-fop fop-complex-double-float)
+;; FOP-INTEGER is different because it affects 4 cells of the fop-funs vector,
+;; though none except the lowest is used. A bignum would have to be so big
+;; that its length required > 1 byte to store.
+(define-cold-fop (fop-integer)
+  (fop-integer (clone-arg))
+  (number-to-core (pop-stack)))
 
 (define-cold-fop (fop-ratio)
   (let ((den (pop-stack)))
@@ -2608,8 +2595,7 @@ core and return a descriptor to it."
 
 (define-cold-code-fop fop-small-code (read-byte-arg) (read-halfword-arg))
 
-(clone-cold-fop (fop-alter-code :pushp nil)
-                (fop-byte-alter-code)
+(define-cold-fop (fop-alter-code :pushp nil)
   (let ((slot (clone-arg))
         (value (pop-stack))
         (code (pop-stack)))
