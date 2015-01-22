@@ -96,15 +96,30 @@ Examples:
 
 (defun run-pending-finalizers ()
   (let (pending)
-    (with-finalizer-store-lock
-        (setf **finalizer-store**
-              (delete-if (lambda (list)
-                           (when (null (weak-pointer-value (car list)))
-                             (push (second list) pending)
-                             t))
-                         **finalizer-store**)))
     ;; We want to run the finalizer bodies outside the lock in case
     ;; finalization of X causes finalization to be added for Y.
+    ;; And to avoid consing we can reuse the deleted conses from the
+    ;; store to build the list of functions.
+    (with-finalizer-store-lock
+      (loop with list = **finalizer-store**
+          with previous
+          for finalizer = (car list)
+          do
+          (unless finalizer
+            (if previous
+                (setf (cdr previous) nil)
+                (setf **finalizer-store** nil))
+            (return))
+          unless (weak-pointer-value (car finalizer))
+          do
+          (psetf pending finalizer
+                 (car finalizer) (second finalizer)
+                 (cdr finalizer) pending
+                 (car list) (cadr list)
+                 (cdr list) (cddr list))
+          else
+          do (setf previous list
+                   list (cdr list))))
     (dolist (fun pending)
       (handler-case
           (funcall fun)
