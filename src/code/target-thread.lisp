@@ -1488,28 +1488,30 @@ See also: RETURN-FROM-THREAD, ABORT-THREAD."
                               (list arguments)))
            #!+win32
            (fp-modes (dpb 0 sb!vm::float-sticky-bits ;; clear accrued bits
-                          (sb!vm:floating-point-modes)))
-           (initial-function
-             (named-lambda initial-thread-function ()
-               ;; Win32 doesn't inherit parent thread's FP modes,
-               ;; while it seems to happen everywhere else
-               #!+win32
-               (setf (sb!vm:floating-point-modes) fp-modes)
-               ;; As it is, this lambda must not cons until we are
-               ;; ready to run GC. Be very careful.
-               (initial-thread-function-trampoline
-                thread setup-sem real-function arguments nil nil nil))))
-      ;; If the starting thread is stopped for gc before it signals
-      ;; the semaphore then we'd be stuck.
-      (assert (not *gc-inhibit*))
-      ;; Keep INITIAL-FUNCTION pinned until the child thread is
-      ;; initialized properly. Wrap the whole thing in
-      ;; WITHOUT-INTERRUPTS because we pass INITIAL-FUNCTION to
-      ;; another thread.
-      (with-system-mutex (*make-thread-lock*)
-        (with-pinned-objects (initial-function)
+                          (sb!vm:floating-point-modes))))
+      ;; It could be just pinned instead, but implementing DX closures
+      ;; is much easier than implementing threading.
+      #!-(or stack-allocatable-closures stack-allocatable-fixed-objects)
+      #.(error "Stack allocatable closures required.")
+      (dx-flet ((initial-thread-function ()
+                  ;; Win32 doesn't inherit parent thread's FP modes,
+                  ;; while it seems to happen everywhere else
+                  #!+win32
+                  (setf (sb!vm:floating-point-modes) fp-modes)
+                  ;; As it is, this lambda must not cons until we are
+                  ;; ready to run GC. Be very careful.
+                  (initial-thread-function-trampoline
+                   thread setup-sem real-function arguments nil nil nil)))
+        ;; If the starting thread is stopped for gc before it signals
+        ;; the semaphore then we'd be stuck.
+        (assert (not *gc-inhibit*))
+        ;; Keep INITIAL-FUNCTION in the dynamic extent until the child
+        ;; thread is initialized properly. Wrap the whole thing in
+        ;; WITHOUT-INTERRUPTS because we pass INITIAL-FUNCTION to
+        ;; another thread.
+        (with-system-mutex (*make-thread-lock*)
           (if (zerop
-               (%create-thread (get-lisp-obj-address initial-function)))
+               (%create-thread (get-lisp-obj-address #'initial-thread-function)))
               (setf thread nil)
               (wait-on-semaphore setup-sem)))))
     (or thread (error "Could not create a new thread."))))
