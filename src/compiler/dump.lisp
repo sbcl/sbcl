@@ -1106,8 +1106,7 @@
       (dump-segment code-segment code-length fasl-output)
 
       ;; DUMP-FIXUPS does its own internal DUMP-FOPs: the bytes it
-      ;; dumps aren't included in the LENGTH passed to our
-      ;; FOP-CODE/FOP-SMALL-CODE fop.
+      ;; dumps aren't included in the LENGTH passed to FOP-CODE.
       (dump-fixups fixups fasl-output)
 
       #!-(or x86 x86-64)
