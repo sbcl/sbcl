@@ -1395,7 +1395,7 @@ session."
   ;; GC. Be very careful.
   (let* ((*current-thread* thread)
          (*restart-clusters* nil)
-         (*handler-clusters* (sb!kernel::initial-handler-clusters))
+         (*handler-clusters* sb!kernel::**initial-handler-clusters**)
          (*exit-in-process* nil)
          (sb!impl::*deadline* nil)
          (sb!impl::*deadline-seconds* nil)

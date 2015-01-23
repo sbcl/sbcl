@@ -16,13 +16,13 @@
   (declare (special *muffled-warnings*))
   (typep warning *muffled-warnings*))
 
-(defun initial-handler-clusters ()
-  `(((,#'(lambda (condition)
-           (typep condition 'warning))
+(defglobal **initial-handler-clusters**
+  `(((,(lambda (condition)
+         (typep condition 'warning))
       .
-      ,#'(lambda (warning)
-           (when (muffle-warning-p warning)
-             (muffle-warning warning)))))))
+      ,(lambda (warning)
+         (when (muffle-warning-p warning)
+           (muffle-warning warning)))))))
 
 ;;; Each cluster is an alist of the form
 ;;;
@@ -38,7 +38,7 @@
 ;;;
 ;;; Lists to which *HANDLER-CLUSTERS* is bound generally have dynamic
 ;;; extent.
-(defvar *handler-clusters* (initial-handler-clusters))
+(defvar *handler-clusters* **initial-handler-clusters**)
 
 ;;; a list of lists of currently active RESTART instances. maintained
 ;;; by RESTART-BIND.
