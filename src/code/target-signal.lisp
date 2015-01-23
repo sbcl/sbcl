@@ -180,6 +180,7 @@
                                              :signal-number signal)
      nil (lambda ()
            (funcall run-handler signal info context))
+     nil
      nil nil nil nil)))
 
 

@@ -267,9 +267,9 @@ created and old ones may exit at any time."
   (setf sb!impl::*exit-lock* (make-mutex :name "Exit Lock")
         *make-thread-lock* (make-mutex :name "Make-Thread Lock"))
   (let ((initial-thread (%make-thread :name "main thread"
-                                      :%alive-p t
-                                      :os-thread (current-thread-os-thread))))
-    (setq *initial-thread* initial-thread
+                                      :%alive-p t)))
+    (setf (thread-os-thread initial-thread) (current-thread-os-thread)
+          *initial-thread* initial-thread
           *current-thread* initial-thread)
     (grab-mutex (thread-result-lock *initial-thread*))
     ;; Either *all-threads* is empty or it contains exactly one thread
@@ -1224,7 +1224,7 @@ on this semaphore, then N of them is woken up."
   ;; Lisp-side cleanup
   (with-all-threads-lock
     (setf (thread-%alive-p thread) nil)
-    (setf (thread-os-thread thread) nil)
+    (setf (thread-os-thread thread) 0)
     (setq *all-threads* (delq thread *all-threads*))
     (when *session*
       (%delete-thread-from-session thread *session*))))
@@ -1384,7 +1384,7 @@ session."
 
 #!+sb-thread
 (defun initial-thread-function-trampoline
-    (thread setup-sem real-function arguments arg1 arg2 arg3)
+    (thread setup-sem real-function thread-list arguments arg1 arg2 arg3)
   ;; In time we'll move some of the binding presently done in C here
   ;; too.
   ;;
@@ -1418,16 +1418,27 @@ session."
     (setf sb!vm:*alloc-signal* *default-alloc-signal*)
     (setf (thread-os-thread thread) (current-thread-os-thread))
     (with-mutex ((thread-result-lock thread))
-      (let* ((cell1 (shiftf (thread-result thread) nil))
-             (cell2 (cdr cell1)))
+      ;; Normally the list is allocated in the parent thread to
+      ;; avoid consing in a nascent thread.
+
+      (let* ((thread-list (or thread-list
+                              (list thread thread)))
+             (session-cons (cdr thread-list)))
         (with-all-threads-lock
-          (setf *all-threads* (rplacd (rplaca cell1 thread) *all-threads*)))
+          (setf (cdr thread-list) *all-threads*
+                *all-threads* thread-list))
         (let ((session *session*))
           (with-session-lock (session)
-            (setf (session-threads session)
-                  (rplacd (rplaca cell2 thread) (session-threads session))))))
+            (setf (cdr session-cons) (session-threads session)
+                  (session-threads session) session-cons))))
       (setf (thread-%alive-p thread) t)
-      (when setup-sem (signal-semaphore setup-sem))
+
+      (when setup-sem
+        (signal-semaphore setup-sem)
+        ;; setup-sem was dx-allocated, set it to NIL so that the
+        ;; backtrace doesn't get confused
+        (setf setup-sem nil))
+
       ;; Using handling-end-of-the-world would be a bit tricky
       ;; due to other catches and interrupts, so we essentially
       ;; re-implement it here. Once and only once more.
@@ -1448,15 +1459,14 @@ session."
                        (sb!unix::unblock-deferrable-signals)
                        (setf (thread-result thread)
                              (prog1
-                                 (cons t
-                                       (multiple-value-list
-                                        (unwind-protect
-                                             (catch '%return-from-thread
-                                               (if (listp arguments)
-                                                   (apply real-function arguments)
-                                                   (funcall real-function arg1 arg2 arg3)))
-                                          (when *exit-in-process*
-                                            (sb!impl::call-exit-hooks)))))
+                                 (multiple-value-list
+                                  (unwind-protect
+                                       (catch '%return-from-thread
+                                         (if (listp arguments)
+                                             (apply real-function arguments)
+                                             (funcall real-function arg1 arg2 arg3)))
+                                    (when *exit-in-process*
+                                      (sb!impl::call-exit-hooks))))
                                #!+sb-safepoint
                                (sb!kernel::gc-safepoint))))
                   ;; we're going down, can't handle interrupts
@@ -1503,7 +1513,9 @@ See also: RETURN-FROM-THREAD, ABORT-THREAD."
                               (list arguments)))
            #!+win32
            (fp-modes (dpb 0 sb!vm::float-sticky-bits ;; clear accrued bits
-                          (sb!vm:floating-point-modes))))
+                          (sb!vm:floating-point-modes)))
+           ;; Allocate in the parent
+           (thread-list (list thread thread)))
       (declare (dynamic-extent setup-sem))
       ;; It could be just pinned instead, but implementing DX closures
       ;; is much easier than implementing threading.
@@ -1517,7 +1529,8 @@ See also: RETURN-FROM-THREAD, ABORT-THREAD."
                   ;; As it is, this lambda must not cons until we are
                   ;; ready to run GC. Be very careful.
                   (initial-thread-function-trampoline
-                   thread setup-sem real-function arguments nil nil nil)))
+                   thread setup-sem real-function thread-list
+                   arguments nil nil nil)))
         ;; If the starting thread is stopped for gc before it signals
         ;; the semaphore then we'd be stuck.
         (assert (not *gc-inhibit*))
@@ -1555,9 +1568,9 @@ subject to change."
                      (allow-with-interrupts
                        ;; Don't use the timeout if the thread is not alive anymore.
                        (grab-mutex lock :timeout (and (thread-alive-p thread) timeout))))
-               (cond ((car (thread-result thread))
+               (cond ((listp (thread-result thread))
                       (return-from join-thread
-                        (values-list (cdr (thread-result thread)))))
+                        (values-list (thread-result thread))))
                      (defaultp
                       (return-from join-thread default))
                      (t
@@ -1577,7 +1590,7 @@ subject to change."
 (defun enter-foreign-callback (arg1 arg2 arg3)
   (initial-thread-function-trampoline
    (make-foreign-thread :name "foreign callback")
-   nil #'sb!alien::enter-alien-callback t arg1 arg2 arg3))
+   nil #'sb!alien::enter-alien-callback nil t arg1 arg2 arg3))
 
 (defmacro with-interruptions-lock ((thread) &body body)
   `(with-system-mutex ((thread-interruptions-lock ,thread))

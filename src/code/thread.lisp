@@ -24,14 +24,10 @@ in future versions."
   (name          nil :type (or thread-name null))
   (%alive-p      nil :type boolean)
   (%ephemeral-p  nil :type boolean)
-  (os-thread     nil :type (or integer null))
+  (os-thread     0 :type sb!vm:word)
   (interruptions nil :type list)
-  ;; On succesful execution of the thread's lambda, a cons of T and a list
-  ;; of the values returned. The two conses created initially are made in
-  ;; the context of the creator thread and are used by the nascent thread
-  ;; to link itself into *ALL-THREADS* and *SESSION* without consing.
-  ;; A list of 2 nils can't be mistaken for normal exit.
-  (result        (list nil nil) :type list)
+  ;; On succesful execution of the thread's lambda a list of values.
+  (result 0)
   (interruptions-lock
    (make-mutex :name "thread interruptions lock")
    :type mutex)
