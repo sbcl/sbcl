@@ -2247,22 +2247,21 @@ core and return a descriptor to it."
 (defun cold-load-symbol (size package)
   (let ((string (make-string size)))
     (read-string-as-bytes *fasl-input-stream* string)
-    (intern string package)))
+    (push-fop-table (intern string package))))
 
 ;; I don't feel like hacking up DEFINE-COLD-FOP any more than necessary,
 ;; so this code is handcrafted to accept two operands.
 (flet ((fop-cold-symbol-in-package-save (index pname-len)
-         (push-fop-stack
-          (push-fop-table (cold-load-symbol pname-len (ref-fop-table index))))))
-  (dotimes (i 16)
+         (push-fop-stack (cold-load-symbol pname-len (ref-fop-table index)))))
+  (dotimes (i 16) ; occupies 16 cells in the dispatch table
     (setf (svref *cold-fop-funs* (+ (get 'fop-symbol-in-package-save 'opcode) i))
           #'fop-cold-symbol-in-package-save)))
 
 (define-cold-fop (fop-lisp-symbol-save)
-  (push-fop-table (cold-load-symbol (clone-arg) *cl-package*)))
+  (cold-load-symbol (clone-arg) *cl-package*))
 
 (define-cold-fop (fop-keyword-symbol-save)
-  (push-fop-table (cold-load-symbol (clone-arg) *keyword-package*)))
+  (cold-load-symbol (clone-arg) *keyword-package*))
 
 (define-cold-fop (fop-uninterned-symbol-save)
   (let ((name (make-string (clone-arg))))
@@ -2527,7 +2526,7 @@ core and return a descriptor to it."
   (let ((debug-source (pop-stack)))
     (cold-push debug-source *current-debug-sources*)))
 
-(define-cold-fop (fop-fdefinition)
+(define-cold-fop (fop-fdefn)
   (cold-fdefinition-object (pop-stack)))
 
 #!-(or x86 x86-64)
@@ -2538,16 +2537,10 @@ core and return a descriptor to it."
 ;;; fixups (or function headers) are applied.
 #!+sb-show (defvar *show-pre-fixup-code-p* nil)
 
-;;; FIXME: The logic here should be converted into a function
-;;; COLD-CODE-FOP-GUTS (NCONST CODE-SIZE) called by DEFINE-COLD-FOP
-;;; FOP-CODE and DEFINE-COLD-FOP FOP-SMALL-CODE, so that
-;;; variable-capture nastiness like (LET ((NCONST ,NCONST) ..) ..)
-;;; doesn't keep me awake at night.
-(defmacro define-cold-code-fop (name nconst code-size)
-  `(define-cold-fop (,name)
-     (let* ((nconst ,nconst)
-            (code-size ,code-size)
-            (raw-header-n-words (+ sb!vm:code-constants-offset nconst))
+(defun cold-load-code (nconst code-size)
+  (macrolet ((pop-stack () '(pop-fop-stack)))
+   (push-fop-stack
+     (let* ((raw-header-n-words (+ sb!vm:code-constants-offset nconst))
             (header-n-words
              ;; Note: we round the number of constants up to ensure
              ;; that the code vector will be properly aligned.
@@ -2589,11 +2582,11 @@ core and return a descriptor to it."
                      "/#X~8,'0x: #X~8,'0x~%"
                      (+ i (gspace-byte-address (descriptor-gspace des)))
                      (bvref-32 (descriptor-bytes des) i)))))
-       des)))
+       des))))
 
-(define-cold-code-fop fop-code (read-word-arg) (read-word-arg))
-
-(define-cold-code-fop fop-small-code (read-byte-arg) (read-halfword-arg))
+(dotimes (i 16) ; occupies 16 cells in the dispatch table
+  (setf (svref *cold-fop-funs* (+ (get 'fop-code 'opcode) i))
+        #'cold-load-code))
 
 (define-cold-fop (fop-alter-code :pushp nil)
   (let ((slot (clone-arg))

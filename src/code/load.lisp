@@ -418,7 +418,7 @@
 ;;; Return true if we successfully load a group from the stream, or
 ;;; NIL if EOF was encountered while trying to read from the stream.
 ;;; Dispatch to the right function for each fop.
-(defconstant +2-operand-fops+ #xF0) ; start of the range
+(defconstant +2-operand-fops+ #xE0) ; start of the range
 (defun load-fasl-group (stream print)
   ;;
   ;; PRINT causes most tlf-equivalent forms to print their primary value.

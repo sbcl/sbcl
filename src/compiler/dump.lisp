@@ -1085,7 +1085,7 @@
                 (dump-push (cdr entry) fasl-output))
                (:fdefinition
                 (dump-object (cdr entry) fasl-output)
-                (dump-fop 'fop-fdefinition fasl-output))
+                (dump-fop 'fop-fdefn fasl-output))
                (:known-fun
                 (dump-object (cdr entry) fasl-output)
                 (dump-fop 'fop-known-fun fasl-output))))
@@ -1100,16 +1100,8 @@
           (dump-push info-handle fasl-output)
           (push info-handle (fasl-output-debug-info fasl-output))))
 
-      ;; FIXME: probably wants to be a 2-operand FOP
       (let ((num-consts (- header-length sb!vm:code-constants-offset)))
-        (cond ((and (< num-consts #x100) (< code-length #x10000))
-               (dump-fop 'fop-small-code fasl-output)
-               (dump-byte num-consts fasl-output)
-               (dump-integer-as-n-bytes code-length (/ sb!vm:n-word-bytes 2) fasl-output))
-              (t
-               (dump-fop 'fop-code fasl-output)
-               (dump-word num-consts fasl-output)
-               (dump-word code-length fasl-output))))
+        (dump-fop 'fop-code fasl-output num-consts code-length))
 
       (dump-segment code-segment code-length fasl-output)
 

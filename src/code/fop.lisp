@@ -272,7 +272,7 @@
   ;; probably resulting in bloated fasl files. A new
   ;; FOP-SYMBOL-IN-LAST-PACKAGE-SAVE/FOP-SMALL-SYMBOL-IN-LAST-PACKAGE-SAVE
   ;; cloned fop pair could undo some of this bloat.
-(define-fop (fop-symbol-in-package-save 240 ((:operands pkg-index namelen)))
+(define-fop (fop-symbol-in-package-save #xF0 ((:operands pkg-index namelen)))
   (aux-fop-intern namelen (ref-fop-table pkg-index)))
 
 (define-fop (fop-uninterned-symbol-save 96 ((:operands namelen)))
@@ -539,13 +539,10 @@
 ;;; putting the implementation and version in required fields in the
 ;;; fasl file header.)
 
-(define-fop (fop-code 58)
-  (load-code (read-word-arg) (read-word-arg)))
+(define-fop (fop-code #xE0 ((:operands n-boxed n-inst-bytes)))
+  (load-code n-boxed n-inst-bytes))
 
-(define-fop (fop-small-code 59)
-  (load-code (read-byte-arg) (read-halfword-arg)))
-
-(define-fop (fop-fdefinition 60 (name)) ; should probably be 'fop-fdefn'
+(define-fop (fop-fdefn 60 (name))
   (find-or-create-fdefn name))
 
 (define-fop (fop-known-fun 65 (name))
