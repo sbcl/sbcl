@@ -484,6 +484,7 @@ evaluated as a PROGN."
     `(let ((*restart-clusters*
              (cons (list ,@(mapcar #'parse-binding bindings))
                    *restart-clusters*)))
+       (declare (truly-dynamic-extent *restart-clusters*))
        ,@forms)))
 
 ;;; Wrap the RESTART-CASE expression in a WITH-CONDITION-RESTARTS if

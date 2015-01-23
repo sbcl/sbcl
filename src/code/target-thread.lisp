@@ -1413,6 +1413,7 @@ session."
          (sb!impl::*previous-readtable-case* nil)
          (sb!impl::*internal-symbol-output-fun* nil)
          (sb!impl::*descriptor-handlers* nil)) ; serve-event
+    (declare (inline make-restart)) ;; to allow DX-allocation
     ;; Binding from C
     (setf sb!vm:*alloc-signal* *default-alloc-signal*)
     (setf (thread-os-thread thread) (current-thread-os-thread))
@@ -1433,38 +1434,43 @@ session."
       (catch 'sb!impl::toplevel-catcher
         (catch 'sb!impl::%end-of-the-world
           (catch '%abort-thread
-            (with-simple-restart
-                (abort "~@<Abort thread (~A)~@:>" *current-thread*)
+            (restart-bind ((abort
+                             (lambda ()
+                               (throw '%abort-thread nil))
+                             :report-function
+                             (lambda (stream)
+                               (format stream "~@<abort thread (~a)~@:>"
+                                       *current-thread*))))
               (without-interrupts
-                  (unwind-protect
-                       (with-local-interrupts
-                         (setf *gc-inhibit* nil) ;for foreign callbacks
-                         (sb!unix::unblock-deferrable-signals)
-                         (setf (thread-result thread)
-                               (prog1
-                                   (cons t
-                                         (multiple-value-list
-                                          (unwind-protect
-                                               (catch '%return-from-thread
-                                                 (if (listp arguments)
-                                                     (apply real-function arguments)
-                                                     (funcall real-function arg1 arg2 arg3)))
-                                            (when *exit-in-process*
-                                              (sb!impl::call-exit-hooks)))))
-                                 #!+sb-safepoint
-                                 (sb!kernel::gc-safepoint))))
-                    ;; We're going down, can't handle interrupts
-                    ;; sanely anymore. GC remains enabled.
-                    (block-deferrable-signals)
-                    ;; We don't want to run interrupts in a dead
-                    ;; thread when we leave WITHOUT-INTERRUPTS.
-                    ;; This potentially causes important
-                    ;; interupts to be lost: SIGINT comes to
-                    ;; mind.
-                    (setq *interrupt-pending* nil)
-                    #!+sb-thruption
-                    (setq *thruption-pending* nil)
-                    (handle-thread-exit thread)))))))))
+                (unwind-protect
+                     (with-local-interrupts
+                       (setf *gc-inhibit* nil) ;for foreign callbacks
+                       (sb!unix::unblock-deferrable-signals)
+                       (setf (thread-result thread)
+                             (prog1
+                                 (cons t
+                                       (multiple-value-list
+                                        (unwind-protect
+                                             (catch '%return-from-thread
+                                               (if (listp arguments)
+                                                   (apply real-function arguments)
+                                                   (funcall real-function arg1 arg2 arg3)))
+                                          (when *exit-in-process*
+                                            (sb!impl::call-exit-hooks)))))
+                               #!+sb-safepoint
+                               (sb!kernel::gc-safepoint))))
+                  ;; we're going down, can't handle interrupts
+                  ;; sanely anymore. gc remains enabled.
+                  (block-deferrable-signals)
+                  ;; we don't want to run interrupts in a dead
+                  ;; thread when we leave without-interrupts.
+                  ;; this potentially causes important
+                  ;; interupts to be lost: sigint comes to
+                  ;; mind.
+                  (setq *interrupt-pending* nil)
+                  #!+sb-thruption
+                  (setq *thruption-pending* nil)
+                  (handle-thread-exit thread)))))))))
   (values))
 
 (defun make-thread (function &key name arguments ephemeral)
