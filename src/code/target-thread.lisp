@@ -744,6 +744,9 @@ IF-NOT-OWNER is :FORCE)."
 
 ;;;; Waitqueues/condition variables
 
+;; For possible DX-allocating, see the notinline counterpart after the
+;; PROGN below
+(declaim (inline make-waitqueue))
 #!+(or (not sb-thread) sb-futex)
 (defstruct (waitqueue (:constructor make-waitqueue (&key name)))
   #!+sb-doc
@@ -811,6 +814,7 @@ IF-NOT-OWNER is :FORCE)."
                               (thread-waiting-for next) queue nil))
                (decf n)))
     nil))
+(declaim (notinline make-waitqueue))
 
 (def!method print-object ((waitqueue waitqueue) stream)
   (print-unreadable-object (waitqueue stream :type t :identity t)
@@ -1008,6 +1012,7 @@ must be held by this thread during this call."
 
 ;;;; Semaphores
 
+(declaim (inline make-semaphore)) ;; for possible DX-allocating
 (defstruct (semaphore (:constructor make-semaphore
                           (&key name ((:count %count) 0))))
   #!+sb-doc
@@ -1019,6 +1024,7 @@ future."
   (waitcount 0 :type sb!vm:word)
   (mutex (make-mutex))
   (queue (make-waitqueue)))
+(declaim (notinline make-semaphore))
 
 #!+sb-doc
 (setf (fdocumentation 'semaphore-name 'function)
@@ -1481,6 +1487,9 @@ See also: RETURN-FROM-THREAD, ABORT-THREAD."
                        'make-thread arguments)
   #!+sb-thread
   (let ((thread (%make-thread :name name :%ephemeral-p ephemeral)))
+    (declare (inline make-semaphore
+                     make-waitqueue
+                     make-mutex))
     (let* ((setup-sem (make-semaphore :name "Thread setup semaphore"))
            (real-function (coerce function 'function))
            (arguments     (if (listp arguments)
@@ -1489,6 +1498,7 @@ See also: RETURN-FROM-THREAD, ABORT-THREAD."
            #!+win32
            (fp-modes (dpb 0 sb!vm::float-sticky-bits ;; clear accrued bits
                           (sb!vm:floating-point-modes))))
+      (declare (dynamic-extent setup-sem))
       ;; It could be just pinned instead, but implementing DX closures
       ;; is much easier than implementing threading.
       #!-(or stack-allocatable-closures stack-allocatable-fixed-objects)

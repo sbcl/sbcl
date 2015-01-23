@@ -55,6 +55,7 @@ temporarily.")
   "Asynchronous signal handling thread."
   (signal-number nil :type integer))
 
+(declaim (inline make-mutex)) ;; for possible DX-allocating
 (def!struct mutex
   #!+sb-doc
   "Mutex type."
@@ -62,6 +63,7 @@ temporarily.")
   (%owner nil :type (or null thread))
   #!+(and sb-thread sb-futex)
   (state    0 :type fixnum))
+(declaim (notinline make-mutex))
 
 (defun mutex-value (mutex)
   #!+sb-doc
