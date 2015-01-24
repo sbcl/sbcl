@@ -33,48 +33,49 @@
 ;;;
 (defmacro !define-fop (fop-code (name &optional arglist (pushp t)) &body forms)
   (aver (member pushp '(nil t)))
-  (binding* (((operands stack-args)
-              (if (consp (car arglist))
-                  (ecase (caar arglist)
-                    (:operands (values (cdar arglist) (cdr arglist))))
-                  (values nil arglist)))
-             (guts (if pushp `((push-fop-stack (progn ,@forms))) forms)))
+  (multiple-value-bind (operands stack-args)
+      (if (consp (car arglist))
+          (ecase (caar arglist)
+            (:operands (values (cdar arglist) (cdr arglist))))
+          (values nil arglist))
     (assert (<= (length operands) 2))
     `(progn
        (defun ,name ,operands
          ,@(if (null stack-args)
-               guts
+               forms
                (with-unique-names (stack ptr)
                  `((with-fop-stack (,stack ,ptr ,(length stack-args))
                      (multiple-value-bind ,stack-args
                          (values ,@(loop for i below (length stack-args)
                                          collect `(fop-stack-ref (+ ,ptr ,i))))
-                       ,@guts))))))
-       (!%define-fop ',name ,fop-code ,(length operands)))))
+                       ,@forms))))))
+       (!%define-fop ',name ,fop-code ,(length operands) ,(if pushp 1 0)))))
 
-(defun !%define-fop (name code n-operands)
+(defun !%define-fop (name base-opcode n-operands pushp)
   (declare (type (mod 3) n-operands)) ; 0, 1, or 2 are allowed
   (let ((n-slots (expt 4 n-operands)))
-    (unless (zerop (mod code n-slots))
+    (unless (zerop (mod base-opcode n-slots))
       (error "Opcode for fop ~S must be a multiple of ~D" name n-slots))
-    (loop for opcode from code below (+ code n-slots)
+    (loop for opcode from base-opcode below (+ base-opcode n-slots)
           when (functionp (svref *fop-funs* opcode))
           do (let ((oname (svref *fop-names* opcode)))
                (when (and oname (not (eq oname name)))
                  (error "fop ~S with opcode ~D conflicts with fop ~S."
                         name opcode oname))))
     (let ((existing-opcode (get name 'opcode)))
-      (when (and existing-opcode (/= existing-opcode code))
+      (when (and existing-opcode (/= existing-opcode base-opcode))
         (error "multiple codes for fop name ~S: ~D and ~D"
-               name code existing-opcode)))
-    (setf (get name 'opcode) code)
+               name base-opcode existing-opcode)))
+    (setf (get name 'opcode) base-opcode)
     ;; The low 2 bits of the opcode comprise the length modifier if there is
     ;; exactly one operand. Such opcodes are aligned in blocks of 4.
     ;; 2-operand fops occupy 16 slots in a reserved range of the function table.
-    (loop for opcode from code below (+ code n-slots)
-          do (setf (svref *fop-names* opcode) name
-                   (svref *fop-funs* opcode) (symbol-function name)
-                   (sbit *fop-argp* (ash opcode -2)) (signum n-operands))))
+    (dotimes (j n-slots)
+      (let ((opcode (+ base-opcode j)))
+        (setf (svref *fop-names* opcode) name
+              (svref *fop-funs* opcode) (symbol-function name)
+              (sbit (car *fop-signatures*) (ash opcode -2)) (signum n-operands)
+              (sbit (cdr *fop-signatures*) opcode) pushp))))
   name)
 
 ;;; a helper function for reading string values from FASL files: sort
@@ -512,7 +513,7 @@
   (let* ((obi (read-word-arg))
          (obj (ref-fop-table obi))
          (idx (read-word-arg)))
-    (if (%instancep obj)
+    (if (%instancep obj) ; suspicious. should have been FOP-STRUCTSET
         (setf (%instance-ref obj idx) val)
         (setf (svref obj idx) val))))
 

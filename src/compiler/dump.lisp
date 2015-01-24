@@ -167,16 +167,15 @@
 ;;; optimizations should be conditional on #!+SB-FROZEN.
 (defmacro dump-fop (fs-expr file &rest args)
   (let* ((fs (eval fs-expr))
-         (val (get fs 'opcode))
+         (val (or (get fs 'opcode)
+                  (error "compiler bug: ~S is not a legal fasload operator."
+                         fs-expr)))
          (fop-argc
-          (if val
-              (if (>= val +2-operand-fops+) 2 (sbit *fop-argp* (ash val -2)))
-              0))
-         (supplied-argc (length args)))
+          (if (>= val +2-operand-fops+)
+              2
+              (sbit (car *fop-signatures*) (ash val -2)))))
     (cond
-      ((not val)
-       (error "compiler bug: ~S is not a legal fasload operator." fs-expr))
-      ((not (eql supplied-argc fop-argc))
+      ((not (eql (length args) fop-argc))
        (error "~S takes ~D argument~:P" fs fop-argc))
       (t
       `(progn

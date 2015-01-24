@@ -2104,18 +2104,17 @@ core and return a descriptor to it."
 ;;;       DEFINE-FOP) instead of creating a code, and
 ;;;   (2) stores its definition in the *COLD-FOP-FUNS* vector,
 ;;;       instead of storing in the *FOP-FUNS* vector.
-(defmacro define-cold-fop ((name &key (pushp t)) &rest forms)
-  (aver (member pushp '(nil t)))
+(defmacro define-cold-fop ((name &optional arglist) &rest forms)
   (let* ((code (get name 'opcode))
-         (argp (plusp (sbit *fop-argp* (ash code -2))))
+         (argp (plusp (sbit (car *fop-signatures*) (ash code -2))))
          (fname (symbolicate "COLD-" name)))
     (unless code
       (error "~S is not a defined FOP." name))
+    (when (and argp (not (singleton-p arglist)))
+      (error "~S must take one argument" name))
     `(progn
-       (defun ,fname ,(if argp '(.arg.) '())
-         (macrolet ((pop-stack () `(pop-fop-stack))
-                    ,@(if argp '((clone-arg () '.arg.))))
-           ,@(if pushp `((push-fop-stack (progn ,@forms))) forms)))
+       (defun ,fname ,arglist
+         (macrolet ((pop-stack () `(pop-fop-stack))) ,@forms))
        ,@(loop for i from code to (logior code (if argp 3 0))
                collect `(setf (svref *cold-fop-funs* ,i) #',fname)))))
 
@@ -2141,15 +2140,14 @@ core and return a descriptor to it."
 
 (define-cold-fop (fop-misc-trap) *unbound-marker*)
 
-(define-cold-fop (fop-character)
-  (make-character-descriptor (clone-arg)))
+(define-cold-fop (fop-character (c))
+  (make-character-descriptor c))
 
 (define-cold-fop (fop-empty-list) nil)
 (define-cold-fop (fop-truth) t)
 
-(define-cold-fop (fop-struct)
-  (let* ((size (clone-arg)) ; n-words including layout, excluding header
-         (layout (pop-stack))
+(define-cold-fop (fop-struct (size)) ; n-words incl. layout, excluding header
+  (let* ((layout (pop-stack))
          (result (allocate-structure-object *dynamic* size layout))
          (metadata
           (descriptor-fixnum
@@ -2252,27 +2250,26 @@ core and return a descriptor to it."
 ;; I don't feel like hacking up DEFINE-COLD-FOP any more than necessary,
 ;; so this code is handcrafted to accept two operands.
 (flet ((fop-cold-symbol-in-package-save (index pname-len)
-         (push-fop-stack (cold-load-symbol pname-len (ref-fop-table index)))))
+         (cold-load-symbol pname-len (ref-fop-table index))))
   (dotimes (i 16) ; occupies 16 cells in the dispatch table
     (setf (svref *cold-fop-funs* (+ (get 'fop-symbol-in-package-save 'opcode) i))
           #'fop-cold-symbol-in-package-save)))
 
-(define-cold-fop (fop-lisp-symbol-save)
-  (cold-load-symbol (clone-arg) *cl-package*))
+(define-cold-fop (fop-lisp-symbol-save (namelen))
+  (cold-load-symbol namelen *cl-package*))
 
-(define-cold-fop (fop-keyword-symbol-save)
-  (cold-load-symbol (clone-arg) *keyword-package*))
+(define-cold-fop (fop-keyword-symbol-save (namelen))
+  (cold-load-symbol namelen *keyword-package*))
 
-(define-cold-fop (fop-uninterned-symbol-save)
-  (let ((name (make-string (clone-arg))))
+(define-cold-fop (fop-uninterned-symbol-save (namelen))
+  (let ((name (make-string namelen)))
     (read-string-as-bytes *fasl-input-stream* name)
     (push-fop-table (get-uninterned-symbol name))))
 
 ;;;; cold fops for loading packages
 
-(define-cold-fop (fop-named-package-save :pushp nil)
-  (let* ((size (clone-arg))
-         (name (make-string size)))
+(define-cold-fop (fop-named-package-save (namelen))
+  (let ((name (make-string namelen)))
     (read-string-as-bytes *fasl-input-stream* name)
     (push-fop-table (find-package name))))
 
@@ -2325,19 +2322,17 @@ core and return a descriptor to it."
 
 ;;;; cold fops for loading vectors
 
-(define-cold-fop (fop-base-string)
-  (let* ((len (clone-arg))
-         (string (make-string len)))
+(define-cold-fop (fop-base-string (len))
+  (let ((string (make-string len)))
     (read-string-as-bytes *fasl-input-stream* string)
     (base-string-to-core string)))
 
 #!+sb-unicode
-(define-cold-fop (fop-character-string)
-  (bug "CHARACTER-STRING dumped by cross-compiler."))
+(define-cold-fop (fop-character-string (len))
+  (bug "CHARACTER-STRING[~D] dumped by cross-compiler." len))
 
-(define-cold-fop (fop-vector)
-  (let* ((size (clone-arg))
-         (result (allocate-vector-object *dynamic*
+(define-cold-fop (fop-vector (size))
+  (let* ((result (allocate-vector-object *dynamic*
                                          sb!vm:n-word-bits
                                          size
                                          sb!vm:simple-vector-widetag)))
@@ -2401,14 +2396,9 @@ core and return a descriptor to it."
 
 ;;;; cold fops for loading numbers
 
-(defmacro define-cold-number-fop (fop)
-  `(define-cold-fop (,fop)
-     ;; Invoke the ordinary warm version of this fop to push the
-     ;; number.
-     (,fop)
-     ;; Replace the warm fop result with the cold image of the warm
-     ;; fop result.
-     (number-to-core (pop-stack))))
+(defmacro define-cold-number-fop (fop &optional arglist)
+  ;; Invoke the ordinary warm version of this fop to cons the number.
+  `(define-cold-fop (,fop ,arglist) (number-to-core (,fop ,@arglist))))
 
 (define-cold-number-fop fop-single-float)
 (define-cold-number-fop fop-double-float)
@@ -2416,12 +2406,7 @@ core and return a descriptor to it."
 (define-cold-number-fop fop-byte-integer)
 (define-cold-number-fop fop-complex-single-float)
 (define-cold-number-fop fop-complex-double-float)
-;; FOP-INTEGER is different because it affects 4 cells of the fop-funs vector,
-;; though none except the lowest is used. A bignum would have to be so big
-;; that its length required > 1 byte to store.
-(define-cold-fop (fop-integer)
-  (fop-integer (clone-arg))
-  (number-to-core (pop-stack)))
+(define-cold-number-fop fop-integer (n-bytes))
 
 (define-cold-fop (fop-ratio)
   (let ((den (pop-stack)))
@@ -2460,7 +2445,7 @@ core and return a descriptor to it."
                                     *load-time-value-counter*
                                     sb!vm:simple-vector-widetag)))
 
-(define-cold-fop (fop-funcall-for-effect :pushp nil)
+(define-cold-fop (fop-funcall-for-effect)
   (if (= (read-byte-arg) 0)
       (cold-push (pop-stack)
                  *current-reversed-cold-toplevels*)
@@ -2468,17 +2453,17 @@ core and return a descriptor to it."
 
 ;;;; cold fops for fixing up circularities
 
-(define-cold-fop (fop-rplaca :pushp nil)
+(define-cold-fop (fop-rplaca)
   (let ((obj (ref-fop-table (read-word-arg)))
         (idx (read-word-arg)))
     (write-memory (cold-nthcdr idx obj) (pop-stack))))
 
-(define-cold-fop (fop-rplacd :pushp nil)
+(define-cold-fop (fop-rplacd)
   (let ((obj (ref-fop-table (read-word-arg)))
         (idx (read-word-arg)))
     (write-wordindexed (cold-nthcdr idx obj) 1 (pop-stack))))
 
-(define-cold-fop (fop-svset :pushp nil)
+(define-cold-fop (fop-svset)
   (let ((obj (ref-fop-table (read-word-arg)))
         (idx (read-word-arg)))
     (write-wordindexed obj
@@ -2488,13 +2473,11 @@ core and return a descriptor to it."
                         (#.sb!vm:other-pointer-lowtag 2)))
                    (pop-stack))))
 
-(define-cold-fop (fop-structset :pushp nil)
+(define-cold-fop (fop-structset)
   (let ((obj (ref-fop-table (read-word-arg)))
         (idx (read-word-arg)))
     (write-wordindexed obj (1+ idx) (pop-stack))))
 
-;;; In the original CMUCL code, this actually explicitly declared PUSHP
-;;; to be T, even though that's what it defaults to in DEFINE-COLD-FOP.
 (define-cold-fop (fop-nthcdr)
   (cold-nthcdr (read-word-arg) (pop-stack)))
 
@@ -2513,7 +2496,7 @@ core and return a descriptor to it."
   ;; (SETF CAR).
   (make-hash-table :test 'equal))
 
-(define-cold-fop (fop-fset :pushp nil)
+(define-cold-fop (fop-fset)
   (let* ((fn (pop-stack))
          (cold-name (pop-stack))
          (warm-name (warm-fun-name cold-name)))
@@ -2522,7 +2505,7 @@ core and return a descriptor to it."
         (setf (gethash warm-name *cold-fset-warm-names*) t))
     (static-fset cold-name fn)))
 
-(define-cold-fop (fop-note-debug-source :pushp nil)
+(define-cold-fop (fop-note-debug-source)
   (let ((debug-source (pop-stack)))
     (cold-push debug-source *current-debug-sources*)))
 
@@ -2539,7 +2522,6 @@ core and return a descriptor to it."
 
 (defun cold-load-code (nconst code-size)
   (macrolet ((pop-stack () '(pop-fop-stack)))
-   (push-fop-stack
      (let* ((raw-header-n-words (+ sb!vm:code-constants-offset nconst))
             (header-n-words
              ;; Note: we round the number of constants up to ensure
@@ -2582,15 +2564,14 @@ core and return a descriptor to it."
                      "/#X~8,'0x: #X~8,'0x~%"
                      (+ i (gspace-byte-address (descriptor-gspace des)))
                      (bvref-32 (descriptor-bytes des) i)))))
-       des))))
+       des)))
 
 (dotimes (i 16) ; occupies 16 cells in the dispatch table
   (setf (svref *cold-fop-funs* (+ (get 'fop-code 'opcode) i))
         #'cold-load-code))
 
-(define-cold-fop (fop-alter-code :pushp nil)
-  (let ((slot (clone-arg))
-        (value (pop-stack))
+(define-cold-fop (fop-alter-code (slot))
+  (let ((value (pop-stack))
         (code (pop-stack)))
     (write-wordindexed code slot value)))
 

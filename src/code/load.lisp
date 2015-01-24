@@ -437,10 +437,10 @@
     (let ((*skip-until* nil))
       (declare (special *skip-until*))
       (loop
-       (let ((byte (the (unsigned-byte 8) (read-byte stream))))
+       (let ((byte (the (unsigned-byte 8) (read-byte stream)))
+             (trace (or #!+sb-show *show-fops-p*)))
          ;; Do some debugging output.
-         #!+sb-show
-         (when *show-fops-p*
+         (when trace
            (format *trace-output* "~&~6x : [~D,~D] ~2,'0x(~A)"
                    (1- (file-position stream))
                    (svref *fop-stack* 0) ; stack pointer
@@ -451,8 +451,8 @@
                 (let ((function (svref *fop-funs* byte)))
                   (cond ((not (functionp function))
                          (error "corrupt fasl file: FOP code #x~x" byte))
-                        ((zerop (sbit *fop-argp* (ash byte -2))) ; no operands
-                         (funcall function))
+                        ((zerop (sbit (car *fop-signatures*) (ash byte -2)))
+                         (funcall function)) ; takes no arguments
                         (t
                          (let (arg1 arg2) ; See !%DEFINE-FOP for encoding
                            (with-fast-read-byte ((unsigned-byte 8) stream)
@@ -461,15 +461,14 @@
                              (when (>= byte +2-operand-fops+)
                                (setq arg2 (fast-read-var-u-integer
                                            (ash 1 (ldb (byte 2 2) byte))))))
-                           #!+sb-show
-                           (when *show-fops-p*
+                           (when trace
                              (format *trace-output* "{~D~@[,~D~]}" arg1 arg2))
                            (if arg2
                                (funcall function arg1 arg2)
                                (funcall function arg1))))))))
-           (declare (ignorable result))
-           #!+sb-show
-           (when *show-fops-p*
+           (when (plusp (sbit (cdr *fop-signatures*) byte))
+             (push-fop-stack result))
+           (when trace
              (let* ((stack *fop-stack*)
                     (ptr (svref stack 0)))
                (format *trace-output* " -- ~[<empty>,~D~:;[~:*~D,~D] ~S~]"
