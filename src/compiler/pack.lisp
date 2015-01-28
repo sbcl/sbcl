@@ -1615,14 +1615,6 @@
                  (setf speed-3 t)
                  (return)))))
 
-         ;; Call the target functions.
-         (do-ir2-blocks (block component)
-           (do ((vop (ir2-block-start-vop block) (vop-next vop)))
-               ((null vop))
-             (let ((target-fun (vop-info-target-fun (vop-info vop))))
-               (when target-fun
-                 (funcall target-fun vop)))))
-
          ;; Assign costs to normal TNs so we know which ones should always
          ;; be packed on the stack, and which are important not to spill.
          (when *pack-assign-costs*

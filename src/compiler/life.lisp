@@ -84,11 +84,12 @@
   (let ((block (tn-local tn))
         (num (tn-local-number tn)))
     (add-global-conflict
-     (if (zerop (sbit (ir2-block-written block) num))
-         :read-only
-         (if (zerop (sbit (ir2-block-live-out block) num))
-             :write
-             :read))
+     (cond ((zerop (sbit (ir2-block-written block) num))
+            :read-only)
+           ((zerop (sbit (ir2-block-live-out block) num))
+            :write)
+           (t
+            :read))
      tn block num))
   (values))
 
