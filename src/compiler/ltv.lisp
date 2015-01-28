@@ -77,7 +77,7 @@ guaranteed to never be modified, so it can be put in read-only storage."
                      (compiler-error "(during EVAL of LOAD-TIME-VALUE)~%~A"
                                      condition)))))
           (if read-only-p
-              (ir1-convert start next result `',value nil)
+              (ir1-convert start next result `',value)
               (the-in-policy (ctype-of value) `(value-cell-ref ,(make-value-cell value))
                              '((type-check . 0))
                              start next result))))))

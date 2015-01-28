@@ -549,7 +549,7 @@
 
 ;;;; IR1-CONVERT, macroexpansion and special form dispatching
 
-(declaim (ftype (sfunction (ctran ctran (or lvar null) t &optional t)
+(declaim (ftype (sfunction (ctran ctran (or lvar null) t)
                            (values))
                 ir1-convert))
 (macrolet (;; Bind *COMPILER-ERROR-BAILOUT* to a function that throws
@@ -579,9 +579,9 @@
   ;; the creation using backquote of forms that contain leaf
   ;; references, without having to introduce dummy names into the
   ;; namespace.
-  (defun ir1-convert (start next result form &optional alias)
+  (defun ir1-convert (start next result form)
     (ir1-error-bailout (start next result form)
-      (let* ((*current-path* (ensure-source-path (or alias form)))
+      (let* ((*current-path* (ensure-source-path form))
              (start (instrument-coverage start nil form)))
         (cond ((atom form)
                (cond ((and (symbolp form) (not (keywordp form)))
