@@ -5410,3 +5410,16 @@
                     (multiple-value-call #'list
                       (values (catch 'ct5 (go 0))))
                   0))))
+
+(with-test (:name :null-cleanups)
+  (let ((x (funcall
+            (compile nil `(lambda ()
+                            (lambda (x)
+                              (declare (optimize speed))
+                              (if x
+                                  (funcall (flet ((bar () 10)) #'bar))
+                                  (funcall (flet ((fez ()
+                                                    (funcall (flet ((foo () 20)) #'foo))))
+                                             #'fez)))))))))
+    (assert (= (funcall x t) 10))
+    (assert (= (funcall x nil) 20))))
