@@ -1,4 +1,7 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
+changes relative to sbcl-1.2.8:
+  * bug fix: more robust debugger and backtraces. (lp#1413850, lp#1099500)
+
 changes in sbcl-1.2.8 relative to sbcl-1.2.7:
   * enhancement: better error and warning messages. (lp#1314767, lp#736383)
   * enhancement: backtrace for invalid argument count produces the exact

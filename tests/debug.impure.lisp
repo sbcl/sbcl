@@ -974,7 +974,30 @@
         (funcall
          (compile nil `(sb-int:named-lambda test (&optional x)
                          (declare (optimize sb-c::recognize-self-calls))
-                         (signal 'error "~a" x)
+                         (signal 'error :format-control "~a" :format-arguments (list x))
                          (test 1)
                          1)))))
+    (assert (= count 1))))
+
+(with-test (:name :local-tail-call-variables)
+  (let ((count 0))
+    (block nil
+      (handler-bind ((error (lambda (c)
+                              (declare (ignore c))
+                              (sb-debug::map-backtrace
+                               (lambda (frame)
+                                 (let ((sb-debug::*current-frame* frame))
+                                   (multiple-value-bind (name args)
+                                       (sb-debug::frame-call frame)
+                                     (when (eq name 'test)
+                                       (assert (equal args '(1)))
+                                       (incf count))))))
+                              (return))))
+        (funcall
+         (compile nil ` (sb-int:named-lambda test (x)
+                          (signal 'error :format-control "~a" :format-arguments (list x))
+                          (flet ((tail ()))
+                            (declare (notinline tail))
+                            (tail))))
+         1)))
     (assert (= count 1))))

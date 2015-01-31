@@ -108,11 +108,13 @@
 ;;; convention for a TAIL-SET. We use the standard return convention
 ;;; when:
 ;;; -- If it has an XEP.
+;;;    it could break the tail call in this case, but it usually
+;;;    doesn't produce better code and makes for worse debugging.
 ;;; -- It appears to be more efficient to use the standard convention,
 ;;;    since there are no non-TR local calls that could benefit from
 ;;;    a non-standard convention.
 ;;; -- We're compiling with RETURN-FROM-FRAME instrumentation, which
-;;;    only works (on x86 and x86-64) for the standard convention.
+;;;    only works (on x86, x86-64, arm) for the standard convention.
 (defun use-standard-returns (tails)
   (declare (type tail-set tails))
   (let ((funs (tail-set-funs tails)))
