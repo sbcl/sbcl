@@ -104,26 +104,10 @@
 
   (values))
 
-;;; Return true if FUN's result is used in a tail-recursive full
-;;; call. We only consider explicit :FULL calls. It is assumed that
-;;; known calls are never part of a tail-recursive loop, so we don't
-;;; need to enforce tail-recursion. In any case, we don't know which
-;;; known calls will actually be full calls until after LTN.
-(defun has-full-call-use (fun)
-  (declare (type clambda fun))
-  (let ((return (lambda-return fun)))
-    (and return
-         (do-uses (use (return-result return) nil)
-           (when (and (node-tail-p use)
-                      (basic-combination-p use)
-                      (eq (basic-combination-kind use) :full))
-             (return t))))))
-
 ;;; Return true if we should use the standard (unknown) return
 ;;; convention for a TAIL-SET. We use the standard return convention
 ;;; when:
-;;; -- We must use the standard convention to preserve tail-recursion,
-;;;    since the TAIL-SET contains both an XEP and a TR full call.
+;;; -- If it has an XEP.
 ;;; -- It appears to be more efficient to use the standard convention,
 ;;;    since there are no non-TR local calls that could benefit from
 ;;;    a non-standard convention.
@@ -132,8 +116,7 @@
 (defun use-standard-returns (tails)
   (declare (type tail-set tails))
   (let ((funs (tail-set-funs tails)))
-    (or (and (find-if #'xep-p funs)
-             (find-if #'has-full-call-use funs))
+    (or (find-if #'xep-p funs)
         (some (lambda (fun) (policy fun (>= insert-debug-catch 2))) funs)
         (block punt
           (dolist (fun funs t)
@@ -201,10 +184,6 @@
                             :locations (mapcar #'make-normal-tn ptypes))))))
 
 ;;; If TAIL-SET doesn't have any INFO, then make a RETURN-INFO for it.
-;;; If we choose a return convention other than :UNKNOWN, and this
-;;; environment is for an XEP, then break tail recursion on the XEP
-;;; calls, since we must always use unknown values when returning from
-;;; an XEP.
 (defun assign-return-locations (fun)
   (declare (type clambda fun))
   (let* ((tails (lambda-tail-set fun))
@@ -213,10 +192,8 @@
                             (return-info-for-set tails))))
          (return (lambda-return fun)))
     (when (and return
-               (not (eq (return-info-kind returns) :unknown))
                (xep-p fun))
-      (do-uses (use (return-result return))
-        (setf (node-tail-p use) nil))))
+      (aver (eq (return-info-kind returns) :unknown))))
   (values))
 
 ;;; Make an IR2-NLX-INFO structure for each NLX entry point recorded.
