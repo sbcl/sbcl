@@ -39,6 +39,7 @@
 (def!constant compiled-debug-var-id-p                   #b00010000)
 (def!constant compiled-debug-var-minimal-p              #b00100000)
 (def!constant compiled-debug-var-deleted-p              #b01000000)
+(def!constant compiled-debug-var-indirect-p             #b10000000)
 
 ;;;; compiled debug blocks
 ;;;;

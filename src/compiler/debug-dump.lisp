@@ -339,7 +339,11 @@
          (save-tn (and tn (tn-save-tn tn)))
          (kind (and tn (tn-kind tn)))
          (flags 0)
-         (info (lambda-var-arg-info var)))
+         (info (lambda-var-arg-info var))
+         (indirect (and (lambda-var-indirect var)
+                        (not (lambda-var-explicit-value-cell var))
+                        (neq (lambda-physenv fun)
+                             (lambda-physenv (lambda-var-home var))))))
     (declare (type index flags))
     (when minimal
       (setq flags (logior flags compiled-debug-var-minimal-p))
@@ -352,10 +356,12 @@
                                  (component-info *component-being-compiled*))))
                (lambda-ancestor-p (lambda-var-home var) fun))
       (setq flags (logior flags compiled-debug-var-environment-live)))
-    (when save-tn
+    (when (or save-tn indirect)
       (setq flags (logior flags compiled-debug-var-save-loc-p)))
     (unless (or (zerop id) minimal)
       (setq flags (logior flags compiled-debug-var-id-p)))
+    (when indirect
+      (setq flags (logior flags compiled-debug-var-indirect-p)))
     (when info
       (case (arg-info-kind info)
         (:more-context
@@ -367,11 +373,29 @@
       (vector-push-extend name buffer)
       (unless (zerop id)
         (vector-push-extend id buffer)))
-    (if (and tn (tn-offset tn))
-        (vector-push-extend (tn-sc-offset tn) buffer)
-        (aver minimal))
-    (when save-tn
-      (vector-push-extend (tn-sc-offset save-tn) buffer)))
+    (cond (indirect
+           ;; Indirect variables live in the parent frame, and are
+           ;; accessed through a saved frame pointer.
+           ;; This reuses the normal encoding, but assigns a differnt
+           ;; meaning to it.
+           ;; The first sc-offset is for the frame pointer, the second
+           ;; is for the stack offset.
+           (let ((fp-tn (or save-tn tn)))
+             (vector-push-extend (make-sc-offset
+                                  (sc-case fp-tn
+                                    (sb!vm::control-stack
+                                     sb!vm:sap-stack-sc-number)
+                                    (t
+                                     sb!vm:sap-reg-sc-number))
+                                  (tn-offset fp-tn))
+                                 buffer)
+             (vector-push-extend (tn-sc-offset (leaf-info var)) buffer)))
+          (t
+           (if (and tn (tn-offset tn))
+               (vector-push-extend (tn-sc-offset tn) buffer)
+               (aver minimal))
+           (when save-tn
+             (vector-push-extend (tn-sc-offset save-tn) buffer)))))
   (values))
 
 ;;; Return a vector suitable for use as the DEBUG-FUN-VARS

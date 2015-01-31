@@ -1716,6 +1716,7 @@ register."
                  (deleted (logtest sb!c::compiled-debug-var-deleted-p flags))
                  (more-context-p (logtest sb!c::compiled-debug-var-more-context-p flags))
                  (more-count-p (logtest sb!c::compiled-debug-var-more-count-p flags))
+                 (indirect-p (logtest sb!c::compiled-debug-var-indirect-p flags))
                  (live (logtest sb!c::compiled-debug-var-environment-live
                                 flags))
                  (save (logtest sb!c::compiled-debug-var-save-loc-p flags))
@@ -1732,7 +1733,8 @@ register."
                                                          sc-offset
                                                          save-sc-offset
                                                          (cond (more-context-p :more-context)
-                                                               (more-count-p :more-count)))
+                                                               (more-count-p :more-count)
+                                                               (indirect-p :indirect)))
                                 buffer)))))))
 
 ;;;; CODE-LOCATIONs
@@ -2024,17 +2026,26 @@ register."
 ;;; DEBUG-VAR relative to the FRAME. This may be an indirect value
 ;;; cell if the variable is both closed over and set.
 (defun access-compiled-debug-var-slot (debug-var frame)
-  (declare (optimize (speed 1)))
   (let ((escaped (compiled-frame-escaped frame)))
-    (if escaped
-        (sub-access-debug-var-slot
-         (frame-pointer frame)
-         (compiled-debug-var-sc-offset debug-var)
-         escaped)
-      (sub-access-debug-var-slot
-       (frame-pointer frame)
-       (or (compiled-debug-var-save-sc-offset debug-var)
-           (compiled-debug-var-sc-offset debug-var))))))
+    (cond ((eq (compiled-debug-var-info debug-var) :indirect)
+           (sub-access-debug-var-slot
+            ;; Indirect are accessed through a frame pointer of the parent.
+            (sub-access-debug-var-slot
+             (frame-pointer frame)
+             (compiled-debug-var-sc-offset debug-var)
+             escaped)
+            (compiled-debug-var-save-sc-offset debug-var)
+            escaped))
+          (escaped
+           (sub-access-debug-var-slot
+            (frame-pointer frame)
+            (compiled-debug-var-sc-offset debug-var)
+            escaped))
+          (t
+           (sub-access-debug-var-slot
+            (frame-pointer frame)
+            (or (compiled-debug-var-save-sc-offset debug-var)
+                (compiled-debug-var-sc-offset debug-var)))))))
 
 ;;; a helper function for working with possibly-invalid values:
 ;;; Do (%MAKE-LISP-OBJ VAL) only if the value looks valid.
