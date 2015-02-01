@@ -14,7 +14,7 @@ AVAILABLE=`git_available_p`
 if [ -f version.lisp-expr -a -z "$AVAILABLE" ]
 then
     # Relase tarball, leave version.lisp-expr alone.
-    return
+    exit 0
 elif [ -z "$AVAILABLE" ]
 then
     echo "Can't run 'git describe' and version.lisp-expr is missing." >&2
