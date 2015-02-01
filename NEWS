@@ -1,5 +1,7 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 changes relative to sbcl-1.2.8:
+  * bug fix: compiler no longer signals an error when compiling certain nested
+    local calls. (lp#1416704, lp#404441)
   * bug fix: more robust debugger and backtraces. (lp#1413850, lp#1099500)
 
 changes in sbcl-1.2.8 relative to sbcl-1.2.7:

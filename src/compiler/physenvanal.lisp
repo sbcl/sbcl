@@ -491,10 +491,9 @@
   (collect ((code)
             (reanalyze-funs))
     (let ((cleanup2 (block-start-cleanup block2)))
-      (do ((cleanup (block-end-cleanup block1)
-                    (node-enclosing-cleanup (cleanup-mess-up cleanup))))
-          ((or (not cleanup)
-               (eq cleanup cleanup2)))
+      (do-nested-cleanups (cleanup block1)
+        (when (eq cleanup cleanup2)
+          (return))
         (let* ((node (cleanup-mess-up cleanup))
                (args (when (basic-combination-p node)
                        (basic-combination-args node))))
@@ -512,16 +511,15 @@
              (dolist (nlx (cleanup-info cleanup))
                (code `(%lexical-exit-breakup ',nlx))))
             (:dynamic-extent
-             (when (not (null (cleanup-info cleanup)))
-               (code `(%cleanup-point)))))))
+             (when (cleanup-info cleanup)
+               (code `(%cleanup-point))))))))
 
-      (when (code)
-        (aver (not (node-tail-p (block-last block1))))
-        (insert-cleanup-code block1 block2
-                             (block-last block1)
-                             `(progn ,@(code)))
-        (dolist (fun (reanalyze-funs))
-          (locall-analyze-fun-1 fun)))))
+    (when (code)
+      (aver (not (node-tail-p (block-last block1))))
+      (insert-cleanup-code
+       block1 block2 (block-last block1) `(progn ,@(code)))
+      (dolist (fun (reanalyze-funs))
+        (locall-analyze-fun-1 fun))))
 
   (values))
 

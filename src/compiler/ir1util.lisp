@@ -22,8 +22,15 @@
   (do ((lexenv (node-lexenv node)
                (lambda-call-lexenv (lexenv-lambda lexenv))))
       ((null lexenv) nil)
-    (let ((cup (lexenv-cleanup lexenv)))
-      (when cup (return cup)))))
+    (awhen (lexenv-cleanup lexenv)
+      (return it))))
+
+(defun map-nested-cleanups (function block &optional return-value)
+  (declare (type cblock block))
+  (do ((cleanup (block-end-cleanup block)
+                (node-enclosing-cleanup (cleanup-mess-up cleanup))))
+      ((not cleanup) return-value)
+    (funcall function cleanup)))
 
 ;;; Convert the FORM in a block inserted between BLOCK1 and BLOCK2 as
 ;;; an implicit MV-PROG1. The inserted block is returned. NODE is used
@@ -1063,24 +1070,22 @@
 ;;; have the same cleanup info, corresponding to the start, so the
 ;;; same approach returns safe result.
 (defun map-block-nlxes (fun block &optional dx-cleanup-fun)
-  (loop for cleanup = (block-end-cleanup block)
-        then (node-enclosing-cleanup (cleanup-mess-up cleanup))
-        while cleanup
-        do (let ((mess-up (cleanup-mess-up cleanup)))
-             (case (cleanup-kind cleanup)
-               ((:block :tagbody)
-                (aver (entry-p mess-up))
-                (loop for exit in (entry-exits mess-up)
-                      for nlx-info = (exit-nlx-info exit)
-                      do (funcall fun nlx-info)))
-               ((:catch :unwind-protect)
-                (aver (combination-p mess-up))
-                (let* ((arg-lvar (first (basic-combination-args mess-up)))
-                       (nlx-info (constant-value (ref-leaf (lvar-use arg-lvar)))))
-                (funcall fun nlx-info)))
-               ((:dynamic-extent)
-                (when dx-cleanup-fun
-                  (funcall dx-cleanup-fun cleanup)))))))
+  (do-nested-cleanups (cleanup block)
+    (let ((mess-up (cleanup-mess-up cleanup)))
+      (case (cleanup-kind cleanup)
+        ((:block :tagbody)
+         (aver (entry-p mess-up))
+         (loop for exit in (entry-exits mess-up)
+            for nlx-info = (exit-nlx-info exit)
+            do (funcall fun nlx-info)))
+        ((:catch :unwind-protect)
+         (aver (combination-p mess-up))
+         (let* ((arg-lvar (first (basic-combination-args mess-up)))
+                (nlx-info (constant-value (ref-leaf (lvar-use arg-lvar)))))
+           (funcall fun nlx-info)))
+        ((:dynamic-extent)
+         (when dx-cleanup-fun
+           (funcall dx-cleanup-fun cleanup)))))))
 
 ;;; Set the FLAG for all the blocks in COMPONENT to NIL, except for
 ;;; the head and tail which are set to T.

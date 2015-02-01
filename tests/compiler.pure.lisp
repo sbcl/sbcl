@@ -5411,7 +5411,7 @@
                       (values (catch 'ct5 (go 0))))
                   0))))
 
-(with-test (:name :null-cleanups)
+(with-test (:name (:null-cleanups-1 :bug-1416704 :bug-404441))
   (let ((x (funcall
             (compile nil `(lambda ()
                             (lambda (x)
@@ -5423,3 +5423,23 @@
                                              #'fez)))))))))
     (assert (= (funcall x t) 10))
     (assert (= (funcall x nil) 20))))
+
+(with-test (:name (:null-cleanups-2 :bug-1416704 :bug-404441))
+  (let ((fun (funcall
+              (compile nil `(lambda ()
+                              (lambda (x)
+                                (declare (optimize speed))
+                                (let* ((a2 (lambda () 20))
+                                       (a4 (lambda ()))
+                                       (a0 (flet ((f () (funcall a2)))
+                                             #'f))
+                                       (a3 (lambda ()
+                                             (if x
+                                                 (if x
+                                                     (throw 'x 10)
+                                                     (let ((a5 (lambda () (funcall a4))))
+                                                       (funcall a5)))
+                                                 (funcall a0)))))
+                                  (funcall a3))))))))
+    (assert (= (catch 'x (funcall fun t)) 10))
+    (assert (= (catch 'x (funcall fun nil)) 20))))
