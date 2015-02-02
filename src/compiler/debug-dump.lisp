@@ -52,6 +52,14 @@
   (declare (type ir2-block 2block))
   (block-physenv (ir2-block-block 2block)))
 
+(defun leaf-visible-to-debugger-p (leaf node)
+  (or (rassoc leaf (lexenv-vars (node-lexenv node)))
+      (let* ((lambda (lexenv-lambda (node-lexenv node)))
+             (call-lexenv (and lambda
+                               (lambda-call-lexenv lambda))))
+        (and call-lexenv
+             (rassoc leaf (lexenv-vars call-lexenv))))))
+
 ;;; Given a local conflicts vector and an IR2 block to represent the
 ;;; set of live TNs, and the VAR-LOCS hash-table representing the
 ;;; variables dumped, compute a bit-vector representing the set of
@@ -72,7 +80,7 @@
         (when (and (lambda-var-p leaf)
                    (or (not (member (tn-kind tn)
                                     '(:environment :debug-environment)))
-                       (rassoc leaf (lexenv-vars (node-lexenv node))))
+                       (leaf-visible-to-debugger-p leaf node))
                    (or (null spilled)
                        (not (member tn spilled))))
           (let ((num (gethash leaf var-locs)))
