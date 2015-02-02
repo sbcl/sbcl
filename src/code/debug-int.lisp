@@ -830,7 +830,7 @@
                       (make-bogus-debug-fun
                        "bogus stack frame"))
                      (t
-                      (debug-fun-from-pc code pc-offset)))))
+                      (debug-fun-from-pc code pc-offset escaped)))))
         (/noshow0 "returning MAKE-COMPILED-FRAME from COMPUTE-CALLING-FRAME")
         (make-compiled-frame caller up-frame d-fun
                              (code-location-from-pc d-fun pc-offset
@@ -1012,7 +1012,7 @@ register."
 ;;; SB!C::COMPILED-DEBUG-FUN from the PC. The result only needs to
 ;;; reference the COMPONENT, for function constants, and the
 ;;; SB!C::COMPILED-DEBUG-FUN.
-(defun debug-fun-from-pc (component pc)
+(defun debug-fun-from-pc (component pc &optional (escaped t))
   (let ((info (%code-debug-info component)))
     (cond
       ((not info)
@@ -1035,10 +1035,20 @@ register."
               (declare (type sb!int:index i))
               (loop
                 (when (or (= i len)
-                          (< pc (if elsewhere-p
-                                    (sb!c::compiled-debug-fun-elsewhere-pc
-                                     (svref fun-map (1+ i)))
-                                    (svref fun-map i))))
+                          (let ((next-pc (if elsewhere-p
+                                             (sb!c::compiled-debug-fun-elsewhere-pc
+                                              (svref fun-map (1+ i)))
+                                             (svref fun-map i))))
+                            (if escaped
+                                (< pc next-pc)
+                                ;; Non-escaped frame means that this frame calls something.
+                                ;; And the PC points to where something should return.
+                                ;; The return adress may be in the next
+                                ;; function, e.g. in local tail calls the
+                                ;; function will be entered just after the
+                                ;; CALL.
+                                ;; See debug.impure.lisp/:local-tail-call for a test-case
+                                (<= pc next-pc))))
                   (return (make-compiled-debug-fun
                            (svref fun-map (1- i))
                            component)))

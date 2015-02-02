@@ -979,6 +979,15 @@
                          1)))))
     (assert (= count 1))))
 
+(with-test (:name :local-tail-call)
+  (assert (verify-backtrace
+           (lambda () (funcall (compile nil `(sb-int:named-lambda test ()
+                                               (signal 'error)
+                                               (flet ((tail ()))
+                                                 (declare (notinline tail))
+                                                 (tail))))))
+           '((test)))))
+
 (with-test (:name :local-tail-call-variables)
   (let ((count 0))
     (block nil
@@ -990,14 +999,18 @@
                                    (multiple-value-bind (name args)
                                        (sb-debug::frame-call frame)
                                      (when (eq name 'test)
-                                       (assert (equal args '(1)))
+                                       (assert (equal args '(error)))
                                        (incf count))))))
                               (return))))
         (funcall
-         (compile nil ` (sb-int:named-lambda test (x)
-                          (signal 'error :format-control "~a" :format-arguments (list x))
-                          (flet ((tail ()))
-                            (declare (notinline tail))
-                            (tail))))
-         1)))
+         (compile nil `(sb-int:named-lambda test (x)
+                         (signal x)
+                         ;; If :local-tail-call fails, this will fail
+                         ;; too, because there's no jump between
+                         ;; SIGNAL and the call to TAIL and it will
+                         ;; show (flet tail) in the backtrace.
+                         (flet ((tail ()))
+                           (declare (notinline tail))
+                           (tail))))
+         'error)))
     (assert (= count 1))))
