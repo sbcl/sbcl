@@ -1007,6 +1007,20 @@ register."
 
 ;;;; frame utilities
 
+(defun find-assembly-routine (component pc)
+  (let* ((start (sap-int (code-instructions component)))
+         (end (+ start pc))
+         (min-name)
+         (min-diff))
+    (loop for name being the hash-key of sb!fasl:*assembler-routines*
+          using (hash-value address)
+          when (and (<= start address end)
+                    (or (not min-diff)
+                        (< (- end address) min-diff)))
+          do (setf min-name name
+                   min-diff (- end address)))
+    min-name))
+
 ;;; This returns a COMPILED-DEBUG-FUN for COMPONENT and PC. We fetch the
 ;;; SB!C::DEBUG-INFO and run down its FUN-MAP to get a
 ;;; SB!C::COMPILED-DEBUG-FUN from the PC. The result only needs to
@@ -1016,10 +1030,8 @@ register."
   (let ((info (%code-debug-info component)))
     (cond
       ((not info)
-       ;; FIXME: It seems that most of these (at least on x86) are
-       ;; actually assembler routines, and could be named by looking
-       ;; at the sb-fasl:*assembler-routines*.
-       (make-bogus-debug-fun "no debug information for frame"))
+       (make-bogus-debug-fun (or (find-assembly-routine component pc)
+                                 "no debug information for frame")))
      ((eq info :bogus-lra)
       (make-bogus-debug-fun "function end breakpoint"))
      (t

@@ -289,7 +289,7 @@
                                '((,two-arg 42 t)
                                  #+(or x86 x86-64)
                                  ,@(and predicate
-                                    '(("no debug information for frame")))
+                                    `((,(find-symbol (format nil "GENERIC-~A" fun) "SB-VM"))))
                                  ((flet ,test-name :in ,*p*) 42 t))))))))
              (test-predicates (&rest functions)
                `(progn ,@(mapcar (lambda (function)
