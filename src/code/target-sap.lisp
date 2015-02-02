@@ -56,7 +56,6 @@
 
 ;;; Convert an integer into a SAP.
 (defun int-sap (int)
-  (declare (type sap-int int))
   (int-sap int))
 
 ;;; Return the 8-bit byte at OFFSET bytes from SAP.

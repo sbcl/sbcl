@@ -18,7 +18,7 @@
 (defstruct (system-area-pointer (:constructor int-sap (int))
                                 (:conc-name "SAP-"))
   ;; the integer representation of the address
-  (int nil :type sap-int :read-only t))
+  (int nil :type unsigned-byte :read-only t))
 
 ;;; cross-compilation-host analogues of target-CMU CL primitive SAP operations
 (defun sap+ (sap offset)
