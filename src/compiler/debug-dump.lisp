@@ -105,9 +105,7 @@
 
   (let ((byte-buffer *byte-buffer*))
     (vector-push-extend
-     (dpb (position-or-lose kind *compiled-code-location-kinds*)
-          compiled-code-location-kind-byte
-          0)
+     (position-or-lose kind *compiled-code-location-kinds*)
      byte-buffer)
 
     (let ((loc (if (fixnump label) label (label-position label))))
@@ -192,70 +190,38 @@
     (dump-location-from-info loc tlf-num var-locs))
   (values))
 
-;;; Dump the successors of Block, being careful not to fly into space
-;;; on weird successors.
-(defun dump-block-successors (block physenv)
-  (declare (type cblock block) (type physenv physenv))
-  (let* ((tail (component-tail (block-component block)))
-         (succ (block-succ block))
-         (valid-succ
-          (if (and succ
-                   (or (eq (car succ) tail)
-                       (not (eq (block-physenv (car succ)) physenv))))
-              ()
-              succ))
-         (byte-buffer *byte-buffer*))
-    (vector-push-extend
-     (dpb (length valid-succ) compiled-debug-block-nsucc-byte 0)
-     byte-buffer)
-    (let ((base (block-number
-                 (node-block
-                  (lambda-bind (physenv-lambda physenv))))))
-      (dolist (b valid-succ)
-        (write-var-integer
-         (the index (- (block-number b) base))
-         byte-buffer))))
-  (values))
-
 ;;; Return a vector and an integer (or null) suitable for use as the
-;;; BLOCKS and TLF-NUMBER in FUN's DEBUG-FUN. This requires two
-;;; passes to compute:
-;;; -- Scan all blocks, dumping the header and successors followed
-;;;    by all the non-elsewhere locations.
-;;; -- Dump the elsewhere block header and all the elsewhere
-;;;    locations (if any.)
+;;; BLOCKS and TLF-NUMBER in FUN's DEBUG-FUN.
 (defun compute-debug-blocks (fun var-locs)
   (declare (type clambda fun) (type hash-table var-locs))
   (let ((*previous-location* 0)
         (tlf-num (find-tlf-number fun))
         (physenv (lambda-physenv fun))
-        (prev-locs nil)
-        (prev-block nil)
-        (byte-buffer *byte-buffer*))
+        (byte-buffer *byte-buffer*)
+        prev-block
+        locations
+        elsewhere-locations)
     (setf (fill-pointer byte-buffer) 0)
-    (collect ((elsewhere))
-      (do-physenv-ir2-blocks (2block physenv)
-        (let ((block (ir2-block-block 2block)))
-          (when (eq (block-info block) 2block)
-            (when prev-block
-              (dump-block-locations prev-block prev-locs tlf-num var-locs))
-            (setq prev-block block  prev-locs ())
-            (dump-block-successors block physenv)))
+    (do-physenv-ir2-blocks (2block physenv)
+      (let ((block (ir2-block-block 2block)))
+        (when (eq (block-info block) 2block)
+          (when prev-block
+            (dump-block-locations prev-block (nreverse (shiftf locations nil))
+                                  tlf-num var-locs))
+          (setf prev-block block)))
+      (dolist (loc (ir2-block-locations 2block))
+        (if (label-elsewhere-p (location-info-label loc))
+            (push loc elsewhere-locations)
+            (push loc locations))))
 
-        (collect ((here prev-locs))
-          (dolist (loc (ir2-block-locations 2block))
-            (if (label-elsewhere-p (location-info-label loc))
-                (elsewhere loc)
-                (here loc)))
-          (setq prev-locs (here))))
+    (dump-block-locations prev-block (nreverse locations)
+                          tlf-num var-locs)
 
-      (dump-block-locations prev-block prev-locs tlf-num var-locs)
-
-      (when (elsewhere)
-        (vector-push-extend compiled-debug-block-elsewhere-p byte-buffer)
-        (write-var-integer (length (elsewhere)) byte-buffer)
-        (dolist (loc (elsewhere))
-          (dump-location-from-info loc tlf-num var-locs))))
+    (when elsewhere-locations
+      (write-var-integer (length elsewhere-locations) byte-buffer)
+      (dolist (loc (nreverse elsewhere-locations))
+        (push loc locations)
+        (dump-location-from-info loc tlf-num var-locs)))
 
     (values (!make-specialized-array (length byte-buffer) '(unsigned-byte 8)
                                      byte-buffer)

@@ -332,8 +332,6 @@
 ;;; DEBUG-BLOCKs.
 (defstruct (debug-block (:constructor nil)
                         (:copier nil))
-  ;; Code-locations where execution continues after this block.
-  (successors nil :type list)
   ;; This indicates whether the block is a special glob of code shared
   ;; by various functions and tucked away elsewhere in a component.
   ;; This kind of block has no start code-location. This slot is in
@@ -344,21 +342,13 @@
     (prin1 (debug-block-fun-name obj) str)))
 
 #!+sb-doc
-(setf (fdocumentation 'debug-block-successors 'function)
-  "Return the list of possible code-locations where execution may continue
-   when the basic-block represented by debug-block completes its execution.")
-
-#!+sb-doc
 (setf (fdocumentation 'debug-block-elsewhere-p 'function)
   "Return whether debug-block represents elsewhere code.")
 
 (defstruct (compiled-debug-block (:include debug-block)
-                                 (:constructor
-                                  make-compiled-debug-block
-                                  (code-locations successors elsewhere-p))
                                  (:copier nil))
   ;; code-location information for the block
-  (code-locations nil :type simple-vector))
+  (code-locations #() :type simple-vector))
 
 ;;;; breakpoints
 
@@ -469,7 +459,7 @@
 (defstruct (compiled-code-location
              (:include code-location)
              (:constructor make-known-code-location
-                           (pc debug-fun %tlf-offset %form-number
+                           (pc debug-fun %debug-block %tlf-offset %form-number
                                %live-set kind step-info &aux (%unknown-p nil)))
              (:constructor make-compiled-code-location (pc debug-fun))
              (:copier nil))
@@ -1627,7 +1617,8 @@ register."
          ;; element size of the packed binary representation of the
          ;; blocks data.
          (live-set-len (ceiling var-count 8))
-         (tlf-number (sb!c::compiled-debug-fun-tlf-number compiler-debug-fun)))
+         (tlf-number (sb!c::compiled-debug-fun-tlf-number compiler-debug-fun))
+         (elsewhere-pc (sb!c::compiled-debug-fun-elsewhere-pc compiler-debug-fun)))
     (unless blocks
       (return-from parse-compiled-debug-blocks nil))
     (macrolet ((aref+ (a i) `(prog1 (aref ,a ,i) (incf ,i))))
@@ -1636,51 +1627,31 @@ register."
               (len (length blocks))
               (last-pc 0))
           (loop
-            (when (>= i len) (return))
-            (let ((succ-and-flags (aref+ blocks i))
-                  (successors nil))
-              (declare (type (unsigned-byte 8) succ-and-flags)
-                       (list successors))
-              (dotimes (k (ldb sb!c::compiled-debug-block-nsucc-byte
-                               succ-and-flags))
-                (push (sb!c:read-var-integer blocks i) successors))
-              (let* ((locations
-                      (dotimes (k (sb!c:read-var-integer blocks i)
-                                  (result locations-buffer))
-                        (let ((kind (svref sb!c::*compiled-code-location-kinds*
-                                           (aref+ blocks i)))
-                              (pc (+ last-pc
+           (when (>= i len) (return))
+           (let ((block (make-compiled-debug-block)))
+             (dotimes (k (sb!c:read-var-integer blocks i))
+               (let ((kind (svref sb!c::*compiled-code-location-kinds*
+                                  (aref+ blocks i)))
+                     (pc (+ last-pc
+                            (sb!c:read-var-integer blocks i)))
+                     (tlf-offset (or tlf-number
                                      (sb!c:read-var-integer blocks i)))
-                              (tlf-offset (or tlf-number
-                                              (sb!c:read-var-integer blocks i)))
-                              (form-number (sb!c:read-var-integer blocks i))
-                              (live-set (sb!c:read-packed-bit-vector
-                                         live-set-len blocks i))
-                              (step-info (sb!c:read-var-string blocks i)))
-                          (vector-push-extend (make-known-code-location
-                                               pc debug-fun tlf-offset
-                                               form-number live-set kind
-                                               step-info)
-                                              locations-buffer)
-                          (setf last-pc pc))))
-                     (block (make-compiled-debug-block
-                             locations successors
-                             (not (zerop (logand
-                                          sb!c::compiled-debug-block-elsewhere-p
-                                          succ-and-flags))))))
-                (vector-push-extend block blocks-buffer)
-                (dotimes (k (length locations))
-                  (setf (code-location-%debug-block (svref locations k))
-                        block))))))
-        (let ((res (result blocks-buffer)))
-          (declare (simple-vector res))
-          (dotimes (i (length res))
-            (let* ((block (svref res i))
-                   (succs nil))
-              (dolist (ele (debug-block-successors block))
-                (push (svref res ele) succs))
-              (setf (debug-block-successors block) succs)))
-          res)))))
+                     (form-number (sb!c:read-var-integer blocks i))
+                     (live-set (sb!c:read-packed-bit-vector
+                                live-set-len blocks i))
+                     (step-info (sb!c:read-var-string blocks i)))
+                 (vector-push-extend (make-known-code-location
+                                      pc debug-fun block tlf-offset
+                                      form-number live-set kind
+                                      step-info)
+                                     locations-buffer)
+                 (setf last-pc pc)))
+             (setf (compiled-debug-block-code-locations block)
+                   (result locations-buffer)
+                   (compiled-debug-block-elsewhere-p block)
+                   (> last-pc elsewhere-pc))
+             (vector-push-extend block blocks-buffer))))
+        (result blocks-buffer)))))
 
 ;;; The argument is a debug internals structure. This returns NIL if
 ;;; there is no variable information. It returns an empty
