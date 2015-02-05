@@ -418,7 +418,7 @@
                   #!+long-float (long-float 4)))))
           (if (= pass 0)
               (setf (ldb (byte 1 (+ pair-idx sign)) presence) 1)
-              (if (eq (ldb (byte 2 pair-idx) presence) #b11)
+              (if (= (ldb (byte 2 pair-idx) presence) #b11)
                   (when (= sign 0)
                     (push (ctype-of z) union-types))
                   (push z unpaired))))))
