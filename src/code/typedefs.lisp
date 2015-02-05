@@ -80,10 +80,6 @@
   ;;  ambiguity to whether it is a 'CLASS-INFO' slot in a 'TYPE'
   ;;  or an 'INFO' slot in a 'TYPE-CLASS']
   (class-info (missing-arg) :type type-class)
-  ;; True if this type has a fixed number of members, and as such
-  ;; could possibly be completely specified in a MEMBER type. This is
-  ;; used by the MEMBER type methods.
-  (enumerable nil :read-only t)
   ;; an arbitrary hash code used in EQ-style hashing of identity
   ;; (since EQ hashing can't be done portably)
   ;; - in the host lisp, generate a hash value using a known, simple
@@ -95,20 +91,21 @@
    #+sb-xc-host (ctype-random)
    #-sb-xc-host (sb!impl::quasi-random-address-based-hash *ctype-hash-state*)
               :type (and #-sb-xc-host fixnum unsigned-byte)
-              :read-only t)
-  ;; Can this object contain other types? A global property of our
-  ;; implementation (which unfortunately seems impossible to enforce
-  ;; with assertions or other in-the-code checks and constraints) is
-  ;; that subclasses which don't contain other types correspond to
-  ;; disjoint subsets (except of course for the NAMED-TYPE T, which
-  ;; covers everything). So NUMBER-TYPE is disjoint from CONS-TYPE is
-  ;; is disjoint from MEMBER-TYPE and so forth. But types which can
-  ;; contain other types, like HAIRY-TYPE and INTERSECTION-TYPE, can
-  ;; violate this rule.
-  (might-contain-other-types-p nil :read-only t))
+              :read-only t))
 (def!method print-object ((ctype ctype) stream)
   (print-unreadable-object (ctype stream :type t)
     (prin1 (type-specifier ctype) stream)))
+
+(declaim (inline type-might-contain-other-types-p))
+(defun type-might-contain-other-types-p (ctype)
+  (type-class-might-contain-other-types-p (type-class-info ctype)))
+
+(declaim (inline type-enumerable))
+(defun type-enumerable (ctype)
+  (let ((answer (type-class-enumerable-p (type-class-info ctype))))
+    (if (functionp answer)
+        (funcall answer ctype)
+        answer)))
 
 ;;; Just dump it as a specifier. (We'll convert it back upon loading.)
 (defun make-type-load-form (type)

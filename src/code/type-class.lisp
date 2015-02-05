@@ -77,7 +77,7 @@
                               (print-unreadable-object (x stream :type t)
                                 (prin1 (type-class-name x) stream)))))
   ;; the name of this type class (used to resolve references at load time)
-  (name (missing-arg) :type symbol)
+  (name (missing-arg) :type symbol :read-only t)
   ;; Dyadic type methods. If the classes of the two types are EQ, then
   ;; we call the SIMPLE-xxx method. If the classes are not EQ, and
   ;; either type's class has a COMPLEX-xxx method, then we call it.
@@ -131,6 +131,30 @@
   ;; a function which returns a Common Lisp type specifier
   ;; representing this type
   (unparse #'must-supply-this :type function)
+
+  ;; Can types of this type-class contain other types?
+  ;; A global property of our
+  ;; implementation (which unfortunately seems impossible to enforce
+  ;; with assertions or other in-the-code checks and constraints) is
+  ;; that subclasses which don't contain other types correspond to
+  ;; disjoint subsets (except of course for the NAMED-TYPE T, which
+  ;; covers everything). So NUMBER-TYPE is disjoint from CONS-TYPE is
+  ;; is disjoint from MEMBER-TYPE and so forth. But types which can
+  ;; contain other types, like HAIRY-TYPE and INTERSECTION-TYPE, can
+  ;; violate this rule.
+  (might-contain-other-types-p nil)
+  ;; a function which returns T if the CTYPE could possibly be
+  ;; equivalent to a MEMBER type. If not a function, then it's
+  ;; a constant T or NIL for all instances of this type class.
+  ;; Note that the old comment for this slot was
+  ;;   "True if this type has a fixed number of members, and as such
+  ;;    could possibly be completely specified in a MEMBER type."
+  ;; The second half of that is right because of the "possibly,"
+  ;; but "has a fixed number" is too strong a claim, because we
+  ;; set enumerable=T for NEGATION and HAIRY and some other things.
+  ;; Conceptually the choices are really {yes, no, unknown}, but
+  ;; whereas "no" means "definitely not", T means "yes or maybe".
+  (enumerable-p nil :type (or function null t))
   ;; a function which returns T if the CTYPE is inhabited by a single
   ;; object and, as a value, the object.  Otherwise, returns NIL, NIL.
   ;; The default case (NIL) is interpreted as a function that always
@@ -156,9 +180,33 @@
   )
 #!-sb-fluid (declaim (freeze-type type-class))
 
+#+sb-xc
+(eval-when (:compile-toplevel)
+  (assert (= (length (dd-slots (find-defstruct-description 'type-class)))
+             ;; there exist two boolean slots, plus NAME
+             (+ (length !type-class-fun-slots) 3))))
+
 (eval-when (#-sb-xc :compile-toplevel :load-toplevel :execute)
   (defun !type-class-fun-slot (name)
     (symbolicate "TYPE-CLASS-" name)))
+
+;; Unfortunately redundant with the slots in the DEF!STRUCT,
+;; but allows asserting about correctness of the constructor
+;; without relying on introspection in host Lisp.
+(defconstant-eqx !type-class-fun-slots
+    '(simple-subtypep
+      complex-subtypep-arg1
+      complex-subtypep-arg2
+      simple-union2
+      complex-union2
+      simple-intersection2
+      complex-intersection2
+      simple-=
+      complex-=
+      negate
+      unparse
+      singleton-p)
+  #'equal)
 
 (defmacro !define-type-method ((class method &rest more-methods)
                                lambda-list &body body)
@@ -174,13 +222,27 @@
                   (cons method more-methods)))
        ',name)))
 
-(defmacro !define-type-class (name &key inherits)
+(defmacro !define-type-class (name &key inherits
+                                     (enumerable (unless inherits (must-supply-this))
+                                                 enumerable-supplied-p)
+                                     (might-contain-other-types
+                                      (unless inherits (must-supply-this))
+                                      might-contain-other-types-supplied-p))
   (let ((make-it
-         (if inherits
-             `(let ((class (copy-structure (type-class-or-lose ',inherits))))
-                (setf (type-class-name class) ',name)
-                class)
-             `(make-type-class :name ',name))))
+         `(let ,(if inherits `((parent (type-class-or-lose ',inherits))))
+            (make-type-class
+             :name ',name
+             :enumerable-p ,(if enumerable-supplied-p
+                                enumerable
+                                `(type-class-enumerable-p parent))
+             :might-contain-other-types-p
+             ,(if might-contain-other-types-supplied-p
+                  might-contain-other-types
+                  `(type-class-might-contain-other-types-p parent))
+             ,@(when inherits
+                 (loop for name in !type-class-fun-slots
+                       append `(,(keywordicate name)
+                                (,(!type-class-fun-slot name) parent))))))))
     #-sb-xc
     `(progn
        (eval-when (:compile-toplevel :load-toplevel :execute)

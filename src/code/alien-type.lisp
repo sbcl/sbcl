@@ -24,7 +24,7 @@
             (:copier nil))
   (alien-type nil :type alien-type :read-only t))
 
-(!define-type-class alien)
+(!define-type-class alien :enumerable nil :might-contain-other-types nil)
 
 (!define-type-method (alien :negate) (type)
   (make-negation-type :type type))

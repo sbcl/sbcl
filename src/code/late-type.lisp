@@ -181,7 +181,8 @@
 (!define-type-method (values :simple-=) (type1 type2)
   (type=-args type1 type2))
 
-(!define-type-class function)
+(!define-type-class function :enumerable nil
+                    :might-contain-other-types nil)
 
 ;;; a flag that we can bind to cause complex function types to be
 ;;; unparsed as FUNCTION. This is useful when we want a type that we
@@ -1106,7 +1107,7 @@
 
 ;;;; built-in types
 
-(!define-type-class named)
+(!define-type-class named :enumerable nil :might-contain-other-types nil)
 
 (!cold-init-forms
  (macrolet ((frob (name var)
@@ -1637,7 +1638,8 @@
 
 ;;;; numeric types
 
-(!define-type-class number)
+(!define-type-class number :enumerable #'numeric-type-enumerable
+                    :might-contain-other-types nil)
 
 (declaim (inline numeric-type-equal))
 (defun numeric-type-equal (type1 type2)
@@ -2398,7 +2400,8 @@ used for a COMPLEX component.~:@>"
 
 ;;;; array types
 
-(!define-type-class array)
+(!define-type-class array :enumerable nil
+                    :might-contain-other-types nil)
 
 (!define-type-method (array :simple-=) (type1 type2)
   (cond ((not (and (equal (array-type-dimensions type1)
@@ -2773,7 +2776,8 @@ used for a COMPLEX component.~:@>"
 
 ;;;; MEMBER types
 
-(!define-type-class member)
+(!define-type-class member :enumerable t
+                    :might-contain-other-types nil)
 
 (!define-type-method (member :negate) (type)
   (let ((xset (member-type-xset type))
@@ -2933,7 +2937,9 @@ used for a COMPLEX component.~:@>"
 ;;;; (to the opaque HAIRY-TYPE) on sufficiently complicated types
 ;;;; involving AND.
 
-(!define-type-class intersection)
+(!define-type-class intersection
+                    :enumerable #'compound-type-enumerable
+                    :might-contain-other-types t)
 
 (!define-type-method (intersection :negate) (type)
   (apply #'type-union
@@ -3064,7 +3070,9 @@ used for a COMPLEX component.~:@>"
 
 ;;;; union types
 
-(!define-type-class union)
+(!define-type-class union
+                    :enumerable #'compound-type-enumerable
+                    :might-contain-other-types t)
 
 (!define-type-method (union :negate) (type)
   (declare (type ctype type))
@@ -3237,7 +3245,7 @@ used for a COMPLEX component.~:@>"
 
 ;;;; CONS types
 
-(!define-type-class cons)
+(!define-type-class cons :enumerable nil :might-contain-other-types nil)
 
 (!def-type-translator cons (&optional (car-type-spec '*) (cdr-type-spec '*))
   (let ((car-type (single-value-specifier-type car-type-spec))
@@ -3384,7 +3392,14 @@ used for a COMPLEX component.~:@>"
 
 ;;;; CHARACTER-SET types
 
-(!define-type-class character-set)
+;; all character-set types are enumerable, but it's not possible
+;; for one to be TYPE= to a MEMBER type because (MEMBER #\x)
+;; is not internally represented as a MEMBER type.
+;; So in case it wasn't clear already ENUMERABLE-P does not mean
+;;  "possibly a MEMBER type in the Lisp-theoretic sense",
+;; but means "could be implemented in SBCL as a MEMBER type".
+(!define-type-class character-set :enumerable nil
+                    :might-contain-other-types nil)
 
 (!def-type-translator character-set
     (&optional (pairs '((0 . #.(1- sb!xc:char-code-limit)))))
@@ -3615,7 +3630,8 @@ used for a COMPLEX component.~:@>"
 ;;;; SIMD-PACK types
 #!+sb-simd-pack
 (progn
-  (!define-type-class simd-pack)
+  (!define-type-class simd-pack :enumerable nil
+                      :might-contain-other-types nil)
 
   (!def-type-translator simd-pack (&optional (element-type-spec '*))
      (if (eql element-type-spec '*)

@@ -874,7 +874,20 @@ between the ~A definition and the ~A definition"
 
 ;;;; CLASS type operations
 
-(!define-type-class classoid)
+;; referenced right away by !DEFINE-TYPE-CLASS.
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  ;; Actually this definition makes very little sense because
+  ;;     (TYPE-ENUMERABLE (FIND-CLASSOID 'CHARACTER)) => T
+  ;; but (TYPE-ENUMERABLE (SPECIFIER-TYPE 'CHARACTER)) => NIL.
+  ;; You should never see the CLASSOID used as a type though,
+  ;; at least not from parsing and set operations.
+  ;; On a related note, (TYPE-ENUMERABLE (FIND-CLASSOID 'NULL))
+  ;; should probably be T, but you'll never see that type either.
+  ;; Perhaps a better definition of this function would be
+  ;;   (if (classoid-translation x) (bug "enumerable-p classoid?") nil)
+  (defun classoid-enumerable-p (x) (eq (classoid-name x) 'character)))
+(!define-type-class classoid :enumerable #'classoid-enumerable-p
+                    :might-contain-other-types nil)
 
 ;;; We might be passed classoids with invalid layouts; in any pairwise
 ;;; class comparison, we must ensure that both are valid before
@@ -1051,10 +1064,6 @@ between the ~A definition and the ~A definition"
 ;;;     object because in general we want to be able to include more
 ;;;     information than just the class (e.g. for numeric types.)
 ;;;
-;;; :ENUMERABLE (default NIL)
-;;;     The value of the :ENUMERABLE slot in the created class.
-;;;     Meaningless in translated classes.
-;;;
 ;;; :STATE (default :SEALED)
 ;;;     The value of CLASS-STATE which we want on completion,
 ;;;     indicating whether subclasses can be created at run-time.
@@ -1077,8 +1086,7 @@ between the ~A definition and the ~A definition"
 (!defvar *!built-in-classes*
    ;; To me these data would look nicer with commas instead of "#."
    '((t :state :read-only :translation t)
-     (character :enumerable t
-                :codes (#.sb!vm:character-widetag)
+     (character :codes (#.sb!vm:character-widetag)
                 :translation (character-set)
                 :prototype-form (code-char 42))
      (symbol :codes (#.sb!vm:symbol-header-widetag)
@@ -1430,7 +1438,6 @@ between the ~A definition and the ~A definition"
               (translation nil trans-p)
               inherits
               codes
-              enumerable
               state
               depth
               prototype-form
@@ -1444,7 +1451,6 @@ between the ~A definition and the ~A definition"
                                ()
                                (cons t (reverse inherits))))
             (classoid (make-built-in-classoid
-                       :enumerable enumerable
                        :name name
                        :translation (if trans-p :initializing nil)
                        :direct-superclasses

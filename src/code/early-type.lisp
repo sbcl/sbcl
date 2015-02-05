@@ -18,15 +18,18 @@
 ;;; and unreasonably complicated types involving AND. We just remember
 ;;; the original type spec.
 (defstruct (hairy-type (:include ctype
-                                 (class-info (type-class-or-lose 'hairy))
-                                 (enumerable t)
-                                 (might-contain-other-types-p t))
+                                 (class-info (type-class-or-lose 'hairy)))
                        (:copier nil)
                        #!+cmu (:pure nil))
   ;; the Common Lisp type-specifier of the type we represent
   (specifier nil :type t :read-only t))
 
-(!define-type-class hairy)
+;; ENUMERABLE-P is T because a hairy type could be equivalent to a MEMBER type.
+;; e.g. any SATISFIES with a predicate returning T over a finite domain.
+;; But in practice there's nothing that can be done with this information,
+;; because we don't call random predicates when performing operations on types
+;; as objects, only when checking for inclusion of something in the type.
+(!define-type-class hairy :enumerable t :might-contain-other-types t)
 
 ;;; An UNKNOWN-TYPE is a type not known to the type system (not yet
 ;;; defined). We make this distinction since we don't want to complain
@@ -55,16 +58,16 @@
          t))))
 
 (defstruct (negation-type (:include ctype
-                                    (class-info (type-class-or-lose 'negation))
-                                    ;; FIXME: is this right?  It's
-                                    ;; what they had before, anyway
-                                    (enumerable t)
-                                    (might-contain-other-types-p t))
+                                    (class-info (type-class-or-lose 'negation)))
                           (:copier nil)
                           #!+cmu (:pure nil))
   (type (missing-arg) :type ctype :read-only t))
 
-(!define-type-class negation)
+;; Former comment was:
+;;   FIXME: is this right?  It's what they had before, anyway
+;; But I think the reason it's right is that "enumerable :t" is equivalent
+;; to "maybe" which is actually the conservative assumption, same as HAIRY.
+(!define-type-class negation :enumerable t :might-contain-other-types t)
 
 ;;; ARGS-TYPE objects are used both to represent VALUES types and
 ;;; to represent FUNCTION types.
@@ -180,7 +183,8 @@
           (t (make-values-type-cached required optional
                                       rest allowp)))))
 
-(!define-type-class values)
+(!define-type-class values :enumerable nil
+                    :might-contain-other-types nil)
 
 ;;; (SPECIFIER-TYPE 'FUNCTION) and its subtypes
 (defstruct (fun-type (:include args-type
@@ -240,6 +244,9 @@
                                    (class-info (type-class-or-lose 'number)))
                          (:constructor %make-numeric-type)
                          (:copier nil))
+  ;; Formerly defined in every CTYPE, but now just in the ones
+  ;; for which enumerability is variable.
+  (enumerable nil :read-only t)
   ;; the kind of numeric type we have, or NIL if not specified (just
   ;; NUMBER or COMPLEX)
   ;;
@@ -317,7 +324,7 @@
                               (complexp   (numeric-type-complexp   base))
                               (low        (numeric-type-low        base))
                               (high       (numeric-type-high       base))
-                              (enumerable (numeric-type-enumerable base)))
+                              (enumerable (type-enumerable         base)))
   (make-numeric-type :class class
                      :format format
                      :complexp complexp
@@ -380,8 +387,7 @@
 ;;; bother with this at this level because MEMBER types are fairly
 ;;; important and union and intersection are well defined.
 (defstruct (member-type (:include ctype
-                                  (class-info (type-class-or-lose 'member))
-                                  (enumerable t))
+                                  (class-info (type-class-or-lose 'member)))
                         (:copier nil)
                         (:constructor %make-member-type (xset fp-zeroes))
                         #-sb-xc-host (:pure nil))
@@ -459,10 +465,12 @@
 
 ;;; A COMPOUND-TYPE is a type defined out of a set of types, the
 ;;; common parent of UNION-TYPE and INTERSECTION-TYPE.
-(defstruct (compound-type (:include ctype
-                                    (might-contain-other-types-p t))
+(defstruct (compound-type (:include ctype)
                           (:constructor nil)
                           (:copier nil))
+  ;; Formerly defined in every CTYPE, but now just in the ones
+  ;; for which enumerability is variable.
+  (enumerable nil :read-only t)
   (types nil :type list :read-only t))
 
 ;;; A UNION-TYPE represents a use of the OR type specifier which we
