@@ -9,7 +9,7 @@
 
 ;;;; XSET
 ;;;;
-;;;; A somewhat effcient set implementation that can store arbitrary
+;;;; A somewhat efficient set implementation that can store arbitrary
 ;;;; objects. For small sets the data is stored in a list, but when
 ;;;; the amount of elements grows beyond +XSET-LIST-SIZE-LIMIT+, we
 ;;;; switch to a hash-table instead.
@@ -68,6 +68,14 @@
                 (setf (gethash x table) t))
               (setf (xset-data xset) table)))
         (setf (gethash elt data) t))))
+
+;; items must be canonical - no duplicates - and few in number.
+(defun xset-from-list (items)
+  (let ((n (length items)))
+    (aver (<= n +xset-list-size-limit+))
+    (let ((xset (alloc-xset)))
+      (setf (xset-list-size xset) n (xset-data xset) items)
+      xset)))
 
 (defun xset-union (a b)
   (let ((xset (alloc-xset)))

@@ -1,5 +1,11 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 changes relative to sbcl-1.2.8:
+  * optimization: The compiler's treatment of type specifiers makes
+    it slightly faster and more memory-efficient. Portable code
+    should be indifferent to this change, however, users of
+    SB-INTROSPECT:FUNCTION-TYPE might notice that (MEMBER T NIL)
+    and (MEMBER NIL T) are both internally collapsed to the former,
+    so that the latter can never be obtained as part of an FTYPE.
   * bug fix: compiler no longer signals an error when compiling certain nested
     local calls. (lp#1416704, lp#404441)
   * bug fix: more robust debugger and backtraces. (lp#1413850, lp#1099500,

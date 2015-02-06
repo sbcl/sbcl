@@ -961,4 +961,18 @@
                         (or (typep ,g '(and array (not (array ,excluded-type))))
                             (typep ,g 'fixnum))))))))
 
+(with-test (:name :interned-type-specifiers)
+  (dolist (specifier '((satisfies keywordp) ; not the same as KEYWORD
+                       boolean
+                       cons
+                       null))
+    ;; In general specifiers can repeatedly parse the same due to
+    ;; the caching in VALUES-SPECIFIER-TYPE provided the entry was
+    ;; not evicted. Here we want to check a stronger condition,
+    ;; that they really always parse to the identical object.
+    (let ((parse1 (sb-kernel:specifier-type specifier)))
+      (sb-int:drop-all-hash-caches)
+      (let ((parse2 (sb-kernel:specifier-type specifier)))
+        (assert (eq parse1 parse2))))))
+
 ;;; success

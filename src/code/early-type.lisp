@@ -19,6 +19,7 @@
 ;;; the original type spec.
 (defstruct (hairy-type (:include ctype
                                  (class-info (type-class-or-lose 'hairy)))
+                       (:constructor %make-hairy-type (specifier))
                        (:copier nil)
                        #!+cmu (:pure nil))
   ;; the Common Lisp type-specifier of the type we represent
@@ -407,32 +408,41 @@
   ;; compared by EQL).  -- CSR, 2003-04-23
   (let ((presence 0)
         (unpaired nil)
-        (union-types nil))
-    (dotimes (pass 2)
-      (dolist (z fp-zeroes)
-        (let ((sign (if (minusp (nth-value 2 (integer-decode-float z))) 1 0))
-              (pair-idx
-                (etypecase z
-                  (single-float 0)
-                  (double-float 2
-                  #!+long-float (long-float 4)))))
-          (if (= pass 0)
-              (setf (ldb (byte 1 (+ pair-idx sign)) presence) 1)
-              (if (= (ldb (byte 2 pair-idx) presence) #b11)
-                  (when (= sign 0)
-                    (push (ctype-of z) union-types))
-                  (push z unpaired))))))
+        (float-types nil))
+    (when fp-zeroes ; avoid doing two passes of nothing
+      (dotimes (pass 2)
+        (dolist (z fp-zeroes)
+          (let ((sign (if (minusp (nth-value 2 (integer-decode-float z))) 1 0))
+                (pair-idx
+                  (etypecase z
+                    (single-float 0)
+                    (double-float 2
+                    #!+long-float (long-float 4)))))
+            (if (= pass 0)
+                (setf (ldb (byte 1 (+ pair-idx sign)) presence) 1)
+                (if (= (ldb (byte 2 pair-idx) presence) #b11)
+                    (when (= sign 0)
+                      (push (ctype-of z) float-types))
+                    (push z unpaired)))))))
     ;; The actual member-type contains the XSET (with no FP zeroes),
     ;; and a list of unpaired zeroes.
-    (let ((member-type (unless (and (xset-empty-p xset) (not unpaired))
-                         (%make-member-type xset unpaired))))
-      (cond (union-types
-             (make-union-type t (if member-type
-                                    (cons member-type union-types)
-                                    union-types)))
-            (member-type)
-            (t
-             *empty-type*)))))
+    (let ((member-type
+           (cond ((and (not unpaired) (equal (xset-data xset) '(nil)))
+                  *null-type*)
+                 ((and (not unpaired)
+                       ;; Semantically this is fine - XSETs
+                       ;; are not order-preserving except by accident
+                       ;; (when not represented as a hash-table).
+                       (or (equal (xset-data xset) '(t nil))
+                           (equal (xset-data xset) '(nil t))))
+                  *boolean-type*)
+                 ((or unpaired (not (xset-empty-p xset)))
+                  (%make-member-type xset unpaired)))))
+      (if float-types
+          (make-union-type t (if member-type
+                                 (cons member-type float-types)
+                                 float-types))
+          (or member-type *empty-type*)))))
 
 (defun member-type-size (type)
   (+ (length (member-type-fp-zeroes type))
@@ -524,10 +534,16 @@
 (defun make-cons-type (car-type cdr-type)
   (aver (not (or (eq car-type *wild-type*)
                  (eq cdr-type *wild-type*))))
-  (if (or (eq car-type *empty-type*)
-          (eq cdr-type *empty-type*))
-      *empty-type*
-      (%make-cons-type car-type cdr-type)))
+  (cond ((or (eq car-type *empty-type*)
+             (eq cdr-type *empty-type*))
+         *empty-type*)
+        ;; It's not a requirement that (CONS T T) be interned,
+        ;; but it improves the hit rate in the function caches.
+        ((and (type= car-type *universal-type*)
+              (type= cdr-type *universal-type*))
+         *cons-t-t-type*)
+        (t
+         (%make-cons-type car-type cdr-type))))
 
 (defun cons-type-length-info (type)
   (declare (type cons-type type))

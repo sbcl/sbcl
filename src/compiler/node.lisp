@@ -612,6 +612,9 @@
   ;; See also the LEAF-DEBUG-NAME function and the
   ;; FUNCTIONAL-%DEBUG-NAME slot.
   (%source-name (missing-arg)
+                ;; I guess we state the type this way to avoid calling
+                ;; LEGAL-FUN-NAME-P unless absolutely necessary,
+                ;; but this seems a bit of a premature optimization.
                 :type (or symbol (and cons (satisfies legal-fun-name-p)))
                 :read-only t)
   ;; the type which values of this leaf must have

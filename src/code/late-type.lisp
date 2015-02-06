@@ -964,6 +964,11 @@
 ;;; definitely correct. NIL is considered to intersect with any type.
 ;;; If T is a subtype of either type, then we also return T, T. This
 ;;; way we recognize that hairy types might intersect with T.
+;;;
+;;; Well now given the statement above that this is "useful for ..."
+;;; a particular thing, I see how treating *empty-type* magically could
+;;; be useful, however given all the _other_ calls to this function within
+;;; this file, it seems suboptimal, because logically it is wrong.
 (defun types-equal-or-intersect (type1 type2)
   (declare (type ctype type1 type2))
   (if (or (eq type1 *empty-type*) (eq type2 *empty-type*))
@@ -1082,10 +1087,8 @@
                                                         other-types)))
           (if distributed
               (apply #'type-union distributed)
-              (make-hairy-type
-               :specifier `(and ,@(map 'list
-                                       #'type-specifier
-                                       simplified-types)))))
+              (%make-hairy-type `(and ,@(map 'list #'type-specifier
+                                             simplified-types)))))
         (cond
           ((null simplified-types) *universal-type*)
           ((null (cdr simplified-types)) (car simplified-types))
@@ -1139,6 +1142,8 @@
    ;; extended sequence hierarchy.  (Might be removed later if we use
    ;; a dedicated FUNDAMENTAL-SEQUENCE class for this.)
    (frob extended-sequence *extended-sequence-type*))
+ (setf *satisfies-keywordp-type* (%make-hairy-type '(satisfies keywordp)))
+ (setf *fun-name-type* (%make-hairy-type '(satisfies legal-fun-name-p)))
  (setf *universal-fun-type*
        (make-fun-type :wild-args t
                       :returns *wild-type*)))
@@ -1430,9 +1435,31 @@
 
 (!define-type-method (hairy :simple-intersection2 :complex-intersection2)
                      (type1 type2)
-  (if (type= type1 type2)
-      type1
-      nil))
+  (cond ((type= type1 type2)
+         type1)
+        ((eq type2 *satisfies-keywordp-type*)
+         ;; (AND (MEMBER A) (SATISFIES KEYWORDP)) is possibly non-empty
+         ;; if A is re-homed as :A. However as a special case that really
+         ;; does occur, (AND (MEMBER NIL) (SATISFIES KEYWORDP))
+         ;; is empty because of the illegality of changing NIL's package.
+         (if (eq type1 *null-type*)
+             *empty-type*
+             (multiple-value-bind (answer certain)
+                 (types-equal-or-intersect type1 (specifier-type 'symbol))
+               (if (and (not answer) certain)
+                   *empty-type*
+                   nil))))
+        ((eq type2 *fun-name-type*)
+         (multiple-value-bind (answer certain)
+             (types-equal-or-intersect type1 (specifier-type 'symbol))
+           (if (and (not answer) certain)
+               (multiple-value-bind (answer certain)
+                   (types-equal-or-intersect type1 (specifier-type 'cons))
+                 (if (and (not answer) certain)
+                     *empty-type*
+                     nil))
+               nil)))
+        (t nil)))
 
 (!define-type-method (hairy :simple-union2)
                      (type1 type2)
@@ -1456,9 +1483,12 @@
              :datum predicate-name
              :expected-type 'symbol
              :format-control "The SATISFIES predicate name is not a symbol: ~S"
-             :format-arguments (list predicate-name))))
-  ;; Create object.
-  (make-hairy-type :specifier whole))
+             :format-arguments (list predicate-name)))
+    ;; Create object.
+    (case predicate-name
+      (keywordp *satisfies-keywordp-type*)
+      (legal-fun-name-p *fun-name-type*)
+      (t (%make-hairy-type whole)))))
 
 ;;;; negation types
 
@@ -2779,6 +2809,16 @@ used for a COMPLEX component.~:@>"
 (!define-type-class member :enumerable t
                     :might-contain-other-types nil)
 
+;; this is ridiculously order-sensitive: the DEFSTRUCT is in 'early-type'
+;; as is MAKE-MEMBER-TYPE, the only user of *NULL-TYPE*.
+;; But the type-class is here, and you can't make a CTYPE object
+;; until a type-class exists for it. Type-classes are akin to layouts,
+;; and ought to be as primordial, and dumped during Genesis.
+;; I have a patch to do exactly that, but until then...
+(!cold-init-forms
+ (setf *null-type* (%make-member-type (xset-from-list '(nil)) nil)
+       *boolean-type* (%make-member-type (xset-from-list '(t nil)) nil)))
+
 (!define-type-method (member :negate) (type)
   (let ((xset (member-type-xset type))
         (fp-zeroes (member-type-fp-zeroes type)))
@@ -3246,6 +3286,10 @@ used for a COMPLEX component.~:@>"
 ;;;; CONS types
 
 (!define-type-class cons :enumerable nil :might-contain-other-types nil)
+
+;; Another order-sensitive form. See related note at MEMBER type-class.
+(!cold-init-forms
+ (setf *cons-t-t-type* (%make-cons-type *universal-type* *universal-type*)))
 
 (!def-type-translator cons (&optional (car-type-spec '*) (cdr-type-spec '*))
   (let ((car-type (single-value-specifier-type car-type-spec))

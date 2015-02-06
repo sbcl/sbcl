@@ -3780,7 +3780,10 @@
 
 (with-test (:name :bug-384892)
   (assert (equal
-           '(function (fixnum fixnum &key (:k1 (member nil t)))
+           ;; The assertion that BOOLEAN becomes (MEMBER T NIL)
+           ;; is slightly brittle, but the rest of the
+           ;; assertion is ok.
+           '(function (fixnum fixnum &key (:k1 (member t nil)))
              (values (member t) &optional))
            (sb-kernel:%simple-fun-type
             (compile nil `(lambda (x y &key k1)
