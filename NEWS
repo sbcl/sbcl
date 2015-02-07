@@ -9,7 +9,7 @@ changes relative to sbcl-1.2.8:
   * bug fix: compiler no longer signals an error when compiling certain nested
     local calls. (lp#1416704, lp#404441)
   * bug fix: more robust debugger and backtraces. (lp#1413850, lp#1099500,
-    lp#1412881, lp#945261)
+    lp#1412881, lp#945261, lp#1419205)
 
 changes in sbcl-1.2.8 relative to sbcl-1.2.7:
   * enhancement: better error and warning messages. (lp#1314767, lp#736383)

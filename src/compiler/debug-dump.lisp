@@ -54,11 +54,13 @@
 
 (defun leaf-visible-to-debugger-p (leaf node)
   (or (rassoc leaf (lexenv-vars (node-lexenv node)))
-      (let* ((lambda (lexenv-lambda (node-lexenv node)))
-             (call-lexenv (and lambda
-                               (lambda-call-lexenv lambda))))
-        (and call-lexenv
-             (rassoc leaf (lexenv-vars call-lexenv))))))
+      (labels ((visible-in-call-lexenv (lambda)
+                 (when lambda
+                   (let ((call-lexenv (lambda-call-lexenv lambda)))
+                     (and call-lexenv
+                          (or (rassoc leaf (lexenv-vars call-lexenv))
+                              (visible-in-call-lexenv (lexenv-lambda call-lexenv))))))))
+        (visible-in-call-lexenv (lexenv-lambda (node-lexenv node))))))
 
 ;;; Given a local conflicts vector and an IR2 block to represent the
 ;;; set of live TNs, and the VAR-LOCS hash-table representing the

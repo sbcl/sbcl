@@ -1037,3 +1037,26 @@
                            l)))
          #(1) 2)))
     (assert (= count 1))))
+
+(with-test (:name :variables-surrounding-inlined-code.2)
+  (let ((count 0))
+    (block nil
+      (handler-bind ((error (lambda (c)
+                              (declare (ignore c))
+                              (sb-debug::map-backtrace
+                               (lambda (frame)
+                                 (let ((sb-debug::*current-frame* frame))
+                                   (multiple-value-bind (name)
+                                       (sb-debug::frame-call frame)
+                                     (when (eq name 'test)
+                                       (assert (equal (sb-debug:var 'l) '(1 2 3)))
+                                       (incf count))))))
+                              (return))))
+        (funcall
+         (compile nil `(sb-int:named-lambda test (c)
+                         (declare (optimize (debug 3)))
+                         (let ((l (list 1 2 3)))
+                           (map 'list #'signal c)
+                           l)))
+         '(error))))
+    (assert (= count 1))))
