@@ -153,9 +153,9 @@ extent of the block."
                           :value value-lvar)))
     (when (ctran-deleted-p exit-ctran)
       (throw 'locall-already-let-converted exit-ctran))
-    (push exit (entry-exits entry))
     (setf (lvar-dest value-lvar) exit)
     (ir1-convert start value-ctran value-lvar value)
+    (push exit (entry-exits entry))
     (link-node-to-previous-ctran exit value-ctran)
     (let ((home-lambda (ctran-home-lambda-or-null start)))
       (when home-lambda

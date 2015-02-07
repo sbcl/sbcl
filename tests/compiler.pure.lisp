@@ -5446,3 +5446,20 @@
                                   (funcall a3))))))))
     (assert (= (catch 'x (funcall fun t)) 10))
     (assert (= (catch 'x (funcall fun nil)) 20))))
+
+
+(with-test (:name :locall-already-let-converted)
+  (assert (eq (funcall
+               (funcall
+                (compile
+                 nil
+                 '(lambda ()
+                   (flet ((call (ff)
+                            (flet ((f () (return-from f ff)))
+                              (declare (inline f))
+                              (f)
+                              (f))))
+                     (declare (inline call))
+                     (call 1)
+                     (call (lambda () 'result)))))))
+              'result)))

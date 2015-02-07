@@ -7,7 +7,7 @@ changes relative to sbcl-1.2.8:
     and (MEMBER NIL T) are both internally collapsed to the former,
     so that the latter can never be obtained as part of an FTYPE.
   * bug fix: compiler no longer signals an error when compiling certain nested
-    local calls. (lp#1416704, lp#404441)
+    local calls. (lp#1416704, lp#404441, lp#1417822)
   * bug fix: more robust debugger and backtraces. (lp#1413850, lp#1099500,
     lp#1412881, lp#945261, lp#1419205)
 
