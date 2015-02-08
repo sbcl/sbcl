@@ -31,8 +31,10 @@
   (- (struct-b-x b)
      (struct-b-y b)
      (struct-b-z b)))
-(assert (= (wiggle (make-struct-a :x 6 :y 5))
-           (jiggle (make-struct-b :x 19 :y 6 :z 2))))
+
+(with-test (:name (defmethod defstruct :same-file))
+  (assert (= (wiggle (make-struct-a :x 6 :y 5))
+             (jiggle (make-struct-b :x 19 :y 6 :z 2)))))
 
 ;;; Compiling DEFGENERIC should prevent "undefined function" style
 ;;; warnings from code within the same file.
@@ -46,8 +48,9 @@
 ;;; broken in such a way that the code here would signal an error.
 (defgeneric zut-n-a-m (a b c))
 (defmethod no-applicable-method ((zut-n-a-m (eql #'zut-n-a-m)) &rest args)
-  (format t "~&No applicable method for ZUT-N-A-M ~S, yet.~%" args))
-(zut-n-a-m 1 2 3)
+  :no-applicable-method)
+(with-test (:name no-applicable-method)
+  (assert (eq :no-applicable-method (zut-n-a-m 1 2 3))))
 
 ;;; bug reported and fixed by Alexey Dejneka sbcl-devel 2001-09-10:
 ;;; This DEFGENERIC shouldn't cause an error.
@@ -75,81 +78,91 @@
 ;;; legal method specializers
 (defclass bug-525916-1 () ())
 (defclass bug-525916-2 () ())
-(with-test (:name :bug-525916)
-(assert (expect-error (defmethod invalid ((arg)) arg)))
-(assert (expect-error (defmethod invalid (nil) 1)))
-(assert (expect-error (defmethod invalid ((arg . bug-525916-1)) arg)))
-(assert (expect-error (defmethod invalid ((arg bug-525916-1 bug-525916-2)) arg))))
+(with-test (:name (defmethod :specializer-syntax :bug-525916))
+  (assert (expect-error (defmethod invalid ((arg)) arg)))
+  (assert (expect-error (defmethod invalid (nil) 1)))
+  (assert (expect-error (defmethod invalid ((arg . bug-525916-1)) arg)))
+  (assert (expect-error (defmethod invalid ((arg bug-525916-1 bug-525916-2)) arg))))
 
 ;;; more lambda-list checking
 ;;;
 ;;; DEFGENERIC lambda lists are subject to various limitations, as per
 ;;; section 3.4.2 of the ANSI spec. Since Alexey Dejneka's patch for
 ;;; bug 191-b ca. sbcl-0.7.22, these limitations should be enforced.
-(labels ((coerce-to-boolean (x)
-           (if x t nil))
-         (%like-or-dislike (expr expected-failure-p)
-           (declare (type boolean expected-failure-p))
-           (format t "~&trying ~S~%" expr)
-           (multiple-value-bind (fun warnings-p failure-p)
-             (compile nil
-                      `(lambda ()
-                         ,expr))
-             (declare (ignore fun))
-             ;; In principle the constraint on WARNINGS-P below seems
-             ;; reasonable, but in practice we get warnings about
-             ;; undefined functions from the DEFGENERICs, apparently
-             ;; because the DECLAIMs which ordinarily prevent such
-             ;; warnings don't take effect because EVAL-WHEN
-             ;; (:COMPILE-TOPLEVEL) loses its magic when compiled
-             ;; within a LAMBDA. So maybe we can't test WARNINGS-P
-             ;; after all?
-             ;;(unless expected-failure-p
-             ;;  (assert (not warnings-p)))
-             (assert (eq (coerce-to-boolean failure-p) expected-failure-p))))
-         (like (expr)
-           (%like-or-dislike expr nil))
-         (dislike (expr)
-           (%like-or-dislike expr t)))
-  ;; basic sanity
-  (dislike '(defgeneric gf-for-ll-test-0 ("a" #p"b")))
-  (like    '(defgeneric gf-for-ll-test-1 ()))
-  (like    '(defgeneric gf-for-ll-test-2 (x)))
-  ;; forbidden default or supplied-p for &OPTIONAL or &KEY arguments
-  (dislike '(defgeneric gf-for-ll-test-3 (x &optional (y 0))))
-  (like    '(defgeneric gf-for-ll-test-4 (x &optional y)))
-  (dislike '(defgeneric gf-for-ll-test-5 (x y &key (z :z z-p))))
-  (like    '(defgeneric gf-for-ll-test-6 (x y &key z)))
-  (dislike '(defgeneric gf-for-ll-test-7 (x &optional (y 0) &key z)))
-  (like    '(defgeneric gf-for-ll-test-8 (x &optional y &key z)))
-  (dislike '(defgeneric gf-for-ll-test-9 (x &optional y &key (z :z))))
-  (like    '(defgeneric gf-for-ll-test-10 (x &optional y &key z)))
-  (dislike '(defgeneric gf-for-ll-test-11 (&optional &key (k :k k-p))))
-  (like    '(defgeneric gf-for-ll-test-12 (&optional &key k)))
-  ;; forbidden &AUX
-  (dislike '(defgeneric gf-for-ll-test-13 (x y z &optional a &aux g h)))
-  (like    '(defgeneric gf-for-ll-test-14 (x y z &optional a)))
-  (dislike '(defgeneric gf-for-ll-test-bare-aux-1 (x &aux)))
-  (like    '(defgeneric gf-for-ll-test-bare-aux-2 (x)))
-  ;; also can't use bogoDEFMETHODish type-qualifier-ish decorations
-  ;; on required arguments
-  (dislike '(defgeneric gf-for-11-test-15 ((arg t))))
-  (like '(defgeneric gf-for-11-test-16 (arg))))
+(with-test (:name (defgeneric :lambda-list))
+  (labels ((coerce-to-boolean (x)
+             (if x t nil))
+           (test-case (lambda-list
+                       &optional
+                       expected-failure-p expected-warnings-p message)
+             (declare (type boolean expected-failure-p))
+             (format t "~&trying ~S~%" lambda-list)
+             (let ((*error-output* (make-string-output-stream) ))
+               (multiple-value-bind (fun warnings-p failure-p)
+                   (compile nil `(lambda () (defgeneric ,(gensym) ,lambda-list)))
+                 (declare (ignore fun))
+                 (assert (eq (coerce-to-boolean failure-p) expected-failure-p))
+                 (assert (eq (coerce-to-boolean warnings-p) expected-warnings-p))
+                 (when message
+                   (assert (search message (get-output-stream-string
+                                            *error-output*))))))))
+    ;; basic sanity
+    (test-case '("a" #p"b")
+               t t "Required argument is not a symbol: \"a\"")
+    (test-case '())
+    (test-case '(x))
+    ;; forbidden default or supplied-p for &OPTIONAL or &KEY arguments
+    (test-case '(x &optional (y 0))
+               t t "invalid (Y 0) in the generic function lambda list")
+    (test-case '(x &optional y))
+    (test-case '(x y &key (z :z z-p))
+               t t "invalid (Z :Z Z-P) in the generic function lambda list")
+    (test-case '(x y &key z))
+    (test-case '(x &optional (y 0) &key z)
+               t t "invalid (Y 0) in the generic function lambda list")
+    (test-case '(x &optional y &key z)
+               nil t "&OPTIONAL and &KEY found in the same lambda list")
+    (test-case '(x &optional y &key (z :z))
+               t t "invalid (Z :Z) in the generic function lambda list")
+    (test-case '(x &optional y &key z)
+               nil t "&OPTIONAL and &KEY found in the same lambda list")
+    (test-case '(&optional &key (k :k k-p))
+               t t "invalid (K :K K-P)")
+    (test-case '(&optional &key k))
+    ;; forbidden &AUX
+    (test-case '(x y z &optional a &aux g h)
+               t t "&AUX is not allowed in a generic function lambda list")
+    (test-case '(x y z &optional a))
+    (test-case '(x &aux)
+               t t "&AUX is not allowed in a generic function lambda list")
+    (test-case '(x))
+    ;; also can't use bogoDEFMETHODish type-qualifier-ish decorations
+    ;; on required arguments
+    (test-case '((arg t))
+               t t "Required argument is not a symbol: (ARG T)")
+    (test-case '(arg))))
 
-;;; structure-class tests setup
+
+;;; Explicit :metaclass option with structure-class and
+;;; standard-class.
+
 (defclass structure-class-foo1 () () (:metaclass cl:structure-class))
 (defclass structure-class-foo2 (structure-class-foo1)
   () (:metaclass cl:structure-class))
+(with-test (:name (defclass :metaclass cl:structure-class))
+  (assert (typep (class-of (make-instance 'structure-class-foo1))
+                 'structure-class))
+  (assert (typep (make-instance 'structure-class-foo1) 'structure-class-foo1))
+  (assert (typep (class-of (make-instance 'structure-class-foo2))
+                 'structure-class))
+  (assert (typep (make-instance 'structure-class-foo2) 'structure-class-foo2)))
 
-;;; standard-class tests setup
 (defclass standard-class-foo1 () () (:metaclass cl:standard-class))
 (defclass standard-class-foo2 (standard-class-foo1)
   () (:metaclass cl:standard-class))
-
-(assert (typep (class-of (make-instance 'structure-class-foo1))
-               'structure-class))
-(assert (typep (make-instance 'structure-class-foo1) 'structure-class-foo1))
-(assert (typep (make-instance 'standard-class-foo1) 'standard-class-foo1))
+(with-test (:name (defclass :metaclass cl:standard-class))
+  (assert (typep (make-instance 'standard-class-foo1) 'standard-class-foo1))
+  (assert (typep (make-instance 'standard-class-foo2) 'standard-class-foo2)))
 
 ;;; DEFGENERIC's blow-away-old-methods behavior is specified to have
 ;;; special hacks to distinguish between defined-with-DEFGENERIC-:METHOD
@@ -318,6 +331,7 @@
   ;; Type-mismatches should be recoverable via USE-VALUE restart.
   (let* ((from (make-instance 'change-class.type-check.1 :foo 1.0))
          (to (handler-bind ((type-error (lambda (condition)
+                                          (declare (ignore condition))
                                           (use-value 3))))
                (change-class from 'change-class.type-check.2))))
     (assert (equal (slot-value to 'foo) 3))))
@@ -1156,31 +1170,31 @@
 
 (assert (= 4 *mio-counter*))
 
-;;; shared -> local slot transfers of inherited slots, reported by
-;;; Bruno Haible
-(let (i)
-  (defclass super-with-magic-slot ()
-    ((magic :initarg :size :initform 1 :allocation :class)))
-  (defclass sub-of-super-with-magic-slot (super-with-magic-slot) ())
-  (setq i (make-instance 'sub-of-super-with-magic-slot))
-  (defclass super-with-magic-slot ()
-    ((magic :initarg :size :initform 2)))
-  (assert (= 1 (slot-value i 'magic))))
+;;; :class -> :instance slot allocation transfers of inherited slots,
+;;; reported by Bruno Haible
+(with-test (:name (defclass :redefinition-class->instance-allocation))
+  (let (i)
+   (defclass super-with-magic-slot ()
+     ((magic :initarg :size :initform 1 :allocation :class)))
+   (defclass sub-of-super-with-magic-slot (super-with-magic-slot) ())
+   (setq i (make-instance 'sub-of-super-with-magic-slot))
+   (defclass super-with-magic-slot ()
+     ((magic :initarg :size :initform 2)))
+   (assert (= 1 (slot-value i 'magic)))))
 
 ;;; MAKE-INSTANCES-OBSOLETE return values
-(defclass one-more-to-obsolete () ())
-(assert (eq 'one-more-to-obsolete
-            (make-instances-obsolete 'one-more-to-obsolete)))
-(assert (eq (find-class 'one-more-to-obsolete)
-            (make-instances-obsolete (find-class 'one-more-to-obsolete))))
+(with-test (:name (make-instances-obsolete :return-values) )
+  (defclass one-more-to-obsolete () ())
+  (assert (eq 'one-more-to-obsolete
+              (make-instances-obsolete 'one-more-to-obsolete)))
+  (assert (eq (find-class 'one-more-to-obsolete)
+              (make-instances-obsolete (find-class 'one-more-to-obsolete)))))
 
 ;;; Sensible error instead of a BUG. Reported by Thomas Burdick.
-(multiple-value-bind (value err)
-    (ignore-errors
-      (defclass slot-def-with-duplicate-accessors ()
-        ((slot :writer get-slot :reader get-slot))))
-  (assert (typep err 'error))
-  (assert (not (typep err 'sb-int:bug))))
+(with-test (:name (defclass :slot-with-duplicate-accessors))
+  (assert-error (defclass slot-with-duplicate-accessors ()
+                  ((slot :writer get-slot :reader get-slot)))
+                (and error (not sb-int:bug))))
 
 ;;; BUG 321: errors in parsing DEFINE-METHOD-COMBINATION arguments
 ;;; lambda lists.
@@ -1188,6 +1202,7 @@
 (define-method-combination w-args ()
   ((method-list *))
   (:arguments arg1 arg2 &aux (extra :extra))
+  (declare (ignore arg1 arg2 extra))
   `(progn ,@(mapcar (lambda (method) `(call-method ,method)) method-list)))
 (defgeneric mc-test-w-args (p1 p2 s)
   (:method-combination w-args)
@@ -1786,8 +1801,9 @@
 (defmethod test-long-form-with-&rest (x &rest others)
   nil)
 
-(assert (equal '(:foo 13)
-               (apply #'test-long-form-with-&rest :foo (make-list 13))))
+(with-test (:name (define-method-combination :long-form-with-&rest))
+  (assert (equal '(:foo 13)
+                 (apply #'test-long-form-with-&rest :foo (make-list 13)))))
 
 ;;;; slot-missing for non-standard classes on SLOT-VALUE
 ;;;;
@@ -1806,21 +1822,23 @@
       (setf (symbol-value *magic-symbol*)  new)
       (symbol-value *magic-symbol*)))
 
-(assert (eql 42 (slot-value (cons t t) *magic-symbol*)))
-(assert (eql 13 (setf (slot-value 123 *magic-symbol*) 13)))
-(assert (eql 13 (slot-value 'foobar *magic-symbol*)))
+(with-test (:name (slot-missing :non-standard-classes))
+  (assert (eql 42 (slot-value (cons t t) *magic-symbol*)))
+  (assert (eql 13 (setf (slot-value 123 *magic-symbol*) 13)))
+  (assert (eql 13 (slot-value 'foobar *magic-symbol*))))
 
 ;;;; Built-in structure and condition layouts should have NIL in
 ;;;; LAYOUT-FOR-STD-CLASS-P, and classes should have T.
 
-(assert (not (sb-pcl::layout-for-std-class-p (sb-pcl::find-layout 'warning))))
-(assert (not (sb-pcl::layout-for-std-class-p (sb-pcl::find-layout 'hash-table))))
-(assert (eq t (sb-pcl::layout-for-std-class-p (sb-pcl::find-layout 'standard-object))))
+(with-test (:name (sb-pcl::layout-for-std-class-p :builtin))
+  (assert (not (sb-pcl::layout-for-std-class-p (sb-pcl::find-layout 'warning))))
+  (assert (not (sb-pcl::layout-for-std-class-p (sb-pcl::find-layout 'hash-table))))
+  (assert (eq t (sb-pcl::layout-for-std-class-p (sb-pcl::find-layout 'standard-object)))))
 
 ;;;; bug 402: PCL used to warn about non-standard declarations
 (declaim (declaration bug-402-d))
 (defgeneric bug-402-gf (x))
-(with-test (:name :bug-402)
+(with-test (:name (defmethod :non-standard-declaration :bug-402))
   (handler-bind ((warning #'error))
     (eval '(defmethod bug-402-gf (x)
             (declare (bug-402-d x))
@@ -1835,8 +1853,10 @@
   (format t "~&Rock on: ~A~%" initargs))
 (defun provoke-ctor-default-initarg-problem ()
   (make-instance 'ctor-default-initarg-problem))
-(handler-bind ((warning #'error))
-  (assert (= 123 (slot-value (provoke-ctor-default-initarg-problem) 'slot))))
+(with-test (:name (make-instance :non-keyword-default-initargs
+                   shared-initialize :before))
+  (handler-bind ((warning #'error))
+    (assert (= 123 (slot-value (provoke-ctor-default-initarg-problem) 'slot)))))
 
 ;;;; discriminating net on streams used to generate code deletion notes on
 ;;;; first call
@@ -2045,41 +2065,53 @@
 
 ;;; test that a cacheing strategy for make-instance initargs checking
 ;;; can handle class redefinitions
-(defclass cacheing-initargs-redefinitions-check ()
-  ((slot :initarg :slot)))
-(defun cacheing-initargs-redefinitions-check-fun (&optional (initarg :slot))
+
+(defun cacheing-initargs-redefinitions-make-instances
+    (&optional (initarg :slot))
   (declare (notinline make-instance))
   (make-instance 'cacheing-initargs-redefinitions-check)
   (make-instance 'cacheing-initargs-redefinitions-check initarg 3))
-(with-test (:name :make-instance-initargs)
+
+(defclass cacheing-initargs-redefinitions-check ()
+  ((slot :initarg :slot)))
+
+(with-test (:name (make-instance :initargs-checking-before-redefinition))
   (make-instance 'cacheing-initargs-redefinitions-check)
   (make-instance 'cacheing-initargs-redefinitions-check :slot 3)
-  (cacheing-initargs-redefinitions-check-fun :slot)
-  (assert-error (cacheing-initargs-redefinitions-check-fun :slot2)))
+  (cacheing-initargs-redefinitions-make-instances :slot)
+  (assert-error (cacheing-initargs-redefinitions-make-instances :slot2)))
+
 (defclass cacheing-initargs-redefinitions-check ()
   ((slot :initarg :slot2)))
-(with-test (:name :make-instance-redefined-initargs)
+
+(with-test (:name (make-instance :initargs-checking-after-redefinition))
   (make-instance 'cacheing-initargs-redefinitions-check)
   (make-instance 'cacheing-initargs-redefinitions-check :slot2 3)
-  (cacheing-initargs-redefinitions-check-fun :slot2)
-  (assert-error (cacheing-initargs-redefinitions-check-fun :slot)))
-(defmethod initialize-instance :after ((class cacheing-initargs-redefinitions-check) &key slot)
+  (cacheing-initargs-redefinitions-make-instances :slot2)
+  (assert-error (cacheing-initargs-redefinitions-make-instances :slot)))
+
+(defmethod initialize-instance :after
+    ((class cacheing-initargs-redefinitions-check) &key slot)
   nil)
-(with-test (:name :make-instance-new-method-initargs)
+
+(with-test (:name (make-instance :initargs-checking-new-method-initargs))
   (make-instance 'cacheing-initargs-redefinitions-check)
   (make-instance 'cacheing-initargs-redefinitions-check :slot2 3)
-  (cacheing-initargs-redefinitions-check-fun :slot2)
-  (let ((thing (cacheing-initargs-redefinitions-check-fun :slot)))
+  (cacheing-initargs-redefinitions-make-instances :slot2)
+  (let ((thing (cacheing-initargs-redefinitions-make-instances :slot)))
     (assert (not (slot-boundp thing 'slot)))))
 
-(with-test (:name :defmethod-specializer-builtin-class-alias)
+
+;;; defmethod tests
+
+(with-test (:name (defmethod :specializer-builtin-class-alias :bug-618387))
   (let ((alias (gensym)))
     (setf (find-class alias) (find-class 'symbol))
     (eval `(defmethod lp-618387 ((s ,alias))
              (symbol-name s)))
     (assert (equal "FOO" (funcall 'lp-618387 :foo)))))
 
-(with-test (:name :pcl-spurious-ignore-warnings)
+(with-test (:name (defmethod :pcl-spurious-ignore-warnings))
   (defgeneric no-spurious-ignore-warnings (req &key key))
   (handler-bind ((warning (lambda (x) (error "~A" x))))
     (eval
@@ -2123,7 +2155,7 @@
              (declare (ignore all-segment-requests))
              (check-type request t)))))
 
-(with-test (:name :bug-1001799)
+(with-test (:name (defmethod :bug-1001799))
   ;; compilation of the defmethod used to cause infinite recursion
   (let ((pax (gensym "PAX"))
         (pnr (gensym "PNR"))
@@ -2246,7 +2278,7 @@
 (defmethod shared-initialize :around ((instance bug-1179858) (slot-names t) &key)
   (call-next-method))
 
-(with-test (:name (:make-instance :fallback-generator-initarg-handling :bug-1179858))
+(with-test (:name (make-instance :fallback-generator-initarg-handling :bug-1179858))
   ;; Now compile a lambda containing MAKE-INSTANCE to exercise the
   ;; fallback constructor generator. Call the resulting compiled
   ;; function to trigger the bug.
@@ -2260,7 +2292,7 @@
 (defmethod shared-initialize :around ((instance bug-1179858b) (slot-names t) &key)
   (call-next-method))
 
-(with-test (:name (:make-instance :fallback-generator-non-keyword-initarg :bug-1179858))
+(with-test (:name (make-instance :fallback-generator-non-keyword-initarg :bug-1179858))
   (flet ((foo= (n i) (= (bug-1179858b-foo i) n)))
     (assert
      (foo= 14 (funcall (compile nil '(lambda () (make-instance 'bug-1179858b))))))
@@ -2305,7 +2337,7 @@
   ;; DEFMETHOD
   (sb-cltl2:macroexpand-all '(defmethod x (a) (macro))))
 
-(with-test (:name (:defmethod-undefined-function :bug-503095))
+(with-test (:name (defmethod :undefined-function :bug-503095))
   (flet ((test-load (file)
            (let (implicit-gf-warning)
              (handler-bind
