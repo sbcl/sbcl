@@ -2367,4 +2367,25 @@
     (declare (ignore foo bar))
     (assert (= count0 count1 count2))))
 
+
+;;; Classes shouldn't be their own direct or indirect superclasses or
+;;; metaclasses.
+
+(with-test (:name (sb-mop:ensure-class :class-is-direct-superclass
+                   :bug-1418883))
+  (assert-error
+   (defclass class-with-self-as-superclass (class-with-self-as-superclass) ())))
+
+(with-test (:name (sb-mop:ensure-class :superclass-cycle :bug-1418883))
+  ;; These have a superclass cycle from the beginning.
+  (defclass class-with-superclass-cycle1 (class-with-superclass-cycle2) ())
+  (assert-error
+   (defclass class-with-superclass-cycle2 (class-with-superclass-cycle1) ())))
+
+(with-test (:name (sb-mop:ensure-class :self-metaclass))
+  ;; These have a superclass cycle from the beginning.
+  (assert-error
+   (defclass class-with-self-as-metaclass () ()
+     (:metaclass class-with-self-as-metaclass))))
+
 ;;;; success

@@ -364,58 +364,76 @@
              (when (and class (eq name (class-name class)))
                ;; NAME is the proper name of CLASS, so redefine it
                class))
-           name
-           args)))
+           name args)))
+
+(defun parse-ensure-class-args (class name args)
+  (let ((metaclass *the-class-standard-class*)
+        (metaclassp nil)
+        (reversed-plist '()))
+    (labels ((find-class* (which class-or-name)
+               (cond
+                 ((classp class-or-name)
+                  (cond
+                    ((eq class-or-name class)
+                     (error "~@<Class ~A specified as its own ~
+                             ~(~A~)class.~@:>"
+                            class-or-name which))
+                    (t
+                     class-or-name)))
+                 ((and class-or-name (legal-class-name-p class-or-name))
+                  (cond
+                    ((eq class-or-name name)
+                     (error "~@<Class named ~
+                             ~/sb-impl::print-symbol-with-prefix/ ~
+                             specified as its own ~(~A~)class.~@:>"
+                            class-or-name which))
+                    ((find-class class-or-name (eq which :meta)))
+                    ((ensure-class
+                      class-or-name :metaclass 'forward-referenced-class))))
+                 (t
+                  (error "~@<Not a class or a legal ~(~A~)class name: ~
+                          ~S.~@:>"
+                         which class-or-name))))
+             (find-superclass (class-or-name)
+               (find-class* :super class-or-name)))
+      (doplist (key value) args
+        (case key
+          (:metaclass
+           (unless metaclassp
+             (setf metaclass (find-class* :meta value)
+                   metaclassp key)))
+          (:direct-superclasses
+           (let ((superclasses (mapcar #'find-superclass value)))
+             (setf reversed-plist (list* superclasses key reversed-plist))))
+          (t
+           (setf reversed-plist (list* value key reversed-plist)))))
+      (values metaclass (nreverse reversed-plist)))))
+
+(defun call-with-ensure-class-context (class name args thunk)
+  (let ((class (with-world-lock ()
+                 (multiple-value-bind (metaclass initargs)
+                     (parse-ensure-class-args class name args)
+                   (let ((class (funcall thunk class name metaclass initargs)))
+                     (without-package-locks
+                       (setf (find-class name) class)))))))
+    ;; After boot (SETF FIND-CLASS) does this.
+    (unless (eq **boot-state** 'complete)
+      (%set-class-type-translation class name))
+    class))
 
 (defmethod ensure-class-using-class ((class null) name &rest args &key)
-  (with-world-lock ()
-    (multiple-value-bind (meta initargs)
-        (frob-ensure-class-args args)
-      (setf class (apply #'make-instance meta :name name initargs))
-      (without-package-locks
-        (setf (find-class name) class))))
-  ;; After boot (SETF FIND-CLASS) does this.
-  (unless (eq **boot-state** 'complete)
-    (%set-class-type-translation class name))
-  class)
+  (call-with-ensure-class-context
+   class name args (lambda (class name metaclass initargs)
+                     (declare (ignore class))
+                     (apply #'make-instance metaclass :name name initargs))))
 
 (defmethod ensure-class-using-class ((class pcl-class) name &rest args &key)
-  (with-world-lock ()
-    (multiple-value-bind (meta initargs)
-        (frob-ensure-class-args args)
-      (unless (eq (class-of class) meta)
-        (apply #'change-class class meta initargs))
-      (apply #'reinitialize-instance class initargs)
-      (without-package-locks
-        (setf (find-class name) class))))
-  ;; After boot (SETF FIND-CLASS) does this.
-  (unless (eq **boot-state** 'complete)
-    (%set-class-type-translation class name))
-  class)
-
-(defun frob-ensure-class-args (args)
-  (let (metaclass metaclassp reversed-plist)
-    (flet ((frob-superclass (s)
-             (cond
-               ((classp s) s)
-               ((legal-class-name-p s)
-                (or (find-class s nil)
-                    (ensure-class s :metaclass 'forward-referenced-class)))
-               (t (error "Not a class or a legal class name: ~S." s)))))
-      (doplist (key val) args
-        (cond ((eq key :metaclass)
-               (unless metaclassp
-                 (setf metaclass val metaclassp key)))
-              (t
-               (when (eq key :direct-superclasses)
-                 (setf val (mapcar #'frob-superclass val)))
-               (setf reversed-plist (list* val key reversed-plist)))))
-      (values (cond (metaclassp
-                     (if (classp metaclass)
-                         metaclass
-                         (find-class metaclass)))
-                    (t *the-class-standard-class*))
-              (nreverse reversed-plist)))))
+  (call-with-ensure-class-context
+   class name args (lambda (class name metaclass initargs)
+                     (aver (eq name (class-name class)))
+                     (unless (eq (class-of class) metaclass)
+                       (apply #'change-class class metaclass initargs))
+                     (apply #'reinitialize-instance class initargs))))
 
 ;;; This is used to call initfunctions of :allocation :class slots.
 (defun call-initfun (fun slotd safe)
