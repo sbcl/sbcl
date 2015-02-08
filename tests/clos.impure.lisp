@@ -2388,4 +2388,30 @@
    (defclass class-with-self-as-metaclass () ()
      (:metaclass class-with-self-as-metaclass))))
 
+(with-test (:name (sb-pcl::update-class :class-becomes-direct-superclass
+                   :bug-1418883))
+  (defclass class-with-eventual-self-as-superclass () ())
+  ;; Update class to introduce superclass.
+  (assert-error
+   (defclass class-with-eventual-self-as-superclass
+       (class-with-eventual-self-as-superclass) ())))
+
+(with-test (:name (sb-pcl::update-class :superclasses-become-cyclic
+                   :bug-1418883))
+  ;; Nothing wrong with these.
+  (defclass class-with-eventual-superclass-cycle1 () ())
+  (defclass class-with-eventual-superclass-cycle2
+      (class-with-eventual-superclass-cycle1) ())
+  ;; Update first class to introduce the superclass cycle.
+  (assert-error
+   (defclass class-with-eventual-superclass-cycle1
+       (class-with-eventual-superclass-cycle2) ())))
+
+(with-test (:name (sb-pcl::update-class :becomses-own-metaclass))
+  (defclass class-with-eventual-self-as-metaclass () ())
+  ;; Try to update metaclass to self.
+  (assert-error
+   (defclass class-with-eventual-self-as-metaclass () ()
+     (:metaclass class-with-eventual-self-as-metaclass))))
+
 ;;;; success

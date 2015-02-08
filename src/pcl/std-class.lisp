@@ -882,18 +882,25 @@
 ;;; This is called by :after shared-initialize whenever a class is initialized
 ;;; or reinitialized. The class may or may not be finalized.
 (defun update-class (class finalizep)
-  (without-package-locks
-    (with-world-lock ()
-      (when (or finalizep (class-finalized-p class))
-        (%update-cpl class (compute-class-precedence-list class))
-        ;; This invocation of UPDATE-SLOTS, in practice, finalizes the
-        ;; class.
-        (%update-slots class (compute-slots class))
-        (update-gfs-of-class class)
-        (setf (plist-value class 'default-initargs) (compute-default-initargs class))
-        (update-ctors 'finalize-inheritance :class class))
-      (dolist (sub (class-direct-subclasses class))
-        (update-class sub nil)))))
+  (labels ((rec (class finalizep &optional (seen '()))
+             (when (find class seen :test #'eq)
+               (error "~@<Specified class ~S as a superclass of ~
+                       itself.~@:>"
+                      class))
+             (without-package-locks
+               (with-world-lock ()
+                 (when (or finalizep (class-finalized-p class))
+                   (%update-cpl class (compute-class-precedence-list class))
+                   ;; This invocation of UPDATE-SLOTS, in practice, finalizes the
+                   ;; class
+                   (%update-slots class (compute-slots class))
+                   (update-gfs-of-class class)
+                   (setf (plist-value class 'default-initargs) (compute-default-initargs class))
+                   (update-ctors 'finalize-inheritance :class class))
+                 (let ((seen (list* class seen)))
+                   (dolist (sub (class-direct-subclasses class))
+                     (rec sub nil seen)))))))
+    (rec class finalizep)))
 
 (define-condition cpl-protocol-violation (reference-condition error)
   ((class :initarg :class :reader cpl-protocol-violation-class)
