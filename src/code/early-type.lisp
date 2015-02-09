@@ -283,6 +283,16 @@
 ;;; Impose canonicalization rules for NUMERIC-TYPE. Note that in some
 ;;; cases, despite the name, we return *EMPTY-TYPE* instead of a
 ;;; NUMERIC-TYPE.
+;;; FIXME: The ENUMERABLE flag is unexpectedly NIL for types that
+;;; come from parsing MEMBER. But bounded integer ranges,
+;;; however large, are enumerable:
+;;;  (TYPE-ENUMERABLE (SPECIFIER-TYPE '(SIGNED-BYTE 99))) => T
+;;;  (TYPE-ENUMERABLE (SPECIFIER-TYPE '(COMPLEX (SIGNED-BYTE 99)))) => T
+;;; but, in contrast,
+;;;  (TYPE-ENUMERABLE (SPECIFIER-TYPE '(EQL 5))) => NIL.
+;;; I can't figure out whether this is supposed to matter.
+;;; Moreover, it seems like this function should be responsible
+;;; for figuring out the right value so that callers don't have to.
 (defun make-numeric-type (&key class format (complexp :real) low high
                                enumerable)
   ;; if interval is empty
