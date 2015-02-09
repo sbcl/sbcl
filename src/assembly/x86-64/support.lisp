@@ -16,8 +16,10 @@
     (ecase style
       (:raw
        (values
-        `((inst mov ,call-tn (make-fixup ',name :assembly-routine))
-          (inst call ,call-tn))
+        `((note-this-location ,vop :call-site)
+          (inst mov ,call-tn (make-fixup ',name :assembly-routine))
+          (inst call ,call-tn)
+          (note-this-location ,vop :single-value-return))
         nil))
       (:full-call
        (values
