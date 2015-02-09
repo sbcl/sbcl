@@ -771,6 +771,15 @@
   ;; lvar, transforms it into a quoted form, and gives this
   ;; source transform another chance, so it all works out OK, in a
   ;; weird roundabout way. -- WHN 2001-03-18
+  ;; FIXME: it doesn't work as intended. Quick example:
+  ;;  * (defun h (x) (typep x `(unsigned-byte ,(1- sb-vm:n-word-bits))))
+  ;;  * (disassemble 'h)
+  ;;      ...
+  ;;      MOV RDI, [RIP-107] ; '(UNSIGNED-BYTE 63)
+  ;;      MOV RAX, [RIP-106] ; #<FDEFINITION for TYPEP>
+  ;;      ...
+  ;; So IR1 has figured out that the backquoted expression is constant,
+  ;; but the magic as described above doesn't happen.
   (if (and (not env)
            (consp spec)
            (eq (car spec) 'quote))
