@@ -205,13 +205,19 @@
   (sb!assem:assemble (*elsewhere*)
     (sb!assem:emit-label label)))
 
-(defun label-elsewhere-p (label-or-posn)
-  (<= (label-position *elsewhere-label*)
-      (etypecase label-or-posn
-        (label
-         (label-position label-or-posn))
-        (index
-         label-or-posn))))
+(defun label-elsewhere-p (label-or-posn kind)
+  (let ((elsewhere (label-position *elsewhere-label*))
+        (label (etypecase label-or-posn
+                 (label
+                  (label-position label-or-posn))
+                 (index
+                  label-or-posn))))
+    (if (memq kind '(:single-value-return
+                     :unknown-return
+                     :known-return))
+        ;; We're interested in what precedes the return, not after
+        (< elsewhere label)
+        (<= elsewhere label))))
 
 #!+inline-constants
 (defun register-inline-constant (&rest constant-descriptor)

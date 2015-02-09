@@ -5463,3 +5463,14 @@
                      (call 1)
                      (call (lambda () 'result)))))))
               'result)))
+
+(with-test (:name :debug-dump-elsewhere)
+  (assert
+   (eql
+    (catch 'x
+      (funcall
+       (compile nil
+                '(lambda ()
+                  (declare (optimize debug))
+                  (throw 'x *)))))
+    *)))

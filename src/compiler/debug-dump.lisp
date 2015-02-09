@@ -212,7 +212,8 @@
                                   tlf-num var-locs))
           (setf prev-block block)))
       (dolist (loc (ir2-block-locations 2block))
-        (if (label-elsewhere-p (location-info-label loc))
+        (if (label-elsewhere-p (location-info-label loc)
+                               (location-info-kind loc))
             (push loc elsewhere-locations)
             (push loc locations))))
 
