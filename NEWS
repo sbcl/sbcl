@@ -6,6 +6,13 @@ changes relative to sbcl-1.2.8:
     SB-INTROSPECT:FUNCTION-TYPE might notice that (MEMBER T NIL)
     and (MEMBER NIL T) are both internally collapsed to the former,
     so that the latter can never be obtained as part of an FTYPE.
+  * optimization: a TYPEP call in which the second argument is not a
+    QUOTE form but nevertheless recognized as a compile-time constant
+    might open-code the test. One scenario for this involves backquote,
+    such as (TYPEP x `(my-type ,some-arg)). Code which relied upon
+    deferring until runtime should declare (NOTINLINE TYPEP).
+    [Due to the sematic constraints of DEFTYPE etc in in CLHS 3.2.2.3,
+    code requiring delayed evaluation could be unportable though.]
   * bug fix: DEFCLASS handles cyclic {super,meta}class relations better
     (lp#1418883)
   * bug fix: compiler no longer signals an error when compiling certain nested

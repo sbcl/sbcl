@@ -5474,3 +5474,9 @@
                   (declare (optimize debug))
                   (throw 'x *)))))
     *)))
+
+(with-test (:name :typep-quasiquoted-constant)
+  (assert (null (ctu:find-named-callees
+                 (compile nil
+                          '(lambda (x)
+                             (typep x `(signed-byte ,sb-vm:n-word-bits))))))))
