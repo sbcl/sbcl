@@ -1632,11 +1632,60 @@
                ',parse))
 
        (let ((,n-res ,(set-up-vop-info inherited-parse parse)))
-         (setf (gethash ',name *backend-template-names*) ,n-res)
-         (setf (template-type ,n-res)
-               (specifier-type (template-type-specifier ,n-res)))
+         (store-vop-info ,n-res)
          ,@(set-up-fun-translation parse n-res))
        ',name)))
+
+(defun store-vop-info (vop-info)
+  ;; This is an inefficent way to perform coalescing, but it doesn't matter.
+  (let* ((my-type-spec (template-type-specifier vop-info))
+         (my-type (specifier-type my-type-spec)))
+    (unless (block found
+              (maphash (lambda (name other)
+                         (declare (ignore name))
+                         ;; we get better coaelesecing by TYPE= rather than
+                         ;; EQUALP on (template-type-specifier vop-info)
+                         ;; because some types have multiple spellings.
+                         (when (type= (vop-info-type other) my-type)
+                           (setf (vop-info-type vop-info) (vop-info-type other))
+                           (return-from found t)))
+                       *backend-template-names*))
+      (setf (vop-info-type vop-info) (specifier-type my-type-spec))))
+  (flet ((find-equalp (accessor)
+           ;; Read the slot from VOP-INFO and try to find any other vop-info
+           ;; that has an EQUALP value in that slot, returning that value.
+           ;; Failing that, try again at a finer grain.
+           (let ((my-val (funcall accessor vop-info))) ; list of vectors
+             (maphash (lambda (name other)
+                        (declare (ignore name))
+                        (let ((other-val (funcall accessor other)))
+                          (when (equalp other-val my-val)
+                            (return-from find-equalp other-val))))
+                      *backend-template-names*)
+             (unless (listp my-val)
+               (return-from find-equalp my-val))
+             (mapl (lambda (cell)
+                     (let ((my-vector (car cell)))
+                       (block found
+                         (maphash (lambda (name other)
+                                    (declare (ignore name))
+                                    (dolist (other-vector
+                                             (funcall accessor other))
+                                      (when (equalp other-vector my-vector)
+                                        (rplaca cell other-vector)
+                                        (return-from found))))
+                                  *backend-template-names*))))
+                   (copy-list my-val))))) ; was a quoted constant, don't mutate
+    (macrolet ((try-coalescing (accessor)
+                 `(setf (,accessor vop-info) (find-equalp #',accessor))))
+      (try-coalescing vop-info-arg-costs)
+      (try-coalescing vop-info-arg-load-scs)
+      (try-coalescing vop-info-result-costs)
+      (try-coalescing vop-info-result-load-scs)
+      (try-coalescing vop-info-more-arg-costs)
+      (try-coalescing vop-info-more-result-costs))
+    (setf (gethash (vop-info-name vop-info) *backend-template-names*)
+          vop-info)))
 
 ;;;; emission macros
 
