@@ -280,6 +280,9 @@
     (read-string-as-unsigned-byte-32 *fasl-input-stream* res)
     (push-fop-table (make-symbol res))))
 
+(!define-fop 104 (fop-copy-symbol-save ((:operands table-index)))
+  (push-fop-table (copy-symbol (ref-fop-table table-index))))
+
 (!define-fop 44 (fop-package (pkg-designator))
   (find-undeleted-package-or-lose pkg-designator))
 

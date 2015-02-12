@@ -517,15 +517,17 @@
   `(setq ,list (cold-cons ,thing ,list)))
 
 (declaim (ftype (function (descriptor sb!vm:word) descriptor) read-wordindexed))
-(defun read-wordindexed (address index)
+(macrolet ((read-bits ()
+             `(let ((gspace (descriptor-intuit-gspace address)))
+                (bvref-word (gspace-bytes gspace)
+                            (ash (+ index (descriptor-word-offset address))
+                                 sb!vm:word-shift)))))
+  (defun read-bits-wordindexed (address index)
+    (read-bits))
+  (defun read-wordindexed (address index)
   #!+sb-doc
   "Return the value which is displaced by INDEX words from ADDRESS."
-  (let* ((gspace (descriptor-intuit-gspace address))
-         (bytes (gspace-bytes gspace))
-         (byte-index (ash (+ index (descriptor-word-offset address))
-                          sb!vm:word-shift))
-         (value (bvref-word bytes byte-index)))
-    (make-random-descriptor value)))
+    (make-random-descriptor (read-bits))))
 
 (declaim (ftype (function (descriptor) descriptor) read-memory))
 (defun read-memory (address)
@@ -659,6 +661,18 @@ core and return a descriptor to it."
           0) ; null string-termination character for C
     des))
 
+(defun base-string-from-core (descriptor)
+  (let* ((len (descriptor-fixnum
+               (read-wordindexed descriptor sb!vm:vector-length-slot)))
+         (str (make-string len))
+         (bytes (gspace-bytes (descriptor-gspace descriptor))))
+    (dotimes (i len str)
+      (setf (aref str i)
+            (code-char (bvref bytes
+                              (+ (descriptor-byte-offset descriptor)
+                                 (* sb!vm:vector-data-offset sb!vm:n-word-bytes)
+                                 i)))))))
+
 (defun bignum-to-core (n)
   #!+sb-doc
   "Copy a bignum to the cold core."
@@ -674,11 +688,24 @@ core and return a descriptor to it."
            (warn "~W words of ~W were written, but ~W bits were left over."
                  words n remainder)))
       (let ((word (ldb (byte sb!vm:n-word-bits 0) remainder)))
+        ;; FIXME: this is disgusting. there should be WRITE-BITS-WORDINDEXED.
         (write-wordindexed handle index
                            (make-descriptor (ash word (- descriptor-low-bits))
                                             (ldb (byte descriptor-low-bits 0)
                                                  word)))))
     handle))
+
+(defun bignum-from-core (descriptor)
+  (let ((n-words (ash (descriptor-bits (read-memory descriptor))
+                      (- sb!vm:n-widetag-bits)))
+        (val 0))
+    (dotimes (i n-words val)
+      (let ((bits (read-bits-wordindexed descriptor
+                                         (+ i sb!vm:bignum-digits-offset))))
+        ;; sign-extend the highest word
+        (when (and (= i (1- n-words)) (logbitp (1- sb!vm:n-word-bits) bits))
+          (setq bits (dpb bits (byte sb!vm:n-word-bits 0) -1)))
+        (setq val (logior (ash bits (* i sb!vm:n-word-bits)) val))))))
 
 (defun number-pair-to-core (first second type)
   #!+sb-doc
@@ -810,6 +837,16 @@ core and return a descriptor to it."
       (write-wordindexed result (+ index sb!vm:vector-data-offset)
                          (pop objects)))
     result))
+
+(defun vector-from-core (descriptor transform)
+  (let* ((len (descriptor-fixnum
+               (read-wordindexed descriptor sb!vm:vector-length-slot)))
+         (vector (make-array len)))
+    (dotimes (i len vector)
+      (setf (aref vector i)
+            (funcall transform
+                     (read-wordindexed descriptor
+                                       (+ sb!vm:vector-data-offset i)))))))
 
 ;;;; symbol magic
 
@@ -2265,6 +2302,16 @@ core and return a descriptor to it."
   (let ((name (make-string namelen)))
     (read-string-as-bytes *fasl-input-stream* name)
     (push-fop-table (get-uninterned-symbol name))))
+
+(define-cold-fop (fop-copy-symbol-save (index))
+  (let* ((symbol (ref-fop-table index))
+         (name
+          (if (symbolp symbol)
+              (symbol-name symbol)
+              (base-string-from-core
+               (read-wordindexed symbol sb!vm:symbol-name-slot)))))
+    ;; Genesis performs additional coalescing of uninterned symbols
+    (push-fop-table (get-uninterned-symbol name))))
 
 ;;;; cold fops for loading packages
 
@@ -2575,6 +2622,64 @@ core and return a descriptor to it."
         (code (pop-stack)))
     (write-wordindexed code slot value)))
 
+(defvar *simple-fun-metadata* (make-hash-table :test 'equalp))
+
+;; Return an expression that can be used to coalesce type-specifiers
+;; and lambda lists attached to simple-funs. It doesn't have to be
+;; a "correct" host representation, just something that preserves EQUAL-ness.
+(defun make-equal-comparable-thing (descriptor)
+  (labels ((recurse (x)
+            (cond ((cold-null x) (return-from recurse nil))
+                  ((is-fixnum-lowtag (descriptor-lowtag x))
+                   (return-from recurse (descriptor-fixnum x)))
+                  #!+#.(cl:if (cl:= sb!vm:n-word-bits 64) '(and) '(or))
+                  ((is-other-immediate-lowtag (descriptor-lowtag x))
+                   (let ((bits (descriptor-bits x)))
+                     (when (= (logand bits sb!vm:widetag-mask)
+                              sb!vm:single-float-widetag)
+                       (return-from recurse `(:ffloat-bits ,bits))))))
+            (ecase (descriptor-lowtag x)
+              (#.sb!vm:list-pointer-lowtag
+               (cons (recurse (cold-car x)) (recurse (cold-cdr x))))
+              (#.sb!vm:other-pointer-lowtag
+               (ecase (logand (descriptor-bits (read-memory x)) sb!vm:widetag-mask)
+                   (#.sb!vm:symbol-header-widetag
+                    (if (cold-null (read-wordindexed x sb!vm:symbol-package-slot))
+                        (get-or-make-uninterned-symbol
+                         (base-string-from-core
+                          (read-wordindexed x sb!vm:symbol-name-slot)))
+                        (warm-symbol x)))
+                   #!+#.(cl:if (cl:= sb!vm:n-word-bits 32) '(and) '(or))
+                   (#.sb!vm:single-float-widetag
+                    `(:ffloat-bits
+                      ,(read-bits-wordindexed x sb!vm:single-float-value-slot)))
+                   (#.sb!vm:double-float-widetag
+                    `(:dfloat-bits
+                      ,(read-bits-wordindexed x sb!vm:double-float-value-slot)
+                      #!+#.(cl:if (cl:= sb!vm:n-word-bits 32) '(and) '(or))
+                      ,(read-bits-wordindexed
+                        x (1+ sb!vm:double-float-value-slot))))
+                   (#.sb!vm:bignum-widetag
+                    (bignum-from-core x))
+                   (#.sb!vm:simple-base-string-widetag
+                    (base-string-from-core x))
+                   ;; Why do function lambda lists have simple-vectors in them?
+                   ;; Because we expose all &OPTIONAL and &KEY default forms.
+                   ;; I think this is abstraction leakage, except possibly for
+                   ;; advertised constant defaults of NIL and such.
+                   ;; How one expresses a value as a sexpr should otherwise
+                   ;; be of no concern to a user of the code.
+                   (#.sb!vm:simple-vector-widetag
+                    (vector-from-core x #'recurse))))))
+           ;; Return a warm symbol whose name is similar to NAME, coaelescing
+           ;; all occurrences of #:.WHOLE. across all files, e.g.
+           (get-or-make-uninterned-symbol (name)
+             (let ((key `(:uninterned-symbol ,name)))
+               (or (gethash key *simple-fun-metadata*)
+                   (let ((symbol (make-symbol name)))
+                     (setf (gethash key *simple-fun-metadata*) symbol))))))
+    (recurse descriptor)))
+
 (define-cold-fop (fop-fun-entry)
   (let* ((info (pop-stack))
          (type (pop-stack))
@@ -2632,8 +2737,15 @@ core and return a descriptor to it."
                               sb!vm:fun-pointer-lowtag))))
     (write-wordindexed fn sb!vm:simple-fun-next-slot next)
     (write-wordindexed fn sb!vm:simple-fun-name-slot name)
-    (write-wordindexed fn sb!vm:simple-fun-arglist-slot arglist)
-    (write-wordindexed fn sb!vm:simple-fun-type-slot type)
+    (flet ((coalesce (sexpr) ; a warm symbol or a cold cons tree
+             (if (symbolp sexpr) ; will be cold-interned automatically
+                 sexpr
+                 (let ((representation (make-equal-comparable-thing sexpr)))
+                   (or (gethash representation *simple-fun-metadata*)
+                       (setf (gethash representation *simple-fun-metadata*)
+                             sexpr))))))
+      (write-wordindexed fn sb!vm:simple-fun-arglist-slot (coalesce arglist))
+      (write-wordindexed fn sb!vm:simple-fun-type-slot (coalesce type)))
     (write-wordindexed fn sb!vm::simple-fun-info-slot info)
     fn))
 
@@ -3573,14 +3685,5 @@ initially undefined function references:~2%")
                     ;; this is only approximate, as it disregards package
                     (intern (recurse (read-wordindexed x sb!vm:symbol-name-slot))))
                    (#.sb!vm:simple-base-string-widetag
-                    (let* ((len (descriptor-fixnum (read-wordindexed x 1)))
-                           (str (make-string len))
-                           (bytes (gspace-bytes (descriptor-gspace x))))
-                      (dotimes (i len str)
-                        (setf (aref str i)
-                              (code-char
-                               (bvref bytes
-                                      (+ (descriptor-byte-offset x)
-                                         (* sb!vm:vector-data-offset sb!vm:n-word-bytes)
-                                         i)))))))))))))
+                    (base-string-from-core x))))))))
     (recurse descriptor)))

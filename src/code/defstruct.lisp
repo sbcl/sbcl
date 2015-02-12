@@ -1508,8 +1508,8 @@ or they must be declared locally notinline at each call site.~@:>")
                         (dd-element-type defstruct)
                         t)))
       (dolist (slot (dd-slots defstruct))
-        (let* ((dum (sb!xc:gensym "DUM"))
-               (name (dsd-name slot))
+        (let* ((name (dsd-name slot))
+               (dum (copy-symbol name))
                (keyword (keywordicate name))
                ;; Canonicalize the type for a prettier macro-expansion
                (type (type-specifier

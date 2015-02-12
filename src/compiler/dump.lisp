@@ -38,6 +38,11 @@
   ;; the EQ table.
   (equal-table (make-hash-table :test 'equal) :type hash-table)
   (eq-table (make-hash-table :test 'eq) :type hash-table)
+  ;; Hashtable mapping a string to a list of fop-table indices of
+  ;; symbols whose name is that string. For any name as compared
+  ;; by STRING= there can be a symbol whose name is a base string
+  ;; and/or a symbol whose name is not a base string.
+  (string=-table (make-hash-table :test 'equal) :type hash-table)
   ;; the table's current free pointer: the next offset to be used
   (table-free 0 :type index)
   ;; an alist (PACKAGE . OFFSET) of the table offsets for each package
@@ -933,6 +938,7 @@
   (declare (type fasl-output file))
   (let* ((pname (symbol-name s))
          (pname-length (length pname))
+         (dumped-as-copy nil)
          (pkg (symbol-package s)))
     ;; see comment in genesis: we need this here for repeatable fasls
     #+sb-xc-host
@@ -945,8 +951,21 @@
         (setq pkg sb!int:*cl-package*)))
 
     (cond ((null pkg)
-           (dump-fop 'fop-uninterned-symbol-save
-                     file pname-length))
+           (let ((this-base-p (typep pname 'base-string)))
+             (dolist (lookalike (gethash pname (fasl-output-string=-table file))
+                                (dump-fop 'fop-uninterned-symbol-save
+                                          file pname-length))
+               ;; Find the right kind of lookalike symbol.
+               ;; actually this seems pretty bogus - afaict, we don't correctly
+               ;; preserve the type of the string (base or character) anyway,
+               ;; but if we did, then this would be right also.
+               ;; [what about a symbol whose name is a (simple-array nil (0))?]
+               (let ((that-base-p (typep (symbol-name lookalike) 'base-string)))
+                 (when (or (and this-base-p that-base-p)
+                           (and (not this-base-p) (not that-base-p)))
+                   (dump-fop 'fop-copy-symbol-save file
+                             (gethash lookalike (fasl-output-eq-table file)))
+                   (return (setq dumped-as-copy t)))))))
           ;; CMU CL had FOP-SYMBOL-SAVE/FOP-SMALL-SYMBOL-SAVE fops which
           ;; used the current value of *PACKAGE*. Unfortunately that's
           ;; broken w.r.t. ANSI Common Lisp semantics, so those are gone
@@ -963,10 +982,12 @@
            (dump-fop 'fop-symbol-in-package-save file
                      (dump-package pkg file) pname-length)))
 
-    #+sb-xc-host (dump-base-chars-of-string pname file)
-    #-sb-xc-host (#!+sb-unicode dump-characters-of-string
-                  #!-sb-unicode dump-base-chars-of-string
-                  pname file)
+    (unless dumped-as-copy
+      #+sb-xc-host (dump-base-chars-of-string pname file)
+      #-sb-xc-host (#!+sb-unicode dump-characters-of-string
+                    #!-sb-unicode dump-base-chars-of-string
+                    pname file)
+      (push s (gethash (symbol-name s) (fasl-output-string=-table file))))
 
     (setf (gethash s (fasl-output-eq-table file))
           (fasl-output-table-free file))
