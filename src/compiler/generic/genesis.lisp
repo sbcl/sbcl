@@ -40,7 +40,6 @@
           (sb!xc:char-code #\L)))
 
 (defun round-up (number size)
-  #!+sb-doc
   "Round NUMBER up to be an integral multiple of SIZE."
   (* size (ceiling number size)))
 
@@ -346,7 +345,6 @@
                        old-free-word-index))))
 
 (defun descriptor-lowtag (des)
-  #!+sb-doc
   "the lowtag bits for DES"
   (logand (descriptor-low des) sb!vm:lowtag-mask))
 
@@ -512,7 +510,6 @@
 
 ;;; FIXME: should be DEFINE-MODIFY-MACRO
 (defmacro cold-push (thing list)
-  #!+sb-doc
   "Push THING onto the given cold-load LIST."
   `(setq ,list (cold-cons ,thing ,list)))
 
@@ -525,13 +522,11 @@
   (defun read-bits-wordindexed (address index)
     (read-bits))
   (defun read-wordindexed (address index)
-  #!+sb-doc
   "Return the value which is displaced by INDEX words from ADDRESS."
     (make-random-descriptor (read-bits))))
 
 (declaim (ftype (function (descriptor) descriptor) read-memory))
 (defun read-memory (address)
-  #!+sb-doc
   "Return the value at ADDRESS."
   (read-wordindexed address 0))
 
@@ -552,7 +547,6 @@
 
 (declaim (ftype (function (descriptor sb!vm:word (or symbol descriptor))) write-wordindexed))
 (defun write-wordindexed (address index value)
-  #!+sb-doc
   "Write VALUE displaced INDEX words from ADDRESS."
   ;; If we're passed a symbol as a value then it needs to be interned.
   (let ((value (cond ((symbolp value) (cold-intern value))
@@ -570,7 +564,6 @@
 
 (declaim (ftype (function (descriptor (or symbol descriptor))) write-memory))
 (defun write-memory (address value)
-  #!+sb-doc
   "Write VALUE (a DESCRIPTOR) at ADDRESS (also a DESCRIPTOR)."
   (write-wordindexed address 0 value))
 
@@ -587,12 +580,10 @@
 ;;; * Vector objects: There is a header word with the type, then a word for
 ;;;   the length, then the data.
 (defun allocate-object (gspace length lowtag)
-  #!+sb-doc
   "Allocate LENGTH words in GSPACE and return a new descriptor of type LOWTAG
   pointing to them."
   (allocate-cold-descriptor gspace (ash length sb!vm:word-shift) lowtag))
 (defun allocate-header+object (gspace length widetag)
-  #!+sb-doc
   "Allocate LENGTH words plus a header word in GSPACE and
   return an ``other-pointer'' descriptor to them. Initialize the header word
   with the resultant length and WIDETAG."
@@ -602,7 +593,6 @@
     (write-header-word des length widetag)
     des))
 (defun allocate-vector-object (gspace element-bits length widetag)
-  #!+sb-doc
   "Allocate LENGTH units of ELEMENT-BITS size plus a header plus a length slot in
   GSPACE and return an ``other-pointer'' descriptor to them. Initialize the
   header word with WIDETAG and the length slot with LENGTH."
@@ -638,7 +628,6 @@
 ;;;; copying simple objects into the cold core
 
 (defun base-string-to-core (string &optional (gspace *dynamic*))
-  #!+sb-doc
   "Copy STRING (which must only contain STANDARD-CHARs) into the cold
 core and return a descriptor to it."
   ;; (Remember that the system convention for storage of strings leaves an
@@ -674,7 +663,6 @@ core and return a descriptor to it."
                                  i)))))))
 
 (defun bignum-to-core (n)
-  #!+sb-doc
   "Copy a bignum to the cold core."
   (let* ((words (ceiling (1+ (integer-length n)) sb!vm:n-word-bits))
          (handle
@@ -708,7 +696,6 @@ core and return a descriptor to it."
         (setq val (logior (ash bits (* i sb!vm:n-word-bits)) val))))))
 
 (defun number-pair-to-core (first second type)
-  #!+sb-doc
   "Makes a number pair of TYPE (ratio or complex) and fills it in."
   (let ((des (allocate-header+object *dynamic* 2 type)))
     (write-wordindexed des 1 first)
@@ -1377,7 +1364,6 @@ core and return a descriptor to it."
 ;;; Since the initial symbols must be allocated before we can intern
 ;;; anything else, we intern those here. We also set the value of T.
 (defun initialize-non-nil-symbols ()
-  #!+sb-doc
   "Initialize the cold load symbol-hacking data structures."
   ;; Intern the others.
   (dolist (symbol sb!vm:*static-symbols*)
@@ -2164,7 +2150,6 @@ core and return a descriptor to it."
 ;;; LOAD-AS-FASL with the fop function table rebound to a table of cold
 ;;; loading functions.
 (defun cold-load (filename)
-  #!+sb-doc
   "Load the file named by FILENAME into the cold load image being built."
   (let* ((*fop-funs* *cold-fop-funs*)
          (*cold-load-filename* (etypecase filename
