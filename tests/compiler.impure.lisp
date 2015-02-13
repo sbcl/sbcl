@@ -2587,4 +2587,18 @@
                             :print nil :verbose nil)))
     (ignore-errors (delete-file fasl))))
 
+(declaim (inline ensure-a-fun))
+(defun ensure-a-fun (f) (coerce f 'function))
+(defmacro compose2 (f g)
+  `(let ((f (ensure-a-fun ,f))
+         (g (ensure-a-fun ,g)))
+     (lambda (arg) (funcall f (funcall g arg)))))
+
+(with-test (:name :coerce-to-function-smarter)
+  (let ((f (compile nil
+                    '(lambda (x)
+                       (funcall (compose2 #'integerp #'car) x)))))
+    ;; should be completely inlined
+    (assert (null (ctu:find-named-callees f)))))
+
 ;;; success

@@ -897,7 +897,11 @@
            ((csubtypep tspec (specifier-type 'function))
             (if (csubtypep (lvar-type x) (specifier-type 'symbol))
                 `(coerce-symbol-to-fun x)
-                `(coerce-to-fun x)))
+                ;; if X can later be derived as FUNCTION then we don't want
+                ;; to call COERCE-TO-FUN, because there's no smartness
+                ;; that can undo that and see that it's really (IDENTITY X).
+                (progn (delay-ir1-transform node :constraint)
+                       `(coerce-to-fun x))))
            (t
             (give-up-ir1-transform
              "~@<open coding coercion to ~S not implemented.~:@>"
