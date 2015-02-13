@@ -101,26 +101,14 @@
 #!-sb-fluid (declaim (inline layout-of))
 (defun layout-of (x)
   (declare (optimize (speed 3) (safety 0)))
-  ;; This used to delay reference to **BUILT-IN-CLASS-CODES** and the layout of
-  ;; NULL, but those both work fine as LOAD-TIME-VALUE forms, with a kludge
-  ;; in (DEF!STRUCT (TN)) due to ineptness at dealing with cyclic defstructs:
-  ;; - Cold-init L-T-V forms execute after all layouts have been made,
-  ;;   which is mostly ok, but ...
-  ;; - A bunch of toplevel forms in <target>/vm.lisp call MAKE-RANDOM-TN
-  ;;   accepting the default value NIL for the global-conflicts slot.
-  ;; - MAKE-RANDOM-TN can't inline the complete check for
-  ;;   (OR GLOBAL-CONFLICTS NULL). It relies on %TYPEP for the classoid part.
-  ;; - By the time of the call to %TYPEP, GLOBAL-CONFLICTS is known to be a
-  ;;   classoid, so SPECIFIER-TYPE is fine, and %%TYPEP gets called.
-  ;; - %%TYPEP sees that it has a classoid as its second arg, so it invokes
-  ;;   (CLASSOID-TYPEP (LAYOUT-OF OBJECT) TYPE OBJECT)
-  ;; - The problem: (LAYOUT-OF NIL), as inlined into %%TYPEP, returns garbage,
-  ;;   not a LAYOUT, because the relevant branch of the COND below has not
-  ;;   had its L-T-V form fixed up soon enough.
   (cond ((%instancep x) (%instance-layout x))
         ((funcallable-instance-p x) (%funcallable-instance-layout x))
-        ((null x) (load-time-value (find-layout 'null) t))
+        ;; Compiler can dump literal layouts, which handily sidesteps
+        ;; the question of when cold-init runs L-T-V forms.
+        ((null x) #.(find-layout 'null))
         (t
+         ;; Note that WIDETAG-OF is slightly suboptimal here and could be
+         ;; improved - we've already ruled out some of the lowtags.
          (svref (load-time-value **built-in-class-codes** t) (widetag-of x)))))
 
 #!-sb-fluid (declaim (inline classoid-of))
