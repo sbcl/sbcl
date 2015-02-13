@@ -642,8 +642,13 @@
            (cdr probe)))))
 
 (defun make-slot-table (class slots &optional bootstrap)
-  (if (not slots)
-      (return-from make-slot-table #(1 nil)))
+  (unless slots
+    ;; *** If changing this empty table value to something else,
+    ;;     be sure to make a similar change to MAKE-COLD-LAYOUT in
+    ;;     compiler/generic/genesis as well as in DEFSTRUCT LAYOUT.
+    ;;     A DEFCONSTANT for this would only transfer the problem
+    ;;     to cold-init in a different sort of way. :-(
+    (return-from make-slot-table #(1 nil)))
   (let* ((n (+ (logior (length slots) 1) 2)) ; an odd divisor is preferred
          (vector (make-array n :initial-element nil)))
     (flet ((add-to-vector (name slot)

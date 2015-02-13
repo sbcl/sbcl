@@ -1014,6 +1014,7 @@ core and return a descriptor to it."
       (res))))
 
 (defvar *simple-vector-0-descriptor*)
+(defvar *vacuous-slot-table*)
 (declaim (ftype (function (symbol descriptor descriptor descriptor descriptor)
                           descriptor)
                 make-cold-layout))
@@ -1045,6 +1046,16 @@ core and return a descriptor to it."
     (cold-set-layout-slot result 'source-location *nil-descriptor*)
     (cold-set-layout-slot result '%for-std-class-b (make-fixnum-descriptor 0))
     (cold-set-layout-slot result 'slot-list *nil-descriptor*)
+
+    (when (member name '(null list symbol))
+      ;; Assign an empty slot-table.  Why this is done only for three
+      ;; classoids is ... too complicated to explain here in a few words,
+      ;; but revision 18c239205d9349abc017b07e7894a710835c5205 broke it.
+      ;; Keep this in sync with MAKE-SLOT-TABLE in pcl/slots-boot.
+      (unless (boundp '*vacuous-slot-table*)
+        (setq *vacuous-slot-table*
+              (host-constant-to-core '#(1 nil))))
+      (cold-set-layout-slot result 'slot-table *vacuous-slot-table*))
 
     (setf (gethash name *cold-layouts*)
           (list result

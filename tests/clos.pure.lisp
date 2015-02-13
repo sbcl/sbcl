@@ -84,4 +84,13 @@
   (sb-ext:compiler-note (e)
     (error e)))
 
-
+(with-test (:name :slot-table-of-symbol-works)
+  (assert (eq :win
+              ;; the error that I want is about a missing slot,
+              ;; not a missing method, so don't let the compiler turn
+              ;; this into (funcall #'(SLOT-ACCESSOR :GLOBAL A READER)...)
+              (handler-case (eval '(slot-value 'a 'a))
+                (simple-condition (c)
+                  (and (search "slot ~S is missing"
+                               (simple-condition-format-control c))
+                       :win))))))
