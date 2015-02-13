@@ -95,10 +95,11 @@
 ;; subtypes, is simpler than RANDOM, and a test of randomness won't
 ;; measure up as well, but for the intended use, it doesn't matter.
 ;; CLOS hashes could probably be made to use this.
-(defun quasi-random-address-based-hash (state)
+(defun quasi-random-address-based-hash (state mask)
   (declare (type (simple-array (and fixnum unsigned-byte) (1)) state))
   ;; Ok with multiple threads - No harm, no foul.
-  (setf (aref state 0) (mix (address-based-counter-val) (aref state 0))))
+  (logand (setf (aref state 0) (mix (address-based-counter-val) (aref state 0)))
+          mask))
 
 
 ;;;; hashing strings

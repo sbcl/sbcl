@@ -29,27 +29,6 @@
 ;; (Except that we never really need it for anything)
 (defglobal *universal-fun-type* -1)
 
-;; These need not be singletons, but again it is more efficient
-;; when there is only a single instance of each.
-(defglobal *cons-t-t-type* -1)
-(defglobal *null-type* -1)
-(defglobal *boolean-type* -1)
-
-;; This one is used when parsing (SATISFIES KEYWORDP)
-;; so that simplifications can be made whe computing intersections,
-;; without which we would see this kind of "empty-type in disguise"
-;;   (AND (SATISFIES KEYWORDP) CONS)
-;; This isn't *keyword-type* because KEYWORD is implemented
-;; as the intersection of SYMBOL and (SATISFIES KEYWORDP)
-;; We could also intern the KEYWORD type but that would require
-;; hacking the INTERSECTION logic.
-(defglobal *satisfies-keywordp-type* -1)
-
-;; Here too I discovered more than 1000 instances in a particular
-;; Lisp image, when really this is *EMPTY-TYPE*.
-;;  (AND (SATISFIES LEGAL-FUN-NAME-P) (SIMPLE-ARRAY CHARACTER (*)))
-(defglobal *fun-name-type* -1)
-
 ;;; a vector that maps type codes to layouts, used for quickly finding
 ;;; the layouts of built-in classes
 (defglobal **built-in-class-codes** #()) ; initialized in cold load

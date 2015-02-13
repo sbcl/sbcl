@@ -824,9 +824,16 @@
                      :values 2)
               ((type1 eq) (type2 eq))
   (declare (type ctype type1 type2))
-  (if (eq type1 type2)
-      (values t t)
-      (memoize (!invoke-type-method :simple-= :complex-= type1 type2))))
+  (cond ((eq type1 type2)
+         (values t t))
+        ;; If args are not EQ, but both allow TYPE= optimization,
+        ;; and at least one is interned, then return no and certainty.
+        ((and (minusp (logior (type-hash-value type1) (type-hash-value type2)))
+              (logtest (logand (type-hash-value type1) (type-hash-value type2))
+                       +type-admits-type=-optimization+))
+         (values nil t))
+        (t
+         (memoize (!invoke-type-method :simple-= :complex-= type1 type2)))))
 
 ;;; Not exactly the negation of TYPE=, since when the relationship is
 ;;; uncertain, we still return NIL, NIL. This is useful in cases where
@@ -1112,10 +1119,30 @@
 
 (!define-type-class named :enumerable nil :might-contain-other-types nil)
 
-(!cold-init-forms
+;; This is used when parsing (SATISFIES KEYWORDP)
+;; so that simplifications can be made when computing intersections,
+;; without which we would see this kind of "empty-type in disguise"
+;;   (AND (SATISFIES KEYWORDP) CONS)
+;; This isn't *keyword-type* because KEYWORD is implemented
+;; as the intersection of SYMBOL and (SATISFIES KEYWORDP)
+;; We could also intern the KEYWORD type but that would require
+;; hacking the INTERSECTION logic.
+(defglobal *satisfies-keywordp-type* -1)
+
+;; Here too I discovered more than 1000 instances in a particular
+;; Lisp image, when really this is *EMPTY-TYPE*.
+;;  (AND (SATISFIES LEGAL-FUN-NAME-P) (SIMPLE-ARRAY CHARACTER (*)))
+(defglobal *fun-name-type* -1)
+
+;; !LATE-TYPE-COLD-INIT can't be GCd - there are lambdas in the toplevel code
+;; component that leak out and persist - but everything below is GCable.
+;; This leads to about 20KB of extra code being retained on x86-64.
+;; An educated guess is that DEFINE-SUPERCLASSES is responsible for the problem.
+(defun !late-type-cold-init2 ()
  (macrolet ((frob (name var)
               `(progn
-                 (setq ,var (make-named-type :name ',name))
+                 (setq ,var
+                       (mark-ctype-interned (make-named-type :name ',name)))
                  (setf (info :type :kind ',name)
                        #+sb-xc-host :defined #-sb-xc-host :primitive)
                  (setf (info :type :builtin ',name) ,var))))
@@ -1142,11 +1169,20 @@
    ;; extended sequence hierarchy.  (Might be removed later if we use
    ;; a dedicated FUNDAMENTAL-SEQUENCE class for this.)
    (frob extended-sequence *extended-sequence-type*))
- (setf *satisfies-keywordp-type* (%make-hairy-type '(satisfies keywordp)))
- (setf *fun-name-type* (%make-hairy-type '(satisfies legal-fun-name-p)))
+ (!intern-important-fun-type-instances)
+ (!intern-important-member-type-instances)
+ (!intern-important-cons-type-instances)
+ (!intern-important-numeric-type-instances)
+ (!intern-important-character-set-type-instances)
+ (!intern-important-array-type-instances) ; must be after numeric and char
+ (setf *satisfies-keywordp-type*
+       (mark-ctype-interned (%make-hairy-type '(satisfies keywordp))))
+ (setf *fun-name-type*
+       (mark-ctype-interned (%make-hairy-type '(satisfies legal-fun-name-p))))
+ ;; This is not an important type- no attempt is made to return exactly this
+ ;; object when parsing FUNCTION. In fact we return the classoid instead
  (setf *universal-fun-type*
-       (make-fun-type :wild-args t
-                      :returns *wild-type*)))
+       (make-fun-type :wild-args t :returns *wild-type*)))
 
 (!define-type-method (named :simple-=) (type1 type2)
   ;;(aver (not (eq type1 *wild-type*))) ; * isn't really a type.
@@ -1391,6 +1427,7 @@
   (named-type-name x))
 
 ;;;; hairy and unknown types
+;;;; DEFINE-TYPE-CLASS HAIRY is in 'early-type'
 
 (!define-type-method (hairy :negate) (x)
   (make-negation-type :type x))
@@ -2064,6 +2101,8 @@
                           ;; REALP) (SATISFIES ZEROP)), in which case we fall
                           ;; through the logic above and end up here,
                           ;; stumped.
+                          ;; FIXME: (COMPLEX NUMBER) is not rejected but should
+                          ;; be, as NUMBER is clearly not a subtype of real.
                           (bug "~@<(known bug #145): The type ~S is too hairy to be ~
 used for a COMPLEX component.~:@>"
                                typespec)))))))
@@ -2809,16 +2848,6 @@ used for a COMPLEX component.~:@>"
 (!define-type-class member :enumerable t
                     :might-contain-other-types nil)
 
-;; this is ridiculously order-sensitive: the DEFSTRUCT is in 'early-type'
-;; as is MAKE-MEMBER-TYPE, the only user of *NULL-TYPE*.
-;; But the type-class is here, and you can't make a CTYPE object
-;; until a type-class exists for it. Type-classes are akin to layouts,
-;; and ought to be as primordial, and dumped during Genesis.
-;; I have a patch to do exactly that, but until then...
-(!cold-init-forms
- (setf *null-type* (%make-member-type (xset-from-list '(nil)) nil)
-       *boolean-type* (%make-member-type (xset-from-list '(t nil)) nil)))
-
 (!define-type-method (member :negate) (type)
   (let ((xset (member-type-xset type))
         (fp-zeroes (member-type-fp-zeroes type)))
@@ -2944,7 +2973,7 @@ used for a COMPLEX component.~:@>"
                        (push m ms)
                        (push (ctype-of m) numbers)))
             (real (push (ctype-of m) numbers))
-           (character (push (sb!xc:char-code m) char-codes))
+            (character (push (sb!xc:char-code m) char-codes))
             (t (push m ms))))
         (apply #'type-union
                (if ms
@@ -3286,10 +3315,6 @@ used for a COMPLEX component.~:@>"
 ;;;; CONS types
 
 (!define-type-class cons :enumerable nil :might-contain-other-types nil)
-
-;; Another order-sensitive form. See related note at MEMBER type-class.
-(!cold-init-forms
- (setf *cons-t-t-type* (%make-cons-type *universal-type* *universal-type*)))
 
 (!def-type-translator cons (&optional (car-type-spec '*) (cdr-type-spec '*))
   (let ((car-type (single-value-specifier-type car-type-spec))
@@ -3989,5 +4014,7 @@ used for a COMPLEX component.~:@>"
    over under))
 
 (!defun-from-collected-cold-init-forms !late-type-cold-init)
+
+#-sb-xc (!late-type-cold-init2)
 
 (/show0 "late-type.lisp end of file")

@@ -3654,7 +3654,7 @@ initially undefined function references:~2%")
 ;; to view strings and things in a gspace.
 (defun warmelize (descriptor)
   (labels ((recurse (x)
-            (when (eql (descriptor-bits x) (descriptor-bits *nil-descriptor*))
+            (when (cold-null x)
               (return-from recurse nil))
             (ecase (descriptor-lowtag x)
               (#.sb!vm:list-pointer-lowtag

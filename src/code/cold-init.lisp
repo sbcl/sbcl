@@ -170,6 +170,8 @@
   (show-and-call !classes-cold-init)
   (show-and-call !early-type-cold-init)
   (show-and-call !late-type-cold-init)
+  ;; See comment at the DEFUN explaining why there are 2 of them.
+  (show-and-call sb!kernel::!late-type-cold-init2)
   (show-and-call !alien-type-cold-init)
   (show-and-call !target-type-cold-init)
   (show-and-call !vm-type-cold-init)

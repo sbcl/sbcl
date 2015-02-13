@@ -60,11 +60,26 @@
 
 
 #+sb-xc-host
-(defun ctype-random ()
-  (setq *ctype-lcg-state*
-        (logand #x8fffff (+ (* 1103515245 *ctype-lcg-state*) 12345))))
+(defun ctype-random (mask)
+  (logand (setq *ctype-lcg-state*
+                (logand #x8fffff (+ (* 1103515245 *ctype-lcg-state*) 12345)))
+          mask))
 
 ;;; the base class for the internal representation of types
+
+;; Each CTYPE instance (incl. subtypes thereof) has a random opaque hash value.
+;; Hashes are mixed together to form a lookup key in the memoization wrappers
+;; for most operations in CTYPES. This works because CTYPEs are immutable.
+;; But 2 bits are "stolen" from the hash to use as flag bits.
+;; The sign bit indicates that the object is the *only* object representing
+;; its type-specifier - it is an "interned" object.
+;; The next highest bit indicates that the object, if compared for TYPE=
+;; against an interned object can quickly return false when not EQ.
+;; Complicated types don't admit the quick failure check.
+;; At any rate, the totally opaque pseudo-random bits are under this mask.
+(defconstant +ctype-hash-mask+
+  (ldb (byte (1- sb!vm:n-positive-fixnum-bits) 0) -1))
+
 (def!struct (ctype (:conc-name type-)
                    (:constructor nil)
                    (:make-load-form-fun make-type-load-form)
@@ -88,13 +103,36 @@
   ;; - in the target, use scrambled bits from the allocation pointer
   ;;   instead.
   (hash-value
-   #+sb-xc-host (ctype-random)
-   #-sb-xc-host (sb!impl::quasi-random-address-based-hash *ctype-hash-state*)
-              :type (and #-sb-xc-host fixnum unsigned-byte)
-              :read-only t))
+   #+sb-xc-host (ctype-random +ctype-hash-mask+)
+   #-sb-xc-host (sb!impl::quasi-random-address-based-hash
+                 *ctype-hash-state* +ctype-hash-mask+)
+              :type (signed-byte #.sb!vm:n-fixnum-bits)
+              ;; FIXME: is there a better way to initialize the hash value
+              ;; and its flag bit simultaneously rather than have it
+              ;; be a read/write slot?
+              :read-only nil))
 (def!method print-object ((ctype ctype) stream)
   (print-unreadable-object (ctype stream :type t)
     (prin1 (type-specifier ctype) stream)))
+
+;; Set the sign bit (the "interned" bit) of the hash-value of OBJ to 1.
+;; This is an indicator that the object is the unique internal representation
+;; of any ctype that is TYPE= to this object.
+;; Everything starts out assumed non-unique.
+;; The hash-cache logic (a/k/a memoization) tends to ignore high bits when
+;; creating cache keys because the mixing function is XOR and the caches
+;; are power-of-2 sizes. Lkewise making the low bits non-random is bad
+;; for cache distribution.
+(defconstant +type-admits-type=-optimization+
+  (ash 1 (- sb!vm:n-positive-fixnum-bits 1))) ; highest bit in fixnum
+(defun mark-ctype-interned (obj)
+  (setf (type-hash-value obj)
+        (logior most-negative-fixnum
+                (if (eq (type-class-name (type-class-info obj)) 'array)
+                    0
+                    +type-admits-type=-optimization+)
+                (type-hash-value obj)))
+  obj)
 
 (declaim (inline type-might-contain-other-types-p))
 (defun type-might-contain-other-types-p (ctype)

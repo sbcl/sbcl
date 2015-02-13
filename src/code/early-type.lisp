@@ -191,18 +191,41 @@
 (defstruct (fun-type (:include args-type
                                (class-info (type-class-or-lose 'function)))
                      (:constructor
-                      make-fun-type (&key required optional rest
-                                          keyp keywords allowp
-                                          wild-args
-                                          returns
-                                     &aux (rest (if (eq rest *empty-type*)
-                                                    nil
-                                                    rest)))))
+                      %make-fun-type (required optional rest
+                                      keyp keywords allowp wild-args returns)))
   ;; true if the arguments are unrestrictive, i.e. *
   (wild-args nil :type boolean :read-only t)
   ;; type describing the return values. This is a values type
   ;; when multiple values were specified for the return.
   (returns (missing-arg) :type ctype :read-only t))
+
+;; Without this canonicalization step, I found >350 different
+;; (FUNCTION (T) *) representations in a sample build.
+(declaim (type (simple-vector 4) *interned-fun-type-instances*))
+(defglobal *interned-fun-types* (make-array 4))
+(defun !intern-important-fun-type-instances ()
+  (setq *interned-fun-types* (make-array 4))
+  (let (required)
+    (dotimes (i 4)
+      (when (plusp i)
+        (push *universal-type* required))
+      (setf (svref *interned-fun-types* i)
+            (mark-ctype-interned
+             (%make-fun-type required nil nil nil nil nil nil *wild-type*))))))
+
+(defun make-fun-type (&key required optional rest
+                           keyp keywords allowp
+                           wild-args returns)
+  (let ((rest (if (eq rest *empty-type*) nil rest))
+        (n (length required)))
+    (if (and (<= n 3)
+             (not optional) (not rest) (not keyp)
+             (not keywords) (not allowp) (not wild-args)
+             (eq returns *wild-type*)
+             (every (lambda (x) (eq x *universal-type*)) required))
+        (svref *interned-fun-types* n)
+        (%make-fun-type required optional rest keyp keywords
+                        allowp wild-args returns))))
 
 ;;; The CONSTANT-TYPE structure represents a use of the CONSTANT-ARG
 ;;; "type specifier", which is only meaningful in function argument
@@ -280,6 +303,45 @@
   (low nil :type (or number cons null) :read-only t)
   (high nil :type (or number cons null) :read-only t))
 
+;; For some numeric subtypes, uniqueness of the object representation
+;; is enforced. These encompass all array specializations and more.
+(defglobal *unsigned-byte-type* -1)
+(defglobal *integer-type* -1)
+(defglobal *unsigned-byte-n-types* -1)
+(defglobal *signed-byte-n-types* -1)
+(defglobal *real-ffloat-type* -1)
+(defglobal *real-dfloat-type* -1)
+(defglobal *complex-ffloat-type* -1)
+(defglobal *complex-dfloat-type* -1)
+#-sb-xc-host
+(declaim (type (simple-vector #.(1+ sb!vm:n-word-bits)) *unsigned-byte-n-types*)
+         (type (simple-vector #.sb!vm:n-word-bits) *signed-byte-n-types*))
+
+;; Called after NUMBER-TYPE type-class has been made.
+(defun !intern-important-numeric-type-instances ()
+  (flet ((float-type (format complexp)
+           (mark-ctype-interned
+            (%make-numeric-type :class 'float :complexp complexp
+                                :format format :enumerable nil)))
+         (int-type (enumerable low high)
+           (mark-ctype-interned
+            (%make-numeric-type :class 'integer :complexp :real
+                                :enumerable enumerable
+                                :low low :high high))))
+    (setq *real-ffloat-type*      (float-type 'single-float :real)
+          *real-dfloat-type*      (float-type 'double-float :real)
+          *complex-ffloat-type*   (float-type 'single-float :complex)
+          *complex-dfloat-type*   (float-type 'double-float :complex)
+          *unsigned-byte-type*    (int-type nil 0 nil)
+          *integer-type*          (int-type nil nil nil)
+          *unsigned-byte-n-types* (make-array (1+ sb!vm:n-word-bits))
+          *signed-byte-n-types*   (make-array sb!vm:n-word-bits))
+    (dotimes (j (1+ sb!vm:n-word-bits))
+      (setf (svref *unsigned-byte-n-types* j) (int-type t 0 (1- (ash 1 j)))))
+    (dotimes (j sb!vm:n-word-bits)
+      (setf (svref *signed-byte-n-types* j)
+            (let ((high (1- (ash 1 j)))) (int-type t (- (1+ high)) high))))))
+
 ;;; Impose canonicalization rules for NUMERIC-TYPE. Note that in some
 ;;; cases, despite the name, we return *EMPTY-TYPE* instead of a
 ;;; NUMERIC-TYPE.
@@ -302,31 +364,61 @@
                (>= (type-bound-number low) (type-bound-number high))
                (> low high)))
       *empty-type*
-      (multiple-value-bind (canonical-low canonical-high)
+      (multiple-value-bind (low high)
           (case class
             (integer
              ;; INTEGER types always have their LOW and HIGH bounds
              ;; represented as inclusive, not exclusive values.
-             (values (if (consp low)
-                         (1+ (type-bound-number low))
-                         low)
-                     (if (consp high)
-                         (1- (type-bound-number high))
-                         high)))
+             (values (if (consp low) (1+ (type-bound-number low)) low)
+                     (if (consp high) (1- (type-bound-number high)) high)))
             (t
              ;; no canonicalization necessary
              (values low high)))
         (when (and (eq class 'rational)
-                   (integerp canonical-low)
-                   (integerp canonical-high)
-                   (= canonical-low canonical-high))
+                   (integerp low)
+                   (integerp high)
+                   (= low high))
           (setf class 'integer))
-        (%make-numeric-type :class class
-                            :format format
-                            :complexp complexp
-                            :low canonical-low
-                            :high canonical-high
-                            :enumerable enumerable))))
+
+        ;; Either lookup the canonical interned object for
+        ;; a point in the type lattice, or construct a new one.
+        (or (cond ((eq class 'float)
+                   (when (and (null low) (null high))
+                     (case format
+                       (single-float
+                        (case complexp
+                          (:real    *real-ffloat-type*)
+                          (:complex *complex-ffloat-type*)))
+                       (double-float
+                        (case complexp
+                          (:real    *real-dfloat-type*)
+                          (:complex *complex-dfloat-type*))))))
+                  ((and (eq class 'integer) (eq complexp :real))
+                   (flet ((n-bits () (integer-length (truly-the word high))))
+                     (declare (inline n-bits))
+                     (cond ((null high)
+                            (cond ((eql low 0) *unsigned-byte-type*)
+                                  ((not low) *integer-type*)))
+                           ((or (= high most-positive-word)
+                                (and (typep high 'word)
+                                     ;; is (1+ high) a power-of-2 ?
+                                     (zerop (logand (1+ high) high))))
+                            (cond ((eql low 0)
+                                   (svref *unsigned-byte-n-types* (n-bits)))
+                                  ((and (< high most-positive-word)
+                                        (eql low (lognot high)))
+                                   (svref *signed-byte-n-types* (n-bits)))))))))
+            (let ((result
+                   (%make-numeric-type :class class
+                                       :format format
+                                       :complexp complexp
+                                       :low low
+                                       :high high
+                                       :enumerable enumerable)))
+              (setf (type-hash-value result)
+                    (logior (type-hash-value result)
+                            +type-admits-type=-optimization+))
+              result)))))
 
 (defun modified-numeric-type (base
                               &key
@@ -346,9 +438,25 @@
 (defstruct (character-set-type
             (:include ctype
                       (class-info (type-class-or-lose 'character-set)))
-            (:constructor %make-character-set-type)
+            (:constructor %make-character-set-type (pairs))
             (:copier nil))
   (pairs (missing-arg) :type list :read-only t))
+
+;; Interned character-set types.
+(defglobal *character-type* -1)
+#!+sb-unicode
+(progn (defglobal *base-char-type* -1)
+       (defglobal *extended-char-type* -1))
+
+(defun !intern-important-character-set-type-instances ()
+  (flet ((range (low high)
+           (mark-ctype-interned
+            (%make-character-set-type (list (cons low high))))))
+    (setq *character-type* (range 0 (1- sb!xc:char-code-limit)))
+    #!+sb-unicode
+    (setq *base-char-type* (range 0 127)
+          *extended-char-type* (range 128 (1- sb!xc:char-code-limit)))))
+
 (defun make-character-set-type (&key pairs)
   ; (aver (equal (mapcar #'car pairs)
   ;              (sort (mapcar #'car pairs) #'<)))
@@ -373,15 +481,25 @@
                                      (min high (1- sb!xc:char-code-limit)))
                                result))))))))
     (if (null pairs)
-       *empty-type*
-       (%make-character-set-type :pairs pairs))))
+        *empty-type*
+        (or (and (singleton-p pairs)
+                 (let* ((pair (car pairs))
+                        (low (car pair)))
+                   (case (cdr pair) ; high
+                     (#.(1- sb!xc:char-code-limit)
+                      (case low
+                        (0 *character-type*)
+                        #!+sb-unicode (128 *extended-char-type*)))
+                     #!+sb-unicode
+                     (127 (if (eql low 0) *base-char-type*)))))
+            (%make-character-set-type pairs)))))
 
 ;;; An ARRAY-TYPE is used to represent any array type, including
 ;;; things such as SIMPLE-BASE-STRING.
 (defstruct (array-type (:include ctype
                                  (class-info (type-class-or-lose 'array)))
-                       (:constructor make-array-type
-                        (dimensions &key complexp element-type
+                       (:constructor %make-array-type
+                        (dimensions complexp element-type
                                     specialized-element-type))
                        (:copier nil))
   ;; the dimensions of the array, or * if unspecified. If a dimension
@@ -394,6 +512,78 @@
   ;; the element type as it is specialized in this implementation
   (specialized-element-type *wild-type* :type ctype :read-only t))
 
+;; For all ctypes which are the element types of specialized arrays,
+;; 3 ctype objects are stored for the rank-1 arrays of that specialization,
+;; one for each of simple, maybe simple, and not simple.
+;; It would also be reasonable to intern (ARRAY <type> *).
+(defglobal *rank-1-array-ctypes* -1)
+(defconstant +canon-array-ctype-hash-divisor+ 37) ; arbitrary-ish
+(defun !intern-important-array-type-instances ()
+  ;; Having made the canonical numeric and character ctypes
+  ;; representing the points in the type lattice for which there
+  ;; are array specializations, we can make the canonical array types.
+  (let* ((element-types
+          (list*
+           *universal-type* *wild-type* *empty-type*
+           *character-type* *base-char-type* *extended-char-type*
+           *real-ffloat-type* *complex-ffloat-type*
+           *real-dfloat-type* *complex-dfloat-type*
+           (delete
+            nil
+            ;; Possibly could use the SAETP-IMPORTANCE as sort criterion
+            ;; so that collisions in a bucket place the more important
+            ;; array type first.
+            (mapcar
+             (lambda (x)
+               (cond ((typep x '(cons (eql unsigned-byte)))
+                      (aref *unsigned-byte-n-types* (cadr x)))
+                     ((eq x 'bit)
+                      (aref *unsigned-byte-n-types* 1))
+                     ((typep x '(cons (eql signed-byte)))
+                      ;; 1- because there is no such thing as (signed-byte 0)
+                      (aref *signed-byte-n-types* (1- (cadr x))))
+                     ;; FIXNUM is its own thing, why? See comment in vm-array
+                     ;; saying to "See the comment in PRIMITIVE-TYPE-AUX"
+                     ((eq x 'fixnum) ; One good kludge deserves another.
+                      (aref *signed-byte-n-types* (1- sb!vm:n-fixnum-bits)))))
+             '#.*specialized-array-element-types*))))
+         (n (length element-types))
+         (data-vector (make-array (* 3 n)))
+         (index 0)
+         (hashtable (make-array +canon-array-ctype-hash-divisor+
+                                :initial-element nil)))
+    ;; This is a compact binned table. A full-blown hashtable is unneeded.
+    #-sb-xc (aver (< (/ n (length hashtable)) 80/100)) ; assert reasonable load
+    (flet ((make-it (complexp type)
+             (mark-ctype-interned (%make-array-type '(*) complexp type type))))
+      (dolist (element-type element-types)
+        (let ((bin (mod (type-hash-value element-type)
+                        +canon-array-ctype-hash-divisor+)))
+          (setf (aref hashtable bin)
+                (nconc (aref hashtable bin) (list (cons element-type index))))
+          (setf (aref data-vector (+ index 0)) (make-it nil    element-type)
+                (aref data-vector (+ index 1)) (make-it :maybe element-type)
+                (aref data-vector (+ index 2)) (make-it t      element-type))
+          (incf index 3))))
+    (setq *rank-1-array-ctypes* (cons data-vector hashtable))))
+
+(defun make-array-type (dimensions &key (complexp :maybe) element-type
+                                        (specialized-element-type *wild-type*))
+  (or (and (eq element-type specialized-element-type)
+           (singleton-p dimensions)
+           (eq (first dimensions) '*)
+           (let ((table *rank-1-array-ctypes*))
+             (dolist (cell (svref (cdr table)
+                                  (mod (type-hash-value element-type)
+                                       +canon-array-ctype-hash-divisor+)))
+               (when (eq (car cell) element-type)
+                 (return (svref (car table)
+                                (+ (cdr cell)
+                                   (ecase complexp
+                                     ((nil) 0) ((:maybe) 1) ((t) 2)))))))))
+      (%make-array-type dimensions
+                        complexp element-type specialized-element-type)))
+
 ;;; A MEMBER-TYPE represent a use of the MEMBER type specifier. We
 ;;; bother with this at this level because MEMBER types are fairly
 ;;; important and union and intersection are well defined.
@@ -404,6 +594,19 @@
                         #-sb-xc-host (:pure nil))
   (xset (missing-arg) :type xset :read-only t)
   (fp-zeroes (missing-arg) :type list :read-only t))
+
+(defglobal *null-type* -1)    ; = (MEMBER NIL)
+(defglobal *eql-t-type* -1)   ; = (MEMBER T)
+(defglobal *boolean-type* -1) ; = (MEMBER T NIL)
+
+(defun !intern-important-member-type-instances ()
+  (flet ((make-it (list)
+           (mark-ctype-interned
+            (%make-member-type (xset-from-list list) nil))))
+    (setf *null-type* (make-it '(nil))
+          *eql-t-type* (make-it '(t))
+          *boolean-type* (make-it '(t nil)))))
+
 (defun make-member-type (&key xset fp-zeroes members)
   (unless xset
     (aver (not fp-zeroes))
@@ -434,20 +637,27 @@
                     (when (= sign 0)
                       (push (ctype-of z) float-types))
                     (push z unpaired)))))))
-    ;; The actual member-type contains the XSET (with no FP zeroes),
-    ;; and a list of unpaired zeroes.
     (let ((member-type
-           (cond ((and (not unpaired) (equal (xset-data xset) '(nil)))
-                  *null-type*)
-                 ((and (not unpaired)
-                       ;; Semantically this is fine - XSETs
-                       ;; are not order-preserving except by accident
-                       ;; (when not represented as a hash-table).
-                       (or (equal (xset-data xset) '(t nil))
-                           (equal (xset-data xset) '(nil t))))
-                  *boolean-type*)
-                 ((or unpaired (not (xset-empty-p xset)))
-                  (%make-member-type xset unpaired)))))
+           (block nil
+             (unless unpaired
+               (when (singleton-p (xset-data xset))
+                 (case (first (xset-data xset))
+                   ((nil) (return *null-type*))
+                   ((t) (return *eql-t-type*))))
+               ;; Semantically this is fine - XSETs
+               ;; are not order-preserving except by accident
+               ;; (when not represented as a hash-table).
+               (when (or (equal (xset-data xset) '(t nil))
+                         (equal (xset-data xset) '(nil t)))
+                 (return *boolean-type*)))
+             (when (or unpaired (not (xset-empty-p xset)))
+               (let ((result (%make-member-type xset unpaired)))
+                 (setf (type-hash-value result)
+                       (logior (type-hash-value result)
+                               +type-admits-type=-optimization+))
+                 result)))))
+      ;; The actual member-type contains the XSET (with no FP zeroes),
+      ;; and a list of unpaired zeroes.
       (if float-types
           (make-union-type t (if member-type
                                  (cons member-type float-types)
@@ -500,6 +710,17 @@
 ;;;      than one MEMBER-TYPE component. FIXME: As of sbcl-0.6.11.13,
 ;;;      this hadn't been fully implemented yet.
 ;;;   2. There are never any UNION-TYPE components.
+;;;
+;;; TODO: As STRING is an especially important union type,
+;;; it could be interned by canonicalizing its subparts into
+;;; ARRAY of {CHARACTER,BASE-CHAR,NIL} in that exact order always.
+;;; It will therefore admit quick TYPE=, but not quick failure, since
+;;;   (type= (specifier-type '(or (simple-array (member #\a) (*))
+;;;                               (simple-array character (*))
+;;;                               (simple-array nil (*))))
+;;;          (specifier-type 'simple-string)) => T and T
+;;; even though (MEMBER #\A) is not TYPE= to BASE-CHAR.
+;;;
 (defstruct (union-type (:include compound-type
                                  (class-info (type-class-or-lose 'union)))
                        (:constructor make-union-type (enumerable types))
@@ -541,6 +762,16 @@
   ;; the CAR and CDR element types (to support ANSI (CONS FOO BAR) types)
   (car-type (missing-arg) :type ctype :read-only t)
   (cdr-type (missing-arg) :type ctype :read-only t))
+
+;; The function caches work significantly better when there
+;; is a unique object that stands for the specifier (CONS T T).
+(defglobal *cons-t-t-type* -1)
+
+(defun !intern-important-cons-type-instances ()
+  (setf *cons-t-t-type*
+        (mark-ctype-interned
+         (%make-cons-type *universal-type* *universal-type*))))
+
 (defun make-cons-type (car-type cdr-type)
   (aver (not (or (eq car-type *wild-type*)
                  (eq cdr-type *wild-type*))))

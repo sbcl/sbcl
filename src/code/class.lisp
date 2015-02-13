@@ -700,7 +700,9 @@ between the ~A definition and the ~A definition"
 ;;; classes. Non-structure "typed" defstructs are a special case, and
 ;;; don't have a corresponding class.
 (def!struct (structure-classoid (:include classoid)
-                                (:constructor make-structure-classoid)))
+                                (:constructor %make-structure-classoid)))
+(defun make-structure-classoid (&key name)
+  (mark-ctype-interned (%make-structure-classoid :name name)))
 
 ;;;; classoid namespace
 
@@ -1457,6 +1459,7 @@ between the ~A definition and the ~A definition"
                        (if (eq name t)
                            nil
                            (mapcar #'find-classoid direct-superclasses)))))
+        (mark-ctype-interned classoid)
         (setf (info :type :kind name) #+sb-xc-host :defined #-sb-xc-host :primitive
               (classoid-cell-classoid (find-classoid-cell name :create t)) classoid)
         (unless trans-p

@@ -962,17 +962,36 @@
                             (typep ,g 'fixnum))))))))
 
 (with-test (:name :interned-type-specifiers)
-  (dolist (specifier '((satisfies keywordp) ; not the same as KEYWORD
-                       boolean
-                       cons
-                       null))
-    ;; In general specifiers can repeatedly parse the same due to
-    ;; the caching in VALUES-SPECIFIER-TYPE provided the entry was
-    ;; not evicted. Here we want to check a stronger condition,
-    ;; that they really always parse to the identical object.
-    (let ((parse1 (sb-kernel:specifier-type specifier)))
-      (sb-int:drop-all-hash-caches)
-      (let ((parse2 (sb-kernel:specifier-type specifier)))
-        (assert (eq parse1 parse2))))))
+  ;; In general specifiers can repeatedly parse the same due to
+  ;; the caching in VALUES-SPECIFIER-TYPE, provided that the entry
+  ;; was not evicted. Here we want to check a stronger condition,
+  ;; that they really always parse to the identical object.
+  (flet ((try (specifier)
+           (let ((parse1 (sb-kernel:specifier-type specifier)))
+             (sb-int:drop-all-hash-caches)
+             (let ((parse2 (sb-kernel:specifier-type specifier)))
+               (assert (eq parse1 parse2))))))
+    (mapc #'try
+          '((satisfies keywordp) ; not the same as KEYWORD
+            boolean
+            cons
+            null
+            character
+            integer
+            bit
+            ;; one-dimensional arrays of unknown type
+            (array * (*))
+            (simple-array * (*))
+            (and (array * (*)) (not simple-array))
+            ;; floating-point
+            single-float
+            double-float
+            (complex single-float)
+            (complex double-float)))
+    ;; and check all specialized arrays
+    (dolist (spec sb-kernel::*specialized-array-element-types*)
+      (try `(array ,spec (*)))
+      (try `(simple-array ,spec (*)))
+      (try `(and (not simple-array) (array ,spec (*)))))))
 
 ;;; success
