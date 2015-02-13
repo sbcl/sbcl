@@ -706,3 +706,30 @@ a bug.~@:>")
   (when (eql *skip-until* label)
     (setf *skip-until* nil))
   (values))
+
+;;; Primordial layouts.
+;;; At the rate the opcode space is filling up, it might be wise to
+;;; rethink using 16 each for FOP-CODE and -SYMBOL-IN-PACKAGE-SAVE.
+(macrolet ((frob (&rest specs)
+             `(progn
+                (defun known-layout-fop (name)
+                  (case name
+                    ,@(mapcar (lambda (spec) `((,(cadr spec)) ,(car spec)))
+                              specs)))
+                ,@(mapcar (lambda (spec)
+                            `(!define-fop ,(car spec)
+                                          (,(symbolicate "FOP-LAYOUT-OF-"
+                                                         (cadr spec)))
+                                          (find-layout ',(cadr spec))))
+                          specs))))
+  (frob (#x6c t)
+        (#x6d structure-object)
+        (#x6e structure!object)
+        (#x6f definition-source-location)
+        (#x70 sb!c::debug-fun)
+        (#x71 sb!c::compiled-debug-fun)
+        (#x72 sb!c::debug-info)
+        (#x73 sb!c::compiled-debug-info)
+        (#x74 sb!c::debug-source)
+        (#x75 defstruct-description)
+        (#x76 defstruct-slot-description)))

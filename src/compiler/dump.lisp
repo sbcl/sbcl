@@ -1323,6 +1323,13 @@
     ;; Q: Shouldn't we aver that NAME is the proper name for its classoid?
     (unless name
       (compiler-error "dumping anonymous layout: ~S" obj))
+    ;; The target lisp can save some space in fasls (sometimes),
+    ;; but the cross-compiler can't because we need to construct the
+    ;; cold representation of all layouts, not reference host layouts.
+    #-sb-xc-host
+    (let ((fop (known-layout-fop name)))
+      (when fop
+        (return-from dump-layout (dump-byte fop file))))
     (dump-object name file))
   (sub-dump-object (layout-inherits obj) file)
   (sub-dump-object (layout-depthoid obj) file)
