@@ -162,15 +162,19 @@
 ;;; producing a symbol in the current package.
 (eval-when (#-sb-xc :compile-toplevel :load-toplevel :execute)
   (defun symbolicate (&rest things)
-    (let* ((length (reduce #'+ things
-                           :key (lambda (x) (length (string x)))))
-           (name (make-array length :element-type 'character)))
-      (let ((index 0))
-        (dolist (thing things (values (intern name)))
-          (let* ((x (string thing))
-                 (len (length x)))
-            (replace name x :start1 index)
-            (incf index len)))))))
+    (declare (dynamic-extent things))
+    (values
+     (intern
+      (if (singleton-p things)
+          (string (first things))
+          (let* ((length (reduce #'+ things
+                                 :key (lambda (x) (length (string x)))))
+                 (name (make-array length :element-type 'character))
+                 (index 0))
+            (dolist (thing things name)
+              (let ((x (string thing)))
+                (replace name x :start1 index)
+                (incf index (length x))))))))))
 
 (defun gensymify (x)
   (if (symbolp x)
