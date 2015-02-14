@@ -525,7 +525,8 @@
   (let* ((element-types
           (list*
            *universal-type* *wild-type* *empty-type*
-           *character-type* *base-char-type* *extended-char-type*
+           *character-type*
+           #!+sb-unicode *base-char-type* #!+sb-unicode *extended-char-type*
            *real-ffloat-type* *complex-ffloat-type*
            *real-dfloat-type* *complex-dfloat-type*
            (delete

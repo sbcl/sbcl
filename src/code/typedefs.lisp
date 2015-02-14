@@ -127,7 +127,7 @@
   (ash 1 (- sb!vm:n-positive-fixnum-bits 1))) ; highest bit in fixnum
 (defun mark-ctype-interned (obj)
   (setf (type-hash-value obj)
-        (logior most-negative-fixnum
+        (logior sb!xc:most-negative-fixnum
                 (if (eq (type-class-name (type-class-info obj)) 'array)
                     0
                     +type-admits-type=-optimization+)
