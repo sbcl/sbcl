@@ -22,6 +22,7 @@ changes relative to sbcl-1.2.8:
   * bug fix: compiler doesn't stumble on a LOGIOR transform. (lp#1389433)
   * bug fix: more robust debugger and backtraces. (lp#1413850, lp#1099500,
     lp#1412881, lp#945261, lp#1419205)
+  * bug fix: files larger than 4GB can now be compiled.
 
 changes in sbcl-1.2.8 relative to sbcl-1.2.7:
   * enhancement: better error and warning messages. (lp#1314767, lp#736383)

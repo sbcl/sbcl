@@ -273,11 +273,11 @@
             (frob i))
           (dovector (i seq (setq length (length seq)))
             (frob i)))
-      (let ((specializer `(unsigned-byte
-                           ,(etypecase maxoid
-                              ((unsigned-byte 8) 8)
-                              ((unsigned-byte 16) 16)
-                              ((unsigned-byte 32) 32)))))
+      (let ((specializer (etypecase maxoid
+                           ((unsigned-byte 8) '(unsigned-byte 8))
+                           ((unsigned-byte 16) '(unsigned-byte 16))
+                           ((unsigned-byte 32) '(unsigned-byte 32))
+                           ((unsigned-byte 64) '(unsigned-byte 64)))))
         ;; formerly (coerce seq `(simple-array ,specializer (*)))
         ;; plus a kludge for cross-compilation. This is nicer.
         (!make-specialized-array length specializer seq)))))
