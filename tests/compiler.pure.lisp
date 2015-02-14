@@ -5480,3 +5480,10 @@
                  (compile nil
                           '(lambda (x)
                              (typep x `(signed-byte ,sb-vm:n-word-bits))))))))
+(with-test (:name :logior-transform)
+  (let ((function (compile nil '(lambda (c)
+                                 (flet ((f (x)
+                                          (the integer x)))
+                                   (logior c (f nil)))))))
+    (assert-error (funcall function 10)
+                  type-error)))

@@ -3494,7 +3494,7 @@
       (give-up-ir1-transform))
     'x))
 
-(deftransform logior ((x y) (* (constant-arg t)) *)
+(deftransform logior ((x y) (* (constant-arg integer)) *)
   "fold identity operation"
   (let* ((y (lvar-value y))
          (width (or (least-zero-bit (lognot y))
