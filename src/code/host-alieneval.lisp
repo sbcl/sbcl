@@ -623,7 +623,8 @@
     #!+(or x86 x86-64)
     (:result
      (list (if (alien-integer-type-signed type) 'signed-byte 'unsigned-byte)
-           sb!vm:n-word-bits))))
+           (max (alien-integer-type-bits type)
+                sb!vm:n-word-bits)))))
 
 ;;; As per the comment in the :ALIEN-REP method above, this is defined
 ;;; elsewhere for x86oids.

@@ -431,4 +431,10 @@
       (error "~@<Alien structure type redefinition failed to signal an ~
               error~@:>"))))
 
+#+largefile
+(with-test (:name (:64-bit-return-truncation))
+  (with-open-file (stream *load-truename*)
+    (file-position stream 4294967310)
+    (assert (= 4294967310 (file-position stream)))))
+
 ;;; success
