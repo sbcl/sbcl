@@ -13,6 +13,8 @@ changes relative to sbcl-1.2.8:
     deferring until runtime should declare (NOTINLINE TYPEP).
     [Due to the sematic constraints of DEFTYPE etc in in CLHS 3.2.2.3,
     code requiring delayed evaluation could be unportable though.]
+  * enhancement: unused variables at the top-level are now reported.
+    (lp#492200)
   * bug fix: DEFCLASS handles cyclic {super,meta}class relations better
     (lp#1418883)
   * bug fix: compiler no longer signals an error when compiling certain nested

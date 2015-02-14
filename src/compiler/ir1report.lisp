@@ -231,10 +231,7 @@
                         :context src-context
                         :file-name (file-info-name file-info)
                         :file-position
-                        (multiple-value-bind (ignore pos)
-                            (find-source-root tlf *source-info*)
-                          (declare (ignore ignore))
-                          pos)
+                        (nth-value 1 (find-source-root tlf *source-info*))
                         :original-source-path (source-path-original-source path)
                         :lexenv (if context
                                     (node-lexenv context)

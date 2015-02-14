@@ -122,7 +122,7 @@
 (defun %add-lambda-vars-to-closures (clambda)
   (let ((physenv (get-lambda-physenv clambda))
         (did-something nil))
-    (note-unreferenced-vars clambda)
+    (note-unreferenced-fun-vars clambda)
     (dolist (var (lambda-vars clambda))
       (dolist (ref (leaf-refs var))
         (let ((ref-physenv (get-node-physenv ref)))

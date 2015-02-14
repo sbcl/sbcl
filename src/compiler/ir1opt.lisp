@@ -1778,7 +1778,7 @@
 (defun delete-let (clambda)
   (declare (type clambda clambda))
   (aver (functional-letlike-p clambda))
-  (note-unreferenced-vars clambda)
+  (note-unreferenced-fun-vars clambda)
   (let ((call (let-combination clambda)))
     (flush-dest (basic-combination-fun call))
     (unlink-node call)
