@@ -858,7 +858,7 @@ core and return a descriptor to it."
     #!+x86-64
     (let ((header-word
            (logior (ash index 32)
-                   (descriptor-bits (read-wordindexed symbol 0)))))
+                   (descriptor-bits (read-memory symbol)))))
       (write-wordindexed symbol 0 (make-random-descriptor header-word)))
     #!-x86-64
     (write-wordindexed symbol sb!vm:symbol-tls-index-slot
@@ -870,7 +870,7 @@ core and return a descriptor to it."
     (let* ((cold-sym (cold-intern symbol))
            (tls-index
             #!+x86-64
-            (ldb (byte 32 32) (descriptor-bits (read-wordindexed cold-sym 0)))
+            (ldb (byte 32 32) (descriptor-bits (read-memory cold-sym)))
             #!-x86-64
             (descriptor-bits
              (read-wordindexed cold-sym sb!vm:symbol-tls-index-slot))))
@@ -978,25 +978,6 @@ core and return a descriptor to it."
   ;; including the layout itself as 1 word
   (layout-length (find-layout 'layout)))
 
-(defun target-layout-index (slot-name)
-  ;; KLUDGE: this is a little bit sleazy, but the tricky thing is that
-  ;; structure slots don't have a terribly firm idea of their names.
-  ;; At least here if we change LAYOUT's package of definition, we
-  ;; only have to change one thing...
-  (let* ((name (find-symbol (symbol-name slot-name) "SB!KERNEL"))
-         (layout (find-layout 'layout))
-         (dd (layout-info layout))
-         (slots (dd-slots dd))
-         (dsd (find name slots :key #'dsd-name)))
-    (aver dsd)
-    (dsd-index dsd)))
-
-(defun cold-set-layout-slot (cold-layout slot-name value)
-  (write-wordindexed
-   cold-layout
-   (+ sb!vm:instance-slots-offset (target-layout-index slot-name))
-   value))
-
 ;;; Return a list of names created from the cold layout INHERITS data
 ;;; in X.
 (defun listify-cold-inherits (x)
@@ -1013,6 +994,25 @@ core and return a descriptor to it."
                    (descriptor-bits des)))))
       (res))))
 
+(macrolet ((dsd-index-from-keyword (initarg slots)
+             `(let ((dsd (find ,initarg ,slots
+                               :test (lambda (x y)
+                                       (eq x (keywordicate (dsd-name y)))))))
+                (aver (eq (dsd-raw-type dsd) t)) ; raw slots not implemented
+                (+ (dsd-index dsd) sb!vm:instance-slots-offset))))
+
+  (defun write-slots (cold-object host-layout &rest assignments)
+    (aver (evenp (length assignments)))
+    (let ((slots (dd-slots (layout-info host-layout))))
+      (loop for (initarg value) on assignments by #'cddr
+            do (write-wordindexed
+                cold-object (dsd-index-from-keyword initarg slots) value))))
+
+  (defun read-slot (cold-object host-layout slot-initarg) ; not "name"
+    (read-wordindexed cold-object
+                      (dsd-index-from-keyword
+                       slot-initarg (dd-slots (layout-info host-layout))))))
+
 (defvar *simple-vector-0-descriptor*)
 (defvar *vacuous-slot-table*)
 (declaim (ftype (function (symbol descriptor descriptor descriptor descriptor)
@@ -1027,35 +1027,37 @@ core and return a descriptor to it."
     ;; Set other slot values.
     ;;
     ;; leave CLASSOID uninitialized for now
-    (cold-set-layout-slot result 'invalid *nil-descriptor*)
-    (cold-set-layout-slot result 'inherits inherits)
-    (cold-set-layout-slot result 'depthoid depthoid)
-    (cold-set-layout-slot result 'length length)
-    (cold-set-layout-slot result 'info *nil-descriptor*)
-    (cold-set-layout-slot result 'pure *nil-descriptor*)
-    #!-interleaved-raw-slots
-    (cold-set-layout-slot result 'n-untagged-slots metadata)
-    #!+interleaved-raw-slots
-    (progn
-      (cold-set-layout-slot result 'untagged-bitmap metadata)
+    (multiple-value-call
+     #'write-slots result (find-layout 'layout)
+     :invalid *nil-descriptor*
+     :inherits inherits
+     :depthoid depthoid
+     :length length
+     :info *nil-descriptor*
+     :pure *nil-descriptor*
+     #!-interleaved-raw-slots
+     (values :n-untagged-slots metadata)
+     #!+interleaved-raw-slots
+     (values :untagged-bitmap metadata
       ;; Nothing in cold-init needs to call EQUALP on a structure with raw slots,
       ;; but for type-correctness this slot needs to be a simple-vector.
-      (unless (boundp '*simple-vector-0-descriptor*)
-        (setq *simple-vector-0-descriptor* (vector-in-core nil)))
-      (cold-set-layout-slot result 'equalp-tests *simple-vector-0-descriptor*))
-    (cold-set-layout-slot result 'source-location *nil-descriptor*)
-    (cold-set-layout-slot result '%for-std-class-b (make-fixnum-descriptor 0))
-    (cold-set-layout-slot result 'slot-list *nil-descriptor*)
-
-    (when (member name '(null list symbol))
+             :equalp-tests (if (boundp '*simple-vector-0-descriptor*)
+                               *simple-vector-0-descriptor*
+                               (setq *simple-vector-0-descriptor*
+                                     (vector-in-core nil))))
+     :source-location *nil-descriptor*
+     :%for-std-class-b (make-fixnum-descriptor 0)
+     :slot-list *nil-descriptor*
+     (if (member name '(null list symbol))
       ;; Assign an empty slot-table.  Why this is done only for three
       ;; classoids is ... too complicated to explain here in a few words,
       ;; but revision 18c239205d9349abc017b07e7894a710835c5205 broke it.
       ;; Keep this in sync with MAKE-SLOT-TABLE in pcl/slots-boot.
-      (unless (boundp '*vacuous-slot-table*)
-        (setq *vacuous-slot-table*
-              (host-constant-to-core '#(1 nil))))
-      (cold-set-layout-slot result 'slot-table *vacuous-slot-table*))
+         (values :slot-table (if (boundp '*vacuous-slot-table*)
+                                 *vacuous-slot-table*
+                                 (setq *vacuous-slot-table*
+                                       (host-constant-to-core '#(1 nil)))))
+         (values)))
 
     (setf (gethash name *cold-layouts*)
           (list result
@@ -1117,26 +1119,20 @@ core and return a descriptor to it."
 (declaim (type hash-table *cold-symbols*))
 
 (defun initialize-packages (package-data-list)
-  (let ((slots (dd-slots (layout-info (find-layout 'package))))
+  (let ((package-layout (find-layout 'package))
         (target-pkg-list nil))
-    (labels ((set-slot (obj slot-name value)
-               (write-wordindexed obj (slot-index slot-name) value))
-             (slot-index (slot-name)
-               (+ sb!vm:instance-slots-offset
-                  (dsd-index
-                   (find slot-name slots :key #'dsd-name :test #'string=))))
-             (init-cold-package (name &optional docstring)
+    (labels ((init-cold-package (name &optional docstring)
                (let ((cold-package (car (gethash name *cold-package-symbols*))))
                  ;; patch in the layout
                  (patch-instance-layout cold-package *package-layout*)
                  ;; Initialize string slots
-                 (set-slot cold-package '%name (base-string-to-core name))
-                 (set-slot cold-package '%nicknames (chill-nicknames name))
-                 (set-slot cold-package 'doc-string
-                           (if docstring
-                               (base-string-to-core docstring)
-                               *nil-descriptor*))
-                 (set-slot cold-package '%use-list *nil-descriptor*)
+                 (write-slots cold-package package-layout
+                              :%name (base-string-to-core name)
+                              :%nicknames (chill-nicknames name)
+                              :doc-string (if docstring
+                                              (base-string-to-core docstring)
+                                              *nil-descriptor*)
+                              :%use-list *nil-descriptor*)
                  ;; the cddr of this will accumulate the 'used-by' package list
                  (push (list name cold-package) target-pkg-list)))
              (chill-nicknames (pkg-name)
@@ -1182,10 +1178,12 @@ core and return a descriptor to it."
             (let ((cell (find-package-cell that)))
               (push (cadr cell) use)
               (push this (cddr cell))))
-          (set-slot this '%use-list (list-to-core (nreverse use)))))
+          (write-slots this package-layout
+                       :%use-list (list-to-core (nreverse use)))))
       ;; pass 3: set the 'used-by' lists
       (dolist (cell target-pkg-list)
-        (set-slot (cadr cell) '%used-by-list (list-to-core (cddr cell)))))))
+        (write-slots (cadr cell) package-layout
+                     :%used-by-list (list-to-core (cddr cell)))))))
 
 ;;; sanity check for a symbol we're about to create on the target
 ;;;
@@ -2184,12 +2182,9 @@ core and return a descriptor to it."
          (result (allocate-structure-object *dynamic* size layout))
          (metadata
           (descriptor-fixnum
-           (read-wordindexed
-            layout
-            (+ sb!vm:instance-slots-offset
-               (target-layout-index
-                #!-interleaved-raw-slots 'n-untagged-slots
-                #!+interleaved-raw-slots 'untagged-bitmap)))))
+           (read-slot layout (find-layout 'layout)
+                      #!-interleaved-raw-slots :n-untagged-slots
+                      #!+interleaved-raw-slots :untagged-bitmap)))
          #!-interleaved-raw-slots (ntagged (- size metadata))
          )
     #!+interleaved-raw-slots
@@ -2526,7 +2521,7 @@ core and return a descriptor to it."
 
 (defun cold-nthcdr (index obj)
   (dotimes (i index)
-    (setq obj (read-wordindexed obj 1)))
+    (setq obj (read-wordindexed obj sb!vm:cons-cdr-slot)))
   obj)
 
 ;;;; cold fops for loading code objects and functions
@@ -3674,7 +3669,7 @@ initially undefined function references:~2%")
                (let ((name (read-wordindexed x sb!vm:simple-fun-name-slot)))
                  `(function ,(recurse name))))
               (#.sb!vm:other-pointer-lowtag
-               (let ((widetag (logand (descriptor-bits (read-wordindexed x 0))
+               (let ((widetag (logand (descriptor-bits (read-memory x))
                                       sb!vm:widetag-mask)))
                  (ecase widetag
                    (#.sb!vm:symbol-header-widetag
