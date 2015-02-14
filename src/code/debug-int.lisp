@@ -205,12 +205,16 @@
 (defstruct (compiled-debug-var
             (:include debug-var)
             (:constructor make-compiled-debug-var
-                (symbol id alive-p sc-offset save-sc-offset info))
+                (symbol id alive-p
+                 sc-offset save-sc-offset indirect-sc-offset info))
             (:copier nil))
   ;; storage class and offset (unexported)
   (sc-offset nil :type sb!c:sc-offset)
   ;; storage class and offset when saved somewhere
   (save-sc-offset nil :type (or sb!c:sc-offset null))
+  ;; For indirect closures the fp of the parent frame is stored in the
+  ;; normal sc-offsets above, and this has the offset into the frame
+  (indirect-sc-offset nil :type (or sb!c:sc-offset null))
   (info nil))
 
 ;;;; frames
@@ -1718,16 +1722,18 @@ register."
                          (geti)
                          0))
                  (sc-offset (if deleted 0 (geti)))
-                 (save-sc-offset (if save (geti) nil)))
+                 (save-sc-offset (and save (geti)))
+                 (indirect-sc-offset (and indirect-p
+                                          (geti))))
             (aver (not (and args-minimal (not minimal))))
             (vector-push-extend (make-compiled-debug-var symbol
                                                          id
                                                          live
                                                          sc-offset
                                                          save-sc-offset
+                                                         indirect-sc-offset
                                                          (cond (more-context-p :more-context)
-                                                               (more-count-p :more-count)
-                                                               (indirect-p :indirect)))
+                                                               (more-count-p :more-count)))
                                 buffer)))))))
 
 ;;;; CODE-LOCATIONs
@@ -2020,14 +2026,19 @@ register."
 ;;; cell if the variable is both closed over and set.
 (defun access-compiled-debug-var-slot (debug-var frame)
   (let ((escaped (compiled-frame-escaped frame)))
-    (cond ((eq (compiled-debug-var-info debug-var) :indirect)
+    (cond ((compiled-debug-var-indirect-sc-offset debug-var)
            (sub-access-debug-var-slot
             ;; Indirect are accessed through a frame pointer of the parent.
-            (sub-access-debug-var-slot
-             (frame-pointer frame)
-             (compiled-debug-var-sc-offset debug-var)
-             escaped)
-            (compiled-debug-var-save-sc-offset debug-var)
+            (descriptor-sap
+             (sub-access-debug-var-slot
+              (frame-pointer frame)
+              (if escaped
+                  (compiled-debug-var-sc-offset debug-var)
+                  (or
+                   (compiled-debug-var-save-sc-offset debug-var)
+                   (compiled-debug-var-sc-offset debug-var)))
+              escaped))
+            (compiled-debug-var-indirect-sc-offset debug-var)
             escaped))
           (escaped
            (sub-access-debug-var-slot

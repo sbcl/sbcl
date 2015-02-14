@@ -925,6 +925,8 @@
 (with-test (:name :clean-fast-method-frame-lossage)
   (low-debug-method 42)) ; no need to assert. it either crashes or doesn't
 
+(defun return-65535 ()
+  65535)
 
 (with-test (:name :indirect-closure-values)
   (let ((count 0))
@@ -947,6 +949,37 @@
                   `(sb-int:named-lambda test ()
                      (declare (optimize debug))
                      (let ((a 1))
+                       (labels
+                           ((f1 ()
+                              (incf a)
+                              (signal 'error))
+                            (f2 ()
+                              (f1)))
+                         (f2))))))))
+    (assert (= count 3))))
+
+(with-test (:name :indirect-closure-values.2)
+  (let ((count 0))
+    (block nil
+      (handler-bind ((error (lambda (c)
+                              (declare (ignore c))
+                              (sb-debug::map-backtrace
+                               (lambda (frame)
+                                 (let ((sb-debug::*current-frame* frame)
+                                       (name (sb-debug::frame-call frame)))
+                                   (when (or (eq name 'test)
+                                             (and (consp name)
+                                                  (or (eql (search '(labels f1) name) 0)
+                                                      (eql (search '(labels f2) name) 0))))
+                                     (incf count)
+                                     (assert (eql (var 'a) 65535))))))
+                              (return))))
+        (funcall
+         (compile nil
+                  `(sb-int:named-lambda test ()
+                     (declare (optimize debug))
+                     (let ((a (return-65535)))
+                       (declare ((unsigned-byte 16) a))
                        (labels
                            ((f1 ()
                               (incf a)

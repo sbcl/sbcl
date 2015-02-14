@@ -333,7 +333,7 @@
                                  (component-info *component-being-compiled*))))
                (lambda-ancestor-p (lambda-var-home var) fun))
       (setq flags (logior flags compiled-debug-var-environment-live)))
-    (when (or save-tn indirect)
+    (when save-tn
       (setq flags (logior flags compiled-debug-var-save-loc-p)))
     (unless (or (zerop id) minimal)
       (setq flags (logior flags compiled-debug-var-id-p)))
@@ -353,20 +353,12 @@
     (cond (indirect
            ;; Indirect variables live in the parent frame, and are
            ;; accessed through a saved frame pointer.
-           ;; This reuses the normal encoding, but assigns a differnt
-           ;; meaning to it.
-           ;; The first sc-offset is for the frame pointer, the second
-           ;; is for the stack offset.
-           (let ((fp-tn (or save-tn tn)))
-             (vector-push-extend (make-sc-offset
-                                  (sc-case fp-tn
-                                    (sb!vm::control-stack
-                                     sb!vm:sap-stack-sc-number)
-                                    (t
-                                     sb!vm:sap-reg-sc-number))
-                                  (tn-offset fp-tn))
-                                 buffer)
-             (vector-push-extend (tn-sc-offset (leaf-info var)) buffer)))
+           ;; The first one/two sc-offsets are for the frame pointer,
+           ;; the third is for the stack offset.
+           (vector-push-extend (tn-sc-offset tn) buffer)
+           (when save-tn
+             (vector-push-extend (tn-sc-offset save-tn) buffer))
+           (vector-push-extend (tn-sc-offset (leaf-info var)) buffer))
           (t
            (if (and tn (tn-offset tn))
                (vector-push-extend (tn-sc-offset tn) buffer)
