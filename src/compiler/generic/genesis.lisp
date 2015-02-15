@@ -1611,8 +1611,8 @@ core and return a descriptor to it."
                                 (cold-foreign-symbol-address "undefined_tramp"))))
           fdefn))))
 
-;;; Handle the at-cold-init-time, fset-for-static-linkage operation
-;;; requested by FOP-FSET.
+;;; Handle the at-cold-init-time, fset-for-static-linkage operation.
+;;; "static" is sort of a misnomer. It's just ordinary fdefinition linkage.
 (defun static-fset (cold-name defn)
   (declare (type (or symbol descriptor) cold-name))
   (let ((fdefn (cold-fdefinition-object cold-name t))
@@ -1632,10 +1632,36 @@ core and return a descriptor to it."
                               (ash sb!vm:simple-fun-code-offset
                                    sb!vm:word-shift))))
                          (#.sb!vm:closure-header-widetag
+                          ;; There's no way to create a closure.
+                          (bug "FSET got closure-header-widetag")
                           (/show0 "/static-fset (closure)")
                           (make-random-descriptor
                            (cold-foreign-symbol-address "closure_tramp")))))
     fdefn))
+
+;;; the names of things which have had COLD-FSET used on them already
+;;; (used to make sure that we don't try to statically link a name to
+;;; more than one definition)
+(defparameter *cold-fset-warm-names*
+  (make-hash-table :test 'equal)) ; names can be conses, e.g. (SETF CAR)
+
+(defun cold-fset (name compiled-lambda docstring inline-expansion source-loc)
+  (declare (ignore source-loc))
+  (multiple-value-bind (cold-name warm-name)
+      ;; (SETF f) was descriptorized when dumped, symbols were not,
+      ;; Figure out what kind of name we're looking at.
+      (if (symbolp name)
+          (values (cold-intern name) name)
+          (values name (warm-fun-name name)))
+    (when (gethash warm-name *cold-fset-warm-names*)
+      (error "duplicate COLD-FSET for ~S" warm-name))
+    (setf (gethash warm-name *cold-fset-warm-names*) t)
+    (let ((args (cold-cons cold-name
+			   (if (or docstring inline-expansion)
+			       (cold-cons docstring inline-expansion)
+			       *nil-descriptor*))))
+      (cold-push (cold-cons 'defun args) *current-reversed-cold-toplevels*))
+    (static-fset cold-name compiled-lambda)))
 
 (defun initialize-static-fns ()
   (let ((*cold-fdefn-gspace* *static*))
@@ -2484,10 +2510,16 @@ core and return a descriptor to it."
                                     sb!vm:simple-vector-widetag)))
 
 (define-cold-fop (fop-funcall-for-effect)
-  (if (= (read-byte-arg) 0)
-      (cold-push (pop-stack)
-                 *current-reversed-cold-toplevels*)
-      (error "You can't FOP-FUNCALL arbitrary stuff in cold load.")))
+  (let ((argc (read-byte-arg))
+        (args))
+    (when (plusp argc)
+      (dotimes (i argc) (push (pop-stack) args))
+      (let ((f (pop-stack)))
+        (ecase f
+         (sb!impl::%defun
+          (return-from cold-fop-funcall-for-effect
+                       (apply #'cold-fset args)))))))
+  (cold-push (pop-stack) *current-reversed-cold-toplevels*))
 
 ;;;; cold fops for fixing up circularities
 
@@ -2525,23 +2557,6 @@ core and return a descriptor to it."
   obj)
 
 ;;;; cold fops for loading code objects and functions
-
-;;; the names of things which have had COLD-FSET used on them already
-;;; (used to make sure that we don't try to statically link a name to
-;;; more than one definition)
-(defparameter *cold-fset-warm-names*
-  ;; This can't be an EQL hash table because names can be conses, e.g.
-  ;; (SETF CAR).
-  (make-hash-table :test 'equal))
-
-(define-cold-fop (fop-fset)
-  (let* ((fn (pop-stack))
-         (cold-name (pop-stack))
-         (warm-name (warm-fun-name cold-name)))
-    (if (gethash warm-name *cold-fset-warm-names*)
-        (error "duplicate COLD-FSET for ~S" warm-name)
-        (setf (gethash warm-name *cold-fset-warm-names*) t))
-    (static-fset cold-name fn)))
 
 (define-cold-fop (fop-note-debug-source)
   (let ((debug-source (pop-stack)))

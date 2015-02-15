@@ -1259,19 +1259,6 @@ necessary, since type inference may take arbitrarily long to converge.")
 
               (mapc #'clear-ir1-info components-from-dfo))))))))
 
-#+sb-xc-host
-(defun process-toplevel-cold-fset (name lambda-expression path)
-  (unless (producing-fasl-file)
-    (error "can't COLD-FSET except in a fasl file"))
-  (legal-fun-name-or-type-error name)
-  (fasl-dump-cold-fset name
-                       (%compile lambda-expression
-                                 *compile-object*
-                                 :name name
-                                 :path path)
-                       *compile-object*)
-  (values))
-
 (defun note-top-level-form (form &optional finalp)
   (when *compile-print*
     (cond ((not *top-level-form-noted*)
@@ -1417,16 +1404,6 @@ necessary, since type inference may take arbitrarily long to converge.")
                                        (car form)
                                        form))))
               (case (car form)
-                ;; In the cross-compiler, top level COLD-FSET arranges
-                ;; for static linking at cold init time.
-                #+sb-xc-host
-                ((!cold-fset)
-                 (aver (not compile-time-too))
-                 (destructuring-bind (cold-fset fun-name lambda-expression) form
-                   (declare (ignore cold-fset))
-                   (process-toplevel-cold-fset fun-name
-                                               lambda-expression
-                                               path)))
                 ((eval-when macrolet symbol-macrolet);things w/ 1 arg before body
                  (need-at-least-one-arg form)
                  (destructuring-bind (special-operator magic &rest body) form

@@ -813,22 +813,6 @@
          (and (> (length name) 2) ; to exclude '* and '**
               (char= #\* (aref name 0))
               (char= #\* (aref name (1- (length name))))))))
-
-;;; If COLD-FSET occurs not at top level, just treat it as an ordinary
-;;; assignment instead of doing cold static linking. That way things like
-;;;   (FLET ((FROB (X) ..))
-;;;     (DEFUN FOO (X Y) (FROB X) ..)
-;;;     (DEFUN BAR (Z) (AND (FROB X) ..)))
-;;; can still "work" for cold init: they don't do magical static
-;;; linking the way that true toplevel DEFUNs do, but at least they do
-;;; the linking eventually, so as long as #'FOO and #'BAR aren't
-;;; needed until "cold toplevel forms" have executed, it's OK.
-(defmacro !cold-fset (name lambda)
-  (style-warn
-   "~@<COLD-FSET ~S not cross-compiled at top level: demoting to ~
-(SETF FDEFINITION)~:@>"
-   name)
-  `(setf (fdefinition ',name) ,lambda))
 
 ;;;; ONCE-ONLY
 ;;;;

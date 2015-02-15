@@ -207,15 +207,13 @@
                         (/primitive-print hexstr))))
   (let (#!+sb-show (index-in-cold-toplevels 0)
         (really-note-if-setf-fun-and-macro #'sb!c::note-if-setf-fun-and-macro)
-        (really-assign-setf-macro #'sb!impl::assign-setf-macro)
-        (really-defun #'sb!impl::%defun))
+        (really-assign-setf-macro #'sb!impl::assign-setf-macro))
     #!+sb-show (declare (type fixnum index-in-cold-toplevels))
 
     (setf (symbol-function 'sb!c::note-if-setf-fun-and-macro)
           (lambda (name) (declare (ignore name)) (values))
           (symbol-function 'sb!impl::assign-setf-macro)
-          #'sb!impl::!quietly-assign-setf-macro
-          (symbol-function 'sb!impl::%defun) #'sb!impl::!%quietly-defun)
+          #'sb!impl::!quietly-assign-setf-macro)
 
     (dolist (toplevel-thing (prog1
                                 (nreverse *!reversed-cold-toplevels*)
@@ -243,13 +241,16 @@
                                 (third toplevel-thing))
                   (get-lisp-obj-address
                    (svref *!load-time-values* (fourth toplevel-thing)))))
+           (defun
+            (destructuring-bind (name &optional docstring &rest inline-expansion)
+                (cdr toplevel-thing)
+              (!%quietly-defun name (fdefinition name) docstring inline-expansion)))
            (t
             (!cold-lose "bogus fixup code in *!REVERSED-COLD-TOPLEVELS*"))))
         (t (!cold-lose "bogus function in *!REVERSED-COLD-TOPLEVELS*"))))
     (setf (symbol-function 'sb!c::note-if-setf-fun-and-macro)
           really-note-if-setf-fun-and-macro
-          (symbol-function 'sb!impl::assign-setf-macro) really-assign-setf-macro
-          (symbol-function 'sb!impl::%defun) really-defun))
+          (symbol-function 'sb!impl::assign-setf-macro) really-assign-setf-macro))
   (/show0 "done with loop over cold toplevel forms and fixups")
 
   ;; Set sane values again, so that the user sees sane values instead

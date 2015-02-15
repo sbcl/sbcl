@@ -53,8 +53,12 @@
   ;; Special forms which we don't currently handle, but might consider
   ;; supporting in the future are LOCALLY (with declarations),
   ;; MACROLET, SYMBOL-MACROLET and THE.
+  ;; Also, if (FLET ((F () ...)) (DEFUN A () ...) (DEFUN B () ...))
+  ;; were handled, then it would probably automatically work in
+  ;; the cold loader too, providing definitions for A and B before
+  ;; executing all other toplevel forms.
   #+sb-xc-host
-  (declare (ignore form expand))
+  (and expand (eq (car form) 'sb!impl::%defun))
   #-sb-xc-host
   (flet ((expand (form)
            (if expand

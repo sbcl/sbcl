@@ -201,22 +201,9 @@ evaluated as a PROGN."
                      name)
                     nil)))))
       `(progn
-         ;; In cross-compilation of toplevel DEFUNs, we arrange for
-         ;; the LAMBDA to be statically linked by GENESIS.
-         #+sb-xc-host
-         (!cold-fset ,name ,named-lambda)
-
          (eval-when (:compile-toplevel)
            (sb!c:%compiler-defun ',name ',inline-lambda t))
-         (%defun ',name
-                 ;; In normal compilation (not for cold load) this is
-                 ;; where the compiled LAMBDA first appears. In
-                 ;; cross-compilation, we manipulate the
-                 ;; previously-statically-linked LAMBDA here.
-                 #-sb-xc-host ,named-lambda
-                 #+sb-xc-host (fdefinition ',name)
-                 ,doc
-                 ',inline-lambda
+         (%defun ',name ,named-lambda ,doc ',inline-lambda
                  (sb!c:source-location))))))
 
 ;; Approximately 20% of the output from #+sb-show is from lines associated with
@@ -226,11 +213,10 @@ evaluated as a PROGN."
 #-sb-xc-host
 (macrolet
     ((def-defun (name fboundp-check)
-       `(defun ,name (name def doc inline-lambda source-location)
+       `(defun ,name (name def doc inline-lambda
+                           ,@(when fboundp-check '(source-location)))
           (declare (type function def))
           (declare (type (or null simple-string) doc))
-          ,@(unless fboundp-check
-              '((declare (ignore source-location))))
           ;; should've been checked by DEFMACRO DEFUN
           (aver (legal-fun-name-p name))
           (sb!c:%compiler-defun name inline-lambda nil)

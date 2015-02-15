@@ -1233,18 +1233,6 @@
   (dump-byte 0 fasl-output)
   (values))
 
-;;; Dump a FOP-FSET to arrange static linkage (at cold init) between
-;;; FUN-NAME and the already-dumped function whose dump handle is
-;;; FUN-DUMP-HANDLE.
-#+sb-xc-host
-(defun fasl-dump-cold-fset (fun-name fun-dump-handle fasl-output)
-  (declare (type fixnum fun-dump-handle))
-  (aver (legal-fun-name-p fun-name))
-  (dump-non-immediate-object fun-name fasl-output)
-  (dump-push fun-dump-handle fasl-output)
-  (dump-fop 'fop-fset fasl-output)
-  (values))
-
 ;;; Compute the correct list of DEBUG-SOURCE structures and backpatch
 ;;; all of the dumped DEBUG-INFO structures. We clear the
 ;;; FASL-OUTPUT-DEBUG-INFO, so that subsequent components with
