@@ -175,12 +175,14 @@
 ;;; it important for it to be INLINE, or could be become an ordinary
 ;;; function without significant loss? -- WHN 19990413
 #!-sb-fluid (declaim (inline type-cache-hash))
-(declaim (ftype (function (ctype ctype) fixnum) type-cache-hash))
+(declaim (ftype (function (ctype ctype) (signed-byte #.sb!vm:n-fixnum-bits))
+                type-cache-hash))
 (defun type-cache-hash (type1 type2)
   (logxor (ash (type-hash-value type1) -3) (type-hash-value type2)))
 
 #!-sb-fluid (declaim (inline type-list-cache-hash))
-(declaim (ftype (function (list) fixnum) type-list-cache-hash))
+(declaim (ftype (function (list) (signed-byte #.sb!vm:n-fixnum-bits))
+                type-list-cache-hash))
 (defun type-list-cache-hash (types)
   (loop with res fixnum = 0
         for type in types
