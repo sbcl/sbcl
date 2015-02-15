@@ -96,7 +96,7 @@
 
 (deferr division-by-zero-error (this that)
   (error 'division-by-zero
-         :operation 'division
+         :operation '/
          :operands (list this that)))
 
 (deferr object-not-type-error (object type)
