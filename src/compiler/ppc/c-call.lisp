@@ -663,8 +663,8 @@
               (load-address-into
                r0
                (foreign-symbol-address
-                #!-sb-safepoint "funcall3"
-                #!+sb-safepoint "callback_wrapper_trampoline"))
+                #!-sb-thread "funcall3"
+                #!+sb-thread "callback_wrapper_trampoline"))
               (inst mtlr r0)
               (inst blrl)
 

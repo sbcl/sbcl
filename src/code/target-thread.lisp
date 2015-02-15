@@ -1586,7 +1586,7 @@ subject to change."
   "Deprecated. Same as TERMINATE-THREAD."
   (terminate-thread thread))
 
-#!+sb-safepoint
+#!+sb-thread
 (defun enter-foreign-callback (arg1 arg2 arg3)
   (initial-thread-function-trampoline
    (make-foreign-thread :name "foreign callback")

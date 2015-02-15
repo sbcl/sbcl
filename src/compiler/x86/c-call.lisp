@@ -427,12 +427,12 @@ pointer to the arguments."
               (inst push eax)                       ; arg1
               (inst push (ash index 2))             ; arg0
 
-              #!+sb-safepoint
+              #!+sb-thread
               (progn
                 (inst mov eax (foreign-symbol-address "callback_wrapper_trampoline"))
                 (inst call eax))
 
-              #!-sb-safepoint
+              #!-sb-thread
               (progn
                 ;; Indirect the access to ENTER-ALIEN-CALLBACK through
                 ;; the symbol-value slot of SB-ALIEN::*ENTER-ALIEN-CALLBACK*

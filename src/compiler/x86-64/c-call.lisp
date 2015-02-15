@@ -386,7 +386,7 @@
                                :offset offset))))
     (let* ((segment (make-segment))
            (rax rax-tn)
-           #!+(or win32 (not sb-safepoint)) (rcx rcx-tn)
+           #!+(or win32 (not sb-thread)) (rcx rcx-tn)
            #!-win32 (rdi rdi-tn)
            #!-win32 (rsi rsi-tn)
            (rdx rdx-tn)
@@ -453,7 +453,7 @@
                   (t
                    (bug "Unknown alien floating point type: ~S" type)))))
 
-        #!-sb-safepoint
+        #!-sb-thread
         (progn
           ;; arg0 to FUNCALL3 (function)
           ;;
@@ -486,7 +486,7 @@
           (inst mov rsp rbp)
           (inst pop rbp))
 
-        #!+sb-safepoint
+        #!+sb-thread
         (progn
           ;; arg0 to ENTER-ALIEN-CALLBACK (trampoline index)
           (inst mov #!-win32 rdi #!+win32 rcx (fixnumize index))

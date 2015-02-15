@@ -988,38 +988,4 @@ signal_handler_callback(lispobj run_handler, int signo, void *info, void *ctx)
 }
 #endif
 
-void
-callback_wrapper_trampoline(
-#if !(defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64))
-    /* On the x86oid backends, the assembly wrapper happens to not pass
-     * in ENTER_ALIEN_CALLBACK explicitly for safepoints.  However, the
-     * platforms with precise GC are tricky enough already, and I want
-     * to minimize the read-time conditionals.  For those platforms, I'm
-     * only replacing funcall3 with callback_wrapper_trampoline while
-     * keeping the arguments unchanged. --DFL */
-    lispobj __attribute__((__unused__)) fun,
-#endif
-    lispobj arg0, lispobj arg1, lispobj arg2)
-{
-#if defined(LISP_FEATURE_WIN32)
-    pthread_np_notice_thread();
-#endif
-    struct thread* th = arch_os_get_current_thread();
-    if (!th) {                  /* callback invoked in non-lisp thread */
-        init_thread_data scribble;
-        attach_os_thread(&scribble);
-        funcall3(StaticSymbolFunction(ENTER_FOREIGN_CALLBACK), arg0,arg1,arg2);
-        detach_os_thread(&scribble);
-        return;
-    }
-
-#ifdef LISP_FEATURE_WIN32
-    /* arg2 is the pointer to a return value, which sits on the stack */
-    th->carried_base_pointer = (os_context_register_t) *(((void**)arg2)-1);
-#endif
-
-    WITH_GC_AT_SAFEPOINTS_ONLY()
-        funcall3(SymbolValue(ENTER_ALIEN_CALLBACK, 0), arg0, arg1, arg2);
-}
-
 #endif /* LISP_FEATURE_SB_SAFEPOINT -- entire file */

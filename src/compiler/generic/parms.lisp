@@ -124,7 +124,7 @@
     sb!di::handle-single-step-trap
     #!+win32 sb!kernel::handle-win32-exception
     #!+sb-thruption sb!thread::run-interruption
-    #!+sb-safepoint sb!thread::enter-foreign-callback
+    #!+sb-thread sb!thread::enter-foreign-callback
     #!+(and sb-safepoint-strictly (not win32))
     sb!unix::signal-handler-callback))
 

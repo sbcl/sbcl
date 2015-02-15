@@ -24,6 +24,8 @@ changes relative to sbcl-1.2.8:
     lp#1412881, lp#945261, lp#1419205)
   * bug fix: files larger than 4GB can now be compiled.
   * bug fix: x86 truncated results from 64-bit foreign functions to 32 bits.
+  * bug fix: callbacks from foreign threads can work without enabling
+    sb-safepoint.
 
 changes in sbcl-1.2.8 relative to sbcl-1.2.7:
   * enhancement: better error and warning messages. (lp#1314767, lp#736383)

@@ -1657,9 +1657,9 @@ core and return a descriptor to it."
       (error "duplicate COLD-FSET for ~S" warm-name))
     (setf (gethash warm-name *cold-fset-warm-names*) t)
     (let ((args (cold-cons cold-name
-			   (if (or docstring inline-expansion)
-			       (cold-cons docstring inline-expansion)
-			       *nil-descriptor*))))
+                           (if (or docstring inline-expansion)
+                               (cold-cons docstring inline-expansion)
+                               *nil-descriptor*))))
       (cold-push (cold-cons 'defun args) *current-reversed-cold-toplevels*))
     (static-fset cold-name compiled-lambda)))
 
