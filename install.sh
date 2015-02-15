@@ -111,7 +111,7 @@ cp doc/sbcl.1 "$BUILD_ROOT$MAN_DIR"/man1/ && echo " man $BUILD_ROOT$MAN_DIR/man1
 # info
 for info in doc/manual/*.info
 do
-  cp $info "$BUILD_ROOT$INFO_DIR"/ \
+  test -e $info && cp $info "$BUILD_ROOT$INFO_DIR"/ \
       && BN=`basename $info` \
       && DIRFAIL=`install-info --info-dir="$BUILD_ROOT$INFO_DIR" \
         "$BUILD_ROOT$INFO_DIR"/$BN > /dev/null 2>&1 \
@@ -121,14 +121,14 @@ done
 
 for info in doc/manual/*.info-*
 do
-  cp $info "$BUILD_ROOT$INFO_DIR"/ \
+  test -e $info && cp $info "$BUILD_ROOT$INFO_DIR"/ \
       && echo " info $BUILD_ROOT$INFO_DIR/`basename $info`"
 done
 
 # pdf
 for pdf in doc/manual/*.pdf
 do
-  cp $pdf "$BUILD_ROOT$DOC_DIR"/ \
+  test -e $pdf && cp $pdf "$BUILD_ROOT$DOC_DIR"/ \
       && echo " pdf $BUILD_ROOT$DOC_DIR/`basename $pdf`"
 done
 
@@ -141,11 +141,11 @@ done
 
 for html in doc/manual/sbcl.html doc/manual/asdf.html
 do
-  cp $html "$BUILD_ROOT$DOC_DIR"/ \
+  test -e $html && cp $html "$BUILD_ROOT$DOC_DIR"/ \
       && echo " html $BUILD_ROOT$DOC_DIR/`basename $html`"
 done
 
 for f in BUGS CREDITS COPYING NEWS
 do
-  cp $f "$BUILD_ROOT$DOC_DIR"/
+  test -e $f && cp $f "$BUILD_ROOT$DOC_DIR"/
 done
