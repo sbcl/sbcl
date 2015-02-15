@@ -1572,7 +1572,7 @@
                  ;; SHIFT-RIGHT-UNALIGNED won't do the right thing
                  ;; with a shift count of 0 or -1, so special case this.
                  (cond ((= y 0)
-                        (error 'division-by-zero :operation 'trunacte
+                        (error 'division-by-zero :operation 'truncate
                                :operands (list x y)))
                        ((= y 1)
                         ;; We could probably get away with (VALUES X 0)
