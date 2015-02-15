@@ -832,6 +832,9 @@ necessary, since type inference may take arbitrarily long to converge.")
   ;; the stream that we are using to read the FILE-INFO, or NIL if
   ;; no stream has been opened yet
   (stream nil :type (or stream null))
+  ;; for coalescing DEFINITION-SOURCE-LOCATION of effectively toplevel forms
+  ;; inside one truly toplevel form.
+  (last-defn-source-loc)
   ;; if the current compilation is recursive (e.g., due to EVAL-WHEN
   ;; processing at compile-time), the invoking compilation's
   ;; source-info.

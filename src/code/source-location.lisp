@@ -12,23 +12,38 @@
 (in-package "SB!C")
 
 (def!struct (definition-source-location
+             (:constructor %make-definition-source-location
+                           (namestring toplevel-form-number))
+             (:copier nil)
              (:make-load-form-fun just-dump-it-normally))
   ;; Namestring of the source file that the definition was compiled from.
   ;; This is null if the definition was not compiled from a file.
-  (namestring
-   (or *source-namestring*
-       (when (and (boundp '*source-info*)
-                  *source-info*)
-         (make-file-info-namestring *compile-file-pathname*
-                                    (sb!c:get-toplevelish-file-info *source-info*))))
-   :type (or string null))
+  (namestring nil :type (or string null) :read-only t)
   ;; Toplevel form index
-  (toplevel-form-number
-   (when (boundp '*current-path*)
-     (source-path-tlf-number *current-path*))
-   :type (or fixnum null))
+  (toplevel-form-number nil :type (or fixnum null) :read-only t)
   ;; plist from WITH-COMPILATION-UNIT
-  (plist *source-plist*))
+  (plist *source-plist* :read-only t))
+
+(defun make-definition-source-location ()
+  (let* ((source-info (and (boundp '*source-info*) *source-info*))
+         (namestring
+          (or *source-namestring*
+              (when source-info
+                (make-file-info-namestring
+                 *compile-file-pathname*
+                 (get-toplevelish-file-info *source-info*)))))
+         (tlf-num (when (boundp '*current-path*)
+                    (source-path-tlf-number *current-path*)))
+         (last (and source-info
+                    (source-info-last-defn-source-loc source-info))))
+    (if (and last
+             (eql (definition-source-location-toplevel-form-number last) tlf-num)
+             (string= (definition-source-location-namestring last) namestring))
+        last
+        (let ((new (%make-definition-source-location namestring tlf-num)))
+          (when source-info
+            (setf (source-info-last-defn-source-loc source-info) new))
+          new))))
 
 (defun make-file-info-namestring (name file-info)
   #+sb-xc-host (declare (ignore name))
@@ -51,24 +66,3 @@
         (if name
             (namestring name)
             nil))))
-
-#!+sb-source-locations
-(define-compiler-macro source-location (&environment env)
-  (declare (ignore env))
-  #-sb-xc-host (make-definition-source-location))
-
-;; We need a regular definition of SOURCE-LOCATION for calls processed
-;; during LOAD on a source file while *EVALUATOR-MODE* is :INTERPRET.
-#!+sb-source-locations
-(setf (symbol-function 'source-location)
-      (lambda () (make-definition-source-location)))
-
-(/show0 "/Processing source location thunks")
-#!+sb-source-locations
-(dolist (fun *source-location-thunks*)
-  (/show0 ".")
-  (funcall fun))
-;; Unbind the symbol to ensure that we detect any attempts to add new
-;; thunks after this.
-(makunbound '*source-location-thunks*)
-(/show0 "/Done with source location thunks")
