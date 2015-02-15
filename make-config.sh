@@ -300,7 +300,7 @@ case `uname` in
     SunOS)
         sbcl_os="sunos"
         ;;
-    CYGWIN* | WindowsNT | MINGW*)
+    CYGWIN* | WindowsNT | MINGW* | MSYS*)
         sbcl_os="win32"
         ;;
     HP-UX)
