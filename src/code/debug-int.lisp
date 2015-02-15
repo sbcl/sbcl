@@ -2161,7 +2161,7 @@ register."
         #!+rt #.sb!vm:word-pointer-reg-sc-number)
        (without-gcing
         (with-escaped-value (val)
-          (make-lisp-obj val nil))))
+          (values (make-lisp-obj val nil)))))
       (#.sb!vm:character-reg-sc-number
        (with-escaped-value (val)
          (code-char val)))
