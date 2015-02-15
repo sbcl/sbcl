@@ -26,6 +26,8 @@ changes relative to sbcl-1.2.8:
   * bug fix: x86 truncated results from 64-bit foreign functions to 32 bits.
   * bug fix: callbacks from foreign threads can work without enabling
     sb-safepoint.
+  * bug fix: sb-introspect:function-lambda-list works properly on interpeted
+    macros. (lp#1387404)
 
 changes in sbcl-1.2.8 relative to sbcl-1.2.7:
   * enhancement: better error and warning messages. (lp#1314767, lp#736383)

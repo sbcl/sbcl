@@ -441,7 +441,7 @@ function designator."
          (sb-pcl::generic-function-pretty-arglist function))
         #+sb-eval
         ((typep function 'sb-eval:interpreted-function)
-         (sb-eval:interpreted-function-lambda-list function))
+         (sb-eval:interpreted-function-debug-lambda-list function))
         (t
          (sb-kernel:%simple-fun-arglist (sb-kernel:%fun-fun function)))))
 

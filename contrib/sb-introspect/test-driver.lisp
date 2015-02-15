@@ -30,6 +30,19 @@
     (function-lambda-list #'(sb-pcl::slow-method cl-user::j (t)))
   (sb-pcl::method-args sb-pcl::next-methods))
 
+(deftest macro-lambda-list.1
+    (equal (function-lambda-list (defmacro macro-lambda-list.1-m (x b)
+                                   `(x b)))
+           '(x b))
+  t)
+
+#+sb-eval
+(deftest macro-lambda-list.2
+    (equal (function-lambda-list (interpret (defmacro macro-lambda-list.2-m (x)
+                                              x)))
+           '(x))
+  t)
+
 (deftest definition-source-plist.1
     (let* ((source (find-definition-source #'cl-user::one))
            (plist (definition-source-plist source))
