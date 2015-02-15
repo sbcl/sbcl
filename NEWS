@@ -28,6 +28,7 @@ changes relative to sbcl-1.2.8:
     sb-safepoint.
   * bug fix: sb-introspect:function-lambda-list works properly on interpeted
     macros. (lp#1387404)
+  * bug fix: ADJUST-ARRAY properly handles non-adjustable arrays. (lp#886418)
 
 changes in sbcl-1.2.8 relative to sbcl-1.2.7:
   * enhancement: better error and warning messages. (lp#1314767, lp#736383)

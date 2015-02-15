@@ -330,3 +330,10 @@
   ;; when converted to bytes
   (when (= sb-vm:n-fixnum-tag-bits 1)
     (assert-error (make-array (1- array-total-size-limit)) error)))
+
+(with-test (:name :adjust-non-adjustable-array)
+  (let* ((a (make-array '(2 3) :initial-contents '((0 1 2) (3 4 5))))
+         (b (adjust-array a '(2 2))))
+    (setf (aref a 0 0) 11)
+    (assert (zerop (aref b 0 0)))
+    (assert (not (eq a b)))))

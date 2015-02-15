@@ -1194,7 +1194,8 @@ of specialized arrays is supported."
                  (declare (ignore old-end))
                  (let ((new-data (if (or (and (array-header-p array)
                                               (%array-displaced-p array))
-                                         (> new-length old-length))
+                                         (> new-length old-length)
+                                         (not (adjustable-array-p array)))
                                      (data-vector-from-inits
                                       dimensions new-length
                                       element-type
