@@ -195,7 +195,13 @@ constantness of the FORM in ENVIRONMENT."
               (handler-case
                   ;; in case the type-spec is malformed!
                   (let ((parsed (careful-specifier-type type)))
+                    ;; xc can't rely on a "non-strict" mode of TYPEP.
                     (and parsed
+                         #+sb-xc-host
+                         (typep (constant-form-value* form)
+                                (let ((*unparse-fun-type-simplify* t))
+                                  (type-specifier parsed)))
+                         #-sb-xc-host
                          (sb!kernel::%%typep (constant-form-value* form)
                                              parsed nil)))
                 (error () nil)))
