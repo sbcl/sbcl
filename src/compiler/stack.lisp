@@ -65,6 +65,64 @@
   (dolist (e late early)
     (pushnew e early)))
 
+;; Blocks are numbered in reverse DFO order, so the "lowest common
+;; dominator" of a set of blocks is the closest dominator of all of
+;; the blocks.
+(defun find-lowest-common-dominator (blocks)
+  ;; FIXME: NIL is defined as a valid value for BLOCK-DOMINATORS,
+  ;; meaning "all blocks in component".  Actually handle this case.
+  (let ((common-dominators (copy-sset (block-dominators (first blocks)))))
+    (dolist (block (rest blocks))
+      (sset-intersection common-dominators (block-dominators block)))
+    (let ((lowest-dominator))
+      (do-sset-elements (dominator common-dominators lowest-dominator)
+        (when (or (not lowest-dominator)
+                  (< (sset-element-number dominator)
+                     (sset-element-number lowest-dominator)))
+          (setf lowest-dominator dominator))))))
+
+;;; Carefully back-propagate DX LVARs from the start of their
+;;; environment to where they are allocated, along all code paths
+;;; which actually allocate said LVARs.
+(defun back-propagate-one-dx-lvar (block dx-lvar)
+  (declare (type cblock block)
+           (type lvar dx-lvar))
+  ;; We have to back-propagate the lifetime of DX-LVAR to its USEs,
+  ;; but only along the paths which actually USE it.  The naive
+  ;; solution (which we're going with for now) is a depth-first search
+  ;; over an arbitrarily complex chunk of flow graph that is known to
+  ;; have a single entry block.
+  (let* ((use-blocks (mapcar #'node-block (find-uses dx-lvar)))
+         (start-block (find-lowest-common-dominator
+                       (list* block use-blocks))))
+    (labels ((mark-lvar-live-on-path (block-list)
+               (dolist (block block-list)
+                 (let ((2block (block-info block)))
+                   (pushnew dx-lvar (ir2-block-end-stack 2block))
+                   (pushnew dx-lvar (ir2-block-start-stack 2block)))))
+             (back-propagate-pathwise (current-block path)
+               (cond
+                 ((member current-block use-blocks)
+                  ;; The LVAR is live on exit from a use-block, but
+                  ;; not on entry.
+                  (pushnew dx-lvar (ir2-block-end-stack
+                                    (block-info current-block)))
+                  (mark-lvar-live-on-path path))
+                 ;; Don't go back past START-BLOCK, and don't loop.
+                 ((and (not (eq current-block start-block))
+                       (not (member current-block path)))
+                  (let ((new-path (list* current-block path)))
+                    (declare (dynamic-extent new-path))
+                    (dolist (pred-block (block-pred current-block))
+                      (back-propagate-pathwise pred-block new-path)))))))
+      (back-propagate-pathwise block nil))))
+
+(defun back-propagate-dx-lvars (block dx-lvars)
+  (declare (type cblock block)
+           (type list dx-lvars))
+  (dolist (dx-lvar dx-lvars)
+    (back-propagate-one-dx-lvar block dx-lvar)))
+
 ;;; Update information on stacks of unknown-values LVARs on the
 ;;; boundaries of BLOCK. Return true if the start stack has been
 ;;; changed.
@@ -80,7 +138,11 @@
          (new-end end))
     (dolist (succ (block-succ block))
       (setq new-end (merge-uvl-live-sets new-end
-                                         (ir2-block-start-stack (block-info succ)))))
+                                         ;; Don't back-propagate DX
+                                         ;; LVARs automatically,
+                                         ;; they're handled specially.
+                                         (remove-if #'lvar-dynamic-extent
+                                                    (ir2-block-start-stack (block-info succ))))))
     (map-block-nlxes (lambda (nlx-info)
                        (let* ((nle (nlx-info-target nlx-info))
                               (nle-start-stack (ir2-block-start-stack
@@ -118,6 +180,18 @@
                                             new-end (ir2-block-pushed 2block))))))))
 
     (setf (ir2-block-end-stack 2block) new-end)
+
+    ;; If a block starts with an "entry DX" node (the start of a DX
+    ;; environment) then we need to back-propagate the DX LVARs to
+    ;; their allocation sites.  We need to be clever about this
+    ;; because some code paths may not allocate all of the DX LVARs.
+    ;;
+    ;; FIXME: Use BLOCK-FLAG to make this happen only once.
+    (let ((first-node (ctran-next (block-start block))))
+      (when (typep first-node 'entry)
+        (let ((cleanup (entry-cleanup first-node)))
+          (when (eq (cleanup-kind cleanup) :dynamic-extent)
+            (back-propagate-dx-lvars block (cleanup-info cleanup))))))
 
     (let ((start new-end))
       (setq start (set-difference start (ir2-block-pushed 2block)))
