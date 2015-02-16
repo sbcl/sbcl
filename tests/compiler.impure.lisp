@@ -2601,4 +2601,11 @@
     ;; should be completely inlined
     (assert (null (ctu:find-named-callees f)))))
 
+(with-test (:name :derived-function-type-casts)
+  (let ((fasl (compile-file "derived-function-type-casts.lisp"
+                            :print nil :verbose nil)))
+    (load fasl)
+    (ignore-errors (delete-file fasl))
+    (assert (null (funcall 'derived-function-type-casts)))))
+
 ;;; success

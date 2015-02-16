@@ -2103,10 +2103,15 @@ is :ANY, the function name is not checked."
 ;;; Return the source name of a combination -- or signals an error
 ;;; if the function leaf is anonymous.
 (defun combination-fun-source-name (combination &optional (errorp t))
-  (let ((leaf (ref-leaf (lvar-uses (combination-fun combination)))))
-    (if (or errorp (leaf-has-source-name-p leaf))
-        (values (leaf-source-name leaf) t)
-        (values nil nil))))
+  (let ((uses (principal-lvar-use (combination-fun combination)))
+        leaf)
+    (cond ((and (ref-p uses)
+                (leaf-has-source-name-p (setf leaf (ref-leaf uses))))
+           (values (leaf-source-name leaf) t))
+          (errorp
+           (aver (not "COMBINATION-FUN is not a ref to a nameful leaf")))
+          (t
+           (values nil nil)))))
 
 (defun combination-fun-debug-name (combination)
   (leaf-debug-name (ref-leaf (lvar-uses (combination-fun combination)))))

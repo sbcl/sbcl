@@ -17,8 +17,8 @@ changes relative to sbcl-1.2.8:
     (lp#492200)
   * bug fix: DEFCLASS handles cyclic {super,meta}class relations better
     (lp#1418883)
-  * bug fix: compiler no longer signals an error when compiling certain nested
-    local calls. (lp#1416704, lp#404441, lp#1417822)
+  * bug fix: compiler no longer signals an error when compiling certain
+    function calls. (lp#1416704, lp#404441, lp#1417822, lp#1234919)
   * bug fix: compiler doesn't stumble on a LOGIOR transform. (lp#1389433)
   * bug fix: more robust debugger and backtraces. (lp#1413850, lp#1099500,
     lp#1412881, lp#945261, lp#1419205, lp#1409402)
