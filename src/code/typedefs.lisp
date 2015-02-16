@@ -166,7 +166,7 @@
         ((csubtypep type2 type1) type1)
         (t nil)))
 
-;;; Hash two things (types) down to a fixnum. In CMU CL this was an EQ
+;;; Hash two things (types) down to a target fixnum. In CMU CL this was an EQ
 ;;; hash, but since it now needs to run in vanilla ANSI Common Lisp at
 ;;; cross-compile time, it's now based on the CTYPE-HASH-VALUE field
 ;;; instead.
@@ -184,7 +184,7 @@
 (declaim (ftype (function (list) (signed-byte #.sb!vm:n-fixnum-bits))
                 type-list-cache-hash))
 (defun type-list-cache-hash (types)
-  (loop with res fixnum = 0
+  (loop with res of-type (signed-byte #.sb!vm:n-fixnum-bits) = 0
         for type in types
         do (setq res (logxor (ash res -1) (type-hash-value type)))
         finally (return res)))

@@ -639,11 +639,12 @@
              ,@(when *profile-hash-cache* ; count seeks
                  `((when (boundp ',statistics-name)
                      (incf (aref ,statistics-name 0)))))
-             (let ((,hashval (the fixnum (funcall ,hash-function ,@arg-vars)))
+             (let ((,hashval (the (signed-byte #.sb!vm:n-fixnum-bits)
+                                  (funcall ,hash-function ,@arg-vars)))
                    (,cache ,var-name))
                (when ,cache
                  (let ((,hashval ,hashval))
-                   (declare (fixnum ,hashval))
+                   (declare (type (signed-byte #.sb!vm:n-fixnum-bits) ,hashval))
                    (loop repeat 2 do
                      (let ((,entry (svref (truly-the ,cache-type ,cache)
                                           (ldb (byte ,hash-bits 0) ,hashval))))
