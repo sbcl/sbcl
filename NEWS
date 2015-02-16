@@ -32,6 +32,8 @@ changes relative to sbcl-1.2.8:
   * bug fix: ADJUST-ARRAY properly handles non-adjustable arrays. (lp#886418)
   * bug fix: compiler no longer fails to dump a multidimensional array
     constant involving a circular reference to itself
+  * bug fix: conditional and nested DX allocation no longer confuse the
+    compiler in STACK analysis. (lp#1044465)
 
 changes in sbcl-1.2.8 relative to sbcl-1.2.7:
   * enhancement: better error and warning messages. (lp#1314767, lp#736383)

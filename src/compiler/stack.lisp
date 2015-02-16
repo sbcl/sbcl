@@ -359,7 +359,6 @@
                          collect maybe-popped into popped
                          finally (return (values popped last-popped rest)))))
              (discard (before-stack after-stack)
-               (aver (not (set-difference after-stack before-stack)))
                (cond
                  ((eq (car before-stack) (car after-stack))
                   (binding* ((moved-count (mismatch before-stack after-stack)
@@ -383,9 +382,20 @@
                       (find-popped before-stack after-stack)
                     (declare (ignore popped))
                     (cleanup-code `(%pop-values ',last-popped))
-                    (discard rest after-stack))))))
-      (discard (ir2-block-end-stack (block-info block1))
-               (ir2-block-start-stack (block-info block2))))
+                    (discard rest after-stack)))))
+             (dummy-allocations (before-stack after-stack)
+               (loop
+                  for previous-lvar = nil then lvar
+                  for lvar in after-stack
+                  unless (memq lvar before-stack)
+                  do (cleanup-code
+                      `(%dummy-dx-alloc ',lvar ',previous-lvar)))))
+      (let* ((end-stack (ir2-block-end-stack (block-info block1)))
+             (start-stack (ir2-block-start-stack (block-info block2)))
+             (pruned-start-stack (ordered-list-intersection
+                                  start-stack end-stack)))
+        (discard end-stack pruned-start-stack)
+        (dummy-allocations pruned-start-stack start-stack)))
     (when (cleanup-code)
       (let* ((block (insert-cleanup-code block1 block2
                                          (block-start-node block2)

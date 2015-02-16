@@ -1587,6 +1587,26 @@
             (t
              (bug "Trying to nip a not stack-allocated LVAR ~S." after))))))
 
+(defoptimizer (%dummy-dx-alloc ir2-convert) ((target source) node block)
+  (let* ((target-lvar (lvar-value target))
+         (source-lvar (lvar-value source))
+         (target-2lvar (lvar-info target-lvar))
+         (source-2lvar (and source-lvar (lvar-info source-lvar))))
+    (aver (lvar-dynamic-extent target-lvar))
+    (cond ((not source-lvar)
+           (vop current-stack-pointer node block
+                (ir2-lvar-stack-pointer target-2lvar)))
+          ((lvar-dynamic-extent source-lvar)
+           (emit-move node block
+                      (ir2-lvar-stack-pointer source-2lvar)
+                      (ir2-lvar-stack-pointer target-2lvar)))
+          ((eq (ir2-lvar-kind source-2lvar) :unknown)
+           (emit-move node block
+                      (first (ir2-lvar-locs source-2lvar))
+                      (ir2-lvar-stack-pointer target-2lvar)))
+          (t (bug "Trying to dummy up DX allocation from a ~
+not stack-allocated LVAR ~S." source-lvar)))))
+
 ;;; Deliver the values TNs to LVAR using MOVE-LVAR-RESULT.
 (defoptimizer (values ir2-convert) ((&rest values) node block)
   (let ((tns (mapcar (lambda (x)

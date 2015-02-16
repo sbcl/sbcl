@@ -433,6 +433,9 @@
                                                        &rest moved)
                                           node ltn-policy)
   (declare (ignore last-nipped last-preserved moved node ltn-policy)))
+(defoptimizer (%dummy-dx-alloc ltn-annotate) ((target source)
+                                              node ltn-policy)
+  (declare (ignore target source node ltn-policy)))
 
 
 ;;;; known call annotation

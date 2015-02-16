@@ -1581,6 +1581,7 @@
 (defknown %%primitive (t t &rest t) *)
 (defknown %pop-values (t) t)
 (defknown %nip-values (t t &rest t) (values))
+(defknown %dummy-dx-alloc (t t) t)
 (defknown %allocate-closures (t) *)
 (defknown %type-check-error (t t) nil)
 (defknown %type-check-error/c (t t) nil)
