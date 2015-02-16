@@ -259,7 +259,8 @@
                  (eq (ir2-lvar-kind (lvar-info tailp-lvar)) :unknown))
         (aver (eq tailp-lvar (first end-stack)))
         (pop end-stack))
-      (setf (ir2-block-end-stack 2block) end-stack))))
+      (setf (ir2-block-end-stack 2block) end-stack)))
+  t)
 
 (defun order-uvl-sets (component)
   (clear-flags component)
@@ -277,11 +278,10 @@
                             (not (bind-p (block-start-node block))))
                    (let ((entry (nle-block-entry-block block)))
                      (setq pred (if (block-flag entry) entry nil))))
-                 (cond (pred
-                        (setf (block-flag block) t)
-                        (order-block-uvl-sets block pred))
-                       (t
-                        (incf todo))))))
+                 (if (and pred
+                          (order-block-uvl-sets block pred))
+                     (setf (block-flag block) t)
+                     (incf todo)))))
         do (when (= last-todo todo)
              ;; If the todo count is the same as on last iteration, it means
              ;; we are stuck, which in turn means the unmarked blocks are
