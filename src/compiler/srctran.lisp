@@ -2504,6 +2504,20 @@
             (setf min-len 0))
           (specifier-type `(integer ,(or min-len '*) ,(or max-len '*))))))))
 
+(defoptimizer (logcount derive-type) ((x))
+  (let ((x-type (lvar-type x)))
+    (when (numeric-type-p x-type)
+      (let ((min (numeric-type-low x-type))
+            (max (numeric-type-high x-type)))
+        (when (and min max)
+          (specifier-type
+           `(integer ,(if (or (> min 0)
+                              (< max -1))
+                          1
+                          0)
+                     ,(max (integer-length min)
+                           (integer-length max)))))))))
+
 (defoptimizer (isqrt derive-type) ((x))
   (let ((x-type (lvar-type x)))
     (when (numeric-type-p x-type)
