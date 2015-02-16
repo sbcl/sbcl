@@ -229,6 +229,11 @@
 
 ;;;; Ordering of live UVL stacks
 
+(defun ordered-list-intersection (ordered-list other-list)
+  (loop for item in ordered-list
+     when (memq item other-list)
+     collect item))
+
 ;;; Put UVLs on the start/end stacks of BLOCK in the right order. PRED
 ;;; is a predecessor of BLOCK with already sorted stacks; because all
 ;;; UVLs being live at the BLOCK start are live in PRED, we just need
@@ -237,9 +242,7 @@
   (let* ((2block (block-info block))
          (pred-end-stack (ir2-block-end-stack (block-info pred)))
          (start (ir2-block-start-stack 2block))
-         (start-stack (loop for lvar in pred-end-stack
-                            when (memq lvar start)
-                            collect lvar))
+         (start-stack (ordered-list-intersection pred-end-stack start))
          (end (ir2-block-end-stack 2block)))
     (when *check-consistency*
       (aver (subsetp start start-stack)))
