@@ -514,12 +514,18 @@ attach_os_thread(init_thread_data *scribble)
 #ifndef LISP_FEATURE_WIN32
     /* On windows, arch_os_thread_init will take care of finding the
      * stack. */
+    void *stack_addr;
+    size_t stack_size;
+#ifdef LISP_FEATURE_DARWIN
+    stack_addr = pthread_get_stackaddr_np(os);
+    stack_size = pthread_get_stacksize_np(os);
+#else
     pthread_attr_t attr;
     int pthread_getattr_np(pthread_t, pthread_attr_t *);
     pthread_getattr_np(os, &attr);
-    void *stack_addr;
-    size_t stack_size;
     pthread_attr_getstack(&attr, &stack_addr, &stack_size);
+#endif
+
     th->control_stack_start = stack_addr;
     th->control_stack_end = (void *) (((uintptr_t) stack_addr) + stack_size);
 #endif
