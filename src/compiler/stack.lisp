@@ -234,6 +234,22 @@
      when (memq item other-list)
      collect item))
 
+(defun ordered-list-union (ordered-list-1 ordered-list-2)
+  (labels ((sub-union (ol1 ol2 result)
+             (cond ((and (null ol1) (null ol2))
+                    result)
+                   ((and (null ol1) ol2)
+                    (sub-union ol1 (cdr ol2) (cons (car ol2) result)))
+                   ((and ol1 (null ol2))
+                    (sub-union (cdr ol1) ol2 (cons (car ol1) result)))
+                   ((eq (car ol1) (car ol2))
+                    (sub-union (cdr ol1) (cdr ol2) (cons (car ol1) result)))
+                   ((memq (car ol1) ol2)
+                    (sub-union ol1 (cdr ol2) (cons (car ol2) result)))
+                   (t
+                    (sub-union (cdr ol1) ol2 (cons (car ol1) result))))))
+    (nreverse (sub-union ordered-list-1 ordered-list-2 nil))))
+
 ;;; Put UVLs on the start/end stacks of BLOCK in the right order. PRED
 ;;; is a predecessor of BLOCK with already sorted stacks; because all
 ;;; UVLs being live at the BLOCK start are live in PRED, we just need
@@ -244,6 +260,24 @@
          (start (ir2-block-start-stack 2block))
          (start-stack (ordered-list-intersection pred-end-stack start))
          (end (ir2-block-end-stack 2block)))
+
+    (when (not (subsetp start start-stack))
+      ;; If BLOCK is a control-flow join for DX allocation paths with
+      ;; different sets of DX LVARs being pushed then we cannot
+      ;; process it correctly until all of its predecessors have been
+      ;; processed.
+      (unless (every #'block-flag (block-pred block))
+        (return-from order-block-uvl-sets nil))
+      ;; If we are in the conditional-DX control-flow join case then
+      ;; we need to find an order for START-STACK that is compatible
+      ;; with all of our predecessors.
+      (dolist (end-stack (mapcar #'ir2-block-end-stack
+                                 (mapcar #'block-info
+                                         (block-pred block))))
+        (setf pred-end-stack
+              (ordered-list-union pred-end-stack end-stack)))
+      (setf start-stack (ordered-list-intersection pred-end-stack start)))
+
     (when *check-consistency*
       (aver (subsetp start start-stack)))
     (setf (ir2-block-start-stack 2block) start-stack)
@@ -325,6 +359,7 @@
                          collect maybe-popped into popped
                          finally (return (values popped last-popped rest)))))
              (discard (before-stack after-stack)
+               (aver (not (set-difference after-stack before-stack)))
                (cond
                  ((eq (car before-stack) (car after-stack))
                   (binding* ((moved-count (mismatch before-stack after-stack)
