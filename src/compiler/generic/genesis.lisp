@@ -290,16 +290,7 @@
   (let ((lowtag (descriptor-lowtag des)))
     (print-unreadable-object (des stream :type t)
       (cond ((is-fixnum-lowtag lowtag)
-             (let ((unsigned (logior (ash (descriptor-high des)
-                                          (1+ (- descriptor-low-bits
-                                                 sb!vm:n-lowtag-bits)))
-                                     (ash (descriptor-low des)
-                                          (- 1 sb!vm:n-lowtag-bits)))))
-               (format stream
-                       "for fixnum: ~W"
-                       (if (> unsigned #x1FFFFFFF)
-                           (- unsigned #x40000000)
-                           unsigned))))
+             (format stream "for fixnum: ~W" (descriptor-fixnum des)))
             ((is-other-immediate-lowtag lowtag)
              (format stream
                      "for other immediate: #X~X, type #b~8,'0B"
@@ -307,10 +298,9 @@
                      (logand (descriptor-low des) sb!vm:widetag-mask)))
             (t
              (format stream
-                     "for pointer: #X~X, lowtag #b~3,'0B, ~A"
-                     (logior (ash (descriptor-high des) descriptor-low-bits)
-                             (logandc2 (descriptor-low des) sb!vm:lowtag-mask))
-                     lowtag
+                     "for pointer: #X~X, lowtag #b~v,'0B, ~A"
+                     (logandc2 (descriptor-bits des) sb!vm:lowtag-mask)
+                     sb!vm:n-lowtag-bits lowtag
                      (let ((gspace (descriptor-gspace des)))
                        (if gspace
                            (gspace-name gspace)
