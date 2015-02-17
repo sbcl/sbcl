@@ -608,9 +608,13 @@
                        (make-fixnum-descriptor length))
     des))
 
+(defun cold-layout-length (layout)
+  (descriptor-fixnum (read-slot layout (find-layout 'layout) :length)))
+
 ;; Make a structure and set the header word and layout.
 ;; LAYOUT-LENGTH is as returned by the like-named function.
-(defun allocate-structure-object (gspace layout-length layout)
+(defun allocate-struct
+    (gspace layout &optional (layout-length (cold-layout-length layout)))
   ;; The math in here is best illustrated by two examples:
   ;; even: size 4 => request to allocate 5 => rounds up to 6, logior => 5
   ;; odd : size 5 => request to allocate 6 => no rounding up, logior => 5
@@ -1019,9 +1023,8 @@ core and return a descriptor to it."
                           descriptor)
                 make-cold-layout))
 (defun make-cold-layout (name length inherits depthoid metadata)
-  (let ((result (allocate-structure-object *dynamic*
-                                           target-layout-length
-                                           *layout-layout*)))
+  (let ((result (allocate-struct *dynamic* *layout-layout*
+                                 target-layout-length)))
     ;; Don't set the CLOS hash value: done in cold-init instead.
     ;;
     ;; Set other slot values.
@@ -1059,16 +1062,8 @@ core and return a descriptor to it."
                                        (host-constant-to-core '#(1 nil)))))
          (values)))
 
-    (setf (gethash name *cold-layouts*)
-          (list result
-                name
-                (descriptor-fixnum length)
-                (listify-cold-inherits inherits)
-                (descriptor-fixnum depthoid)
-                (descriptor-fixnum metadata)))
-    (setf (gethash (descriptor-bits result) *cold-layout-names*) name)
-
-    result))
+    (setf (gethash (descriptor-bits result) *cold-layout-names*) name
+          (gethash name *cold-layouts*) result)))
 
 ;; This is called to backpatch two small sets of objects:
 ;;  - layouts which are made before layout-of-layout is made (4 of them)
@@ -1401,21 +1396,18 @@ core and return a descriptor to it."
 ;;; a helper function for FINISH-SYMBOLS: Return a cold alist suitable
 ;;; to be stored in *!INITIAL-LAYOUTS*.
 (defun cold-list-all-layouts ()
-  (let ((layouts nil)
-        (result *nil-descriptor*))
-    (maphash (lambda (key stuff)
-               (push (cons key (first stuff)) layouts))
-             *cold-layouts*)
+  (let ((result *nil-descriptor*))
     (flet ((sorter (x y)
              (let ((xpn (package-name (symbol-package-for-target-symbol x)))
                    (ypn (package-name (symbol-package-for-target-symbol y))))
                (cond
                  ((string= x y) (string< xpn ypn))
                  (t (string< x y))))))
-      (setq layouts (sort layouts #'sorter :key #'car)))
-    (dolist (layout layouts result)
+    (dolist (layout (sort (%hash-table-alist *cold-layouts*) #'sorter
+                          :key #'car)
+                    result)
       (cold-push (cold-cons (cold-intern (car layout)) (cdr layout))
-                 result))))
+                 result)))))
 
 ;;; Establish initial values for magic symbols.
 ;;;
@@ -1695,7 +1687,7 @@ core and return a descriptor to it."
     ;; Emit in the same order symbols reside in core to avoid
     ;; sensitivity to the iteration order of host's maphash.
     (loop for (warm-sym . info)
-          in (sort (sb!impl::%hash-table-alist hashtable) #'<
+          in (sort (%hash-table-alist hashtable) #'<
                    :key (lambda (x) (descriptor-bits (cold-intern (car x)))))
           do (write-wordindexed
               (cold-intern warm-sym) sb!vm:symbol-info-slot
@@ -2205,7 +2197,7 @@ core and return a descriptor to it."
 
 (define-cold-fop (fop-struct (size)) ; n-words incl. layout, excluding header
   (let* ((layout (pop-stack))
-         (result (allocate-structure-object *dynamic* size layout))
+         (result (allocate-struct *dynamic* layout size))
          (metadata
           (descriptor-fixnum
            (read-slot layout (find-layout 'layout)
@@ -2213,9 +2205,11 @@ core and return a descriptor to it."
                       #!+interleaved-raw-slots :untagged-bitmap)))
          #!-interleaved-raw-slots (ntagged (- size metadata))
          )
-    #!+interleaved-raw-slots
+    ;; Raw slots can not possibly work because dump-struct uses
+    ;; %RAW-INSTANCE-REF/WORD which does not exist in the cross-compiler.
+    ;; Remove this assertion if that problem is somehow circumvented.
     (unless (= metadata 0)
-      (error "Interleaved raw slots not (yet) known to work in genesis."))
+      (error "Raw slots not working in genesis."))
 
     (do ((index 1 (1+ index)))
         ((eql index size))
@@ -2234,30 +2228,23 @@ core and return a descriptor to it."
          (depthoid-des (pop-stack))
          (cold-inherits (pop-stack))
          (name (pop-stack))
-         (old (gethash name *cold-layouts*)))
+         (old-layout-descriptor (gethash name *cold-layouts*)))
     (declare (type descriptor length-des depthoid-des cold-inherits))
     (declare (type symbol name))
     ;; If a layout of this name has been defined already
-    (if old
+    (if old-layout-descriptor
       ;; Enforce consistency between the previous definition and the
       ;; current definition, then return the previous definition.
-      (destructuring-bind
-          ;; FIXME: This would be more maintainable if we used
-          ;; DEFSTRUCT (:TYPE LIST) to define COLD-LAYOUT. -- WHN 19990825
-          (old-layout-descriptor
-           old-name
-           old-length
-           old-inherits-list
-           old-depthoid
-           old-metadata)
-          old
-        (declare (type descriptor old-layout-descriptor))
-        (declare (type index old-length))
-        (declare (type list old-inherits-list))
-        (declare (type fixnum old-depthoid))
-        (declare (type unsigned-byte old-metadata))
-        (aver (eq name old-name))
-        (let ((length (descriptor-fixnum length-des))
+      (flet ((get-slot (keyword)
+               (read-slot old-layout-descriptor (find-layout 'layout) keyword)))
+        (let ((old-length (descriptor-fixnum (get-slot :length)))
+              (old-inherits-list (listify-cold-inherits (get-slot :inherits)))
+              (old-depthoid (descriptor-fixnum (get-slot :depthoid)))
+              (old-metadata
+               (descriptor-fixnum
+                (get-slot #!-interleaved-raw-slots :n-untagged-slots
+                          #!+interleaved-raw-slots :untagged-bitmap)))
+              (length (descriptor-fixnum length-des))
               (inherits-list (listify-cold-inherits cold-inherits))
               (depthoid (descriptor-fixnum depthoid-des))
               (metadata (descriptor-fixnum metadata-des)))
@@ -3269,14 +3256,12 @@ initially undefined function references:~2%")
                 name)))
 
     (format t "~%~|~%layout names:~2%")
-    (collect ((stuff))
-      (maphash (lambda (name gorp)
-                 (declare (ignore name))
-                 (stuff (cons (descriptor-bits (car gorp))
-                              (cdr gorp))))
-               *cold-layouts*)
-      (dolist (x (sort (stuff) #'< :key #'car))
-        (apply #'format t "~8,'0X: ~S[~D]~%~10T~S~%" x))))
+    (dolist (x (sort (%hash-table-alist *cold-layouts*) #'<
+                     :key (lambda (x) (descriptor-bits (cdr x)))))
+      (let* ((des (cdr x))
+             (inherits (read-slot des (find-layout 'layout) :inherits)))
+        (format t "~8,'0X: ~S[~D]~%~10T~:S~%" (descriptor-bits des) (car x)
+                  (cold-layout-length des) (listify-cold-inherits inherits)))))
 
   (values))
 
@@ -3537,9 +3522,9 @@ initially undefined function references:~2%")
                                          pkg-metadata))
                           (gethash "COMMON-LISP" *cold-package-symbols*))
               (setf (gethash name *cold-package-symbols*)
-                    (cons (allocate-structure-object
-                           *dynamic* (layout-length (find-layout 'package))
-                           (make-fixnum-descriptor 0))
+                    (cons (allocate-struct
+                           *dynamic* (make-fixnum-descriptor 0)
+                           (layout-length (find-layout 'package)))
                           (cons nil nil))))) ; (externals . internals)
            (*nil-descriptor* (make-nil-descriptor target-cl-pkg-info))
            (*current-reversed-cold-toplevels* *nil-descriptor*)
