@@ -2425,6 +2425,10 @@ core and return a descriptor to it."
                                     :end end)
     result))
 
+(not-cold-fop fop-array)
+#+nil
+;; This code is unexercised. The only use of FOP-ARRAY is from target-dump.
+;; It would be a shame to delete it though, as it might come in handy.
 (define-cold-fop (fop-array)
   (let* ((rank (read-word-arg))
          (data-vector (pop-stack))
@@ -2442,13 +2446,7 @@ core and return a descriptor to it."
         (let ((dim (pop-stack)))
           (unless (is-fixnum-lowtag (descriptor-lowtag dim))
             (error "non-fixnum dimension? (~S)" dim))
-          (setf total-elements
-                (* total-elements
-                   (logior (ash (descriptor-high dim)
-                                (- descriptor-low-bits
-                                   sb!vm:n-fixnum-tag-bits))
-                           (ash (descriptor-low dim)
-                                sb!vm:n-fixnum-tag-bits))))
+          (setf total-elements (* total-elements (descriptor-fixnum dim)))
           (write-wordindexed result
                              (+ sb!vm:array-dimensions-offset axis)
                              dim)))
