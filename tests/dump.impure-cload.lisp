@@ -15,6 +15,9 @@
 
 (declaim (optimize (debug 3) (speed 2) (space 1)))
 
+;;; this would fail an AVER in NOTE-POTENTIAL-CIRCULARITY
+(defparameter *circular-2d-array* #1=#2A((a b) (#1# x)))
+
 ;;; Don Geddis reported this test case 25 December 1999 on a CMU CL
 ;;; mailing list: dumping circular lists caused the compiler to enter
 ;;; an infinite loop. Douglas Crosher reported a patch 27 Dec 1999.

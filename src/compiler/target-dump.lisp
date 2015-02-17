@@ -46,6 +46,7 @@
 ;;; cross-compilation time, it might possible to use ROW-MAJOR-AREF
 ;;; stuff to do it portably.
 (defun dump-multi-dim-array (array file)
+  (note-potential-circularity array file)
   (let ((rank (array-rank array)))
     (dotimes (i rank)
       (dump-integer (array-dimension array i) file))
