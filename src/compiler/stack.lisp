@@ -251,9 +251,11 @@
     (nreverse (sub-union ordered-list-1 ordered-list-2 nil))))
 
 ;;; Put UVLs on the start/end stacks of BLOCK in the right order. PRED
-;;; is a predecessor of BLOCK with already sorted stacks; because all
-;;; UVLs being live at the BLOCK start are live in PRED, we just need
-;;; to delete dead UVLs.
+;;; is a predecessor of BLOCK with already sorted stacks; if all UVLs
+;;; being live at the BLOCK start are live in PRED we just need to
+;;; delete killed UVLs, otherwise we need (thanks to conditional or
+;;; nested DX) to set a total order for the UVLs live at the end of
+;;; all predecessors.
 (defun order-block-uvl-sets (block pred)
   (let* ((2block (block-info block))
          (pred-end-stack (ir2-block-end-stack (block-info pred)))
@@ -342,7 +344,7 @@
 ;;; will never actually be executed. It doesn't seem to be worth the
 ;;; risk of trying to optimize this, since this rarely happens and
 ;;; wastes only space.
-(defun discard-unused-values (block1 block2)
+(defun insert-stack-cleanups (block1 block2)
   (declare (type cblock block1 block2))
   (collect ((cleanup-code))
     (labels ((find-popped (before after)
@@ -395,15 +397,19 @@
              (pruned-start-stack (ordered-list-intersection
                                   start-stack end-stack)))
         (discard end-stack pruned-start-stack)
-        (dummy-allocations pruned-start-stack start-stack)))
-    (when (cleanup-code)
-      (let* ((block (insert-cleanup-code block1 block2
-                                         (block-start-node block2)
-                                         `(progn ,@(cleanup-code))))
-             (2block (make-ir2-block block)))
-        (setf (block-info block) 2block)
-        (add-to-emit-order 2block (block-info block1))
-        (ltn-analyze-belated-block block))))
+        (dummy-allocations pruned-start-stack start-stack)
+        (when (cleanup-code)
+          (let* ((block (insert-cleanup-code block1 block2
+                                             (block-start-node block2)
+                                             `(progn ,@(cleanup-code))))
+                 (2block (make-ir2-block block)))
+            (setf (block-info block) 2block)
+            ;; Set the start and end stacks to make traces less
+            ;; confusing.  Purely cosmetic.
+            (setf (ir2-block-start-stack 2block) end-stack)
+            (setf (ir2-block-end-stack 2block) start-stack)
+            (add-to-emit-order 2block (block-info block1))
+            (ltn-analyze-belated-block block))))))
 
   (values))
 
@@ -427,8 +433,9 @@
 
 ;;; Analyze the use of unknown-values and DX lvars in COMPONENT,
 ;;; inserting cleanup code to discard values that are generated but
-;;; never received. This phase doesn't need to be run when
-;;; Values-Receivers and Dx-Lvars are null, i.e. there are no
+;;; never received and to set appropriate bounds for DX values that
+;;; are cleaned up but never allocated. This phase doesn't need to be
+;;; run when Values-Receivers and Dx-Lvars are null, i.e. there are no
 ;;; unknown-values lvars used across block boundaries and no DX LVARs.
 (defun stack-analyze (component)
   (declare (type component component))
@@ -455,6 +462,6 @@
           (when (and (block-start succ)
                      (not (eq (ir2-block-start-stack (block-info succ))
                               top)))
-            (discard-unused-values block succ))))))
+            (insert-stack-cleanups block succ))))))
 
   (values))
