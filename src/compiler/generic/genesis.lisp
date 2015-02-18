@@ -213,11 +213,10 @@
 (defconstant max-core-space-id 3)
 (defconstant deflated-core-space-id-flag 4)
 
-(defconstant descriptor-low-bits 16
-  "the number of bits in the low half of the descriptor")
-(defconstant target-space-alignment (ash 1 descriptor-low-bits)
-  "the alignment requirement for spaces in the target.
-  Must be at least (ASH 1 DESCRIPTOR-LOW-BITS)")
+;; This is somewhat arbitrary as there is no concept of the the
+;; number of bits in the "low" part of a descriptor any more.
+(defconstant target-space-alignment (ash 1 16)
+  "the alignment requirement for spaces in the target.")
 
 ;;; a GENESIS-time representation of a memory space (e.g. read-only
 ;;; space, dynamic space, or static space)
@@ -269,23 +268,21 @@
   (= (logand lowtag 3) sb!vm:other-immediate-0-lowtag))
 
 (defstruct (descriptor
-            (:constructor make-descriptor
-                          (high low &optional gspace word-offset))
+            (:constructor make-descriptor (bits &optional gspace word-offset))
             (:copier nil))
   ;; the GSPACE that this descriptor is allocated in, or NIL if not set yet.
   (gspace nil :type (or gspace (eql :load-time-value) null))
   ;; the offset in words from the start of GSPACE, or NIL if not set yet
   (word-offset nil :type (or sb!vm:word null))
-  ;; the high and low halves of the descriptor
-  ;;
-  ;; KLUDGE: Judging from the comments in genesis.lisp of the CMU CL
-  ;; old-rt compiler, this split dates back from a very early version
-  ;; of genesis where 32-bit integers were represented as conses of
-  ;; two 16-bit integers. In any system with nice (UNSIGNED-BYTE 32)
-  ;; structure slots, like CMU CL >= 17 or any version of SBCL, there
-  ;; seems to be no reason to persist in this. -- WHN 19990917
-  high
-  low)
+  (bits 0 :read-only t :type (unsigned-byte #.sb!vm:n-machine-word-bits)))
+
+;; FIXME: most uses of MAKE-RANDOM-DESCRIPTOR are abuses for writing a raw word
+;; into target memory as if it were a descriptor, because there is no variant
+;; of WRITE-WORDINDEXED taking a non-descriptor value.
+;; As an intermediary step, perhaps this should be renamed to MAKE-RAW-BITS.
+(defun make-random-descriptor (bits)
+  (make-descriptor (logand bits sb!ext:most-positive-word)))
+
 (def!method print-object ((des descriptor) stream)
   (let ((lowtag (descriptor-lowtag des)))
     (print-unreadable-object (des stream :type t)
@@ -295,7 +292,7 @@
              (format stream
                      "for other immediate: #X~X, type #b~8,'0B"
                      (ash (descriptor-bits des) (- sb!vm:n-widetag-bits))
-                     (logand (descriptor-low des) sb!vm:widetag-mask)))
+                     (logand (descriptor-bits des) sb!vm:widetag-mask)))
             (t
              (format stream
                      "for pointer: #X~X, lowtag #b~v,'0B, ~A"
@@ -324,23 +321,13 @@
     ;; Now that GSPACE is big enough, we can meaningfully grab a chunk of it.
     (setf (gspace-free-word-index gspace) new-free-word-index)
     (let ((ptr (+ (gspace-word-address gspace) old-free-word-index)))
-      (make-descriptor (ash ptr (- sb!vm:word-shift descriptor-low-bits))
-                       (logior (ash (logand ptr
-                                            (1- (ash 1
-                                                     (- descriptor-low-bits
-                                                        sb!vm:word-shift))))
-                                    sb!vm:word-shift)
-                               lowtag)
+      (make-descriptor (logior (ash ptr sb!vm:word-shift) lowtag)
                        gspace
                        old-free-word-index))))
 
 (defun descriptor-lowtag (des)
   "the lowtag bits for DES"
-  (logand (descriptor-low des) sb!vm:lowtag-mask))
-
-(defun descriptor-bits (des)
-  (logior (ash (descriptor-high des) descriptor-low-bits)
-          (descriptor-low des)))
+  (logand (descriptor-bits des) sb!vm:lowtag-mask))
 
 (defun descriptor-fixnum (des)
   (let ((bits (descriptor-bits des)))
@@ -378,9 +365,9 @@
   (or (descriptor-gspace des)
 
       ;; gspace wasn't set, now we have to search for it.
-      (let ((lowtag (descriptor-lowtag des))
-            (high (descriptor-high des))
-            (low (descriptor-low des)))
+      (let* ((lowtag (descriptor-lowtag des))
+             (abs-word-addr (ash (- (descriptor-bits des) lowtag)
+                                 (- sb!vm:word-shift))))
 
         ;; Non-pointer objects don't have a gspace.
         (unless (or (eql lowtag sb!vm:fun-pointer-lowtag)
@@ -393,62 +380,36 @@
                  (error "couldn't find a GSPACE for ~S" des))
           ;; Bounds-check the descriptor against the allocated area
           ;; within each gspace.
-          ;;
-          ;; Most of the faffing around in here involving ash and
-          ;; various computed shift counts is due to the high/low
-          ;; split representation of the descriptor bits and an
-          ;; apparent disinclination to create intermediate values
-          ;; larger than a target fixnum.
-          ;;
-          ;; This code relies on the fact that GSPACEs are aligned
-          ;; such that the descriptor-low-bits low bits are zero.
-          (when (and (>= high (ash (gspace-word-address gspace)
-                                   (- sb!vm:word-shift descriptor-low-bits)))
-                     (<= high (ash (+ (gspace-word-address gspace)
-                                      (gspace-free-word-index gspace))
-                                   (- sb!vm:word-shift descriptor-low-bits))))
+          (when (and (<= (gspace-word-address gspace)
+                         abs-word-addr
+                         (+ (gspace-word-address gspace)
+                            (gspace-free-word-index gspace))))
             ;; Update the descriptor with the correct gspace and the
             ;; offset within the gspace and return the gspace.
-            (setf (descriptor-gspace des) gspace)
             (setf (descriptor-word-offset des)
-                  (+ (ash (- high (ash (gspace-word-address gspace)
-                                       (- sb!vm:word-shift
-                                          descriptor-low-bits)))
-                          (- descriptor-low-bits sb!vm:word-shift))
-                     (ash (logandc2 low sb!vm:lowtag-mask)
-                          (- sb!vm:word-shift))))
-            (return gspace))))))
+                  (- abs-word-addr (gspace-word-address gspace)))
+            (return (setf (descriptor-gspace des) gspace)))))))
 
-(defun make-random-descriptor (value)
-  (make-descriptor (logand (ash value (- descriptor-low-bits))
-                           (1- (ash 1
-                                    (- sb!vm:n-word-bits
-                                       descriptor-low-bits))))
-                   (logand value (1- (ash 1 descriptor-low-bits)))))
+(defun %fixnum-descriptor-if-possible (num)
+  (and (typep num '(signed-byte #.sb!vm:n-fixnum-bits))
+       (make-random-descriptor (ash num sb!vm:n-fixnum-tag-bits))))
 
 (defun make-fixnum-descriptor (num)
-  (when (>= (integer-length num)
-            (- sb!vm:n-word-bits sb!vm:n-fixnum-tag-bits))
-    (error "~W is too big for a fixnum." num))
-  (make-random-descriptor (ash num sb!vm:n-fixnum-tag-bits)))
+  (or (%fixnum-descriptor-if-possible num)
+      (error "~W is too big for a fixnum." num)))
 
 (defun make-other-immediate-descriptor (data type)
-  (make-descriptor (ash data (- sb!vm:n-widetag-bits descriptor-low-bits))
-                   (logior (logand (ash data (- descriptor-low-bits
-                                                sb!vm:n-widetag-bits))
-                                   (1- (ash 1 descriptor-low-bits)))
-                           type)))
+  (make-descriptor (logior (ash data sb!vm:n-widetag-bits) type)))
 
 (defun make-character-descriptor (data)
   (make-other-immediate-descriptor data sb!vm:character-widetag))
 
-(defun descriptor-beyond (des offset type)
-  (let* ((low (logior (+ (logandc2 (descriptor-low des) sb!vm:lowtag-mask)
-                         offset)
-                      type))
-         (high (+ (descriptor-high des)
-                  (ash low (- descriptor-low-bits)))))
-    (make-descriptor high (logand low (1- (ash 1 descriptor-low-bits))))))
+(defun descriptor-beyond (des offset lowtag)
+  ;; OFFSET is in bytes and relative to the descriptor as a native pointer,
+  ;; not the tagged address. Then we slap on a new lowtag.
+  (make-descriptor
+   (logior (+ offset (logandc2 (descriptor-bits des) sb!vm:lowtag-mask))
+           lowtag)))
 
 ;;;; miscellaneous variables and other noise
 
@@ -505,10 +466,9 @@
 
 (declaim (ftype (function (descriptor sb!vm:word) descriptor) read-wordindexed))
 (macrolet ((read-bits ()
-             `(let ((gspace (descriptor-intuit-gspace address)))
-                (bvref-word (gspace-bytes gspace)
-                            (ash (+ index (descriptor-word-offset address))
-                                 sb!vm:word-shift)))))
+             `(bvref-word (descriptor-bytes address)
+                          (ash (+ index (descriptor-word-offset address))
+                               sb!vm:word-shift))))
   (defun read-bits-wordindexed (address index)
     (read-bits))
   (defun read-wordindexed (address index)
@@ -547,7 +507,7 @@
                                            (logand (descriptor-bits address)
                                                    sb!vm:lowtag-mask))
                                         value)
-        (let* ((bytes (gspace-bytes (descriptor-intuit-gspace address)))
+        (let* ((bytes (descriptor-bytes address))
                (byte-index (ash (+ index (descriptor-word-offset address))
                                 sb!vm:word-shift)))
           (setf (bvref-word bytes byte-index) (descriptor-bits value))))))
@@ -648,7 +608,7 @@ core and return a descriptor to it."
   (let* ((len (descriptor-fixnum
                (read-wordindexed descriptor sb!vm:vector-length-slot)))
          (str (make-string len))
-         (bytes (gspace-bytes (descriptor-gspace descriptor))))
+         (bytes (descriptor-bytes descriptor)))
     (dotimes (i len str)
       (setf (aref str i)
             (code-char (bvref bytes
@@ -669,12 +629,10 @@ core and return a descriptor to it."
            ;; FIXME: Shouldn't this be a fatal error?
            (warn "~W words of ~W were written, but ~W bits were left over."
                  words n remainder)))
-      (let ((word (ldb (byte sb!vm:n-word-bits 0) remainder)))
         ;; FIXME: this is disgusting. there should be WRITE-BITS-WORDINDEXED.
-        (write-wordindexed handle index
-                           (make-descriptor (ash word (- descriptor-low-bits))
-                                            (ldb (byte descriptor-low-bits 0)
-                                                 word)))))
+      (write-wordindexed handle index
+                         (make-random-descriptor
+                          (ldb (byte sb!vm:n-word-bits 0) remainder))))
     handle))
 
 (defun bignum-from-core (descriptor)
@@ -701,6 +659,8 @@ core and return a descriptor to it."
         (lo (double-float-low-bits x)))
     (ecase sb!vm::n-word-bits
       (32
+       ;; As noted in BIGNUM-TO-CORE, this idiom is unclear - the things
+       ;; aren't descriptors. Same for COMPLEX-foo-TO-CORE
        (let ((high-bits (make-random-descriptor hi))
              (low-bits (make-random-descriptor lo)))
          (ecase sb!c:*backend-byte-order*
@@ -772,9 +732,7 @@ core and return a descriptor to it."
 ;;; Copy the given number to the core.
 (defun number-to-core (number)
   (typecase number
-    (integer (if (< (integer-length number)
-                    (- sb!vm:n-word-bits sb!vm:n-fixnum-tag-bits))
-                 (make-fixnum-descriptor number)
+    (integer (or (%fixnum-descriptor-if-possible number)
                  (bignum-to-core number)))
     (ratio (number-pair-to-core (number-to-core (numerator number))
                                 (number-to-core (denominator number))
@@ -1321,8 +1279,7 @@ core and return a descriptor to it."
 ;;; code from destroying the world with (RPLACx nil 'kablooey)
 (defun make-nil-descriptor (target-cl-pkg-info)
   (let* ((des (allocate-header+object *static* sb!vm:symbol-size 0))
-         (result (make-descriptor (descriptor-high des)
-                                  (+ (descriptor-low des)
+         (result (make-descriptor (+ (descriptor-bits des)
                                      (* 2 sb!vm:n-word-bytes)
                                      (- sb!vm:list-pointer-lowtag
                                         sb!vm:other-pointer-lowtag)))))
@@ -1363,8 +1320,8 @@ core and return a descriptor to it."
   (dolist (symbol sb!vm:*static-symbols*)
     (let* ((des (cold-intern symbol :gspace *static*))
            (offset-wanted (sb!vm:static-symbol-offset symbol))
-           (offset-found (- (descriptor-low des)
-                            (descriptor-low *nil-descriptor*))))
+           (offset-found (- (descriptor-bits des)
+                            (descriptor-bits *nil-descriptor*))))
       (unless (= offset-wanted offset-found)
         ;; FIXME: should be fatal
         (warn "Offset from ~S to ~S is ~W, not ~W"
@@ -1598,7 +1555,7 @@ core and return a descriptor to it."
 (defun static-fset (cold-name defn)
   (declare (type (or symbol descriptor) cold-name))
   (let ((fdefn (cold-fdefinition-object cold-name t))
-        (type (logand (descriptor-low (read-memory defn)) sb!vm:widetag-mask)))
+        (type (logand (descriptor-bits (read-memory defn)) sb!vm:widetag-mask)))
     (write-wordindexed fdefn sb!vm:fdefn-fun-slot defn)
     (write-wordindexed fdefn
                        sb!vm:fdefn-raw-addr-slot
@@ -1649,10 +1606,10 @@ core and return a descriptor to it."
   (let ((*cold-fdefn-gspace* *static*))
     (dolist (sym sb!vm:*static-funs*)
       (let* ((fdefn (cold-fdefinition-object (cold-intern sym)))
-             (offset (- (+ (- (descriptor-low fdefn)
+             (offset (- (+ (- (descriptor-bits fdefn)
                               sb!vm:other-pointer-lowtag)
                            (* sb!vm:fdefn-raw-addr-slot sb!vm:n-word-bytes))
-                        (descriptor-low *nil-descriptor*)))
+                        (descriptor-bits *nil-descriptor*)))
              (desired (sb!vm:static-fun-offset sym)))
         (unless (= offset desired)
           ;; FIXME: should be fatal
@@ -2475,7 +2432,7 @@ core and return a descriptor to it."
                   *nil-descriptor*)))
                *current-reversed-cold-toplevels*)
     (setf *load-time-value-counter* (1+ counter))
-    (make-descriptor 0 0 :load-time-value counter)))
+    (make-descriptor 0 :load-time-value counter)))
 
 (defun finalize-load-time-value-noise ()
   (cold-set '*!load-time-values*
@@ -2567,9 +2524,7 @@ core and return a descriptor to it."
        (write-wordindexed des sb!vm:code-entry-points-slot *nil-descriptor*)
        (write-wordindexed des sb!vm:code-debug-info-slot (pop-stack))
        (when (oddp raw-header-n-words)
-         (write-wordindexed des
-                            raw-header-n-words
-                            (make-random-descriptor 0)))
+         (write-wordindexed des raw-header-n-words (make-descriptor 0)))
        (do ((index (1- raw-header-n-words) (1- index)))
            ((< index sb!vm:code-constants-offset))
          (write-wordindexed des index (pop-stack)))
@@ -2708,7 +2663,7 @@ core and return a descriptor to it."
                        ;; KLUDGE: a pointer to the actual code of the
                        ;; object, as described nowhere that I can find
                        ;; -- WHN 19990907
-                       (make-random-descriptor
+                       (make-descriptor ; raw bits that look like fixnum
                         (+ (descriptor-bits fn)
                            (- (ash sb!vm:simple-fun-code-offset
                                    sb!vm:word-shift)
