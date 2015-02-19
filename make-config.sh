@@ -127,7 +127,7 @@ then
     exit 1
 fi
 
-# Previously XC host was provided as a positional argument. 
+# Previously XC host was provided as a positional argument.
 if test -n "$legacy_xc_spec"
 then
     SBCL_XC_HOST="$legacy_xc_spec"
@@ -417,6 +417,14 @@ then
             echo "No threads on this platform."
             ;;
     esac
+else
+    case $sbcl_arch in
+        x86|x86-64)
+            case $sbcl_os in
+                linux)
+                    WITH_FEATURES="$WITH_FEATURES :sb-thread"
+            esac
+    esac
 fi
 
 ltf=`pwd`/local-target-features.lisp-expr
@@ -424,8 +432,8 @@ echo //initializing $ltf
 echo ';;;; This is a machine-generated file.' > $ltf
 echo ';;;; Please do not edit it by hand.' >> $ltf
 echo ';;;; See make-config.sh.' >> $ltf
-echo "(lambda (features) (union (set-difference features (list$WITHOUT_FEATURES))" >> $ltf
-printf " (union (list$WITH_FEATURES) (list " >> $ltf
+echo "(lambda (features) (union (set-difference (union features (list$WITH_FEATURES)) (list$WITHOUT_FEATURES))" >> $ltf
+printf " (list " >> $ltf
 
 printf ":%s" "$sbcl_arch" >> $ltf
 
@@ -460,7 +468,7 @@ case "$sbcl_os" in
 		printf ' :largefile' >> $ltf
 		;;
             x86 | x86-64)
-		printf ' :sb-thread :sb-futex :largefile' >> $ltf
+		printf ' :sb-futex :largefile' >> $ltf
 		;;
             ppc)
 		printf ' :sb-futex' >> $ltf
@@ -725,7 +733,7 @@ export sbcl_os sbcl_arch
 sh tools-for-build/grovel-features.sh >> $ltf
 
 echo //finishing $ltf
-echo '))))' >> $ltf
+echo ')))' >> $ltf
 
 # FIXME: The version system should probably be redone along these lines:
 #
