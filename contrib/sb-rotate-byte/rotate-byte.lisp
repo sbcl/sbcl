@@ -23,3 +23,7 @@ contains the bits of INTEGER."
   ;; inhibit transforms
   (declare (notinline %rotate-byte))
   (%rotate-byte count 32 0 integer))
+
+#+x86-64
+(defun %unsigned-64-rotate-byte (count integer)
+  (%unsigned-64-rotate-byte count integer))

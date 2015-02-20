@@ -15,7 +15,7 @@
      (:file "x86-vm" :if-feature :x86)
      (:file "x86-64-vm" :if-feature :x86-64)
      (:file "ppc-vm" :if-feature :ppc)))
-   (:file "rotate-byte" :depends-on ("compiler")))
+   (:file "rotate-byte" :depends-on ("vm")))
   :perform (load-op :after (o c) (provide 'sb-rotate-byte))
   :perform (test-op (o c) (test-system 'sb-rotate-byte/tests)))
 

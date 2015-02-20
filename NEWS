@@ -34,6 +34,7 @@ changes relative to sbcl-1.2.8:
     constant involving a circular reference to itself
   * bug fix: conditional and nested DX allocation no longer confuse the
     compiler in STACK analysis. (lp#1044465)
+  * bug fix: sb-rotate-byte constant folding bug fixed. (lp#1423682)
 
 changes in sbcl-1.2.8 relative to sbcl-1.2.7:
   * enhancement: better error and warning messages. (lp#1314767, lp#736383)
