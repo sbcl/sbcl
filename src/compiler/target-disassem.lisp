@@ -545,12 +545,13 @@
       (call-offs-hooks nil stream dstate)
 
       (when (< (dstate-cur-offs dstate) data-end-offset)
-        (format stream "~A  #x~v,'0x" '.word
-                (* 2 sb!vm:n-word-bytes)
-                (sap-ref-int (dstate-segment-sap dstate)
-                             (dstate-cur-offs dstate)
-                             sb!vm:n-word-bytes
-                             (dstate-byte-order dstate)))
+        (sb!sys:without-gcing
+         (format stream "~A  #x~v,'0x" '.word
+                 (* 2 sb!vm:n-word-bytes)
+                 (sap-ref-int (funcall (seg-sap-maker segment))
+                              (dstate-cur-offs dstate)
+                              sb!vm:n-word-bytes
+                              (dstate-byte-order dstate))))
         (setf (dstate-next-offs dstate)
               (+ (dstate-cur-offs dstate) sb!vm:n-word-bytes)))
 
