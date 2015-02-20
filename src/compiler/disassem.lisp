@@ -65,9 +65,10 @@
 
 ;;;; cached functions
 ;;;;
-;;;; FIXME: Is it important to cache these? For performance? Or why?
-;;;; If performance: *Really*? How fast does disassembly need to be??
-;;;; So: Could we just punt this?
+;;;; There's no need for 1000 different versions of a function equivalent
+;;;; to (PROGN (PRINT ADDR) (PRINT OPCODE) (PRINT ARG)) so we try to
+;;;; coalesce sexprs, since there is no such thing as coalescing compiled code.
+;;;; This is not really a "cache" as much as hashtable for coalescing.
 
 (defstruct (fun-cache (:copier nil)
                       (:print-object (lambda (self stream)

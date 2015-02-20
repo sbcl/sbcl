@@ -184,6 +184,7 @@
       (unless (zerop (length *constant-vector*))
         (let ((constants (sb!vm:sort-inline-constants *constant-vector*)))
           (assemble (*constant-segment*)
+            #+nil
             (sb!vm:emit-constant-segment-header
              *constant-segment*
              constants
@@ -194,7 +195,8 @@
             (map nil (lambda (constant)
                        (sb!vm:emit-inline-constant (car constant) (cdr constant)))
                  constants)))
-        (sb!assem:append-segment *code-segment* *constant-segment*))
+        (sb!assem:append-segment *constant-segment* *code-segment*)
+        (setq *code-segment* *constant-segment*))
       (setf *constant-segment* nil
             *constant-vector*  nil
             *constant-table*   nil))

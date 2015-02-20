@@ -264,23 +264,16 @@
   ;; Length of the memory range excluding any trailing untagged data.
   ;; Defaults to 'length' but could be shorter.
   (opcodes-length 0 :type disassem-length)
-  ;; The number of pad bytes after opcodes-length that should be dumped
-  ;; as raw bytes prior to displaying raw bytes that are genuinely data.
-  (opcode-trailer-length 0 :type disassem-length)
   (virtual-location 0 :type address)
   (storage-info nil :type (or null storage-info))
-  ;; For backends which support unboxed constants within the segment,
-  ;; they are collected into unboxed-refs so that they can be shown
-  ;; in their correct size according to the referencing instruction.
-  (unboxed-refs nil :type list) ; alist of (offset . size)
   (code nil :type (or null sb!kernel:code-component))
+  (unboxed-data-range nil :type (or null (cons fixnum fixnum)))
   (hooks nil :type list))
 (def!method print-object ((seg segment) stream)
   (print-unreadable-object (seg stream :type t)
     (let ((addr (sb!sys:sap-int (funcall (seg-sap-maker seg)))))
-      (format stream "#X~X[~W]~:[ (#X~X)~;~*~]~@[ in ~S~]"
-              addr
-              (seg-length seg)
+      (format stream "#X~X..~X[~W]~:[ (#X~X)~;~*~]~@[ in ~S~]"
+              addr (+ addr (seg-length seg)) (seg-length seg)
               (= (seg-virtual-location seg) addr)
               (seg-virtual-location seg)
               (seg-code seg)))))
@@ -518,6 +511,15 @@
            (type (or null stream) stream))
 
   (let ((ispace (get-inst-space))
+        (data-end-offset
+         ;; If the segment starts with unboxed data,
+         ;; dump some number of words using the .WORD pseudo-ops.
+         (if (and (seg-unboxed-data-range segment)
+                  (= (segment-offs-to-code-offs 0 segment)
+                     (car (seg-unboxed-data-range segment))))
+             (code-offs-to-segment-offs (cdr (seg-unboxed-data-range segment))
+                                        segment)
+             0)) ; sentinel value
         (prefix-p nil) ; just processed a prefix inst
         (prefix-len 0) ; sum of lengths of any prefix instruction(s)
         (prefix-print-names nil)) ; reverse list of prefixes seen
@@ -541,6 +543,16 @@
       (unless (or prefix-p (null stream))
         (print-current-address stream dstate))
       (call-offs-hooks nil stream dstate)
+
+      (when (< (dstate-cur-offs dstate) data-end-offset)
+        (format stream "~A  #x~v,'0x" '.word
+                (* 2 sb!vm:n-word-bytes)
+                (sap-ref-int (dstate-segment-sap dstate)
+                             (dstate-cur-offs dstate)
+                             sb!vm:n-word-bytes
+                             (dstate-byte-order dstate)))
+        (setf (dstate-next-offs dstate)
+              (+ (dstate-cur-offs dstate) sb!vm:n-word-bytes)))
 
       (unless (> (dstate-next-offs dstate) (dstate-cur-offs dstate))
         (sb!sys:without-gcing
@@ -961,7 +973,14 @@
            :virtual-location (or virtual-location
                                  (sb!sys:sap-int (funcall sap-maker)))
            :hooks hooks
-           :code code)))
+           :code code
+           :unboxed-data-range
+           (and code
+                (let ((n-words (sb!kernel:code-n-unboxed-data-words code))
+                      (start (sb!kernel:get-header-data code)))
+                  (and (plusp n-words)
+                       (cons (* sb!vm:n-word-bytes start)
+                             (* sb!vm:n-word-bytes (+ start n-words)))))))))
     (add-debugging-hooks segment debug-fun source-form-cache)
     (add-fun-header-hooks segment)
     segment))
@@ -1432,14 +1451,7 @@
            (funcall printer chunk inst stream dstate))))
      segment
      dstate
-     stream)
-    ;; "unboxed data" are more general than just large constants,
-    ;; but presently are comprised only of those. It would have made
-    ;; sense to featurize this on inline-constants, however it turned
-    ;; out to be difficult to get x86 (-32) to work, which as it happens
-    ;; is the only other backend that has the inline-constants feature.
-    #!+x86-64
-    (disassemble-unboxed-data segment stream dstate)))
+     stream)))
 
 ;;; Disassemble the machine code instructions in each memory segment
 ;;; in SEGMENTS in turn to STREAM.
@@ -1471,10 +1483,6 @@
                     (seg-virtual-location seg) i n-segments))
           (disassemble-segment seg stream dstate))))))
 
-#!-x86-64
-(defun determine-opcode-bounds (seglist dstate)
-  (declare (ignore seglist dstate)))
-
 
 ;;;; top level functions
 
@@ -1487,7 +1495,6 @@
            (type (member t nil) use-labels))
   (let* ((dstate (make-dstate))
          (segments (get-fun-segments fun)))
-    (determine-opcode-bounds segments dstate)
     (when use-labels
       (label-segments segments dstate))
     (disassemble-segments segments stream dstate)))
@@ -1501,6 +1508,7 @@
         ((typep thing 'sb!pcl::%method-function)
          ;; in a %METHOD-FUNCTION, the user code is in the fast function, so
          ;; we to disassemble both.
+         ;; FIXME: interpreted methods need to be compiled as above.
          (list thing (sb!pcl::%method-function-fast-function thing)))
         ((functionp thing)
          thing)
@@ -1592,7 +1600,6 @@
               code-component))
          (dstate (make-dstate))
          (segments (get-code-segments code-component)))
-    (determine-opcode-bounds segments dstate)
     (when use-labels
       (label-segments segments dstate))
     (disassemble-segments segments stream dstate)))
@@ -1606,16 +1613,12 @@
 
 ;;; Disassemble the machine code instructions associated with
 ;;; ASSEM-SEGMENT (of type assem:segment).
-;;; The logic to determine opcode bounds is the same as for the above cases,
-;;; which is unfortunately Rube-Goldberg-esque here, as the assembler knows the
-;;; bounds, but has already combined multiple segments. This could be improved.
 (defun disassemble-assem-segment (assem-segment stream)
   (declare (type sb!assem:segment assem-segment)
            (type stream stream))
   (let ((dstate (make-dstate))
         (disassem-segments
          (list (assem-segment-to-disassem-segment assem-segment))))
-    (determine-opcode-bounds disassem-segments dstate)
     (label-segments disassem-segments dstate)
     (disassemble-segments disassem-segments stream dstate)))
 

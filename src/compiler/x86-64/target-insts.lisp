@@ -83,8 +83,16 @@
                             addr dstate width))
                         (sb!disassem:maybe-note-assembler-routine
                          addr nil dstate)
-                        ;; lacking anything better, show the absolute address
-                        (sb!disassem:note (format nil "[#x~x]" addr) dstate))))))
+                        ;; Show the absolute address and maybe the contents.
+                        (sb!disassem:note
+                         (format nil "[#x~x]~@[ = ~x~]"
+                                 addr
+                                 (case width
+                                  (:qword (unboxed-constant-ref
+                                           dstate
+                                           (+ (sb!disassem:dstate-next-offs
+                                               dstate) offset)))))
+                         dstate))))))
             (firstp
                (sb!disassem:princ16 offset stream)
                (or (minusp offset)
@@ -129,121 +137,16 @@
                  (format stream "thread.~(~A~)" (slot-name slot)))
                dstate))))))))
 
-(in-package "SB!DISASSEM")
+(defun unboxed-constant-ref (dstate segment-offset)
+  (let* ((seg (sb!disassem:dstate-segment dstate))
+         (code-offset
+          (sb!disassem::segment-offs-to-code-offs segment-offset seg))
+         (unboxed-range (sb!disassem::seg-unboxed-data-range seg)))
+    (and unboxed-range
+         (<= (car unboxed-range) code-offset (cdr unboxed-range))
+         (sb!disassem::sap-ref-int
+          (sb!disassem:dstate-segment-sap dstate)
+          segment-offset
+          n-word-bytes
+          (sb!disassem::dstate-byte-order dstate)))))
 
-;; Pre-scan a disassembly segment list to find heuristically the start of
-;; unboxed constants. This isn't done for disassembly of arbitrary memory,
-;; only for Lisp code because that is known to obey the convention that
-;; RIP-relative accesses having positive displacement are to unboxed constants.
-;; For each reference, record its length so that it will subsequently
-;; display the proper number of bytes.
-
-;; FIXME: I really think it ought to be possible to cut down to 2 passes
-;; from the current three passes that are made over each segment
-;; (one to determine opcode bounds, one to label, one to display).
-;; If, on the labeling pass, we just stop looking at bytes when encountering
-;; an address that intersects a known unboxed data ref, then we're done.
-(defun determine-opcode-bounds (seglist dstate)
-  (flet ((mem-ref (displacement size more-segments)
-           (let ((seg (dstate-segment dstate))
-                 ;; compute a segment-relative address of the constant
-                 (ref-offset (+ (dstate-next-offs dstate) displacement)))
-             ;; Terminate MAP-SEGMENT-INSTRUCTIONS early for this segment
-             (setf (seg-opcodes-length seg)
-                   (min ref-offset (seg-opcodes-length seg)))
-             ;; And for following segments.
-             (let ((code-offset (segment-offs-to-code-offs ref-offset seg)))
-               (dolist (seg more-segments)
-                 (setf (seg-opcodes-length seg)
-                       (min (code-offs-to-segment-offs code-offset seg)
-                            (seg-opcodes-length seg)))))
-             ;; Store the segment-relative address of the reference.
-             ;; There should not be duplicate references with different sizes.
-             (unless (member ref-offset (seg-unboxed-refs seg) :key #'car)
-               (push (cons ref-offset size) (seg-unboxed-refs seg))))))
-    (do* ((sink (make-broadcast-stream))
-          (tail seglist (cdr tail))
-          (seg (car tail) (car tail)))
-         ((endp tail))
-      (setf (dstate-get-prop dstate :rip-relative-mem-ref-hook)
-            (lambda (displacement size)
-              (when (plusp displacement) ; displacement forward from RIP
-                (mem-ref displacement size (cdr tail)))))
-      (let (last-inst-start-ofs last-inst-end-ofs)
-        ;; Scan the segment for memory references by "printing",
-        ;; which will invoke PRINT-MEM-REF as appropriate.
-        (map-segment-instructions
-           (lambda (chunk inst)
-             (declare (type dchunk chunk) (type instruction inst))
-             (let ((printer (inst-printer inst)))
-               (when printer
-                 (funcall printer chunk inst sink dstate)))
-             (setf last-inst-start-ofs (dstate-cur-offs dstate)
-                   last-inst-end-ofs (1- (dstate-next-offs dstate))))
-           seg dstate)
-        ;; Decrease the length further if the last instruction can't be
-        ;; completely decoded without crossing into the unboxed constants.
-        ;; It's probably zero-fill. "ADD [RAX],AL" encodes as {0,0}
-        ;; and is the most likely reason to chop one byte and stop.
-        (unless (< last-inst-end-ofs (seg-opcodes-length seg))
-          (let ((n-skip (- (seg-opcodes-length seg) last-inst-start-ofs)))
-            (setf (seg-opcodes-length seg) last-inst-start-ofs
-                  (seg-opcode-trailer-length seg) n-skip))))))
-  (setf (dstate-get-prop dstate :rip-relative-mem-ref-hook) nil))
-
-(defun disassemble-unboxed-data (segment stream dstate)
-  (unless (< (dstate-cur-offs dstate) (seg-length segment))
-    (return-from disassemble-unboxed-data))
-  (aver (= (dstate-cur-offs dstate) (seg-opcodes-length segment)))
-  ;; Remove refs at addresses outside this segment and sort whatever remains.
-  (let ((refs (sort (remove-if (lambda (x) (< (car x) (dstate-cur-offs dstate)))
-                               (seg-unboxed-refs segment))
-                    #'< :key #'car)))
-    (flet ((hexdump (nbytes)
-             (print-current-address stream dstate)
-             (print-inst nbytes stream dstate)
-             (incf (dstate-cur-offs dstate) nbytes)))
-      ;; Demarcate just before the first byte of 0-fill (if any) rather than at
-      ;; the first location which was referenced as data, because it looks
-      ;; nicer to have no incomplete instructions prior to that,
-      ;; though some may spuriously decode as a legal sequence of zero bytes.
-      ;; e.g. on x86-64 the shortest valid sequence is two zeros, so we'll never
-      ;; decode one zero as an instruction, but will instead show it as a pad.
-      (format stream "~&; Unboxed data:")
-      (let ((n-skip (seg-opcode-trailer-length segment)))
-        (when (plusp n-skip)
-          (hexdump n-skip)))
-      ;; The way to guarantee we have the exact 'data-start' is to track refs
-      ;; from all disassembly segments to all others. This is not trivial,
-      ;; so not implemented.
-      (let ((data-start (caar refs)))
-        (when (and data-start (> data-start (dstate-cur-offs dstate)))
-          ;; Padding follows the last decoded instruction
-          (hexdump (- data-start (seg-opcodes-length segment)))))
-      ;; Print all bytes of each unboxed memory reference on a line.
-      (loop
-         (when (>= (dstate-cur-offs dstate)
-                   (seg-length (dstate-segment dstate)))
-           (return))
-         (let* ((size (cdar refs)) ; a keyword designating the operand-size
-                (nbytes (if size (sb!vm::size-nbyte size))))
-           ;; Dump until the next unboxed ref not to exceed seg-length.
-           ;; XMM register operations invoke PRINT-MEM-REF with WIDTH=NIL but
-           ;; in anticipation of possibly loading a vector register (YMM,ZMM)
-           ;; with adjacent packed constants, the REFS list is advanced only
-           ; when cur-offs is beyond the current ref.
-           (cond (nbytes
-                  ;; assert that we don't run past the next ref.
-                  (aver (or (endp (cdr refs))
-                            (<= (+ (dstate-cur-offs dstate) nbytes)
-                                (caadr refs))))
-                  (hexdump nbytes))
-                 (t
-                  (hexdump
-                   (min (if (cdr refs)
-                            (- (caadr refs) (dstate-cur-offs dstate))
-                            16) ; for lack of anything better
-                        (- (seg-length (dstate-segment dstate))
-                           (dstate-cur-offs dstate))))))) ; clip to seg
-         (when (and (cdr refs) (>= (dstate-cur-offs dstate) (caadr refs)))
-           (pop refs))))))
