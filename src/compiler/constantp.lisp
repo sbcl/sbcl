@@ -13,8 +13,12 @@
 
 (!begin-collecting-cold-init-forms)
 
-(defvar **special-form-constantp-tests**)
+(defglobal **special-form-constantp-tests** nil)
+#-sb-xc-host
 (declaim (type hash-table **special-form-constantp-tests**))
+;; FIXME: inlined FIND in a simple-vector of 8 things seems to perform
+;; roughly twice as fast as GETHASH when optimized for speed.
+;; Even for as many as 16 things it would be faster.
 (!cold-init-forms
   (setf **special-form-constantp-tests** (make-hash-table)))
 
@@ -135,8 +139,12 @@ constantness of the FORM in ENVIRONMENT."
 ;;;; analysis to assignments then other forms must take this
 ;;;; into account.
 
-(defmacro defconstantp (operator lambda-list &key test eval)
-  (with-unique-names (form environment envp)
+(defmacro !defconstantp (operator lambda-list &key test eval)
+  (let ((test-fn (symbolicate "CONSTANTP-TEST$" operator))
+        (eval-fn (symbolicate "CONSTANTP-EVAL$" operator))
+        (form (make-symbol "FORM"))
+        (environment (make-symbol "ENV"))
+        (envp (make-symbol "ENVP")))
     (flet ((frob (body)
              `(flet ((constantp* (x)
                        (%constantp x ,environment ,envp))
@@ -152,20 +160,17 @@ constantness of the FORM in ENVIRONMENT."
                                          lambda-list)))
                    ,body))))
       `(progn
-         (setf (gethash ',operator **special-form-constantp-tests**)
-               (cons (named-lambda ,(format nil "CONSTANTP-TEST-~A" operator)
-                                   (,form ,environment ,envp)
-                       ,(frob test))
-                     (named-lambda ,(format nil "CONSTANTP-EVAL-~A" operator)
-                                   (,form ,environment ,envp)
-                       ,(frob eval))))))))
+         (defun ,test-fn (,form ,environment ,envp) ,(frob test))
+         (defun ,eval-fn (,form ,environment ,envp) ,(frob eval))
+         (!cold-init-forms
+          (setf (gethash ',operator **special-form-constantp-tests**)
+                (cons #',test-fn #',eval-fn)))))))
 
-(!cold-init-forms
- (defconstantp quote (value)
+(!defconstantp quote (value)
    :test t
    :eval value)
 
- (defconstantp if (test then &optional else)
+(!defconstantp if (test then &optional else)
    :test
    (and (constantp* test)
         (constantp* (if (constant-form-value* test)
@@ -175,15 +180,15 @@ constantness of the FORM in ENVIRONMENT."
              (constant-form-value* then)
              (constant-form-value* else)))
 
- (defconstantp progn (&body forms)
+(!defconstantp progn (&body forms)
    :test (every #'constantp* forms)
    :eval (constant-form-value* (car (last forms))))
 
- (defconstantp unwind-protect (protected-form &body cleanup-forms)
+(!defconstantp unwind-protect (protected-form &body cleanup-forms)
    :test (every #'constantp* (cons protected-form cleanup-forms))
    :eval (constant-form-value* protected-form))
 
- (defconstantp the (type form)
+(!defconstantp the (type form)
    ;; We can't call TYPEP because the form might be (THE (FUNCTION (t) t) #<fn>)
    ;; which is valid for declaration but not for discrimination.
    ;; Instead use %%TYPEP in non-strict mode. FIXME:
@@ -207,7 +212,7 @@ constantness of the FORM in ENVIRONMENT."
                 (error () nil)))
    :eval (constant-form-value* form))
 
- (defconstantp block (name &body forms)
+(!defconstantp block (name &body forms)
    ;; We currently fail to detect cases like
    ;;
    ;; (BLOCK FOO
@@ -219,11 +224,11 @@ constantness of the FORM in ENVIRONMENT."
    :test (every #'constantp* forms)
    :eval (constant-form-value* (car (last forms))))
 
- (defconstantp multiple-value-prog1 (first-form &body forms)
+(!defconstantp multiple-value-prog1 (first-form &body forms)
    :test (every #'constantp* (cons first-form forms))
    :eval (constant-form-value* first-form))
 
- (defconstantp progv (symbols values &body forms)
+(!defconstantp progv (symbols values &body forms)
    :test (and (constantp* symbols)
               (constantp* values)
               (let* ((symbol-values (constant-form-value* symbols))
@@ -236,7 +241,7 @@ constantness of the FORM in ENVIRONMENT."
    :eval (progv
              (constant-form-value* symbols)
              (constant-form-value* values)
-           (constant-form-value* (car (last forms))))))
+           (constant-form-value* (car (last forms)))))
 
 (!defun-from-collected-cold-init-forms !constantp-cold-init)
 
