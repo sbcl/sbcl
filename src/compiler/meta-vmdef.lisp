@@ -1662,7 +1662,7 @@
                           (when (equalp other-val my-val)
                             (return-from find-equalp other-val))))
                       *backend-template-names*)
-             (unless (listp my-val)
+             (unless (and (listp my-val) (vectorp (car my-val)))
                (return-from find-equalp my-val))
              (mapl (lambda (cell)
                      (let ((my-vector (car cell)))
@@ -1678,14 +1678,19 @@
                    (copy-list my-val))))) ; was a quoted constant, don't mutate
     (macrolet ((try-coalescing (accessor)
                  `(setf (,accessor vop-info) (find-equalp #',accessor))))
+      (try-coalescing vop-info-arg-types)
       (try-coalescing vop-info-arg-costs)
       (try-coalescing vop-info-arg-load-scs)
+      (try-coalescing vop-info-result-types)
       (try-coalescing vop-info-result-costs)
       (try-coalescing vop-info-result-load-scs)
       (try-coalescing vop-info-more-arg-costs)
-      (try-coalescing vop-info-more-result-costs))
-    (setf (gethash (vop-info-name vop-info) *backend-template-names*)
-          vop-info)))
+      (try-coalescing vop-info-more-result-costs)
+      (try-coalescing vop-info-temps)
+      (try-coalescing vop-info-ref-ordering)
+      (try-coalescing vop-info-targets)))
+  (setf (gethash (vop-info-name vop-info) *backend-template-names*)
+        vop-info))
 
 ;;;; emission macros
 
