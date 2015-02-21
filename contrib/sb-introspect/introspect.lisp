@@ -137,15 +137,17 @@ FBOUNDP."
 (defun find-vop-source (name)
   (let* ((templates (vop-sources-from-fun-templates name))
          (vop (gethash name sb-c::*backend-template-names*))
-         (source (and vop
-                      (find-definition-source
-                       (sb-c::vop-info-generator-function vop)))))
-    (when source
-      (setf (definition-source-description source)
-            (list name)))
-    (if source
-        (cons source templates)
-        templates)))
+         (generator (when vop
+                      (sb-c::vop-info-generator-function vop)))
+         (source (when generator
+                   (find-definition-source generator))))
+    (cond
+      (source
+       (setf (definition-source-description source)
+             (list name))
+       (cons source templates))
+      (t
+       templates))))
 
 (defun find-definition-sources-by-name (name type)
   "Returns a list of DEFINITION-SOURCEs for the objects of type TYPE

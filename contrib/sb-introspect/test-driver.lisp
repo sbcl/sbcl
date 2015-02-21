@@ -43,6 +43,15 @@
            '(x))
   t)
 
+;; The CHECK-TYPE vop does not have a generator function. Make sure
+;; (find-definition-sources-by-name 'check-type :vop) returns NIL
+;; instead of signaling an error.
+(deftest definition-source.1
+    (values (find-definition-sources-by-name 'check-type :vop)
+            (definition-source-plist
+                (find-definition-sources-by-name 'check-type :macro)))
+  nil nil)
+
 (deftest definition-source-plist.1
     (let* ((source (find-definition-source #'cl-user::one))
            (plist (definition-source-plist source))
