@@ -1095,6 +1095,17 @@
                                    :type t
                                    :identity ,identity)
            ,@(nreverse reversed-prints))))))
+
+(defun print-symbol-with-prefix (stream symbol colon at)
+  #!+sb-doc
+  "For use with ~/: Write SYMBOL to STREAM as if it is not accessible from
+  the current package."
+  (declare (ignore colon at))
+  ;; Only keywords should be accessible from the keyword package, and
+  ;; keywords are always printed with colons, so this guarantees that the
+  ;; symbol will not be printed without a prefix.
+  (let ((*package* *keyword-package*))
+    (write symbol :stream stream :escape t)))
 
 ;;;; etc.
 
@@ -1183,51 +1194,72 @@
 ;;; - SB-THREAD:JOIN-THREAD-ERROR-THREAD, since 1.0.29.17 (06/2009)     -> Final: 09/2012
 ;;; - SB-THREAD:INTERRUPT-THREAD-ERROR-THREAD since 1.0.29.17 (06/2009) -> Final: 06/2012
 
-(defmacro define-deprecated-function (state since name replacements lambda-list &body body)
+(deftype deprecation-state ()
+  '(member :early :late :final))
+
+(defmacro define-deprecated-function (state since name replacements lambda-list
+                                      &body body)
+  (declare (type deprecation-state state)
+           (type string since)
+           (type function-name name)
+           (type (or function-name list) replacements)
+           (type list lambda-list))
   (let* ((replacements (normalize-deprecation-replacements replacements))
          #!+sb-doc
          (doc
-           (let ((*package* (find-package :keyword))
-                 (*print-pretty* nil))
-             (apply #'format nil
-                    "~S has been deprecated as of SBCL ~A.~
-                    ~#[~;~2%Use ~S instead.~;~2%~
-                            Use ~S or ~S instead.~:;~2%~
-                            Use~@{~#[~; or~] ~S~^,~} instead.~]"
-                    name since replacements))))
-    `(progn
-       ,(ecase state
-          ((:early :late)
-           `(progn
-              (defun ,name ,lambda-list
+          (apply #'format nil
+                 "~/sb-impl:print-symbol-with-prefix/ has been ~
+                  deprecated as of SBCL ~A.~
+                  ~#[~;~
+                    ~2%Use ~/sb-impl:print-symbol-with-prefix/ instead.~;~
+                    ~2%Use ~/sb-impl:print-symbol-with-prefix/ or ~
+                    /sb-impl:print-symbol-with-prefix/ instead.~:;~
+                    ~2%Use~@{~#[~; or~] ~
+                    ~/sb-impl:print-symbol-with-prefix/~^,~} instead.~
+                  ~]"
+                 name since replacements)))
+    `(prog1
+         ,(ecase state
+            ((:early :late)
+             `(defun ,name ,lambda-list
                 #!+sb-doc ,doc
-                ,@body)))
-          ((:final)
-           `(progn
-              (declaim (ftype (function * nil) ,name))
-              (setf (fdefinition ',name)
-                    (deprecated-function ',name ',replacements ,since))
-              #!+sb-doc
-              (setf (documentation ',name 'function) ,doc))))
+                ,@body))
+            ((:final)
+             `(progn
+                (declaim (ftype (function * nil) ,name))
+                (setf (fdefinition ',name)
+                      (deprecated-function ,since ',name ',replacements))
+                #!+sb-doc
+                (setf (fdocumentation ',name 'function) ,doc)
+                ',name)))
        (setf (compiler-macro-function ',name)
              (deprecation-compiler-macro ,state ,since ',name ',replacements)))))
 
 (defun check-deprecated-variable (name)
   (let ((info (info :variable :deprecated name)))
     (when info
-      (deprecation-warning (car info) (cdr info) name nil))))
+      (deprecation-warning (first info) (second info) name (third info))
+      (values-list info))))
 
-(defmacro define-deprecated-variable (state since name &key (value nil valuep) replacement)
-  (declare (ignorable replacement))
-  `(progn
-     (setf (info :variable :deprecated ',name) (cons ,state ,since))
-     ,@(when (member state '(:early :late))
-         `((defvar ,name ,@(when valuep (list value))
-             #!+sb-doc
-             ,(let ((*package* (find-package :keyword)))
-                (format nil
-                        "~@<~S has been deprecated as of SBCL ~A~@[, use ~S instead~].~:>"
-                        name since replacement)))))))
+(defmacro define-deprecated-variable (state since name
+                                      &key (value nil valuep) replacement)
+  (declare (ignorable replacement)
+           (type deprecation-state state)
+           (type string since)
+           (type symbol name))
+  `(prog2
+       (setf (info :variable :deprecated ',name)
+             '(,state ,since ,(when replacement `(,replacement))))
+       ,(if (member state '(:early :late))
+            `(defvar ,name ,@(when valuep (list value)))
+            `',name)
+     #!+sb-doc
+     (setf (fdocumentation ',name 'variable)
+           ,(format nil "~@<~/sb-impl:print-symbol-with-prefix/ has ~
+                         been deprecated as of SBCL ~A.~@[~2% Use ~
+                         ~/sb-impl:print-symbol-with-prefix/ ~
+                         instead~].~:>"
+                    name since replacement))))
 
 ;;; Anaphoric macros
 (defmacro awhen (test &body body)

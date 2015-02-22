@@ -17,6 +17,14 @@
 
 (declaim (maybe-inline get get3 %put getf remprop %putf get-properties keywordp))
 
+#-sb-xc-host
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (defun handle-deprecated-global-variable (name)
+    (multiple-value-bind (state since replacements)
+        (check-deprecated-variable name)
+      (when (eq state :final)
+        `(deprecation-error ,since ',name '(,@replacements))))))
+
 (defun symbol-value (symbol)
   #!+sb-doc
   "Return SYMBOL's current bound value."
@@ -27,8 +35,8 @@
 (define-compiler-macro symbol-value (&whole form symbol &environment env)
   (when (sb!xc:constantp symbol env)
     (let ((name (constant-form-value symbol env)))
-      (when (symbolp name)
-        (check-deprecated-variable name))))
+      (awhen (and (symbolp name) (handle-deprecated-global-variable name))
+        (return-from symbol-value it))))
   form)
 
 (defun boundp (symbol)
@@ -53,6 +61,14 @@ in single-threaded builds: in multithreaded builds bound values are
 distinct from the global value. Can also be SETF."
   (declare (optimize (safety 1)))
   (symbol-global-value symbol))
+
+#-sb-xc-host
+(define-compiler-macro symbol-global-value (&whole form symbol &environment env)
+  (when (sb!xc:constantp symbol env)
+    (let ((name (constant-form-value symbol env)))
+      (awhen (and (symbolp name) (handle-deprecated-global-variable name))
+        (return-from symbol-global-value it))))
+  form)
 
 (defun set-symbol-global-value (symbol new-value)
   (about-to-modify-symbol-value symbol 'set new-value)

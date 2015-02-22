@@ -270,7 +270,7 @@
       (let ((kind (info :variable :kind name))
             (type (info :variable :type name))
             (where-from (info :variable :where-from name)))
-        (when (eq kind :unknown)
+        (when (and (eq kind :unknown) (not (check-deprecated-variable name)))
           (note-undefined-reference name :variable))
         (setf (gethash name *free-vars*)
               (case kind
@@ -689,24 +689,30 @@
                          `(symbol-value ',name)))
         (etypecase var
           (leaf
-           (when (lambda-var-p var)
-             (let ((home (ctran-home-lambda-or-null start)))
-               (when home
-                 (sset-adjoin var (lambda-calls-or-closes home))))
-             (when (lambda-var-ignorep var)
-               ;; (ANSI's specification for the IGNORE declaration requires
-               ;; that this be a STYLE-WARNING, not a full WARNING.)
-               #-sb-xc-host
-               (compiler-style-warn "reading an ignored variable: ~S" name)
-               ;; there's no need for us to accept ANSI's lameness when
-               ;; processing our own code, though.
-               #+sb-xc-host
-               (warn "reading an ignored variable: ~S" name)))
-           (when (global-var-p var)
-             (check-deprecated-variable name))
+           (cond
+             ((lambda-var-p var)
+              (let ((home (ctran-home-lambda-or-null start)))
+                (when home
+                  (sset-adjoin var (lambda-calls-or-closes home))))
+              (when (lambda-var-ignorep var)
+                ;; (ANSI's specification for the IGNORE declaration requires
+                ;; that this be a STYLE-WARNING, not a full WARNING.)
+                #-sb-xc-host
+                (compiler-style-warn "reading an ignored variable: ~S" name)
+                ;; there's no need for us to accept ANSI's lameness when
+                ;; processing our own code, though.
+                #+sb-xc-host
+                (warn "reading an ignored variable: ~S" name)))
+             (t
+              (multiple-value-bind (state since replacements)
+                  (check-deprecated-variable name)
+                (when (eq state :final)
+                  (ir1-convert
+                   start next result
+                   `(deprecation-error ,since ',name '(,@replacements)))
+                  (return-from ir1-convert-var (values))))))
            (reference-leaf start next result var name))
-          (cons
-           (aver (eq (car var) 'macro))
+          ((cons (eql macro)) ; symbol-macro
            ;; FIXME: [Free] type declarations. -- APD, 2002-01-26
            (ir1-convert start next result (cdr var)))
           (heap-alien-info
