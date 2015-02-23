@@ -433,7 +433,8 @@
                      (aver (eq name (class-name class)))
                      (unless (eq (class-of class) metaclass)
                        (apply #'change-class class metaclass initargs))
-                     (apply #'reinitialize-instance class initargs))))
+                     (apply #'reinitialize-instance class initargs)
+                     class)))
 
 ;;; This is used to call initfunctions of :allocation :class slots.
 (defun call-initfun (fun slotd safe)
