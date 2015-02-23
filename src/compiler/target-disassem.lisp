@@ -1687,36 +1687,25 @@
          t)
         (values nil nil))))
 
-(defstruct code-constant-raw value)
-(def!method print-object ((self code-constant-raw) stream)
-  ;; A raw code constant is never a Lisp object, so if it is a cons,
-  ;; then it's the address of raw data- mnemonic is that (x) is like [x].
-  ;; Ideally we would want to show is as [Label] and then label the
-  ;; corresponding unboxed data.
-  (if (listp (code-constant-raw-value self))
-      (format stream "[#x~x]" (car (code-constant-raw-value self)))
-      (format stream "#x~8,'0x" (code-constant-raw-value self))))
-
 (defun get-code-constant-absolute (addr dstate &optional width)
   (declare (type address addr))
   (declare (type disassem-state dstate))
+  (declare (ignore width))
   (let ((code (seg-code (dstate-segment dstate))))
     (if (null code)
       (return-from get-code-constant-absolute (values nil nil)))
+    ;; This WITHOUT-GCING, while not technically broken, is extremely deceptive
+    ;; because if it is really needed, then this function has a broken API.
+    ;; Since ADDR comes in as absolute, CODE must not move between the caller's
+    ;; computation and the comparison below. But we're already in WITHOUT-GCING
+    ;; in MAP-SEGMENT-INSTRUCTIONS, so, who cares, I guess?
     (sb!sys:without-gcing
      (let* ((n-header-bytes (* (sb!kernel:get-header-data code) sb!vm:n-word-bytes))
-            (n-code-bytes (sb!kernel:%code-code-size code))
             (header-addr (- (sb!kernel:get-lisp-obj-address code)
                             sb!vm:other-pointer-lowtag))
             (code-start (+ header-addr n-header-bytes)))
          (cond ((< header-addr addr code-start)
                 (values (sb!sys:sap-ref-lispobj (sb!sys:int-sap addr) 0) t))
-               ;; guess it's a non-descriptor constant from the instructions
-               ((and (eq width :qword)
-                     (< code-start addr (+ code-start n-code-bytes)))
-                (values (make-code-constant-raw
-                         :value (sb!sys:sap-ref-64 (sb!sys:int-sap addr) 0))
-                        t))
                (t
                 (values nil nil)))))))
 
