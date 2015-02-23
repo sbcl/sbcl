@@ -5487,3 +5487,9 @@
                                    (logior c (f nil)))))))
     (assert-error (funcall function 10)
                   type-error)))
+
+(with-test (:name :eql/integer-folding)
+  (assert-no-signal
+    (compile nil
+             '(lambda (a)
+                (fceiling (the (member 2.3 21672589639883401935) a))))))

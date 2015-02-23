@@ -233,6 +233,11 @@
   #!+sb-doc
   "Return T if OBJ1 and OBJ2 are the same object, otherwise NIL."
   (eq obj1 obj2))
+;;; and this too, but it's only needed for backends on which
+;;; IR1 might potentially transform EQL into %EQL/INTEGER.
+#!+integer-eql-vop
+(defun %eql/integer (obj1 obj2)
+  (eql (the integer obj1) (the integer obj2)))
 
 (declaim (inline %eql))
 (defun %eql (obj1 obj2)
