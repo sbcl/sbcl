@@ -1,5 +1,5 @@
 #!/bin/sh
-# Not a shell script, but something intended to be sourced from shell scripts
+
 git_available_p() {
     # Check that (1) we have git (2) this is a git tree.
     if ( which git >/dev/null 2>/dev/null && git describe >/dev/null 2>/dev/null )
@@ -89,4 +89,3 @@ else
         $version_branchname $version_n_branch \
         $version_hash $version_dirty >>version.lisp-expr
 fi
-
