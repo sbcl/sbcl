@@ -49,16 +49,16 @@
 ;;; Used internally, but it would be nice to provide something
 ;;; like this for users as well.
 ;;;
-;;; FIXME / IMPORTANT: If the slot is raw, the address is correct only for
+;;; FIXME / IMPORTANT: On backends without interleaved raw slots,
+;;  if the slot is raw, the address is correct only for
 ;;; instances of the specified class, not its subclasses!
 #!+sb-thread
 (defmacro define-structure-slot-addressor (name &key structure slot)
   (let* ((dd (find-defstruct-description structure t))
-         (slotd (when dd (find slot (dd-slots dd) :key #'dsd-name)))
-         (index (when slotd (dsd-index slotd)))
-         (raw-type (dsd-raw-type slotd)))
-    (unless index
-      (error "Slot ~S not found in ~S." slot structure))
+         (slotd (or (and dd (find slot (dd-slots dd) :key #'dsd-name))
+                    (error "Slot ~S not found in ~S." slot structure)))
+         (index (dsd-index slotd))
+         #!-interleaved-raw-slots (raw-type (dsd-raw-type slotd)))
     `(progn
        (declaim (inline ,name))
        (defun ,name (instance)
@@ -66,13 +66,16 @@
          (truly-the
           word
           (+ (get-lisp-obj-address instance)
-             (- (* ,(if (eq t raw-type)
+             ,(+ (- sb!vm:instance-pointer-lowtag)
+                 #!+interleaved-raw-slots
+                 (* (+ sb!vm:instance-slots-offset index) sb!vm:n-word-bytes)
+                 #!-interleaved-raw-slots
+                 (* (if (eq t raw-type)
                         (+ sb!vm:instance-slots-offset index)
                         (- (1+ (sb!kernel::dd-instance-length dd))
                            sb!vm:instance-slots-offset index
                            (1- (sb!kernel::raw-slot-words raw-type))))
-                   sb!vm:n-word-bytes)
-                sb!vm:instance-pointer-lowtag)))))))
+                    sb!vm:n-word-bytes))))))))
 
 ;;;; ATOMIC-INCF and ATOMIC-DECF
 

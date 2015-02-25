@@ -136,3 +136,27 @@
   ;; has a word of junk in its padding slot, as could happen
   ;; if the structure was stack-allocated (I think)
   (assert (equalp *anotherfoo* *afoo*)))
+
+(defstruct foo
+  a
+  (w 0 :type sb-ext:word)
+  b
+  (cdf #c(0d0 0d0) :type (complex double-float))
+  c)
+(sb-kernel:define-structure-slot-addressor
+ foo-w-ptr :structure foo :slot w)
+(sb-kernel:define-structure-slot-addressor
+ foo-cdf-ptr :structure foo :slot cdf)
+
+(with-test (:name :define-structure-slot-addressor)
+  (let* ((word (logand sb-ext:most-positive-word #xfeedbad))
+         (re 4.2d58)
+         (im 8.93d-10)
+         (thing (make-foo :cdf (complex re im) :w word)))
+     (sb-sys:with-pinned-objects (thing)
+      (assert (= word (sb-sys:sap-ref-word
+                       (sb-sys:int-sap (foo-w-ptr thing)) 0)))
+      (assert (= re (sb-sys:sap-ref-double
+                     (sb-sys:int-sap (foo-cdf-ptr thing)) 0)))
+      (assert (= im (sb-sys:sap-ref-double
+                     (sb-sys:int-sap (foo-cdf-ptr thing)) 8))))))
