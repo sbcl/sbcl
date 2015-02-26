@@ -52,7 +52,6 @@
 ;;; FIXME / IMPORTANT: On backends without interleaved raw slots,
 ;;  if the slot is raw, the address is correct only for
 ;;; instances of the specified class, not its subclasses!
-#!+sb-thread
 (defmacro define-structure-slot-addressor (name &key structure slot)
   (let* ((dd (find-defstruct-description structure t))
          (slotd (or (and dd (find slot (dd-slots dd) :key #'dsd-name))
