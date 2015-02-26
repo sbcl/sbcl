@@ -5489,7 +5489,8 @@
                   type-error)))
 
 (with-test (:name :eql/integer-folding)
-  (assert-no-signal
+  (multiple-value-bind (f warning)
     (compile nil
              '(lambda (a)
-                (fceiling (the (member 2.3 21672589639883401935) a))))))
+                (fceiling (the (member 2.3 21672589639883401935) a))))
+   (assert (and f (not warning)))))
