@@ -521,8 +521,12 @@ attach_os_thread(init_thread_data *scribble)
     stack_size = pthread_get_stacksize_np(os);
 #else
     pthread_attr_t attr;
+#if defined(__FreeBSD__)
+    pthread_attr_get_np(os, &attr);
+#else
     int pthread_getattr_np(pthread_t, pthread_attr_t *);
     pthread_getattr_np(os, &attr);
+#endif
     pthread_attr_getstack(&attr, &stack_addr, &stack_size);
 #endif
 
