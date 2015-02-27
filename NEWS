@@ -1,5 +1,5 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
-changes relative to sbcl-1.2.8:
+changes in sbcl-1.2.9 relative to sbcl-1.2.8:
   * minor incompatible change and bug fix: unboxed numeric constants
     on x86oids are arranged in memory differently, and the disassembler
     does not show them separately in DISASSEMBLE, but does
