@@ -515,6 +515,16 @@ has written, having proved that it is unreachable."))
 ;;; WITH-COMPILATION-UNIT, which can potentially be invoked outside
 ;;; the compiler, hence the BOUNDP check.
 (defun note-undefined-reference (name kind)
+  ;; A convenience: in the cross-compiler, assume that any function
+  ;; in any SB! package will eventually be defined.
+  ;; This may be untrue, but is true enough that it correctly muffles
+  ;; far more warnings than it incorrectly muffles (if any).
+  ;; Warnings about failure to inline will still be shown.
+  #+sb-xc-host
+  (when (eq kind :function)
+    (let ((package (symbol-package (fun-name-block-name name))))
+      (when (= (mismatch (string (package-name package)) "SB!") 3)
+        (return-from note-undefined-reference (values)))))
   (unless (and
            ;; Check for boundness so we don't blow up if we're called
            ;; when IR1 conversion isn't going on.

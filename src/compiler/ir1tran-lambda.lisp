@@ -412,6 +412,9 @@
                 (let ((bindings (default-bindings))
                       (call
                        `(locally
+                         ;; See lengthy comment at top of 'seqtran'
+                         ;; as to why muffling is not done during xc.
+                            #-sb-xc-host
                             (declare (muffle-conditions code-deletion-note))
                           (%funcall ,fun ,@(reverse vals) ,@(default-vals)))))
                   (ir1-convert-lambda-body (if bindings

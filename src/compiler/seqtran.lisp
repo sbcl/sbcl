@@ -10,6 +10,27 @@
 ;;;; files for more information.
 
 (in-package "SB!C")
+
+;;; Regarding several reader-conditionalized MUFFLE-CONDITION declarations
+;;; throughout this file, here's why: Transforms produce sexprs that as far
+;;; as the compiler is concerned could have been user-supplied.
+;;; In as much as the forms mention a type-name, that name had best be
+;;; recognized, or else it's a style-warning (or worse).
+;;; And in cross-compilation, COMPILER-NOTE isn't known early enough for
+;;; the transforms in this file to refer to a known type.
+;;; But mysteriously the xc would report a style-warning about COMPILER-NOTE
+;;; - or any descendant - being unknown, and then go on with life.
+;;; How was this possible? Well, it's only trying to _parse_ the type
+;;; on account of the declarations saying to muffle things of that type.
+;;; Indeed the declaration merits a warning.
+;;; But this is an extremely sad and confusing state of affairs,
+;;; because while we expect some CODE-DELETION-NOTEs, we don't expect to see
+;;; that CODE-DELETION-NOTE is an undefined type.
+;;; Alternatively, we could invent DEFINE!-CONDITION which would cause
+;;; the cross-compiler to be born knowing all the required types.
+;;; Moreover, it would be nice if some of the declarations were commented
+;;; with their reason for existence.
+
 
 ;;;; mapping onto lists: the MAPFOO functions
 
@@ -52,7 +73,11 @@
               (let ((temp (gensym))
                     (map-result (gensym)))
                 `(let ((,map-result
-                        (locally (declare (muffle-conditions compiler-note))
+                        ;; MUFFLE- is not injected when cross-compiling.
+                        ;; See top of file for explanation.
+                        (locally
+                            #-sb-xc-host
+                            (declare (muffle-conditions compiler-note))
                           (list nil))))
                    (declare (truly-dynamic-extent ,map-result))
                    (do-anonymous ((,temp ,map-result) . ,(do-clauses))
@@ -62,7 +87,11 @@
               (let ((temp (gensym))
                     (map-result (gensym)))
                 `(let ((,map-result
-                        (locally (declare (muffle-conditions compiler-note))
+                        ;; MUFFLE- is not injected when cross-compiling.
+                        ;; See top of file for explanation.
+                        (locally
+                            #-sb-xc-host
+                            (declare (muffle-conditions compiler-note))
                           (list nil))))
                    (declare (truly-dynamic-extent ,map-result))
                    (do-anonymous ((,temp ,map-result) . ,(do-clauses))
@@ -1351,6 +1380,7 @@
                                    `(sb!impl::string-dispatch ((simple-array * (*))
                                                                sequence)
                                                               ,var
+                                      #-sb-xc-host
                                       (declare (muffle-conditions compiler-note))
                                       (length ,var)))))
                (non-constant-start
@@ -1366,7 +1396,7 @@
                      (.pos. ,non-constant-start)
                      (.string. (make-string .length. :element-type ',element-type)))
                 (declare (type index .length. .pos.)
-                         (muffle-conditions compiler-note)
+                         #-sb-xc-host (muffle-conditions compiler-note)
                          (ignorable .pos.))
                 ,@(loop with constants = -1
                         for first = t then nil

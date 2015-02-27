@@ -71,14 +71,6 @@
 (setf *in-target-compilation-mode-fn* #'in-target-cross-compilation-mode)
 
 ;;; Run the cross-compiler to produce cold fasl files.
-;; This suppresses ~6000 lines of "undefined function" warnings from the
-;; cross-compiler stemming from the calls to INSTANCE-TYPEP that occur before
-;; src/code/class gets compiled. It magically converts efficiently,
-;; but IR1 is a little bit naive about how it happens.
-(dolist (f '(sb!kernel:layout-depthoid
-             sb!kernel:layout-inherits))
-  (setf (sb!int:info :function :kind f) :function
-        (sb!int:info :function :where-from f) :declared))
 ;; ... and since the cross-compiler hasn't seen a DEFMACRO for QUASIQUOTE,
 ;; make it think it has, otherwise it fails more-or-less immediately.
 (setf (sb!int:info :function :kind 'sb!int:quasiquote) :macro
