@@ -609,7 +609,10 @@ collection."
         ;; BODY is stuffed in a function to preserve the lexical
         ;; environment.
         `(flet ((,wpo () (progn ,@body)))
-           (declare (muffle-conditions compiler-note))
+           ;; The cross-compiler prints either "unknown type: COMPILER-NOTE" at
+           ;; each use of W-P-O prior to 'ir1report' being compiled, or else
+           ;; "could not stack allocate". Kill it with fire :-(
+           (declare (muffle-conditions #+sb-xc compiler-note #-sb-xc t))
            ;; PINS are dx-allocated in case the compiler for some
            ;; unfathomable reason decides to allocate value-cells
            ;; for them -- since we have DX value-cells on x86oid

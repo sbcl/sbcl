@@ -105,7 +105,6 @@
        (defmacro layout-raw-slot-metadata (x) `(layout-untagged-bitmap ,x)))
 
 ;; information about how a slot of a given DSD-RAW-TYPE is to be accessed
-(eval-when (:compile-toplevel :load-toplevel :execute)
 (defstruct (raw-slot-data
             (:copier nil)
             (:predicate nil))
@@ -124,11 +123,14 @@
   ;; themselves are aligned by exactly two words, so specifying more
   ;; than two words here would not work.
   (alignment 1 :type (integer 1 2) :read-only t)
-  (comparer (missing-arg) :type function :read-only t)))
+  (comparer (missing-arg) :type function :read-only t))
 
 #!-sb-fluid (declaim (freeze-type raw-slot-data))
 
-(defglobal *raw-slot-data-list*
+;; Simulate DEFINE-LOAD-TIME-GLOBAL - always bound in the image
+;; but not eval'd in the compiler.
+(defglobal *raw-slot-data-list* nil)
+(setq *raw-slot-data-list*
   (macrolet ((make-comparer (accessor-name)
                ;; Not a symbol, because there aren't any so-named functions.
                `(named-lambda ,(string (symbolicate accessor-name "="))
