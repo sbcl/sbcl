@@ -776,6 +776,10 @@ core and return a descriptor to it."
       (write-wordindexed result (+ index sb!vm:vector-data-offset)
                          (pop objects)))
     result))
+(defun cold-svset (vector index value)
+  (write-wordindexed vector
+                     (+ (descriptor-fixnum index) sb!vm:vector-data-offset)
+                     value))
 
 (defun vector-from-core (descriptor transform)
   (let* ((len (descriptor-fixnum
@@ -896,6 +900,8 @@ core and return a descriptor to it."
                       (descriptor symbol-or-symbol-des)
                       (symbol (cold-intern symbol-or-symbol-des)))))
     (write-wordindexed symbol-des sb!vm:symbol-value-slot value)))
+(defun cold-symbol-value (symbol)
+  (read-wordindexed (cold-intern symbol) sb!vm:symbol-value-slot))
 
 ;;;; layouts and type system pre-initialization
 
@@ -958,7 +964,8 @@ core and return a descriptor to it."
     (let ((slots (dd-slots (layout-info host-layout))))
       (loop for (initarg value) on assignments by #'cddr
             do (write-wordindexed
-                cold-object (dsd-index-from-keyword initarg slots) value))))
+                cold-object (dsd-index-from-keyword initarg slots) value)))
+    cold-object)
 
   (defun read-slot (cold-object host-layout slot-initarg) ; not "name"
     (read-wordindexed cold-object
@@ -2419,20 +2426,47 @@ core and return a descriptor to it."
 
 (defvar *load-time-value-counter*)
 
-(define-cold-fop (fop-funcall)
-  (unless (= (read-byte-arg) 0)
-    (error "You can't FOP-FUNCALL arbitrary stuff in cold load."))
-  (let ((counter *load-time-value-counter*))
-    (cold-push (cold-cons
-                (cold-intern :load-time-value)
-                (cold-cons
-                 (pop-stack)
-                 (cold-cons
-                  (number-to-core counter)
-                  *nil-descriptor*)))
-               *current-reversed-cold-toplevels*)
-    (setf *load-time-value-counter* (1+ counter))
-    (make-descriptor 0 :load-time-value counter)))
+(flet ((pop-args ()
+         (let (args)
+           (dotimes (i (read-byte-arg)
+                       (if args (values (pop-fop-stack) args) (values nil nil)))
+             (push (pop-fop-stack) args)))))
+
+  (define-cold-fop (fop-funcall)
+    (multiple-value-bind (f args) (pop-args)
+      (when f
+        (return-from cold-fop-funcall
+          (case f
+           (fdefinition
+            ;; Special form #'F fopcompiles into `(FDEFINITION ,f)
+            (aver (and (singleton-p args) (symbolp (car args))))
+            (let ((f (read-wordindexed (cold-fdefinition-object (car args))
+                                       sb!vm:fdefn-fun-slot)))
+              ;; It works only if DEFUN F was seen first.
+              (aver (not (cold-null f)))
+              f))
+           (t
+            (error "Can't FUNCALL ~S in cold load" f))))))
+    (let ((counter *load-time-value-counter*))
+      (cold-push (cold-cons
+                  (cold-intern :load-time-value)
+                  (cold-cons
+                   (pop-stack)
+                   (cold-cons
+                    (number-to-core counter)
+                    *nil-descriptor*)))
+                 *current-reversed-cold-toplevels*)
+      (setf *load-time-value-counter* (1+ counter))
+      (make-descriptor 0 :load-time-value counter)))
+
+  (define-cold-fop (fop-funcall-for-effect)
+    (multiple-value-bind (f args) (pop-args)
+      (when f
+        (return-from cold-fop-funcall-for-effect
+          (acond ((eq f 'sb!impl::%defun) (apply #'cold-fset args))
+                 ((get f :sb-cold-funcall-handler) (apply it args))
+                 (t (error "Can't FUNCALL-FOR-EFFECT ~S in cold load" f))))))
+    (cold-push (pop-stack) *current-reversed-cold-toplevels*)))
 
 (defun finalize-load-time-value-noise ()
   (cold-set '*!load-time-values*
@@ -2441,17 +2475,6 @@ core and return a descriptor to it."
                                     *load-time-value-counter*
                                     sb!vm:simple-vector-widetag)))
 
-(define-cold-fop (fop-funcall-for-effect)
-  (let ((argc (read-byte-arg))
-        (args))
-    (when (plusp argc)
-      (dotimes (i argc) (push (pop-stack) args))
-      (let ((f (pop-stack)))
-        (ecase f
-         (sb!impl::%defun
-          (return-from cold-fop-funcall-for-effect
-                       (apply #'cold-fset args)))))))
-  (cold-push (pop-stack) *current-reversed-cold-toplevels*))
 
 ;;;; cold fops for fixing up circularities
 

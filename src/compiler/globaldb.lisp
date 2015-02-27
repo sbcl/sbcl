@@ -83,17 +83,6 @@
   (do ((n (logior x 1) (+ n 2)))
       ((positive-primep n) n)))
 
-;;;; info classes, info types, and type numbers, part I: what's needed
-;;;; not only at compile time but also at run time
-
-;;;; Note: This section is a blast from the past, a little trip down
-;;;; memory lane to revisit the weird host/target interactions of the
-;;;; CMU CL build process. Because of the way that the cross-compiler
-;;;; and target compiler share stuff here, if you change anything in
-;;;; here, you'd be well-advised to nuke all your fasl files and
-;;;; restart compilation from the very beginning of the bootstrap
-;;;; process.
-
 ;;; Why do we suppress the :COMPILE-TOPLEVEL situation here when we're
 ;;; running the cross-compiler? The cross-compiler (which was built
 ;;; from these sources) has its version of these data and functions
@@ -108,23 +97,14 @@
 (eval-when (#-sb-xc :compile-toplevel :load-toplevel :execute)
 
 ;;; a map from type numbers to TYPE-INFO objects. There is one type
-;;; number for each defined CLASS/TYPE pair.
-;;;
-;;; We build its value at build-the-cross-compiler time (with calls to
-;;; DEFINE-INFO-TYPE), then generate code to recreate the compile time
-;;; value, and arrange for that code to be called in cold load.
-;;; KLUDGE: We don't try to reset its value when cross-compiling the
-;;; compiler, since that creates too many bootstrapping problems,
-;;; instead just reusing the built-in-the-cross-compiler version,
-;;; which is theoretically a little bit ugly but pretty safe in
-;;; practice because the cross-compiler is as close to the target
-;;; compiler as we can make it, i.e. identical in most ways, including
-;;; this one. -- WHN 2001-08-19
+;;; number for each kind of info.
 (declaim (type (simple-vector #.(ash 1 type-number-bits)) *info-types*))
 (!defglobal *info-types*
             (make-array (ash 1 type-number-bits) :initial-element nil))
 
-(defstruct (type-info
+;; FIXME: really unclear name. It's an INFO-TYPE, not a TYPE-INFO.
+;;        But probably would be better as GLOBALDB-METAINFO or something.
+(def!struct (type-info
             #-no-ansi-print-object
             (:print-object (lambda (x s)
                              (print-unreadable-object (x s)
@@ -134,31 +114,33 @@
                                        (type-info-name x)
                                        (type-info-number x)))))
             (:constructor
-             make-globaldb-info-metadata (number class name type-spec))
+             !make-globaldb-info-metadata
+             (number class name type-spec
+              type-checker validate-function default))
             (:copier nil))
-  ;; the name of this type
-  (name nil :type keyword)
-  ;; this type's class
-  (class nil :type keyword)
   ;; a number that uniquely identifies this type (and implicitly its class)
-  (number nil :type type-number)
+  (number nil :type type-number :read-only t)
+  ;; 2-part key to this piece of metainfo
+  ;; FIXME: taxonomy by CLASS and TYPE is too confusing and overloaded.
+  ;;        and "name" is just wrong as neither half alone is the name.
+  (class nil :type keyword :read-only t)
+  (name nil :type keyword :read-only t)
   ;; a type specifier which info of this type must satisfy
-  (type-spec nil :type t)
-  ;; If FUNCTIONP, then a function called when there is no information of
-  ;; this type. If not FUNCTIONP, then any object serving as a default.
-  (default nil)
+  (type-spec nil :type t :read-only t)
   ;; Two functions called by (SETF INFO) before calling SET-INFO-VALUE.
-  ;; Regarding the type specifiers on these slots, I wanted to write them
-  ;; as (SFUNCTION (T) T) for documentation - and it elides the check for
-  ;; multiple values returned - but doing that causes failure building the
-  ;; cross-compiler under CMUCL 20c because it tries to call TYPEP on that,
-  ;; and complains that it can't.
   ;; 1. A function that type-checks its argument and returns it,
   ;;    or signals an error.
-  (type-checker #'identity :type function)
+  ;;    Some Lisps trip over their shoelaces trying to assert that
+  ;;    a function is (function (t) t). Our code is fine though.
+  (type-checker nil :type #+sb-xc-host function #-sb-xc-host (sfunction (t) t)
+                :read-only t)
   ;; 2. a function of two arguments, a name and new-value, which performs
   ;;    any other checks and/or side-effects including signaling an error.
-  (validate-function nil :type (or function null)))
+  (validate-function nil :type (or function null) :read-only t)
+  ;; If FUNCTIONP, then a function called when there is no information of
+  ;; this type. If not FUNCTIONP, then any object serving as a default.
+  (default nil)) ; shoud be :read-only t.  I have a fix for that.
+
 (declaim (freeze-type type-info))
 
 (defconstant +info-metainfo-type-num+ 0)
@@ -166,89 +148,78 @@
 ;; Perform the equivalent of (GET-INFO-VALUE sym +INFO-METAINFO-TYPE-NUM+)
 ;; but without the AVER that metadata already exists, and bypassing the
 ;; defaulting logic.
-(defun %get-type-info-metadata (sym)
-  (let* ((info-vector (symbol-info-vector sym))
-         (index (if info-vector
-                    (packed-info-value-index info-vector +no-auxilliary-key+
-                                             +info-metainfo-type-num+))))
-    (if index (svref info-vector index))))
+(defmacro !get-type-info-metadata (sym)
+  `(let* ((info-vector (symbol-info-vector ,sym))
+          (index (if info-vector
+                     (packed-info-value-index info-vector +no-auxilliary-key+
+                                              +info-metainfo-type-num+))))
+     (if index (svref info-vector index))))
 
-;; Find or create a TYPE-INFO object designated by CLASS- and TYPE-KEYWORD.
-;; If not found, the specified TYPE-NUM and TYPE-SPEC are used to
-;; initialize it. If TYPE-NUM is -1, the next available number is assigned.
-;; Return the new type-num.
-(defun register-info-metadata (type-num class-keyword type-keyword type-spec)
-    (let ((metainfo (find-type-info class-keyword type-keyword)))
-      (cond (metainfo) ; Do absolutely positively nothing.
-            (t
-             (when (eql type-num -1) ; pick a new type-num
-               ;; The zeroth type-num is reserved for INFO's own private use.
-               ;; +fdefn-type-num+ is also reserved and must be special-cased.
-               ;; Generalizing DEFINE-INFO-TYPE to optionally pass a type-number
-               ;; would also mean changing the fact that a specified number is
-               ;; used only for restoring *INFO-TYPES* during cold-init.
-               (setq type-num
-                     (or (if (and (eq class-keyword :function)
-                                  (eq type-keyword :definition))
-                             +fdefn-type-num+
-                             (position nil *info-types* :start 1))
-                         (error "no more INFO type numbers available"))))
-             (setf metainfo (make-globaldb-info-metadata
-                             type-num class-keyword type-keyword type-spec)
-                   (aref *info-types* type-num) metainfo)
-             (let ((list (%get-type-info-metadata type-keyword)))
-               (set-info-value
-                type-keyword +info-metainfo-type-num+
-                (cond ((not list) metainfo) ; unique, just store it
-                      ((listp list) (cons metainfo list)) ; prepend to the list
-                      (t (list metainfo list))))))) ; convert atom to a list
-      (type-info-number metainfo)))
-
-;; If CLASS-KEYWORD/TYPE-KEYWORD designate an info-type,
-;; return the corresponding TYPE-INFO object, otherwise NIL.
-(defun find-type-info (class-keyword type-keyword)
-    (declare (type keyword class-keyword type-keyword))
-    (let ((metadata (%get-type-info-metadata type-keyword)))
-      ;; Most TYPE-KEYWORDs uniquely designate an object, so we store only that.
-      ;; Otherwise we store a list which has a small handful of (<= 4) items.
-      (cond ((listp metadata)
-             ;; Can we *please* make (FIND ...) not call GENERIC+
-             ;; so that I don't feel compelled to express this as a DOLIST ?
-             (dolist (info metadata nil)
-               (when (eq (type-info-class (truly-the type-info info))
-                         class-keyword)
-                 (return info))))
-            ((eq (type-info-class (truly-the type-info metadata)) class-keyword)
-             metadata))))
-
-(declaim (ftype (function (keyword keyword) type-info) type-info-or-lose))
+;; really this takes (KEYWORD KEYWORD) but SYMBOL is easier to test,
+;; and "or lose" is an explicit check anyway.
+(declaim (ftype (function (symbol symbol) type-info) type-info-or-lose))
 (defun type-info-or-lose (class type)
-  #+sb-xc (/noshow0 "entering TYPE-INFO-OR-LOSE, CLASS,TYPE=..")
-  #+sb-xc (/nohexstr class)
-  #+sb-xc (/nohexstr type)
-  (or (find-type-info class type)
+  ;; Usually TYPE designates a unique object, so we store only that object.
+  ;; Otherwise we store a list which has a small (<= 4) handful of items.
+  (or (let ((metadata (!get-type-info-metadata type)))
+        (cond ((listp metadata)
+               (dolist (info metadata nil) ; FIND is slower :-(
+                 (when (eq (type-info-class (truly-the type-info info))
+                           class)
+                   (return info))))
+              ((eq (type-info-class (truly-the type-info metadata)) class)
+               metadata)))
       (error "(~S ~S) is not a defined info type." class type)))
 
+(defun !register-type-info (metainfo)
+  (let* ((name (type-info-name metainfo))
+         (list (!get-type-info-metadata name)))
+    (set-info-value name +info-metainfo-type-num+
+                    (cond ((not list) metainfo) ; unique, just store it
+                          ((listp list) (cons metainfo list)) ; prepend to the list
+                          (t (list metainfo list)))))) ; convert atom to a list
+
+(defun !%define-info-type (class name type-spec type-checker
+                                 validate-function default &optional id)
+  (awhen (ignore-errors (type-info-or-lose class name)) ; if found
+    (when id
+      (aver (= (type-info-number it) id)))
+    (return-from !%define-info-type it)) ; do nothing
+  (let ((id (or id (position nil *info-types* :start 1)
+                   (error "no more INFO type numbers available"))))
+    (!register-type-info
+     (setf (aref *info-types* id)
+           (!make-globaldb-info-metadata id class name type-spec type-checker
+                                         validate-function default)))))
+
 ) ; EVAL-WHEN
+
+#-sb-xc
+(setf (get '!%define-info-type :sb-cold-funcall-handler)
+      (lambda (class name type-spec checker validator default id)
+        ;; The SB!FASL: symbols are poor style, but the lesser evil.
+        ;; If exported, then they'll stick around in the target image.
+        ;; Perhaps SB-COLD should re-export some of these.
+        (declare (special sb!fasl::*dynamic* sb!fasl::*cold-layouts*))
+        (let ((layout (gethash 'type-info sb!fasl::*cold-layouts*)))
+          (sb!fasl::cold-svset
+           (sb!fasl::cold-symbol-value '*info-types*)
+           id
+           (sb!fasl::write-slots
+            (sb!fasl::allocate-struct sb!fasl::*dynamic* layout)
+            (find-layout 'type-info)
+            :class class :name name :type-spec type-spec
+            :type-checker checker :validate-function validator
+            :default default :number id)))))
+
+(!cold-init-forms
+ (dovector (x (the simple-vector *info-types*))
+   ;; Genesis writes the *INFO-TYPES* array, but setting up the mapping
+   ;; from keyword-pair to object is deferred until cold-init.
+   (when x (!register-type-info x))))
 
 ;;;; info types, and type numbers, part II: what's
 ;;;; needed only at compile time, not at run time
-
-(eval-when (:compile-toplevel :execute)
-
-;;; a list of forms for initializing the DEFAULT slots of TYPE-INFO
-;;; objects, accumulated during compilation and eventually converted
-;;; into a function to be called at cold load time after the
-;;; appropriate TYPE-INFO objects have been created
-;;;
-;;; Note: This is quite similar to the !COLD-INIT-FORMS machinery, but
-;;; we can't conveniently use the ordinary !COLD-INIT-FORMS machinery
-;;; here. The problem is that the natural order in which the
-;;; default-slot-initialization forms are generated relative to the
-;;; order in which the TYPE-INFO-creation forms are generated doesn't
-;;; match the relative order in which the forms need to be executed at
-;;; cold load time.
-(defparameter *!reversed-type-info-init-forms* nil)
 
 ;;; Define a new type of global information.
 ;;; CLASS/TYPE form a two-piece name for the kind of information,
@@ -266,9 +237,9 @@
 ;;;  :DEFAULT (CONSTANTLY #'<a-function-name>) to adhere to the convention
 ;;; that default objects satisfying FUNCTIONP will always be funcalled.
 ;;;
-;;; The main thing we do is determine the type's number. We need to do
-;;; this at macroexpansion time, since both the COMPILE and LOAD time
-;;; calls to %DEFINE-INFO-TYPE must use the same type number.
+(eval-when (:compile-toplevel :execute)
+;; This convoluted idiom creates a macro that disappears from the target,
+;; kind of an alternative to the "!" name convention.
 (#+sb-xc-host defmacro
  #-sb-xc-host sb!xc:defmacro
     define-info-type ((class type)
@@ -276,34 +247,17 @@
                             (validate-function)
                             default)
   (declare (type keyword class type))
-  `(progn
-     (eval-when (:compile-toplevel :execute)
-       ;; At compile time, ensure that the type number exists. It will
-       ;; need to be forced to exist at cold load time, too, but
-       ;; that's not handled here; it's handled by later code which
-       ;; looks at the compile time state and generates code to
-       ;; replicate it at cold load time.
-       (let ((num (register-info-metadata -1 ,class ,type ',type-spec)))
-       ;; Arrange for TYPE-INFO-DEFAULT, TYPE-INFO-TYPE-CHECKER, and
-       ;; TYPE-INFO-VALIDATE-FUNCTION to be set at cold load
-       ;; time. (They can't very well be set at cross-compile time,
-       ;; since they differ between host and target and are
-       ;; host-compiled closures.)
-         (push `(let ((type-info (aref *info-types* ,num)))
-                  ;; cold-init can't actually AVER without crashing hard,
-                  ;; but what the heck, let's do it.
-                  (aver type-info)
-                ,@',(unless (eq type-spec 't)
-                      ;; avoid re-inventing #'IDENTITY N times over
-                      `((setf (type-info-type-checker type-info)
-                              (lambda (x) (declare (type ,type-spec x)) x))))
-                (setf (type-info-validate-function type-info)
-                      ,',validate-function
-                      (type-info-default type-info) ,',default))
-             *!reversed-type-info-init-forms*)))
-     ',type))
-
-) ; EVAL-WHEN
+  ;; There was formerly a remark that (COPY-TREE TYPE-SPEC) ensures repeatable
+  ;; fasls. That's not true now, probably never was. A compiler is permitted to
+  ;; coalesce EQUAL quoted lists and there's no defense against it, so why try?
+  (let ((form
+         `(!%define-info-type ,class ,type ',type-spec
+           ,(if (eq type-spec 't) '#'identity `(lambda (x) (the ,type-spec x)))
+           ,validate-function ,default
+           ;; Rationale for hardcoding here is explained at INFO-VECTOR-FDEFN.
+           ,(or (and (eq class :function) (eq type :definition) +fdefn-type-num+)
+                #+sb-xc (type-info-number (type-info-or-lose class type))))))
+    `(eval-when (#-sb-xc :compile-toplevel :load-toplevel :execute) ,form))))
 
 
 ;;; INFO is the standard way to access the database. It's settable.
@@ -375,26 +329,19 @@
 (declaim (ftype (sfunction (t type-number) (values t boolean))
                 get-info-value))
 (defun get-info-value (name type-number)
-  ;; sanity check: If we have screwed up initialization somehow, then
-  ;; *INFO-TYPES* could still be uninitialized at the time we try to
-  ;; get an info value, and then we'd be out of luck. (This happened,
-  ;; and was confusing to debug, when rewriting EVAL-WHEN in
-  ;; sbcl-0.pre7.x.)
-  (let ((metainfo (aref *info-types* type-number)))
-    (aver metainfo)
-    (multiple-value-bind (vector aux-key)
-        (let ((name (uncross name)))
-          (with-globaldb-name (key1 key2) name
-            :simple (values (symbol-info-vector key1) key2)
-            :hairy (values (info-gethash name *info-environment*)
-                           +no-auxilliary-key+)))
-      (when vector
-        (let ((index
-               (packed-info-value-index vector aux-key type-number)))
-          (when index
-            (return-from get-info-value (values (svref vector index) t))))))
-    (let ((val (type-info-default metainfo)))
-      (values (if (functionp val) (funcall val name) val) nil))))
+  (multiple-value-bind (vector aux-key)
+      (let ((name (uncross name)))
+        (with-globaldb-name (key1 key2) name
+          :simple (values (symbol-info-vector key1) key2)
+          :hairy (values (info-gethash name *info-environment*)
+                         +no-auxilliary-key+)))
+    (when vector
+      (let ((index
+             (packed-info-value-index vector aux-key type-number)))
+        (when index
+          (return-from get-info-value (values (svref vector index) t))))))
+  (let ((val (type-info-default (aref *info-types* type-number))))
+    (values (if (functionp val) (funcall val name) val) nil)))
 
 ;; Perform the approximate equivalent operations of retrieving
 ;; (INFO :CLASS :TYPE NAME), but if no info is found, invoke CREATION-FORM
@@ -461,11 +408,7 @@
 
 ;;;; ":FUNCTION" subsection - Data pertaining to globally known functions.
 
-;; must be info type number 1
 (define-info-type (:function :definition) :type-spec (or fdefn null))
-(eval-when (:compile-toplevel)
-  (aver (= (type-info-number (type-info-or-lose :function :definition))
-           +fdefn-type-num+)))
 
 ;;; the kind of functional object being described. If null, NAME isn't
 ;;; a known functional object.
@@ -494,7 +437,6 @@
                  (if (fboundp name)
                      (handler-bind ((style-warning #'muffle-warning))
                        (specifier-type (sb!impl::%fun-type (fdefinition name))))
-                     ;; I think this should be *universal-fun-type*
                      (specifier-type 'function))))
 
 ;;; the ASSUMED-TYPE for this function, if we have to infer the type
@@ -768,8 +710,6 @@
 (define-info-type (:source-location :typed-structure) :type-spec t)
 (define-info-type (:source-location :symbol-macro) :type-spec t)
 
-#!-sb-fluid (declaim (freeze-type basic-info-env))
-
 ;; This is for the SB-INTROSPECT contrib module, and debugging.
 (defun call-with-each-info (function symbol)
   (awhen (symbol-info-vector symbol)
@@ -790,38 +730,6 @@
          (write val :level 1)))
      sym)))
 
-
-;;; Now that we have finished initializing
-;;; *INFO-TYPES* (at compile time), generate code to set them at cold
-;;; load time to the same state they have currently.
-(!cold-init-forms
-  (/show0 "beginning *INFO-TYPES* initialization")
-  (mapc (lambda (x)
-          (register-info-metadata (first x) (second x) (third x) (fourth x)))
-        '#.(loop for info-type across *info-types*
-                  when info-type
-                 collect (list (type-info-number info-type)
-                               (type-info-class info-type)
-                               (type-info-name info-type)
-                               ;; KLUDGE: for repeatable xc fasls, to
-                               ;; avoid different cross-compiler
-                               ;; treatment of equal constants here we
-                               ;; COPY-TREE, which is not in general a
-                               ;; valid identity transformation
-                               ;; [e.g. on (EQL (FOO))] but is OK for
-                               ;; all the types we use here.
-                               (copy-tree (type-info-type-spec info-type)))))
-  (/show0 "done with *INFO-TYPES* initialization"))
-
-;;; At cold load time, after the INFO-TYPE objects have been created,
-;;; we can set their DEFAULT and TYPE slots.
-(macrolet ((frob ()
-             `(!cold-init-forms
-               ;; I [dpk] really think reversal now is a red herring.
-               ;; I see nothing that would fail here regardless of order.
-                ,@(reverse *!reversed-type-info-init-forms*))))
-  (frob))
-
 ;;; Source transforms / compiler macros for INFO functions.
 ;;;
 ;;; When building the XC, we give it a source transform, so that it can
@@ -836,6 +744,8 @@
              (aver (member 'class lambda-list))
              (aver (member 'type lambda-list))
              `(progn
+                ;; FIXME: instead of a macro and a transform, just define the macro
+                ;; early enough for both host and target compilation to see.
                 #+sb-xc-host
                 (define-source-transform ,name ,lambda-list
                   (if (and (keywordp class) (keywordp type))
@@ -847,12 +757,9 @@
                       .whole.)))))
 
   (def info (class type name)
-    (let (#+sb-xc-host (sb!xc:*gensym-counter* sb!xc:*gensym-counter*)
-          (info (type-info-or-lose class type)))
-      (with-unique-names (value foundp)
-        `(multiple-value-bind (,value ,foundp)
-             (get-info-value ,name ,(type-info-number info))
-           (values (truly-the ,(type-info-type-spec info) ,value) ,foundp)))))
+    (let ((info (type-info-or-lose class type)))
+      `(truly-the (values ,(type-info-type-spec info) boolean)
+                  (get-info-value ,name ,(type-info-number info)))))
 
   (def (setf info) (new-value class type name)
     (let* (#+sb-xc-host (sb!xc:*gensym-counter* sb!xc:*gensym-counter*)
