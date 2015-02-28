@@ -2885,6 +2885,28 @@
   (defoptimizer (%ash/right derive-type) ((n shift))
     (two-arg-derive-type n shift #'%ash/right-derive-type-aux #'%ash/right))
   )
+
+(deftransform expt ((base power) ((constant-arg unsigned-byte) unsigned-byte))
+  (let ((base (lvar-value base)))
+    (unless (= (logcount base) 1)
+      (give-up-ir1-transform))
+    `(ash 1 ,(if (= base 2)
+                 `power
+                 `(* power ,(1- (integer-length base)))))))
+
+(deftransform expt ((base power) ((constant-arg unsigned-byte) integer))
+  (let ((base (lvar-value base)))
+    (cond ((/= (logcount base) 1)
+           (give-up-ir1-transform))
+          ((= base 1)
+           1)
+          (t
+           `(let ((%denominator (ash 1 ,(if (= base 2)
+                                           `(abs power)
+                                           `(* (abs power) ,(1- (integer-length base)))))))
+              (if (minusp power)
+                  (%make-ratio 1 %denominator)
+                  %denominator))))))
 
 ;;; Modular functions
 
