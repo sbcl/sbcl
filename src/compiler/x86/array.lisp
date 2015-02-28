@@ -177,11 +177,54 @@
 ;;;; integer vectors whose elements are smaller than a byte, i.e.,
 ;;;; bit, 2-bit, and 4-bit vectors
 
+(define-vop (data-vector-ref-with-offset/simple-bit-vector-c)
+  (:translate data-vector-ref-with-offset)
+  (:policy :fast-safe)
+  (:args (object :scs (descriptor-reg)))
+  (:arg-types simple-bit-vector
+              (:constant (integer 0 #x7fffffff)) (:constant (integer 0 0)))
+  (:info index offset)
+  (:ignore offset)
+  (:results (result :scs (any-reg)))
+  (:result-types positive-fixnum)
+  (:generator 3
+    (multiple-value-bind (dword-index bit) (floor index 32)
+      (inst mov result
+                (make-ea :dword :base object
+                         :disp (+ (* dword-index 4)
+                                  (- (* vector-data-offset n-word-bytes)
+                                     other-pointer-lowtag))))
+      (let ((right-shift (- bit n-fixnum-tag-bits)))
+        (cond ((plusp right-shift)
+               (inst shr result right-shift))
+              ((minusp right-shift) ; = left shift
+               (inst shl result (- right-shift))))))
+    (inst and result (fixnumize 1))))
+
+(define-vop (data-vector-ref-with-offset/simple-bit-vector)
+  (:translate data-vector-ref-with-offset)
+  (:policy :fast-safe)
+  (:args (object :scs (descriptor-reg))
+         (index :scs (unsigned-reg)))
+  (:info offset)
+  (:ignore offset)
+  (:arg-types simple-bit-vector positive-fixnum (:constant (integer 0 0)))
+  (:results (result :scs (any-reg)))
+  (:result-types positive-fixnum)
+  (:generator 4
+    (inst bt (make-ea :dword :base object
+                      :disp (- (* vector-data-offset n-word-bytes)
+                               other-pointer-lowtag))
+             index)
+    (inst sbb result result)
+    (inst and result (fixnumize 1))))
+
 (macrolet ((def-small-data-vector-frobs (type bits)
              (let* ((elements-per-word (floor n-word-bits bits))
                     (bit-shift (1- (integer-length elements-per-word))))
     `(progn
-       (define-vop (,(symbolicate 'data-vector-ref-with-offset/ type))
+      ,@(unless (= bits 1)
+       `((define-vop (,(symbolicate 'data-vector-ref-with-offset/ type))
          (:note "inline array access")
          (:translate data-vector-ref-with-offset)
          (:policy :fast-safe)
@@ -224,7 +267,7 @@
              (unless (zerop extra)
                (inst shr result (* extra ,bits)))
              (unless (= extra ,(1- elements-per-word))
-               (inst and result ,(1- (ash 1 bits)))))))
+               (inst and result ,(1- (ash 1 bits)))))))))
        (define-vop (,(symbolicate 'data-vector-set-with-offset/ type))
          (:note "inline array store")
          (:translate data-vector-set-with-offset)
