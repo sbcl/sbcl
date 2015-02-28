@@ -259,7 +259,7 @@ maintained."
     `(let ((,index ,start))
        (loop
         (cond ((< (truly-the index ,index) (length ,rest-var))
-               (let ((,var (sb!c::fast-&rest-nth ,index ,rest-var))
+               (let ((,var (fast-&rest-nth ,index ,rest-var))
                      ,@(if index-var `((,index-var ,index))))
                  ,@body)
                (incf ,index))

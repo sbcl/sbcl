@@ -23,7 +23,7 @@
    NIL whenever FUNCTION returns non-NIL."
   ;; KLUDGE: constraint propagation is unable to detect that NTH gets
   ;; called only on indices known to be less than the predetermined N.
-  (macrolet ((arg (n) `(sb!c::fast-&rest-nth ,n arguments)))
+  (macrolet ((arg (n) `(fast-&rest-nth ,n arguments)))
     (lambda (&rest arguments)
       (not (let ((n (length arguments)))
              (if (> n 3)

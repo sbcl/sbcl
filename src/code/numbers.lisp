@@ -363,7 +363,7 @@
                 #!+sb-doc
                 ,doc
                 (if numbers
-                    (let ((result (the number (sb!c::fast-&rest-nth 0 numbers))))
+                    (let ((result (the number (fast-&rest-nth 0 numbers))))
                       (do-rest-arg ((n) numbers 1 result)
                         (setq result (,op result n))))
                     ,init))))
@@ -974,7 +974,8 @@ the first."
              `(defun ,op (&rest integers)
                 #!+sb-doc ,doc
                 (if integers
-                    (do ((result (nth 0 integers) (,op result (nth i integers)))
+                    (do ((result (fast-&rest-nth 0 integers)
+                                 (,op result (fast-&rest-nth i integers)))
                          (i 1 (1+ i)))
                         ((>= i (length integers))
                          result)
@@ -1287,10 +1288,10 @@ and the number of 0 bits if INTEGER is negative."
   integers. GCD with no arguments is defined to be 0."
   (case (length integers)
     (0 0)
-    (1 (abs (the integer (nth 0 integers))))
+    (1 (abs (the integer (fast-&rest-nth 0 integers))))
     (otherwise
-     (do ((result (nth 0 integers)
-                  (gcd result (the integer (nth i integers))))
+     (do ((result (fast-&rest-nth 0 integers)
+                  (gcd result (the integer (fast-&rest-nth i integers))))
           (i 1 (1+ i)))
          ((>= i (length integers))
           result)
@@ -1302,10 +1303,10 @@ and the number of 0 bits if INTEGER is negative."
   arguments is defined to be 1."
   (case (length integers)
     (0 1)
-    (1 (abs (the integer (nth 0 integers))))
+    (1 (abs (the integer (fast-&rest-nth 0 integers))))
     (otherwise
-     (do ((result (nth 0 integers)
-                  (lcm result (the integer (nth i integers))))
+     (do ((result (fast-&rest-nth 0 integers)
+                  (lcm result (the integer (fast-&rest-nth i integers))))
           (i 1 (1+ i)))
          ((>= i (length integers))
           result)
