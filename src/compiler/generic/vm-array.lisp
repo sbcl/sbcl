@@ -199,16 +199,6 @@
   (setf sb!kernel::*specialized-array-element-types*
         '#.sb!kernel::*specialized-array-element-types*))
 
-(defvar *simple-array-primitive-types*
-  (map 'list
-       (lambda (saetp)
-         (cons (saetp-specifier saetp)
-               (saetp-primitive-type-name saetp)))
-       *specialized-array-element-type-properties*)
-  #!+sb-doc
-  "An alist for mapping simple array element types to their
-corresponding primitive types.")
-
 (defvar *vector-without-complex-typecode-infos*
   #+sb-xc-host
   (loop for saetp across *specialized-array-element-type-properties*

@@ -289,19 +289,18 @@
              (t
               (any)))))
         (array-type
-         (if (array-type-complexp type)
+         (if (or (array-type-complexp type)
+                 (not (singleton-p (array-type-dimensions type))))
              (any)
-             (let* ((dims (array-type-dimensions type))
-                    (etype (array-type-specialized-element-type type))
-                    (type-spec (type-specifier etype))
-                    ;; FIXME: We're _WHAT_?  Testing for type equality
-                    ;; with a specifier and #'EQUAL?  *BOGGLE*.  --
-                    ;; CSR, 2003-06-24
-                    (ptype (cdr (assoc type-spec *simple-array-primitive-types*
-                                       :test #'equal))))
-               (if (and (consp dims) (null (rest dims)) ptype)
-                   (values (primitive-type-or-lose ptype)
-                           (eq (first dims) '*))
+             ;; EQ is ok to compare by because all CTYPEs representing
+             ;; array specializations are interned objects.
+             (let ((saetp (find (array-type-specialized-element-type type)
+                                *specialized-array-element-type-properties*
+                                :key #'saetp-ctype :test #'eq)))
+               (if saetp
+                   (values (primitive-type-or-lose
+                            (saetp-primitive-type-name saetp))
+                           (eq (first (array-type-dimensions type)) '*))
                    (any)))))
         (union-type
          (if (type= type (specifier-type 'list))
@@ -372,12 +371,9 @@
            ((extended-sequence) (any))
            ((nil) (any))))
         (character-set-type
-         (let ((pairs (character-set-type-pairs type)))
-           (if (and (= (length pairs) 1)
-                    (= (caar pairs) 0)
-                    (= (cdar pairs) (1- sb!xc:char-code-limit)))
-               (exactly character)
-               (part-of character))))
+         (if (eq type sb!kernel::*character-type*)
+             (exactly character)
+             (part-of character)))
         #!+sb-simd-pack
         (simd-pack-type
          (let ((eltypes (simd-pack-type-element-type type)))
