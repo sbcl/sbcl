@@ -79,7 +79,7 @@
               (when (eql (incf field-idx) +infos-per-word+)
                 (setq field-idx 0 descriptor-idx (1+ descriptor-idx)))
               (when (eql (packed-info-field it descriptor-idx field-idx)
-                         +fdefn-type-num+)
+                         +fdefn-info-num+)
                 (return-from find-fdefn
                   (aref it (1- (the index data-idx))))))))
         (when (eq key1 'setf) ; bypass the legality test

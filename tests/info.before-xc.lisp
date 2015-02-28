@@ -59,8 +59,8 @@
          (verify (ans)
            (let (result) ; => ((name . ((type . val) (type . val))) ...)
              (%call-with-each-info
-              (lambda (name type-number value)
-                (let ((pair (cons type-number value)))
+              (lambda (name info-number value)
+                (let ((pair (cons info-number value)))
                   (if (equal name (caar result))
                       (push pair (cdar result))
                       (push (list name pair) result))))
@@ -89,30 +89,30 @@
               ((CAS ,s) (3 . "CAS-info#3"))
               ((FROB ,s) (15 . "FROB-info#15"))))
 
-    (iv-put 'cas +fdefn-type-num+ "CAS-fdefn") ; pretend
+    (iv-put 'cas +fdefn-info-num+ "CAS-fdefn") ; pretend
     ;; fdefinition for (CAS) moves in front of its info type #3
     (verify `((,s (12 . "info#12"))
               ((SETF ,s) (6 . "SETF-info#6"))
-              ((CAS ,s) (,+fdefn-type-num+ . "CAS-fdefn") (3 . "CAS-info#3"))
+              ((CAS ,s) (,+fdefn-info-num+ . "CAS-fdefn") (3 . "CAS-info#3"))
               ((FROB ,s) (15 . "FROB-info#15"))))
 
-    (iv-put 'frob +fdefn-type-num+ "FROB-fdefn")
+    (iv-put 'frob +fdefn-info-num+ "FROB-fdefn")
     (verify `((,s (12 . "info#12"))
               ((SETF ,s) (6 . "SETF-info#6"))
-              ((CAS ,s) (,+fdefn-type-num+ . "CAS-fdefn") (3 . "CAS-info#3"))
+              ((CAS ,s) (,+fdefn-info-num+ . "CAS-fdefn") (3 . "CAS-info#3"))
               ((FROB ,s)
-               (,+fdefn-type-num+ . "FROB-fdefn") (15 . "FROB-info#15"))))
+               (,+fdefn-info-num+ . "FROB-fdefn") (15 . "FROB-info#15"))))
 
-    (iv-put 'setf +fdefn-type-num+ "SETF-fdefn")
+    (iv-put 'setf +fdefn-info-num+ "SETF-fdefn")
     (verify `((,s (12 . "info#12"))
-              ((SETF ,s) (,+fdefn-type-num+ . "SETF-fdefn") (6 . "SETF-info#6"))
-              ((CAS ,s) (,+fdefn-type-num+ . "CAS-fdefn") (3 . "CAS-info#3"))
+              ((SETF ,s) (,+fdefn-info-num+ . "SETF-fdefn") (6 . "SETF-info#6"))
+              ((CAS ,s) (,+fdefn-info-num+ . "CAS-fdefn") (3 . "CAS-info#3"))
               ((FROB ,s)
-               (,+fdefn-type-num+ . "FROB-fdefn") (15 . "FROB-info#15"))))
+               (,+fdefn-info-num+ . "FROB-fdefn") (15 . "FROB-info#15"))))
 
-    (iv-del 'cas +fdefn-type-num+)
-    (iv-del 'setf +fdefn-type-num+)
-    (iv-del 'frob +fdefn-type-num+)
+    (iv-del 'cas +fdefn-info-num+)
+    (iv-del 'setf +fdefn-info-num+)
+    (iv-del 'frob +fdefn-info-num+)
     (verify `((,s (12 . "info#12"))
               ((SETF ,s) (6 . "SETF-info#6"))
               ((CAS ,s) (3 . "CAS-info#3"))
@@ -123,8 +123,8 @@
     (verify `(((CAS ,s) (3 . "CAS-info#3"))
               ((FROB ,s) (15 . "FROB-info#15"))))
 
-    (iv-put 'setf +fdefn-type-num+ "fdefn")
-    (verify `(((SETF ,s) (,+fdefn-type-num+ . "fdefn"))
+    (iv-put 'setf +fdefn-info-num+ "fdefn")
+    (verify `(((SETF ,s) (,+fdefn-info-num+ . "fdefn"))
               ((CAS ,s) (3 . "CAS-info#3"))
               ((FROB ,s) (15 . "FROB-info#15"))))))
 

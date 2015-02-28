@@ -163,7 +163,7 @@ distinct from the global value. Can also be SETF."
     ;; fops in genesis's fasload. Anonymizing the constant works around the
     ;; issue, at the expense of an extra copy of the empty info vector.
     (let ((new-vect (funcall update-fn
-                             (or current-vect #.sb!c::+nil-packed-infos+))))
+                             (or current-vect #.+nil-packed-infos+))))
       (unless (simple-vector-p new-vect)
         (aver (null new-vect))
         (return)) ; nothing to do

@@ -179,16 +179,16 @@
   (mapcan (lambda (x) (mapcar (lambda (y) (cons x y)) b))
           a))
 
-;; The real GET-INFO-VALUE AVERs that TYPE-NUMBER is legal. This one doesn't.
-(defun cheating-get-info-value (sym aux-key type-number)
+;; The real GET-INFO-VALUE AVERs that INFO-NUMBER is legal. This one doesn't.
+(defun cheating-get-info-value (sym aux-key info-number)
   (let* ((vector (symbol-info-vector sym))
-         (index (packed-info-value-index vector aux-key type-number)))
+         (index (packed-info-value-index vector aux-key info-number)))
     (if index
         (values (svref vector index) t)
         (values nil nil))))
 
 ;; Info vectors may be concurrently updated. If more than one thread writes
-;; the same name/type-number, it's random which thread prevails, but for
+;; the same name/info-number, it's random which thread prevails, but for
 ;; non-colliding updates, none should be lost.
 ;; This is not a "reasonable" use of packed info vectors.
 ;; It's just a check of the response of the algorithm to heavy pounding.
@@ -465,7 +465,7 @@
         (n-created 0)
         (highest-type-num
          (position-if #'identity sb-c::*info-types*
-                      :end sb-c::+fdefn-type-num+ :from-end t)))
+                      :end sb-int:+fdefn-info-num+ :from-end t)))
     (loop for name across names
           for i from 0
           do (setf (aref fdefn-result i)

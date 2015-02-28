@@ -9,7 +9,7 @@
 
 (in-package "SB!C")
 
-;;;; This file implements abstract types which map globaldb Type-Number/Name
+;;;; This file implements abstract types which map globaldb Info-Number/Name
 ;;;; pairs to data values. The database itself is defined in 'globaldb'.
 
 ;;; Quasi-lockfree concurrent hashtable
@@ -430,7 +430,7 @@
 ;;;
 ;;; Note:
 ;;; * The root name is exogenous to the vector - it is not stored.
-;;; * The type-number for (:FUNCTION :DEFINITION) is 63, :KIND is 1, etc.
+;;; * The info-number for (:FUNCTION :DEFINITION) is 63, :KIND is 1, etc.
 ;;; * Names which are lists of length other than 2, or improper lists,
 ;;;   or whose elements are not both symbols, are disqualified.
 
@@ -479,19 +479,13 @@
 
 ;;;;; Some stuff moved from 'globaldb.lisp':
 
-;;;; At run time, we represent the type of info that we want by a small
-;;;; non-negative integer.
-(eval-when (:compile-toplevel :load-toplevel :execute)
-  (def!constant type-number-bits 6))
-(deftype type-number () `(unsigned-byte ,type-number-bits))
-
-(defconstant info-type-mask (ldb (byte type-number-bits 0) -1)) ; #b111111
+(defconstant info-num-mask (ldb (byte info-number-bits 0) -1)) ; #b111111
 
 ;; Using 6 bits per packed field, 5 infos can be described in a 30-bit fixnum,
 ;; or 10 in a fixnum on 64-bit machines (regardless of n-fixnum-tag-bits).
 ;; The eval-when seems to be necessary for building with CCL as host.
 (eval-when (:compile-toplevel :load-toplevel :execute)
-  (defconstant +infos-per-word+ (floor sb!vm:n-fixnum-bits type-number-bits)))
+  (defconstant +infos-per-word+ (floor sb!vm:n-fixnum-bits info-number-bits)))
 
 ;; Descriptors are target fixnums
 (deftype info-descriptor () `(signed-byte ,sb!vm:n-fixnum-bits))
@@ -503,25 +497,25 @@
 ;; An empty info-vector. Its 0th field describes that there are no more fields.
 (defconstant-eqx +nil-packed-infos+ #(0) #'equalp)
 
-;; FDEFINITIONs have a type-number that admits slightly clever logic
+;; FDEFINITIONs have an info-number that admits slightly clever logic
 ;; for INFO-VECTOR-FDEFN. Do not change this constant without
 ;; careful examination of that function.
-(defconstant +fdefn-type-num+ info-type-mask)
+(defconstant +fdefn-info-num+ info-num-mask)
 
 ;; Extract a field from a packed info descriptor.
-;; A field is either a count of type-numbers, or a type-number.
+;; A field is either a count of info-numbers, or an info-number.
 (declaim (inline packed-info-field))
 (defun packed-info-field (vector desc-index field-index)
-  ;; Should not need (THE TYPE-NUMBER) however type inference
+  ;; Should not need (THE INFO-NUMBER) however type inference
   ;; seems borked during cross-compilation due to the shadowed LDB
   ;; (see "don't watch:" in cold/defun-load-or-cload-xcompiler)
   ;; and in particular it sees especially weird that this message appears
   ;;    note: type assertion too complex to check:
   ;;    (VALUES (UNSIGNED-BYTE 6) &REST T).
   ;; because nothing here should be possibly-multiple-value-producing.
-  (the type-number
-    (ldb (byte type-number-bits
-               (* (the (mod #.+infos-per-word+) field-index) type-number-bits))
+  (the info-number
+    (ldb (byte info-number-bits
+               (* (the (mod #.+infos-per-word+) field-index) info-number-bits))
          (the info-descriptor (svref vector desc-index)))))
 
 ;; Compute the number of elements needed to hold unpacked VECTOR after packing.
@@ -574,21 +568,21 @@
          (field-shift 0)
          (word 0))
     (declare (type index-or-minus-1 i j k end)
-             (type (mod #.(1+ (* (1- +infos-per-word+) type-number-bits)))
+             (type (mod #.(1+ (* (1- +infos-per-word+) info-number-bits)))
                    field-shift)
              (type info-descriptor word))
     (flet ((put-field (val) ; insert VAL into the current packed descriptor
-             (declare (type type-number val))
+             (declare (type info-number val))
              (setq word (logior (make-info-descriptor val field-shift) word))
-             (if (< field-shift (* (1- +infos-per-word+) type-number-bits))
-                 (incf field-shift type-number-bits)
+             (if (< field-shift (* (1- +infos-per-word+) info-number-bits))
+                 (incf field-shift info-number-bits)
                  (setf (svref output (incf j)) word field-shift 0 word 0))))
       ;; Truncating divide by 2: count = n-elements in the group @ 2 per entry,
       ;; +1 for count itself but not including its aux-key.
       (loop (let ((count (ash (the index (svref input (incf i))) -1)))
               (put-field count) ; how many infos to follow
               (dotimes (iter count)
-                (put-field (svref input (incf i))) ; an info type-number
+                (put-field (svref input (incf i))) ; an info-number
                 (setf (svref output (decf k)) (svref input (incf i)))) ; value
               (when (>= (incf i) end)
                 (return))
@@ -618,8 +612,8 @@
                   (incf ,descriptor-index)
                   (setq ,word (svref ,input ,descriptor-index)
                         ,count +infos-per-word+))
-                (prog1 (logand ,word info-type-mask)
-                  (setq ,word (ash ,word (- type-number-bits)))
+                (prog1 (logand ,word info-num-mask)
+                  (setq ,word (ash ,word (- info-number-bits)))
                   (decf ,count))))
          ,@body))))
 
@@ -750,13 +744,13 @@
                              (return data-idx))))))
               descriptor-idx field-idx)))) ; can be ignored if 1st val is nil
 
-;; Take a packed info-vector INPUT and insert (AUX-KEY,TYPE-NUMBER,VALUE).
+;; Take a packed info-vector INPUT and insert (AUX-KEY,INFO-NUMBER,VALUE).
 ;; Packed info-vectors are immutable. Any alteration must create a copy.
 ;; This is done by unpacking/repacking - it's easy enough and fairly
 ;; efficient since the temporary vector is stack-allocated.
 ;;
-(defun %packed-info-insert (input aux-key type-number value)
-  (declare (simple-vector input) (type type-number type-number))
+(defun %packed-info-insert (input aux-key info-number value)
+  (declare (simple-vector input) (type info-number info-number))
   (let* ((n-extra-elts
           ;; Test if the aux-key has been seen before or needs to be added.
           (if (and (not (eql aux-key +no-auxilliary-key+))
@@ -779,7 +773,7 @@
              ;; for the primary Name. All other aux-keys go to the end.
              (let ((point (if (eq aux-key 'setf) (svref new 0) old-size)))
                (insert-at point aux-key 3) ; = add 3 data cells not incl. aux-key
-               (setf (svref new (+ point 2)) type-number
+               (setf (svref new (+ point 2)) info-number
                      (svref new (+ point 3)) value)))
             (t
              (let ((data-start (info-find-aux-key/unpacked
@@ -789,13 +783,13 @@
                ;; fdefn must be the first piece of info for any name.
                ;; This facilitates implementing SYMBOL-FUNCTION without
                ;; without completely decoding the vector.
-               (insert-at (+ data-start (if (eql type-number +fdefn-type-num+)
+               (insert-at (+ data-start (if (eql info-number +fdefn-info-num+)
                                             1 (svref new data-start)))
-                          type-number value)
+                          info-number value)
                ;; add 2 cells, and verify that re-packing won't
                ;; overflow the 'count' for this info group.
                (aver (typep (ash (incf (svref new data-start) 2) -1)
-                            'type-number))))))
+                            'info-number))))))
     (packify-infos new)))
 
 ;; Return T if INFO-VECTOR admits quicker insertion logic - it must have
@@ -810,26 +804,26 @@
     (and (< n-infos (1- +infos-per-word+))
          (eql n-infos (1- (length input))))))
 
-;; Take a packed info-vector INPUT and return a new one with TYPE-NUMBER/VALUE
+;; Take a packed info-vector INPUT and return a new one with INFO-NUMBER/VALUE
 ;; added for the root name. The vector must satisfy INFO-QUICKLY-INSERTABLE-P.
 ;; This code is separate from PACKED-INFO-INSERT to facilitate writing
 ;; a unit test of this logic against the complete logic.
 ;;
-(defun quick-packed-info-insert (input type-number value)
+(defun quick-packed-info-insert (input info-number value)
   ;; Because INPUT contains 1 descriptor and its corresponding values,
   ;; the current length is exactly NEW-N, the new number of fields.
   (let* ((descriptor (svref input 0))
-         (new-n (truly-the type-number (length input)))
+         (new-n (truly-the info-number (length input)))
          (new-vect (make-array (1+ new-n))))
     ;; Two cases: we're either inserting info for the fdefn, or not.
-    (cond ((eq type-number +fdefn-type-num+)
+    (cond ((eq info-number +fdefn-info-num+)
            ;; fdefn, if present, must remain the first packed field.
-           ;; Replace the lowest field (the count) with +fdefn-type-num+,
+           ;; Replace the lowest field (the count) with +fdefn-info-num+,
            ;; shift everything left 6 bits, then OR in the new count.
            (setf (svref new-vect 0)
                  (logior (make-info-descriptor
-                          (dpb +fdefn-type-num+ (byte type-number-bits 0)
-                               descriptor) type-number-bits) new-n)
+                          (dpb +fdefn-info-num+ (byte info-number-bits 0)
+                               descriptor) info-number-bits) new-n)
                  ;; Packed vectors are indexed "backwards". The first
                  ;; field's info is in the highest numbered cell.
                  (svref new-vect new-n) value)
@@ -839,7 +833,7 @@
            ;; Add a field on the high end and increment the count.
            (setf (svref new-vect 0)
                  (logior (make-info-descriptor
-                          type-number (* type-number-bits new-n))
+                          info-number (* info-number-bits new-n))
                          (1+ descriptor))
                  (svref new-vect 1) value)
            ;; Slide the old data up 1 cell.
@@ -848,16 +842,16 @@
     new-vect))
 
 (declaim (maybe-inline packed-info-insert))
-(defun packed-info-insert (vector aux-key type-number newval)
+(defun packed-info-insert (vector aux-key info-number newval)
   (if (and (eql aux-key +no-auxilliary-key+)
            (info-quickly-insertable-p vector))
-      (quick-packed-info-insert vector type-number newval)
-      (%packed-info-insert vector aux-key type-number newval)))
+      (quick-packed-info-insert vector info-number newval)
+      (%packed-info-insert vector aux-key info-number newval)))
 
-;; Search packed VECTOR for AUX-KEY and TYPE-NUMBER, returning
+;; Search packed VECTOR for AUX-KEY and INFO-NUMBER, returning
 ;; the index of the data if found, or NIL if not found.
 ;;
-(declaim (ftype (function (simple-vector (or (eql 0) symbol) type-number)
+(declaim (ftype (function (simple-vector (or (eql 0) symbol) info-number)
                           (or null index))
                 packed-info-value-index))
 
@@ -873,24 +867,24 @@
         (return-from packed-info-value-index nil)))
     ;; Fetch a descriptor and shift out trailing bits that won't be scanned.
     (let* ((descriptor (ash (the info-descriptor (aref vector descriptor-idx))
-                            (* (- type-number-bits) field-idx)))
-           (n-infos (logand descriptor info-type-mask))
+                            (* (- info-number-bits) field-idx)))
+           (n-infos (logand descriptor info-num-mask))
            ;; Compute n things in this descriptor after extracting one field. e.g.
            ;; if starting index = 2, there's space for 7 more fields in 60 bits.
            (swath (min (- +infos-per-word+ field-idx 1) n-infos)))
       ;; Type inference on n-infos deems it to have no lower bound due to DECF.
       (declare (type info-descriptor descriptor)
-               (type (unsigned-byte #.type-number-bits) n-infos)
+               (type (unsigned-byte #.info-number-bits) n-infos)
                (type index data-idx))
       ;; Repeatedly shift and mask, which is quicker than extracting a field at
       ;; varying positions. Start by shifting out the n-infos field.
-      (setq descriptor (ash descriptor (- type-number-bits)))
+      (setq descriptor (ash descriptor (- info-number-bits)))
       (loop
          (dotimes (j swath)
-           (when (eql type-num (logand descriptor info-type-mask))
+           (when (eql type-num (logand descriptor info-num-mask))
              (return-from packed-info-value-index
                (the index (- data-idx j 1))))
-           (setq descriptor (ash descriptor (- type-number-bits))))
+           (setq descriptor (ash descriptor (- info-number-bits))))
          (when (zerop (decf n-infos swath))
            (return nil))
          (incf descriptor-idx)
@@ -922,7 +916,7 @@
       (aver start) ; must be found - it was in the packed vector
       (setq data-start start)) ; point to the group's length cell
     (dolist (type-num type-nums)
-      (declare (type type-number type-num))
+      (declare (type info-number type-num))
       (let ((i (loop for probe from (1+ data-start) by 2
                      repeat (ash (svref new data-start) -1) ; =n-entries
                      when (eql (svref new probe) type-num)
@@ -997,7 +991,7 @@
         (t (list aux-symbol stem)))) ; something like (SETF frob)
 
 ;; Call FUNCTION with each piece of info in packed VECT using ROOT-SYMBOL
-;; as the primary name. FUNCTION must accept 3 values (NAME TYPE-NUMBER VALUE).
+;; as the primary name. FUNCTION must accept 3 values (NAME INFO-NUMBER VALUE).
 (defun %call-with-each-info (function vect root-symbol)
   (let ((name root-symbol)
         (data-idx (length vect)))
@@ -1040,7 +1034,7 @@ This is interpreted as
 |#
 
 ;; Reshape inputs per the above commented example to a packed vector.
-;; The info for a symbol's fdefn must precede other type-numbers.
+;; The info for a symbol's fdefn must precede other info-numbers.
 ;; and SETF must be the first aux key if other aux keys are present.
 ;; The test function does not enforce these invariants.
 ;; N.B. As this function starts with "!", is is omitted from the target image.
@@ -1048,7 +1042,7 @@ This is interpreted as
   (flet ((check (plist)
            (and (evenp (length plist))
                 (loop for (indicator value) on plist by #'cddr
-                      always (typep indicator 'type-number))))
+                      always (typep indicator 'info-number))))
          (add-length-prefix (list) ; computers count better than people
            (cons (1+ (length list)) list)))
     (unless (and (check (first lists))
@@ -1100,13 +1094,13 @@ This is interpreted as
   (when vect
     ;; This is safe: Info-Vector invariant requires that it have length >= 1.
     (let ((word (the fixnum (svref vect 0))))
-      ;; Test that the first type-number is +fdefn-type-num+ and its n-infos
+      ;; Test that the first info-number is +fdefn-info-num+ and its n-infos
       ;; field is nonzero. These conditions can be tested simultaneously
       ;; using a SIMD-in-a-register idea. The low 6 bits must be nonzero
       ;; and the next 6 must be exactly #b111111, so considered together
       ;; as a 12-bit unsigned integer it must be >= #b111111000001
-      (when (>= (ldb (byte (* type-number-bits 2) 0) word)
-                (1+ (ash +fdefn-type-num+ type-number-bits)))
+      (when (>= (ldb (byte (* info-number-bits 2) 0) word)
+                (1+ (ash +fdefn-info-num+ info-number-bits)))
         ;; DATA-REF-WITH-OFFSET doesn't know the info-vector length invariant,
         ;; so depite (safety 0) eliding bounds check, FOLD-INDEX-ADDRESSING
         ;; wasn't kicking in without (TRULY-THE (INTEGER 1 *)).
@@ -1147,7 +1141,7 @@ This is interpreted as
 (declaim (type info-hashtable *info-environment*))
 (defvar *info-environment*)
 
-;;; Update the info TYPE-NUMBER for NAME in the global environment,
+;;; Update the INFO-NUMBER for NAME in the global environment,
 ;;; setting it to NEW-VALUE. This is thread-safe in the presence
 ;;; of multiple readers/writers. Threads simultaneously writing data
 ;;; for the same NAME will succeed if the info type numbers differ,
@@ -1170,18 +1164,18 @@ This is interpreted as
 ;;;
 ;;; Return the new value so that this can be conveniently used in a
 ;;; SETF function.
-(defun set-info-value (name type-number new-value)
+(defun set-info-value (name info-number new-value)
   (when (typep name 'fixnum)
     (error "~D is not a legal INFO name." name))
   (let ((name (uncross name)))
-    ;; If the TYPE-NUMBER already exists in VECT, then copy it and
+    ;; If the INFO-NUMBER already exists in VECT, then copy it and
     ;; alter one cell; otherwise unpack it, grow the vector, and repack.
     (dx-flet ((augment (vect aux-key) ; VECT is a packed vector, never NIL
                 (declare (simple-vector vect))
                 (let ((index
-                       (packed-info-value-index vect aux-key type-number)))
+                       (packed-info-value-index vect aux-key info-number)))
                   (if (not index)
-                      (packed-info-insert vect aux-key type-number new-value)
+                      (packed-info-insert vect aux-key info-number new-value)
                       (let ((copy (copy-seq vect)))
                         (setf (svref copy index) new-value)
                         copy)))))
@@ -1203,7 +1197,7 @@ This is interpreted as
 ;; if there was already a value, that value and T; otherwise two NILs.
 ;; Return the newly-computed value. If NEW-VALUE-FUN returns the old value
 ;; (compared by EQ) when there was one, then no globaldb update is made.
-(defun %atomic-set-info-value (name type-number new-value-fun)
+(defun %atomic-set-info-value (name info-number new-value-fun)
   (declare (function new-value-fun))
   (when (typep name 'fixnum)
     (error "~D is not a legal INFO name." name))
@@ -1211,10 +1205,10 @@ This is interpreted as
     (dx-flet ((augment (vect aux-key) ; VECT is a packed vector, never NIL
                 (declare (simple-vector vect))
                 (let ((index
-                       (packed-info-value-index vect aux-key type-number)))
+                       (packed-info-value-index vect aux-key info-number)))
                   (if (not index)
                       (packed-info-insert
-                       vect aux-key type-number
+                       vect aux-key info-number
                        (setq new-value (funcall new-value-fun nil nil)))
                       (let ((oldval (svref vect index)))
                         (setq new-value (funcall new-value-fun oldval t))
@@ -1245,24 +1239,24 @@ This is interpreted as
 ;; Note also that we do not do an initial attempt to read once with INFO,
 ;; followed up by a double-checking get-or-set operation. It is assumed that
 ;; the user of this already did an initial check, if such is warranted.
-(defun %get-info-value-initializing (name type-number creation-thunk)
+(defun %get-info-value-initializing (name info-number creation-thunk)
   (when (typep name 'fixnum)
     (error "~D is not a legal INFO name." name))
   (let ((name (uncross name))
         result)
     (dx-flet ((get-or-set (info-vect aux-key)
                 (let ((index
-                       (packed-info-value-index info-vect aux-key type-number)))
+                       (packed-info-value-index info-vect aux-key info-number)))
                   (cond (index
                          (setq result (svref info-vect index))
                          nil) ; no update to info-vector
                         (t
-                         ;; Update conflicts possibly for unrelated type-number
+                         ;; Update conflicts possibly for unrelated info-number
                          ;; can force re-execution. (UNLESS result ...) tries
                          ;; to avoid calling the thunk more than once.
                          (unless result
                            (setq result (funcall creation-thunk)))
-                         (packed-info-insert info-vect aux-key type-number
+                         (packed-info-insert info-vect aux-key info-number
                                              result))))))
       (with-globaldb-name (key1 key2) name
         :simple

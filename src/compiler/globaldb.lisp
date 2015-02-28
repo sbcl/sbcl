@@ -98,9 +98,9 @@
 
 ;;; a map from type numbers to TYPE-INFO objects. There is one type
 ;;; number for each kind of info.
-(declaim (type (simple-vector #.(ash 1 type-number-bits)) *info-types*))
+(declaim (type (simple-vector #.(ash 1 info-number-bits)) *info-types*))
 (!defglobal *info-types*
-            (make-array (ash 1 type-number-bits) :initial-element nil))
+            (make-array (ash 1 info-number-bits) :initial-element nil))
 
 ;; FIXME: really unclear name. It's an INFO-TYPE, not a TYPE-INFO.
 ;;        But probably would be better as GLOBALDB-METAINFO or something.
@@ -119,7 +119,7 @@
               type-checker validate-function default))
             (:copier nil))
   ;; a number that uniquely identifies this type (and implicitly its class)
-  (number nil :type type-number :read-only t)
+  (number nil :type info-number :read-only t)
   ;; 2-part key to this piece of metainfo
   ;; FIXME: taxonomy by CLASS and TYPE is too confusing and overloaded.
   ;;        and "name" is just wrong as neither half alone is the name.
@@ -255,7 +255,7 @@
            ,(if (eq type-spec 't) '#'identity `(lambda (x) (the ,type-spec x)))
            ,validate-function ,default
            ;; Rationale for hardcoding here is explained at INFO-VECTOR-FDEFN.
-           ,(or (and (eq class :function) (eq type :definition) +fdefn-type-num+)
+           ,(or (and (eq class :function) (eq type :definition) +fdefn-info-num+)
                 #+sb-xc (type-info-number (type-info-or-lose class type))))))
     `(eval-when (#-sb-xc :compile-toplevel :load-toplevel :execute) ,form))))
 
@@ -281,13 +281,13 @@
 ;;; the current environment. Return true if there was any info.
 (defun clear-info (class type name)
   (let* ((info (type-info-or-lose class type))
-         (type-number-list (list (type-info-number info))))
-    (declare (dynamic-extent type-number-list))
-    (clear-info-values name type-number-list)))
+         (info-number-list (list (type-info-number info))))
+    (declare (dynamic-extent info-number-list))
+    (clear-info-values name info-number-list)))
 
-(defun clear-info-values (name type-numbers)
-  (dolist (type type-numbers)
-    (aver (and (typep type 'type-number) (svref *info-types* type))))
+(defun clear-info-values (name info-numbers)
+  (dolist (type info-numbers)
+    (aver (and (typep type 'info-number) (svref *info-types* type))))
   ;; A call to UNCROSS was suspiciously absent, so I added this ERROR
   ;; to be certain that it's not supposed to happen when building the xc.
   #+sb-xc-xhost (error "Strange CLEAR-INFO building the xc: ~S ~S" name type)
@@ -297,7 +297,7 @@
       ;; If PACKED-INFO-REMOVE has nothing to do, it returns NIL,
       ;; corresponding to the input that UPDATE-SYMBOL-INFO expects.
       (dx-flet ((clear-simple (old)
-                  (setq new (packed-info-remove old key2 type-numbers))))
+                  (setq new (packed-info-remove old key2 info-numbers))))
         (update-symbol-info key1 #'clear-simple))
       :hairy
       ;; The global hashtable is not imbued with knowledge of the convention
@@ -310,7 +310,7 @@
                   (if old
                       ;; if -REMOVE => nil, then update NEW but return OLD
                       (or (setq new (packed-info-remove
-                                     old +no-auxilliary-key+ type-numbers))
+                                     old +no-auxilliary-key+ info-numbers))
                           old))))
         (info-puthash *info-environment* name #'clear-hairy)))
     (not (null new))))
@@ -323,12 +323,12 @@
 
 ;;;; GET-INFO-VALUE
 
-;;; Return the value of NAME / TYPE-NUMBER from the global environment,
+;;; Return the value of NAME / INFO-NUMBER from the global environment,
 ;;; or return the default if there is no global info.
 ;;; The secondary value indicates whether info was found vs defaulted.
-(declaim (ftype (sfunction (t type-number) (values t boolean))
+(declaim (ftype (sfunction (t info-number) (values t boolean))
                 get-info-value))
-(defun get-info-value (name type-number)
+(defun get-info-value (name info-number)
   (multiple-value-bind (vector aux-key)
       (let ((name (uncross name)))
         (with-globaldb-name (key1 key2) name
@@ -337,10 +337,10 @@
                          +no-auxilliary-key+)))
     (when vector
       (let ((index
-             (packed-info-value-index vector aux-key type-number)))
+             (packed-info-value-index vector aux-key info-number)))
         (when index
           (return-from get-info-value (values (svref vector index) t))))))
-  (let ((val (type-info-default (aref *info-types* type-number))))
+  (let ((val (type-info-default (aref *info-types* info-number))))
     (values (if (functionp val) (funcall val name) val) nil)))
 
 ;; Perform the approximate equivalent operations of retrieving
@@ -354,14 +354,14 @@
 ;; A mutex-guarded table would probably be more appropriate in such cases.
 ;;
 (def!macro get-info-value-initializing (info-class info-type name creation-form)
-  (with-unique-names (type-number proc)
-    `(let ((,type-number
+  (with-unique-names (info-number proc)
+    `(let ((,info-number
             ,(if (and (keywordp info-type) (keywordp info-class))
                  (type-info-number (type-info-or-lose info-class info-type))
                  `(type-info-number
                    (type-info-or-lose ,info-class ,info-type)))))
        (dx-flet ((,proc () ,creation-form))
-         (%get-info-value-initializing ,name ,type-number #',proc)))))
+         (%get-info-value-initializing ,name ,info-number #',proc)))))
 
 ;; interface to %ATOMIC-SET-INFO-VALUE
 ;; GET-INFO-VALUE-INITIALIZING is a restricted case of this,
@@ -369,8 +369,8 @@
 ;; Atomic update will be important for making the fasloader threadsafe
 ;; using a predominantly lock-free design, and other nice things.
 (def!macro atomic-set-info-value (info-class info-type name lambda)
-  (with-unique-names (type-number proc)
-    `(let ((,type-number
+  (with-unique-names (info-number proc)
+    `(let ((,info-number
             ,(if (and (keywordp info-type) (keywordp info-class))
                  (type-info-number (type-info-or-lose info-class info-type))
                  `(type-info-number
@@ -380,8 +380,8 @@
             ;;   (DX-LET ((x (LAMBDA <whatever>))) (F x))
             (destructuring-bind (lambda-list . body) (cdr lambda)
               `(dx-flet ((,proc ,lambda-list ,@body))
-                 (%atomic-set-info-value ,name ,type-number #',proc)))
-            `(%atomic-set-info-value ,name ,type-number ,lambda)))))
+                 (%atomic-set-info-value ,name ,info-number #',proc)))
+            `(%atomic-set-info-value ,name ,info-number ,lambda)))))
 
 ;; Call FUNCTION once for each Name in globaldb that has information associated
 ;; with it, passing the function the Name as its only argument.

@@ -1630,13 +1630,13 @@ core and return a descriptor to it."
     ;; Collect fdefinitions that go with one symbol, e.g. CAR and (SETF CAR),
     ;; using the host's code for manipulating a packed info-vector.
     (maphash (lambda (warm-name cold-fdefn)
-               (sb!c::with-globaldb-name (key1 key2) warm-name
+               (with-globaldb-name (key1 key2) warm-name
                  :hairy (error "Hairy fdefn name in genesis: ~S" warm-name)
                  :simple
                  (setf (gethash key1 hashtable)
-                       (sb!c::packed-info-insert
-                        (gethash key1 hashtable sb!c::+nil-packed-infos+)
-                        key2 sb!c::+fdefn-type-num+ cold-fdefn))))
+                       (packed-info-insert
+                        (gethash key1 hashtable +nil-packed-infos+)
+                        key2 +fdefn-info-num+ cold-fdefn))))
               *cold-fdefn-objects*)
     ;; Emit in the same order symbols reside in core to avoid
     ;; sensitivity to the iteration order of host's maphash.
