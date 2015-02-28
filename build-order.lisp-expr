@@ -117,6 +117,7 @@
  ("src/code/parse-body")       ; on host for PARSE-BODY
  ("src/code/parse-defmacro")   ; on host for PARSE-DEFMACRO
  ("src/compiler/deftype")      ; on host for SB!XC:DEFTYPE
+ ("src/code/restart" :not-host) ; %DEFCONSTANT can bind a restart
  ("src/compiler/defconstant")
  ("src/code/early-alieneval")  ; for funs and vars needed at build and run time
 

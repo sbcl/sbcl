@@ -44,30 +44,6 @@
 ;;; by RESTART-BIND.
 (defvar *restart-clusters* '())
 
-(declaim (inline make-restart)) ;; for DX allocation
-(defstruct (restart (:constructor make-restart
-                        ;; Having TEST-FUNCTION at the end allows
-                        ;; to not replicate its default value in RESTART-BIND.
-                        (name function
-                         &optional report-function
-                                   interactive-function
-                                   test-function))
-                    (:copier nil) (:predicate nil))
-  (name (missing-arg) :type symbol :read-only t)
-  (function (missing-arg) :type function :read-only t)
-  (report-function nil :type (or null function) :read-only t)
-  (interactive-function nil :type (or null function) :read-only t)
-  (test-function (lambda (cond) (declare (ignore cond)) t) :type function :read-only t)
-  ;; the list of conditions which are currently associated to the
-  ;; restart. maintained by WITH-CONDITION-RESTARTS in a neither
-  ;; thread- nor interrupt-safe way. This should not be a problem
-  ;; however, since safe uses of restarts have to assume dynamic
-  ;; extent.
-  (associated-conditions '() :type list))
-(declaim (notinline make-restart))
-
-#!-sb-fluid (declaim (freeze-type restart))
-
 (def!method print-object ((restart restart) stream)
   (if *print-escape*
       (print-unreadable-object (restart stream :type t :identity t)
