@@ -72,7 +72,7 @@
   (if (slot-boundp method '%generic-function)
       (print-unreadable-object (method stream :type t :identity t)
         (let ((generic-function (method-generic-function method)))
-          (format stream "~S ~{~S ~}~:S"
+          (format stream "~/sb-impl::print-symbol-with-prefix/ ~{~S ~}~:S"
                   (and generic-function
                        (generic-function-name generic-function))
                   (method-qualifiers method)
@@ -85,7 +85,7 @@
   (if (slot-boundp method '%generic-function)
       (print-unreadable-object (method stream :type t :identity t)
         (let ((generic-function (method-generic-function method)))
-          (format stream "~S, slot:~S, ~:S"
+          (format stream "~/sb-impl::print-symbol-with-prefix/, slot:~S, ~:S"
                   (and generic-function
                        (generic-function-name generic-function))
                   (accessor-method-slot-name method)
@@ -108,9 +108,8 @@
          (let ((name (slot-value instance 'name)))
            (print-unreadable-object
                (instance stream :type t :identity (not properly-named-p))
-             (if extra-p
-                 (format stream "~S ~:S" name extra)
-                 (prin1 name stream)))))
+             (format stream "~/sb-impl::print-symbol-with-prefix/~:[~:; ~:S~]"
+                     name extra-p extra))))
         ((not extra-p) ; case (2): empty body to avoid an extra space
          (print-unreadable-object (instance stream :type t :identity t)))
         (t ; case (3). no name, but extra data - show #<unbound slot> and data
@@ -123,7 +122,7 @@
       (let* ((name (class-name class))
              (proper-p (and (symbolp name) (eq (find-class name nil) class))))
         (print-unreadable-object (class stream :type t :identity (not proper-p))
-          (prin1 name stream)))
+          (print-symbol-with-prefix stream name)))
       ;; "#<CLASS #<unbound slot> {122D1141}>" is ugly. Don't show that.
       (print-unreadable-object (class stream :type t :identity t))))
 

@@ -53,7 +53,7 @@
 
 (let ((output (with-output-to-string (*standard-output*)
                 (pcl1 3))))
-  (assert (search "(CALL-TO-GF #<MY-GENERIC-FUNCTION-PCL1 PCL1 (1)> 3)" output)))
+  (assert (search "(CALL-TO-GF #<MY-GENERIC-FUNCTION-PCL1 MOP-4::PCL1 (1)> 3)" output)))
 
 #|
 (defclass my-generic-function-pcl2 (standard-generic-function) ()
