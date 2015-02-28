@@ -13,7 +13,6 @@
 
 (in-package "SB!VM")
 
-(eval-when (:compile-toplevel :load-toplevel :execute)
 (defstruct (specialized-array-element-type-properties
             (:conc-name saetp-)
             (:constructor
@@ -55,9 +54,12 @@
   ;; the relative importance of this array type.  Previously used for
   ;; determining the order of the TYPECASE in
   ;; HAIRY-DATA-VECTOR-{REF,SET}; currently (as of 2013-09-18) unused.
-  (importance (missing-arg) :type fixnum :read-only t)))
+  (importance (missing-arg) :type fixnum :read-only t))
 
-(defglobal *specialized-array-element-type-properties*
+;; Simulate DEFINE-LOAD-TIME-GLOBAL - always bound in the image
+;; but not eval'd in the compiler.
+(defglobal *specialized-array-element-type-properties* nil)
+(setq *specialized-array-element-type-properties*
   (map 'simple-vector
        (lambda (args)
          (apply #'!make-saetp args))
@@ -170,12 +172,13 @@
 
 ;; The compiler can see that the number of types that must be present in a
 ;; union of arrays to convert (OR (array t1) ... (array tN)) to (ARRAY *)
-;; is a constant, but only if *SPECIALIZED-ARRAY-ELEMENT-TYPE-PROPERTIES*
-;; doesn't potentially have to signal an unbound symbol error,
-;; so use DEFGLOBAL and then proclaim its type.
-(proclaim `(type (simple-vector
-                  ,(length *specialized-array-element-type-properties*))
-                 *specialized-array-element-type-properties*))
+;; is a constant if (LENGTH *SPECIALIZED-ARRAY-ELEMENT-TYPE-PROPERTIES*) is
+;; a constant. So proclaim the type of the global var. This works because
+;; the compiler doesn't retroactively try to check the initializer of NIL.
+#-sb-xc-host
+(declaim (type (simple-vector
+                #.(length *specialized-array-element-type-properties*))
+               *specialized-array-element-type-properties*))
 
 (defun valid-bit-bash-saetp-p (saetp)
   ;; BIT-BASHing isn't allowed on simple vectors that contain pointers
@@ -189,15 +192,15 @@
        ;; than the word size.
        (<= (saetp-n-bits saetp) n-word-bits)))
 
+#+sb-xc-host
 (defvar sb!kernel::*specialized-array-element-types*
   (map 'list
        #'saetp-specifier
        *specialized-array-element-type-properties*))
 
 #-sb-xc-host
-(defun !vm-type-cold-init ()
-  (setf sb!kernel::*specialized-array-element-types*
-        '#.sb!kernel::*specialized-array-element-types*))
+(!defglobal sb!kernel::*specialized-array-element-types*
+            '#.sb!kernel::*specialized-array-element-types*)
 
 (defvar *vector-without-complex-typecode-infos*
   #+sb-xc-host

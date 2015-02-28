@@ -174,7 +174,6 @@
   (show-and-call sb!kernel::!late-type-cold-init2)
   (show-and-call !alien-type-cold-init)
   (show-and-call !target-type-cold-init)
-  (show-and-call !vm-type-cold-init)
   ;; FIXME: It would be tidy to make sure that that these cold init
   ;; functions are called in the same relative order as the toplevel
   ;; forms of the corresponding source files.
