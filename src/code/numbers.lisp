@@ -1070,11 +1070,11 @@ and the number of 0 bits if INTEGER is negative."
                   (count (truly-the fixnum count)))
               (declare (fixnum length count))
               (cond ((and (plusp count)
-                          (> (+ length count)
-                             (integer-length most-positive-fixnum)))
+                          (>= (+ length count)
+                              sb!vm:n-word-bits))
                      (bignum-ashift-left (make-small-bignum integer) count))
                     (t
-                     (truly-the fixnum
+                     (truly-the (signed-byte #.sb!vm:n-word-bits)
                                 (ash (truly-the fixnum integer) count))))))
            ((minusp count)
             (if (minusp integer) -1 0))
