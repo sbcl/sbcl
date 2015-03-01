@@ -1197,6 +1197,30 @@
 (deftype deprecation-state ()
   '(member :early :late :final))
 
+(defun print-deprecation-message (name since &optional replacements stream)
+  (apply #'format stream
+         #+sb-xc-host
+         "~/sb!impl:print-symbol-with-prefix/ has been ~
+          deprecated as of SBCL ~A.~
+          ~#[~;~
+            ~2%Use ~/sb!impl:print-symbol-with-prefix/ instead.~;~
+            ~2%Use ~/sb!impl:print-symbol-with-prefix/ or ~
+            /sb!impl:print-symbol-with-prefix/ instead.~:;~
+            ~2%Use~@{~#[~; or~] ~
+            ~/sb!impl:print-symbol-with-prefix/~^,~} instead.~
+          ~]"
+         #-sb-xc-host
+         "~/sb-impl:print-symbol-with-prefix/ has been ~
+          deprecated as of SBCL ~A.~
+          ~#[~;~
+            ~2%Use ~/sb-impl:print-symbol-with-prefix/ instead.~;~
+            ~2%Use ~/sb-impl:print-symbol-with-prefix/ or ~
+            /sb-impl:print-symbol-with-prefix/ instead.~:;~
+            ~2%Use~@{~#[~; or~] ~
+            ~/sb-impl:print-symbol-with-prefix/~^,~} instead.~
+          ~]"
+         name since replacements))
+
 (defmacro define-deprecated-function (state since name replacements lambda-list
                                       &body body)
   (declare (type deprecation-state state)
@@ -1205,19 +1229,7 @@
            (type (or function-name list) replacements)
            (type list lambda-list))
   (let* ((replacements (normalize-deprecation-replacements replacements))
-         #!+sb-doc
-         (doc
-          (apply #'format nil
-                 "~/sb-impl:print-symbol-with-prefix/ has been ~
-                  deprecated as of SBCL ~A.~
-                  ~#[~;~
-                    ~2%Use ~/sb-impl:print-symbol-with-prefix/ instead.~;~
-                    ~2%Use ~/sb-impl:print-symbol-with-prefix/ or ~
-                    /sb-impl:print-symbol-with-prefix/ instead.~:;~
-                    ~2%Use~@{~#[~; or~] ~
-                    ~/sb-impl:print-symbol-with-prefix/~^,~} instead.~
-                  ~]"
-                 name since replacements)))
+         (doc (print-deprecation-message name since replacements)))
     `(prog1
          ,(ecase state
             ((:early :late)
@@ -1255,11 +1267,7 @@
             `',name)
      #!+sb-doc
      (setf (fdocumentation ',name 'variable)
-           ,(format nil "~@<~/sb-impl:print-symbol-with-prefix/ has ~
-                         been deprecated as of SBCL ~A.~@[~2% Use ~
-                         ~/sb-impl:print-symbol-with-prefix/ ~
-                         instead~].~:>"
-                    name since replacement))))
+           ,(print-deprecation-message name since (list replacement)))))
 
 ;;; Anaphoric macros
 (defmacro awhen (test &body body)
