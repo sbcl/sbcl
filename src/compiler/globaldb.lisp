@@ -623,9 +623,8 @@
 ;;; If true, then the type coresponding to this name. Note that if
 ;;; this is a built-in class with a translation, then this is the
 ;;; translation, not the class object. This info type keeps track of
-;;; various atomic types (NIL etc.) and also serves as a cache to
-;;; ensure that common standard types (atomic and otherwise) are only
-;;; consed once.
+;;; various atomic types (NIL etc.) and also serves as a means to
+;;; ensure that common standard types are only consed once.
 (define-info-type (:type :builtin) :type-spec (or ctype null))
 
 ;;; The classoid-cell for this type

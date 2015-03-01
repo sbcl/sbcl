@@ -1017,8 +1017,8 @@
 
 ;;; Take a list of type specifiers, computing the translation of each
 ;;; specifier and defining it as a builtin type.
-(declaim (ftype (function (list) (values)) precompute-types))
-(defun precompute-types (specs)
+(declaim (ftype (function (list) (values)) !precompute-types))
+(defun !precompute-types (specs)
   (dolist (spec specs)
     (let ((res (specifier-type spec)))
       (unless (unknown-type-p res)
