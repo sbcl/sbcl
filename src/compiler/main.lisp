@@ -691,6 +691,11 @@ necessary, since type inference may take arbitrarily long to converge.")
         (print-loop (component-outer-loop component))))
     |#
 
+    ;; This should happen at some point before PHYSENV-ANALYZE, and
+    ;; after RECORD-COMPONENT-XREFS.  Beyond that, I haven't really
+    ;; thought things through.  -- AJB, 2014-Jun-08
+    (eliminate-dead-code component)
+
     ;; FIXME: What is MAYBE-MUMBLE for? Do we need it any more?
     (maybe-mumble "env ")
     (physenv-analyze component)

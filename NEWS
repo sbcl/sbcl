@@ -13,6 +13,8 @@ changes relative to sbcl-1.2.9:
     (policy),SB-EXT:QUIT,SB-UNIX:UNIX-EXIT,SB-DEBUG:*SHOW-ENTRY-POINT-DETAILS*
   * bug-fix: sb-bsd-sockets on win32 uses proper C function declrations.
     (lp#1426667)
+  * bug fix: A new dead code elimination phase removes dead code loops
+    that confuse stack analysis. (lp#1255782, lp#308914)
 
 changes in sbcl-1.2.9 relative to sbcl-1.2.8:
   * minor incompatible change and bug fix: unboxed numeric constants

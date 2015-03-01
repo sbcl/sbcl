@@ -523,6 +523,7 @@
  ("src/compiler/generic/vm-tran")
  ("src/compiler/locall")
  ("src/compiler/dfo")
+ ("src/compiler/dce")
  ("src/compiler/checkgen")
  ("src/compiler/constraint")
  ("src/compiler/physenvanal")
