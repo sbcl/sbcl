@@ -602,6 +602,8 @@
 ;;; that are implemented as structures. For PCL classes, that have
 ;;; only been compiled, but not loaded yet, we return
 ;;; :FORTHCOMING-DEFCLASS-TYPE.
+;;; The only major distinction between :PRIMITIVE and :DEFINED
+;;; is how badly the system complains about attempted redefinition.
 (define-info-type (:type :kind)
   :type-spec (member :primitive :defined :instance
                      :forthcoming-defclass-type nil)
@@ -611,13 +613,26 @@
                          (error 'declaration-type-conflict-error
                                 :format-arguments (list name)))))
 
-;;; the expander function for a defined type
-(define-info-type (:type :expander) :type-spec (or function null))
-
 (define-info-type (:type :documentation) :type-spec (or string null))
 
+;;; The expander function for a defined type.
+;;; It returns a type expression, not a CTYPE.
+(define-info-type (:type :expander)
+  :type-spec (or function null)
+  ;; This error is never seen by a user.
+  ;; The user sees "illegal to redefine standard type".
+  :validate-function (lambda (name new-value)
+                       (when (and new-value (info :type :translator name))
+                         (error "Type has a translator"))))
+
 ;;; function that parses type specifiers into CTYPE structures
-(define-info-type (:type :translator) :type-spec (or function null))
+(define-info-type (:type :translator)
+  :type-spec (or function null)
+  ;; This error is never seen by a user. After meta-compile there is no
+  ;; means to define additional types with custom translators.
+  :validate-function (lambda (name new-value)
+                       (when (and new-value (info :type :expander name))
+                         (error "Type has an expander"))))
 
 ;;; If true, then the type coresponding to this name. Note that if
 ;;; this is a built-in class with a translation, then this is the

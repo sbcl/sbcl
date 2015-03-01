@@ -17,16 +17,11 @@
 ;;;; implementation-dependent DEFTYPEs
 
 ;;; Make DOUBLE-FLOAT a synonym for LONG-FLOAT, SINGLE-FLOAT for
-;;; SHORT-FLOAT. This is expanded before the translator gets a chance,
-;;; so we will get precedence.
-#!-long-float
-(setf (info :type :kind 'long-float) :defined)
-#!-long-float
-(sb!xc:deftype long-float (&optional low high)
-  `(double-float ,low ,high))
-(setf (info :type :kind 'short-float) :defined)
-(sb!xc:deftype short-float (&optional low high)
-  `(single-float ,low ,high))
+;;; SHORT-FLOAT. This is done by way of an "expander", not a "translator".
+;;; !PRECOMPUTE-TYPES will turn their :TYPE :KIND into :PRIMITIVE
+;;; in the target image so that they become not redefinable.
+(sb!xc:deftype long-float (&optional low high) `(double-float ,low ,high))
+(sb!xc:deftype short-float (&optional low high) `(single-float ,low ,high))
 
 ;;; worst-case values for float attributes
 (sb!xc:deftype float-exponent ()

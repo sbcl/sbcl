@@ -2269,10 +2269,11 @@ used for a COMPLEX component.~:@>"
 (defmacro !define-float-format (f)
   `(!def-bounded-type ,f float ,f))
 
-(!define-float-format short-float)
+;; (!define-float-format short-float) ; it's a DEFTYPE
 (!define-float-format single-float)
 (!define-float-format double-float)
-(!define-float-format long-float)
+;; long-float support is dead.
+;; (!define-float-format long-float) ; also a DEFTYPE
 
 (defun numeric-types-intersect (type1 type2)
   (declare (type numeric-type type1 type2))
