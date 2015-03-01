@@ -83,8 +83,6 @@
 
  ;; for socket-receive
  (:type socklen-t "int")
- (:type size-t "size_t")
- (:type ssize-t "ssize_t")
 
  (:structure in-addr ("struct in_addr"
                       ((array (unsigned 8)) addr "u_int32_t" "s_addr")))
@@ -160,7 +158,7 @@
                       (socket int) ; KLUDGE: should be SOCKET, not int.
                       (how int)))
 
- (:function win32-recvfrom ("recvfrom" ssize-t
+ (:function win32-recvfrom ("recvfrom" int
                             (socket int)
                             (buf (* t))
                             (len integer)
@@ -174,16 +172,16 @@
                         (len integer)
                         (flags integer)))
 
- (:function win32-send ("send" ssize-t
+ (:function win32-send ("send" int
                         (socket int)
                         (buf (* t))
-                        (len size-t)
+                        (len int)
                         (flags int)))
 
  (:function win32-sendto ("sendto" int
                           (socket int)
                           (buf (* t))
-                          (len size-t)
+                          (len int)
                           (flags int)
                           (sockaddr (* t)) ; KLUDGE: sockaddr-in or sockaddr-un?
                           (socklen socklen-t)))
