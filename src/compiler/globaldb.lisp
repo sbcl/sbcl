@@ -606,8 +606,7 @@
   :type-spec (member :primitive :defined :instance
                      :forthcoming-defclass-type nil)
   :validate-function (lambda (name new-value)
-                       (declare (ignore new-value)
-                                (notinline info))
+                       (declare (ignore new-value))
                        (when (info :declaration :recognized name)
                          (error 'declaration-type-conflict-error
                                 :format-arguments (list name)))))
@@ -659,8 +658,7 @@
   ;; There's no portable way to unproclaim that a symbol is a declaration,
   ;; but at the low-level permit new-value to be NIL.
   :validate-function (lambda (name new-value)
-                       (declare (symbol name)
-                                (notinline info))
+                       (declare (symbol name))
                        (cond (new-value
                               (when (info :type :kind name)
                                 (error 'declaration-type-conflict-error
