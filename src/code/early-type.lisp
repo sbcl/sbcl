@@ -921,9 +921,9 @@ Returns two values: the expansion, and a boolean that is true when
 expansion happened."
   (declare (type type-specifier type-specifier))
   (declare (ignore env))
-  (multiple-value-bind (expander lspec)
-      (let ((spec type-specifier))
-        (cond ((and (symbolp spec) (info :type :builtin spec))
+  (let* ((spec type-specifier)
+         (atom (if (listp spec) (car spec) spec))
+         (expander (and (symbolp atom) (info :type :expander atom))))
                ;; We do not expand builtins even though it'd be
                ;; possible to do so sometimes (e.g. STRING) for two
                ;; reasons:
@@ -931,20 +931,8 @@ expansion happened."
                ;; a) From a user's point of view, CL types are opaque.
                ;;
                ;; b) so (EQUAL (TYPEXPAND 'STRING) (TYPEXPAND-ALL 'STRING))
-               (values nil nil))
-              ((symbolp spec)
-               (values (info :type :expander spec) spec))
-              ((and (consp spec) (symbolp (car spec)) (info :type :builtin (car spec)))
-               ;; see above
-               (values nil nil))
-              ((and (consp spec) (symbolp (car spec)))
-               (values (info :type :expander (car spec)) spec))
-              (t nil)))
-    (if expander
-        (values (funcall expander (if (symbolp lspec)
-                                      (list lspec)
-                                      lspec))
-                t)
+    (if (and expander (not (info :type :builtin atom)))
+        (values (funcall expander (if (symbolp spec) (list spec) spec)) t)
         (values type-specifier nil))))
 
 (defun typexpand (type-specifier &optional env)
