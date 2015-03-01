@@ -100,6 +100,45 @@ include the pathname of the file and the position of the definition."
 FBOUNDP."
   (and (sb-int:valid-function-name-p name) t))
 
+;;;; Utilities for code
+
+(declaim (inline map-code-constants))
+(defun map-code-constants (code fn)
+  "Call FN for each constant in CODE's constant pool."
+  (check-type code sb-kernel:code-component)
+  (loop for i from sb-vm:code-constants-offset below
+       (sb-kernel:get-header-data code)
+     do (funcall fn (sb-kernel:code-header-ref code i))))
+
+(declaim (inline map-allocated-code-components))
+(defun map-allocated-code-components (spaces fn)
+  "Call FN for each allocated code component in one of SPACES.  FN
+receives the object and its size as arguments.  SPACES should be a
+list of the symbols :dynamic, :static, or :read-only."
+  (dolist (space spaces)
+    (sb-vm::map-allocated-objects
+     (lambda (obj header size)
+       (when (= sb-vm:code-header-widetag header)
+         (funcall fn obj size)))
+     space)))
+
+(declaim (inline map-caller-code-components))
+(defun map-caller-code-components (function spaces fn)
+  "Call FN for each code component with a fdefn for FUNCTION in its
+constant pool."
+  (let ((function (coerce function 'function)))
+    (map-allocated-code-components
+     spaces
+     (lambda (obj size)
+       (declare (ignore size))
+       (map-code-constants
+        obj
+        (lambda (constant)
+          (when (and (sb-kernel:fdefn-p constant)
+                     (eq (sb-kernel:fdefn-fun constant)
+                         function))
+            (funcall fn obj))))))))
+
 ;;;; Finding definitions
 
 (defstruct definition-source
@@ -490,7 +529,7 @@ value."
 
 ;;;; find callers/callees, liberated from Helmut Eller's code in SLIME
 
-;;; This interface is trmendously experimental.
+;;; This interface is tremendously experimental.
 
 ;;; For the moment I'm taking the view that FDEFN is an internal
 ;;; object (one out of one CMUCL developer surveyed didn't know what
@@ -514,7 +553,6 @@ value."
                callees))))
     callees))
 
-
 (defun find-function-callers (function &optional (spaces '(:read-only :static
                                                            :dynamic)))
   "Return functions which call FUNCTION, by searching SPACES for code objects"
@@ -531,43 +569,6 @@ value."
                       while e
                       do (pushnew e referrers)))))))
     referrers))
-
-(declaim (inline map-code-constants)) ; FIXME: out-of-order
-(defun map-code-constants (code fn)
-  "Call FN for each constant in CODE's constant pool."
-  (check-type code sb-kernel:code-component)
-  (loop for i from sb-vm:code-constants-offset below
-        (sb-kernel:get-header-data code)
-        do (funcall fn (sb-kernel:code-header-ref code i))))
-
-(declaim (inline map-allocated-code-components))
-(defun map-allocated-code-components (spaces fn)
-  "Call FN for each allocated code component in one of SPACES.  FN
-receives the object and its size as arguments.  SPACES should be a
-list of the symbols :dynamic, :static, or :read-only."
-  (dolist (space spaces)
-    (sb-vm::map-allocated-objects
-     (lambda (obj header size)
-       (when (= sb-vm:code-header-widetag header)
-         (funcall fn obj size)))
-     space)))
-
-(declaim (inline map-caller-code-components)) ; FIXME: out-of-order
-(defun map-caller-code-components (function spaces fn)
-  "Call FN for each code component with a fdefn for FUNCTION in its
-constant pool."
-  (let ((function (coerce function 'function)))
-    (map-allocated-code-components
-     spaces
-     (lambda (obj size)
-       (declare (ignore size))
-       (map-code-constants
-        obj
-        (lambda (constant)
-          (when (and (sb-kernel:fdefn-p constant)
-                     (eq (sb-kernel:fdefn-fun constant)
-                         function))
-            (funcall fn obj))))))))
 
 ;;; XREF facility
 
