@@ -322,11 +322,13 @@
                      (setf (block-flag block) t)
                      (incf todo)))))
         do (when (= last-todo todo)
-             ;; If the todo count is the same as on last iteration, it means
-             ;; we are stuck, which in turn means the unmarked blocks are
-             ;; actually unreachable, so UVL set ordering for them doesn't
-             ;; matter.
-             (return-from order-uvl-sets))
+             ;; If the todo count is the same as on last iteration and
+             ;; there are still blocks to do, it means we are stuck,
+             ;; which in turn means the unmarked blocks are actually
+             ;; unreachable and should have been eliminated by DCE,
+             ;; and will very likely cause problems with later parts
+             ;; of STACK analysis, so abort now if we're in trouble.
+             (aver (not (plusp todo))))
         while (plusp todo)))
 
 ;;; This is called when we discover that the stack-top unknown-values
