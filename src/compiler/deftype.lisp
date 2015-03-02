@@ -19,6 +19,7 @@
 (defun %deftype (name)
   (setf (classoid-cell-pcl-class (find-classoid-cell name :create t)) nil))
 
+(defvar !*xc-processed-deftypes* nil)
 (def!macro sb!xc:deftype (&whole form name lambda-list &body body)
   #!+sb-doc
   "Define a new type, with syntax like DEFMACRO."
@@ -43,6 +44,11 @@
                         doc
                         nil)))))
     `(progn
+       #+sb-xc-host
+       (eval-when (:compile-toplevel)
+         ;; This needs to be in the macroexpansion when building the xc,
+         ;; but not when running the xc. But it's harmless in the latter.
+         (pushnew ',name !*xc-processed-deftypes*))
        (eval-when (:compile-toplevel :load-toplevel :execute)
          (%compiler-deftype ',name
                             ',lambda-list

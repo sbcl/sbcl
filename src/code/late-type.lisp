@@ -1023,17 +1023,7 @@
     (let ((res (specifier-type spec)))
       (unless (unknown-type-p res)
         (setf (info :type :builtin spec) res)
-        ;; KLUDGE: the three copies of this idiom in this file (and
-        ;; the one in class.lisp as at sbcl-0.7.4.1x) should be
-        ;; coalesced, or perhaps the error-detecting code that
-        ;; disallows redefinition of :PRIMITIVE types should be
-        ;; rewritten to use *TYPE-SYSTEM-FINALIZED* (rather than
-        ;; *TYPE-SYSTEM-INITIALIZED*). The effect of this is not to
-        ;; cause redefinition errors when precompute-types is called
-        ;; for a second time while building the target compiler using
-        ;; the cross-compiler. -- CSR, trying to explain why this
-        ;; isn't completely wrong, 2002-06-07
-        (setf (info :type :kind spec) #+sb-xc-host :defined #-sb-xc-host :primitive))))
+        (setf (info :type :kind spec) :primitive))))
   (values))
 
 ;;;; general TYPE-UNION and TYPE-INTERSECTION operations
@@ -1143,8 +1133,7 @@
               `(progn
                  (setq ,var
                        (mark-ctype-interned (make-named-type :name ',name)))
-                 (setf (info :type :kind ',name)
-                       #+sb-xc-host :defined #-sb-xc-host :primitive)
+                 (setf (info :type :kind ',name) :primitive)
                  (setf (info :type :builtin ',name) ,var))))
    ;; KLUDGE: In ANSI, * isn't really the name of a type, it's just a
    ;; special symbol which can be stuck in some places where an
@@ -2037,9 +2026,8 @@
              (t nil))))))
 
 
-(!cold-init-forms
-  (setf (info :type :kind 'number)
-        #+sb-xc-host :defined #-sb-xc-host :primitive)
+(!cold-init-forms ;; is !PRECOMPUTE-TYPES not doing the right thing?
+  (setf (info :type :kind 'number) :primitive)
   (setf (info :type :builtin 'number)
         (make-numeric-type :complexp nil)))
 

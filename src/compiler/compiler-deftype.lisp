@@ -18,7 +18,12 @@
       (:symbol name "defining ~A as a type specifier"))
   (ecase (info :type :kind name)
     (:primitive
-     (when *type-system-initialized*
+     ;; The allowance for already-processed deftypes works around the issue that
+     ;; building the cross-compiler made these :primitive and not re-definable.
+     ;; One remedy was to claim that they weren't :primitive, which made the xc
+     ;; model of the target's type system not a faithful reflection.
+     (when (and *type-system-initialized*
+                #+sb-xc-host (not (member name !*xc-processed-deftypes*)))
        (error "illegal to redefine standard type: ~S" name)))
     (:instance
      (warn "The class ~S is being redefined to be a DEFTYPE." name)

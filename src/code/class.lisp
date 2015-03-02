@@ -1459,7 +1459,7 @@ between the ~A definition and the ~A definition"
                            nil
                            (mapcar #'find-classoid direct-superclasses)))))
         (mark-ctype-interned classoid)
-        (setf (info :type :kind name) #+sb-xc-host :defined #-sb-xc-host :primitive
+        (setf (info :type :kind name) :primitive
               (classoid-cell-classoid (find-classoid-cell name :create t)) classoid)
         (unless trans-p
           (setf (info :type :builtin name) classoid))
