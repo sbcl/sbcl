@@ -352,6 +352,8 @@
                       ;; to record locations, which is strange because the main
                       ;; compiler does not have similar logic afaict.
                       ((source-location)
+                       ;; FIXME: since the fopcompiler expands compiler-macros,
+                       ;; this case should probably be killed. It can't execute.
                        (if (policy *policy* (and (> space 1)
                                                  (> space debug)))
                            (fopcompile-constant nil for-value-p)
@@ -362,17 +364,21 @@
                       ((if)
                        (fopcompile-if args path for-value-p))
                       ((progn locally)
-                       (loop for (arg . next) on args
+                       (if (and for-value-p (endp args))
+                           (fopcompile nil path t)
+                           (loop for (arg . next) on args
                              do (fopcompile arg
                                             path (if next
                                                      nil
-                                                     for-value-p))))
+                                                     for-value-p)))))
                       ((setq)
-                       (loop for (name value . next) on args by #'cddr
+                       (if (and for-value-p (endp args))
+                           (fopcompile nil path t)
+                           (loop for (name value . next) on args by #'cddr
                              do (fopcompile `(set ',name ,value) path
                                             (if next
                                                 nil
-                                                for-value-p))))
+                                                for-value-p)))))
                       ((eval-when)
                        (destructuring-bind (situations &body body) args
                          (if (or (member :execute situations)

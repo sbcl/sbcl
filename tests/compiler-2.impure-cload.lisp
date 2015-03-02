@@ -16,6 +16,16 @@
 ;;;; recognize self-calls
 (declaim (optimize speed))
 
+;;; This is a fopcompilable form that caused FOP stack underflow
+;;; because the PROGN and SETQ each failed to push a NIL onto the stack.
+;;; >>> DO NOT ADD A (WITH-TEST) TO THIS. <<< It must stay fopcompilable.
+(let ((a (progn)) ; lp# 1427050
+      (b (setq))
+      (b (+ 1 2)))
+  (defvar *aaa* a)
+  (defvar *bbb* b))
+
+
 ;;;; These three forms should be equivalent.
 
 ;;; This used to be a bug in the handling of null-lexenv vs toplevel

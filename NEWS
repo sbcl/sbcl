@@ -18,6 +18,9 @@ changes relative to sbcl-1.2.9:
     (lp#1426667)
   * bug fix: A new dead code elimination phase removes dead code loops
     that confuse stack analysis. (lp#1255782, lp#308914)
+  * bug fix: A toplevel form which was simple enough to bypass the main
+    compiler in COMPILE-FILE, and which contained an empty SETQ or PROGN
+    would produce an invalid fasl file. (lp#1427050)
 
 changes in sbcl-1.2.9 relative to sbcl-1.2.8:
   * minor incompatible change and bug fix: unboxed numeric constants
