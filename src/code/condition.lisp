@@ -1650,54 +1650,56 @@ the usual naming convention (names like *FOO*) for special variables"
    (runtime-error :initarg :runtime-error :reader deprecated-name-runtime-error)))
 
 (def!method print-object ((condition deprecation-condition) stream)
-  (let ((*package* (find-package :keyword)))
+  (flet ((print-it (stream)
+           (sb!impl::print-deprecation-message
+            (deprecated-name condition)
+            (deprecated-since condition)
+            (deprecated-name-replacements condition)
+            stream)))
     (if *print-escape*
         (print-unreadable-object (condition stream :type t)
-          (apply #'format
-                 stream "~S is deprecated.~
-                         ~#[~; Use ~S instead.~; ~
-                               Use ~S or ~S instead.~:; ~
-                               Use~@{~#[~; or~] ~S~^,~} instead.~]"
-                  (deprecated-name condition)
-                  (deprecated-name-replacements condition)))
-        (apply #'format
-               stream "~@<~S has been deprecated as of SBCL ~A.~
-                       ~#[~; Use ~S instead.~; ~
-                             Use ~S or ~S instead.~:; ~
-                             Use~@{~#[~; or~] ~S~^,~:_~} instead.~]~:@>"
-                (deprecated-name condition)
-                (deprecated-since condition)
-                (deprecated-name-replacements condition)))))
+          (print-it stream))
+        (print-it stream))))
 
-(define-condition early-deprecation-warning (style-warning deprecation-condition)
-  ())
+(macrolet ((define-deprecation-warning
+               (name superclass check-runtime-error format-string)
+             `(progn
+                (define-condition ,name (,superclass deprecation-condition) ())
 
-(def!method print-object :after ((warning early-deprecation-warning) stream)
-  (unless *print-escape*
-    (let ((*package* (find-package :keyword)))
-      (format stream "~%~@<~:@_In future SBCL versions ~S will signal a full warning ~
-                      at compile-time.~:@>"
-              (deprecated-name warning)))))
+                (def!method print-object :after ((condition ,name) stream)
+                  (when (and (not *print-escape*)
+                             ,@(when check-runtime-error
+                                `((deprecated-name-runtime-error condition))))
+                    (format stream ,format-string
+                            (deprecated-name condition)))))))
 
-(define-condition late-deprecation-warning (warning deprecation-condition)
-  ())
+  (define-deprecation-warning early-deprecation-warning style-warning nil
+    #+sb-xc-host
+    "~%~@<~:@_In future SBCL versions ~
+     ~/sb!impl:print-symbol-with-prefix/ will signal a full warning ~
+     at compile-time.~:@>"
+    #-sb-xc-host
+    "~%~@<~:@_In future SBCL versions ~
+     ~/sb-impl:print-symbol-with-prefix/ will signal a full warning ~
+     at compile-time.~:@>")
 
-(def!method print-object :after ((warning late-deprecation-warning) stream)
-  (unless *print-escape*
-    (when (deprecated-name-runtime-error warning)
-      (let ((*package* (find-package :keyword)))
-        (format stream "~%~@<~:@_In future SBCL versions ~S will signal a runtime error.~:@>"
-                (deprecated-name warning))))))
+  (define-deprecation-warning late-deprecation-warning warning t
+    #+sb-xc-host
+    "~%~@<~:@_In future SBCL versions ~
+     ~/sb!impl:print-symbol-with-prefix/ will signal a runtime ~
+     error.~:@>"
+    #-sb-xc-host
+    "~%~@<~:@_In future SBCL versions ~
+     ~/sb-impl:print-symbol-with-prefix/ will signal a runtime ~
+     error.~:@>")
 
-(define-condition final-deprecation-warning (warning deprecation-condition)
-  ())
-
-(def!method print-object :after ((warning final-deprecation-warning) stream)
-  (unless *print-escape*
-    (when (deprecated-name-runtime-error warning)
-      (let ((*package* (find-package :keyword)))
-        (format stream "~%~@<~:@_An error will be signaled at runtime for ~S.~:@>"
-                (deprecated-name warning))))))
+  (define-deprecation-warning final-deprecation-warning warning t
+    #+sb-xc-host
+    "~%~@<~:@_An error will be signaled at runtime for ~
+     ~/sb!impl:print-symbol-with-prefix/.~:@>"
+    #-sb-xc-host
+    "~%~@<~:@_An error will be signaled at runtime for ~
+     ~/sb-impl:print-symbol-with-prefix/.~:@>"))
 
 (define-condition deprecation-error (error deprecation-condition)
   ())
