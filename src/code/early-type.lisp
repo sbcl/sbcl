@@ -862,9 +862,11 @@
               (when (and (atom spec)
                          (member spec '(and or not member eql satisfies values)))
                 (error "The symbol ~S is not valid as a type specifier." spec))
-              (let ((fun (info :type :translator (if (consp spec) (car spec) spec))))
-                (cond (fun
-                       (funcall fun (if (atom spec) (list spec) spec)))
+              (let ((fun-or-ctype
+                     (info :type :translator (if (consp spec) (car spec) spec))))
+                (cond ((functionp fun-or-ctype)
+                       (funcall fun-or-ctype (if (atom spec) (list spec) spec)))
+                      (fun-or-ctype)
                       ((or (and (consp spec) (symbolp (car spec))
                                 (not (info :type :builtin (car spec))))
                            (and (symbolp spec) (not (info :type :builtin spec))))

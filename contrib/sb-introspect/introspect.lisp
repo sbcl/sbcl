@@ -457,7 +457,7 @@ value."
      (sb-int:info :type :lambda-list typespec-operator))
     (:primitive
      (let ((translator-fun (sb-int:info :type :translator typespec-operator)))
-       (if translator-fun
+       (if (functionp translator-fun)
            (values (sb-kernel:%fun-lambda-list translator-fun) t)
            ;; Some builtin types (e.g. STRING) do not have a
            ;; translator, but they were actually defined via DEFTYPE

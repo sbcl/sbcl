@@ -672,19 +672,13 @@
     (setq classoid (find-classoid classoid nil)))
   (etypecase classoid
     (null)
-    (built-in-classoid
-     (let ((translation (built-in-classoid-translation classoid)))
-       (cond
-         (translation
-          (aver (ctype-p translation))
-          (setf (info :type :translator class)
-                (lambda (spec) (declare (ignore spec)) translation)))
-         (t
-          (setf (info :type :translator class)
-                (lambda (spec) (declare (ignore spec)) classoid))))))
     (classoid
+     ;; There used to be an AVER preventing the placeholder :INITIALIZING from
+     ;; sneaking into globaldb. It can't any more due to type-safe (SETF INFO).
      (setf (info :type :translator class)
-           (lambda (spec) (declare (ignore spec)) classoid)))))
+           (or (and (typep classoid 'built-in-classoid)
+                    (built-in-classoid-translation classoid))
+               classoid)))))
 
 (!bootstrap-meta-braid)
 (!bootstrap-accessor-definitions t)

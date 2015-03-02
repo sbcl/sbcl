@@ -341,7 +341,7 @@
   (setf (slot-value specl '%type)
         `(eql ,(specializer-object specl)))
   (setf (info :type :translator specl)
-        (constantly (make-member-type :members (list (specializer-object specl))))))
+        (make-member-type :members (list (specializer-object specl)))))
 
 (defun real-load-defclass (name metaclass-name supers slots other
                            readers writers slot-names source-location safe-p)

@@ -807,8 +807,7 @@ between the ~A definition and the ~A definition"
                        (or (info :type :kind name) :defined))
                  (let ((translation (built-in-classoid-translation new-value)))
                    (when translation
-                     (setf (info :type :translator name)
-                           (lambda (c) (declare (ignore c)) translation)))))
+                     (setf (info :type :translator name) translation))))
                 (t
                  (setf (info :type :kind name) :instance)))
           (setf (classoid-cell-classoid cell) new-value)
