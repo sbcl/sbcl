@@ -1230,6 +1230,7 @@
            (type list lambda-list))
   (let* ((replacements (normalize-deprecation-replacements replacements))
          (doc (print-deprecation-message name since replacements)))
+    (declare (ignorable doc))
     `(prog1
          ,(ecase state
             ((:early :late)
