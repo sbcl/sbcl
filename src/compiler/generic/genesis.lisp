@@ -2520,6 +2520,8 @@ core and return a descriptor to it."
 (define-cold-fop (fop-fdefn)
   (cold-fdefinition-object (pop-stack)))
 
+(not-cold-fop fop-known-fun)
+
 #!-(or x86 x86-64)
 (define-cold-fop (fop-sanctify-for-execution)
   (pop-stack))

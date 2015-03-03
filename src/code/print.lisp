@@ -135,61 +135,6 @@ variable: an unreadable object representing the error is printed instead.")
 
 ;;;; routines to print objects
 
-
-;;; keyword variables shared by WRITE and WRITE-TO-STRING, and
-;;; the bindings they map to.
-(eval-when (:compile-toplevel :load-toplevel :execute)
-  (defun compiler-expand-write-mumble (fn form object keys)
-    (do (streamvar bind ignore)
-        ((not (cdr keys))
-         (if keys
-             form ; Odd number of keys, fail by returning the original form
-             (let* ((objvar (copy-symbol 'object))
-                    (bind `((,objvar ,object) ,@(nreverse bind)))
-                    (ignore (when ignore `((declare (ignore ,@ignore))))))
-               (case fn
-                 (write
-                  `(let ,bind ,@ignore
-                     (output-object ,objvar
-                                    ,(if streamvar
-                                         `(out-synonym-of ,streamvar)
-                                         '*standard-output*))
-                     ,objvar))
-                 (write-to-string
-                  (if (cdr bind)
-                      `(let ,bind ,@ignore (stringify-object ,objvar))
-                      `(stringify-object ,object)))))))
-      (let* ((key (pop keys))
-             (value (pop keys))
-             (variable
-              (cond ((getf '(:escape *print-escape*
-                             :radix *print-radix*
-                             :base *print-base*
-                             :circle *print-circle*
-                             :pretty *print-pretty*
-                             :level *print-level*
-                             :length *print-length*
-                             :case *print-case*
-                             :array *print-array*
-                             :gensym *print-gensym*
-                             :readably *print-readably*
-                             :right-margin *print-right-margin*
-                             :miser-width *print-miser-width*
-                             :lines *print-lines*
-                             :pprint-dispatch *print-pprint-dispatch*
-                             :suppress-errors *suppress-print-errors*)
-                           key))
-                    ((and (eq key :stream) (eq fn 'write))
-                     (or streamvar (setq streamvar (copy-symbol 'stream))))
-                    (t
-                     (return form)))))
-        (when (assoc variable bind)
-          ;; First key has precedence, but we still need to execute the
-          ;; argument, and in the right order.
-          (setf variable (gensym "IGNORE"))
-          (push variable ignore))
-        (push (list variable value) bind)))))
-
 (defun write (object &key
                      ((:stream stream) *standard-output*)
                      ((:escape *print-escape*) *print-escape*)
@@ -216,10 +161,6 @@ variable: an unreadable object representing the error is printed instead.")
   "Output OBJECT to the specified stream, defaulting to *STANDARD-OUTPUT*."
   (output-object object (out-synonym-of stream))
   object)
-
-;;; Optimize common case of constant keyword arguments
-(define-compiler-macro write (&whole form object &rest keys)
-  (compiler-expand-write-mumble 'write form object keys))
 
 (defun prin1 (object &optional stream)
   #!+sb-doc
@@ -281,10 +222,6 @@ variable: an unreadable object representing the error is printed instead.")
   #!+sb-doc
   "Return the printed representation of OBJECT as a string."
   (stringify-object object))
-
-;;; Optimize common case of constant keyword arguments
-(define-compiler-macro write-to-string (&whole form object &rest keys)
-  (compiler-expand-write-mumble 'write-to-string form object keys))
 
 (defun prin1-to-string (object)
   #!+sb-doc
@@ -537,38 +474,7 @@ variable: an unreadable object representing the error is printed instead.")
 ;;; This variable contains the current definition of one of three
 ;;; symbol printers. SETUP-PRINTER-STATE sets this variable.
 (defvar *internal-symbol-output-fun* nil)
-
-;;; This function sets the internal global symbol
-;;; *INTERNAL-SYMBOL-OUTPUT-FUN* to the right function depending on
-;;; the value of *PRINT-CASE*. See the manual for details. The print
-;;; buffer stream is also reset.
-(defun setup-printer-state ()
-  (unless (and (eq *print-case* *previous-case*)
-               (eq (readtable-case *readtable*) *previous-readtable-case*))
-    (setq *previous-case* *print-case*)
-    (setq *previous-readtable-case* (readtable-case *readtable*))
-    (unless (member *print-case* '(:upcase :downcase :capitalize))
-      (setq *print-case* :upcase)
-      (error "invalid *PRINT-CASE* value: ~S" *previous-case*))
-    (unless (member *previous-readtable-case*
-                    '(:upcase :downcase :invert :preserve))
-      (setf (readtable-case *readtable*) :upcase)
-      (error "invalid READTABLE-CASE value: ~S" *previous-readtable-case*))
-
-    (setq *internal-symbol-output-fun*
-          (case *previous-readtable-case*
-            (:upcase
-             (case *print-case*
-               (:upcase #'output-preserve-symbol)
-               (:downcase #'output-lowercase-symbol)
-               (:capitalize #'output-capitalize-symbol)))
-            (:downcase
-             (case *print-case*
-               (:upcase #'output-uppercase-symbol)
-               (:downcase #'output-preserve-symbol)
-               (:capitalize #'output-capitalize-symbol)))
-            (:preserve #'output-preserve-symbol)
-            (:invert #'output-invert-symbol)))))
+(declaim (function *internal-symbol-output-fun*))
 
 ;;; Output PNAME (a symbol-name or package-name) surrounded with |'s,
 ;;; and with any embedded |'s or \'s escaped.
@@ -762,7 +668,7 @@ variable: an unreadable object representing the error is printed instead.")
            (bases *digit-bases*)
            (base *print-base*)
            (letter-attribute
-            (case (readtable-case *readtable*)
+            (case (%readtable-case *readtable*)
               (:upcase uppercase-attribute)
               (:downcase lowercase-attribute)
               (t (logior lowercase-attribute uppercase-attribute))))
@@ -925,7 +831,7 @@ variable: an unreadable object representing the error is printed instead.")
 (defun output-capitalize-symbol (pname stream)
   (declare (simple-string pname))
   (let ((prev-not-alphanum t)
-        (up (eq (readtable-case *readtable*) :upcase)))
+        (up (eq (%readtable-case *readtable*) :upcase)))
     (dotimes (i (length pname))
       (let ((char (char pname i)))
         (write-char (if up
@@ -955,6 +861,33 @@ variable: an unreadable object representing the error is printed instead.")
           (all-lower (output-uppercase-symbol pname stream))
           (t
            (write-string pname stream)))))
+
+;;; Set the internal global symbol *INTERNAL-SYMBOL-OUTPUT-FUN*
+;;; to the right function depending on the values of *PRINT-CASE*
+;;; and (%READTABLE-CASE *READTABLE*).
+(defun setup-printer-state ()
+  (let ((readtable-case (%readtable-case *readtable*))
+        (print-case *print-case*))
+    (unless (and (eq print-case *previous-case*)
+                 (eq readtable-case *previous-readtable-case*))
+      (setq *previous-case* print-case)
+      (setq *previous-readtable-case* readtable-case)
+      (setq *internal-symbol-output-fun*
+            ;; a morally equivalent reformulation of FOP-KNOWN-FUN
+            (macrolet ((load-time-fn (name) `(load-time-value #',name t)))
+             (case readtable-case
+               (:upcase
+                (case print-case
+                  (:upcase (load-time-fn output-preserve-symbol))
+                  (:downcase (load-time-fn output-lowercase-symbol))
+                  (:capitalize (load-time-fn output-capitalize-symbol))))
+               (:downcase
+                (case print-case
+                  (:upcase (load-time-fn output-uppercase-symbol))
+                  (:downcase (load-time-fn output-preserve-symbol))
+                  (:capitalize (load-time-fn output-capitalize-symbol))))
+               (:preserve (load-time-fn output-preserve-symbol))
+               (:invert (load-time-fn output-invert-symbol))))))))
 
 #|
 (defun test1 ()
