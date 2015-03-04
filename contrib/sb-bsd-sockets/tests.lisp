@@ -480,23 +480,3 @@
 
   (define-shutdown-tests :output)
   (define-shutdown-tests :io))
-
-(deftest recvfrom-fail
-  (handler-case
-      (let ((socket (make-instance 'sb-bsd-sockets:inet-socket
-                                   :type :datagram
-                                   :protocol :udp)))
-        (unwind-protect
-             (progn
-               (sb-bsd-sockets:socket-bind socket #(0 0 0 0) 0)
-               (sb-bsd-sockets:socket-connect socket #(127 0 0 1) 111)
-               (let ((buffer (make-array 16 :element-type '(unsigned-byte 8))))
-                 (sb-bsd-sockets:socket-send socket buffer 16)
-                 (sb-bsd-sockets:socket-receive socket buffer 16
-                                                :element-type '(unsigned-byte 8)))
-               nil)
-          (sb-bsd-sockets:socket-close socket)))
-    (sb-bsd-sockets:socket-error ()
-      t)
-    (error ()))
-  t)
