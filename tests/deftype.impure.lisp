@@ -41,7 +41,7 @@
 
 ;; Ensure that DEFCLASS after DEFTYPE nukes the lambda-list.
 (defun get-deftype-lambda-list (symbol)
-  (let ((expander (sb-int:info :type :expander)))
+  (let ((expander (sb-int:info :type :expander symbol)))
     (and (functionp expander)
          (sb-kernel:%fun-lambda-list expander))))
 (deftype bar (x) `(integer ,x))
