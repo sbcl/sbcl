@@ -376,7 +376,7 @@
            ;; A soft warning seems appropriate because in this case it's
            ;; at least in theory not wrong to call the function.
            ;; The user can declare an FTYPE if both things are intentional.
-           (style-warn "defining setf macro for ~S when ~S is fbound"
+           (style-warn "defining setf macro for ~S when ~S is also defined"
                        name setf-fn-name)))))
     (assign-it))
     #+sb-xc

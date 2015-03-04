@@ -760,8 +760,8 @@ core and return a descriptor to it."
 ;;; Allocate a cons cell in GSPACE and fill it in with CAR and CDR.
 (defun cold-cons (car cdr &optional (gspace *dynamic*))
   (let ((dest (allocate-object gspace 2 sb!vm:list-pointer-lowtag)))
-    (write-memory dest car)
-    (write-wordindexed dest 1 cdr)
+    (write-wordindexed dest sb!vm:cons-car-slot car)
+    (write-wordindexed dest sb!vm:cons-cdr-slot cdr)
     dest))
 
 ;;; Make a simple-vector on the target that holds the specified

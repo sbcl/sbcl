@@ -821,7 +821,7 @@ of specialized arrays is supported."
 ;;; (setf aref/bit/sbit) are implemented using setf-functions,
 ;;; because they have to work with (setf (apply #'aref array subscripts))
 ;;; All other setfs can be done using setf-functions too, but I
-;;; haven't found technical advantages or disatvantages for either
+;;; haven't found technical advantages or disadvantages for either
 ;;; scheme.
 (defun (setf aref) (new-value array &rest subscripts)
   (declare (truly-dynamic-extent subscripts)
