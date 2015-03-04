@@ -367,11 +367,8 @@
            ;; This indicates probable user error. Compilation assumed something
            ;; to be functional; a macro says otherwise. Because :where-from's
            ;; default can be :assumed, PRESENT-P disambiguates "defaulted" from
-           ;; "known" to have made an existence assumption. Also, we define
-           ;; (SETF SLOT-VALUE) as a macro in warm build of PCL after
-           ;; its functional nature has been assumed, so it gets an exception.
-           ;; FIXME: maybe declaim its type earlier outside of the PCL build.
-           (when (and present-p (not (eq name 'slot-value)))
+           ;; "known" to have made an existence assumption.
+           (when present-p
              (warn "defining setf macro for ~S when ~S was previously ~
              treated as a function" name setf-fn-name)))
           (:defined

@@ -252,8 +252,12 @@ bootstrapping.
 
 (defun compile-or-load-defgeneric (fun-name)
   (proclaim-as-fun-name fun-name)
+  (when (typep fun-name '(cons (eql setf)))
+    (sb-c::warn-if-setf-macro fun-name))
   (note-name-defined fun-name :function)
   (unless (eq (info :function :where-from fun-name) :declared)
+    ;; Hmm. This is similar to BECOME-DEFINED-FUN-NAME
+    ;; except that it doesn't clear an :ASSUMED-TYPE. Should it?
     (setf (info :function :where-from fun-name) :defined)
     (setf (info :function :type fun-name)
           (specifier-type 'function))))

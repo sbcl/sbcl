@@ -203,6 +203,9 @@ evaluated as a PROGN."
       `(progn
          (eval-when (:compile-toplevel)
            (sb!c:%compiler-defun ',name ',inline-lambda t))
+         ,@(when (typep name '(cons (eql setf)))
+             `((eval-when (:compile-toplevel :execute)
+                 (sb!c::warn-if-setf-macro ',name))))
          (%defun ',name ,named-lambda ,doc ',inline-lambda
                  (sb!c:source-location))))))
 

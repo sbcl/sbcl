@@ -73,20 +73,6 @@
   (when (boundp '*free-funs*)       ; when compiling
     (remhash name *free-funs*))
 
-  ;; It's uncommon for users to define both a SETF macro and function for
-  ;; the same thing, so usually we warn about it, but offer a somewhat arbitrary
-  ;; escape to avoid a warning - if the function gets an ftype proclaimed
-  ;; before DEFSETF (or -EXPANDER) is used, we don't complain about the macro.
-  ;; SBCL itself provides most SETFable things both ways even when CLHS does not
-  ;; say specifically that #'(SETF x) exists.
-  ;; But when building SBCL the order of function/macro definition is not
-  ;; directly controlled because most SETF functions are defined en masse by
-  ;; 'setf-funs' with no regard for what exists, and we also have to respect
-  ;; all other constraints on build order to make bootstrap work.
-  ;; So, ... just don't warn when running the cross-compiler, which means
-  ;; don't compile this line in when building the cross-compiler.
-  #-sb-xc-host(note-if-setf-fun-and-macro name)
-
   (values))
 
 ;;; This is called to do something about SETF functions that overlap
@@ -95,14 +81,17 @@
 ;;; warning. Due to the weak semantics of the (SETF FUNCTION) name, we
 ;;; can't assume that they aren't just naming a function (SETF FOO)
 ;;; for the heck of it. NAME is already known to be well-formed.
-(defun note-if-setf-fun-and-macro (name)
-  (when (and (consp name)
-             (eq (car name) 'setf))
-    (let ((stem (second name)))
-      (when (or (info :setf :inverse stem) (info :setf :expander stem))
-        (compiler-style-warn
+(defun warn-if-setf-macro (name)
+  ;; Never warn about this situation when running the cross-compiler.
+  ;; SBCL provides expanders/inverses *and* functions for most SETFable things
+  ;; even when CLHS does not specifically state that #'(SETF x) exists.
+  #+sb-xc-host (declare (ignore name))
+  #-sb-xc-host
+  (let ((stem (second name)))
+    (when (or (info :setf :inverse stem) (info :setf :expander stem))
+      (compiler-style-warn
          "defining function ~S when ~S already has a SETF macro"
-         name stem))))
+         name stem)))
   (values))
 
 ;;; Make NAME no longer be a function name: clear everything back to
