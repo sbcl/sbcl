@@ -793,7 +793,6 @@ between the ~A definition and the ~A definition"
              (warn "redefining DEFTYPE type to be a class: ~
                     ~/sb-impl::print-symbol-with-prefix/" name)
              (clear-info :type :expander name)
-             (clear-info :type :lambda-list name)
              (clear-info :type :source-location name)))
 
           (remhash name table)

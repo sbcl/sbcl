@@ -46,8 +46,8 @@
      )
     ((nil :forthcoming-defclass-type)
      (setf (info :type :kind name) :defined)))
-  (setf (info :type :expander name) expander
-        (info :type :lambda-list name) lambda-list)
+  #-sb-xc-host (setf (%fun-lambda-list expander) lambda-list)
+  (setf (info :type :expander name) expander)
   (sb!c:with-source-location (source-location)
     (setf (info :type :source-location name) source-location))
   (when doc

@@ -665,7 +665,8 @@
                (when class (classoid-layout class)))))
 
 ;;; DEFTYPE lambda-list
-(define-info-type (:type :lambda-list) :type-spec list)
+;; FIXME: remove this after making swank-fancy-inspector not use it.
+(define-info-type (:type :lambda-list) :type-spec nil)
 
 (define-info-type (:type :source-location) :type-spec t)
 

@@ -350,10 +350,9 @@
         (pprint-indent :block 2 stream)
         (describe-documentation symbol 'type stream (eq t fun))
         (unless (eq t fun)
-          (describe-lambda-list (if (eq :primitive kind)
-                                    (%fun-lambda-list fun)
-                                    (info :type :lambda-list symbol))
-                                stream)
+          ;; even though :translator can store a CTYPE, this is safe
+          ;; because a symbol can't have a non-FUNCTIONP translator.
+          (describe-lambda-list (%fun-lambda-list fun) stream)
           (multiple-value-bind (expansion ok)
               (handler-case (typexpand-1 symbol)
                 (error () (values nil nil)))

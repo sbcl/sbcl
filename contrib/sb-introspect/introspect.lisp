@@ -452,18 +452,14 @@ function designator."
 value, and a flag whether the arglist could be found as second
 value."
   (check-type typespec-operator symbol)
-  (case (sb-int:info :type :kind typespec-operator)
-    (:defined
-     (sb-int:info :type :lambda-list typespec-operator))
-    (:primitive
-     (let ((translator-fun (sb-int:info :type :translator typespec-operator)))
-       (if (functionp translator-fun)
-           (values (sb-kernel:%fun-lambda-list translator-fun) t)
-           ;; Some builtin types (e.g. STRING) do not have a
-           ;; translator, but they were actually defined via DEFTYPE
-           ;; in src/code/deftypes-for-target.lisp.
-           (sb-int:info :type :lambda-list typespec-operator))))
-    (t (values nil nil))))
+  ;; Don't return a lambda-list for combinators AND,OR,NOT.
+  (let ((f (and (sb-int:info :type :kind typespec-operator)
+                ;; globaldb prevents storing both of these
+                (or (sb-int:info :type :expander typespec-operator)
+                    (sb-int:info :type :translator typespec-operator)))))
+    (if (functionp f)
+        (values (sb-kernel:%fun-lambda-list f) t)
+        (values nil nil))))
 
 (defun function-type (function-designator)
   "Returns the ftype of FUNCTION-DESIGNATOR, or NIL."

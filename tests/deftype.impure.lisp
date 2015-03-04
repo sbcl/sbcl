@@ -40,10 +40,14 @@
                t))
 
 ;; Ensure that DEFCLASS after DEFTYPE nukes the lambda-list.
+(defun get-deftype-lambda-list (symbol)
+  (let ((expander (sb-int:info :type :expander)))
+    (and (functionp expander)
+         (sb-kernel:%fun-lambda-list expander))))
 (deftype bar (x) `(integer ,x))
-(assert (equal '(x) (sb-int:info :type :lambda-list 'bar)))
+(assert (equal '(x) (get-deftype-lambda-list 'bar)))
 (defclass bar () ())
-(assert (not (sb-int:info :type :lambda-list 'bar)))
+(assert (not (get-deftype-lambda-list 'bar)))
 
 ;; Need to work with plain symbols as the body.
 (defconstant whatever 't)
