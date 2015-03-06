@@ -101,6 +101,8 @@
 
 ;;; a list of toplevel things set by GENESIS
 (defvar *!reversed-cold-toplevels*)
+(!defvar *!reversed-cold-setf-macros* nil) ; just SETF macros
+(!defvar *!reversed-cold-defuns* nil)      ; just DEFUNs
 
 ;;; a SIMPLE-VECTOR set by GENESIS
 (defvar *!load-time-values*)
@@ -192,6 +194,12 @@
   ;; to the subclasses of STRUCTURE-OBJECT.
   (show-and-call sb!kernel::!set-up-structure-object-class)
 
+  (dolist (x (nreverse *!reversed-cold-setf-macros*))
+    (apply #'!quietly-assign-setf-macro x))
+  (dolist (x (nreverse *!reversed-cold-defuns*))
+    (destructuring-bind (name &optional docstring . inline-expansion) x
+      (!%quietly-defun name docstring inline-expansion)))
+
   ;; KLUDGE: Why are fixups mixed up with toplevel forms? Couldn't
   ;; fixups be done separately? Wouldn't that be clearer and better?
   ;; -- WHN 19991204
@@ -209,12 +217,8 @@
                       (let ((hexstr (hexstr r-c-tl-length)))
                         (/show0 "(hexstr calculated..)")
                         (/primitive-print hexstr))))
-  (let (#!+sb-show (index-in-cold-toplevels 0)
-        (really-assign-setf-macro #'sb!impl::assign-setf-macro))
+  (let (#!+sb-show (index-in-cold-toplevels 0))
     #!+sb-show (declare (type fixnum index-in-cold-toplevels))
-
-    (setf (symbol-function 'sb!impl::assign-setf-macro)
-          #'sb!impl::!quietly-assign-setf-macro)
 
     (dolist (toplevel-thing (prog1
                                 (nreverse *!reversed-cold-toplevels*)
@@ -242,14 +246,9 @@
                                 (third toplevel-thing))
                   (get-lisp-obj-address
                    (svref *!load-time-values* (fourth toplevel-thing)))))
-           (defun
-            (destructuring-bind (name &optional docstring &rest inline-expansion)
-                (cdr toplevel-thing)
-              (!%quietly-defun name (fdefinition name) docstring inline-expansion)))
            (t
             (!cold-lose "bogus fixup code in *!REVERSED-COLD-TOPLEVELS*"))))
-        (t (!cold-lose "bogus function in *!REVERSED-COLD-TOPLEVELS*"))))
-    (setf (symbol-function 'sb!impl::assign-setf-macro) really-assign-setf-macro))
+        (t (!cold-lose "bogus operation in *!REVERSED-COLD-TOPLEVELS*")))))
   (/show0 "done with loop over cold toplevel forms and fixups")
 
   ;; Set sane values again, so that the user sees sane values instead

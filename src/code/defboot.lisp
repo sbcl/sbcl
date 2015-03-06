@@ -209,42 +209,33 @@ evaluated as a PROGN."
          (%defun ',name ,named-lambda ,doc ',inline-lambda
                  (sb!c:source-location))))))
 
-;; Approximately 20% of the output from #+sb-show is from lines associated with
-;; printing "redefining NAME in %DEFUN" and lines about how it is not possible
-;; to actually invoke WARN at that point.
-;; So FBOUNDP etc is useless because the warning is ignored during cold-init.
 #-sb-xc-host
-(macrolet
-    ((def-defun (name fboundp-check)
-       `(defun ,name (name def doc inline-lambda
-                           ,@(when fboundp-check '(source-location)))
+(progn (defun %defun (name def doc inline-lambda source-location)
           (declare (type function def))
           (declare (type (or null simple-string) doc))
           ;; should've been checked by DEFMACRO DEFUN
           (aver (legal-fun-name-p name))
           (sb!c:%compiler-defun name inline-lambda nil)
-          ,@(when fboundp-check
-              `((when (fboundp name)
-                  (/show0 "redefining NAME in %DEFUN")
-                  (warn 'redefinition-with-defun
-                        :name name
-                        :new-function def
-                        :new-location source-location))))
+          (when (fboundp name)
+            (warn 'redefinition-with-defun
+                  :name name :new-function def :new-location source-location))
           (setf (sb!xc:fdefinition name) def)
   ;; %COMPILER-DEFUN doesn't do this except at compile-time, when it
   ;; also checks package locks. By doing this here we let (SETF
   ;; FDEFINITION) do the load-time package lock checking before
   ;; we frob any existing inline expansions.
           (sb!c::%set-inline-expansion name nil inline-lambda)
-
           (sb!c::note-name-defined name :function)
-
           (when doc
             (setf (%fun-doc def) doc))
-
-          name)))
-  (def-defun %defun t)
-  (def-defun !%quietly-defun nil))
+          name)
+       ;; During cold-init we don't touch the fdefinition.
+       (defun !%quietly-defun (name doc inline-lambda)
+         (sb!c:%compiler-defun name nil nil) ; makes :WHERE-FROM = :DEFINED
+         (sb!c::%set-inline-expansion name nil inline-lambda)
+         ;; and no need to call NOTE-NAME-DEFINED. It would do nothing.
+         (when doc
+           (setf (%fun-doc (fdefinition name)) doc))))
 
 ;;;; DEFVAR and DEFPARAMETER
 

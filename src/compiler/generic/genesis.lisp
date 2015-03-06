@@ -436,10 +436,8 @@
 ;;; when the target Lisp starts up
 ;;;
 ;;; Each TOPLEVEL-THING can be a function to be executed or a fixup or
-;;; loadtime value, represented by (CONS KEYWORD ..). The FILENAME
-;;; tells which fasl file each list element came from, for debugging
-;;; purposes.
-(defvar *current-reversed-cold-toplevels*)
+;;; loadtime value, represented by (CONS KEYWORD ..).
+(defvar *current-reversed-cold-toplevels*) ; except for DEFUNs and SETF macros
 
 ;;; the head of a list of DEBUG-SOURCEs which need to be patched when
 ;;; the cold core starts up
@@ -1209,13 +1207,15 @@ core and return a descriptor to it."
 
 ;;; Dump the target representation of HOST-VALUE,
 ;;; the type of which is in a restrictive set.
-(defun host-constant-to-core (host-value)
+(defun host-constant-to-core (host-value &optional (sanity-check t))
   ;; rough check for no shared substructure and/or circularity.
   ;; of course this would be wrong if it were a string containing "#1="
-  (when (search "#1=" (write-to-string host-value :circle t :readably t))
+  (when (and sanity-check
+             (search "#1=" (write-to-string host-value :circle t :readably t)))
     (warn "Strange constant to core from Genesis: ~S" host-value))
   (labels ((target-representation (value)
              (etypecase value
+               (descriptor value)
                (symbol (if (symbol-package value)
                            (cold-intern value)
                            (get-uninterned-symbol (string value))))
@@ -1603,11 +1603,11 @@ core and return a descriptor to it."
     (when (gethash warm-name *cold-fset-warm-names*)
       (error "duplicate COLD-FSET for ~S" warm-name))
     (setf (gethash warm-name *cold-fset-warm-names*) t)
-    (let ((args (cold-cons cold-name
+    (target-push (cold-cons cold-name
                            (if (or docstring inline-expansion)
                                (cold-cons docstring inline-expansion)
-                               *nil-descriptor*))))
-      (cold-push (cold-cons 'defun args) *current-reversed-cold-toplevels*))
+                               *nil-descriptor*))
+                 '*!reversed-cold-defuns*)
     (static-fset cold-name compiled-lambda)))
 
 (defun initialize-static-fns ()
@@ -2465,6 +2465,9 @@ core and return a descriptor to it."
       (when f
         (return-from cold-fop-funcall-for-effect
           (acond ((eq f 'sb!impl::%defun) (apply #'cold-fset args))
+                 ((eq f 'sb!impl::assign-setf-macro)
+                  (target-push (host-constant-to-core args nil)
+                               '*!reversed-cold-setf-macros*))
                  ((get f :sb-cold-funcall-handler) (apply it args))
                  (t (error "Can't FUNCALL-FOR-EFFECT ~S in cold load" f))))))
     (cold-push (pop-stack) *current-reversed-cold-toplevels*)))

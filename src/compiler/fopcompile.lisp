@@ -62,7 +62,7 @@
        ;; It is assumed that uses of recognized functions are carefully
        ;; controlled, and recursion on fopcompilable-p would say "yes".
        (let ((function (car form)))
-         (or (eq function 'sb!impl::%defun)
+         (or (member function '(sb!impl::%defun sb!impl::assign-setf-macro))
              (and (symbolp function) ; no ((lambda ...) ...)
                   (not (null (get function :sb-cold-funcall-handler)))))))
   #-sb-xc-host
