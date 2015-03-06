@@ -15,11 +15,7 @@
 ;;;; top level forms.
 ;;;;
 ;;;; (In CMU CL, and in SBCL as of 0.6.9 anyway, functions not defined
-;;;; by DEFUN aren't set up specially by GENESIS. In particular,
-;;;; structure slot accessors are not set up. Slot accessors are
-;;;; available at cold init time because they're usually compiled
-;;;; inline. They're not available as out-of-line functions until the
-;;;; toplevel forms installing them have run.)
+;;;; by DEFUN aren't set up specially by GENESIS.)
 
 ;;;; This software is part of the SBCL system. See the README file for
 ;;;; more information.
