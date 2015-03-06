@@ -296,8 +296,7 @@
   ;; the ANSI-specified initial value of *PACKAGE*
   (setf *package* (find-package "COMMON-LISP-USER"))
 
-  (/show0 "done initializing, setting *COLD-INIT-COMPLETE-P*")
-  (setf *cold-init-complete-p* t)
+  (!enable-infinite-error-protector)
 
   ; hppa heap is segmented, lisp and c uses a stub to call eachother
   #!+hpux (%primitive sb!vm::setup-return-from-lisp-stub)

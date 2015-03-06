@@ -32,10 +32,8 @@
                   *interrupt-pending*
                   #!+sb-thruption *thruption-pending*))
 
-(!defglobal *cold-init-complete-p* nil)
-
 ;;; counts of nested errors (with internal errors double-counted)
-(!defvar *maximum-error-depth* 10)
+(defvar *maximum-error-depth*) ; this gets set to 10 when cold-init is finished
 (!defvar *current-error-depth* 0)
 
 ;;;; default initfiles
@@ -138,15 +136,13 @@ means to wait indefinitely.")
 (defun infinite-error-protector ()
   (/show0 "entering INFINITE-ERROR-PROTECTOR, *CURRENT-ERROR-DEPTH*=..")
   (/hexstr *current-error-depth*)
-  (unless *cold-init-complete-p*
-    (%primitive print "Argh! error in cold init, halting")
-    (%primitive sb!c:halt))
-  ;; Checking BOUNDP on these variables would be superfluous
-  ;; because REALP will return false for unbound-marker.
+  ;; *MAXIMUM-ERROR-DEPTH* is not bound during cold-init, and testing BOUNDP
+  ;; is superfluous since REALP will return false either way.
   (let ((cur (locally (declare (optimize (safety 0))) *current-error-depth*))
         (max (locally (declare (optimize (safety 0))) *maximum-error-depth*)))
     (cond ((or (not (realp cur)) (not (realp max))) ; why not just FIXNUMP?
-           (%primitive print "Argh! corrupted error depth, halting")
+           ;; This string will later be changed by frobbing the code header.
+           (%primitive print "Argh! error in cold init, halting")
            (%primitive sb!c:halt))
           ((> cur max)
            (/show0 "*MAXIMUM-ERROR-DEPTH*=..")
@@ -160,6 +156,15 @@ means to wait indefinitely.")
           (t
            (/show0 "returning normally from INFINITE-ERROR-PROTECTOR")
            nil))))
+
+(defun !enable-infinite-error-protector ()
+  (let ((code (fun-code-header #'infinite-error-protector)))
+    (do ((i (1- (get-header-data code)) (1- i)))
+        ((< i sb!vm:code-constants-offset))
+      (when (let ((obj (code-header-ref code i)))
+              (and (stringp obj) (search "Argh!" obj)))
+        (setf (code-header-ref code i) "Argh! corrupted error depth, halting")
+        (return (setf *maximum-error-depth* 10))))))
 
 ;;;; miscellaneous external functions
 
