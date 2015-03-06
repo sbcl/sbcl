@@ -464,6 +464,11 @@
   "Push THING onto the given cold-load LIST."
   `(setq ,list (cold-cons ,thing ,list)))
 
+;; Like above, but the list is held in the target's image of the host symbol,
+;; not the host's value of the symbol.
+(defun target-push (cold-thing host-symbol)
+  (cold-set host-symbol (cold-cons cold-thing (cold-symbol-value host-symbol))))
+
 (declaim (ftype (function (descriptor sb!vm:word) descriptor) read-wordindexed))
 (macrolet ((read-bits ()
              `(bvref-word (descriptor-bytes address)

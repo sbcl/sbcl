@@ -131,6 +131,11 @@
                       *standard-output* *error-output*
                       *trace-output* *error-output*))
 
+  ;; Assert that FBOUNDP doesn't choke when its answer is NIL.
+  ;; It was fine if T because in that case the legality of the arg is certain.
+  ;; And be extra paranoid - ensure that it it really gets called.
+  (locally (declare (notinline fboundp)) (fboundp '(setf !zzzzzz)))
+
   ;; Putting data in a synchronized hashtable (*PACKAGE-NAMES*)
   ;; requires that the main thread be properly initialized.
   (show-and-call thread-init-or-reinit)

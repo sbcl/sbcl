@@ -1,7 +1,7 @@
 (in-package "SB!IMPL")
 
 ;;;; generalized function names
-(defvar *valid-fun-names-alist* nil)
+(!defvar *valid-fun-names-alist* nil)
 
 (defun %define-fun-name-syntax (symbol checker)
   (let ((found (assoc symbol *valid-fun-names-alist* :test #'eq)))
@@ -9,6 +9,13 @@
         (setf (cdr found) checker)
         (setq *valid-fun-names-alist*
               (acons symbol checker *valid-fun-names-alist*)))))
+
+#+sb-xc-host
+(setf (get '%define-fun-name-syntax :sb-cold-funcall-handler)
+      (lambda (symbol checker)
+        (sb!fasl::target-push
+         (sb!fasl::cold-cons (sb!fasl::cold-intern symbol) checker)
+         '*valid-fun-names-alist*)))
 
 (defmacro define-function-name-syntax (symbol (var) &body body)
   #!+sb-doc
