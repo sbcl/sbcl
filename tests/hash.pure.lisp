@@ -54,3 +54,56 @@
         (setq prev ptr)))
     ;; GC could occur in here. Just check that 9 out of 10 trials succeed.
     (assert (>= win 9))))
+
+;;; The value of SXHASH on bit-vectors of length a multiple of the word
+;;; size didn't depend on the contents of the last word, specifically
+;;; making it a constant for bit-vectors of length equal to the word
+;;; size.
+;;; Here we test that at least two different hash codes occur per length.
+(with-test (:name (sxhash :quality bit-vector :non-constant))
+  (let (;; Up to which length to test.
+        (max-length 200)
+        ;; How many random bits to use before declaring a test failure.
+        (random-bits-to-use 200))
+    (loop for length from 1 to max-length do
+          (let ((v (make-array length :element-type 'bit)))
+            (flet ((randomize-v ()
+                     (map-into v (lambda ()
+                                   (random 2)))))
+              (randomize-v)
+              (let ((sxhash (sxhash v))
+                    (random-bits-used 0))
+                (loop
+                  (randomize-v)
+                  (when (/= (sxhash v) sxhash)
+                    (return))
+                  (incf random-bits-used length)
+                  (when (>= random-bits-used random-bits-to-use)
+                    (error "SXHASH is constant on bit-vectors of length ~a."
+                           length)))))))))
+
+;;; See the comment at the previous test.
+;;; Here we test that the hash code depends on any of the last N-WORD-BITS
+;;; bits.
+(with-test (:name (sxhash :quality bit-vector :dependent-on-final-bits))
+  (let (;; Up to which length to test.
+        (max-length 200)
+        ;; How many random bits to use before declaring a test failure.
+        (random-bits-to-use 200))
+    ;; The previous test covers lengths up to the word size, so start
+    ;; above that.
+    (loop for length from (1+ sb-vm:n-word-bits) to max-length do
+          (let ((v (make-array length :element-type 'bit :initial-element 0)))
+            (flet ((randomize-v ()
+                     (loop for i downfrom (1- length)
+                           repeat sb-vm:n-word-bits
+                           do (setf (aref v i) (random 2)))))
+              (randomize-v)
+              (let ((sxhash (sxhash v)))
+                (dotimes (i (ceiling random-bits-to-use sb-vm:n-word-bits)
+                          (error "SXHASH on bit-vectors of length ~a ~
+                                  does not depend on the final ~a bits."
+                                 length sb-vm:n-word-bits))
+                  (randomize-v)
+                  (when (/= (sxhash v) sxhash)
+                    (return)))))))))

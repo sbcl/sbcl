@@ -14,7 +14,11 @@ changes relative to sbcl-1.2.9:
   * minor incompatible change: performing introspection via the system-internal
     SB-INT:INFO function could expose that :TYPE :TRANSLATOR is not necessarily
     a function, as it always was before. (Affects swank-fancy-inspector)
-  * bug-fix: sb-bsd-sockets on win32 uses proper C function declrations.
+  * enhancement: The value of SXHASH on bit-vectors of length equal to the
+    word size now depends on the vector's contents instead of being constant;
+    its value on bit-vectors of length divisible by the word size now depends
+    also on the contents of the vector's last word.
+  * bug-fix: sb-bsd-sockets on win32 uses proper C function declarations.
     (lp#1426667)
   * bug fix: A new dead code elimination phase removes dead code loops
     that confuse stack analysis. (lp#1255782, lp#308914)
