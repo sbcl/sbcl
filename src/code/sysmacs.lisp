@@ -244,7 +244,7 @@ maintained."
                                  (prog1 (aref ,f-buffer ,f-index)
                                    (incf ,f-index))))))))
          (declare (inline fast-read-byte))
-         (declare (enable-package-locks read-byte))
+         (declare (enable-package-locks fast-read-byte))
          (unwind-protect
               (locally ,@body)
            (setf (ansi-stream-in-index ,f-stream) ,f-index))))))

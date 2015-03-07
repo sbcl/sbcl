@@ -378,8 +378,25 @@
     (test-reading "#-sbcl(a (b c (d (e) (f) g)) h i j . x . y baz) 5")
     ))
 
-
 (with-test (:name :sharp-star-empty-multiple-escapes)
   (assert (eq (handler-case (read-from-string "#*101||1")
                 (sb-int:simple-reader-error () :win))
               :win)))
+
+;;; The WITH-FAST-READ-BYTE macro accidentally left the package lock
+;;; of FAST-READ-BYTE disabled during its body.
+(with-test (:name :fast-read-byte-package-lock
+            :skipped-on '(not :sb-package-locks))
+  (let ((fun
+         ;; Suppress the compiler output to avoid noise when running the
+         ;; test. (There are a warning and an error about the package
+         ;; lock violation and a note about FAST-READ-BYTE being
+         ;; unused.) It's easy and more precise to test for the error
+         ;; that the compiled function signals when it is called.
+         (let ((*error-output* (make-broadcast-stream)))
+           (compile nil
+                    '(lambda ()
+                      (sb-int:with-fast-read-byte (t *standard-input*)
+                        ;; Signal an error if the symbol is locked.
+                        (declare (special sb-int:fast-read-byte))))))))
+    (assert-error (funcall fun) program-error)))
