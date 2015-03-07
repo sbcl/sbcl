@@ -422,7 +422,8 @@
 ;;; Move untagged number arguments/return-values.
 (define-vop (move-word-arg)
   (:args (x :scs (signed-reg unsigned-reg) :target y)
-         (fp :scs (any-reg) :load-if (not (sc-is y sap-reg))))
+         (fp :scs (any-reg)
+             :load-if (not (sc-is y signed-reg unsigned-reg))))
   (:results (y))
   (:note "word integer argument move")
   (:generator 0

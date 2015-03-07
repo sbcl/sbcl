@@ -265,7 +265,7 @@
   (:args (x :target y
             :scs (signed-reg unsigned-reg))
          (fp :scs (any-reg)
-             :load-if (not (sc-is y sap-reg))))
+             :load-if (not (sc-is y signed-reg unsigned-reg))))
   (:results (y))
   (:note "word integer argument move")
   (:generator 0
