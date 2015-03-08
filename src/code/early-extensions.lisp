@@ -1170,29 +1170,29 @@
 ;;; EARLY:
 ;;;
 ;;; LATE:
-;;; - SB-THREAD::GET-MUTEX, since 1.2.10 (02/2015)                         -> Final: 08/2015
-;;; - SB-THREAD::SPINLOCK (type), since 1.2.10 (02/2015)                   -> Final: 08/2015
-;;; - SB-THREAD::MAKE-SPINLOCK, since 1.2.10 (02/2015)                     -> Final: 08/2015
-;;; - SB-THREAD::WITH-SPINLOCK, since 1.2.10 (02/2015)                     -> Final: 08/2015
-;;; - SB-THREAD::WITH-RECURSIVE-SPINLOCK, since 1.2.10 (02/2015)           -> Final: 08/2015
-;;; - SB-THREAD::GET-SPINLOCK, since 1.2.10 (02/2015)                      -> Final: 08/2015
-;;; - SB-THREAD::RELEASE-SPINLOCK, since 1.2.10 (02/2015)                  -> Final: 08/2015
-;;; - SB-THREAD::SPINLOCK-VALUE, since 1.2.10 (02/2015)                    -> Final: 08/2015
-;;; - SB-THREAD::SPINLOCK-NAME, since 1.2.10 (02/2015)                     -> Final: 08/2015
-;;; - SETF SB-THREAD::SPINLOCK-NAME, since 1.2.10 (02/2015)                -> Final: 08/2015
-;;; - SB-C::MERGE-TAIL-CALLS (policy), since 1.2.10 (02/2015)              -> Final: 08/2015
-;;; - SB-EXT:QUIT, since 1.2.10 (02/2015)                                  -> Final: 08/2015
-;;; - SB-UNIX:UNIX-EXIT, since 1.2.10 (02/2015)                            -> Final: 08/2015
-;;; - SB-DEBUG:*SHOW-ENTRY-POINT-DETAILS*, since 1.2.10 (02/2015)          -> Final: 08/2015
+;;; - SB-THREAD::GET-MUTEX                         since 1.2.10 (03/2015) -> Final: 08/2015
+;;; - SB-THREAD::SPINLOCK (type)                   since 1.2.10 (03/2015) -> Final: 08/2015
+;;; - SB-THREAD::MAKE-SPINLOCK                     since 1.2.10 (03/2015) -> Final: 08/2015
+;;; - SB-THREAD::WITH-SPINLOCK                     since 1.2.10 (03/2015) -> Final: 08/2015
+;;; - SB-THREAD::WITH-RECURSIVE-SPINLOCK           since 1.2.10 (03/2015) -> Final: 08/2015
+;;; - SB-THREAD::GET-SPINLOCK                      since 1.2.10 (03/2015) -> Final: 08/2015
+;;; - SB-THREAD::RELEASE-SPINLOCK                  since 1.2.10 (03/2015) -> Final: 08/2015
+;;; - SB-THREAD::SPINLOCK-VALUE                    since 1.2.10 (03/2015) -> Final: 08/2015
+;;; - SB-THREAD::SPINLOCK-NAME                     since 1.2.10 (03/2015) -> Final: 08/2015
+;;; - SETF SB-THREAD::SPINLOCK-NAME                since 1.2.10 (03/2015) -> Final: 08/2015
+;;; - SB-C::MERGE-TAIL-CALLS (policy)              since 1.2.10 (03/2015) -> Final: 08/2015
+;;; - SB-EXT:QUIT                                  since 1.2.10 (03/2015) -> Final: 08/2015
+;;; - SB-UNIX:UNIX-EXIT                            since 1.2.10 (03/2015) -> Final: 08/2015
+;;; - SB-DEBUG:*SHOW-ENTRY-POINT-DETAILS*          since 1.2.10 (03/2015) -> Final: 08/2015
 ;;;
 ;;; FINAL:
-;;; - SB-SYS:OUTPUT-RAW-BYTES, since 1.2.10 (02/2015)                      -> Remove: 04/2015
-;;; - SB-C::STACK-ALLOCATE-DYNAMIC-EXTENT (policy), since 1.2.10 (02/2015) -> Remove: 04/2015
-;;; - SB-C::STACK-ALLOCATE-VECTOR (policy), since 1.2.10  (02/2015)        -> Remove: 04/2015
-;;; - SB-C::STACK-ALLOCATE-VALUE-CELLS (policy), since 1.2.10  (02/2015)   -> Remove: 04/2015
-;;; - SB-INTROSPECT:FUNCTION-ARGLIST, since 1.2.10 (02/2015                -> Remove: 04/2015
-;;; - SB-THREAD:JOIN-THREAD-ERROR-THREAD, since 1.2.10 (02/2015)           -> Remove: 04/2015
-;;; - SB-THREAD:INTERRUPT-THREAD-ERROR-THREAD since 1.2.10 (02/2015)       -> Remove: 04/2015
+;;; - SB-SYS:OUTPUT-RAW-BYTES                      since 1.2.10 (03/2015) -> Remove: 04/2015
+;;; - SB-C::STACK-ALLOCATE-DYNAMIC-EXTENT (policy) since 1.2.10 (03/2015) -> Remove: 04/2015
+;;; - SB-C::STACK-ALLOCATE-VECTOR (policy)         since 1.2.10 (03/2015) -> Remove: 04/2015
+;;; - SB-C::STACK-ALLOCATE-VALUE-CELLS (policy)    since 1.2.10 (03/2015) -> Remove: 04/2015
+;;; - SB-INTROSPECT:FUNCTION-ARGLIST               since 1.2.10 (03/2015) -> Remove: 04/2015
+;;; - SB-THREAD:JOIN-THREAD-ERROR-THREAD           since 1.2.10 (03/2015) -> Remove: 04/2015
+;;; - SB-THREAD:INTERRUPT-THREAD-ERROR-THREAD      since 1.2.10 (03/2015) -> Remove: 04/2015
 
 (deftype deprecation-state ()
   '(member :early :late :final))
