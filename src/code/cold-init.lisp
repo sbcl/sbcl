@@ -135,7 +135,7 @@
 
   ;; Assert that FBOUNDP doesn't choke when its answer is NIL.
   ;; It was fine if T because in that case the legality of the arg is certain.
-  ;; And be extra paranoid - ensure that it it really gets called.
+  ;; And be extra paranoid - ensure that it really gets called.
   (locally (declare (notinline fboundp)) (fboundp '(setf !zzzzzz)))
 
   ;; Putting data in a synchronized hashtable (*PACKAGE-NAMES*)
@@ -246,6 +246,8 @@
                                 (third toplevel-thing))
                   (get-lisp-obj-address
                    (svref *!load-time-values* (fourth toplevel-thing)))))
+           (defstruct
+            (apply 'sb!kernel::%defstruct (cdr toplevel-thing)))
            (t
             (!cold-lose "bogus fixup code in *!REVERSED-COLD-TOPLEVELS*"))))
         (t (!cold-lose "bogus operation in *!REVERSED-COLD-TOPLEVELS*")))))

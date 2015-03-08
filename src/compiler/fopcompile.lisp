@@ -35,7 +35,14 @@
 ;;; The instances of double expansion still remain, e.g. (fun (macro)),
 ;;; since PROCESS-TOPLEVEL-FORM only expands the macros at the first
 ;;; position.
-(defun fopcompilable-p (form &optional (expand t))
+
+(flet ((setq-fopcompilable-p (args)
+         (loop for (name value) on args by #'cddr
+               always (and (symbolp name)
+                           (member (info :variable :kind name)
+                                   '(:special :global))
+                           (fopcompilable-p value)))))
+ (defun fopcompilable-p (form &optional (expand t))
   ;; We'd like to be able to handle
   ;;   -- simple funcalls, nested recursively, e.g.
   ;;      (SET '*PACKAGE* (FIND-PACKAGE "CL-USER"))
@@ -59,12 +66,20 @@
   ;; executing all other toplevel forms.
   #+sb-xc-host
   (and expand
-       ;; It is assumed that uses of recognized functions are carefully
-       ;; controlled, and recursion on fopcompilable-p would say "yes".
-       (let ((function (car form)))
-         (or (member function '(sb!impl::%defun sb!impl::assign-setf-macro))
-             (and (symbolp function) ; no ((lambda ...) ...)
-                  (not (null (get function :sb-cold-funcall-handler)))))))
+       (or (and (self-evaluating-p form)
+                (constant-fopcompilable-p form))
+           (and (listp form)
+                (let ((function (car form)))
+                  ;; It is assumed that uses of recognized functions are
+                  ;; carefully controlled, and recursion on fopcompilable-p
+                  ;; would say "yes".
+                  (or (member function '(sb!impl::%defun
+                                         sb!impl::assign-setf-macro
+                                         sb!kernel::%defstruct))
+                      (and (symbolp function) ; no ((lambda ...) ...)
+                           (not (null (get function :sb-cold-funcall-handler))))
+                      (and (eq function 'setq)
+                           (setq-fopcompilable-p (cdr form))))))))
   #-sb-xc-host
   (flet ((expand (form)
            (if expand
@@ -127,11 +142,7 @@
                              (every #'fopcompilable-p args)))
                        ;; Allow SETQ only on special or global variables
                        ((setq)
-                        (loop for (name value) on args by #'cddr
-                              always (and (symbolp name)
-                                          (member (info :variable :kind name)
-                                                  '(:special :global))
-                                          (fopcompilable-p value))))
+                        (setq-fopcompilable-p args))
                        ;; The real toplevel form processing has already been
                        ;; done, so EVAL-WHEN handling will be easy.
                        ((eval-when)
@@ -172,7 +183,7 @@
                              ;; calling LIST, which is probably more
                              ;; trouble than it's worth).
                              (<= (length args) 255)
-                             (every #'fopcompilable-p args)))))))))))
+                             (every #'fopcompilable-p args))))))))))))
 
 (defun let-fopcompilable-p (operator args)
   (when (>= (length args) 1)
@@ -221,7 +232,7 @@
                ;; can't contain other objects
                ;; FIXME: OAOOM. See MAYBE-EMIT-MAKE-LOAD-FORMS.
                (unless (typep value
-                              '(or unboxed-array
+                              '(or #-sb-xc-host unboxed-array
                                 symbol
                                 number
                                 character
@@ -249,6 +260,11 @@
                    ((array t)
                     (dotimes (i (array-total-size value))
                       (grovel (row-major-aref value i))))
+                   ;; This is the same kludge as appears in EMIT-MAKE-LOAD-FORM
+                   ;; which informs the xc that LAYOUTs are leaf-like nodes.
+                   ;; This case was never reached before because cross-compiling
+                   ;; used to generate target machine code for everything.
+                   #+sb-xc-host (layout)
                    (instance
                     (multiple-value-bind (creation-form init-form)
                         (handler-case

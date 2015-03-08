@@ -484,13 +484,10 @@
 (declaim (ftype (function (descriptor sb!vm:word descriptor) (values))
                 note-load-time-value-reference))
 (defun note-load-time-value-reference (address offset marker)
-  (cold-push (cold-cons
-              (cold-intern :load-time-value-fixup)
-              (cold-cons address
-                         (cold-cons (number-to-core offset)
-                                    (cold-cons
-                                     (number-to-core (descriptor-word-offset marker))
-                                     *nil-descriptor*))))
+  (cold-push (cold-list (cold-intern :load-time-value-fixup)
+                        address
+                        (number-to-core offset)
+                        (number-to-core (descriptor-word-offset marker)))
              *current-reversed-cold-toplevels*)
   (values))
 
@@ -557,8 +554,12 @@
                        (make-fixnum-descriptor length))
     des))
 
+;;; the hosts's representation of LAYOUT-of-LAYOUT
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (defvar *host-layout-of-layout* (find-layout 'layout)))
+
 (defun cold-layout-length (layout)
-  (descriptor-fixnum (read-slot layout (find-layout 'layout) :length)))
+  (descriptor-fixnum (read-slot layout *host-layout-of-layout* :length)))
 
 ;; Make a structure and set the header word and layout.
 ;; LAYOUT-LENGTH is as returned by the like-named function.
@@ -762,6 +763,16 @@ core and return a descriptor to it."
     (write-wordindexed dest sb!vm:cons-car-slot car)
     (write-wordindexed dest sb!vm:cons-cdr-slot cdr)
     dest))
+(defun cold-list (&rest args)
+  (if args
+      (cold-cons (car args) (apply 'cold-list (cdr args)))
+      *nil-descriptor*))
+(defun cold-list-length (list) ; but no circularity detection
+  ;; a recursive implementation uses too much stack for some Lisps
+  (let ((n 0))
+    (loop (if (cold-null list) (return n))
+          (incf n)
+          (setq list (cold-cdr list)))))
 
 ;;; Make a simple-vector on the target that holds the specified
 ;;; OBJECTS, and return its descriptor.
@@ -912,10 +923,7 @@ core and return a descriptor to it."
 ;;; WHN 19990816] is initializing layout's layout, which must point to
 ;;; itself.
 
-;;; a map from class names to lists of
-;;;    `(,descriptor ,name ,length ,inherits ,depth)
-;;; KLUDGE: It would be more understandable and maintainable to use
-;;; DEFSTRUCT (:TYPE LIST) here. -- WHN 19990823
+;;; a map from name as a host symbol to the descriptor of its target layout
 (defvar *cold-layouts* (make-hash-table :test 'equal))
 
 ;;; a map from DESCRIPTOR-BITS of cold layouts to the name, for inverting
@@ -930,10 +938,12 @@ core and return a descriptor to it."
 ;;; the descriptor for PACKAGE's layout (needed when making packages)
 (defvar *package-layout*)
 
+(defvar *known-structure-classoids*)
+
 (defconstant target-layout-length
   ;; LAYOUT-LENGTH counts the number of words in an instance,
   ;; including the layout itself as 1 word
-  (layout-length (find-layout 'layout)))
+  (layout-length *host-layout-of-layout*))
 
 ;;; Return a list of names created from the cold layout INHERITS data
 ;;; in X.
@@ -985,7 +995,7 @@ core and return a descriptor to it."
     ;;
     ;; leave CLASSOID uninitialized for now
     (multiple-value-call
-     #'write-slots result (find-layout 'layout)
+     #'write-slots result *host-layout-of-layout*
      :invalid *nil-descriptor*
      :inherits inherits
      :depthoid depthoid
@@ -1030,7 +1040,7 @@ core and return a descriptor to it."
   (clrhash *cold-layouts*)
   ;; This assertion is due to the fact that MAKE-COLD-LAYOUT does not
   ;; know how to set any raw slots.
-  (aver (= 0 (layout-raw-slot-metadata (find-layout 'layout))))
+  (aver (= 0 (layout-raw-slot-metadata *host-layout-of-layout*)))
   (setq *layout-layout* (make-fixnum-descriptor 0))
   (flet ((chill-layout (name &rest inherits)
            ;; Check that the number of specified INHERITS matches
@@ -1348,21 +1358,18 @@ core and return a descriptor to it."
                                    :gspace *static*)))
     (cold-set p-a-a-symbol (make-fixnum-descriptor 0))))
 
+;;; Sort *COLD-LAYOUTS* to return them in a deterministic order.
+(defun sort-cold-layouts ()
+  (sort (%hash-table-alist *cold-layouts*) #'<
+        :key (lambda (x) (descriptor-bits (cdr x)))))
+
 ;;; a helper function for FINISH-SYMBOLS: Return a cold alist suitable
 ;;; to be stored in *!INITIAL-LAYOUTS*.
 (defun cold-list-all-layouts ()
   (let ((result *nil-descriptor*))
-    (flet ((sorter (x y)
-             (let ((xpn (package-name (symbol-package-for-target-symbol x)))
-                   (ypn (package-name (symbol-package-for-target-symbol y))))
-               (cond
-                 ((string= x y) (string< xpn ypn))
-                 (t (string< x y))))))
-    (dolist (layout (sort (%hash-table-alist *cold-layouts*) #'sorter
-                          :key #'car)
-                    result)
+    (dolist (layout (sort-cold-layouts) result)
       (cold-push (cold-cons (cold-intern (car layout)) (cdr layout))
-                 result)))))
+                 result))))
 
 ;;; Establish initial values for magic symbols.
 ;;;
@@ -2155,7 +2162,7 @@ core and return a descriptor to it."
          (result (allocate-struct *dynamic* layout size))
          (metadata
           (descriptor-fixnum
-           (read-slot layout (find-layout 'layout)
+           (read-slot layout *host-layout-of-layout*
                       #!-interleaved-raw-slots :n-untagged-slots
                       #!+interleaved-raw-slots :untagged-bitmap)))
          #!-interleaved-raw-slots (ntagged (- size metadata))
@@ -2191,7 +2198,7 @@ core and return a descriptor to it."
       ;; Enforce consistency between the previous definition and the
       ;; current definition, then return the previous definition.
       (flet ((get-slot (keyword)
-               (read-slot old-layout-descriptor (find-layout 'layout) keyword)))
+               (read-slot old-layout-descriptor *host-layout-of-layout* keyword)))
         (let ((old-length (descriptor-fixnum (get-slot :length)))
               (old-inherits-list (listify-cold-inherits (get-slot :inherits)))
               (old-depthoid (descriptor-fixnum (get-slot :depthoid)))
@@ -2449,13 +2456,9 @@ core and return a descriptor to it."
            (t
             (error "Can't FUNCALL ~S in cold load" f))))))
     (let ((counter *load-time-value-counter*))
-      (cold-push (cold-cons
-                  (cold-intern :load-time-value)
-                  (cold-cons
-                   (pop-stack)
-                   (cold-cons
-                    (number-to-core counter)
-                    *nil-descriptor*)))
+      (cold-push (cold-list (cold-intern :load-time-value)
+                            (pop-stack)
+                            (number-to-core counter))
                  *current-reversed-cold-toplevels*)
       (setf *load-time-value-counter* (1+ counter))
       (make-descriptor 0 :load-time-value counter)))
@@ -2465,9 +2468,18 @@ core and return a descriptor to it."
       (when f
         (return-from cold-fop-funcall-for-effect
           (acond ((eq f 'sb!impl::%defun) (apply #'cold-fset args))
+                 ((eq f 'sb!kernel::%defstruct)
+                  (push args *known-structure-classoids*)
+                  (cold-push (apply #'cold-list (cold-intern 'defstruct) args)
+                             *current-reversed-cold-toplevels*))
                  ((eq f 'sb!impl::assign-setf-macro)
                   (target-push (host-constant-to-core args nil)
                                '*!reversed-cold-setf-macros*))
+                 ((eq f 'set)
+                  (aver (= (length args) 2))
+                  (cold-set (first args)
+                            (let ((val (second args)))
+                              (if (symbolp val) (cold-intern val) val))))
                  ((get f :sb-cold-funcall-handler) (apply it args))
                  (t (error "Can't FUNCALL-FOR-EFFECT ~S in cold load" f))))))
     (cold-push (pop-stack) *current-reversed-cold-toplevels*)))
@@ -3230,10 +3242,9 @@ initially undefined function references:~2%")
                 name)))
 
     (format t "~%~|~%layout names:~2%")
-    (dolist (x (sort (%hash-table-alist *cold-layouts*) #'<
-                     :key (lambda (x) (descriptor-bits (cdr x)))))
+    (dolist (x (sort-cold-layouts))
       (let* ((des (cdr x))
-             (inherits (read-slot des (find-layout 'layout) :inherits)))
+             (inherits (read-slot des *host-layout-of-layout* :inherits)))
         (format t "~8,'0X: ~S[~D]~%~10T~:S~%" (descriptor-bits des) (car x)
                   (cold-layout-length des) (listify-cold-inherits inherits)))))
 
@@ -3501,6 +3512,7 @@ initially undefined function references:~2%")
                            (layout-length (find-layout 'package)))
                           (cons nil nil))))) ; (externals . internals)
            (*nil-descriptor* (make-nil-descriptor target-cl-pkg-info))
+           (*known-structure-classoids* nil)
            (*current-reversed-cold-toplevels* *nil-descriptor*)
            (*current-debug-sources* *nil-descriptor*)
            (*unbound-marker* (make-other-immediate-descriptor
@@ -3543,6 +3555,20 @@ initially undefined function references:~2%")
       (dolist (file-name object-file-names)
         (write-line (namestring file-name))
         (cold-load file-name))
+
+      (when *known-structure-classoids*
+        (let ((dd-layout (find-layout 'defstruct-description)))
+          (dolist (defstruct-args *known-structure-classoids*)
+            (let* ((dd (first defstruct-args))
+                   (name (warm-symbol (read-slot dd dd-layout :name)))
+                   (layout (gethash name *cold-layouts*)))
+              (aver layout)
+              (write-slots layout *host-layout-of-layout* :info dd))))
+        (format t "~&; SB!Loader: ~D DEFSTRUCTs, ~D DEFUNs, ~D SETF macros~%"
+                (length *known-structure-classoids*)
+                (cold-list-length (cold-symbol-value '*!reversed-cold-defuns*))
+                (cold-list-length
+                 (cold-symbol-value '*!reversed-cold-setf-macros*))))
 
       ;; Tidy up loose ends left by cold loading. ("Postpare from cold load?")
       (resolve-assembler-fixups)

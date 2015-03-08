@@ -1348,6 +1348,9 @@ or they must be declared locally notinline at each call site.~@:>")
         (not (eq (layout-classoid new-layout) (layout-classoid old-layout)))
         (error "shouldn't happen: weird state of OLD-LAYOUT?"))
        ((not *type-system-initialized*)
+        ;; The assignment of INFO here can almost be deleted,
+        ;; except for a few magical types that don't d.t.r.t. in cold-init:
+        ;;  STRUCTURE-OBJECT, CONDITION, ALIEN-VALUE, INTERPRETED-FUNCTION
         (setf (layout-info old-layout) info)
         (values class old-layout nil))
        ((redefine-layout-warning old-context
