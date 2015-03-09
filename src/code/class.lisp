@@ -182,7 +182,7 @@
   (length 0 :type index)
   ;; If this layout has some kind of compiler meta-info, then this is
   ;; it. If a structure, then we store the DEFSTRUCT-DESCRIPTION here.
-  (info nil)
+  (info nil :type (or null defstruct-description))
   ;; This is true if objects of this class are never modified to
   ;; contain dynamic pointers in their slots or constant-like
   ;; substructure (and hence can be copied into read-only space by
@@ -371,12 +371,10 @@
                                 context length inherits depthoid
                                 raw-slot-metadata)
   (declare (type layout old-layout) (type simple-string old-context context))
-  (let ((name (layout-proper-name old-layout)))
-    (or (let ((old-inherits (layout-inherits old-layout)))
-          (or (when (mismatch old-inherits
-                              inherits
-                              :key #'layout-proper-name)
-                (warn "change in superclasses of class ~S:~%  ~
+  (let ((name (layout-proper-name old-layout))
+        (old-inherits (layout-inherits old-layout)))
+    (or (when (mismatch old-inherits inherits :key #'layout-proper-name)
+          (warn "change in superclasses of class ~S:~%  ~
                        ~A superclasses: ~S~%  ~
                        ~A superclasses: ~S"
                       name
@@ -384,18 +382,17 @@
                       (map 'list #'layout-proper-name old-inherits)
                       context
                       (map 'list #'layout-proper-name inherits))
-                t)
-              (let ((diff (mismatch old-inherits inherits)))
-                (when diff
-                  (warn
-                   "in class ~S:~%  ~
+          t)
+        (let ((diff (mismatch old-inherits inherits)))
+          (when diff
+            (warn "in class ~S:~%  ~
                     ~@(~A~) definition of superclass ~S is incompatible with~%  ~
                     ~A definition."
                    name
                    old-context
                    (layout-proper-name (svref old-inherits diff))
                    context)
-                  t))))
+            t))
         (let ((old-length (layout-length old-layout)))
           (unless (= old-length length)
             (warn "change in instance length of class ~S:~%  ~
@@ -1488,6 +1485,9 @@ between the ~A definition and the ~A definition"
 ;;; is loaded and the class defined.
 (!cold-init-forms
   (/show0 "about to define temporary STANDARD-CLASSes")
+  ;; You'd think with all the pedantic explanation in here it would at least
+  ;; be right, but it isn't: layout-inherits for FUNDAMENTAL-STREAM
+  ;; ends up as (T SLOT-OBJECT STREAM STANDARD-OBJECT)
   (dolist (x '(;; Why is STREAM duplicated in this list? Because, when
                ;; the inherits-vector of FUNDAMENTAL-STREAM is set up,
                ;; a vector containing the elements of the list below,

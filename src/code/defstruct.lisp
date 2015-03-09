@@ -1303,6 +1303,7 @@ or they must be declared locally notinline at each call site.~@:>")
 ;;; case it is the old layout.
 (defun ensure-structure-class (info inherits old-context new-context
                                     &key compiler-layout)
+  (declare (type defstruct-description info))
   (multiple-value-bind (class old-layout)
       (destructuring-bind
           (&optional
@@ -1329,30 +1330,31 @@ or they must be declared locally notinline at each call site.~@:>")
             (t
              (list (layout-classoid
                     (svref inherits (1- (length inherits))))))))
-    (let ((new-layout (make-layout :classoid class
-                                   :inherits inherits
-                                   :depthoid (length inherits)
-                                   :length (dd-layout-length info)
-                                   :info info
-                                   . #!-interleaved-raw-slots
-                                     (:n-untagged-slots (dd-raw-length info))
-                                     #!+interleaved-raw-slots
-                                     (:untagged-bitmap (dd-bitmap info))))
-          (old-layout (or compiler-layout old-layout)))
+    (let* ((old-layout (or compiler-layout old-layout))
+           (new-layout
+            (when (or (not old-layout) *type-system-initialized*)
+              (make-layout :classoid class
+                           :inherits inherits
+                           :depthoid (length inherits)
+                           :length (dd-layout-length info)
+                           :info info . #!-interleaved-raw-slots
+                                        (:n-untagged-slots (dd-raw-length info))
+                                        #!+interleaved-raw-slots
+                                        (:untagged-bitmap (dd-bitmap info))))))
       (cond
        ((not old-layout)
         (values class new-layout nil))
-       (;; This clause corresponds to an assertion in REDEFINE-LAYOUT-WARNING
-        ;; of classic CMU CL. I moved it out to here because it was only
-        ;; exercised in this code path anyway. -- WHN 19990510
-        (not (eq (layout-classoid new-layout) (layout-classoid old-layout)))
-        (error "shouldn't happen: weird state of OLD-LAYOUT?"))
-       ((not *type-system-initialized*)
+       ((not new-layout)
         ;; The assignment of INFO here can almost be deleted,
         ;; except for a few magical types that don't d.t.r.t. in cold-init:
         ;;  STRUCTURE-OBJECT, CONDITION, ALIEN-VALUE, INTERPRETED-FUNCTION
         (setf (layout-info old-layout) info)
         (values class old-layout nil))
+       (;; This clause corresponds to an assertion in REDEFINE-LAYOUT-WARNING
+        ;; of classic CMU CL. I moved it out to here because it was only
+        ;; exercised in this code path anyway. -- WHN 19990510
+        (not (eq (layout-classoid new-layout) (layout-classoid old-layout)))
+        (error "shouldn't happen: weird state of OLD-LAYOUT?"))
        ((redefine-layout-warning old-context
                                  old-layout
                                  new-context
@@ -1363,20 +1365,15 @@ or they must be declared locally notinline at each call site.~@:>")
         (values class new-layout old-layout))
        (t
         (let ((old-info (layout-info old-layout)))
-          (typecase old-info
-            ((or defstruct-description)
+          (if old-info
              (cond ((redefine-structure-warning class old-info info)
                     (values class new-layout old-layout))
                    (t
                     (setf (layout-info old-layout) info)
-                    (values class old-layout nil))))
-            (null
-             (setf (layout-info old-layout) info)
-             (values class old-layout nil))
-            (t
-             (error "shouldn't happen! strange thing in LAYOUT-INFO:~%  ~S"
-                    old-layout)
-             (values class new-layout old-layout)))))))))
+                    (values class old-layout nil)))
+             (progn
+               (setf (layout-info old-layout) info)
+               (values class old-layout nil)))))))))
 
 ;;; Return a list of pairs (name . index). Used for :TYPE'd
 ;;; constructors to find all the names that we have to splice in &
