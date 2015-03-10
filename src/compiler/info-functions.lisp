@@ -101,8 +101,8 @@
     (macrolet ((frob (&rest types)
                  `(clear-info-values
                    name ',(mapcar (lambda (x)
-                                    (type-info-number
-                                     (type-info-or-lose :function x)))
+                                    (meta-info-number
+                                     (meta-info-or-lose :function x)))
                                   types))))
       ;; Note that this does not clear the :DEFINITION.
       ;; That's correct, because if we lose the association between a
@@ -276,7 +276,7 @@ return NIL. Can be set with SETF when ENV is NIL."
   (declare (type (or null string) string))
   (let ((info-number
          (macrolet ((info-number (class type)
-                      (type-info-number (type-info-or-lose class type))))
+                      (meta-info-number (meta-info-or-lose class type))))
            (case doc-type
              (variable (info-number :variable :documentation))
              (structure

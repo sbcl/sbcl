@@ -1142,7 +1142,7 @@
    (frob * *wild-type*)
    (frob nil *empty-type*)
    (frob t *universal-type*)
-   (setf (sb!c::type-info-default (sb!c::type-info-or-lose :variable :type))
+   (setf (sb!c::meta-info-default (sb!c::meta-info-or-lose :variable :type))
          *universal-type*)
    ;; new in sbcl-0.9.5: these used to be CLASSOID types, but that
    ;; view of them was incompatible with requirements on the MOP

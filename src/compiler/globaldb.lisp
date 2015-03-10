@@ -96,23 +96,21 @@
 ;;; would make the cross-compiler very confused.)
 (eval-when (#-sb-xc :compile-toplevel :load-toplevel :execute)
 
-;;; a map from type numbers to TYPE-INFO objects. There is one type
-;;; number for each kind of info.
+;;; A map from info-number to its META-INFO object.
+;;; The reverse mapping is obtained by reading the META-INFO.
 (declaim (type (simple-vector #.(ash 1 info-number-bits)) *info-types*))
 (!defglobal *info-types*
             (make-array (ash 1 info-number-bits) :initial-element nil))
 
-;; FIXME: really unclear name. It's an INFO-TYPE, not a TYPE-INFO.
-;;        But probably would be better as GLOBALDB-METAINFO or something.
-(def!struct (type-info
+(def!struct (meta-info
             #-no-ansi-print-object
             (:print-object (lambda (x s)
                              (print-unreadable-object (x s)
                                (format s
                                        "~S ~S, Number = ~W"
-                                       (type-info-class x)
-                                       (type-info-name x)
-                                       (type-info-number x)))))
+                                       (meta-info-class x)
+                                       (meta-info-name x)
+                                       (meta-info-number x)))))
             (:constructor
              !make-globaldb-info-metadata
              (number class name type-spec
@@ -123,8 +121,8 @@
   ;; 2-part key to this piece of metainfo
   ;; FIXME: taxonomy by CLASS and TYPE is too confusing and overloaded.
   ;;        and "name" is just wrong as neither half alone is the name.
-  (class nil :type keyword :read-only t)
-  (name nil :type keyword :read-only t)
+  (class nil :type keyword :read-only t) ; FIXME: rename to "category"
+  (name nil :type keyword :read-only t)  ; FIXME: rename to "kind"
   ;; a type specifier which info of this type must satisfy
   (type-spec nil :type t :read-only t)
   ;; Two functions called by (SETF INFO) before calling SET-INFO-VALUE.
@@ -141,14 +139,16 @@
   ;; this type. If not FUNCTIONP, then any object serving as a default.
   (default nil)) ; shoud be :read-only t.  I have a fix for that.
 
-(declaim (freeze-type type-info))
+(declaim (freeze-type meta-info))
 
 (defconstant +info-metainfo-type-num+ 0)
 
 ;; Perform the equivalent of (GET-INFO-VALUE sym +INFO-METAINFO-TYPE-NUM+)
-;; but without the AVER that metadata already exists, and bypassing the
-;; defaulting logic.
-(defmacro !get-type-info-metadata (sym)
+;; but without the AVER that meta-info for +info-metainfo-type-num+ exists,
+;; and bypassing the defaulting logic, returning zero or more META-INFOs that
+;; match SYM based on the second half of their key, which is often a unique
+;; identifier by itself.
+(defmacro !get-meta-infos (sym)
   `(let* ((info-vector (symbol-info-vector ,sym))
           (index (if info-vector
                      (packed-info-value-index info-vector +no-auxilliary-key+
@@ -157,23 +157,23 @@
 
 ;; really this takes (KEYWORD KEYWORD) but SYMBOL is easier to test,
 ;; and "or lose" is an explicit check anyway.
-(declaim (ftype (function (symbol symbol) type-info) type-info-or-lose))
-(defun type-info-or-lose (class type)
+(declaim (ftype (function (symbol symbol) meta-info) meta-info-or-lose))
+(defun meta-info-or-lose (class type)
   ;; Usually TYPE designates a unique object, so we store only that object.
   ;; Otherwise we store a list which has a small (<= 4) handful of items.
-  (or (let ((metadata (!get-type-info-metadata type)))
+  (or (let ((metadata (!get-meta-infos type)))
         (cond ((listp metadata)
                (dolist (info metadata nil) ; FIND is slower :-(
-                 (when (eq (type-info-class (truly-the type-info info))
+                 (when (eq (meta-info-class (truly-the meta-info info))
                            class)
                    (return info))))
-              ((eq (type-info-class (truly-the type-info metadata)) class)
+              ((eq (meta-info-class (truly-the meta-info metadata)) class)
                metadata)))
       (error "(~S ~S) is not a defined info type." class type)))
 
-(defun !register-type-info (metainfo)
-  (let* ((name (type-info-name metainfo))
-         (list (!get-type-info-metadata name)))
+(defun !register-meta-info (metainfo)
+  (let* ((name (meta-info-name metainfo))
+         (list (!get-meta-infos name)))
     (set-info-value name +info-metainfo-type-num+
                     (cond ((not list) metainfo) ; unique, just store it
                           ((listp list) (cons metainfo list)) ; prepend to the list
@@ -181,13 +181,13 @@
 
 (defun !%define-info-type (class name type-spec type-checker
                                  validate-function default &optional id)
-  (awhen (ignore-errors (type-info-or-lose class name)) ; if found
+  (awhen (ignore-errors (meta-info-or-lose class name)) ; if found
     (when id
-      (aver (= (type-info-number it) id)))
+      (aver (= (meta-info-number it) id)))
     (return-from !%define-info-type it)) ; do nothing
   (let ((id (or id (position nil *info-types* :start 1)
                    (error "no more INFO type numbers available"))))
-    (!register-type-info
+    (!register-meta-info
      (setf (aref *info-types* id)
            (!make-globaldb-info-metadata id class name type-spec type-checker
                                          validate-function default)))))
@@ -201,13 +201,13 @@
         ;; If exported, then they'll stick around in the target image.
         ;; Perhaps SB-COLD should re-export some of these.
         (declare (special sb!fasl::*dynamic* sb!fasl::*cold-layouts*))
-        (let ((layout (gethash 'type-info sb!fasl::*cold-layouts*)))
+        (let ((layout (gethash 'meta-info sb!fasl::*cold-layouts*)))
           (sb!fasl::cold-svset
            (sb!fasl::cold-symbol-value '*info-types*)
            id
            (sb!fasl::write-slots
             (sb!fasl::allocate-struct sb!fasl::*dynamic* layout)
-            (find-layout 'type-info)
+            (find-layout 'meta-info)
             :class class :name name :type-spec type-spec
             :type-checker checker :validate-function validator
             :default default :number id)))))
@@ -216,7 +216,7 @@
  (dovector (x (the simple-vector *info-types*))
    ;; Genesis writes the *INFO-TYPES* array, but setting up the mapping
    ;; from keyword-pair to object is deferred until cold-init.
-   (when x (!register-type-info x))))
+   (when x (!register-meta-info x))))
 
 ;;;; info types, and type numbers, part II: what's
 ;;;; needed only at compile time, not at run time
@@ -256,7 +256,7 @@
            ,validate-function ,default
            ;; Rationale for hardcoding here is explained at INFO-VECTOR-FDEFN.
            ,(or (and (eq class :function) (eq type :definition) +fdefn-info-num+)
-                #+sb-xc (type-info-number (type-info-or-lose class type))))))
+                #+sb-xc (meta-info-number (meta-info-or-lose class type))))))
     `(eval-when (#-sb-xc :compile-toplevel :load-toplevel :execute) ,form))))
 
 
@@ -267,21 +267,21 @@
 ;;; recorded. If there is no information, the first value returned is
 ;;; the default and the second value returned is NIL.
 (defun info (class type name)
-  (let ((info (type-info-or-lose class type)))
-    (get-info-value name (type-info-number info))))
+  (let ((info (meta-info-or-lose class type)))
+    (get-info-value name (meta-info-number info))))
 
 (defun (setf info) (new-value class type name)
-  (let ((info (type-info-or-lose class type)))
-    (funcall (type-info-type-checker info) new-value)
-    (awhen (type-info-validate-function info)
+  (let ((info (meta-info-or-lose class type)))
+    (funcall (meta-info-type-checker info) new-value)
+    (awhen (meta-info-validate-function info)
       (funcall it name new-value))
-    (set-info-value name (type-info-number info) new-value)))
+    (set-info-value name (meta-info-number info) new-value)))
 
 ;;; Clear the information of the specified TYPE and CLASS for NAME in
 ;;; the current environment. Return true if there was any info.
 (defun clear-info (class type name)
-  (let* ((info (type-info-or-lose class type))
-         (info-number-list (list (type-info-number info))))
+  (let* ((info (meta-info-or-lose class type))
+         (info-number-list (list (meta-info-number info))))
     (declare (dynamic-extent info-number-list))
     (clear-info-values name info-number-list)))
 
@@ -340,7 +340,7 @@
              (packed-info-value-index vector aux-key info-number)))
         (when index
           (return-from get-info-value (values (svref vector index) t))))))
-  (let ((val (type-info-default (aref *info-types* info-number))))
+  (let ((val (meta-info-default (aref *info-types* info-number))))
     (values (if (functionp val) (funcall val name) val) nil)))
 
 ;; Perform the approximate equivalent operations of retrieving
@@ -357,9 +357,9 @@
   (with-unique-names (info-number proc)
     `(let ((,info-number
             ,(if (and (keywordp info-type) (keywordp info-class))
-                 (type-info-number (type-info-or-lose info-class info-type))
-                 `(type-info-number
-                   (type-info-or-lose ,info-class ,info-type)))))
+                 (meta-info-number (meta-info-or-lose info-class info-type))
+                 `(meta-info-number
+                   (meta-info-or-lose ,info-class ,info-type)))))
        (dx-flet ((,proc () ,creation-form))
          (%get-info-value-initializing ,name ,info-number #',proc)))))
 
@@ -372,9 +372,9 @@
   (with-unique-names (info-number proc)
     `(let ((,info-number
             ,(if (and (keywordp info-type) (keywordp info-class))
-                 (type-info-number (type-info-or-lose info-class info-type))
-                 `(type-info-number
-                   (type-info-or-lose ,info-class ,info-type)))))
+                 (meta-info-number (meta-info-or-lose info-class info-type))
+                 `(meta-info-number
+                   (meta-info-or-lose ,info-class ,info-type)))))
        ,(if (and (listp lambda) (eq (car lambda) 'lambda))
             ;; rewrite as FLET because the compiler is unable to dxify
             ;;   (DX-LET ((x (LAMBDA <whatever>))) (F x))
@@ -751,7 +751,7 @@
          (format t "~&  ~@[type ~D~]~@[~{~S ~S~}~] = "
                  (if (not type) type-num)
                  (if type
-                     (list (type-info-class type) (type-info-name type))))
+                     (list (meta-info-class type) (meta-info-name type))))
          (write val :level 1)))
      sym)))
 
@@ -782,21 +782,21 @@
                       .whole.)))))
 
   (def info (class type name)
-    (let ((info (type-info-or-lose class type)))
-      `(truly-the (values ,(type-info-type-spec info) boolean)
-                  (get-info-value ,name ,(type-info-number info)))))
+    (let ((info (meta-info-or-lose class type)))
+      `(truly-the (values ,(meta-info-type-spec info) boolean)
+                  (get-info-value ,name ,(meta-info-number info)))))
 
   (def (setf info) (new-value class type name)
     (let* (#+sb-xc-host (sb!xc:*gensym-counter* sb!xc:*gensym-counter*)
-           (info (type-info-or-lose class type))
-           (tin (type-info-number info))
-           (type-spec (type-info-type-spec info))
+           (info (meta-info-or-lose class type))
+           (tin (meta-info-number info))
+           (type-spec (meta-info-type-spec info))
            (check
-            (when (type-info-validate-function info)
+            (when (meta-info-validate-function info)
               ;; is (or ... null), but non-null in host implies non-null
               `(truly-the function
-                (type-info-validate-function
-                 (truly-the type-info (svref *info-types* ,tin)))))))
+                (meta-info-validate-function
+                 (truly-the meta-info (svref *info-types* ,tin)))))))
       (with-unique-names (new)
         `(let ((,new ,new-value))
            ;; enforce type-correctness regardless of enclosing policy
@@ -807,7 +807,7 @@
              (set-info-value ,name ,tin ,new))))))
 
   (def clear-info (class type name)
-    (let ((info (type-info-or-lose class type)))
-      `(clear-info-values ,name '(,(type-info-number info))))))
+    (let ((info (meta-info-or-lose class type)))
+      `(clear-info-values ,name '(,(meta-info-number info))))))
 
 (!defun-from-collected-cold-init-forms !globaldb-cold-init)
