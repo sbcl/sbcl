@@ -1080,6 +1080,8 @@
   ;; optional arg. This is true for keywords with non-constant
   ;; defaults even when there is no user-specified supplied-p var.
   (supplied-p nil :type (or lambda-var null))
+  ;; NIL if supplied-p is only used for directing evaluation of init forms
+  (supplied-used-p t :type boolean)
   ;; the default for a keyword or optional, represented as the
   ;; original Lisp code. This is set to NIL in &KEY arguments that are
   ;; defaulted using the SUPPLIED-P arg.

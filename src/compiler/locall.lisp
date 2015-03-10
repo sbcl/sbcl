@@ -725,7 +725,9 @@
                   (:optional
                    (call-args (car temp))
                    (when (arg-info-supplied-p info)
-                     (call-args t)))
+                     (call-args (if (arg-info-supplied-used-p info)
+                                    t
+                                    1))))
                   (:rest
                    (call-args `(list ,@more-temps))
                    ;; &REST arguments may be accompanied by extra
@@ -756,7 +758,12 @@
                 (call-args temp)
                 (call-args (arg-info-default info)))
             (when (arg-info-supplied-p info)
-              (call-args (not (null temp))))))
+              (call-args (cond ((arg-info-supplied-used-p info)
+                                (not (null temp)))
+                               (temp
+                                1)
+                               (t
+                                0))))))
 
         (convert-hairy-fun-entry ref call (optional-dispatch-main-entry fun)
                                  (append temps more-temps)

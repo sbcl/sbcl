@@ -588,13 +588,19 @@
                      (default (arg-info-default info))
                      (keyword (arg-info-key info))
                      (supplied-p (arg-info-supplied-p info))
+                     (supplied-used-p (arg-info-supplied-used-p info))
                      (n-value (sb!xc:gensym "N-VALUE-"))
                      (clause (cond (supplied-p
                                     (let ((n-supplied (sb!xc:gensym "N-SUPPLIED-")))
-                                      (temps n-supplied)
+                                      (temps (list n-supplied
+                                                   (if supplied-used-p
+                                                       nil
+                                                       0)))
                                       (arg-vals n-value n-supplied)
                                       `((eq ,n-key ',keyword)
-                                        (setq ,n-supplied t)
+                                        (setq ,n-supplied ,(if supplied-used-p
+                                                               t
+                                                               1))
                                         (setq ,n-value ,n-value-temp))))
                                    (t
                                     (arg-vals n-value)
@@ -609,13 +615,15 @@
                 (tests clause)))
 
             (unless allowp
-              (temps n-allowp n-lose n-losep)
+              (temps n-allowp
+                     (list n-lose 0)
+                     (list n-losep 0))
               (unless found-allow-p
                 (tests `((eq ,n-key :allow-other-keys)
                          (setq ,n-allowp ,n-value-temp))))
               (tests `(t
                        (setq ,n-lose ,n-key
-                             ,n-losep t))))
+                             ,n-losep 1))))
 
             (body
              `(when (oddp ,n-count)
@@ -643,7 +651,7 @@
                     (cond ,@(tests))))))
 
             (unless allowp
-              (body `(when (and ,n-losep (not ,n-allowp))
+              (body `(when (and (neq ,n-losep 0) (not ,n-allowp))
                        (%unknown-key-arg-error ,n-lose)))))))
 
       (let ((ep (ir1-convert-lambda-body
@@ -730,11 +738,19 @@
                  (unless supplied-p
                    (setf (arg-info-supplied-p info) supplied-temp))
                  (when hairy-default
-                   (setf (arg-info-default info) nil))
+                   (setf (arg-info-default info) nil)
+                   (unless supplied-p
+                     (setf (arg-info-supplied-used-p info) nil)))
                  (main-vars supplied-temp)
                  (cond (hairy-default
-                        (main-vals nil nil)
-                        (bind-vals `(if ,n-supplied ,n-val ,default)))
+                        (main-vals nil
+                                   (if supplied-p
+                                       nil
+                                       0))
+                        (bind-vals
+                         (if supplied-p
+                             `(if ,n-supplied ,n-val ,default)
+                             `(if (eq ,n-supplied 0) ,default ,n-val))))
                        (t
                         (main-vals default nil)
                         (bind-vals n-val)))
