@@ -480,14 +480,13 @@
 ;;;     This is the ordinary way, the natural way of representing e.g.
 ;;;       (DECLAIM (INLINE FOO))
 ;;;       (DEFUN FOO (X) (+ X 1))
-;;;   * The value in INFO can be a closure which returns the lambda
-;;;     expression, e.g.
+;;;   * It can be a closure which returns the lambda expression, e.g.
 ;;;       (SETF (INFO :FUNCTION :INLINE-EXPANSION-DESIGNATOR 'BAR-LEFT-CHILD)
 ;;;             (LAMBDA ()
 ;;;               '(LAMBDA (BAR) (BAR-REF BAR 3))))
-;;;     This twisty way of storing values is supported in order to
-;;;     allow structure slot accessors, and perhaps later other
-;;;     stereotyped functions, to be represented compactly.
+;;;     The latter is potentially slightly more compact, but not only
+;;      is it difficult to portably expose this space-saving device,
+;;;     it doesn't even work as designed for its internal-only use.
 (define-info-type (:function :inline-expansion-designator)
   :type-spec (or list function))
 
@@ -512,7 +511,7 @@
 ;;; the macroexpansion function for this macro
 (define-info-type (:function :macro-function) :type-spec (or function null))
 
-;;; the compiler-macroexpansion function for this macro
+;;; the compiler-macroexpansion function for this function or macro
 (define-info-type (:function :compiler-macro-function)
   :type-spec (or function null))
 
