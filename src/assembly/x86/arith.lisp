@@ -121,8 +121,6 @@
                           (:save-p t))
                          ((:arg x (descriptor-reg any-reg) edx-offset)
                           (:res res (descriptor-reg any-reg) edx-offset)
-
-                          (:temp eax unsigned-reg eax-offset)
                           (:temp ecx unsigned-reg ecx-offset))
   (inst test x fixnum-tag-mask)
   (inst jmp :z FIXNUM)

@@ -140,8 +140,6 @@
                           (:save-p t))
                          ((:arg x (descriptor-reg any-reg) rdx-offset)
                           (:res res (descriptor-reg any-reg) rdx-offset)
-
-                          (:temp rax unsigned-reg rax-offset)
                           (:temp rcx unsigned-reg rcx-offset))
   (inst test (reg-in-size x :byte) fixnum-tag-mask)
   (inst jmp :z FIXNUM)
