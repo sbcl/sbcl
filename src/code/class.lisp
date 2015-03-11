@@ -282,8 +282,8 @@
                   (make-layout :classoid (or classoid (make-undefined-classoid name)))))))))
 
 ;;; If LAYOUT is uninitialized, initialize it with CLASSOID, LENGTH,
-;;; INHERITS, and DEPTHOID, otherwise require that it be consistent
-;;; with CLASSOID, LENGTH, INHERITS, and DEPTHOID.
+;;; INHERITS, DEPTHOID, and RAW-SLOT-METADATA. Otherwise require
+;;; that it be consistent with the existing values.
 ;;;
 ;;; UNDEFINED-CLASS values are interpreted specially as "we don't know
 ;;; anything about the class", so if LAYOUT is initialized, any
@@ -422,8 +422,8 @@ between the ~A definition and the ~A definition"
                 name old-context context)
           t))))
 
-;;; Require that LAYOUT data be consistent with CLASS, LENGTH,
-;;; INHERITS, and DEPTHOID.
+;;; Require that LAYOUT data be consistent with CLASSOID, LENGTH,
+;;; INHERITS, DEPTHOID, and RAW-SLOT-METADATA.
 (declaim (ftype (function
                  (layout classoid index simple-vector layout-depthoid
                          layout-raw-slot-metadata-type))
