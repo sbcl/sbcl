@@ -1120,6 +1120,19 @@ unless :NAMED is also specified.")))
         ;; Provide inline expansion (or not).
         (when check-inlining
           (push predicate-name fnames))
+        ;; FIXME: THIS DOES NOT WORK! It might have worked for slot accesors
+        ;; back when they were closures (installed by %TARGET-DEFSTRUCT)
+        ;; and not DEFUNs. But I think it *never* worked for predicates.
+        ;; A careful examination of control flow shows the following sequence:
+        ;;   %COMPILER-DEFSTRUCT
+        ;;   %COMPILER-DEFUN of the predicate name
+        ;;   %DEFUN of the predicate name
+        ;; with of course some other irrelevant junk here and there.
+        ;; Neither %COMPILER-DEFUN nor %DEFUN is aware of the intended
+        ;; "compact" representation of the predicate, and so they overwrite
+        ;; what was there with the inline expansion as a sexpr.
+        ;; Probably this feature should be ripped out.
+        ;;
         ;; Let the predicate be inlined.
         (setf (info :function :inline-expansion-designator predicate-name)
               ;; The memory saved by this strange representation has got to be
