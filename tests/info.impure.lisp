@@ -77,8 +77,8 @@
   (loop for type-info across *info-types*
         when (and type-info (not (eq (meta-info-type-spec type-info) 't)))
         do
-        (let ((key1 (meta-info-class type-info))
-              (key2 (meta-info-name type-info))
+        (let ((key1 (meta-info-category type-info))
+              (key2 (meta-info-kind type-info))
               (sillyval (make-string-output-stream))) ; nothing should be this
           ;; check the type-checker function
           (let ((f (compile nil

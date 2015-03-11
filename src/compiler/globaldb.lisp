@@ -6,21 +6,22 @@
 ;;;; the information may well have several representations.
 ;;;;
 ;;;; The database contains arbitrary Lisp values, addressed by a
-;;;; combination of Name, Class and Type. The Name is an EQUAL-thing
-;;;; which is the name of the thing we are recording information
-;;;; about. Class is the kind of object involved. Typical classes are
-;;;; :FUNCTION, :VARIABLE, :TYPE, ... A Type names a particular piece
-;;;; of information within a given class. Class and Type are keywords,
-;;;; and are compared with EQ.
+;;;; <Name,Info-Number> pair, where Info-Number is identified by
+;;;; a <Category,Kind> pair, each being a keyword. The Name is a thing
+;;;; which we are recording information about. [Names are compared by EQUAL.]
+;;;; Category and Kind create a taxonomy of the data values for a thing.
+;;;; For example, '+ names both a function and a variable, so has (at least)
+;;;; two categories of information. Within each category, we have several
+;;;; pieces of info, and in fact some of these have the same-named :Kind
+;;;; such as <:FUNCTION,:TYPE> and <:VARIABLE,:TYPE>.
+;;;; (And sometimes the Kind is literally :KIND, as a consequence of
+;;;; how users of the database desire to name their keys.)
 
 ;;;; The relation between this file and 'info-vectors' is that the
 ;;;; latter provides a fundamental mechanism to create property-list-like
-;;;; things whose "indicators" are restricted to small integers
-;;;; and whose values are anything; whereas the globaldb provides the
-;;;; facility of looking up the properties by keyword, a/k/a Class+Type.
-;;;; The keyword regime is somewhat arbitrary because ultimately the
-;;;; pair of keywords just translates to a small integer, usually
-;;;; resolvable at compile-time for the most part.
+;;;; things whose "indicators" are restricted to small integers.
+;;;; The globaldb abstraction is layered on top of that and is responsible
+;;;; for translating <Category,Kind> to a small integer.
 
 ;;;; This software is part of the SBCL system. See the README file for
 ;;;; more information.
@@ -108,21 +109,18 @@
                              (print-unreadable-object (x s)
                                (format s
                                        "~S ~S, Number = ~W"
-                                       (meta-info-class x)
-                                       (meta-info-name x)
+                                       (meta-info-category x)
+                                       (meta-info-kind x)
                                        (meta-info-number x)))))
             (:constructor
-             !make-globaldb-info-metadata
-             (number class name type-spec
-              type-checker validate-function default))
+             !make-meta-info (number category kind type-spec
+                              type-checker validate-function default))
             (:copier nil))
-  ;; a number that uniquely identifies this type (and implicitly its class)
+  ;; a number that uniquely identifies this object
   (number nil :type info-number :read-only t)
   ;; 2-part key to this piece of metainfo
-  ;; FIXME: taxonomy by CLASS and TYPE is too confusing and overloaded.
-  ;;        and "name" is just wrong as neither half alone is the name.
-  (class nil :type keyword :read-only t) ; FIXME: rename to "category"
-  (name nil :type keyword :read-only t)  ; FIXME: rename to "kind"
+  (category nil :type keyword :read-only t)
+  (kind nil :type keyword :read-only t)
   ;; a type specifier which info of this type must satisfy
   (type-spec nil :type t :read-only t)
   ;; Two functions called by (SETF INFO) before calling SET-INFO-VALUE.
@@ -146,10 +144,10 @@
 ;; Perform the equivalent of (GET-INFO-VALUE sym +INFO-METAINFO-TYPE-NUM+)
 ;; but without the AVER that meta-info for +info-metainfo-type-num+ exists,
 ;; and bypassing the defaulting logic, returning zero or more META-INFOs that
-;; match SYM based on the second half of their key, which is often a unique
+;; match KIND based on half of their key, which is often a unique
 ;; identifier by itself.
-(defmacro !get-meta-infos (sym)
-  `(let* ((info-vector (symbol-info-vector ,sym))
+(defmacro !get-meta-infos (kind)
+  `(let* ((info-vector (symbol-info-vector ,kind))
           (index (if info-vector
                      (packed-info-value-index info-vector +no-auxilliary-key+
                                               +info-metainfo-type-num+))))
@@ -158,30 +156,30 @@
 ;; really this takes (KEYWORD KEYWORD) but SYMBOL is easier to test,
 ;; and "or lose" is an explicit check anyway.
 (declaim (ftype (function (symbol symbol) meta-info) meta-info-or-lose))
-(defun meta-info-or-lose (class type)
-  ;; Usually TYPE designates a unique object, so we store only that object.
+(defun meta-info-or-lose (category kind)
+  ;; Usually KIND designates a unique object, so we store only that object.
   ;; Otherwise we store a list which has a small (<= 4) handful of items.
-  (or (let ((metadata (!get-meta-infos type)))
+  (or (let ((metadata (!get-meta-infos kind)))
         (cond ((listp metadata)
                (dolist (info metadata nil) ; FIND is slower :-(
-                 (when (eq (meta-info-class (truly-the meta-info info))
-                           class)
+                 (when (eq (meta-info-category (truly-the meta-info info))
+                           category)
                    (return info))))
-              ((eq (meta-info-class (truly-the meta-info metadata)) class)
+              ((eq (meta-info-category (truly-the meta-info metadata)) category)
                metadata)))
-      (error "(~S ~S) is not a defined info type." class type)))
+      (error "(~S ~S) is not a defined info type." category kind)))
 
 (defun !register-meta-info (metainfo)
-  (let* ((name (meta-info-name metainfo))
+  (let* ((name (meta-info-kind metainfo))
          (list (!get-meta-infos name)))
     (set-info-value name +info-metainfo-type-num+
                     (cond ((not list) metainfo) ; unique, just store it
                           ((listp list) (cons metainfo list)) ; prepend to the list
                           (t (list metainfo list)))))) ; convert atom to a list
 
-(defun !%define-info-type (class name type-spec type-checker
-                                 validate-function default &optional id)
-  (awhen (ignore-errors (meta-info-or-lose class name)) ; if found
+(defun !%define-info-type (category kind type-spec type-checker
+                           validate-function default &optional id)
+  (awhen (ignore-errors (meta-info-or-lose category kind)) ; if found
     (when id
       (aver (= (meta-info-number it) id)))
     (return-from !%define-info-type it)) ; do nothing
@@ -189,14 +187,14 @@
                    (error "no more INFO type numbers available"))))
     (!register-meta-info
      (setf (aref *info-types* id)
-           (!make-globaldb-info-metadata id class name type-spec type-checker
-                                         validate-function default)))))
+           (!make-meta-info id category kind type-spec type-checker
+                            validate-function default)))))
 
 ) ; EVAL-WHEN
 
 #-sb-xc
 (setf (get '!%define-info-type :sb-cold-funcall-handler)
-      (lambda (class name type-spec checker validator default id)
+      (lambda (category kind type-spec checker validator default id)
         ;; The SB!FASL: symbols are poor style, but the lesser evil.
         ;; If exported, then they'll stick around in the target image.
         ;; Perhaps SB-COLD should re-export some of these.
@@ -208,7 +206,7 @@
            (sb!fasl::write-slots
             (sb!fasl::allocate-struct sb!fasl::*dynamic* layout)
             (find-layout 'meta-info)
-            :class class :name name :type-spec type-spec
+            :category category :kind kind :type-spec type-spec
             :type-checker checker :validate-function validator
             :default default :number id)))))
 
@@ -222,9 +220,9 @@
 ;;;; needed only at compile time, not at run time
 
 ;;; Define a new type of global information.
-;;; CLASS/TYPE form a two-piece name for the kind of information,
+;;; CATEGORY/KIND form a two-part name for the piece of information,
 ;;; DEFAULT is a defaulting expression, and TYPE-SPEC
-;;; is a type specifier which values of the type must satisfy.
+;;; is a type specifier which data values must satisfy.
 ;;; Roughly speaking there is a hierarchy to the two-piece names
 ;;; but this is a fiction that is not maintained anywhere in the internals.
 ;;;
@@ -242,45 +240,46 @@
 ;; kind of an alternative to the "!" name convention.
 (#+sb-xc-host defmacro
  #-sb-xc-host sb!xc:defmacro
-    define-info-type ((class type)
+    define-info-type ((category kind)
                        &key (type-spec (missing-arg))
                             (validate-function)
                             default)
-  (declare (type keyword class type))
+  (declare (type keyword category kind))
   ;; There was formerly a remark that (COPY-TREE TYPE-SPEC) ensures repeatable
   ;; fasls. That's not true now, probably never was. A compiler is permitted to
   ;; coalesce EQUAL quoted lists and there's no defense against it, so why try?
   (let ((form
-         `(!%define-info-type ,class ,type ',type-spec
+         `(!%define-info-type ,category ,kind ',type-spec
            ,(if (eq type-spec 't) '#'identity `(lambda (x) (the ,type-spec x)))
            ,validate-function ,default
            ;; Rationale for hardcoding here is explained at INFO-VECTOR-FDEFN.
-           ,(or (and (eq class :function) (eq type :definition) +fdefn-info-num+)
-                #+sb-xc (meta-info-number (meta-info-or-lose class type))))))
+           ,(or (and (eq category :function) (eq kind :definition)
+                     +fdefn-info-num+)
+                #+sb-xc (meta-info-number (meta-info-or-lose category kind))))))
     `(eval-when (#-sb-xc :compile-toplevel :load-toplevel :execute) ,form))))
 
 
 ;;; INFO is the standard way to access the database. It's settable.
 ;;;
-;;; Return the information of the specified TYPE and CLASS for NAME.
+;;; Return the information of the specified CATEGORY and KIND for NAME.
 ;;; The second value returned is true if there is any such information
 ;;; recorded. If there is no information, the first value returned is
 ;;; the default and the second value returned is NIL.
-(defun info (class type name)
-  (let ((info (meta-info-or-lose class type)))
+(defun info (category kind name)
+  (let ((info (meta-info-or-lose category kind)))
     (get-info-value name (meta-info-number info))))
 
-(defun (setf info) (new-value class type name)
-  (let ((info (meta-info-or-lose class type)))
+(defun (setf info) (new-value category kind name)
+  (let ((info (meta-info-or-lose category kind)))
     (funcall (meta-info-type-checker info) new-value)
     (awhen (meta-info-validate-function info)
       (funcall it name new-value))
     (set-info-value name (meta-info-number info) new-value)))
 
-;;; Clear the information of the specified TYPE and CLASS for NAME in
+;;; Clear the information of the specified CATEGORY and KIND for NAME in
 ;;; the current environment. Return true if there was any info.
-(defun clear-info (class type name)
-  (let* ((info (meta-info-or-lose class type))
+(defun clear-info (category kind name)
+  (let* ((info (meta-info-or-lose category kind))
          (info-number-list (list (meta-info-number info))))
     (declare (dynamic-extent info-number-list))
     (clear-info-values name info-number-list)))
@@ -290,7 +289,8 @@
     (aver (and (typep type 'info-number) (svref *info-types* type))))
   ;; A call to UNCROSS was suspiciously absent, so I added this ERROR
   ;; to be certain that it's not supposed to happen when building the xc.
-  #+sb-xc-xhost (error "Strange CLEAR-INFO building the xc: ~S ~S" name type)
+  #+sb-xc-xhost (error "Strange CLEAR-INFO building the xc: ~S ~S"
+                       name info-numbers)
   (let (new)
     (with-globaldb-name (key1 key2) name
       :simple
@@ -344,7 +344,7 @@
     (values (if (functionp val) (funcall val name) val) nil)))
 
 ;; Perform the approximate equivalent operations of retrieving
-;; (INFO :CLASS :TYPE NAME), but if no info is found, invoke CREATION-FORM
+;; (INFO :CATEGORY :KIND NAME), but if no info is found, invoke CREATION-FORM
 ;; to produce an object that becomes the value for that piece of info, storing
 ;; and returning it. The entire sequence behaves atomically but with a proviso:
 ;; the creation form's result may be discarded, and another object returned
@@ -353,13 +353,12 @@
 ;; side-effects from making and discarding its result, do NOT use this macro.
 ;; A mutex-guarded table would probably be more appropriate in such cases.
 ;;
-(def!macro get-info-value-initializing (info-class info-type name creation-form)
+(def!macro get-info-value-initializing (category kind name creation-form)
   (with-unique-names (info-number proc)
     `(let ((,info-number
-            ,(if (and (keywordp info-type) (keywordp info-class))
-                 (meta-info-number (meta-info-or-lose info-class info-type))
-                 `(meta-info-number
-                   (meta-info-or-lose ,info-class ,info-type)))))
+            ,(if (and (keywordp category) (keywordp kind))
+                 (meta-info-number (meta-info-or-lose category kind))
+                 `(meta-info-number (meta-info-or-lose ,category ,kind)))))
        (dx-flet ((,proc () ,creation-form))
          (%get-info-value-initializing ,name ,info-number #',proc)))))
 
@@ -368,13 +367,12 @@
 ;; and perhaps could be implemented as such.
 ;; Atomic update will be important for making the fasloader threadsafe
 ;; using a predominantly lock-free design, and other nice things.
-(def!macro atomic-set-info-value (info-class info-type name lambda)
+(def!macro atomic-set-info-value (category kind name lambda)
   (with-unique-names (info-number proc)
     `(let ((,info-number
-            ,(if (and (keywordp info-type) (keywordp info-class))
-                 (meta-info-number (meta-info-or-lose info-class info-type))
-                 `(meta-info-number
-                   (meta-info-or-lose ,info-class ,info-type)))))
+            ,(if (and (keywordp category) (keywordp kind))
+                 (meta-info-number (meta-info-or-lose category kind))
+                 `(meta-info-number (meta-info-or-lose ,category ,kind)))))
        ,(if (and (listp lambda) (eq (car lambda) 'lambda))
             ;; rewrite as FLET because the compiler is unable to dxify
             ;;   (DX-LET ((x (LAMBDA <whatever>))) (F x))
@@ -427,7 +425,7 @@
 ;;; The type specifier for this function.
 (define-info-type (:function :type)
   :type-spec ctype
-  ;; Again (as in DEFINE-INFO-TYPE :CLASS :FUNCTION :TYPE :KIND) it's
+  ;; Again [as in (DEFINE-INFO-TYPE (:FUNCTION :TYPE) ...)] it's
   ;; not clear how to generalize the FBOUNDP expression to the
   ;; cross-compiler. -- WHN 19990330
   :default
@@ -462,7 +460,7 @@
 (define-info-type (:function :where-from)
   :type-spec (member :declared :defined-method :assumed :defined)
   :default
-  ;; Again (as in DEFINE-INFO-TYPE :CLASS :FUNCTION :TYPE :KIND) it's
+  ;; Again [as in (DEFINE-INFO-TYPE (:FUNCTION :KIND) ...)] it's
   ;; not clear how to generalize the FBOUNDP expression to the
   ;; cross-compiler. -- WHN 19990606
   #+sb-xc-host :assumed
@@ -723,9 +721,9 @@
 
 ;;;; ":SOURCE-LOCATION" subsection.
 ;;; This is kind of the opposite of what I'd have thought more logical,
-;;; where each of the above subsections - also called "info classes" -
-;;; has one of its kinds of information being :SOURCE-LOCATION.  And in fact
-;;; that *is* how :TYPE was handled. However, many global entities
+;;; where each of the above categories has one of its kinds of information
+;;; being :SOURCE-LOCATION.
+;;; And in fact that *is* how :TYPE was handled. However, many global entities
 ;;; store their source-location hanging off some other hook, avoiding the
 ;;; globaldb entirely, such as functions using a #<code-component>.
 ;;; So either way is basically a hodgepodge.
@@ -751,7 +749,7 @@
          (format t "~&  ~@[type ~D~]~@[~{~S ~S~}~] = "
                  (if (not type) type-num)
                  (if type
-                     (list (meta-info-class type) (meta-info-name type))))
+                     (list (meta-info-category type) (meta-info-kind type))))
          (write val :level 1)))
      sym)))
 
@@ -766,29 +764,29 @@
 ;;; Target needs just one, since there compiler macros and source-transforms
 ;;; are equivalent.
 (macrolet ((def (name lambda-list form)
-             (aver (member 'class lambda-list))
-             (aver (member 'type lambda-list))
+             (aver (member 'category lambda-list))
+             (aver (member 'kind lambda-list))
              `(progn
                 ;; FIXME: instead of a macro and a transform, just define the macro
                 ;; early enough for both host and target compilation to see.
                 #+sb-xc-host
                 (define-source-transform ,name ,lambda-list
-                  (if (and (keywordp class) (keywordp type))
+                  (if (and (keywordp category) (keywordp kind))
                       ,form
                       (values nil t)))
                 (define-compiler-macro ,name ,(append '(&whole .whole.) lambda-list)
-                  (if (and (keywordp class) (keywordp type))
+                  (if (and (keywordp category) (keywordp kind))
                       ,form
                       .whole.)))))
 
-  (def info (class type name)
-    (let ((info (meta-info-or-lose class type)))
+  (def info (category kind name)
+    (let ((info (meta-info-or-lose category kind)))
       `(truly-the (values ,(meta-info-type-spec info) boolean)
                   (get-info-value ,name ,(meta-info-number info)))))
 
-  (def (setf info) (new-value class type name)
+  (def (setf info) (new-value category kind name)
     (let* (#+sb-xc-host (sb!xc:*gensym-counter* sb!xc:*gensym-counter*)
-           (info (meta-info-or-lose class type))
+           (info (meta-info-or-lose category kind))
            (tin (meta-info-number info))
            (type-spec (meta-info-type-spec info))
            (check
@@ -806,8 +804,8 @@
                  `((funcall ,check ,name ,new)))
              (set-info-value ,name ,tin ,new))))))
 
-  (def clear-info (class type name)
-    (let ((info (meta-info-or-lose class type)))
+  (def clear-info (category kind name)
+    (let ((info (meta-info-or-lose category kind)))
       `(clear-info-values ,name '(,(meta-info-number info))))))
 
 (!defun-from-collected-cold-init-forms !globaldb-cold-init)
