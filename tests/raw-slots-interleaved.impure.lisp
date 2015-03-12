@@ -160,3 +160,7 @@
                      (sb-sys:int-sap (foo-cdf-ptr thing)) 0)))
       (assert (= im (sb-sys:sap-ref-double
                      (sb-sys:int-sap (foo-cdf-ptr thing)) 8))))))
+
+(load "compiler-test-util.lisp")
+(with-test (:name :copy-structure-efficient-case)
+  (assert (not (ctu:find-named-callees #'copy-structure :name 'ash))))

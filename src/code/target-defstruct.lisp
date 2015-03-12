@@ -226,7 +226,8 @@
                  (copy-loop nil))
                 ;; The fixnum case uses fixnum operations for ODPP and ASH.
                 ((fixnump metadata) ; shift and mask is faster than logbitp
-                 (copy-loop (oddp metadata) (setq metadata (ash metadata -1))))
+                 (copy-loop (oddp (truly-the fixnum metadata))
+                            (setq metadata (ash metadata -1))))
                 (t ; bignum - use LOGBITP to avoid consing more bignums
                  (copy-loop (logbitp i metadata))))))
       res)))
