@@ -157,11 +157,11 @@ recompile the existing definition, but this is not currently supported.)
 If NAME is NIL, the compiled function is returned as the primary value.
 Otherwise the resulting compiled function replaces existing function
 definition of NAME, and NAME is returned as primary value; if NAME is a symbol
-tha names a macro, its macro function is replaced and NAME is returned as
+that names a macro, its macro function is replaced and NAME is returned as
 primary value.
 
-Also returns secondary value which is true if any conditions of type WARNING
-occur during the compilation, and NIL otherwise.
+Also returns a secondary value which is true if any conditions of type
+WARNING occur during the compilation, and NIL otherwise.
 
 Tertiary value is true if any conditions of type ERROR, or WARNING that are
 not STYLE-WARNINGs occur during compilation, and NIL otherwise.
