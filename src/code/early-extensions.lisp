@@ -1220,7 +1220,7 @@
           ~#[~;~
             ~2%Use ~/sb!impl:print-symbol-with-prefix/ instead.~;~
             ~2%Use ~/sb!impl:print-symbol-with-prefix/ or ~
-            /sb!impl:print-symbol-with-prefix/ instead.~:;~
+            ~/sb!impl:print-symbol-with-prefix/ instead.~:;~
             ~2%Use~@{~#[~; or~] ~
             ~/sb!impl:print-symbol-with-prefix/~^,~} instead.~
           ~]"
@@ -1230,7 +1230,7 @@
           ~#[~;~
             ~2%Use ~/sb-impl:print-symbol-with-prefix/ instead.~;~
             ~2%Use ~/sb-impl:print-symbol-with-prefix/ or ~
-            /sb-impl:print-symbol-with-prefix/ instead.~:;~
+            ~/sb-impl:print-symbol-with-prefix/ instead.~:;~
             ~2%Use~@{~#[~; or~] ~
             ~/sb-impl:print-symbol-with-prefix/~^,~} instead.~
           ~]"

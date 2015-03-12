@@ -14,12 +14,15 @@
 
 ;;;; Helpers
 
-(defun check-deprecated-thing (kind name state make-body)
+(defun check-deprecated-thing (kind name state make-body
+                               &key (replacements
+                                     (list (format nil "~A.~A"
+                                                   name '#:replacement))))
   (flet ((search-string (string)
            (dolist (fragment `(,(string name)
                                 "deprecated" "as" "of" "SBCL" "1.2.10"
                                 "Use"
-                                ,(format nil "~A.~A" name '#:replacement)
+                                ,@replacements
                                 "instead"))
              (assert (search fragment string)))))
     ;; Check the signaled warning condition.
@@ -110,3 +113,33 @@
 (with-test (:name (sb-impl::define-deprecated-function :final))
   (check-deprecated-thing 'function 'deprecated-function.final :final
                           (lambda (name) `((,name)))))
+
+(sb-impl::define-deprecated-function :early "1.2.10"
+    deprecated-function.two-replacements
+    (deprecated-function.two-replacements.replacement1
+     deprecated-function.two-replacements.replacement2)
+    ()
+  :deprecated)
+
+(with-test (:name (sb-impl::define-deprecated-function :two-replacements))
+  (check-deprecated-thing
+   'function 'deprecated-function.two-replacements :early
+   (lambda (name) `((,name)))
+   :replacements '("DEPRECATED-FUNCTION.TWO-REPLACEMENTS.REPLACEMENT1"
+                   "DEPRECATED-FUNCTION.TWO-REPLACEMENTS.REPLACEMENT2")))
+
+(sb-impl::define-deprecated-function :early "1.2.10"
+    deprecated-function.three-replacements
+    (deprecated-function.three-replacements.replacement1
+     deprecated-function.three-replacements.replacement2
+     deprecated-function.three-replacements.replacement3)
+    ()
+  :deprecated)
+
+(with-test (:name (sb-impl::define-deprecated-function :three-replacements))
+  (check-deprecated-thing
+   'function 'deprecated-function.three-replacements :early
+   (lambda (name) `((,name)))
+   :replacements '("DEPRECATED-FUNCTION.THREE-REPLACEMENTS.REPLACEMENT1"
+                   "DEPRECATED-FUNCTION.THREE-REPLACEMENTS.REPLACEMENT2"
+                   "DEPRECATED-FUNCTION.THREE-REPLACEMENTS.REPLACEMENT3")))
