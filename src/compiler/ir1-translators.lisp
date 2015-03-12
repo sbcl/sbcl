@@ -516,23 +516,18 @@ Return VALUE without evaluating it."
                      thing))))
 
 (defun fun-name-leaf (thing)
-  (if (consp thing)
-      (cond
-        ((member (car thing)
-                 '(lambda named-lambda lambda-with-lexenv))
-         (values (ir1-convert-lambdalike
-                  thing
-                  :debug-name (name-lambdalike thing))
-                 t))
-        ((legal-fun-name-p thing)
-         (values (find-lexically-apparent-fun
-                  thing "as the argument to FUNCTION")
-                 nil))
-        (t
-         (compiler-error "~S is not a legal function name." thing)))
-      (values (find-lexically-apparent-fun
-               thing "as the argument to FUNCTION")
-              nil)))
+  (cond
+    ((typep thing
+            '(cons (member lambda named-lambda lambda-with-lexenv)))
+     (values (ir1-convert-lambdalike
+              thing :debug-name (name-lambdalike thing))
+             t))
+    ((legal-fun-name-p thing)
+     (values (find-lexically-apparent-fun
+              thing "as the argument to FUNCTION")
+             nil))
+    (t
+     (compiler-error "~S is not a legal function name." thing))))
 
 (def-ir1-translator %%allocate-closures ((&rest leaves) start next result)
   (aver (eq result 'nil))

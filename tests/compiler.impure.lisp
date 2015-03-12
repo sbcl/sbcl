@@ -2608,4 +2608,14 @@
     (ignore-errors (delete-file fasl))
     (assert (null (funcall 'derived-function-type-casts)))))
 
+(with-test (:name (compile function :invalid-function-name))
+  (flet ((test-case (nameoid)
+           (multiple-value-bind (result warningsp failurep)
+               (compile nil `(lambda () (function ,nameoid)))
+             (declare (ignore result warningsp))
+             (assert failurep))))
+    (test-case 1)
+    (test-case "foo")
+    (test-case '(foo bar))))
+
 ;;; success
