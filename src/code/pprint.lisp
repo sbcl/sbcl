@@ -773,7 +773,7 @@ line break."
              ;; Keep name as a string, because NAMED-LAMBDA with a symbol
              ;; affects the global environment, when all you want
              ;; is to give the lambda a human-readable label.
-             (format nil "~A-P"
+             (format nil "PPRINT-DISPATCH-TEST-FOR:~A"
                      (cond ((symbolp type-spec) type-spec)
                            ((symbolp function) function)
                            ((%fun-name function))
