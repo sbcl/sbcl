@@ -1329,6 +1329,18 @@
        (inst mov keyword (make-ea :dword :base object :index index
                                   :disp n-word-bytes))))))
 
+(define-vop (more-arg/c)
+  (:translate sb!c::%more-arg)
+  (:policy :fast-safe)
+  (:args (object :scs (descriptor-reg) :to (:result 1)))
+  (:info index)
+  (:arg-types * (:constant (signed-byte 32)))
+  (:results (value :scs (descriptor-reg any-reg)))
+  (:result-types *)
+  (:generator 3
+    (inst mov value (make-ea :dword :base object
+                                    :disp (- (* index n-word-bytes))))))
+
 (define-vop (more-arg)
     (:translate sb!c::%more-arg)
   (:policy :fast-safe)
