@@ -1214,7 +1214,7 @@
 
 (defun print-deprecation-message (name since &optional replacements stream)
   (apply #'format stream
-         #+sb-xc-host
+         (!uncross-format-control
          "~/sb!impl:print-symbol-with-prefix/ has been ~
           deprecated as of SBCL ~A.~
           ~#[~;~
@@ -1223,17 +1223,7 @@
             ~/sb!impl:print-symbol-with-prefix/ instead.~:;~
             ~2%Use~@{~#[~; or~] ~
             ~/sb!impl:print-symbol-with-prefix/~^,~} instead.~
-          ~]"
-         #-sb-xc-host
-         "~/sb-impl:print-symbol-with-prefix/ has been ~
-          deprecated as of SBCL ~A.~
-          ~#[~;~
-            ~2%Use ~/sb-impl:print-symbol-with-prefix/ instead.~;~
-            ~2%Use ~/sb-impl:print-symbol-with-prefix/ or ~
-            ~/sb-impl:print-symbol-with-prefix/ instead.~:;~
-            ~2%Use~@{~#[~; or~] ~
-            ~/sb-impl:print-symbol-with-prefix/~^,~} instead.~
-          ~]"
+          ~]")
          name since replacements))
 
 (defmacro define-deprecated-function (state since name replacements lambda-list
