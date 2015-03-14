@@ -264,7 +264,7 @@
   (:results (results :more t))
   ;; RBX is used to first load the address, allowing the debugger to
   ;; determine which alien was accessed in case it's undefined.
-  (:temporary (:sc sap-reg :offset rbx-offset) rbx)
+  (:temporary (:sc sap-reg :offset rbx-offset :from (:argument 0)) rbx)
   (:temporary (:sc unsigned-reg :offset rax-offset :to :result) rax)
   ;; For safepoint builds: Force values of non-volatiles to the stack.
   ;; These are the callee-saved registers in the native ABI, but
