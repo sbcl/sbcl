@@ -15,6 +15,7 @@
 
 ;;;; LAMBDA hackery
 
+;;;; FIXME: where is that file?
 ;;;; Note: Take a look at the compiler-overview.tex section on "Hairy
 ;;;; function representation" before you seriously mess with this
 ;;;; stuff.
@@ -437,7 +438,7 @@
     fun))
 
 ;;; This function deals with supplied-p vars in optional arguments. If
-;;; the there is no supplied-p arg, then we just call
+;;; there is no supplied-p arg, then we just call
 ;;; IR1-CONVERT-HAIRY-ARGS on the remaining arguments, and generate a
 ;;; optional entry that calls the result. If there is a supplied-p
 ;;; var, then we add it into the default vars and throw a T into the
@@ -1200,12 +1201,12 @@
     (assert-definition-type
      fun type
      ;; KLUDGE: Common Lisp is such a dynamic language that in general
-     ;; all we can do here in general is issue a STYLE-WARNING. It
-     ;; would be nice to issue a full WARNING in the special case of
-     ;; of type mismatches within a compilation unit (as in section
-     ;; 3.2.2.3 of the spec) but at least as of sbcl-0.6.11, we don't
-     ;; keep track of whether the mismatched data came from the same
-     ;; compilation unit, so we can't do that. -- WHN 2001-02-11
+     ;; all we can do here is issue a STYLE-WARNING. It would be nice
+     ;; to issue a full WARNING in the special case of type mismatches
+     ;; within a compilation unit (as in section 3.2.2.3 of the spec)
+     ;; but at least as of sbcl-0.6.11, we don't keep track of whether
+     ;; the mismatched data came from the same compilation unit, so we
+     ;; can't do that. -- WHN 2001-02-11
      :lossage-fun #'compiler-style-warn
      :unwinnage-fun (cond (info #'compiler-style-warn)
                           (for-real #'compiler-notify)
