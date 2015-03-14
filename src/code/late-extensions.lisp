@@ -82,7 +82,16 @@
                            &aux (place (sb!xc:macroexpand specified-place env)))
   (declare (type (member atomic-incf atomic-decf) name))
   (flet ((invalid-place ()
-           (error "Invalid first argument to ~S: ~S" name specified-place)))
+           (error "Invalid first argument to ~S: ~S" name specified-place))
+         (compute-newval (old) ; used only if no atomic inc vop
+           `(logand (,(case name (atomic-incf '+) (atomic-decf '-)) ,old
+                     (the sb!vm:signed-word ,diff)) sb!ext:most-positive-word))
+         (compute-delta () ; used only with atomic inc vop
+           `(logand ,(case name
+                      (atomic-incf `(the sb!vm:signed-word ,diff))
+                      (atomic-decf `(- (the sb!vm:signed-word ,diff))))
+                    sb!ext:most-positive-word)))
+    (declare (ignorable #'compute-newval #'compute-delta))
     (if (and (symbolp place)
              (eq (info :variable :kind place) :global)
              (type= (info :variable :type place) (specifier-type 'fixnum)))
@@ -100,34 +109,22 @@
       ;; CL builtins can't be lexically rebound, but structure accessors can.
       (case op
         (aref
-         (when (cddr args)
+         (unless (singleton-p (cdr args))
            (invalid-place))
-         #!+(or x86 x86-64 ppc)
          (with-unique-names (array)
            `(let ((,array (the (simple-array word (*)) ,(car args))))
+              #!+(or x86 x86-64 ppc)
               (%array-atomic-incf/word
                ,array
                (%check-bound ,array (array-dimension ,array 0) ,(cadr args))
-               (logand #.(1- (ash 1 sb!vm:n-word-bits))
-                       ,(case name
-                         (atomic-incf `(the sb!vm:signed-word ,diff))
-                         (atomic-decf `(- (the sb!vm:signed-word ,diff))))))))
-         #!-(or x86 x86-64 ppc)
-         (with-unique-names (array index old-value)
-           (let ((incremented-value
-                  (case name
-                   (atomic-incf
-                    `(+ ,old-value (the sb!vm:signed-word ,diff)))
-                   (atomic-decf
-                    `(- ,old-value (the sb!vm:signed-word ,diff))))))
-             `(without-interrupts
-                (let* ((,array ,(car args))
-                       (,index ,(cadr args))
-                       (,old-value (aref ,array ,index)))
-                  (setf (aref ,array ,index)
-                        (logand #.(1- (ash 1 sb!vm:n-word-bits))
-                                ,incremented-value))
-                  ,old-value)))))
+               ,(compute-delta))
+              #!-(or x86 x86-64 ppc)
+              ,(with-unique-names (index old-value)
+                `(without-interrupts
+                  (let* ((,index ,(cadr args))
+                         (,old-value (aref ,array ,index)))
+                    (setf (aref ,array ,index) ,(compute-newval old-value))
+                    ,old-value))))))
         ((car cdr first rest)
          (when (cdr args)
            (invalid-place))
@@ -142,51 +139,37 @@
                             (atomic-decf '%atomic-dec-cdr))))
              ,(car args) (the fixnum ,diff))))
         (t
-         (when (cdr args)
-           (invalid-place))
-         ;; Without the SYMBOLP check this would erroneously allow
+         (when (or (cdr args)
+         ;; Because accessor info is identical for the writer and reader
+         ;; functions, without a SYMBOLP check this would erroneously allow
          ;;   (ATOMIC-INCF ((SETF STRUCT-SLOT) x))
-         (let ((info (and (symbolp op) (info :function :source-transform op))))
-           (if (consp info)
-               (let* ((dd (car info))
-                      (structure (dd-name dd))
-                      (slotd (cdr info))
-                      (index (dsd-index slotd))
-                      (type (dsd-type slotd)))
-                 (declare (ignorable structure index))
-                 (unless (and (eq 'sb!vm:word (dsd-raw-type slotd))
-                              (type= (specifier-type type) (specifier-type 'sb!vm:word)))
-                   (error "~S requires a slot of type (UNSIGNED-BYTE ~S), not ~S: ~S"
-                          name sb!vm:n-word-bits type place))
-                 (when (dsd-read-only slotd)
-                   (error "Cannot use ~S with structure accessor for a read-only slot: ~S"
-                          name place))
-                 #!+(or x86 x86-64 ppc)
-                 `(truly-the sb!vm:word
-                             (%raw-instance-atomic-incf/word
-                              (the ,structure ,@args) ,index
-                              (logand #.(1- (ash 1 sb!vm:n-word-bits))
-                                      ,(case name
-                                        (atomic-incf
-                                         `(the sb!vm:signed-word ,diff))
-                                        (atomic-decf
-                                         `(- (the sb!vm:signed-word ,diff)))))))
+                   (not (symbolp op))
+                   (not (structure-instance-accessor-p op)))
+             (invalid-place))
+         (let* ((accessor-info (structure-instance-accessor-p op))
+                (slotd (cdr accessor-info))
+                (type (dsd-type slotd)))
+           (unless (and (eq 'sb!vm:word (dsd-raw-type slotd))
+                        (type= (specifier-type type) (specifier-type 'sb!vm:word)))
+             (error "~S requires a slot of type (UNSIGNED-BYTE ~S), not ~S: ~S"
+                    name sb!vm:n-word-bits type place))
+           (when (dsd-read-only slotd)
+             (error "Cannot use ~S with structure accessor for a read-only slot: ~S"
+                    name place))
+           #!+(or x86 x86-64 ppc)
+           `(truly-the sb!vm:word
+             (%raw-instance-atomic-incf/word
+              (the ,(dd-name (car accessor-info)) ,@args)
+              ,(dsd-index slotd)
+              ,(compute-delta)))
                  ;; No threads outside x86 and x86-64 for now, so this is easy...
-                 #!-(or x86 x86-64 ppc)
-                 (with-unique-names (structure old)
-                   `(without-interrupts
-                      (let* ((,structure ,@args)
-                             (,old (,op ,structure)))
-                        (setf (,op ,structure)
-                              (logand
-                               #.(1- (ash 1 sb!vm:n-word-bits))
-                               ,(case name
-                                 (atomic-incf
-                                  `(+ ,old (the sb!vm:signed-word ,diff)))
-                                 (atomic-decf
-                                  `(- ,old (the sb!vm:signed-word ,diff))))))
-                        ,old))))
-             (invalid-place))))))))
+           #!-(or x86 x86-64 ppc)
+           (with-unique-names (structure old-value)
+             `(without-interrupts
+               (let* ((,structure ,@args)
+                      (,old-value (,op ,structure)))
+                 (setf (,op ,structure) ,(compute-newval old-value))
+                 ,old-value)))))))))
 
 (def!macro atomic-incf (&environment env place &optional (diff 1))
   #!+sb-doc

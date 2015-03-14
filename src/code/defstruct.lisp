@@ -2003,4 +2003,10 @@ or they must be declared locally notinline at each call site.~@:>")
           (errorp
            (error "No DEFSTRUCT-DESCRIPTION for ~S." name)))))
 
+(defun structure-instance-accessor-p (name)
+  (let ((info (info :function :source-transform name)))
+    (and (listp info)
+         (defstruct-slot-description-p (cdr info))
+         info)))
+
 (/show0 "code/defstruct.lisp end of file")

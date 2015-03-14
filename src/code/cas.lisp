@@ -87,8 +87,7 @@ EXPERIMENTAL: Interface subject to change."
              (funcall it expanded environment))
 
             ;; Structure accessor
-            ((let ((info (info :function :source-transform name)))
-               (and (consp info) info))
+            ((structure-instance-accessor-p name)
              (expand-structure-slot-cas it name expanded))
 
             ;; CAS function
