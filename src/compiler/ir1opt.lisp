@@ -2257,8 +2257,8 @@
         (unless (eq value-type *empty-type*)
 
           ;; FIXME: Do it in one step.
-          (let ((context (cons (node-source-form cast)
-                               (lvar-all-sources (cast-value cast)))))
+          (let ((context (node-source-form cast))
+                (detail (lvar-all-sources (cast-value cast))))
             (filter-lvar
              value
              (if (cast-single-value-p cast)
@@ -2270,7 +2270,8 @@
              `(%compile-time-type-error 'dummy
                                         ',(type-specifier atype)
                                         ',(type-specifier value-type)
-                                        ',context)))
+                                        ',detail
+                                        ',(source-to-string context))))
           ;; KLUDGE: FILTER-LVAR does not work for non-returning
           ;; functions, so we declare the return type of
           ;; %COMPILE-TIME-TYPE-ERROR to be * and derive the real type

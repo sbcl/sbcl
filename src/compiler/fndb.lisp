@@ -1588,7 +1588,7 @@
 
 ;; FIXME: This function does not return, but due to the implementation
 ;; of FILTER-LVAR we cannot write it here.
-(defknown %compile-time-type-error (t t t t) *)
+(defknown %compile-time-type-error (t t t t t) *)
 (defknown case-failure (t t t) nil)
 
 (defknown %odd-key-args-error () nil)

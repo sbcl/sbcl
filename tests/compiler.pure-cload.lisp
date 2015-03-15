@@ -181,3 +181,11 @@
     (make-tests)))
 
 (lambda () (the string (+ 1 x)))
+
+(lambda ()
+  (macrolet ((x (&rest args)
+               (declare (ignore args))
+               'a))
+    (let (a)
+      (declare (type vector a))
+      (x #.#'list))))
