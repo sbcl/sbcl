@@ -2518,6 +2518,14 @@ bootstrapping.
               nil))
       (real-get-method generic-function qualifiers specializers errorp)))
 
+;; minor KLUDGE: a separate code component for this function allows GCing
+;; a few symbols and their associated code that would otherwise be retained:
+;;  *!EARLY-{GENERIC-}FUNCTIONS*, *!GENERIC-FUNCTION-FIXUPS*
+(defun early-gf-primary-slow-method-fn (fn)
+  (lambda (args next-methods)
+    (declare (ignore next-methods))
+    (apply fn args)))
+
 (defun !fix-early-generic-functions ()
   (let ((accessors nil))
     ;; Rearrange *!EARLY-GENERIC-FUNCTIONS* to speed up
@@ -2583,10 +2591,7 @@ bootstrapping.
                                        (initargs
                                         (list :function
                                               (set-fun-name
-                                               (lambda (args next-methods)
-                                                 (declare (ignore
-                                                           next-methods))
-                                                 (apply fn args))
+                                               (early-gf-primary-slow-method-fn fn)
                                                `(call ,fn-name)))))
                                   (declare (type function fn))
                                   (make-a-method 'standard-method
