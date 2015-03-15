@@ -470,23 +470,9 @@
 ;;; function, or NIL if there is none
 ;;;
 ;;; To inline a function, we want a lambda expression, e.g.
-;;; '(LAMBDA (X) (+ X 1)). That can be encoded here in one of two
-;;; ways.
-;;;   * The value in INFO can be the lambda expression itself, e.g.
-;;;       (SETF (INFO :FUNCTION :INLINE-EXPANSION-DESIGNATOR 'FOO)
-;;;             '(LAMBDA (X) (+ X 1)))
-;;;     This is the ordinary way, the natural way of representing e.g.
-;;;       (DECLAIM (INLINE FOO))
-;;;       (DEFUN FOO (X) (+ X 1))
-;;;   * It can be a closure which returns the lambda expression, e.g.
-;;;       (SETF (INFO :FUNCTION :INLINE-EXPANSION-DESIGNATOR 'BAR-LEFT-CHILD)
-;;;             (LAMBDA ()
-;;;               '(LAMBDA (BAR) (BAR-REF BAR 3))))
-;;;     The latter is potentially slightly more compact, but not only
-;;      is it difficult to portably expose this space-saving device,
-;;;     it doesn't even work as designed for its internal-only use.
+;;; '(LAMBDA (X) (+ X 1)).
 (define-info-type (:function :inline-expansion-designator)
-  :type-spec (or list function))
+  :type-spec list)
 
 ;;; This specifies whether this function may be expanded inline. If
 ;;; null, we don't care.

@@ -1098,9 +1098,15 @@
               (multiple-value-bind (transformed pass)
                   (if (functionp transform)
                       (funcall transform form)
-                      (let ((result (slot-access-transform
-                                     (if (consp name) :write :read)
-                                     (cdr form) transform)))
+                      (let ((result
+                             (if (eq (cdr transform) :predicate)
+                                 (and (singleton-p (cdr form))
+                                      `(%instance-typep
+                                        ,(cadr form)
+                                        ',(dd-name (car transform))))
+                                 (slot-access-transform
+                                  (if (consp name) :write :read)
+                                  (cdr form) transform))))
                         (values result (null result))))
                 (cond (pass
                        (ir1-convert-maybe-predicate start next result form var))

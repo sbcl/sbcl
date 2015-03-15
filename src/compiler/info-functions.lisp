@@ -128,14 +128,10 @@
     (if (info :function :assumed-type name)
         (clear-info :function :assumed-type name))))
 
-;;; Decode any raw (INFO :FUNCTION :INLINE-EXPANSION-DESIGNATOR FUN-NAME)
-;;; value into a lambda expression, or return NIL if there is none.
+;;; Trivially wrap (INFO :FUNCTION :INLINE-EXPANSION-DESIGNATOR FUN-NAME)
 (declaim (ftype (function ((or symbol cons)) list) fun-name-inline-expansion))
 (defun fun-name-inline-expansion (fun-name)
-  (let ((info (info :function :inline-expansion-designator fun-name)))
-    (if (functionp info)
-        (funcall info)
-        info)))
+  (info :function :inline-expansion-designator fun-name))
 
 ;;;; ANSI Common Lisp functions which are defined in terms of the info
 ;;;; database
