@@ -98,32 +98,27 @@
   (unless (eq :declared (info :function :where-from name))
     (clear-info :function :type name)))
 
-(defmacro !coerce-name-to-fun (accessor name)
-  `(let* ((name ,name) (fdefn (,accessor name)))
+;;; Return the fdefn-fun of NAME's fdefinition including any encapsulations.
+;;; LOOKUP-FN, defaulting to FIND-FDEFN, specifies how to lookup the fdefn.
+;;; As a special case it can be given as SYMBOL-FDEFN which is slightly quicker.
+;;; This is the core of the implementation of the standard FDEFINITION function,
+;;; but as we've defined FDEFINITION, that strips encapsulations.
+(defmacro %coerce-name-to-fun (name &optional (lookup-fn 'find-fdefn))
+  `(let* ((name ,name) (fdefn (,lookup-fn name)))
      (if fdefn
          (truly-the function
                     (values (sb!sys:%primitive sb!c:safe-fdefn-fun fdefn)))
          (error 'undefined-function :name name))))
 
-;;; Return the fdefn-fun of NAME's fdefinition including any encapsulations.
-;;; The compiler emits calls to this when someone tries to FUNCALL
-;;; something. SETFable.
-#!-sb-fluid (declaim (inline %coerce-name-to-fun))
-(defun %coerce-name-to-fun (name)
-  (!coerce-name-to-fun find-fdefn name))
-(defun (setf %coerce-name-to-fun) (function name)
-  (maybe-clobber-ftype name)
-  (let ((fdefn (find-or-create-fdefn name)))
-    (setf (fdefn-fun fdefn) function)))
-
-;; CALLABLE is a function-designator, not an extended-function-designator,
-;; i.e. it is a function or symbol, and not a generalized function name.
+;; Coerce CALLABLE (a function-designator) to a FUNCTION.
+;; The compiler emits this when someone tries to FUNCALL something.
+;; Extended-function-designators are not accepted,
 ;; This function is defknowned with 'explicit-check', and we avoid calling
 ;; SYMBOL-FUNCTION because that would do another check.
 (defun %coerce-callable-to-fun (callable)
   (etypecase callable
     (function callable)
-    (symbol (!coerce-name-to-fun symbol-fdefn callable))))
+    (symbol (%coerce-name-to-fun callable symbol-fdefn))))
 
 
 ;;;; definition encapsulation

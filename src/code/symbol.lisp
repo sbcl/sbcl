@@ -132,13 +132,20 @@ distinct from the global value. Can also be SETF."
 (defun symbol-function (symbol)
   #!+sb-doc
   "Return SYMBOL's current function definition. Settable with SETF."
-  (!coerce-name-to-fun symbol-fdefn symbol))
+  (%coerce-name-to-fun symbol symbol-fdefn))
 
 (defun (setf symbol-function) (new-value symbol)
   (declare (type symbol symbol) (type function new-value))
   (with-single-package-locked-error
       (:symbol symbol "setting the symbol-function of ~A")
-    (setf (%coerce-name-to-fun symbol) new-value)))
+    ;; This code is a little "surprising" in that it is not just a limited
+    ;; case of (SETF FDEFINITION), but instead a different thing.
+    ;; I really think the code paths should be reconciled.
+    ;; e.g. what's up with *USER-HASH-TABLE-TESTS* being checked
+    ;; in %SET-FDEFINITION but not here?
+    (maybe-clobber-ftype symbol)
+    (let ((fdefn (find-or-create-fdefn symbol)))
+      (setf (fdefn-fun fdefn) new-value))))
 
 ;;; Accessors for the dual-purpose info/plist slot
 

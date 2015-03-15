@@ -1627,7 +1627,6 @@
   (values (simple-array * (*)) index index index)
   (foldable flushable))
 (defknown %set-symbol-package (symbol t) t ())
-(defknown %coerce-name-to-fun ((or symbol cons)) function (flushable))
 (defknown %coerce-callable-to-fun (callable) function
     (flushable explicit-check))
 (defknown array-bounding-indices-bad-error (t t t) nil)
