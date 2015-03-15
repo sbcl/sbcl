@@ -49,6 +49,10 @@
 #include "interrupt.h"
 #include "lispregs.h"
 
+#ifdef LISP_FEATURE_OPENBSD
+#include <pthread_np.h>
+#endif
+
 #if defined(LISP_FEATURE_WIN32) && defined(LISP_FEATURE_SB_THREAD)
 # define IMMEDIATE_POST_MORTEM
 #endif
@@ -516,12 +520,17 @@ attach_os_thread(init_thread_data *scribble)
      * stack. */
     void *stack_addr;
     size_t stack_size;
-#ifdef LISP_FEATURE_DARWIN
+#ifdef LISP_FEATURE_OPENBSD
+    stack_t stack;
+    pthread_stackseg_np(os, &stack);
+    stack_size = stack.ss_size;
+    stack_addr = (void*)((size_t)stack.ss_sp - stack_size);
+#elif defined(LISP_FEATURE_DARWIN)
     stack_addr = pthread_get_stackaddr_np(os);
     stack_size = pthread_get_stacksize_np(os);
 #else
     pthread_attr_t attr;
-#if defined(__FreeBSD__)
+#ifdef LISP_FEATURE_FREEBSD
     pthread_attr_get_np(os, &attr);
 #else
     int pthread_getattr_np(pthread_t, pthread_attr_t *);
