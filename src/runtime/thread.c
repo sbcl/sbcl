@@ -49,7 +49,7 @@
 #include "interrupt.h"
 #include "lispregs.h"
 
-#ifdef LISP_FEATURE_OPENBSD
+#if defined(LISP_FEATURE_OPENBSD) && defined(LISP_FEATURE_SB_THREAD)
 #include <pthread_np.h>
 #endif
 
