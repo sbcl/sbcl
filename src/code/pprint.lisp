@@ -706,12 +706,9 @@
    from the output and indentation is introduced at the beginning of the
    next line. (See PPRINT-INDENT.)"
   (declare (type (member :linear :miser :fill :mandatory) kind)
-           (type (or stream (member t nil)) stream)
+           (type stream-designator stream)
            (values null))
-  (let ((stream (case stream
-                  ((t) *terminal-io*)
-                  ((nil) *standard-output*)
-                  (t stream))))
+  (let ((stream (out-synonym-of stream)))
     (when (print-pretty-on-stream-p stream)
       (enqueue-newline stream kind)))
   nil)
@@ -733,12 +730,9 @@ The new indentation value does not take effect until the following
 line break."
   (declare (type (member :block :current) relative-to)
            (type real n)
-           (type (or stream (member t nil)) stream)
+           (type stream-designator stream)
            (values null))
-  (let ((stream (case stream
-                  ((t) *terminal-io*)
-                  ((nil) *standard-output*)
-                  (t stream))))
+  (let ((stream (out-synonym-of stream)))
     (when (print-pretty-on-stream-p stream)
       (enqueue-indent stream relative-to (truncate n))))
   nil)
@@ -758,12 +752,9 @@ line break."
        of the current section, not the start of the line."
   (declare (type (member :line :section :line-relative :section-relative) kind)
            (type unsigned-byte colnum colinc)
-           (type (or stream (member t nil)) stream)
+           (type stream-designator stream)
            (values null))
-  (let ((stream (case stream
-                  ((t) *terminal-io*)
-                  ((nil) *standard-output*)
-                  (t stream))))
+  (let ((stream (out-synonym-of stream)))
     (when (print-pretty-on-stream-p stream)
       (enqueue-tab stream kind colnum colinc)))
   nil)
