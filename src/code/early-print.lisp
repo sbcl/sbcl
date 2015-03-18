@@ -85,20 +85,22 @@
 ;;; output like #1=#1#. The MODE parameter is used for detecting and
 ;;; correcting this problem.
 (defun check-for-circularity (object &optional assign (mode t))
-  (cond ((null *print-circle*)
+  (when (null *print-circle*)
          ;; Don't bother, nobody cares.
-         nil)
-        ((null *circularity-hash-table*)
+    (return-from check-for-circularity nil))
+  (let ((circularity-hash-table *circularity-hash-table*))
+    (cond
+        ((null circularity-hash-table)
           (values nil :initiate))
         ((null *circularity-counter*)
-         (ecase (gethash object *circularity-hash-table*)
+         (ecase (gethash object circularity-hash-table)
            ((nil)
             ;; first encounter
-            (setf (gethash object *circularity-hash-table*) mode)
+            (setf (gethash object circularity-hash-table) mode)
             ;; We need to keep looking.
             nil)
            ((:logical-block)
-            (setf (gethash object *circularity-hash-table*)
+            (setf (gethash object circularity-hash-table)
                   :logical-block-circular)
             t)
            ((t)
@@ -106,19 +108,19 @@
                    ;; We've seen the object before in output-object, and now
                    ;; a second time in a PPRINT-LOGICAL-BLOCK (for example
                    ;; via pprint-dispatch). Don't mark it as circular yet.
-                   (setf (gethash object *circularity-hash-table*)
+                   (setf (gethash object circularity-hash-table)
                          :logical-block)
                    nil)
                   (t
                    ;; second encounter
-                   (setf (gethash object *circularity-hash-table*) 0)
+                   (setf (gethash object circularity-hash-table) 0)
                    ;; It's a circular reference.
                    t)))
            ((0 :logical-block-circular)
             ;; It's a circular reference.
             t)))
         (t
-         (let ((value (gethash object *circularity-hash-table*)))
+         (let ((value (gethash object circularity-hash-table)))
            (case value
              ((nil t :logical-block)
               ;; If NIL, we found an object that wasn't there the
@@ -148,7 +150,7 @@
                           (eq mode :logical-block))
                      (let ((value (incf *circularity-counter*)))
                        ;; first occurrence of this object: Set the counter.
-                       (setf (gethash object *circularity-hash-table*) value)
+                       (setf (gethash object circularity-hash-table) value)
                        value))
                     (t
                      nil)))
@@ -156,12 +158,12 @@
               (if (eq assign t)
                   (let ((value (incf *circularity-counter*)))
                     ;; first occurrence of this object: Set the counter.
-                    (setf (gethash object *circularity-hash-table*) value)
+                    (setf (gethash object circularity-hash-table) value)
                     value)
                   t))
              (t
               ;; second or later occurrence
-              (- value)))))))
+              (- value))))))))
 
 ;;; Handle the results of CHECK-FOR-CIRCULARITY. If this returns T then
 ;;; you should go ahead and print the object. If it returns NIL, then
@@ -193,8 +195,7 @@
   (with-unique-names (marker body-name)
     `(labels ((,body-name ()
                ,@body))
-      (cond ((not *print-circle*)
-            (,body-name))
+      (cond ((not *print-circle*) (,body-name))
             (*circularity-hash-table*
              (let ((,marker (check-for-circularity ,object t :logical-block)))
                (if ,marker
