@@ -186,7 +186,7 @@
       `(progn
          #!+sb-show
          (when *fop-nop4-count*
-           (dump-byte ,(get 'fop-nop4 'fop-code) ,file)
+           (dump-byte (get 'fop-nop4 'fop-code) ,file)
            (dump-integer-as-n-bytes (mod (incf *fop-nop4-count*) (expt 2 32))
                                     4 ,file))
          ,(if (zerop fop-argc)
