@@ -21,7 +21,7 @@
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (defun handle-deprecated-global-variable (name)
     (multiple-value-bind (state since replacements)
-        (check-deprecated-variable name)
+        (check-deprecated-thing 'variable name)
       (when (eq state :final)
         `(deprecation-error ,since ',name '(,@replacements))))))
 

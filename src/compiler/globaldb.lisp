@@ -373,6 +373,9 @@
   #+sb-xc-host nil
   #-sb-xc-host (lambda (name) (if (fboundp name) :function nil)))
 
+;;; Indicates whether the function is deprecated.
+(define-info-type (:function :deprecated) :type-spec deprecation-info)
+
 (declaim (ftype (sfunction (t) ctype)
                 specifier-type ctype-of sb!kernel::ctype-of-array))
 

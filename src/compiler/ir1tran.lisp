@@ -270,7 +270,8 @@
       (let ((kind (info :variable :kind name))
             (type (info :variable :type name))
             (where-from (info :variable :where-from name)))
-        (when (and (eq kind :unknown) (not (check-deprecated-variable name)))
+        (when (and (eq kind :unknown)
+                   (not (check-deprecated-thing 'variable name)))
           (note-undefined-reference name :variable))
         (setf (gethash name *free-vars*)
               (case kind
@@ -705,7 +706,7 @@
                 (warn "reading an ignored variable: ~S" name)))
              (t
               (multiple-value-bind (state since replacements)
-                  (check-deprecated-variable name)
+                  (check-deprecated-thing 'variable name)
                 (when (eq state :final)
                   (ir1-convert
                    start next result
@@ -757,18 +758,23 @@
 ;;; If FORM has a usable compiler macro, use it; otherwise return FORM itself.
 ;;; Return the name of the compiler-macro as a secondary value, if applicable.
 (defun expand-compiler-macro (form)
-  (multiple-value-bind (cmacro-fun cmacro-fun-name)
-      (find-compiler-macro (car form) form)
-    (if (and cmacro-fun
-             ;; CLHS 3.2.2.1.3 specifies that NOTINLINE
-             ;; suppresses compiler-macros.
-             (not (fun-lexically-notinline-p cmacro-fun-name)))
-        (values (handler-case (careful-expand-macro cmacro-fun form t)
-                  (compiler-macro-keyword-problem (c)
-                    (print-compiler-message *error-output* "note: ~A" (list c))
-                    form))
-                cmacro-fun-name)
-        (values form nil))))
+  (binding* ((name (car form))
+             ((cmacro-fun cmacro-fun-name)
+              (find-compiler-macro name form)))
+    (cond
+      ((and cmacro-fun
+            ;; CLHS 3.2.2.1.3 specifies that NOTINLINE
+            ;; suppresses compiler-macros.
+            (not (fun-lexically-notinline-p cmacro-fun-name)))
+       (check-deprecated-thing 'function name)
+       (values (handler-case (careful-expand-macro cmacro-fun form t)
+                 (compiler-macro-keyword-problem (condition)
+                   (print-compiler-message
+                    *error-output* "note: ~A" (list condition))
+                   form))
+               cmacro-fun-name))
+      (t
+       (values form nil)))))
 
 ;;; Picks off special forms and compiler-macro expansions, and hands
 ;;; the rest to IR1-CONVERT-COMMON-FUNCTOID
@@ -794,11 +800,13 @@
          (let ((lexical-def (if (leaf-p op) op (lexenv-find op funs))))
            (typecase lexical-def
              (null
+              (check-deprecated-thing 'function op)
               (ir1-convert-global-functoid start next result form op))
              (functional
               (ir1-convert-local-combination start next result form
                                              lexical-def))
              (global-var
+              (check-deprecated-thing 'function (leaf-source-name lexical-def))
               (ir1-convert-srctran start next result lexical-def form))
              (t
               (aver (and (consp lexical-def) (eq (car lexical-def) 'macro)))
@@ -1093,12 +1101,12 @@
 (defun ir1-convert-srctran (start next result var form)
   (declare (type ctran start next) (type (or lvar null) result)
            (type global-var var))
-  (let ((inlinep (when (defined-fun-p var)
+  (let ((name (leaf-source-name var))
+        (inlinep (when (defined-fun-p var)
                    (defined-fun-inlinep var))))
     (if (eq inlinep :notinline)
         (ir1-convert-combination start next result form var)
-        (let* ((name (leaf-source-name var))
-               (transform (info :function :source-transform name)))
+        (let* ((transform (info :function :source-transform name)))
           (if transform
               (multiple-value-bind (transformed pass)
                   (if (functionp transform)

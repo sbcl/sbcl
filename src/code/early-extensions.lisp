@@ -1266,25 +1266,14 @@
 ;; Return the state of deprecation of the thing identified by
 ;; NAMESPACE and NAME, or NIL.
 (defun deprecated-thing-p (namespace name)
-  (ecase namespace
-    (function
-     ;; This can't work on the host due to CLOSUREP,%FUN-NAME, etc.
-     #-sb-xc-host
-     (let ((macro-fun (info :function :compiler-macro-function name)))
-       (and (closurep macro-fun)
-            (eq (%fun-name macro-fun) '.deprecation-warning.)
-            ;; If you name a function literally :EARLY and it happens to
-            ;; be in :LATE deprecation, then this could be wrong; etc.
-            ;; But come on now ... who would name a function like that?
-            (find-if-in-closure (lambda (x) (member x '(:early :late :final)))
-                                macro-fun))))
-    (variable
-     (multiple-value-bind (info infop)
-         (info :variable :deprecated name)
-       (when infop
-         (values (deprecation-info-state info)
-                 (deprecation-info-since info)
-                 (deprecation-info-replacements info)))))))
+  (multiple-value-bind (info infop)
+      (ecase namespace
+        (variable (info :variable :deprecated name))
+        (function (info :function :deprecated name)))
+    (when infop
+      (values (deprecation-info-state info)
+              (deprecation-info-since info)
+              (deprecation-info-replacements info)))))
 
 (defun deprecation-error (since name replacements)
   (error 'deprecation-error
@@ -1303,6 +1292,13 @@
         :since since
         :runtime-error runtime-error))
 
+(defun check-deprecated-thing (namespace name)
+  (multiple-value-bind (state since replacements)
+      (deprecated-thing-p namespace name)
+    (when state
+      (deprecation-warn state since name replacements)
+      (values state since replacements))))
+
 (defun deprecated-function (since name replacements &optional doc)
   (declare (ignorable since name replacements doc))
   #+sb-xc-host
@@ -1319,15 +1315,6 @@
     (when doc
       (setf (%fun-doc closure) doc))
     closure))
-
-;; Note: Naming a lambda does not work on the host, so we can't actually
-;; detect deprecated functions.
-(defun deprecation-compiler-macro (state since name replacements)
-  ;; this lambda's name is significant - see DEPRECATED-THING-P
-  (named-lambda .deprecation-warning. (form env)
-    (declare (ignore env))
-    (deprecation-warn state since name replacements)
-    form))
 
 ;; This is the moral equivalent of a warning from /usr/bin/ld that
 ;; "gets() is dangerous." You're informed by both the compiler and linker.
@@ -1438,15 +1425,8 @@
                       (deprecated-function ,since ',name ',replacements
                                            #!+sb-doc ,doc))
                 ',name)))
-       (setf (compiler-macro-function ',name)
-             (deprecation-compiler-macro ,state ,since ',name ',replacements)))))
-
-(defun check-deprecated-variable (name)
-  (multiple-value-bind (state since replacements)
-      (deprecated-thing-p 'variable name)
-    (when state
-      (deprecation-warn state since name replacements)
-      (values state since replacements))))
+       (setf (info :function :deprecated ',name)
+             (make-deprecation-info ,state ,since ',replacements)))))
 
 (defmacro define-deprecated-variable (state since name
                                       &key (value nil valuep) replacement)
