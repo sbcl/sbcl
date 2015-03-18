@@ -167,6 +167,7 @@
                          (fill-pointer (pretty-stream-buffer-fill-pointer
                                         stream))
                          (new-fill-ptr (+ fill-pointer count)))
+                    (declare (fixnum available count))
                     (if (typep string 'simple-base-string)
                         ;; FIXME: Reimplementing REPLACE, since it
                         ;; can't be inlined and we don't have a
@@ -1153,10 +1154,10 @@ line break."
     (let* ((pretty-p nil)
            (sigil (case (car list)
                     (function "#'")
-                    (quote "'")
                     ;; QUASIQUOTE can't choose not to print prettily.
                     ;; Wrongly nested commas beget unreadable sexprs.
-                    (quasiquote (setq pretty-p t) "`"))))
+                    (quasiquote (setq pretty-p t) "`")
+                    (t "'")))) ; ordinary QUOTE
       (when (or pretty-p *pprint-quote-with-syntactic-sugar*)
         (write-string sigil stream)
         (return-from pprint-quote (output-object (cadr list) stream)))))
