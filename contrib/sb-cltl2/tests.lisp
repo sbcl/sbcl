@@ -213,6 +213,15 @@
     (var-info *foo*)
   (:special nil nil))
 
+(defvar *variable-info.global-special/unbound.deprecation*)
+(declaim (sb-ext:deprecated :early ("SBCL" "1.2.3")
+          (variable *variable-info.global-special/unbound.deprecation* :replacement foo)))
+(deftest variable-info.global-special/unbound.deprecation
+    (var-info *variable-info.global-special/unbound.deprecation*)
+  (:special nil ((sb-ext:deprecated . (:state        :early
+                                       :since        ("SBCL" "1.2.3")
+                                       :replacements (foo))))))
+
 (deftest variable-info.global-special/unbound/extra-decl
     (locally (declare (special *foo*))
       (var-info *foo*))
@@ -302,6 +311,14 @@
     (var-info #:undefined)
   (nil nil nil))
 
+(declaim (sb-ext:deprecated :early ("SBCL" "1.2.3")
+          (variable *variable-info.undefined.deprecation* :replacement foo)))
+(deftest variable-info.undefined.deprecation
+    (var-info *variable-info.undefined.deprecation*)
+  (nil nil ((sb-ext:deprecated . (:state        :early
+                                  :since        ("SBCL" "1.2.3")
+                                  :replacements (foo))))))
+
 (declaim (global this-is-global))
 (deftest global-variable
     (var-info this-is-global)
@@ -316,6 +333,16 @@
 (deftest alien-variable
     (var-info errno)
   (:alien nil nil))
+
+(defglobal *variable-info.global.deprecation* 1)
+(declaim (sb-ext:deprecated :early ("SBCL" "1.2.3")
+          (variable *variable-info.global.deprecation* :replacement foo)))
+(deftest variable-info.global.deprecation
+    (var-info *variable-info.global.deprecation*)
+  (:global nil ((always-bound . t)
+                (sb-ext:deprecated . (:state        :early
+                                      :since        ("SBCL" "1.2.3")
+                                      :replacements (foo))))))
 
 ;;;; FUNCTION-INFORMATION
 
@@ -334,7 +361,16 @@
 
 (deftest function-info.global/ftype
     (fun-info my-global-fun-2)
-  (:function nil ((ftype function (cons) (values t &optional)))))
+  (:function nil ((ftype . (function (cons) (values t &optional))))))
+
+(defun function-info.global.deprecation ())
+(declaim (sb-ext:deprecated :early "1.2.3"
+          (function function-info.global.deprecation :replacement foo)))
+(deftest function-info.global.deprecation
+    (fun-info function-info.global.deprecation)
+  (:function nil ((sb-ext:deprecated . (:state        :early
+                                        :since        ("SBCL" "1.2.3")
+                                        :replacements (foo))))))
 
 (defmacro my-macro (x) x)
 
@@ -512,8 +548,6 @@
             (variable-information 'x e)))
   ((foo bar baz)
    :lexical))
-
-
 
 ;;;;; DEFINE-DECLARATION
 

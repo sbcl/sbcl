@@ -144,6 +144,18 @@
             (push entry-cons ret))))
       (nreverse ret))))
 
+(defun maybe-deprecation-entry (info)
+  (when info
+    (with-accessors ((state sb-int:deprecation-info-state)
+                     (software sb-int:deprecation-info-software)
+                     (version sb-int:deprecation-info-version)
+                     (replacements sb-int:deprecation-info-replacements))
+        info
+      (list (cons 'sb-ext:deprecated
+                  (list :state state
+                        :since (list software version)
+                        :replacements replacements))))))
+
 ;;; Retrieve the user-supplied (from define-declaration) value for
 ;;; the declaration with the given NAME
 (defun extra-decl-info (name env)
@@ -206,6 +218,31 @@ CARS of the alist include:
     associated with NAME. If the CDR is FUNCTION the alist element may
     be omitted.
 
+  SB-EXT:DEPRECATED
+    \(SBCL specific)
+    The CDR is a plist containing the following properties
+
+      :STATE ( :EARLY | :LATE | :FINAL )
+        Use of :EARLY deprecated functions signals a STYLE-WARNING at
+        compile-time.
+
+        Use of :LATE deprecated functions signals a full WARNING at
+        compile-time.
+
+        Use of :FINAL deprecated functions signals a full WARNING at
+        compile-time and an error at runtime.
+
+      :SINCE (SOFTWARE VERSION)
+        VERSION is a string designating the version since which the
+        function has been deprecated. SOFTWARE is the name of the
+        software to which VERSION refers, e.g. \"SBCL\" for deprecated
+        functions in SBCL.
+
+      :REPLACEMENTS REPLACEMENTS
+        When this property is present, REPLACEMENTS is a list of
+        symbols naming functions that should be used instead of the
+        deprecated function.
+
 In addition to these declarations defined using DEFINE-DECLARATION may
 appear."
   (let* ((*lexenv* (or env (make-null-lexenv)))
@@ -254,6 +291,8 @@ appear."
                    (list-cons-when (and ftype (neq *universal-fun-type* ftype))
                      'ftype (type-specifier ftype))
                    (list-cons-when dx 'dynamic-extent t)
+                   (maybe-deprecation-entry
+                    (info :function :deprecated name))
                    (extra-pairs :function name fun *lexenv*)))))
 
 (declaim (ftype (sfunction
@@ -315,8 +354,33 @@ CARS of the alist include:
     be omitted.
 
   SB-EXT:ALWAYS-BOUND
-    If CDR is T, NAME has been declared as SB-EXT:ALWAYS-BOUND \(SBCL
-    specific.)
+    \(SBCL specific)
+    If CDR is T, NAME has been declared as SB-EXT:ALWAYS-BOUND
+
+  SB-EXT:DEPRECATED
+    \(SBCL specific)
+    The CDR is a plist containing the following properties
+
+      :STATE ( :EARLY | :LATE | :FINAL )
+        Use of :EARLY deprecated variables signals a STYLE-WARNING at
+        compile-time.
+
+        Use of :LATE deprecated variables signals a full WARNING at
+        compile-time.
+
+        Use of :FINAL deprecated variables signals a full WARNING at
+        compile-time and an error at runtime.
+
+      :SINCE (SOFTWARE VERSION)
+        VERSION is a string designating the version since which the
+        variable has been deprecated. SOFTWARE is the name of the
+        software to which VERSION refers, e.g. \"SBCL\" for deprecated
+        variables in SBCL.
+
+      :REPLACEMENTS REPLACEMENTS
+        When this property is present, REPLACEMENTS is a list of
+        symbols naming variables that should be used instead of the
+        deprecated variable.
 
 In addition to these declarations defined using DEFINE-DECLARATION may
 appear."
@@ -368,6 +432,8 @@ appear."
                    (list-cons-when dx 'dynamic-extent t)
                    (list-cons-when (info :variable :always-bound name)
                      'sb-ext:always-bound t)
+                   (maybe-deprecation-entry
+                    (info :variable :deprecated name))
                    (extra-pairs :variable name var *lexenv*)))))
 
 (declaim (ftype (sfunction (symbol &optional (or null lexenv)) t)
