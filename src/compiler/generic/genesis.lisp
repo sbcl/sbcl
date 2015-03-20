@@ -272,6 +272,9 @@
   (word-offset nil :type (or sb!vm:word null))
   (bits 0 :read-only t :type (unsigned-byte #.sb!vm:n-machine-word-bits)))
 
+(declaim (inline descriptor=))
+(defun descriptor= (a b) (eql (descriptor-bits a) (descriptor-bits b)))
+
 ;; FIXME: most uses of MAKE-RANDOM-DESCRIPTOR are abuses for writing a raw word
 ;; into target memory as if it were a descriptor, because there is no variant
 ;; of WRITE-WORDINDEXED taking a non-descriptor value.
@@ -791,15 +794,22 @@ core and return a descriptor to it."
                      (+ (descriptor-fixnum index) sb!vm:vector-data-offset)
                      value))
 
-(defun vector-from-core (descriptor transform)
-  (let* ((len (descriptor-fixnum
-               (read-wordindexed descriptor sb!vm:vector-length-slot)))
+(declaim (inline cold-vector-len cold-svref))
+(defun cold-vector-len (vector)
+  (descriptor-fixnum (read-wordindexed vector sb!vm:vector-length-slot)))
+(defun cold-svref (vector i)
+  (read-wordindexed vector (+ (if (integerp i) i (descriptor-fixnum i))
+                              sb!vm:vector-data-offset)))
+(defun cold-vector-elements-eq (a b)
+  (and (eql (cold-vector-len a) (cold-vector-len b))
+       (dotimes (k (cold-vector-len a) t)
+         (unless (descriptor= (cold-svref a k) (cold-svref b k))
+           (return nil)))))
+(defun vector-from-core (descriptor &optional (transform #'identity))
+  (let* ((len (cold-vector-len descriptor))
          (vector (make-array len)))
     (dotimes (i len vector)
-      (setf (aref vector i)
-            (funcall transform
-                     (read-wordindexed descriptor
-                                       (+ sb!vm:vector-data-offset i)))))))
+      (setf (aref vector i) (funcall transform (cold-svref descriptor i))))))
 
 ;;;; symbol magic
 
@@ -948,18 +958,10 @@ core and return a descriptor to it."
 ;;; Return a list of names created from the cold layout INHERITS data
 ;;; in X.
 (defun listify-cold-inherits (x)
-  (let ((len (descriptor-fixnum (read-wordindexed x
-                                                  sb!vm:vector-length-slot))))
-    (collect ((res))
-      (dotimes (index len)
-        (let* ((des (read-wordindexed x (+ sb!vm:vector-data-offset index)))
-               (found (gethash (descriptor-bits des) *cold-layout-names*)))
-          (if found
-            (res found)
-            (error "unknown descriptor at index ~S (bits = ~8,'0X)"
-                   index
-                   (descriptor-bits des)))))
-      (res))))
+  (map 'list (lambda (des)
+               (or (gethash (descriptor-bits des) *cold-layout-names*)
+                   (error "~S is not the descriptor of a cold-layout" des)))
+       (vector-from-core x)))
 
 (macrolet ((dsd-index-from-keyword (initarg slots)
              `(let ((dsd (find ,initarg ,slots
@@ -2200,14 +2202,12 @@ core and return a descriptor to it."
       (flet ((get-slot (keyword)
                (read-slot old-layout-descriptor *host-layout-of-layout* keyword)))
         (let ((old-length (descriptor-fixnum (get-slot :length)))
-              (old-inherits-list (listify-cold-inherits (get-slot :inherits)))
               (old-depthoid (descriptor-fixnum (get-slot :depthoid)))
               (old-metadata
                (descriptor-fixnum
                 (get-slot #!-interleaved-raw-slots :n-untagged-slots
                           #!+interleaved-raw-slots :untagged-bitmap)))
               (length (descriptor-fixnum length-des))
-              (inherits-list (listify-cold-inherits cold-inherits))
               (depthoid (descriptor-fixnum depthoid-des))
               (metadata (descriptor-fixnum metadata-des)))
           (unless (= length old-length)
@@ -2216,13 +2216,13 @@ core and return a descriptor to it."
                    name
                    length
                    old-length))
-          (unless (equal inherits-list old-inherits-list)
+          (unless (cold-vector-elements-eq cold-inherits (get-slot :inherits))
             (error "cold loading a reference to class ~S when the compile~%~
                     time inherits were ~S~%~
                     and current inherits are ~S"
                    name
-                   inherits-list
-                   old-inherits-list))
+                   (listify-cold-inherits cold-inherits)
+                   (listify-cold-inherits (get-slot :inherits))))
           (unless (= depthoid old-depthoid)
             (error "cold loading a reference to class ~S when the compile~%~
                     time inheritance depthoid was ~S and current inheritance~%~
