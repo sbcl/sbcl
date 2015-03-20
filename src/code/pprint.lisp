@@ -1201,8 +1201,8 @@ line break."
        (write-char #\space stream)
        (pprint-newline :mandatory stream)))))
 
-;;; FIXME: could become SB!XC:DEFMACRO wrapped in EVAL-WHEN (COMPILE EVAL)
-(defmacro pprint-tagbody-guts (stream)
+(eval-when (:compile-toplevel :execute)
+(sb!xc:defmacro pprint-tagbody-guts (stream)
   `(loop
      (pprint-exit-if-list-exhausted)
      (write-char #\space ,stream)
@@ -1211,7 +1211,7 @@ line break."
                       (if (atom form-or-tag) 0 1)
                       ,stream)
        (pprint-newline :linear ,stream)
-       (output-object form-or-tag ,stream))))
+       (output-object form-or-tag ,stream)))))
 
 (defun pprint-tagbody (stream list &rest noise)
   (declare (ignore noise))
