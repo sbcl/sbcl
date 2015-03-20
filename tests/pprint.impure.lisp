@@ -325,5 +325,14 @@
 (with-test (:name :literal-fun-nested-lists)
   (assert (search "EQUALP" (format nil "~:w" `((((((,#'equalp)))))))
                   :test #'char-equal)))
+
+(defvar *a* (make-array 3 :fill-pointer 0))
+(with-test (:name :pprint-logical-block-eval-order)
+  (flet ((vp (x) (vector-push x *a*)))
+    (pprint-logical-block (nil (progn (vp 1) '(foo))
+                               :suffix (progn (vp 2) "}")
+                               :prefix (progn (vp 3) "{"))
+      (write (pprint-pop))))
+  (assert (equalp *a* #(1 2 3))))
 
 ;;; success

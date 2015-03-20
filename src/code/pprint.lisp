@@ -28,6 +28,14 @@
 
 (defconstant default-line-length 80)
 
+;; We're allowed to DXify the pretty-stream used by PPRINT-LOGICAL-BLOCK.
+;;   "pprint-logical-block and the pretty printing stream it creates have
+;;    dynamic extent. The consequences are undefined if, outside of this
+;;    extent, output is attempted to the pretty printing stream it creates."
+;; However doing that is slightly dangerous since there are a zillion ways
+;; for users to get a hold of the stream and stash it somewhere.
+;; Anyway, just a thought...
+(declaim (maybe-inline make-pretty-stream))
 (defstruct (pretty-stream (:include ansi-stream
                                     (out #'pretty-out)
                                     (sout #'pretty-sout)
@@ -1434,6 +1442,22 @@ line break."
 
 ;;;; the interface seen by regular (ugly) printer and initialization routines
 
+(eval-when (:compile-toplevel :execute)
+(sb!xc:defmacro with-pretty-stream ((stream-var
+                                     &optional (stream-expression stream-var))
+                                    &body body)
+  (let ((flet-name (sb!xc:gensym "WITH-PRETTY-STREAM")))
+    `(flet ((,flet-name (,stream-var)
+              ,@body))
+       (let ((stream ,stream-expression))
+         (if (pretty-stream-p stream)
+             (,flet-name stream)
+             (catch 'line-limit-abbreviation-happened
+               (let ((stream (make-pretty-stream stream)))
+                 (,flet-name stream)
+                 (force-pretty-output stream)))))
+       nil))))
+
 ;;; OUTPUT-PRETTY-OBJECT is called by OUTPUT-OBJECT when
 ;;; *PRINT-PRETTY* is true.
 (defun output-pretty-object (object stream)
@@ -1444,6 +1468,76 @@ line break."
         ;; No point in consing up a pretty stream if we are not using pretty
         ;; printing the object after all.
         (output-ugly-object object stream))))
+
+(defun call-logical-block-printer (proc stream prefix per-line-p suffix
+                                   &optional (object nil obj-supplied-p))
+  ;; PREFIX and SUFFIX will be checked for stringness by START-LOGICAL-BLOCK.
+  ;; Doing it here would be more strict, but I really don't think it's worth
+  ;; an extra check. The only observable difference would occur when you have
+  ;; a non-list object which bypasses START-LOGICAL-BLOCK.
+  ;; Also, START-LOGICAL-BLOCK could become an FLET inside here.
+  (declare (function proc))
+  (with-pretty-stream (stream (out-synonym-of stream))
+    (if (not (listp object)) ; implies obj-supplied-p
+        ;; the spec says "If object is not a list, it is printed using WRITE"
+        ;; but I guess this is close enough.
+        (output-object object stream)
+        (dx-let ((state (cons 0 stream)))
+          (if obj-supplied-p
+              (with-circularity-detection (object stream)
+                (descend-into (stream)
+                  (start-logical-block stream prefix per-line-p suffix)
+                  (funcall proc object state stream)
+                  ;; Comment preserved for posterity:
+                  ;;   FIXME: Don't we need UNWIND-PROTECT to ensure this
+                  ;;   always gets executed?
+                  ;; I think not because I wouldn't characterize this as
+                  ;; "cleanup" code. If and only if you follow the accepted
+                  ;; protocol for defining and using print functions should
+                  ;; the behavior be expected to be reasonable and predictable.
+                  ;; Throwing to LINE-LIMIT-ABBREVIATION-HAPPENED is designed
+                  ;; to do the right thing, and printing should not generally
+                  ;; continue to have side-effects if the user felt it necessary
+                  ;; to nonlocally exit in an unexpected way for other reasons.
+                  (end-logical-block stream)))
+              (descend-into (stream)
+                (start-logical-block stream prefix per-line-p suffix)
+                (funcall proc state stream)
+                (end-logical-block stream)))))))
+
+;; Return non-nil if we should keep printing within the logical-block,
+;; or NIL to stop printing due to non-list, length cutoff, or circularity.
+(defun pprint-length-check (obj state)
+  (let ((stream (cdr state)))
+    (cond ((or (not (listp obj))
+               ;; Consider (A . `(,B C)) = (A QUASIQUOTE ,B C)
+               ;; We have to detect this and print as the form on the left,
+               ;; since pretty commas with no containing #\` will be unreadable
+               ;; due to a nesting error.
+               (and (eq (car obj) 'quasiquote) (singleton-p (cdr obj))))
+           (write-string ". " stream)
+           (output-object obj stream)
+           nil)
+          ((and (not *print-readably*) (eql (car state) *print-length*))
+           (write-string "..." stream)
+           nil)
+          ((and obj
+                (plusp (car state))
+                (check-for-circularity obj nil :logical-block))
+           (write-string ". " stream)
+           (output-object obj stream)
+           nil)
+          (t
+           (incf (car state))))))
+
+;; As above, but for logical blocks with an unspecific object.
+(defun pprint-length-check* (state)
+  (let ((stream (cdr state)))
+    (cond ((and (not *print-readably*) (eql (car state) *print-length*))
+           (write-string "..." stream)
+           nil)
+          (t
+           (incf (car state))))))
 
 (defun !pprint-cold-init ()
   (/show0 "entering !PPRINT-COLD-INIT")

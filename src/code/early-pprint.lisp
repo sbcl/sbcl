@@ -10,32 +10,15 @@
 ;;;; files for more information.
 
 (in-package "SB!PRETTY")
-
-;;;; utilities
 
-(defmacro with-pretty-stream ((stream-var
-                               &optional (stream-expression stream-var))
-                              &body body)
-  (let ((flet-name (sb!xc:gensym "WITH-PRETTY-STREAM")))
-    `(flet ((,flet-name (,stream-var)
-              ,@body))
-       (let ((stream ,stream-expression))
-         (if (pretty-stream-p stream)
-             (,flet-name stream)
-             (catch 'line-limit-abbreviation-happened
-               (let ((stream (make-pretty-stream stream)))
-                 (,flet-name stream)
-                 (force-pretty-output stream)))))
-       nil)))
-
 ;;;; user interface to the pretty printer
 
 (defmacro pprint-logical-block ((stream-symbol
                                  object
-                                 &key
-                                 (prefix nil prefixp)
-                                 (per-line-prefix nil per-line-prefix-p)
-                                 (suffix "" suffixp))
+                                 &rest keys
+                                 &key (prefix nil prefixp)
+                                      (per-line-prefix nil per-line-prefix-p)
+                                      (suffix ""))
                                 &body body)
   #!+sb-doc
   "Group some output into a logical block. STREAM-SYMBOL should be either a
@@ -44,98 +27,57 @@
   (let ((prefix (cond ((and prefixp per-line-prefix-p)
                        (error "cannot specify values for both PREFIX and PER-LINE-PREFIX."))
                       (prefixp prefix)
-                      (per-line-prefix-p per-line-prefix))))
-    (let ((object-var (if object (gensym) nil)))
-      (once-only ((prefix-var prefix) (suffix-var suffix))
-        (multiple-value-bind (stream-var stream-expression)
-            (case stream-symbol
-              ((nil)
-               (values '*standard-output* '*standard-output*))
-              ((t)
-               (values '*terminal-io* '*terminal-io*))
-              (t
-               (values stream-symbol
-                       (once-only ((stream stream-symbol))
-                         `(case ,stream
-                            ((nil) *standard-output*)
-                            ((t) *terminal-io*)
-                            (t ,stream))))))
-          (let* ((block-name (sb!xc:gensym "PPRINT-LOGICAL-BLOCK-"))
-                 (count-name (gensym "PPRINT-LOGICAL-BLOCK-LENGTH-"))
-                 (pp-pop-name (sb!xc:gensym "PPRINT-POP-"))
-                 (body
-                  ;; FIXME: It looks as though PPRINT-LOGICAL-BLOCK might
-                  ;; expand into a boatload of code, since DESCEND-INTO is a
-                  ;; macro too. It might be worth looking at this to make
-                  ;; sure it's not too bloated, since PPRINT-LOGICAL-BLOCK
-                  ;; is called many times from system pretty-printing code.
-                  ;;
-                  ;; FIXME: I think pprint-logical-block is broken wrt
-                  ;; argument order, multiple evaluation, etc. of its
-                  ;; keyword (:PREFIX, :PER-LINE-PREFIX and :SUFFIX)
-                  ;; arguments.  Dunno if that's legal.
-                  `(descend-into (,stream-var)
-                     (let ((,count-name 0))
-                       (declare (type index ,count-name) (ignorable ,count-name))
-                       ,@(when (or prefixp per-line-prefix-p)
-                               `((declare (string ,prefix-var))))
-                       ,@(when (and suffixp)
-                               `((declare (string ,suffix-var))))
-                       (start-logical-block ,stream-var
-                                            ,prefix-var
-                                            ,(if per-line-prefix-p t nil)
-                                            ,suffix-var)
-                       (block ,block-name
-                         (flet ((,pp-pop-name ()
-                                  ,@(when object
-                                     `((unless (listp-for-pprint ,object-var)
-                                         (return-from ,block-name
-                                           (%pprint-dotted-tail ,object-var
-                                                                ,stream-var)))))
-                                  (when (and (not *print-readably*)
-                                             (eql ,count-name *print-length*))
-                                    (write-string "..." ,stream-var)
-                                    (return-from ,block-name nil))
-                                  ,@(when object
-                                          `((when (and ,object-var
-                                                       (plusp ,count-name)
-                                                       (check-for-circularity
-                                                        ,object-var
-                                                        nil
-                                                        :logical-block))
-                                              (write-string ". " ,stream-var)
-                                              (output-object ,object-var ,stream-var)
-                                              (return-from ,block-name nil))))
-                                  (incf ,count-name)
-                                  ,@(if object
-                                        `((pop ,object-var))
-                                        `(nil))))
-                           (declare (ignorable (function ,pp-pop-name)))
-                           (locally
-                               (declare (disable-package-locks
-                                         pprint-pop pprint-exit-if-list-exhausted))
-                             (macrolet ((pprint-pop ()
-                                          '(,pp-pop-name))
-                                        (pprint-exit-if-list-exhausted ()
-                                          ,(if object
-                                               `'(when (null ,object-var)
-                                                  (return-from ,block-name nil))
-                                               `'(return-from ,block-name nil))))
-                               (declare (enable-package-locks
-                                         pprint-pop pprint-exit-if-list-exhausted))
-                               ,@body))))
-                       ;; FIXME: Don't we need UNWIND-PROTECT to ensure this
-                       ;; always gets executed?
-                       (end-logical-block ,stream-var)))))
-            (when object
-              (setf body
-                    `(let ((,object-var ,object))
-                       (if (listp ,object-var)
-                           (with-circularity-detection (,object-var ,stream-var)
-                             ,body)
-                           (output-object ,object-var ,stream-var)))))
-            `(with-pretty-stream (,stream-var ,stream-expression)
-               ,body)))))))
+                      (per-line-prefix-p per-line-prefix)))
+        (proc (make-symbol "PPRINT-BLOCK"))
+        (list (and object (make-symbol "LIST")))
+        (state (make-symbol "STATE"))
+        (stream-var (case stream-symbol
+                      ((nil) '*standard-output*)
+                      ((t) '*terminal-io*)
+                      (t stream-symbol)))
+        (bindings))
+    ;; This is not a function, but to the degree possible should have usual
+    ;; evaluation order. No bothering with duplicated keyword args,
+    ;; or :allow-other-keys nonsense.
+    (unless (and (constantp prefix) (constantp suffix))
+      (loop (multiple-value-bind (indicator value tail)
+                (get-properties keys '(:prefix :per-line-prefix :suffix))
+              (if (not indicator) (return))
+              (setq keys (cddr tail))
+              (unless (assoc indicator bindings :test 'string=) ; dup
+                (let ((tmp (copy-symbol indicator)))
+                  (setq bindings (nconc bindings (list (list tmp value))))
+                  (if (eq indicator :suffix)
+                      (setq suffix tmp)
+                      (setq prefix tmp))))))
+      (when object
+        (let ((tmp (make-symbol "OBJ")))
+          (setq bindings (acons tmp (list object) bindings) object tmp))))
+    `(dx-flet ((,proc (,@(and list (list list)) ,state ,stream-var)
+                 (declare (ignorable ,@(and list (list list))
+                                      ,state ,stream-var))
+                 (declare (disable-package-locks pprint-exit-if-list-exhausted
+                                                 pprint-pop))
+                 (macrolet ,(if object
+                                `((pprint-exit-if-list-exhausted ()
+                                    '(when (null ,list) (return-from ,proc)))
+                                  (pprint-pop ()
+                                    '(if (pprint-length-check ,list ,state)
+                                         (pop ,list)
+                                         (return-from ,proc))))
+                                `((pprint-exit-if-list-exhausted ()
+                                    '(return-from ,proc))
+                                  (pprint-pop ()
+                                    '(if (pprint-length-check* ,state)
+                                         nil
+                                         (return-from ,proc)))))
+                   (declare (enable-package-locks pprint-exit-if-list-exhausted
+                                                  pprint-pop))
+                   ,@body)))
+       (let ,bindings
+         (call-logical-block-printer #',proc ,stream-symbol
+                                     ,prefix ,per-line-prefix-p ,suffix
+                                     ,@(if object (list object)))))))
 
 (defmacro pprint-exit-if-list-exhausted ()
   #!+sb-doc
@@ -154,17 +96,3 @@
    If the LIST argument to PPRINT-LOGICAL-BLOCK was NIL, then nothing
    is popped, but the *PRINT-LENGTH* testing still happens."
   (error "PPRINT-POP must be lexically inside PPRINT-LOGICAL-BLOCK."))
-
-;; utilities needed by PPRINT-POP
-;; Consider (A . `(,B C)) = (A QUASIQUOTE ,B C)
-;; We have to detect this and print as the form on the left since pretty commas
-;; with no containing #\` will fail at read-time due to a nesting error.
-;; There isn't an equivalent of *BACKQUOTE-DEPTH* for output streams so we
-;; can't revert to printing the comma as #S(SB-IMPL::COMMA ...)
-(declaim (inline listp-for-pprint))
-(defun listp-for-pprint (x)
-  (and (listp x) (not (and (eq (car x) 'quasiquote) (singleton-p (cdr x))))))
-(defun %pprint-dotted-tail (obj stream)
-  (write-string ". " stream)
-  (output-object obj stream)
-  nil)
