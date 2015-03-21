@@ -8,7 +8,7 @@ $(UIOP_FASL):: uiop.lisp ../../output/sbcl.core
 	mkdir -p $(DEST)
 	$(SBCL) --eval '(compile-file #p"SYS:CONTRIB;ASDF;UIOP.LISP" :output-file (parse-native-namestring "$@"))' </dev/null
 
-$(ASDF_FASL):: asdf.lisp ../../output/sbcl.core
+$(ASDF_FASL):: asdf.lisp ../../output/sbcl.core $(UIOP_FASL)
 	if [ -d asdf-upstream ] ; then rm -rf asdf-upstream ; fi
 	mkdir -p $(DEST)
 	$(SBCL) --eval '(compile-file #p"SYS:CONTRIB;ASDF;ASDF.LISP" :output-file (parse-native-namestring "$@"))' </dev/null
