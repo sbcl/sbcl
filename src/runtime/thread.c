@@ -49,17 +49,25 @@
 #include "interrupt.h"
 #include "lispregs.h"
 
-#if defined(LISP_FEATURE_OPENBSD) && defined(LISP_FEATURE_SB_THREAD)
+#ifdef LISP_FEATURE_SB_THREAD
+
+#ifdef LISP_FEATURE_OPENBSD
 #include <pthread_np.h>
 #endif
 
-#if defined(LISP_FEATURE_WIN32) && defined(LISP_FEATURE_SB_THREAD)
+#ifdef LISP_FEATURE_SUNOS
+#include <thread.h>
+#endif
+
+#ifdef LISP_FEATURE_WIN32
 # define IMMEDIATE_POST_MORTEM
 #endif
 
-#if defined(LISP_FEATURE_DARWIN) && defined(LISP_FEATURE_SB_THREAD)
+#ifdef LISP_FEATURE_DARWIN 
 #define DELAY_THREAD_POST_MORTEM 5
 #define LOCK_CREATE_THREAD
+#endif
+
 #endif
 
 #if defined(LISP_FEATURE_FREEBSD) || defined(LISP_FEATURE_DRAGONFLY)
@@ -525,6 +533,11 @@ attach_os_thread(init_thread_data *scribble)
     pthread_stackseg_np(os, &stack);
     stack_size = stack.ss_size;
     stack_addr = (void*)((size_t)stack.ss_sp - stack_size);
+#elif defined LISP_FEATURE_SUNOS
+  stack_t stack;
+  thr_stksegment(&stack);
+  stack_size = stack.ss_size;
+  stack_addr = (void*)((size_t)stack.ss_sp - stack_size);
 #elif defined(LISP_FEATURE_DARWIN)
     stack_addr = pthread_get_stackaddr_np(os);
     stack_size = pthread_get_stacksize_np(os);

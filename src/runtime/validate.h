@@ -37,7 +37,7 @@
 #endif
 
 #if !defined(LANGUAGE_ASSEMBLY)
-#include <thread.h>
+#include "thread.h"
 
 #ifdef LISP_FEATURE_STACK_GROWS_DOWNWARD_NOT_UPWARD
 
