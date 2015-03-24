@@ -715,7 +715,7 @@ Unicode-related functions are located in the @code{sb-unicode} package.
 
 SBCL also extends ANSI character literal syntax to support Unicode
 codepoints. You can either specify a character by its Unicode name, with
-spaces replaced by underscores, if a unique name exists @footnote{aPlease
+spaces replaced by underscores, if a unique name exists @footnote{Please
 note that the codepoint U+1F5CF (PAGE) introduced in Unicode 7.0 is
 named @code{UNICODE_PAGE}, since the name ``Page'' is required to be
 assigned to form-feed (U+0C) by the ANSI standard.} or
@@ -724,7 +724,7 @@ by giving its hexadecimal codepoint preceded by a ``U'', an optional
 character directly into your source code if it can be encoded in your
 file. If a character had an assigned name in Unicode 1.0 that was
 distinct from its current name, you may also use that name (with spaces
-replaced by underscares) to specify the character, unless the name is
+replaced by underscores) to specify the character, unless the name is
 already associated with a codepoint in the latest Unicode standard (such
 as ``BELL'').
 
@@ -835,12 +835,12 @@ It also extends standard Common Lisp case functions such as
 @findex @cl{char-downcase}
 @code{string-downcase} to support a subset of Unicode's casing behavior.
 Specifically, a character is
-@findex @cl{both-case-p} 
+@findex @cl{both-case-p}
 @code{both-case-p} if its case mapping in Unicode is one-to-one and
 invertable.
 
 The @code{sb-unicode} package also provides functions for
-collating/sorting strings according to the Unicode Collation Algorithm. 
+collating/sorting strings according to the Unicode Collation Algorithm.
 
 @include fun-sb-unicode-unicode-lt.texinfo
 
