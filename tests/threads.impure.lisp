@@ -1483,7 +1483,7 @@
 (with-test (:name :spinlock-api)
   (let* ((warned 0)
          (funs
-           (handler-bind ((sb-int:late-deprecation-warning (lambda (_)
+           (handler-bind ((sb-int:early-deprecation-warning (lambda (_)
                                                               (declare (ignore _))
                                                               (incf warned))))
              (list (compile nil `(lambda (lock)

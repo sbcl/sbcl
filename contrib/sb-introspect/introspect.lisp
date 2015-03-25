@@ -465,8 +465,8 @@ If an unsupported TYPE is requested, the function will return NIL.
        :plist (sb-c:definition-source-location-plist location))
       (make-definition-source)))
 
-(sb-int:define-deprecated-function :final "1.2.10" function-arglist
-    function-lambda-list (function)
+(sb-int:define-deprecated-function :late "1.0.24.5" function-arglist function-lambda-list
+    (function)
   (function-lambda-list function))
 
 (defun function-lambda-list (function)

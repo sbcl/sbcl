@@ -435,7 +435,7 @@ avoiding atexit(3) hooks, etc. Otherwise exit(2) is called."
       (void-syscall ("_exit" int) code)
       (void-syscall ("exit" int) code)))
 
-(define-deprecated-function :late "1.2.10" unix-exit os-exit (code)
+(define-deprecated-function :early "1.0.56.55" unix-exit os-exit (code)
   (os-exit code))
 
 ;;; Return the process id of the current process.
