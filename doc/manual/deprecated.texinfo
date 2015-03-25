@@ -135,8 +135,6 @@ Deprecated in favor of the corresponding prefix-less functions
 1.2.10 in March 2015. Expected to move into late deprecation in August
 2015.
 
-@end itemize
-
 @item @strong{SB-EXT:QUIT}
 
 Deprecated in favor of @code{sb-ext:exit} as of 1.0.56.55 in May 2012.
