@@ -1,5 +1,5 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
-changes relative to sbcl-1.2.9:
+changes in sbcl-1.2.10 relative to sbcl-1.2.9:
   * minor incompatible change: all SOCKINT::WIN32-* functions have been
     deprecated with EARLY deprecation state
   * minor incompatible change: performing introspection via the system-internal
