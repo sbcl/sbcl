@@ -133,10 +133,11 @@
       (format *debug-io* "~&/FOP-NOP4 ARG=~W=#X~X~%" arg arg))))
 
 (!define-fop 0 (fop-nop () nil))
-(!define-fop 1 (fop-pop (x) nil) (push-fop-table x))
+(!define-fop 1 (fop-pop (x) nil) (push-fop-table x (fasl-input)))
 (!define-fop 2 (fop-empty-list) nil)
 (!define-fop 3 (fop-truth) t)
-(!define-fop 4 (fop-push ((:operands index))) (ref-fop-table index))
+(!define-fop 4 (fop-push ((:operands index)))
+  (ref-fop-table (fasl-input) index))
 
 ;;; CMU CL had FOP-POP-FOR-EFFECT as fop 65, but it was never used and seemed
 ;;; to have no possible use.
@@ -189,7 +190,7 @@
 ;; or possibly a hand-written equivalent (however unlikely).
 (!define-fop 68 (fop-allocate-instance (name) nil)
   (let ((instance (allocate-instance (find-class (the symbol name)))))
-    (push-fop-table instance)))
+    (push-fop-table instance (fasl-input))))
 
 ;; Fill in object slots as dictated by the second return value from
 ;; MAKE-LOAD-FORM-SAVING-SLOTS.
@@ -218,7 +219,7 @@
 
 (!define-fop 62 (fop-verify-table-size () nil)
   (let ((expected-index (read-word-arg (fasl-input-stream))))
-    (unless (= (get-fop-table-index) expected-index)
+    (unless (= (svref (%fasl-input-table (fasl-input)) 0) expected-index)
       (bug "fasl table of improper size"))))
 (!define-fop 63 (fop-verify-empty-stack () nil)
   (unless (fop-stack-empty-p)
@@ -232,9 +233,10 @@
 
 (declaim (freeze-type undefined-package))
 
-(defun aux-fop-intern (size package input-stream)
+(defun aux-fop-intern (size package fasl-input)
   (declare (optimize speed))
-  (let ((buffer (make-string size)))
+  (let ((input-stream (%fasl-input-stream fasl-input))
+        (buffer (make-string size)))
     #+sb-xc-host
     (read-string-as-bytes input-stream buffer size)
     #-sb-xc-host
@@ -253,12 +255,12 @@
                           (intern* buffer
                                    size
                                    package
-                                   :no-copy t))))))
+                                   :no-copy t)) fasl-input))))
 
 (!define-fop 80 (fop-lisp-symbol-save ((:operands namelen)))
-  (aux-fop-intern namelen *cl-package* (fasl-input-stream)))
+  (aux-fop-intern namelen *cl-package* (fasl-input)))
 (!define-fop 84 (fop-keyword-symbol-save ((:operands namelen)))
-  (aux-fop-intern namelen *keyword-package* (fasl-input-stream)))
+  (aux-fop-intern namelen *keyword-package* (fasl-input)))
 
 ;; But srsly? Most of the space is wasted by UCS4 encoding of ASCII.
 ;; An extra word per symbol for the package is nothing by comparison.
@@ -268,7 +270,7 @@
   ;; FOP-SYMBOL-IN-LAST-PACKAGE-SAVE/FOP-SMALL-SYMBOL-IN-LAST-PACKAGE-SAVE
   ;; cloned fop pair could undo some of this bloat.
 (!define-fop #xF0 (fop-symbol-in-package-save ((:operands pkg-index namelen)))
-  (aux-fop-intern namelen (ref-fop-table pkg-index) (fasl-input-stream)))
+  (aux-fop-intern namelen (ref-fop-table (fasl-input) pkg-index) (fasl-input)))
 
 (!define-fop 96 (fop-uninterned-symbol-save ((:operands namelen)))
   (let ((res (make-string namelen)))
@@ -276,10 +278,11 @@
     (read-string-as-bytes (fasl-input-stream) res)
     #!+sb-unicode
     (read-string-as-unsigned-byte-32 (fasl-input-stream) res)
-    (push-fop-table (make-symbol res))))
+    (push-fop-table (make-symbol res) (fasl-input))))
 
 (!define-fop 104 (fop-copy-symbol-save ((:operands table-index)))
-  (push-fop-table (copy-symbol (ref-fop-table table-index))))
+  (push-fop-table (copy-symbol (ref-fop-table (fasl-input) table-index))
+                  (fasl-input)))
 
 (!define-fop 44 (fop-package (pkg-designator))
   (find-undeleted-package-or-lose pkg-designator))
@@ -297,7 +300,8 @@
     (push-fop-table
      (handler-case (find-undeleted-package-or-lose package-name)
        (simple-package-error (c)
-         (make-undefined-package :error (princ-to-string c)))))))
+         (make-undefined-package :error (princ-to-string c))))
+     (fasl-input))))
 
 ;;;; fops for loading numbers
 
@@ -507,25 +511,26 @@
 ;;;; fops for fixing up circularities
 
 (!define-fop 200 (fop-rplaca (val) nil)
-  (let ((obj (ref-fop-table (read-word-arg (fasl-input-stream))))
+  (let ((obj (ref-fop-table (fasl-input) (read-word-arg (fasl-input-stream))))
         (idx (read-word-arg (fasl-input-stream))))
     (setf (car (nthcdr idx obj)) val)))
 
 (!define-fop 201 (fop-rplacd (val) nil)
-  (let ((obj (ref-fop-table (read-word-arg (fasl-input-stream))))
+  (let ((obj (ref-fop-table (fasl-input) (read-word-arg (fasl-input-stream))))
         (idx (read-word-arg (fasl-input-stream))))
     (setf (cdr (nthcdr idx obj)) val)))
 
 (!define-fop 202 (fop-svset (val) nil)
   (let* ((obi (read-word-arg (fasl-input-stream)))
-         (obj (ref-fop-table obi))
+         (obj (ref-fop-table (fasl-input) obi))
          (idx (read-word-arg (fasl-input-stream))))
     (if (%instancep obj) ; suspicious. should have been FOP-STRUCTSET
         (setf (%instance-ref obj idx) val)
         (setf (svref obj idx) val))))
 
 (!define-fop 204 (fop-structset (val) nil)
-  (setf (%instance-ref (ref-fop-table (read-word-arg (fasl-input-stream)))
+  (setf (%instance-ref (ref-fop-table (fasl-input)
+                                      (read-word-arg (fasl-input-stream)))
                        (read-word-arg (fasl-input-stream)))
         val))
 

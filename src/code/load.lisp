@@ -132,28 +132,18 @@
 ;;; FOPs use the table to save stuff, other FOPs refer to the table by
 ;;; direct indexes via REF-FOP-TABLE.
 
-(defvar *fop-table*)
-(declaim (simple-vector *fop-table*))
-
 (declaim (inline ref-fop-table))
-(defun ref-fop-table (index)
-  (declare (type index index))
-  (svref *fop-table* (the index (+ index 1))))
+(defun ref-fop-table (fasl-input index)
+  (svref (%fasl-input-table fasl-input) (1+ (the index index))))
 
-(defun get-fop-table-index ()
-  (svref *fop-table* 0))
-
-(defun reset-fop-table ()
-  (setf (svref *fop-table* 0) 0))
-
-(defun push-fop-table (thing) ; and return THING
-  (let* ((table *fop-table*)
+(defun push-fop-table (thing fasl-input) ; and return THING
+  (let* ((table (%fasl-input-table fasl-input))
          (index (+ (the index (aref table 0)) 1)))
     (declare (fixnum index)
              (simple-vector table))
     (when (eql index (length table))
       (setf table (grow-fop-vector table index)
-            *fop-table* table))
+            (%fasl-input-table fasl-input) table))
     (setf (aref table 0) index
           (aref table index) thing)))
 
@@ -418,7 +408,7 @@
 ;;; NIL if EOF was encountered while trying to read from the stream.
 ;;; Dispatch to the right function for each fop.
 (defconstant +2-operand-fops+ #xE0) ; start of the range
-(defun load-fasl-group (stream print)
+(defun load-fasl-group (fasl-input print)
   ;;
   ;; PRINT causes most tlf-equivalent forms to print their primary value.
   ;; This differs from loading of Lisp source, which prints all values of
@@ -429,11 +419,11 @@
   ;;   contents of the source file, but some information is generally printed."
   ;;
   (declare (ignorable print))
-  (unless (check-fasl-header stream)
-    (return-from load-fasl-group))
-  (catch 'fasl-group-end
-    (reset-fop-table)
-    (let ((fasl-input (make-fasl-input stream)))
+  (let ((stream (%fasl-input-stream fasl-input)))
+    (unless (check-fasl-header stream)
+      (return-from load-fasl-group))
+    (catch 'fasl-group-end
+      (setf (svref (%fasl-input-table fasl-input) 0) 0)
       (loop
        (let ((byte (the (unsigned-byte 8) (read-byte stream)))
              (trace (or #!+sb-show *show-fops-p*)))
@@ -442,7 +432,7 @@
            (format *trace-output* "~&~6x : [~D,~D] ~2,'0x(~A)"
                    (1- (file-position stream))
                    (svref *fop-stack* 0) ; stack pointer
-                   (svref *fop-table* 0) ; table pointer
+                   (svref (%fasl-input-table fasl-input) 0) ; table pointer
                    byte (aref *fop-names* byte)))
          ;; Actually execute the fop.
          (let ((result
@@ -472,7 +462,7 @@
              (let* ((stack *fop-stack*)
                     (ptr (svref stack 0)))
                (format *trace-output* " -- ~[<empty>,~D~:;[~:*~D,~D] ~S~]"
-                       ptr (svref *fop-table* 0)
+                       ptr (svref (%fasl-input-table fasl-input) 0)
                        (unless (eql ptr 0) (aref stack ptr)))
                (terpri *trace-output*)))
            #-sb-xc-host
@@ -489,14 +479,14 @@
   (when (zerop (file-length stream))
     (error "attempt to load an empty FASL file:~%  ~S" (namestring stream)))
   (maybe-announce-load stream verbose)
-  ;; FIXME: should be slots of the FASL-INPUT struct
-  (let ((*fop-table* (make-fop-vector 1000))
-        (*fop-stack* (make-fop-vector 100)))
+  ;; FIXME: should be slot of the FASL-INPUT struct
+  (let ((*fop-stack* (make-fop-vector 100))
+        (fasl-input (make-fasl-input stream)))
     (unwind-protect
-         (loop while (load-fasl-group stream print))
+         (loop while (load-fasl-group fasl-input print))
       ;; Nuke the table and stack to avoid keeping garbage on
       ;; conservatively collected platforms.
-      (nuke-fop-vector *fop-table*)
+      (nuke-fop-vector (%fasl-input-table fasl-input))
       (nuke-fop-vector *fop-stack*)))
   t)
 

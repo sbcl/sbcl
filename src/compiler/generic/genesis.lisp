@@ -2256,12 +2256,13 @@ core and return a descriptor to it."
 (defun cold-load-symbol (size package fasl-input)
   (let ((string (make-string size)))
     (read-string-as-bytes (%fasl-input-stream fasl-input) string)
-    (push-fop-table (intern string package))))
+    (push-fop-table (intern string package) fasl-input)))
 
 ;; I don't feel like hacking up DEFINE-COLD-FOP any more than necessary,
 ;; so this code is handcrafted to accept two operands.
 (flet ((fop-cold-symbol-in-package-save (fasl-input index pname-len)
-         (cold-load-symbol pname-len (ref-fop-table index) fasl-input)))
+         (cold-load-symbol pname-len (ref-fop-table fasl-input index)
+                           fasl-input)))
   (dotimes (i 16) ; occupies 16 cells in the dispatch table
     (setf (svref *cold-fop-funs* (+ (get 'fop-symbol-in-package-save 'opcode) i))
           #'fop-cold-symbol-in-package-save)))
@@ -2275,24 +2276,24 @@ core and return a descriptor to it."
 (define-cold-fop (fop-uninterned-symbol-save (namelen))
   (let ((name (make-string namelen)))
     (read-string-as-bytes (fasl-input-stream) name)
-    (push-fop-table (get-uninterned-symbol name))))
+    (push-fop-table (get-uninterned-symbol name) (fasl-input))))
 
 (define-cold-fop (fop-copy-symbol-save (index))
-  (let* ((symbol (ref-fop-table index))
+  (let* ((symbol (ref-fop-table (fasl-input) index))
          (name
           (if (symbolp symbol)
               (symbol-name symbol)
               (base-string-from-core
                (read-wordindexed symbol sb!vm:symbol-name-slot)))))
     ;; Genesis performs additional coalescing of uninterned symbols
-    (push-fop-table (get-uninterned-symbol name))))
+    (push-fop-table (get-uninterned-symbol name) (fasl-input))))
 
 ;;;; cold fops for loading packages
 
 (define-cold-fop (fop-named-package-save (namelen))
   (let ((name (make-string namelen)))
     (read-string-as-bytes (fasl-input-stream) name)
-    (push-fop-table (find-package name))))
+    (push-fop-table (find-package name) (fasl-input))))
 
 ;;;; cold fops for loading lists
 
@@ -2504,17 +2505,17 @@ core and return a descriptor to it."
 ;;;; cold fops for fixing up circularities
 
 (define-cold-fop (fop-rplaca)
-  (let ((obj (ref-fop-table (read-word-arg)))
+  (let ((obj (ref-fop-table (fasl-input) (read-word-arg)))
         (idx (read-word-arg)))
     (write-memory (cold-nthcdr idx obj) (pop-stack))))
 
 (define-cold-fop (fop-rplacd)
-  (let ((obj (ref-fop-table (read-word-arg)))
+  (let ((obj (ref-fop-table (fasl-input) (read-word-arg)))
         (idx (read-word-arg)))
     (write-wordindexed (cold-nthcdr idx obj) 1 (pop-stack))))
 
 (define-cold-fop (fop-svset)
-  (let ((obj (ref-fop-table (read-word-arg)))
+  (let ((obj (ref-fop-table (fasl-input) (read-word-arg)))
         (idx (read-word-arg)))
     (write-wordindexed obj
                    (+ idx
@@ -2524,7 +2525,7 @@ core and return a descriptor to it."
                    (pop-stack))))
 
 (define-cold-fop (fop-structset)
-  (let ((obj (ref-fop-table (read-word-arg)))
+  (let ((obj (ref-fop-table (fasl-input) (read-word-arg)))
         (idx (read-word-arg)))
     (write-wordindexed obj (+ idx sb!vm:instance-slots-offset) (pop-stack))))
 
