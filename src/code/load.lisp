@@ -433,13 +433,13 @@
                    (1- (file-position stream))
                    (svref *fop-stack* 0) ; stack pointer
                    (svref (%fasl-input-table fasl-input) 0) ; table pointer
-                   byte (aref *fop-names* byte)))
+                   byte (aref **fop-names** byte)))
          ;; Actually execute the fop.
          (let ((result
-                (let ((function (svref *fop-funs* byte)))
+                (let ((function (svref **fop-funs** byte)))
                   (cond ((not (functionp function))
                          (error "corrupt fasl file: FOP code #x~x" byte))
-                        ((zerop (sbit (car *fop-signatures*) (ash byte -2)))
+                        ((zerop (sbit (car **fop-signatures**) (ash byte -2)))
                          ;; takes no arguments from the fasl file
                          (funcall function fasl-input))
                         (t
@@ -456,7 +456,7 @@
                            (if arg2
                                (funcall function fasl-input arg1 arg2)
                                (funcall function fasl-input arg1))))))))
-           (when (plusp (sbit (cdr *fop-signatures*) byte))
+           (when (plusp (sbit (cdr **fop-signatures**) byte))
              (push-fop-stack result))
            (when trace
              (let* ((stack *fop-stack*)

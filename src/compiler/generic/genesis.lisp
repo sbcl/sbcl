@@ -2090,13 +2090,6 @@ core and return a descriptor to it."
 
 ;;;; general machinery for cold-loading FASL files
 
-;;; FOP functions for cold loading
-(defvar *cold-fop-funs*
-  ;; We start out with a copy of the ordinary *FOP-FUNS*. The ones
-  ;; which aren't appropriate for cold load will be destructively
-  ;; modified.
-  (copy-seq *fop-funs*))
-
 (defun pop-fop-stack ()
   (let* ((stack *fop-stack*)
          (top (svref stack 0)))
@@ -2109,13 +2102,11 @@ core and return a descriptor to it."
 ;;; Cause a fop to have a special definition for cold load.
 ;;;
 ;;; This is similar to DEFINE-FOP, but unlike DEFINE-FOP, this version
-;;;   (1) looks up the code for this name (created by a previous
-;;;       DEFINE-FOP) instead of creating a code, and
-;;;   (2) stores its definition in the *COLD-FOP-FUNS* vector,
-;;;       instead of storing in the *FOP-FUNS* vector.
+;;; looks up the encoding for this name (created by a previous DEFINE-FOP)
+;;; instead of creating a new encoding.
 (defmacro define-cold-fop ((name &optional arglist) &rest forms)
   (let* ((code (get name 'opcode))
-         (argp (plusp (sbit (car *fop-signatures*) (ash code -2))))
+         (argp (plusp (sbit (car **fop-signatures**) (ash code -2))))
          (fname (symbolicate "COLD-" name)))
     (unless code
       (error "~S is not a defined FOP." name))
@@ -2132,8 +2123,10 @@ core and return a descriptor to it."
                       '(funcall 'read-word-arg (fasl-input-stream)))
                     (pop-stack () `(pop-fop-stack)))
            ,@forms))
+       ;; We simply overwrite elements of **FOP-FUNS** since the contents
+       ;; of the host are never propagated directly into the target core.
        ,@(loop for i from code to (logior code (if argp 3 0))
-               collect `(setf (svref *cold-fop-funs* ,i) #',fname)))))
+               collect `(setf (svref **fop-funs** ,i) #',fname)))))
 
 ;;; Cause a fop to be undefined in cold load.
 (defmacro not-cold-fop (name)
@@ -2145,8 +2138,7 @@ core and return a descriptor to it."
 ;;; loading functions.
 (defun cold-load (filename)
   "Load the file named by FILENAME into the cold load image being built."
-  (let* ((*fop-funs* *cold-fop-funs*)
-         (*cold-load-filename* (etypecase filename
+  (let ((*cold-load-filename* (etypecase filename
                                  (string filename)
                                  (pathname (namestring filename)))))
     (with-open-file (s filename :element-type '(unsigned-byte 8))
@@ -2259,7 +2251,7 @@ core and return a descriptor to it."
          (cold-load-symbol pname-len (ref-fop-table fasl-input index)
                            fasl-input)))
   (dotimes (i 16) ; occupies 16 cells in the dispatch table
-    (setf (svref *cold-fop-funs* (+ (get 'fop-symbol-in-package-save 'opcode) i))
+    (setf (svref **fop-funs** (+ (get 'fop-symbol-in-package-save 'opcode) i))
           #'fop-cold-symbol-in-package-save)))
 
 (define-cold-fop (fop-lisp-symbol-save (namelen))
@@ -2595,7 +2587,7 @@ core and return a descriptor to it."
        des)))
 
 (dotimes (i 16) ; occupies 16 cells in the dispatch table
-  (setf (svref *cold-fop-funs* (+ (get 'fop-code 'opcode) i))
+  (setf (svref **fop-funs** (+ (get 'fop-code 'opcode) i))
         #'cold-load-code))
 
 (define-cold-fop (fop-alter-code (slot))

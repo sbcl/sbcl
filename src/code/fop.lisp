@@ -55,8 +55,8 @@
     (unless (zerop (mod base-opcode n-slots))
       (error "Opcode for fop ~S must be a multiple of ~D" name n-slots))
     (loop for opcode from base-opcode below (+ base-opcode n-slots)
-          when (functionp (svref *fop-funs* opcode))
-          do (let ((oname (svref *fop-names* opcode)))
+          when (functionp (svref **fop-funs** opcode))
+          do (let ((oname (svref **fop-names** opcode)))
                (when (and oname (not (eq oname name)))
                  (error "fop ~S with opcode ~D conflicts with fop ~S."
                         name opcode oname))))
@@ -70,10 +70,10 @@
     ;; 2-operand fops occupy 16 slots in a reserved range of the function table.
     (dotimes (j n-slots)
       (let ((opcode (+ base-opcode j)))
-        (setf (svref *fop-names* opcode) name
-              (svref *fop-funs* opcode) (symbol-function name)
-              (sbit (car *fop-signatures*) (ash opcode -2)) (signum n-operands)
-              (sbit (cdr *fop-signatures*) opcode) pushp))))
+        (setf (svref **fop-names** opcode) name
+              (svref **fop-funs** opcode) (symbol-function name)
+              (sbit (car **fop-signatures**) (ash opcode -2)) (signum n-operands)
+              (sbit (cdr **fop-signatures**) opcode) pushp))))
   name)
 
 ;;; a helper function for reading string values from FASL files: sort

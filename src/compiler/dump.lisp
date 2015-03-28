@@ -178,7 +178,7 @@
          (fop-argc
           (if (>= val +2-operand-fops+)
               2
-              (sbit (car *fop-signatures*) (ash val -2)))))
+              (sbit (car **fop-signatures**) (ash val -2)))))
     (cond
       ((not (eql (length args) fop-argc))
        (error "~S takes ~D argument~:P" fs fop-argc))
