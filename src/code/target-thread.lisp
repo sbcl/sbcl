@@ -1893,8 +1893,6 @@ mechanism for inter-thread communication."
                  :info (list :write :unbound-in-thread))
           (values nil nil))))
 
-(defun sb!vm::locked-symbol-global-value-add (symbol-name delta)
-  (sb!vm::locked-symbol-global-value-add symbol-name delta))
 
 
 ;;;; Stepping
