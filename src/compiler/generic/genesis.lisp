@@ -2447,14 +2447,13 @@ core and return a descriptor to it."
 (flet ((pop-args (input)
          (let (args)
            (dotimes (i (read-byte-arg (%fasl-input-stream input))
-                       (if args (values (pop-fop-stack) args) (values nil nil)))
+                       (values (pop-fop-stack) args))
              (push (pop-fop-stack) args)))))
 
   (define-cold-fop (fop-funcall)
-    (multiple-value-bind (f args) (pop-args (fasl-input))
-      (when f
-        (return-from cold-fop-funcall
-          (case f
+    (multiple-value-bind (fun args) (pop-args (fasl-input))
+      (if args
+          (case fun
            (fdefinition
             ;; Special form #'F fopcompiles into `(FDEFINITION ,f)
             (aver (and (singleton-p args) (symbolp (car args))))
@@ -2464,35 +2463,35 @@ core and return a descriptor to it."
               (aver (not (cold-null f)))
               f))
            (t
-            (error "Can't FUNCALL ~S in cold load" f))))))
-    (let ((counter *load-time-value-counter*))
-      (cold-push (cold-list (cold-intern :load-time-value)
-                            (pop-stack)
-                            (number-to-core counter))
-                 *current-reversed-cold-toplevels*)
-      (setf *load-time-value-counter* (1+ counter))
-      (make-descriptor 0 :load-time-value counter)))
+            (error "Can't FUNCALL ~S in cold load" fun)))
+          (let ((counter *load-time-value-counter*))
+            (cold-push (cold-list (cold-intern :load-time-value) fun
+                                  (number-to-core counter))
+                       *current-reversed-cold-toplevels*)
+            (setf *load-time-value-counter* (1+ counter))
+            (make-descriptor 0 :load-time-value counter)))))
 
   (define-cold-fop (fop-funcall-for-effect)
-    (multiple-value-bind (f args) (pop-args (fasl-input))
-      (when f
-        (return-from cold-fop-funcall-for-effect
-          (acond ((eq f 'sb!impl::%defun) (apply #'cold-fset args))
-                 ((eq f 'sb!kernel::%defstruct)
-                  (push args *known-structure-classoids*)
-                  (cold-push (apply #'cold-list (cold-intern 'defstruct) args)
-                             *current-reversed-cold-toplevels*))
-                 ((eq f 'sb!impl::assign-setf-macro)
-                  (target-push (host-constant-to-core args nil)
-                               '*!reversed-cold-setf-macros*))
-                 ((eq f 'set)
-                  (aver (= (length args) 2))
-                  (cold-set (first args)
-                            (let ((val (second args)))
-                              (if (symbolp val) (cold-intern val) val))))
-                 ((get f :sb-cold-funcall-handler) (apply it args))
-                 (t (error "Can't FUNCALL-FOR-EFFECT ~S in cold load" f))))))
-    (cold-push (pop-stack) *current-reversed-cold-toplevels*)))
+    (multiple-value-bind (fun args) (pop-args (fasl-input))
+      (if (not args)
+          (cold-push fun *current-reversed-cold-toplevels*)
+          (case fun
+            (sb!impl::%defun (apply #'cold-fset args))
+            (sb!kernel::%defstruct
+             (push args *known-structure-classoids*)
+             (cold-push (apply #'cold-list (cold-intern 'defstruct) args)
+                        *current-reversed-cold-toplevels*))
+            (sb!impl::assign-setf-macro
+             (target-push (host-constant-to-core args nil)
+                          '*!reversed-cold-setf-macros*))
+            (set
+             (aver (= (length args) 2))
+             (cold-set (first args)
+                       (let ((val (second args)))
+                         (if (symbolp val) (cold-intern val) val))))
+            (t (acond ((get fun :sb-cold-funcall-handler) (apply it args))
+                      (t (error "Can't FUNCALL-FOR-EFFECT ~S in cold load"
+                                fun)))))))))
 
 (defun finalize-load-time-value-noise ()
   (cold-set '*!load-time-values*
