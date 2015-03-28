@@ -159,6 +159,15 @@
   "the current number of recursive LOADs")
 (declaim (type index *load-depth*))
 
-;;; the FASL file we're reading from
-(defvar *fasl-input-stream*)
-(declaim (type ansi-stream *fasl-input-stream*))
+;;; a holder for the FASL file we're reading from
+(defstruct (fasl-input (:conc-name %fasl-input-)
+                       (:constructor make-fasl-input (stream))
+                       (:predicate nil)
+                       (:copier nil))
+  (stream nil :type ansi-stream :read-only t)
+  ;; Sometimes we want to skip over any FOPs with side-effects (like
+  ;; function calls) while executing other FOPs. SKIP-UNTIL will
+  ;; either contain the position where the skipping will stop, or
+  ;; NIL if we're executing normally.
+  (skip-until nil))
+(declaim (freeze-type fasl-input))

@@ -93,11 +93,11 @@
          (cnt 1 (1+ cnt)))
         ((>= cnt n) res))))
 
-;;; Read an N-byte unsigned integer from the *FASL-INPUT-STREAM*.
-(defmacro read-arg (n)
+;;; Read an N-byte unsigned integer from FASL-INPUT-STREAM.
+(defmacro read-arg (n fasl-input-stream)
   (if (= n 1)
-      `(the (unsigned-byte 8) (read-byte *fasl-input-stream*))
-      `(with-fast-read-byte ((unsigned-byte 8) *fasl-input-stream*)
+      `(the (unsigned-byte 8) (read-byte ,fasl-input-stream))
+      `(with-fast-read-byte ((unsigned-byte 8) ,fasl-input-stream)
          (fast-read-u-integer ,n))))
 
 ;; FIXME: on x86-64, these functions exceed 600, 900, and 1200 bytes of code
@@ -107,21 +107,21 @@
 ;; But this would only be feasible on machines that are little-endian
 ;; and that allow unaligned reads. (like x86)
 (declaim (inline read-byte-arg read-halfword-arg read-word-arg))
-(defun read-byte-arg ()
+(defun read-byte-arg (stream)
   (declare (optimize (speed 0)))
-  (read-arg 1))
+  (read-arg 1 stream))
 
-(defun read-halfword-arg ()
+(defun read-halfword-arg (stream)
   (declare (optimize (speed 0)))
-  (read-arg #.(/ sb!vm:n-word-bytes 2)))
+  (read-arg #.(/ sb!vm:n-word-bytes 2) stream)) ; READ-ARG doesn't eval N
 
-(defun read-word-arg ()
+(defun read-word-arg (stream)
   (declare (optimize (speed 0)))
-  (read-arg #.sb!vm:n-word-bytes))
+  (read-arg #.sb!vm:n-word-bytes stream))
 
-(defun read-unsigned-byte-32-arg ()
+(defun read-unsigned-byte-32-arg (stream)
   (declare (optimize (speed 0)))
-  (read-arg 4))
+  (read-arg 4 stream))
 
 
 ;;;; the fop table
@@ -371,7 +371,7 @@
                    :expected (char-code (schar fhsss count))))))
       ;; Read and validate version-specific compatibility stuff.
       (flet ((string-from-stream ()
-               (let* ((length (read-unsigned-byte-32-arg))
+               (let* ((length (read-unsigned-byte-32-arg stream))
                       (result (make-string length)))
                  (read-string-as-bytes stream result)
                  result)))
@@ -383,7 +383,7 @@
                    :stream stream
                    :implementation implementation
                    :expected expected-implementation)))
-        (let* ((fasl-version (read-word-arg))
+        (let* ((fasl-version (read-word-arg stream))
                (sbcl-version (if (<= fasl-version 76)
                                  "1.0.11.18"
                                  (string-from-stream)))
@@ -433,8 +433,7 @@
     (return-from load-fasl-group))
   (catch 'fasl-group-end
     (reset-fop-table)
-    (let ((*skip-until* nil))
-      (declare (special *skip-until*))
+    (let ((fasl-input (make-fasl-input stream)))
       (loop
        (let ((byte (the (unsigned-byte 8) (read-byte stream)))
              (trace (or #!+sb-show *show-fops-p*)))
@@ -451,8 +450,10 @@
                   (cond ((not (functionp function))
                          (error "corrupt fasl file: FOP code #x~x" byte))
                         ((zerop (sbit (car *fop-signatures*) (ash byte -2)))
-                         (funcall function)) ; takes no arguments
+                         ;; takes no arguments from the fasl file
+                         (funcall function fasl-input))
                         (t
+                         ;; one or two arguments come from the fasl file
                          (let (arg1 arg2) ; See !%DEFINE-FOP for encoding
                            (with-fast-read-byte ((unsigned-byte 8) stream)
                              (setq arg1 (fast-read-var-u-integer
@@ -463,8 +464,8 @@
                            (when trace
                              (format *trace-output* "{~D~@[,~D~]}" arg1 arg2))
                            (if arg2
-                               (funcall function arg1 arg2)
-                               (funcall function arg1))))))))
+                               (funcall function fasl-input arg1 arg2)
+                               (funcall function fasl-input arg1))))))))
            (when (plusp (sbit (cdr *fop-signatures*) byte))
              (push-fop-stack result))
            (when trace
@@ -488,9 +489,9 @@
   (when (zerop (file-length stream))
     (error "attempt to load an empty FASL file:~%  ~S" (namestring stream)))
   (maybe-announce-load stream verbose)
-  (let* ((*fasl-input-stream* stream)
-         (*fop-table* (make-fop-vector 1000))
-         (*fop-stack* (make-fop-vector 100)))
+  ;; FIXME: should be slots of the FASL-INPUT struct
+  (let ((*fop-table* (make-fop-vector 1000))
+        (*fop-stack* (make-fop-vector 100)))
     (unwind-protect
          (loop while (load-fasl-group stream print))
       ;; Nuke the table and stack to avoid keeping garbage on

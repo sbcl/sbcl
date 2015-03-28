@@ -2127,8 +2127,16 @@ core and return a descriptor to it."
     (when (and argp (not (singleton-p arglist)))
       (error "~S must take one argument" name))
     `(progn
-       (defun ,fname ,arglist
-         (macrolet ((pop-stack () `(pop-fop-stack))) ,@forms))
+       (defun ,fname (.fasl-input. ,@arglist)
+         (declare (ignorable .fasl-input.))
+         (macrolet ((fasl-input () '(the fasl-input .fasl-input.))
+                    (fasl-input-stream () '(%fasl-input-stream (fasl-input)))
+                    (read-byte-arg ()
+                      '(funcall 'read-byte-arg (fasl-input-stream)))
+                    (read-word-arg ()
+                      '(funcall 'read-word-arg (fasl-input-stream)))
+                    (pop-stack () `(pop-fop-stack)))
+           ,@forms))
        ,@(loop for i from code to (logior code (if argp 3 0))
                collect `(setf (svref *cold-fop-funs* ,i) #',fname)))))
 
@@ -2243,30 +2251,30 @@ core and return a descriptor to it."
 
 ;;;; cold fops for loading symbols
 
-;;; Load a symbol SIZE characters long from *FASL-INPUT-STREAM* and
+;;; Load a symbol SIZE characters long from FASL-INPUT, and
 ;;; intern that symbol in PACKAGE.
-(defun cold-load-symbol (size package)
+(defun cold-load-symbol (size package fasl-input)
   (let ((string (make-string size)))
-    (read-string-as-bytes *fasl-input-stream* string)
+    (read-string-as-bytes (%fasl-input-stream fasl-input) string)
     (push-fop-table (intern string package))))
 
 ;; I don't feel like hacking up DEFINE-COLD-FOP any more than necessary,
 ;; so this code is handcrafted to accept two operands.
-(flet ((fop-cold-symbol-in-package-save (index pname-len)
-         (cold-load-symbol pname-len (ref-fop-table index))))
+(flet ((fop-cold-symbol-in-package-save (fasl-input index pname-len)
+         (cold-load-symbol pname-len (ref-fop-table index) fasl-input)))
   (dotimes (i 16) ; occupies 16 cells in the dispatch table
     (setf (svref *cold-fop-funs* (+ (get 'fop-symbol-in-package-save 'opcode) i))
           #'fop-cold-symbol-in-package-save)))
 
 (define-cold-fop (fop-lisp-symbol-save (namelen))
-  (cold-load-symbol namelen *cl-package*))
+  (cold-load-symbol namelen *cl-package* (fasl-input)))
 
 (define-cold-fop (fop-keyword-symbol-save (namelen))
-  (cold-load-symbol namelen *keyword-package*))
+  (cold-load-symbol namelen *keyword-package* (fasl-input)))
 
 (define-cold-fop (fop-uninterned-symbol-save (namelen))
   (let ((name (make-string namelen)))
-    (read-string-as-bytes *fasl-input-stream* name)
+    (read-string-as-bytes (fasl-input-stream) name)
     (push-fop-table (get-uninterned-symbol name))))
 
 (define-cold-fop (fop-copy-symbol-save (index))
@@ -2283,7 +2291,7 @@ core and return a descriptor to it."
 
 (define-cold-fop (fop-named-package-save (namelen))
   (let ((name (make-string namelen)))
-    (read-string-as-bytes *fasl-input-stream* name)
+    (read-string-as-bytes (fasl-input-stream) name)
     (push-fop-table (find-package name))))
 
 ;;;; cold fops for loading lists
@@ -2337,7 +2345,7 @@ core and return a descriptor to it."
 
 (define-cold-fop (fop-base-string (len))
   (let ((string (make-string len)))
-    (read-string-as-bytes *fasl-input-stream* string)
+    (read-string-as-bytes (fasl-input-stream) string)
     (base-string-to-core string)))
 
 #!+sb-unicode
@@ -2369,7 +2377,7 @@ core and return a descriptor to it."
                  (ceiling (* len sizebits)
                           sb!vm:n-byte-bits))))
     (read-bigvec-as-sequence-or-die (descriptor-bytes result)
-                                    *fasl-input-stream*
+                                    (fasl-input-stream)
                                     :start start
                                     :end end)
     result))
@@ -2409,7 +2417,8 @@ core and return a descriptor to it."
 
 (defmacro define-cold-number-fop (fop &optional arglist)
   ;; Invoke the ordinary warm version of this fop to cons the number.
-  `(define-cold-fop (,fop ,arglist) (number-to-core (,fop ,@arglist))))
+  `(define-cold-fop (,fop ,arglist)
+     (number-to-core (,fop (fasl-input) ,@arglist))))
 
 (define-cold-number-fop fop-single-float)
 (define-cold-number-fop fop-double-float)
@@ -2434,14 +2443,14 @@ core and return a descriptor to it."
 
 (defvar *load-time-value-counter*)
 
-(flet ((pop-args ()
+(flet ((pop-args (input)
          (let (args)
-           (dotimes (i (read-byte-arg)
+           (dotimes (i (read-byte-arg (%fasl-input-stream input))
                        (if args (values (pop-fop-stack) args) (values nil nil)))
              (push (pop-fop-stack) args)))))
 
   (define-cold-fop (fop-funcall)
-    (multiple-value-bind (f args) (pop-args)
+    (multiple-value-bind (f args) (pop-args (fasl-input))
       (when f
         (return-from cold-fop-funcall
           (case f
@@ -2464,7 +2473,7 @@ core and return a descriptor to it."
       (make-descriptor 0 :load-time-value counter)))
 
   (define-cold-fop (fop-funcall-for-effect)
-    (multiple-value-bind (f args) (pop-args)
+    (multiple-value-bind (f args) (pop-args (fasl-input))
       (when f
         (return-from cold-fop-funcall-for-effect
           (acond ((eq f 'sb!impl::%defun) (apply #'cold-fset args))
@@ -2546,7 +2555,7 @@ core and return a descriptor to it."
 ;;; fixups (or function headers) are applied.
 #!+sb-show (defvar *show-pre-fixup-code-p* nil)
 
-(defun cold-load-code (nconst code-size)
+(defun cold-load-code (fasl-input nconst code-size)
   (macrolet ((pop-stack () '(pop-fop-stack)))
      (let* ((raw-header-n-words (+ sb!vm:code-constants-offset nconst))
             (header-n-words
@@ -2573,7 +2582,7 @@ core and return a descriptor to it."
                         (ash header-n-words sb!vm:word-shift)))
               (end (+ start code-size)))
          (read-bigvec-as-sequence-or-die (descriptor-bytes des)
-                                         *fasl-input-stream*
+                                         (%fasl-input-stream fasl-input)
                                          :start start
                                          :end end)
          #!+sb-show
@@ -2740,7 +2749,7 @@ core and return a descriptor to it."
          (code-object (pop-stack))
          (len (read-byte-arg))
          (sym (make-string len)))
-    (read-string-as-bytes *fasl-input-stream* sym)
+    (read-string-as-bytes (fasl-input-stream) sym)
     #!+sb-dynamic-core
     (let ((offset (read-word-arg))
           (value (dyncore-note-symbol sym nil)))
@@ -2759,7 +2768,7 @@ core and return a descriptor to it."
          (len (read-byte-arg))
          (sym (make-string len)))
     #!-sb-dynamic-core (declare (ignore code-object))
-    (read-string-as-bytes *fasl-input-stream* sym)
+    (read-string-as-bytes (fasl-input-stream) sym)
     #!+sb-dynamic-core
     (let ((offset (read-word-arg))
           (value (dyncore-note-symbol sym t)))
@@ -2794,7 +2803,7 @@ core and return a descriptor to it."
                      (ash header-n-words sb!vm:word-shift)))
            (end (+ start length)))
       (read-bigvec-as-sequence-or-die (descriptor-bytes des)
-                                      *fasl-input-stream*
+                                      (fasl-input-stream)
                                       :start start
                                       :end end))
     des))

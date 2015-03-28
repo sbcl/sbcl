@@ -2,12 +2,6 @@
 
 (in-package "SB!FASL")
 
-;;; Sometimes we want to skip over any FOPs with side-effects (like
-;;; function calls) while executing other FOPs. *SKIP-UNTIL* will
-;;; either contain the position where the skipping will stop, or
-;;; NIL if we're executing normally.
-(defvar *skip-until* nil)
-
 ;;; Bind STACK-VAR and PTR-VAR to the start of a subsequence of
 ;;; the fop stack of length COUNT, then execute BODY.
 ;;; Within the body, FOP-STACK-REF is used in lieu of SVREF
@@ -40,15 +34,19 @@
           (values nil arglist))
     (assert (<= (length operands) 2))
     `(progn
-       (defun ,name ,operands
-         ,@(if (null stack-args)
-               forms
-               (with-unique-names (stack ptr)
-                 `((with-fop-stack (,stack ,ptr ,(length stack-args))
-                     (multiple-value-bind ,stack-args
-                         (values ,@(loop for i below (length stack-args)
-                                         collect `(fop-stack-ref (+ ,ptr ,i))))
-                       ,@forms))))))
+       (defun ,name (.fasl-input. ,@operands)
+         (declare (ignorable .fasl-input.))
+         (macrolet ((fasl-input () '(truly-the fasl-input .fasl-input.))
+                    (fasl-input-stream () '(%fasl-input-stream (fasl-input)))
+                    (skip-until () '(%fasl-input-skip-until (fasl-input))))
+           ,@(if (null stack-args)
+                 forms
+                 (with-unique-names (stack ptr)
+                   `((with-fop-stack (,stack ,ptr ,(length stack-args))
+                       (multiple-value-bind ,stack-args
+                           (values ,@(loop for i below (length stack-args)
+                                           collect `(fop-stack-ref (+ ,ptr ,i))))
+                         ,@forms)))))))
        (!%define-fop ',name ,fop-code ,(length operands) ,(if pushp 1 0)))))
 
 (defun !%define-fop (name base-opcode n-operands pushp)
@@ -128,7 +126,7 @@
 ;;; unused fop codes, so we add this second NOP, which reads 4
 ;;; arbitrary bytes and discards them.
 (!define-fop 137 (fop-nop4 () nil)
-  (let ((arg (read-arg 4)))
+  (let ((arg (read-arg 4 (fasl-input-stream))))
     (declare (ignorable arg))
     #!+sb-show
     (when *show-fop-nop4-p*
@@ -219,7 +217,7 @@
 ;;; packages directly instead of piggybacking on the host code.
 
 (!define-fop 62 (fop-verify-table-size () nil)
-  (let ((expected-index (read-word-arg)))
+  (let ((expected-index (read-word-arg (fasl-input-stream))))
     (unless (= (get-fop-table-index) expected-index)
       (bug "fasl table of improper size"))))
 (!define-fop 63 (fop-verify-empty-stack () nil)
@@ -234,17 +232,17 @@
 
 (declaim (freeze-type undefined-package))
 
-(defun aux-fop-intern (size package)
+(defun aux-fop-intern (size package input-stream)
   (declare (optimize speed))
   (let ((buffer (make-string size)))
     #+sb-xc-host
-    (read-string-as-bytes *fasl-input-stream* buffer size)
+    (read-string-as-bytes input-stream buffer size)
     #-sb-xc-host
     (progn
       #!+sb-unicode
-      (read-string-as-unsigned-byte-32 *fasl-input-stream* buffer size)
+      (read-string-as-unsigned-byte-32 input-stream buffer size)
       #!-sb-unicode
-      (read-string-as-bytes *fasl-input-stream* buffer size))
+      (read-string-as-bytes input-stream buffer size))
     (if (undefined-package-p package)
         (error 'simple-package-error
                :format-control "Error finding package for symbol ~s:~% ~a"
@@ -258,9 +256,9 @@
                                    :no-copy t))))))
 
 (!define-fop 80 (fop-lisp-symbol-save ((:operands namelen)))
-  (aux-fop-intern namelen *cl-package*))
+  (aux-fop-intern namelen *cl-package* (fasl-input-stream)))
 (!define-fop 84 (fop-keyword-symbol-save ((:operands namelen)))
-  (aux-fop-intern namelen *keyword-package*))
+  (aux-fop-intern namelen *keyword-package* (fasl-input-stream)))
 
 ;; But srsly? Most of the space is wasted by UCS4 encoding of ASCII.
 ;; An extra word per symbol for the package is nothing by comparison.
@@ -270,14 +268,14 @@
   ;; FOP-SYMBOL-IN-LAST-PACKAGE-SAVE/FOP-SMALL-SYMBOL-IN-LAST-PACKAGE-SAVE
   ;; cloned fop pair could undo some of this bloat.
 (!define-fop #xF0 (fop-symbol-in-package-save ((:operands pkg-index namelen)))
-  (aux-fop-intern namelen (ref-fop-table pkg-index)))
+  (aux-fop-intern namelen (ref-fop-table pkg-index) (fasl-input-stream)))
 
 (!define-fop 96 (fop-uninterned-symbol-save ((:operands namelen)))
   (let ((res (make-string namelen)))
     #!-sb-unicode
-    (read-string-as-bytes *fasl-input-stream* res)
+    (read-string-as-bytes (fasl-input-stream) res)
     #!+sb-unicode
-    (read-string-as-unsigned-byte-32 *fasl-input-stream* res)
+    (read-string-as-unsigned-byte-32 (fasl-input-stream) res)
     (push-fop-table (make-symbol res))))
 
 (!define-fop 104 (fop-copy-symbol-save ((:operands table-index)))
@@ -289,13 +287,13 @@
 (!define-fop 156 (fop-named-package-save ((:operands length)) nil)
   (let ((package-name (make-string length)))
     #+sb-xc-host
-    (read-string-as-bytes *fasl-input-stream* package-name)
+    (read-string-as-bytes (fasl-input-stream) package-name)
     #-sb-xc-host
     (progn
       #!-sb-unicode
-      (read-string-as-bytes *fasl-input-stream* package-name)
+      (read-string-as-bytes (fasl-input-stream) package-name)
       #!+sb-unicode
-      (read-string-as-unsigned-byte-32 *fasl-input-stream* package-name))
+      (read-string-as-unsigned-byte-32 (fasl-input-stream) package-name))
     (push-fop-table
      (handler-case (find-undeleted-package-or-lose package-name)
        (simple-package-error (c)
@@ -303,11 +301,11 @@
 
 ;;;; fops for loading numbers
 
-;;; Load a signed integer LENGTH bytes long from *FASL-INPUT-STREAM*.
-(defun load-s-integer (length)
+;;; Load a signed integer LENGTH bytes long from FASL-INPUT-STREAM.
+(defun load-s-integer (length fasl-input-stream)
   (declare (fixnum length)
            (optimize speed))
-  (with-fast-read-byte ((unsigned-byte 8) *fasl-input-stream*)
+  (with-fast-read-byte ((unsigned-byte 8) fasl-input-stream)
     (do* ((index length (1- index))
           (byte 0 (fast-read-byte))
           (result 0 (+ result (ash byte bits)))
@@ -319,14 +317,16 @@
       (declare (fixnum index byte bits)))))
 
 (!define-fop 36 (fop-integer ((:operands n-bytes)))
-  (load-s-integer n-bytes))
+  (load-s-integer n-bytes (fasl-input-stream)))
 
 (!define-fop 34 (fop-word-integer)
-  (with-fast-read-byte ((unsigned-byte 8) *fasl-input-stream*)
+  (with-fast-read-byte ((unsigned-byte 8) (fasl-input-stream))
     (fast-read-s-integer #.sb!vm:n-word-bytes)))
 
 (!define-fop 35 (fop-byte-integer)
-  (with-fast-read-byte ((unsigned-byte 8) *fasl-input-stream*)
+  ;; FIXME: WITH-FAST-READ-BYTE for exactly 1 byte is not really faster/better
+  ;; than regular READ-BYTE. The expansion of READ-ARG corroborates this claim.
+  (with-fast-read-byte ((unsigned-byte 8) (fasl-input-stream))
     (fast-read-s-integer 1)))
 
 (!define-fop 70 (fop-ratio (num den)) (%make-ratio num den))
@@ -342,12 +342,12 @@
   (macrolet ((define-complex-fop (opcode name type)
                (let ((reader (symbolicate "FAST-READ-" type)))
                  `(!define-fop ,opcode (,name)
-                      (with-fast-read-byte ((unsigned-byte 8) *fasl-input-stream*)
+                      (with-fast-read-byte ((unsigned-byte 8) (fasl-input-stream))
                         (complex (,reader) (,reader))))))
              (define-float-fop (opcode name type)
                (let ((reader (symbolicate "FAST-READ-" type)))
                  `(!define-fop ,opcode (,name)
-                    (with-fast-read-byte ((unsigned-byte 8) *fasl-input-stream*)
+                    (with-fast-read-byte ((unsigned-byte 8) (fasl-input-stream))
                       (,reader))))))
     (define-complex-fop 72 fop-complex-single-float single-float)
     (define-complex-fop 73 fop-complex-double-float double-float)
@@ -360,7 +360,7 @@
 
 #!+sb-simd-pack
 (!define-fop 88 (fop-simd-pack)
-  (with-fast-read-byte ((unsigned-byte 8) *fasl-input-stream*)
+  (with-fast-read-byte ((unsigned-byte 8) (fasl-input-stream))
     (%make-simd-pack (fast-read-s-integer 8)
                      (fast-read-u-integer 8)
                      (fast-read-u-integer 8))))
@@ -378,9 +378,11 @@
          ((= i ptr) res)
       (declare (type index i)))))
 
-(!define-fop 33 (fop-list) (fop-list-from-stack (read-byte-arg)))
+(!define-fop 33 (fop-list)
+  (fop-list-from-stack (read-byte-arg (fasl-input-stream))))
 (!define-fop 16 (fop-list*)
-  (let ((n (read-byte-arg))) ; N is the number of cons cells (0 is ok)
+  ;; N is the number of cons cells (0 is ok)
+  (let ((n (read-byte-arg (fasl-input-stream))))
     (with-fop-stack (stack ptr (1+ n))
       (do* ((i (+ ptr n) (1- i))
             (res (fop-stack-ref (+ ptr n))
@@ -414,7 +416,7 @@
 
 (!define-fop 100 (fop-base-string ((:operands length)))
   (let ((res (make-string length :element-type 'base-char)))
-    (read-base-string-as-bytes *fasl-input-stream* res)
+    (read-base-string-as-bytes (fasl-input-stream) res)
     res))
 
 #!+sb-unicode
@@ -428,7 +430,7 @@
   #-sb-xc-host
   (!define-fop 160 (fop-character-string ((:operands length)))
     (let ((res (make-string length)))
-      (read-string-as-unsigned-byte-32 *fasl-input-stream* res)
+      (read-string-as-unsigned-byte-32 (fasl-input-stream) res)
       res)))
 
 (!define-fop 92 (fop-vector ((:operands size)))
@@ -440,7 +442,7 @@
     res))
 
 (!define-fop 89 (fop-array (vec))
-  (let* ((rank (read-word-arg))
+  (let* ((rank (read-word-arg (fasl-input-stream)))
          (length (length vec))
          (res (make-array-header sb!vm:simple-array-widetag rank)))
     (declare (simple-array vec)
@@ -463,8 +465,8 @@
                **saetp-bits-per-length**))
 
 (!define-fop 43 (fop-spec-vector)
-  (let* ((length (read-word-arg))
-         (widetag (read-byte-arg))
+  (let* ((length (read-word-arg (fasl-input-stream)))
+         (widetag (read-byte-arg (fasl-input-stream)))
          (bits-per-length (aref **saetp-bits-per-length** widetag))
          (bits (progn (aver (< bits-per-length 255))
                       (* length bits-per-length)))
@@ -473,23 +475,23 @@
          (vector (allocate-vector widetag length words)))
     (declare (type index length bytes words)
              (type word bits))
-    (read-n-bytes *fasl-input-stream* vector 0 bytes)
+    (read-n-bytes (fasl-input-stream) vector 0 bytes)
     vector))
 
 (!define-fop 53 (fop-eval (expr)) ; This seems to be unused
-  (if *skip-until*
+  (if (skip-until)
       expr
       (eval expr)))
 
 (!define-fop 54 (fop-eval-for-effect (expr) nil) ; This seems to be unused
-  (unless *skip-until*
+  (unless (skip-until)
     (eval expr))
   nil)
 
-(defun fop-funcall* ()
- (let ((argc (read-byte-arg)))
+(defun fop-funcall* (input-stream skipping)
+ (let ((argc (read-byte-arg input-stream)))
    (with-fop-stack (stack ptr (1+ argc))
-     (unless *skip-until*
+     (unless skipping
        (do ((i (+ ptr argc))
             (args))
            ((= i ptr) (apply (fop-stack-ref i) args))
@@ -497,38 +499,40 @@
          (push (fop-stack-ref i) args)
          (decf i))))))
 
-(!define-fop 55 (fop-funcall) (fop-funcall*))
-(!define-fop 56 (fop-funcall-for-effect () nil) (fop-funcall*))
+(!define-fop 55 (fop-funcall)
+  (fop-funcall* (fasl-input-stream) (skip-until)))
+(!define-fop 56 (fop-funcall-for-effect () nil)
+  (fop-funcall* (fasl-input-stream) (skip-until)))
 
 ;;;; fops for fixing up circularities
 
 (!define-fop 200 (fop-rplaca (val) nil)
-  (let ((obj (ref-fop-table (read-word-arg)))
-        (idx (read-word-arg)))
+  (let ((obj (ref-fop-table (read-word-arg (fasl-input-stream))))
+        (idx (read-word-arg (fasl-input-stream))))
     (setf (car (nthcdr idx obj)) val)))
 
 (!define-fop 201 (fop-rplacd (val) nil)
-  (let ((obj (ref-fop-table (read-word-arg)))
-        (idx (read-word-arg)))
+  (let ((obj (ref-fop-table (read-word-arg (fasl-input-stream))))
+        (idx (read-word-arg (fasl-input-stream))))
     (setf (cdr (nthcdr idx obj)) val)))
 
 (!define-fop 202 (fop-svset (val) nil)
-  (let* ((obi (read-word-arg))
+  (let* ((obi (read-word-arg (fasl-input-stream)))
          (obj (ref-fop-table obi))
-         (idx (read-word-arg)))
+         (idx (read-word-arg (fasl-input-stream))))
     (if (%instancep obj) ; suspicious. should have been FOP-STRUCTSET
         (setf (%instance-ref obj idx) val)
         (setf (svref obj idx) val))))
 
 (!define-fop 204 (fop-structset (val) nil)
-  (setf (%instance-ref (ref-fop-table (read-word-arg))
-                       (read-word-arg))
+  (setf (%instance-ref (ref-fop-table (read-word-arg (fasl-input-stream)))
+                       (read-word-arg (fasl-input-stream)))
         val))
 
 ;;; In the original CMUCL code, this actually explicitly declared PUSHP
 ;;; to be T, even though that's what it defaults to in DEFINE-FOP.
 (!define-fop 203 (fop-nthcdr (obj))
-  (nthcdr (read-word-arg) obj))
+  (nthcdr (read-word-arg (fasl-input-stream)) obj))
 
 ;;;; fops for loading functions
 
@@ -540,7 +544,7 @@
 ;;; fasl file header.)
 
 (!define-fop #xE0 (fop-code ((:operands n-boxed-words n-unboxed-bytes)))
-  (load-code n-boxed-words n-unboxed-bytes))
+  (load-code (fasl-input-stream) n-boxed-words n-unboxed-bytes))
 
 ;; this gets you an #<fdefn> object, not the result of (FDEFINITION x)
 (!define-fop 60 (fop-fdefn (name))
@@ -592,7 +596,7 @@ a bug.~@:>")
   #+sb-xc-host ; since xc host doesn't know how to compile %PRIMITIVE
   (error "FOP-FUN-ENTRY can't be defined without %PRIMITIVE.")
   #-sb-xc-host
-  (let ((offset (read-word-arg)))
+  (let ((offset (read-word-arg (fasl-input-stream))))
     (declare (type index offset))
     (unless (zerop (logand offset sb!vm:lowtag-mask))
       (bug "unaligned function object, offset = #X~X" offset))
@@ -628,43 +632,44 @@ a bug.~@:>")
 
 (!define-fop 146 (fop-symbol-tls-fixup (code-object kind symbol))
   (sb!vm:fixup-code-object code-object
-                           (read-word-arg)
+                           (read-word-arg (fasl-input-stream))
                            (ensure-symbol-tls-index symbol)
                            kind)
   code-object)
 
 (!define-fop 147 (fop-foreign-fixup (code-object kind))
-  (let* ((len (read-byte-arg))
+  (let* ((len (read-byte-arg (fasl-input-stream)))
          (sym (make-string len :element-type 'base-char)))
-    (read-n-bytes *fasl-input-stream* sym 0 len)
+    (read-n-bytes (fasl-input-stream) sym 0 len)
     (sb!vm:fixup-code-object code-object
-                             (read-word-arg)
+                             (read-word-arg (fasl-input-stream))
                              (foreign-symbol-address sym)
                              kind)
     code-object))
 
 (!define-fop 148 (fop-assembler-fixup (code-object kind routine))
-    (multiple-value-bind (value found) (gethash routine *assembler-routines*)
-      (unless found
-        (error "undefined assembler routine: ~S" routine))
-      (sb!vm:fixup-code-object code-object (read-word-arg) value kind))
-    code-object)
+  (multiple-value-bind (value found) (gethash routine *assembler-routines*)
+    (unless found
+      (error "undefined assembler routine: ~S" routine))
+    (sb!vm:fixup-code-object code-object (read-word-arg (fasl-input-stream))
+                             value kind))
+  code-object)
 
 (!define-fop 149 (fop-code-object-fixup (code-object kind))
     ;; Note: We don't have to worry about GC moving the code-object after
     ;; the GET-LISP-OBJ-ADDRESS and before that value is deposited, because
     ;; we can only use code-object fixups when code-objects don't move.
-    (sb!vm:fixup-code-object code-object (read-word-arg)
-                             (get-lisp-obj-address code-object) kind)
-    code-object)
+  (sb!vm:fixup-code-object code-object (read-word-arg (fasl-input-stream))
+                           (get-lisp-obj-address code-object) kind)
+  code-object)
 
 #!+linkage-table
 (!define-fop 150 (fop-foreign-dataref-fixup (code-object kind))
-  (let* ((len (read-byte-arg))
+  (let* ((len (read-byte-arg (fasl-input-stream)))
          (sym (make-string len :element-type 'base-char)))
-    (read-n-bytes *fasl-input-stream* sym 0 len)
+    (read-n-bytes (fasl-input-stream) sym 0 len)
     (sb!vm:fixup-code-object code-object
-                             (read-word-arg)
+                             (read-word-arg (fasl-input-stream))
                              (foreign-symbol-address sym t)
                              kind)
     code-object))
@@ -677,34 +682,34 @@ a bug.~@:>")
 ;;; be done to ensure that the fop table gets populated correctly
 ;;; regardless of the execution path.
 (!define-fop 151 (fop-skip (position) nil)
-  (unless *skip-until*
-    (setf *skip-until* position))
+  (unless (skip-until)
+    (setf (skip-until) position))
   (values))
 
 ;;; As before, but only start skipping if the top of the FOP stack is NIL.
 (!define-fop 152 (fop-skip-if-false (position condition) nil)
-  (unless (or condition *skip-until*)
-    (setf *skip-until* position))
+  (unless (or condition (skip-until))
+    (setf (skip-until) position))
   (values))
 
 ;;; If skipping, pop the top of the stack and discard it. Needed for
 ;;; ensuring that the stack stays balanced when skipping.
 (!define-fop 153 (fop-drop-if-skipping () nil)
-  (when *skip-until*
+  (when (skip-until)
     (fop-stack-pop-n 1))
   (values))
 
 ;;; If skipping, push a dummy value on the stack. Needed for
 ;;; ensuring that the stack stays balanced when skipping.
 (!define-fop 154 (fop-push-nil-if-skipping () nil)
-  (when *skip-until*
+  (when (skip-until)
     (push-fop-stack nil))
   (values))
 
-;;; Stop skipping if the top of the stack matches *SKIP-UNTIL*
+;;; Stop skipping if the top of the stack matches SKIP-UNTIL
 (!define-fop 155 (fop-maybe-stop-skipping (label) nil)
-  (when (eql *skip-until* label)
-    (setf *skip-until* nil))
+  (when (eql (skip-until) label)
+    (setf (skip-until) nil))
   (values))
 
 ;;; Primordial layouts.

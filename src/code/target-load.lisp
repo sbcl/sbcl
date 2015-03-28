@@ -206,7 +206,7 @@
 
 ;;; Load a code object. BOX-NUM objects are popped off the stack for
 ;;; the boxed storage section, then SIZE bytes of code are read in.
-(defun load-code (box-num code-length)
+(defun load-code (input-stream box-num code-length)
   (declare (fixnum box-num code-length))
   (let ((code (sb!c:allocate-code-object box-num code-length)))
     (with-fop-stack (stack ptr (1+ box-num))
@@ -215,7 +215,7 @@
             for j of-type index from ptr below (+ ptr box-num)
             do (setf (code-header-ref code i) (fop-stack-ref j)))
       (without-gcing
-        (read-n-bytes *fasl-input-stream*
+        (read-n-bytes input-stream
                       (code-instructions code)
                       0
                       code-length))
