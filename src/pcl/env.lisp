@@ -176,20 +176,17 @@
         `(classoid-layout (find-classoid ',pname)))
       :ignore-it))
 
-(defmethod make-load-form ((object structure-object) &optional env)
-  (declare (ignore env))
+(defun dont-know-how-to-dump (object)
   (error "~@<don't know how to dump ~S (default ~S method called).~>"
          object 'make-load-form))
 
-(defmethod make-load-form ((object standard-object) &optional env)
-  (declare (ignore env))
-  (error "~@<don't know how to dump ~S (default ~S method called).~>"
-         object 'make-load-form))
-
-(defmethod make-load-form ((object condition) &optional env)
-  (declare (ignore env))
-  (error "~@<don't know how to dump ~S (default ~S method called).~>"
-         object 'make-load-form))
+(macrolet ((define-default-make-load-form-method (class)
+             `(defmethod make-load-form ((object ,class) &optional env)
+                (declare (ignore env))
+                (dont-know-how-to-dump object))))
+  (define-default-make-load-form-method structure-object)
+  (define-default-make-load-form-method standard-object)
+  (define-default-make-load-form-method condition))
 
 (defmethod make-load-form ((object sb-impl::comma) &optional env)
   (declare (ignore object env))
