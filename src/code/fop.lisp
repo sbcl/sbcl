@@ -6,9 +6,11 @@
 ;;; the fop stack of length COUNT, then execute BODY.
 ;;; Within the body, FOP-STACK-REF is used in lieu of SVREF
 ;;; to elide bounds checking.
-(defmacro with-fop-stack ((stack-var ptr-var count) &body body)
-  `(multiple-value-bind (,stack-var ,ptr-var)
-       (truly-the (values simple-vector index) (fop-stack-pop-n ,count))
+(defmacro with-fop-stack (((stack-var &optional stack-expr) ptr-var count)
+                          &body body)
+  `(let* (,@(when stack-expr
+              (list `(,stack-var (the simple-vector ,stack-expr))))
+          (,ptr-var (truly-the index (fop-stack-pop-n ,stack-var ,count))))
      (macrolet ((fop-stack-ref (i)
                   `(locally
                        #-sb-xc-host
@@ -38,11 +40,13 @@
          (declare (ignorable .fasl-input.))
          (macrolet ((fasl-input () '(truly-the fasl-input .fasl-input.))
                     (fasl-input-stream () '(%fasl-input-stream (fasl-input)))
+                    (operand-stack () '(%fasl-input-stack (fasl-input)))
                     (skip-until () '(%fasl-input-skip-until (fasl-input))))
            ,@(if (null stack-args)
                  forms
                  (with-unique-names (stack ptr)
-                   `((with-fop-stack (,stack ,ptr ,(length stack-args))
+                   `((with-fop-stack ((,stack (operand-stack))
+                                      ,ptr ,(length stack-args))
                        (multiple-value-bind ,stack-args
                            (values ,@(loop for i below (length stack-args)
                                            collect `(fop-stack-ref (+ ,ptr ,i))))
@@ -157,7 +161,7 @@
          ;; otherwise subtract 1 because the layout consumes a slot.
          (n-data-words (- size sb!vm:instance-data-start)))
     (declare (type index size))
-    (with-fop-stack (stack ptr n-data-words)
+    (with-fop-stack ((stack (operand-stack)) ptr n-data-words)
       (let ((ptr (+ ptr n-data-words)))
         (declare (type index ptr))
         (setf (%instance-layout res) layout)
@@ -198,8 +202,9 @@
 ;; rather than using read-arg because many calls of this might share
 ;; the list, which must be constructed into the fop-table no matter what.
 (!define-fop 69 (fop-initialize-instance (slot-names obj) nil)
-  (let ((n-slots (pop slot-names)))
-    (multiple-value-bind (stack ptr) (fop-stack-pop-n n-slots)
+  (let* ((n-slots (pop slot-names))
+         (stack (operand-stack))
+         (ptr (fop-stack-pop-n stack n-slots)))
       (dotimes (i n-slots)
         (let ((val (svref stack (+ ptr i)))
               (slot-name (pop slot-names)))
@@ -207,7 +212,7 @@
               ;; SLOT-MAKUNBOUND-USING-CLASS might do something nonstandard.
               (slot-makunbound obj slot-name)
               ;; FIXME: the DEFSETF for this isn't defined until warm load
-              (sb!pcl::set-slot-value obj slot-name val)))))))
+              (sb!pcl::set-slot-value obj slot-name val))))))
 
 (!define-fop 64 (fop-end-group () nil)
   (/show0 "THROWing FASL-GROUP-END")
@@ -222,7 +227,7 @@
     (unless (= (svref (%fasl-input-table (fasl-input)) 0) expected-index)
       (bug "fasl table of improper size"))))
 (!define-fop 63 (fop-verify-empty-stack () nil)
-  (unless (fop-stack-empty-p)
+  (unless (fop-stack-empty-p (operand-stack))
     (bug "fasl stack not empty when it should be")))
 
 ;;;; fops for loading symbols
@@ -371,23 +376,23 @@
 
 ;;;; loading lists
 
-(defun fop-list-from-stack (n)
+(defun fop-list-from-stack (stack n)
   ;; N is 0-255 when called from FOP-LIST,
   ;; but it is as large as ARRAY-RANK-LIMIT in FOP-ARRAY.
   (declare (type (unsigned-byte 16) n)
            (optimize (speed 3)))
-  (with-fop-stack (stack ptr n)
+  (with-fop-stack ((stack) ptr n)
     (do* ((i (+ ptr n) (1- i))
           (res () (cons (fop-stack-ref i) res)))
          ((= i ptr) res)
       (declare (type index i)))))
 
 (!define-fop 33 (fop-list)
-  (fop-list-from-stack (read-byte-arg (fasl-input-stream))))
+  (fop-list-from-stack (operand-stack) (read-byte-arg (fasl-input-stream))))
 (!define-fop 16 (fop-list*)
   ;; N is the number of cons cells (0 is ok)
   (let ((n (read-byte-arg (fasl-input-stream))))
-    (with-fop-stack (stack ptr (1+ n))
+    (with-fop-stack ((stack (operand-stack)) ptr (1+ n))
       (do* ((i (+ ptr n) (1- i))
             (res (fop-stack-ref (+ ptr n))
                  (cons (fop-stack-ref i) res)))
@@ -438,10 +443,11 @@
       res)))
 
 (!define-fop 92 (fop-vector ((:operands size)))
-  (let ((res (make-array size)))
+  (let ((res (make-array size))
+        (stack (operand-stack)))
     (declare (fixnum size))
     (unless (zerop size)
-      (multiple-value-bind (stack ptr) (fop-stack-pop-n size)
+      (let ((ptr (fop-stack-pop-n stack size)))
         (replace res stack :start2 ptr)))
     res))
 
@@ -451,7 +457,9 @@
          (res (make-array-header sb!vm:simple-array-widetag rank)))
     (declare (simple-array vec)
              (type (unsigned-byte #.(- sb!vm:n-word-bits sb!vm:n-widetag-bits)) rank))
-    (set-array-header res vec length nil 0 (fop-list-from-stack rank) nil t)
+    (set-array-header res vec length nil 0
+                      (fop-list-from-stack (operand-stack) rank)
+                      nil t)
     res))
 
 (defglobal **saetp-bits-per-length**
@@ -492,9 +500,9 @@
     (eval expr))
   nil)
 
-(defun fop-funcall* (input-stream skipping)
+(defun fop-funcall* (input-stream stack skipping)
  (let ((argc (read-byte-arg input-stream)))
-   (with-fop-stack (stack ptr (1+ argc))
+   (with-fop-stack ((stack) ptr (1+ argc))
      (unless skipping
        (do ((i (+ ptr argc))
             (args))
@@ -503,10 +511,11 @@
          (push (fop-stack-ref i) args)
          (decf i))))))
 
+;; FIXME: there should be a syntax to share these identical bodies
 (!define-fop 55 (fop-funcall)
-  (fop-funcall* (fasl-input-stream) (skip-until)))
+  (fop-funcall* (fasl-input-stream) (operand-stack) (skip-until)))
 (!define-fop 56 (fop-funcall-for-effect () nil)
-  (fop-funcall* (fasl-input-stream) (skip-until)))
+  (fop-funcall* (fasl-input-stream) (operand-stack) (skip-until)))
 
 ;;;; fops for fixing up circularities
 
@@ -549,7 +558,8 @@
 ;;; fasl file header.)
 
 (!define-fop #xE0 (fop-code ((:operands n-boxed-words n-unboxed-bytes)))
-  (load-code (fasl-input-stream) n-boxed-words n-unboxed-bytes))
+  (with-fop-stack ((stack (operand-stack)) ptr (1+ n-boxed-words))
+    (load-code n-boxed-words n-unboxed-bytes stack ptr (fasl-input-stream))))
 
 ;; this gets you an #<fdefn> object, not the result of (FDEFINITION x)
 (!define-fop 60 (fop-fdefn (name))
@@ -701,14 +711,14 @@ a bug.~@:>")
 ;;; ensuring that the stack stays balanced when skipping.
 (!define-fop 153 (fop-drop-if-skipping () nil)
   (when (skip-until)
-    (fop-stack-pop-n 1))
+    (fop-stack-pop-n (operand-stack) 1))
   (values))
 
 ;;; If skipping, push a dummy value on the stack. Needed for
 ;;; ensuring that the stack stays balanced when skipping.
 (!define-fop 154 (fop-push-nil-if-skipping () nil)
   (when (skip-until)
-    (push-fop-stack nil))
+    (push-fop-stack nil (fasl-input)))
   (values))
 
 ;;; Stop skipping if the top of the stack matches SKIP-UNTIL

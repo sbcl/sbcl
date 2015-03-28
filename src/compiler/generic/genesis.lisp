@@ -2090,9 +2090,8 @@ core and return a descriptor to it."
 
 ;;;; general machinery for cold-loading FASL files
 
-(defun pop-fop-stack ()
-  (let* ((stack *fop-stack*)
-         (top (svref stack 0)))
+(defun pop-fop-stack (stack)
+  (let ((top (svref stack 0)))
     (declare (type index top))
     (when (eql 0 top)
       (error "FOP stack empty"))
@@ -2117,11 +2116,8 @@ core and return a descriptor to it."
          (declare (ignorable .fasl-input.))
          (macrolet ((fasl-input () '(the fasl-input .fasl-input.))
                     (fasl-input-stream () '(%fasl-input-stream (fasl-input)))
-                    (read-byte-arg ()
-                      '(funcall 'read-byte-arg (fasl-input-stream)))
-                    (read-word-arg ()
-                      '(funcall 'read-word-arg (fasl-input-stream)))
-                    (pop-stack () `(pop-fop-stack)))
+                    (pop-stack ()
+                      '(pop-fop-stack (%fasl-input-stack (fasl-input)))))
            ,@forms))
        ;; We simply overwrite elements of **FOP-FUNS** since the contents
        ;; of the host are never propagated directly into the target core.
@@ -2293,9 +2289,9 @@ core and return a descriptor to it."
      (declare (fixnum index))))
 
 (define-cold-fop (fop-list)
-  (cold-stack-list (read-byte-arg) *nil-descriptor*))
+  (cold-stack-list (read-byte-arg (fasl-input-stream)) *nil-descriptor*))
 (define-cold-fop (fop-list*)
-  (cold-stack-list (read-byte-arg) (pop-stack)))
+  (cold-stack-list (read-byte-arg (fasl-input-stream)) (pop-stack)))
 (define-cold-fop (fop-list-1)
   (cold-stack-list 1 *nil-descriptor*))
 (define-cold-fop (fop-list-2)
@@ -2354,8 +2350,8 @@ core and return a descriptor to it."
     result))
 
 (define-cold-fop (fop-spec-vector)
-  (let* ((len (read-word-arg))
-         (type (read-byte-arg))
+  (let* ((len (read-word-arg (fasl-input-stream)))
+         (type (read-byte-arg (fasl-input-stream)))
          (sizebits (aref **saetp-bits-per-length** type))
          (result (progn (aver (< sizebits 255))
                         (allocate-vector-object *dynamic* sizebits len type)))
@@ -2375,7 +2371,7 @@ core and return a descriptor to it."
 ;; This code is unexercised. The only use of FOP-ARRAY is from target-dump.
 ;; It would be a shame to delete it though, as it might come in handy.
 (define-cold-fop (fop-array)
-  (let* ((rank (read-word-arg))
+  (let* ((rank (read-word-arg (fasl-input-stream)))
          (data-vector (pop-stack))
          (result (allocate-object *dynamic*
                                   (+ sb!vm:array-dimensions-offset rank)
@@ -2431,11 +2427,12 @@ core and return a descriptor to it."
 
 (defvar *load-time-value-counter*)
 
-(flet ((pop-args (input)
-         (let (args)
-           (dotimes (i (read-byte-arg (%fasl-input-stream input))
-                       (values (pop-fop-stack) args))
-             (push (pop-fop-stack) args)))))
+(flet ((pop-args (fasl-input)
+         (let ((args)
+               (stack (%fasl-input-stack fasl-input)))
+           (dotimes (i (read-byte-arg (%fasl-input-stream fasl-input))
+                       (values (pop-fop-stack stack) args))
+             (push (pop-fop-stack stack) args)))))
 
   (define-cold-fop (fop-funcall)
     (multiple-value-bind (fun args) (pop-args (fasl-input))
@@ -2491,18 +2488,18 @@ core and return a descriptor to it."
 ;;;; cold fops for fixing up circularities
 
 (define-cold-fop (fop-rplaca)
-  (let ((obj (ref-fop-table (fasl-input) (read-word-arg)))
-        (idx (read-word-arg)))
+  (let ((obj (ref-fop-table (fasl-input) (read-word-arg (fasl-input-stream))))
+        (idx (read-word-arg (fasl-input-stream))))
     (write-memory (cold-nthcdr idx obj) (pop-stack))))
 
 (define-cold-fop (fop-rplacd)
-  (let ((obj (ref-fop-table (fasl-input) (read-word-arg)))
-        (idx (read-word-arg)))
+  (let ((obj (ref-fop-table (fasl-input) (read-word-arg (fasl-input-stream))))
+        (idx (read-word-arg (fasl-input-stream))))
     (write-wordindexed (cold-nthcdr idx obj) 1 (pop-stack))))
 
 (define-cold-fop (fop-svset)
-  (let ((obj (ref-fop-table (fasl-input) (read-word-arg)))
-        (idx (read-word-arg)))
+  (let ((obj (ref-fop-table (fasl-input) (read-word-arg (fasl-input-stream))))
+        (idx (read-word-arg (fasl-input-stream))))
     (write-wordindexed obj
                    (+ idx
                       (ecase (descriptor-lowtag obj)
@@ -2511,12 +2508,12 @@ core and return a descriptor to it."
                    (pop-stack))))
 
 (define-cold-fop (fop-structset)
-  (let ((obj (ref-fop-table (fasl-input) (read-word-arg)))
-        (idx (read-word-arg)))
+  (let ((obj (ref-fop-table (fasl-input) (read-word-arg (fasl-input-stream))))
+        (idx (read-word-arg (fasl-input-stream))))
     (write-wordindexed obj (+ idx sb!vm:instance-slots-offset) (pop-stack))))
 
 (define-cold-fop (fop-nthcdr)
-  (cold-nthcdr (read-word-arg) (pop-stack)))
+  (cold-nthcdr (read-word-arg (fasl-input-stream)) (pop-stack)))
 
 (defun cold-nthcdr (index obj)
   (dotimes (i index)
@@ -2543,7 +2540,7 @@ core and return a descriptor to it."
 #!+sb-show (defvar *show-pre-fixup-code-p* nil)
 
 (defun cold-load-code (fasl-input nconst code-size)
-  (macrolet ((pop-stack () '(pop-fop-stack)))
+  (macrolet ((pop-stack () '(pop-fop-stack (%fasl-input-stack fasl-input))))
      (let* ((raw-header-n-words (+ sb!vm:code-constants-offset nconst))
             (header-n-words
              ;; Note: we round the number of constants up to ensure
@@ -2659,7 +2656,7 @@ core and return a descriptor to it."
          (arglist (pop-stack))
          (name (pop-stack))
          (code-object (pop-stack))
-         (offset (calc-offset code-object (read-word-arg)))
+         (offset (calc-offset code-object (read-word-arg (fasl-input-stream))))
          (fn (descriptor-beyond code-object
                                 offset
                                 sb!vm:fun-pointer-lowtag))
@@ -2727,23 +2724,24 @@ core and return a descriptor to it."
   (let* ((symbol (pop-stack))
          (kind (pop-stack))
          (code-object (pop-stack)))
-    (do-cold-fixup code-object (read-word-arg) (ensure-symbol-tls-index symbol)
-                   kind)
+    (do-cold-fixup code-object
+                   (read-word-arg (fasl-input-stream))
+                   (ensure-symbol-tls-index symbol) kind)
     code-object))
 
 (define-cold-fop (fop-foreign-fixup)
   (let* ((kind (pop-stack))
          (code-object (pop-stack))
-         (len (read-byte-arg))
+         (len (read-byte-arg (fasl-input-stream)))
          (sym (make-string len)))
     (read-string-as-bytes (fasl-input-stream) sym)
     #!+sb-dynamic-core
-    (let ((offset (read-word-arg))
+    (let ((offset (read-word-arg (fasl-input-stream)))
           (value (dyncore-note-symbol sym nil)))
       (do-cold-fixup code-object offset value kind))
     #!- (and) (format t "Bad non-plt fixup: ~S~S~%" sym code-object)
     #!-sb-dynamic-core
-    (let ((offset (read-word-arg))
+    (let ((offset (read-word-arg (fasl-input-stream)))
           (value (cold-foreign-symbol-address sym)))
       (do-cold-fixup code-object offset value kind))
    code-object))
@@ -2752,12 +2750,12 @@ core and return a descriptor to it."
 (define-cold-fop (fop-foreign-dataref-fixup)
   (let* ((kind (pop-stack))
          (code-object (pop-stack))
-         (len (read-byte-arg))
+         (len (read-byte-arg (fasl-input-stream)))
          (sym (make-string len)))
     #!-sb-dynamic-core (declare (ignore code-object))
     (read-string-as-bytes (fasl-input-stream) sym)
     #!+sb-dynamic-core
-    (let ((offset (read-word-arg))
+    (let ((offset (read-word-arg (fasl-input-stream)))
           (value (dyncore-note-symbol sym t)))
       (do-cold-fixup code-object offset value kind)
       code-object)
@@ -2769,7 +2767,7 @@ core and return a descriptor to it."
       (error "shared foreign symbol in cold load: ~S (~S)" sym kind))))
 
 (define-cold-fop (fop-assembler-code)
-  (let* ((length (read-word-arg))
+  (let* ((length (read-word-arg (fasl-input-stream)))
          (header-n-words
           ;; Note: we round the number of constants up to ensure that
           ;; the code vector will be properly aligned.
@@ -2798,7 +2796,7 @@ core and return a descriptor to it."
 (define-cold-fop (fop-assembler-routine)
   (let* ((routine (pop-stack))
          (des (pop-stack))
-         (offset (calc-offset des (read-word-arg))))
+         (offset (calc-offset des (read-word-arg (fasl-input-stream)))))
     (record-cold-assembler-routine
      routine
      (+ (logandc2 (descriptor-bits des) sb!vm:lowtag-mask) offset))
@@ -2808,14 +2806,14 @@ core and return a descriptor to it."
   (let* ((routine (pop-stack))
          (kind (pop-stack))
          (code-object (pop-stack))
-         (offset (read-word-arg)))
+         (offset (read-word-arg (fasl-input-stream))))
     (record-cold-assembler-fixup routine code-object offset kind)
     code-object))
 
 (define-cold-fop (fop-code-object-fixup)
   (let* ((kind (pop-stack))
          (code-object (pop-stack))
-         (offset (read-word-arg))
+         (offset (read-word-arg (fasl-input-stream)))
          (value (descriptor-bits code-object)))
     (do-cold-fixup code-object offset value kind)
     code-object))

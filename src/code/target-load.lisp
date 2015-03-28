@@ -205,21 +205,18 @@
           (defaulted-source-truename defaulted-source-pathname))))
 
 ;;; Load a code object. BOX-NUM objects are popped off the stack for
-;;; the boxed storage section, then SIZE bytes of code are read in.
-(defun load-code (input-stream box-num code-length)
+;;; the boxed storage section, then CODE-LENGTH bytes of code are read in.
+(defun load-code (box-num code-length stack ptr input-stream)
   (declare (fixnum box-num code-length))
+  (declare (simple-vector stack) (type index ptr))
   (let ((code (sb!c:allocate-code-object box-num code-length)))
-    (with-fop-stack (stack ptr (1+ box-num))
-      (setf (%code-debug-info code) (fop-stack-ref (+ ptr box-num)))
-      (loop for i of-type index from sb!vm:code-constants-offset
-            for j of-type index from ptr below (+ ptr box-num)
-            do (setf (code-header-ref code i) (fop-stack-ref j)))
-      (without-gcing
-        (read-n-bytes input-stream
-                      (code-instructions code)
-                      0
-                      code-length))
-      code)))
+    (setf (%code-debug-info code) (svref stack (+ ptr box-num)))
+    (loop for i of-type index from sb!vm:code-constants-offset
+          for j of-type index from ptr below (+ ptr box-num)
+          do (setf (code-header-ref code i) (svref stack j)))
+    (without-gcing
+      (read-n-bytes input-stream (code-instructions code) 0 code-length))
+    code))
 
 ;;;; linkage fixups
 

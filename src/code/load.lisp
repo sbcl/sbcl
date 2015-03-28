@@ -176,35 +176,29 @@
 
 ;;;; the fop stack
 
-;;; Much like the table, this is bound to a simple vector whose first
-;;; element is the current index.
-(defvar *fop-stack*)
-(declaim (simple-vector *fop-stack*))
-
 (declaim (inline fop-stack-empty-p))
-(defun fop-stack-empty-p ()
-  (eql 0 (svref *fop-stack* 0)))
+(defun fop-stack-empty-p (stack)
+  (eql 0 (svref stack 0)))
 
 ;; Ensure that N arguments can be popped from the FOP stack.
 ;; Return the stack and the pointer to the first argument.
 ;; Update the new top-of-stack to reflect that all N have been popped.
-(defun fop-stack-pop-n (n)
+(defun fop-stack-pop-n (stack n)
   (declare (type index n))
-  (let* ((stack *fop-stack*)
-         (top (the index (svref stack 0)))
+  (let* ((top (the index (svref stack 0)))
          (new-top (- top n)))
     (if (minusp new-top) ; 0 is ok at this point
         (error "FOP stack underflow")
         (progn (setf (svref stack 0) new-top)
-               (values stack (1+ new-top))))))
+               (1+ new-top)))))
 
-(defun push-fop-stack (value)
-  (let* ((stack *fop-stack*)
+(defun push-fop-stack (value fasl-input)
+  (let* ((stack (%fasl-input-stack fasl-input))
          (next (1+ (the index (svref stack 0)))))
     (declare (type index next))
     (when (eql (length stack) next)
       (setf stack (grow-fop-vector stack next)
-            *fop-stack* stack))
+            (%fasl-input-stack fasl-input) stack))
     (setf (svref stack 0) next
           (svref stack next) value)))
 
@@ -431,7 +425,7 @@
          (when trace
            (format *trace-output* "~&~6x : [~D,~D] ~2,'0x(~A)"
                    (1- (file-position stream))
-                   (svref *fop-stack* 0) ; stack pointer
+                   (svref (%fasl-input-stack fasl-input) 0) ; stack pointer
                    (svref (%fasl-input-table fasl-input) 0) ; table pointer
                    byte (aref **fop-names** byte)))
          ;; Actually execute the fop.
@@ -457,9 +451,9 @@
                                (funcall function fasl-input arg1 arg2)
                                (funcall function fasl-input arg1))))))))
            (when (plusp (sbit (cdr **fop-signatures**) byte))
-             (push-fop-stack result))
+             (push-fop-stack result fasl-input))
            (when trace
-             (let* ((stack *fop-stack*)
+             (let* ((stack (%fasl-input-stack fasl-input))
                     (ptr (svref stack 0)))
                (format *trace-output* " -- ~[<empty>,~D~:;[~:*~D,~D] ~S~]"
                        ptr (svref (%fasl-input-table fasl-input) 0)
@@ -471,7 +465,8 @@
                             (error "Missing FOP definition?"))))
              (when (and print
                         (eq byte (terminator-opcode))
-                        (fop-stack-empty-p)) ; (presumed) end of TLF
+                        (fop-stack-empty-p ; (presumed) end of TLF
+                         (%fasl-input-stack fasl-input)))
                (load-fresh-line)
                (prin1 result)))))))))
 
@@ -479,15 +474,13 @@
   (when (zerop (file-length stream))
     (error "attempt to load an empty FASL file:~%  ~S" (namestring stream)))
   (maybe-announce-load stream verbose)
-  ;; FIXME: should be slot of the FASL-INPUT struct
-  (let ((*fop-stack* (make-fop-vector 100))
-        (fasl-input (make-fasl-input stream)))
+  (let ((fasl-input (make-fasl-input stream)))
     (unwind-protect
          (loop while (load-fasl-group fasl-input print))
       ;; Nuke the table and stack to avoid keeping garbage on
       ;; conservatively collected platforms.
       (nuke-fop-vector (%fasl-input-table fasl-input))
-      (nuke-fop-vector *fop-stack*)))
+      (nuke-fop-vector (%fasl-input-stack fasl-input))))
   t)
 
 (declaim (notinline read-byte)) ; Why is it even *declaimed* inline above?
