@@ -104,7 +104,8 @@
          (push (cons ',name ,name) *entry-points*)
          ,@code
          ,@(generate-return-sequence
-            (or (cadr (assoc :return-style options)) :raw)))
+            (or (cadr (assoc :return-style options)) :raw))
+         (emit-alignment sb!vm:n-lowtag-bits))
        (when sb!xc:*compile-print*
          (format *error-output* "~S assembled~%" ',name)))))
 
