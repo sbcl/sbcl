@@ -206,7 +206,6 @@
 
 ;;; Load a code object. BOX-NUM objects are popped off the stack for
 ;;; the boxed storage section, then SIZE bytes of code are read in.
-#!-x86
 (defun load-code (box-num code-length)
   (declare (fixnum box-num code-length))
   (let ((code (sb!c:allocate-code-object box-num code-length)))
@@ -221,50 +220,6 @@
                       0
                       code-length))
       code)))
-
-;;; Moving native code during a GC or purify is not so trivial on the
-;;; x86 port.
-;;;
-;;; Our strategy for allowing the loading of x86 native code into the
-;;; dynamic heap requires that the addresses of fixups be saved for
-;;; all these code objects. After a purify these fixups can be
-;;; dropped. In CMU CL, this policy was enabled with
-;;; *ENABLE-DYNAMIC-SPACE-CODE*; in SBCL it's always used.
-#!+x86
-(defun load-code (box-num code-length)
-  (declare (fixnum box-num code-length))
-  (with-fop-stack (stack ptr (1+ box-num))
-    (let* ((dbi (fop-stack-ref (+ ptr box-num))) ; debug-info
-           (stuff (cons dbi (loop for i of-type index
-                                  downfrom (+ ptr box-num -1) to ptr
-                                  collect (fop-stack-ref i)))))
-        ;; FIXME: *LOAD-CODE-VERBOSE* should probably be #!+SB-SHOW.
-        (when *load-code-verbose*
-          (format t "stuff: ~S~%" stuff)
-          (format t
-                  "   : ~S ~S ~S~%"
-                  (sb!c::compiled-debug-info-p dbi)
-                  (sb!c::debug-info-p dbi)
-                  (sb!c::compiled-debug-info-name dbi))
-          (format t "   loading to the dynamic space~%"))
-
-        (let ((code (sb!c:allocate-code-object box-num code-length))
-              (index (+ sb!vm:code-constants-offset box-num)))
-          (declare (type index index))
-          (when *load-code-verbose*
-            (format t
-                    "  obj addr=~X~%"
-                    (get-lisp-obj-address code)))
-          (setf (%code-debug-info code) (pop stuff))
-          (dotimes (i box-num)
-            (declare (fixnum i))
-            (setf (code-header-ref code (decf index)) (pop stuff)))
-          (without-gcing
-            (read-n-bytes *fasl-input-stream*
-                          (code-instructions code)
-                          0
-                          code-length))
-          code))))
 
 ;;;; linkage fixups
 
