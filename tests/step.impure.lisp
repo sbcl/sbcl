@@ -183,7 +183,6 @@
             ("(- X 2)" :unknown)
             ("(FIB-BREAK (- X 2))" (1))
             ("(+ (FIB-BREAK (1- X)) (FIB-BREAK (- X 2)))" :unknown)))
-         (count 0)
          (*stepper-hook* (lambda (condition)
                            (typecase condition
                              (step-form-condition
@@ -194,6 +193,7 @@
     (setf *cerror-called* nil)
     (handler-bind ((cerror-break
                     (lambda (c)
+                      (declare (ignore c))
                       (sb-impl::enable-stepping)
                       (invoke-restart 'continue))))
       (fib-break 3))
@@ -290,4 +290,3 @@
 (with-test (:name :step-out/2)
   (handler-bind ((step-condition #'sb-impl::invoke-stepper))
     (test-step-out/2)))
-
