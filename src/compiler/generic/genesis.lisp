@@ -2064,18 +2064,13 @@ core and return a descriptor to it."
 ;;; create *STATIC-FOREIGN-SYMBOLS*, which the code in
 ;;; target-load.lisp refers to.
 (defun foreign-symbols-to-core ()
-  (let ((symbols nil)
-        (result *nil-descriptor*))
+  (let ((result *nil-descriptor*))
     #!-sb-dynamic-core
-    (progn
-      (maphash (lambda (symbol value)
-                 (push (cons symbol value) symbols))
-               *cold-foreign-symbol-table*)
-      (setq symbols (sort symbols #'string< :key #'car))
-      (dolist (symbol symbols)
-        (cold-push (cold-cons (base-string-to-core (car symbol))
-                              (number-to-core (cdr symbol)))
-                   result)))
+    (dolist (symbol (sort (%hash-table-alist *cold-foreign-symbol-table*)
+                          #'string< :key #'car))
+      (cold-push (cold-cons (base-string-to-core (car symbol))
+                            (number-to-core (cdr symbol)))
+                 result))
     (cold-set '*!initial-foreign-symbols* result)
     #!+sb-dynamic-core
     (let ((runtime-linking-list *nil-descriptor*))
