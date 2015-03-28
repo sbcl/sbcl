@@ -2517,7 +2517,7 @@ core and return a descriptor to it."
 (define-cold-fop (fop-structset)
   (let ((obj (ref-fop-table (read-word-arg)))
         (idx (read-word-arg)))
-    (write-wordindexed obj (1+ idx) (pop-stack))))
+    (write-wordindexed obj (+ idx sb!vm:instance-slots-offset) (pop-stack))))
 
 (define-cold-fop (fop-nthcdr)
   (cold-nthcdr (read-word-arg) (pop-stack)))
