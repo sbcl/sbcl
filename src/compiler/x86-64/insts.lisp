@@ -2267,18 +2267,20 @@
 
 ;;; The one-byte encodings for INC and DEC are used as REX prefixes
 ;;; in 64-bit mode so we always use the two-byte form.
-(define-instruction inc (segment dst)
+(define-instruction inc (segment dst &optional prefix)
   (:printer reg/mem ((op '(#b1111111 #b000))))
   (:emitter
+   (emit-prefix segment prefix)
    (let ((size (operand-size dst)))
      (maybe-emit-operand-size-prefix segment size)
      (maybe-emit-rex-for-ea segment dst nil)
      (emit-byte segment (if (eq size :byte) #b11111110 #b11111111))
      (emit-ea segment dst #b000))))
 
-(define-instruction dec (segment dst)
+(define-instruction dec (segment dst &optional prefix)
   (:printer reg/mem ((op '(#b1111111 #b001))))
   (:emitter
+   (emit-prefix segment prefix)
    (let ((size (operand-size dst)))
      (maybe-emit-operand-size-prefix segment size)
      (maybe-emit-rex-for-ea segment dst nil)
@@ -2696,10 +2698,12 @@
                                 (:name :tab reg/mem ", " reg)))))
 
 (macrolet ((define (inst opcode-extension)
-             `(define-instruction ,inst (segment src index)
+             `(define-instruction ,inst (segment src index &optional prefix)
                 (:printer-list (bit-test-inst-printer-list ,opcode-extension))
-                (:emitter (emit-bit-test-and-mumble segment src index
-                                                    ,opcode-extension)))))
+                (:emitter
+                 (emit-prefix segment prefix)
+                 (emit-bit-test-and-mumble segment src index
+                                           ,opcode-extension)))))
   (define bt  4)
   (define bts 5)
   (define btr 6)
