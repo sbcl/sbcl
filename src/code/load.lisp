@@ -95,7 +95,6 @@
 
 ;;; Read an N-byte unsigned integer from the *FASL-INPUT-STREAM*.
 (defmacro read-arg (n)
-  (declare (optimize (speed 0)))
   (if (= n 1)
       `(the (unsigned-byte 8) (read-byte *fasl-input-stream*))
       `(with-fast-read-byte ((unsigned-byte 8) *fasl-input-stream*)
