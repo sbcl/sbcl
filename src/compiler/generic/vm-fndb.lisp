@@ -268,7 +268,7 @@
   system-area-pointer
   (flushable))
 
-(defknown ensure-symbol-tls-index (symbol) fixnum)
+(defknown ensure-symbol-tls-index (symbol) (and fixnum unsigned-byte))
 
 
 ;;;; debugger support

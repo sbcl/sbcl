@@ -1413,11 +1413,8 @@ core and return a descriptor to it."
   (cold-set '*!initial-layouts* (cold-list-all-layouts))
 
   #!+sb-thread
-  (progn
-    (cold-set 'sb!vm::*free-tls-index*
-              (make-random-descriptor (ash *genesis-tls-counter*
-                                           sb!vm:word-shift)))
-    (cold-set 'sb!vm::*tls-index-lock* (make-fixnum-descriptor 0)))
+  (cold-set 'sb!vm::*free-tls-index*
+            (make-descriptor (ash *genesis-tls-counter* sb!vm:word-shift)))
 
   (dolist (symbol sb!impl::*cache-vector-symbols*)
     (cold-set symbol *nil-descriptor*))

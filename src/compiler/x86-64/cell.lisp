@@ -378,16 +378,17 @@
   (:args (val :scs (any-reg descriptor-reg))
          (symbol :scs (descriptor-reg) :target tmp
                  :to :load))
-  (:temporary (:sc unsigned-reg) tls-index bsp tmp)
+  (:temporary (:sc unsigned-reg :offset rax-offset) tls-index)
+  (:temporary (:sc unsigned-reg) bsp tmp)
   (:generator 10
     (load-binding-stack-pointer bsp)
     (inst mov (reg-in-size tls-index :dword) (tls-index-of symbol))
     (inst add bsp (* binding-size n-word-bytes))
     (store-binding-stack-pointer bsp)
-    (inst test tls-index tls-index)
+    (inst test (reg-in-size tls-index :dword) (reg-in-size tls-index :dword))
     (inst jmp :ne TLS-INDEX-VALID)
     (inst mov tls-index symbol)
-    (inst mov tmp (subprimitive-tls-allocator tls-index))
+    (inst mov tmp (make-fixup 'alloc-tls-index :assembly-routine))
     (inst call tmp)
     TLS-INDEX-VALID
     (inst mov tmp (make-ea :qword :base thread-base-tn :index tls-index))

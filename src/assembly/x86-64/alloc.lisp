@@ -69,67 +69,69 @@
   (def r14)
   (def r15))
 
-#+sb-assembling
-(macrolet
-    ((def (reg)
-       (declare (ignorable reg))
-       #!+sb-thread
-       (let* ((name (intern (format nil "ALLOC-TLS-INDEX-IN-~A" reg)))
-              (target-offset (intern (format nil "~A-OFFSET" reg)))
-              (other-offset (if (eql 'rax reg)
-                                'rcx-offset
-                                'rax-offset)))
-         ;; Symbol starts in TARGET, where the TLS-INDEX ends up in.
-         `(define-assembly-routine ,name
-              ((:temp other descriptor-reg ,other-offset)
-               (:temp target descriptor-reg ,target-offset))
-            (let ((get-tls-index-lock (gen-label))
-                  (release-tls-index-lock (gen-label)))
-              (pseudo-atomic
-               ;; Save OTHER & push the symbol. RAX is either one of the two.
-               (inst push other)
-               (inst push target)
-               (emit-label get-tls-index-lock)
-               (let ((not-rax ,(if (eql 'rax reg) 'other 'target)))
-                 (inst mov not-rax 1)
-                 (zeroize rax-tn)
-                 (inst cmpxchg (make-ea-for-symbol-value *tls-index-lock*)
-                       not-rax :lock)
-                 (inst jmp :ne get-tls-index-lock))
-               ;; The symbol is now in OTHER.
-               (inst pop other)
-               ;; Now with the lock held, see if the symbol's tls index has been
-               ;; set in the meantime.
-               (inst mov (reg-in-size target :dword) (tls-index-of other))
-               (inst test target target)
-               (inst jmp :ne release-tls-index-lock)
-               ;; Allocate a new tls-index.
-               (load-symbol-value target *free-tls-index*)
-               (let ((not-error (gen-label))
-                     (error (generate-error-code nil 'tls-exhausted-error)))
-                 (inst cmp target (ash tls-size word-shift))
-                 (inst jmp :l not-error)
-                 (%clear-pseudo-atomic)
-                 (inst jmp error)
-                 (emit-label not-error))
-               (inst add (make-ea-for-symbol-value *free-tls-index*)
-                     n-word-bytes)
-               (inst mov (tls-index-of other) (reg-in-size target :dword))
-               (emit-label release-tls-index-lock)
-               ;; No need for barriers on x86/x86-64 on unlock.
-               (store-symbol-value 0 *tls-index-lock*)
-               ;; Restore OTHER.
-               (inst pop other)))))))
-  (def rax)
-  (def rcx)
-  (def rdx)
-  (def rbx)
-  (def rsi)
-  (def rdi)
-  (def r8)
-  (def r9)
-  (def r10)
-  (def r12)
-  (def r13)
-  (def r14)
-  (def r15))
+#!+sb-thread
+(define-assembly-routine (alloc-tls-index
+                          (:translate ensure-symbol-tls-index)
+                          (:result-types positive-fixnum)
+                          (:policy :fast-safe))
+    ;; The vop result is unsigned-reg because the assembly routine does not
+    ;; fixnumize its answer, which is confusing because it looks like a fixnum.
+    ;; But the result of the function ENSURE-SYMBOL-TLS-INDEX is a fixnum whose
+    ;; value in Lisp is the number that the assembly code computes,
+    ;; *not* the fixnum whose representation is what it computes.
+    ((:arg symbol (descriptor-reg) rax-offset) ; both input and output
+     (:res result (unsigned-reg) rax-offset))
+  (let* ((scratch-reg rcx-tn) ; RCX gets callee-saved, not declared as a temp
+         ;; The free-index and lock are in the low and high halves of 1 qword.
+         (free-tls-index-ea (make-ea-for-symbol-value *free-tls-index*))
+         (spinlock free-tls-index-ea) ; same :qword
+         (lock-bit 63) ; the qword's sign bit (any bit > 31 would work fine)
+         (tls-full (gen-label)))
+    ;; A pseudo-atomic section avoids bad behavior if the current thread were
+    ;; to receive an interrupt causing it to do a slow operation between
+    ;; acquisition and release of the spinlock. Preventing GC is irrelevant,
+    ;; but would not be if we recycled tls indices of garbage symbols.
+    (pseudo-atomic
+     (assemble () ; for conversion of tagbody-like labels to assembler labels
+     RETRY
+       (inst bts spinlock lock-bit :lock)
+       (inst jmp :nc got-tls-index-lock)
+       (inst pause) ; spin loop hint
+       ;; TODO: yielding the CPU here would be a good idea
+       (inst jmp retry)
+     GOT-TLS-INDEX-LOCK
+       ;; Now we hold the spinlock. With it held, see if the symbol's
+       ;; tls-index has been set in the meantime.
+       (inst cmp (tls-index-of symbol) 0)
+       (inst jmp :e new-tls-index)
+       ;; CMP against memory showed the tls-index to be valid, so clear the lock
+       ;; and re-read the memory (safe because transition can only occur to
+       ;; a nonzero value), then jump out to end the PA section.
+       (inst btr spinlock lock-bit :lock)
+       (inst mov (reg-in-size symbol :dword) (tls-index-of symbol))
+       (inst jmp done)
+     NEW-TLS-INDEX
+       ;; Allocate a new tls-index.
+       (inst push scratch-reg)
+       (inst mov scratch-reg free-tls-index-ea)
+       ;; Must ignore the semaphore bit in the register's high half.
+       (inst cmp (reg-in-size scratch-reg :dword) (* tls-size n-word-bytes))
+       (inst jmp :ae tls-full)
+       ;; scratch-reg goes into symbol's TLS and into the arg/result reg.
+       (inst mov (tls-index-of symbol) (reg-in-size scratch-reg :dword))
+       (inst mov (reg-in-size result :dword) (reg-in-size scratch-reg :dword))
+       ;; Load scratch-reg with a constant that clears the lock bit
+       ;; and bumps the free index in one go.
+       (inst mov scratch-reg (+ (- (ash 1 lock-bit)) n-word-bytes))
+       (inst add free-tls-index-ea scratch-reg :lock)
+       (inst pop scratch-reg)
+     DONE)) ; end PSEUDO-ATOMIC
+    (inst ret)
+    (emit-label tls-full)
+    ;; The disassembly of this code looks nicer when the failure path
+    ;; immediately follows the ordinary path vs. being in *ELSEWHERE*.
+    (inst pop (reg-in-size scratch-reg :qword)) ; balance the stack
+    (inst btr spinlock lock-bit :lock)
+    (%clear-pseudo-atomic)
+    ;; There's a spurious RET instruction auto-inserted, but no matter.
+    (error-call nil 'tls-exhausted-error)))

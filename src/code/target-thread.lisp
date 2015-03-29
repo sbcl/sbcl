@@ -1818,14 +1818,15 @@ assume that unknown code can safely be terminated using TERMINATE-THREAD."
   ;; Get values from the TLS area of the current thread.
   (defun %thread-local-references ()
     ;; TLS-INDEX-START is a word number relative to thread base.
-    ;; *FREE-TLS-INDEX* - which should only be read by machine code  - is an
+    ;; *FREE-TLS-INDEX* - which is only manipulated by machine code  - is an
     ;; offset from thread base to the next usable TLS cell as a raw word
     ;; manifesting in Lisp as a fixnum. Convert it from byte number to word
     ;; number before using it as the upper bound for the sequential scan.
-    (declare (special sb!vm::*free-tls-index*))
     (loop for index from tls-index-start
-          below (ash (get-lisp-obj-address sb!vm::*free-tls-index*)
-                     (- sb!vm:word-shift))
+          ;; On x86-64, mask off the sign bit. It is used as a semaphore.
+          below (ash (logand #!+x86-64 most-positive-fixnum
+                             sb!vm::*free-tls-index*)
+                     (+ (- sb!vm:word-shift) sb!vm:n-fixnum-tag-bits))
           for obj = (sb!kernel:%make-lisp-obj
                      (sb!sys:sap-int (sb!vm::current-thread-offset-sap index)))
           unless (or (member (widetag-of obj)
