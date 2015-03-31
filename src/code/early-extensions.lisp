@@ -549,12 +549,9 @@
                                               :initial-contents '(1 0 0))))))))
       ;; It would be bad if another thread sees MAKE-ARRAY's result in the
       ;; global variable before the vector's header+length have been set.
-      ;; This is theoretically possible if the architecture allows out-of-order
-      ;; memory writes.  A barrier will prevent that, but a meta-bug prevents
-      ;; using SB!THREAD:BARRIER here. The macro isn't defined yet? (FIXME)
-      ;; Note that this bug already existed and I'm just documenting it.
-      ;; Most likely all caches are made before ever starting multiple threads.
-      (progn ; sb!thread:barrier (:write)
+      ;; Without a barrier, this would be theoretically possible if the
+      ;; architecture allows out-of-order memory writes.
+      (sb!thread:barrier (:write)
         (reset-stats)
         (setq cache (make-array size :initial-element 0)))
       (set! symbol cache))))
