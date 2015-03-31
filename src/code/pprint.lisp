@@ -827,14 +827,14 @@ line break."
 (defvar *standard-pprint-dispatch-table*)
 (defvar *initial-pprint-dispatch-table*)
 
-(defstruct (pprint-dispatch-entry (:copier nil))
+(defstruct (pprint-dispatch-entry (:copier nil) (:predicate nil))
   ;; the type specifier for this entry
   (type (missing-arg) :type t :read-only t)
   ;; a function to test to see whether an object is of this type,
   ;; either (LAMBDA (OBJ) (TYPEP OBJECT TYPE)) or a builtin predicate.
   ;; We don't bother computing this for entries in the CONS
   ;; hash table, because we don't need it.
-  (test-fn nil :type (or function null) :read-only t)
+  (test-fn nil :type (or function null))
   ;; the priority for this guy
   (priority 0 :type real :read-only t)
   ;; T iff one of the original entries.
@@ -849,11 +849,6 @@ line break."
             (pprint-dispatch-entry-priority entry)
             (pprint-dispatch-entry-initial-p entry))))
 
-(defun cons-type-specifier-p (spec)
-  (typep spec '(cons (eql cons)
-                     (cons (cons (member eql member) (cons t null))
-                           null))))
-
 ;; Return T iff E1 is strictly less preferable than E2.
 (defun entry< (e1 e2)
   (declare (type pprint-dispatch-entry e1 e2))
@@ -867,14 +862,14 @@ line break."
           (< (pprint-dispatch-entry-priority e1)
              (pprint-dispatch-entry-priority e2)))))
 
-;; Return the predicate for TYPE. This used to involve rewriting TYPE
-;; into a sexpr due to (CONS <t1> <t2>) not being an official specifier.
-;; Now that it is, there's nothing magical about it.
-(defun compute-test-fn (type function)
+;; Return the predicate for CTYPE, equivalently TYPE-SPEC.
+;; This used to involve rewriting into a sexpr if CONS was involved,
+;; since it was not an official specifier. But now it is.
+(defun compute-test-fn (ctype type-spec function)
   (declare (special sb!c::*backend-type-predicates*))
   ;; Avoid compiling code for an existing structure predicate
-  (or (and (eq (info :type :kind type) :instance)
-           (let ((layout (info :type :compiler-layout type)))
+  (or (and (eq (info :type :kind type-spec) :instance)
+           (let ((layout (info :type :compiler-layout type-spec)))
              (and layout
                   (let ((info (layout-info layout)))
                     (and info
@@ -882,8 +877,7 @@ line break."
                            (and pred (fboundp pred)
                                 (symbol-function pred))))))))
       ;; avoid compiling code for CONS, ARRAY, VECTOR, etc
-      (awhen (assoc (specifier-type type) sb!c::*backend-type-predicates*
-                    :test #'type=)
+      (awhen (assoc ctype sb!c::*backend-type-predicates* :test #'type=)
         (symbol-function (cdr it)))
       ;; OK, compile something
       (let ((name
@@ -891,13 +885,14 @@ line break."
              ;; affects the global environment, when all you want
              ;; is to give the lambda a human-readable label.
              (format nil "~A-P"
-                     (cond ((symbolp type) type)
+                     (cond ((symbolp type-spec) type-spec)
                            ((symbolp function) function)
                            ((%fun-name function))
                            (t
-                            (write-to-string type :pretty nil :escape nil
+                            (write-to-string type-spec :pretty nil :escape nil
                                              :readably nil))))))
-        (compile nil `(named-lambda ,name (object) (typep object ',type))))))
+        (compile nil
+                 `(named-lambda ,name (object) (typep object ',type-spec))))))
 
 (defun copy-pprint-dispatch (&optional (table *print-pprint-dispatch*))
   (declare (type (or pprint-dispatch-table null) table))
@@ -933,6 +928,44 @@ line break."
     (cerror "Frob it anyway!" 'standard-pprint-dispatch-table-modified-error
             :operation operation)))
 
+;; Similar to (NOT CONTAINS-UNKNOWN-TYPE-P), but this is for when you
+;; want to pre-verify that TYPEP won't outright croak, given that you're
+;; going to call it really soon.
+;; Granted, certain checks could pass or fail by short-circuiting,
+;; such as (TYPEP 3 '(OR NUMBER (SATISFIES NO-SUCH-FUN))
+;; but this has to be maximally conservative.
+(defun testable-type-p (ctype)
+  (typecase ctype
+    (unknown-type nil) ; must precede HAIRY because an unknown is HAIRY
+    (hairy-type
+     (let ((spec (hairy-type-specifier ctype)))
+       ;; Anything other than (SATISFIES ...) is testable
+       ;; because there's no reason to suppose that it isn't.
+       (or (neq (car spec) 'satisfies) (fboundp (cadr spec)))))
+    (compound-type (every #'testable-type-p (compound-type-types ctype)))
+    (negation-type (testable-type-p (negation-type-type ctype)))
+    (cons-type (and (testable-type-p (cons-type-car-type ctype))
+                    (testable-type-p (cons-type-cdr-type ctype))))
+    (array-type (testable-type-p (array-type-element-type ctype)))
+    (t t)))
+
+(defun defer-type-checker (entry)
+  (let ((saved-nonce sb!c::*type-cache-nonce*))
+    (lambda (obj)
+      (let ((nonce sb!c::*type-cache-nonce*))
+        (if (eq nonce saved-nonce)
+            nil
+            (let ((ctype (specifier-type (pprint-dispatch-entry-type entry))))
+              (setq saved-nonce nonce)
+              (if (testable-type-p ctype)
+                  (funcall (setf (pprint-dispatch-entry-test-fn entry)
+                                 (compute-test-fn
+                                  ctype
+                                  (pprint-dispatch-entry-type entry)
+                                  (pprint-dispatch-entry-fun entry)))
+                           obj)
+                  nil)))))))
+
 ;; The dispatch mechanism is not quite sophisticated enough to have a guard
 ;; condition on CONS entries. One place this would impact is that you could
 ;; write the full matcher for QUOTE as just a type-specifier. It can be done
@@ -948,12 +981,35 @@ line break."
   (/show0 "entering SET-PPRINT-DISPATCH, TYPE=...")
   (/hexstr type)
   (assert-not-standard-pprint-dispatch-table table 'set-pprint-dispatch)
-  (let* ((consp (cons-type-specifier-p type))
+  (let* ((ctype (or (handler-bind
+                        ((parse-unknown-type
+                          (lambda (c)
+                            (warn "~S is not a recognized type specifier"
+                                  (parse-unknown-type-specifier c)))))
+                      (sb!c::careful-specifier-type type))
+                    (error "~S is not a valid type-specifier" type)))
+         (consp (and (cons-type-p ctype)
+                     (eq (cons-type-cdr-type ctype) *universal-type*)
+                     (member-type-p (cons-type-car-type ctype))
+                     ;; FIXME: (CONS (MEMBER A B ...)) could be hash-based
+                     ;; by expanding it here rather than letting the
+                     ;; compiler see it.
+                     (eql 1 (member-type-size (cons-type-car-type ctype)))))
+         (disabled-p (not (testable-type-p ctype)))
          (entry (if function
                     (make-pprint-dispatch-entry
                      :type type
-                     :test-fn (unless consp (compute-test-fn type function))
+                     :test-fn (unless (or consp disabled-p)
+                                (compute-test-fn ctype type function))
                      :priority priority :fun function))))
+    (when (and function disabled-p)
+      ;; a DISABLED-P test function has to close over the ENTRY
+      (setf (pprint-dispatch-entry-test-fn entry) (defer-type-checker entry))
+      (unless (unknown-type-p ctype) ; already warned in this case
+        ;; But (OR KNOWN UNKNOWN) did not signal - actually it is indeterminate
+        ;; - depending on whather it was cached. I think we should not cache
+        ;; any specifier that contains any unknown anywhere within it.
+        (warn "~S contains an unrecognized type specifier" type)))
     (if consp
         (let ((hashtable (pprint-dispatch-table-cons-entries table))
               (key (second (second type))))

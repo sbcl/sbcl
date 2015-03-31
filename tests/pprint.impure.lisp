@@ -18,7 +18,7 @@
 ;;;; This is not a requirement in general, but is quite reasonable.
 (with-test (:name :pprint-dispatch-order-preserving)
   (let ((tbl (sb-pretty::make-pprint-dispatch-table)))
-    (handler-bind ((style-warning #'muffle-warning)) ; nonexistent types
+    (handler-bind ((warning #'muffle-warning)) ; nonexistent types
       (set-pprint-dispatch 'foo1 #'pprint-fill 5 tbl)
       (set-pprint-dispatch 'fool #'pprint-fill 0 tbl)
       (set-pprint-dispatch 'foo2 #'pprint-fill 5 tbl))
@@ -334,5 +334,46 @@
                                :prefix (progn (vp 3) "{"))
       (write (pprint-pop))))
   (assert (equalp *a* #(1 2 3))))
+
+;; these warn, but "work" in as much as they don't kill the machinery
+(with-test (:name (:pprint-dispatch :set-ppd-unknown-type))
+  (handler-bind ((warning #'muffle-warning))
+    (assert-signal
+     (set-pprint-dispatch 'frood
+                          (lambda (stream obj)
+                            (let ((*print-pretty* nil))
+                              (format stream "[frood: ~D]" obj))))
+     warning)
+    (assert-signal
+     (set-pprint-dispatch '(or weasel (and woodle (satisfies thing)))
+                          (lambda (stream obj)
+                            (format stream "hi ~A!" (type-of obj))))
+     warning)
+    (write-to-string (macroexpand '(setf (values a b) (floor x y)))
+                     :pretty t)
+    ;; yay, we're not dead
+    ))
+
+(with-test (:name (:pprint-dispatch :unknown-type-1a))
+  (assert (string= (write-to-string (list 1 2 3 1006) :pretty t)
+                   "(1 2 3 1006)")))
+(deftype frood () '(integer 1005 1006))
+(with-test (:name (:pprint-dispatch :unknown-type-1b))
+  (assert (string= (write-to-string (list 1 2 3 1006) :pretty t)
+                   "(1 2 3 [frood: 1006])")))
+(defstruct weasel)
+(with-test (:name (:pprint-dispatch :unknown-type-2a))
+  ;; still can't use the dispatch entry because of the OR
+  ;; even though WEASEL "could have" eagerly returned T.
+  (assert (string= (write-to-string (make-weasel) :pretty t)
+                   "#S(WEASEL)")))
+(defstruct woodle)
+(with-test (:name (:pprint-dispatch :unknown-type-2b))
+  ;; still no, because #'THING is not boundp
+  (assert (string= (write-to-string (make-weasel) :pretty t)
+                   "#S(WEASEL)"))
+  (defun thing (x) x)
+  (assert (string= (write-to-string (make-weasel) :pretty t)
+                   "hi WEASEL!")))
 
 ;;; success

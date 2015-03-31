@@ -276,7 +276,6 @@
 
  ("src/code/stream"        :not-host)
  ("src/code/print"         :not-host)
- ("src/code/pprint"        :not-host)
  ("src/code/early-format")
  ("src/code/target-format" :not-host)
  ("src/code/defpackage"    :not-host)
@@ -390,6 +389,7 @@
  ;; and because they define
  ;;   * the function SPECIFIER-TYPE, which is used in fndb.lisp.
  ("src/code/late-type")
+ ("src/code/pprint" :not-host)
  ("src/code/deftypes-for-target")
 
  ;; defines IR1-ATTRIBUTES macro, needed by proclaim.lisp

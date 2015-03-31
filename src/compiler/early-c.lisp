@@ -165,12 +165,20 @@ the stack without triggering overflow protection.")
 
 ;;;; miscellaneous utilities
 
+;;; This is for "observers" who want to know if type names have been added.
+;;; Rather than registering listeners, they can detect changes by comparing
+;;; their stored nonce to the current nonce. Additionally the observers
+;;; can detect whether function definitions have occurred.
+(declaim (fixnum *type-cache-nonce*))
+(!defglobal *type-cache-nonce* 0)
+
 ;;; Delete any undefined warnings for NAME and KIND. This is for the
 ;;; benefit of the compiler, but it's sometimes called from stuff like
 ;;; type-defining code which isn't logically part of the compiler.
 (declaim (ftype (function ((or symbol cons) keyword) (values))
                 note-name-defined))
 (defun note-name-defined (name kind)
+  #-sb-xc-host (atomic-incf *type-cache-nonce*)
   ;; We do this BOUNDP check because this function can be called when
   ;; not in a compilation unit (as when loading top level forms).
   (when (boundp '*undefined-warnings*)
