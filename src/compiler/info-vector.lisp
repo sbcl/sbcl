@@ -159,8 +159,8 @@
 ;; from scanning physically forward, preferably within a cache line,
 ;; but for practical purposes linear probing is worse.]
 ;;
-(defmacro do-probe-sequence ((storage key table &optional hash)
-                             &key probe hit miss)
+(defmacro !do-probe-sequence ((storage key table &optional hash)
+                              &key probe hit miss)
   (with-unique-names (test miss-fn len key-index step)
     (once-only ((storage storage) (key key) (table table)
                 (hashval
@@ -227,7 +227,7 @@
 ;; or started all over again before the reader got a chance to chase one time.
 ;;
 (defun info-gethash (key env &aux (storage (info-env-storage env)))
-  (do-probe-sequence (storage key env)
+  (!do-probe-sequence (storage key env)
     :miss (return-from info-gethash nil)
     ;; With 99% certainty the :READ barrier is needed for non-x86, and if not,
     ;; it can't hurt. 'info-storage-next' can be empty until at least one cell
@@ -288,7 +288,7 @@
                               (update array index actual-old)))))))))
     (named-let probe ((hashval (funcall (info-env-hash-function env) key))
                       (storage (info-env-storage env)))
-      (do-probe-sequence (storage key env hashval)
+      (!do-probe-sequence (storage key env hashval)
        :hit (follow/update storage (value-index))
        :miss
        (progn
@@ -348,7 +348,7 @@
           unless (eql key +empty-key+)
           do (let* ((new-key-index
                       (block nil
-                        (do-probe-sequence (new-storage key env)
+                        (!do-probe-sequence (new-storage key env)
                           :hit (bug "Globaldb rehash failure. Mutated key?")
                           :miss (return (key-index)))))
                     (old-value-index (+ old-key-index old-capacity))
@@ -596,9 +596,9 @@
 ;; returns the next field from a descriptor in INPUT-VAR, a packed vector.
 ;; The generator uses DESCRIPTOR-INDEX and updates it as a side-effect.
 ;;
-(defmacro with-packed-info-iterator ((generator input-var
-                                                &key descriptor-index)
-                                     &body body)
+(defmacro !with-packed-info-iterator ((generator input-var
+                                                 &key descriptor-index)
+                                      &body body)
   (with-unique-names (input word count)
     `(let* ((,input (the simple-vector ,input-var))
             (,descriptor-index -1)
@@ -620,8 +620,8 @@
 ;; Iterate over VECTOR, binding DATA-INDEX to the index of each aux-key in turn.
 ;; TOTAL-N-FIELDS is deliberately exposed to invoking code.
 ;;
-(defmacro do-packed-info-vector-aux-key ((vector &optional (data-index (gensym)))
-                                         step-form &optional result-form)
+(defmacro !do-packed-info-vector-aux-key ((vector &optional (data-index (gensym)))
+                                          step-form &optional result-form)
   (with-unique-names (descriptor-idx field-idx)
     (once-only ((vector vector))
       `(let ((,data-index (length ,vector))
@@ -644,6 +644,21 @@
                  (return ,result-form))
                ,@(if step-form (list step-form)))))))
 
+;; Return all function names that are stored in SYMBOL's info-vector.
+;; As an example, (INFO-VECTOR-NAME-LIST 'SB-PCL::DIRECT-SUPERCLASSES) =>
+;; ((SB-PCL::SLOT-ACCESSOR :GLOBAL SB-PCL::DIRECT-SUPERCLASSES SB-PCL::READER)
+;;  (SB-PCL::SLOT-ACCESSOR :GLOBAL SB-PCL::DIRECT-SUPERCLASSES BOUNDP)
+;;  (SB-PCL::SLOT-ACCESSOR :GLOBAL SB-PCL::DIRECT-SUPERCLASSES SB-PCL::WRITER))
+(defun info-vector-name-list (symbol)
+  (let ((vector (symbol-info-vector symbol))
+        (list))
+    (when vector
+      (!do-packed-info-vector-aux-key (vector key-index)
+        (push (construct-globaldb-name (svref vector key-index) symbol)
+              list))
+      (nconc (and (plusp (packed-info-field vector 0 0)) (list symbol))
+             (nreverse list)))))
+
 ;; Compute the number of elements needed to hold packed VECTOR after unpacking.
 ;; The unpacked size is the number of auxilliary keys plus the number of entries
 ;; @ 2 cells per entry, plus the number of length cells which indicate the
@@ -652,7 +667,7 @@
 ;;
 (defun compute-unpackified-info-size (vector)
   (declare (simple-vector vector))
-  (do-packed-info-vector-aux-key (vector) ()
+  (!do-packed-info-vector-aux-key (vector) ()
     ;; off-by-one: the first info group's auxilliary key is imaginary
     (1- (truly-the fixnum (ash total-n-fields 1)))))
 
@@ -666,7 +681,7 @@
     (setq output (make-array (compute-unpackified-info-size input))))
   (let ((i (length input)) (j -1))  ; input index and output index respectively
     (declare (type index-or-minus-1 i j))
-    (with-packed-info-iterator (next-field input :descriptor-index desc-idx)
+    (!with-packed-info-iterator (next-field input :descriptor-index desc-idx)
       (loop ; over name
          (let ((n-infos (next-field)))
            ;; store the info group length, including the length cell in the length
@@ -996,7 +1011,7 @@
   (let ((name root-symbol)
         (data-idx (length vect)))
     (declare (type index data-idx))
-    (with-packed-info-iterator (next-field vect :descriptor-index desc-idx)
+    (!with-packed-info-iterator (next-field vect :descriptor-index desc-idx)
       (loop ; over name
          (dotimes (i (next-field)) ; number of infos for this name
            (funcall function name (next-field) (svref vect (decf data-idx))))

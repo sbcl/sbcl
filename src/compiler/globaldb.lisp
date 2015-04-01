@@ -386,19 +386,17 @@
 ;;
 (defun call-with-each-globaldb-name (fun-designator)
   (let ((function (coerce fun-designator 'function)))
-    (dolist (package (list-all-packages))
-      (do-symbols (symbol package)
-        (when (eq (symbol-package symbol) package)
-          (let ((vector (symbol-info-vector symbol)))
-            (when vector
-              ;; Check whether SYMBOL has info for itself
-              (when (plusp (packed-info-field vector 0 0))
-                (funcall function symbol))
-              ;; Now deal with (<othersym> SYMBOL) names
-              (do-packed-info-vector-aux-key (vector key-index)
-                (funcall function
-                         (construct-globaldb-name (svref vector key-index)
-                                                  symbol))))))))
+    (with-package-iterator (iter (list-all-packages) :internal :external)
+      (loop (multiple-value-bind (winp symbol access package) (iter)
+              (declare (ignore access))
+              (if (not winp) (return))
+              ;; Try to process each symbol at most once by associating it with
+              ;; a single package. If a symbol is apparently uninterned,
+              ;; always keep it since we can't know if it has been seen once.
+              (when (or (not (symbol-package symbol))
+                        (eq package (symbol-package symbol)))
+                (dolist (name (info-vector-name-list symbol))
+                  (funcall function name))))))
     (info-maphash (lambda (name data)
                     (declare (ignore data))
                     (funcall function name))
