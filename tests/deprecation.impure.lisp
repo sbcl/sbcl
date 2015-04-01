@@ -143,3 +143,35 @@
    :replacements '("DEPRECATED-FUNCTION.THREE-REPLACEMENTS.REPLACEMENT1"
                    "DEPRECATED-FUNCTION.THREE-REPLACEMENTS.REPLACEMENT2"
                    "DEPRECATED-FUNCTION.THREE-REPLACEMENTS.REPLACEMENT3")))
+
+
+(sb-int:define-deprecated-function :early "1.2.10"
+  please-dont-use-this moar-better-function (x) (identity x))
+(sb-int:define-deprecated-function :late "1.2.10"
+  really-dont-do-it use-other-thing-instead (x) (identity x))
+(sb-int:define-deprecated-function :final "1.2.10"
+  you-cant-use-this replacement-fn (x) (identity x))
+
+(with-test (:name :intropect-deprecation-stage)
+  (assert (eq (sb-int:deprecated-thing-p :function 'please-dont-use-this)
+              :early))
+  (assert (eq (sb-int:deprecated-thing-p :function 'really-dont-do-it)
+              :late))
+  (assert (eq (sb-int:deprecated-thing-p :function 'you-cant-use-this)
+              :final)))
+
+(with-test (:name :load-time-deprecation-warning)
+  (let ((source "load-test.tmp") fasl)
+    (with-open-file (f source :direction :output
+                       :if-does-not-exist :create :if-exists :supersede)
+      (write-string "(defun a () (quit))" f)
+      ;; a full warning even though the PLEASE-DONT- function is only :early
+      (write-string "(defun b () (please-dont-use-this) (really-dont-do-it))" f)
+      (write-string "(defun c () (you-cant-use-this))" f))
+    (unwind-protect
+         (progn (setq fasl
+                      (let ((*error-output* (make-broadcast-stream)))
+                        (compile-file source :verbose nil :print nil)))
+                (assert-signal (load fasl) warning))
+      (delete-file fasl)
+      (delete-file source))))

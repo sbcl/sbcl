@@ -452,23 +452,29 @@
                                (funcall function fasl-input arg1))))))))
            (when (plusp (sbit (cdr **fop-signatures**) byte))
              (push-fop-stack result fasl-input))
-           (when trace
-             (let* ((stack (%fasl-input-stack fasl-input))
-                    (ptr (svref stack 0)))
+           (let* ((stack (%fasl-input-stack fasl-input))
+                  (ptr (svref stack 0)))
+             (when trace
                (format *trace-output* " -- ~[<empty>,~D~:;[~:*~D,~D] ~S~]"
                        ptr (svref (%fasl-input-table fasl-input) 0)
                        (unless (eql ptr 0) (aref stack ptr)))
-               (terpri *trace-output*)))
-           #-sb-xc-host
-           (macrolet ((terminator-opcode ()
-                        (or (get 'fop-funcall-for-effect 'opcode)
-                            (error "Missing FOP definition?"))))
-             (when (and print
-                        (eq byte (terminator-opcode))
-                        (fop-stack-empty-p ; (presumed) end of TLF
-                         (%fasl-input-stack fasl-input)))
-               (load-fresh-line)
-               (prin1 result)))))))))
+               (terpri *trace-output*))
+             #-sb-xc-host
+             (macrolet ((terminator-opcode ()
+                          (or (get 'fop-funcall-for-effect 'opcode)
+                              (error "Missing FOP definition?"))))
+               (when (and (eq byte (terminator-opcode))
+                          (fop-stack-empty-p stack)) ; (presumed) end of TLF
+                 (awhen (%fasl-input-deprecated-stuff fasl-input)
+                   ;; Delaying this message rather than printing it
+                   ;; in fop-fdefn makes it more informative (usually).
+                   (setf (%fasl-input-deprecated-stuff fasl-input) nil)
+                   (loader-deprecation-warn
+                    it
+                    (and (eq (svref stack 1) 'sb!impl::%defun) (svref stack 2))))
+                 (when print
+                   (load-fresh-line)
+                   (prin1 result)))))))))))
 
 (defun load-as-fasl (stream verbose print)
   (when (zerop (file-length stream))

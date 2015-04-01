@@ -5,6 +5,10 @@ changes relative to sbcl-1.2.10:
     The dispatch table will be altered, but the new entry is disabled.
     Subsequent type-defining forms will cause pprint-dispatch tables to
     re-examine whether any disabled entries should be enabled. (lp#1429520)
+  * enhancement: Loading code containing calls to a deprecated function will,
+    under most circumstances, signal warnings similar to compiling such code.
+    The usual caveat holds about not detecting calls through a computed name,
+    as in (funcall (intern "DEPRECATED-FUN" "SB-EXT")).
 
 changes in sbcl-1.2.10 relative to sbcl-1.2.9:
   * minor incompatible change: all SOCKINT::WIN32-* functions have been

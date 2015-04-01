@@ -1073,6 +1073,8 @@ possibly temporarily, because it might be used internally."
                "FINAL-DEPRECATION-WARNING"
                "DEPRECATION-WARNING"
                "DEPRECATION-ERROR"
+               "DEPRECATED-THING-P"
+               "LOADER-DEPRECATION-WARN"
 
                ;; miscellaneous non-standard but handy user-level functions..
                "ASSQ" "DELQ" "MEMQ" "POSQ" "NEQ"

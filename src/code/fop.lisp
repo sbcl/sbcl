@@ -563,6 +563,9 @@
 
 ;; this gets you an #<fdefn> object, not the result of (FDEFINITION x)
 (!define-fop 60 (fop-fdefn (name))
+  (awhen (deprecated-thing-p :function name) ; returns the stage of deprecation
+    (pushnew (list* it name :function)
+             (%fasl-input-deprecated-stuff (fasl-input)) :test 'equal))
   (find-or-create-fdefn name))
 
 (!define-fop 65 (fop-known-fun (name))

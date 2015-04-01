@@ -1138,15 +1138,51 @@
         :runtime-error runtime-error))
 
 (defun deprecated-function (since name replacements)
-  (lambda (&rest deprecated-function-args)
+  ;; this lambda's name is significant - see DEPRECATED-THING-P
+  (named-lambda .deprecated-function. (&rest deprecated-function-args)
     (declare (ignore deprecated-function-args))
     (deprecation-error since name replacements)))
 
 (defun deprecation-compiler-macro (state since name replacements)
-  (lambda (form env)
+  ;; this lambda's name is significant - see DEPRECATED-THING-P
+  (named-lambda .deprecation-warning. (form env)
     (declare (ignore env))
     (deprecation-warning state since name replacements)
     form))
+
+;; Return the stage of deprecation of thing identified by KIND and NAME, or NIL.
+(defun deprecated-thing-p (kind name)
+  (ecase kind
+    (:function
+     (or (let ((macro-fun (info :function :compiler-macro-function name)))
+           (and (closurep macro-fun)
+                (eq (%fun-name macro-fun) '.deprecation-warning.)
+                ;; If you name a function literally :EARLY and it happens to
+                ;; be in :LATE deprecation, then this could be wrong; and v.v.
+                ;; But come on now ... who would name a function like that?
+                (find-if-in-closure (lambda (x) (member x '(:early :late)))
+                                    macro-fun)))
+         (let ((fdefn (find-fdefn name)))
+           (and fdefn
+                (let ((fun (fdefn-fun fdefn)))
+                  (and (closurep fun)
+                       (eq (%fun-name fun) '.deprecated-function.)
+                       :final))))))))
+
+;; This is the moral equivalent of a warning from /usr/bin/ld that
+;; "gets() is dangerous." You're informed by both the compiler and linker.
+(defun loader-deprecation-warn (stuff whence)
+  ;; Stuff is a list: ((<state> name . category) ...)
+  ;; For now we only deal with category = :FUNCTION so we ignore it.
+  (let ((warning-class
+         ;; We're only going to warn once (per toplevel form),
+         ;; so pick the most stern warning applicable.
+         (if (every (lambda (x) (eq (car x) :early)) stuff)
+             'simple-style-warning 'simple-warning)))
+    (warn warning-class
+          :format-control "Reference to deprecated function~P ~S~@[ from ~S~]"
+          :format-arguments
+          (list (length stuff) (mapcar #'second stuff) whence))))
 
 ;;; STATE is one of
 ;;;
