@@ -19,6 +19,8 @@
                                      (list (format nil "~A.~A"
                                                    name '#:replacement))))
   (flet ((search-string (string)
+           (declare (ignorable string))
+           #+sb-doc
            (dolist (fragment `(,(string name)
                                 "deprecated" "as" "of" "SBCL" "1.2.10"
                                 "Use"
@@ -152,13 +154,22 @@
 (sb-int:define-deprecated-function :final "1.2.10"
   you-cant-use-this replacement-fn (x) (identity x))
 
-(with-test (:name :intropect-deprecation-stage)
+(with-test (:name :introspect-deprecation-stage)
   (assert (eq (sb-int:deprecated-thing-p :function 'please-dont-use-this)
               :early))
   (assert (eq (sb-int:deprecated-thing-p :function 'really-dont-do-it)
               :late))
   (assert (eq (sb-int:deprecated-thing-p :function 'you-cant-use-this)
               :final)))
+
+;; lp#1439151
+(with-test (:name :late-deprecated-fun-doc :skipped-on '(not :sb-doc))
+  (assert (string= (documentation 'you-cant-use-this 'function)
+                   (documentation #'you-cant-use-this 'function)))
+  (assert (string= (documentation 'deprecated-function.late 'function)
+                   (documentation #'deprecated-function.late 'function)))
+  (assert (string/= (documentation 'you-cant-use-this 'function)
+                    (documentation 'deprecated-function.late 'function))))
 
 (with-test (:name :load-time-deprecation-warning)
   (let ((source "load-test.tmp") fasl)

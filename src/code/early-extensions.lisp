@@ -1137,11 +1137,18 @@
         :since since
         :runtime-error runtime-error))
 
-(defun deprecated-function (since name replacements)
-  ;; this lambda's name is significant - see DEPRECATED-THING-P
-  (named-lambda .deprecated-function. (&rest deprecated-function-args)
-    (declare (ignore deprecated-function-args))
-    (deprecation-error since name replacements)))
+(defun deprecated-function (since name replacements &optional doc)
+  (let ((closure
+         ;; setting the name is mildly redundant since the closure captures
+         ;; its name. However %FUN-DOC can't make use of that fact.
+         (set-closure-name
+          (lambda (&rest deprecated-function-args)
+            (declare (ignore deprecated-function-args))
+            (deprecation-error since name replacements))
+          name)))
+    (when doc
+      (setf (%fun-doc closure) doc))
+    closure))
 
 (defun deprecation-compiler-macro (state since name replacements)
   ;; this lambda's name is significant - see DEPRECATED-THING-P
@@ -1154,20 +1161,14 @@
 (defun deprecated-thing-p (kind name)
   (ecase kind
     (:function
-     (or (let ((macro-fun (info :function :compiler-macro-function name)))
-           (and (closurep macro-fun)
-                (eq (%fun-name macro-fun) '.deprecation-warning.)
-                ;; If you name a function literally :EARLY and it happens to
-                ;; be in :LATE deprecation, then this could be wrong; and v.v.
-                ;; But come on now ... who would name a function like that?
-                (find-if-in-closure (lambda (x) (member x '(:early :late)))
-                                    macro-fun)))
-         (let ((fdefn (find-fdefn name)))
-           (and fdefn
-                (let ((fun (fdefn-fun fdefn)))
-                  (and (closurep fun)
-                       (eq (%fun-name fun) '.deprecated-function.)
-                       :final))))))))
+     (let ((macro-fun (info :function :compiler-macro-function name)))
+       (and (closurep macro-fun)
+            (eq (%fun-name macro-fun) '.deprecation-warning.)
+            ;; If you name a function literally :EARLY and it happens to
+            ;; be in :LATE deprecation, then this could be wrong; etc.
+            ;; But come on now ... who would name a function like that?
+            (find-if-in-closure (lambda (x) (member x '(:early :late :final)))
+                                macro-fun))))))
 
 ;; This is the moral equivalent of a warning from /usr/bin/ld that
 ;; "gets() is dangerous." You're informed by both the compiler and linker.
@@ -1278,9 +1279,8 @@
              `(progn
                 (declaim (ftype (function * nil) ,name))
                 (setf (fdefinition ',name)
-                      (deprecated-function ,since ',name ',replacements))
-                #!+sb-doc
-                (setf (fdocumentation ',name 'function) ,doc)
+                      (deprecated-function ,since ',name ',replacements
+                                           #!+sb-doc ,doc))
                 ',name)))
        (setf (compiler-macro-function ',name)
              (deprecation-compiler-macro ,state ,since ',name ',replacements)))))

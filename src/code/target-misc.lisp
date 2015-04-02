@@ -153,6 +153,10 @@
     (sb!eval:interpreted-function
      (sb!eval:interpreted-function-documentation function))
     (t
+     (when (closurep function)
+       (multiple-value-bind (name namedp) (closure-name function)
+         (when namedp
+           (return-from %fun-doc (random-documentation name 'function)))))
      (%simple-fun-doc (%fun-fun function)))))
 
 (defun (setf %fun-doc) (new-value function)
@@ -162,6 +166,11 @@
     (sb!eval:interpreted-function
      (setf (sb!eval:interpreted-function-documentation function) new-value))
     ((or simple-fun closure)
+     (when (closurep function)
+       (multiple-value-bind (name namedp) (closure-name function)
+         (when namedp
+           (return-from %fun-doc
+             (setf (random-documentation name 'function) new-value)))))
      (setf (%simple-fun-doc (%fun-fun function)) new-value)))
   new-value)
 

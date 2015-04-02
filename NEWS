@@ -9,6 +9,8 @@ changes relative to sbcl-1.2.10:
     under most circumstances, signal warnings similar to compiling such code.
     The usual caveat holds about not detecting calls through a computed name,
     as in (funcall (intern "DEPRECATED-FUN" "SB-EXT")).
+  * bug fix: functions in :FINAL deprecation have the correct docstring.
+    No visible change, as no such functions presently exist. (lp#1439151)
 
 changes in sbcl-1.2.10 relative to sbcl-1.2.9:
   * minor incompatible change: all SOCKINT::WIN32-* functions have been
