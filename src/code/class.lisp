@@ -146,8 +146,7 @@
                                   ;; DEF!STRUCT setup. -- WHN 19990930
                                   #+sb-xc-host
                                   make-load-form-for-layout))
-  ;; a pseudo-random hash value for use by CLOS.  KLUDGE: The fact
-  ;; that this slot is at offset 1 is known to GENESIS.
+  ;; a pseudo-random hash value for use by CLOS.
   (clos-hash (random-layout-clos-hash) :type layout-clos-hash)
   ;; the class that this is a layout for
   (classoid (missing-arg) :type classoid)
