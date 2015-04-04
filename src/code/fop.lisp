@@ -576,31 +576,11 @@
   (sb!vm:sanctify-for-execution component)
   component)
 
-(!define-fop 74 (fop-fset (name fn) nil)
-  ;; Ordinary, not-for-cold-load code shouldn't need to mess with this
-  ;; at all, since it's only used as part of the conspiracy between
-  ;; the cross-compiler and GENESIS to statically link FDEFINITIONs
-  ;; for cold init.
-  (warn "~@<FOP-FSET seen in ordinary load (not cold load) -- quite strange! ~
-If you didn't do something strange to cause this, please report it as a ~
-bug.~:@>")
-  ;; Unlike CMU CL, we don't treat this as a no-op in ordinary code.
-  ;; If the user (or, more likely, developer) is trying to reload
-  ;; compiled-for-cold-load code into a warm SBCL, we'll do a warm
-  ;; assignment. (This is partly for abstract tidiness, since the warm
-  ;; assignment is the closest analogy to what happens at cold load,
-  ;; and partly because otherwise our compiled-for-cold-load code will
-  ;; fail, since in SBCL things like compiled-for-cold-load %DEFUN
-  ;; depend more strongly than in CMU CL on FOP-FSET actually doing
-  ;; something.)
-  (setf (fdefinition name) fn))
-
 (!define-fop 174 (fop-note-debug-source (debug-source) nil)
   (warn "~@<FOP-NOTE-DEBUG-SOURCE seen in ordinary load (not cold load) -- ~
 very strange!  If you didn't do something to cause this, please report it as ~
 a bug.~@:>")
-  ;; as with COLD-FSET above, we are going to be lenient with coming
-  ;; across this fop in a warm SBCL.
+  ;; we are going to be lenient with coming across this fop in a warm SBCL.
   (setf (sb!c::debug-source-compiled debug-source) (get-universal-time)
         (sb!c::debug-source-created debug-source)
         (file-write-date (sb!c::debug-source-namestring debug-source))))
