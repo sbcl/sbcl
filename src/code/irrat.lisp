@@ -475,10 +475,10 @@
           (sqrt (+ (* rx rx) (* ix ix))))
          (single-float
           (coerce (%hypot (coerce rx 'double-float)
-                          (coerce ix 'double-float))
+                          (coerce (truly-the single-float ix) 'double-float))
                   'single-float))
          (double-float
-          (%hypot rx ix)))))))
+          (%hypot rx (truly-the double-float ix))))))))
 
 (defun phase (number)
   #!+sb-doc
