@@ -9,6 +9,11 @@
 
 int main ()
 {
+#ifdef __NetBSD__
+  /* dladdr(3) is broken on NetBSD currently, don't forget to replace
+     with a version check when they fix it */
+  return 1;
+#else
    void * handle = dlopen((void*)0, RTLD_GLOBAL | RTLD_NOW);
    void * addr = dlsym(handle, "printf");
    Dl_info * info = (Dl_info*) malloc(sizeof(Dl_info));
@@ -17,4 +22,5 @@ int main ()
    } else {
        return 104;
    }
+#endif
 }
