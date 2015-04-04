@@ -216,14 +216,12 @@ backtraces. Possible values are :MINIMAL, :NORMAL, and :FULL.
 (define-deprecated-variable :early "1.1.4.9" *show-entry-point-details*
   :value nil)
 
-(defun backtrace (&optional (count *backtrace-frame-count*) (stream *debug-io*))
-  #!+sb-doc
-  "Replaced by PRINT-BACKTRACE, will eventually be deprecated."
+(define-deprecated-function :early "1.2.15" backtrace (print-backtrace)
+    (&optional (count *backtrace-frame-count*) (stream *debug-io*))
   (print-backtrace :count count :stream stream))
 
-(defun backtrace-as-list (&optional (count *backtrace-frame-count*))
-  #!+sb-doc
-  "Replaced by LIST-BACKTRACE, will eventually be deprecated."
+(define-deprecated-function :early "1.2.15" backtrace-as-list (list-backtrace)
+    (&optional (count *backtrace-frame-count*))
   (list-backtrace :count count))
 
 (defun backtrace-start-frame (frame-designator)
