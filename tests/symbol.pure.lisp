@@ -28,3 +28,14 @@
 
 (with-test (:name (gensym :fixnum-restriction))
   (gensym (1+ most-positive-fixnum)))
+
+;; lp#1439921
+;; CLHS states that SYMBOL-FUNCTION of a symbol naming a special operator
+;; or macro must return something implementation-defined that might not
+;; be a function. In this implementation it is a function, but it is illegal
+;; to assign that function into another symbol via (SETF FDEFINITION).
+(with-test (:name :setf-fdefinition-no-magic-functions)
+  (assert-error (setf (fdefinition 'mysym) (fdefinition 'and)))
+  (assert-error (setf (fdefinition 'mysym) (fdefinition 'if)))
+  (assert-error (setf (symbol-function 'mysym) (symbol-function 'and)))
+  (assert-error (setf (symbol-function 'mysym) (symbol-function 'if))))

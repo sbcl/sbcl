@@ -163,20 +163,32 @@ only."
   (when (eq (info :function :kind symbol) :special-form)
     (error "~S names a special form." symbol))
   (with-single-package-locked-error (:symbol symbol "setting the macro-function of ~S")
+    (clear-info :function :type symbol)
     (setf (info :function :kind symbol) :macro)
     (setf (info :function :macro-function symbol) function)
-    ;; This is a nice thing to have in the target SBCL, but in the
-    ;; cross-compilation host it's not nice to mess with
-    ;; (SYMBOL-FUNCTION FOO) where FOO might be a symbol in the
-    ;; cross-compilation host's COMMON-LISP package.
-    #-sb-xc-host
-    (setf (symbol-function symbol)
-          (lambda (&rest args)
-            (declare (ignore args))
-            ;; (ANSI specification of FUNCALL says that this should be
-            ;; an error of type UNDEFINED-FUNCTION, not just SIMPLE-ERROR.)
-            (error 'undefined-function :name symbol))))
+    (install-guard-function symbol `(:macro ,symbol) nil))
   function)
+
+;; Set (SYMBOL-FUNCTION SYMBOL) to a closure that signals an error,
+;; preventing funcall/apply of macros and special operators.
+(defun install-guard-function (symbol fun-name docstring)
+  (when docstring
+    (setf (random-documentation symbol 'function) docstring))
+  #-sb-xc-host
+  ;; (SETF SYMBOL-FUNCTION) goes out of its way to disallow this closure,
+  ;; but we can trivially replicate its low-level effect.
+  (setf (fdefn-fun (find-or-create-fdefn symbol))
+        (sb!impl::set-closure-name
+         (lambda (&rest args)
+           (declare (ignore args))
+           ;; ANSI specification of FUNCALL says that this should be
+           ;; an error of type UNDEFINED-FUNCTION, not just SIMPLE-ERROR.
+           ;; SPECIAL-FORM-FUNCTION is a subtype of UNDEFINED-FUNCTION.
+           (error (if (eq (info :function :kind symbol) :special-form)
+                      'special-form-function
+                      'undefined-function)
+                  :name symbol))
+         fun-name)))
 
 (defun fun-locally-defined-p (name env)
   (and env

@@ -134,8 +134,21 @@ distinct from the global value. Can also be SETF."
   "Return SYMBOL's current function definition. Settable with SETF."
   (%coerce-name-to-fun symbol symbol-fdefn))
 
+;; I think there are two bugs here.
+;; Per CLHS "SETF may be used with symbol-function to replace a global
+;;           function definition when the symbol's function definition
+;;           does not represent a special operator."
+;; 1. This should fail:
+;;    * (in-package CL) ; circumvent package lock
+;;    * (setf (symbol-function 'if) #'cons) => #<FUNCTION CONS>
+;; 2. (SETF (SYMBOL-FUNCTION 'I-ONCE-WAS-A-MACRO) #'CONS)
+;;    should _probably_ make I-ONCE-WAS-A-MACRO not a macro
 (defun (setf symbol-function) (new-value symbol)
   (declare (type symbol symbol) (type function new-value))
+  ;; (SYMBOL-FUNCTION symbol) == (FDEFINITION symbol) according to the writeup
+  ;; on SYMBOL-FUNCTION. It doesn't say that SETF behaves the same, but let's
+  ;; assume it does, and that we can't assign our macro/special guard funs.
+  (err-if-unacceptable-function new-value '(setf symbol-function))
   (with-single-package-locked-error
       (:symbol symbol "setting the symbol-function of ~A")
     ;; This code is a little "surprising" in that it is not just a limited

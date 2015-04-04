@@ -68,26 +68,17 @@
 (declaim (inline coerce-to-list))
 (declaim (inline coerce-to-vector))
 
-(defun coerce-symbol-to-fun (object)
+(defun coerce-symbol-to-fun (symbol)
   ;; FIXME? I would think to use SYMBOL-FUNCTION here which does not strip off
   ;; encapsulations. But Stas wrote FDEFINITION so ...
   ;; [Also note, we won't encapsulate a macro or special-form, so this
   ;; introspective technique to decide what kind something is works either way]
-  (let* ((def (fdefinition object))
-         (widetag (fun-subtype def)))
-    (cond ((and (eq widetag sb!vm:closure-header-widetag)
-                (eq (%closure-fun def)
-                    (load-time-value
-                     ;; pick a macro, any macro...
-                     (%closure-fun (symbol-function 'with-unique-names))
-                     t)))
-           (error "~S names a macro." object))
-          ((and (eq widetag sb!vm:simple-fun-header-widetag)
-                (let ((name (%simple-fun-name def)))
-                  (and (listp name) (eq (car name) 'special-operator))))
-           (error "~S names a special operator." object))
-          (t
-           def))))
+  (let ((def (fdefinition symbol)))
+    (acond ((macro/special-guard-fun-p def)
+            (error (if (eq it :special)
+                       "~S names a special operator." "~S names a macro.")
+                   symbol))
+           (t def))))
 
 (defun coerce-to-fun (object)
   ;; (Unlike the other COERCE-TO-FOOs, this one isn't inline, because

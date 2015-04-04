@@ -588,7 +588,9 @@
         (multiple-value-bind (fun what lambda-list derived-type declared-type
                               inline methods)
             (cond ((and (not function) (symbolp name) (special-operator-p name))
-                   (let ((fun (symbol-function name)))
+                   ;; The function in the symbol is irrelevant.
+                   ;; Use the def-ir1-translator function for source location.
+                   (let ((fun (info :function :ir1-convert name)))
                      (values fun "a special operator" (%fun-lambda-list fun))))
                   ((and (not function) (symbolp name) (macro-function name))
                    (let ((fun (macro-function name)))

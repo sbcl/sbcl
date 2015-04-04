@@ -11,6 +11,8 @@ changes relative to sbcl-1.2.10:
     as in (funcall (intern "DEPRECATED-FUN" "SB-EXT")).
   * bug fix: functions in :FINAL deprecation have the correct docstring.
     No visible change, as no such functions presently exist. (lp#1439151)
+  * bug fix: (SETF (FDEFINITION this) (FDEFINITION OTHER)) signals an error
+    if OTHER names either a macro or special-operator. (lp#1439921)
 
 changes in sbcl-1.2.10 relative to sbcl-1.2.9:
   * minor incompatible change: all SOCKINT::WIN32-* functions have been

@@ -474,7 +474,9 @@ If an unsupported TYPE is requested, the function will return NIL.
 Works for special-operators, macros, simple functions, interpreted functions,
 and generic functions. Signals an error if FUNCTION is not a valid extended
 function designator."
-  (cond ((valid-function-name-p function)
+  (cond ((and (symbolp function) (special-operator-p function))
+         (function-lambda-list (sb-int:info :function :ir1-convert function)))
+        ((valid-function-name-p function)
          (function-lambda-list (or (and (symbolp function)
                                         (macro-function function))
                                    (fdefinition function))))

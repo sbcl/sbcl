@@ -27,11 +27,12 @@
                               &body body)
   (let ((fn-name (symbolicate "IR1-CONVERT-" name)))
     (with-unique-names (whole-var n-env)
-      (multiple-value-bind (body decls #-sb-xc-host doc)
+      (multiple-value-bind (body decls doc)
           (parse-defmacro lambda-list whole-var body name "special form"
                           :environment n-env
                           :error-fun 'compiler-error
                           :wrap-block nil)
+        (declare (ignorable doc))
         `(progn
            (declaim (ftype (function (ctran ctran (or lvar null) t) (values))
                            ,fn-name))
@@ -41,26 +42,16 @@
              ,@decls
              ,body
              (values))
+           (install-guard-function ',name '(:special ,name) ,(or #!+sb-doc doc))
+           ;; The guard function is a closure, which can't have its lambda-list
+           ;; changed independently of other closures based on the same
+           ;; simple-fun. So change it in the ir1-translator since the actual
+           ;; lambda-list is not terribly useful.
            #-sb-xc-host
-           ;; It's nice to do this for error checking in the target
-           ;; SBCL, but it's not nice to do this when we're running in
-           ;; the cross-compilation host Lisp, which owns the
-           ;; SYMBOL-FUNCTION of its COMMON-LISP symbols. These guard
-           ;; functions also provide the documentation for special forms.
-           ;; FIXME: should be disallowed after bootstrap. Package-lock
-           ;; prevents it, but the protection could be stronger than that.
-           ;; The lambda name has significance to COERCE-SYMBOL-TO-FUN.
-           (let ((fun (named-lambda (sb!impl::special-operator ,name)
-                          (&rest args)
-                        ,@(when doc (list doc))
-                        (declare (ignore args))
-                        (error 'special-form-function :name ',name)) ))
-             ;; Set up a macro lambda list to a function.
-             (setf (%simple-fun-arglist fun)
-                   ',(if (eq (first lambda-list) '&whole)
-                         (cddr lambda-list)
-                         lambda-list)
-                   (symbol-function ',name) fun))
+           (setf (%fun-lambda-list #',fn-name) ; This is for DESCRIBE et. al.
+                 ',(if (eq (first lambda-list) '&whole)
+                       (cddr lambda-list)
+                       lambda-list))
            ;; FIXME: Evidently "there can only be one!" -- we overwrite any
            ;; other :IR1-CONVERT value. This deserves a warning, I think.
            (setf (info :function :ir1-convert ',name) #',fn-name)

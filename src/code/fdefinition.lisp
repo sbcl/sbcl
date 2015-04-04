@@ -278,10 +278,37 @@
   "A list of functions that (SETF FDEFINITION) invokes before storing the
    new value. The functions take the function name and the new value.")
 
+;; Return :MACRO or :SPECIAL if FUNCTION is the error-signaling trampoline
+;; for a macro or a special operator respectively. Test for this by seeing
+;; whether FUNCTION is the same closure as for a known macro.
+;; For cold-init to work, this must pick any macro defined before
+;; this function is. A safe choice is a macro from this same file.
+(defun macro/special-guard-fun-p (function)
+  (and (closurep function)
+       ;; Prior to cold-init fixing up the load-time-value, this compares
+       ;; %closure-fun to 0, which is ok - it returns NIL.
+       (eq (load-time-value
+            (%closure-fun (symbol-function '%coerce-name-to-fun)) t)
+           (%closure-fun function))
+       ;; This is not super-efficient, but every code path that gets
+       ;; here does so with the intent of signaling an error.
+       (car (%fun-name function))))
+
+;; Reject any "object of implementation-dependent nature" that
+;; so happens to be a function in SBCL, but which must not be
+;; bound to a function-name by way of (SETF FEDFINITION).
+(defun err-if-unacceptable-function (object setter)
+  (when (macro/special-guard-fun-p object)
+    (error 'simple-reference-error
+           :references (list '(:ansi-cl :function fdefinition))
+           :format-control "~S is not acceptable to ~S."
+           :format-arguments (list object setter))))
+
 (defun %set-fdefinition (name new-value)
   #!+sb-doc
   "Set NAME's global function definition."
   (declare (type function new-value) (optimize (safety 1)))
+  (err-if-unacceptable-function new-value '(setf fdefinition))
   (with-single-package-locked-error (:symbol name "setting fdefinition of ~A")
     (maybe-clobber-ftype name)
 
