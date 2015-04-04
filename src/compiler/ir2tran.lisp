@@ -185,13 +185,19 @@
              (vop fast-symbol-global-value node block name-tn res)
              (vop symbol-global-value node block name-tn res))))
       (:global-function
-       (cond #-sb-xc-host
-             ((and (info :function :definition name)
+       ;; In cross-compilation, testing (INFO :function :definition) is not
+       ;; sensible (or possible) but we can assume that things with fun-info
+       ;; will eventually be defined. If that's untrue, e.g. if we referred
+       ;; to #'DESCRIBE during cold-load, we'd just fix it locally by declaring
+       ;; DESCRIBE notinline.
+       ;; But in the target, more caution is warranted because users might
+       ;; DEFKNOWN a function but fail to define it. And they shouldn't be
+       ;; expected to understand the failure mode and the remedy.
+       (cond ((and #-sb-xc-host (info :function :definition name)
                    (info :function :info name)
                    (let ((*lexenv* (node-lexenv node)))
                      (not (fun-lexically-notinline-p name))))
-              ;; Known functions can be saved without going through fdefns,
-              ;; except during cross-compilation
+              ;; Known functions can be dumped without going through fdefns.
               ;; But if NOTINLINEd, don't early-bind to the functional value
               ;; because that disallows redefinition, including but not limited
               ;; to encapsulations, which in turn makes TRACE not work, which

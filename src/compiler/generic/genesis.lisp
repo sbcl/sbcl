@@ -922,6 +922,8 @@ core and return a descriptor to it."
     (write-wordindexed symbol-des sb!vm:symbol-value-slot value)))
 (defun cold-symbol-value (symbol)
   (read-wordindexed (cold-intern symbol) sb!vm:symbol-value-slot))
+(defun cold-fdefn-fun (cold-fdefn)
+  (read-wordindexed cold-fdefn sb!vm:fdefn-fun-slot))
 
 ;;;; layouts and type system pre-initialization
 
@@ -1556,8 +1558,7 @@ core and return a descriptor to it."
           (setf (gethash warm-name *cold-fdefn-objects*) fdefn)
           (write-wordindexed fdefn sb!vm:fdefn-name-slot cold-name)
           (unless leave-fn-raw
-            (write-wordindexed fdefn sb!vm:fdefn-fun-slot
-                               *nil-descriptor*)
+            (write-wordindexed fdefn sb!vm:fdefn-fun-slot *nil-descriptor*)
             (write-wordindexed fdefn
                                sb!vm:fdefn-raw-addr-slot
                                (make-random-descriptor
@@ -1771,6 +1772,9 @@ core and return a descriptor to it."
     (unless value
       (warn "Assembler routine ~S not defined." symbol))
     value))
+
+;;; Unlike in the target, FOP-KNOWN-FUN sometimes has to backpatch.
+(defvar *deferred-known-fun-refs*)
 
 ;;; The x86 port needs to store code fixups along with code objects if
 ;;; they are to be moved, so fixups for code objects in the dynamic
@@ -2438,8 +2442,7 @@ core and return a descriptor to it."
            (fdefinition
             ;; Special form #'F fopcompiles into `(FDEFINITION ,f)
             (aver (and (singleton-p args) (symbolp (car args))))
-            (let ((f (read-wordindexed (cold-fdefinition-object (car args))
-                                       sb!vm:fdefn-fun-slot)))
+            (let ((f (cold-fdefn-fun (cold-fdefinition-object (car args)))))
               ;; It works only if DEFUN F was seen first.
               (aver (not (cold-null f)))
               f))
@@ -2526,7 +2529,10 @@ core and return a descriptor to it."
 (define-cold-fop (fop-fdefn)
   (cold-fdefinition-object (pop-stack)))
 
-(not-cold-fop fop-known-fun)
+(define-cold-fop (fop-known-fun)
+  (let* ((name (pop-stack))
+         (fun (cold-fdefn-fun (cold-fdefinition-object name))))
+    (if (cold-null fun) `(:known-fun . ,name) fun)))
 
 #!-(or x86 x86-64)
 (define-cold-fop (fop-sanctify-for-execution)
@@ -2558,7 +2564,10 @@ core and return a descriptor to it."
          (write-wordindexed des raw-header-n-words (make-descriptor 0)))
        (do ((index (1- raw-header-n-words) (1- index)))
            ((< index sb!vm:code-constants-offset))
-         (write-wordindexed des index (pop-stack)))
+         (let ((obj (pop-stack)))
+           (if (and (consp obj) (eq (car obj) :known-fun))
+               (push (list* (cdr obj) des index) *deferred-known-fun-refs*)
+               (write-wordindexed des index obj))))
        (let* ((start (+ (descriptor-byte-offset des)
                         (ash header-n-words sb!vm:word-shift)))
               (end (+ start code-size)))
@@ -2583,6 +2592,13 @@ core and return a descriptor to it."
 (dotimes (i 16) ; occupies 16 cells in the dispatch table
   (setf (svref **fop-funs** (+ (get 'fop-code 'opcode) i))
         #'cold-load-code))
+
+(defun resolve-deferred-known-funs ()
+  (dolist (item *deferred-known-fun-refs*)
+    (let ((fun (cold-fdefn-fun (cold-fdefinition-object (car item)))))
+      (aver (not (cold-null fun)))
+      (let ((place (cdr item)))
+        (write-wordindexed (car place) (cdr place) fun)))))
 
 (define-cold-fop (fop-alter-code (slot))
   (let ((value (pop-stack))
@@ -3198,10 +3214,8 @@ core and return a descriptor to it."
     (let ((funs nil)
           (undefs nil))
       (maphash (lambda (name fdefn)
-                 (let ((fun (read-wordindexed fdefn
-                                              sb!vm:fdefn-fun-slot)))
-                   (if (= (descriptor-bits fun)
-                          (descriptor-bits *nil-descriptor*))
+                 (let ((fun (cold-fdefn-fun fdefn)))
+                   (if (cold-null fun)
                        (push name undefs)
                        (let ((addr (read-wordindexed
                                     fdefn sb!vm:fdefn-raw-addr-slot)))
@@ -3376,9 +3390,8 @@ initially undefined function references:~2%")
       (write-word initial-fun-core-entry-type-code)
       (write-word 3)
       (let* ((cold-name (cold-intern '!cold-init))
-             (cold-fdefn (cold-fdefinition-object cold-name))
-             (initial-fun (read-wordindexed cold-fdefn
-                                            sb!vm:fdefn-fun-slot)))
+             (initial-fun
+              (cold-fdefn-fun (cold-fdefinition-object cold-name))))
         (format t
                 "~&/(DESCRIPTOR-BITS INITIAL-FUN)=#X~X~%"
                 (descriptor-bits initial-fun))
@@ -3511,6 +3524,7 @@ initially undefined function references:~2%")
                               sb!vm:unbound-marker-widetag))
            *cold-assembler-fixups*
            *cold-assembler-routines*
+           (*deferred-known-fun-refs* nil)
            #!+x86 (*load-time-code-fixups* (make-hash-table)))
 
       ;; Prepare for cold load.
@@ -3562,6 +3576,7 @@ initially undefined function references:~2%")
                  (cold-symbol-value '*!reversed-cold-setf-macros*))))
 
       ;; Tidy up loose ends left by cold loading. ("Postpare from cold load?")
+      (resolve-deferred-known-funs)
       (resolve-assembler-fixups)
       #!+x86 (output-load-time-code-fixups)
       (foreign-symbols-to-core)
