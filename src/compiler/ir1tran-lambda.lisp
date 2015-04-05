@@ -652,7 +652,7 @@
                     (cond ,@(tests))))))
 
             (unless allowp
-              (body `(when (and (neq ,n-losep 0) (not ,n-allowp))
+              (body `(when (and (/= ,n-losep 0) (not ,n-allowp))
                        (%unknown-key-arg-error ,n-lose)))))))
 
       (let ((ep (ir1-convert-lambda-body

@@ -113,6 +113,10 @@
  ("src/compiler/generic/early-objdef")
  ("src/code/early-array") ; needs "early-vm" numbers
 
+ ;; "early-extensions" contains a call to TYPEP that is transformed into a call
+ ;; to %OTHER-POINTER-WIDETAG, which is an ordinary inline function, and not
+ ;; known to the cross-compiler until it has seen the DEFUN in 'kernel'
+ ("src/code/kernel" :not-host)
  ("src/code/early-extensions") ; on host for COLLECT, SYMBOLICATE, etc.
  ("src/code/parse-body")       ; on host for PARSE-BODY
  ("src/code/parse-defmacro")   ; on host for PARSE-DEFMACRO
@@ -183,7 +187,6 @@
  ;;    and stuff."
  ;; Dunno exactly what this meant or whether it still holds. -- WHN 19990803
  ;; FIXME: more informative and up-to-date comment?
- ("src/code/kernel"      :not-host)
  ("src/code/toplevel"    :not-host)
  ("src/code/cold-error"  :not-host)
  ;; 'info-vector' is needed at least as early as 'fdefinition' so that the
@@ -208,7 +211,8 @@
 
  ("src/code/typedefs")
  ("src/compiler/generic/vm-array")
- ("src/code/array"         :not-host)
+ ("src/code/weak"          :not-host)
+ ("src/code/array"         :not-host) ; needs WEAK-POINTER-VALUE
  ("src/code/early-float"   :not-host)
  ("src/code/target-sxhash" :not-host) ; needs most-fooative-foo-float constants
 
@@ -295,7 +299,6 @@
  ("src/code/sort"  :not-host)
  ("src/code/time"  :not-host)
  ("src/code/timer" :not-host)
- ("src/code/weak"  :not-host)
  ("src/code/final" :not-host)
 
  ("src/code/setf-funs" :not-host)

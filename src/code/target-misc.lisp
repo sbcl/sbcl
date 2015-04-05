@@ -173,6 +173,21 @@
              (setf (random-documentation name 'function) new-value)))))
      (setf (%simple-fun-doc (%fun-fun function)) new-value)))
   new-value)
+
+(defun code-n-unboxed-data-words (code-obj)
+  ;; If the number of boxed words (from the header) is not the same as
+  ;; the displacement backwards from the first simple-fun to the header,
+  ;; then there are unboxed constants between the end of the boxed constants
+  ;; and the first simple-fun.
+  (let ((f (%code-entry-points code-obj)))
+    (or (and f
+             (let ((from (get-header-data code-obj))
+                   (to (ash (with-pinned-objects (f)
+                              (sap-ref-word (int-sap (get-lisp-obj-address f))
+                                            (- sb!vm:fun-pointer-lowtag)))
+                            (- sb!vm:n-widetag-bits))))
+               (and (< from to) (- to from))))
+        0)))
 
 ;;; various environment inquiries
 
