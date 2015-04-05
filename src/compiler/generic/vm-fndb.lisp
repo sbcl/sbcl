@@ -124,6 +124,8 @@
 (defknown widetag-of (t) (unsigned-byte #.sb!vm:n-widetag-bits)
   (flushable movable))
 
+;; FIXME: Sure looks like 24 should be (- n-word-bytes n-widetag-bits).
+;;        If not, add a comment why not.
 (defknown (get-header-data get-closure-length) (t) (unsigned-byte 24)
   (flushable))
 (defknown set-header-data (t (unsigned-byte 24)) t
