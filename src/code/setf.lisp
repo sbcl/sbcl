@@ -1,5 +1,4 @@
-;;;; SETF and friends (except for stuff defined with COLLECT, which
-;;;; comes later)
+;;;; SETF and friends
 ;;;;
 ;;;; Note: The expansions for SETF and friends sometimes create
 ;;;; needless LET-bindings of argument values. The compiler will
@@ -152,41 +151,31 @@
    value expression. Evaluates all of the expressions in turn, then
    assigns the value of each expression to the place on its left,
    returning the value of the leftmost."
+  (declare (type sb!c::lexenv env))
   (when (< (length args) 2)
     (error "~S called with too few arguments: ~S" 'shiftf form))
-  (let (let*-bindings mv-bindings setters getters)
+  (collect ((let-bindings) (mv-bindings) (setters) (getters))
     (dolist (arg (butlast args))
       (multiple-value-bind (temps subforms store-vars setter getter)
           (sb!xc:get-setf-expansion arg env)
-        (mapc (lambda (tmp form)
-                (push `(,tmp ,form) let*-bindings))
-              temps
-              subforms)
-        (push store-vars mv-bindings)
-        (push setter setters)
-        (push getter getters)))
+        (let-bindings (mapcar #'list  temps subforms))
+        (mv-bindings store-vars)
+        (setters setter)
+        (getters getter)))
     ;; Handle the last arg specially here. The getter is just the last
     ;; arg itself.
-    (push (car (last args)) getters)
-
-    ;; Reverse the collected lists so last bit looks nicer.
-    (setf let*-bindings (nreverse let*-bindings)
-          mv-bindings (nreverse mv-bindings)
-          setters (nreverse setters)
-          getters (nreverse getters))
-
-    (labels ((thunk (mv-bindings getters)
+    (getters (car (last args)))
+    (labels ((thunk (mv-bindings getters setters)
                (if mv-bindings
                    `((multiple-value-bind
                            ,(car mv-bindings)
                          ,(car getters)
-                       ,@(thunk (cdr mv-bindings) (cdr getters))))
+                       ,@(thunk (cdr mv-bindings) (cdr getters) setters)))
                    `(,@setters))))
-      `(let ,let*-bindings
-        (multiple-value-bind ,(car mv-bindings)
-            ,(car getters)
-          ,@(thunk mv-bindings (cdr getters))
-          (values ,@(car mv-bindings)))))))
+      `(let ,(reduce #'append (let-bindings))
+         (multiple-value-bind ,(car (mv-bindings)) ,(car (getters))
+           ,@(thunk (mv-bindings) (cdr (getters)) (setters))
+           (values ,@(car (mv-bindings))))))))
 
 (defmacro-mundanely psetf (&rest args &environment env)
   #!+sb-doc
@@ -198,11 +187,10 @@
   (collect ((let*-bindings) (mv-bindings) (setters))
     (do ((a args (cddr a)))
         ((endp a))
-      (if (endp (cdr a))
-          (error "Odd number of args to PSETF."))
-      (multiple-value-bind (dummies vals newval setter getter)
+      (when (endp (cdr a))
+        (error "Odd number of args to PSETF."))
+      (multiple-value-bind (dummies vals newval setter)
           (sb!xc:get-setf-expansion (car a) env)
-        (declare (ignore getter))
         (let*-bindings (mapcar #'list dummies vals))
         (mv-bindings (list newval (cadr a)))
         (setters setter)))
@@ -230,10 +218,7 @@
       (dolist (arg args)
         (multiple-value-bind (temps subforms store-vars setter getter)
             (sb!xc:get-setf-expansion arg env)
-          (loop
-             for temp in temps
-             for subform in subforms
-             do (let*-bindings `(,temp ,subform)))
+          (let*-bindings (mapcar #'list temps subforms))
           (mv-bindings store-vars)
           (setters setter)
           (getters getter)))
@@ -244,7 +229,7 @@
                      `((multiple-value-bind ,(car mv-bindings) ,(car getters)
                          ,@(thunk (cdr mv-bindings) (cdr getters))))
                      (setters))))
-        `(let* ,(let*-bindings)
+        `(let* ,(reduce #'append(let*-bindings))
            ,@(thunk (mv-bindings) (cdr (getters))))))))
 
 (defmacro-mundanely push (obj place &environment env)
