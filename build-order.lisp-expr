@@ -763,10 +763,9 @@
  ;; for them
  ("src/code/defboot")
  ("src/code/destructuring-bind")
- ("src/code/early-setf")
+ ("src/code/setf")
  ("src/code/macros")
  ("src/code/loop")
- ("src/code/late-setf")
  ("src/code/cas")
  ("src/code/late-cas")
 
