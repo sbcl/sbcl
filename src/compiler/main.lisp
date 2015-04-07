@@ -874,39 +874,6 @@ necessary, since type inference may take arbitrarily long to converge.")
                 (pathnamep (file-info-name finfo)))
             finfo))))
 
-;;; Return a form read from STREAM; or for EOF use the trick,
-;;; popularized by Kent Pitman, of returning STREAM itself. If an
-;;; error happens, then convert it to standard abort-the-compilation
-;;; error condition (possibly recording some extra location
-;;; information).  CONDITION-NAME is what to signal on error,
-;;; and should be INPUT-ERROR-IN-COMPILE-FILE or a subclass of it.
-;;; The signaled condition encapsulates a reader condition.
-(defun read-for-compile-file (stream position condition-name)
-  (handler-case
-      (read-preserving-whitespace stream nil stream)
-    (reader-error (condition)
-      (compiler-error condition-name
-                      ;; We don't need to supply :POSITION here because
-                      ;; READER-ERRORs already know their position in the file.
-                      :condition condition
-                      :stream stream))
-    ;; ANSI, in its wisdom, says that READ should return END-OF-FILE
-    ;; (and that this is not a READER-ERROR) when it encounters end of
-    ;; file in the middle of something it's trying to read.
-    (end-of-file (condition)
-      (compiler-error condition-name
-                      :condition condition
-                      ;; We need to supply :POSITION here because the END-OF-FILE
-                      ;; condition doesn't carry the position that the user
-                      ;; probably cares about, where the failed READ began.
-                      :position position
-                      :stream stream))
-    (error (condition)
-      (compiler-error condition-name
-                      :condition condition
-                      :position position
-                      :stream stream))))
-
 ;;; If STREAM is present, return it, otherwise open a stream to the
 ;;; current file. There must be a current file.
 ;;;
@@ -938,6 +905,54 @@ necessary, since type inference may take arbitrarily long to converge.")
   (setf (source-info-stream info) nil)
   (values))
 
+;; Loop over forms read from INFO's stream, calling FUNCTION with each.
+;; CONDITION-NAME is signaled if there is a reader error, and should be
+;; a subtype of not-so-aptly-named INPUT-ERROR-IN-COMPILE-FILE.
+(defun %do-forms-from-info (function info condition-name)
+  (declare (function function))
+  (let* ((file-info (source-info-file-info info))
+         (stream (get-source-stream info))
+         (pos (file-position stream))
+         (form
+          ;; Return a form read from STREAM; or for EOF use the trick,
+          ;; popularized by Kent Pitman, of returning STREAM itself.
+          (handler-case (read-preserving-whitespace stream nil stream)
+            (reader-error (condition)
+              (compiler-error condition-name
+                ;; We don't need to supply :POSITION here because
+                ;; READER-ERRORs already know their position in the file.
+                              :condition condition
+                              :stream stream))
+            ;; ANSI, in its wisdom, says that READ should return END-OF-FILE
+            ;; (and that this is not a READER-ERROR) when it encounters end of
+            ;; file in the middle of something it's trying to read,
+            ;; making it unfortunately indistinguishable from legal EOF.
+            ;; Were it not for that, it would be more elegant to just
+            ;; handle one more condition in the HANDLER-CASE.
+            (end-of-file (condition)
+              (compiler-error condition-name
+                              :condition condition
+                ;; We need to supply :POSITION here because the END-OF-FILE
+                ;; condition doesn't carry the position that the user
+                ;; probably cares about, where the failed READ began.
+                              :position pos
+                              :stream stream))
+            (error (condition)
+              (compiler-error condition-name
+                              :condition condition
+                              :position pos
+                              :stream stream)))))
+    (unless (eq form stream) ; not EOF
+      (funcall function form
+               :current-index
+               (let* ((forms (file-info-forms file-info))
+                      (current-idx (+ (fill-pointer forms)
+                                      (file-info-source-root file-info))))
+                 (vector-push-extend form forms)
+                 (vector-push-extend pos (file-info-positions file-info))
+                 current-idx))
+      (%do-forms-from-info function info condition-name))))
+
 ;;; Loop over FORMS retrieved from INFO.  Used by COMPILE-FILE and
 ;;; LOAD when loading from a FILE-STREAM associated with a source
 ;;; file.  ON-ERROR is the name of a condition class that should
@@ -948,22 +963,9 @@ necessary, since type inference may take arbitrarily long to converge.")
   (aver (symbolp form))
   (once-only ((info info))
     `(let ((*source-info* ,info))
-       (loop (destructuring-bind (,form &key ,@keys &allow-other-keys)
-                 (let* ((file-info (source-info-file-info ,info))
-                        (stream (get-source-stream ,info))
-                        (pos (file-position stream))
-                        (form (read-for-compile-file stream pos ,on-error)))
-                   (if (eq form stream) ; i.e., if EOF
-                       (return)
-                       (let* ((forms (file-info-forms file-info))
-                              (current-idx (+ (fill-pointer forms)
-                                              (file-info-source-root
-                                               file-info))))
-                         (vector-push-extend form forms)
-                         (vector-push-extend pos (file-info-positions
-                                                  file-info))
-                         (list form :current-index current-idx))))
-               ,@body)))))
+       (%do-forms-from-info (lambda (,form &key ,@keys &allow-other-keys)
+                              ,@body)
+                            ,info ,on-error))))
 
 ;;; Read and compile the source file.
 (defun sub-sub-compile-file (info)
