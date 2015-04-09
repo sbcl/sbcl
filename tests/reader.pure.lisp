@@ -213,14 +213,21 @@
 
 ;;; All these must return a primary value of NIL when *read-suppress* is T
 ;;; Reported by Bruno Haible on cmucl-imp 2004-10-25.
-(let ((*read-suppress* t))
-  (assert (null (read-from-string "(1 2 3)")))
-  (assert (null (with-input-from-string (s "abc xyz)")
-                  (read-delimited-list #\) s))))
-  (assert (null (with-input-from-string (s "(1 2 3)")
-                  (read-preserving-whitespace s))))
-  (assert (null (with-input-from-string (s "(1 2 3)")
-                 (read s)))))
+(with-test (:name :read-suppress-char-macros)
+  (let ((*read-suppress* t))
+    (assert (null (read-from-string "(1 2 3)")))
+    (assert (null (with-input-from-string (s "abc xyz)")
+                    (read-delimited-list #\) s))))
+    (assert (null (with-input-from-string (s "(1 2 3)")
+                    (read-preserving-whitespace s))))
+    (assert (null (with-input-from-string (s "(1 2 3)")
+                    (read s))))
+    ;; .. and it's better to avoid consing rather than produce an object and
+    ;; throw it away, even though it's (mostly) indistinguishable to the user.
+    (let ((input (make-string-input-stream "this-is-a-string! .")))
+      (assert (string= (sb-impl::with-read-buffer ()
+                         (sb-impl::read-string input #\!))
+                       "")))))
 
 ;;; System code that asks whether %READ-PRESERVING-WHITESPACE hit EOF
 ;;; mistook NIL as an object returned normally for NIL the default eof mark.

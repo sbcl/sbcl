@@ -860,7 +860,9 @@ standard Lisp readtable when NIL."
   (declare (character closech))
   (let ((stream (in-synonym-of stream))
         (buf *read-buffer*)
-        (rt *readtable*))
+        (rt *readtable*)
+        ;; *read-suppress* => "... macros will not construct any new objects"
+        (suppress *read-suppress*))
     (reset-read-buffer buf)
     (macrolet ((scan (read-a-char eofp &optional finish)
                  `(loop (let ((char ,read-a-char))
@@ -871,13 +873,15 @@ standard Lisp readtable when NIL."
                                  (setq char ,read-a-char)
                                  (when ,eofp
                                    (error 'end-of-file :stream stream))))
-                         (ouch-read-buffer (truly-the character char) buf)))))
+                          (unless suppress
+                            (ouch-read-buffer (truly-the character char)
+                                              buf))))))
       (if (ansi-stream-p stream)
           (prepare-for-fast-read-char stream
            (scan (fast-read-char t) nil (done-with-fast-read-char)))
         ;; CLOS stream
           (scan (read-char stream nil +EOF+) (eq char +EOF+))))
-    (copy-token-buf-string buf)))
+    (if suppress "" (copy-token-buf-string buf))))
 
 (defun read-right-paren (stream ignore)
   (declare (ignore ignore))
