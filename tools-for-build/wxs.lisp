@@ -142,7 +142,8 @@
                  "Id" ,(directory-id root))
     ("Component" ("Id" ,(component-id root)
                   "Guid" ,(make-guid)
-                  "DiskId" 1)
+                  "DiskId" 1
+                  #+x86-64 "Win64" #+x86-64 "yes")
      ,@(loop for file in (directory
                           (make-pathname :name :wild :type :wild :defaults root))
              when (or (pathname-name file) (pathname-type file))
@@ -209,18 +210,17 @@
       ("Directory" ("Id" "TARGETDIR"
                     "Name" "SourceDir")
        ("Directory" ("Id" "ProgramMenuFolder")
-        ("Component" ("Id" "SBCL_Shortcut"
-                      "Guid" ,(make-guid))
-         ("Shortcut" ("Id" "sbcl.lnk"
-                      "Name" ,(application-name)
-                      "Target" "[INSTALLDIR]sbcl.exe"
-                      "Arguments" "--core \"[#sbcl.core]\""))
-         ("RegistryValue" ("Root" "HKCU"
-                           "Key" ,(application-name)
-                           "Name" "installed"
-                           "Type" "integer"
-                           "Value" "1"
-                           "KeyPath" "yes"))))
+        ("Directory" ("Id" "ProgramMenuDir"
+                      "Name" ,(application-name))
+         ("Component" ("Id" "ProgramMenuDir"
+                       "Guid" ,(make-guid))
+          ("RemoveFolder" ("Id" "ProgramMenuDir"
+                           "On" "uninstall"))
+          ("RegistryValue" ("Root" "HKCU"
+                            "Key" "Software\[Manufacturer]\[ProductName]"
+                            "Type" "string"
+                            "Value" ""
+                            "KeyPath" "yes")))))
        ("Directory" ("Id" #-x86-64 "ProgramFilesFolder" #+x86-64 "ProgramFiles64Folder"
                      "Name" "PFiles")
         ("Directory" ("Id" "BaseFolder"
@@ -230,7 +230,9 @@
           ("Directory" ("Id" "INSTALLDIR")
            ("Component" ("Id" "SBCL_SetHOME"
                          "Guid" ,(make-guid)
-                         "DiskId" 1)
+                         "DiskId" 1
+                         #+x86-64 "Win64" #+x86-64 "yes")
+            ("CreateFolder")
             ("Environment" ("Id" "Env_SBCL_HOME"
                             "System" "yes"
                             "Action" "set"
@@ -240,7 +242,9 @@
 
            ("Component" ("Id" "SBCL_SetPATH"
                          "Guid" ,(make-guid)
-                         "DiskId" 1)
+                         "DiskId" 1
+                         #+x86-64 "Win64" #+x86-64 "yes")
+            ("CreateFolder")
             ("Environment" ("Id" "Env_PATH"
                             "System" "yes"
                             "Action" "set"
@@ -249,7 +253,8 @@
                             "Value" "[INSTALLDIR]")))
            ("Component" ("Id" "SBCL_Base"
                          "Guid" ,(make-guid)
-                         "DiskId" 1)
+                         "DiskId" 1
+                         #+x86-64 "Win64" #+x86-64 "yes")
             ;; If we want to associate files with SBCL, this
             ;; is how it's done -- but doing this by default
             ;; and without asking the user for permission Is
@@ -257,20 +262,25 @@
             ;; how to make WiX ask for permission for this...
             ;; ,(make-extension "fasl" "application/x-lisp-fasl")
             ;; ,(make-extension "lisp" "text/x-lisp-source")
-            ("File" ("Name" "sbcl.exe"
-                     "Source" "../src/runtime/sbcl.exe"))
             ("File" ("Name" "sbcl.core"
-                     "Source" "sbcl.core")))
+                     "Source" "sbcl.core"))
+            ("File" ("Name" "sbcl.exe"
+                     "Source" "../src/runtime/sbcl.exe"
+                     "KeyPath" "yes")
+                    ("Shortcut" ("Id" "sbcl.lnk"
+                                 "Advertise" "yes"
+                                 "Name" ,(application-name)
+                                 "Directory" "ProgramMenuDir"
+                                 "Arguments" "--core \"[#sbcl.core]\""))))
            ,@(collect-contrib-components))))))
       ("Feature" ("Id" "Minimal"
                   "Title" "SBCL Executable"
                   "ConfigurableDirectory" "INSTALLDIR"
                   "Level" 1)
        ("ComponentRef" ("Id" "SBCL_Base"))
+       ("ComponentRef" ("Id" "ProgramMenuDir"))
        ("Feature" ("Id" "Contrib" "Level" 1 "Title" "Contributed Modules")
                   ,@(ref-all-components))
-       ("Feature" ("Id" "Shortcut" "Level" 1 "Title" "Add Start Menu Shortcut")
-                  ("ComponentRef" ("Id" "SBCL_Shortcut")))
        ("Feature" ("Id" "SetPath" "Level" 1 "Title" "Set Environment Variable: PATH")
                   ("ComponentRef" ("Id" "SBCL_SetPATH")))
        ;; SetHome is still enabled by default (level 1), because SBCL
