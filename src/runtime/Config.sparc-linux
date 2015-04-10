@@ -9,7 +9,7 @@
 # provided with absolutely no warranty. See the COPYING and CREDITS
 # files for more information.
 
-ASFLAGS = -g -Wall -Wa,-xarch=v8plus
+#ASFLAGS = -g -Wall -Wa,-xarch=v8plus ;; this is not used anywhere
 LINKFLAGS += -v -rdynamic
 NM = ./linux-nm
 

@@ -17,7 +17,6 @@ TARGET=sbcl
 # Defaults which might be overridden or modified by values in the
 # Config file. Most of them are same on most systems right now.
 # If you need to override one of these, do it in Config.
-LD = ld
 LINKFLAGS = -g
 NM = nm -gp
 DEPEND_FLAGS = -MM
@@ -26,7 +25,6 @@ GREP = grep
 include ../../output/prefix.def
 
 CFLAGS = -g -Wall -Wsign-compare -O3
-ASFLAGS = $(CFLAGS)
 CPPFLAGS = -I. -DSBCL_PREFIX=\"$(SBCL_PREFIX)\"
 
 # Give make access to the target Lisp features.
@@ -37,7 +35,7 @@ include genesis/Makefile.features
 # Config-foo file for setup foo, then arrange for Config to be a
 # symlink to Config-foo.
 # Commonly used variables in Config are: ARCH_SRC, ASSEM_SRC, GC_SRC,
-# OS_SRC, OS_LIBS, OS_OBJS, OS_CLEAN_FILES
+# OS_SRC, OS_LIBS, OS_CLEAN_FILES
 include Config
 
 COMMON_SRC = alloc.c backtrace.c breakpoint.c coreparse.c \
@@ -51,7 +49,7 @@ C_SRC = $(COMMON_SRC) ${ARCH_SRC} ${OS_SRC} ${GC_SRC}
 
 SRCS = $(C_SRC) ${ASSEM_SRC}
 
-OBJS = $(C_SRC:.c=.o) $(ASSEM_SRC:.S=.o) ${OS_OBJS}
+OBJS = $(C_SRC:.c=.o) $(ASSEM_SRC:.S=.o)
 
 LIBS = ${OS_LIBS} -lm
 

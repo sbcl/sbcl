@@ -9,7 +9,7 @@
 # provided with absolutely no warranty. See the COPYING and CREDITS
 # files for more information.
 
-LD = ld -taso
+#LD = ld -taso ;; $LD is no longer used anywhere, should that be moved below?
 LINKFLAGS += -dynamic -v -Wl,-T -Wl,ld-script.alpha-linux -rdynamic
 NM = ./linux-nm
 
