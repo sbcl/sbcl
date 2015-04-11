@@ -25,6 +25,7 @@ GREP = grep
 include ../../output/prefix.def
 
 CFLAGS = -g -Wall -Wsign-compare -O3
+ASFLAGS = $(CFLAGS)
 CPPFLAGS = -I. -DSBCL_PREFIX=\"$(SBCL_PREFIX)\"
 
 # Give make access to the target Lisp features.
