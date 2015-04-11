@@ -2633,6 +2633,64 @@
     (t
      stream)))
 
+;;;; FORM-TRACKING-STREAM
+
+;; The compiler uses this to record for each input subform the start and
+;; end positions as character offsets. Measuring in characters rather than
+;; bytes is both faster and better suited to the task.
+;; This is due to FILE-POSITION on an FD-STREAM making a system call
+;; every time, to ensure that the case of an append-only stream works
+;; correctly (where the OS forces all writes to the end), and other factors.
+
+(defstruct (form-tracking-stream
+            (:include ansi-stream
+             (in #'tracking-stream-in)
+             (misc #'tracking-stream-misc))
+            (:constructor %make-form-tracking-stream (source observer))
+            (:copier nil))
+  (source nil :type stream :read-only t) ; underlying stream
+  ;; a function which is called for events on this stream.
+  (observer (missing-arg) :type function :read-only t)
+  (char-pos 0 :type index)
+  (last-newline -1 :type index-or-minus-1))
+
+;; Delegate the reading of a character to STREAM's source stream,
+;; incrementing the character position on success.
+;; It would be more efficient if FORM-TRACKING-STREAM inherited from FD-STREAM,
+;; to get a frc-buffer of its own. But it would complicate fast-read-char
+;; to have it understand how to keep both byte and character position accurate.
+;; So we favor simplicity over speed, and in terms of overall compiler
+;; bottlenecks, it isn't one.
+(defun tracking-stream-in (stream eof-error-p eof-value)
+  ;; Whether the caller wanted an error for EOF is propagated through.
+  ;; But in case the call was (READ-CHAR STREAM NIL #\a) making EOF
+  ;; indistinct, we specify a known eof-value in the "next-method" call.
+  (let ((char (read-char (form-tracking-stream-source stream) eof-error-p 0)))
+    (if (eql char 0) ; eof-error-p must have been NIL to get here
+        eof-value ; so return caller's chosen EOF marker
+        (let ((pos (form-tracking-stream-char-pos stream)))
+          (when (and (eql char #\Newline)
+                     ;; call observer only if it wasn't an unread and re-read
+                     (> pos (form-tracking-stream-last-newline stream)))
+            (funcall (form-tracking-stream-observer stream) :newline pos nil)
+            (setf (form-tracking-stream-last-newline stream) pos))
+          (setf (form-tracking-stream-char-pos stream) (1+ pos))
+          char))))
+
+(defun tracking-stream-misc (stream operation &optional arg1 arg2)
+  (let ((source (form-tracking-stream-source stream)))
+    (cond ((eq operation :unread)
+           (prog1 (unread-char arg1 source)
+             (decf (form-tracking-stream-char-pos stream))))
+          ((and (eq operation :file-position) arg1)
+           (error 'simple-stream-error
+                  :format-control "~S is not positionable"
+                  :format-arguments (list stream)))
+          (t ; punt
+           (if (ansi-stream-p source)
+               (funcall (ansi-stream-misc source) source operation arg1 arg2)
+               (stream-misc-dispatch source operation arg1 arg2))))))
+
 ;; Using (get-std-handle-or-null +std-error-handle+) instead of the file
 ;; descriptor might make this work on win32, but I don't know.
 #!-win32

@@ -683,9 +683,12 @@ standard Lisp readtable when NIL."
                (t
                 (multiple-value-bind (result-p result)
                     (read-maybe-nothing stream char)
-                  ;; Repeat if macro returned nothing.
                   (unless (zerop result-p)
-                    (return (unless *read-suppress* result))))))))
+                    (return (unless *read-suppress* result)))
+                  ;; Repeat if macro returned nothing.
+                  (when (form-tracking-stream-p stream)
+                    (funcall (form-tracking-stream-observer stream)
+                             :reset nil nil)))))))
       (let ((*sharp-equal-alist* nil))
         (with-read-buffer ()
           (%read-preserving-whitespace stream eof-error-p eof-value t)))))
@@ -709,9 +712,16 @@ standard Lisp readtable when NIL."
 ;;; past them. CHAR must not be whitespace.
 (defun read-maybe-nothing (stream char)
   (multiple-value-call
-   (lambda (&optional (result nil supplied-p) &rest junk)
-     (declare (ignore junk)) ; is this ANSI-specified?
-     (values (if supplied-p 1 0) result))
+      (lambda (stream start-pos &optional (result nil supplied-p) &rest junk)
+        (declare (ignore junk)) ; is this ANSI-specified?
+        (when (and supplied-p start-pos)
+          (funcall (form-tracking-stream-observer stream)
+                   start-pos (form-tracking-stream-char-pos stream) result))
+        (values (if supplied-p 1 0) result))
+   stream ; KLUDGE: not capturing STREAM in the lambda avoids closure consing
+   (and (form-tracking-stream-p stream)
+        ;; Subtract 1 because the position points _after_ CHAR.
+        (1- (form-tracking-stream-char-pos stream)))
    (funcall (!cmt-entry-to-function
              (get-raw-cmt-entry char *readtable*) #'read-token)
             stream char)))
@@ -769,6 +779,11 @@ standard Lisp readtable when NIL."
   ;; Don't return anything.
   (values))
 
+;;; FIXME: for these two macro chars, if STREAM is a FORM-TRACKING-STREAM,
+;;; every cons cell should generate a notification so that the readtable
+;;; manipulation in SB-COVER can be eliminated in favor of a stream observer.
+;;; It is cheap to add events- it won't increase consing in the compiler
+;;; because it the extra events can simply be ignored.
 (macrolet
     ((with-list-reader ((streamvar delimiter) &body body)
        `(let* ((thelist (list nil))

@@ -652,6 +652,7 @@ like *STACK-TOP-HINT* and unsupported stuff like *TRACED-FUN-LIST*."
                ;; Customizing printing of compiler and debugger messages
                "*COMPILER-PRINT-VARIABLE-ALIST*"
                "*DEBUG-PRINT-VARIABLE-ALIST*"
+               "COMPILE-FILE-POSITION"
 
                ;; Hooks into init & save sequences
                "*INIT-HOOKS*" "*SAVE-HOOKS*" "*EXIT-HOOKS*"
@@ -1273,6 +1274,7 @@ possibly temporarily, because it might be used internally."
                "FAST-READ-U-INTEGER"
                "FAST-READ-VAR-U-INTEGER"
                "FILE-NAME"
+               "%MAKE-FORM-TRACKING-STREAM"
                "INTERN*"
                "WITH-FAST-READ-BYTE"
                "PREPARE-FOR-FAST-READ-CHAR"

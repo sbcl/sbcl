@@ -167,3 +167,157 @@ Tertiary value is true if any conditions of type ERROR, or WARNING that are
 not STYLE-WARNINGs occur during compilation, and NIL otherwise.
 "
   (compile-in-lexenv name definition (make-null-lexenv)))
+
+(defun make-form-tracking-stream (stream file-info)
+  (%make-form-tracking-stream
+   stream
+   (lambda (arg1 arg2 arg3)
+     ;; Log some kind of reader event into FILE-INFO.
+     (case arg1
+       (:newline
+        (vector-push-extend arg2 (file-info-newlines file-info)))
+       (:reset ; a char macro returned zero values - "virtual whitespace".
+        ;; I think this would be an ideal place at which to inquire and stash
+        ;; the FILE-POSITION in bytes so that DEBUG-SOURCE-START-POSITIONS
+        ;; are obtained _after_ having skipped virtual whitespace, not before.
+        (setf (fill-pointer (file-info-subforms file-info)) 0))
+       (t
+        (let ((subforms (file-info-subforms file-info)))
+          ;; (ARG1 ARG2 ARG3) = (start-pos end-pos form)
+          (vector-push-extend arg1 subforms)
+          (vector-push-extend arg2 subforms)
+          (vector-push-extend arg3 subforms)))))))
+
+;;; COMPILE-FILE-POSITION macro
+
+;; Macros and inline functions report the original-source position. e.g.:
+;;   01: (declaim (inline foo))
+;;   02: (defun foo (x) (if x (warn "fail @line ~d" (compile-file-position))))
+;;   03: (defun bar (y) (foo y))
+;;   04: (defun baz (y) (foo y))
+;; will cause BAR to print 3 and BAZ to print 4 in the warning message.
+
+;; For macros this seems fair enough, but for inline functions it could
+;; be considered undesirable on the grounds that enabling/disabling inlining
+;; should not change visible behavior. Other then working harder to figure
+;; out where we are in inlined code (which may not even be feasible),
+;; a viable remedy is that all inlineable functions should have their stored
+;; representation not contain any macros, i.e. macros could be pre-expanded,
+;; which in this case means stuffing in the literal integers.
+;; I feel that that would be a general improvement to semantics, because
+;; as things are, an inline function's macros are expanded at least as many
+;; times as there are calls to the function - not very defensible
+;; as a design choice, but just an accident of the particular implementation.
+;;
+(defmacro compile-file-position ()
+  #!+sb-doc
+  "Return line# and column# of this macro invocation as multiple values."
+  (or (and *source-info*
+           (file-info-subforms (source-info-file-info *source-info*))
+           (boundp '*current-path*)
+           *current-path*
+           (let* ((original-source-path
+                   (cddr (member 'original-source-start *current-path*)))
+                  (path (reverse original-source-path))
+                  (file-info (source-info-file-info *source-info*))
+                  (form (elt (file-info-forms file-info) (car path)))
+                  (charpos))
+             (dolist (p (cdr path))
+               (setq form (nth p form)))
+             (with-array-data ((vect (file-info-subforms file-info))
+                               (start) (end) :check-fill-pointer t)
+               (declare (ignore start))
+               (do ((i (1- end) (- i 3)))
+                   ((< i 0))
+                 (declare (index-or-minus-1 i))
+                 (when (eq form (svref vect i))
+                   (if charpos ; ambiguous
+                       (return (setq charpos (compile-file-position-helper
+                                              file-info (cdr path))))
+                       (setq charpos (svref vect (- i 2)))))))
+             (when charpos
+               (let* ((newlines (file-info-newlines file-info))
+                      (index
+                       (position charpos newlines :test #'>= :from-end t)))
+                 ;; Line numbers traditionally begin at 1, columns at 0.
+                 (if index
+                     ;; INDEX is 1 less than the number of newlines seen
+                     ;; up to and including this startpos.
+                     ;; e.g. index=0 => 1 newline seen => line=2
+                     `(values ,(+ index 2)
+                              ;; 1 char after the newline = column 0
+                              ,(- charpos (aref newlines index) 1))
+                     ;; zero newlines were seen
+                     `(values 1 ,charpos))))))
+      '(values 0 -1)))
+
+;; Find FORM's character position in FILE-INFO by looking for PATH-TO-FIND.
+;; This is done by imparting tree structure to the annotations
+;; more-or-less paralleling construction of the original sexpr.
+;; Unfortunately, though this was a nice idea, it is not terribly useful.
+;; FIND-SOURCE-PATHS can not supply the correct path because it assumes
+;; that a form determines a path, whereas the opposite is more accurate.
+;; e.g. below are two functions that cause misbehavior.
+#|
+ * (defun example1 (x)
+     (if x
+         #1=(format t "Err#2 @~D~%" (compile-file-position))
+         (progn #1#)))
+ * (defconstant +foo+ '(format t "Err#1 @~D~%" (compile-file-position))))
+ * (defun example2 (x) (if x #.+foo+ (progn #.+foo+)))
+|#
+;; In each case the compiler assigns the same source path to two logically
+;; different paths that it takes as it IR1-translates each half of the IF
+;; expression, though the ELSE branch obviously has a longer path.
+;; However, if you _could_ supply correct paths, this would compute correct
+;; answers. (Modulo any bugs due to near-total lack of testing)
+
+;; Also note one more thing that doesn't work, and expectedly so:
+;;  (DEFUN F () (FORMAT T #.(FORMAT NIL "Fail ~D~%" (COMPILE-FILE-POSITION))))
+
+(defun compile-file-position-helper (file-info path-to-find)
+  (let (found-form start-char)
+    (labels
+        ((recurse (subpath upper-bound queue)
+           (let ((index -1))
+             (declare (type index-or-minus-1 index))
+             (loop
+              (let* ((item (car queue))
+                     (end (cdar item)))
+                (when (> end upper-bound)
+                  (return))
+                (pop queue)
+                (incf index)
+                (when (and (eql index (car subpath)) (not (cdr subpath)))
+                  ;; This does not eagerly declare victory, because we want
+                  ;; to find the rightmost match. In "#1=(FOO)" there are two
+                  ;; different annotations pointing to (FOO).
+                  (setq found-form (cdr item)
+                        start-char (caar item)))
+                (unless queue (return))
+                (let* ((next (car queue))
+                       (next-end (cdar next)))
+                  (cond ((< next-end end) ; could descend
+                         ;; only scan children if we're on the correct path
+                         (if (eql index (car subpath))
+                             (setf queue (recurse (cdr subpath) end queue))
+                             ;; else skip quickly by finding the next sibling
+                             (loop
+                                (pop queue)
+                                (when (or (endp queue) (>= (caaar queue) end))
+                                  (return))))
+                           (unless queue (return)))
+                        ((= next-end end) ; probably because of "#n="
+                         (decf (truly-the (integer 0) index))))))))
+           queue))
+      (let ((list
+             (with-array-data ((v (file-info-subforms file-info))
+                               (start) (end) :check-fill-pointer t)
+               (declare (ignore start))
+               (sort (loop for i from 0 below end by 3
+                           collect (acons (aref v i)
+                                          (aref v (+ i 1))
+                                          (aref v (+ i 2))))
+                     #'< :key 'caar))))
+        (recurse path-to-find (cdaar list) (cdr list))))
+    start-char))

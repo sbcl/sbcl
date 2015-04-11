@@ -820,7 +820,14 @@ necessary, since type inference may take arbitrarily long to converge.")
   ;; the file positions that reading of each form started at (i.e. the
   ;; end of the previous form)
   (forms (make-array 10 :fill-pointer 0 :adjustable t) :type (vector t))
-  (positions (make-array 10 :fill-pointer 0 :adjustable t) :type (vector t)))
+  (positions (make-array 10 :fill-pointer 0 :adjustable t) :type (vector t))
+  ;; The next two slots are updated by form-tracking-stream-observer
+  ;; when this FILE-INFO is for COMPILE-FILE (and not for COMPILE).
+  ;;  A vector of the character position of each #\Newline seen
+  (newlines nil :type (or null (vector t)) :read-only t)
+  ;;  A vector of character ranges than span each subform in the TLF,
+  ;;  reset to empty for each one.
+  (subforms nil :type (or null (vector t)) :read-only t))
 
 ;;; The SOURCE-INFO structure provides a handle on all the source
 ;;; information for an entire compilation.
@@ -847,11 +854,17 @@ necessary, since type inference may take arbitrarily long to converge.")
   (parent nil :type (or source-info null)))
 
 ;;; Given a pathname, return a SOURCE-INFO structure.
-(defun make-file-source-info (file external-format)
+(defun make-file-source-info (file external-format &optional form-tracking-p)
   (make-source-info
    :file-info (make-file-info :name (truename file)
                               :untruename (merge-pathnames file)
                               :external-format external-format
+                              :newlines
+                              (if form-tracking-p
+                                  (make-array 10 :fill-pointer 0 :adjustable t))
+                              :subforms
+                              (if form-tracking-p
+                                  (make-array 100 :fill-pointer 0 :adjustable t))
                               :write-date (file-write-date file))))
 
 ;;; Return a SOURCE-INFO to describe the incremental compilation of FORM.
@@ -894,8 +907,12 @@ necessary, since type inference may take arbitrarily long to converge.")
         (setf sb!xc:*compile-file-truename* name
               sb!xc:*compile-file-pathname* (file-info-untruename file-info)
               (source-info-stream info)
-              (open name :direction :input
-                    :external-format external-format)))))
+              (let ((stream (open name :direction :input
+                                       :external-format external-format)))
+                ;; SBCL stream classes aren't available in the host
+                (if (or #-sb-xc-host (file-info-newlines file-info))
+                    (make-form-tracking-stream stream file-info)
+                    stream))))))
 
 ;;; Close the stream in INFO if it is open.
 (defun close-source-info (info)
@@ -911,7 +928,10 @@ necessary, since type inference may take arbitrarily long to converge.")
 (defun %do-forms-from-info (function info condition-name)
   (declare (function function))
   (let* ((file-info (source-info-file-info info))
-         (stream (get-source-stream info))
+         (stream
+          (progn (awhen (file-info-subforms file-info)
+                  (setf (fill-pointer it) 0))
+                 (get-source-stream info)))
          (pos (file-position stream))
          (form
           ;; Return a form read from STREAM; or for EOF use the trick,
@@ -1844,7 +1864,8 @@ SPEED and COMPILATION-SPEED optimization values, and the
          (warnings-p nil)
          (failure-p t) ; T in case error keeps this from being set later
          (input-pathname (verify-source-file input-file))
-         (source-info (make-file-source-info input-pathname external-format))
+         (source-info
+          (make-file-source-info input-pathname external-format t))
          (*compiler-trace-output* nil)) ; might be modified below
 
     (unwind-protect
