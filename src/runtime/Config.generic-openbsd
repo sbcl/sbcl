@@ -17,6 +17,7 @@ OS_LIBS += -lutil
 ifneq ($(shell $(CC) -dumpspecs 2>/dev/null | grep -e -nopie),)
 CFLAGS += -fno-pie
 LINKFLAGS += -nopie
+LDFLAGS += -nopie
 endif
 
 ifdef LISP_FEATURE_SB_THREAD

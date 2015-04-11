@@ -46,6 +46,7 @@ endif
 ifneq ($(shell $(CC) -dumpspecs 2>/dev/null | grep -e nopie),)
 CFLAGS += -fno-pie
 LINKFLAGS += -nopie
+LDFLAGS += -nopie
 endif
 
 GC_SRC = gencgc.c

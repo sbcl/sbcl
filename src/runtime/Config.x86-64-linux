@@ -50,6 +50,7 @@ GC_SRC = gencgc.c
 ifneq ($(shell $(CC) -dumpspecs 2>/dev/null | grep -e nopie),)
 CFLAGS += -fno-pie
 LINKFLAGS += -nopie
+LDFLAGS += -nopie
 endif
 
 # Nothing to do for after-grovel-headers.
