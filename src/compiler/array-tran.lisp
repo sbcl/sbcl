@@ -989,12 +989,12 @@
 ;;; do type testing inside %WITH-ARRAY-DATA instead of outside, and
 ;;; the DEFTRANSFORM can't tell that that's going on, so it can make
 ;;; sense to use FORCE-INLINE option in that case.
-(def!macro with-array-data (((data-var array &key offset-var)
-                             (start-var &optional (svalue 0))
-                             (end-var &optional (evalue nil))
-                             &key force-inline check-fill-pointer)
-                            &body forms
-                            &environment env)
+(sb!xc:defmacro with-array-data (((data-var array &key offset-var)
+                                  (start-var &optional (svalue 0))
+                                  (end-var &optional (evalue nil))
+                                  &key force-inline check-fill-pointer)
+                                 &body forms
+                                 &environment env)
   (once-only ((n-array array)
               (n-svalue `(the index ,svalue))
               (n-evalue `(the (or index null) ,evalue)))

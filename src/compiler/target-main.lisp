@@ -209,47 +209,48 @@ not STYLE-WARNINGs occur during compilation, and NIL otherwise.
 ;; times as there are calls to the function - not very defensible
 ;; as a design choice, but just an accident of the particular implementation.
 ;;
-(defmacro compile-file-position ()
-  #!+sb-doc
-  "Return line# and column# of this macro invocation as multiple values."
-  (or (and *source-info*
-           (file-info-subforms (source-info-file-info *source-info*))
-           (boundp '*current-path*)
-           *current-path*
-           (let* ((original-source-path
-                   (cddr (member 'original-source-start *current-path*)))
-                  (path (reverse original-source-path))
-                  (file-info (source-info-file-info *source-info*))
-                  (form (elt (file-info-forms file-info) (car path)))
-                  (charpos))
-             (dolist (p (cdr path))
-               (setq form (nth p form)))
-             (with-array-data ((vect (file-info-subforms file-info))
-                               (start) (end) :check-fill-pointer t)
-               (declare (ignore start))
-               (do ((i (1- end) (- i 3)))
-                   ((< i 0))
-                 (declare (index-or-minus-1 i))
-                 (when (eq form (svref vect i))
-                   (if charpos ; ambiguous
-                       (return (setq charpos (compile-file-position-helper
-                                              file-info (cdr path))))
-                       (setq charpos (svref vect (- i 2)))))))
-             (when charpos
-               (let* ((newlines (file-info-newlines file-info))
-                      (index
-                       (position charpos newlines :test #'>= :from-end t)))
-                 ;; Line numbers traditionally begin at 1, columns at 0.
-                 (if index
-                     ;; INDEX is 1 less than the number of newlines seen
-                     ;; up to and including this startpos.
-                     ;; e.g. index=0 => 1 newline seen => line=2
-                     `(values ,(+ index 2)
-                              ;; 1 char after the newline = column 0
-                              ,(- charpos (aref newlines index) 1))
-                     ;; zero newlines were seen
-                     `(values 1 ,charpos))))))
-      '(values 0 -1)))
+(let ()
+  (defmacro compile-file-position ()
+    #!+sb-doc
+    "Return line# and column# of this macro invocation as multiple values."
+    (or (and *source-info*
+             (file-info-subforms (source-info-file-info *source-info*))
+             (boundp '*current-path*)
+             *current-path*
+             (let* ((original-source-path
+                     (cddr (member 'original-source-start *current-path*)))
+                    (path (reverse original-source-path))
+                    (file-info (source-info-file-info *source-info*))
+                    (form (elt (file-info-forms file-info) (car path)))
+                    (charpos))
+               (dolist (p (cdr path))
+                 (setq form (nth p form)))
+               (with-array-data ((vect (file-info-subforms file-info))
+                                 (start) (end) :check-fill-pointer t)
+                 (declare (ignore start))
+                 (do ((i (1- end) (- i 3)))
+                     ((< i 0))
+                   (declare (index-or-minus-1 i))
+                   (when (eq form (svref vect i))
+                     (if charpos ; ambiguous
+                         (return (setq charpos (compile-file-position-helper
+                                                file-info (cdr path))))
+                         (setq charpos (svref vect (- i 2)))))))
+               (when charpos
+                 (let* ((newlines (file-info-newlines file-info))
+                        (index
+                         (position charpos newlines :test #'>= :from-end t)))
+                   ;; Line numbers traditionally begin at 1, columns at 0.
+                   (if index
+                       ;; INDEX is 1 less than the number of newlines seen
+                       ;; up to and including this startpos.
+                       ;; e.g. index=0 => 1 newline seen => line=2
+                       `(values ,(+ index 2)
+                                ;; 1 char after the newline = column 0
+                                ,(- charpos (aref newlines index) 1))
+                       ;; zero newlines were seen
+                       `(values 1 ,charpos))))))
+        '(values 0 -1))))
 
 ;; Find FORM's character position in FILE-INFO by looking for PATH-TO-FIND.
 ;; This is done by imparting tree structure to the annotations
