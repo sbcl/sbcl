@@ -215,6 +215,7 @@ name. Type can currently be one of the following:
    :SOURCE-TRANSFORM
    :TRANSFORM
    :VOP
+   :IR1-CONVERT
 
 If an unsupported TYPE is requested, the function will return NIL.
 "
@@ -254,11 +255,16 @@ If an unsupported TYPE is requested, the function will return NIL.
        ((:compiler-macro)
         (when (compiler-macro-function name)
           (find-definition-source (compiler-macro-function name))))
+       (:ir1-convert
+        (let ((converter (sb-int:info :function :ir1-convert name)))
+          (and converter
+           (find-definition-source converter))))
        ((:function :generic-function)
         (when (and (fboundp name)
-                   (or (not (symbolp name))
-                       (not (macro-function name))
-                       (special-operator-p name)))
+                   (or (consp name)
+                       (and
+                        (not (macro-function name))
+                        (not (special-operator-p name)))))
           (let ((fun (real-fdefinition name)))
             (when (eq (not (typep fun 'generic-function))
                       (not (eq type :generic-function)))
