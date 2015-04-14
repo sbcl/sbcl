@@ -1634,6 +1634,9 @@
        (let ((,n-res ,(set-up-vop-info inherited-parse parse)))
          (store-vop-info ,n-res)
          ,@(set-up-fun-translation parse n-res))
+       (let ((source-location (source-location)))
+         (when source-location
+           (setf (info :source-location :vop ',name) source-location)))
        ',name)))
 
 (defun store-vop-info (vop-info)
