@@ -241,7 +241,7 @@
                (list chunks))
       (labels ((refill-buffer ()
                  (prog1
-                     (fast-read-char-refill stream nil nil)
+                     (not (fast-read-char-refill stream nil))
                    (setf %frc-index% (ansi-stream-in-index %frc-stream%))))
                (newline-position ()
                  (position #\Newline (the (simple-array character (*))
@@ -528,7 +528,9 @@
 ;;; the IN-BUFFER for text streams. There is definitely an IN-BUFFER,
 ;;; and hence must be an N-BIN method. It's also called by other stream
 ;;; functions which directly peek into the frc buffer.
-(defun fast-read-char-refill (stream eof-error-p eof-value)
+;;; If EOF is hit and EOF-ERROR-P is false, then return NIL,
+;;; otherwise return the new index into CIN-BUFFER.
+(defun fast-read-char-refill (stream eof-error-p)
   (let* ((ibuf (ansi-stream-cin-buffer stream))
          (count (funcall (ansi-stream-n-bin stream)
                          stream
@@ -561,11 +563,11 @@
                 ;; definitely EOF now
                 (setf (ansi-stream-in-index stream)
                       +ansi-stream-in-buffer-length+)
-                (values t (eof-or-lose stream eof-error-p eof-value)))
+                (eof-or-lose stream eof-error-p nil))
                ;; we resynced or were given something instead
                (t
                 (setf (aref ibuf index) value)
-                (values nil (setf (ansi-stream-in-index stream) index))))))
+                (setf (ansi-stream-in-index stream) index)))))
           (t
            (when (/= start +ansi-stream-in-buffer-extra+)
              (#.(let* ((n-character-array-bits
@@ -579,8 +581,7 @@
                 ibuf +ansi-stream-in-buffer-extra+
                 ibuf start
                 count))
-           (values nil
-                   (setf (ansi-stream-in-index stream) start))))))
+           (setf (ansi-stream-in-index stream) start)))))
 
 ;;; This is similar to FAST-READ-CHAR-REFILL, but we don't have to
 ;;; leave room for unreading.
@@ -2050,7 +2051,7 @@ benefit of the function GET-OUTPUT-STREAM-STRING.")
         (return-from ansi-stream-read-string-from-frc-buffer nil))
       (labels ((refill-buffer ()
                  (prog1
-                     (fast-read-char-refill stream nil nil)
+                     (not (fast-read-char-refill stream nil))
                    (setf %frc-index% (ansi-stream-in-index %frc-stream%))))
                (add-chunk ()
                  (let* ((end (length %frc-buffer%))

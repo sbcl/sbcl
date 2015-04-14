@@ -168,7 +168,7 @@ maintained."
           (%frc-method% (ansi-stream-in %frc-stream%))
           (%frc-buffer% (ansi-stream-cin-buffer %frc-stream%))
           (%frc-index% (ansi-stream-in-index %frc-stream%)))
-     (declare (type index %frc-index%)
+     (declare (type (mod ,(1+ +ansi-stream-in-buffer-length+)) %frc-index%)
               (type ansi-stream %frc-stream%))
      ,@forms))
 
@@ -184,20 +184,22 @@ maintained."
 ;;; because it's either going to yield a character or signal EOF.
 (defmacro fast-read-char (&optional (eof-error-p t) (eof-value ()))
   (let ((result
-         `(cond
-            ((not %frc-buffer%)
-             (funcall %frc-method% %frc-stream% ,eof-error-p ,eof-value))
-            ((= %frc-index% +ansi-stream-in-buffer-length+)
-             (multiple-value-bind (eof-p index-or-value)
-                 (fast-read-char-refill %frc-stream% ,eof-error-p ,eof-value)
-               (if eof-p
-                   index-or-value
-                   (progn
-                     (setq %frc-index% (1+ (truly-the index index-or-value)))
-                     (aref %frc-buffer% index-or-value)))))
-            (t
-             (prog1 (aref %frc-buffer% %frc-index%)
-               (incf %frc-index%))))))
+         `(if (not %frc-buffer%)
+              (funcall %frc-method% %frc-stream% ,eof-error-p ,eof-value)
+              (block nil
+                (when (= %frc-index% +ansi-stream-in-buffer-length+)
+                  (let ((index-or-nil
+                         (fast-read-char-refill %frc-stream% ,eof-error-p)))
+                    ,@(unless (eq eof-error-p 't)
+                        `((when (null index-or-nil)
+                            (return ,eof-value))))
+                    (setq %frc-index%
+                          (truly-the (mod ,+ansi-stream-in-buffer-length+)
+                                     index-or-nil))))
+                (prog1 (aref %frc-buffer%
+                             (truly-the (mod ,+ansi-stream-in-buffer-length+)
+                                        %frc-index%))
+                  (incf %frc-index%))))))
     (cond ((eq eof-error-p 't)
            `(truly-the character ,result))
           ((and (symbolp eof-value) (constantp eof-value)

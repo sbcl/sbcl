@@ -182,4 +182,5 @@
        (or ,@array-types system-area-pointer))))
   ;; And finally, simple vector-of-anything is called a "rank-1-array"
   ;; because "simple-vector" means (simple-array t (*))
-  (object-not-simple-rank-1-array (simple-array * (*))))))
+  (object-not-simple-rank-1-array (simple-array * (*)))
+  (object-not-ansi-stream ansi-stream))))

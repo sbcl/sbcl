@@ -104,7 +104,8 @@
   ;; +ANSI-STREAM-IN-BUFFER-LENGTH+.)
   (in-buffer nil :type (or ansi-stream-in-buffer null))
   (cin-buffer nil :type (or ansi-stream-cin-buffer null))
-  (in-index +ansi-stream-in-buffer-length+ :type index)
+  (in-index +ansi-stream-in-buffer-length+
+            :type (integer 0 #.+ansi-stream-in-buffer-length+))
 
   ;; buffered input functions
   (in #'ill-in :type function)                  ; READ-CHAR function
