@@ -138,7 +138,7 @@
   (dual-channel-p nil)
   ;; character position if known -- this may run into bignums, but
   ;; we probably should flip it into null then for efficiency's sake...
-  (char-pos nil :type (or unsigned-byte null))
+  (output-column nil :type (or unsigned-byte null))
   ;; T if input is waiting on FD. :EOF if we hit EOF.
   (listen nil :type (member nil t :eof))
   ;; T if serve-event is allowed when this stream blocks
@@ -636,8 +636,8 @@
                       (:line character)
                       (:full character))
   (if (eql byte #\Newline)
-      (setf (fd-stream-char-pos stream) 0)
-      (incf (fd-stream-char-pos stream)))
+      (setf (fd-stream-output-column stream) 0)
+      (incf (fd-stream-output-column stream)))
   (setf (sap-ref-8 (buffer-sap obuf) tail)
         (char-code byte)))
 
@@ -742,8 +742,8 @@
             (:none (funcall (fd-stream-output-bytes stream)
                             stream thing t start end))))
       (if last-newline
-          (setf (fd-stream-char-pos stream) (- end last-newline 1))
-          (incf (fd-stream-char-pos stream) (- end start))))))
+          (setf (fd-stream-output-column stream) (- end last-newline 1))
+          (incf (fd-stream-output-column stream) (- end start))))))
 
 (defstruct (external-format
              (:constructor %make-external-format)
@@ -1465,8 +1465,8 @@
                                            (:line character)
                                            (:full character))
           (if (eql byte #\Newline)
-              (setf (fd-stream-char-pos stream) 0)
-              (incf (fd-stream-char-pos stream)))
+              (setf (fd-stream-output-column stream) 0)
+              (incf (fd-stream-output-column stream)))
         (let ((bits (char-code byte))
               (sap (buffer-sap obuf))
               (tail (buffer-tail obuf)))
@@ -1740,7 +1740,7 @@
 
     ;; FIXME: Why only for output? Why unconditionally?
     (when output-p
-      (setf (fd-stream-char-pos fd-stream) 0))
+      (setf (fd-stream-output-column fd-stream) 0))
 
     (when (and character-stream-p (eq external-format :default))
       (/show0 "/getting default external format")
@@ -2031,7 +2031,7 @@
     (:line-length
      80)
     (:charpos
-     (fd-stream-char-pos fd-stream))
+     (fd-stream-output-column fd-stream))
     (:file-length
      (unless (fd-stream-file fd-stream)
        ;; This is a TYPE-ERROR because ANSI's species FILE-LENGTH
