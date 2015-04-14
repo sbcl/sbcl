@@ -48,13 +48,13 @@
 (deftest make-inet-socket.smoke
   ;; make a socket
   (let ((s (make-instance 'inet-socket :type :stream :protocol (get-protocol-by-name "tcp"))))
-    (and (> (socket-file-descriptor s) 1) t))
+    (> (socket-file-descriptor s) 1))
   t)
 
 (deftest make-inet-socket.keyword
     ;; make a socket
     (let ((s (make-instance 'inet-socket :type :stream :protocol :tcp)))
-      (and (> (socket-file-descriptor s) 1) t))
+      (> (socket-file-descriptor s) 1))
   t)
 
 (deftest* (make-inet-socket-wrong)
@@ -69,8 +69,8 @@
         operation-not-supported-error
         socket-type-not-supported-error
         protocol-not-supported-error)
-          (c)
-        (declare (ignorable c)) t)
+          ()
+        t)
       (:no-error nil))
   t)
 
@@ -86,21 +86,25 @@
         operation-not-supported-error
         protocol-not-supported-error
         socket-type-not-supported-error)
-          (c)
-        (declare (ignorable c)) t)
+          ()
+        t)
       (:no-error nil))
   t)
 
 #-win32
 (deftest make-inet6-socket.smoke
-  (let ((s (make-instance 'inet6-socket :type :stream :protocol (get-protocol-by-name "tcp"))))
-    (and (> (socket-file-descriptor s) 1) t))
+  (handler-case
+      (let ((s (make-instance 'inet6-socket :type :stream :protocol (get-protocol-by-name "tcp"))))
+        (> (socket-file-descriptor s) 1))
+    (address-family-not-supported () t))
   t)
 
 #-win32
 (deftest make-inet6-socket.keyword
-  (let ((s (make-instance 'inet6-socket :type :stream :protocol :tcp)))
-    (and (> (socket-file-descriptor s) 1) t))
+  (handler-case
+      (let ((s (make-instance 'inet6-socket :type :stream :protocol :tcp)))
+        (> (socket-file-descriptor s) 1))
+    (address-family-not-supported () t))
   t)
 
 (deftest* (non-block-socket)
@@ -131,29 +135,31 @@
 
 #-win32
 (deftest inet6-socket-bind
-  (let* ((tcp (get-protocol-by-name "tcp"))
-         (address (make-inet6-address "::1"))
-         (s1 (make-instance 'inet6-socket :type :stream :protocol tcp))
-         (s2 (make-instance 'inet6-socket :type :stream :protocol tcp)))
-    (unwind-protect
-         ;; Given the functions we've got so far, if you can think of a
-         ;; better way to make sure the bind succeeded than trying it
-         ;; twice, let me know
-         (handler-case
-             (socket-bind s1 address 0)
-           (socket-error ()
-             ;; This may mean no IPv6 support, can't fail a test
-             ;; because of that
-             t)
-           (:no-error (x)
-             (declare (ignore x))
+  (handler-case
+      (let* ((tcp (get-protocol-by-name "tcp"))
+             (address (make-inet6-address "::1"))
+             (s1 (make-instance 'inet6-socket :type :stream :protocol tcp))
+             (s2 (make-instance 'inet6-socket :type :stream :protocol tcp)))
+        (unwind-protect
+             ;; Given the functions we've got so far, if you can think of a
+             ;; better way to make sure the bind succeeded than trying it
+             ;; twice, let me know
              (handler-case
-                 (let ((port (nth-value 1 (socket-name s1))))
-                   (socket-bind s2 address port)
-                   nil)
-               (address-in-use-error () t))))
-      (socket-close s1)
-      (socket-close s2)))
+                 (socket-bind s1 address 0)
+               (socket-error ()
+                 ;; This may mean no IPv6 support, can't fail a test
+                 ;; because of that (address-family-not-supported doesn't catch that)
+                 t)
+               (:no-error (x)
+                 (declare (ignore x))
+                 (handler-case
+                     (let ((port (nth-value 1 (socket-name s1))))
+                       (socket-bind s2 address port)
+                       nil)
+                   (address-in-use-error () t))))
+          (socket-close s1)
+          (socket-close s2)))
+    (address-family-not-supported () t))
   t)
 
 (deftest* (simple-sockopt-test)

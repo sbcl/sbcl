@@ -347,8 +347,6 @@ request an input stream and get an output stream in response\)."
                (format s "Socket error in \"~A\": ~A (~A)"
                        (socket-error-syscall c)
                        (or (socket-error-symbol c) (socket-error-errno c))
-                       #+cmu (sb-unix:get-unix-error-msg num)
-                       #+sbcl
                        #+win32 (sb-win32:format-system-message num)
                        #-win32 (sb-int:strerror num)))))
   (:documentation "Common base class of socket related conditions."))
@@ -383,21 +381,11 @@ request an input stream and get an output stream in response\)."
 (define-socket-condition sockint::ESOCKTNOSUPPORT socket-type-not-supported-error)
 (define-socket-condition sockint::ENETUNREACH network-unreachable-error)
 (define-socket-condition sockint::ENOTCONN not-connected-error)
+(define-socket-condition sockint::EAFNOSUPPORT address-family-not-supported)
 
 (defun condition-for-errno (err)
   (or (cdr (assoc err *conditions-for-errno* :test #'eql)) 'socket-error))
 
-#+cmu
-(defun socket-error (where)
-  ;; Peter's debian/x86 cmucl packages (and sbcl, derived from them)
-  ;; use a direct syscall interface, and have to call UNIX-GET-ERRNO
-  ;; to update the value that unix-errno looks at.  On other CMUCL
-  ;; ports, (UNIX-GET-ERRNO) is not needed and doesn't exist
-  (when (fboundp 'unix::unix-get-errno) (unix::unix-get-errno))
-  (let ((condition (condition-for-errno sb-unix:unix-errno)))
-    (error condition :errno sb-unix:unix-errno  :syscall where)))
-
-#+sbcl
 (defun socket-error (where &optional (errno (socket-errno)))
   ;; FIXME: Our Texinfo documentation extractor needs at least this to
   ;; spit out the signature. Real documentation would be better...

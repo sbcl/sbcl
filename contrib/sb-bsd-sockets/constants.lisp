@@ -90,6 +90,7 @@
  (:integer ESOCKTNOSUPPORT "ESOCKTNOSUPPORT")
  (:integer ENETUNREACH "ENETUNREACH")
  (:integer ENOTCONN "ENOTCONN")
+ (:integer EAFNOSUPPORT "EAFNOSUPPORT")
 
  (:integer NETDB-INTERNAL #+hpux "h_NETDB_INTERNAL" #-hpux "NETDB_INTERNAL" "See errno.")
  (:integer NETDB-SUCCESS #+hpux "h_NETDB_SUCCESS" #-hpux "NETDB_SUCCESS" "No problem.")
