@@ -638,18 +638,16 @@
                            (not (dd-default-constructor dd))
                            (let ((ctors (dd-constructors dd)))
                              (or (not ctors) (equal ctors '((nil))))))))
-                   (hierarchy-check
+                   (get-ancestor
                     ;; Use DATA-VECTOR-REF directly, since that's what SVREF in
                     ;; a SAFETY 0 lexenv will eventually be transformed to.
                     ;; This can give a large compilation speedup, since
                     ;; %INSTANCE-TYPEPs are frequently created during
                     ;; GENERATE-TYPE-CHECKS, and the normal aref transformation
                     ;; path is pretty heavy.
-                    `(and (> (layout-depthoid ,n-layout) ,depthoid)
-                          (locally (declare (optimize (safety 0)))
-                            (eq (data-vector-ref (layout-inherits ,n-layout)
-                                                 ,depthoid)
-                                ',layout)))))
+                    `(locally (declare (optimize (safety 0)))
+                       (data-vector-ref (layout-inherits ,n-layout) ,depthoid)))
+                   (deeper-p `(> (layout-depthoid ,n-layout) ,depthoid)))
               (aver (equal pred '(%instancep object)))
               `(and ,pred
                     (let ((,n-layout ,get-layout))
@@ -661,9 +659,9 @@
                       ;; object with an invalid layout to a structure
                       ;; type test.
                       ,(if abstract-base-p
-                           `(if ,hierarchy-check t (eq ,n-layout ',layout))
-                           `(if (eq ,n-layout ',layout) t ,hierarchy-check))))))
-
+                           `(eq (if ,deeper-p ,get-ancestor ,n-layout) ,layout)
+                           `(cond ((eq ,n-layout ,layout) t)
+                                  (,deeper-p (eq ,get-ancestor ,layout))))))))
            ((and layout (>= (layout-depthoid layout) 0))
             ;; hierarchical layout depths for other things (e.g.
             ;; CONDITION, STREAM)
