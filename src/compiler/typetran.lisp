@@ -677,15 +677,13 @@
                     `((when (layout-invalid ,n-layout)
                         (setq ,n-layout (update-object-layout-or-invalid
                                          object ',layout)))
-                      (if (let ((,n-inherits (layout-inherits
-                                              (truly-the layout ,n-layout))))
-                            (declare (optimize (safety 0)))
-                            (and (> (vector-length ,n-inherits) ,depthoid)
-                                 ;; See above.
-                                 (eq (data-vector-ref ,n-inherits ,depthoid)
-                                     ',layout)))
-                          t
-                          (eq ,n-layout ',layout)))))
+                      (let ((,n-inherits (layout-inherits
+                                          (truly-the layout ,n-layout))))
+                        (declare (optimize (safety 0)))
+                        (eq (if (> (vector-length ,n-inherits) ,depthoid)
+                                (data-vector-ref ,n-inherits ,depthoid)
+                                ,n-layout)
+                            ,layout)))))
               (if pred
                   `(and ,pred (let ((,n-layout ,get-layout)) ,@guts))
                   `(block typep

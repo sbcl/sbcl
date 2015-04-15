@@ -69,10 +69,8 @@
     ;;    (CLASS-PROTOTYPE (FIND-CLASS 'STRING)) => 42
     (let ((inherits (layout-inherits (truly-the layout layout))))
       (declare (optimize (safety 0)))
-      (if (and (> (length inherits) depthoid)
-               (eq (svref inherits depthoid) slayout))
-          t
-          (eq layout slayout)))))
+      (eq (if (> (length inherits) depthoid) (svref inherits depthoid) layout)
+          slayout))))
 
 ;;; Is X a SEQUENCE?  Harder than just (OR VECTOR LIST)
 (defun sequencep (x)
