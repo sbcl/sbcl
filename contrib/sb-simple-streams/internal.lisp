@@ -624,7 +624,8 @@
                                      (sb-int:strerror errno)))
                    (return nil)))))))))
 
-(defun open-fd-stream (pathname &key (direction :input)
+(defun open-fd-stream (pathname &key (class 'sb-sys:fd-stream)
+                                (direction :input)
                                 (element-type 'base-char)
                                 (if-exists nil if-exists-given)
                                 (if-does-not-exist nil if-does-not-exist-given)
@@ -642,6 +643,7 @@
         (case direction
           ((:input :output :io)
            (sb-sys:make-fd-stream fd
+                                  :class class
                                   :input (member direction '(:input :io))
                                   :output (member direction '(:output :io))
                                   :element-type element-type

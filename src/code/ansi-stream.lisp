@@ -121,7 +121,12 @@
   (sout #'ill-out :type function)               ; string output function
 
   ;; other, less-used methods
-  (misc #'no-op-placeholder :type function))
+  (misc #'no-op-placeholder :type function)
+
+  ;; Absolute character position, acting also as a generalized boolean
+  ;; in lieu of testing FORM-TRACKING-STREAM-P to see if we must
+  ;; maintain correctness of the slot in ANSI-STREAM-UNREAD-CHAR.
+  (input-char-pos nil))
 
 (def!method print-object ((x ansi-stream) stream)
   (print-unreadable-object (x stream :type t :identity t)))

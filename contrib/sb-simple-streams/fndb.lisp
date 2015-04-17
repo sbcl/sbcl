@@ -64,6 +64,8 @@ TODO (rudi 2003-05-19): make the above work, make (defknown open) use it.
 ||#
 
 
+;; This adds keywords for :MAPPED, :INPUT-HANDLE :OUTPUT-HANDLE.
+;; But [BUG?] why is the first arg type T instead of PATHNAME-DESIGNATOR?
 (sb-c:defknown open (t &rest t
                        &key (:direction (member :input :output :io :probe))
                        (:element-type sb-kernel:type-specifier)

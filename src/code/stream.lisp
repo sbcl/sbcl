@@ -354,7 +354,11 @@
     (when (minusp index) (error "nothing to unread"))
     (cond (buffer
            (setf (aref buffer index) character)
-           (setf (ansi-stream-in-index stream) index))
+           (setf (ansi-stream-in-index stream) index)
+           ;; Ugh. an ANSI-STREAM with a char buffer never gives a chance to
+           ;; the stream's misc routine to handle the UNREAD operation.
+           (when (ansi-stream-input-char-pos stream)
+             (decf (ansi-stream-input-char-pos stream))))
           (t
            (funcall (ansi-stream-misc stream) stream
                     :unread character)))))
@@ -513,6 +517,10 @@
 ;;; If EOF is hit and EOF-ERROR-P is false, then return NIL,
 ;;; otherwise return the new index into CIN-BUFFER.
 (defun fast-read-char-refill (stream eof-error-p)
+  (when (ansi-stream-input-char-pos stream)
+    ;; Characters between (ANSI-STREAM-IN-INDEX %FRC-STREAM%)
+    ;; and +ANSI-STREAM-IN-BUFFER-LENGTH+ have to be re-scanned.
+    (update-input-char-pos stream))
   (let* ((ibuf (ansi-stream-cin-buffer stream))
          (count (funcall (ansi-stream-n-bin stream)
                          stream
@@ -541,6 +549,13 @@
            (let* ((index (1- +ansi-stream-in-buffer-length+))
                   (value (funcall (ansi-stream-in stream) stream nil :eof)))
              (cond
+               ;; When not signaling an error, it is important that IN-INDEX
+               ;; be set to +ANSI-STREAM-IN-BUFFER-LENGTH+ here, even though
+               ;; DONE-WITH-FAST-READ-CHAR will do the same, thereby writing
+               ;; the caller's %FRC-INDEX% (= +ANSI-STREAM-IN-BUFFER-LENGTH+)
+               ;; into the slot. But because we've already bumped INPUT-CHAR-POS
+               ;; and scanned characters between the original %FRC-INDEX%
+               ;; and the buffer end (above), we must *not* do that again.
                ((eql value :eof)
                 ;; definitely EOF now
                 (setf (ansi-stream-in-index stream)

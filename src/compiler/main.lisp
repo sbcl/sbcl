@@ -907,12 +907,22 @@ necessary, since type inference may take arbitrarily long to converge.")
         (setf sb!xc:*compile-file-truename* name
               sb!xc:*compile-file-pathname* (file-info-untruename file-info)
               (source-info-stream info)
-              (let ((stream (open name :direction :input
-                                       :external-format external-format)))
-                ;; SBCL stream classes aren't available in the host
-                (if (or #-sb-xc-host (file-info-newlines file-info))
-                    (make-form-tracking-stream stream file-info)
-                    stream))))))
+              (let ((stream
+                     (open name
+                           :direction :input
+                           :external-format external-format
+                           #-sb-xc-host
+                           :class
+                           ;; SBCL stream classes aren't available in the host
+                           #-sb-xc-host
+                           (if (file-info-newlines file-info)
+                               'form-tracking-stream
+                               'fd-stream))))
+                #-sb-xc-host
+                (when (form-tracking-stream-p stream)
+                  (setf (form-tracking-stream-observer stream)
+                        (make-form-tracking-stream-observer file-info)))
+                stream)))))
 
 ;;; Close the stream in INFO if it is open.
 (defun close-source-info (info)

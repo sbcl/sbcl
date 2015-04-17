@@ -168,9 +168,7 @@ not STYLE-WARNINGs occur during compilation, and NIL otherwise.
 "
   (compile-in-lexenv name definition (make-null-lexenv)))
 
-(defun make-form-tracking-stream (stream file-info)
-  (%make-form-tracking-stream
-   stream
+(defun make-form-tracking-stream-observer (file-info)
    (lambda (arg1 arg2 arg3)
      ;; Log some kind of reader event into FILE-INFO.
      (case arg1
@@ -186,7 +184,7 @@ not STYLE-WARNINGs occur during compilation, and NIL otherwise.
           ;; (ARG1 ARG2 ARG3) = (start-pos end-pos form)
           (vector-push-extend arg1 subforms)
           (vector-push-extend arg2 subforms)
-          (vector-push-extend arg3 subforms)))))))
+          (vector-push-extend arg3 subforms))))))
 
 ;;; COMPILE-FILE-POSITION macro
 

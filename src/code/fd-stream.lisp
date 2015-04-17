@@ -193,6 +193,26 @@
       ;; splice to *available-buffers*
       (with-available-buffers-lock ()
         (setf *available-buffers* (nconc queue *available-buffers*))))))
+
+;;;; FORM-TRACKING-STREAM
+
+;; The compiler uses this to record for each input subform the start and
+;; end positions as character offsets. Measuring in characters rather than
+;; bytes is both better suited to the task - in that it is consistent with
+;; reporting of "point" by Emacs - and faster than querying FILE-POSITION.
+;; The slowness of FILE-POSITION on an FD-STREAM is due to making a system
+;; call every time, to ensure that the case of an append-only stream works
+;; correctly (where the OS forces all writes to the end), and other factors.
+
+(defstruct (form-tracking-stream
+            (:constructor %make-form-tracking-stream)
+            (:include fd-stream
+                      (misc #'tracking-stream-misc)
+                      (input-char-pos 0))
+            (:copier nil))
+  ;; a function which is called for events on this stream.
+  (observer #'error :type function)
+  (last-newline -1 :type index-or-minus-1))
 
 ;;;; CORE OUTPUT FUNCTIONS
 
@@ -2201,6 +2221,7 @@
 ;;; handle blocking IO on the stream.
 (defun make-fd-stream (fd
                        &key
+                       (class 'fd-stream)
                        (input nil input-p)
                        (output nil output-p)
                        (element-type 'base-char)
@@ -2224,7 +2245,10 @@
          (setf input t))
         ((not (or input output))
          (error "File descriptor must be opened either for input or output.")))
-  (let ((stream (%make-fd-stream :fd fd
+  (let ((stream (funcall (ecase class
+                           (fd-stream '%make-fd-stream)
+                           (form-tracking-stream '%make-form-tracking-stream))
+                                 :fd fd
                                  :fd-type
                                  #!-win32 (sb!unix:fd-type fd)
                                  ;; KLUDGE.
@@ -2284,6 +2308,8 @@
                (if-exists nil if-exists-given)
                (if-does-not-exist nil if-does-not-exist-given)
                (external-format :default)
+               ;; :class is a private option - use it at your own risk
+               (class 'fd-stream)
              &aux                       ; Squelch assignment warning.
              (direction direction)
              (if-does-not-exist if-does-not-exist)
@@ -2442,6 +2468,7 @@
                         (when (eq if-exists :append)
                           (sb!unix:unix-lseek fd 0 sb!unix:l_xtnd))
                         (make-fd-stream fd
+                                        :class class
                                         :input input
                                         :output output
                                         :element-type element-type
@@ -2633,63 +2660,36 @@
     (t
      stream)))
 
-;;;; FORM-TRACKING-STREAM
-
-;; The compiler uses this to record for each input subform the start and
-;; end positions as character offsets. Measuring in characters rather than
-;; bytes is both faster and better suited to the task.
-;; This is due to FILE-POSITION on an FD-STREAM making a system call
-;; every time, to ensure that the case of an append-only stream works
-;; correctly (where the OS forces all writes to the end), and other factors.
-
-(defstruct (form-tracking-stream
-            (:include ansi-stream
-             (in #'tracking-stream-in)
-             (misc #'tracking-stream-misc))
-            (:constructor %make-form-tracking-stream (source observer))
-            (:copier nil))
-  (source nil :type stream :read-only t) ; underlying stream
-  ;; a function which is called for events on this stream.
-  (observer (missing-arg) :type function :read-only t)
-  (char-pos 0 :type index)
-  (last-newline -1 :type index-or-minus-1))
-
-;; Delegate the reading of a character to STREAM's source stream,
-;; incrementing the character position on success.
-;; It would be more efficient if FORM-TRACKING-STREAM inherited from FD-STREAM,
-;; to get a frc-buffer of its own. But it would complicate fast-read-char
-;; to have it understand how to keep both byte and character position accurate.
-;; So we favor simplicity over speed, and in terms of overall compiler
-;; bottlenecks, it isn't one.
-(defun tracking-stream-in (stream eof-error-p eof-value)
-  ;; Whether the caller wanted an error for EOF is propagated through.
-  ;; But in case the call was (READ-CHAR STREAM NIL #\a) making EOF
-  ;; indistinct, we specify a known eof-value in the "next-method" call.
-  (let ((char (read-char (form-tracking-stream-source stream) eof-error-p 0)))
-    (if (eql char 0) ; eof-error-p must have been NIL to get here
-        eof-value ; so return caller's chosen EOF marker
-        (let ((pos (form-tracking-stream-char-pos stream)))
-          (when (and (eql char #\Newline)
-                     ;; call observer only if it wasn't an unread and re-read
-                     (> pos (form-tracking-stream-last-newline stream)))
-            (funcall (form-tracking-stream-observer stream) :newline pos nil)
-            (setf (form-tracking-stream-last-newline stream) pos))
-          (setf (form-tracking-stream-char-pos stream) (1+ pos))
-          char))))
+;; Fix the INPUT-CHAR-POS slot of STREAM after having consumed characters
+;; from the CIN-BUFFER. This operation is done upon exit from a FAST-READ-CHAR
+;; loop, and for each buffer refill inside the loop.
+(defun update-input-char-pos (stream &optional (end +ansi-stream-in-buffer-length+))
+  (do ((chars (ansi-stream-cin-buffer stream))
+       (pos (form-tracking-stream-input-char-pos stream))
+       (i (ansi-stream-in-index stream) (1+ i)))
+      ((>= i end)
+       (setf (form-tracking-stream-input-char-pos stream) pos))
+    (let ((char (aref chars i)))
+      (when (and (eql char #\Newline)
+                 ;; call observer only if it wasn't an unread and re-read
+                 (> pos (form-tracking-stream-last-newline stream)))
+        (funcall (form-tracking-stream-observer stream) :newline pos nil)
+        (setf (form-tracking-stream-last-newline stream) pos))
+      (incf pos))))
 
 (defun tracking-stream-misc (stream operation &optional arg1 arg2)
-  (let ((source (form-tracking-stream-source stream)))
-    (cond ((eq operation :unread)
-           (prog1 (unread-char arg1 source)
-             (decf (form-tracking-stream-char-pos stream))))
-          ((and (eq operation :file-position) arg1)
-           (error 'simple-stream-error
-                  :format-control "~S is not positionable"
-                  :format-arguments (list stream)))
-          (t ; punt
-           (if (ansi-stream-p source)
-               (funcall (ansi-stream-misc source) source operation arg1 arg2)
-               (stream-misc-dispatch source operation arg1 arg2))))))
+  ;; The :UNREAD operation will never be invoked because STREAM has a buffer,
+  ;; so unreading is implemented entirely within ANSI-STREAM-UNREAD-CHAR.
+  ;; But we do need to prevent attempts to change the absolute position.
+  (case operation
+    (:file-position
+     (if arg1
+         (error 'simple-stream-error
+                :format-control "~S is not positionable"
+                :format-arguments (list stream))
+         (fd-stream-get-file-position stream)))
+    (t ; call next method
+     (fd-stream-misc-routine stream operation arg1 arg2))))
 
 ;; Using (get-std-handle-or-null +std-error-handle+) instead of the file
 ;; descriptor might make this work on win32, but I don't know.

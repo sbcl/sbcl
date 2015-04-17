@@ -1359,6 +1359,7 @@
 
 (defknown open
   (pathname-designator &key
+                       (:class symbol)
                        (:direction (member :input :output :io :probe))
                        (:element-type type-specifier)
                        (:if-exists (member :error :new-version :rename

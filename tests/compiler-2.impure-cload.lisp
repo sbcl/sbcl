@@ -121,3 +121,7 @@
   (assert (string= (more-foo nil) "Yikes (98 . 31)"))
   (assert (string= (bork t) "failed to frob a knob at line #103"))
   (assert (string= (bork nil) "failed to frob a knob at line #117")))
+
+(eval-when (:compile-toplevel)
+  (let ((stream (sb-c::source-info-stream sb-c::*source-info*)))
+    (assert (pathname stream))))

@@ -716,12 +716,12 @@ standard Lisp readtable when NIL."
         (declare (ignore junk)) ; is this ANSI-specified?
         (when (and supplied-p start-pos)
           (funcall (form-tracking-stream-observer stream)
-                   start-pos (form-tracking-stream-char-pos stream) result))
+                   start-pos (form-tracking-stream-input-char-pos stream) result))
         (values (if supplied-p 1 0) result))
    stream ; KLUDGE: not capturing STREAM in the lambda avoids closure consing
    (and (form-tracking-stream-p stream)
         ;; Subtract 1 because the position points _after_ CHAR.
-        (1- (form-tracking-stream-char-pos stream)))
+        (1- (form-tracking-stream-input-char-pos stream)))
    (funcall (!cmt-entry-to-function
              (get-raw-cmt-entry char *readtable*) #'read-token)
             stream char)))
