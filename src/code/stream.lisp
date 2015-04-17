@@ -235,6 +235,7 @@
 (defun ansi-stream-read-line-from-frc-buffer (stream eof-error-p eof-value)
   (prepare-for-fast-read-char stream
     (declare (ignore %frc-method%))
+    (declare (type ansi-stream-cin-buffer %frc-buffer%))
     (let ((chunks-total-length 0)
           (chunks nil))
       (declare (type index chunks-total-length)
@@ -242,53 +243,35 @@
       (labels ((refill-buffer ()
                  (prog1 (fast-read-char-refill stream nil)
                    (setf %frc-index% (ansi-stream-in-index %frc-stream%))))
-               (newline-position ()
-                 (position #\Newline (the (simple-array character (*))
-                                       %frc-buffer%)
-                           :test #'char=
-                           :start %frc-index%))
-               (make-and-return-result-string (pos)
-                 (let* ((len (+ (- (or pos %frc-index%)
-                                   %frc-index%)
-                                chunks-total-length))
-                        (res (make-string len))
-                        (start 0))
-                   (declare (type index start))
-                   (when chunks
-                     (dolist (chunk (nreverse chunks))
-                       (declare (type (simple-array character) chunk))
-                       (replace res chunk :start1 start)
-                       (incf start (length chunk))))
-                   (unless (null pos)
+               (build-result (pos n-more-chars)
+                 (let ((res (make-string (+ chunks-total-length n-more-chars)))
+                       (start1 chunks-total-length))
+                   (declare (type index start1))
+                   (when (>= pos 0)
                      (replace res %frc-buffer%
-                              :start1 start
-                              :start2 %frc-index% :end2 pos)
+                              :start1 start1 :start2 %frc-index% :end2 pos)
                      (setf %frc-index% (1+ pos)))
                    (done-with-fast-read-char)
-                   (return-from ansi-stream-read-line-from-frc-buffer (values res (null pos)))))
-               (add-chunk ()
-                 (let* ((end (length %frc-buffer%))
-                        (len (- end %frc-index%))
-                        (chunk (make-string len)))
-                   (replace chunk %frc-buffer% :start2 %frc-index% :end2 end)
-                   (push chunk chunks)
-                   (incf chunks-total-length len)
-                   (unless (refill-buffer)
-                     (make-and-return-result-string nil)))))
-        (declare (inline make-and-return-result-string
-                         refill-buffer))
-        (when (and (= %frc-index% +ansi-stream-in-buffer-length+)
-                   (not (refill-buffer)))
+                   (dolist (chunk chunks res)
+                     (declare (type (simple-array character (*)) chunk))
+                     (decf start1 (length chunk))
+                     (replace res chunk :start1 start1)))))
+        (declare (inline refill-buffer))
+        (if (or (< %frc-index% +ansi-stream-in-buffer-length+) (refill-buffer))
+            (loop
+             (let ((pos (position #\Newline %frc-buffer%
+                                  :test #'char= :start %frc-index%)))
+               (when pos
+                 (return (values (build-result pos (- pos %frc-index%)) nil)))
+               (let ((chunk (subseq %frc-buffer% %frc-index%)))
+                 (incf chunks-total-length (length chunk))
+                 (push chunk chunks))
+               (unless (refill-buffer)
+                 (return (values (build-result -1 0) t)))))
           ;; EOF had been reached before we read anything
           ;; at all. Return the EOF value or signal the error.
-          (done-with-fast-read-char)
-          (return-from ansi-stream-read-line-from-frc-buffer
-            (values (eof-or-lose stream eof-error-p eof-value) t)))
-        (loop
-           (let ((pos (newline-position)))
-             (if pos
-                 (make-and-return-result-string pos)
-                 (add-chunk))))))))
+            (progn (done-with-fast-read-char)
+                   (eof-or-lose stream eof-error-p (values eof-value t))))))))
 
 #!-sb-fluid (declaim (inline ansi-stream-read-line))
 (defun ansi-stream-read-line (stream eof-error-p eof-value recursive-p)
