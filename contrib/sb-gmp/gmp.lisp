@@ -91,11 +91,24 @@
 
 
 ;;; types and initialization
+
+(define-alien-type gmp-limb
+  #-(and win32 x86-64) unsigned-long
+  #+(and win32 x86-64) unsigned-long-long)
+
+(deftype ui ()
+  #-(and win32 x86-64) '(unsigned-byte #.sb-vm:n-word-bits)
+  #+(and win32 x86-64) '(unsigned-byte 32))
+
+(deftype si ()
+  #-(and win32 x86-64) '(signed-byte #.sb-vm:n-word-bits)
+  #+(and win32 x86-64) '(signed-byte 32))
+
 (define-alien-type nil
     (struct gmpint
             (mp_alloc int)
             (mp_size int)
-            (mp_d (* unsigned-long))))
+            (mp_d (* gmp-limb))))
 
 ;; Section 3.6 "Memory Management" of the GMP manual states: "mpz_t
 ;; and mpq_t variables never reduce their allocated space. Normally
@@ -134,7 +147,7 @@ bignum."
   "Convert and copy a positive GMP integer into the buffer of a
 pre-allocated bignum. The allocated bignum-length must be (1+ COUNT)."
   (declare (optimize (speed 3) (space 3) (safety 0))
-           (type (alien (* unsigned-long)) z)
+           (type (alien (* gmp-limb)) z)
            (type bignum-type b)
            (type bignum-length count))
   (dotimes (i count (%normalize-bignum b (1+ count)))
@@ -430,7 +443,7 @@ pre-allocated bignum. The allocated bignum-length must be (1+ COUNT)."
       (__gmpz_mul (addr result) (addr ga) (addr gb)))))
 
 (defgmpfun mpz-mul-2exp (a b)
-  (check-type b (unsigned-byte #.sb-vm:n-word-bits))
+  (check-type b ui)
   (with-mpz-results ((result (+ (1+ (blength a))
                                 (floor b sb-vm:n-word-bits))))
     (with-mpz-vars ((a ga))
@@ -462,7 +475,7 @@ pre-allocated bignum. The allocated bignum-length must be (1+ COUNT)."
         (__gmpz_fdiv_qr (addr quot) (addr rem) (addr gn) (addr gd))))))
 
 (defgmpfun mpz-fdiv-2exp (a b)
-  (check-type b (unsigned-byte #.sb-vm:n-word-bits))
+  (check-type b ui)
   (with-mpz-results ((result (1+ (- (blength a)
                                     (floor b sb-vm:n-word-bits)))))
     (with-mpz-vars ((a ga))
@@ -521,23 +534,23 @@ pre-allocated bignum. The allocated bignum-length must be (1+ COUNT)."
       (__gmpz_nextprime (addr prime) (addr ga)))))
 
 (defgmpfun mpz-fac (n)
-  (check-type n (unsigned-byte #.sb-vm:n-word-bits))
+  (check-type n ui)
   (with-gmp-mpz-results (fac)
     (__gmpz_fac_ui (addr fac) n)))
 
 (defgmpfun %mpz-2fac (n)
-  (check-type n (unsigned-byte #.sb-vm:n-word-bits))
+  (check-type n ui)
   (with-gmp-mpz-results (fac)
     (__gmpz_2fac_ui (addr fac) n)))
 
 (defgmpfun %mpz-mfac (n m)
-  (check-type n (unsigned-byte #.sb-vm:n-word-bits))
-  (check-type m (unsigned-byte #.sb-vm:n-word-bits))
+  (check-type n ui)
+  (check-type m ui)
   (with-gmp-mpz-results (fac)
     (__gmpz_mfac_uiui (addr fac) n m)))
 
 (defgmpfun %mpz-primorial (n)
-  (check-type n (unsigned-byte #.sb-vm:n-word-bits))
+  (check-type n ui)
   (with-gmp-mpz-results (r)
     (__gmpz_primorial_ui (addr r) n)))
 
@@ -575,7 +588,7 @@ pre-allocated bignum. The allocated bignum-length must be (1+ COUNT)."
     (setf (fdefinition 'mpz-remove) #'mpz-remove-5.1)))
 
 (defgmpfun mpz-bin (n k)
-  (check-type k (unsigned-byte #.sb-vm:n-word-bits))
+  (check-type k ui)
   (with-gmp-mpz-results (r)
     (with-mpz-vars ((n gn))
       (__gmpz_bin_ui (addr r) (addr gn) k))))
@@ -585,7 +598,7 @@ pre-allocated bignum. The allocated bignum-length must be (1+ COUNT)."
   ;; fibonacci number magnitude in bits is assymptotic to n(log_2 phi)
   ;; This is correct for the result but appears not to be enough for GMP
   ;; during computation (memory access error), so use GMP-side allocation.
-  (check-type n (unsigned-byte #.sb-vm:n-word-bits))
+  (check-type n ui)
   (with-gmp-mpz-results (fibn fibn-1)
     (__gmpz_fib2_ui (addr fibn) (addr fibn-1) n)))
 
@@ -656,8 +669,8 @@ pre-allocated bignum. The allocated bignum-length must be (1+ COUNT)."
 (defun make-gmp-rstate-lc (a c m2exp)
   "Instantiate a state for the GMP linear congruential random number generator."
   (declare (optimize (speed 3) (space 3)))
-  (check-type c (unsigned-byte #.sb-vm:n-word-bits))
-  (check-type m2exp (unsigned-byte #.sb-vm:n-word-bits))
+  (check-type c ui)
+  (check-type m2exp ui)
   (let* ((state (%make-gmp-rstate))
          (ref (gmp-rstate-ref state)))
     (with-mpz-vars ((a ga))
@@ -671,7 +684,7 @@ pre-allocated bignum. The allocated bignum-length must be (1+ COUNT)."
   (check-type state gmp-rstate)
   (let ((ref (gmp-rstate-ref state)))
     (cond
-      ((typep seed '(unsigned-byte #.sb-vm:n-word-bits))
+      ((typep seed 'ui)
        (__gmp_randseed_ui ref seed))
       ((typep seed '(integer 0 *))
        (with-mpz-vars ((seed gseed))
@@ -683,7 +696,7 @@ pre-allocated bignum. The allocated bignum-length must be (1+ COUNT)."
   "Return a random integer in the range 0..(2^bitcount - 1)."
   (declare (optimize (speed 3) (space 3) (safety 0)))
   (check-type state gmp-rstate)
-  (check-type bitcount (unsigned-byte #.sb-vm:n-word-bits))
+  (check-type bitcount ui)
   (let ((ref (gmp-rstate-ref state)))
     (with-mpz-results ((result (+ (ceiling bitcount sb-vm:n-word-bits) 2)))
       (__gmpz_urandomb (addr result) ref bitcount))))
