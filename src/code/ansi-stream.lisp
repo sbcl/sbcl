@@ -110,6 +110,9 @@
   ;; buffered input functions
   (in #'ill-in :type function)                  ; READ-CHAR function
   (bin #'ill-bin :type function)                ; byte input function
+  ;; 'n-bin' might not transfer bytes to the consumer.
+  ;; A character FD-STREAM uses this method to transfer octets from the
+  ;; source buffer into characters of the destination buffer.
   (n-bin #'ill-bin :type function)              ; n-byte input function
 
   ;; output functions

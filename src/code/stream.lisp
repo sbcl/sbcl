@@ -240,8 +240,7 @@
       (declare (type index chunks-total-length)
                (list chunks))
       (labels ((refill-buffer ()
-                 (prog1
-                     (not (fast-read-char-refill stream nil))
+                 (prog1 (fast-read-char-refill stream nil)
                    (setf %frc-index% (ansi-stream-in-index %frc-stream%))))
                (newline-position ()
                  (position #\Newline (the (simple-array character (*))
@@ -274,12 +273,12 @@
                    (replace chunk %frc-buffer% :start2 %frc-index% :end2 end)
                    (push chunk chunks)
                    (incf chunks-total-length len)
-                   (when (refill-buffer)
+                   (unless (refill-buffer)
                      (make-and-return-result-string nil)))))
         (declare (inline make-and-return-result-string
                          refill-buffer))
         (when (and (= %frc-index% +ansi-stream-in-buffer-length+)
-                   (refill-buffer))
+                   (not (refill-buffer)))
           ;; EOF had been reached before we read anything
           ;; at all. Return the EOF value or signal the error.
           (done-with-fast-read-char)
@@ -2050,8 +2049,7 @@ benefit of the function GET-OUTPUT-STREAM-STRING.")
       (unless %frc-buffer%
         (return-from ansi-stream-read-string-from-frc-buffer nil))
       (labels ((refill-buffer ()
-                 (prog1
-                     (not (fast-read-char-refill stream nil))
+                 (prog1 (fast-read-char-refill stream nil)
                    (setf %frc-index% (ansi-stream-in-index %frc-stream%))))
                (add-chunk ()
                  (let* ((end (length %frc-buffer%))
@@ -2068,16 +2066,15 @@ benefit of the function GET-OUTPUT-STREAM-STRING.")
                               :end2 (+ %frc-index% len)))
                    (incf read len)
                    (incf %frc-index% len)
-                   (when (or (eql needed read)
-                             (refill-buffer))
+                   (when (or (eql needed read) (not (refill-buffer)))
                      (done-with-fast-read-char)
                      (return-from ansi-stream-read-string-from-frc-buffer
                        (+ start read))))))
         (declare (inline refill-buffer))
         (when (and (= %frc-index% +ansi-stream-in-buffer-length+)
-                   (refill-buffer))
+                   (not (refill-buffer)))
           ;; EOF had been reached before we read anything
-          ;; at all. Return the EOF value or signal the error.
+          ;; at all. But READ-SEQUENCE never signals an EOF error.
           (done-with-fast-read-char)
           (return-from ansi-stream-read-string-from-frc-buffer start))
         (loop (add-chunk))))))

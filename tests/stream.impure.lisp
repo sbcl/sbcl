@@ -733,4 +733,54 @@
                (assert (eql 9 p2)))))
       (ignore-errors (delete-file p)))))
 
+(defstruct (mock-fd-stream
+            (:constructor %make-mock-fd-stream (buffer-chain))
+            (:include sb-impl::ansi-stream
+                      (in #'mock-fd-stream-in)
+                      (n-bin #'mock-fd-stream-n-bin)
+                      (cin-buffer
+                       (make-array sb-impl::+ansi-stream-in-buffer-length+
+                                   :element-type 'character))))
+  buffer-chain)
+
+(defun make-mock-fd-stream (buffer-chain)
+  ;; For notational convenience, #\| becomes #\Newline.
+  (%make-mock-fd-stream
+   (mapcar (lambda (x) (substitute #\Newline #\| x)) buffer-chain)))
+
+(defun mock-fd-stream-in (stream eof-err-p eof-val)
+  (sb-impl::eof-or-lose stream eof-err-p eof-val))
+
+(defun mock-fd-stream-n-bin (stream char-buf start count eof-err-p)
+  (cond ((mock-fd-stream-buffer-chain stream)
+         (let* ((chars (pop (mock-fd-stream-buffer-chain stream)))
+                (n-chars (length chars)))
+           ;; make sure the mock object is being used as expected.
+           (assert (>= count (length chars)))
+           (replace char-buf chars :start1 start)
+           n-chars))
+        (t
+         (sb-impl::eof-or-lose stream eof-err-p 0))))
+
+(with-test (:name :read-chunk-from-frc-buffer)
+  (let ((s (make-mock-fd-stream '("zabc" "d" "efgh" "foo|bar" "hi"))))
+    (multiple-value-bind (line eofp)
+        (sb-impl::ansi-stream-read-line-from-frc-buffer s nil 'woot)
+      (assert (and (string= line "zabcdefghfoo") (not eofp))))
+    (multiple-value-bind (line eofp)
+        (sb-impl::ansi-stream-read-line-from-frc-buffer s nil 'woot)
+      (assert (and (string= line "barhi") eofp)))
+    (multiple-value-bind (line eofp)
+        (sb-impl::ansi-stream-read-line-from-frc-buffer s nil 'woot)
+      (assert (and (eq line 'woot) eofp))))
+  (let ((s (make-mock-fd-stream '("zabc" "d" "efgh" "foo*bar" "hi")))
+        (string (make-string 100)))
+    (let ((endpos
+           (sb-impl::ansi-stream-read-string-from-frc-buffer string s 10 nil)))
+      (assert (and (= endpos 28)
+                   (string= (subseq string 10 endpos) "zabcdefghfoo*barhi"))))
+    (let ((endpos
+           (sb-impl::ansi-stream-read-string-from-frc-buffer string s 0 nil)))
+      (assert (= endpos 0)))))
+
 ;;; success
