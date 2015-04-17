@@ -468,6 +468,7 @@
                     (list name))
               '(sfunction ,arg-types ,result-type)
               (ir1-attributes ,@attributes)
+              (source-location)
               ,@keys))
 
 ;;; Create a function which parses combination args according to WHAT

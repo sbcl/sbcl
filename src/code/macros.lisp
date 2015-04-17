@@ -523,7 +523,8 @@ invoked. In that case it will store into PLACE and start over."
   "DECLAIM Declaration*
   Do a declaration or declarations for the global environment."
   `(eval-when (:compile-toplevel :load-toplevel :execute)
-     ,@(mapcar (lambda (spec) `(sb!xc:proclaim ',spec))
+     ,@(mapcar (lambda (spec)
+                 `(sb!c::%proclaim ',spec (sb!c:source-location)))
                specs)))
 
 ;; Avoid unknown return values in emitted code for PRINT-UNREADABLE-OBJECT

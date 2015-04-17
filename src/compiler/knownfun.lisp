@@ -226,7 +226,7 @@
 
 ;;; Make a FUN-INFO structure with the specified type, attributes
 ;;; and optimizers.
-(declaim (ftype (function (list list attributes &key
+(declaim (ftype (function (list list attributes t &key
                                 (:derive-type (or function null))
                                 (:optimizer (or function null))
                                 (:destroyed-constant-args (or function null))
@@ -234,9 +234,9 @@
                                 (:overwrite-fndb-silently boolean))
                           *)
                 %defknown))
-(defun %defknown (names type attributes
+(defun %defknown (names type attributes location
                   &key derive-type optimizer destroyed-constant-args result-arg
-                    overwrite-fndb-silently)
+                       overwrite-fndb-silently)
   (let ((ctype (specifier-type type))
         (info (make-fun-info :attributes attributes
                              :derive-type derive-type
@@ -262,7 +262,11 @@
       (setf (info :function :type name) ctype)
       (setf (info :function :where-from name) :declared)
       (setf (info :function :kind name) :function)
-      (setf (info :function :info name) info)))
+      (setf (info :function :info name) info)
+      (if location
+          (setf (getf (info :source-location :declaration name) 'defknown)
+                location)
+          (remf (info :source-location :declaration name) 'defknown))))
   names)
 
 ;;; Return the FUN-INFO for NAME or die trying. Since this is

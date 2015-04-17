@@ -183,6 +183,7 @@ name. Type can currently be one of the following:
    :SYMBOL-MACRO
    :TYPE
    :VARIABLE
+   :DECLARATION
 
    (Internal)
    :OPTIMIZER
@@ -352,6 +353,13 @@ If an unsupported TYPE is requested, the function will return NIL.
           (when (and transform-fun
                      (not accessor))
             (find-definition-source transform-fun))))
+       (:declaration
+        (let ((locations (sb-int:info :source-location :declaration name)))
+          (loop for (kind loc) on locations by #'cddr
+                when loc
+                collect (let ((loc (translate-source-location loc)))
+                          (setf (definition-source-description loc) (list kind))
+                          loc))))
        (t
         nil)))))
 

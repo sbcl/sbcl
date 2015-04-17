@@ -273,13 +273,17 @@
           (t
            decl-spec))))
 
-(defun sb!xc:proclaim (raw-form)
-  #+sb-xc (/show0 "entering PROCLAIM, RAW-FORM=..")
-  #+sb-xc (/hexstr raw-form)
+(defun %proclaim (raw-form location)
   (destructuring-bind (&whole form &optional kind &rest args)
       (canonized-decl-spec raw-form)
-    (labels ((map-names (names function &rest extra-args)
+    (labels ((store-location (name)
+               (if location
+                   (setf (getf (info :source-location :declaration name) kind)
+                         location)
+                   (remf (info :source-location :declaration name) kind)))
+             (map-names (names function &rest extra-args)
                (mapc (lambda (name)
+                       (store-location name)
                        (apply function name extra-args))
                      names))
              (map-args (function &rest extra-args)
@@ -323,7 +327,12 @@
          (map-args #'process-declaration-declaration form))
         (t
          (unless (info :declaration :recognized kind)
-           (compiler-warn "unrecognized declaration ~S" raw-form))))))
+           (compiler-warn "unrecognized declaration ~S" raw-form)))))))
+
+(defun sb!xc:proclaim (raw-form)
+  #+sb-xc (/show0 "entering PROCLAIM, RAW-FORM=..")
+  #+sb-xc (/hexstr raw-form)
+  (%proclaim raw-form nil)
   #+sb-xc (/show0 "returning from PROCLAIM")
   (values))
 
