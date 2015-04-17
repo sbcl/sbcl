@@ -443,7 +443,7 @@
           (type-union unexceptional-type null-type)
           unexceptional-type))))
 
-(defun position-derive-type (call)
+(defun count/position-max-value (call)
   (declare (type combination call))
     ;; Could possibly constrain the result more highly if
     ;; the :start/:end were provided and of known types.
@@ -467,8 +467,15 @@
     ;; We could use LVAR-CONSERVATIVE-TYPE to get a conservative answer.
     ;; However that's probably not an important use, so the above
     ;; logic restricts itself to simple arrays.
-    (let ((dim (max-dim (lvar-type (second (combination-args call))))))
-      (when (integerp dim)
-        (specifier-type `(or (integer 0 (,dim)) null))))))
+    (max-dim (lvar-type (second (combination-args call))))))
+
+(defun position-derive-type (call)
+  (let ((dim (count/position-max-value call)))
+    (when (integerp dim)
+      (specifier-type `(or (integer 0 (,dim)) null)))))
+(defun count-derive-type (call)
+  (let ((dim (count/position-max-value call)))
+    (when (integerp dim)
+      (specifier-type `(integer 0 ,dim)))))
 
 (/show0 "knownfun.lisp end of file")
