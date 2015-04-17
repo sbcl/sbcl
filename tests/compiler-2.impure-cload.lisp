@@ -92,7 +92,7 @@
 ;;; COMPILE-FILE-POSITION
 
 (macrolet ((line () `(multiple-value-call 'cons (compile-file-position))))
-  (defun foo (x)
+  (defun more-foo (x)
     (if x
         (format nil "Great! ~D" (line)) ; <-- this is line 97
         (format nil "Yikes ~D" (line)))))
@@ -117,7 +117,7 @@
             (progn (more-randomness))))))) ; <-- this is line 117
 
 (with-test (:name :compile-file-position)
-  (assert (string= (foo t) "Great! (97 . 32)"))
-  (assert (string= (foo nil) "Yikes (98 . 31)"))
+  (assert (string= (more-foo t) "Great! (97 . 32)"))
+  (assert (string= (more-foo nil) "Yikes (98 . 31)"))
   (assert (string= (bork t) "failed to frob a knob at line #103"))
   (assert (string= (bork nil) "failed to frob a knob at line #117")))
