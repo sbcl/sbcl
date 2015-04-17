@@ -5494,3 +5494,14 @@
              '(lambda (a)
                 (fceiling (the (member 2.3 21672589639883401935) a))))
    (assert (and f (not warning)))))
+
+(with-test (:name :position-derive-type)
+  (let ((f (compile nil
+                    '(lambda (x)
+                      (declare (type (simple-string 90) x))
+                      (declare (muffle-conditions code-deletion-note))
+                      (let ((b (position #\i x)))
+                        (if (and (integerp b) (> b 100))
+                            'yikes 'okey-dokey))))))
+    ;; The function can not return YIKES
+    (assert (not (ctu:find-code-constants f :type '(eql yikes))))))

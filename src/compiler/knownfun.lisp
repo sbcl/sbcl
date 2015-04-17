@@ -441,12 +441,30 @@
 
 (defun position-derive-type (call)
   (declare (type combination call))
-  (let ((seq (second (combination-args call))))
     ;; Could possibly constrain the result more highly if
     ;; the :start/:end were provided and of known types.
-    (when (constant-lvar-p seq)
-      (let ((seq (lvar-value seq)))
-        (when (typep seq '(simple-array * (*)))
-          (specifier-type `(or (integer 0 (,(length seq))) null)))))))
+  (labels ((max-dim (type)
+             ;; This can deal with just enough hair to handle type STRING,
+             ;; but might be made to use GENERIC-ABSTRACT-TYPE-FUNCTION
+             ;; if we really want to be more clever.
+             (typecase type
+               (union-type (reduce #'max2 (union-type-types type)
+                                   :key #'max-dim))
+               (array-type (if (and (not (array-type-complexp type))
+                                    (singleton-p (array-type-dimensions type)))
+                               (first (array-type-dimensions type))
+                               '*))
+               (t '*)))
+           (max2 (a b)
+             (if (and (integerp a) (integerp b)) (max a b) '*)))
+    ;; If type derivation were able to notice that non-simple arrays can
+    ;; be mutated (changing the type), we could safely use LVAR-TYPE on
+    ;; any vector type. But it doesn't notice.
+    ;; We could use LVAR-CONSERVATIVE-TYPE to get a conservative answer.
+    ;; However that's probably not an important use, so the above
+    ;; logic restricts itself to simple arrays.
+    (let ((dim (max-dim (lvar-type (second (combination-args call))))))
+      (when (integerp dim)
+        (specifier-type `(or (integer 0 (,dim)) null))))))
 
 (/show0 "knownfun.lisp end of file")
