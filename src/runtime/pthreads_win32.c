@@ -553,7 +553,7 @@ int pthread_once(pthread_once_t *once_control, void (*init_routine)(void))
 }
 
 /* TODO call signal handlers */
-int pthread_sigmask(int how, const sigset_t *set, sigset_t *oldset)
+int _sbcl_pthread_sigmask(int how, const sigset_t *set, sigset_t *oldset)
 {
   pthread_t self = pthread_self();
   if (oldset)

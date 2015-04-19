@@ -131,7 +131,7 @@ void memory_fault_handler(int signal, siginfo_t *siginfo,
 void build_fake_signal_context(os_context_t *context,
                                x86_thread_state32_t *thread_state,
                                x86_float_state32_t *float_state) {
-    pthread_sigmask(0, NULL, &context->uc_sigmask);
+    thread_sigmask(0, NULL, &context->uc_sigmask);
     context->uc_mcontext->SS = *thread_state;
     context->uc_mcontext->FS = *float_state;
 }
@@ -143,7 +143,7 @@ void update_thread_state_from_context(x86_thread_state32_t *thread_state,
                                       os_context_t *context) {
     *thread_state = context->uc_mcontext->SS;
     *float_state = context->uc_mcontext->FS;
-    pthread_sigmask(SIG_SETMASK, &context->uc_sigmask, NULL);
+    thread_sigmask(SIG_SETMASK, &context->uc_sigmask, NULL);
 }
 
 /* Modify a context to push new data on its stack. */

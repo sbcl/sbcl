@@ -508,7 +508,7 @@ check_pending_thruptions(os_context_t *ctx)
     pself->blocked_signal_set = oldset;
     if (ctx) ctx->sigmask = oldset;
 #else
-    pthread_sigmask(SIG_SETMASK, &oldset, 0);
+    thread_sigmask(SIG_SETMASK, &oldset, 0);
 #endif
 
 #ifndef LISP_FEATURE_C_STACK_IS_CONTROL_STACK
@@ -857,7 +857,7 @@ wake_thread_posix(os_thread_t os_thread)
     gc_state_unlock();
 
     odxprint(safepoints, "wake_thread_posix leaving, found=%d", found);
-    pthread_sigmask(SIG_SETMASK, &oldset, 0);
+    thread_sigmask(SIG_SETMASK, &oldset, 0);
     return found ? 0 : -1;
 }
 #endif /* !LISP_FEATURE_WIN32 */

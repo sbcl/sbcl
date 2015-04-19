@@ -29,7 +29,13 @@
 #if defined(LISP_FEATURE_SB_THREAD)
 #define thread_self() pthread_self()
 #define thread_kill pthread_kill
+
+#ifdef LISP_FEATURE_WIN32
+#define thread_sigmask _sbcl_pthread_sigmask
+#else
 #define thread_sigmask pthread_sigmask
+#endif
+
 #define thread_mutex_lock(l) pthread_mutex_lock(l)
 #define thread_mutex_unlock(l) pthread_mutex_unlock(l)
 #else

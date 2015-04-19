@@ -17,7 +17,6 @@
 #ifndef LISP_FEATURE_WIN32
 #include <sched.h>
 #endif
-#include "runtime.h"
 #include <stddef.h>
 #include <errno.h>
 #include <sys/types.h>
