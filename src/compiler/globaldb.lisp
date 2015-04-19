@@ -718,6 +718,7 @@
 (define-info-type (:source-location :symbol-macro) :type-spec t)
 (define-info-type (:source-location :vop) :type-spec t)
 (define-info-type (:source-location :declaration) :type-spec t)
+(define-info-type (:source-location :alien-type) :type-spec t)
 
 ;; This is for the SB-INTROSPECT contrib module, and debugging.
 (defun call-with-each-info (function symbol)

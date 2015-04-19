@@ -290,7 +290,9 @@
          ,@(when *new-auxiliary-types*
              `((%def-auxiliary-alien-types ',*new-auxiliary-types*)))
          ,@(when name
-             `((%define-alien-type ',name ',alien-type)))))))
+             `((%define-alien-type ',name ',alien-type)
+               (setf (info :source-location :alien-type ',name)
+                     (sb!c:source-location))))))))
 
 (eval-when (#-sb-xc :compile-toplevel :load-toplevel :execute)
   (defun %def-auxiliary-alien-types (types)

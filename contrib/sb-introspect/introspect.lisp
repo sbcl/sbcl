@@ -182,6 +182,7 @@ name. Type can currently be one of the following:
    :STRUCTURE
    :SYMBOL-MACRO
    :TYPE
+   :ALIEN-TYPE
    :VARIABLE
    :DECLARATION
 
@@ -334,8 +335,8 @@ If an unsupported TYPE is requested, the function will return NIL.
                       (setf (definition-source-description source)
                             (list name))
                       source))))))
-       ((:vop)
-        (let ((loc (sb-int:info :source-location :vop name)))
+       ((:vop :alien-type)
+        (let ((loc (sb-int:info :source-location type name)))
           (and loc
                (translate-source-location loc))))
        ((:source-transform)

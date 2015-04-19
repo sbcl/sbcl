@@ -13,6 +13,8 @@ changes relative to sbcl-1.2.10:
     to a constant (VALUES integer integer) indicating the source line/column
     from which it was read, intended for logging Lisp runtime errors in
     a style similar to that afforded by the C preprocessor __LINE__ macro.
+  * enhancement: improved source locations for VOPs, alien types and
+    declarations.
   * bug fix: functions in :FINAL deprecation have the correct docstring.
     No visible change, as no such functions presently exist. (lp#1439151)
   * bug fix: (SETF (FDEFINITION this) (FDEFINITION OTHER)) signals an error
