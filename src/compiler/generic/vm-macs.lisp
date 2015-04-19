@@ -130,6 +130,7 @@
                   ,lowtag ',(inits))))
       `(progn
          (eval-when (:compile-toplevel :load-toplevel :execute)
+           (setf (info :type :source-location ',name) (source-location))
            (!%define-primitive-object
             ',(make-primitive-object :name name
                                      :widetag widetag

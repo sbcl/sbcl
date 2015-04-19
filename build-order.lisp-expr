@@ -318,6 +318,10 @@
  ;; ("src/code/defbangmacro" was here until sbcl-0.6.7.3.)
 
  ("src/compiler/macros")
+
+ ("src/compiler/globaldb")
+ ("src/compiler/info-functions")
+
  ("src/compiler/generic/vm-macs")
  ("src/compiler/generic/objdef")
 
@@ -338,10 +342,6 @@
 
  ;; needs "backend"
  ("src/compiler/target/backend-parms")
-
- ;; for INFO and SB!XC:MACRO-FUNCTION, needed by defmacro.lisp
- ("src/compiler/globaldb")
- ("src/compiler/info-functions")
 
  ("src/code/force-delayed-defbangconstants")
  ("src/code/defmacro")
