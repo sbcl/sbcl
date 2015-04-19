@@ -214,7 +214,7 @@ If an unsupported TYPE is requested, the function will return NIL.
        ((:variable)
         (when (and (symbolp name)
                    (member (sb-int:info :variable :kind name)
-                           '(:global :special)))
+                           '(:global :special :alien)))
           (translate-source-location (sb-int:info :source-location type name))))
        ((:constant)
         (when (and (symbolp name)

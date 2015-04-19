@@ -69,17 +69,19 @@ is guessed from the one supplied."
                `((%def-auxiliary-alien-types ',*new-auxiliary-types*)))
            (%define-alien-variable ',lisp-name
                                    ',alien-name
-                                   ',alien-type))))))
+                                   ',alien-type
+                                   (sb!c:source-location)))))))
 
 ;;; Do the actual work of DEFINE-ALIEN-VARIABLE.
 (eval-when (:compile-toplevel :load-toplevel :execute)
-  (defun %define-alien-variable (lisp-name alien-name type)
+  (defun %define-alien-variable (lisp-name alien-name type location)
     (setf (info :variable :kind lisp-name) :alien)
     (setf (info :variable :where-from lisp-name) :defined)
     (setf (info :variable :alien-info lisp-name)
           (make-heap-alien-info :type type
                                 :alien-name alien-name
-                                :datap t))))
+                                :datap t))
+    (setf (info :source-location :variable lisp-name) location)))
 
 (defun alien-value (symbol)
   #!+sb-doc
