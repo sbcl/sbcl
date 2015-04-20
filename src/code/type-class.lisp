@@ -92,6 +92,11 @@
   ;; The ARG1 method is only called when the first argument is in its
   ;; class, and the ARG2 method is only called when called when the
   ;; second type is. If either is specified, both must be.
+  ;; FIXME: "both must be" is false of CLASSOID type-class.
+  ;;        Figure out if this is a comment bug or a logic bug.
+  ;; * (type-class-complex-subtypep-arg1 (type-class-or-lose 'classoid)) => NIL
+  ;; * (type-class-complex-subtypep-arg2 (type-class-or-lose 'classoid))
+  ;;   => #<FUNCTION CLASSOID-COMPLEX-SUBTYPEP-ARG2-TYPE-METHOD>
   (simple-subtypep #'must-supply-this :type function)
   (complex-subtypep-arg1 nil :type (or function null))
   (complex-subtypep-arg2 nil :type (or function null))
