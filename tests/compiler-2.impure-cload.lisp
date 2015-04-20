@@ -116,11 +116,25 @@
               (more-randomness))
             (progn (more-randomness))))))) ; <-- this is line 117
 
+(defun compile-file-pos-sharp-dot (x)
+  (list #.(format nil "Foo line ~D" (compile-file-position)) ; line #120
+        x))
+
+(defun compile-file-pos-eval-in-macro ()
+  (macrolet ((macro (x)
+               (format nil "hi ~A at ~D" x
+                       (compile-file-position)))) ; line #126
+    (macro "there")))
+
 (with-test (:name :compile-file-position)
   (assert (string= (more-foo t) "Great! (97 . 32)"))
   (assert (string= (more-foo nil) "Yikes (98 . 31)"))
   (assert (string= (bork t) "failed to frob a knob at line #103"))
-  (assert (string= (bork nil) "failed to frob a knob at line #117")))
+  (assert (string= (bork nil) "failed to frob a knob at line #117"))
+  (assert (string= (car (compile-file-pos-sharp-dot nil))
+                    "Foo line 120"))
+  (assert (string= (compile-file-pos-eval-in-macro)
+                    "hi there at 126")))
 
 (eval-when (:compile-toplevel)
   (let ((stream (sb-c::source-info-stream sb-c::*source-info*)))

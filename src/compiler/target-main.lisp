@@ -208,21 +208,11 @@ not STYLE-WARNINGs occur during compilation, and NIL otherwise.
 ;; as a design choice, but just an accident of the particular implementation.
 ;;
 (let ()
-  (defmacro compile-file-position ()
+  (defmacro compile-file-position (&whole this-form)
     #!+sb-doc
     "Return line# and column# of this macro invocation as multiple values."
-    (or (and *source-info*
-             (file-info-subforms (source-info-file-info *source-info*))
-             (boundp '*current-path*)
-             *current-path*
-             (let* ((original-source-path
-                     (cddr (member 'original-source-start *current-path*)))
-                    (path (reverse original-source-path))
-                    (file-info (source-info-file-info *source-info*))
-                    (form (elt (file-info-forms file-info) (car path)))
-                    (charpos))
-               (dolist (p (cdr path))
-                 (setq form (nth p form)))
+    (let (file-info charpos)
+      (flet ((find-form-eq (form &optional fallback-path)
                (with-array-data ((vect (file-info-subforms file-info))
                                  (start) (end) :check-fill-pointer t)
                  (declare (ignore start))
@@ -231,24 +221,50 @@ not STYLE-WARNINGs occur during compilation, and NIL otherwise.
                    (declare (index-or-minus-1 i))
                    (when (eq form (svref vect i))
                      (if charpos ; ambiguous
-                         (return (setq charpos (compile-file-position-helper
-                                                file-info (cdr path))))
-                         (setq charpos (svref vect (- i 2)))))))
-               (when charpos
-                 (let* ((newlines (file-info-newlines file-info))
-                        (index
-                         (position charpos newlines :test #'>= :from-end t)))
-                   ;; Line numbers traditionally begin at 1, columns at 0.
-                   (if index
-                       ;; INDEX is 1 less than the number of newlines seen
-                       ;; up to and including this startpos.
-                       ;; e.g. index=0 => 1 newline seen => line=2
-                       `(values ,(+ index 2)
-                                ;; 1 char after the newline = column 0
-                                ,(- charpos (aref newlines index) 1))
-                       ;; zero newlines were seen
-                       `(values 1 ,charpos))))))
-        '(values 0 -1))))
+                         (return
+                           (setq charpos
+                                 (and fallback-path
+                                      (compile-file-position-helper
+                                       file-info fallback-path))))
+                         (setq charpos (svref vect (- i 2)))))))))
+        (cond
+          ((and *source-info* (boundp '*current-path*) (not *current-path*))
+           ;; probably a read-time eval
+           (setq file-info (source-info-file-info *source-info*))
+           (find-form-eq this-form))
+          ;; Hmm, would a &WHOLE argument would work better or worse in general?
+          ((and *source-info* (boundp '*current-path*) *current-path*)
+           (setq file-info (source-info-file-info *source-info*))
+           (let* ((original-source-path
+                   (cddr (member 'original-source-start *current-path*)))
+                  (path (reverse original-source-path)))
+             (when (file-info-subforms file-info)
+               (let ((form (elt (file-info-forms file-info) (car path))))
+                 (dolist (p (cdr path))
+                   (setq form (nth p form)))
+                 (find-form-eq form (cdr path))))
+             (unless charpos
+               (let ((parent (source-info-parent *source-info*)))
+                 ;; probably in a local macro executing COMPILE-FILE-POSITION,
+                 ;; not producing a sexpr containing an invocation of C-F-P.
+                 (when parent
+                   (setq file-info (source-info-file-info parent))
+                   (find-form-eq this-form)))))))
+        (if charpos
+            (let* ((newlines (file-info-newlines file-info))
+                   (index
+                    (position charpos newlines :test #'>= :from-end t)))
+              ;; Line numbers traditionally begin at 1, columns at 0.
+              (if index
+                  ;; INDEX is 1 less than the number of newlines seen
+                  ;; up to and including this startpos.
+                  ;; e.g. index=0 => 1 newline seen => line=2
+                  `(values ,(+ index 2)
+                           ;; 1 char after the newline = column 0
+                           ,(- charpos (aref newlines index) 1))
+                  ;; zero newlines were seen
+                  `(values 1 ,charpos)))
+            '(values 0 -1))))))
 
 ;; Find FORM's character position in FILE-INFO by looking for PATH-TO-FIND.
 ;; This is done by imparting tree structure to the annotations
@@ -270,9 +286,6 @@ not STYLE-WARNINGs occur during compilation, and NIL otherwise.
 ;; expression, though the ELSE branch obviously has a longer path.
 ;; However, if you _could_ supply correct paths, this would compute correct
 ;; answers. (Modulo any bugs due to near-total lack of testing)
-
-;; Also note one more thing that doesn't work, and expectedly so:
-;;  (DEFUN F () (FORMAT T #.(FORMAT NIL "Fail ~D~%" (COMPILE-FILE-POSITION))))
 
 (defun compile-file-position-helper (file-info path-to-find)
   (let (found-form start-char)
