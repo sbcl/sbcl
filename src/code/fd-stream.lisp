@@ -212,7 +212,12 @@
             (:copier nil))
   ;; a function which is called for events on this stream.
   (observer #'error :type function)
-  (last-newline -1 :type index-or-minus-1))
+  (last-newline -1 :type index-or-minus-1)
+  ;; Better than reporting that a reader error occurred at a position
+  ;; before any whitespace (or equivalently, a macro producing no value),
+  ;; we can note the position at the first "good" character.
+  (form-start-byte-pos)
+  (form-start-char-pos))
 
 ;;;; CORE OUTPUT FUNCTIONS
 

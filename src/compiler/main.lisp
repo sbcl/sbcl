@@ -918,7 +918,6 @@ necessary, since type inference may take arbitrarily long to converge.")
                            (if (file-info-newlines file-info)
                                'form-tracking-stream
                                'fd-stream))))
-                #-sb-xc-host
                 (when (form-tracking-stream-p stream)
                   (setf (form-tracking-stream-observer stream)
                         (make-form-tracking-stream-observer file-info)))
@@ -938,15 +937,21 @@ necessary, since type inference may take arbitrarily long to converge.")
 (defun %do-forms-from-info (function info condition-name)
   (declare (function function))
   (let* ((file-info (source-info-file-info info))
-         (stream
-          (progn (awhen (file-info-subforms file-info)
-                  (setf (fill-pointer it) 0))
-                 (get-source-stream info)))
+         (stream (get-source-stream info))
          (pos (file-position stream))
          (form
           ;; Return a form read from STREAM; or for EOF use the trick,
           ;; popularized by Kent Pitman, of returning STREAM itself.
-          (handler-case (read-preserving-whitespace stream nil stream)
+          (handler-case
+              (progn
+                ;; Reset for a new toplevel form.
+                ;; FIXME: It would be nice to make LOAD similarly do this
+                ;; for accurate position reporting by line/column.
+                (when (form-tracking-stream-p stream)
+                  (setf (form-tracking-stream-form-start-char-pos stream) nil))
+                (awhen (file-info-subforms file-info)
+                  (setf (fill-pointer it) 0))
+                (read-preserving-whitespace stream nil stream))
             (reader-error (condition)
               (compiler-error condition-name
                 ;; We don't need to supply :POSITION here because
@@ -959,19 +964,23 @@ necessary, since type inference may take arbitrarily long to converge.")
             ;; making it unfortunately indistinguishable from legal EOF.
             ;; Were it not for that, it would be more elegant to just
             ;; handle one more condition in the HANDLER-CASE.
-            (end-of-file (condition)
-              (compiler-error condition-name
-                              :condition condition
+            ((or end-of-file error) (condition)
+              (compiler-error
+               condition-name
+               :condition condition
                 ;; We need to supply :POSITION here because the END-OF-FILE
                 ;; condition doesn't carry the position that the user
                 ;; probably cares about, where the failed READ began.
-                              :position pos
-                              :stream stream))
-            (error (condition)
-              (compiler-error condition-name
-                              :condition condition
-                              :position pos
-                              :stream stream)))))
+               :position
+               (or (and (form-tracking-stream-p stream)
+                        (form-tracking-stream-form-start-byte-pos stream))
+                   pos)
+               :line/col
+               (and (form-tracking-stream-p stream)
+                    (line/col-from-charpos
+                     (form-tracking-stream-form-start-char-pos stream)
+                     file-info))
+               :stream stream)))))
     (unless (eq form stream) ; not EOF
       (funcall function form
                :current-index

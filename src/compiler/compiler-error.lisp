@@ -159,6 +159,9 @@
    (position :reader input-error-in-compile-file-position
              :initarg :position
              :initform nil)
+   (line/col :reader input-error-in-compile-file-line/col
+             :initarg :line/col
+             :initform nil)
    (invoker :reader input-error-in-compile-file-invoker
             :initarg :invoker :initform 'compile-file))
   (:report
@@ -171,10 +174,16 @@
              'read
              (input-error-in-compile-file-invoker condition)
              (encapsulated-condition condition)
-             (when (input-error-in-compile-file-position condition)
-               (sb!kernel::stream-error-position-info
-                (stream-error-stream condition)
-                (input-error-in-compile-file-position condition)))))))
+             (let ((pos (input-error-in-compile-file-position condition)))
+               (acond ((input-error-in-compile-file-line/col condition)
+                       `((:line ,(car it))
+                         (:column ,(cdr it))
+                         (:position
+                          ,(or pos (1- (file-position
+                                        (stream-error-stream condition)))))))
+                      (pos
+                       (sb!kernel::stream-error-position-info
+                        (stream-error-stream condition) pos))))))))
 
 (define-condition input-error-in-load (input-error-in-compile-file) ()
   (:default-initargs :invoker 'load))

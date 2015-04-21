@@ -29,3 +29,7 @@
        (flet ((fast-read-byte ()
                   (the ,type (read-byte ,f-stream ,f-eof-error-p ,f-eof-value))))
          ,@body))))
+
+(defun form-tracking-stream-p (x)
+  (declare (ignore x))
+  nil)

@@ -676,19 +676,34 @@ standard Lisp readtable when NIL."
   (declare (optimize (sb!c::check-tag-existence 0)))
   (if recursive-p
       ;; a loop for repeating when a macro returns nothing
-      (loop
-       (let ((char (read-char stream eof-error-p +EOF+)))
-         (cond ((eq char +EOF+) (return eof-value))
-               ((whitespace[2]p char))
-               (t
-                (multiple-value-bind (result-p result)
-                    (read-maybe-nothing stream char)
-                  (unless (zerop result-p)
-                    (return (unless *read-suppress* result)))
-                  ;; Repeat if macro returned nothing.
-                  (when (form-tracking-stream-p stream)
-                    (funcall (form-tracking-stream-observer stream)
-                             :reset nil nil)))))))
+      (let* ((tracking-p (form-tracking-stream-p stream))
+             (outermost-p
+              (and tracking-p
+                   (null (form-tracking-stream-form-start-char-pos stream)))))
+        (loop
+         (let ((char (read-char stream eof-error-p +EOF+)))
+           (cond ((eq char +EOF+) (return eof-value))
+                 ((whitespace[2]p char))
+                 (t
+                  (when outermost-p
+                    ;; Calling FILE-POSITION at each token seems to slow down
+                    ;; the reader by somewhere between 8x to 10x.
+                    ;; Once per outermost form is acceptably fast though.
+                    (setf (form-tracking-stream-form-start-byte-pos stream)
+                          ;; pretend we queried the position before reading CHAR
+                          (- (file-position stream)
+                             (or (file-string-length stream (string char)) 0))
+                          (form-tracking-stream-form-start-char-pos stream)
+                          ;; likewise
+                          (1- (form-tracking-stream-input-char-pos stream))))
+                  (multiple-value-bind (result-p result)
+                      (read-maybe-nothing stream char)
+                    (unless (zerop result-p)
+                      (return (unless *read-suppress* result)))
+                    ;; Repeat if macro returned nothing.
+                    (when tracking-p
+                      (funcall (form-tracking-stream-observer stream)
+                               :reset nil nil))))))))
       (let ((*sharp-equal-alist* nil))
         (with-read-buffer ()
           (%read-preserving-whitespace stream eof-error-p eof-value t)))))
@@ -711,20 +726,24 @@ standard Lisp readtable when NIL."
 ;;; for functions that want comments to return so that they can look
 ;;; past them. CHAR must not be whitespace.
 (defun read-maybe-nothing (stream char)
-  (multiple-value-call
-      (lambda (stream start-pos &optional (result nil supplied-p) &rest junk)
-        (declare (ignore junk)) ; is this ANSI-specified?
-        (when (and supplied-p start-pos)
-          (funcall (form-tracking-stream-observer stream)
-                   start-pos (form-tracking-stream-input-char-pos stream) result))
-        (values (if supplied-p 1 0) result))
-   stream ; KLUDGE: not capturing STREAM in the lambda avoids closure consing
-   (and (form-tracking-stream-p stream)
-        ;; Subtract 1 because the position points _after_ CHAR.
-        (1- (form-tracking-stream-input-char-pos stream)))
-   (funcall (!cmt-entry-to-function
-             (get-raw-cmt-entry char *readtable*) #'read-token)
-            stream char)))
+  (truly-the
+   (values bit t) ; avoid a type-check. M-V-CALL is lame
+   (multiple-value-call
+       (lambda (stream start-pos &optional (result nil supplied-p) &rest junk)
+         (declare (ignore junk)) ; is this ANSI-specified?
+         (when (and supplied-p start-pos)
+           (funcall (form-tracking-stream-observer stream)
+                    start-pos
+                    (form-tracking-stream-input-char-pos stream) result))
+         (values (if supplied-p 1 0) result))
+     ;; KLUDGE: not capturing anything in the lambda avoids closure consing
+     stream
+     (and (form-tracking-stream-p stream)
+          ;; Subtract 1 because the position points _after_ CHAR.
+          (1- (form-tracking-stream-input-char-pos stream)))
+     (funcall (!cmt-entry-to-function
+               (get-raw-cmt-entry char *readtable*) #'read-token)
+              stream char))))
 
 (defun read (&optional (stream *standard-input*)
                        (eof-error-p t)

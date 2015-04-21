@@ -5505,3 +5505,11 @@
                             'yikes 'okey-dokey))))))
     ;; The function can not return YIKES
     (assert (not (ctu:find-code-constants f :type '(eql yikes))))))
+
+(with-test (:name :compile-file-error-position-reporting)
+  (dolist (input '("data/wonky1.lisp" "data/wonky2.lisp" "data/wonky3.lisp"))
+    (let ((expect (with-open-file (f input) (read f))))
+      (assert (stringp expect))
+      (let ((err-string (with-output-to-string (*error-output*)
+                          (compile-file input :print nil))))
+        (assert (search expect err-string))))))

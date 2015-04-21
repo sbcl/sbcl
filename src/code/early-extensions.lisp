@@ -1632,6 +1632,23 @@ to :INTERPRET, an interpreter will be used.")
        (file-position stream))))
 
 (defun stream-error-position-info (stream &optional position)
+  (declare (special sb!c::*source-info*)) ; FIXME: disentangle from compiler
+  (when (and (not position)
+             (form-tracking-stream-p stream)
+             (boundp 'sb!c::*source-info*)
+             (eq (sb!c::source-info-stream sb!c::*source-info*) stream)
+             (sb!c::file-info-newlines
+              (sb!c::source-info-file-info sb!c::*source-info*)))
+    (let* ((charpos (sb!impl::ansi-stream-input-char-pos stream))
+           (line/col (sb!c::line/col-from-charpos
+                      charpos
+                      (sb!c::source-info-file-info sb!c::*source-info*))))
+      (return-from stream-error-position-info
+        `((:line ,(car line/col))
+          (:column ,(cdr line/col))
+          ,@(let ((position (file-position-or-nil-for-error stream)))
+              (when position `((:file-position ,(1- position)))))))))
+
   ;; Give up early for interactive streams and non-character stream.
   (when (or (ignore-errors (interactive-stream-p stream))
             (not (subtypep (ignore-errors (stream-element-type stream))
