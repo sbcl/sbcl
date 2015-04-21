@@ -588,8 +588,7 @@
   (def 5)
   (def 6))
 
-;; Should this be !DEFINE-HASH-CACHE ?
-(defmacro define-hash-cache (name args
+(defmacro !define-hash-cache (name args
                              &key hash-function hash-bits memoizer
                                   (values 1))
   (declare (ignore memoizer))
@@ -700,8 +699,8 @@
        ,fun)))
 
 ;;; some syntactic sugar for defining a function whose values are
-;;; cached by DEFINE-HASH-CACHE
-;;; These keywords are mostly defined at DEFINE-HASH-CACHE.
+;;; cached by !DEFINE-HASH-CACHE
+;;; These keywords are mostly defined at !DEFINE-HASH-CACHE.
 ;;; Additional options:
 ;;; :MEMOIZER <name>
 ;;;   If provided, it is the name of a local macro that must be called
@@ -721,7 +720,7 @@
     ;; What I wouldn't give to be able to use BINDING*, right?
     (multiple-value-bind (forms decls doc) (parse-body body-decls-doc)
       `(progn
-        (define-hash-cache ,name ,args ,@options)
+        (!define-hash-cache ,name ,args ,@options)
         (defun ,name ,arg-names
           ,@decls
           ,@(if doc (list doc))

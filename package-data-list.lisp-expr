@@ -1186,9 +1186,7 @@ possibly temporarily, because it might be used internally."
                "*LOAD-SOURCE-DEFAULT-TYPE*" "BASE-CHAR-CODE-LIMIT"
 
                ;; hash caches
-               "DEFINE-HASH-CACHE"
                "DEFUN-CACHED"
-               "DEFINE-CACHED-SYNONYM"
                "DROP-ALL-HASH-CACHES"
 
                ;; time
