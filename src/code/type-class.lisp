@@ -191,10 +191,6 @@
              ;; there exist two boolean slots, plus NAME
              (+ (length !type-class-fun-slots) 3))))
 
-(eval-when (#-sb-xc :compile-toplevel :load-toplevel :execute)
-  (defun !type-class-fun-slot (name)
-    (symbolicate "TYPE-CLASS-" name)))
-
 ;; Unfortunately redundant with the slots in the DEF!STRUCT,
 ;; but allows asserting about correctness of the constructor
 ;; without relying on introspection in host Lisp.
@@ -212,6 +208,13 @@
       unparse
       singleton-p)
   #'equal)
+
+(eval-when (#-sb-xc :compile-toplevel :load-toplevel :execute)
+  (defun !type-class-fun-slot (name)
+    (unless (member name !type-class-fun-slots
+                    :key (if (keywordp name) 'keywordicate 'identity))
+      (warn "Undefined type-class method ~S" name))
+    (symbolicate "TYPE-CLASS-" name)))
 
 (defmacro !define-type-method ((class method &rest more-methods)
                                lambda-list &body body)
@@ -274,27 +277,24 @@
 ;;; being. -- WHN 2001-03-11
 (defmacro !invoke-type-method (simple complex-arg2 type1 type2 &key
                                       (default '(values nil t))
-                                      (complex-arg1 :foo complex-arg1-p))
+                                        ; assume complex fn is symmetric
+                                        ; unless told otherwise.
+                                      (complex-arg1 complex-arg2 complex-arg1-p))
   (declare (type keyword simple complex-arg1 complex-arg2))
-  (let ((simple (!type-class-fun-slot simple))
-        (cslot1 (!type-class-fun-slot
-                 (if complex-arg1-p complex-arg1 complex-arg2)))
-        (cslot2 (!type-class-fun-slot complex-arg2)))
-    (once-only ((ntype1 type1)
-                (ntype2 type2))
-      (once-only ((class1 `(type-class-info ,ntype1))
-                  (class2 `(type-class-info ,ntype2)))
-        `(if (eq ,class1 ,class2)
-             (funcall (,simple ,class1) ,ntype1 ,ntype2)
-             ,(once-only ((complex2 `(,cslot2 ,class2)))
-                `(if ,complex2
-                     (funcall ,complex2 ,ntype1 ,ntype2)
-                     ,(once-only ((complex1 `(,cslot1 ,class1)))
-                        `(if ,complex1
-                             (if ,complex-arg1-p
-                                 (funcall ,complex1 ,ntype1 ,ntype2)
-                                 (funcall ,complex1 ,ntype2 ,ntype1))
-                          ,default)))))))))
+  (once-only ((left type1)
+              (right type2))
+    (once-only ((class1 `(type-class-info ,left))
+                (class2 `(type-class-info ,right)))
+      `(if (eq ,class1 ,class2)
+           (funcall (,(!type-class-fun-slot simple) ,class1) ,left ,right)
+           (acond ((,(!type-class-fun-slot complex-arg2) ,class2)
+                   (funcall it ,left ,right))
+                  ((,(!type-class-fun-slot complex-arg1) ,class1)
+                   ;; if COMPLEX-ARG1 method was provided, the method accepts
+                   ;; the arguments exactly as given. Otherwise, flip them.
+                   (funcall it ,@(if complex-arg1-p
+                                     `(,left ,right) `(,right ,left))))
+                  (t ,default))))))
 
 ;;; This is a very specialized implementation of CLOS-style
 ;;; CALL-NEXT-METHOD within our twisty little type class object
