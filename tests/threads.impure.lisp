@@ -1358,14 +1358,16 @@
       (let ((a (subtypep type1 type2)))
         (dotimes (i 100)
           (assert (eq (subtypep type1 type2) a))))))
-  (format t "ok~%")
+  (write-char #\.)
   (force-output))
 
 (with-test (:name (:hash-cache :subtypep))
   (mapc #'join-thread
-        (loop repeat 10
-              collect (sb-thread:make-thread #'subtypep-hash-cache-test))))
-(format t "hash-cache tests done~%")
+        ;; this didn't "reliably fail" with a small number of threads.
+        ;; 30 is a compromise between running time and confidence in the result.
+        (loop repeat 30
+              collect (sb-thread:make-thread #'subtypep-hash-cache-test)))
+  (terpri))
 
 ;;;; BLACK BOX TESTS
 
