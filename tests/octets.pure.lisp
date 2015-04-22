@@ -396,3 +396,31 @@
                              :external-format :utf-32be)))
     (let ((string (map 'string 'code-char '(#xd800 #xdc00 #xfffe #x10ffff))))
       (assert (equalp (enc string) #(0 0 0 63 0 0 0 63 0 0 0 63 0 0 0 63))))))
+
+(with-test (:name :compile-file-position-with-encodings
+            :skipped-on '(not :sb-unicode))
+  (with-open-file (f1 "data/compile-file-pos.lisp" :external-format :utf-8)
+    (with-open-file (f2 "data/compile-file-pos-utf16be.lisp"
+                        :external-format :utf-16be)
+      (dotimes (i 3) ; skip three lines
+        ;; because a comment line differs, and the function names differ
+        (read-line f1)
+        (read-line f2))
+      (dotimes (i 3) ; compare three lines
+        (assert (string= (read-line f1) (read-line f2))))))
+  (flet ((compile-and-load (file encoding main-fun)
+           (let ((fasl (compile-file file
+                                     :external-format encoding
+                                     :print nil :verbose nil)))
+             (load fasl)
+             (delete-file fasl)
+             (funcall main-fun))))
+    (multiple-value-bind (a1 b1 c1)
+        (compile-and-load "data/compile-file-pos.lisp" :utf-8 'cfp-foolz1)
+      (multiple-value-bind (a2 b2 c2)
+          (compile-and-load "data/compile-file-pos-utf16be.lisp" :utf-16be
+                            'cfp-foolz2)
+        (assert (string= a1 a2))
+        (assert (string= b1 b2))
+        ;; COMPILE-FILE-POSITION is insensitive to file encoding.
+        (assert (string= c1 c2))))))

@@ -89,9 +89,9 @@
       (sb-int:info :variable :macro-expansion '%trash%)
     (assert (and (not val) (not foundp)))))
 
-;;; COMPILE-FILE-POSITION
+;;; COMPILE-FILE-LINE and COMPILE-FILE-POSITION
 
-(macrolet ((line () `(multiple-value-call 'cons (compile-file-position))))
+(macrolet ((line () `(multiple-value-call 'cons (compile-file-line))))
   (defun more-foo (x)
     (if x
         (format nil "Great! ~D" (line)) ; <-- this is line 97
@@ -100,7 +100,7 @@
 (declaim (inline thing))
 (defun thing ()
   (format nil "failed to frob a knob at line #~D"
-          (compile-file-position))) ; <-- this is line 103
+          (compile-file-line))) ; <-- this is line 103
 
 (defmacro more-randomness ()
   '(progn
@@ -117,16 +117,16 @@
             (progn (more-randomness))))))) ; <-- this is line 117
 
 (defun compile-file-pos-sharp-dot (x)
-  (list #.(format nil "Foo line ~D" (compile-file-position)) ; line #120
+  (list #.(format nil "Foo line ~D" (compile-file-line)) ; line #120
         x))
 
 (defun compile-file-pos-eval-in-macro ()
   (macrolet ((macro (x)
                (format nil "hi ~A at ~D" x
-                       (compile-file-position)))) ; line #126
+                       (compile-file-line)))) ; line #126
     (macro "there")))
 
-(with-test (:name :compile-file-position)
+(with-test (:name :compile-file-line)
   (assert (string= (more-foo t) "Great! (97 . 32)"))
   (assert (string= (more-foo nil) "Yikes (98 . 31)"))
   (assert (string= (bork t) "failed to frob a knob at line #103"))

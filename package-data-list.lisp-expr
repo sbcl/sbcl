@@ -652,6 +652,7 @@ like *STACK-TOP-HINT* and unsupported stuff like *TRACED-FUN-LIST*."
                ;; Customizing printing of compiler and debugger messages
                "*COMPILER-PRINT-VARIABLE-ALIST*"
                "*DEBUG-PRINT-VARIABLE-ALIST*"
+               "COMPILE-FILE-LINE"
                "COMPILE-FILE-POSITION"
 
                ;; Hooks into init & save sequences

@@ -9,10 +9,11 @@ changes relative to sbcl-1.2.10:
     under most circumstances, signal warnings similar to compiling such code.
     The usual caveat holds about not detecting calls through a computed name,
     as in (funcall (intern "DEPRECATED-FUN" "SB-EXT")).
-  * enhancement: (SB-EXT:COMPILE-FILE-POSITION) is a new macro that expands
+  * enhancement: (SB-EXT:COMPILE-FILE-LINE) is a new macro that expands
     to a constant (VALUES integer integer) indicating the source line/column
     from which it was read, intended for logging Lisp runtime errors in
     a style similar to that afforded by the C preprocessor __LINE__ macro.
+    Similarly (SB-EXT:COMPILE-FILE-POSITION) returns a position in characters.
   * enhancement: improved source locations for VOPs, alien types and
     declarations.
   * bug fix: functions in :FINAL deprecation have the correct docstring.

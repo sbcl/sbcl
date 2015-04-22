@@ -207,12 +207,23 @@ not STYLE-WARNINGs occur during compilation, and NIL otherwise.
 ;; times as there are calls to the function - not very defensible
 ;; as a design choice, but just an accident of the particular implementation.
 ;;
-(let ()
-  (defmacro compile-file-position (&whole this-form)
-    #!+sb-doc
-    "Return line# and column# of this macro invocation as multiple values."
-    (let (file-info charpos)
-      (flet ((find-form-eq (form &optional fallback-path)
+(defmacro compile-file-position (&whole this-form)
+  #!+sb-doc
+  "Return character position of this macro invocation or NIL if unavailable."
+  ;; Counting characters is intuitive because the transfer element size is 1
+  ;; measurement unit. The standard allows counting in something other than
+  ;; characters (namely bytes) for character streams, which is basically
+  ;; irrelevant here, as we don't need random access to the file.
+  (compute-compile-file-position this-form nil))
+
+(defmacro compile-file-line (&whole this-form)
+  #!+sb-doc
+  "Return line# and column# of this macro invocation as multiple values."
+  (compute-compile-file-position this-form t))
+
+(defun compute-compile-file-position (this-form as-line/col-p)
+  (let (file-info charpos)
+    (flet ((find-form-eq (form &optional fallback-path)
                (with-array-data ((vect (file-info-subforms file-info))
                                  (start) (end) :check-fill-pointer t)
                  (declare (ignore start))
@@ -227,7 +238,7 @@ not STYLE-WARNINGs occur during compilation, and NIL otherwise.
                                       (compile-file-position-helper
                                        file-info fallback-path))))
                          (setq charpos (svref vect (- i 2)))))))))
-        (cond
+      (cond
           ((and *source-info* (boundp '*current-path*) (not *current-path*))
            ;; probably a read-time eval
            (setq file-info (source-info-file-info *source-info*))
@@ -249,11 +260,13 @@ not STYLE-WARNINGs occur during compilation, and NIL otherwise.
                  ;; not producing a sexpr containing an invocation of C-F-P.
                  (when parent
                    (setq file-info (source-info-file-info parent))
-                   (find-form-eq this-form)))))))
+                   (find-form-eq this-form))))))))
+    (if as-line/col-p
         (if charpos
             (let ((line/col (line/col-from-charpos charpos file-info)))
               `(values ,(car line/col) ,(cdr line/col)))
-            '(values 0 -1))))))
+            '(values 0 -1))
+        charpos)))
 
 (defun line/col-from-charpos (charpos file-info)
   (let* ((newlines (file-info-newlines file-info))
