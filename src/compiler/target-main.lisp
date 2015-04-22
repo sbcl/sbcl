@@ -172,8 +172,6 @@ not STYLE-WARNINGs occur during compilation, and NIL otherwise.
    (lambda (arg1 arg2 arg3)
      ;; Log some kind of reader event into FILE-INFO.
      (case arg1
-       (:newline
-        (vector-push-extend arg2 (file-info-newlines file-info)))
        (:reset ; a char macro returned zero values - "virtual whitespace".
         ;; I think this would be an ideal place at which to inquire and stash
         ;; the FILE-POSITION in bytes so that DEBUG-SOURCE-START-POSITIONS
@@ -222,7 +220,7 @@ not STYLE-WARNINGs occur during compilation, and NIL otherwise.
   (compute-compile-file-position this-form t))
 
 (defun compute-compile-file-position (this-form as-line/col-p)
-  (let (file-info charpos)
+  (let (file-info stream charpos)
     (flet ((find-form-eq (form &optional fallback-path)
                (with-array-data ((vect (file-info-subforms file-info))
                                  (start) (end) :check-fill-pointer t)
@@ -238,38 +236,42 @@ not STYLE-WARNINGs occur during compilation, and NIL otherwise.
                                       (compile-file-position-helper
                                        file-info fallback-path))))
                          (setq charpos (svref vect (- i 2)))))))))
-      (cond
-          ((and *source-info* (boundp '*current-path*) (not *current-path*))
-           ;; probably a read-time eval
-           (setq file-info (source-info-file-info *source-info*))
-           (find-form-eq this-form))
+      (let ((source-info *source-info*))
+        (when (and source-info (boundp '*current-path*))
+          (setq file-info (source-info-file-info source-info)
+                stream (source-info-stream source-info))
+          (cond
+            ((not *current-path*)
+             ;; probably a read-time eval
+             (find-form-eq this-form))
           ;; Hmm, would a &WHOLE argument would work better or worse in general?
-          ((and *source-info* (boundp '*current-path*) *current-path*)
-           (setq file-info (source-info-file-info *source-info*))
-           (let* ((original-source-path
-                   (cddr (member 'original-source-start *current-path*)))
-                  (path (reverse original-source-path)))
-             (when (file-info-subforms file-info)
-               (let ((form (elt (file-info-forms file-info) (car path))))
-                 (dolist (p (cdr path))
-                   (setq form (nth p form)))
-                 (find-form-eq form (cdr path))))
-             (unless charpos
-               (let ((parent (source-info-parent *source-info*)))
+            (t
+             (let* ((original-source-path
+                     (cddr (member 'original-source-start *current-path*)))
+                    (path (reverse original-source-path)))
+               (when (file-info-subforms file-info)
+                 (let ((form (elt (file-info-forms file-info) (car path))))
+                   (dolist (p (cdr path))
+                     (setq form (nth p form)))
+                   (find-form-eq form (cdr path))))
+               (unless charpos
+                 (let ((parent (source-info-parent *source-info*)))
                  ;; probably in a local macro executing COMPILE-FILE-POSITION,
                  ;; not producing a sexpr containing an invocation of C-F-P.
-                 (when parent
-                   (setq file-info (source-info-file-info parent))
-                   (find-form-eq this-form))))))))
+                   (when parent
+                     (setq file-info (source-info-file-info parent)
+                           stream (source-info-stream parent))
+                     (find-form-eq this-form))))))))))
     (if as-line/col-p
-        (if charpos
-            (let ((line/col (line/col-from-charpos charpos file-info)))
+        (if (and charpos (form-tracking-stream-p stream))
+            (let ((line/col (line/col-from-charpos stream charpos)))
               `(values ,(car line/col) ,(cdr line/col)))
             '(values 0 -1))
         charpos)))
 
-(defun line/col-from-charpos (charpos file-info)
-  (let* ((newlines (file-info-newlines file-info))
+(defun line/col-from-charpos
+    (stream &optional (charpos (sb!impl::ansi-stream-input-char-pos stream)))
+  (let* ((newlines (sb!impl::form-tracking-stream-newlines stream))
          (index (position charpos newlines :test #'>= :from-end t)))
     ;; Line numbers traditionally begin at 1, columns at 0.
     (if index

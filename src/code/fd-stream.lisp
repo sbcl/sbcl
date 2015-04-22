@@ -211,7 +211,9 @@
                       (input-char-pos 0))
             (:copier nil))
   ;; a function which is called for events on this stream.
-  (observer #'error :type function)
+  (observer (lambda (x y z) (declare (ignore x y z))) :type function)
+  ;;  A vector of the character position of each #\Newline seen
+  (newlines (make-array 10 :fill-pointer 0 :adjustable t))
   (last-newline -1 :type index-or-minus-1)
   ;; Better than reporting that a reader error occurred at a position
   ;; before any whitespace (or equivalently, a macro producing no value),
@@ -2676,9 +2678,9 @@
        (setf (form-tracking-stream-input-char-pos stream) pos))
     (let ((char (aref chars i)))
       (when (and (eql char #\Newline)
-                 ;; call observer only if it wasn't an unread and re-read
+                 ;; record it only if it wasn't unread and re-read
                  (> pos (form-tracking-stream-last-newline stream)))
-        (funcall (form-tracking-stream-observer stream) :newline pos nil)
+        (vector-push-extend pos (form-tracking-stream-newlines stream))
         (setf (form-tracking-stream-last-newline stream) pos))
       (incf pos))))
 

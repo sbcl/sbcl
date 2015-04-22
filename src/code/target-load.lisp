@@ -162,8 +162,9 @@
           (when (and (or should-be-fasl-p (not (eql 0 (file-length stream))))
                      (fasl-header-p stream :errorp should-be-fasl-p))
             (return-from load (load-stream stream t)))))
-      ;; Case 3: Open using the gived external format, process as source.
-      (with-open-file (stream pathname :external-format external-format)
+      ;; Case 3: Open using the given external format, process as source.
+      (with-open-file (stream pathname :external-format external-format
+                              :class 'form-tracking-stream)
         (load-stream stream nil)))))
 
 ;; This implements the defaulting SBCL seems to have inherited from

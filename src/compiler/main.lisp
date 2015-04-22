@@ -821,12 +821,8 @@ necessary, since type inference may take arbitrarily long to converge.")
   ;; end of the previous form)
   (forms (make-array 10 :fill-pointer 0 :adjustable t) :type (vector t))
   (positions (make-array 10 :fill-pointer 0 :adjustable t) :type (vector t))
-  ;; The next two slots are updated by form-tracking-stream-observer
-  ;; when this FILE-INFO is for COMPILE-FILE (and not for COMPILE).
-  ;;  A vector of the character position of each #\Newline seen
-  (newlines nil :type (or null (vector t)) :read-only t)
-  ;;  A vector of character ranges than span each subform in the TLF,
-  ;;  reset to empty for each one.
+  ;; A vector of character ranges than span each subform in the TLF,
+  ;; reset to empty for each one, updated by form-tracking-stream-observer.
   (subforms nil :type (or null (vector t)) :read-only t))
 
 ;;; The SOURCE-INFO structure provides a handle on all the source
@@ -834,7 +830,8 @@ necessary, since type inference may take arbitrarily long to converge.")
 (def!struct (source-info
              #-no-ansi-print-object
              (:print-object (lambda (s stream)
-                              (print-unreadable-object (s stream :type t))))
+                              (print-unreadable-object
+                                  (s stream :type t :identity t))))
              (:copier nil))
   ;; the UT that compilation started at
   (start-time (get-universal-time) :type unsigned-byte)
@@ -859,9 +856,6 @@ necessary, since type inference may take arbitrarily long to converge.")
    :file-info (make-file-info :name (truename file)
                               :untruename (merge-pathnames file)
                               :external-format external-format
-                              :newlines
-                              (if form-tracking-p
-                                  (make-array 10 :fill-pointer 0 :adjustable t))
                               :subforms
                               (if form-tracking-p
                                   (make-array 100 :fill-pointer 0 :adjustable t))
@@ -911,14 +905,10 @@ necessary, since type inference may take arbitrarily long to converge.")
                      (open name
                            :direction :input
                            :external-format external-format
-                           #-sb-xc-host
-                           :class
                            ;; SBCL stream classes aren't available in the host
-                           #-sb-xc-host
-                           (if (file-info-newlines file-info)
-                               'form-tracking-stream
-                               'fd-stream))))
-                (when (form-tracking-stream-p stream)
+                           #-sb-xc-host :class
+                           #-sb-xc-host 'form-tracking-stream)))
+                (when (file-info-subforms file-info)
                   (setf (form-tracking-stream-observer stream)
                         (make-form-tracking-stream-observer file-info)))
                 stream)))))
@@ -945,8 +935,6 @@ necessary, since type inference may take arbitrarily long to converge.")
           (handler-case
               (progn
                 ;; Reset for a new toplevel form.
-                ;; FIXME: It would be nice to make LOAD similarly do this
-                ;; for accurate position reporting by line/column.
                 (when (form-tracking-stream-p stream)
                   (setf (form-tracking-stream-form-start-char-pos stream) nil))
                 (awhen (file-info-subforms file-info)
@@ -978,8 +966,8 @@ necessary, since type inference may take arbitrarily long to converge.")
                :line/col
                (and (form-tracking-stream-p stream)
                     (line/col-from-charpos
-                     (form-tracking-stream-form-start-char-pos stream)
-                     file-info))
+                     stream
+                     (form-tracking-stream-form-start-char-pos stream)))
                :stream stream)))))
     (unless (eq form stream) ; not EOF
       (funcall function form
@@ -1884,7 +1872,8 @@ SPEED and COMPILATION-SPEED optimization values, and the
          (failure-p t) ; T in case error keeps this from being set later
          (input-pathname (verify-source-file input-file))
          (source-info
-          (make-file-source-info input-pathname external-format t))
+          (make-file-source-info input-pathname external-format
+                                 #-sb-xc-host t)) ; can't track, no SBCL streams
          (*compiler-trace-output* nil)) ; might be modified below
 
     (unwind-protect
