@@ -648,11 +648,7 @@
                          ;; This barrier is a no-op on all multi-threaded SBCL
                          ;; architectures. No CPU except Alpha will move a read
                          ;; prior to a read on which it depends.
-                         ;; FIXME: shouldn't need "#-sb-xc-host" but BARRIER in
-                         ;;  cross-thread is somehow replaced in xc with code
-                         ;;  that makes (SB!VM:%DATA-DEPENDENCY-BARRIER) appear
-                         ;;  as an infinitely self-recursive call.
-                         #-sb-xc-host (sb!thread:barrier (:data-dependency))
+                         (sb!thread:barrier (:data-dependency))
                          (locally (declare (type ,line-type ,entry))
                            (let* ,binds
                              (when (and ,@tests)
@@ -676,8 +672,7 @@
                    ;; MUST NOT be observed by another thread before its cells
                    ;; are filled. Equally bad, the 'output' cells in the line
                    ;; could be 0 while the 'input' cells matched something.
-                   ;; FIXME: as above, "#-sb-xc-host" should not be needed.
-                   #-sb-xc-host (sb!thread:barrier (:write))
+                   (sb!thread:barrier (:write))
                    (cond ((eql (svref ,cache idx1) 0)
                           (setf (svref ,cache idx1) ,entry))
                          ((eql (svref ,cache idx2) 0)

@@ -117,6 +117,9 @@
  ;; to %OTHER-POINTER-WIDETAG, which is an ordinary inline function, and not
  ;; known to the cross-compiler until it has seen the DEFUN in 'kernel'
  ("src/code/kernel" :not-host)
+ ;; This has the BARRIER stuff that the threading support needs,
+ ;; required for some code in 'early-extensions'
+ ("src/code/barrier" :not-host)
  ("src/code/early-extensions") ; on host for COLLECT, SYMBOLICATE, etc.
  ("src/code/parse-body")       ; on host for PARSE-BODY
  ("src/code/parse-defmacro")   ; on host for PARSE-DEFMACRO
@@ -473,9 +476,6 @@
 
  ;; This has ASSEMBLY-UNIT-related stuff needed by core.lisp.
  ("src/compiler/early-assem")
-
- ;; This has the BARRIER stuff that the threading support needs.
- ("src/code/barrier")
 
  ;; core.lisp contains DEFSTRUCT CORE-OBJECT, and "compiler/main.lisp"
  ;; does lots of (TYPEP FOO 'CORE-OBJECT), so it's nice to compile this
