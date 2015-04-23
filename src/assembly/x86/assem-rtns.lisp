@@ -326,12 +326,8 @@
   (dotimes (i 8)
     (inst fstp fr0-tn))
 
-  ;; I'm unlikely to ever forget this again.
+  ;; ABI requires this
   (inst cld)
-
-  ;; Set up a bogus stack frame for RtlUnwind to pick its return
-  ;; address from.  (Yes, this is how RtlUnwind works.)
-  (inst push (make-fixup 'win32-unwind-tail :assembly-routine))
   (inst push ebp-tn)
   (inst mov ebp-tn esp-tn)
 
@@ -340,22 +336,10 @@
   (inst push 0)
   (inst push 0)
   (inst push ecx-tn)
-  (inst call (make-fixup "RtlUnwind" :foreign)))
 
-;; We want no VOP for this one and for it to only happen on Win32
-;; targets.  Hence the following disaster.
-#!+#.(cl:if (cl:member sb-assembling cl:*features*) win32 '(or))
-(define-assembly-routine
-    (win32-unwind-tail (:return-style :none))
-    ((:temp block unsigned-reg eax-offset))
+  (inst call (make-fixup "RtlUnwind" :foreign))
 
-  ;; The unwind returns here.  Had to use a VOP for this because
-  ;; PUSH won't accept a label as an argument.
-
-  ;; Clean up the bogus stack frame we pushed for the unwind.
   (inst pop ebp-tn)
-  (inst pop esi-tn) ;; Random scratch register.
-
   ;; This section based on VOP CALL-OUT.
   ;; Restore the NPX for lisp; ensure no regs are empty
   (dotimes (i 8)
@@ -371,7 +355,6 @@
   ;; Nlx-entry expects the arg start in ebx-tn and the arg count
   ;; in ecx-tn.  Fortunately, that's where they are already.
   (inst jmp (make-ea-for-object-slot block unwind-block-entry-pc-slot 0)))
-
 
 ;;;; Win32 UWP block SEH interface.
 
