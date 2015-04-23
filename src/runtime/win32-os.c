@@ -229,7 +229,7 @@ unsigned long block_deferrables_and_return_mask()
 void apply_sigmask(unsigned long sigmask)
 {
     sigset_t sset = (sigset_t)sigmask;
-    pthread_sigmask(SIG_SETMASK, &sset, 0);
+    thread_sigmask(SIG_SETMASK, &sset, 0);
 }
 #endif
 

@@ -156,6 +156,7 @@
     void
     (mask unsigned))
 
+  ;; KLUDGE: unused, was intended for invoke-interruption below?
   (defmacro without-interrupts/with-deferrables-blocked (&body body)
     (let ((mask-var (gensym)))
       `(without-interrupts
