@@ -4,7 +4,7 @@
 ;;; name it thus to avoid having to mess with the clc lpn translations
 
 ;;; first, the headers necessary to find definitions of everything
-("winsock2.h")
+("winsock2.h" "errno.h")
 
 ;;; then the stuff we're looking for
 ((:integer af-inet "AF_INET" "IP Protocol family")
