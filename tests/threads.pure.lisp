@@ -649,7 +649,9 @@
   (let ((thread (make-thread (lambda ()
                                (abort-thread)
                                :foo))))
-    (assert (eq :aborted! (join-thread thread :default :aborted!)))))
+    (assert (equal '(:aborted! :abort)
+                   (multiple-value-list
+                    (join-thread thread :default :aborted!))))))
 
 (with-test (:name (:abort-thread :main-thread))
   (assert (main-thread-p))

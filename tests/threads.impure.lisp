@@ -163,16 +163,29 @@
   (sleep 3)
   (assert (not (thread-alive-p thread))))
 
-(with-test (:name (:join-thread :nlx :default))
-  (let ((sym (gensym)))
-    (assert (eq sym (join-thread (make-thread (lambda () (sb-thread:abort-thread)))
-                                 :default sym)))))
+(with-test (:name (join-thread :abort :default))
+  (let* ((sym (gensym))
+         (thread (make-thread (lambda () (abort-thread)))))
+    (assert (equal (multiple-value-list
+                    (join-thread thread :default sym))
+                   (list sym :abort)))))
 
-(with-test (:name (:join-thread :nlx :error))
-  (assert-error (join-thread (make-thread (lambda () (sb-thread:abort-thread))))
+(with-test (:name (join-thread :abort :error))
+  (assert-error (join-thread (make-thread (lambda () (abort-thread))))
                 join-thread-error))
 
-(with-test (:name (:join-thread :multiple-values))
+(with-test (:name (join-thread :timeout :default))
+  (let* ((sym (gensym))
+         (thread (make-kill-thread (lambda () (sleep most-positive-fixnum)))))
+    (assert (equal (multiple-value-list
+                    (join-thread thread :timeout .001 :default sym))
+                   (list sym :timeout)))))
+
+(with-test (:name (join-thread :timeout :error))
+  (let ((thread (make-kill-thread (lambda () (sleep most-positive-fixnum)))))
+    (assert-error (join-thread thread :timeout .001) join-thread-error)))
+
+(with-test (:name (join-thread :multiple-values))
   (assert (equal '(1 2 3)
                  (multiple-value-list
                   (join-thread (make-thread (lambda () (values 1 2 3))))))))

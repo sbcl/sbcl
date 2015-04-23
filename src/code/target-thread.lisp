@@ -1565,8 +1565,15 @@ See also: RETURN-FROM-THREAD, ABORT-THREAD."
   "Suspend current thread until THREAD exits. Return the result values
 of the thread function.
 
-If the thread does not exit normally within TIMEOUT seconds return
-DEFAULT if given, or else signal JOIN-THREAD-ERROR.
+If the thread does not exit within TIMEOUT seconds and DEFAULT is
+supplied, return two values: 1) DEFAULT 2) :TIMEOUT. If DEFAULT is not
+supplied, signal a JOIN-THREAD-ERROR with JOIN-THREAD-ERROR-PROBLEM
+equal to :TIMEOUT.
+
+If the thread did not exit normally (i.e. aborted) and DEFAULT is
+supplied, return two values: 1) DEFAULT 2) :ABORT. If DEFAULT is not
+supplied, signal a JOIN-THREAD-THREAD-ERROR with problem equal
+to :ABORT.
 
 Trying to join the main thread will cause JOIN-THREAD to block until
 TIMEOUT occurs or the process exits: when main thread exits, the
@@ -1579,22 +1586,23 @@ subject to change."
         (problem :timeout))
     (without-interrupts
       (unwind-protect
-           (if (setf got-it
-                     (allow-with-interrupts
-                       ;; Don't use the timeout if the thread is not alive anymore.
-                       (grab-mutex lock :timeout (and (thread-alive-p thread) timeout))))
-               (cond ((listp (thread-result thread))
-                      (return-from join-thread
-                        (values-list (thread-result thread))))
-                     (defaultp
-                      (return-from join-thread default))
-                     (t
-                      (setf problem :abort)))
-               (when defaultp
-                 (return-from join-thread default)))
+           (cond
+             ((not (setf got-it
+                         (allow-with-interrupts
+                           ;; Don't use the timeout if the thread is
+                           ;; not alive anymore.
+                           (grab-mutex lock :timeout (and (thread-alive-p thread)
+                                                          timeout))))))
+             ((listp (thread-result thread))
+              (return-from join-thread
+                (values-list (thread-result thread))))
+             (t
+              (setf problem :abort)))
         (when got-it
           (release-mutex lock))))
-    (error 'join-thread-error :thread thread :problem problem)))
+    (if defaultp
+        (values default problem)
+        (error 'join-thread-error :thread thread :problem problem))))
 
 (defun destroy-thread (thread)
   #!+sb-doc

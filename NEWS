@@ -3,6 +3,8 @@ changes relative to sbcl-1.2.12:
   * incompatible change: on success, TRY-SEMAPHORE and WAIT-ON-SEMAPHORE
     return the new count
   * enhancement: WAIT-ON-SEMAPHORE accepts a decrement parameter
+  * enhancement: JOIN-THREAD allows distinguishing timeout vs. abort in all
+    situations
   * enhancement: On Windows DBG_PRINTEXCEPTION_C is handled and its message is
     printed. (lp#1437947)
   * bug-fix: TRUENAME works properly on broken symlinks presented as
