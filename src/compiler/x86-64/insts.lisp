@@ -3724,14 +3724,13 @@
   (define-sse-inst-implicit-mask blendvps #x66 #x38 #x14)
   (define-sse-inst-implicit-mask blendvpd #x66 #x38 #x15))
 
-;; FIXME: is that right!?
 (define-instruction movnti (segment dst src)
-  (:printer ext-reg-reg/mem-no-width ((op #xc3)))
+  (:printer ext-reg-reg/mem-no-width ((op #xc3)) '(:name :tab reg/mem ", " reg))
   (:emitter
    (aver (not (or (register-p dst)
                   (xmm-register-p dst))))
    (aver (register-p src))
-   (maybe-emit-rex-for-ea segment src dst)
+   (maybe-emit-rex-for-ea segment dst src)
    (emit-byte segment #x0f)
    (emit-byte segment #xc3)
    (emit-ea segment dst (reg-tn-encoding src))))
