@@ -506,7 +506,7 @@ profiling, and :TIME for wallclock profiling.")
              (not (eq *timer-thread* thread)))
         (member thread profiled-threads :test #'eq))))
 
-#+(or x86 x86-64)
+#+(and (or x86 x86-64) (not win32))
 (progn
   ;; Ensure that only one thread at a time will be doing profiling stuff.
   (defvar *profiler-lock* (sb-thread:make-mutex :name "Statistical Profiler"))
@@ -750,6 +750,7 @@ The following keyword args are recognized:
 (defvar *old-alloc-interval* nil)
 (defvar *old-sample-interval* nil)
 
+#-win32
 (defun start-profiling (&key (max-samples *max-samples*)
                         (mode *sampling-mode*)
                         (sample-interval *sample-interval*)
