@@ -28,6 +28,8 @@ if [ -z $CC ]; then
         CC=gcc
     fi
 fi
+
+unset EXTRA_CFLAGS # avoid any potential interference 
 export CC LANG LC_ALL
 
 # Load our build configuration

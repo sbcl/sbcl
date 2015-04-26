@@ -10,8 +10,6 @@ DEST=$(SBCL_PWD)/obj/sbcl-home/contrib/
 FASL=$(DEST)/$(SYSTEM).fasl
 ASD=$(DEST)/$(SYSTEM).asd
 
-undefine EXTRA_CFLAGS
-
 ifeq (SunOS,$(UNAME))
   EXTRA_CFLAGS=-D_XOPEN_SOURCE=500 -D__EXTENSIONS__
   PATH:=/usr/xpg4/bin:${PATH}
