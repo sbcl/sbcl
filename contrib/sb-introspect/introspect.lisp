@@ -162,6 +162,32 @@ constant pool."
   ;; is.
   (description nil :type list))
 
+(defun vop-sources-from-fun-templates (name)
+  (let ((fun-info (sb-int:info :function :info name)))
+    (when fun-info
+      (loop for vop in (sb-c::fun-info-templates fun-info)
+            for source = (find-definition-source
+                          (sb-c::vop-info-generator-function vop))
+            do (setf (definition-source-description source)
+                     (list (sb-c::template-name vop)
+                           (sb-c::template-note vop)))
+            collect source))))
+
+(defun find-vop-source (name)
+  (let* ((templates (vop-sources-from-fun-templates name))
+         (vop (gethash name sb-c::*backend-template-names*))
+         (generator (when vop
+                      (sb-c::vop-info-generator-function vop)))
+         (source (when generator
+                   (find-definition-source generator))))
+    (cond
+      (source
+       (setf (definition-source-description source)
+             (list name))
+       (cons source templates))
+      (t
+       templates))))
+
 (defun find-definition-sources-by-name (name type)
   "Returns a list of DEFINITION-SOURCEs for the objects of type TYPE
 defined with name NAME. NAME may be a symbol or a extended function
@@ -335,7 +361,12 @@ If an unsupported TYPE is requested, the function will return NIL.
                       (setf (definition-source-description source)
                             (list name))
                       source))))))
-       ((:vop :alien-type)
+       (:vop
+        (let ((loc (sb-int:info :source-location type name)))
+          (if loc
+              (translate-source-location loc)
+              (find-vop-source name))))
+       (:alien-type
         (let ((loc (sb-int:info :source-location type name)))
           (and loc
                (translate-source-location loc))))
