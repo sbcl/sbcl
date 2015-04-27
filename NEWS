@@ -1,5 +1,5 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
-changes relative to sbcl-1.2.10:
+changes in sbcl-1.2.11 relative to sbcl-1.2.10:
   * enhancement: SET-PPRINT-DISPATCH will warn when given an expression in
     which any part is unrecognizable as a legal type-specifier.
     The dispatch table will be altered, but the new entry is disabled.
