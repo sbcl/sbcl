@@ -951,7 +951,8 @@
         (setq pkg sb!int:*cl-package*)))
 
     (cond ((null pkg)
-           (let ((this-base-p (typep pname 'base-string)))
+           (let ((this-base-p #+sb-xc-host t
+                              #-sb-xc-host (typep pname 'base-string)))
              (dolist (lookalike (gethash pname (fasl-output-string=-table file))
                                 (dump-fop 'fop-uninterned-symbol-save
                                           file pname-length))
@@ -960,7 +961,9 @@
                ;; preserve the type of the string (base or character) anyway,
                ;; but if we did, then this would be right also.
                ;; [what about a symbol whose name is a (simple-array nil (0))?]
-               (let ((that-base-p (typep (symbol-name lookalike) 'base-string)))
+               (let ((that-base-p
+                      #+sb-xc-host t
+                      #-sb-xc-host (typep (symbol-name lookalike) 'base-string)))
                  (when (or (and this-base-p that-base-p)
                            (and (not this-base-p) (not that-base-p)))
                    (dump-fop 'fop-copy-symbol-save file
