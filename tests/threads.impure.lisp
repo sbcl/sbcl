@@ -1566,13 +1566,16 @@
 
 (with-test (:name :fp-mode-inheritance-threads)
   (flet ((test ()
-           (let ((thread-fp-mode)
-                 (fp-mode (dpb 0 sb-vm::float-sticky-bits (sb-vm:floating-point-modes))))
-             (sb-thread:join-thread
-              (sb-thread:make-thread
-               (lambda ()
-                 (setf thread-fp-mode
-                       (dpb 0 sb-vm::float-sticky-bits (sb-vm:floating-point-modes))))))
+           (let* ((reserved-bits #+x86 (ash #b1110000011000000 16)
+                                 #-x86 0)
+                  (fp-mode (logandc2 (dpb 0 sb-vm::float-sticky-bits (sb-vm:floating-point-modes))
+                                     reserved-bits))
+                  (thread-fp-mode
+                    (sb-thread:join-thread
+                     (sb-thread:make-thread
+                      (lambda ()
+                        (dpb 0 sb-vm::float-sticky-bits (sb-vm:floating-point-modes)))))))
+             
              (assert (= fp-mode thread-fp-mode)))))
     (test)
     (sb-int:with-float-traps-masked (:divide-by-zero)
