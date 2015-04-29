@@ -376,4 +376,15 @@
   (assert (string= (write-to-string (make-weasel) :pretty t)
                    "hi WEASEL!")))
 
+(deftype known-cons ()
+  '(cons (member known-cons)))
+(with-test (:name (:pprint-dispatch :known-cons-type))
+  (flet ((pprint-known-cons (stream obj)
+           (format stream "#<KNOWN-CONS ~S>" (cdr obj))))
+    (set-pprint-dispatch 'known-cons #'pprint-known-cons))
+  (assert (string= (write-to-string (cons 'known-cons t) :pretty t)
+                   "#<KNOWN-CONS T>"))
+  (assert (string= (write-to-string (cons 'known-cons (cons 'known-cons t)) :pretty t)
+                   "#<KNOWN-CONS #<KNOWN-CONS T>>")))
+
 ;;; success

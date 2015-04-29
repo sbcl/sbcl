@@ -1012,7 +1012,7 @@ line break."
         (warn "~S contains an unrecognized type specifier" type)))
     (if consp
         (let ((hashtable (pprint-dispatch-table-cons-entries table))
-              (key (second (second type))))
+              (key (car (member-type-members (cons-type-car-type ctype)))))
           (if function
               (setf (gethash key hashtable) entry)
               (remhash key hashtable)))
