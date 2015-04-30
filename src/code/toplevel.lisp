@@ -124,7 +124,8 @@ means to wait indefinitely.")
 ;;; INFINITE-ERROR-PROTECT is used by ERROR and friends to keep us out
 ;;; of hyperspace.
 (defmacro infinite-error-protect (&rest forms)
-  `(unless (infinite-error-protector)
+  `(progn
+     (infinite-error-protector)
      (/show0 "back from INFINITE-ERROR-PROTECTOR")
      (let ((*current-error-depth* (1+ *current-error-depth*)))
        (/show0 "in INFINITE-ERROR-PROTECT, incremented error depth")
@@ -151,8 +152,7 @@ means to wait indefinitely.")
            (error-error "Help! "
                         cur
                         " nested errors. "
-                        "SB-KERNEL:*MAXIMUM-ERROR-DEPTH* exceeded.")
-           t)
+                        "SB-KERNEL:*MAXIMUM-ERROR-DEPTH* exceeded."))
           (t
            (/show0 "returning normally from INFINITE-ERROR-PROTECTOR")
            nil))))
