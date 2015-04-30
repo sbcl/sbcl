@@ -158,8 +158,9 @@
          (:results ,@(mapcar #'arg-or-res-spec results))
          ;; This formerly unioned in the contents of an :ignore clause from
          ;; the value of the 'call-temps' variable, for no good reason afaict.
-         (:ignore ,@(set-difference (mapcar #'reg-spec-name temps)
-                                    (cdr (assoc :call-temps options))))
+         (:ignore ,@(sort (set-difference (mapcar #'reg-spec-name temps)
+                                          (cdr (assoc :call-temps options)))
+                          #'string<))
          ,@call-temps
          ;; This too is a tad sleazy - because of how VOP parsing works,
          ;; any :SAVE-P specified in options supersedes one from call-temps.
