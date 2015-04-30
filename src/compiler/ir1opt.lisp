@@ -2211,6 +2211,10 @@
             (return-from may-delete-vestigial-exit nil))))))
   (values t))
 
+(defun compile-time-type-error-context (context)
+  #+sb-xc-host context
+  #-sb-xc-host (source-to-string context))
+
 (defun ir1-optimize-cast (cast &optional do-not-optimize)
   (declare (type cast cast))
   (let ((value (cast-value cast))
@@ -2271,7 +2275,7 @@
                                         ',(type-specifier atype)
                                         ',(type-specifier value-type)
                                         ',detail
-                                        ',(source-to-string context))))
+                                        ',(compile-time-type-error-context context))))
           ;; KLUDGE: FILTER-LVAR does not work for non-returning
           ;; functions, so we declare the return type of
           ;; %COMPILE-TIME-TYPE-ERROR to be * and derive the real type
