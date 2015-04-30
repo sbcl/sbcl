@@ -377,11 +377,22 @@
                    "hi WEASEL!")))
 
 (deftype known-cons ()
-  '(cons (member known-cons)))
+  '(cons (member known-cons other-known-cons other-other)))
 (with-test (:name (:pprint-dispatch :known-cons-type))
   (flet ((pprint-known-cons (stream obj)
            (format stream "#<KNOWN-CONS ~S>" (cdr obj))))
     (set-pprint-dispatch 'known-cons #'pprint-known-cons))
+  (let ((hashtable (sb-pretty::pprint-dispatch-table-cons-entries
+                    *print-pprint-dispatch*)))
+    ;; First ensure that the CONS table was used
+    (assert (gethash 'known-cons hashtable))
+    ;; Check that dispatch entries are shared. In practice it is not "useful"
+    ;; but it is a consequence of the general approach of allowing any MEMBER
+    ;; type versus disallowing MEMBER types of more than one element.
+    (assert (eq (gethash 'known-cons hashtable)
+                (gethash 'other-known-cons hashtable)))
+    (assert (eq (gethash 'known-cons hashtable)
+                (gethash 'other-other hashtable))))
   (assert (string= (write-to-string (cons 'known-cons t) :pretty t)
                    "#<KNOWN-CONS T>"))
   (assert (string= (write-to-string (cons 'known-cons (cons 'known-cons t)) :pretty t)

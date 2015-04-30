@@ -990,11 +990,7 @@ line break."
                     (error "~S is not a valid type-specifier" type)))
          (consp (and (cons-type-p ctype)
                      (eq (cons-type-cdr-type ctype) *universal-type*)
-                     (member-type-p (cons-type-car-type ctype))
-                     ;; FIXME: (CONS (MEMBER A B ...)) could be hash-based
-                     ;; by expanding it here rather than letting the
-                     ;; compiler see it.
-                     (eql 1 (member-type-size (cons-type-car-type ctype)))))
+                     (member-type-p (cons-type-car-type ctype))))
          (disabled-p (not (testable-type-p ctype)))
          (entry (if function
                     (make-pprint-dispatch-entry
@@ -1011,11 +1007,11 @@ line break."
         ;; any specifier that contains any unknown anywhere within it.
         (warn "~S contains an unrecognized type specifier" type)))
     (if consp
-        (let ((hashtable (pprint-dispatch-table-cons-entries table))
-              (key (car (member-type-members (cons-type-car-type ctype)))))
-          (if function
-              (setf (gethash key hashtable) entry)
-              (remhash key hashtable)))
+        (let ((hashtable (pprint-dispatch-table-cons-entries table)))
+          (dolist (key (member-type-members (cons-type-car-type ctype)))
+            (if function
+                (setf (gethash key hashtable) entry)
+                (remhash key hashtable))))
         (setf (pprint-dispatch-table-entries table)
               (let ((list (delete type (pprint-dispatch-table-entries table)
                                   :key #'pprint-dispatch-entry-type
@@ -1632,26 +1628,24 @@ line break."
                           (function pprint-quote)
                           (if pprint-if)
                           (labels pprint-flet)
-                          (let pprint-let)
-                          (let* pprint-let)
+                          ((let let*) pprint-let)
                           (locally pprint-progn)
                           (macrolet pprint-flet)
                           (multiple-value-call pprint-block)
                           (multiple-value-prog1 pprint-block)
                           (progn pprint-progn)
                           (progv pprint-progv)
-                          (quote pprint-quote)
+                          ((quasiquote quote) pprint-quote)
                           (return-from pprint-block)
-                          (setq pprint-setq)
+                          ((setq psetq setf psetf) pprint-setq)
                           (symbol-macrolet pprint-let)
                           (tagbody pprint-tagbody)
                           (throw pprint-block)
                           (unwind-protect pprint-block)
 
                           ;; macros
-                          (case pprint-case)
-                          (ccase pprint-case)
-                          (ctypecase pprint-typecase)
+                          ((case ccase ecase) pprint-case)
+                          ((ctypecase etypecase typecase) pprint-typecase)
                           (declaim pprint-declare)
                           (defconstant pprint-block)
                           (define-modify-macro pprint-defun)
@@ -1666,15 +1660,9 @@ line break."
                           (defun pprint-defun)
                           (defvar pprint-block)
                           (destructuring-bind pprint-destructuring-bind)
-                          (do pprint-do)
-                          (do* pprint-do)
-                          (do-all-symbols pprint-dolist)
-                          (do-external-symbols pprint-dolist)
-                          (do-symbols pprint-dolist)
-                          (dolist pprint-dolist)
-                          (dotimes pprint-dolist)
-                          (ecase pprint-case)
-                          (etypecase pprint-typecase)
+                          ((do do*) pprint-do)
+                          ((do-all-symbols do-external-symbols do-symbols
+                            dolist dotimes) pprint-dolist)
                           #+nil (handler-bind ...)
                           #+nil (handler-case ...)
                           (loop pprint-loop)
@@ -1682,21 +1670,14 @@ line break."
                           (multiple-value-setq pprint-block)
                           (pprint-logical-block pprint-block)
                           (print-unreadable-object pprint-block)
-                          (prog pprint-prog)
-                          (prog* pprint-prog)
+                          ((prog prog*) pprint-prog)
                           (prog1 pprint-block)
                           (prog2 pprint-prog2)
-                          (psetf pprint-setq)
-                          (psetq pprint-setq)
-                          (quasiquote pprint-quote)
                           #+nil (restart-bind ...)
                           #+nil (restart-case ...)
-                          (setf pprint-setq)
                           (step pprint-progn)
                           (time pprint-progn)
-                          (typecase pprint-typecase)
-                          (unless pprint-block)
-                          (when pprint-block)
+                          ((unless when) pprint-block)
                           (with-compilation-unit pprint-block)
                           #+nil (with-condition-restarts ...)
                           (with-hash-table-iterator pprint-block)
@@ -1712,7 +1693,11 @@ line break."
                           (sb!int:dx-flet pprint-flet)
                           ))
 
-      (set-pprint-dispatch `(cons (eql ,(first magic-form)))
+      ;; Grouping some symbols together in the above list looks pretty.
+      ;; The sharing of dispatch entries is inconsequential.
+      (set-pprint-dispatch (let ((thing (first magic-form)))
+                             `(cons (member
+                                     ,@(if (consp thing) thing (list thing)))))
                            (symbol-function (second magic-form))))
     (setf *initial-pprint-dispatch-table* *print-pprint-dispatch*))
 
