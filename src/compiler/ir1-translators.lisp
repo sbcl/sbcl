@@ -495,6 +495,18 @@ Return VALUE without evaluating it."
                                      (neq :catch (cleanup-kind (entry-cleanup (pop b)))))))
                             (lexenv-blocks *lexenv*) :from-end t))
               *source-namestring*
+              #+sb-xc-host
+              (progn
+                (aver (not *compile-file-truename*))
+                (aver (string= (pathname-name *load-truename*) "compile-cold-sbcl"))
+                ;; FIXME: the fact that this is what it is is probably
+                ;; more a reflection of a bug in genesis (not binding
+                ;; *LOAD-TRUENAME* to something sensible) rather than
+                ;; something useful (lambdas created at genesis time
+                ;; being given names referring to
+                ;; compile-cold-sbcl.lisp)
+                "SYS:SRC;COLD;COMPILE-COLD-SBCL.LISP")
+              #-sb-xc-host
               (let ((p (or *compile-file-truename* *load-truename*)))
                 (when p (namestring p))))))
     (when context
