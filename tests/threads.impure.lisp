@@ -1575,7 +1575,6 @@
                      (sb-thread:make-thread
                       (lambda ()
                         (dpb 0 sb-vm::float-sticky-bits (sb-vm:floating-point-modes)))))))
-             
              (assert (= fp-mode thread-fp-mode)))))
     (test)
     (sb-int:with-float-traps-masked (:divide-by-zero)
