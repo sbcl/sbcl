@@ -142,8 +142,7 @@ means to wait indefinitely.")
   (let ((cur (locally (declare (optimize (safety 0))) *current-error-depth*))
         (max (locally (declare (optimize (safety 0))) *maximum-error-depth*)))
     (cond ((or (not (realp cur)) (not (realp max))) ; why not just FIXNUMP?
-           ;; This string will later be changed by frobbing the code header.
-           (%primitive print "Argh! error in cold init, halting")
+           (%primitive print "Argh! corrupted error depth, halting")
            (%primitive sb!c:halt))
           ((> cur max)
            (/show0 "*MAXIMUM-ERROR-DEPTH*=..")
@@ -157,14 +156,7 @@ means to wait indefinitely.")
            (/show0 "returning normally from INFINITE-ERROR-PROTECTOR")
            nil))))
 
-(defun !enable-infinite-error-protector ()
-  (let ((code (fun-code-header #'infinite-error-protector)))
-    (do ((i (1- (get-header-data code)) (1- i)))
-        ((< i sb!vm:code-constants-offset))
-      (when (let ((obj (code-header-ref code i)))
-              (and (stringp obj) (search "Argh!" obj)))
-        (setf (code-header-ref code i) "Argh! corrupted error depth, halting")
-        (return (setf *maximum-error-depth* 10))))))
+(defun !enable-infinite-error-protector () (setf *maximum-error-depth* 10))
 
 ;;;; miscellaneous external functions
 
