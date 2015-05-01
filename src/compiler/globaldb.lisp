@@ -97,12 +97,6 @@
 ;;; would make the cross-compiler very confused.)
 (eval-when (#-sb-xc :compile-toplevel :load-toplevel :execute)
 
-;;; A map from info-number to its META-INFO object.
-;;; The reverse mapping is obtained by reading the META-INFO.
-(declaim (type (simple-vector #.(ash 1 info-number-bits)) *info-types*))
-(!defglobal *info-types*
-            (make-array (ash 1 info-number-bits) :initial-element nil))
-
 (def!struct (meta-info
             #-no-ansi-print-object
             (:print-object (lambda (x s)
@@ -153,10 +147,11 @@
                                               +info-metainfo-type-num+))))
      (if index (svref info-vector index))))
 
-;; really this takes (KEYWORD KEYWORD) but SYMBOL is easier to test,
-;; and "or lose" is an explicit check anyway.
-(declaim (ftype (function (symbol symbol) meta-info) meta-info-or-lose))
-(defun meta-info-or-lose (category kind)
+(defun meta-info (category kind &optional (errorp t))
+  ;; Really this takes (KEYWORD KEYWORD) but SYMBOL is easier to test.
+  ;; Nearly all callers have ERRORP defaulting to T,
+  ;; so there is an explicit check anyway if not found.
+  (declare (symbol category kind))
   ;; Usually KIND designates a unique object, so we store only that object.
   ;; Otherwise we store a list which has a small (<= 4) handful of items.
   (or (let ((metadata (!get-meta-infos kind)))
@@ -167,7 +162,9 @@
                    (return info))))
               ((eq (meta-info-category (truly-the meta-info metadata)) category)
                metadata)))
-      (error "(~S ~S) is not a defined info type." category kind)))
+      (if errorp
+          (error "(~S ~S) is not a defined info type." category kind)
+          nil)))
 
 (defun !register-meta-info (metainfo)
   (let* ((name (meta-info-kind metainfo))
@@ -179,7 +176,7 @@
 
 (defun !%define-info-type (category kind type-spec type-checker
                            validate-function default &optional id)
-  (awhen (ignore-errors (meta-info-or-lose category kind)) ; if found
+  (awhen (meta-info category kind nil) ; if found
     (when id
       (aver (= (meta-info-number it) id)))
     (return-from !%define-info-type it)) ; do nothing
@@ -255,34 +252,38 @@
            ;; Rationale for hardcoding here is explained at INFO-VECTOR-FDEFN.
            ,(or (and (eq category :function) (eq kind :definition)
                      +fdefn-info-num+)
-                #+sb-xc (meta-info-number (meta-info-or-lose category kind))))))
+                #+sb-xc (meta-info-number (meta-info category kind))))))
     `(eval-when (#-sb-xc :compile-toplevel :load-toplevel :execute) ,form))))
 
 
+(macrolet ((meta-info-or-lose (category kind)
+             ;; don't need to type-check META-INFO's result, since it
+             ;; defaults to signaling an error if no meta-info found.
+             `(truly-the meta-info (meta-info ,category ,kind))))
 ;;; INFO is the standard way to access the database. It's settable.
 ;;;
 ;;; Return the information of the specified CATEGORY and KIND for NAME.
 ;;; The second value returned is true if there is any such information
 ;;; recorded. If there is no information, the first value returned is
 ;;; the default and the second value returned is NIL.
-(defun info (category kind name)
-  (let ((info (meta-info-or-lose category kind)))
-    (get-info-value name (meta-info-number info))))
+  (defun info (category kind name)
+    (let ((info (meta-info category kind)))
+      (get-info-value name (meta-info-number info))))
 
-(defun (setf info) (new-value category kind name)
-  (let ((info (meta-info-or-lose category kind)))
-    (funcall (meta-info-type-checker info) new-value)
-    (awhen (meta-info-validate-function info)
-      (funcall it name new-value))
-    (set-info-value name (meta-info-number info) new-value)))
+  (defun (setf info) (new-value category kind name)
+    (let ((info (meta-info category kind)))
+      (funcall (meta-info-type-checker info) new-value)
+      (awhen (meta-info-validate-function info)
+        (funcall it name new-value))
+      (set-info-value name (meta-info-number info) new-value)))
 
-;;; Clear the information of the specified CATEGORY and KIND for NAME in
-;;; the current environment. Return true if there was any info.
-(defun clear-info (category kind name)
-  (let* ((info (meta-info-or-lose category kind))
-         (info-number-list (list (meta-info-number info))))
-    (declare (dynamic-extent info-number-list))
-    (clear-info-values name info-number-list)))
+  ;; Clear the information of the specified CATEGORY and KIND for NAME in
+  ;; the current environment. Return true if there was any info.
+  (defun clear-info (category kind name)
+    (let* ((info (meta-info category kind))
+           (info-number-list (list (meta-info-number info))))
+      (declare (dynamic-extent info-number-list))
+      (clear-info-values name info-number-list))))
 
 (defun clear-info-values (name info-numbers)
   (dolist (type info-numbers)
@@ -357,8 +358,8 @@
   (with-unique-names (info-number proc)
     `(let ((,info-number
             ,(if (and (keywordp category) (keywordp kind))
-                 (meta-info-number (meta-info-or-lose category kind))
-                 `(meta-info-number (meta-info-or-lose ,category ,kind)))))
+                 (meta-info-number (meta-info category kind))
+                 `(meta-info-number (meta-info ,category ,kind)))))
        (dx-flet ((,proc () ,creation-form))
          (%get-info-value-initializing ,name ,info-number #',proc)))))
 
@@ -371,8 +372,8 @@
   (with-unique-names (info-number proc)
     `(let ((,info-number
             ,(if (and (keywordp category) (keywordp kind))
-                 (meta-info-number (meta-info-or-lose category kind))
-                 `(meta-info-number (meta-info-or-lose ,category ,kind)))))
+                 (meta-info-number (meta-info category kind))
+                 `(meta-info-number (meta-info ,category ,kind)))))
        ,(if (and (listp lambda) (eq (car lambda) 'lambda))
             ;; rewrite as FLET because the compiler is unable to dxify
             ;;   (DX-LET ((x (LAMBDA <whatever>))) (F x))
@@ -590,21 +591,14 @@
                      :forthcoming-defclass-type nil)
   :validate-function (lambda (name new-value)
                        (declare (ignore new-value))
+                       ;; The compiler-macro signals an error
+                       ;; on forward-referenced info-types.
+                       #+sb-xc-host (declare (notinline info))
                        (when (info :declaration :recognized name)
                          (error 'declaration-type-conflict-error
                                 :format-arguments (list name)))))
 
 (define-info-type (:type :documentation) :type-spec (or string null))
-
-;;; The expander function for a defined type.
-;;; It returns a type expression, not a CTYPE.
-(define-info-type (:type :expander)
-  :type-spec (or function null)
-  ;; This error is never seen by a user.
-  ;; The user sees "illegal to redefine standard type".
-  :validate-function (lambda (name new-value)
-                       (when (and new-value (info :type :translator name))
-                         (bug "Type has a translator"))))
 
 ;;; Either a CTYPE which is the translation of this type name,
 ;;; or a function that parses type specifiers into CTYPE structures.
@@ -616,12 +610,25 @@
   ;; This error is never seen by a user. After meta-compile there is no
   ;; means to define additional types with custom translators.
   :validate-function (lambda (name new-value)
+                       ;; The compiler-macro signals an error
+                       ;; on forward-referenced info-types.
+                       #+sb-xc-host (declare (notinline info))
                        (when (and new-value (info :type :expander name))
                          (bug "Type has an expander"))
                        (when (and (not (functionp new-value))
                                   new-value
                                   (info :type :builtin name))
                          (bug ":BUILTIN and :TRANSLATOR are incompatible"))))
+
+;;; The expander function for a defined type.
+;;; It returns a type expression, not a CTYPE.
+(define-info-type (:type :expander)
+  :type-spec (or function null)
+  ;; This error is never seen by a user.
+  ;; The user sees "illegal to redefine standard type".
+  :validate-function (lambda (name new-value)
+                       (when (and new-value (info :type :translator name))
+                         (bug "Type has a translator"))))
 
 ;;; If true, then the type coresponding to this name. Note that if
 ;;; this is a built-in class with a translation, then this is the
@@ -739,60 +746,5 @@
                      (list (meta-info-category type) (meta-info-kind type))))
          (write val :level 1)))
      sym)))
-
-;;; Source transforms / compiler macros for INFO functions.
-;;;
-;;; When building the XC, we give it a source transform, so that it can
-;;; compile INFO calls in the target efficiently; we also give it a compiler
-;;; macro, so that at least those INFO calls compiled after this file can be
-;;; efficient. (Host compiler-macros do not fire when compiling the target,
-;;; and source transforms don't fire when building the XC, so we need both.)
-;;;
-;;; Target needs just one, since there compiler macros and source-transforms
-;;; are equivalent.
-(macrolet ((def (name lambda-list form)
-             (aver (member 'category lambda-list))
-             (aver (member 'kind lambda-list))
-             `(progn
-                ;; FIXME: instead of a macro and a transform, just define the macro
-                ;; early enough for both host and target compilation to see.
-                #+sb-xc-host
-                (define-source-transform ,name ,lambda-list
-                  (if (and (keywordp category) (keywordp kind))
-                      ,form
-                      (values nil t)))
-                (define-compiler-macro ,name ,(append '(&whole .whole.) lambda-list)
-                  (if (and (keywordp category) (keywordp kind))
-                      ,form
-                      .whole.)))))
-
-  (def info (category kind name)
-    (let ((info (meta-info-or-lose category kind)))
-      `(truly-the (values ,(meta-info-type-spec info) boolean)
-                  (get-info-value ,name ,(meta-info-number info)))))
-
-  (def (setf info) (new-value category kind name)
-    (let* (#+sb-xc-host (sb!xc:*gensym-counter* sb!xc:*gensym-counter*)
-           (info (meta-info-or-lose category kind))
-           (tin (meta-info-number info))
-           (type-spec (meta-info-type-spec info))
-           (check
-            (when (meta-info-validate-function info)
-              ;; is (or ... null), but non-null in host implies non-null
-              `(truly-the function
-                (meta-info-validate-function
-                 (truly-the meta-info (svref *info-types* ,tin)))))))
-      (with-unique-names (new)
-        `(let ((,new ,new-value))
-           ;; enforce type-correctness regardless of enclosing policy
-           (let ((,new (locally (declare (optimize (safety 3)))
-                         (the ,type-spec ,new))))
-             ,@(when check
-                 `((funcall ,check ,name ,new)))
-             (set-info-value ,name ,tin ,new))))))
-
-  (def clear-info (category kind name)
-    (let ((info (meta-info-or-lose category kind)))
-      `(clear-info-values ,name '(,(meta-info-number info))))))
 
 (!defun-from-collected-cold-init-forms !globaldb-cold-init)

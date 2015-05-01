@@ -364,10 +364,3 @@
 ;;; This is like DO, except it has no implicit NIL block.
 (def!macro do-anonymous (varlist endlist &rest body)
   (frob-do-body varlist endlist body 'let 'psetq 'do-anonymous (gensym)))
-
-;;;; Theoretically is 'early-globaldb' but it's not worth creating a file for.
-;;;; At run time, we represent the type of a piece of INFO in the globaldb
-;;;; by a small integer between 1 and 63.  [0 is reserved for internal use.]
-(eval-when (:compile-toplevel :load-toplevel :execute)
-  (def!constant info-number-bits 6))
-(deftype info-number () `(unsigned-byte ,info-number-bits))

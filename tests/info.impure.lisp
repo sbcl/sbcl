@@ -20,6 +20,10 @@
 
 (in-package :cl-user)
 
+(test-util:with-test (:name :no-meta-info)
+ (assert-signal (compile nil '(lambda (x) (sb-int:info :type :nokind x)))
+                style-warning))
+
 (defun foo (a) (list a))
 (let ((x 1)) (foo x))
 
@@ -96,7 +100,7 @@
                            'type-error)))))
   ;; but if I *really* want, a bad value can be installed
   (set-info-value (gensym)
-                  (meta-info-number (meta-info-or-lose :variable :kind))
+                  (meta-info-number (meta-info :variable :kind))
                   :this-is-no-good))
 
 (test-util:with-test (:name :unrecognize-recognized-declaration)
