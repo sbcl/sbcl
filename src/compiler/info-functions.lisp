@@ -172,6 +172,7 @@ only."
 ;; Set (SYMBOL-FUNCTION SYMBOL) to a closure that signals an error,
 ;; preventing funcall/apply of macros and special operators.
 (defun install-guard-function (symbol fun-name docstring)
+  #+sb-xc-host (declare (ignore fun-name))
   (when docstring
     (setf (random-documentation symbol 'function) docstring))
   #-sb-xc-host

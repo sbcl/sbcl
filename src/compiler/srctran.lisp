@@ -5055,15 +5055,6 @@
 
 ;;;; Transforms for internal compiler utilities
 
-(defknown set-info-value (t info-number t) t)
-
-;; An optimizer to derive that SET-INFO-VALUE always returns NEWVAL's type.
-;; Using `(TRULY-THE (VALUES ,(TYPE-INFO-TYPE ...))) in the compiler-macro
-;; for (SETF INFO) would achieve a similar effect, but this is even better.
-(defoptimizer (set-info-value derive-type) ((name info-number newval))
-  (declare (ignore name info-number))
-  (lvar-type newval))
-
 ;;; If QUALITY-NAME is constant and a valid name, don't bother
 ;;; checking that it's still valid at run-time.
 (deftransform policy-quality ((policy quality-name)

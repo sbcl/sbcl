@@ -1796,6 +1796,9 @@
 (defknown sc-number-or-lose (symbol) sc-number
   (foldable))
 
+(defknown set-info-value (t info-number t) t ()
+  :derive-type #'result-type-last-arg)
+
 ;;;; memory barriers
 
 (defknown sb!vm:%compiler-barrier () (values) ())
