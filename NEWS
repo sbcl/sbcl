@@ -1,4 +1,9 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
+changes relative to sbcl-1.2.11:
+  * Read/modify/write macros accessing a place which is a composition
+    of CAR+CDR operations, such as (SHIFTF (CADR X) (ELT (F) 0)),
+    do not access subforms more than once. (lp#1450968)
+
 changes in sbcl-1.2.11 relative to sbcl-1.2.10:
   * enhancement: SET-PPRINT-DISPATCH will warn when given an expression in
     which any part is unrecognizable as a legal type-specifier.

@@ -431,10 +431,9 @@
            (style-warn "defining setf macro for ~S when ~S is also defined"
                        name setf-fn-name)))))
     (assign-it))
-    #+sb-xc
-    (defun !quietly-assign-setf-macro ; For cold-init
-        (name expander expander-lambda-list inverse doc)
-      (assign-it))))
+  (defun !quietly-assign-setf-macro ; For cold-init
+      (name expander expander-lambda-list inverse doc)
+    (assign-it))))
 
 (def!macro sb!xc:defsetf (access-fn &rest rest)
   #!+sb-doc

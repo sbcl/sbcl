@@ -164,4 +164,35 @@
   (multiple-value-bind (val winp) (sb-int:info :setf :expander 'foo2)
     (assert (and (not val) (not winp)))))
 
+;; The expander for (CADAR x) should behave as (CAR (CDAR x)) etc.
+;; This mainly affects read/modify/write semantics.
+(with-test (:name :car+cdr-compositions-lp1450968)
+  (flet ((maketree (n &aux (count -1))
+           (labels ((recurse (n)
+                      (if (zerop n)
+                          (incf count)
+                          (cons (recurse (1- n)) (recurse (1- n))))))
+             (recurse n))))
+    (loop
+     for n-ops from 2 to 4
+     do (dotimes (bitmask (ash 1 n-ops))
+          (let* ((ops (coerce (loop for i below n-ops
+                                    collect (if (logbitp i bitmask) #\D #\A))
+                              'string))
+                 (accessor (sb-int:symbolicate "C" ops "R"))
+                 (tree (maketree n-ops))
+                 (left (car tree))
+                 (right (cdr tree)))
+            (assert (eql (funcall accessor tree) bitmask))
+            (let ((f (compile nil
+                              `(lambda (obj)
+                                 (incf (,accessor obj)
+                                       (progn (rplaca obj nil)
+                                              (rplacd obj nil)
+                                              1000))))))
+              (funcall f tree)
+              (let ((tree* (cons left right)))
+                (assert (eql (funcall accessor tree*)
+                             (+ bitmask 1000))))))))))
+
 ;;; success
