@@ -305,32 +305,40 @@
                              ,setter
                              (return t))))))))))
 
+;;; INCF and DECF have a straightforward expansion, avoiding temp vars,
+;;; when the PLACE is a non-macro symbol. Otherwise we do the generalized
+;;; SETF-like thing. The compiler doesn't care either way, but this
+;;; reduces the incentive to treat some macros as special-forms when
+;;; squeezing more performance from a Lisp interpreter.
 ;;; we can't use DEFINE-MODIFY-MACRO because of ANSI 5.1.3
-(defmacro-mundanely incf (place &optional (delta 1) &environment env)
+(flet ((expand (place delta env operator)
+         (when (symbolp place)
+           (multiple-value-bind (expansion expanded)
+               (sb!xc:macroexpand-1 place env)
+             (unless expanded
+               (return-from expand `(setq ,place (,operator ,place ,delta))))
+             ;; GET-SETF-EXPANSION would have macroexpanded too, so do it now.
+             (setq place expansion)))
+         (multiple-value-bind (dummies vals newval setter getter)
+             (sb!xc:get-setf-expansion place env)
+           (let* ((const (numberp delta))
+                  (d (if const delta (copy-symbol 'delta))))
+             `(let* (,@(mapcar #'list dummies vals)
+                     ,@(unless const (list `(,d ,delta)))
+                     (,(car newval) (,operator ,getter ,d))
+                     ,@(cdr newval))
+                ,setter)))))
+  (defmacro-mundanely incf (place &optional (delta 1) &environment env)
   #!+sb-doc
   "The first argument is some location holding a number. This number is
   incremented by the second argument, DELTA, which defaults to 1."
-  (multiple-value-bind (dummies vals newval setter getter)
-      (sb!xc:get-setf-expansion place env)
-    (let ((d (gensym)))
-      `(let* (,@(mapcar #'list dummies vals)
-              (,d ,delta)
-              (,(car newval) (+ ,getter ,d))
-              ,@(cdr newval))
-         ,setter))))
+    (expand place delta env '+))
 
-(defmacro-mundanely decf (place &optional (delta 1) &environment env)
+  (defmacro-mundanely decf (place &optional (delta 1) &environment env)
   #!+sb-doc
   "The first argument is some location holding a number. This number is
   decremented by the second argument, DELTA, which defaults to 1."
-  (multiple-value-bind (dummies vals newval setter getter)
-      (sb!xc:get-setf-expansion place env)
-    (let ((d (gensym)))
-      `(let* (,@(mapcar #'list dummies vals)
-              (,d ,delta)
-              (,(car newval) (- ,getter ,d))
-              ,@(cdr newval))
-         ,setter))))
+    (expand place delta env '-)))
 
 ;;;; DEFINE-MODIFY-MACRO stuff
 
