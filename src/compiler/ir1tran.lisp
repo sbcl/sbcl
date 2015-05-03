@@ -766,13 +766,9 @@
 (defun ir1-convert-functoid (start next result form)
   (let* ((op (car form))
          (translator (and (symbolp op) (info :function :ir1-convert op))))
-    (cond (translator
-           ;; FIXME: redundant? A macro can not be defined in the first place.
-           (when (sb!xc:compiler-macro-function op *lexenv*)
-             (compiler-warn "ignoring compiler macro for special form"))
-           (funcall translator start next result form))
-          (t
-           (multiple-value-bind (res cmacro-fun-name)
+    (if translator
+        (funcall translator start next result form)
+        (multiple-value-bind (res cmacro-fun-name)
                (expand-compiler-macro form)
              (cond ((eq res form)
                     (ir1-convert-common-functoid start next result form op))
@@ -780,7 +776,7 @@
                     (unless (policy *lexenv* (zerop store-xref-data))
                       (record-call cmacro-fun-name (ctran-block start)
                                    *current-path*))
-                    (ir1-convert start next result res))))))))
+                    (ir1-convert start next result res)))))))
 
 ;;; Handles the "common" cases: any other forms except special forms
 ;;; and compiler-macros.

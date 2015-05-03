@@ -39,3 +39,8 @@
                         '(funcall #'square x)
                         nil)))
 
+(with-test (:name :cannot-define-macro-for-special-form)
+  ;; DEFINE-COMPILER-MACRO is unusual in that it won't even expand
+  ;; if its first argument names a special operator at expansion time.
+  (assert-error (macroexpand-1
+                 '(define-compiler-macro catch (foo &rest bar)))))
