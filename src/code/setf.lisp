@@ -489,26 +489,23 @@
   #!+sb-doc
   "Associates a SETF update function or macro with the specified access
   function or macro. The format is complex. See the manual for details."
-  (cond ((and (not (listp (car rest))) (symbolp (car rest)))
-         `(eval-when (:load-toplevel :compile-toplevel :execute)
-            (assign-setf-macro ',access-fn
-                               nil
-                               nil
-                               ',(car rest)
-                                ,(when (and (car rest) (stringp (cadr rest)))
-                                   `',(cadr rest)))))
-        ((and (cdr rest) (listp (cadr rest)))
-         (destructuring-bind
-             (lambda-list (&rest store-variables) &body body)
-             rest
-           (with-unique-names (whole access-form environment)
-             (multiple-value-bind (body local-decs doc)
+  (unless (symbolp access-fn)
+    (error "~S access-function name ~S is not a symbol."
+           'sb!xc:defsetf access-fn))
+  (typecase rest
+    ((cons (and symbol (not null)) (or null (cons string null)))
+     `(eval-when (:load-toplevel :compile-toplevel :execute)
+        (assign-setf-macro ',access-fn nil nil ',(car rest) ',(cadr rest))))
+    ((cons list (cons list))
+     (destructuring-bind (lambda-list (&rest store-variables) &body body) rest
+       (with-unique-names (whole access-form environment)
+         (multiple-value-bind (body local-decs doc)
                  (parse-defmacro `(,lambda-list ,@store-variables)
                                  whole body access-fn 'defsetf
                                  :environment environment
                                  :anonymousp t)
-               `(eval-when (:compile-toplevel :load-toplevel :execute)
-                  (assign-setf-macro
+           `(eval-when (:compile-toplevel :load-toplevel :execute)
+              (assign-setf-macro
                    ',access-fn
                    (lambda (,access-form ,environment)
                      ,@local-decs
@@ -518,8 +515,8 @@
                    ',lambda-list
                    nil
                    ',doc))))))
-        (t
-         (error "ill-formed DEFSETF for ~S" access-fn))))
+    (t
+     (error "Ill-formed DEFSETF for ~S" access-fn))))
 
 (defun %defsetf (orig-access-form num-store-vars expander)
   (declare (type function expander))

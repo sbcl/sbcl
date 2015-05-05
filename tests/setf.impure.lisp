@@ -210,4 +210,13 @@
       (assert (equal (read-from-string (write-to-string expansion :gensym nil))
                      expect)))))
 
+(with-test (:name :defsetf-syntax-errors)
+  (dolist (test '((defsetf foo set-foo junk other-junk) ; would accept
+                  (defsetf foo set-foo . junk))) ; would crash
+    (assert (search "Ill-formed DEFSETF"
+                    (simple-condition-format-control
+                     (nth-value 1 (ignore-errors (macroexpand-1 test)))))))
+  ;; no (SETF (SETF f)) methods
+  (assert-error (macroexpand-1 '(defsetf (setf foo) set-setf-foo))))
+
 ;;; success
