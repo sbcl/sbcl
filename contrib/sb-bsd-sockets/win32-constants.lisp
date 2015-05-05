@@ -221,13 +221,6 @@
                         (g int)
                         (flags int)))
 
- (:function fd->handle ("_get_osfhandle" int
-                        (fd int)))
-
- (:function handle->fd ("_open_osfhandle" int
-                        (osfhandle int)
-                        (flags int)))
-
  (:structure wsa-data ("struct WSAData"
                        (integer version "u_int16_t" "wVersion")
                        (integer high-version "u_int16_t" "wHighVersion")
