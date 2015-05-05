@@ -62,82 +62,96 @@
 #-sb-xc-host (defsetf first %rplaca)
 #-sb-xc-host (defsetf cdr   %rplacd)
 #-sb-xc-host (defsetf rest  %rplacd)
+
+(eval-when (:compile-toplevel :load-toplevel :execute)
+(defun %cxr-setf-expander (sub-accessor setter)
+  (flet ((expand (place-reader original-form)
+           (let ((temp (sb!xc:gensym "LIST"))
+                 (newval (sb!xc:gensym "NEW")))
+             (values (list temp)
+                     `((,@place-reader ,@(cdr original-form)))
+                     (list newval)
+                     `(,setter ,temp ,newval)
+                     `(,(if (eq setter '%rplacd) 'cdr 'car) ,temp)))))
+    (if (eq sub-accessor 'nthcdr) ; random N
+        (lambda (access-form env)
+          (declare (ignore env))
+          (destructuring-bind (n list) (cdr access-form) ; for effect
+            (declare (ignore n list)))
+          (expand '(nthcdr) access-form))
+        ;; NTHCDR of fixed N, or CxxxxR composition
+        (lambda (access-form env)
+          (declare (ignore env))
+          (destructuring-bind (list) (cdr access-form) ; for effect
+            (declare (ignore list)))
+          (expand sub-accessor access-form))))))
+
+#-sb-xc-host
+(macrolet ((def (name &optional alias &aux (string (string name)))
+             `(eval-when (:compile-toplevel :load-toplevel :execute)
+                (let ((closure
+                       (%cxr-setf-expander
+                        '(,(symbolicate "C" (subseq string 2)))
+                        ',(symbolicate "%RPLAC" (subseq string 1 2)))))
+                  (!quietly-assign-setf-macro ',name closure '(list) nil nil)
+                  ,@(when alias
+                      `((!quietly-assign-setf-macro ',alias closure '(list)
+                                                    nil nil)))))))
+  ;; Rather than expand into a DEFINE-SETF-EXPANDER, install a single closure
+  ;; as the expander and capture just enough to distinguish the variations.
+  (def caar)
+  (def cadr second)
+  (def cdar)
+  (def cddr)
+  (def caaar)
+  (def cadar)
+  (def cdaar)
+  (def cddar)
+  (def caadr)
+  (def caddr third)
+  (def cdadr)
+  (def cdddr)
+  (def caaaar)
+  (def cadaar)
+  (def cdaaar)
+  (def cddaar)
+  (def caadar)
+  (def caddar)
+  (def cdadar)
+  (def cdddar)
+  (def caaadr)
+  (def cadadr)
+  (def cdaadr)
+  (def cddadr)
+  (def caaddr)
+  (def cadddr fourth)
+  (def cdaddr)
+  (def cddddr))
+
+;; FIFTH through TENTH
+#-sb-xc-host
+(macrolet ((def (name subform)
+             `(eval-when (:compile-toplevel :load-toplevel :execute)
+                (!quietly-assign-setf-macro
+                 ',name (%cxr-setf-expander ',subform '%rplaca)
+                 '(list) nil nil))))
+  (def fifth   (nthcdr 4)) ; or CDDDDR
+  (def sixth   (nthcdr 5))
+  (def seventh (nthcdr 6))
+  (def eighth  (nthcdr 7))
+  (def ninth   (nthcdr 8))
+  (def tenth   (nthcdr 9)))
+
+;; CLHS says under the entry for NTH:
+;; "nth may be used to specify a place to setf. Specifically,
+;;  (setf (nth n list) new-object) == (setf (car (nthcdr n list)) new-object)"
+;; which means that it's wrong to use %SETNTH because in the second form,
+;; (NTHCDR ...) is a subform of the CAR expression, and so must be
+;; bound to a temporary variable.
 #-sb-xc-host
 (eval-when (:compile-toplevel :load-toplevel :execute)
-  (flet ((expander (sub-accessor getter setter)
-           (lambda (access-form env)
-             (declare (ignore env))
-             (destructuring-bind (place) (cdr access-form)
-               (let ((temp (copy-symbol 'list))
-                     (newval (copy-symbol 'new)))
-                 (values (list temp) `((,@sub-accessor ,place)) (list newval)
-                         `(,setter ,temp ,newval) `(,getter ,temp)))))))
-    ;; Rather than expand into a DEFINE-SETF-EXPANDER, install a single closure
-    ;; as the expander and capture just enough to distinguish the variations.
-    (macrolet ((def (name &optional alias &aux (string (string name)))
-                `(let ((closure
-                        ,(let ((slot (subseq string 1 2))) ; A or D
-                           `(expander '(,(symbolicate "C" (subseq string 2)))
-                                      ',(symbolicate "C" slot "R")
-                                      ',(symbolicate "%RPLAC" slot)))))
-                   (!quietly-assign-setf-macro ',name closure '(x) nil nil)
-                   ,@(when alias
-                       `((!quietly-assign-setf-macro ',alias closure '(x)
-                                                     nil nil))))))
-      (def caar)
-      (def cadr second)
-      (def cdar)
-      (def cddr)
-      (def caaar)
-      (def cadar)
-      (def cdaar)
-      (def cddar)
-      (def caadr)
-      (def caddr third)
-      (def cdadr)
-      (def cdddr)
-      (def caaaar)
-      (def cadaar)
-      (def cdaaar)
-      (def cddaar)
-      (def caadar)
-      (def caddar)
-      (def cdadar)
-      (def cdddar)
-      (def caaadr)
-      (def cadadr)
-      (def cdaadr)
-      (def cddadr)
-      (def caaddr)
-      (def cadddr fourth)
-      (def cdaddr)
-      (def cddddr))
-    (macrolet ((def (name subform)
-                 `(!quietly-assign-setf-macro
-                   ',name (expander ',subform 'car '%rplaca) '(x) nil nil)))
-      (def fifth   (nthcdr 4)) ; or CDDDDR
-      (def sixth   (nthcdr 5))
-      (def seventh (nthcdr 6))
-      (def eighth  (nthcdr 7))
-      (def ninth   (nthcdr 8))
-      (def tenth   (nthcdr 9))))
-  ;; CLHS says under the entry for NTH:
-  ;;  "nth may be used to specify a place to setf. Specifically,
-  ;;  (setf (nth n list) new-object) ==  (setf (car (nthcdr n list)) new-object)"
-  ;; which means that it's wrong to use %SETNTH because in the stated equivalent
-  ;; form, (NTHCDR ...) is a subform of the CAR expression
-  ;; which must be bound to a temmporary.
-  (!quietly-assign-setf-macro
-   'nth
-   (lambda (access-form env)
-     (declare (ignore env))
-     (destructuring-bind (n list) (cdr access-form)
-       (let ((temp (copy-symbol 'list))
-             (newval (copy-symbol 'new)))
-         (values (list temp) `((nthcdr ,n ,list)) (list newval)
-                 `(%rplaca ,temp ,newval)
-                 `(car ,temp)))))
-   '(x) nil nil))
+  (!quietly-assign-setf-macro 'nth (%cxr-setf-expander 'nthcdr '%rplaca)
+                              '(n list) nil nil))
 
 #-sb-xc-host (defsetf elt %setelt)
 #-sb-xc-host (defsetf row-major-aref %set-row-major-aref)
