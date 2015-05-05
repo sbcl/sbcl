@@ -195,4 +195,19 @@
                 (assert (eql (funcall accessor tree*)
                              (+ bitmask 1000))))))))))
 
+(define-symbol-macro %foofy1% (values a b c))
+(define-symbol-macro %foofy2% (values x y z))
+;; PSETF and PSETQ eliminate vacuous LET* forms.
+(with-test (:name :psetf-expansion-maximally-concise)
+  (dolist (op '(psetq psetf))
+    (let* ((form `(,op %foofy1% (f) %foofy2% (g)))
+           (expansion (let ((*gensym-counter* 1)) (macroexpand-1 form)))
+           (expect '(multiple-value-bind (new1 new2 new3) (f)
+                     (multiple-value-bind (new4 new5 new6) (g)
+                       (setq a new1) (setq b new2) (setq c new3)
+                       (setq x new4) (setq y new5) (setq z new6)
+                       nil))))
+      (assert (equal (read-from-string (write-to-string expansion :gensym nil))
+                     expect)))))
+
 ;;; success

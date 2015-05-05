@@ -145,7 +145,65 @@
 
 ;;;; various SETF-related macros
 
-(defmacro-mundanely shiftf (&whole form &rest args &environment env)
+;; Code shared by PSETQ, PSETF, SHIFTF attempting to minimize the expansion.
+;; This has significant speed+space benefit to a non-preprocessing interpreter,
+;; and to some degree a preprocessing interpreter.
+(labels
+    ((expand (args env operator single-op)
+       (cond ((singleton-p (cdr args)) ; commonest case probably
+              (return-from expand `(progn (,single-op ,@args) nil)))
+             ((not args)
+              (return-from expand nil)))
+       (collect ((let*-bindings) (mv-bindings) (setters))
+         (do ((a args (cddr a)))
+             ((endp a))
+           (when (endp (cdr a))
+             (error "Odd number of args to ~S." operator))
+           (let ((place (car a))
+                 (value-form (cadr a)))
+             (when (and (not (symbolp place)) (eq operator 'psetq))
+               (error 'simple-program-error
+                      :format-control "Place ~S in PSETQ is not a SYMBOL"
+                      :format-arguments (list place)))
+             (multiple-value-bind (temps vals stores setter)
+                 (sb!xc:get-setf-expansion place env)
+               (let*-bindings (mapcar #'list temps vals))
+               (mv-bindings (cons stores value-form))
+               (setters setter))))
+         (car (build (let*-bindings) (mv-bindings)
+                     (de-values-ify (setters))))))
+     ;; Instead of emitting (PROGN (VALUES (SETQ ...) (SETQ ...)) NIL)
+     ;; the SETQs can be lifted into the PROGN. This is an unimportant tweak
+     ;; for compiled code, but it helps the interpreter not needlessly collect
+     ;; arguments to call VALUES; and it's more human-readable.
+     (de-values-ify (forms)
+       (mapcan (lambda (form)
+                 (if (and (listp form) (eq (car form) 'values))
+                     (cdr form)
+                     (list form))) forms))
+     ;; The next three functions each return lists of forms to avoid having
+     ;; to specially recognize a PROGN as the recursion base case.
+     (build (let*-bindings mv-bindings setters)
+       (if let*-bindings
+           (gen-let* (car let*-bindings)
+                     (gen-mv-bind (caar mv-bindings) (cdar mv-bindings)
+                                  (build (cdr let*-bindings) (cdr mv-bindings)
+                                         setters)))
+           `(,@setters nil)))
+     (gen-let* (bindings body-forms)
+       (cond ((not bindings) body-forms)
+             (t
+              (when (and (singleton-p body-forms) (eq (caar body-forms) 'let*))
+                (let ((nested (cdar body-forms))) ; extract the nested LET*
+                  (setq bindings (append bindings (car nested))
+                        body-forms (cdr nested))))
+              `((let* ,bindings ,@body-forms)))))
+     (gen-mv-bind (stores values body-forms)
+       (if (singleton-p stores)
+           (gen-let* `((,(car stores) ,values)) body-forms)
+           `((multiple-value-bind ,stores ,values ,@body-forms)))))
+
+  (defmacro-mundanely shiftf (&whole form &rest args &environment env)
   #!+sb-doc
   "One or more SETF-style place expressions, followed by a single
    value expression. Evaluates all of the expressions in turn, then
@@ -167,40 +225,32 @@
     (getters (car (last args)))
     (labels ((thunk (mv-bindings getters setters)
                (if mv-bindings
-                   `((multiple-value-bind
-                           ,(car mv-bindings)
-                         ,(car getters)
-                       ,@(thunk (cdr mv-bindings) (cdr getters) setters)))
-                   `(,@setters))))
-      `(let ,(reduce #'append (let-bindings))
-         (multiple-value-bind ,(car (mv-bindings)) ,(car (getters))
-           ,@(thunk (mv-bindings) (cdr (getters)) (setters))
-           (values ,@(car (mv-bindings))))))))
+                   (gen-mv-bind (car mv-bindings) (car getters)
+                                (thunk (cdr mv-bindings) (cdr getters) setters))
+                   setters)))
+      (let ((outputs (loop for i below (length (car (mv-bindings)))
+                           collect (sb!xc:gensym "OUT"))))
+        `(let ,(reduce #'append (let-bindings))
+           ,@(gen-mv-bind outputs (car (getters))
+                          (thunk (mv-bindings) (cdr (getters))
+                                 `(,@(de-values-ify (setters))
+                                   (values ,@outputs)))))))))
 
-(defmacro-mundanely psetf (&rest args &environment env)
+  (defmacro-mundanely psetf (&rest pairs &environment env)
   #!+sb-doc
   "This is to SETF as PSETQ is to SETQ. Args are alternating place
   expressions and values to go into those places. All of the subforms and
   values are determined, left to right, and only then are the locations
   updated. Returns NIL."
-  (declare (type sb!c::lexenv env))
-  (collect ((let*-bindings) (mv-bindings) (setters))
-    (do ((a args (cddr a)))
-        ((endp a))
-      (when (endp (cdr a))
-        (error "Odd number of args to PSETF."))
-      (multiple-value-bind (dummies vals newval setter)
-          (sb!xc:get-setf-expansion (car a) env)
-        (let*-bindings (mapcar #'list dummies vals))
-        (mv-bindings (list newval (cadr a)))
-        (setters setter)))
-    (labels ((thunk (let*-bindings mv-bindings)
-               (if let*-bindings
-                   `(let* ,(car let*-bindings)
-                      (multiple-value-bind ,@(car mv-bindings)
-                          ,(thunk (cdr let*-bindings) (cdr mv-bindings))))
-                   `(progn ,@(setters) nil))))
-      (thunk (let*-bindings) (mv-bindings)))))
+    (expand pairs env 'psetf 'setf))
+
+  (defmacro-mundanely psetq (&rest pairs &environment env)
+  #!+sb-doc
+  "PSETQ {var value}*
+   Set the variables to the values, like SETQ, except that assignments
+   happen in parallel, i.e. no assignments take place until all the
+   forms have been evaluated."
+    (expand pairs env 'psetq 'setq)))
 
 ;;; FIXME: Compiling this definition of ROTATEF apparently blows away the
 ;;; definition in the cross-compiler itself, so that after that, any

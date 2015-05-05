@@ -735,22 +735,6 @@ specification."
 (defmacro-mundanely return (&optional (value nil))
   `(return-from nil ,value))
 
-(defmacro-mundanely psetq (&rest pairs)
-  #!+sb-doc
-  "PSETQ {var value}*
-   Set the variables to the values, like SETQ, except that assignments
-   happen in parallel, i.e. no assignments take place until all the
-   forms have been evaluated."
-  ;; Given the possibility of symbol-macros, we delegate to PSETF
-  ;; which knows how to deal with them, after checking that syntax is
-  ;; compatible with PSETQ.
-  (do ((pair pairs (cddr pair)))
-      ((endp pair) `(psetf ,@pairs))
-    (unless (symbolp (car pair))
-      (error 'simple-program-error
-             :format-control "variable ~S in PSETQ is not a SYMBOL"
-             :format-arguments (list (car pair))))))
-
 (defmacro-mundanely lambda (&whole whole args &body body)
   (declare (ignore args body))
   `#',whole)
