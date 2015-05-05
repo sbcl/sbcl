@@ -71,12 +71,13 @@
   ((name :reader case-failure-name :initarg :name)
    (possibilities :reader case-failure-possibilities :initarg :possibilities))
   (:report
-    (lambda (condition stream)
-      (format stream "~@<~S fell through ~S expression.~@[ ~
+   (lambda (condition stream)
+     (let ((*print-escape* t))
+       (format stream "~@<~S fell through ~S expression.~@[ ~
                       ~:_Wanted one of (~/pprint-fill/).~]~:>"
-              (type-error-datum condition)
-              (case-failure-name condition)
-              (case-failure-possibilities condition)))))
+               (type-error-datum condition)
+               (case-failure-name condition)
+               (case-failure-possibilities condition))))))
 
 (define-condition compiled-program-error (program-error)
   ((message :initarg :message :reader program-error-message)
