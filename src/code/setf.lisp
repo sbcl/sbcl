@@ -37,7 +37,7 @@
   (let (temp)
     (cond ((symbolp form)
            (multiple-value-bind (expansion expanded)
-               (%macroexpand-1 form environment)
+               (sb!xc:macroexpand-1 form environment)
              (if expanded
                  (sb!xc:get-setf-expansion expansion environment)
                  (let ((new-var (sb!xc:gensym "NEW")))
@@ -112,36 +112,38 @@
 ;;; returning a hairy LET form. This is probably important mainly as a
 ;;; convenience in allowing the use of SETF inverses without the full
 ;;; interpreter.
-(defmacro-mundanely setf (&rest args &environment env)
+(defmacro-mundanely setf (&whole form &rest args &environment env)
   #!+sb-doc
   "Takes pairs of arguments like SETQ. The first is a place and the second
   is the value that is supposed to go into that place. Returns the last
   value. The place argument may be any of the access forms for which SETF
   knows a corresponding setting form."
-  (let ((nargs (length args)))
-    (cond
-     ((= nargs 2)
-      (let ((place (first args))
-            (value-form (second args)))
-        (if (atom place)
-          `(setq ,place ,value-form)
-          (multiple-value-bind (dummies vals newval setter getter)
-              (sb!xc:get-setf-expansion place env)
-            (declare (ignore getter))
-            (let ((inverse (info :setf :inverse (car place))))
-              (if (and inverse (eq inverse (car setter)))
-                `(,inverse ,@(cdr place) ,value-form)
-                `(let* (,@(mapcar #'list dummies vals))
-                   (multiple-value-bind ,newval ,value-form
-                     ,setter))))))))
-     ((oddp nargs)
-      (error "odd number of args to SETF"))
-     (t
-      (do ((a args (cddr a))
-           (reversed-setfs nil))
-          ((null a)
-           `(progn ,@(nreverse reversed-setfs)))
-        (push (list 'setf (car a) (cadr a)) reversed-setfs))))))
+  (unless args
+    (return-from setf nil))
+  (destructuring-bind (place value-form . more) args
+    (when more
+      (return-from setf `(progn ,@(sb!c::explode-setq form 'error))))
+    ;; Macros without a SETF expander/inverse can be expanded now,
+    ;; for shorter output in the case where (M) is a macro invocation
+    ;; expanding to *A-VAR*, rather than deferring the macroexpansion
+    ;; to GET-SETF-EXPANSION which will introduce a needless gensym.
+    (loop
+       (when (and (listp place)
+                  (let ((op (car place)))
+                    (or (info :setf :expander op) (info :setf :inverse op))))
+         (return))
+       (multiple-value-bind (expansion macro-p) (%macroexpand-1 place env)
+         (cond (macro-p (setq place expansion)) ; iterate
+               ((symbolp place) (return-from setf `(setq ,place ,value-form)))
+               (t (return)))))
+    (multiple-value-bind (temps vals newval setter getter)
+        (sb!xc:get-setf-expansion place env)
+      (declare (ignore getter))
+      (let ((inverse (info :setf :inverse (car place))))
+        (if (and inverse (eq inverse (car setter)))
+            `(,inverse ,@(cdr place) ,value-form)
+            `(let* (,@(mapcar #'list temps vals))
+               (multiple-value-bind ,newval ,value-form ,setter)))))))
 
 ;;;; various SETF-related macros
 

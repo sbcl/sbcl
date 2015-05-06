@@ -219,4 +219,52 @@
   ;; no (SETF (SETF f)) methods
   (assert-error (macroexpand-1 '(defsetf (setf foo) set-setf-foo))))
 
+(defmacro mymacro () '*x*)
+(define-symbol-macro foox (car *x*))
+(with-test (:name :setf-of-symbol-macro)
+  (assert (equal (macroexpand-1 '(setf foox 3)) '(sb-kernel:%rplaca *x* 3))))
+(with-test (:name :setf-of-macro)
+  (assert (equal (macroexpand-1 '(setf (mymacro) 3)) '(setq *x* 3))))
+
+(defvar *x* (list 1))
+(defun set-foox (x)
+  (declare (type (integer 1 20) foox))
+  (setq foox x))
+(with-test (:name :setf-of-symbol-macro-typecheck)
+  ;; this was not broken, but since I've deleted the comment
+  ;;  "FIXME: [Free] type declaration. -- APD, 2002-01-26"
+  ;; from ir1-translators, it's probably worth a test
+  ;; since at some point it must not have worked as intended.
+  (assert-error (set-foox 99)))
+
+(declaim (special *foo-array*))
+;; When dealing with symbol-macros, compiled SETQ would locate the leaf
+;; for the symbol and then covertly stuff in the expansion to a SETF form.
+;; *MACROEXPAND-HOOK* would see the SETF but not the expansion
+;; of the symbol, except those expansions occurring with GET-SETF-EXPANSION.
+;; Now it can see the first-round expansion too.
+(with-test (:name :compiled-setq-macroexpand-hook)
+  (sb-int:collect ((expansions))
+    (let ((*macroexpand-hook*
+           (lambda (expander form env)
+             (let ((new (funcall expander form env)))
+               (when (or (symbolp form) (eq (car form) 'setf))
+                 (expansions (list form new)))
+               new))))
+      (compile nil '(lambda (x)
+                     (symbol-macrolet ((ref-it (aref a 0))
+                                       (a *foo-array*)
+                                       (thing ref-it))
+                       (setq thing x)))))
+    (let ((readback (read-from-string
+                     (write-to-string (expansions) :gensym nil))))
+      (assert (equal readback
+                     '((thing ref-it)
+                       (ref-it (aref a 0))
+                       (a *foo-array*)
+                       ((setf thing x)
+                        (let* ((a1 a))
+                          (multiple-value-bind (new0) x
+                            (funcall #'(setf aref) new0 a1 0))))))))))
+
 ;;; success

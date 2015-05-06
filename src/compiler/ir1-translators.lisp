@@ -977,18 +977,24 @@ care."
 
 ;;;; SETQ
 
+(defun explode-setq (form err-fun)
+  (collect ((sets))
+    (do ((op (car form))
+         (thing (cdr form) (cddr thing)))
+        ((endp thing) (sets))
+      (if (endp (cdr thing))
+          (funcall err-fun "odd number of args to ~A: ~S" op form)
+          (sets `(,op ,(first thing) ,(second thing)))))))
+
 ;;; If there is a definition in LEXENV-VARS, just set that, otherwise
 ;;; look at the global information. If the name is for a constant,
 ;;; then error out.
 (def-ir1-translator setq ((&whole source &rest things) start next result)
-  (let ((len (length things)))
-    (when (oddp len)
-      (compiler-error "odd number of args to SETQ: ~S" source))
-    (if (= len 2)
-        (let* ((name (first things))
-               (value-form (second things))
-               (leaf (or (lexenv-find name vars) (find-free-var name))))
-          (etypecase leaf
+  (if (proper-list-of-length-p things 2)
+      (let* ((name (first things))
+             (value-form (second things))
+             (leaf (or (lexenv-find name vars) (find-free-var name))))
+        (etypecase leaf
             (leaf
              (when (constant-p leaf)
                (compiler-error "~S is a constant and thus can't be set." name))
@@ -1009,17 +1015,14 @@ care."
                  (setq-var start next result leaf value-form)))
             (cons
              (aver (eq (car leaf) 'macro))
-             ;; FIXME: [Free] type declaration. -- APD, 2002-01-26
-             (ir1-convert start next result
-                          `(setf ,(cdr leaf) ,(second things))))
+             ;; Allow *MACROEXPAND-HOOK* to see NAME get expanded,
+             ;; not just see a use of SETF on the new place.
+             (ir1-convert start next result `(setf ,name ,(second things))))
             (heap-alien-info
              (ir1-convert start next result
                           `(%set-heap-alien ',leaf ,(second things))))))
-        (collect ((sets))
-          (do ((thing things (cddr thing)))
-              ((endp thing)
-               (ir1-convert-progn-body start next result (sets)))
-            (sets `(setq ,(first thing) ,(second thing))))))))
+      (ir1-convert-progn-body start next result
+                              (explode-setq source 'compiler-error))))
 
 ;;; This is kind of like REFERENCE-LEAF, but we generate a SET node.
 ;;; This should only need to be called in SETQ.
