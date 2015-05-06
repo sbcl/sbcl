@@ -363,23 +363,22 @@
 ;;; reduces the incentive to treat some macros as special-forms when
 ;;; squeezing more performance from a Lisp interpreter.
 ;;; we can't use DEFINE-MODIFY-MACRO because of ANSI 5.1.3
+(declaim (inline xsubtract))
+(defun xsubtract (a b) (- b a)) ; exchanged subtract
 (flet ((expand (place delta env operator)
          (when (symbolp place)
            (multiple-value-bind (expansion expanded)
                (sb!xc:macroexpand-1 place env)
              (unless expanded
-               (return-from expand `(setq ,place (,operator ,place ,delta))))
+               (return-from expand `(setq ,place (,operator ,delta ,place))))
              ;; GET-SETF-EXPANSION would have macroexpanded too, so do it now.
              (setq place expansion)))
          (multiple-value-bind (dummies vals newval setter getter)
              (sb!xc:get-setf-expansion place env)
-           (let* ((const (numberp delta))
-                  (d (if const delta (copy-symbol 'delta))))
-             `(let* (,@(mapcar #'list dummies vals)
-                     ,@(unless const (list `(,d ,delta)))
-                     (,(car newval) (,operator ,getter ,d))
-                     ,@(cdr newval))
-                ,setter)))))
+           `(let* (,@(mapcar #'list dummies vals)
+                   (,(car newval) (,operator ,delta ,getter))
+                   ,@(cdr newval))
+              ,setter))))
   (defmacro-mundanely incf (place &optional (delta 1) &environment env)
   #!+sb-doc
   "The first argument is some location holding a number. This number is
@@ -390,10 +389,26 @@
   #!+sb-doc
   "The first argument is some location holding a number. This number is
   decremented by the second argument, DELTA, which defaults to 1."
-    (expand place delta env '-)))
+    (expand place delta env 'xsubtract)))
 
 ;;;; DEFINE-MODIFY-MACRO stuff
 
+;; FIXME: the comments (at INCF/DECF/REMF) saying not to use DEFINE-MODIFY-MACRO
+;; "because of ANSI 5.1.3" deflect the real issue - D-M-M expands incorrectly.
+;; If it were right, you should definitely be able to use it for at least INCF.
+;; An example of the problem:
+;; * (define-modify-macro buggy-incf (x) +)
+;; * (macroexpand-1 '(buggy-incf (cadr (l)) (delta)))
+;; -> (LET* ((#:LIST553 (CDR (L))) (#:NEW554 (+ (CAR #:LIST553) (DELTA))))
+;;      (SB-KERNEL:%RPLACA #:LIST553 #:NEW554))
+;; wherein (DELTA) was supposed to have been evaluated _before_ reading the
+;; PLACE but is actually evaluated after it.
+;; Specifically, 5.1.3 says "For each of the ``read-modify-write'' operators
+;;   in the next figure and for any additional macros defined by the programmer
+;;   using define-modify-macro, an exception is made ..."
+;; Because of the word "and" in that sentence it doesn't matter whether INCF
+;; was defined manually or with DEFINE-MODIFY-MACRO. Those should be the same.
+;;
 (def!macro sb!xc:define-modify-macro (name lambda-list function &optional doc-string)
   #!+sb-doc
   "Creates a new read-modify-write macro like PUSH or INCF."
@@ -674,6 +689,11 @@
             `(apply #',function ,@vars))))
 
 ;;; Special-case a BYTE bytespec so that the compiler can recognize it.
+;;; FIXME: it is suboptimal that (INCF (LDB (BYTE 9 0) (ELT X 0)))
+;;; performs two reads of (ELT X 0), once to get the value from which
+;;; to extract a 9-bit subfield, and again to combine the incremented
+;;; value with the other bits. I don't think it's wrong per se,
+;;; but is worthy of some thought as to whether it can be improved.
 (sb!xc:define-setf-expander ldb (bytespec place &environment env)
   #!+sb-doc
   "The first argument is a byte specifier. The second is any place form

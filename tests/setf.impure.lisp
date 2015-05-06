@@ -267,4 +267,12 @@
                           (multiple-value-bind (new0) x
                             (funcall #'(setf aref) new0 a1 0))))))))))
 
+(with-test (:name :incf-argument-eval-order)
+  (let ((testvar 1))
+    (flet ((double-it () (setq testvar (* 2 testvar))))
+      (incf testvar (double-it)))
+    ;; testvar should be 4, not 3, because the read for INCF
+    ;; occurs after doubling.
+    (assert (eql testvar 4))))
+
 ;;; success
