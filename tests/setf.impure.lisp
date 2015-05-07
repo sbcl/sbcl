@@ -365,4 +365,28 @@
                    ((29 30 31 32 33 34 35) (36 37 38 39 40 41 42)))
                array)))))
 
+(define-modify-macro append2+ (a b &optional c &rest more) append
+                     "append at least two more lists onto the place")
+(define-modify-macro other-incf (&optional (delta 1)) +)
+
+(with-test (:name :define-modify-macro-arg-eval-order)
+  ;; Uses a bunch of temps
+  (assert (equal-mod-gensyms
+           (let ((*gensym-counter* 1))
+             (macroexpand-1 '(append2+ (car x) (f) (g) (h) (i) (j))))
+           '(let* ((x2 x) (a (f)) (b (g)) (c (h)) (g3 (i)) (g4 (j)))
+             (sb-kernel:%rplaca x2 (append (car X2) a b c g3 g4)))))
+
+  ;; Calling OTHER-INCF with the default delta of 1 uses no temps.
+  (assert (equal (macroexpand '(other-incf *foo-base*))
+                 '(setq *foo-base* (+ *foo-base* 1))))
+  ;; Otherwise, it uses a temp because it "doesn't know" that + commutes.
+  (assert (equal-mod-gensyms (macroexpand '(other-incf b (ff)))
+                             '(let* ((delta (ff))) (setq b (+ b delta)))))
+  ;; And the following result should be identical to that of ordinary INCF.
+  (let ((testvar 1))
+    (flet ((double-it () (setq testvar (* 2 testvar))))
+      (other-incf testvar (double-it)))
+    (assert (eql testvar 4))))
+
 ;;; success

@@ -374,7 +374,7 @@
 ;;; SETF-like thing. The compiler doesn't care either way, but this
 ;;; reduces the incentive to treat some macros as special-forms when
 ;;; squeezing more performance from a Lisp interpreter.
-;;; we can't use DEFINE-MODIFY-MACRO because of ANSI 5.1.3
+;;; DEFINE-MODIFY-MACRO could be used, but this expands more compactly.
 (declaim (inline xsubtract))
 (defun xsubtract (a b) (- b a)) ; exchanged subtract
 (flet ((expand (place delta env operator)
@@ -405,22 +405,6 @@
 
 ;;;; DEFINE-MODIFY-MACRO stuff
 
-;; FIXME: the comments (at INCF/DECF/REMF) saying not to use DEFINE-MODIFY-MACRO
-;; "because of ANSI 5.1.3" deflect the real issue - D-M-M expands incorrectly.
-;; If it were right, you should definitely be able to use it for at least INCF.
-;; An example of the problem:
-;; * (define-modify-macro buggy-incf (x) +)
-;; * (macroexpand-1 '(buggy-incf (cadr (l)) (delta)))
-;; -> (LET* ((#:LIST553 (CDR (L))) (#:NEW554 (+ (CAR #:LIST553) (DELTA))))
-;;      (SB-KERNEL:%RPLACA #:LIST553 #:NEW554))
-;; wherein (DELTA) was supposed to have been evaluated _before_ reading the
-;; PLACE but is actually evaluated after it.
-;; Specifically, 5.1.3 says "For each of the ``read-modify-write'' operators
-;;   in the next figure and for any additional macros defined by the programmer
-;;   using define-modify-macro, an exception is made ..."
-;; Because of the word "and" in that sentence it doesn't matter whether INCF
-;; was defined manually or with DEFINE-MODIFY-MACRO. Those should be the same.
-;;
 (def!macro sb!xc:define-modify-macro (name lambda-list function &optional doc-string)
   #!+sb-doc
   "Creates a new read-modify-write macro like PUSH or INCF."
@@ -453,17 +437,9 @@
     `(#-sb-xc-host sb!xc:defmacro
       #+sb-xc-host defmacro-mundanely
          ,name (,reference ,@lambda-list &environment ,env)
-       ,doc-string
-       (multiple-value-bind (dummies vals newval setter getter)
-           (sb!xc:get-setf-expansion ,reference ,env)
-         (let ()
-             `(let* (,@(mapcar #'list dummies vals)
-                     (,(car newval)
-                      ,,(if rest-arg
-                          `(list* ',function getter ,@other-args ,rest-arg)
-                          `(list ',function getter ,@other-args)))
-                     ,@(cdr newval))
-                ,setter))))))
+       ,@(when doc-string (list (the string doc-string)))
+       (expand-rmw-macro ',function ,reference (list* ,@other-args ,rest-arg)
+                         ,env ',other-args))))
 
 ;;;; DEFSETF
 
@@ -552,26 +528,66 @@
     (t
      (error "Ill-formed DEFSETF for ~S" access-fn))))
 
-;; Peform the work of expanding a SETF whose expander was defined by
-;; the "long form" of DEFSETF.
-;; FIXME: totally broken if there are keyword arguments. lp#1452947
-(defun %defsetf (orig-access-form environment num-store-vars expander)
-  (declare (type function expander))
-  (collect ((temp-names) (temp-vals) (call-arguments))
-    (dolist (subform (cdr orig-access-form))
-      (call-arguments (if (sb!xc:constantp subform environment)
-                          subform
-                          (let ((temp (gensym)))
-                            (temp-names temp)
-                            (temp-vals subform)
-                            temp))))
-    (let ((stores (make-gensym-list num-store-vars "NEW")))
-      (values (temp-names)
-              (temp-vals)
-              stores
-              (funcall expander (cons (call-arguments) stores)
-                       environment)
-              `(,(car orig-access-form) ,@(call-arguments))))))
+;; DEFINE-MODIFY-MACRO and the "long form" of DEFSETF share some logic,
+;; namely, the step of collecting the first two values for
+;; GET-SETF-EXPANSION while eschewing bindings for constant arguments.
+(flet ((collect-call-temps (place-subforms environment name-hints)
+         (collect ((temp-vars) (temp-vals) (call-arguments))
+           (dolist (form place-subforms
+                         (values (temp-vars) (temp-vals) (call-arguments)))
+             (call-arguments (if (sb!xc:constantp form environment)
+                                 form
+                                 (let ((temp (if name-hints
+                                                 (copy-symbol (car name-hints))
+                                                 (sb!xc:gensym))))
+                                   (temp-vars temp)
+                                   (temp-vals form)
+                                   temp)))
+             (pop name-hints)))))
+
+  ;; Expand a SETF form defined by the long form of DEFSETF.
+  ;; FIXME: totally broken if there are keyword arguments. lp#1452947
+  (defun %defsetf (orig-access-form environment num-store-vars expander)
+    (declare (type function expander))
+    (multiple-value-bind (temp-vars temp-vals call-arguments)
+        (collect-call-temps (cdr orig-access-form) environment nil)
+      (let ((stores (make-gensym-list num-store-vars "NEW")))
+        (values temp-vars temp-vals stores
+                (funcall expander (cons call-arguments stores) environment)
+                `(,(car orig-access-form) ,@call-arguments)))))
+
+  ;; Expand a macro defined by DEFINE-MODIFY-MACRO.
+  ;; The generated call resembles (FUNCTION PLACE . ARG-FORMS) but the
+  ;; read and write of PLACE - not including its subforms - are done
+  ;; only after all ARG-FORMS are evaluated.
+  (defun expand-rmw-macro (function place arg-forms environment name-hints)
+    (multiple-value-bind (temp-vars temp-vals stores setter getter)
+        (sb!xc:get-setf-expansion place environment)
+      (multiple-value-bind (fun-temp-vars fun-temp-vals call-arguments)
+          (collect-call-temps arg-forms environment name-hints)
+        (let* ((compute `(,function ,getter ,@call-arguments))
+               (set-fn (and (listp setter) (car setter)))
+               (newval-temp (car stores))
+               (newval-binding `((,newval-temp ,compute))))
+          ;; Try to elide the binding of NEWVAL-TEMP. If the SINGLETON-P test
+          ;; passes, then NEWVAL-TEMP is the last argument to the setter form.
+          ;; Checking that everything else is an expected symbol
+          ;; ensures that no other reference to NEWVAL-TEMP exists.
+          (when (and (singleton-p (member newval-temp setter))
+                     (or (eq set-fn 'setq)
+                         (and (eq (info :function :kind set-fn) :function)
+                              (every (lambda (x)
+                                       (or (member x temp-vars)
+                                           (member x fun-temp-vars)
+                                           (eq x newval-temp)))
+                                     (cdr setter)))))
+            (setq newval-binding nil
+                  setter (append (butlast setter) (list compute))))
+          (let ((bindings (append (mapcar #'list temp-vars temp-vals)
+                                  (mapcar #'list fun-temp-vars fun-temp-vals)
+                                  newval-binding
+                                  (cdr stores))))
+            (if bindings `(let* ,bindings ,setter) setter)))))))
 
 ;;;; DEFMACRO DEFINE-SETF-EXPANDER and various DEFINE-SETF-EXPANDERs
 
