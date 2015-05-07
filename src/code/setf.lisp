@@ -334,28 +334,38 @@
   to hold a property list or (). This list is destructively altered to
   remove the property specified by the indicator. Returns T if such a
   property was present, NIL if not."
-  (multiple-value-bind (dummies vals newval setter getter)
+  (multiple-value-bind (temps vals newval setter getter)
       (sb!xc:get-setf-expansion place env)
-    (let ((ind-temp (gensym))
-          (local1 (gensym))
-          (local2 (gensym)))
-      `(let* (,@(mapcar #'list dummies vals)
+    (let* ((flag (make-symbol "FLAG"))
+           (body `(multiple-value-bind (,(car newval) ,flag)
               ;; See ANSI 5.1.3 for why we do out-of-order evaluation
-              (,ind-temp ,indicator)
-              (,(car newval) ,getter)
-              ,@(cdr newval))
-         (do ((,local1 ,(car newval) (cddr ,local1))
-              (,local2 nil ,local1))
-             ((atom ,local1) nil)
-             (cond ((atom (cdr ,local1))
-                    (error "Odd-length property list in REMF."))
-                   ((eq (car ,local1) ,ind-temp)
-                    (cond (,local2
-                           (rplacd (cdr ,local2) (cddr ,local1))
-                           (return t))
-                          (t (setq ,(car newval) (cddr ,(car newval)))
-                             ,setter
-                             (return t))))))))))
+                      (truly-the (values list boolean)
+                                 (%remf ,indicator ,getter))
+                    ,(if (cdr newval) `(let ,(cdr newval) ,setter) setter)
+                    ,flag)))
+      (if temps `(let* ,(mapcar #'list temps vals) ,body) body))))
+
+;; Perform the work of REMF.
+(defun %remf (indicator plist)
+  (let ((tail plist) (predecessor))
+    (loop
+     (when (endp tail) (return (values plist nil)))
+     (let ((key (pop tail)))
+       (when (atom tail)
+         (error (if tail
+                    "Improper list in REMF."
+                    "Odd-length list in REMF.")))
+       (let ((next (cdr tail)))
+         (when (eq key indicator)
+           ;; This function is strict in its return type!
+           (the list next) ; for effect
+           (return (values (cond (predecessor
+                                  (setf (cdr predecessor) next)
+                                  plist)
+                                 (t
+                                  next))
+                           t)))
+         (setq predecessor tail tail next))))))
 
 ;;; INCF and DECF have a straightforward expansion, avoiding temp vars,
 ;;; when the PLACE is a non-macro symbol. Otherwise we do the generalized

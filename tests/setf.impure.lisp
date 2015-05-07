@@ -267,6 +267,38 @@
                           (multiple-value-bind (new0) x
                             (funcall #'(setf aref) new0 a1 0))))))))))
 
+(with-test (:name :remf-basic-correctness)
+  (flet ((try (indicator input expect)
+           (handler-case (sb-impl::%remf indicator (copy-list input))
+             (error () (assert (eq expect :error)))
+             (:no-error (newval flag)
+               (assert (and (equal newval expect)
+                            (eq flag (not (equal newval input)))))
+               (let* ((foo (vector (copy-list input)))
+                      (removedp (remf (aref foo 0) indicator)))
+                 (assert (equal (aref foo 0) expect))
+                 (assert (eq removedp (not (equal input expect)))))))))
+    (try 'x '() '())
+    (try 'x 'a :error)
+    (try 'x '(a) :error)
+    (try 'x '(a . b) :error)
+    (try 'x '(a b . c) :error)
+    ;; indicator not found
+    (try 'weazel '(a b :foo :goo) '(a b :foo :goo))
+    (try 'weazel '(a b :foo :goo . 3) :error) ; improper
+    (try 'weazel '(a b :foo :goo baz) :error) ; odd length
+    ;; pair deleted from head
+    (try 'a '(a b :foo :goo a 3) '(:foo :goo a 3))
+    (try 'a '(a b :foo :goo) '(:foo :goo))
+    (try 'a '(a b :foo) '(:foo)) ; odd length unnoticed
+    (try 'a '(a b . :foo) :error) ; but won't return a non-list
+    ;; pair deleted from interior
+    (try :foo '(a b :foo :goo) '(a b))
+    (try :foo '(a b :foo :goo :boo) '(a b :boo)) ; odd length unnoticed
+    (try :foo '(a b :foo :goo :foo) '(a b :foo)) ; other :FOO is irrelevant
+    (try :foo '(a b :foo :goo . bad) :error)
+    ))
+
 (with-test (:name :incf-argument-eval-order)
   (let ((testvar 1))
     (flet ((double-it () (setq testvar (* 2 testvar))))
