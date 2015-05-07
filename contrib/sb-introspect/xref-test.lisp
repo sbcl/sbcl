@@ -85,6 +85,10 @@
     (who-calls 'inline/4)
   (inline/4-user))
 
+(define-xref-test who-calls.17
+    (who-calls 'called-by-traced-fun)
+  (traced-fun))
+
 
 (define-xref-test who-macroexpands.1
     (who-macroexpands 'macro/1)

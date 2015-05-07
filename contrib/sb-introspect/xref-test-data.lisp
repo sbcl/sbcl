@@ -224,3 +224,10 @@
 
 (defmethod a-gf-3 ((x (eql *an-instance-of-a-subclass*))))
 (defmethod a-gf-3 ((x (eql *an-instance-of-a-substructure*))))
+
+(defun called-by-traced-fun ())
+
+(defun traced-fun ()
+  (called-by-traced-fun))
+
+(trace traced-fun)
