@@ -51,7 +51,7 @@
                       (return t)))))
            (expand-or-get-setf-inverse form environment))
          ((info :setf :inverse (car form))
-          (get-setf-method-inverse form `(,it) nil environment))
+          (make-setf-quintuple-simple form environment nil `(,it)))
          ((info :setf :expander (car form))
            ;; KLUDGE: It may seem as though this should go through
            ;; *MACROEXPAND-HOOK*, but the ANSI spec seems fairly explicit
@@ -76,31 +76,8 @@
       (%macroexpand-1 form environment)
     (if expanded
         (sb!xc:get-setf-expansion expansion environment)
-        (get-setf-method-inverse form
-                                 `(funcall #'(setf ,(car form)))
-                                 t
-                                 environment))))
-
-(defun get-setf-method-inverse (form inverse setf-fun environment)
-  (let ((new-var (sb!xc:gensym "NEW"))
-        (vars nil)
-        (vals nil)
-        (args nil))
-    (dolist (x (reverse (cdr form)))
-      (cond ((sb!xc:constantp x environment)
-             (push x args))
-            (t
-             (let ((temp (gensymify x)))
-               (push temp args)
-               (push temp vars)
-               (push x vals)))))
-    (values vars
-            vals
-            (list new-var)
-            (if setf-fun
-                `(,@inverse ,new-var ,@args)
-                `(,@inverse ,@args ,new-var))
-            `(,(car form) ,@args))))
+        (make-setf-quintuple-simple form environment
+                                    t `(funcall #'(setf ,(car form)))))))
 
 ;;;; SETF itself
 
@@ -518,17 +495,16 @@
               (assign-setf-macro
                ',access-fn
                (lambda (,access-form ,environment)
-                 (%defsetf ,access-form ,environment
-                           ,(length store-variables)
-                           (lambda (,whole ,environment)
-                             ,@local-decs ,body)))
+                 (make-setf-quintuple ,access-form ,environment
+                                      ,(length store-variables)
+                                      (lambda (,whole ,environment)
+                                        ,@local-decs ,body)))
                ',lambda-list nil ',doc))))))
     (t
      (error "Ill-formed DEFSETF for ~S" access-fn))))
 
-;; DEFINE-MODIFY-MACRO and the "long form" of DEFSETF share some logic,
-;; namely, the step of collecting the first two values for
-;; GET-SETF-EXPANSION while eschewing bindings for constant arguments.
+;; Much of the SETF framework shares logic to assemble the first two values
+;; for GET-SETF-EXPANSION while eschewing bindings for constant arguments.
 (flet ((collect-call-temps (place-subforms environment name-hints)
          (collect ((temp-vars) (temp-vals) (call-arguments))
            (dolist (form place-subforms
@@ -537,22 +513,34 @@
                                  form
                                  (let ((temp (if name-hints
                                                  (copy-symbol (car name-hints))
-                                                 (sb!xc:gensym))))
+                                                 (gensymify form))))
                                    (temp-vars temp)
                                    (temp-vals form)
                                    temp)))
              (pop name-hints)))))
 
-  ;; Expand a SETF form defined by the long form of DEFSETF.
+  ;; Return the 5-part expansion of a SETF form that calls #'(SETF Fn)
+  ;; when SETF-FUN-P is non-nil, or the short form of a DEFSETF, when NIL.
+  ;; INVERSE should be (FUNCALL #'(SETF x)) or (SETTER-FN) respectively.
+  (defun make-setf-quintuple-simple (access-form environment setf-fun-p inverse)
+    (multiple-value-bind (temp-vars temp-vals args)
+        (collect-call-temps (cdr access-form) environment nil)
+      (let ((store (sb!xc:gensym "NEW")))
+        (values temp-vars temp-vals (list store)
+                `(,@inverse ,@(if setf-fun-p `(,store ,@args) `(,@args ,store)))
+                `(,(car access-form) ,@args)))))
+
+  ;; Return the 5-part expansion of a SETF form defined by the long form
+  ;; of DEFSETF.
   ;; FIXME: totally broken if there are keyword arguments. lp#1452947
-  (defun %defsetf (orig-access-form environment num-store-vars expander)
+  (defun make-setf-quintuple (access-form environment num-store-vars expander)
     (declare (type function expander))
     (multiple-value-bind (temp-vars temp-vals call-arguments)
-        (collect-call-temps (cdr orig-access-form) environment nil)
+        (collect-call-temps (cdr access-form) environment nil)
       (let ((stores (make-gensym-list num-store-vars "NEW")))
         (values temp-vars temp-vals stores
                 (funcall expander (cons call-arguments stores) environment)
-                `(,(car orig-access-form) ,@call-arguments)))))
+                `(,(car access-form) ,@call-arguments)))))
 
   ;; Expand a macro defined by DEFINE-MODIFY-MACRO.
   ;; The generated call resembles (FUNCTION PLACE . ARG-FORMS) but the

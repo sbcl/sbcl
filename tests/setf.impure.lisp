@@ -287,8 +287,8 @@
                (ref-it (aref a 0))
                (a *foo-array*)
                ((setf thing x)
-                (let* ((a1 a) (new0 x))
-                  (funcall #'(setf aref) new0 a1 0))))))))
+                (let* ((a0 a) (new1 x))
+                  (funcall #'(setf aref) new1 a0 0))))))))
 
 (with-test (:name :remf-basic-correctness)
   (flet ((try (indicator input expect)
@@ -374,8 +374,8 @@
   (assert (equal-mod-gensyms
            (let ((*gensym-counter* 1))
              (macroexpand-1 '(append2+ (car x) (f) (g) (h) (i) (j))))
-           '(let* ((x2 x) (a (f)) (b (g)) (c (h)) (g3 (i)) (g4 (j)))
-             (sb-kernel:%rplaca x2 (append (car X2) a b c g3 g4)))))
+           '(let* ((x1 x) (a (f)) (b (g)) (c (h)) (g3 (i)) (g4 (j)))
+             (sb-kernel:%rplaca x1 (append (car x1) a b c g3 g4)))))
 
   ;; Calling OTHER-INCF with the default delta of 1 uses no temps.
   (assert (equal (macroexpand '(other-incf *foo-base*))
