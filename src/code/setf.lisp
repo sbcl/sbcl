@@ -682,15 +682,22 @@
 ;;;   it used to be.)  The function arg must be constant, and is converted to
 ;;;   an APPLY of the SETF function, which ought to exist.
 ;;;
+;;; Historical note: The hack was considered evil becase prior to the
+;;; standardization of #'(SETF F) as a namespace for functions, all that existed
+;;; were SETF expanders. To "invert" (APPLY #'F A B .. LAST), you assumed that
+;;; the SETF expander was ok to use on (F A B .. LAST), yielding something
+;;; like (set-F A B .. LAST). If the LAST arg didn't move (based on comparing
+;;; gensyms between the "getter" and "setter" forms), you'd stick APPLY
+;;; in front and hope for the best. Plus AREF still had to be special-cased.
+;;;
 ;;; It may not be clear (wasn't to me..) that this is a standard thing, but See
 ;;; "5.1.2.5 APPLY Forms as Places" in the ANSI spec. I haven't actually
 ;;; verified that this code has any correspondence to that code, but at least
 ;;; ANSI has some place for SETF APPLY. -- WHN 19990604
 (sb!xc:define-setf-expander apply (functionoid &rest args)
-  (unless (and (listp functionoid)
-               (= (length functionoid) 2)
-               (eq (first functionoid) 'function)
-               (symbolp (second functionoid)))
+  ;; Technically (per CLHS) this only must allow AREF,BIT,SBIT
+  ;; but there's not much danger in allowing other stuff.
+  (unless (typep functionoid '(cons (eql function) (cons symbol null)))
     (error "SETF of APPLY is only defined for function args like #'SYMBOL."))
   (let ((function (second functionoid))
         (new-var (gensym))

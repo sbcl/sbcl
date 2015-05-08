@@ -343,4 +343,22 @@
    `(set-xy ,store 'x ,x 'y ,y))
 ;; FIXME: add tests
 
+(with-test (:name :setf-of-apply-aref)
+  (let ((n 0)
+        (array (make-array '(3 2 7)))
+        (indices (list 0 0 0)))
+    (flet ((bump-index ()
+             (let ((i (1- (length indices))))
+               (loop (cond ((< (nth i indices) (1- (array-dimension array i)))
+                            (return (incf (nth i indices))))
+                           ((= i 0) (return nil))
+                           (t (setf (nth i indices) 0) (decf i)))))))
+      (loop (setf (apply #'aref array indices) (incf n))
+            (unless (bump-index) (return)))
+      (assert (equalp
+               #3A(((1 2 3 4 5 6 7) (8 9 10 11 12 13 14))
+                   ((15 16 17 18 19 20 21) (22 23 24 25 26 27 28))
+                   ((29 30 31 32 33 34 35) (36 37 38 39 40 41 42)))
+               array)))))
+
 ;;; success
