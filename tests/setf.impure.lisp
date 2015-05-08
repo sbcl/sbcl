@@ -54,16 +54,17 @@
 
 ;;; DEFSETF accepts &ENVIRONMENT but not &AUX
 (defsetf test-defsetf-env-1  (&environment env) (new)
-  (declare (ignore new))
+  ;; Note: we're not trying to ignore NEW, we're trying to ignore
+  ;; the variable that SETF binds whose name is in NEW.
   (if (macro-function 'defsetf-env-trick env)
-      :local
-      :global))
+      `(progn ,new :local)
+      `(progn ,new :global)))
 
 (defsetf test-defsetf-env-2  (local global &environment env) (new)
-  (declare (ignore new))
+  ;; As above, NEW values are generally not supposed to be ignored.
   (if (macro-function 'defsetf-env-trick env)
-      local
-      global))
+      `(progn ,new ,local)
+      `(progn ,new ,global)))
 
 (assert (eq :local (macrolet ((defsetf-env-trick ()))
                      (setf (test-defsetf-env-1) 13))))
@@ -115,20 +116,23 @@
                     (setf (get 'z :z 0) 4)))))
 
 (with-test (:name :setf-fun-and-macro-full-warn)
-  (multiple-value-bind (fun warnings-p failure-p)
-      (compile nil '(lambda (x) (setf (shoe-color x) 'cordovan)))
-    (assert (and fun warnings-p (not failure-p))))
+  ;; make the compiler assume existence of #'(setf shoe-color)
+  (handler-bind ((warning #'muffle-warning))
+      (compile nil '(lambda (x) (setf (shoe-color x) 'cordovan))))
+  ;; now we get a full warning because the macro was seen too late.
   (assert (typep (handler-case (eval '(defsetf shoe-color set-shoe-color))
                    (warning (c) c))
                  '(and warning (not style-warning)))))
 
 (with-test (:name :setf-fun-and-macro-style-1)
   (eval '(defun (setf shoe-size) (new x) x new))
+  ;; unlike above, this is merely a style-warning
   (assert (typep (handler-case (eval '(defsetf shoe-size set-shoe-size))
                    (warning (c) c))
                  'style-warning)))
 
 ;; This is a test of the compiler, but it belongs with the above.
+;; FIXME: does this need to go through COMPILE-FILE, or will COMPILE work?
 (defvar *tmpfile* "setf-tmp.lisp")
 (with-test (:name :setf-fun-and-macro-style-2)
   (unwind-protect
