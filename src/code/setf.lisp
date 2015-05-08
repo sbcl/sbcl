@@ -34,9 +34,8 @@
   "Return five values needed by the SETF machinery: a list of temporary
    variables, a list of values with which to fill them, a list of temporaries
    for the new values, the setting function, and the accessing function."
-  (let (temp)
-    (cond ((symbolp form)
-           (multiple-value-bind (expansion expanded)
+  (acond ((symbolp form)
+          (multiple-value-bind (expansion expanded)
                (sb!xc:macroexpand-1 form environment)
              (if expanded
                  (sb!xc:get-setf-expansion expansion environment)
@@ -44,30 +43,29 @@
                    (values nil nil (list new-var)
                            `(setq ,form ,new-var) form)))))
           ;; Local functions inhibit global SETF methods.
-          ((and environment
-                (let ((name (car form)))
+         ((and environment
+               (let ((name (car form)))
                   (dolist (x (sb!c::lexenv-funs environment))
                     (when (and (eq (car x) name)
                                (not (sb!c::defined-fun-p (cdr x))))
                       (return t)))))
            (expand-or-get-setf-inverse form environment))
-          ((setq temp (info :setf :inverse (car form)))
-           (get-setf-method-inverse form `(,temp) nil environment))
-          ((setq temp (info :setf :expander (car form)))
+         ((info :setf :inverse (car form))
+          (get-setf-method-inverse form `(,it) nil environment))
+         ((info :setf :expander (car form))
            ;; KLUDGE: It may seem as though this should go through
            ;; *MACROEXPAND-HOOK*, but the ANSI spec seems fairly explicit
            ;; that *MACROEXPAND-HOOK* is a hook for MACROEXPAND-1, not
            ;; for macroexpansion in general. -- WHN 19991128
-           (funcall temp
-                    form
+           (funcall it form
                     ;; As near as I can tell from the ANSI spec,
                     ;; macroexpanders have a right to expect an actual
                     ;; lexical environment, not just a NIL which is to
                     ;; be interpreted as a null lexical environment.
                     ;; -- WHN 19991128
                     (coerce-to-lexenv environment)))
-          (t
-           (expand-or-get-setf-inverse form environment)))))
+         (t
+          (expand-or-get-setf-inverse form environment))))
 
 ;;; If a macro, expand one level and try again. If not, go for the
 ;;; SETF function.
