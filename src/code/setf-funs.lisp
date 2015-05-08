@@ -59,6 +59,8 @@
 
 (define-setters ("COMMON-LISP")
   ;; Semantically silly...
-  getf apply ldb mask-field logbitp subseq values
+  getf apply ldb mask-field logbitp values
+  ;; Hairy lambda list
+  get subseq
   ;; Have explicit redundant definitions...
-  setf bit sbit get aref gethash)
+  bit sbit aref gethash)
