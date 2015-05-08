@@ -1608,7 +1608,7 @@ function to be removed without further warning."
            (error 'type-error
                   :datum (first args)
                   :expected-type '(simple-array * (*)))))
-       (defglobal ,table-name (make-array ,(1+ sb!vm:widetag-mask)
+       (!defglobal ,table-name (make-array ,(1+ sb!vm:widetag-mask)
                                           :initial-element #',error-name))
        ,@(loop for info across sb!vm:*specialized-array-element-type-properties*
                for typecode = (sb!vm:saetp-typecode info)
@@ -1621,7 +1621,10 @@ function to be removed without further warning."
                               (declare (type (simple-array ,specifier (*))
                                              ,(first params)))
                               ,@body)
-                            (setf (svref ,table-name ,typecode) #',fun-name))))
+                            ;; This could actually be done by Genesis if I make
+                            ;; FOPCOMPILABLE-P return T for this SETF.
+                            (!cold-init-forms
+                             (setf (svref ,table-name ,typecode) #',fun-name)))))
        (defmacro ,dispatch-name (&rest args)
          (check-type (first args) symbol)
          (let ((tag (gensym "TAG")))

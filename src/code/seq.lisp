@@ -17,6 +17,8 @@
 ;;;; files for more information.
 
 (in-package "SB!IMPL")
+
+(!begin-collecting-cold-init-forms)
 
 ;;;; utilities
 
@@ -2787,3 +2789,5 @@ many elements are copied."
                       (sb!sequence:dosequence (content contents)
                         (frob (1+ axis) (cdr dims) content))))))
       (frob 0 dimensions initial-contents))))
+
+(!defun-from-collected-cold-init-forms !seq-cold-init)
