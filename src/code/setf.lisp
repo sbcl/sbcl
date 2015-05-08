@@ -526,49 +526,50 @@
     ((cons list (cons list))
      (destructuring-bind (lambda-list (&rest store-variables) &body body) rest
        (with-unique-names (whole access-form environment)
+         ;; FIXME: a defsetf lambda-list is *NOT* a macro lambda list!
+         ;; Suppose that (MY-ACC ((X))) is a macro, not a function,
+         ;; and you attempt to destructure the X. It parses ok by accident,
+         ;; but when you attempt to bind to subforms of MY-ACC,
+         ;; you find that ((X)) is not a well-formed sexpr.
          (multiple-value-bind (body local-decs doc)
-                 (parse-defmacro `(,lambda-list ,@store-variables)
-                                 whole body access-fn 'defsetf
-                                 :environment environment
-                                 :anonymousp t)
+             ;; This technique of parsing the stores as part of the
+             ;; the function's lambda list is loathsome.
+             (parse-defmacro `(,lambda-list ,@store-variables)
+                             whole body access-fn 'defsetf
+                             :environment environment
+                             :anonymousp t)
            `(eval-when (:compile-toplevel :load-toplevel :execute)
               (assign-setf-macro
-                   ',access-fn
-                   (lambda (,access-form ,environment)
-                     ,@local-decs
-                     (%defsetf ,access-form ,(length store-variables)
-                               (lambda (,whole)
-                                 ,body)))
-                   ',lambda-list
-                   nil
-                   ',doc))))))
+               ',access-fn
+               (lambda (,access-form ,environment)
+                 (%defsetf ,access-form ,environment
+                           ,(length store-variables)
+                           (lambda (,whole ,environment)
+                             ,@local-decs ,body)))
+               ',lambda-list nil ',doc))))))
     (t
      (error "Ill-formed DEFSETF for ~S" access-fn))))
 
-(defun %defsetf (orig-access-form num-store-vars expander)
+;; Peform the work of expanding a SETF whose expander was defined by
+;; the "long form" of DEFSETF.
+;; FIXME: totally broken if there are keyword arguments. lp#1452947
+(defun %defsetf (orig-access-form environment num-store-vars expander)
   (declare (type function expander))
-  (let (subforms
-        subform-vars
-        subform-exprs
-        store-vars)
+  (collect ((temp-names) (temp-vals) (call-arguments))
     (dolist (subform (cdr orig-access-form))
-      (if (constantp subform)
-        (push subform subforms)
-        (let ((var (gensym)))
-          (push var subforms)
-          (push var subform-vars)
-          (push subform subform-exprs))))
-    (dotimes (i num-store-vars)
-      (push (gensym) store-vars))
-    (let ((r-subforms (nreverse subforms))
-          (r-subform-vars (nreverse subform-vars))
-          (r-subform-exprs (nreverse subform-exprs))
-          (r-store-vars (nreverse store-vars)))
-      (values r-subform-vars
-              r-subform-exprs
-              r-store-vars
-              (funcall expander (cons r-subforms r-store-vars))
-              `(,(car orig-access-form) ,@r-subforms)))))
+      (call-arguments (if (sb!xc:constantp subform environment)
+                          subform
+                          (let ((temp (gensym)))
+                            (temp-names temp)
+                            (temp-vals subform)
+                            temp))))
+    (let ((stores (make-gensym-list num-store-vars "NEW")))
+      (values (temp-names)
+              (temp-vals)
+              stores
+              (funcall expander (cons (call-arguments) stores)
+                       environment)
+              `(,(car orig-access-form) ,@(call-arguments))))))
 
 ;;;; DEFMACRO DEFINE-SETF-EXPANDER and various DEFINE-SETF-EXPANDERs
 

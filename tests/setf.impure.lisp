@@ -15,6 +15,22 @@
 
 (in-package :cl-user)
 
+;; Return T if two sexprs would be EQUAL supposing that any
+;; two symbols whose print names are STRING= are in fact EQ.
+;; This is a "poor man's unification algorithm"
+;; which would consider the trees equal when a bijection
+;; between the symbols exists that makes them actually equal.
+(defun equal-mod-gensyms (a b)
+  (labels ((recurse (a b)
+             (cond ((and (consp a) (consp b))
+                    (and (recurse (car a) (car b))
+                         (recurse (cdr a) (cdr b))))
+                   ((and (symbolp a) (symbolp b))
+                    (string= a b))
+                   (t ; strings, numbers
+                    (equal a b)))))
+    (recurse a b)))
+
 (defvar *foo* nil)
 (defun (setf foo) (bar)
     (setf *foo* bar))
@@ -211,8 +227,7 @@
                        (setq a new1) (setq b new2) (setq c new3)
                        (setq x new4) (setq y new5) (setq z new6)
                        nil))))
-      (assert (equal (read-from-string (write-to-string expansion :gensym nil))
-                     expect)))))
+      (assert (equal-mod-gensyms expansion expect)))))
 
 (with-test (:name :defsetf-syntax-errors)
   (dolist (test '((defsetf foo set-foo junk other-junk) ; would accept
@@ -260,16 +275,15 @@
                                        (a *foo-array*)
                                        (thing ref-it))
                        (setq thing x)))))
-    (let ((readback (read-from-string
-                     (write-to-string (expansions) :gensym nil))))
-      (assert (equal readback
-                     '((thing ref-it)
-                       (ref-it (aref a 0))
-                       (a *foo-array*)
-                       ((setf thing x)
-                        (let* ((a1 a))
-                          (multiple-value-bind (new0) x
-                            (funcall #'(setf aref) new0 a1 0))))))))))
+    (assert (equal-mod-gensyms
+             (expansions)
+             '((thing ref-it)
+               (ref-it (aref a 0))
+               (a *foo-array*)
+               ((setf thing x)
+                (let* ((a1 a))
+                  (multiple-value-bind (new0) x
+                    (funcall #'(setf aref) new0 a1 0)))))))))
 
 (with-test (:name :remf-basic-correctness)
   (flet ((try (indicator input expect)
@@ -310,5 +324,23 @@
     ;; testvar should be 4, not 3, because the read for INCF
     ;; occurs after doubling.
     (assert (eql testvar 4))))
+
+;; Simple DEFSETF test
+(with-test (:name :defsetf-subseq-constant-indices)
+  (assert (equal-mod-gensyms
+           (let ((*gensym-counter* 1))
+             (macroexpand-1 '(setf (subseq (foo) 4 6) "Hi")))
+           '(let* ((g1 (foo)))
+             (multiple-value-bind (new2) "Hi"
+               (progn (replace g1 new2 :start1 4 :end1 6) new2))))))
+
+;; Setup for CLHS hairy example (not working)
+(defvar *xy* (make-array '(10 10)))
+(defun xy (&key ((x x) 0) ((y y) 0)) (aref *xy* x y))
+(defun set-xy (new-value &key ((x x) 0) ((y y) 0))
+  (setf (aref *xy* x y) new-value))
+(defsetf xy (&key ((x x) 0) ((y y) 0)) (store)
+   `(set-xy ,store 'x ,x 'y ,y))
+;; FIXME: add tests
 
 ;;; success
