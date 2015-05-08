@@ -106,104 +106,74 @@
 
 ;;;; SETF itself
 
-;;; Except for atoms, we always call GET-SETF-EXPANSION, since it has
-;;; some non-trivial semantics. But when there is a setf inverse, and
-;;; G-S-E uses it, then we return a call to the inverse, rather than
-;;; returning a hairy LET form. This is probably important mainly as a
-;;; convenience in allowing the use of SETF inverses without the full
-;;; interpreter.
-(defmacro-mundanely setf (&whole form &rest args &environment env)
+;; Code shared by SETF, PSETF, SHIFTF attempting to minimize the expansion.
+;; This has significant speed+space benefit to a non-preprocessing interpreter,
+;; and to some degree a preprocessing interpreter.
+(labels ((gen-let* (bindings body-forms)
+           (cond ((not bindings) body-forms)
+                 (t
+                  (when (and (singleton-p body-forms)
+                             (listp (car body-forms))
+                             (eq (caar body-forms) 'let*))
+                    (let ((nested (cdar body-forms))) ; extract the nested LET*
+                      (setq bindings (append bindings (car nested))
+                            body-forms (cdr nested))))
+                  `((let* ,bindings ,@body-forms)))))
+         (gen-mv-bind (stores values body-forms)
+           (if (singleton-p stores)
+               (gen-let* `((,(car stores) ,values)) body-forms)
+               `((multiple-value-bind ,stores ,values ,@body-forms))))
+         ;; Instead of emitting (PROGN (VALUES (SETQ ...) (SETQ ...)) NIL)
+         ;; the SETQs can be lifted into the PROGN. This is unimportant
+         ;; for compiled code, but it helps the interpreter not needlessly
+         ;; collect arguments to call VALUES; and it's more human-readable.
+         (de-values-ify (forms)
+           (mapcan (lambda (form)
+                     (if (and (listp form) (eq (car form) 'values))
+                         (copy-list (cdr form))
+                         (list form)))
+                   forms)))
+
+  ;;; Except for atoms, we always call GET-SETF-EXPANSION, since it has
+  ;;; some non-trivial semantics. But when there is a setf inverse, and
+  ;;; G-S-E uses it, then we return a call to the inverse, rather than
+  ;;; returning a hairy LET form. This is probably important mainly as a
+  ;;; convenience in allowing the use of SETF inverses without the full
+  ;;; interpreter.
+  (defmacro-mundanely setf (&whole form &rest args &environment env)
   #!+sb-doc
   "Takes pairs of arguments like SETQ. The first is a place and the second
   is the value that is supposed to go into that place. Returns the last
   value. The place argument may be any of the access forms for which SETF
   knows a corresponding setting form."
-  (unless args
-    (return-from setf nil))
-  (destructuring-bind (place value-form . more) args
-    (when more
-      (return-from setf `(progn ,@(sb!c::explode-setq form 'error))))
-    ;; Macros without a SETF expander/inverse can be expanded now,
-    ;; for shorter output in the case where (M) is a macro invocation
-    ;; expanding to *A-VAR*, rather than deferring the macroexpansion
-    ;; to GET-SETF-EXPANSION which will introduce a needless gensym.
-    (loop
-       (when (and (listp place)
-                  (let ((op (car place)))
-                    (or (info :setf :expander op) (info :setf :inverse op))))
-         (return))
-       (multiple-value-bind (expansion macro-p) (%macroexpand-1 place env)
-         (cond (macro-p (setq place expansion)) ; iterate
-               ((symbolp place) (return-from setf `(setq ,place ,value-form)))
-               (t (return)))))
-    (multiple-value-bind (temps vals newval setter getter)
-        (sb!xc:get-setf-expansion place env)
-      (declare (ignore getter))
-      (let ((inverse (info :setf :inverse (car place))))
-        (if (and inverse (eq inverse (car setter)))
-            `(,inverse ,@(cdr place) ,value-form)
-            `(let* (,@(mapcar #'list temps vals))
-               (multiple-value-bind ,newval ,value-form ,setter)))))))
-
-;;;; various SETF-related macros
+    (unless args
+      (return-from setf nil))
+    (destructuring-bind (place value-form . more) args
+      (when more
+        (return-from setf `(progn ,@(sb!c::explode-setq form 'error))))
+      ;; Macros without a SETF expander/inverse can be expanded now,
+      ;; for shorter output in the case where (M) is a macro invocation
+      ;; expanding to *A-VAR*, rather than deferring the macroexpansion
+      ;; to GET-SETF-EXPANSION which will introduce a needless gensym.
+      (loop
+         (when (and (listp place)
+                    (let ((op (car place)))
+                      (or (info :setf :expander op) (info :setf :inverse op))))
+           (return))
+         (multiple-value-bind (expansion macro-p) (%macroexpand-1 place env)
+           (cond (macro-p (setq place expansion)) ; iterate
+                 ((symbolp place) (return-from setf `(setq ,place ,value-form)))
+                 (t (return)))))
+      (multiple-value-bind (temps vals newval setter)
+          (sb!xc:get-setf-expansion place env)
+        (let ((inverse (info :setf :inverse (car place))))
+          (if (and inverse (eq inverse (car setter)))
+              `(,inverse ,@(cdr place) ,value-form)
+              (car (gen-let* (mapcar #'list temps vals)
+                             (gen-mv-bind newval value-form
+                                          (list setter)))))))))
 
-;; Code shared by PSETQ, PSETF, SHIFTF attempting to minimize the expansion.
-;; This has significant speed+space benefit to a non-preprocessing interpreter,
-;; and to some degree a preprocessing interpreter.
-(labels
-    ((expand (args env operator single-op)
-       (cond ((singleton-p (cdr args)) ; commonest case probably
-              (return-from expand `(progn (,single-op ,@args) nil)))
-             ((not args)
-              (return-from expand nil)))
-       (collect ((let*-bindings) (mv-bindings) (setters))
-         (do ((a args (cddr a)))
-             ((endp a))
-           (when (endp (cdr a))
-             (error "Odd number of args to ~S." operator))
-           (let ((place (car a))
-                 (value-form (cadr a)))
-             (when (and (not (symbolp place)) (eq operator 'psetq))
-               (error 'simple-program-error
-                      :format-control "Place ~S in PSETQ is not a SYMBOL"
-                      :format-arguments (list place)))
-             (multiple-value-bind (temps vals stores setter)
-                 (sb!xc:get-setf-expansion place env)
-               (let*-bindings (mapcar #'list temps vals))
-               (mv-bindings (cons stores value-form))
-               (setters setter))))
-         (car (build (let*-bindings) (mv-bindings)
-                     (de-values-ify (setters))))))
-     ;; Instead of emitting (PROGN (VALUES (SETQ ...) (SETQ ...)) NIL)
-     ;; the SETQs can be lifted into the PROGN. This is an unimportant tweak
-     ;; for compiled code, but it helps the interpreter not needlessly collect
-     ;; arguments to call VALUES; and it's more human-readable.
-     (de-values-ify (forms)
-       (mapcan (lambda (form)
-                 (if (and (listp form) (eq (car form) 'values))
-                     (cdr form)
-                     (list form))) forms))
-     ;; The next three functions each return lists of forms to avoid having
-     ;; to specially recognize a PROGN as the recursion base case.
-     (build (let*-bindings mv-bindings setters)
-       (if let*-bindings
-           (gen-let* (car let*-bindings)
-                     (gen-mv-bind (caar mv-bindings) (cdar mv-bindings)
-                                  (build (cdr let*-bindings) (cdr mv-bindings)
-                                         setters)))
-           `(,@setters nil)))
-     (gen-let* (bindings body-forms)
-       (cond ((not bindings) body-forms)
-             (t
-              (when (and (singleton-p body-forms) (eq (caar body-forms) 'let*))
-                (let ((nested (cdar body-forms))) ; extract the nested LET*
-                  (setq bindings (append bindings (car nested))
-                        body-forms (cdr nested))))
-              `((let* ,bindings ,@body-forms)))))
-     (gen-mv-bind (stores values body-forms)
-       (if (singleton-p stores)
-           (gen-let* `((,(car stores) ,values)) body-forms)
-           `((multiple-value-bind ,stores ,values ,@body-forms)))))
+  ;; various SETF-related macros
 
   (defmacro-mundanely shiftf (&whole form &rest args &environment env)
   #!+sb-doc
@@ -238,6 +208,38 @@
                                  `(,@(de-values-ify (setters))
                                    (values ,@outputs)))))))))
 
+  (labels
+      ((expand (args env operator single-op)
+         (cond ((singleton-p (cdr args)) ; commonest case probably
+                (return-from expand `(progn (,single-op ,@args) nil)))
+               ((not args)
+                (return-from expand nil)))
+         (collect ((let*-bindings) (mv-bindings) (setters))
+           (do ((a args (cddr a)))
+               ((endp a))
+             (when (endp (cdr a))
+               (error "Odd number of args to ~S." operator))
+             (let ((place (car a))
+                   (value-form (cadr a)))
+               (when (and (not (symbolp place)) (eq operator 'psetq))
+                 (error 'simple-program-error
+                        :format-control "Place ~S in PSETQ is not a SYMBOL"
+                        :format-arguments (list place)))
+               (multiple-value-bind (temps vals stores setter)
+                   (sb!xc:get-setf-expansion place env)
+                 (let*-bindings (mapcar #'list temps vals))
+                 (mv-bindings (cons stores value-form))
+                 (setters setter))))
+           (car (build (let*-bindings) (mv-bindings)
+                       (de-values-ify (setters))))))
+       (build (let*-bindings mv-bindings setters)
+         (if let*-bindings
+             (gen-let* (car let*-bindings)
+                       (gen-mv-bind (caar mv-bindings) (cdar mv-bindings)
+                                    (build (cdr let*-bindings) (cdr mv-bindings)
+                                           setters)))
+             `(,@setters nil))))
+
   (defmacro-mundanely psetf (&rest pairs &environment env)
   #!+sb-doc
   "This is to SETF as PSETQ is to SETQ. Args are alternating place
@@ -252,7 +254,7 @@
    Set the variables to the values, like SETQ, except that assignments
    happen in parallel, i.e. no assignments take place until all the
    forms have been evaluated."
-    (expand pairs env 'psetq 'setq)))
+    (expand pairs env 'psetq 'setq))))
 
 ;;; FIXME: Compiling this definition of ROTATEF apparently blows away the
 ;;; definition in the cross-compiler itself, so that after that, any

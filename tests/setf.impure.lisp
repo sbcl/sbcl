@@ -82,6 +82,12 @@
       `(progn ,new ,local)
       `(progn ,new ,global)))
 
+;; Returning an atom is not illegal, though is strange.
+(defsetf test-defsetf-trick-3 () (new) new 'bork)
+(with-test (:name :setf-expander-returns-atom)
+  ;; Simply don't crash in SETF and we're good.
+  (macroexpand-1 '(setf (test-defsetf-trick-3) 'a)))
+
 (assert (eq :local (macrolet ((defsetf-env-trick ()))
                      (setf (test-defsetf-env-1) 13))))
 
@@ -281,9 +287,8 @@
                (ref-it (aref a 0))
                (a *foo-array*)
                ((setf thing x)
-                (let* ((a1 a))
-                  (multiple-value-bind (new0) x
-                    (funcall #'(setf aref) new0 a1 0)))))))))
+                (let* ((a1 a) (new0 x))
+                  (funcall #'(setf aref) new0 a1 0))))))))
 
 (with-test (:name :remf-basic-correctness)
   (flet ((try (indicator input expect)
@@ -330,9 +335,8 @@
   (assert (equal-mod-gensyms
            (let ((*gensym-counter* 1))
              (macroexpand-1 '(setf (subseq (foo) 4 6) "Hi")))
-           '(let* ((g1 (foo)))
-             (multiple-value-bind (new2) "Hi"
-               (progn (replace g1 new2 :start1 4 :end1 6) new2))))))
+           '(let* ((g1 (foo)) (new2 "Hi"))
+              (progn (replace g1 new2 :start1 4 :end1 6) new2)))))
 
 ;; Setup for CLHS hairy example (not working)
 (defvar *xy* (make-array '(10 10)))
