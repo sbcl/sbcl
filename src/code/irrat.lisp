@@ -22,7 +22,7 @@
 ;;; Lisp call, and saves number consing to boot.
 (eval-when (:compile-toplevel :execute)
 
-(sb!xc:defmacro def-math-rtn (name num-args)
+(sb!xc:defmacro def-math-rtn (name num-args &optional wrapper)
   (let ((function (symbolicate "%" (string-upcase name)))
         (args (loop for i below num-args
                     collect (intern (format nil "ARG~D" i)))))
@@ -30,7 +30,7 @@
        (declaim (inline ,function))
        (defun ,function ,args
          (alien-funcall
-          (extern-alien ,name
+          (extern-alien ,(format nil "~:[~;sb_~]~a" wrapper name)
                         (function double-float
                                   ,@(loop repeat num-args
                                           collect 'double-float)))
@@ -75,82 +75,25 @@
 #!-x86 (def-math-rtn "tan" 1)
 #!-x86 (def-math-rtn "atan" 1)
 #!-x86 (def-math-rtn "atan2" 2)
-#!-(and win32 x86)
-(progn
-  (def-math-rtn "acos" 1)
-  (def-math-rtn "asin" 1)
-  (def-math-rtn "cosh" 1)
-  (def-math-rtn "sinh" 1)
-  (def-math-rtn "tanh" 1)
-  #!-win32
-  (progn
-    (def-math-rtn "asinh" 1)
-    (def-math-rtn "acosh" 1)
-    (def-math-rtn "atanh" 1)))
-#!+win32
-(progn
-  #!-x86-64
-  (progn
-    (declaim (inline %asin))
-    (defun %asin (number)
-      (%atan (/ number (sqrt (- 1 (* number number))))))
-    (declaim (inline %acos))
-    (defun %acos (number)
-      (- (/ pi 2) (%asin number)))
-    (declaim (inline %cosh))
-    (defun %cosh (number)
-      (/ (+ (exp number) (exp (- number))) 2))
-    (declaim (inline %sinh))
-    (defun %sinh (number)
-      (/ (- (exp number) (exp (- number))) 2))
-    (declaim (inline %tanh))
-    (defun %tanh (number)
-      (/ (%sinh number) (%cosh number))))
-  (declaim (inline %asinh))
-  (defun %asinh (number)
-    (log (+ number (sqrt (+ (* number number) 1.0d0))) #.(exp 1.0d0)))
-  (declaim (inline %acosh))
-  (defun %acosh (number)
-    (log (+ number (sqrt (- (* number number) 1.0d0))) #.(exp 1.0d0)))
-  (declaim (inline %atanh))
-  (defun %atanh (number)
-    (let ((ratio (/ (+ 1 number) (- 1 number))))
-      ;; Were we effectively zero?
-      (if (= ratio -1.0d0)
-          0.0d0
-          (/ (log ratio #.(exp 1.0d0)) 2.0d0)))))
+
+(def-math-rtn "acos" 1 #!+win32 t)
+(def-math-rtn "asin" 1 #!+win32 t)
+(def-math-rtn "cosh" 1 #!+win32 t)
+(def-math-rtn "sinh" 1 #!+win32 t)
+(def-math-rtn "tanh" 1 #!+win32 t)
+(def-math-rtn "asinh" 1 #!+win32 t)
+(def-math-rtn "acosh" 1 #!+win32 t)
+(def-math-rtn "atanh" 1 #!+win32 t)
 
 ;;; exponential and logarithmic
+(def-math-rtn "hypot" 2 #!+win32 t)
 #!-x86 (def-math-rtn "exp" 1)
 #!-x86 (def-math-rtn "log" 1)
 #!-x86 (def-math-rtn "log10" 1)
-#!-(and win32 x86) (def-math-rtn "pow" 2)
+(def-math-rtn "pow" 2)
 #!-(or x86 x86-64 arm-vfp) (def-math-rtn "sqrt" 1)
-#!-win32 (def-math-rtn "hypot" 2)
 #!-x86 (def-math-rtn "log1p" 1)
 
-#!+win32
-(progn
-  ;; This is written in a peculiar way to avoid overflow. Note that in
-  ;; sqrt(x^2 + y^2), either square or the sum can overflow.
-  ;;
-  ;; Factoring x^2 out of sqrt(x^2 + y^2) gives us the expression
-  ;; |x|sqrt(1 + (y/x)^2), which, assuming |x| >= |y|, can only overflow
-  ;; if |x| is sufficiently large.
-  ;;
-  ;; The ZEROP test suffices (y is non-negative) to guard against
-  ;; divisions by zero: x >= y > 0.
-  (declaim (inline %hypot))
-  (defun %hypot (x y)
-    (declare (type double-float x y))
-    (let ((x (abs x))
-          (y (abs y)))
-      (when (> y x)
-        (rotatef x y))
-      (if (zerop y)
-          x
-          (let ((y/x (/ y x)))
-            (* x (sqrt (1+ (* y/x y/x)))))))))
 
 ;;;; power functions
 

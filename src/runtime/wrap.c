@@ -48,6 +48,7 @@
 #if defined(LISP_FEATURE_WIN32)
 #define WIN32_LEAN_AND_MEAN
 #include <errno.h>
+#include <math.h>
 #endif
 
 #include "runtime.h"
@@ -569,4 +570,22 @@ int sb_utimes(char *path, struct timeval times[2])
 {
     return utimes(path, times);
 }
-#endif /* !LISP_FEATURE_WIN32 */
+#else /* !LISP_FEATURE_WIN32 */
+#define SB_TRIG_WRAPPER(name) \
+    double sb_##name (double x) {               \
+        return name(x);                         \
+    }
+SB_TRIG_WRAPPER(acos)
+SB_TRIG_WRAPPER(asin)
+SB_TRIG_WRAPPER(cosh)
+SB_TRIG_WRAPPER(sinh)
+SB_TRIG_WRAPPER(tanh)
+SB_TRIG_WRAPPER(asinh)
+SB_TRIG_WRAPPER(acosh)
+SB_TRIG_WRAPPER(atanh)
+
+double sb_hypot (double x, double y) {
+    return hypot(x, y);
+}
+
+#endif
