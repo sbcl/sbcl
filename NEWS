@@ -1,5 +1,6 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 changes relative to sbcl-1.2.11:
+  * optimization: better MAP and MAP-INTO on known vector result types.
   * bug fix: Read/modify/write macros accessing a place which is a
     composition of CAR+CDR operations, such as (SHIFTF (CADR X) (ELT V 0)),
     do not access subforms more than once. (lp#1450968)

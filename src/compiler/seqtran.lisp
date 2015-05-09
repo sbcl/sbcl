@@ -315,35 +315,55 @@
                         (vector * &rest *)
                         * :node node)
   "open code"
-  (let ((seqs-names (make-gensym-list (length seqs))))
-    `(lambda (result fun ,@seqs-names)
-       ,(if (and (policy node (> speed space))
-                 (not (csubtypep (lvar-type result)
-                                 (specifier-type '(simple-array * 1)))))
-            (let ((data  (gensym "DATA"))
-                  (start (gensym "START"))
-                  (end   (gensym "END")))
-              `(with-array-data ((,data result)
-                                 (,start)
-                                 (,end))
-                 (declare (ignore ,end))
-                 ,(build-sequence-iterator
-                   seqs seqs-names
-                   :result '(when (array-has-fill-pointer-p result)
-                             (setf (fill-pointer result) index))
-                   :into 'result
-                   :body `(locally (declare (optimize (insert-array-bounds-checks 0)))
-                            (setf (aref ,data (truly-the index (+ index ,start)))
-                                  funcall-result))
-                   :fast t)))
-            (build-sequence-iterator
-             seqs seqs-names
-             :result '(when (array-has-fill-pointer-p result)
-                       (setf (fill-pointer result) index))
-             :into 'result
-             :body '(locally (declare (optimize (insert-array-bounds-checks 0)))
-                     (setf (aref result index) funcall-result))))
-       result)))
+  (let* ((seqs-names (make-gensym-list (length seqs)))
+         (result-type (lvar-type result))
+         (non-complex-vector-type-p (csubtypep result-type
+                                               (specifier-type '(simple-array * 1)))))
+    (catch-give-up-ir1-transform
+        `(lambda (result fun ,@seqs-names)
+           ,(if (and (policy node (> speed space))
+                     (not non-complex-vector-type-p))
+                (let ((data  (gensym "DATA"))
+                      (start (gensym "START"))
+                      (end   (gensym "END")))
+                  `(with-array-data ((,data result)
+                                     (,start)
+                                     (,end))
+                     (declare (ignore ,end))
+                     ,(build-sequence-iterator
+                       seqs seqs-names
+                       :result '(when (array-has-fill-pointer-p result)
+                                 (setf (fill-pointer result) index))
+                       :into 'result
+                       :body `(locally (declare (optimize (insert-array-bounds-checks 0)))
+                                (setf (aref ,data (truly-the index (+ index ,start)))
+                                      funcall-result))
+                       :fast t)))
+                (build-sequence-iterator
+                 seqs seqs-names
+                 :result '(when (array-has-fill-pointer-p result)
+                           (setf (fill-pointer result) index))
+                 :into 'result
+                 :body '(locally (declare (optimize (insert-array-bounds-checks 0)))
+                         (setf (aref result index) funcall-result))))
+           result)
+      (cond #-sb-xc-host
+            ;; %%vector-map-into-funs%% is not defined in xc
+            ;; if something needs to be faster in the compiler, it
+            ;; should declare the input sequences instead.
+            ((and non-complex-vector-type-p
+                  (array-type-p result-type)
+                  (not (eq (array-type-specialized-element-type result-type)
+                           *wild-type*)))
+             (let ((saetp (find-saetp-by-ctype (array-type-specialized-element-type result-type))))
+               (unless saetp
+                 (give-up-ir1-transform "Uknown upgraded array element type of the result"))
+               (let ((mapper (%fun-name (svref sb!impl::%%vector-map-into-funs%%
+                                               (sb!vm:saetp-typecode saetp)))))
+                 `(progn (,mapper result 0 (length result) (%coerce-callable-to-fun fun) seqs)
+                         result))))
+            (t
+             (give-up))))))
 
 
 ;;; FIXME: once the confusion over doing transforms with known-complex

@@ -529,6 +529,15 @@
   :derive-type #'result-type-first-arg
   :destroyed-constant-args (nth-constant-nonempty-sequence-args 1))
 
+(defknown #.(loop for info across sb!vm:*specialized-array-element-type-properties*
+                  collect
+                  (intern (concatenate 'string "VECTOR-MAP-INTO/"
+                                       (string (sb!vm:saetp-primitive-type-name info)))
+                          :sb!impl))
+    (simple-array index index function list)
+    index
+    (call explicit-check))
+
 ;;; returns the result from the predicate...
 (defknown some (callable sequence &rest sequence) t
   (foldable unsafely-flushable call))

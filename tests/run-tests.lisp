@@ -1,6 +1,3 @@
-(handler-bind (#+win32 (warning #'muffle-warning))
-  (require :sb-posix))
-
 (load "test-util.lisp")
 
 (defpackage :run-tests
