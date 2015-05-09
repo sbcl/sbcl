@@ -1379,6 +1379,25 @@
               (pushnew reason (cdr assoc)))
             (throw 'give-up-ir1-transform :delayed)))))
 
+;;; Poor man's catching and resignalling
+;;; Implicit GIVE-UP macrolet will resignal the give-up "condition"
+(defmacro catch-give-up-ir1-transform (form &body gave-up-body)
+  (let ((block (gensym "BLOCK"))
+        (kind (gensym "KIND"))
+        (args (gensym "ARGS")))
+    `(block ,block
+       (multiple-value-bind (,kind ,args)
+           (catch 'give-up-ir1-transform
+             (return-from ,block ,form))
+         (ecase ,kind
+           (:delayed
+            (throw 'give-up-ir1-transform :delayed))
+           ((:failure :aborted)
+            (macrolet ((give-up ()
+                         `(throw 'give-up-ir1-transform (values ,',kind
+                                                                ,',args))))
+              ,@gave-up-body)))))))
+
 ;;; Clear any delayed transform with no reasons - these should have
 ;;; been tried in the last pass. Then remove the reason from the
 ;;; delayed transform reasons, and if any become empty then set

@@ -294,24 +294,21 @@
                      (null (values nil nil))
                      (list (values `(push funcall-result acc)
                                    `(nreverse acc))))
-                 (block nil
-                   (let ((gave-up
-                           (catch 'give-up-ir1-transform
-                             (return
-                               `(lambda (result-type fun ,@seq-args)
-                                  (declare (ignore result-type))
-                                  (let ((fun (%coerce-callable-to-fun fun))
-                                        (acc nil))
-                                    (declare (type list acc))
-                                    (declare (ignorable acc))
-                                    ,(build-sequence-iterator
-                                      all-seqs seq-args
-                                      :result result
-                                      :body push-dacc
-                                      :fast (policy node (> speed space)))))))))
-                     (if (and (null result-type-value) (null seqs))
-                         '(%map-for-effect-arity-1 fun seq)
-                         (throw 'give-up-ir1-transform gave-up)))))))))))
+                 (catch-give-up-ir1-transform
+                     `(lambda (result-type fun ,@seq-args)
+                        (declare (ignore result-type))
+                        (let ((fun (%coerce-callable-to-fun fun))
+                              (acc nil))
+                          (declare (type list acc))
+                          (declare (ignorable acc))
+                          ,(build-sequence-iterator
+                            all-seqs seq-args
+                            :result result
+                            :body push-dacc
+                            :fast (policy node (> speed space)))))
+                   (if (and (null result-type-value) (null seqs))
+                       '(%map-for-effect-arity-1 fun seq)
+                       (give-up))))))))))
 
 ;;; MAP-INTO
 (deftransform map-into ((result fun &rest seqs)
