@@ -15,22 +15,6 @@
 
 (in-package :cl-user)
 
-;; Return T if two sexprs would be EQUAL supposing that any
-;; two symbols whose print names are STRING= are in fact EQ.
-;; This is a "poor man's unification algorithm"
-;; which would consider the trees equal when a bijection
-;; between the symbols exists that makes them actually equal.
-(defun equal-mod-gensyms (a b)
-  (labels ((recurse (a b)
-             (cond ((and (consp a) (consp b))
-                    (and (recurse (car a) (car b))
-                         (recurse (cdr a) (cdr b))))
-                   ((and (symbolp a) (symbolp b))
-                    (string= a b))
-                   (t ; strings, numbers
-                    (equal a b)))))
-    (recurse a b)))
-
 (defvar *foo* nil)
 (defun (setf foo) (bar)
     (setf *foo* bar))
@@ -333,10 +317,9 @@
 ;; Simple DEFSETF test
 (with-test (:name :defsetf-subseq-constant-indices)
   (assert (equal-mod-gensyms
-           (let ((*gensym-counter* 1))
-             (macroexpand-1 '(setf (subseq (foo) 4 6) "Hi")))
-           '(let* ((g1 (foo)) (new2 "Hi"))
-              (progn (replace g1 new2 :start1 4 :end1 6) new2)))))
+           (macroexpand-1 '(setf (subseq (foo) 4 6) "Hi"))
+           '(let* ((subform (foo)) (newval "Hi"))
+              (progn (replace subform newval :start1 4 :end1 6) newval)))))
 
 ;; Setup for CLHS hairy example (not working)
 (defvar *xy* (make-array '(10 10)))
@@ -372,8 +355,7 @@
 (with-test (:name :define-modify-macro-arg-eval-order)
   ;; Uses a bunch of temps
   (assert (equal-mod-gensyms
-           (let ((*gensym-counter* 1))
-             (macroexpand-1 '(append2+ (car x) (f) (g) (h) (i) (j))))
+           (macroexpand-1 '(append2+ (car x) (f) (g) (h) (i) (j)))
            '(let* ((x1 x) (a (f)) (b (g)) (c (h)) (g3 (i)) (g4 (j)))
              (sb-kernel:%rplaca x1 (append (car x1) a b c g3 g4)))))
 
