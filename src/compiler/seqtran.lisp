@@ -244,29 +244,18 @@
 
 ;;; Try to compile %MAP efficiently when we can determine sequence
 ;;; argument types at compile time.
-;;;
-;;; Note: This transform was written to allow open coding of
-;;; quantifiers by expressing them in terms of (MAP NIL ..). For
-;;; non-NIL values of RESULT-TYPE, it's still useful, but not
-;;; necessarily as efficient as possible. In particular, it will be
-;;; inefficient when RESULT-TYPE is a SIMPLE-ARRAY with specialized
-;;; numeric element types. It should be straightforward to make it
-;;; handle that case more efficiently, but it's left as an exercise to
-;;; the reader, because the code is complicated enough already and I
-;;; don't happen to need that functionality right now. -- WHN 20000410
 (deftransform %map ((result-type fun seq &rest seqs) * *
                     :node node :policy (>= speed space))
   "open code"
   (unless (constant-lvar-p result-type)
     (give-up-ir1-transform "RESULT-TYPE argument not constant"))
-  (labels ( ;; 1-valued SUBTYPEP, fails unless second value of SUBTYPEP is true
-           (fn-1subtypep (fn x y)
-             (multiple-value-bind (subtype-p valid-p) (funcall fn x y)
-               (if valid-p
-                   subtype-p
-                   (give-up-ir1-transform
-                    "can't analyze sequence type relationship"))))
-           (1subtypep (x y) (fn-1subtypep #'sb!xc:subtypep x y)))
+  (flet ( ;; 1-valued SUBTYPEP, fails unless second value of SUBTYPEP is true
+         (1subtypep (x y)
+           (multiple-value-bind (subtype-p valid-p) (sb!xc:subtypep x y)
+             (if valid-p
+                 subtype-p
+                 (give-up-ir1-transform
+                  "can't analyze sequence type relationship")))))
     (let* ((result-type-value (lvar-value result-type))
            (result-supertype (cond ((null result-type-value) 'null)
                                    ((1subtypep result-type-value 'vector)
@@ -276,22 +265,27 @@
                                    (t
                                     (give-up-ir1-transform
                                      "result type unsuitable")))))
-      (cond ((and result-type-value (null seqs))
+      (cond ((and (eq result-supertype 'list) (null seqs))
              ;; The consing arity-1 cases can be implemented
              ;; reasonably efficiently as function calls, and the cost
              ;; of consing should be significantly larger than
              ;; function call overhead, so we always compile these
              ;; cases as full calls regardless of speed-versus-space
              ;; optimization policy.
-             (cond ((subtypep result-type-value 'list)
-                    '(%map-to-list-arity-1 fun seq))
-                   ( ;; (This one can be inefficient due to COERCE, but
-                    ;; the current open-coded implementation has the
-                    ;; same problem.)
-                    (subtypep result-type-value 'vector)
-                    `(coerce (%map-to-simple-vector-arity-1 fun seq)
-                             ',result-type-value))
-                   (t (bug "impossible (?) sequence type"))))
+             '(%map-to-list-arity-1 fun seq))
+            ;; (We use the same idiom, of returning a LAMBDA from
+            ;; DEFTRANSFORM, as is used in the DEFTRANSFORMs for
+            ;; FUNCALL and ALIEN-FUNCALL, and for the same
+            ;; reason: we need to get the runtime values of each
+            ;; of the &REST vars.)
+            ((eq result-supertype 'vector)
+             (let* ((all-seqs (cons seq seqs))
+                    (seq-args (make-gensym-list (length all-seqs))))
+               `(lambda (result-type fun ,@seq-args)
+                  (map-into (make-sequence result-type
+                                           (min ,@(loop for arg in seq-args
+                                                        collect `(length ,arg))))
+                            fun ,@seq-args))))
             (t
              (let* ((all-seqs (cons seq seqs))
                     (seq-args (make-gensym-list (length all-seqs))))
@@ -299,15 +293,7 @@
                    (ecase result-supertype
                      (null (values nil nil))
                      (list (values `(push funcall-result acc)
-                                   `(nreverse acc)))
-                     (vector (values `(push funcall-result acc)
-                                     `(coerce (nreverse acc)
-                                              ',result-type-value))))
-                 ;; (We use the same idiom, of returning a LAMBDA from
-                 ;; DEFTRANSFORM, as is used in the DEFTRANSFORMs for
-                 ;; FUNCALL and ALIEN-FUNCALL, and for the same
-                 ;; reason: we need to get the runtime values of each
-                 ;; of the &REST vars.)
+                                   `(nreverse acc))))
                  (block nil
                    (let ((gave-up
                            (catch 'give-up-ir1-transform
@@ -332,10 +318,7 @@
                         (vector * &rest *)
                         * :node node)
   "open code"
-  (let ((seqs-names (mapcar (lambda (x)
-                              (declare (ignore x))
-                              (gensym))
-                            seqs)))
+  (let ((seqs-names (make-gensym-list (length seqs))))
     `(lambda (result fun ,@seqs-names)
        ,(if (and (policy node (> speed space))
                  (not (csubtypep (lvar-type result)
@@ -353,8 +336,8 @@
                              (setf (fill-pointer result) index))
                    :into 'result
                    :body `(locally (declare (optimize (insert-array-bounds-checks 0)))
-                           (setf (aref ,data (truly-the index (+ index ,start)))
-                                 funcall-result))
+                            (setf (aref ,data (truly-the index (+ index ,start)))
+                                  funcall-result))
                    :fast t)))
             (build-sequence-iterator
              seqs seqs-names
