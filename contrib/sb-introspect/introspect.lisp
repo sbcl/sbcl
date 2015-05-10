@@ -295,9 +295,10 @@ If an unsupported TYPE is requested, the function will return NIL.
         (let ((expander (or (sb-int:info :setf :inverse name)
                             (sb-int:info :setf :expander name))))
           (when expander
-            (find-definition-source (if (symbolp expander)
-                                        (symbol-function expander)
-                                        expander)))))
+            (find-definition-source
+             (cond ((symbolp expander) (symbol-function expander))
+                   ((listp expander) (cdr expander))
+                   (t expander))))))
        ((:structure)
         (let ((class (get-class name)))
           (if class

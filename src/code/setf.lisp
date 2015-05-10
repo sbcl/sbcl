@@ -51,19 +51,15 @@
                       (return t)))))
            (expand-or-get-setf-inverse form environment))
          ((info :setf :inverse (car form))
-          (make-setf-quintuple-simple form environment nil `(,it)))
+          (make-simple-setf-quintuple form environment nil `(,it)))
          ((info :setf :expander (car form))
+          (if (consp it)
+              (make-setf-quintuple form environment (car it) (cdr it))
            ;; KLUDGE: It may seem as though this should go through
            ;; *MACROEXPAND-HOOK*, but the ANSI spec seems fairly explicit
            ;; that *MACROEXPAND-HOOK* is a hook for MACROEXPAND-1, not
            ;; for macroexpansion in general. -- WHN 19991128
-           (funcall it form
-                    ;; As near as I can tell from the ANSI spec,
-                    ;; macroexpanders have a right to expect an actual
-                    ;; lexical environment, not just a NIL which is to
-                    ;; be interpreted as a null lexical environment.
-                    ;; -- WHN 19991128
-                    (coerce-to-lexenv environment)))
+              (funcall it form environment)))
          (t
           (expand-or-get-setf-inverse form environment))))
 
@@ -76,7 +72,7 @@
       (%macroexpand-1 form environment)
     (if expanded
         (sb!xc:get-setf-expansion expansion environment)
-        (make-setf-quintuple-simple form environment
+        (make-simple-setf-quintuple form environment
                                     t `(funcall #'(setf ,(car form)))))))
 
 ;;;; SETF itself
@@ -433,7 +429,7 @@
                   (when doc
                     (setf (fdocumentation name 'setf) doc))
                   name)))
-  (defun assign-setf-macro (name expander expander-lambda-list inverse doc)
+  (defun %defsetf (name expander expander-lambda-list inverse doc)
     #+sb-xc-host (declare (ignore expander-lambda-list))
     (with-single-package-locked-error
         (:symbol name "defining a setf-expander for ~A"))
@@ -461,8 +457,7 @@
            (style-warn "defining setf macro for ~S when ~S is also defined"
                        name setf-fn-name)))))
     (assign-it))
-  (defun !quietly-assign-setf-macro ; For cold-init
-      (name expander expander-lambda-list inverse doc)
+  (defun !quietly-defsetf (name expander expander-lambda-list inverse doc)
     (assign-it))))
 
 (def!macro sb!xc:defsetf (access-fn &rest rest)
@@ -475,31 +470,32 @@
   (typecase rest
     ((cons (and symbol (not null)) (or null (cons string null)))
      `(eval-when (:load-toplevel :compile-toplevel :execute)
-        (assign-setf-macro ',access-fn nil nil ',(car rest) ',(cadr rest))))
+        (%defsetf ',access-fn nil nil ',(car rest) ',(cadr rest))))
     ((cons list (cons list))
      (destructuring-bind (lambda-list (&rest store-variables) &body body) rest
-       (with-unique-names (whole access-form environment)
+       (multiple-value-bind (forms decls doc) (parse-body body)
+         (multiple-value-bind (store-var-decl other-decls)
+             (extract-var-decls decls store-variables)
+           (let ((form (copy-symbol 'form))
+                 (environment (copy-symbol 'env)))
          ;; FIXME: a defsetf lambda-list is *NOT* a macro lambda list!
          ;; Suppose that (MY-ACC ((X))) is a macro, not a function,
          ;; and you attempt to destructure the X. It parses ok by accident,
          ;; but when you attempt to bind to subforms of MY-ACC,
          ;; you find that ((X)) is not a well-formed sexpr.
-         (multiple-value-bind (body local-decs doc)
-             ;; This technique of parsing the stores as part of the
-             ;; the function's lambda list is loathsome.
-             (parse-defmacro `(,lambda-list ,@store-variables)
-                             whole body access-fn 'defsetf
-                             :environment environment
-                             :anonymousp t)
-           `(eval-when (:compile-toplevel :load-toplevel :execute)
-              (assign-setf-macro
-               ',access-fn
-               (lambda (,access-form ,environment)
-                 (make-setf-quintuple ,access-form ,environment
-                                      ,(length store-variables)
-                                      (lambda (,whole ,environment)
-                                        ,@local-decs ,body)))
-               ',lambda-list nil ',doc))))))
+             (multiple-value-bind (body env-decl)
+                 (parse-defmacro lambda-list form `(,@other-decls ,@forms)
+                                 access-fn 'defsetf
+                                 :environment environment
+                                 :anonymousp t)
+               `(eval-when (:compile-toplevel :load-toplevel :execute)
+                  (%defsetf ',access-fn
+                            (cons ,(length store-variables)
+                                  (lambda (,form ,environment ,@store-variables)
+                                    ,@env-decl ; possibly (IGNORE ENVIRONMENT)
+                                    ,@(if store-var-decl (list store-var-decl))
+                                    ,body))
+                            ',lambda-list nil ',doc))))))))
     (t
      (error "Ill-formed DEFSETF for ~S" access-fn))))
 
@@ -522,7 +518,7 @@
   ;; Return the 5-part expansion of a SETF form that calls #'(SETF Fn)
   ;; when SETF-FUN-P is non-nil, or the short form of a DEFSETF, when NIL.
   ;; INVERSE should be (FUNCALL #'(SETF x)) or (SETTER-FN) respectively.
-  (defun make-setf-quintuple-simple (access-form environment setf-fun-p inverse)
+  (defun make-simple-setf-quintuple (access-form environment setf-fun-p inverse)
     (multiple-value-bind (temp-vars temp-vals args)
         (collect-call-temps (cdr access-form) environment nil)
       (let ((store (sb!xc:gensym "NEW")))
@@ -539,7 +535,7 @@
         (collect-call-temps (cdr access-form) environment nil)
       (let ((stores (make-gensym-list num-store-vars "NEW")))
         (values temp-vars temp-vals stores
-                (funcall expander (cons call-arguments stores) environment)
+                (apply expander call-arguments environment stores)
                 `(,(car access-form) ,@call-arguments)))))
 
   ;; Expand a macro defined by DEFINE-MODIFY-MACRO.
@@ -591,13 +587,9 @@
                         'sb!xc:define-setf-expander
                         :environment environment)
       `(eval-when (:compile-toplevel :load-toplevel :execute)
-         (assign-setf-macro ',access-fn
-                            (lambda (,whole ,environment)
-                              ,@local-decs
-                              ,body)
-                            ',lambda-list
-                            nil
-                            ',doc)))))
+         (%defsetf ',access-fn
+                   (lambda (,whole ,environment) ,@local-decs ,body)
+                   ',lambda-list nil ',doc)))))
 
 (sb!xc:define-setf-expander values (&rest places &environment env)
   (declare (type sb!c::lexenv env))

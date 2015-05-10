@@ -145,10 +145,7 @@
                   (defmacro-error (format nil "required argument after ~A"
                                           restp)
                       context name))
-                (when (process-sublist var "REQUIRED-" `(car ,path))
-                  ;; Note &ENVIRONMENT from DEFSETF sublist
-                  (aver (eq context 'defsetf))
-                  (setf env-arg-used t))
+                (process-sublist var "REQUIRED-" `(car ,path))
                 (setq path `(cdr ,path)
                       minimum (1+ minimum)
                       maximum (1+ maximum)))
@@ -203,9 +200,7 @@
                (&environment
                 (cond (env-illegal
                        (error "&ENVIRONMENT is not valid with ~S." context))
-                      ;; DEFSETF explicitly allows &ENVIRONMENT, and we get
-                      ;; it here in a sublist.
-                      ((and sublist (neq context 'defsetf))
+                      (sublist
                        (error "&ENVIRONMENT is only valid at top level of ~
                              lambda-list."))
                       (env-arg-used

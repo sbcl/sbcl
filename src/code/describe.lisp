@@ -698,6 +698,8 @@
                  (describe-documentation name2 'setf stream))
                (terpri stream))
               (expander
+               (when (listp expander)
+                 (setq expander (cdr expander)))
                (pprint-logical-block (stream nil)
                  (format stream "~&~A has a complex setf-expansion:"
                          name)

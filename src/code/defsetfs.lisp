@@ -93,10 +93,9 @@
                        (%cxr-setf-expander
                         '(,(symbolicate "C" (subseq string 2)))
                         ',(symbolicate "%RPLAC" (subseq string 1 2)))))
-                  (!quietly-assign-setf-macro ',name closure '(list) nil nil)
+                  (!quietly-defsetf ',name closure '(list) nil nil)
                   ,@(when alias
-                      `((!quietly-assign-setf-macro ',alias closure '(list)
-                                                    nil nil)))))))
+                      `((!quietly-defsetf ',alias closure '(list) nil nil)))))))
   ;; Rather than expand into a DEFINE-SETF-EXPANDER, install a single closure
   ;; as the expander and capture just enough to distinguish the variations.
   (def caar)
@@ -132,9 +131,8 @@
 #-sb-xc-host
 (macrolet ((def (name subform)
              `(eval-when (:compile-toplevel :load-toplevel :execute)
-                (!quietly-assign-setf-macro
-                 ',name (%cxr-setf-expander ',subform '%rplaca)
-                 '(list) nil nil))))
+                (!quietly-defsetf ',name (%cxr-setf-expander ',subform '%rplaca)
+                                  '(list) nil nil))))
   (def fifth   (nthcdr 4)) ; or CDDDDR
   (def sixth   (nthcdr 5))
   (def seventh (nthcdr 6))
@@ -150,8 +148,8 @@
 ;; bound to a temporary variable.
 #-sb-xc-host
 (eval-when (:compile-toplevel :load-toplevel :execute)
-  (!quietly-assign-setf-macro 'nth (%cxr-setf-expander 'nthcdr '%rplaca)
-                              '(n list) nil nil))
+  (!quietly-defsetf 'nth (%cxr-setf-expander 'nthcdr '%rplaca) '(n list)
+                    nil nil))
 
 #-sb-xc-host (defsetf elt %setelt)
 #-sb-xc-host (defsetf row-major-aref %set-row-major-aref)

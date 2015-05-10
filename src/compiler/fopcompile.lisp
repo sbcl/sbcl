@@ -74,7 +74,7 @@
                   ;; carefully controlled, and recursion on fopcompilable-p
                   ;; would say "yes".
                   (or (member function '(sb!impl::%defun
-                                         sb!impl::assign-setf-macro
+                                         sb!impl::%defsetf
                                          sb!kernel::%defstruct))
                       (and (symbolp function) ; no ((lambda ...) ...)
                            (not (null (get function :sb-cold-funcall-handler))))

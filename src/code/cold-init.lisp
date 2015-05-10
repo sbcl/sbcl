@@ -197,7 +197,7 @@
   (show-and-call sb!kernel::!set-up-structure-object-class)
 
   (dolist (x (nreverse *!reversed-cold-setf-macros*))
-    (apply #'!quietly-assign-setf-macro x))
+    (apply #'!quietly-defsetf x))
   (dolist (x (nreverse *!reversed-cold-defuns*))
     (destructuring-bind (name &optional docstring . inline-expansion) x
       (!%quietly-defun name docstring inline-expansion)))

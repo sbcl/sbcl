@@ -2483,6 +2483,8 @@ core and return a descriptor to it."
             ;; Special form #'F fopcompiles into `(FDEFINITION ,f)
             (aver (and (singleton-p args) (symbolp (car args))))
             (target-symbol-function (car args)))
+           (cons
+            (cold-cons (first args) (second args)))
            (t
             (error "Can't FUNCALL ~S in cold load" fun)))
           (let ((counter *load-time-value-counter*))
@@ -2502,7 +2504,7 @@ core and return a descriptor to it."
              (push args *known-structure-classoids*)
              (cold-push (apply #'cold-list (cold-intern 'defstruct) args)
                         *current-reversed-cold-toplevels*))
-            (sb!impl::assign-setf-macro
+            (sb!impl::%defsetf
              (target-push (host-constant-to-core args nil)
                           '*!reversed-cold-setf-macros*))
             (set
