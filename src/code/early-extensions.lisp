@@ -1334,6 +1334,8 @@
 ;; those which pertain to the variables and those which don't.
 (defun extract-var-decls (decls symbols)
   (labels ((applies-to-variables (decl)
+             ;; If DECL is a variable-affecting declaration, then return
+             ;; the subset of SYMBOLS to which DECL applies.
              (let ((id (car decl)))
                (remove-if (lambda (x) (not (memq x symbols)))
                           (cond ((eq id 'type)
@@ -1345,17 +1347,18 @@
                                      (info :type :kind id))
                                  (cdr decl))))))
            (partition (spec)
-             (let ((variables (applies-to-variables spec)))
-               (cond ((not variables)
-                      (values nil spec))
-                     ((eq (car spec) 'type)
-                      (let ((more (set-difference (cddr spec) variables)))
-                        (values `(type ,(cadr spec) ,@variables)
-                                (if more `(type ,(cadr spec) ,@more)))))
-                     (t
-                      (let ((more (set-difference (cdr spec) variables)))
-                        (values `(,(car spec) ,@variables)
-                                (if more `(,(car spec) ,@more)))))))))
+             ;; If SPEC is a declaration affecting some variables in SYMBOLS
+             ;; and some not, split it into two mutually exclusive declarations.
+             (acond ((applies-to-variables spec)
+                     (multiple-value-bind (decl-head all-symbols)
+                         (if (eq (car spec) 'type)
+                             (values `(type ,(cadr spec)) (cddr spec))
+                             (values `(,(car spec)) (cdr spec)))
+                       (let ((more (set-difference all-symbols it)))
+                         (values `(,@decl-head ,@it)
+                                 (and more `(,@decl-head ,@more))))))
+                    (t
+                     (values nil spec)))))
     ;; This loop is less inefficient than theoretically possible,
     ;; reconstructing the tree even if no need,
     ;; but it's just a macroexpander, so... fine.
@@ -1380,11 +1383,7 @@
 ;;; Any name in a list of names may be NIL to ignore the respective value.
 ;;; If NAMES itself is nil, the initial-value form is evaluated only for effect.
 ;;;
-;;; Clauses with no flags and one binding per clause are equivalent to LET*.
-;;; We reduce to LET* when possible so that the body can contain declarations
-;;; without having to split out declarations which affect variables and insert
-;;; them into the appropriate places. This qualifies as an extreme KLUDGE,
-;;; but has desirable behavior of allowing declarations in the innermost form.
+;;; Clauses with no flag and one binding are equivalent to LET.
 ;;;
 ;;; Caution: don't use declarations of the form (<non-builtin-type-id> <var>)
 ;;; before the INFO database is set up in building the cross-compiler,
@@ -1411,17 +1410,23 @@
                  (setq names (mapcar (lambda (name)
                                        (or name (car (push (gensym) ignores))))
                                      names))))
-              (multiple-value-bind (binding-decls rest-decls)
+              (multiple-value-bind (binding-decls other-decls)
                   ;; If no more bindings, and no (WHEN ...) before the FORMS,
                   ;; then don't bother parsing decls.
                   (if (or (cdr bindings) flag)
                       (extract-var-decls decls
                                          (filter-names names (cdr bindings)))
                       (values nil decls))
-                (let ((continue (acond ((cdr bindings) (recurse it rest-decls))
-                                       (t (append decls forms)))))
-                  `((multiple-value-bind ,names ,value-form
+                (multiple-value-bind (other-decls continue)
+                    (acond ((cdr bindings)
+                            (values nil (recurse it other-decls)))
+                           (t
+                            (values other-decls forms)))
+                  `((,@(if (singleton-p names)
+                           `(let ((,(car names) ,value-form)))
+                           `(multiple-value-bind ,names ,value-form))
                       ,@(decl-expr binding-decls ignores)
+                      ,@other-decls
                       ,@(ecase flag
                           ((nil) continue)
                           ((:exit-if-null)
@@ -1438,7 +1443,8 @@
                                      (cons var (cdr binding)))))
                              bindings)
                 ,@(decl-expr nil ignores)
-                ,@body)))))
+                ,@decls
+                ,@forms)))))
        (filter-names (names more-bindings)
          ;; Return the subset of SYMBOLs that does not intersect any
          ;; symbol in MORE-BINDINGS. This makes declarations apply only

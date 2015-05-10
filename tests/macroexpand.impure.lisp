@@ -76,6 +76,7 @@
                      (write-to-string e :escape nil))))
   (:no-error () (error "Expected an error")))
 
+(with-test (:name :binding*-expander)
 (assert (equal (macroexpand-1
                 '(sb-int:binding* (((foo x bar zz) (f) :exit-if-null)
                                    ((baz y) (g bar)))
@@ -98,3 +99,56 @@
                  (LET* ((X (G Y X)))
                    (DECLARE (INTEGER X))
                    (FOO)))))
+
+;; The conversion of a trailing sequence of individual bindings
+;; into one LET* failed to remove declarations that were already
+;; injected pertinent to ealier bound variables.
+(assert (equal-mod-gensyms
+         (macroexpand-1
+          '(sb-int:binding* (((v1 v2 nil) (foo))
+                             (a (f v1))
+                             (b (g v2)))
+            (declare (special fred) (optimize speed)
+                     (optimize (debug 3)))
+            (declare (integer v1 v2))
+            (body)))
+         '(multiple-value-bind (v1 v2 #1=#:g538) (foo)
+           (declare (integer v1 v2))
+           (declare (ignorable #1#))
+           (let* ((a (f v1)) (b (g v2)))
+             (declare (special fred) (optimize speed) (optimize (debug 3)))
+             (body)))))
+
+;; :EXIT-IF-NULL was inserting declarations into the WHEN expression.
+(assert (equal-mod-gensyms
+         (macroexpand-1
+          '(sb-int:binding* (((a1 a2) (f))
+                             (b (g))
+                             ((c1 nil c2) (h) :exit-if-null)
+                             ((d1 d1) (f))
+                             (nil (e) :exit-if-null))
+            (declare (special fff c2) (integer d1))
+            (declare (fixnum a2)
+                     (special *x* *y* c1))
+            (declare (cons b) (type integer *y* a1))
+            (a-body-form)
+            (another-body-form)))
+         '(multiple-value-bind (a1 a2) (f)
+           (declare (fixnum a2) (type integer a1))
+           (let ((b (g)))
+             (declare (cons b))
+             (multiple-value-bind (c1 #2=#:dummy-1 c2) (h)
+               (declare (special c2) (special c1))
+               (declare (ignorable #2#))
+               (when c1
+                 (multiple-value-bind (d1 d1) (f)
+                   (declare (integer d1))
+                   (let ((#3=#:dummy-2 (e)))
+                     (declare (ignorable #3#))
+                     (declare (special fff))
+                     (declare (special *y* *x*))
+                     (declare (type integer *y*))
+                     (when #3#
+                       (a-body-form) (another-body-form))))))))))
+
+) ; end BINDING*-EXPANDER test
