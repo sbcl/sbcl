@@ -299,8 +299,6 @@
 
  ("src/code/module" :not-host)
 
- ("src/code/interr" :not-host)
-
  ("src/code/query"  :not-host)
 
  ("src/code/sort"  :not-host)
@@ -692,6 +690,7 @@
  ("src/code/target-thread"     :not-host)
 
  ;; defines SB!DI:DO-DEBUG-FUN-BLOCKS, needed by target-disassem.lisp
+ ("src/code/interr" :not-host)
  ("src/code/gc"     :not-host)
  ("src/code/purify" :not-host)
  ("src/code/debug-int" :not-host)

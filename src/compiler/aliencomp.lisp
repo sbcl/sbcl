@@ -611,6 +611,36 @@
     `(lambda (function ,@names)
        (alien-funcall (deref function) ,@names))))
 
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (defvar *saved-fp-and-pcs* nil)
+  ;; Can't use DECLAIM since always-bound is a non-standard declaration
+  (sb!xc:proclaim '(sb!ext:always-bound *saved-fp-and-pcs*)))
+
+#!+c-stack-is-control-stack
+(declaim (inline invoke-with-saved-fp-and-pc))
+#!+c-stack-is-control-stack
+(defun invoke-with-saved-fp-and-pc (fn)
+  (declare #-sb-xc-host (muffle-conditions compiler-note)
+           (optimize (speed 3)))
+  (let ((fp-and-pc (make-array 2 :element-type 'word)))
+    (declare (truly-dynamic-extent fp-and-pc))
+    (setf (aref fp-and-pc 0) (sb!kernel:get-lisp-obj-address
+                              (sb!kernel:%caller-frame))
+          (aref fp-and-pc 1) (sap-int (sb!kernel:%caller-pc)))
+    (let ((*saved-fp-and-pcs* (cons fp-and-pc *saved-fp-and-pcs*)))
+      (declare (truly-dynamic-extent *saved-fp-and-pcs*))
+      (funcall fn))))
+
+(defun find-saved-fp-and-pc (fp)
+  (dolist (x *saved-fp-and-pcs*)
+    (declare (type (simple-array word (2)) x))
+    (when (#!+stack-grows-downward-not-upward
+           sap>
+           #!-stack-grows-downward-not-upward
+           sap<
+           (int-sap (aref x 0)) fp)
+      (return (values (int-sap (aref x 0)) (int-sap (aref x 1)))))))
+
 (deftransform alien-funcall ((function &rest args) * * :node node :important t)
   (let ((type (lvar-type function)))
     (unless (alien-type-type-p type)

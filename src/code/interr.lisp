@@ -244,23 +244,20 @@
           (%primitive sb!c:current-binding-pointer)))
    (infinite-error-protect
     (/show0 "about to bind ALIEN-CONTEXT")
-    (let* ((alien-context (locally
-                              (declare (optimize (inhibit-warnings 3)))
-                            (sap-alien context (* os-context-t))))
+    (let* ((alien-context (sap-alien context (* os-context-t)))
            #!+c-stack-is-control-stack
            (fp-and-pc (make-array 2 :element-type 'word))
-           #!+c-stack-is-control-stack
-           (*saved-fp-and-pcs*
-             (cons fp-and-pc
-                   (when (boundp '*saved-fp-and-pcs*)
-                     *saved-fp-and-pcs*))))
+           #!+c-stack-is-control-stack)
       #!+c-stack-is-control-stack
-      (declare (truly-dynamic-extent *saved-fp-and-pcs*
-                                     fp-and-pc))
+      (declare (truly-dynamic-extent fp-and-pc))
       #!+c-stack-is-control-stack
       (setf (aref fp-and-pc 0) (sb!vm:context-register alien-context sb!vm::cfp-offset)
             (aref fp-and-pc 1) (sb!sys:sap-int (sb!vm:context-pc alien-context)))
-      (/show0 "about to bind ERROR-NUMBER and ARGUMENTS")
+      (let (#!+c-stack-is-control-stack
+            (*saved-fp-and-pcs* (cons fp-and-pc *saved-fp-and-pcs*)))
+        #!+c-stack-is-control-stack
+        (declare (truly-dynamic-extent *saved-fp-and-pcs*))
+       (/show0 "about to bind ERROR-NUMBER and ARGUMENTS"))
       (multiple-value-bind (error-number arguments)
           (sb!vm:internal-error-args alien-context)
         (with-interrupt-bindings
