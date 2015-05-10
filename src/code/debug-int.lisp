@@ -632,10 +632,7 @@
   (multiple-value-bind (saved-fp saved-pc)
       (sb!alien-internals:find-saved-fp-and-pc fp)
     (when saved-fp
-      (compute-calling-frame (descriptor-sap saved-fp)
-                             (descriptor-sap saved-pc)
-                             up-frame
-                             t))))
+      (compute-calling-frame saved-fp saved-pc up-frame t))))
 
 ;;; Return the frame immediately below FRAME on the stack; or when
 ;;; FRAME is the bottom of the stack, return NIL.
