@@ -21,7 +21,8 @@
 ;;; >>> DO NOT ADD A (WITH-TEST) TO THIS. <<< It must stay fopcompilable.
 (let ((a (progn)) ; lp# 1427050
       (b (setq))
-      (b (+ 1 2)))
+      (c (+ 1 2)))
+  (print c)
   (defvar *aaa* a)
   (defvar *bbb* b))
 
