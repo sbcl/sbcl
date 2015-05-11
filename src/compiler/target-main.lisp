@@ -269,21 +269,6 @@ not STYLE-WARNINGs occur during compilation, and NIL otherwise.
             '(values 0 -1))
         charpos)))
 
-(defun line/col-from-charpos
-    (stream &optional (charpos (sb!impl::ansi-stream-input-char-pos stream)))
-  (let* ((newlines (sb!impl::form-tracking-stream-newlines stream))
-         (index (position charpos newlines :test #'>= :from-end t)))
-    ;; Line numbers traditionally begin at 1, columns at 0.
-    (if index
-        ;; INDEX is 1 less than the number of newlines seen
-        ;; up to and including this startpos.
-        ;; e.g. index=0 => 1 newline seen => line=2
-        (cons (+ index 2)
-              ;; 1 char after the newline = column 0
-              (- charpos (aref newlines index) 1))
-        ;; zero newlines were seen
-        (cons 1 charpos))))
-
 ;; Find FORM's character position in FILE-INFO by looking for PATH-TO-FIND.
 ;; This is done by imparting tree structure to the annotations
 ;; more-or-less paralleling construction of the original sexpr.

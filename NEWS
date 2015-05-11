@@ -7,6 +7,8 @@ changes relative to sbcl-1.2.11:
   * bug fix: short form of DEFSETF no longer allows trailing junk.
   * bug fix: DEFINE-MODIFY-MACRO respects the provisions of CLHS 5.1.3
     regarding argument evaluation order. (lp#1452539)
+  * enhancement: The input stream for COMPILE-FILE implements
+    STREAM-LINE-COLUMN.
 
 changes in sbcl-1.2.11 relative to sbcl-1.2.10:
   * enhancement: SET-PPRINT-DISPATCH will warn when given an expression in

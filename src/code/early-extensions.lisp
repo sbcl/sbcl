@@ -1647,7 +1647,7 @@ to :INTERPRET, an interpreter will be used.")
 
 (defun stream-error-position-info (stream &optional position)
   (when (and (not position) (form-tracking-stream-p stream))
-    (let ((line/col (sb!c::line/col-from-charpos stream)))
+    (let ((line/col (line/col-from-charpos stream)))
       (return-from stream-error-position-info
         `((:line ,(car line/col))
           (:column ,(cdr line/col))

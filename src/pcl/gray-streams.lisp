@@ -328,6 +328,8 @@
   defined for this function."))
 
 (defgeneric stream-line-column (stream)
+  (:method ((stream sb-int:form-tracking-stream))
+    (cdr (sb-int:line/col-from-charpos stream)))
   #+sb-doc
   (:documentation
    "Return the column number where the next character

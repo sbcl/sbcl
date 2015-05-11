@@ -220,6 +220,21 @@
   ;; we can note the position at the first "good" character.
   (form-start-byte-pos)
   (form-start-char-pos))
+
+(defun line/col-from-charpos
+    (stream &optional (charpos (ansi-stream-input-char-pos stream)))
+  (let* ((newlines (form-tracking-stream-newlines stream))
+         (index (position charpos newlines :test #'>= :from-end t)))
+    ;; Line numbers traditionally begin at 1, columns at 0.
+    (if index
+        ;; INDEX is 1 less than the number of newlines seen
+        ;; up to and including this startpos.
+        ;; e.g. index=0 => 1 newline seen => line=2
+        (cons (+ index 2)
+              ;; 1 char after the newline = column 0
+              (- charpos (aref newlines index) 1))
+        ;; zero newlines were seen
+        (cons 1 charpos))))
 
 ;;;; CORE OUTPUT FUNCTIONS
 

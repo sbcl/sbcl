@@ -59,3 +59,17 @@
 (eval-when (:compile-toplevel)
   (let ((stream (sb-c::source-info-stream sb-c::*source-info*)))
     (assert (pathname stream))))
+
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (set-dispatch-macro-character
+   #\# #\@
+   (lambda (stream char arg)
+     (declare (ignore char arg) (optimize (speed 0)))
+     ;; return the column where the '#' was
+     `'(,(- (stream-line-column stream) 2)))))
+
+(defun foo-char-macro () (list #@
+                          #@))
+
+(with-test (:name :compile-file-stream-line-column)
+  (assert (equal (foo-char-macro) '((31) (26)))))
