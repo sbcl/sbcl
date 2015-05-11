@@ -45,21 +45,23 @@
             (setf (source-info-last-defn-source-loc source-info) new))
           new))))
 
+#+sb-xc-host
+(defun lpnify-namestring (untruename dir type)
+  (let ((src (position "src" dir :test #'string= :from-end t)))
+    (cond
+     ((and src (not (string= (car (last dir)) "output")))
+      (format nil "SYS:~{~:@(~A~);~}~:@(~A~).~:@(~A~)"
+              (subseq dir src) (pathname-name untruename) type))
+     (t (aver (string-equal (car (last dir)) "output"))
+        (aver (string-equal (pathname-name untruename) "stuff-groveled-from-headers"))
+        (format nil "SYS:OUTPUT;STUFF-GROVELED-FROM-HEADERS.~:@(~A~)" type)))))
+
 (defun make-file-info-namestring (name file-info)
   #+sb-xc-host (declare (ignore name))
   (let* ((untruename (file-info-untruename file-info))
          (dir (and untruename (pathname-directory untruename))))
     #+sb-xc-host
-    (let ((src (position "src" dir :test #'string=
-                         :from-end t)))
-      (cond
-        ((and src (not (string= (car (last dir)) "output")))
-         (format nil "SYS:~{~:@(~A~);~}~:@(~A~).LISP"
-                 (subseq dir src) (pathname-name untruename)))
-        (t (aver (string-equal (car (last dir)) "output"))
-           (aver (string-equal (pathname-name untruename) "stuff-groveled-from-headers"))
-           (aver (string-equal (pathname-type untruename) "lisp"))
-           "SYS:OUTPUT;STUFF-GROVELED-FROM-HEADERS.LISP")))
+    (lpnify-namestring untruename dir (pathname-type untruename))
     #-sb-xc-host
     (if (and dir (eq (first dir) :absolute))
         (namestring untruename)
