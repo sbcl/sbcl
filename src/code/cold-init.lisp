@@ -159,8 +159,6 @@
 
   ;; Must be done before any non-opencoded array references are made.
   (show-and-call !hairy-data-vector-reffer-init)
-  ;; Must be done for not-open-coded-for-known-types MAP-INTO to work.
-  (show-and-call !seq-cold-init)
 
   (show-and-call !character-database-cold-init)
   (show-and-call !character-name-database-cold-init)

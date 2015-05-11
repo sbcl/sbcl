@@ -41,7 +41,13 @@
                always (and (symbolp name)
                            (member (info :variable :kind name)
                                    '(:special :global))
-                           (fopcompilable-p value)))))
+                           (fopcompilable-p value))))
+       (cold-svset-fopcompilable-p (args)
+         (destructuring-bind (thing index value) args
+           (and (symbolp thing)
+                (integerp index)
+                (eq (info :variable :kind thing) :global)
+                (typep value '(cons (eql function) (cons symbol null)))))))
  (defun fopcompilable-p (form &optional (expand t))
   ;; We'd like to be able to handle
   ;;   -- simple funcalls, nested recursively, e.g.
@@ -78,6 +84,10 @@
                                          sb!kernel::%defstruct))
                       (and (symbolp function) ; no ((lambda ...) ...)
                            (not (null (get function :sb-cold-funcall-handler))))
+                      (and (eq function 'setf)
+                           (fopcompilable-p (%macroexpand form *lexenv*)))
+                      (and (eq function 'sb!kernel:%svset)
+                           (cold-svset-fopcompilable-p (cdr form)))
                       (and (eq function 'setq)
                            (setq-fopcompilable-p (cdr form))))))))
   #-sb-xc-host

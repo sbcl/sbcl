@@ -921,7 +921,10 @@ core and return a descriptor to it."
                       (symbol (cold-intern symbol-or-symbol-des)))))
     (write-wordindexed symbol-des sb!vm:symbol-value-slot value)))
 (defun cold-symbol-value (symbol)
-  (read-wordindexed (cold-intern symbol) sb!vm:symbol-value-slot))
+  (let ((val (read-wordindexed (cold-intern symbol) sb!vm:symbol-value-slot)))
+    (if (= (descriptor-bits val) sb!vm:unbound-marker-widetag)
+        (error "Taking Cold-symbol-value of unbound symbol ~S" symbol)
+        val)))
 (defun cold-fdefn-fun (cold-fdefn)
   (read-wordindexed cold-fdefn sb!vm:fdefn-fun-slot))
 
@@ -2483,8 +2486,8 @@ core and return a descriptor to it."
             ;; Special form #'F fopcompiles into `(FDEFINITION ,f)
             (aver (and (singleton-p args) (symbolp (car args))))
             (target-symbol-function (car args)))
-           (cons
-            (cold-cons (first args) (second args)))
+           (cons (cold-cons (first args) (second args)))
+           (symbol-global-value (cold-symbol-value (first args)))
            (t
             (error "Can't FUNCALL ~S in cold load" fun)))
           (let ((counter *load-time-value-counter*))
@@ -2512,6 +2515,7 @@ core and return a descriptor to it."
              (cold-set (first args)
                        (let ((val (second args)))
                          (if (symbolp val) (cold-intern val) val))))
+            (%svset (apply 'cold-svset args))
             (t (acond ((get fun :sb-cold-funcall-handler) (apply it args))
                       (t (error "Can't FUNCALL-FOR-EFFECT ~S in cold load"
                                 fun)))))))))

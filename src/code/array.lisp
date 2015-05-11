@@ -1621,10 +1621,7 @@ function to be removed without further warning."
                               (declare (type (simple-array ,specifier (*))
                                              ,(first params)))
                               ,@body)
-                            ;; This could actually be done by Genesis if I make
-                            ;; FOPCOMPILABLE-P return T for this SETF.
-                            (!cold-init-forms
-                             (setf (svref ,table-name ,typecode) #',fun-name)))))
+                            (setf (svref ,table-name ,typecode) #',fun-name))))
        (defmacro ,dispatch-name (&rest args)
          (check-type (first args) symbol)
          (let ((tag (gensym "TAG")))
