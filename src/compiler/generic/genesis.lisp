@@ -448,11 +448,6 @@
 
 ;;; foreign symbol references
 (defparameter *cold-foreign-undefined-symbols* nil)
-
-;;; the name of the object file currently being cold loaded (as a string, not a
-;;; pathname), or NIL if we're not currently cold loading any object file
-(defvar *cold-load-filename* nil)
-(declaim (type (or string null) *cold-load-filename*))
 
 ;;;; miscellaneous stuff to read and write the core memory
 
@@ -2178,11 +2173,8 @@ core and return a descriptor to it."
 ;;; loading functions.
 (defun cold-load (filename)
   "Load the file named by FILENAME into the cold load image being built."
-  (let ((*cold-load-filename* (etypecase filename
-                                 (string filename)
-                                 (pathname (namestring filename)))))
-    (with-open-file (s filename :element-type '(unsigned-byte 8))
-      (load-as-fasl s nil nil))))
+  (with-open-file (s filename :element-type '(unsigned-byte 8))
+    (load-as-fasl s nil nil)))
 
 ;;;; miscellaneous cold fops
 
