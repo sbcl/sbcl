@@ -246,8 +246,7 @@
     (/show0 "about to bind ALIEN-CONTEXT")
     (let* ((alien-context (sap-alien context (* os-context-t)))
            #!+c-stack-is-control-stack
-           (fp-and-pc (make-array 2 :element-type 'word))
-           #!+c-stack-is-control-stack)
+           (fp-and-pc (make-array 2 :element-type 'word)))
       #!+c-stack-is-control-stack
       (declare (truly-dynamic-extent fp-and-pc))
       #!+c-stack-is-control-stack
