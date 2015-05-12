@@ -266,14 +266,12 @@
   #!+sb-doc
   "Takes an object and a location holding a list. Conses the object onto
   the list, returning the modified list. OBJ is evaluated before PLACE."
-  (multiple-value-bind (dummies vals newval setter getter)
-      (sb!xc:get-setf-expansion place env)
-    (let ((g (gensym)))
-      `(let* ((,g ,obj)
-              ,@(mapcar #'list dummies vals)
-              (,(car newval) (cons ,g ,getter))
-              ,@(cdr newval))
-         ,setter))))
+  ;; If PLACE has multiple store locations, what should we do?
+  ;; In other Lisp implementations:
+  ;; - One errs, says "Multiple store variables not expected"
+  ;; - One pushes multiple values produced by OBJ form into multiple places.
+  ;; - At least two produce an incorrect expansion that doesn't even work.
+  (expand-rmw-macro 'cons (list obj) place '() env '(item)))
 
 (defmacro-mundanely pushnew (obj place &rest keys
                              &key key test test-not &environment env)
@@ -413,7 +411,8 @@
       #+sb-xc-host defmacro-mundanely
          ,name (,reference ,@lambda-list &environment ,env)
        ,@(when doc-string (list (the string doc-string)))
-       (expand-rmw-macro ',function ,reference (list* ,@other-args ,rest-arg)
+       (expand-rmw-macro ',function
+                         '() ,reference (list* ,@other-args ,rest-arg)
                          ,env ',other-args))))
 
 ;;;; DEFSETF
@@ -546,34 +545,40 @@
   ;; The generated call resembles (FUNCTION PLACE . ARG-FORMS) but the
   ;; read and write of PLACE - not including its subforms - are done
   ;; only after all ARG-FORMS are evaluated.
-  (defun expand-rmw-macro (function place arg-forms environment name-hints)
-    (multiple-value-bind (temp-vars temp-vals stores setter getter)
-        (sb!xc:get-setf-expansion place environment)
-      (multiple-value-bind (fun-temp-vars fun-temp-vals call-arguments)
-          (collect-call-temps arg-forms environment name-hints)
-        (let* ((compute `(,function ,getter ,@call-arguments))
-               (set-fn (and (listp setter) (car setter)))
-               (newval-temp (car stores))
-               (newval-binding `((,newval-temp ,compute))))
-          ;; Try to elide the binding of NEWVAL-TEMP. If the SINGLETON-P test
-          ;; passes, then NEWVAL-TEMP is the last argument to the setter form.
-          ;; Checking that everything else is an expected symbol
-          ;; ensures that no other reference to NEWVAL-TEMP exists.
-          (when (and (singleton-p (member newval-temp setter))
-                     (or (eq set-fn 'setq)
-                         (and (eq (info :function :kind set-fn) :function)
-                              (every (lambda (x)
-                                       (or (member x temp-vars)
-                                           (member x fun-temp-vars)
-                                           (eq x newval-temp)))
-                                     (cdr setter)))))
-            (setq newval-binding nil
-                  setter (append (butlast setter) (list compute))))
-          (let ((bindings (append (mapcar #'list temp-vars temp-vals)
-                                  (mapcar #'list fun-temp-vars fun-temp-vals)
-                                  newval-binding
-                                  (cdr stores))))
-            (if bindings `(let* ,bindings ,setter) setter)))))))
+   (defun expand-rmw-macro (function before-arg-forms place after-arg-forms
+                                environment name-hints)
+     ;; Note that NAME-HINTS do the wrong thing if you have both "before" and
+     ;; "after" args. In that case it is probably best to specify them as ().
+     (binding* (((before-temps before-vals before-args)
+                 (collect-call-temps before-arg-forms environment name-hints))
+                ((place-temps place-subforms stores setter getter)
+                 (sb!xc:get-setf-expansion place environment))
+                ((after-temps after-vals after-args)
+                 (collect-call-temps after-arg-forms environment name-hints))
+                (compute `(,function ,@before-args ,getter ,@after-args))
+                (set-fn (and (listp setter) (car setter)))
+                (newval-temp (car stores))
+                (newval-binding `((,newval-temp ,compute))))
+       ;; Elide the binding of NEWVAL-TEMP if it is ref'd exactly once
+       ;; and all the call arguments are temporaries and/or constants.
+       (when (and (= (count newval-temp setter) 1)
+                  (or (eq set-fn 'setq)
+                      (and (eq (info :function :kind set-fn) :function)
+                           (every (lambda (x)
+                                    (or (member x place-temps)
+                                        (eq x newval-temp)
+                                        (sb!xc:constantp x environment)))
+                                  (cdr setter)))))
+         (setq newval-binding nil
+               setter (substitute compute newval-temp setter)))
+       (let ((bindings
+              (flet ((zip (list1 list2) (mapcar #'list list1 list2)))
+                (append (zip before-temps before-vals)
+                        (zip place-temps place-subforms)
+                        (zip after-temps after-vals)
+                        newval-binding
+                        (cdr stores)))))
+         (if bindings `(let* ,bindings ,setter) setter)))))
 
 ;;;; DEFMACRO DEFINE-SETF-EXPANDER and various DEFINE-SETF-EXPANDERs
 
