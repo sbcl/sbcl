@@ -425,8 +425,10 @@
                     (clear-info :setf :expander name)
                     (setf (info :setf :inverse name) inverse))
                   (when expander
-                    #-sb-xc-host (setf (%fun-lambda-list expander)
-                                       expander-lambda-list)
+                    #-sb-xc-host
+                    (setf (%fun-lambda-list
+                           (if (listp expander) (cdr expander) expander))
+                          expander-lambda-list)
                     (clear-info :setf :inverse name)
                     (setf (info :setf :expander name) expander))
                   (when doc
@@ -508,15 +510,21 @@
          (collect ((temp-vars) (temp-vals) (call-arguments))
            (dolist (form place-subforms
                          (values (temp-vars) (temp-vals) (call-arguments)))
-             (call-arguments (if (sb!xc:constantp form environment)
-                                 form
-                                 (let ((temp (if name-hints
-                                                 (copy-symbol (car name-hints))
-                                                 (gensymify form))))
-                                   (temp-vars temp)
-                                   (temp-vals form)
-                                   temp)))
-             (pop name-hints)))))
+             ;; Generated code is more understandable when it uses temp vars
+             ;; whose names resemble the lambda vars for the DEFSETF of PLACE.
+             (labels ((nice-tempname ()
+                        (if name-hints
+                            (let ((sym (pop name-hints)))
+                              (if (member sym sb!xc:lambda-list-keywords)
+                                  (nice-tempname)
+                                  (copy-symbol (if (consp sym) (car sym) sym))))
+                            (gensymify form))))
+               (call-arguments (if (sb!xc:constantp form environment)
+                                   form
+                                   (let ((temp (nice-tempname)))
+                                     (temp-vars temp)
+                                     (temp-vals form)
+                                     temp))))))))
 
   ;; Return the 5-part expansion of a SETF form that calls #'(SETF Fn)
   ;; when SETF-FUN-P is non-nil, or the short form of a DEFSETF, when NIL.
@@ -535,8 +543,11 @@
   (defun make-setf-quintuple (access-form environment num-store-vars expander)
     (declare (type function expander))
     (multiple-value-bind (temp-vars temp-vals call-arguments)
-        (collect-call-temps (cdr access-form) environment nil)
-      (let ((stores (make-gensym-list num-store-vars "NEW")))
+        ;; FORMALS affect aesthetics only, not behavior.
+        (let ((formals #-sb-xc-host (%simple-fun-arglist expander)))
+          (collect-call-temps (cdr access-form) environment formals))
+      (let ((stores (let ((sb!xc:*gensym-counter* 1))
+                      (make-gensym-list num-store-vars "NEW"))))
         (values temp-vars temp-vals stores
                 (apply expander call-arguments environment stores)
                 `(,(car access-form) ,@call-arguments)))))
@@ -639,30 +650,25 @@
                  ,newval)
               `(getf ,get ,ptemp ,@(if default `(,def-temp)))))))
 
-(sb!xc:define-setf-expander get (symbol prop &optional default)
-  (let ((symbol-temp (gensym))
-        (prop-temp (gensym))
-        (def-temp (if default (gensym)))
-        (newval (gensym)))
-    (values `(,symbol-temp ,prop-temp ,@(if default `(,def-temp)))
-            `(,symbol ,prop ,@(if default `(,default)))
-            (list newval)
-            `(progn ,def-temp ;; prevent unused style-warning
-                    (%put ,symbol-temp ,prop-temp ,newval))
-            `(get ,symbol-temp ,prop-temp ,@(if default `(,def-temp))))))
+;; CLHS Notes on DEFSETF say that: "A setf of a call on access-fn also evaluates
+;;  all of access-fn's arguments; it cannot treat any of them specially."
+;; An implication is that even though the DEFAULT argument to GET,GETHASH serves
+;; no purpose except when used in a R/M/W context such as PUSH, you can't elide
+;; it. In particular, this must fail: (SETF (GET 'SYM 'IND (ERROR "Foo")) 3).
 
-(sb!xc:define-setf-expander gethash (key hashtable &optional default)
-  (let ((key-temp (gensym))
-        (hashtable-temp (gensym))
-        (default-temp (if default (gensym)))
-        (new-value-temp (gensym)))
-    (values
-     `(,key-temp ,hashtable-temp ,@(if default `(,default-temp)))
-     `(,key ,hashtable ,@(if default `(,default)))
-     `(,new-value-temp)
-     `(progn ,default-temp ;; prevent unused style-warning
-             (%puthash ,key-temp ,hashtable-temp ,new-value-temp))
-     `(gethash ,key-temp ,hashtable-temp ,@(if default `(,default-temp))))))
+(sb!xc:defsetf get (symbol indicator &optional default &environment e) (newval)
+  (let ((form `(%put ,symbol ,indicator ,newval)))
+    (if (and default (not (sb!xc:constantp default e)))
+        `(progn ,default ,form) ; reference default to "use" it
+        form)))
+
+;; A possible optimization for read/modify/write of GETHASH
+;; would be to predetermine the vector element where the key/value pair goes.
+(sb!xc:defsetf gethash (key hashtable &optional default &environment e) (newval)
+  (let ((form `(%puthash ,key ,hashtable ,newval)))
+    (if (and default (not (sb!xc:constantp default e)))
+        `(progn ,default ,form) ; reference default to "use" it
+        form)))
 
 (sb!xc:define-setf-expander logbitp (index int &environment env)
   (declare (type sb!c::lexenv env))

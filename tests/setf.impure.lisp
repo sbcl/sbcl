@@ -321,6 +321,13 @@
            '(let* ((subform (foo)) (newval "Hi"))
               (progn (replace subform newval :start1 4 :end1 6) newval)))))
 
+(with-test (:name :defsetf-gethash)
+  (assert (equal-mod-gensyms
+           (macroexpand-1 '(push 1 (gethash :k tbl '(none))))
+           ;; the only temp var should be for TBL
+           '(let* ((#1=#:hashtable tbl))
+             (sb-kernel:%puthash :k #1# (cons 1 (gethash :k #1# '(none))))))))
+
 ;; Setup for CLHS hairy example (not working)
 (defvar *xy* (make-array '(10 10)))
 (defun xy (&key ((x x) 0) ((y y) 0)) (aref *xy* x y))
