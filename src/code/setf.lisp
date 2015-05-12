@@ -296,15 +296,19 @@
   #!+sb-doc
   "The argument is a location holding a list. Pops one item off the front
   of the list and returns it."
-  (multiple-value-bind (dummies vals newval setter getter)
-      (sb!xc:get-setf-expansion place env)
-    (let ((list-head (gensym)))
-      `(let* (,@(mapcar #'list dummies vals)
-              (,list-head ,getter)
-              (,(car newval) (cdr ,list-head))
-              ,@(cdr newval))
-         ,setter
-         (car ,list-head)))))
+  (if (symbolp (setq place (macroexpand-for-setf place env)))
+      `(prog1 (car ,place) (setq ,place (cdr ,place)))
+      (multiple-value-bind (temps vals stores setter getter)
+          (sb!xc:get-setf-expansion place env)
+        (let ((list (copy-symbol 'list))
+              (ret (copy-symbol 'car)))
+          `(let* (,@(mapcar #'list temps vals)
+                  (,list ,getter)
+                  (,ret (car ,list))
+                  (,(car stores) (cdr ,list))
+                  ,@(cdr stores))
+             ,setter
+             ,ret)))))
 
 (defmacro-mundanely remf (place indicator &environment env)
   #!+sb-doc

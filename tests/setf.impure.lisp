@@ -378,4 +378,13 @@
                    (try))
                  '(setq y (+ 1 y)))))
 
+(defparameter *foobar-list* (list 1 2 3))
+(defun my-foobar-list () *foobar-list*)
+(defun (setf my-foobar-list) (newval)
+  (incf (car *foobar-list*))
+  (setq *foobar-list* newval))
+(with-test (:name :pop-eval-order-bug-1454021)
+  ;; Assert that POP reads CAR of the list before invoking the setter
+  (assert (eq (pop (my-foobar-list)) 1)))
+
 ;;; success

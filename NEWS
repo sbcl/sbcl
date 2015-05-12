@@ -1,5 +1,7 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 changes relative to sbcl-1.2.11:
+  * enhancement: The input stream for COMPILE-FILE implements
+    STREAM-LINE-COLUMN.
   * optimization: better MAP and MAP-INTO on known vector result types.
   * bug fix: Read/modify/write macros accessing a place which is a
     composition of CAR+CDR operations, such as (SHIFTF (CADR X) (ELT V 0)),
@@ -7,8 +9,8 @@ changes relative to sbcl-1.2.11:
   * bug fix: short form of DEFSETF no longer allows trailing junk.
   * bug fix: DEFINE-MODIFY-MACRO respects the provisions of CLHS 5.1.3
     regarding argument evaluation order. (lp#1452539)
-  * enhancement: The input stream for COMPILE-FILE implements
-    STREAM-LINE-COLUMN.
+  * bug fix: POP works as specified in CLHS if the setter for its
+    argument has a side-effect on the existing CAR value. (lp#1454021)
 
 changes in sbcl-1.2.11 relative to sbcl-1.2.10:
   * enhancement: SET-PPRINT-DISPATCH will warn when given an expression in
