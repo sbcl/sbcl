@@ -371,4 +371,11 @@
       (other-incf testvar (double-it)))
     (assert (eql testvar 4))))
 
+(with-test (:name :incf-avoid-temp-vars)
+  (assert (equal (macrolet ((x () 'y)
+                            (try (&environment env)
+                              (list 'quote (macroexpand-1 '(incf (x)) env))))
+                   (try))
+                 '(setq y (+ 1 y)))))
+
 ;;; success

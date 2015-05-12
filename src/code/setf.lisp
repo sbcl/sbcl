@@ -74,6 +74,22 @@
         (sb!xc:get-setf-expansion expansion environment)
         (make-simple-setf-quintuple form environment
                                     t `(funcall #'(setf ,(car form)))))))
+
+;; Expand PLACE until it is a form that SETF might know something about.
+;; Macros are expanded only when no SETF expander (or inverse) exists.
+;; Symbol-macros are always expanded because there are no SETF expanders
+;; for them. This is useful mainly when a symbol-macro or ordinary macro
+;; expands to a "mundane" lexical or special variable.
+(defun macroexpand-for-setf (place environment)
+  (loop
+     (when (and (listp place)
+                (let ((op (car place)))
+                  (or (info :setf :expander op) (info :setf :inverse op))))
+       (return place))
+     (multiple-value-bind (expansion macro-p) (%macroexpand-1 place environment)
+       (if macro-p
+           (setq place expansion) ; iterate
+           (return place)))))
 
 ;;;; SETF itself
 
@@ -122,19 +138,8 @@
     (destructuring-bind (place value-form . more) args
       (when more
         (return-from setf `(progn ,@(sb!c::explode-setq form 'error))))
-      ;; Macros without a SETF expander/inverse can be expanded now,
-      ;; for shorter output in the case where (M) is a macro invocation
-      ;; expanding to *A-VAR*, rather than deferring the macroexpansion
-      ;; to GET-SETF-EXPANSION which will introduce a needless gensym.
-      (loop
-         (when (and (listp place)
-                    (let ((op (car place)))
-                      (or (info :setf :expander op) (info :setf :inverse op))))
-           (return))
-         (multiple-value-bind (expansion macro-p) (%macroexpand-1 place env)
-           (cond (macro-p (setq place expansion)) ; iterate
-                 ((symbolp place) (return-from setf `(setq ,place ,value-form)))
-                 (t (return)))))
+      (when (symbolp (setq place (macroexpand-for-setf place env)))
+        (return-from setf `(setq ,place ,value-form)))
       (multiple-value-bind (temps vals newval setter)
           (sb!xc:get-setf-expansion place env)
         (let ((inverse (info :setf :inverse (car place))))
@@ -349,19 +354,14 @@
 (declaim (inline xsubtract))
 (defun xsubtract (a b) (- b a)) ; exchanged subtract
 (flet ((expand (place delta env operator)
-         (when (symbolp place)
-           (multiple-value-bind (expansion expanded)
-               (sb!xc:macroexpand-1 place env)
-             (unless expanded
-               (return-from expand `(setq ,place (,operator ,delta ,place))))
-             ;; GET-SETF-EXPANSION would have macroexpanded too, so do it now.
-             (setq place expansion)))
-         (multiple-value-bind (dummies vals newval setter getter)
-             (sb!xc:get-setf-expansion place env)
-           `(let* (,@(mapcar #'list dummies vals)
-                   (,(car newval) (,operator ,delta ,getter))
-                   ,@(cdr newval))
-              ,setter))))
+         (if (symbolp (setq place (macroexpand-for-setf place env)))
+             `(setq ,place (,operator ,delta ,place))
+             (multiple-value-bind (dummies vals newval setter getter)
+                 (sb!xc:get-setf-expansion place env)
+               `(let* (,@(mapcar #'list dummies vals)
+                       (,(car newval) (,operator ,delta ,getter))
+                       ,@(cdr newval))
+                  ,setter)))))
   (defmacro-mundanely incf (place &optional (delta 1) &environment env)
   #!+sb-doc
   "The first argument is some location holding a number. This number is
