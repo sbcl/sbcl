@@ -2425,11 +2425,11 @@
                               (type (integer 0 #.(1- sb-vm:n-word-bits)) n)
                               (optimize speed))
                              (logandc2 x (ash -1 n)))))
-         (trace-output
-          (with-output-to-string (*trace-output*)
-            (eval `(trace ,(intern (format nil "ASH-LEFT-MOD~D" sb-vm::n-word-bits) "SB-VM")))
-            (assert (= 7 (funcall fun 15 3))))))
-    (assert (string= "" trace-output))))
+         (thing-not-to-call
+          (intern (format nil "ASH-LEFT-MOD~D" sb-vm::n-word-bits) "SB-VM")))
+    (assert (not (member (symbol-function thing-not-to-call)
+                         (ctu:find-named-callees fun))))
+    (assert (= 7 (funcall fun 15 3)))))
 
 (test-util:with-test (:name :bug-997528)
   (let ((fun (compile nil '(lambda (x)
