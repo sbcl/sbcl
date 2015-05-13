@@ -28,22 +28,46 @@
 ;;;; LOAD-AS-SOURCE
 
 ;;; Load a text stream.  (Note that load-as-fasl is in another file.)
+;; We'd like, when entering the debugger as a result of an EVAL error,
+;; that the condition be annotated with the stream position.
+;; One way to do it is catch all conditions and encapsulate them in
+;; something new such as a LOADER-EVAL-ERROR and re-signal.
+;; The printer for the encapsulated condition has the data it needs to
+;; show the original condition and the line/col. That would unfortunately
+;; interfere with handlers that were bound around LOAD, since they would
+;; only receive the encapsulated condition, and not be able to test for
+;; things they're interested in, such as which redefinition warnings to ignore.
+;; Instead, printing a herald for any SERIOUS-CONDITION approximates
+;; the desired behavior closely enough without printing something for warnings.
+;; TODO: It would be supremely cool if, for toplevel PROGN, we could
+;; indicate the position of the specific subform that failed
 (defun load-as-source (stream &key verbose print (context "loading"))
   (maybe-announce-load stream verbose)
   (let* ((pathname (ignore-errors (translate-logical-pathname stream)))
          (native (when pathname (native-namestring pathname))))
     (with-simple-restart (abort "Abort ~A file ~S." context native)
-      (flet ((eval-form (form index)
+     (labels ((condition-herald (c)
+                (declare (ignore c)) ; propagates up
+                (when (form-tracking-stream-p stream)
+                  (let* ((startpos
+                          (form-tracking-stream-form-start-char-pos stream))
+                         (point (line/col-from-charpos stream startpos)))
+                    (format *error-output* "~&While evaluating the form ~
+ starting at line ~D, column ~D~%  of ~S:"
+                            (car point) (cdr point)
+                            (or pathname stream)))))
+              (eval-form (form index)
                (with-simple-restart (continue "Ignore error and continue ~A file ~S."
                                               context native)
                  (loop
+                  (handler-bind ((serious-condition #'condition-herald))
                    (with-simple-restart (retry "Retry EVAL of current toplevel form.")
                      (if print
                          (let ((results (multiple-value-list (eval-tlf form index))))
                            (load-fresh-line)
                            (format t "~{~S~^, ~}~%" results))
                          (eval-tlf form index)))
-                   (return)))))
+                   (return))))))
         (if pathname
             (let* ((info (sb!c::make-file-source-info
                           pathname (stream-external-format stream)))

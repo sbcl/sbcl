@@ -2,6 +2,8 @@
 changes relative to sbcl-1.2.11:
   * enhancement: The input stream for COMPILE-FILE implements
     STREAM-LINE-COLUMN.
+  * enhancement: EVAL errors that occur by way of LOAD report the starting
+    line and column number of the erring toplevel form. (lp#565247)
   * optimization: better MAP and MAP-INTO on known vector result types.
   * bug fix: Read/modify/write macros accessing a place which is a
     composition of CAR+CDR operations, such as (SHIFTF (CADR X) (ELT V 0)),

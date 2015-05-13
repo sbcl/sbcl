@@ -28,6 +28,7 @@
 
 ;; These tests are essentially the same as in compiler.pure.lisp
 (with-test (:name :load-as-source-error-position-reporting)
+  ;; These test errors that occur during READ
   (dolist (input '("data/wonky1.lisp" "data/wonky2.lisp" "data/wonky3.lisp"))
     (let ((expect (with-open-file (f input) (read f))))
       (assert (stringp expect))
@@ -39,4 +40,10 @@
                                        (return-from foo
                                          (write-to-string c :escape nil)))))
                  (load input)))))
-        (assert (search expect err-string))))))
+        (assert (search expect err-string)))))
+
+  ;; This tests an error that occur during EVAL
+  (let ((s (with-output-to-string (*error-output*)
+             (handler-bind ((error #'abort)) (load "data/wonky4.lisp")))))
+    (assert (search "While evaluating the form starting at line 16, column 1"
+                    s))))
