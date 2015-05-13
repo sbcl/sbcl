@@ -11,6 +11,9 @@ changes relative to sbcl-1.2.11:
     regarding argument evaluation order. (lp#1452539)
   * bug fix: POP works as specified in CLHS if the setter for its
     argument has a side-effect on the existing CAR value. (lp#1454021)
+  * bug fix: Reading "#()" with a positive numeric argument signals a
+    reader error. As specified, reading "#1()" has undefined consequences,
+    so correct portable code should be indifferent to this. (lp#1252100)
 
 changes in sbcl-1.2.11 relative to sbcl-1.2.10:
   * enhancement: SET-PPRINT-DISPATCH will warn when given an expression in

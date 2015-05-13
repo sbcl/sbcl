@@ -34,6 +34,9 @@
             "Vector longer than the specified length: #~S~S."
             length list))
           (length
+           (when (and (plusp length) (null list))
+             (simple-reader-error
+              stream "Vector of length ~D can't be initialized from ()" length))
            ;; the syntax `#n(foo ,@bar) is not well-defined. [See lp#1096043.]
            ;; We take it to mean that the vector as read should be padded to
            ;; length 'n'. It could be argued that 'n' is the length after
