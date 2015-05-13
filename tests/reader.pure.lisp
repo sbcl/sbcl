@@ -413,3 +413,7 @@
                         ;; Signal an error if the symbol is locked.
                         (declare (special sb-int:fast-read-byte))))))))
     (assert-error (funcall fun) program-error)))
+
+(with-test (:name :sharp-plus-requires-subform)
+  (assert-error (read-from-string "(let ((foo 3) #+sbcl) wat)"))
+  (assert-error (read-from-string "(let ((foo 3) #-brand-x) wat)")))

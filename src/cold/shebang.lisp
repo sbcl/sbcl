@@ -50,20 +50,16 @@
   (let ((next-char (read-char stream)))
     (unless (find next-char "+-")
       (error "illegal read syntax: #!~C" next-char))
-    ;; When test is not satisfied
-    ;; FIXME: clearer if order of NOT-P and (NOT NOT-P) were reversed? then
-    ;; would become "unless test is satisfied"..
-    (when (let* ((*package* (find-package "KEYWORD"))
-                 (*read-suppress* nil)
-                 (not-p (char= next-char #\-))
-                 (feature (read stream)))
-            (if (feature-in-list-p feature *shebang-features*)
-                not-p
-                (not not-p)))
-      ;; Read (and discard) a form from input.
-      (let ((*read-suppress* t))
-        (read stream t nil t))))
-  (values))
+    (if (char= (if (let* ((*package* (find-package "KEYWORD"))
+                          (*read-suppress* nil)
+                          (feature (read stream)))
+                     (feature-in-list-p feature *shebang-features*))
+                   #\+ #\-) next-char)
+        (read stream t nil t)
+        ;; Read (and discard) a form from input.
+        (let ((*read-suppress* t))
+          (read stream t nil t)
+          (values)))))
 (compile 'shebang-reader)
 
 (set-dispatch-macro-character #\# #\! #'shebang-reader)
