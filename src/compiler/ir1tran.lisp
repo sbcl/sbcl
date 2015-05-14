@@ -1248,7 +1248,7 @@
                            (lambda-var-specvar var))
                       (process-var it nil))))
             (cons
-             ;; FIXME: non-ANSI weirdness
+             ;; FIXME: non-ANSI weirdness. [See lp#309122]
              (aver (eq (car var) 'macro))
              (new-vars `(,var-name . (macro . (the ,(first decl)
                                                 ,(cdr var))))))
