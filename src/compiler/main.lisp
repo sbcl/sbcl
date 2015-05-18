@@ -1330,9 +1330,11 @@ necessary, since type inference may take arbitrarily long to converge.")
     (if (null *macro-policy*)
         (frob)
         (let* ((*lexenv*
-                (make-lexenv :policy (process-optimize-decl (macro-policy-decls nil)
-                                                            (lexenv-policy *lexenv*))
-                             :default *lexenv*))
+                (make-lexenv
+                 :policy (process-optimize-decl
+                          `(optimize ,@(policy-to-decl-spec *macro-policy*))
+                          (lexenv-policy *lexenv*))
+                 :default *lexenv*))
                ;; In case a null lexenv is created, it needs to get the newly
                ;; effective global policy, not the policy currently in *POLICY*.
                (*policy* (lexenv-policy *lexenv*)))

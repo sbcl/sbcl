@@ -1387,7 +1387,7 @@
       ;; have one.
       (let ((policy (lexenv-%policy *lexenv*)))
         (dolist (functional functionals)
-          (when (equal policy (lexenv-%policy (functional-lexenv functional)))
+          (when (policy= policy (lexenv-%policy (functional-lexenv functional)))
             (return functional)))))))
 
 ;;; Do stuff to delete the semantic attachments of a REF node. When

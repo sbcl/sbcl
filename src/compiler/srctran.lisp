@@ -5052,18 +5052,6 @@
   (defun /report-lvar (x message)
     (declare (ignore x message))))
 
-
-;;;; Transforms for internal compiler utilities
-
-;;; If QUALITY-NAME is constant and a valid name, don't bother
-;;; checking that it's still valid at run-time.
-(deftransform policy-quality ((policy quality-name)
-                              (t symbol))
-  (unless (and (constant-lvar-p quality-name)
-               (policy-quality-name-p (lvar-value quality-name)))
-    (give-up-ir1-transform))
-  '(%policy-quality policy quality-name))
-
 (deftransform encode-universal-time
     ((second minute hour date month year &optional time-zone)
      ((constant-arg (mod 60)) (constant-arg (mod 60))

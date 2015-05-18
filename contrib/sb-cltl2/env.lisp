@@ -386,13 +386,10 @@ the condition types that have been muffled."
   (let ((env (or env (make-null-lexenv))))
     (case declaration-name
       (optimize
-       (let ((policy (sb-c::lexenv-policy env)))
-         (collect ((res))
-           (dolist (name sb-c::*policy-qualities*)
-             (res (list name (sb-c::policy-quality policy name))))
-           (loop for (name . nil) in sb-c::*policy-dependent-qualities*
-                 do (res (list name (sb-c::policy-quality policy name))))
-           (res))))
+       ;; CLtL2-mandated behavior:
+       ;; "The returned list always contains an entry for each of the standard
+       ;; qualities and for each of the implementation-specific qualities"
+       (sb-c::policy-to-decl-spec (sb-c::lexenv-policy env) nil t))
       (sb-ext:muffle-conditions
        (car (rassoc 'muffle-warning
                     (sb-c::lexenv-handled-conditions env))))

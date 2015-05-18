@@ -1423,19 +1423,19 @@
 
 ;;; a helper for the POLICY macro, defined late here so that the
 ;;; various type tests can be inlined
-(declaim (ftype (function ((or list lexenv node functional)) list)
-                %coerce-to-policy))
+;;; Arg is declared of type T because the function body tests it.
+;;; You might think that NIL as a policy becomes *POLICY*,
+;;; but no, NIL was always an empty alist representing no qualities,
+;;; which is a valid policy that makes each quality read as 1.
+;;; In contrast, a LEXENV with NIL policy _does_ become *POLICY*.
+(declaim (ftype (function (t) policy) %coerce-to-policy))
 (defun %coerce-to-policy (thing)
-  (let ((result (etypecase thing
-                  (list thing)
-                  (lexenv (lexenv-policy thing))
-                  (node (lexenv-policy (node-lexenv thing)))
-                  (functional (lexenv-policy (functional-lexenv thing))))))
-    ;; Test the first element of the list as a rudimentary sanity
-    ;; that it really does look like a valid policy.
-    (aver (or (null result) (policy-quality-name-p (caar result))))
-    ;; Voila.
-    result))
+  (cond ((policy-p thing) thing)
+        (thing (lexenv-policy (etypecase thing
+                                (lexenv thing)
+                                (node (node-lexenv thing))
+                                (functional (functional-lexenv thing)))))
+        (t **baseline-policy**)))
 
 ;;;; Freeze some structure types to speed type testing.
 

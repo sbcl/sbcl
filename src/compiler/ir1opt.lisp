@@ -2138,7 +2138,7 @@
           (dolist (val vals)
             (when types
               (let ((type (pop types)))
-                (assert-lvar-type val type '((type-check . 0)))))))
+                (assert-lvar-type val type **zero-typecheck-policy**)))))
         ;; Propagate declared types of MV-BIND variables.
         (propagate-to-args use fun)
         (reoptimize-call use))

@@ -64,7 +64,7 @@
   ;; and the global policy is stored in *POLICY*. (Because we want to
   ;; be able to affect it from :WITH-COMPILATION-UNIT.) NIL here also
   ;; works as a convenient null-lexenv identifier.
-  (%policy nil :type policy)
+  (%policy nil :type (or null policy))
   ;; A list associating extra user info to symbols.  The entries
   ;; are of the form (:declare name . value),
   ;; (:variable name key . value), or (:function name key . value)

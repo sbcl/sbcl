@@ -360,14 +360,12 @@
               (format stream "~@:_Expansion: ~S" expansion)))))
       (terpri stream)))
 
-  (when (or (member symbol sb-c::*policy-qualities*)
-            (assoc symbol sb-c::*policy-dependent-qualities*))
+  (awhen (sb-c::policy-quality-name-p symbol)
     (pprint-logical-block (stream nil)
       (pprint-newline :mandatory stream)
       (pprint-indent :block 2 stream)
       (format stream "~A names a~:[ dependent~;n~] optimization policy quality:"
-              symbol
-              (member symbol sb-c::*policy-qualities*))
+              symbol (minusp it))
       (describe-documentation symbol 'optimize stream t))
     (terpri stream))
 

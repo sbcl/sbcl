@@ -104,7 +104,7 @@
                    nil nil nil nil nil
                    (sb!c::lexenv-handled-conditions old-lexenv)
                    (sb!c::lexenv-disabled-package-locks old-lexenv)
-                   (sb!c::lexenv-policy old-lexenv)
+                   (sb!c::lexenv-policy old-lexenv) ; = (OR %POLICY *POLICY*)
                    (sb!c::lexenv-user-data old-lexenv))))
       (dolist (declaration declarations)
         (unless (consp declaration)
@@ -112,19 +112,21 @@
                     declaration (cons 'declare declarations)))
         (case (car declaration)
           ((optimize)
+           (setf (sb!c::lexenv-%policy lexenv)
+                 (copy-structure (sb!c::lexenv-%policy lexenv)))
            (dolist (element (cdr declaration))
              (multiple-value-bind (quality value)
-                 (if (not (consp element))
+                 (if (not (consp element)) ; FIXME: OAOOM w/'proclaim'
                      (values element 3)
                      (program-destructuring-bind (quality value)
                          element
                        (values quality value)))
-               (if (sb!c::policy-quality-name-p quality)
-                   (push (cons quality value)
-                         (sb!c::lexenv-%policy lexenv))
-                   (warn "ignoring unknown optimization quality ~
-                                      ~S in ~S" quality
-                                      (cons 'declare declarations))))))
+               (sb!int:acond
+                ((sb!c::policy-quality-name-p quality)
+                 (sb!c::alter-policy (sb!c::lexenv-%policy lexenv)
+                                     sb!int:it value))
+                (t (warn "ignoring unknown optimization quality ~S in ~S"
+                         quality (cons 'declare declarations)))))))
           (muffle-conditions
            (setf (sb!c::lexenv-handled-conditions lexenv)
                  (sb!c::process-muffle-conditions-decl

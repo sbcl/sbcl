@@ -5438,7 +5438,7 @@ This can help you produce more deterministic output for FASLs."))
                                                        (case x (compilation-speed 'c::cspeed)
                                                              (otherwise x)))
                             #+lispworks (slot-value compiler::*optimization-level* x)
-                            #+sbcl (cdr (assoc x sb-c::*policy*)))
+                            #+sbcl (sb-c::policy-quality sb-c::*policy* x))
                :when y :collect (list x y))))
   (defun proclaim-optimization-settings ()
     "Proclaim the optimization settings in *OPTIMIZATION-SETTINGS*"

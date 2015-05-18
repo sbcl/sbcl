@@ -34,19 +34,20 @@
 ;;; Return a new POLICY containing the policy information represented
 ;;; by the optimize declaration SPEC. Any parameters not specified are
 ;;; defaulted from the POLICY argument.
-(declaim (ftype (function (list policy) (values policy list))
+(declaim (ftype (function (list (or policy null)) (values policy list))
                 process-optimize-decl))
 (defun process-optimize-decl (spec policy)
-  (let ((result nil)
+  (let ((result (copy-policy (or policy **baseline-policy**)))
         (specified-qualities))
     ;; Add new entries from SPEC.
-    (dolist (q-and-v-or-just-q (cdr spec))
-      (multiple-value-bind (quality raw-value)
-          (if (atom q-and-v-or-just-q)
-              (values q-and-v-or-just-q 3)
-              (destructuring-bind (quality raw-value) q-and-v-or-just-q
-                (values quality raw-value)))
-        (cond ((not (policy-quality-name-p quality))
+    (dolist (q-and-v-or-just-q (cdr spec) (values result specified-qualities))
+      (binding* (((quality raw-value)
+                  (if (atom q-and-v-or-just-q)
+                      (values q-and-v-or-just-q 3)
+                      (destructuring-bind (quality raw-value) q-and-v-or-just-q
+                        (values quality raw-value))))
+                 (index (policy-quality-name-p quality)))
+        (cond ((not index)
                (or (policy-quality-deprecation-warning quality)
                    (compiler-warn
                     "~@<Ignoring unknown optimization quality ~S in:~_ ~S~:>"
@@ -61,18 +62,8 @@
                (when (eql quality 'inhibit-warnings)
                  (compiler-style-warn "~S is deprecated: use ~S instead"
                                       quality 'muffle-conditions))
-               (let* ((pair (cons quality raw-value))
-                      (found (member quality result :key #'car)))
-                 (push pair specified-qualities)
-                 (if found
-                     (rplaca found pair)
-                     (push pair result)))))))
-    ;; Add any nonredundant entries from old POLICY.
-    (dolist (old-entry policy)
-      (unless (assq (car old-entry) result)
-        (push old-entry result)))
-    ;; Voila.
-    (values (sort-policy result) specified-qualities)))
+               (push (cons quality raw-value) specified-qualities)
+               (alter-policy result index raw-value)))))))
 
 (declaim (ftype (function (list list) list)
                 process-handle-conditions-decl))
@@ -336,14 +327,16 @@
   #+sb-xc (/show0 "returning from PROCLAIM")
   (values))
 
+;; Issue a style warning if there are any repeated OPTIMIZE declarations
+;; given the SPECIFIED-QUALITIES, unless there is no ambiguity.
 (defun advise-if-repeated-optimize-qualities (new-policy specified-qualities)
   (let (dups)
     (dolist (quality-and-value specified-qualities)
       (let* ((quality (car quality-and-value))
-             (current (assq quality new-policy)))
-        (when (and (not (eql (cdr quality-and-value) (cdr current)))
+             (current (policy-quality new-policy quality)))
+        (when (and (not (eql (cdr quality-and-value) current))
                    (not (assq quality dups)))
-          (push `(,quality ,(cdr current)) dups))))
+          (push `(,quality ,current) dups))))
     (when dups
       (compiler-style-warn
        "Repeated OPTIMIZE qualit~@P. Using ~{~S~^ and ~}"

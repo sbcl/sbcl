@@ -69,7 +69,7 @@ guaranteed to never be modified, so it can be put in read-only storage."
                   (if read-only-p
                       `(%load-time-value ',handle)
                       `(value-cell-ref (%load-time-value ',handle)))))
-            (the-in-policy type value-form '((type-check . 0))
+            (the-in-policy type value-form **zero-typecheck-policy**
                            start next result)))
         (let* ((value
                  (handler-case (eval form)
@@ -79,7 +79,7 @@ guaranteed to never be modified, so it can be put in read-only storage."
           (if read-only-p
               (ir1-convert start next result `',value)
               (the-in-policy (ctype-of value) `(value-cell-ref ,(make-value-cell value))
-                             '((type-check . 0))
+                             **zero-typecheck-policy**
                              start next result))))))
 
 (defoptimizer (%load-time-value ir2-convert) ((handle) node block)

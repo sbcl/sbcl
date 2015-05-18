@@ -156,3 +156,6 @@ compiled with this declaration in effect.")
 (define-optimization-quality store-closure-debug-pointer
     0
   ("no" "no" "yes" "yes"))
+
+;;; On the cross-compilation host, we initialize at load time
+#+sb-xc-host (!policy-cold-init-or-resanify)

@@ -48,9 +48,7 @@
        `(sb-pcl::%pcl-instance-p object)))))
 
 (defun sb-pcl::safe-code-p (&optional env)
-  (let* ((lexenv (or env (make-null-lexenv)))
-         (policy (lexenv-policy lexenv)))
-    (eql (cdr (assoc 'safety policy)) 3)))
+  (policy (or env (make-null-lexenv)) (eql safety 3)))
 
 (declaim (ftype function sb-pcl::parse-specialized-lambda-list))
 (define-source-context defmethod (name &rest stuff)

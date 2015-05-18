@@ -338,7 +338,7 @@ Evaluate the FORMS in the specified SITUATIONS (any of :COMPILE-TOPLEVEL,
                     ,(compile-in-lexenv
                       nil
                       `(lambda (,whole ,environment)
-                         ,@(macro-policy-decls t)
+                         ,@(macro-policy-decls)
                          ,@local-decls
                          ,body)
                       lexenv))))))))
@@ -957,7 +957,7 @@ unconditionally.
 Consequences are undefined if any result is not of the declared type
 -- typical symptoms including memory corruptions. Use with great
 care."
-  (the-in-policy value-type form '((type-check . 0)) start next result))
+  (the-in-policy value-type form **zero-typecheck-policy** start next result))
 
 #-sb-xc-host
 (setf (info :function :macro-function 'truly-the)
