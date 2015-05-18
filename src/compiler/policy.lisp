@@ -207,10 +207,8 @@ EXPERIMENTAL INTERFACE: Subject to change."
 ;;; OPTIMIZE forms have messed with it.
 (defun !policy-cold-init-or-resanify ()
   (setq **baseline-policy**
-        ;; Compute this by starting with #b01 in each bitfield,
-        ;; and mask off the extraneous bits.
-        (make-policy (logand (1- (ash 1 (* 2 n-policy-primary-qualities)))
-                             #x5555555))
+        (make-policy (loop for i below n-policy-primary-qualities
+                           sum (ash #b01 (* i 2))))
         **zero-typecheck-policy**
         (alter-policy (copy-policy **baseline-policy**)
                       #-sb-xc (policy-quality-name-p 'type-check)
