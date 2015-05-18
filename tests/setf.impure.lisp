@@ -385,6 +385,21 @@
                    (try))
                  '(setq y (+ 1 y)))))
 
+(with-test (:name :push-getf-avoid-temp-vars)
+  ;; Not only should subforms of PLACE avoid binding temp vars for constants,
+  ;; so should the arguments to GETF and %PUTF.
+  ;; This reads (AREF A) twice but I think that's unavoidable
+  (assert (equal-mod-gensyms
+           (macroexpand-1 '(push 'foo (getf (aref a (x) 1) :my-indicator '(t))))
+           '(let* ((a642 a)
+                   (g643 (x))
+                   (new645
+                    (cons 'foo (getf (aref a642 g643 1) :my-indicator '(t)))))
+             (let ((new644
+                    (sb-impl::%putf (aref a642 g643 1) :my-indicator new645)))
+               (funcall #'(setf aref) new644 a642 g643 1)
+               new645)))))
+
 (defparameter *foobar-list* (list 1 2 3))
 (defun my-foobar-list () *foobar-list*)
 (defun (setf my-foobar-list) (newval)

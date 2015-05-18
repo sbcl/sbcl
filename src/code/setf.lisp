@@ -504,68 +504,77 @@
     (t
      (error "Ill-formed DEFSETF for ~S" access-fn))))
 
-;; Much of the SETF framework shares logic to assemble the first two values
-;; for GET-SETF-EXPANSION while eschewing bindings for constant arguments.
-(flet ((collect-call-temps (place-subforms environment name-hints)
-         (collect ((temp-vars) (temp-vals) (call-arguments))
-           (dolist (form place-subforms
-                         (values (temp-vars) (temp-vals) (call-arguments)))
-             ;; Generated code is more understandable when it uses temp vars
-             ;; whose names resemble the lambda vars for the DEFSETF of PLACE.
-             (labels ((nice-tempname ()
-                        (if name-hints
-                            (let ((sym (pop name-hints)))
-                              (if (member sym sb!xc:lambda-list-keywords)
-                                  (nice-tempname)
-                                  (copy-symbol (if (consp sym) (car sym) sym))))
-                            (gensymify form))))
-               (call-arguments (if (sb!xc:constantp form environment)
-                                   form
-                                   (let ((temp (nice-tempname)))
-                                     (temp-vars temp)
-                                     (temp-vals form)
-                                     temp))))))))
+;; Given SEXPRS which is a list of things to evaluate, return four values:
+;;  - a list of uninterned symbols to bind to any non-constant sexpr
+;;  - a list of things to bind those symbols to
+;;  - a list parallel to SEXPRS with each non-constant element
+;;    replaced by its temporary variable from the first list.
+;;  - a bitmask over the sexprs containing a 1 for each non-constant.
+;; Uninterned symbols are named according to the NAME-HINTS so that
+;; expansions use variables resembling the DEFSETF whence they came.
+;;
+(defun collect-setf-temps (sexprs environment name-hints)
+  (labels ((next-name-hint ()
+             (let ((sym (pop name-hints))) ; OK if list was nil
+               (if (member sym sb!xc:lambda-list-keywords)
+                   (next-name-hint)
+                   (if (listp sym) (car sym) sym))))
+           (nice-tempname (form)
+             (acond ((next-name-hint) (copy-symbol it))
+                    (t (gensymify form)))))
+    (collect ((temp-vars) (temp-vals) (call-arguments))
+      (let ((mask 0) (bit 1))
+        (dolist (form sexprs (values (temp-vars) (temp-vals) (call-arguments)
+                                     mask))
+          (call-arguments (if (sb!xc:constantp form environment)
+                              (progn (next-name-hint) form) ; Skip one hint.
+                              (let ((temp (nice-tempname form)))
+                                (setq mask (logior mask bit))
+                                (temp-vars temp)
+                                (temp-vals form)
+                                temp)))
+          (setq bit (ash bit 1)))))))
 
-  ;; Return the 5-part expansion of a SETF form that calls #'(SETF Fn)
-  ;; when SETF-FUN-P is non-nil, or the short form of a DEFSETF, when NIL.
-  ;; INVERSE should be (FUNCALL #'(SETF x)) or (SETTER-FN) respectively.
-  (defun make-simple-setf-quintuple (access-form environment setf-fun-p inverse)
+;; Return the 5-part expansion of a SETF form that calls #'(SETF Fn)
+;; when SETF-FUN-P is non-nil, or the short form of a DEFSETF, when NIL.
+;; INVERSE should be (FUNCALL #'(SETF x)) or (SETTER-FN) respectively.
+(defun make-simple-setf-quintuple (access-form environment setf-fun-p inverse)
     (multiple-value-bind (temp-vars temp-vals args)
-        (collect-call-temps (cdr access-form) environment nil)
+        (collect-setf-temps (cdr access-form) environment nil)
       (let ((store (sb!xc:gensym "NEW")))
         (values temp-vars temp-vals (list store)
                 `(,@inverse ,@(if setf-fun-p `(,store ,@args) `(,@args ,store)))
                 `(,(car access-form) ,@args)))))
 
-  ;; Return the 5-part expansion of a SETF form defined by the long form
-  ;; of DEFSETF.
-  ;; FIXME: totally broken if there are keyword arguments. lp#1452947
-  (defun make-setf-quintuple (access-form environment num-store-vars expander)
+;; Return the 5-part expansion of a SETF form defined by the long form
+;; of DEFSETF.
+;; FIXME: totally broken if there are keyword arguments. lp#1452947
+(defun make-setf-quintuple (access-form environment num-store-vars expander)
     (declare (type function expander))
     (multiple-value-bind (temp-vars temp-vals call-arguments)
         ;; FORMALS affect aesthetics only, not behavior.
         (let ((formals #-sb-xc-host (%simple-fun-arglist expander)))
-          (collect-call-temps (cdr access-form) environment formals))
+          (collect-setf-temps (cdr access-form) environment formals))
       (let ((stores (let ((sb!xc:*gensym-counter* 1))
                       (make-gensym-list num-store-vars "NEW"))))
         (values temp-vars temp-vals stores
                 (apply expander call-arguments environment stores)
                 `(,(car access-form) ,@call-arguments)))))
 
-  ;; Expand a macro defined by DEFINE-MODIFY-MACRO.
-  ;; The generated call resembles (FUNCTION PLACE . ARG-FORMS) but the
-  ;; read and write of PLACE - not including its subforms - are done
-  ;; only after all ARG-FORMS are evaluated.
-   (defun expand-rmw-macro (function before-arg-forms place after-arg-forms
-                                environment name-hints)
+;; Expand a macro defined by DEFINE-MODIFY-MACRO.
+;; The generated call resembles (FUNCTION <before-args> PLACE <after-args>)
+;; but the read/write of PLACE is done after all {BEFORE,AFTER}-ARG-FORMS are
+;; evaluated. Subforms of PLACE are evaluated in the usual order.
+(defun expand-rmw-macro (function before-arg-forms place after-arg-forms
+                         environment name-hints)
      ;; Note that NAME-HINTS do the wrong thing if you have both "before" and
      ;; "after" args. In that case it is probably best to specify them as ().
      (binding* (((before-temps before-vals before-args)
-                 (collect-call-temps before-arg-forms environment name-hints))
+                 (collect-setf-temps before-arg-forms environment name-hints))
                 ((place-temps place-subforms stores setter getter)
                  (sb!xc:get-setf-expansion place environment))
                 ((after-temps after-vals after-args)
-                 (collect-call-temps after-arg-forms environment name-hints))
+                 (collect-setf-temps after-arg-forms environment name-hints))
                 (compute `(,function ,@before-args ,getter ,@after-args))
                 (set-fn (and (listp setter) (car setter)))
                 (newval-temp (car stores))
@@ -589,7 +598,7 @@
                         (zip after-temps after-vals)
                         newval-binding
                         (cdr stores)))))
-         (if bindings `(let* ,bindings ,setter) setter)))))
+         (if bindings `(let* ,bindings ,setter) setter))))
 
 ;;;; DEFMACRO DEFINE-SETF-EXPANDER and various DEFINE-SETF-EXPANDERs
 
@@ -631,24 +640,23 @@
       (values all-dummies all-vals newvals
               `(values ,@(setters)) `(values ,@(getters))))))
 
-(sb!xc:define-setf-expander getf (place prop
-                                  &optional default
-                                  &environment env)
+(sb!xc:define-setf-expander getf (place prop &optional default &environment env)
   (declare (type sb!c::lexenv env))
-  (multiple-value-bind (temps values stores set get)
-      (sb!xc:get-setf-expansion place env)
-    (let ((newval (gensym))
-          (ptemp (gensym))
-          (def-temp (if default (gensym))))
-      (values `(,@temps ,ptemp ,@(if default `(,def-temp)))
-              `(,@values ,prop ,@(if default `(,default)))
+  (binding* (((place-tempvars place-tempvals stores set get)
+              (sb!xc:get-setf-expansion place env))
+             ((call-tempvars call-tempvals call-args bitmask)
+              (collect-setf-temps (list prop default) env '(indicator default)))
+             (newval (gensym "NEW")))
+      (values `(,@place-tempvars ,@call-tempvars)
+              `(,@place-tempvals ,@call-tempvals)
               `(,newval)
-              `(let ((,(car stores) (%putf ,get ,ptemp ,newval))
+              `(let ((,(car stores) (%putf ,get ,(first call-args) ,newval))
                      ,@(cdr stores))
-                 ,def-temp ;; prevent unused style-warning
+                 ;; prevent "unused variable" style-warning
+                 ,@(when (logbitp 1 bitmask) (last call-tempvars))
                  ,set
                  ,newval)
-              `(getf ,get ,ptemp ,@(if default `(,def-temp)))))))
+              `(getf ,get ,@call-args))))
 
 ;; CLHS Notes on DEFSETF say that: "A setf of a call on access-fn also evaluates
 ;;  all of access-fn's arguments; it cannot treat any of them specially."
@@ -657,18 +665,16 @@
 ;; it. In particular, this must fail: (SETF (GET 'SYM 'IND (ERROR "Foo")) 3).
 
 (sb!xc:defsetf get (symbol indicator &optional default &environment e) (newval)
-  (let ((form `(%put ,symbol ,indicator ,newval)))
-    (if (and default (not (sb!xc:constantp default e)))
-        `(progn ,default ,form) ; reference default to "use" it
-        form)))
+  (let ((constp (sb!xc:constantp default e)))
+    ;; always reference default's temp var to "use" it
+    `(%put ,symbol ,indicator ,(if constp newval `(progn ,default ,newval)))))
 
 ;; A possible optimization for read/modify/write of GETHASH
 ;; would be to predetermine the vector element where the key/value pair goes.
 (sb!xc:defsetf gethash (key hashtable &optional default &environment e) (newval)
-  (let ((form `(%puthash ,key ,hashtable ,newval)))
-    (if (and default (not (sb!xc:constantp default e)))
-        `(progn ,default ,form) ; reference default to "use" it
-        form)))
+  (let ((constp (sb!xc:constantp default e)))
+    ;; always reference default's temp var to "use" it
+    `(%puthash ,key ,hashtable ,(if constp newval `(progn ,default ,newval)))))
 
 (sb!xc:define-setf-expander logbitp (index int &environment env)
   (declare (type sb!c::lexenv env))
