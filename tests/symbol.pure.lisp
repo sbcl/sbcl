@@ -23,7 +23,9 @@
 (with-test (:name (gentemp :pprinter))
   (let* ((*print-pprint-dispatch* (copy-pprint-dispatch)))
     (set-pprint-dispatch 'string
-                         (lambda (stream obj) (write-string "BAR-" stream)))
+                         (lambda (stream obj)
+                           (declare (ignore obj))
+                           (write-string "BAR-" stream)))
     (assert (string= "FOO-" (gentemp "FOO-") :end2 4))))
 
 (with-test (:name (gensym :fixnum-restriction))
@@ -39,3 +41,14 @@
   (assert-error (setf (fdefinition 'mysym) (fdefinition 'if)))
   (assert-error (setf (symbol-function 'mysym) (symbol-function 'and)))
   (assert-error (setf (symbol-function 'mysym) (symbol-function 'if))))
+
+(with-test (:name :macro-guard-function-name)
+  (do-all-symbols (s)
+    (when (macro-function s)
+      (let* ((f (symbol-function s))
+             (name (sb-impl::fun-name f)))
+        (if (special-operator-p s)
+            (assert (typep name '(cons (eql :special)
+                                       (cons symbol null))))
+            (assert (typep name '(cons (eql :macro)
+                                       (cons symbol null)))))))))

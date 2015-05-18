@@ -51,7 +51,7 @@
 (defun %fun-type (function)
   (%simple-fun-type (%fun-fun function)))
 
-(defglobal *closure-name-marker* (make-symbol ".CLOSURE-NAME."))
+(!defglobal *closure-name-marker* (make-symbol ".CLOSURE-NAME."))
 (defun closure-name (closure)
   (declare (closure closure))
   (let ((len (get-closure-length closure)))
@@ -88,8 +88,7 @@
                                         (ash ,index sb!vm:word-shift)))))
         (loop for i from 1 to physical-len
               do (setf (word copy i) (word closure i)))
-        (setf (word copy (1+ physical-len))
-              (load-time-value *closure-name-marker* t))))
+        (setf (word copy (1+ physical-len)) *closure-name-marker*)))
     copy))
 
 ;; Rename a closure. Doing so changes its identity unless it was already named.
