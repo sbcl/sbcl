@@ -259,11 +259,11 @@
 ;;; is a list of all the arguments bound, which the caller should make
 ;;; IGNORABLE if their only purpose is to make the syntax work.
 (defun parse-deftransform (lambda-list node-var error-form)
-  (multiple-value-bind (req opt restp rest keyp keys allowp)
-      (parse-lambda-list lambda-list)
+  (multiple-value-bind (llks req opt rest keys) (parse-lambda-list lambda-list)
     (let* ((tail (make-symbol "ARGS"))
            (dummies (make-gensym-list 2))
            (all-dummies (cons tail dummies))
+           (keyp (ll-kwds-keyp llks))
            (keys (mapcar (lambda (spec)
                            (multiple-value-bind (key var)
                                (if (atom spec)
@@ -294,19 +294,19 @@
           (binds `(,(if (atom arg) arg (car arg)) (pop ,tail))))
         ;; Now if min or max # of args is incorrect,
         ;; or there are unacceptable keywords, bail out
-        (when (or req keyp (not restp))
+        (when (or req keyp (not rest))
           (binds `(,(pop dummies) ; binding is for effect, not value
                    (unless (and ,@(if req `(,final-mandatory-arg))
-                                ,@(if (and (not restp) (not keyp))
+                                ,@(if (and (not rest) (not keyp))
                                       `((endp ,tail)))
                                 ,@(if keyp
-                                      (if allowp
+                                      (if (ll-kwds-allowp llks)
                                           `((check-key-args-constant ,tail))
                                           `((check-transform-keys
                                              ,tail ',(mapcar #'cdr keys))))))
                       ,error-form))))
-        (when restp
-          (binds `(,rest ,tail)))
+        (when rest
+          (binds `(,(car rest) ,tail)))
         ;; Return list of bindings, the list of user-specified symbols,
         ;; and the list of gensyms to be declared ignorable.
         (values (append (binds)

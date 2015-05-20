@@ -160,8 +160,7 @@ EXPERIMENTAL: Interface subject to change."
                  ,@decls
                  ,body))))))
 
-(def!macro defcas (&whole form accessor lambda-list function
-                  &optional docstring)
+(def!macro defcas (accessor lambda-list function &optional docstring)
   #!+sb-doc
   "Analogous to short-form DEFSETF. Defines FUNCTION as responsible
 for compare-and-swap on places accessed using ACCESSOR. LAMBDA-LIST
@@ -172,20 +171,16 @@ resulting from DEFCAS, nor can it verify that they are atomic: it is up to the
 user of DEFCAS to ensure that the function specified is atomic.
 
 EXPERIMENTAL: Interface subject to change."
-  (multiple-value-bind (reqs opts restp rest keyp keys allowp auxp)
-      (parse-lambda-list lambda-list)
-    (declare (ignore keys))
-    (when (or keyp allowp auxp)
-      (error "&KEY, &AUX, and &ALLOW-OTHER-KEYS not allowed in DEFCAS ~
-              lambda-list.~%  ~S" form))
+  (multiple-value-bind (llks reqs opts rest)
+      (parse-lambda-list lambda-list
+                         :disallow '(&key &allow-other-keys &aux &environment)
+                         :context "a DEFCAS lambda-list")
+    (declare (ignore llks))
     `(define-cas-expander ,accessor ,lambda-list
        ,@(when docstring (list docstring))
-       (let ((temps (mapcar #'gensymify
-                            ',(append reqs opts
-                                      (when restp (list (gensymify rest))))))
-             (args (list ,@(append reqs
-                                   opts
-                                   (when restp (list rest)))))
+       ;; FIXME: if a &REST arg is present, this is really weird.
+       (let ((temps (mapcar #'gensymify ',(append reqs opts rest)))
+             (args (list ,@(append reqs opts rest)))
              (old (gensym "OLD"))
              (new (gensym "NEW")))
          (values temps

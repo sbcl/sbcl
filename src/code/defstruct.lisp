@@ -1520,7 +1520,7 @@ or they must be declared locally notinline at each call site.~@:>")
 ;;; the appropriate args to make a constructor.
 (defun create-boa-constructor (defstruct boa creator)
   (declare (type function creator))
-  (multiple-value-bind (req opt restp rest keyp keys allowp auxp aux)
+  (multiple-value-bind (llks req opt rest keys aux)
       (parse-lambda-list (second boa))
     (collect ((arglist)
               (vars)
@@ -1583,14 +1583,15 @@ or they must be declared locally notinline at each call site.~@:>")
                     (t
                      (do-default arg)))))
 
-          (when restp
-            (arglist '&rest rest)
-            (vars rest)
-            (ftype-args '&rest)
-            (arg-type t)
-            (decls `(type list ,rest)))
+          (when rest
+            (let ((rest (car rest)))
+              (arglist '&rest rest)
+              (vars rest)
+              (ftype-args '&rest)
+              (arg-type t)
+              (decls `(type list ,rest))))
 
-          (when keyp
+          (when (ll-kwds-keyp llks)
             (arglist '&key)
             (ftype-args '&key)
             (dolist (key keys)
@@ -1615,11 +1616,11 @@ or they must be declared locally notinline at each call site.~@:>")
                           (vars supplied-test)))))
                   (do-default key t))))
 
-          (when allowp
+          (when (ll-kwds-allowp llks)
             (arglist '&allow-other-keys)
             (ftype-args '&allow-other-keys))
 
-          (when auxp
+          (when (ll-kwds-auxp llks)
             (arglist '&aux)
             (dolist (arg aux)
               (typecase arg

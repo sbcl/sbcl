@@ -280,3 +280,20 @@ the stack without triggering overflow protection.")
           (bug "~S is a legal function name, and cannot be used as a ~
                 debug name." name))
         name))))
+
+;;; A struct containing an indicator of presence of certain lambda-list
+;;; keywords resulting from parsing a lambda-listy thing.
+;;; We don't need flags for &REST or &MORE, but do for &KEY/&AUX
+;;; because sometimes we need to know if they were present at all
+;;; with no variables. Though now that the parser can reject &AUX
+;;; as directed, it might not need a status flag.
+(defstruct (ll-kwds (:type vector)
+                    (:constructor make-ll-kwds (keyp allowp auxp envp))
+                    (:copier nil))
+  (keyp   nil :read-only t)
+  (allowp nil :read-only t)
+  (auxp   nil :read-only t)
+  (envp   nil :read-only t))
+
+(defconstant-eqx +no-lambda-list-keywords+ (make-array 4 :initial-element nil)
+  #'equalp)

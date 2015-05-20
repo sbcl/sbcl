@@ -211,8 +211,9 @@
 ;;; Returns true if number of arguments matches required/optional
 ;;; arguments handler expects.
 (defun internal-error-args-ok (arguments handler)
-  (multiple-value-bind (req opt)
+  (multiple-value-bind (llks req opt)
       (parse-lambda-list (%simple-fun-arglist handler) :silent t)
+    (declare (ignore llks))
     ;; The handler always gets name as the first (extra) argument.
     (let ((n (1+ (length arguments)))
           (n-req (length req))

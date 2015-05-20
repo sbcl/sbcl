@@ -105,17 +105,14 @@
                                        (subseq optional 0 (1+ last-not-rest))))
                                 rest))))
 
-(defun parse-args-types (lambda-list-like-thing)
-  (multiple-value-bind
-        (required optional restp rest keyp keys allowp auxp aux
-                  morep more-context more-count llk-p)
-      (parse-lambda-list-like-thing lambda-list-like-thing :silent t)
-    (declare (ignore aux morep more-context more-count))
-    (when auxp
-      (error "&AUX in a FUNCTION or VALUES type: ~S." lambda-list-like-thing))
+(defun parse-args-types (lambda-listy-thing)
+  (multiple-value-bind (llks required optional rest keys)
+      (parse-lambda-list lambda-listy-thing
+                         :context 'type :disallow '(&aux &environment)
+                         :silent t)
     (let ((required (mapcar #'single-value-specifier-type required))
           (optional (mapcar #'single-value-specifier-type optional))
-          (rest (when restp (single-value-specifier-type rest)))
+          (rest (when rest (single-value-specifier-type (car rest))))
           (keywords
            (collect ((key-info))
              (dolist (key keys)
@@ -124,15 +121,18 @@
                (let ((kwd (first key)))
                  (when (find kwd (key-info) :key #'key-info-name)
                    (error "~@<repeated keyword ~S in lambda list: ~2I~_~S~:>"
-                          kwd lambda-list-like-thing))
+                          kwd lambda-listy-thing))
                  (key-info
                   (make-key-info
                    :name kwd
                    :type (single-value-specifier-type (second key))))))
              (key-info))))
       (multiple-value-bind (required optional rest)
-          (canonicalize-args-type-args required optional rest keyp)
-        (values required optional rest keyp keywords allowp llk-p)))))
+          (canonicalize-args-type-args required optional rest
+                                       (ll-kwds-keyp llks))
+        (values required optional rest
+                (ll-kwds-keyp llks) keywords (ll-kwds-allowp llks)
+                (neq llks +no-lambda-list-keywords+))))))
 
 (defstruct (values-type
             (:include args-type

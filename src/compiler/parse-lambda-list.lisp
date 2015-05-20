@@ -14,98 +14,117 @@
 ;;; Break something like a lambda list (but not necessarily actually a
 ;;; lambda list, e.g. the representation of argument types which is
 ;;; used within an FTYPE specification) into its component parts. We
-;;; return twelve values:
-;;;  1. a list of the required args;
-;;;  2. a list of the &OPTIONAL arg specs;
-;;;  3. true if a &REST arg was specified;
-;;;  4. the &REST arg;
-;;;  5. true if &KEY args are present;
-;;;  6. a list of the &KEY arg specs;
-;;;  7. true if &ALLOW-OTHER-KEYS was specified.;
-;;;  8. true if any &AUX is present (new in SBCL vs. CMU CL);
-;;;  9. a list of the &AUX specifiers;
-;;; 10. true if a &MORE arg was specified;
-;;; 11. the &MORE context var;
-;;; 12. the &MORE count var;
-;;; 13. true if any lambda list keyword is present (only for
-;;;     PARSE-LAMBDA-LIST-LIKE-THING).
+;;; return eight values:
+;;;  1. a LAMBDA-LIST-KEYWORDS structure, if any were present
+;;;  2. a list of the required args;
+;;;  3. a list of the &OPTIONAL arg specs;
+;;;  4. a singleton list of the &REST arg if present;
+;;;  5. a list of the &KEY arg specs;
+;;;  6. a list of the &AUX specifiers;
+;;;  7. the &MORE context and count vars if present;
+;;;  8. the &ENVIRONMENT arg if present
 ;;;
 ;;; The top level lambda list syntax is checked for validity, but the
 ;;; arg specifiers are just passed through untouched. If something is
 ;;; wrong, we use COMPILER-ERROR, aborting compilation to the last
 ;;; recovery point.
-(declaim (ftype (sfunction (list &key (:silent boolean))
-                           (values list list boolean t boolean list boolean
-                                   boolean list boolean t t boolean))
-                parse-lambda-list-like-thing))
-(declaim (ftype (sfunction (list &key (:silent boolean))
-                           (values list list boolean t boolean list boolean
-                                   boolean list boolean t t))
+(declaim (ftype (sfunction
+                 (list &key (:context t) (:disallow list) (:silent boolean))
+                 (values (simple-vector 4) list list list list list list t))
                 parse-lambda-list))
-(defun parse-lambda-list-like-thing (list &key silent)
-  (collect ((required)
-            (optional)
-            (keys)
-            (aux))
-    (let ((restp nil)
-          (rest nil)
-          (morep nil)
-          (more-context nil)
-          (more-count nil)
+
+;;; Note: CLHS 3.4.4 [macro lambda list] allows &ENVIRONMENT anywhere,
+;;; but 3.4.7 [defsetf lambda list] has it only at the end.
+;;; This is possibly surprising to people since there seems to be some
+;;; expectation that a DEFSETF lambda list is a macro lambda list,
+;;; which it isn't. We'll relax and accept &ENVIRONMENT in the middle.
+;;; But we won't accept the ugly syntax that parse-defmacro accidentally
+;;; allows of (A B &ENVIRONMENT E X Y) which has 4 positional parameters.
+;;; Nor can it appear between &KEY and &ALLOW-OTHER-KEYS.
+;;;
+(defun parse-lambda-list (list &key (disallow '(&environment)) context silent)
+  (collect ((required) (optional) (more) (keys) (aux))
+    (let ((rest nil)
           (keyp nil)
           (auxp nil)
           (allowp nil)
+          (tail list)
+          (arg nil)
+          (envp nil)
+          (env nil)
+          (saved-state nil)
           (state :required))
-      (declare (type (member :allow-other-keys :aux
-                             :key
-                             :more-context :more-count
-                             :optional
-                             :post-more :post-rest
-                             :required :rest)
-                     state))
-      (dolist (arg list)
-        (if (member arg sb!xc:lambda-list-keywords)
-            (case arg
-              (&optional
-               (unless (eq state :required)
-                 (compiler-error "misplaced &OPTIONAL in lambda list: ~S"
-                                 list))
-               (setq state :optional))
-              (&rest
-               (unless (member state '(:required :optional))
-                 (compiler-error "misplaced &REST in lambda list: ~S" list))
-               (setq state :rest))
-              (&more
-               (unless (member state '(:required :optional))
-                 (compiler-error "misplaced &MORE in lambda list: ~S" list))
-               (setq morep t
-                     state :more-context))
+      (labels ((croak (string &rest err-args)
+                 (compiler-error 'simple-program-error
+                                 :format-control string
+                                 :format-arguments err-args))
+               (need-symbol (x why)
+                 (unless (symbolp x)
+                   (croak "~A is not a symbol: ~S" why x))))
+        (flet ((transition (from-states to-state &optional visited-p)
+                 (when (and (eq state :post-env) (neq saved-state :key))
+                   (shiftf state saved-state nil)) ; pop the state
+                 (cond ((not (member state from-states))
+                        (croak "misplaced ~S in lambda list: ~S" arg list))
+                       (visited-p
+                        (croak "repeated ~S in lambda list: ~S" arg list))
+                       (t
+                        (setq state to-state))))
+               (handle-parameter ()
+                 (setq state
+                  (case state
+                    (:required (required arg) state)
+                    (:optional (optional arg) state)
+                    (:rest     (setq rest (list arg)) :post-rest)
+                    (:more     (more arg) (if (cdr (more)) :post-more :more))
+                    (:key      (keys arg) state)
+                    (:aux      (aux arg) state)
+                    (:env      (setq env arg)
+                               (if (and (eq saved-state :required)
+                                        (not (required))) :required :post-env))
+                    (t (croak "expecting lambda list keyword at ~S in: ~S"
+                              arg list)))))
+               (explain-context ()
+                 (case context
+                   (type "a FUNCTION or VALUES type specifier")
+                   (t context))))
+          (loop
+           (when (endp tail) (return))
+           (setq arg (pop tail))
+           (cond
+            ((or (not (symbolp arg))
+                 (let ((name (symbol-name arg)))
+                   (or (zerop (length name)) (char/= (char name 0) #\&))))
+             (handle-parameter))
+            ((member arg disallow)
+             (if context
+                 (croak "~A is not allowed in ~A: ~S" arg (explain-context) list)
+                 (croak "Bad lambda list keyword ~S in: ~S" arg list)))
+            (t
+             (case arg
+              (&optional (transition '(:required) :optional))
+              (&rest     (transition '(:required :optional) :rest))
+              (&more     (transition '(:required :optional) :more))
               (&key
-               (unless (member state
-                               '(:required :optional :post-rest :post-more))
-                 (compiler-error "misplaced &KEY in lambda list: ~S" list))
+               (transition '(:required :optional :post-rest :post-more)
+                           :key)
+               (setq keyp t)
                #-sb-xc-host
-               (when (optional)
-                 (unless silent
-                   (compiler-style-warn
-                    "&OPTIONAL and &KEY found in the same lambda list: ~S" list)))
-               (setq keyp t
-                     state :key))
-              (&allow-other-keys
-               (unless (eq state ':key)
-                 (compiler-error "misplaced &ALLOW-OTHER-KEYS in ~
-                                  lambda list: ~S"
-                                 list))
-               (setq allowp t
-                     state :allow-other-keys))
-              (&aux
-               (when (member state '(:rest :more-context :more-count))
-                 (compiler-error "misplaced &AUX in lambda list: ~S" list))
-               (when auxp
-                 (compiler-error "multiple &AUX in lambda list: ~S" list))
-               (setq auxp t
-                     state :aux))
-              (t
+               (when (and (optional) (not silent))
+                 (compiler-style-warn
+                  "&OPTIONAL and &KEY found in the same lambda list: ~S" list)))
+              (&allow-other-keys (transition '(:key) :allow-other-keys)
+                                 (setq allowp t))
+              (&aux (transition '(:post-more :required :optional :post-rest
+                                  :key :allow-other-keys) :aux)
+                    (setq auxp t))
+              (&environment
+               (let ((current state))
+                 ;; Valid "from" states are almost like &AUX
+                 (transition '(:required :optional :post-rest
+                               :key :allow-other-keys) :env envp)
+                 (setq envp t saved-state current)))
+              ((&body &whole)
                ;; It could be argued that &WHOLE and friends would be
                ;; just ordinary variables in an ordinary lambda-list,
                ;; but since (1) that seem exceedingly to have been the
@@ -119,91 +138,52 @@
                ;; specifier ot a lambda list keyword. Ergo, symbols
                ;; appearing in LAMBDA-LIST-KEYWORDS cannot be
                ;; parameter specifiers.]
-               (compiler-error 'simple-program-error
-                               :format-control "Bad lambda list keyword ~S in: ~S"
-                               :format-arguments (list arg list))))
-            (progn
-              (when (symbolp arg)
-                (let ((name (symbol-name arg)))
-                  (when (and (plusp (length name))
-                             (char= (char name 0) #\&))
+               (croak "Bad lambda list keyword ~S in: ~S" arg list))
+              (t
+               (unless silent
                     ;; Should this be COMPILER-STYLE-WARN?
-                    (unless silent
-                      (style-warn
-                       "suspicious variable in lambda list: ~S." arg)))))
-              (case state
-                (:required (required arg))
-                (:optional (optional arg))
-                (:rest
-                 (setq restp t
-                       rest arg
-                       state :post-rest))
-                (:more-context
-                 (setq more-context arg
-                       state :more-count))
-                (:more-count
-                 (setq more-count arg
-                       state :post-more))
-                (:key (keys arg))
-                (:aux (aux arg))
-                (t
-                 (compiler-error "found garbage in lambda list when expecting ~
-                                  a keyword: ~S"
-                                 arg))))))
-      (when (eq state :rest)
-        (compiler-error "&REST without rest variable"))
+                 (style-warn "suspicious variable in lambda list: ~S." arg))
+               (handle-parameter))))))
 
-      (values (required) (optional) restp rest keyp (keys) allowp auxp (aux)
-              morep more-context more-count
-              (neq state :required)))))
+          (when (member state '(:rest :more :env))
+            (croak "~A expects a variable following it" arg)))
 
-;;; like PARSE-LAMBDA-LIST-LIKE-THING, except our LAMBDA-LIST argument
-;;; really *is* a lambda list, not just a "lambda-list-like thing", so
-;;; can barf on things which're illegal as arguments in lambda lists
-;;; even if they could conceivably be legal in not-quite-a-lambda-list
-;;; weirdosities
-(defun parse-lambda-list (lambda-list &key silent)
-  ;; Classify parameters without checking their validity individually.
-  (multiple-value-bind (required optional restp rest keyp keys allowp auxp aux
-                        morep more-context more-count)
-      (parse-lambda-list-like-thing lambda-list :silent silent)
-
-    ;; Check validity of parameters.
-    (flet ((need-symbol (x why)
-             (unless (symbolp x)
-               (compiler-error "~A is not a symbol: ~S" why x))))
-      (dolist (i required)
-        (need-symbol i "Required argument"))
-      (dolist (i optional)
-        (typecase i
-          (symbol)
-          (cons
-           (destructuring-bind (var &optional init-form supplied-p) i
-             (declare (ignore init-form supplied-p))
-             (need-symbol var "&OPTIONAL parameter name")))
-          (t
-           (compiler-error "&OPTIONAL parameter is not a symbol or cons: ~S"
-                           i))))
-      (when restp
-        (need-symbol rest "&REST argument"))
-      (when keyp
-        (dolist (i keys)
-          (typecase i
-            (symbol)
-            (cons
-             (destructuring-bind (var-or-kv &optional init-form supplied-p) i
-               (declare (ignore init-form supplied-p))
-               (if (consp var-or-kv)
-                   (destructuring-bind (keyword-name var) var-or-kv
-                     (declare (ignore keyword-name))
-                     (need-symbol var "&KEY parameter name"))
-                   (need-symbol var-or-kv "&KEY parameter name"))))
-            (t
-             (compiler-error "&KEY parameter is not a symbol or cons: ~S"
-                             i))))))
+      ;; For CONTEXT other than 'TYPE we reject illegal list elements.
+      ;; TYPEs have arbitrary shapes,
+      ;; such as (VALUES (ARRAY (MUMBLE) (1 2)) &OPTIONAL (MEMBER X Y Z)).
+      ;; But why don't we reject constant symbols here?
+        (unless (eq context 'type)
+          (dolist (i (required))
+            (need-symbol i "Required argument"))
+          (dolist (i (optional))
+            (typecase i
+              (symbol)
+              (cons
+               (destructuring-bind (var &optional init-form supplied-p) i
+                 (declare (ignore init-form supplied-p))
+                 (need-symbol var "&OPTIONAL parameter name")))
+              (t
+               (croak "&OPTIONAL parameter is not a symbol or cons: ~S" i))))
+          (when rest
+            (need-symbol (car rest) "&REST argument"))
+          (dolist (i (keys))
+            (typecase i
+              (symbol)
+              (cons
+               (destructuring-bind (var-or-kv &optional init-form supplied-p) i
+                 (declare (ignore init-form supplied-p))
+                 (if (consp var-or-kv)
+                     (destructuring-bind (keyword-name var) var-or-kv
+                       (declare (ignore keyword-name))
+                       (need-symbol var "&KEY parameter name"))
+                     (need-symbol var-or-kv "&KEY parameter name"))))
+              (t
+               (croak "&KEY parameter is not a symbol or cons: ~S" i))))))
 
     ;; Voila.
-    (values required optional restp rest keyp keys allowp auxp aux
-            morep more-context more-count)))
+      (values (if (or (neq state :required) envp)
+                  (make-ll-kwds keyp allowp auxp envp)
+                  +no-lambda-list-keywords+)
+              (required) (optional) rest (keys) (aux) (more) env))))
 
 (/show0 "parse-lambda-list.lisp end of file")

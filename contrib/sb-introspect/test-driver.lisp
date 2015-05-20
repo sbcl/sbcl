@@ -241,20 +241,19 @@
 ;;    (GF.A GF.B &REST GF.REST &KEY GF.K-X M1.K-Z M1.K-Y M2.K-Q)
 ;;
 (deftest gf-interplay.1
-    (multiple-value-bind (required optional restp rest keyp keys allowp
-                                auxp aux morep more-context more-count)
+    (multiple-value-bind (llks required optional rest keys aux more)
         (sb-int:parse-lambda-list (function-lambda-list #'xuuq))
       (and (equal required '(gf.a gf.b))
            (null optional)
-           (and restp (eql rest 'gf.rest))
-           (and keyp
+           (eq (car rest) 'gf.rest)
+           (and (sb-int:ll-kwds-keyp llks)
                 (member 'gf.k-X keys)
                 (member 'm1.k-Y keys)
                 (member 'm1.k-Z keys)
                 (member 'm2.k-Q keys))
-           (not allowp)
-           (and (not auxp) (null aux))
-           (and (not morep) (null more-context) (not more-count))))
+           (not (sb-int:ll-kwds-allowp llks))
+           (and (not (sb-int:ll-kwds-auxp llks)) (null aux))
+           (null more)))
   t)
 
 ;;; Check what happens when there's no explicit DEFGENERIC.

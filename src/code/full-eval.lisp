@@ -284,11 +284,15 @@
 ;;;
 ;;; Used only for implementing calls to interpreted functions.
 (defun parse-arguments (arguments lambda-list)
-  (multiple-value-bind (required optional rest-p rest keyword-p
-                        keyword allow-other-keys-p aux-p aux)
+  (multiple-value-bind (llks required optional rest keyword aux)
       (handler-bind ((style-warning #'muffle-warning))
         (sb!int:parse-lambda-list lambda-list))
     (let* ((original-arguments arguments)
+           (rest-p (not (null rest)))
+           (rest (car rest))
+           (keyword-p (sb!int:ll-kwds-keyp llks))
+           (allow-other-keys-p (sb!int:ll-kwds-allowp llks))
+           (aux-p (sb!int:ll-kwds-auxp llks))
            (arguments-present (length arguments))
            (required-length (length required))
            (optional-length (length optional))

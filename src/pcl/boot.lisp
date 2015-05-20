@@ -209,7 +209,7 @@ bootstrapping.
                (setf (initarg car-option)
                      `',(cdr option)))
               (:argument-precedence-order
-               (let* ((required (parse-lambda-list lambda-list))
+               (let* ((required (nth-value 1 (parse-lambda-list lambda-list)))
                       (supplied (cdr option)))
                  (unless (= (length required) (length supplied))
                    (error 'simple-program-error
@@ -291,31 +291,19 @@ bootstrapping.
                     :format-control
                     "~@<invalid ~S ~_in the generic function lambda list ~S~:>"
                     :format-arguments (list arg lambda-list))))
-    (multiple-value-bind (required optional restp rest keyp keys allowp
-                          auxp aux morep more-context more-count)
-        (parse-lambda-list lambda-list)
-      (declare (ignore required)) ; since they're no different in a gf ll
-      (declare (ignore restp rest)) ; since they're no different in a gf ll
-      (declare (ignore allowp)) ; since &ALLOW-OTHER-KEYS is fine either way
-      (declare (ignore aux)) ; since we require AUXP=NIL
-      (declare (ignore more-context more-count)) ; safely ignored unless MOREP
+    (multiple-value-bind (llks required optional rest keys)
+        (parse-lambda-list lambda-list
+                           :disallow '(&aux &environment &more)
+                           :context "a generic function lambda list")
+      (declare (ignore llks rest))
       ;; no defaults allowed for &OPTIONAL arguments
       (dolist (arg optional)
         (or (symbol-or-singleton-p arg) (complain arg)))
       ;; no defaults allowed for &KEY arguments
-      (when keyp
-        (dolist (arg keys)
-          (or (symbol-or-singleton-p arg)
-              (typep arg '(cons (cons symbol (cons symbol null)) null))
-              (complain arg))))
-      ;; no &AUX allowed
-      (when auxp
-        (error "&AUX is not allowed in a generic function lambda list: ~S"
-               lambda-list))
-      ;; Oh, *puhlease*... not specifically as per section 3.4.2 of
-      ;; the ANSI spec, but the CMU CL &MORE extension does not
-      ;; belong here!
-      (aver (not morep)))))
+      (dolist (arg keys)
+        (or (symbol-or-singleton-p arg)
+            (typep arg '(cons (cons symbol (cons symbol null)) null))
+            (complain arg))))))
 
 (defmacro defmethod (name &rest args)
   (multiple-value-bind (qualifiers lambda-list body)

@@ -87,10 +87,8 @@
 (declaim (ftype (sfunction (list) (values list boolean boolean list list))
                 make-lambda-vars))
 (defun make-lambda-vars (list)
-  (multiple-value-bind (required optional restp rest keyp keys allowp auxp aux
-                        morep more-context more-count)
+  (multiple-value-bind (llks required optional rest keys aux more-vars)
       (parse-lambda-list list)
-    (declare (ignore auxp)) ; since we just iterate over AUX regardless
     (collect ((vars)
               (names-so-far)
               (aux-vars)
@@ -131,23 +129,23 @@
                 (names-so-far name)
                 (parse-default spec info))))
 
-        (when restp
-          (let ((var (varify-lambda-arg rest (names-so-far))))
+        (when rest
+          (let ((var (varify-lambda-arg (car rest) (names-so-far))))
             (setf (lambda-var-arg-info var) (make-arg-info :kind :rest))
             (vars var)
-            (names-so-far rest)))
+            (names-so-far (lambda-var-%source-name var))))
 
-        (when morep
-          (let ((var (varify-lambda-arg more-context (names-so-far))))
+        (when more-vars
+          (let ((var (varify-lambda-arg (car more-vars) (names-so-far))))
             (setf (lambda-var-arg-info var)
                   (make-arg-info :kind :more-context))
             (vars var)
-            (names-so-far more-context))
-          (let ((var (varify-lambda-arg more-count (names-so-far))))
+            (names-so-far (lambda-var-%source-name var)))
+          (let ((var (varify-lambda-arg (cadr more-vars) (names-so-far))))
             (setf (lambda-var-arg-info var)
                   (make-arg-info :kind :more-count))
             (vars var)
-            (names-so-far more-count)))
+            (names-so-far (lambda-var-%source-name var))))
 
         (dolist (spec keys)
           (cond
@@ -202,7 +200,8 @@
                    (aux-vals (second spec))
                    (names-so-far name)))))
 
-        (values (vars) keyp allowp (aux-vars) (aux-vals))))))
+        (values (vars) (ll-kwds-keyp llks) (ll-kwds-allowp llks)
+                (aux-vars) (aux-vals))))))
 
 ;;; This is similar to IR1-CONVERT-PROGN-BODY except that we
 ;;; sequentially bind each AUX-VAR to the corresponding AUX-VAL before
@@ -1135,17 +1134,16 @@
 ;;; return type is *, and each individual arguments type is T -- but we get
 ;;; the argument counts and keywords.
 (defun ftype-from-lambda-list (lambda-list)
-  (multiple-value-bind (req opt restp rest-name keyp key-list allowp morep)
+  (multiple-value-bind (llks req opt rest key-list aux more)
       (parse-lambda-list lambda-list)
-    (declare (ignore rest-name))
-    (flet ((t (list)
-             (mapcar (constantly t) list)))
-      (let ((reqs (t req))
-            (opts (when opt (cons '&optional (t opt))))
+    (declare (ignore aux))
+    (flet ((list-of-t (list) (mapcar (constantly t) list)))
+      (let ((reqs (list-of-t req))
+            (opts (when opt (cons '&optional (list-of-t opt))))
             ;; When it comes to building a type, &REST means pretty much the
             ;; same thing as &MORE.
-            (rest (when (or morep restp) (list '&rest t)))
-            (keys (when keyp
+            (rest (when (or more rest) '(&rest t)))
+            (keys (when (ll-kwds-keyp llks)
                     (cons '&key (mapcar (lambda (spec)
                                           (let ((key/var (if (consp spec)
                                                              (car spec)
@@ -1155,7 +1153,7 @@
                                                       (keywordicate key/var))
                                                   t)))
                                         key-list))))
-            (allow (when allowp (list '&allow-other-keys))))
+            (allow (when (ll-kwds-allowp llks) '(&allow-other-keys))))
         (specifier-type `(function (,@reqs ,@opts ,@rest ,@keys ,@allow) *))))))
 
 ;;; Get a DEFINED-FUN object for a function we are about to define. If

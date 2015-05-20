@@ -619,14 +619,12 @@
                (gf-lambda-list (generic-function-lambda-list gf))
                (tfun (constantly t))
                keysp)
-          (multiple-value-bind (gf.required gf.optional gf.restp gf.rest
-                                            gf.keyp gf.keys gf.allowp)
+          (multiple-value-bind (llks gf.required gf.optional gf.rest gf.keys)
               (parse-lambda-list gf-lambda-list)
-            (declare (ignore gf.rest))
             ;; 7.6.4 point 5 probably entails that if any method says
             ;; &allow-other-keys then the gf should be construed to
             ;; accept any key.
-            (let* ((allowp (or gf.allowp
+            (let* ((allowp (or (ll-kwds-allowp llks)
                                (find '&allow-other-keys methods
                                      :test #'find
                                      :key #'method-lambda-list)))
@@ -636,9 +634,9 @@
                        (,@(mapcar tfun gf.required)
                           ,@(if gf.optional
                                 `(&optional ,@(mapcar tfun gf.optional)))
-                          ,@(if gf.restp
+                          ,@(if gf.rest
                                 `(&rest t))
-                          ,@(when gf.keyp
+                          ,@(when (ll-kwds-keyp llks)
                               (let ((all-keys
                                      (mapcar
                                       (lambda (x)
@@ -1724,8 +1722,8 @@
         (methods (generic-function-methods generic-function)))
     (if (null methods)
         gf-lambda-list
-        (multiple-value-bind (gf.required gf.optional gf.rest gf.keys gf.allowp)
-            (%split-arglist gf-lambda-list)
+        (multiple-value-bind (gf.llks gf.required gf.optional gf.rest gf.keys)
+            (parse-lambda-list gf-lambda-list :silent t)
           ;; Possibly extend the keyword parameters of the gf by
           ;; additional key parameters of its methods:
           (let ((methods.keys nil) (methods.allowp nil))
@@ -1735,7 +1733,7 @@
                 (setq methods.keys (union methods.keys m.keyparams :key #'maybe-car))
                 (setq methods.allowp (or methods.allowp m.allow-other-keys))))
             (let ((arglist '()))
-              (when (or gf.allowp methods.allowp)
+              (when (or (ll-kwds-allowp gf.llks) methods.allowp)
                 (push '&allow-other-keys arglist))
               (when (or gf.keys methods.keys)
                 ;; We make sure that the keys of the gf appear before
@@ -1745,7 +1743,7 @@
                                      (nset-difference methods.keys gf.keys)
                                      arglist)))
               (when gf.rest
-                (setq arglist (nconc (list '&rest gf.rest) arglist)))
+                (setq arglist (nconc (cons '&rest gf.rest) arglist)))
               (when gf.optional
                 (setq arglist (nconc (list '&optional) gf.optional arglist)))
               (nconc gf.required arglist)))))))
@@ -1754,14 +1752,3 @@
   (if (listp thing)
       (car thing)
       thing))
-
-
-(defun %split-arglist (lambda-list)
-  ;; This function serves to shrink the number of returned values of
-  ;; PARSE-LAMBDA-LIST to something handier.
-  (multiple-value-bind (required optional restp rest keyp keys allowp
-                        auxp aux morep more-context more-count)
-      (parse-lambda-list lambda-list :silent t)
-    (declare (ignore restp keyp auxp aux morep))
-    (declare (ignore more-context more-count))
-    (values required optional rest keys allowp)))
