@@ -112,11 +112,11 @@
 (defun convert-call (ref call fun)
   (declare (type ref ref) (type combination call) (type clambda fun))
   (propagate-to-args call fun)
-  (setf (basic-combination-kind call) :local)
   (unless (call-full-like-p call)
     (dolist (arg (basic-combination-args call))
       (when arg
         (flush-lvar-externally-checkable-type arg))))
+  (setf (basic-combination-kind call) :local)
   (sset-adjoin fun (lambda-calls-or-closes (node-home-lambda call)))
   (recognize-dynamic-extent-lvars call fun)
   (merge-tail-sets call fun)
