@@ -292,7 +292,6 @@
            (rest (car rest))
            (keyword-p (sb!int:ll-kwds-keyp llks))
            (allow-other-keys-p (sb!int:ll-kwds-allowp llks))
-           (aux-p (sb!int:ll-kwds-auxp llks))
            (arguments-present (length arguments))
            (required-length (length required))
            (optional-length (length optional))
@@ -351,7 +350,7 @@
                 (push (cons (supplied-p-parameter keyword-spec)
                             (list 'quote (not (eq supplied *not-present*))))
                       let*-like-bindings))))))
-      (when aux-p
+      (when aux
         (do ()
             ((null aux))
           (let ((this-aux (pop aux)))

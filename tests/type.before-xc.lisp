@@ -342,4 +342,7 @@
 (assert (type= (specifier-type 'nil)
                (specifier-type '(and symbol funcallable-instance))))
 
+(assert (not (type= (specifier-type '(function (t) (values &optional)))
+                    (specifier-type '(function (t) (values))))))
+
 (/show "done with tests/type.before-xc.lisp")

@@ -1620,7 +1620,10 @@ or they must be declared locally notinline at each call site.~@:>")
             (arglist '&allow-other-keys)
             (ftype-args '&allow-other-keys))
 
-          (when (ll-kwds-auxp llks)
+          ;; PARSE-LAMBDA-LIST doesn't distinguish between &AUX with nothing
+          ;; after it, and absence of &AUX. They mean the same thing, even as
+          ;; "interesting" as &AUX can be in a BOA lambda list [CLHS 3.4.6]
+          (when aux
             (arglist '&aux)
             (dolist (arg aux)
               (typecase arg

@@ -132,7 +132,7 @@
                                        (ll-kwds-keyp llks))
         (values required optional rest
                 (ll-kwds-keyp llks) keywords (ll-kwds-allowp llks)
-                (neq llks +no-lambda-list-keywords+))))))
+                (not (null llks)))))))
 
 (defstruct (values-type
             (:include args-type

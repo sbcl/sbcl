@@ -281,19 +281,11 @@ the stack without triggering overflow protection.")
                 debug name." name))
         name))))
 
-;;; A struct containing an indicator of presence of certain lambda-list
-;;; keywords resulting from parsing a lambda-listy thing.
-;;; We don't need flags for &REST or &MORE, but do for &KEY/&AUX
-;;; because sometimes we need to know if they were present at all
-;;; with no variables. Though now that the parser can reject &AUX
-;;; as directed, it might not need a status flag.
-(defstruct (ll-kwds (:type vector)
-                    (:constructor make-ll-kwds (keyp allowp auxp envp))
-                    (:copier nil))
-  (keyp   nil :read-only t)
-  (allowp nil :read-only t)
-  (auxp   nil :read-only t)
-  (envp   nil :read-only t))
-
-(defconstant-eqx +no-lambda-list-keywords+ (make-array 4 :initial-element nil)
-  #'equalp)
+;;; Some accessors to distinguish a parse of (values &optional) from (values)
+;;; and (lambda (x &key)) from (lambda (x)). If any lambda list keyword was seen
+;;; in the argument to PARSE-LAMBDA-LIST then it returns a cons of two booleans
+;;; signifying whether &KEY and &ALLOW-OTHER-KEYS were present.
+;;; Otherwise it returns NIL for absence of all lambda list keywords.
+(declaim (inline ll-kwds-keyp ll-kwds-allowp))
+(defun ll-kwds-keyp (x) (car x))
+(defun ll-kwds-allowp (x) (cdr x))

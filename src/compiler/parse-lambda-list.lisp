@@ -15,14 +15,15 @@
 ;;; lambda list, e.g. the representation of argument types which is
 ;;; used within an FTYPE specification) into its component parts. We
 ;;; return eight values:
-;;;  1. a LAMBDA-LIST-KEYWORDS structure, if any were present
+;;;  1. a cons of booleans indicating presence of &KEY/&ALLOW-OTHER-KEYS
+;;;     or NIL if there were no lambda list keywords at all.
 ;;;  2. a list of the required args;
 ;;;  3. a list of the &OPTIONAL arg specs;
 ;;;  4. a singleton list of the &REST arg if present;
 ;;;  5. a list of the &KEY arg specs;
 ;;;  6. a list of the &AUX specifiers;
 ;;;  7. the &MORE context and count vars if present;
-;;;  8. the &ENVIRONMENT arg if present
+;;;  8. a singleton list of the &ENVIRONMENT arg if present
 ;;;
 ;;; The top level lambda list syntax is checked for validity, but the
 ;;; arg specifiers are just passed through untouched. If something is
@@ -30,7 +31,7 @@
 ;;; recovery point.
 (declaim (ftype (sfunction
                  (list &key (:context t) (:disallow list) (:silent boolean))
-                 (values (simple-vector 4) list list list list list list t))
+                 (values list list list list list list list list))
                 parse-lambda-list))
 
 ;;; Note: CLHS 3.4.4 [macro lambda list] allows &ENVIRONMENT anywhere,
@@ -46,12 +47,10 @@
   (collect ((required) (optional) (more) (keys) (aux))
     (let ((rest nil)
           (keyp nil)
-          (auxp nil)
           (allowp nil)
+          (env nil)
           (tail list)
           (arg nil)
-          (envp nil)
-          (env nil)
           (saved-state nil)
           (state :required))
       (labels ((croak (string &rest err-args)
@@ -79,7 +78,7 @@
                     (:more     (more arg) (if (cdr (more)) :post-more :more))
                     (:key      (keys arg) state)
                     (:aux      (aux arg) state)
-                    (:env      (setq env arg)
+                    (:env      (setq env (list arg))
                                (if (and (eq saved-state :required)
                                         (not (required))) :required :post-env))
                     (t (croak "expecting lambda list keyword at ~S in: ~S"
@@ -116,14 +115,12 @@
               (&allow-other-keys (transition '(:key) :allow-other-keys)
                                  (setq allowp t))
               (&aux (transition '(:post-more :required :optional :post-rest
-                                  :key :allow-other-keys) :aux)
-                    (setq auxp t))
+                                  :key :allow-other-keys) :aux))
               (&environment
-               (let ((current state))
-                 ;; Valid "from" states are almost like &AUX
-                 (transition '(:required :optional :post-rest
-                               :key :allow-other-keys) :env envp)
-                 (setq envp t saved-state current)))
+               (setq saved-state state)
+               ;; Valid "from" states are almost like &AUX
+               (transition '(:required :optional :post-rest
+                             :key :allow-other-keys) :env env))
               ((&body &whole)
                ;; It could be argued that &WHOLE and friends would be
                ;; just ordinary variables in an ordinary lambda-list,
@@ -181,9 +178,7 @@
                (croak "&KEY parameter is not a symbol or cons: ~S" i))))))
 
     ;; Voila.
-      (values (if (or (neq state :required) envp)
-                  (make-ll-kwds keyp allowp auxp envp)
-                  +no-lambda-list-keywords+)
+      (values (if (or (neq state :required) env) (cons keyp allowp))
               (required) (optional) rest (keys) (aux) (more) env))))
 
 (/show0 "parse-lambda-list.lisp end of file")

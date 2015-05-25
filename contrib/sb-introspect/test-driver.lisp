@@ -252,7 +252,7 @@
                 (member 'm1.k-Z keys)
                 (member 'm2.k-Q keys))
            (not (sb-int:ll-kwds-allowp llks))
-           (and (not (sb-int:ll-kwds-auxp llks)) (null aux))
+           (null aux)
            (null more)))
   t)
 
