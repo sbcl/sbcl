@@ -17,6 +17,13 @@
 ;;; global policy restrictions as a POLICY object or nil
 (defvar *policy-restrictions* nil)
 
+;;; ** FIXME: The check in ADVISE-IF-REPEATED-OPTIMIZE-QUALITIES fails
+;;; spuriously when you restrict the policy.
+;;; It asserts that you did not specify some quality value that is not the
+;;; effective value for the quality after processing all declarations,
+;;; because if it isn't, then there must have been an ignored duplicate.
+;;; So any value you specify other than the floor appears as if it got ignored.
+
 (defun restrict-compiler-policy (&optional quality (min 0))
   #!+sb-doc
   "Assign a minimum value to an optimization quality. QUALITY is the name of
@@ -47,7 +54,9 @@ EXPERIMENTAL INTERFACE: Subject to change."
       (setf *policy-restrictions* (make-policy 0 0)))
     (alter-policy *policy-restrictions* (policy-quality-name-p quality)
                   min (plusp min)))
-  *policy-restrictions*)
+  ;; Return dotted pairs, not elements that look declaration-like.
+  (mapc (lambda (x) (rplacd x (cadr x)))
+        (policy-to-decl-spec *policy-restrictions*)))
 
 (defstruct (policy-dependent-quality (:copier nil))
   (name nil :type symbol :read-only t)
@@ -111,12 +120,10 @@ EXPERIMENTAL INTERFACE: Subject to change."
 ;; Return POLICY as a list suitable to the OPTIMIZE declaration.
 ;; If FORCE-ALL then include qualities without an explicit value too.
 (defun policy-to-decl-spec (policy &optional (raw t) force-all)
-  (loop with presence = (if force-all
-                            (ldb (byte max-policy-qualities 0) -1)
-                            (policy-presence-bits policy))
+  (loop with presence = (policy-presence-bits policy)
         for index from (- n-policy-primary-qualities)
         below (length **policy-dependent-qualities**)
-        when (logbitp (mod index max-policy-qualities) presence)
+        when (or force-all (logbitp (mod index max-policy-qualities) presence))
         collect
        (list (if (minusp index)
                  (elt **policy-primary-qualities** (lognot index))

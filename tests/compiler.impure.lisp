@@ -1477,6 +1477,22 @@
                                      (boundp '*v*)))
                      1))
     (sb-ext:restrict-compiler-policy 'debug 0)))
+
+(with-test (:name :restrict-compiler-policy-result)
+  (let ((sb-c::*policy-restrictions* sb-c::*policy-restrictions*))
+    (let ((res (sb-ext:restrict-compiler-policy 'safety 2)))
+      ;; returns an alist
+      (assert (equal res '((safety . 2)))))
+    (let ((res (sb-ext:restrict-compiler-policy 'debug 3)))
+      ;; returns an alist, indeterminate order
+      (assert (or (equal res '((safety . 2) (debug . 3)))
+                  (equal res '((debug . 3) (safety . 2))))))
+    ;; remove the SAFETY restriction
+    (let ((res (sb-ext:restrict-compiler-policy 'safety 0)))
+      (assert (equal res '((debug . 3)))))
+    ;; remove the DEBUG restriction
+    (let ((res (sb-ext:restrict-compiler-policy 'debug 0)))
+      (assert (null res)))))
 
 ;;;; tests not in the problem domain, but of the consistency of the
 ;;;; compiler machinery itself
