@@ -2,6 +2,8 @@
 changes relative to sbcl-1.2.12:
   * enhancement: On Windows DBG_PRINTEXCEPTION_C is handled and its message is
     printed. (lp#1437947)
+  * bug-fix: TRUENAME works properly on broken symlinks presented as
+    directories. (lp#1458164)
 
 changes in sbcl-1.2.12 relative to sbcl-1.2.11:
   * minor incompatible change: the SB-C::*POLICY* variable is no longer

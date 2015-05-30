@@ -56,6 +56,7 @@ run_sbcl <<EOF
   (assert (equal (truename "link-1")     #p"$testdir/test-1.tmp"))
   (assert (equal (truename "link-2")     #p"$testdir/test-2.tmp"))
   (assert (equal (truename "link-3")     #p"$testdir/link-3"))
+  (assert (equal (truename "link-3/")    #p"$testdir/link-3"))
   (assert (equal (truename "link-4")     #p"$testdir/link-4"))
   (assert (equal (truename "link-5")     #p"$testdir/link-5"))
   (assert (equal (truename "link-6")     #p"$testdir/link-6"))

@@ -395,7 +395,10 @@
                                   (or realpath
                                       (fail "couldn't resolve ~A" filename errno)))
                                 :as-directory t)
-                               pathname))
+                               (if (directory-pathname-p pathname)
+                                   (parse (car (last (pathname-directory pathname)))
+                                          :as-directory nil)
+                                   pathname)))
                              (:author (sb!unix:uid-username uid))
                              (:write-date (+ unix-to-universal-time mtime))))))
                      ;; If we're still here, the file doesn't exist; error.
