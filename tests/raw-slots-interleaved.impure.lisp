@@ -76,10 +76,11 @@
   (assert (typep bignum 'bignum))
   (sb-sys:with-pinned-objects (bignum)
     (alien-funcall (extern-alien "positive_bignum_logbitp"
-                                 (function long int long))
+                                 (function boolean int system-area-pointer))
                    index
-                   (- (sb-kernel:get-lisp-obj-address bignum)
-                      sb-vm:other-pointer-lowtag))))
+                   (sb-sys:int-sap
+                    (- (sb-kernel:get-lisp-obj-address bignum)
+                       sb-vm:other-pointer-lowtag)))))
 
 (with-test (:name :c-bignum-logbitp)
   ;; walking 1 bit
@@ -87,8 +88,8 @@
     (let ((num (ash 1 i)))
       (when (typep num 'bignum)
         (dotimes (j 257)
-          (assert (= (c-bignum-logbitp j num)
-                     (if (logbitp j num) 1 0)))))))
+          (assert (eq (c-bignum-logbitp j num)
+                     (logbitp j num)))))))
   ;; random bits
   (let ((max (ash 1 768)))
     (dotimes (i 100)
@@ -96,8 +97,8 @@
         (when (typep num 'bignum)
           (dotimes (j (* (sb-bignum:%bignum-length num)
                          sb-vm:n-word-bits))
-            (assert (= (c-bignum-logbitp j num)
-                       (if (logbitp j num) 1 0)))))))))
+            (assert (eq (c-bignum-logbitp j num)
+                       (logbitp j num)))))))))
 
 ;; for testing the comparator
 (defstruct foo1
