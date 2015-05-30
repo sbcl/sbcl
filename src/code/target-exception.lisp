@@ -78,7 +78,19 @@
             (exception-record system-area-pointer)
             (exception-address system-area-pointer)
             (number-parameters dword)
-            (exception-information system-area-pointer)))
+            (exception-information (array system-area-pointer
+                                          #.+exception-maximum-parameters+))))
+
+;;; DBG_PRINTEXCEPTION_C shouldn'tbe fatal, and even if it is related to
+;;; something bad, better to print the message than just fail with no info
+(defun dbg-printexception-c (record)
+  (when (= (slot record 'number-parameters) 2)
+    ;; (sap-int (deref (slot record 'exception-information) 0)) =
+    ;; length of string including 0-terminator
+    (warn (cast
+           (sap-alien (deref (slot record 'exception-information) 1)
+                      (* char))
+           c-string))))
 
 ;;; Actual exception handler. We hit something the runtime doesn't
 ;;; want to or know how to deal with (that is, not a sigtrap or gc wp
@@ -88,10 +100,13 @@
          (code (slot record 'exception-code))
          (condition-name (cdr (assoc code *exception-code-map*)))
          (sb!debug:*stack-top-hint* (nth-value 1 (sb!kernel:find-interrupted-name-and-frame))))
-    (if condition-name
-        (error condition-name)
-        (error "An exception occurred in context ~S: ~S. (Exception code: ~S)"
-               context-sap exception-record-sap code))))
+    (cond (condition-name
+           (error condition-name))
+          ((= code +dbg-printexception-c+)
+           (dbg-printexception-c record))
+          (t
+           (error "An exception occurred in context ~S: ~S. (Exception code: ~S)"
+                  context-sap exception-record-sap code)))))
 
 ;;;; etc.
 

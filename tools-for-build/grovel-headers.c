@@ -184,7 +184,7 @@ main(int argc, char *argv[])
     defconstant ("CSIDL_FLAG_CREATE", CSIDL_FLAG_CREATE);
     defconstant ("CSIDL_FLAG_MASK", CSIDL_FLAG_MASK);
 
-    printf(";;; Exception codes\n");
+    printf(";;; Exceptions\n");
     defconstant("+exception-access-violation+", EXCEPTION_ACCESS_VIOLATION);
     defconstant("+exception-array-bounds-exceeded+", EXCEPTION_ARRAY_BOUNDS_EXCEEDED);
     defconstant("+exception-breakpoint+", EXCEPTION_BREAKPOINT);
@@ -205,6 +205,9 @@ main(int argc, char *argv[])
     defconstant("+exception-priv-instruction+", EXCEPTION_PRIV_INSTRUCTION);
     defconstant("+exception-single-step+", EXCEPTION_SINGLE_STEP);
     defconstant("+exception-stack-overflow+", EXCEPTION_STACK_OVERFLOW);
+    defconstant("+dbg-printexception-c+", DBG_PRINTEXCEPTION_C);
+
+    defconstant("+exception-maximum-parameters+", EXCEPTION_MAXIMUM_PARAMETERS);
 
     printf(";;; FormatMessage\n");
 
