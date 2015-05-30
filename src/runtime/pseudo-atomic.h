@@ -115,19 +115,19 @@ clear_pseudo_atomic_atomic(struct thread *thread)
 static inline int
 get_pseudo_atomic_interrupted(struct thread *thread)
 {
-    return SymbolValue(PSEUDO_ATOMIC_INTERRUPTED, thread) != NIL;
+    return SymbolValue(PSEUDO_ATOMIC_INTERRUPTED, thread) != 0;
 }
 
 static inline void
 set_pseudo_atomic_interrupted(struct thread *thread)
 {
-    SetSymbolValue(PSEUDO_ATOMIC_INTERRUPTED, MAKE_FIXNUM(0x000f0001), thread);
+    SetSymbolValue(PSEUDO_ATOMIC_INTERRUPTED, do_pending_interrupt, thread);
 }
 
 static inline void
 clear_pseudo_atomic_interrupted(struct thread *thread)
 {
-    SetSymbolValue(PSEUDO_ATOMIC_INTERRUPTED, NIL, 0);
+    SetSymbolValue(PSEUDO_ATOMIC_INTERRUPTED, 0, 0);
 }
 
 #define set_alloc_pointer(value)                \

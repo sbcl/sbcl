@@ -25,7 +25,18 @@
      (:temp ndescr non-descriptor-reg nl2-offset)
      (:temp pa-flag non-descriptor-reg ocfp-offset)
      (:temp vector descriptor-reg r8-offset))
-  (pseudo-atomic (pa-flag)
+  ;; Why :LINK NIL?
+  ;; Either LR or PC need to always point into the code object.
+  ;; Since this is a static assembly routine, PC is already not pointing there.
+  ;; But it's called using blx, so LR is still good.
+  ;; Normally PSEUDO-ATOMIC calls do_pending_interrupt using BLX too,
+  ;; which will make LR point here, now GC can collect the parent function away.
+  ;; But the call to do_pending_interrupt is at the end, and there's
+  ;; nothing more needed to be done by the routine, so
+  ;; do_pending_interrupt can return to the parent function directly.
+  ;; This still uses the normal :return-style, BX LR, since the call
+  ;; to do_pending_interrupt interrupt is conditional.
+  (pseudo-atomic (pa-flag :link nil)
     ;; boxed words == unboxed bytes
     (inst add ndescr words (* (1+ vector-data-offset) n-word-bytes))
     (inst bic ndescr ndescr lowtag-mask)
@@ -40,8 +51,8 @@
     (inst mov ndescr 0)
     #!-gencgc
     (storew ndescr pa-flag -1)
-    (storew length vector vector-length-slot other-pointer-lowtag))
-  (move result vector))
+    (storew length vector vector-length-slot other-pointer-lowtag)
+    (move result vector)))
 
 (define-assembly-routine (allocate-vector-on-stack
                           (:policy :fast-safe)
@@ -56,7 +67,8 @@
      (:temp ndescr non-descriptor-reg nl2-offset)
      (:temp pa-flag non-descriptor-reg ocfp-offset)
      (:temp vector descriptor-reg r8-offset))
-  (pseudo-atomic (pa-flag)
+  ;; See why :LINK NIL is needed in ALLOCATE-VECTOR-ON-HEAP above.
+  (pseudo-atomic (pa-flag :link nil)
     ;; boxed words == unboxed bytes
     (inst add ndescr words (* (1+ vector-data-offset) n-word-bytes))
     (inst bic ndescr ndescr lowtag-mask)

@@ -369,6 +369,7 @@ case `uname -m` in
     9000/800) guessed_sbcl_arch=hppa ;;
     mips*) guessed_sbcl_arch=mips ;;
     arm*) guessed_sbcl_arch=arm ;;
+    aarch64) guessed_sbcl_arch=arm ;;
     *)
         # If we're not building on a supported target architecture, we
         # we have no guess, but it's not an error yet, since maybe

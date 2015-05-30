@@ -90,9 +90,8 @@ call_into_lisp:
 	@@ Leave PSEUDO-ATOMIC and check for interrupts.
 	str     reg_NULL, STATIC_SYMBOL_VALUE(PSEUDO_ATOMIC_ATOMIC)
 	ldr     reg_OCFP, STATIC_SYMBOL_VALUE(PSEUDO_ATOMIC_INTERRUPTED)
-	cmp     reg_OCFP, reg_NULL
-	movlt   reg_OCFP, reg_OCFP, lsr #N_FIXNUM_TAG_BITS
-	swilt   #0
+	cmp     reg_OCFP, #0
+	blxne   reg_OCFP
 
 	@@ Load our function args.  Cleverness abounds!
 	rsb	reg_NL3, reg_NARGS, #8
@@ -139,9 +138,8 @@ call_into_lisp:
 	@@ Leave PSEUDO-ATOMIC and check for interrupts.
 	str     reg_NULL, STATIC_SYMBOL_VALUE(PSEUDO_ATOMIC_ATOMIC)
 	ldr     reg_OCFP, STATIC_SYMBOL_VALUE(PSEUDO_ATOMIC_INTERRUPTED)
-	cmp     reg_OCFP, reg_NULL
-	movlt   reg_OCFP, reg_OCFP, lsr #N_FIXNUM_TAG_BITS
-	swilt   #0
+        cmp     reg_OCFP, #0
+	blxne   reg_OCFP
 
 	@@ Restore saved registers.
         fldmfdd sp!, {d8-d15}
@@ -224,9 +222,8 @@ call_into_c:
 	@@ Leave PSEUDO-ATOMIC and check for interrupts.
 	str     reg_NULL, STATIC_SYMBOL_VALUE(PSEUDO_ATOMIC_ATOMIC)
 	ldr     reg_OCFP, STATIC_SYMBOL_VALUE(PSEUDO_ATOMIC_INTERRUPTED)
-	cmp     reg_OCFP, reg_NULL
-	movlt   reg_OCFP, reg_OCFP, lsr #N_FIXNUM_TAG_BITS
-	swilt   #0
+        cmp     reg_OCFP, #0
+	blxne   reg_OCFP
 
         @@ Now that we're in C mode, move the remaining register args
 	@@ into place.
@@ -288,9 +285,8 @@ call_into_c:
 	@@ Leave PSEUDO-ATOMIC and check for interrupts.
 	str     reg_NULL, STATIC_SYMBOL_VALUE(PSEUDO_ATOMIC_ATOMIC)
 	ldr     reg_OCFP, STATIC_SYMBOL_VALUE(PSEUDO_ATOMIC_INTERRUPTED)
-	cmp     reg_OCFP, reg_NULL
-	movlt   reg_OCFP, reg_OCFP, lsr #N_FIXNUM_TAG_BITS
-	swilt   #0
+        cmp     reg_OCFP, #0
+	blxne   reg_OCFP
 
         @@ Restore our caller state from our stack frame.
         ldr     reg_CODE, [reg_NFP, #8]
@@ -476,9 +472,10 @@ fpu_restore:
 	.global	do_pending_interrupt
 	.type	do_pending_interrupt, %function
 do_pending_interrupt:
-        stmfd	sp!, {reg_OCFP, lr}
-        ldr     reg_OCFP, =0xf0001
-        swi     #0
-        ldmfd	sp!, {reg_OCFP, lr}
+        .word 0xe7f001f0
+        .byte trap_PendingInterrupt
+        .byte 0
+        .byte 0
+        .byte 0
 	bx	lr
 #endif

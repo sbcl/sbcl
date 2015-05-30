@@ -335,19 +335,15 @@
 
 ;;;; PSEUDO-ATOMIC
 
+
 ;;; handy macro for making sequences look atomic
-;;;
-;;; FLAG-TN must be wired to R7.  If a deferred interrupt happens
-;;; while we have *PSEUDO-ATOMIC* set to non-nil, then
-;;; *PSEUDO-ATOMIC-INTERRUPTED* will be changed from NIL to the fixnum
-;;; #x000f0001 (so, #x003c0004), which is the syscall number for
-;;; BREAK_POINT.  This value is less than #x0800000b (NIL).  The
-;;; runtime "knows" that an SWI with a condition code of :LT instead
-;;; of the normal :AL is a pseudo-atomic interrupted trap.
-(defmacro pseudo-atomic ((flag-tn) &body forms)
+
+;;; With LINK being NIL this doesn't store the next PC in LR when
+;;; calling do_pending_interrupt.
+;;; This used by allocate-vector-on-heap, there's a comment explaining
+;;; why it needs that.
+(defmacro pseudo-atomic ((flag-tn &key (link t)) &body forms)
   `(progn
-     (aver (and (sc-is ,flag-tn non-descriptor-reg)
-                (= (tn-offset ,flag-tn) 7)))
      (without-scheduling ()
        (store-symbol-value pc-tn *pseudo-atomic-atomic*))
      (assemble ()
@@ -355,9 +351,12 @@
      (without-scheduling ()
        (store-symbol-value null-tn *pseudo-atomic-atomic*)
        (load-symbol-value ,flag-tn *pseudo-atomic-interrupted*)
-       (inst cmp ,flag-tn null-tn)
-       (inst mov :lt ,flag-tn (lsr ,flag-tn n-fixnum-tag-bits))
-       (inst swi :lt 0))))
+       ;; When *pseudo-atomic-interrupted* is not 0 it contains the address of
+       ;; do_pending_interrupt
+       (inst cmp ,flag-tn 0)
+       ,(if link
+            `(inst blx :ne ,flag-tn)
+            `(inst bx :ne ,flag-tn)))))
 
 ;;;; memory accessor vop generators
 
