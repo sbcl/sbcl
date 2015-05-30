@@ -2192,7 +2192,7 @@ is :ANY, the function name is not checked."
 
 
 (defun call-full-like-p (call)
-  (declare (type combination call))
+  (declare (type basic-combination call))
   (let ((kind (basic-combination-kind call)))
     (or (eq kind :full)
         (and (eq kind :known)

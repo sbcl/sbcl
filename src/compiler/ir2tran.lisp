@@ -128,7 +128,8 @@
 
 (defun boxed-ref-p (ref)
   (let ((dest (lvar-dest (ref-lvar ref))))
-    (cond ((and (basic-combination-p dest) (eq :full (basic-combination-kind dest)))
+    (cond ((and (basic-combination-p dest)
+                (call-full-like-p dest))
            t)
           ((and (return-p dest) (%return-is-boxed dest)))
           (t
