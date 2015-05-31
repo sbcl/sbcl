@@ -447,5 +447,10 @@
           (assert (= (car foo) (ash 1 (+ i 2))))
           (assert (= (car foo) 0))))))
 
+;; a DEFSETF lambda list is not a macro lambda-list
+(with-test (:name :defsetf-lambda-list-strictness)
+  (assert-error
+   ;; All implementations agree that this is malformed.
+   (macroexpand-1 '(defsetf baz (a . other-stuff) (v) ''who-cares))))
 
 ;;; success

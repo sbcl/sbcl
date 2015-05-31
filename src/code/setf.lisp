@@ -466,30 +466,27 @@
      `(eval-when (:load-toplevel :compile-toplevel :execute)
         (%defsetf ',access-fn nil nil ',(car rest) ',(cadr rest))))
     ((cons list (cons list))
-     (destructuring-bind (lambda-list (&rest store-variables) &body body) rest
-       (multiple-value-bind (forms decls doc) (parse-body body)
-         (multiple-value-bind (store-var-decl other-decls)
-             (extract-var-decls decls store-variables)
-           (let ((form (copy-symbol 'form))
-                 (environment (copy-symbol 'env)))
-         ;; FIXME: a defsetf lambda-list is *NOT* a macro lambda list!
-         ;; Suppose that (MY-ACC ((X))) is a macro, not a function,
-         ;; and you attempt to destructure the X. It parses ok by accident,
-         ;; but when you attempt to bind to subforms of MY-ACC,
-         ;; you find that ((X)) is not a well-formed sexpr.
-             (multiple-value-bind (body env-decl)
-                 (parse-defmacro lambda-list form `(,@other-decls ,@forms)
-                                 access-fn 'defsetf
-                                 :environment environment
-                                 :anonymousp t)
-               `(eval-when (:compile-toplevel :load-toplevel :execute)
-                  (%defsetf ',access-fn
-                            (cons ,(length store-variables)
-                                  (lambda (,form ,environment ,@store-variables)
-                                    ,@env-decl ; possibly (IGNORE ENVIRONMENT)
-                                    ,@(if store-var-decl (list store-var-decl))
-                                    ,body))
-                            ',lambda-list nil ',doc))))))))
+     (destructuring-bind (lambda-list (&rest stores) &body body) rest
+       (binding* (((llks req opt rest key aux more env)
+                   (parse-lambda-list lambda-list :disallow '(&aux &more)
+                                      :context 'defsetf))
+                  ((forms decls doc) (parse-body body))
+                  ((outer-decls inner-decls)
+                   (extract-var-decls decls (append env stores)))
+                  (subforms (copy-symbol 'subforms))
+                  (env-var (if env (car env) (copy-symbol 'env)))
+                  (lambda-list (build-lambda-list llks req opt rest key)))
+         (declare (ignore aux more))
+         `(eval-when (:compile-toplevel :load-toplevel :execute)
+            (%defsetf ',access-fn
+                      (cons ,(length stores)
+                            (lambda (,subforms ,env-var ,@stores)
+                              ,@(if outer-decls (list outer-decls))
+                              ,@(unless env `((declare (ignore ,env-var))))
+                              (apply (lambda ,lambda-list
+                                       ,@inner-decls (block ,access-fn ,@forms))
+                                     ,subforms)))
+                      ',lambda-list nil ',doc)))))
     (t
      (error "Ill-formed DEFSETF for ~S" access-fn))))
 

@@ -169,4 +169,13 @@
       (values (if (or (neq state :required) env) (cons keyp allowp))
               (required) (optional) rest (keys) (aux) (more) env))))
 
+;; Invert the parsing operation.
+(defun build-lambda-list (llks required &optional optional rest keys aux)
+  (append required
+          (if optional (cons '&optional optional))
+          (if rest (cons '&rest rest))
+          (if (ll-kwds-keyp llks) (cons '&key keys)) ; KEYS can be nil
+          (if (ll-kwds-allowp llks) '(&allow-other-keys))
+          (if aux (cons '&aux aux))))
+
 (/show0 "parse-lambda-list.lisp end of file")
