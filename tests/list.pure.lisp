@@ -276,7 +276,7 @@
 (macrolet ((test (value form)
              `(let ((* ,value))
                 (assert (eval ,form))
-                (assert (funcall (compile nil (lambda () ,form)))))))
+                (assert (funcall (compile nil '(lambda () ,form)))))))
   (test 'evenp
         (equal '(2 3 4) (member-if * (list 1 2 3 4))))
   (test 'evenp
@@ -300,7 +300,7 @@
 (macrolet ((test (value form)
              `(let ((* ,value))
                 (assert (eval ,form))
-                (assert (funcall (compile nil (lambda () ,form)))))))
+                (assert (funcall (compile nil '(lambda () ,form)))))))
   (test 'oddp
         (equal '(2 3 4) (member-if-not * (list 1 2 3 4))))
   (test 'oddp
