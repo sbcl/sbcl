@@ -72,6 +72,11 @@ Example:
           ,new))))
 
 EXPERIMENTAL: Interface subject to change."
+  ;; FIXME: this seems wrong on two points:
+  ;; 1. if TRULY-THE had a CAS expander (which it doesn't) we'd want
+  ;;    to use %MACROEXPAND[-1] so as not to lose the "truly-the"-ness
+  ;; 2. if both a CAS expander and a macro exist, the CAS expander
+  ;;    should be preferred before macroexpanding (just like SETF does)
     (let ((expanded (sb!xc:macroexpand place environment)))
       (flet ((invalid-place ()
            (error "Invalid place to CAS: ~S -> ~S" place expanded)))
