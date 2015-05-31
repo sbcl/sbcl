@@ -288,14 +288,15 @@
     (let ((alien-type (parse-alien-type type env)))
       `(eval-when (:compile-toplevel :load-toplevel :execute)
          ,@(when *new-auxiliary-types*
-             `((%def-auxiliary-alien-types ',*new-auxiliary-types*)))
+             `((%def-auxiliary-alien-types ',*new-auxiliary-types*
+                                           (sb!c:source-location))))
          ,@(when name
              `((%define-alien-type ',name ',alien-type)
                (setf (info :source-location :alien-type ',name)
                      (sb!c:source-location))))))))
 
 (eval-when (#-sb-xc :compile-toplevel :load-toplevel :execute)
-  (defun %def-auxiliary-alien-types (types)
+  (defun %def-auxiliary-alien-types (types source-location)
     (dolist (info types)
       ;; Clear up the type we're about to define from the toplevel
       ;; *new-auxiliary-types* (local scopes take care of themselves).
@@ -313,11 +314,14 @@
                               (warn
                                "redefining ~A ~S to be:~%  ~S,~%was:~%  ~S"
                                kind name defn old))
-                            (setf (info :alien-type ,kind name) defn))))
+                            (setf (info :alien-type ,kind name) defn
+                                  (info :source-location :alien-type name)
+                                  source-location))))
           (ecase kind
             (:struct (frob :struct))
             (:union (frob :union))
             (:enum (frob :enum)))))))
+
   (defun %define-alien-type (name new)
     (ecase (info :alien-type :kind name)
       (:primitive

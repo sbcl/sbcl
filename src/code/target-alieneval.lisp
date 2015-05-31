@@ -66,7 +66,8 @@ is guessed from the one supplied."
       (let ((alien-type (parse-alien-type type env)))
         `(eval-when (:compile-toplevel :load-toplevel :execute)
            ,@(when *new-auxiliary-types*
-               `((%def-auxiliary-alien-types ',*new-auxiliary-types*)))
+               `((%def-auxiliary-alien-types ',*new-auxiliary-types*
+                                             (sb!c:source-location))))
            (%define-alien-variable ',lisp-name
                                    ',alien-name
                                    ',alien-type

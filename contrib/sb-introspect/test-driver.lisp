@@ -552,29 +552,41 @@
 ;;; Defstruct accessor, copier, and predicate
 
 (deftest defstruct-fun-sources
-    (let ((copier (find-definition-source #'cl-user::copy-three))
-          (accessor (find-definition-source #'cl-user::three-four))
-          (predicate (find-definition-source #'cl-user::three-p)))
-      (values (and (equalp copier accessor)
-                   (equalp copier predicate))
-              (equal "TEST.LISP.NEWEST"
-                     (file-namestring (definition-source-pathname copier)))
-              (equal '(5)
-                     (definition-source-form-path copier))))
- t
- t
- t)
+  (let ((copier (find-definition-source #'cl-user::copy-three))
+        (accessor (find-definition-source #'cl-user::three-four))
+        (predicate (find-definition-source #'cl-user::three-p)))
+    (values (and (equalp copier accessor)
+                 (equalp copier predicate))
+            (equal "TEST.LISP.NEWEST"
+                   (file-namestring (definition-source-pathname copier)))
+            (equal '(5)
+                   (definition-source-form-path copier))))
+  t
+  t
+  t)
 
 (deftest defstruct-fun-sources-by-name
-    (let ((copier (car (find-definition-sources-by-name 'cl-user::copy-three :function)))
-          (accessor (car (find-definition-sources-by-name 'cl-user::three-four :function)))
-          (predicate (car (find-definition-sources-by-name 'cl-user::three-p :function))))
-      (values (and (equalp copier accessor)
-                   (equalp copier predicate))
-              (equal "TEST.LISP.NEWEST"
-                     (file-namestring (definition-source-pathname copier)))
-              (equal '(5)
-                     (definition-source-form-path copier))))
- t
- t
- t)
+  (let ((copier (car (find-definition-sources-by-name 'cl-user::copy-three :function)))
+        (accessor (car (find-definition-sources-by-name 'cl-user::three-four :function)))
+        (predicate (car (find-definition-sources-by-name 'cl-user::three-p :function))))
+    (values (and (equalp copier accessor)
+                 (equalp copier predicate))
+            (equal "TEST.LISP.NEWEST"
+                   (file-namestring (definition-source-pathname copier)))
+            (equal '(5)
+                   (definition-source-form-path copier))))
+  t
+  t
+  t)
+
+(deftest alien-type.1
+  (matchp-name :alien-type 'cl-user::test-alien-type 30)
+  t)
+
+(deftest alien-type.2
+  (matchp-name :alien-type 'cl-user::test-alien-struct 31)
+  t)
+
+(deftest alien-variable
+  (matchp-name :variable 'cl-user::test-alien-var 32)
+  t)

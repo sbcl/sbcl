@@ -76,3 +76,11 @@
     :foo))
 
 (sb-ext:defglobal **global** 'value)
+
+(sb-alien:define-alien-type test-alien-type sb-alien:long)
+
+(sb-alien:define-alien-type nil
+  (struct test-alien-struct
+          (x sb-alien:system-area-pointer)))
+
+(sb-alien:define-alien-variable ("errno" test-alien-var) sb-alien:int)
