@@ -105,6 +105,10 @@
            (if (singleton-p stores)
                (gen-let* `((,(car stores) ,values)) body-forms)
                `((multiple-value-bind ,stores ,values ,@body-forms))))
+         (forms-list (form)
+           (if (and (consp form) (eq (car form) 'progn))
+               (cdr form)
+               (list form)))
          ;; Instead of emitting (PROGN (VALUES (SETQ ...) (SETQ ...)) NIL)
          ;; the SETQs can be lifted into the PROGN. This is unimportant
          ;; for compiled code, but it helps the interpreter not needlessly
@@ -136,7 +140,7 @@
       (multiple-value-bind (temps vals newval setter)
           (sb!xc:get-setf-expansion place env)
         (car (gen-let* (mapcar #'list temps vals)
-                       (gen-mv-bind newval value-form (list setter)))))))
+                       (gen-mv-bind newval value-form (forms-list setter)))))))
 
   ;; various SETF-related macros
 
@@ -501,9 +505,10 @@
 (defun collect-setf-temps (sexprs environment name-hints)
   (labels ((next-name-hint ()
              (let ((sym (pop name-hints))) ; OK if list was nil
-               (if (member sym sb!xc:lambda-list-keywords)
-                   (next-name-hint)
-                   (if (listp sym) (car sym) sym))))
+               (case sym
+                 (&optional (next-name-hint))
+                 ((&key &rest) (setq name-hints nil))
+                 (t (if (listp sym) (car sym) sym)))))
            (nice-tempname (form)
              (acond ((next-name-hint) (copy-symbol it))
                     (t (gensymify form)))))
@@ -654,24 +659,6 @@
     ;; always reference default's temp var to "use" it
     `(%puthash ,key ,hashtable ,(if constp newval `(progn ,default ,newval)))))
 
-(sb!xc:define-setf-expander logbitp (index int &environment env)
-  (declare (type sb!c::lexenv env))
-  (multiple-value-bind (temps vals stores store-form access-form)
-      (sb!xc:get-setf-expansion int env)
-    (let ((ind (gensym))
-          (store (gensym))
-          (stemp (first stores)))
-      (values `(,ind ,@temps)
-              `(,index
-                ,@vals)
-              (list store)
-              `(let ((,stemp
-                      (dpb (if ,store 1 0) (byte 1 ,ind) ,access-form))
-                     ,@(cdr stores))
-                 ,store-form
-                 ,store)
-              `(logbitp ,ind ,access-form)))))
-
 ;;; CMU CL had a comment here that:
 ;;;   Evil hack invented by the gnomes of Vassar Street (though not as evil as
 ;;;   it used to be.)  The function arg must be constant, and is converted to
@@ -701,6 +688,52 @@
             `(apply #'(setf ,function) ,new-var ,@vars)
             `(apply #',function ,@vars))))
 
+;;; Perform expansion of SETF on LDB, MASK-FIELD, or LOGBITP.
+;;; It is preferable to destructure the BYTE form and bind temp vars to its
+;;; parts rather than bind a temp for its result. (See the source transforms
+;;; for LDB/DPB). But for constant arguments to BYTE, we don't need any temp.
+(defun setf-expand-ldb (bytespec-form place env store-fun load-fun)
+  (binding* ((spec (%macroexpand bytespec-form env))
+             ((byte-tempvars byte-tempvals byte-args)
+              (if (typep spec '(cons (eql byte)
+                                     (and (not (cons integer (cons integer)))
+                                          (cons t (cons t null)))))
+                  (collect-setf-temps (cdr spec) env '(size pos))
+                  (collect-setf-temps (list spec) env '(bytespec))))
+             (byte (if (cdr byte-args) (cons 'byte byte-args) (car byte-args)))
+             ((place-tempvars place-tempvals stores setter getter)
+              (sb!xc:get-setf-expansion place env))
+             (newval (sb!xc:gensym "NEW"))
+             (new-int `(,store-fun
+                        ,(if (eq load-fun 'logbitp) `(if ,newval 1 0) newval)
+                        ,byte ,getter)))
+    (values `(,@byte-tempvars ,@place-tempvars)
+            `(,@byte-tempvals ,@place-tempvals)
+            (list newval)
+            ;; FIXME: expand-rmw-macro has code for determining whether
+            ;; a binding of a "newval" can be elided.
+            (if (and (typep setter '(cons (eql setq)
+                                          (cons symbol (cons t null))))
+                     (singleton-p stores)
+                     (eq (third setter) (first stores)))
+                `(progn (setq ,(second setter) ,new-int) ,newval)
+                `(let ((,(car stores) ,new-int) ,@(cdr stores))
+                   ,setter
+                   ,newval))
+            (if (eq load-fun 'logbitp)
+                ;; If there was a temp for the POS, then use it.
+                ;; Otherwise use the constant POS from the original spec.
+                `(logbitp ,(or (car byte-tempvars) (third spec)) ,getter)
+                `(,load-fun ,byte ,getter)))))
+
+;;; SETF of LOGBITP is not mandated by CLHS but is nice to have.
+;;; FIXME: the code is suboptimal. Better code would "pre-shift" the 1 bit,
+;;; so that result = (in & ~mask) | (flag ? mask : 0)
+;;; Additionally (setf (logbitp N x) t) is extremely stupid- it first clears
+;;; and then sets the bit, though it does manage to pre-shift the constants.
+(sb!xc:define-setf-expander logbitp (index place &environment env)
+  (setf-expand-ldb `(byte 1 ,index) place env 'dpb 'logbitp))
+
 ;;; Special-case a BYTE bytespec so that the compiler can recognize it.
 ;;; FIXME: it is suboptimal that (INCF (LDB (BYTE 9 0) (ELT X 0)))
 ;;; performs two reads of (ELT X 0), once to get the value from which
@@ -712,50 +745,14 @@
   "The first argument is a byte specifier. The second is any place form
 acceptable to SETF. Replace the specified byte of the number in this
 place with bits from the low-order end of the new value."
-  (declare (type sb!c::lexenv env))
-  (multiple-value-bind (dummies vals newval setter getter)
-      (sb!xc:get-setf-expansion place env)
-    (if (and (consp bytespec) (eq (car bytespec) 'byte))
-        (let ((n-size (gensym))
-              (n-pos (gensym))
-              (n-new (gensym)))
-          (values (list* n-size n-pos dummies)
-                  (list* (second bytespec) (third bytespec) vals)
-                  (list n-new)
-                  `(let ((,(car newval) (dpb ,n-new (byte ,n-size ,n-pos)
-                                             ,getter))
-                         ,@(cdr newval))
-                     ,setter
-                     ,n-new)
-                  `(ldb (byte ,n-size ,n-pos) ,getter)))
-        (let ((btemp (gensym))
-              (gnuval (gensym)))
-          (values (cons btemp dummies)
-                  (cons bytespec vals)
-                  (list gnuval)
-                  `(let ((,(car newval) (dpb ,gnuval ,btemp ,getter)))
-                     ,setter
-                     ,gnuval)
-                  `(ldb ,btemp ,getter))))))
+  (setf-expand-ldb bytespec place env 'dpb 'ldb))
 
 (sb!xc:define-setf-expander mask-field (bytespec place &environment env)
   #!+sb-doc
   "The first argument is a byte specifier. The second is any place form
 acceptable to SETF. Replaces the specified byte of the number in this place
 with bits from the corresponding position in the new value."
-  (declare (type sb!c::lexenv env))
-  (multiple-value-bind (dummies vals newval setter getter)
-      (sb!xc:get-setf-expansion place env)
-    (let ((btemp (gensym))
-          (gnuval (gensym)))
-      (values (cons btemp dummies)
-              (cons bytespec vals)
-              (list gnuval)
-              `(let ((,(car newval) (deposit-field ,gnuval ,btemp ,getter))
-                     ,@(cdr newval))
-                 ,setter
-                 ,gnuval)
-              `(mask-field ,btemp ,getter)))))
+  (setf-expand-ldb bytespec place env 'deposit-byte 'mask-field))
 
 (defun setf-expand-the (the type place env)
   (declare (type sb!c::lexenv env))

@@ -6,6 +6,7 @@ changes relative to sbcl-1.2.12:
     directories. (lp#1458164)
   * bug fix: Inlined DPB and DEPOSIT-FIELD don't interfere with left-to-right
     order of argument evaluation. (lp#1458190)
+  * bug fix: (SETF (LDB (BYTE 1 2 JUNK) X) 0) is rightly rejected.
 
 changes in sbcl-1.2.12 relative to sbcl-1.2.11:
   * minor incompatible change: the SB-C::*POLICY* variable is no longer

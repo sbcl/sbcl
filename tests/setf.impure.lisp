@@ -15,6 +15,8 @@
 
 (in-package :cl-user)
 
+(load "compiler-test-util.lisp")
+
 (defvar *foo* nil)
 (defun (setf foo) (bar)
     (setf *foo* bar))
@@ -319,7 +321,8 @@
   (assert (equal-mod-gensyms
            (macroexpand-1 '(setf (subseq (foo) 4 6) "Hi"))
            '(let* ((subform (foo)) (newval "Hi"))
-              (progn (replace subform newval :start1 4 :end1 6) newval)))))
+              (replace subform newval :start1 4 :end1 6)
+              newval))))
 
 (with-test (:name :defsetf-gethash)
   (assert (equal-mod-gensyms
@@ -417,5 +420,32 @@
   (let ((k :test) (v #'equal) (list nil))
     (pushnew '(hi) list k v)
     (assert (equal list '((hi))))))
+
+(with-test (:name :setf-ldb-syntax)
+  ;; this gets both a warning and an error.
+  (assert-error (let ((x 0)) (setf (ldb (byte 4 2 3) x) 1))))
+
+(with-test (:name :setf-ldb-recognize-local-macros)
+  ;; This lambda should call neither %LDB nor %DPB
+  (assert (not (ctu:find-named-callees
+                (compile nil
+                         '(lambda (x)
+                           (declare (type (cons) x))
+                           (symbol-macrolet ((b (byte 4 3)))
+                             (incf (ldb b (truly-the fixnum (car x)))))))))))
+
+;; There's aren't a lot of reasonable uses of the setf "getter" for LOGBITP.
+;; It might come in handy for SHIFTF or ROTATEF, or this:
+(define-modify-macro negatef () not)
+(with-test (:name :modify-macro-logbitp)
+  (dotimes (i 11)
+    (let ((foo (list 0)))
+      ;; To be extra tricky, flip the Ith bit in a 9-bit subfield
+      ;; starting at 2. This should have no effect for I >= 9.
+      (negatef (logbitp i (ldb (byte 9 2) (car foo))))
+      (if (< i 9)
+          (assert (= (car foo) (ash 1 (+ i 2))))
+          (assert (= (car foo) 0))))))
+
 
 ;;; success
