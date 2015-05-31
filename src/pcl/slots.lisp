@@ -146,8 +146,9 @@
   (let* ((wrapper (valid-wrapper-of object))
          (cell (or (find-slot-cell wrapper slot-name)
                    (return-from set-slot-value
-                     (values (slot-missing (wrapper-class* wrapper) object slot-name
-                                           'setf new-value)))))
+                     (progn (slot-missing (wrapper-class* wrapper)
+                                          object slot-name 'setf new-value)
+                            new-value))))
          (location (car cell))
          (info (cdr cell))
          (typecheck (slot-info-typecheck info)))

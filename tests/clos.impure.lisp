@@ -941,17 +941,23 @@
 (defmethod slot-missing (class (o class-with-all-slots-missing)
                          slot-name op
                          &optional new-value)
+  (declare (ignore new-value))
   op)
 (assert (eq (slot-value (make-instance 'class-with-all-slots-missing) 'foo)
             'slot-value))
 (assert (eq (funcall (lambda (x) (slot-value x 'bar))
                      (make-instance 'class-with-all-slots-missing))
             'slot-value))
-(assert (eq (funcall (lambda (x) (setf (slot-value x 'baz) 'baz))
-                     (make-instance 'class-with-all-slots-missing))
+(macrolet ((try (which)
+             `(assert (eq ((lambda (x)
+                             (declare (,which sb-pcl::set-slot-value))
+                             (setf (slot-value x 'b) 'baz))
+                           (make-instance 'class-with-all-slots-missing))
             ;; SLOT-MISSING's value is specified to be ignored; we
             ;; return NEW-VALUE.
-            'baz))
+                          'baz))))
+  (try inline)
+  (try notinline))
 
 ;;; we should be able to specialize on anything that names a class.
 (defclass name-for-class () ())
