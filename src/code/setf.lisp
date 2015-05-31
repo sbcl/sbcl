@@ -34,46 +34,41 @@
   "Return five values needed by the SETF machinery: a list of temporary
    variables, a list of values with which to fill them, a list of temporaries
    for the new values, the setting function, and the accessing function."
-  (acond ((symbolp form)
-          (multiple-value-bind (expansion expanded)
-               (sb!xc:macroexpand-1 form environment)
-             (if expanded
-                 (sb!xc:get-setf-expansion expansion environment)
-                 (let ((new-var (sb!xc:gensym "NEW")))
-                   (values nil nil (list new-var)
-                           `(setq ,form ,new-var) form)))))
+  (if (symbolp form)
+      (multiple-value-bind (expansion expanded)
+          (sb!xc:macroexpand-1 form environment)
+        (if expanded
+            (sb!xc:get-setf-expansion expansion environment)
+            (let ((store (sb!xc:gensym "NEW")))
+              (values nil nil (list store) `(setq ,form ,store) form))))
+      (let ((name (car form)))
+        (flet ((expand (call arg-maker)
+                 ;; Produce the expansion of a SETF form that calls either
+                 ;; #'(SETF name) or an inverse given by short form DEFSETF.
+                 (multiple-value-bind (temp-vars temp-vals args)
+                     (collect-setf-temps (cdr form) environment nil)
+                   (let ((store (sb!xc:gensym "NEW")))
+                     (values temp-vars temp-vals (list store)
+                             `(,.call ,@(funcall arg-maker store args))
+                             `(,name ,@args))))))
           ;; Local functions inhibit global SETF methods.
-         ((and environment
-               (let ((name (car form)))
-                  (dolist (x (sb!c::lexenv-funs environment))
-                    (when (and (eq (car x) name)
-                               (not (sb!c::defined-fun-p (cdr x))))
-                      (return t)))))
-           (expand-or-get-setf-inverse form environment))
-         ((info :setf :inverse (car form))
-          (make-simple-setf-quintuple form environment nil `(,it)))
-         ((info :setf :expander (car form))
-          (if (consp it)
-              (make-setf-quintuple form environment (car it) (cdr it))
-           ;; KLUDGE: It may seem as though this should go through
-           ;; *MACROEXPAND-HOOK*, but the ANSI spec seems fairly explicit
-           ;; that *MACROEXPAND-HOOK* is a hook for MACROEXPAND-1, not
-           ;; for macroexpansion in general. -- WHN 19991128
-              (funcall it form environment)))
-         (t
-          (expand-or-get-setf-inverse form environment))))
-
-;;; If a macro, expand one level and try again. If not, go for the
-;;; SETF function.
-(declaim (ftype (function (t (or null sb!c::lexenv)))
-                expand-or-get-setf-inverse))
-(defun expand-or-get-setf-inverse (form environment)
-  (multiple-value-bind (expansion expanded)
-      (%macroexpand-1 form environment)
-    (if expanded
-        (sb!xc:get-setf-expansion expansion environment)
-        (make-simple-setf-quintuple form environment
-                                    t `(funcall #'(setf ,(car form)))))))
+          (unless (sb!c::fun-locally-defined-p name environment)
+            (acond ((info :setf :inverse name)
+                    (return-from sb!xc:get-setf-expansion
+                      (expand `(,it) (lambda (new args) `(,@args ,new)))))
+                   ((info :setf :expander name)
+                    (return-from sb!xc:get-setf-expansion
+                      (if (consp it)
+                          (make-setf-quintuple form environment
+                                               (car it) (cdr it))
+                          (funcall it form environment))))))
+          ;; When NAME is a macro, retry from the top.
+          ;; Otherwise default to the function named `(SETF ,name).
+          (multiple-value-bind (expansion expanded)
+              (%macroexpand-1 form environment)
+            (if expanded
+                (sb!xc:get-setf-expansion expansion environment)
+                (expand `(funcall #'(setf ,name)) #'cons)))))))
 
 ;; Expand PLACE until it is a form that SETF might know something about.
 ;; Macros are expanded only when no SETF expander (or inverse) exists.
@@ -121,12 +116,6 @@
                          (list form)))
                    forms)))
 
-  ;;; Except for atoms, we always call GET-SETF-EXPANSION, since it has
-  ;;; some non-trivial semantics. But when there is a setf inverse, and
-  ;;; G-S-E uses it, then we return a call to the inverse, rather than
-  ;;; returning a hairy LET form. This is probably important mainly as a
-  ;;; convenience in allowing the use of SETF inverses without the full
-  ;;; interpreter.
   (defmacro-mundanely setf (&whole form &rest args &environment env)
   #!+sb-doc
   "Takes pairs of arguments like SETQ. The first is a place and the second
@@ -140,14 +129,14 @@
         (return-from setf `(progn ,@(sb!c::explode-setq form 'error))))
       (when (symbolp (setq place (macroexpand-for-setf place env)))
         (return-from setf `(setq ,place ,value-form)))
+      (let* ((fun (car place))
+             (inverse (info :setf :inverse fun)))
+        (when (and inverse (not (sb!c::fun-locally-defined-p fun env)))
+          (return-from setf `(,inverse ,@(cdr place) ,value-form))))
       (multiple-value-bind (temps vals newval setter)
           (sb!xc:get-setf-expansion place env)
-        (let ((inverse (info :setf :inverse (car place))))
-          (if (and inverse (eq inverse (car setter)))
-              `(,inverse ,@(cdr place) ,value-form)
-              (car (gen-let* (mapcar #'list temps vals)
-                             (gen-mv-bind newval value-form
-                                          (list setter)))))))))
+        (car (gen-let* (mapcar #'list temps vals)
+                       (gen-mv-bind newval value-form (list setter)))))))
 
   ;; various SETF-related macros
 
@@ -530,17 +519,6 @@
                                 (temp-vals form)
                                 temp)))
           (setq bit (ash bit 1)))))))
-
-;; Return the 5-part expansion of a SETF form that calls #'(SETF Fn)
-;; when SETF-FUN-P is non-nil, or the short form of a DEFSETF, when NIL.
-;; INVERSE should be (FUNCALL #'(SETF x)) or (SETTER-FN) respectively.
-(defun make-simple-setf-quintuple (access-form environment setf-fun-p inverse)
-    (multiple-value-bind (temp-vars temp-vals args)
-        (collect-setf-temps (cdr access-form) environment nil)
-      (let ((store (sb!xc:gensym "NEW")))
-        (values temp-vars temp-vals (list store)
-                `(,@inverse ,@(if setf-fun-p `(,store ,@args) `(,@args ,store)))
-                `(,(car access-form) ,@args)))))
 
 ;; Return the 5-part expansion of a SETF form defined by the long form
 ;; of DEFSETF.
