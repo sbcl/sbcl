@@ -3147,6 +3147,7 @@
 
 (defun integer-type-numeric-bounds (type)
   (typecase type
+    ;; KLUDGE: this is not INTEGER-type-numeric-bounds
     (numeric-type (values (numeric-type-low type)
                           (numeric-type-high type)))
     (union-type
@@ -4720,166 +4721,78 @@
                            :format-arguments
                            (list nargs 'cerror y x (max max1 max2))))))))))))))
 
+(defun constant-cons-type (type)
+  (multiple-value-bind (singleton value)
+      (type-singleton-p type)
+    (if singleton
+        (values value t)
+        (typecase type
+          (cons-type
+           (multiple-value-bind (car car-good)
+               (constant-cons-type (cons-type-car-type type))
+             (multiple-value-bind (cdr cdr-good)
+                 (constant-cons-type (cons-type-cdr-type type))
+               (and car-good cdr-good
+                    (values (cons car cdr) t)))))))))
+
 (defoptimizer (coerce derive-type) ((value type) node)
-  (cond
-    ((constant-lvar-p type)
-     ;; This branch is essentially (RESULT-TYPE-SPECIFIER-NTH-ARG 2),
-     ;; but dealing with the niggle that complex canonicalization gets
-     ;; in the way: (COERCE 1 'COMPLEX) returns 1, which is not of
-     ;; type COMPLEX.
-     (let* ((specifier (lvar-value type))
-            (result-typeoid (careful-specifier-type specifier)))
-       (cond
-         ((null result-typeoid) nil)
-         ((csubtypep result-typeoid (specifier-type 'number))
-          ;; the difficult case: we have to cope with ANSI 12.1.5.3
-          ;; Rule of Canonical Representation for Complex Rationals,
-          ;; which is a truly nasty delivery to field.
-          (cond
-            ((csubtypep result-typeoid (specifier-type 'real))
-             ;; cleverness required here: it would be nice to deduce
-             ;; that something of type (INTEGER 2 3) coerced to type
-             ;; DOUBLE-FLOAT should return (DOUBLE-FLOAT 2.0d0 3.0d0).
-             ;; FLOAT gets its own clause because it's implemented as
-             ;; a UNION-TYPE, so we don't catch it in the NUMERIC-TYPE
-             ;; logic below.
-             result-typeoid)
-            ((and (numeric-type-p result-typeoid)
-                  (eq (numeric-type-complexp result-typeoid) :real))
-             ;; FIXME: is this clause (a) necessary or (b) useful?
-             result-typeoid)
-            ((or (csubtypep result-typeoid
-                            (specifier-type '(complex single-float)))
-                 (csubtypep result-typeoid
-                            (specifier-type '(complex double-float)))
-                 #!+long-float
-                 (csubtypep result-typeoid
-                            (specifier-type '(complex long-float))))
-             ;; float complex types are never canonicalized.
-             result-typeoid)
-            (t
-             ;; if it's not a REAL, or a COMPLEX FLOAToid, it's
-             ;; probably just a COMPLEX or equivalent.  So, in that
-             ;; case, we will return a complex or an object of the
-             ;; provided type if it's rational:
-             (type-union result-typeoid
-                         (type-intersection (lvar-type value)
-                                            (specifier-type 'rational))))))
-         ((and (policy node (zerop safety))
-               (csubtypep result-typeoid (specifier-type '(array * (*)))))
-          ;; At zero safety the deftransform for COERCE can elide dimension
-          ;; checks for the things like (COERCE X '(SIMPLE-VECTOR 5)) -- so we
-          ;; need to simplify the type to drop the dimension information.
-          (let ((vtype (simplify-vector-type result-typeoid)))
-            (if vtype
-                (specifier-type vtype)
-                result-typeoid)))
-         (t
-          result-typeoid))))
-    (t
-     ;; OK, the result-type argument isn't constant.  However, there
-     ;; are common uses where we can still do better than just
-     ;; *UNIVERSAL-TYPE*: e.g. (COERCE X (ARRAY-ELEMENT-TYPE Y)),
-     ;; where Y is of a known type.  See messages on cmucl-imp
-     ;; 2001-02-14 and sbcl-devel 2002-12-12.  We only worry here
-     ;; about types that can be returned by (ARRAY-ELEMENT-TYPE Y), on
-     ;; the basis that it's unlikely that other uses are both
-     ;; time-critical and get to this branch of the COND (non-constant
-     ;; second argument to COERCE).  -- CSR, 2002-12-16
-     (let ((value-type (lvar-type value))
-           (type-type (lvar-type type)))
-       (labels
-           ((good-cons-type-p (cons-type)
-              ;; Make sure the cons-type we're looking at is something
-              ;; we're prepared to handle which is basically something
-              ;; that array-element-type can return.
-              (or (and (member-type-p cons-type)
-                       (eql 1 (member-type-size cons-type))
-                       (null (first (member-type-members cons-type))))
-                  (let ((car-type (cons-type-car-type cons-type)))
-                    (and (member-type-p car-type)
-                         (eql 1 (member-type-members car-type))
-                         (let ((elt (first (member-type-members car-type))))
-                           (or (symbolp elt)
-                               (numberp elt)
-                               (and (listp elt)
-                                    (numberp (first elt)))))
-                         (good-cons-type-p (cons-type-cdr-type cons-type))))))
-            (unconsify-type (good-cons-type)
-              ;; Convert the "printed" respresentation of a cons
-              ;; specifier into a type specifier.  That is, the
-              ;; specifier (CONS (EQL SIGNED-BYTE) (CONS (EQL 16)
-              ;; NULL)) is converted to (SIGNED-BYTE 16).
-              (cond ((or (null good-cons-type)
-                         (eq good-cons-type 'null))
-                     nil)
-                    ((and (eq (first good-cons-type) 'cons)
-                          (eq (first (second good-cons-type)) 'member))
-                     `(,(second (second good-cons-type))
-                       ,@(unconsify-type (caddr good-cons-type))))))
-            (coerceable-p (part)
-              ;; Can the value be coerced to the given type?  Coerce is
-              ;; complicated, so we don't handle every possible case
-              ;; here---just the most common and easiest cases:
-              ;;
-              ;; * Any REAL can be coerced to a FLOAT type.
-              ;; * Any NUMBER can be coerced to a (COMPLEX
-              ;;   SINGLE/DOUBLE-FLOAT).
-              ;;
-              ;; FIXME I: we should also be able to deal with characters
-              ;; here.
-              ;;
-              ;; FIXME II: I'm not sure that anything is necessary
-              ;; here, at least while COMPLEX is not a specialized
-              ;; array element type in the system.  Reasoning: if
-              ;; something cannot be coerced to the requested type, an
-              ;; error will be raised (and so any downstream compiled
-              ;; code on the assumption of the returned type is
-              ;; unreachable).  If something can, then it will be of
-              ;; the requested type, because (by assumption) COMPLEX
-              ;; (and other difficult types like (COMPLEX INTEGER)
-              ;; aren't specialized types.
-              (let ((coerced-type (careful-specifier-type part)))
-                (when coerced-type
-                  (or (and (csubtypep coerced-type (specifier-type 'float))
-                           (csubtypep value-type (specifier-type 'real)))
-                      (and (csubtypep coerced-type
-                                      (specifier-type `(or (complex single-float)
-                                                           (complex double-float))))
-                          (csubtypep value-type (specifier-type 'number)))))))
-            (process-types (type)
-              ;; FIXME: This needs some work because we should be able
-              ;; to derive the resulting type better than just the
-              ;; type arg of coerce.  That is, if X is (INTEGER 10
-              ;; 20), then (COERCE X 'DOUBLE-FLOAT) should say
-              ;; (DOUBLE-FLOAT 10d0 20d0) instead of just
-              ;; double-float.
-              (cond ((member-type-p type)
-                     (block punt
-                       (let (members)
-                         (mapc-member-type-members
-                          (lambda (member)
-                            (if (coerceable-p member)
-                                (push member members)
-                                (return-from punt *universal-type*)))
-                          type)
-                         (specifier-type `(or ,@members)))))
-                    ((and (cons-type-p type)
-                          (good-cons-type-p type))
-                     (let ((c-type (unconsify-type (type-specifier type))))
-                       (if (coerceable-p c-type)
-                           (specifier-type c-type)
-                           *universal-type*)))
-                    (t
-                     *universal-type*))))
-         (cond ((union-type-p type-type)
-                (apply #'type-union (mapcar #'process-types
-                                            (union-type-types type-type))))
-               ((or (member-type-p type-type)
-                    (cons-type-p type-type))
-                (process-types type-type))
-               (t
-                *universal-type*)))))))
+  (multiple-value-bind (type constant)
+      (if (constant-lvar-p type)
+          (values (lvar-value type) t)
+          (constant-cons-type (lvar-type type)))
+    (when constant
+      ;; This branch is essentially (RESULT-TYPE-SPECIFIER-NTH-ARG 2),
+      ;; but dealing with the niggle that complex canonicalization gets
+      ;; in the way: (COERCE 1 'COMPLEX) returns 1, which is not of
+      ;; type COMPLEX.
+      (let ((result-typeoid (careful-specifier-type type)))
+        (cond
+          ((null result-typeoid) nil)
+          ((csubtypep result-typeoid (specifier-type 'number))
+           ;; the difficult case: we have to cope with ANSI 12.1.5.3
+           ;; Rule of Canonical Representation for Complex Rationals,
+           ;; which is a truly nasty delivery to field.
+           (cond
+             ((csubtypep result-typeoid (specifier-type 'real))
+              ;; cleverness required here: it would be nice to deduce
+              ;; that something of type (INTEGER 2 3) coerced to type
+              ;; DOUBLE-FLOAT should return (DOUBLE-FLOAT 2.0d0 3.0d0).
+              ;; FLOAT gets its own clause because it's implemented as
+              ;; a UNION-TYPE, so we don't catch it in the NUMERIC-TYPE
+              ;; logic below.
+              result-typeoid)
+             ((and (numeric-type-p result-typeoid)
+                   (eq (numeric-type-complexp result-typeoid) :real))
+              ;; FIXME: is this clause (a) necessary or (b) useful?
+              result-typeoid)
+             ((or (csubtypep result-typeoid
+                             (specifier-type '(complex single-float)))
+                  (csubtypep result-typeoid
+                             (specifier-type '(complex double-float)))
+                  #!+long-float
+                  (csubtypep result-typeoid
+                             (specifier-type '(complex long-float))))
+              ;; float complex types are never canonicalized.
+              result-typeoid)
+             (t
+              ;; if it's not a REAL, or a COMPLEX FLOAToid, it's
+              ;; probably just a COMPLEX or equivalent.  So, in that
+              ;; case, we will return a complex or an object of the
+              ;; provided type if it's rational:
+              (type-union result-typeoid
+                          (type-intersection (lvar-type value)
+                                             (specifier-type 'rational))))))
+          ((and (policy node (zerop safety))
+                (csubtypep result-typeoid (specifier-type '(array * (*)))))
+           ;; At zero safety the deftransform for COERCE can elide dimension
+           ;; checks for the things like (COERCE X '(SIMPLE-VECTOR 5)) -- so we
+           ;; need to simplify the type to drop the dimension information.
+           (let ((vtype (simplify-vector-type result-typeoid)))
+             (if vtype
+                 (specifier-type vtype)
+                 result-typeoid)))
+          (t
+           result-typeoid))))))
 
 (defoptimizer (compile derive-type) ((nameoid function))
   (declare (ignore function))

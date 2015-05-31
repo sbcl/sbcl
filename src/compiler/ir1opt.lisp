@@ -25,9 +25,8 @@
   (and (lvar-p thing)
        (or (let ((use (principal-lvar-use thing)))
              (and (ref-p use) (constant-p (ref-leaf use))))
-           ;; check for EQL types (but not singleton numeric types)
-           (let ((type (lvar-type thing)))
-             (values (type-singleton-p type))))))
+           ;; check for EQL types and singleton numeric types
+           (values (type-singleton-p (lvar-type thing))))))
 
 ;;; Return the constant value for an LVAR whose only use is a constant
 ;;; node.

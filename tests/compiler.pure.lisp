@@ -5513,3 +5513,28 @@
       (let ((err-string (with-output-to-string (*error-output*)
                           (compile-file input :print nil))))
         (assert (search expect err-string))))))
+
+(with-test (:name :coerce-derive-type)
+  (macrolet ((check (type ll form &rest values)
+               `(assert (equal (funcall (compile nil `(lambda ,',ll
+                                                        (ctu:compiler-derived-type ,',form)))
+                                        ,@values)
+                               ',type))))
+    (check list
+           (a)
+           (coerce a 'list)
+           nil)
+    (check (unsigned-byte 32)
+           (a)
+           (coerce a '(unsigned-byte 32))
+           10)
+    (check character
+           (a x)
+           (coerce a (array-element-type (the (array character) x)))
+           #\a
+           "abc")
+    (check (unsigned-byte 32)
+           (a x)
+           (coerce a (array-element-type (the (array (unsigned-byte 32)) x)))
+           10
+           (make-array 10 :element-type '(unsigned-byte 32)))))
