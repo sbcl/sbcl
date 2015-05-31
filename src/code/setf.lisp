@@ -342,8 +342,6 @@
 ;;; reduces the incentive to treat some macros as special-forms when
 ;;; squeezing more performance from a Lisp interpreter.
 ;;; DEFINE-MODIFY-MACRO could be used, but this expands more compactly.
-(declaim (inline xsubtract))
-(defun xsubtract (a b) (- b a)) ; exchanged subtract
 (flet ((expand (place delta env operator)
          (if (symbolp (setq place (macroexpand-for-setf place env)))
              `(setq ,place (,operator ,delta ,place))

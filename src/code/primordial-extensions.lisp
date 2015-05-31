@@ -111,6 +111,13 @@
                      ,label-2
                      (unless ,(first endlist) (go ,label-1))
                      (return-from ,block (progn ,@(rest endlist))))))))))
+
+;; Define "exchanged subtract" So that DECF on a symbol requires no LET binding:
+;;  (DECF I (EXPR)) -> (SETQ I (XSUBTRACT (EXPR) I))
+;; which meets the CLHS 5.1.3 requirement to eval (EXPR) prior to reading
+;; the old value of I. Formerly in 'setf' but too late to avoid full calls.
+(declaim (inline xsubtract))
+(defun xsubtract (a b) (- b a))
 
 ;;;; GENSYM tricks
 
@@ -135,14 +142,11 @@
 
 ;;; Return a list of N gensyms. (This is a common suboperation in
 ;;; macros and other code-manipulating code.)
-(declaim (ftype (function (index &optional t) (values list &optional))
+(declaim (ftype (function (unsigned-byte &optional t) (values list &optional))
                 make-gensym-list))
 (defun make-gensym-list (n &optional name)
-  (when (eq t name)
-    (break))
-  (if name
-      (loop repeat n collect (sb!xc:gensym (string name)))
-      (loop repeat n collect (sb!xc:gensym))))
+  (let ((arg (if name (string name) "G")))
+    (loop repeat n collect (sb!xc:gensym arg))))
 
 ;;;; miscellany
 
