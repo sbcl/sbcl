@@ -191,4 +191,32 @@
                           '(1 2 3))
                  #(1 2 3))))
 
-;;; success
+(with-test (:name :map-into-type-mismatch)
+  (assert-error
+   (funcall
+    (compile nil
+             `(lambda (x)
+                (map-into (make-array 1 :element-type '(signed-byte 16)) x)))
+    (constantly nil))
+   type-error)
+  (assert-error
+   (funcall
+    (compile nil
+             `(lambda (array x)
+                (map-into array x)))
+    (make-array 1 :element-type '(signed-byte 16)) (constantly nil))
+   type-error))
+
+(with-test (:name :map-type-mismatch)
+  (assert-error
+   (funcall
+    (compile nil
+             `(lambda (x) (map '(vector (signed-byte 16) 1) #'identity x)))
+    '(1.0))
+   type-error)
+  (assert-error
+   (funcall
+    (compile nil
+             `(lambda (type x) (map type #'identity x)))
+    '(vector (signed-byte 16) 1) '(1.0))
+   type-error))

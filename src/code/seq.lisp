@@ -1119,8 +1119,7 @@ many elements are copied."
          (loop (f)))))
 
 (define-array-dispatch vector-map-into (data start end fun sequences)
-  (declare (optimize speed (safety 0))
-           (type index start end)
+  (declare (type index start end)
            (type function fun)
            (type list sequences))
   (let ((index start))
