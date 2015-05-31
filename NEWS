@@ -11,6 +11,10 @@ changes relative to sbcl-1.2.12:
   * bug fix: calls to (SETF SLOT-VALUE) on a missing slot would in certain
     situations incorrectly return the result of a SLOT-MISSING method
     instead of always returning the new value. (lp#1460381)
+  * bug fix: a DEFMACRO occurring not at toplevel and capturing parts of
+    its lexical environment (thus being a closure) caused expressions
+    involving the macro name to cause corruption in the pretty-printer
+    due to faulty introspection of the lambda list of a closure.
 
 changes in sbcl-1.2.12 relative to sbcl-1.2.11:
   * minor incompatible change: the SB-C::*POLICY* variable is no longer

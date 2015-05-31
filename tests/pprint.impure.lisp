@@ -398,4 +398,16 @@
   (assert (string= (write-to-string (cons 'known-cons (cons 'known-cons t)) :pretty t)
                    "#<KNOWN-CONS #<KNOWN-CONS T>>")))
 
+;; force MACDADDY to be a closure over X.
+(let ((x 3)) (defmacro macdaddy (a b &body z) a b z `(who-cares ,x)) (incf x))
+
+(with-test (:name :closure-macro-arglist)
+  ;; assert correct test setup - MACDADDY is a closure
+  (assert (eq (sb-kernel:fun-subtype (macro-function 'macdaddy))
+              sb-vm:closure-header-widetag))
+  ;; MACRO-INDENTATION used %simple-fun-arglist instead of %fun-arglist.
+  ;; Depending on your luck it would either not return the right answer,
+  ;; or crash, depending on what lay at 4 words past the function address.
+  (assert (= (sb-pretty::macro-indentation 'macdaddy) 2)))
+
 ;;; success

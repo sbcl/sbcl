@@ -1442,11 +1442,12 @@ line break."
 ;;; the first N arguments specially then indent any further arguments
 ;;; like a body.
 (defun macro-indentation (name)
-  (labels ((proper-list-p (list)
-             (not (nth-value 1 (ignore-errors (list-length list)))))
-           (macro-arglist (name)
-             (%simple-fun-arglist (macro-function name)))
-           (clean-arglist (arglist)
+  (labels ((clean-arglist (arglist)
+             ;; FIXME: for purposes of introspection, we should never "leak"
+             ;; that a macro uses an &AUX variable, that it takes &WHOLE,
+             ;; or that it cares about its lexenv (though that's debatable).
+             ;; Certainly the first two aspects are not part of the macro's
+             ;; interface, and as such, should not be stored at all.
              "Remove &whole, &enviroment, and &aux elements from ARGLIST."
              (cond ((null arglist) '())
                    ((member (car arglist) '(&whole &environment))
@@ -1454,7 +1455,7 @@ line break."
                    ((eq (car arglist) '&aux)
                     '())
                    (t (cons (car arglist) (clean-arglist (cdr arglist)))))))
-    (let ((arglist (macro-arglist name)))
+    (let ((arglist (%fun-lambda-list (macro-function name))))
       (if (proper-list-p arglist)       ; guard against dotted arglists
           (position '&body (remove '&optional (clean-arglist arglist)))
           nil))))
