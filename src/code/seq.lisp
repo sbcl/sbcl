@@ -1160,10 +1160,15 @@ many elements are copied."
        (let ((node result-sequence))
          (declare (type list node))
          (map-into-lambda sequences (&rest args)
-           (declare (truly-dynamic-extent args)
-                    (optimize speed (safety 0)))
-           (when (null node)
-             (return-from map-into result-sequence))
+           (declare (truly-dynamic-extent args))
+           (cond ((null node)
+                  (return-from map-into result-sequence))
+                 ((not (listp (cdr node)))
+                  (error 'simple-type-error
+                         :format-control "~a is not a proper list"
+                         :format-arguments (list result-sequence)
+                         :expected-type 'list
+                         :datum result-sequence)))
            (setf (car node) (apply really-fun args))
            (setf node (cdr node)))))
       (sequence

@@ -205,6 +205,13 @@
              `(lambda (array x)
                 (map-into array x)))
     (make-array 1 :element-type '(signed-byte 16)) (constantly nil))
+   type-error)
+  (assert-error
+   (funcall
+    (compile nil
+             `(lambda (array x)
+                (map-into array x)))
+    (cons 1 2) (constantly nil))
    type-error))
 
 (with-test (:name :map-type-mismatch)
