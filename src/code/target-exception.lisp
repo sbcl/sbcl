@@ -87,7 +87,8 @@
   (when (= (slot record 'number-parameters) 2)
     ;; (sap-int (deref (slot record 'exception-information) 0)) =
     ;; length of string including 0-terminator
-    (warn (cast
+    (warn "DBG_PRINTEXCEPTION_C: ~a"
+          (cast
            (sap-alien (deref (slot record 'exception-information) 1)
                       (* char))
            c-string))))
