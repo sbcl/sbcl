@@ -32,13 +32,16 @@
                 (make-file-info-namestring
                  *compile-file-pathname*
                  (get-toplevelish-file-info *source-info*)))))
-         (tlf-num (when (boundp '*current-path*)
-                    (source-path-tlf-number *current-path*)))
+         (tlf-num (acond ((boundp '*current-path*)
+                          (source-path-tlf-number *current-path*))
+                         ((and source-info (source-info-file-info source-info))
+                          (1- (fill-pointer (file-info-forms it))))))
          (last (and source-info
                     (source-info-last-defn-source-loc source-info))))
     (if (and last
              (eql (definition-source-location-toplevel-form-number last) tlf-num)
-             (string= (definition-source-location-namestring last) namestring))
+             (string= (definition-source-location-namestring last) namestring)
+             (equal (definition-source-location-plist last) *source-plist*))
         last
         (let ((new (%make-definition-source-location namestring tlf-num)))
           (when source-info

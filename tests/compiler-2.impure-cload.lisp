@@ -89,3 +89,18 @@
   (multiple-value-bind (val foundp)
       (sb-int:info :variable :macro-expansion '%trash%)
     (assert (and (not val) (not foundp)))))
+
+;; This must be one toplevel form.
+;; In practice you'd never do anything like this I suspect.
+(progn
+  (defvar *foofoo1* 1)
+  (eval-when (:compile-toplevel)
+    (setq sb-c::*source-plist* '(strange "Yes")))
+  (defvar *foofoo2* 2))
+
+(with-test (:name :source-location-plist-invalid-memoization)
+  (assert (null (sb-c:definition-source-location-plist
+                    (sb-int:info :source-location :variable '*foofoo1*))))
+  (assert (equal (sb-c:definition-source-location-plist
+                     (sb-int:info :source-location :variable '*foofoo2*))
+                 '(strange "Yes"))))

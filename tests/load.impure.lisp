@@ -13,6 +13,19 @@
 
 (defvar *tmp-filename* "load-test.tmp")
 
+;;; Loading from Lisp should set the TOPLEVEL-FORM-NUMBER slot
+(with-test (:name :load-lisp-assigns-tlf-num)
+  (with-open-file (f *tmp-filename* :direction :output
+                     :if-exists :supersede :if-does-not-exist :create)
+    (write '(defvar *var0* 'this-is-form-0) :stream f)
+    (write '(defvar *var1* 'this-is-form-1) :stream f))
+  (load *tmp-filename*)
+  (assert (eql 0 (sb-c:definition-source-location-toplevel-form-number
+                     (sb-int:info :source-location :variable '*var0*))))
+  (assert (eql 1 (sb-c:definition-source-location-toplevel-form-number
+                     (sb-int:info :source-location :variable '*var1*))))
+  (delete-file *tmp-filename*))
+
 ;;; Bug reported by Sean Ross: FASL loader set fill pointer to loaded
 ;;; simple arrays.
 
