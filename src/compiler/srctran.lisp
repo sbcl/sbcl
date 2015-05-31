@@ -2622,46 +2622,42 @@
 ;;;; arguments passed to internal %FOO functions. We then attempt to
 ;;;; transform the %FOO functions into boolean operations when the
 ;;;; size and position are constant and the operands are fixnums.
+;;;; The goal of the source-transform is to avoid consing a byte specifier
+;;;; to immediately throw away. A more powerful framework could recognize
+;;;; in IR1 when a constructor call flows to one or more accessors for the
+;;;; constructed object and nowhere else (no mutators). If so, forwarding
+;;;; the constructor arguments to their reads would generally solve this.
+;;;; A transform approximates that, but fails when BYTE is produced by an
+;;;; inline function and not a macro.
+(flet ((xform (bytespec-form env int fun &optional (new nil setter-p))
+         (let ((spec (%macroexpand bytespec-form env)))
+           (if (and (consp spec) (eq (car spec) 'byte))
+               (if (proper-list-of-length-p (cdr spec) 2)
+                   (values `(,fun ,@(if setter-p (list new))
+                                  ,(second spec) ,(third spec) ,int) nil)
+                   ;; No point in compiling calls to BYTE-{SIZE,POSITION}
+                   (values nil t)) ; T => "pass" (meaning "fail")
+               (let ((new-temp (if setter-p (copy-symbol 'new)))
+                     (byte (copy-symbol 'byte)))
+                 (values `(let (,@(if new-temp `((,new-temp ,new)))
+                                (,byte ,spec))
+                            (,fun ,@(if setter-p (list new-temp))
+                                  (byte-size ,byte) (byte-position ,byte) ,int))
+                         nil))))))
 
-(macrolet (;; Evaluate body with SIZE-VAR and POS-VAR bound to
-           ;; expressions that evaluate to the SIZE and POSITION of
-           ;; the byte-specifier form SPEC. We may wrap a let around
-           ;; the result of the body to bind some variables.
-           ;;
-           ;; If the spec is a BYTE form, then bind the vars to the
-           ;; subforms. otherwise, evaluate SPEC and use the BYTE-SIZE
-           ;; and BYTE-POSITION. The goal of this transformation is to
-           ;; avoid consing up byte specifiers and then immediately
-           ;; throwing them away.
-           (with-byte-specifier ((size-var pos-var spec) &body body)
-             (once-only ((spec `(macroexpand ,spec))
-                         (temp '(gensym)))
-                        `(if (and (consp ,spec)
-                                  (eq (car ,spec) 'byte)
-                                  (= (length ,spec) 3))
-                        (let ((,size-var (second ,spec))
-                              (,pos-var (third ,spec)))
-                          ,@body)
-                        (let ((,size-var `(byte-size ,,temp))
-                              (,pos-var `(byte-position ,,temp)))
-                          `(let ((,,temp ,,spec))
-                             ,,@body))))))
+  ;; DEFINE-SOURCE-TRANSFORM has no compile-time effect, so it's fine that
+  ;; these 4 things are non-toplevel. (xform does not need to be a macro)
+  (define-source-transform ldb (spec int &environment env)
+    (xform spec env int '%ldb))
 
-  (define-source-transform ldb (spec int)
-    (with-byte-specifier (size pos spec)
-      `(%ldb ,size ,pos ,int)))
+  (define-source-transform dpb (newbyte spec int &environment env)
+    (xform spec env int '%dpb newbyte))
 
-  (define-source-transform dpb (newbyte spec int)
-    (with-byte-specifier (size pos spec)
-      `(%dpb ,newbyte ,size ,pos ,int)))
+  (define-source-transform mask-field (spec int &environment env)
+    (xform spec env int '%mask-field))
 
-  (define-source-transform mask-field (spec int)
-    (with-byte-specifier (size pos spec)
-      `(%mask-field ,size ,pos ,int)))
-
-  (define-source-transform deposit-field (newbyte spec int)
-    (with-byte-specifier (size pos spec)
-      `(%deposit-field ,newbyte ,size ,pos ,int))))
+  (define-source-transform deposit-field (newbyte spec int &environment env)
+    (xform spec env int '%deposit-field newbyte)))
 
 (defoptimizer (%ldb derive-type) ((size posn num))
   (declare (ignore posn num))
