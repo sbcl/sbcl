@@ -75,9 +75,9 @@
           (if ospec
               (setf (car ospec)
                     (type-specifier
-                     (type-union (specifier-type (car ospec))
-                                 (specifier-type typespec))))
-              (push (cons (type-specifier (specifier-type typespec))
+                     (type-union (compiler-specifier-type (car ospec))
+                                 (compiler-specifier-type typespec))))
+              (push (cons (type-specifier (compiler-specifier-type typespec))
                           restart-name)
                     new)))))
     new))
@@ -101,8 +101,8 @@
               (let ((type-specifier
                      (type-specifier
                       (type-intersection
-                       (specifier-type (car ospec))
-                       (specifier-type `(not ,typespec))))))
+                       (compiler-specifier-type (car ospec))
+                       (compiler-specifier-type `(not ,typespec))))))
                 (if type-specifier
                     (setf (car ospec) type-specifier)
                     (setq new

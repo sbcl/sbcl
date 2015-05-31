@@ -2233,8 +2233,9 @@ is :ANY, the function name is not checked."
        `(progn
           (defun ,careful (specifier)
             (handler-case (,basic specifier)
-              (sb!kernel::arg-count-error (condition)
-                (values nil (list (format nil "~A" condition))))
+              ((or sb!kernel::arg-count-error
+                type-error) (condition)
+                (values nil (list (princ-to-string condition))))
               (simple-error (condition)
                 (values nil (list* (simple-condition-format-control condition)
                                    (simple-condition-format-arguments condition))))))

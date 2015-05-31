@@ -2636,4 +2636,20 @@
     (test-case "foo")
     (test-case '(foo bar))))
 
-;;; success
+(defun catch-compiled-program-error (form &rest values)
+  (multiple-value-bind (function warn fail)
+      (compile nil form)
+    (assert warn)
+    (assert fail)
+    (assert-error (apply function values))))
+
+(with-test (:name :duplicate-&key-no-error)
+  (catch-compiled-program-error
+   '(lambda () (defun duplicate-&key-no-error (&key a a) a))))
+
+(with-test (:name :bad-type-specifiers)
+  (catch-compiled-program-error
+   '(lambda (x) (typep x '(values 10)))
+   1)
+  (catch-compiled-program-error
+   '(lambda () (declare (sb-ext:muffle-conditions 10)))))

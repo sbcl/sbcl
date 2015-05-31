@@ -1154,7 +1154,7 @@
                                                   t)))
                                         key-list))))
             (allow (when (ll-kwds-allowp llks) '(&allow-other-keys))))
-        (specifier-type `(function (,@reqs ,@opts ,@rest ,@keys ,@allow) *))))))
+        (compiler-specifier-type `(function (,@reqs ,@opts ,@rest ,@keys ,@allow) *))))))
 
 ;;; Get a DEFINED-FUN object for a function we are about to define. If
 ;;; the function has been forward referenced, then substitute for the
