@@ -55,8 +55,10 @@ EXPERIMENTAL INTERFACE: Subject to change."
     (alter-policy *policy-restrictions* (policy-quality-name-p quality)
                   min (plusp min)))
   ;; Return dotted pairs, not elements that look declaration-like.
-  (mapc (lambda (x) (rplacd x (cadr x)))
-        (policy-to-decl-spec *policy-restrictions*)))
+  (if *policy-restrictions*
+      (mapc (lambda (x) (rplacd x (cadr x)))
+            (policy-to-decl-spec *policy-restrictions*))
+      '()))
 
 (defstruct (policy-dependent-quality (:copier nil))
   (name nil :type symbol :read-only t)

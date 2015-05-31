@@ -1480,6 +1480,8 @@
 
 (with-test (:name :restrict-compiler-policy-result)
   (let ((sb-c::*policy-restrictions* sb-c::*policy-restrictions*))
+    ;; Passing no arguments returns the current quality/value pairs.
+    (assert (null (sb-ext:restrict-compiler-policy)))
     (let ((res (sb-ext:restrict-compiler-policy 'safety 2)))
       ;; returns an alist
       (assert (equal res '((safety . 2)))))
