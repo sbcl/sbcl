@@ -43,7 +43,9 @@
 ;;; allows of (A B &ENVIRONMENT E X Y) which has 4 positional parameters.
 ;;; Nor can it appear between &KEY and &ALLOW-OTHER-KEYS.
 ;;;
-(defun parse-lambda-list (list &key (disallow '(&environment)) context silent)
+(defun parse-lambda-list (list &key (disallow '(&environment))
+                                    (context "an ordinary lambda list")
+                                    silent)
   (collect ((required) (optional) (more) (keys) (aux))
     (let ((rest nil)
           (keyp nil)
@@ -95,10 +97,11 @@
                  (let ((name (symbol-name arg)))
                    (or (zerop (length name)) (char/= (char name 0) #\&))))
              (handle-parameter))
-            ((member arg disallow)
-             (if context
-                 (croak "~A is not allowed in ~A: ~S" arg (explain-context) list)
-                 (croak "Bad lambda list keyword ~S in: ~S" arg list)))
+            ((or (memq arg disallow) (memq arg '(&body &whole)))
+             (let ((context (case context
+                              (type "a FUNCTION or VALUES type specifier")
+                              (t context))))
+               (croak "~A is not allowed in ~A: ~S" arg context list)))
             (t
              (case arg
               (&optional (transition '(:required) :optional))
@@ -121,21 +124,6 @@
                ;; Valid "from" states are almost like &AUX
                (transition '(:required :optional :post-rest
                              :key :allow-other-keys) :env env))
-              ((&body &whole)
-               ;; It could be argued that &WHOLE and friends would be
-               ;; just ordinary variables in an ordinary lambda-list,
-               ;; but since (1) that seem exceedingly to have been the
-               ;; programmers intent and (2) the spec can be
-               ;; interpreted as giving as licence to signal an
-               ;; error[*] that is what we do.
-               ;;
-               ;; [* All lambda list keywords used in the
-               ;; implementation appear in LAMBDA-LIST-KEYWORDS. Each
-               ;; member of a lambda list is either a parameter
-               ;; specifier ot a lambda list keyword. Ergo, symbols
-               ;; appearing in LAMBDA-LIST-KEYWORDS cannot be
-               ;; parameter specifiers.]
-               (croak "Bad lambda list keyword ~S in: ~S" arg list))
               (t
                (unless silent
                     ;; Should this be COMPILER-STYLE-WARN?

@@ -105,6 +105,10 @@
                                        (subseq optional 0 (1+ last-not-rest))))
                                 rest))))
 
+;; FIXME: take an additional argument indicating whether we are parsing a VALUES
+;; or a FUNCTION type. Then PARSE-LAMBDA-LIST can reject &KEY appropriately,
+;; and the error message, instead of saying what is disallowed in "this or that"
+;; can actually say which kind of lambda-listy thing was being parsed.
 (defun parse-args-types (lambda-listy-thing)
   (multiple-value-bind (llks required optional rest keys)
       (parse-lambda-list lambda-listy-thing
