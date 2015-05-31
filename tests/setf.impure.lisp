@@ -409,4 +409,13 @@
   ;; Assert that POP reads CAR of the list before invoking the setter
   (assert (eq (pop (my-foobar-list)) 1)))
 
+;; lp#1460360
+(with-test (:name :pushnew-evals-keyword-args)
+  ;; Though not directly supported by an example in CLHS,
+  ;; convention seems to dictate that :KEY, :TEST, :TEST-NOT are not
+  ;; parsed by DS-BIND, but instead are blindly forwarded to ADJOIN.
+  (let ((k :test) (v #'equal) (list nil))
+    (pushnew '(hi) list k v)
+    (assert (equal list '((hi))))))
+
 ;;; success

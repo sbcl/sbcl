@@ -271,24 +271,20 @@
   ;; - One errs, says "Multiple store variables not expected"
   ;; - One pushes multiple values produced by OBJ form into multiple places.
   ;; - At least two produce an incorrect expansion that doesn't even work.
-  (expand-rmw-macro 'cons (list obj) place '() env '(item)))
+  (expand-rmw-macro 'cons (list obj) place '() nil env '(item)))
 
-(defmacro-mundanely pushnew (obj place &rest keys
-                             &key key test test-not &environment env)
+(defmacro-mundanely pushnew (obj place &rest keys &environment env)
   #!+sb-doc
   "Takes an object and a location holding a list. If the object is
   already in the list, does nothing; otherwise, conses the object onto
-  the list. Returns the modified list. If there is a :TEST keyword, this
-  is used for the comparison."
+  the list. Keyword arguments are accepted as per the ADJOIN function."
   (declare (ignore key test test-not))
-  (multiple-value-bind (dummies vals newval setter getter)
-      (sb!xc:get-setf-expansion place env)
-    (let ((g (gensym)))
-      `(let* ((,g ,obj)
-              ,@(mapcar #'list dummies vals)
-              (,(car newval) (adjoin ,g ,getter ,@keys))
-              ,@(cdr newval))
-         ,setter))))
+  ;; Passing AFTER-ARGS-BINDP = NIL causes the forms subsequent to PLACE
+  ;; to be inserted literally as-is, giving the (apparently) desired behavior
+  ;; of *not* evaluating them before the Read/Modify/Write of PLACE, which
+  ;; seems to be an exception to the 5.1.3 exception on L-to-R evaluation.
+  ;; The spec only mentions that ITEM is eval'd before PLACE.
+  (expand-rmw-macro 'adjoin (list obj) place keys nil env '(item)))
 
 (defmacro-mundanely pop (place &environment env)
   #!+sb-doc
@@ -412,7 +408,7 @@
          ,name (,reference ,@lambda-list &environment ,env)
        ,@(when doc-string (list (the string doc-string)))
        (expand-rmw-macro ',function
-                         '() ,reference (list* ,@other-args ,rest-arg)
+                         '() ,reference (list* ,@other-args ,rest-arg) t
                          ,env ',other-args))))
 
 ;;;; DEFSETF
@@ -565,8 +561,10 @@
 ;; The generated call resembles (FUNCTION <before-args> PLACE <after-args>)
 ;; but the read/write of PLACE is done after all {BEFORE,AFTER}-ARG-FORMS are
 ;; evaluated. Subforms of PLACE are evaluated in the usual order.
+;;
+;; Exception: See comment at PUSHNEW for the effect of AFTER-ARGS-BINDP = NIL.
 (defun expand-rmw-macro (function before-arg-forms place after-arg-forms
-                         environment name-hints)
+                         after-args-bindp environment name-hints)
      ;; Note that NAME-HINTS do the wrong thing if you have both "before" and
      ;; "after" args. In that case it is probably best to specify them as ().
      (binding* (((before-temps before-vals before-args)
@@ -574,7 +572,9 @@
                 ((place-temps place-subforms stores setter getter)
                  (sb!xc:get-setf-expansion place environment))
                 ((after-temps after-vals after-args)
-                 (collect-setf-temps after-arg-forms environment name-hints))
+                 (if after-args-bindp
+                     (collect-setf-temps after-arg-forms environment name-hints)
+                     (values nil nil after-arg-forms)))
                 (compute `(,function ,@before-args ,getter ,@after-args))
                 (set-fn (and (listp setter) (car setter)))
                 (newval-temp (car stores))
