@@ -324,25 +324,45 @@
 
 ;;;; GET-INFO-VALUE
 
+;;; If non-nil, *GLOBALDB-OBSERVER*'s CAR is a bitmask over info numbers
+;;; for which you'd like to call the function in the CDR whenever info
+;;; of that number is queried.
+(!defvar *globaldb-observer* nil)
+(declaim (type (or (cons (unsigned-byte #.(ash 1 info-number-bits)) function)
+                   null) *globaldb-observer*))
+#-sb-xc-host (declaim (always-bound *globaldb-observer*))
+
 ;;; Return the value of NAME / INFO-NUMBER from the global environment,
 ;;; or return the default if there is no global info.
 ;;; The secondary value indicates whether info was found vs defaulted.
 (declaim (ftype (sfunction (t info-number) (values t boolean))
                 get-info-value))
 (defun get-info-value (name info-number)
-  (multiple-value-bind (vector aux-key)
-      (let ((name (uncross name)))
-        (with-globaldb-name (key1 key2) name
-          :simple (values (symbol-info-vector key1) key2)
-          :hairy (values (info-gethash name *info-environment*)
-                         +no-auxilliary-key+)))
-    (when vector
-      (let ((index
-             (packed-info-value-index vector aux-key info-number)))
-        (when index
-          (return-from get-info-value (values (svref vector index) t))))))
-  (let ((val (meta-info-default (aref *info-types* info-number))))
-    (values (if (functionp val) (funcall val name) val) nil)))
+  (let* ((hook *globaldb-observer*)
+         (hookp (and (and hook
+                          (not (eql 0 (car hook)))
+                          (logbitp info-number (car hook))))))
+    (multiple-value-bind (vector aux-key)
+        (let ((name (uncross name)))
+          (with-globaldb-name (key1 key2) name
+           ;; In the :simple branch, KEY1 is no doubt a symbol,
+           ;; but constraint propagation isn't informing the compiler here.
+           :simple (values (symbol-info-vector (truly-the symbol key1)) key2)
+           :hairy (values (info-gethash name *info-environment*)
+                          +no-auxilliary-key+)))
+      (when vector
+        (let ((index (packed-info-value-index vector aux-key info-number)))
+          (when index
+            (let ((answer (svref vector index)))
+              (when hookp
+                (funcall (truly-the function (cdr hook))
+                         name info-number answer t))
+              (return-from get-info-value (values answer t)))))))
+    (let* ((def (meta-info-default (aref *info-types* info-number)))
+           (answer (if (functionp def) (funcall def name) def)))
+      (when hookp
+        (funcall (truly-the function (cdr hook)) name info-number answer nil))
+      (values answer nil))))
 
 ;; Perform the approximate equivalent operations of retrieving
 ;; (INFO :CATEGORY :KIND NAME), but if no info is found, invoke CREATION-FORM

@@ -273,6 +273,11 @@ any non-negative real number."
       ;; 2. Rebind the stream symbol in case some poor sod sees
       ;;    a broken stream here while running with *BREAK-ON-ERRORS*.
       (let ((stream (stream-output-stream (symbol-value name))))
+        ;; This is kind of crummy because it checks in globaldb for each
+        ;; stream symbol whether it can be bound to a stream. The translator
+        ;; for PROGV could skip ABOUT-TO-MODIFY-SYMBOL-VALUE based on
+        ;; an aspect of a policy, but if users figure that out they could
+        ;; do something horrible like rebind T and NIL.
         (progv (list name) (list null)
           (handler-bind ((stream-error
                            (lambda (c)
