@@ -372,39 +372,31 @@
         (if (eq result *wild-type*)
             (specifier-type 'function)
             (make-fun-type :wild-args t :returns result))
-        (multiple-value-bind (required optional rest keyp keywords allowp)
-            (parse-args-types args)
+        (multiple-value-bind (llks required optional rest keywords)
+            (parse-args-types args :function-type)
           (if (and (null required)
                    (null optional)
                    (eq rest *universal-type*)
-                   (not keyp))
+                   (not (ll-kwds-keyp llks)))
               (if (eq result *wild-type*)
                   (specifier-type 'function)
                   (make-fun-type :wild-args t :returns result))
               (make-fun-type :required required
                              :optional optional
                              :rest rest
-                             :keyp keyp
+                             :keyp (ll-kwds-keyp llks)
                              :keywords keywords
-                             :allowp allowp
+                             :allowp (ll-kwds-allowp llks)
                              :returns result))))))
 
 (!def-type-translator values (&rest values)
   (if (eq values '*)
       *wild-type*
-      (multiple-value-bind (required optional rest keyp keywords allowp llk-p)
-          (parse-args-types values)
-        (declare (ignore keywords))
-        (cond (keyp
-               (error "&KEY appeared in a VALUES type specifier ~S."
-                      `(values ,@values)))
-              (llk-p
-               (make-values-type :required required
-                                 :optional optional
-                                 :rest rest
-                                 :allowp allowp))
-              (t
-               (make-short-values-type required))))))
+      (multiple-value-bind (llks required optional rest)
+          (parse-args-types values :values-type)
+        (if llks
+            (make-values-type :required required :optional optional :rest rest)
+            (make-short-values-type required)))))
 
 ;;;; VALUES types interfaces
 ;;;;

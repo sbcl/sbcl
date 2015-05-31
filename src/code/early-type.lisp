@@ -105,14 +105,13 @@
                                        (subseq optional 0 (1+ last-not-rest))))
                                 rest))))
 
-;; FIXME: take an additional argument indicating whether we are parsing a VALUES
-;; or a FUNCTION type. Then PARSE-LAMBDA-LIST can reject &KEY appropriately,
-;; and the error message, instead of saying what is disallowed in "this or that"
-;; can actually say which kind of lambda-listy thing was being parsed.
-(defun parse-args-types (lambda-listy-thing)
+(defun parse-args-types (lambda-listy-thing context)
   (multiple-value-bind (llks required optional rest keys)
       (parse-lambda-list lambda-listy-thing
-                         :context 'type :disallow '(&aux &environment)
+                         :context context
+                         :disallow (ecase context
+                                     (:values-type '(&key &aux &environment))
+                                     (:function-type '(&aux &environment)))
                          :silent t)
     (let ((required (mapcar #'single-value-specifier-type required))
           (optional (mapcar #'single-value-specifier-type optional))
@@ -134,9 +133,7 @@
       (multiple-value-bind (required optional rest)
           (canonicalize-args-type-args required optional rest
                                        (ll-kwds-keyp llks))
-        (values required optional rest
-                (ll-kwds-keyp llks) keywords (ll-kwds-allowp llks)
-                (not (null llks)))))))
+        (values llks required optional rest keywords)))))
 
 (defstruct (values-type
             (:include args-type

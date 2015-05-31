@@ -84,11 +84,7 @@
                                (if (and (eq saved-state :required)
                                         (not (required))) :required :post-env))
                     (t (croak "expecting lambda list keyword at ~S in: ~S"
-                              arg list)))))
-               (explain-context ()
-                 (case context
-                   (type "a FUNCTION or VALUES type specifier")
-                   (t context))))
+                              arg list))))))
           (loop
            (when (endp tail) (return))
            (setq arg (pop tail))
@@ -99,7 +95,8 @@
              (handle-parameter))
             ((or (memq arg disallow) (memq arg '(&body &whole)))
              (let ((context (case context
-                              (type "a FUNCTION or VALUES type specifier")
+                              (:function-type "a FUNCTION type specifier")
+                              (:values-type "a VALUES type specifier")
                               (t context))))
                (croak "~A is not allowed in ~A: ~S" arg context list)))
             (t
@@ -133,11 +130,11 @@
           (when (member state '(:rest :more :env))
             (croak "~A expects a variable following it" arg)))
 
-      ;; For CONTEXT other than 'TYPE we reject illegal list elements.
-      ;; TYPEs have arbitrary shapes,
-      ;; such as (VALUES (ARRAY (MUMBLE) (1 2)) &OPTIONAL (MEMBER X Y Z)).
-      ;; But why don't we reject constant symbols here?
-        (unless (eq context 'type)
+        ;; For CONTEXT other than :VALUES-TYPE/:FUNCTION-TYPE we reject
+        ;; illegal list elements. Type specifiers have arbitrary shapes,
+        ;; such as (VALUES (ARRAY (MUMBLE) (1 2)) &OPTIONAL (MEMBER X Y Z)).
+        ;; But why don't we reject constant symbols here?
+        (unless (member context '(:values-type :function-type))
           (dolist (i (required))
             (need-symbol i "Required argument"))
           (dolist (i (optional))
