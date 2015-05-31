@@ -391,9 +391,7 @@
        (if is-=
            (inst fcmpd x y)
            (inst fcmped x y))))
-    ;; We'd like to use FMSTAT, but it's not defined.  Sharing the
-    ;; same encoding is "FMRX PC, FPSCR", which we CAN encode.
-    (inst fmrx pc-tn :fpscr)))
+    (inst fmstat)))
 
 (macrolet ((frob (name sc ptype)
              `(define-vop (,name float-compare)
@@ -437,7 +435,7 @@
        (if is-=
            (inst fcmpzd x)
            (inst fcmpezd x))))
-    (inst fmrx pc-tn :fpscr)))
+    (inst fmstat)))
 
 (macrolet ((frob (name sc ptype constant-type)
              `(define-vop (,name float-compare-zero)

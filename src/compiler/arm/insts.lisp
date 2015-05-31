@@ -92,6 +92,26 @@
              (ignore dstate))
     (princ (aref *register-names* value) stream))
 
+  (defun print-float-reg (value stream dstate)
+    (declare (type stream stream)
+             (list value)
+             (ignore dstate))
+    (destructuring-bind (double high low) value
+      (format stream "~[S~;D~]~a"
+              double
+              (if (= double 1)
+                  high
+                  (logior (ash high 1) low)))))
+
+  (defun print-float-sys-reg (value stream dstate)
+    (declare (type stream stream)
+             (fixnum value)
+             (ignore dstate))
+    (princ (ecase value
+             (#b0000 "FPSID")
+             (#b0001 "FPSCR")
+             (#b1000 "FPEXC")) stream))
+
   (defun print-shift-type (value stream dstate)
     (declare (type stream stream)
              (fixnum value)
@@ -105,9 +125,7 @@
     (destructuring-bind (amount shift) value
       (cond
         ((and (zerop amount)
-              (zerop shift))
-         ;; No shift
-         )
+              (zerop shift))) ;; No shift
         ((and (zerop amount)
               (= shift 3))
          (princ ", RRX" stream))
@@ -177,6 +195,12 @@
 
 (sb!disassem:define-arg-type reg
     :printer #'print-reg)
+
+(sb!disassem:define-arg-type float-reg
+  :printer #'print-float-reg)
+
+(sb!disassem:define-arg-type float-sys-reg
+  :printer #'print-float-sys-reg)
 
 (sb!disassem:define-arg-type shift-type
     :printer #'print-shift-type)
@@ -360,6 +384,95 @@
   (sbo :field (byte 12 8) :value #xFFF)
   (opcode-4 :field (byte 4 4))
   (rm :field (byte 4 0) :type 'reg))
+
+(sb!disassem:define-instruction-format
+    (fp-binary 32
+     :default-printer '(:name cond :tab fd ", " fn ", " fm))
+    (cond :field (byte 4 28) :type 'condition-code)
+    (opc-1 :field (byte 4 24) :value #b1110)
+    (p :field (byte 1 23))
+    (q :field (byte 1 21))
+    (r :field (byte 1 20))
+    (s :field (byte 1 6))
+    (fn :fields (list (byte 1 8) (byte 4 16) (byte 1 7)) :type 'float-reg)
+    (fd :fields (list (byte 1 8) (byte 4 12) (byte 1 22)) :type 'float-reg)
+    (fm :fields (list (byte 1 8) (byte 4 0) (byte 1 5)) :type 'float-reg)
+    (opc-2 :field (byte 3 9) :value #b101)
+    (size :field (byte 1 8))
+    (opc-3 :field (byte 1 4) :value 0))
+
+(sb!disassem:define-instruction-format
+    (fp-unary 32
+     :default-printer '(:name cond :tab fd  ", " fm))
+    (cond :field (byte 4 28) :type 'condition-code)
+    (opc-1 :field (byte 5 23) :value #b11101)
+    (opc-2 :field (byte 2 20) :value #b11)
+    (opc :field (byte 4 16))
+    (fd :fields (list (byte 1 8) (byte 4 12) (byte 1 22)) :type 'float-reg)
+    (fm :fields (list (byte 1 8) (byte 4 0) (byte 1 5)) :type 'float-reg)
+    (opc-3 :field (byte 3 9) :value #b101)
+    (size :field (byte 1 8))
+    (n :field (byte 1 7))
+    (s :field (byte 1 6) :value 1)
+    (opc-4 :field (byte 1 4) :value 0))
+
+(sb!disassem:define-instruction-format
+    (fp-unary-one-op 32
+     :default-printer '(:name cond :tab fd))
+    (cond :field (byte 4 28) :type 'condition-code)
+    (opc-1 :field (byte 5 23) :value #b11101)
+    (opc-2 :field (byte 2 20) :value #b11)
+    (opc :field (byte 4 16))
+    (fd :fields (list (byte 1 8) (byte 4 12) (byte 1 22)) :type 'float-reg)
+
+    (fm :fields (list (byte 1 8) (byte 4 0) (byte 1 5)) :type 'float-reg)
+    (opc-3 :field (byte 3 9) :value #b101)
+    (size :field (byte 1 8))
+    (n :field (byte 1 7))
+    (s :field (byte 1 6) :value 1)
+    (sbz :field (byte 6 0) :value 0))
+
+(sb!disassem:define-instruction-format
+    (fp-srt 32)
+    (cond :field (byte 4 28) :type 'condition-code)
+    (opc-1 :field (byte 4 24) :value #b1110)
+    (opc :field (byte 3 21))
+    (l :field (byte 1 20))
+    (fn :fields (list (byte 1 8) (byte 1 7) (byte 4 16)) :type 'float-reg)
+    (rd :field (byte 4 12)  :type 'reg)
+    (opc-3 :field (byte 3 9) :value #b101)
+    (size :field (byte 1 8))
+    (opc-4 :field (byte 7 0) :value #b0010000))
+
+(sb!disassem:define-instruction-format
+    (fp-srt-sys 32)
+    (cond :field (byte 4 28) :type 'condition-code)
+    (opc-1 :field (byte 4 24) :value #b1110)
+    (opc :field (byte 3 21))
+    (l :field (byte 1 20))
+    (fn :field (byte 4 16) :type 'float-sys-reg)
+    (rd :field (byte 4 12)  :type 'reg)
+    (opc-3 :field (byte 3 9) :value #b101)
+    (opc-4 :field (byte 8 0) :value #b00010000))
+
+(sb!disassem:define-instruction-format
+    (fp-trt 32)
+    (cond :field (byte 4 28) :type 'condition-code)
+    (opc-1 :field (byte 7 21) :value #b1100010)
+    (l :field (byte 1 20))
+    (rn :field (byte 4 16)  :type 'reg)
+    (rd :field (byte 4 12)  :type 'reg)
+    (opc-2 :field (byte 3 9) :value #b101)
+    (size :field (byte 1 8))
+    (opc-3 :field (byte 2 6) :value 0)
+    (fm :fields (list (byte 1 8) (byte 4 0) (byte 1 5)) :type 'float-reg)
+    (opc-4 :field (byte 1 4) :value 1))
+
+(sb!disassem:define-instruction-format
+    (conditional 32
+     :default-printer '(:name cond))
+    (cond :field (byte 4 28) :type 'condition-code)
+    (op :field (byte 28 0)))
 
 ;;;; special magic to support decoding internal-error and related traps
 
@@ -1446,6 +1559,11 @@
                           (:single 0)
                           (:double 1))))
     `(define-instruction ,name (segment &rest args)
+       (:printer fp-binary ((p ,p)
+                            (q ,q)
+                            (r ,r)
+                            (s ,s)
+                            (size ,precision-flag)))
        (:emitter
         (with-condition-defaulted (args (condition dest op-n op-m))
           (emit-fp-dp-instruction segment
@@ -1487,6 +1605,12 @@
                           (:single 0)
                           (:double 1))))
     `(define-instruction ,name (segment &rest args)
+       (:printer ,(if op-m-sbz
+                      'fp-unary-one-op
+                      'fp-unary)
+                 ((size ,precision-flag)
+                  (n ,n)
+                  (opc ,fn)))
        (:emitter
         (with-condition-defaulted (args (condition dest
                                                    ,@(unless op-m-sbz
@@ -1678,6 +1802,20 @@
   (byte 1 7) ; N
   (byte 7 0)) ; #b0010000
 
+(define-bitfield-emitter emit-conditional-instruction 32
+  (byte 4 28)                           ; cond
+  (byte 28 0))                          ; op
+
+;;; This has the same encoding as FMRX R15, FPSCR
+(define-instruction fmstat (segment &rest args)
+  (:printer conditional
+            ((op #xEF1FA10)))
+  (:emitter
+   (with-condition-defaulted (args (condition))
+     (emit-conditional-instruction  segment
+                                    (conditional-opcode condition)
+                                    #xEF1FA10))))
+
 (defun system-reg-encoding (float-reg)
   (ecase float-reg
     (:fpsid #b0000)
@@ -1692,6 +1830,15 @@
                           (:to-arm 1)
                           (:from-arm 0))))
     `(define-instruction ,name (segment &rest args)
+       (:printer ,(if system-reg
+                      'fp-srt-sys
+                      'fp-srt)
+                 ((opc ,opcode)
+                  (l ,direction-flag)
+                  (size ,precision-flag))
+                 ',(if (eq direction :to-arm)
+                      '(:name cond :tab rd ", " fn)
+                      '(:name cond :tab fn ", " rd)))
        (:emitter
         (with-condition-defaulted (args (condition ,@(if (eq direction :to-arm)
                                                          '(arm-reg float-reg)
@@ -1742,6 +1889,12 @@
                           (:to-arm 1)
                           (:from-arm 0))))
     `(define-instruction ,name (segment &rest args)
+       (:printer fp-trt
+                 ((l ,direction-flag)
+                  (size ,precision-flag))
+                 ',(if (eq direction :to-arm)
+                       '(:name cond :tab rd ", " rn ", " fm)
+                       '(:name cond :tab fm ", " rd ", " rn )))
        (:emitter
         (with-condition-defaulted (args (condition ,@(if (eq direction :to-arm)
                                                          '(arm-reg-1 arm-reg-2 float-reg)
