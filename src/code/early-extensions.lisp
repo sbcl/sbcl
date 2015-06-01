@@ -292,7 +292,8 @@
 ;;; in the functional position, including macros and lambdas.
 (defmacro collect (collections &body body)
   (let ((macros ())
-        (binds ()))
+        (binds ())
+        (ignores ()))
     (dolist (spec collections)
       (unless (proper-list-of-length-p spec 1 3)
         (error "malformed collection specifier: ~S" spec))
@@ -307,6 +308,7 @@
           (let ((n-tail (gensym (concatenate 'string
                                              (symbol-name name)
                                              "-N-TAIL-"))))
+            (push n-tail ignores)
             (if default
               (push `(,n-tail (last ,n-value)) binds)
               (push n-tail binds))
@@ -316,7 +318,13 @@
           (push `(,name (&rest args)
                    (collect-normal-expander ',n-value ',kind args))
                 macros))))
-    `(macrolet ,macros (let* ,(nreverse binds) ,@body))))
+    `(macrolet ,macros
+       (let* ,(nreverse binds)
+         ;; Even if the user reads each collection result,
+         ;; reader conditionals might statically eliminate all writes.
+         ;; Since we don't know, all the -n-tail variable are ignorable.
+         ,@(if ignores `((declare (ignorable ,@ignores))))
+         ,@body))))
 
 ;;;; some old-fashioned functions. (They're not just for old-fashioned
 ;;;; code, they're also used as optimized forms of the corresponding

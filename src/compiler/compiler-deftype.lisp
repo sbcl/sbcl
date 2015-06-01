@@ -14,6 +14,7 @@
 (/show0 "compiler-deftype.lisp 14")
 
 (defun %compiler-deftype (name lambda-list expander doc source-location)
+  #+sb-xc-host (declare (ignore lambda-list))
   (with-single-package-locked-error
       (:symbol name "defining ~A as a type specifier"))
   (ecase (info :type :kind name)
