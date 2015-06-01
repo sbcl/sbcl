@@ -21,7 +21,7 @@
 ;;; is not seen by the "#." expression a few lines down.
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (defconstant info-number-bits 6))
-(deftype info-number () `(unsigned-byte ,info-number-bits))
+(def!type info-number () `(unsigned-byte ,info-number-bits))
 
 ;;; A map from info-number to its META-INFO object.
 ;;; The reverse mapping is obtained by reading the META-INFO.

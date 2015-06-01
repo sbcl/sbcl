@@ -67,10 +67,6 @@
     (notinline . :notinline)
     (maybe-inline . :maybe-inline)))
 
-;;; the lexical environment we are currently converting in
-(defvar *lexenv*)
-(declaim (type lexenv *lexenv*))
-
 ;;; *FREE-VARS* translates from the names of variables referenced
 ;;; globally to the LEAF structures for them. *FREE-FUNS* is like
 ;;; *FREE-VARS*, only it deals with function names.
@@ -105,10 +101,6 @@
 (defvar *current-component*)
 (defvar *delayed-ir1-transforms*)
 (defvar *eval-tlf-index*)
-(defvar *handled-conditions*)
-(defvar *disabled-package-locks*)
-(defvar *policy*)
-(defvar *macro-policy* nil)
 (defvar *dynamic-counts-tn*)
 (defvar *elsewhere*)
 (defvar *event-info*)
@@ -120,7 +112,6 @@
   (defvar *constant-segment*)
   (defvar *constant-table*)
   (defvar *constant-vector*))
-(defvar *lexenv*)
 (defvar *source-info*)
 (defvar *source-plist*)
 (defvar *source-namestring*)

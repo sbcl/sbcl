@@ -318,6 +318,7 @@
 
  ("src/compiler/early-c")
  ("src/compiler/policy")
+ ("src/compiler/lexenv")
  ("src/compiler/policies")
 
  ;; ("src/code/defbangmacro" was here until sbcl-0.6.7.3.)
@@ -456,7 +457,6 @@
  ("src/code/readtable")
  ("src/code/pathname")
  ("src/code/host-pprint")
- ("src/compiler/lexenv")
 
  ;; KLUDGE: Much stuff above here is the type system and/or the INFO
  ;; system, not really the compiler proper. It might be easier to

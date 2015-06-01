@@ -172,10 +172,6 @@
 (sb!xc:deftype external-format-designator ()
   '(or keyword (cons keyword)))
 
-;;; an object suitable for input to standard functions that accept
-;;; "environment objects" (of the ANSI glossary)
-(sb!xc:deftype lexenv-designator () '(or lexenv null))
-
 ;;; a thing that can be passed to FUNCALL & friends
 ;;;
 ;;; FIXME: should be FUNCTION-DESIGNATOR?

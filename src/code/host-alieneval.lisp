@@ -179,7 +179,7 @@
 ;;; Parse TYPE as an alien type specifier and return the resultant
 ;;; ALIEN-TYPE structure.
 (defun parse-alien-type (type env)
-  (declare (type (or sb!kernel:lexenv null) env))
+  (declare (type sb!kernel:lexenv-designator env))
   (if (consp type)
       (let ((translator (info :alien-type :translator (car type))))
         (unless translator
@@ -198,7 +198,7 @@
          (error "unknown alien type: ~S" type)))))
 
 (defun auxiliary-alien-type (kind name env)
-  (declare (type (or sb!kernel:lexenv null) env))
+  (declare (type sb!kernel:lexenv-designator env))
   (flet ((aux-defn-matches (x)
            (and (eq (first x) kind) (eq (second x) name))))
     (let ((in-auxiliaries
@@ -215,7 +215,7 @@
              (info :alien-type :enum name)))))))
 
 (defun (setf auxiliary-alien-type) (new-value kind name env)
-  (declare (type (or sb!kernel:lexenv null) env))
+  (declare (type sb!kernel:lexenv-designator env))
   (flet ((aux-defn-matches (x)
            (and (eq (first x) kind) (eq (second x) name))))
     (when (find-if #'aux-defn-matches *new-auxiliary-types*)
@@ -1023,7 +1023,7 @@
 ;;; MAKE-ALIEN-RECORD-TYPE to %MAKE-ALIEN-RECORD-TYPE and use
 ;;; ENSURE-ALIEN-RECORD-TYPE instead. --NS 20040729
 (defun parse-alien-record-type (kind name fields env)
-  (declare (type (or sb!kernel:lexenv null) env))
+  (declare (type sb!kernel:lexenv-designator env))
   (flet ((frob-type (type new-fields alignment bits)
            (setf (alien-record-type-fields type) new-fields
                  (alien-record-type-alignment type) alignment

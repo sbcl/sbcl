@@ -11,6 +11,9 @@
 
 (in-package "SB!C")
 
+(defvar *handled-conditions* nil)
+(defvar *disabled-package-locks* nil)
+
 ;;; The LEXENV represents the lexical environment used for IR1 conversion.
 ;;; (This is also what shows up as an ENVIRONMENT value in macroexpansion.)
 #!-sb-fluid (declaim (inline internal-make-lexenv)) ; only called in one place
@@ -70,6 +73,14 @@
   ;; (:variable name key . value), or (:function name key . value)
   (user-data nil :type list))
 
+;;; the lexical environment we are currently converting in
+(defvar *lexenv*)
+(declaim (type lexenv *lexenv*))
+
+;;; an object suitable for input to standard functions that accept
+;;; "environment objects" (of the ANSI glossary)
+(def!type lexenv-designator () '(or lexenv null))
+
 (defun lexenv-policy (lexenv)
   (or (lexenv-%policy lexenv) *policy*))
 
@@ -112,6 +123,9 @@
                                          nil nil nil
                                          ,@(cdr lambda)))
         ((dolist (x vars nil)
+           ;; FIXME: it is a bug that you need to ignore X
+           ;; because iteration variables are, by definition, always "used".
+           #+sb-xc-host (declare (ignore x))
            #+sb-xc-host
            ;; KLUDGE: too complicated for cross-compilation
            (return t)
@@ -134,6 +148,7 @@
                   (return t))))))
          nil)
         ((dolist (x funs nil)
+           #+sb-xc-host (declare (ignore x))
            #+sb-xc-host
            ;; KLUDGE: too complicated for cross-compilation (and
            ;; failure of OAOO in comments, *sigh*)

@@ -14,8 +14,10 @@
 ;;; a value for an optimization declaration
 (def!type policy-quality () '(integer 0 3))
 
+(defvar *policy*)
+(defvar *macro-policy* nil)
 ;;; global policy restrictions as a POLICY object or nil
-(defvar *policy-restrictions* nil)
+(!defvar *policy-restrictions* nil)
 
 ;;; ** FIXME: The check in ADVISE-IF-REPEATED-OPTIMIZE-QUALITIES fails
 ;;; spuriously when you restrict the policy.
@@ -97,7 +99,7 @@ EXPERIMENTAL INTERFACE: Subject to change."
 ;; Each primary and dependent quality policy is assigned a small integer index.
 ;; The POLICY struct represents a set of policies in an order-insensitive way
 ;; that facilitates quicker lookup than scanning an alist.
-(defstruct (policy (:constructor make-policy
+(def!struct (policy (:constructor make-policy
                                  (primary-qualities &optional presence-bits)))
   ;; Mask with a 1 for each quality that has an explicit value in this policy.
   ;; Primary qualities fill the mask from left-to-right and dependent qualities
@@ -228,11 +230,7 @@ EXPERIMENTAL INTERFACE: Subject to change."
 
   ;; CMU CL didn't use 1 as the default for everything,
   ;; but since ANSI says 1 is the ordinary value, we do.
-  (setf *policy* (copy-policy **baseline-policy**))
-  (setf *policy-restrictions* nil)
-  ;; not actually POLICY, but very similar
-  (setf *handled-conditions* nil
-        *disabled-package-locks* nil))
+  (setf *policy* (copy-policy **baseline-policy**)))
 
 ;;; Look up a named optimization quality in POLICY. This is only
 ;;; called by compiler code for known-valid QUALITY-NAMEs, e.g. SPEED;

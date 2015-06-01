@@ -28,7 +28,8 @@
 ;;; form and that produces five values: a list of temporary variables, a list
 ;;; of value forms, a list of the single store-value form, a storing function,
 ;;; and an accessing function.
-(declaim (ftype (function (t &optional (or null sb!c::lexenv))) sb!xc:get-setf-expansion))
+(declaim (ftype (function (t &optional lexenv-designator))
+                sb!xc:get-setf-expansion))
 (defun sb!xc:get-setf-expansion (form &optional environment)
   #!+sb-doc
   "Return five values needed by the SETF machinery: a list of temporary
