@@ -2109,7 +2109,8 @@
      (emit-ea segment dst (reg-tn-encoding src)))))
 
 (define-instruction cmpxchg16b (segment mem &optional prefix)
-  (:printer ext-reg-reg/mem-no-width ((op #xC7)) '(:name :tab reg/mem))
+  (:printer ext-reg/mem-no-width
+            ((op '(#xC7 1))))
   (:emitter
    (aver (not (register-p mem)))
    (emit-prefix segment prefix)
@@ -2118,6 +2119,16 @@
    (emit-byte segment #xC7)
    (emit-ea segment mem 1))) ; operand extension
 
+(define-instruction rdrand (segment dst)
+  (:printer ext-reg/mem-no-width
+            ((op '(#xC7 6))))
+  (:emitter
+   (aver (register-p dst))
+   (maybe-emit-operand-size-prefix segment (operand-size dst))
+   (maybe-emit-rex-for-ea segment dst nil)
+   (emit-byte segment #x0F)
+   (emit-byte segment #xC7)
+   (emit-ea segment dst 6)))
 
 ;;;; flag control instructions
 
