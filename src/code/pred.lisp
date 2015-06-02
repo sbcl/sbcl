@@ -170,7 +170,7 @@
   (def-type-predicate-wrapper vectorp)
   (def-type-predicate-wrapper vector-nil-p))
 
-#!+(or x86 x86-64 arm)
+#!+(or x86 x86-64 arm arm64)
 (defun fixnum-mod-p (x limit)
   (and (fixnump x)
        (<= 0 x limit)))

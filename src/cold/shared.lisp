@@ -142,7 +142,7 @@
           "target backend-subfeatures *SHEBANG-BACKEND-FEATURES*=~@<~S~:>~%"
           *shebang-backend-subfeatures*))
 
-(let ((arch (intersection '(:alpha :arm :hppa :mips :ppc :sparc :x86 :x86-64)
+(let ((arch (intersection '(:alpha :arm :arm64 :hppa :mips :ppc :sparc :x86 :x86-64)
                           *shebang-features*)))
   (cond ((not arch) (error "No architecture selected"))
         ((> (length arch) 1) (error "More than one architecture selected"))))
@@ -160,7 +160,7 @@
           ":GENCGC and :CHENEYGC are incompatible")
          ("(and cheneygc (not (or alpha arm hppa mips ppc sparc)))"
           ":CHENEYGC not supported on selected architecture")
-         ("(and gencgc (not (or sparc ppc x86 x86-64 arm)))"
+         ("(and gencgc (not (or sparc ppc x86 x86-64 arm arm64)))"
           ":GENCGC not supported on selected architecture")
          ("(not (or gencgc cheneygc))"
           "One of :GENCGC or :CHENEYGC must be enabled")
@@ -260,6 +260,7 @@
                    #!+alpha "alpha"
                    #!+hppa "hppa"
                    #!+arm "arm"
+                   #!+arm64 "arm64"
                    (subseq stem (+ position 7)))
       stem)))
 (compile 'stem-remap-target)

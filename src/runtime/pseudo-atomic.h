@@ -93,7 +93,7 @@ clear_pseudo_atomic_interrupted(struct thread *thread)
 
 #undef LISPOBJ_ASM_SUFFIX
 
-#elif defined(LISP_FEATURE_ARM)
+#elif defined(LISP_FEATURE_ARM) || defined LISP_FEATURE_ARM64
 static inline int
 get_pseudo_atomic_atomic(struct thread *thread)
 {

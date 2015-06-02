@@ -87,7 +87,7 @@
   (movable foldable flushable commutative))
 (defknown (equal equalp) (t t) boolean (foldable flushable recursive))
 
-#!+(or x86 x86-64 arm)
+#!+(or x86 x86-64 arm arm64)
 (defknown fixnum-mod-p (t fixnum) boolean
   (movable foldable flushable always-translatable))
 

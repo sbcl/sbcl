@@ -113,7 +113,7 @@ extern void globals_init(void);
 #  define EXTERN(name,bytes) .global name
 # endif
 /**/
-# ifdef LISP_FEATURE_ARM
+# if defined(LISP_FEATURE_ARM) || defined(LISP_FEATURE_ARM64)
 #   define EXTERN(name,bytes) .global name
 # endif
 

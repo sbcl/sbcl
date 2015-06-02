@@ -507,6 +507,9 @@ write_generation_stats(FILE *file)
 #elif defined(LISP_FEATURE_ARM)
     #define FPU_STATE_SIZE 8
     long long fpu_state[FPU_STATE_SIZE];
+#elif defined(LISP_FEATURE_ARM64)
+    #define FPU_STATE_SIZE 32
+    long fpu_state[FPU_STATE_SIZE];
 #endif
 
     /* This code uses the FP instructions which may be set up for Lisp

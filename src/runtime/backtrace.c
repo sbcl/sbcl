@@ -130,7 +130,7 @@ call_info_from_context(struct call_info *info, os_context_t *context)
     uword_t pc;
 
     info->interrupted = 1;
-#if !defined(LISP_FEATURE_ARM)
+#if !defined(LISP_FEATURE_ARM) && !defined(LISP_FEATURE_ARM64)
     if (lowtag_of(*os_context_register_addr(context, reg_CODE))
         == FUN_POINTER_LOWTAG) {
         /* We tried to call a function, but crapped out before $CODE could

@@ -641,7 +641,7 @@ build_fake_control_stack_frames(struct thread *th,os_context_t *context)
 
     /* Build a fake stack frame or frames */
 
-#if !defined(LISP_FEATURE_ARM)
+#if !defined(LISP_FEATURE_ARM) && !defined(LISP_FEATURE_ARM64)
     access_control_frame_pointer(th) =
         (lispobj *)(uword_t)
             (*os_context_register_addr(context, reg_CSP));
@@ -732,7 +732,7 @@ fake_foreign_function_call(os_context_t *context)
         *os_context_register_addr(context, reg_BSP));
 #endif
 
-#ifdef LISP_FEATURE_ARM
+#if defined(LISP_FEATURE_ARM) || defined LISP_FEATURE_ARM64
     /* Stash our control stack pointer */
     bind_variable(INTERRUPTED_CONTROL_STACK_POINTER,
                   SymbolValue(CONTROL_STACK_POINTER, thread),
@@ -778,7 +778,7 @@ undo_fake_foreign_function_call(os_context_t *context)
     /* Undo dynamic binding of FREE_INTERRUPT_CONTEXT_INDEX */
     unbind(thread);
 
-#ifdef LISP_FEATURE_ARM
+#if defined(LISP_FEATURE_ARM) || defined LISP_FEATURE_ARM64
     /* Restore our saved control stack pointer */
     SetSymbolValue(CONTROL_STACK_POINTER,
                    SymbolValue(INTERRUPTED_CONTROL_STACK_POINTER,
@@ -1581,7 +1581,7 @@ arrange_return_to_c_function(os_context_t *context,
     *os_context_npc_addr(context) =
         4 + *os_context_pc_addr(context);
 #endif
-#if defined(LISP_FEATURE_SPARC) || defined(LISP_FEATURE_ARM)
+#if defined(LISP_FEATURE_SPARC) || defined(LISP_FEATURE_ARM) || defined(LISP_FEATURE_ARM64)
     *os_context_register_addr(context,reg_CODE) =
         (os_context_register_t)(fun + FUN_POINTER_LOWTAG);
 #endif
@@ -1600,7 +1600,7 @@ arrange_return_to_lisp_function(os_context_t *context, lispobj function)
 }
 
 // These have undefined_alien_function tramp in x-assem.S
-#if !(defined(LISP_FEATURE_X86_64) || defined(LISP_FEATURE_ARM))
+#if !(defined(LISP_FEATURE_X86_64) || defined(LISP_FEATURE_ARM) || defined(LISP_FEATURE_ARM64))
 /* KLUDGE: Theoretically the approach we use for undefined alien
  * variables should work for functions as well, but on PPC/Darwin
  * we get bus error at bogus addresses instead, hence this workaround,

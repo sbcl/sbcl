@@ -252,6 +252,7 @@
  #!+alpha ("src/code/alpha-vm" :not-host)
  #!+mips  ("src/code/mips-vm"  :not-host)
  #!+arm   ("src/code/arm-vm" :not-host)
+ #!+arm64 ("src/code/arm64-vm" :not-host)
 
  ;; FIXME: do we really want to keep this? -- CSR, 2002-08-31
  #!+rt    ("src/code/rt-vm"    :not-host)
