@@ -559,7 +559,7 @@
 ;;;; hash cache utility
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
-  (defvar *profile-hash-cache* t))
+  (defvar *profile-hash-cache* nil))
 
 ;;; Define a hash cache that associates some number of argument values
 ;;; with a result value. The TEST-FUNCTION paired with each ARG-NAME
