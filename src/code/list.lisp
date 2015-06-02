@@ -391,12 +391,6 @@
              result)
           (rplacd tail (list (car more)))))))
 
-(define-compiler-macro append (&whole form &rest lists)
-  (case (length lists)
-    (0 nil)
-    (1 (car lists))
-    (2 `(append2 ,@lists))
-    (t form)))
 
 ;;;; list copying functions
 

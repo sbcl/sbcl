@@ -53,6 +53,9 @@
  ;; any forms referring to cross-compilation host internal functions
  ;; leaking into target SBCL code.
  ("src/code/backq")
+ ;; Naturally 'backq' generates a lot of calls to APPEND,
+ ;; the compiler-macro for which should be defined as soon as possible.
+ ("src/code/cmacros" :not-host)
 
  ;; It's difficult to be too early with a DECLAIM SPECIAL (or DEFVAR
  ;; or whatever) thanks to the sullenly-do-the-wrong-thing semantics

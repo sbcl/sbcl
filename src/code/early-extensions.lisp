@@ -643,24 +643,24 @@
 ;; so a 1-arg/1-result cache line needn't cons at all except once
 ;; (and maybe not even that if we make the cache into pairs of cells).
 ;; But this way is easier to understand, for now anyway.
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (defun hash-cache-line-allocator (n)
+    (aref #.(coerce (loop for i from 2 to 6
+                          collect (symbolicate "ALLOC-HASH-CACHE-LINE/"
+                                               (char "23456" (- i 2))))
+                    'vector)
+          (- n 2))))
 (macrolet ((def (n)
              (let* ((ftype `(sfunction ,(make-list n :initial-element t) t))
-                    (fn (symbolicate "ALLOC-HASH-CACHE-LINE/"
-                                     (write-to-string n)))
-                    (args (loop for i from 1 to n
-                                collect (make-symbol (write-to-string i)))))
+                    (fn (hash-cache-line-allocator n))
+                    (args (make-gensym-list n)))
                `(progn
                   (declaim (ftype ,ftype ,fn))
                   (defun ,fn ,args
                     (declare (optimize (safety 0)))
                     ,(if (<= n 3)
                          `(list* ,@args)
-                         ;; FIXME: (VECTOR ,@args) should emit exactly the
-                         ;; same code as this, except it is worse.
-                         `(let ((a (make-array ,n)))
-                            ,@(loop for i from 0 for arg in args
-                                    collect `(setf (svref a ,i) ,arg))
-                            a)))))))
+                         `(vector ,@args)))))))
   (def 2)
   (def 3)
   (def 4)
@@ -736,9 +736,7 @@
                        (setq ,hashval (ash ,hashval ,(- hash-bits)))))))
                (multiple-value-bind ,result-temps (funcall ,thunk)
                  (let ((,entry
-                        (,(let ((*package* (symbol-package 'alloc-hash-cache)))
-                            (symbolicate "ALLOC-HASH-CACHE-LINE/"
-                                         (write-to-string (+ nargs values))))
+                        (,(hash-cache-line-allocator (+ nargs values))
                          ,@arg-vars ,@result-temps))
                        (,cache
                         (truly-the ,cache-type

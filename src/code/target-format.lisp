@@ -51,12 +51,6 @@
      (%format destination control-string format-arguments)
      nil)))
 
-(define-compiler-macro format (&whole form destination control &rest args)
-  (declare (ignore control args))
-  (when (stringp destination)
-    (warn "Literal string as destination in FORMAT:~%  ~S" form))
-  form)
-
 (defun %format (stream string-or-fun orig-args &optional (args orig-args))
   (if (functionp string-or-fun)
       (apply string-or-fun stream args)
