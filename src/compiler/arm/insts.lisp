@@ -53,8 +53,8 @@
 
 (defun maybe-add-notes (dstate)
   (let* ((inst (sb!disassem::sap-ref-int
-                (sb!disassem::dstate-segment-sap dstate)
-                (sb!disassem::dstate-cur-offs dstate)
+                (sb!disassem:dstate-segment-sap dstate)
+                (sb!disassem:dstate-cur-offs dstate)
                 n-word-bytes
                 (sb!disassem::dstate-byte-order dstate)))
          (op (ldb (byte 8 20) inst))
@@ -72,8 +72,17 @@
           (t
            (case op
              (89 ;; LDR
-              (when (eql rn code-offset)
-                (sb!disassem:note-code-constant offset dstate))))))))
+              (case rn
+                (#.code-offset
+                 (sb!disassem:note-code-constant offset dstate))
+                (#.pc-offset
+                 (let ((value (sb!disassem::sap-ref-int
+                               (sb!disassem:dstate-segment-sap dstate)
+                               (+ (sb!disassem:dstate-cur-offs dstate)
+                                  offset 8)
+                               n-word-bytes
+                               (sb!disassem::dstate-byte-order dstate))))
+                   (sb!disassem:maybe-note-assembler-routine value nil dstate))))))))))
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
   ;; DEFINE-ARG-TYPE requires that any :PRINTER be defined at
