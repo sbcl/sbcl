@@ -30,24 +30,19 @@
   (let ((reversed-decls nil)
         (forms body)
         (doc nil))
-    ;; Since we don't have macros like AND, OR, and NOT yet, it's hard
-    ;; to express these tests clearly. Giving them names seems to help
-    ;; a little bit.
     (flet ((doc-string-p (x remaining-forms)
-             (if (stringp x)
-                 (if doc-string-allowed
-                     ;; ANSI 3.4.11 explicitly requires that a doc
-                     ;; string be followed by another form (either an
-                     ;; ordinary form or a declaration). Hence:
-                     (if remaining-forms
-                         (if doc
-                             ;; ANSI 3.4.11 says that the consequences of
-                             ;; duplicate doc strings are unspecified.
-                             ;; That's probably not something the
-                             ;; programmer intends. We raise an error so
-                             ;; that this won't pass unnoticed.
-                             (error "duplicate doc string ~S" x)
-                             t)))))
+             (and (stringp x) doc-string-allowed
+                  ;; ANSI 3.4.11 explicitly requires that a doc string
+                  ;; be followed by another form (either an ordinary form
+                  ;; or a declaration). Hence:
+                  remaining-forms
+                  (if doc
+                      ;; .. and says that the consequences of multiple
+                      ;; doc strings are unspecified.
+                      ;; That's probably not something the programmer intends.
+                      ;; We raise an error so that this won't pass unnoticed.
+                      (error "duplicate doc string ~S" x)
+                      t)))
            (declaration-p (x)
              (if (consp x)
                  (let ((name (car x)))
