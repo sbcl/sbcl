@@ -135,7 +135,7 @@
             (another-body-form)))
          '(multiple-value-bind (a1 a2) (f)
            (declare (fixnum a2) (type integer a1))
-           (let ((b (g)))
+           (let* ((b (g)))
              (declare (cons b))
              (multiple-value-bind (c1 #2=#:dummy-1 c2) (h)
                (declare (special c2) (special c1))
@@ -143,7 +143,7 @@
                (when c1
                  (multiple-value-bind (d1 d1) (f)
                    (declare (integer d1))
-                   (let ((#3=#:dummy-2 (e)))
+                   (let* ((#3=#:dummy-2 (e)))
                      (declare (ignorable #3#))
                      (declare (special fff))
                      (declare (special *y* *x*))

@@ -124,8 +124,8 @@
  ;; This has the BARRIER stuff that the threading support needs,
  ;; required for some code in 'early-extensions'
  ("src/code/barrier" :not-host)
- ("src/code/early-extensions") ; on host for COLLECT, SYMBOLICATE, etc.
  ("src/code/parse-body")       ; on host for PARSE-BODY
+ ("src/code/early-extensions") ; on host for COLLECT, SYMBOLICATE, etc.
  ("src/code/parse-defmacro")   ; on host for PARSE-DEFMACRO
  ("src/compiler/deftype")      ; on host for SB!XC:DEFTYPE
  ("src/code/restart" :not-host) ; %DEFCONSTANT can bind a restart
