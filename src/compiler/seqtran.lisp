@@ -1388,54 +1388,53 @@
                        while (and (stringp value)
                                     (< (length value) *concatenate-open-code-limit*))
                        sum (length value))))
-          `(apply
-            (lambda ,vars
-              (declare (ignorable ,@vars))
-              (declare (optimize (insert-array-bounds-checks 0)))
-              (let* ((.length. (+ ,@lengths))
-                     (.pos. ,non-constant-start)
-                     (.string. (make-string .length. :element-type ',element-type)))
-                (declare (type index .length. .pos.)
-                         #-sb-xc-host (muffle-conditions compiler-note)
-                         (ignorable .pos.))
-                ,@(loop with constants = -1
-                        for first = t then nil
-                        for value in lvar-values
-                        for var in vars
-                        collect
-                        (cond ((and (stringp value)
-                                    (< (length value) *concatenate-open-code-limit*))
-                               ;; Fold the array reads for constant arguments
-                               `(progn
-                                  ,@(loop for c across value
-                                          for i from 0
-                                          collect
-                                          ;; Without truly-the we get massive numbers
-                                          ;; of pointless error traps.
-                                          `(setf (aref .string.
-                                                       (truly-the index ,(if constants
-                                                                             (incf constants)
-                                                                             `(+ .pos. ,i))))
-                                                 ,c))
-                                  ,(unless constants
-                                     `(incf (truly-the index .pos.) ,(length value)))))
-                              (t
-                               (prog1
-                                   `(sb!impl::string-dispatch
-                                        (#!+sb-unicode
-                                         (simple-array character (*))
-                                         (simple-array base-char (*))
-                                         t)
-                                        ,var
-                                      (replace .string. ,var
-                                               ,@(cond ((not constants)
-                                                        '(:start1 .pos.))
-                                                       ((plusp non-constant-start)
-                                                        `(:start1 ,non-constant-start))))
-                                      (incf (truly-the index .pos.) (length ,var)))
-                                 (setf constants nil)))))
-                .string.))
-            lvars)))))
+          `(lambda (.dummy. ,@vars)
+             (declare (ignore .dummy.)
+                      (ignorable ,@vars))
+             (declare (optimize (insert-array-bounds-checks 0)))
+             (let* ((.length. (+ ,@lengths))
+                    (.pos. ,non-constant-start)
+                    (.string. (make-string .length. :element-type ',element-type)))
+               (declare (type index .length. .pos.)
+                        #-sb-xc-host (muffle-conditions compiler-note)
+                        (ignorable .pos.))
+               ,@(loop with constants = -1
+                       for first = t then nil
+                       for value in lvar-values
+                       for var in vars
+                       collect
+                       (cond ((and (stringp value)
+                                   (< (length value) *concatenate-open-code-limit*))
+                              ;; Fold the array reads for constant arguments
+                              `(progn
+                                 ,@(loop for c across value
+                                         for i from 0
+                                         collect
+                                         ;; Without truly-the we get massive numbers
+                                         ;; of pointless error traps.
+                                         `(setf (aref .string.
+                                                      (truly-the index ,(if constants
+                                                                            (incf constants)
+                                                                            `(+ .pos. ,i))))
+                                                ,c))
+                                 ,(unless constants
+                                    `(incf (truly-the index .pos.) ,(length value)))))
+                             (t
+                              (prog1
+                                  `(sb!impl::string-dispatch
+                                       (#!+sb-unicode
+                                        (simple-array character (*))
+                                        (simple-array base-char (*))
+                                        t)
+                                       ,var
+                                     (replace .string. ,var
+                                              ,@(cond ((not constants)
+                                                       '(:start1 .pos.))
+                                                      ((plusp non-constant-start)
+                                                       `(:start1 ,non-constant-start))))
+                                     (incf (truly-the index .pos.) (length ,var)))
+                                (setf constants nil)))))
+               .string.))))))
 
 ;;;; CONS accessor DERIVE-TYPE optimizers
 
