@@ -63,7 +63,7 @@
 #-sb-xc-host (defsetf cdr   %rplacd)
 #-sb-xc-host (defsetf rest  %rplacd)
 
-(eval-when (:compile-toplevel :load-toplevel :execute)
+(eval-when (#-sb-xc :compile-toplevel :load-toplevel :execute)
 (defun %cxr-setf-expander (sub-accessor setter)
   (flet ((expand (place-reader original-form)
            (let ((temp (sb!xc:gensym "LIST"))

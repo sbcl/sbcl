@@ -643,7 +643,7 @@
 ;; so a 1-arg/1-result cache line needn't cons at all except once
 ;; (and maybe not even that if we make the cache into pairs of cells).
 ;; But this way is easier to understand, for now anyway.
-(eval-when (:compile-toplevel :load-toplevel :execute)
+(eval-when (#-sb-xc :compile-toplevel :load-toplevel :execute)
   (defun hash-cache-line-allocator (n)
     (aref #.(coerce (loop for i from 2 to 6
                           collect (symbolicate "ALLOC-HASH-CACHE-LINE/"

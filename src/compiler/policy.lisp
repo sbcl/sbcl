@@ -211,6 +211,7 @@ EXPERIMENTAL INTERFACE: Subject to change."
 (defglobal **baseline-policy** nil)
 ;; Baseline policy altered with (TYPE-CHECK 0)
 (defglobal **zero-typecheck-policy** nil)
+#-sb-xc-host (declaim (type policy **baseline-policy**))
 
 ;;; This is to be called early in cold init to set things up, and may
 ;;; also be called again later in cold init in order to reset default
@@ -274,6 +275,11 @@ EXPERIMENTAL INTERFACE: Subject to change."
                      (ldb (byte 2 byte-pos) (policy-dependent-qualities policy))
                      1)
                  (quality-floor policy-dependent-qualities)))))))
+
+;;; Forward declaration of %COERCE-TO-POLICY.
+;;; Definition is in 'node' so that FUNCTIONAL and NODE types are defined.
+;;; Arg is declared of type T because the function explicitly checks it.
+(declaim (ftype (sfunction (t) policy) %coerce-to-policy))
 
 ;;; syntactic sugar for querying optimization policy qualities
 ;;;

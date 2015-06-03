@@ -1423,12 +1423,10 @@
 
 ;;; a helper for the POLICY macro, defined late here so that the
 ;;; various type tests can be inlined
-;;; Arg is declared of type T because the function body tests it.
 ;;; You might think that NIL as a policy becomes *POLICY*,
 ;;; but no, NIL was always an empty alist representing no qualities,
 ;;; which is a valid policy that makes each quality read as 1.
 ;;; In contrast, a LEXENV with NIL policy _does_ become *POLICY*.
-(declaim (ftype (function (t) policy) %coerce-to-policy))
 (defun %coerce-to-policy (thing)
   (cond ((policy-p thing) thing)
         (thing (lexenv-policy (etypecase thing
