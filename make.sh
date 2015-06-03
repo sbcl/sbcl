@@ -64,6 +64,11 @@ tools-for-build/canonicalize-whitespace
 # Or, if you can set up the files somewhere shared (with NFS, AFS, or
 # whatever) between the host machine and the target machine, the basic
 # procedure above should still work, but you can skip the "copy" steps.
+# If you can use rsync on the host machine, you can call make-config.sh
+# with:
+# --host-location=user@host-machine:<rsync path to host sbcl directory>
+# and the make-target-*.sh scripts will take care of transferring the
+# necessary files.
 time sh make-host-1.sh
 time sh make-target-1.sh
 time sh make-host-2.sh

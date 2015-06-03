@@ -139,7 +139,8 @@ INSTALLING SBCL
 
   If you don't already have an SBCL binary installed as "sbcl" on your
   system, you'll need to tell make.sh what Lisp to use as the
-  cross-compilation host. For example, to use CMUCL (assuming has
+  cross-compilation host (cf. make.sh for detailed instructions on
+  how to cross compile). For example, to use CMUCL (assuming has
   been installed under its default name "lisp") as the
   cross-compilation host:
 

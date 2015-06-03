@@ -210,6 +210,19 @@ Options:
                   Use an existing CMU CL binary as a cross-compilation
                   host when you have weird things in your .cmucl-init
                   file.
+
+  --host-location=<string> Location of the source directory on compilation host
+
+      The string is passed to the command rsync to transfer the
+      necessary files between the target and host directories during
+      the make-target-*.sh steps of cross-compilation (cf. make.sh)
+
+      Examples:
+
+       user@host-machine:/home/user/sbcl
+                  Transfer the files to/from directory /home/user/sbcl
+                  on host-machine.
+
 EOF
   exit 1
 fi
