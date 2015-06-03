@@ -10,10 +10,10 @@
  */
 
 
-#define NREGS (31)
+#define NREGS (32)
 
 #ifdef LANGUAGE_ASSEMBLY
-#    define REG(num) w##num
+#    define REG(num) x##num
 #else
 #    define REG(num) (num)
 #endif
@@ -21,26 +21,50 @@
 #define reg_R0          REG(0)
 #define reg_R1          REG(1)
 #define reg_R2          REG(2)
-#define reg_LEXENV      REG(3)
-#define reg_NL2         REG(4)
-#define reg_CODE        REG(5)
-#define reg_NL3         REG(6)
-#define reg_OCFP        REG(7)
+#define reg_R3          REG(3)
+#define reg_R4          REG(4)
+#define reg_R5          REG(5)
+#define reg_R6          REG(6)
+#define reg_R7          REG(7)
 #define reg_R8          REG(8)
-#define reg_NFP         REG(9)
-#define reg_NULL        REG(10)
-#define reg_CFP         REG(11)
-#define reg_NARGS       REG(12)
-#define reg_NSP         REG(13)
+#define reg_R9          REG(9)
+#ifdef LISP_FEATURE_SB_THREAD
+#define reg_THREAD      REG(10)
+#else
+#define reg_10          REG(10)
+#endif
+#define reg_LEXENV      REG(11)
+
+#define reg_NL0         REG(12)
+#define reg_NL1         REG(13)
+#define reg_NL2         REG(14)
+#define reg_NL3         REG(15)
+#define reg_NL4         REG(16)
+#define reg_NL5         REG(17)
+#define reg_NL6         REG(18)
+#define reg_NL7         REG(19)
+#define reg_NL8         REG(20)
+#define reg_NL9         REG(21)
+
+#define reg_NARGS       REG(22)
+#define reg_NFP         REG(23)
+#define reg_OCFP        REG(24)
+#define reg_CFP         REG(25)
+#define reg_CSP         REG(26)
+#define reg_TMP         REG(27)
+#define reg_NULL        REG(28)
+#define reg_CODE        REG(29)
 #define reg_LR          REG(30)
-#define reg_PC          REG(15)
+#define reg_NSP         REG(31)
 
 #define REGNAMES \
         "R0",           "R1",           "R2",           "LEXENV", \
         "NL2",          "CODE",         "NL3",          "OCFP", \
         "R8",           "NFP",          "NULL",         "CFP", \
-        "NARGS",        "NSP",          "LR",           "PC"
+        "NARGS",        "NSP",          "LR",           "PC", "TMP"
 
 #define BOXED_REGISTERS { \
-    reg_R0, reg_R1, reg_R2, reg_LEXENV, reg_R8, reg_CODE \
+    reg_R0, reg_R1, reg_R2, reg_R3, reg_R4, reg_R5, reg_R6, \
+    reg_R7, reg_R8, reg_R9, REG(10), reg_LEXENV, reg_CODE   \
 }
+

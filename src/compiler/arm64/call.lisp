@@ -1073,7 +1073,7 @@
       (assemble (*elsewhere*)
         (emit-label fixup-lab)
         (inst word (make-fixup 'tail-call-variable :assembly-routine)))
-      (inst load-from-label pc-tn lip fixup-lab))))
+      (inst load-from-label (error "pc-tn") lip fixup-lab))))
 
 ;;;; Unknown values return:
 
@@ -1197,7 +1197,7 @@
     (move old-fp old-fp-arg)
     (move vals vals-arg)
     (move nvals nvals-arg)
-    (inst ldr pc-tn (@ fixup))
+    (inst ldr (error "pc-tn") (@ fixup))
     FIXUP
     (inst word (make-fixup 'return-multiple :assembly-routine))))
 

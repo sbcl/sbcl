@@ -87,7 +87,7 @@
   ;; instead of a random mix of both.
   (("unknown system lossage" unknown)
    ("An attempt was made to use an undefined FDEFINITION." undefined-fun)
-   #!+(or arm x86-64)
+   #!+(or arm arm64 x86-64)
    ("An attempt was made to use an undefined alien function" undefined-alien-fun)
    ("invalid argument count" invalid-arg-count)
    ("bogus argument to VALUES-LIST" bogus-arg-to-values-list)

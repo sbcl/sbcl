@@ -60,8 +60,7 @@ int arch_os_thread_cleanup(struct thread *thread) {
 }
 #endif
 
-os_context_regis
-ter_t   *
+os_context_register_t   *
 os_context_register_addr(os_context_t *context, int offset)
 {
     return &(context->uc_mcontext.regs[offset]);

@@ -951,9 +951,9 @@
                              (sap-int (sb!vm:context-pc scp))
                              code
                              (%code-entry-points code)
-                             #!-arm
+                             #!-(or arm arm64)
                              (sb!vm:context-register scp sb!vm::lra-offset)
-                             #!+arm
+                             #!+(or arm arm64)
                              (stack-ref frame-pointer lra-save-offset)
                              computed-return))
                       ;; We failed to pinpoint where PC is, but set

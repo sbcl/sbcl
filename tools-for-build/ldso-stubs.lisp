@@ -63,7 +63,7 @@ ldso_stub__~A: ;                                \\
 #endif
 #include \"sbcl.h\""
 
-#!+ (or arm arm64) "
+#!+arm "
 #define LDSO_STUBIFY(fct)               \\
   .align                              ; \\
   .global ldso_stub__ ## fct          ; \\
@@ -71,6 +71,15 @@ ldso_stub__~A: ;                                \\
 ldso_stub__ ## fct:                   ; \\
   ldr r8, =fct                        ; \\
   bx r8                               ; \\
+  .size ldso_stub__ ## fct, .-ldso_stub__ ## fct"
+#!+arm64"
+#define LDSO_STUBIFY(fct)               \\
+  .align                              ; \\
+  .global ldso_stub__ ## fct          ; \\
+  .type ldso_stub__ ## fct, %function ; \\
+ldso_stub__ ## fct:                   ; \\
+  ldr x8, =fct                        ; \\
+  br x8                               ; \\
   .size ldso_stub__ ## fct, .-ldso_stub__ ## fct"
 
 #!+sparc "

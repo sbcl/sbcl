@@ -293,7 +293,7 @@
        (labels ((emit-generator (instruction move-result)
                   `((loadw offset object 0 instance-pointer-lowtag)
                     (inst mov offset (lsr offset n-widetag-bits))
-                    (inst rsb offset index (lsl offset n-fixnum-tag-bits))
+                    (error "(inst rsb offset index (lsl offset n-fixnum-tag-bits))")
                     (inst sub offset offset (+ (* (- ,width
                                                      instance-slots-offset)
                                                   n-word-bytes)

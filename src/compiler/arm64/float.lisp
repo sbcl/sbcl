@@ -50,46 +50,41 @@
   (frob single-move single-reg move-single)
   (frob double-move double-reg move-double))
 
-(define-vop (move-from-float)
-  (:args (x :to :save))
+(define-vop (move-from-single)
+  (:args (x :scs (single-reg) :to :save))
+  (:results (y :scs (descriptor-reg)))
+  (:note "float to pointer coercion")
+  (:generator 4
+    (error "implement")))
+
+(define-move-vop move-from-single :move
+  (single-reg) (descriptor-reg))
+
+(define-vop (move-from-double)
+  (:args (x :scs (double-reg) :to :save))
   (:results (y))
   (:note "float to pointer coercion")
-  (:temporary (:sc non-descriptor-reg :offset ocfp-offset) pa-flag)
+  (:temporary (:sc non-descriptor-reg) tmp)
   (:temporary (:sc interior-reg) lip)
-  (:variant-vars double-p size type data)
+  (:results (y :scs (descriptor-reg)))
   (:generator 13
-    (with-fixed-allocation (y pa-flag type size)
-      (inst sub lip y other-pointer-lowtag)
-      (if double-p
-          (inst fstd x (@ lip (* data n-word-bytes)))
-          (inst fsts x (@ lip (* data n-word-bytes)))))))
+   (with-fixed-allocation (y tmp
+                           double-float-widetag
+                           double-float-value-slot)
+     (inst sub lip y other-pointer-lowtag)
+     (inst fstd x (@ lip (* double-float-value-slot n-word-bytes))))))
 
-(macrolet ((frob (name sc &rest args)
-             `(progn
-                (define-vop (,name move-from-float)
-                  (:args (x :scs (,sc) :to :save))
-                  (:results (y :scs (descriptor-reg)))
-                  (:variant ,@args))
-                (define-move-vop ,name :move (,sc) (descriptor-reg)))))
-  (frob move-from-single single-reg
-    nil single-float-size single-float-widetag single-float-value-slot)
-  (frob move-from-double double-reg
-    t double-float-size double-float-widetag double-float-value-slot))
+(define-move-vop move-from-double :move (double-reg) (descriptor-reg))
 
-(macrolet ((frob (name sc double-p value)
-             `(progn
-                (define-vop (,name)
-                  (:args (x :scs (descriptor-reg)))
-                  (:results (y :scs (,sc)))
-                  (:temporary (:sc interior-reg) lip)
-                  (:note "pointer to float coercion")
-                  (:generator 2
-                     (inst sub lip x other-pointer-lowtag)
-                     (inst ,(if double-p 'fldd 'flds) y
-                           (@ lip (* ,value n-word-bytes)))))
-                (define-move-vop ,name :move (descriptor-reg) (,sc)))))
-  (frob move-to-single single-reg nil single-float-value-slot)
-  (frob move-to-double double-reg t double-float-value-slot))
+(define-vop (move-to-double)
+  (:args (x :scs (descriptor-reg)))
+  (:results (y :scs (double-reg)))
+  (:temporary (:sc interior-reg) lip)
+  (:note "pointer to float coercion")
+  (:generator 2
+              (inst sub lip x other-pointer-lowtag)
+              (inst fldd y (@ lip (* double-float-value-slot n-word-bytes)))))
+(define-move-vop move-to-double :move (descriptor-reg) (double-reg))
 
 (macrolet ((frob (name sc stack-sc double-p)
              `(progn
@@ -599,7 +594,7 @@
          (single-stack
           (loadw bits (current-nfp-tn vop) (tn-offset float)))
          (descriptor-reg
-          (loadw bits float single-float-value-slot other-pointer-lowtag))))
+          (error "implement"))))
       (signed-stack
        (sc-case float
          (single-reg

@@ -272,7 +272,7 @@
       (assemble (*elsewhere* vop)
         (emit-label uwp-label)
         (inst word (make-fixup 'unwind :assembly-routine)))
-      (inst load-from-label pc-tn lr-tn uwp-label)
+      (inst load-from-label (error "pc-tn") lr-tn uwp-label)
 
       (emit-label ENTRY-LABEL)
       ;; KLUDGE: either COMPUTE-LRA computes or UNWIND jumps one

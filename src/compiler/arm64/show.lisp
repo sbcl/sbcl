@@ -38,7 +38,7 @@
       (move ocfp object)
       (inst load-from-label temp lip call-into-c-fixup)
       (inst load-from-label cfunc lip debug-print-fixup)
-      (inst blx temp)
+      (inst bl temp)
       (when cur-nfp
         (load-stack-tn cur-nfp nfp-save))
       (move result nargs))))

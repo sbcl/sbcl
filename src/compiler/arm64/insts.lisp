@@ -75,14 +75,15 @@
               (case rn
                 (#.code-offset
                  (sb!disassem:note-code-constant offset dstate))
-                (#.pc-offset
-                 (let ((value (sb!disassem::sap-ref-int
-                               (sb!disassem:dstate-segment-sap dstate)
-                               (+ (sb!disassem:dstate-cur-offs dstate)
-                                  offset 8)
-                               n-word-bytes
-                               (sb!disassem::dstate-byte-order dstate))))
-                   (sb!disassem:maybe-note-assembler-routine value nil dstate))))))))))
+                ;; (#.pc-offset
+                ;;  (let ((value (sb!disassem::sap-ref-int
+                ;;                (sb!disassem:dstate-segment-sap dstate)
+                ;;                (+ (sb!disassem:dstate-cur-offs dstate)
+                ;;                   offset 8)
+                ;;                n-word-bytes
+                ;;                (sb!disassem::dstate-byte-order dstate))))
+                ;;    (sb!disassem:maybe-note-assembler-routine value nil dstate)))
+                )))))))
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
   ;; DEFINE-ARG-TYPE requires that any :PRINTER be defined at
@@ -906,8 +907,6 @@
 (define-data-processing-instruction eors #x03 t t)
 (define-data-processing-instruction sub  #x04 t t)
 (define-data-processing-instruction subs #x05 t t)
-(define-data-processing-instruction rsb  #x06 t t)
-(define-data-processing-instruction rsbs #x07 t t)
 (define-data-processing-instruction add  #x08 t t)
 (define-data-processing-instruction adds #x09 t t)
 (define-data-processing-instruction adc  #x0a t t)
@@ -1020,31 +1019,6 @@
      (aver (label-p dest))
      (emit-branch-back-patch segment condition #b1011 dest))))
 
-(define-bitfield-emitter emit-branch-exchange-instruction 32
-  (byte 4 28) (byte 8 20) (byte 4 16) (byte 4 12)
-  (byte 4 8) (byte 4 4) (byte 4 0))
-
-(define-instruction bx (segment &rest args)
-  (:printer branch-exchange ((opcode-8 #b00010010)
-                             (opcode-4 #b0001)))
-  (:emitter
-   (with-condition-defaulted (args (condition dest))
-     (aver (register-p dest))
-     (emit-branch-exchange-instruction segment
-                                       (conditional-opcode condition)
-                                       #b00010010 #b1111 #b1111
-                                       #b1111 #b0001 (tn-offset dest)))))
-
-(define-instruction blx (segment &rest args)
-  (:printer branch-exchange ((opcode-8 #b00010010)
-                             (opcode-4 #b0011)))
-  (:emitter
-   (with-condition-defaulted (args (condition dest))
-     (aver (register-p dest))
-     (emit-branch-exchange-instruction segment
-                                       (conditional-opcode condition)
-                                       #b00010010 #b1111 #b1111
-                                       #b1111 #b0011 (tn-offset dest)))))
 
 ;;;; Semaphore instructions
 
@@ -1237,7 +1211,7 @@
                                                           :down
                                                           :up)
                                                       mode)
-                                      pc-offset (tn-offset data)
+                                      (error "pc-offset") (tn-offset data)
                                       absolute-delta)))))
            ((integerp offset)
             (aver (typep offset '(unsigned-byte 12)))
@@ -1394,7 +1368,7 @@
         ;; OTHER-POINTER-LOWTAG.  The extra two words are to
         ;; compensate for the offset applied by ARM CPUs when reading
         ;; the program counter.
-        (inst sub lip pc-tn (- ;; The 8 below is the displacement
+        (inst sub lip (error "pc-tn") (- ;; The 8 below is the displacement
                                ;; from reading the program counter.
                                (+ position 8)
                                (+ (label-position object-label)
@@ -1441,7 +1415,7 @@
               (let* ((delta (compute-delta position))
                      (absolute-delta (abs delta)))
                 (load-chunk segment delta
-                            lip pc-tn (mask-field (byte 8 16) absolute-delta))
+                            lip (error "pc-tn") (mask-field (byte 8 16) absolute-delta))
                 (load-chunk segment delta
                             lip lip (mask-field (byte 8 8) absolute-delta))
                 (load-chunk segment delta
@@ -1452,7 +1426,7 @@
                      (absolute-delta (abs delta)))
                 (assemble (segment vop)
                   (load-chunk segment delta
-                              lip pc-tn (mask-field (byte 8 8) absolute-delta))
+                              lip (error "pc-tn") (mask-field (byte 8 8) absolute-delta))
                   (load-chunk segment delta
                               dest lip (mask-field (byte 8 0) absolute-delta)))))
 
@@ -1461,7 +1435,7 @@
                      (absolute-delta (abs delta)))
                 (assemble (segment vop)
                   (load-chunk segment delta
-                              dest pc-tn absolute-delta))))
+                              dest (error "pc-tn") absolute-delta))))
 
             (two-instruction-maybe-shrink (segment posn magic-value)
               (let ((delta (compute-delta posn magic-value)))
@@ -1517,13 +1491,13 @@
                        (absolute-delta (abs delta)))
                   (assemble (segment vop)
                     (load-chunk segment delta
-                                lip pc-tn (mask-field (byte 8 12) absolute-delta))
+                                lip (error "pc-tn") (mask-field (byte 8 12) absolute-delta))
                     (inst ldr condition dest (@ lip (mask-field (byte 12 0) delta))))))
 
               (one-instruction-emitter (segment position)
                 (let* ((delta (compute-delta position)))
                   (assemble (segment vop)
-                    (inst ldr condition dest (@ pc-tn delta)))))
+                    (inst ldr condition dest (@ (error "pc-tn") delta)))))
 
               (two-instruction-maybe-shrink (segment posn magic-value)
                 (let ((delta (compute-delta posn magic-value)))

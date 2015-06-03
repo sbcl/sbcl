@@ -102,9 +102,11 @@
 
 (defmacro lisp-jump (function)
   "Jump to the lisp function FUNCTION."
-  `(inst add pc-tn ,function
-         (- (ash simple-fun-code-offset word-shift)
-            fun-pointer-lowtag)))
+  `(progn
+     (inst add tmp-tn ,function
+           (- (ash simple-fun-code-offset word-shift)
+              fun-pointer-lowtag))
+     (inst b tmp-tn)))
 
 (defmacro lisp-return (return-pc return-style)
   "Return to RETURN-PC."
@@ -116,9 +118,8 @@
              (:single-value '(inst msr (cpsr :f) 0))
              (:multiple-values '(inst msr (cpsr :f) #xf0000000))
              (:known))
-     #+(or) ;; Doesn't work, can't have a negative immediate value.
-     (inst add pc-tn ,return-pc (- 4 other-pointer-lowtag))
-     (inst sub pc-tn ,return-pc (- other-pointer-lowtag 4))))
+     (inst sub tmp-tn ,return-pc (- other-pointer-lowtag 4))
+     (inst b tmp-tn)))
 
 (defmacro emit-return-pc (label)
   "Emit a return-pc header word.  LABEL is the label to use for this return-pc."
@@ -210,7 +211,7 @@
                                                                 (tn-offset size)))
                                                      (ash 1 (tn-offset lr-tn))))
     (inst load-from-label alloc-tn alloc-tn fixup)
-    (inst blx alloc-tn)
+    (inst bl alloc-tn)
     (emit-word sb!assem::**current-segment** (logior #xe8bd0000
                                                      (ash 1 (tn-offset alloc-tn))
                                                      (ash 1 (tn-offset lr-tn))))
@@ -345,7 +346,7 @@
 (defmacro pseudo-atomic ((flag-tn &key (link t)) &body forms)
   `(progn
      (without-scheduling ()
-       (store-symbol-value pc-tn *pseudo-atomic-atomic*))
+       (store-symbol-value csp-tn *pseudo-atomic-atomic*))
      (assemble ()
        ,@forms)
      (without-scheduling ()
@@ -355,8 +356,8 @@
        ;; do_pending_interrupt
        (inst cmp ,flag-tn 0)
        ,(if link
-            `(inst blx :ne ,flag-tn)
-            `(inst bx :ne ,flag-tn)))))
+            `(inst bl :ne ,flag-tn)
+            `(inst b :ne ,flag-tn)))))
 
 ;;;; memory accessor vop generators
 

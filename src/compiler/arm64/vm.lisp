@@ -15,7 +15,7 @@
 ;;;; register specs
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
-  (defvar *register-names* (make-array 16 :initial-element nil)))
+  (defvar *register-names* (make-array 32 :initial-element nil)))
 
 (macrolet ((defreg (name offset)
              (let ((offset-sym (symbolicate name "-OFFSET")))
@@ -32,41 +32,63 @@
   (defreg r0 0)
   (defreg r1 1)
   (defreg r2 2)
-  (defreg lexenv 3)
-  (defreg nl2 4)
-  (defreg code 5)
-  (defreg nl3 6)
-  (defreg ocfp 7)
+  (defreg r3 3)
+  (defreg r4 4)
+  (defreg r5 5)
+  (defreg r6 6)
+  (defreg r7 7)
   (defreg r8 8)
-  (defreg nfp 9)
-  (defreg null 10)
-  (defreg cfp 11)
-  (defreg nargs 12)
-  (defreg nsp 13)
-  (defreg lr 14)
-  (defreg pc 15) ;; Yes, the program counter.
+  (defreg r9 9)
+  #!+sb-thread
+  (defreg thread 10)
+  #!-sb-thread
+  (defreg r10 10)
+  (defreg lexenv 11)
+  
+  (defreg nl0 12)
+  (defreg nl1 13)
+  (defreg nl2 14)
+  (defreg nl3 15)
+  (defreg nl4 16)
+  (defreg nl5 17)
+  (defreg nl6 18)
+  (defreg nl7 19)
+  (defreg nl8 20)
+  (defreg nl9 21)
+  
+  (defreg nargs 22)
+  (defreg nfp 23)
+  (defreg ocfp 24)
+  (defreg cfp 25)
+  (defreg csp 26)
+  (defreg tmp 27)
+  (defreg null 28)
+  (defreg code 29)
+  (defreg lr 30)
+  (defreg nsp 31)
+  (defreg zr 31)
 
   (defregset system-regs
-      null cfp nsp lr pc code)
+      null cfp nsp lr code)
 
   (defregset descriptor-regs
-      r0 r1 r2 lexenv r8)
+      r0 r1 r2 r3 r4 r5 r6 r7 r8 r9 #!-sb-thread r10 #!+sb-thread thread lexenv)
 
   (defregset non-descriptor-regs
-      ocfp nfp nargs nl2 nl3)
+      nl0 nl1 nl2 nl3 nl4 nl5 nl6 nl7 nl8 nl9 nargs nfp ocfp)
 
   ;; registers used to pass arguments
   ;;
   ;; the number of arguments/return values passed in registers
-  (def!constant  register-arg-count 3)
+  (def!constant  register-arg-count 4)
   ;; names and offsets for registers used to pass arguments
-  (defregset *register-arg-offsets*  r0 r1 r2)
-  (defparameter *register-arg-names* '(r0 r1 r2)))
+  (defregset *register-arg-offsets*  r0 r1 r2 r3)
+  (defparameter *register-arg-names* '(r0 r1 r2 r3)))
 
 
 ;;;; SB and SC definition:
 
-(define-storage-base registers :finite :size 16)
+(define-storage-base registers :finite :size 32)
 (define-storage-base control-stack :unbounded :size 2 :size-increment 1)
 (define-storage-base non-descriptor-stack :unbounded :size 0)
 (define-storage-base constant :non-packed)
@@ -138,8 +160,8 @@
                   :alternate-scs (control-stack))
 
   ;; The non-descriptor stacks.
-  (signed-stack non-descriptor-stack)    ; (signed-byte 32)
-  (unsigned-stack non-descriptor-stack)  ; (unsigned-byte 32)
+  (signed-stack non-descriptor-stack)    ; (signed-byte 64)
+  (unsigned-stack non-descriptor-stack)  ; (unsigned-byte 64)
   (character-stack non-descriptor-stack) ; non-descriptor characters.
   (sap-stack non-descriptor-stack)       ; System area pointers.
   (single-stack non-descriptor-stack)    ; single-floats
@@ -230,13 +252,14 @@
 
   (defregtn null descriptor-reg)
   (defregtn code descriptor-reg)
+  (defregtn tmp any-reg)
 
   (defregtn nargs any-reg)
   (defregtn ocfp any-reg)
   (defregtn nsp any-reg)
   (defregtn cfp any-reg)
-  (defregtn lr interior-reg)
-  (defregtn pc any-reg))
+  (defregtn csp any-reg)
+  (defregtn lr interior-reg))
 
 ;;; If VALUE can be represented as an immediate constant, then return the
 ;;; appropriate SC number, otherwise return NIL.

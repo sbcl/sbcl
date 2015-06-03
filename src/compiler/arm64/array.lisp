@@ -147,6 +147,12 @@
   (def-full-data-vector-frobs simple-array-unsigned-byte-32 unsigned-num
     unsigned-reg)
 
+  (def-full-data-vector-frobs simple-array-unsigned-byte-63 unsigned-num
+    unsigned-reg)
+
+  (def-full-data-vector-frobs simple-array-unsigned-byte-64 unsigned-num
+    unsigned-reg)
+
   (def-partial-data-vector-frobs simple-array-signed-byte-8 tagged-num
     :byte t signed-reg)
 
@@ -159,6 +165,8 @@
     any-reg)
 
   (def-full-data-vector-frobs simple-array-signed-byte-32 signed-num
+    signed-reg)
+  (def-full-data-vector-frobs simple-array-signed-byte-64 signed-num
     signed-reg))
 
 ;;; Integer vectors whose elements are smaller than a byte.  I.e. bit, 2-bit,

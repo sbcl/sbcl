@@ -42,19 +42,19 @@
 (define-vop (fast-negate/fixnum fixnum-unop)
   (:translate %negate)
   (:generator 1
-    (inst rsb res x 0)))
+              (error "(inst rsb res x 0)")))
 
 (define-vop (fast-negate/signed signed-unop)
   (:translate %negate)
   (:generator 2
-    (inst rsb res x 0)))
+              (error "(inst rsb res x 0)")))
 
 (define-vop (fast-negate/unsigned signed-unop)
   (:args (x :scs (unsigned-reg) :target res))
   (:arg-types unsigned-num)
   (:translate %negate)
   (:generator 3
-    (inst rsb res x 0)))
+              (error "(inst rsb res x 0)")))
 
 (define-vop (fast-lognot/fixnum signed-unop)
   (:args (x :scs (any-reg)))
@@ -283,9 +283,9 @@
              fast-ash-left-c/fixnum=>fixnum)
   (:translate ash-left-modfx))
 
-(define-vop (fast-ash-left-mod32-c/fixnum=>fixnum
+(define-vop (fast-ash-left-mod64-c/fixnum=>fixnum
              fast-ash-left-c/fixnum=>fixnum)
-  (:translate ash-left-mod32))
+  (:translate ash-left-mod64))
 
 (define-vop (fast-ash-c/unsigned=>unsigned)
   (:translate ash)
@@ -321,13 +321,13 @@
           (t
            (inst mov result 0)))))
 
-(define-vop (fast-ash-left-mod32-c/unsigned=>unsigned
+(define-vop (fast-ash-left-mod64-c/unsigned=>unsigned
              fast-ash-c/unsigned=>unsigned)
-  (:translate ash-left-mod32))
+  (:translate ash-left-mod64))
 
-(define-vop (fast-ash-left-mod32-c/signed=>signed
+(define-vop (fast-ash-left-mod64-c/signed=>signed
              fast-ash-c/signed=>signed)
-  (:translate ash-left-mod32))
+  (:translate ash-left-mod64))
 
 (define-vop (fast-ash/signed/unsigned)
   (:note "inline ASH")
@@ -341,7 +341,7 @@
     (move temp amount)
     (inst cmp temp 0)
     (inst b :ge LEFT)
-    (inst rsb temp temp 0) ;; negate
+    (error "(inst rsb temp temp 0)") ;; negate
     (inst cmp temp sb!vm:n-word-bits)
     (inst mov :gt temp sb!vm:n-word-bits)
     (inst mov result (ecase variant
@@ -395,9 +395,9 @@
   (def fast-ash-left/signed=>signed signed-reg signed-num signed-reg 3)
   (def fast-ash-left/unsigned=>unsigned unsigned-reg unsigned-num unsigned-reg 3))
 
-(define-vop (fast-ash-left-mod32/unsigned=>unsigned
+(define-vop (fast-ash-left-mod64/unsigned=>unsigned
              fast-ash-left/unsigned=>unsigned)
-  (:translate ash-left-mod32))
+  (:translate ash-left-mod64))
 
 #!+ash-right-vops
 (define-vop (fast-%ash/right/unsigned)
@@ -475,7 +475,7 @@
     (inst cmp temp 0)
     (inst mvn :lt temp temp)
     (inst clz temp temp)
-    (inst rsb temp temp 32)
+    (error "(inst rsb temp temp 32)")
     (inst mov res (lsl temp n-fixnum-tag-bits))))
 
 (define-vop (unsigned-byte-32-count)

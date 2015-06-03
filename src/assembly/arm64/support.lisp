@@ -19,9 +19,9 @@
        (values
         `((let ((,fixup-address (gen-label)))
             ,@(if (eq style :none)
-                  `((inst load-from-label pc-tn lr-tn ,fixup-address))
+                  `((inst load-from-label (error "pc-tn") lr-tn ,fixup-address))
                   `((inst load-from-label lr-tn lr-tn ,fixup-address)
-                    (inst blx lr-tn)))
+                    (inst bl lr-tn)))
             (assemble (*elsewhere* ,vop)
               (emit-label ,fixup-address)
               (inst word (make-fixup ',name :assembly-routine)))))
@@ -64,7 +64,7 @@
 (defun generate-return-sequence (style)
   (ecase style
     (:raw
-     `((inst bx lr-tn)))
+     `((inst b lr-tn)))
     #+(or)
     (:full-call
      `((lisp-return (make-random-tn :kind :normal

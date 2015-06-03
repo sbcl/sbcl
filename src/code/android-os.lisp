@@ -80,7 +80,7 @@
           ;; which seem comparable to the information in the example
           ;; in the MACHINE-VERSION page of the ANSI spec.
           #!+(or x86 x86-64) "model name"
-          #!+arm "Processor"))
+          #!+(or arm arm64) "Processor"))
      (when marker
        (with-open-file (stream "/proc/cpuinfo"
                                ;; Even on Linux it's an option to build

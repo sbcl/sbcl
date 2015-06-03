@@ -226,7 +226,7 @@
         (sap-reg (move cfunc function))
         (sap-stack
          (load-stack-offset cfunc cur-nfp function)))
-      (inst blx temp)
+      (inst bl temp)
       (when cur-nfp
         (load-stack-tn cur-nfp nfp-save)))))
 
@@ -503,7 +503,7 @@
 
         ;; Call
         (load-immediate-word r4-tn (foreign-symbol-address "funcall3"))
-        (inst blx r4-tn)
+        (inst bl r4-tn)
 
         ;; Result now on top of stack, put it in the right register
         (cond
@@ -531,7 +531,7 @@
            (error "Unrecognized alien type: ~A" result-type)))
         (move nsp-tn nsp-save-tn)
         (emit-word segment #xe8bd4ff8) ;; ldmfd sp!, {r3-r11, lr}
-        (inst bx lr-tn))
+        (inst b lr-tn))
       (finalize-segment segment)
       ;; Now that the segment is done, convert it to a static
       ;; vector we can point foreign code to.

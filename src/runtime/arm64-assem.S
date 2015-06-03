@@ -11,8 +11,23 @@
 #include "genesis/simple-fun.h"
 #include "genesis/symbol.h"
 
-#define STATIC_SYMBOL_VALUE(sym) [reg_NULL, #(((sym)-NIL)+SYMBOL_VALUE_OFFSET)]
+#define LOAD_STATIC_SYMBOL_VALUE(value,sym) \
+        mov reg_TMP,((sym)-NIL+SYMBOL_VALUE_OFFSET) ;\
+        ldr value,[reg_NULL, reg_TMP]
 
+#define STORE_STATIC_SYMBOL_VALUE(value,sym) \
+        mov reg_TMP,((sym)-NIL+SYMBOL_VALUE_OFFSET) ;\
+        ldr value,[reg_NULL, reg_TMP]
+        
+#define ENTER_PA \
+        STORE_STATIC_SYMBOL_VALUE(reg_CFP,PSEUDO_ATOMIC_INTERRUPTED)
+
+        #define LEAVE_PA \
+        STORE_STATIC_SYMBOL_VALUE(reg_NULL,PSEUDO_ATOMIC_ATOMIC) ;\
+        LOAD_STATIC_SYMBOL_VALUE(reg_OCFP,PSEUDO_ATOMIC_INTERRUPTED)      ;\
+        cbz     reg_OCFP, 1f; \
+	blr      reg_OCFP; \
+1: 
 	.align
 	.global	call_into_lisp
 	.type	call_into_lisp, %function
@@ -24,19 +39,27 @@ call_into_lisp:
 	// There will be no more than three args, so we don't need to
 	// worry about parameters to be passed on the stack.
 
-	// All registers other than X0-X3 and X12 are callee-saves.
-        // Save X3 to get 8-byte alignemnt.
-	stmfd	sp!, {x3-x11, lr}
-        fstmfdd sp!, {d8-d15}
+	// All registers other than X19-X28 are callee-saves.
+
+        stp     x19,x20, [sp,#-16]!
+        stp     x21,x22, [sp,#-16]!
+        stp     x23,x24, [sp,#-16]!
+        stp     x25,x26, [sp,#-16]!
+        stp     x27,x28, [sp,#-16]!
+
+        stp     d8, d9, [sp,#-16]!
+        stp     d10, d11, [sp,#-16]!
+        stp     d12, d13, [sp,#-16]!
+        stp     d14, d15, [sp,#-16]!
 
 	// Start by finding NIL.
 	ldr	reg_NULL, .known_nil
 
 	// Set up NARGS.
-	mov	reg_NARGS, x2, lsl #2
+	orr	reg_NARGS, xzr, x2, LSL #1
 
 	// Move args pointer out of the way of the args to be loaded.
-	mov	reg_X8, x1
+	mov	reg_R8, x1
 
 	// Move the function to its passing location.
 	mov	reg_LEXENV, x0
@@ -44,7 +67,7 @@ call_into_lisp:
 	// Clear the boxed registers that don't already have something
 	// in them.
 	mov	reg_CODE, #0
-	mov     reg_X2, #0
+	mov     reg_R2, #0
 
 	// Find the lisp stack and frame pointers.  We're allocating a
 	// new lisp stack frame, so load the stack pointer into CFP.
@@ -55,19 +78,19 @@ call_into_lisp:
 	ldr	reg_NFP, [reg_NFP]
 	ldr	reg_CFP, [reg_CFP]
 
-	// Enter PSEUDO-ATOMIC.
-	str     pc, STATIC_SYMBOL_VALUE(PSEUDO_ATOMIC_ATOMIC)
+        ENTER_PA
+	
 
 #ifndef LISP_FEATURE_GENCGC
         // Copy the current allocation pointer into the symbol.
         ldr     reg_OCFP, =dynamic_space_free_pointer
         ldr     reg_OCFP, [reg_OCFP]
-        str     reg_OCFP, STATIC_SYMBOL_VALUE(ALLOCATION_POINTER)
+        STORE_STATIC_SYMBOL_VALUE(reg_OCFP, ALLOCATION_POINTER)
 #endif
 
 	// Clear FFCA, so the runtime knows that we're "in lisp".
 	ldr     reg_OCFP, =foreign_function_call_active
-	str     reg_X2, [reg_OCFP]
+	str     reg_R2, [reg_OCFP]
 
 	// We need to set up the lisp stack pointer and the basics of
 	// our stack frame while we're still in P-A.  Any sooner and
@@ -77,7 +100,7 @@ call_into_lisp:
 
 	// Allocate our frame and set up the Lisp stack pointer
         add     reg_OCFP, reg_CFP, #8
-        str     reg_OCFP, STATIC_SYMBOL_VALUE(CONTROL_STACK_POINTER)
+        STORE_STATIC_SYMBOL_VALUE(reg_OCFP, ALLOCATION_POINTER)
 
 	// Set up the "frame link"
 	str     reg_NFP, [reg_OCFP, #-8]
@@ -86,64 +109,74 @@ call_into_lisp:
 	ldr	reg_NL3, =.lra
         str     reg_NL3, [reg_OCFP, #-4]
 
-	// Leave PSEUDO-ATOMIC and check for interrupts.
-	str     reg_NULL, STATIC_SYMBOL_VALUE(PSEUDO_ATOMIC_ATOMIC)
-	ldr     reg_OCFP, STATIC_SYMBOL_VALUE(PSEUDO_ATOMIC_INTERRUPTED)
-	cmp     reg_OCFP, #0
-	blxne   reg_OCFP
+	LEAVE_PA
 
 	// Load our function args.  Cleverness abounds!
-	rsb	reg_NL3, reg_NARGS, #8
-	add	pc, pc, reg_NL3
-	ldr	reg_X2, [reg_X8, #8]
-	ldr	reg_X1, [reg_X8, #4]
-	ldr	reg_X0, [reg_X8]
+	cbz reg_NARGS, no_args
+        cmp reg_NARGS, #2
+        beq two_args
+        bmi one_arg
+three_args:
+	ldr	reg_R2, [reg_R8, #8]
+two_args:        
+	ldr	reg_R1, [reg_R8, #4]
+one_arg:
+	ldr	reg_R0, [reg_R8]
+no_args:
 
         // Load the closure-fun (or simple-fun-self), in case we're
 	// trying to call a closure.
         ldr     reg_CODE, [reg_LEXENV, #CLOSURE_FUN_OFFSET]
 
 	// And, finally, call into Lisp!
-	add	reg_PC, reg_CODE, #SIMPLE_FUN_CODE_OFFSET
+	add	reg_TMP, reg_CODE, #SIMPLE_FUN_CODE_OFFSET
+        br      reg_TMP
 
 	.align 3
 	.equ	.lra, .+OTHER_POINTER_LOWTAG
 	.word	RETURN_PC_HEADER_WIDETAG
 
 	// Correct stack pointer for return processing.
-	streq	reg_OCFP, STATIC_SYMBOL_VALUE(CONTROL_STACK_POINTER)
+        bne no_multiple_values
 
-	// Enter PSEUDO-ATOMIC.
-	str     pc, STATIC_SYMBOL_VALUE(PSEUDO_ATOMIC_ATOMIC)
+        STORE_STATIC_SYMBOL_VALUE(reg_OCFP, ALLOCATION_POINTER)
+
+no_multiple_values:
+
+	ENTER_PA
+
 
         // Save the lisp stack and frame pointers.
 	ldr	reg_NFP, .frame_pointer_address
 	str	reg_CFP, [reg_NFP]
-        ldr     reg_NFP, STATIC_SYMBOL_VALUE(CONTROL_STACK_POINTER)
 	ldr	reg_OCFP, .stack_pointer_address
-	str	reg_NFP, [reg_OCFP]
+	str	reg_CSP, [reg_OCFP]
 
 	// Set FFCA, so the runtime knows that we're not "in lisp".
 	ldr     reg_OCFP, =foreign_function_call_active
-	str     pc, [reg_OCFP]
+	str     reg_OCFP, [reg_OCFP]
 
 #ifndef LISP_FEATURE_GENCGC
         // Copy the current allocation pointer out from the symbol.
         ldr     reg_OCFP, =dynamic_space_free_pointer
-        ldr     reg_NFP, STATIC_SYMBOL_VALUE(ALLOCATION_POINTER)
+        LOAD_STATIC_SYMBOL_VALUE(reg_NFP, ALLOCATION_POINTER)
         str     reg_NFP, [reg_OCFP]
 #endif
 
-	// Leave PSEUDO-ATOMIC and check for interrupts.
-	str     reg_NULL, STATIC_SYMBOL_VALUE(PSEUDO_ATOMIC_ATOMIC)
-	ldr     reg_OCFP, STATIC_SYMBOL_VALUE(PSEUDO_ATOMIC_INTERRUPTED)
-        cmp     reg_OCFP, #0
-	blxne   reg_OCFP
+        LEAVE_PA
 
 	// Restore saved registers.
-        fldmfdd sp!, {d8-d15}
-	ldmfd	sp!, {x3-x11, lr}
-	bx	lr
+        ldp     x27,x28, [sp,#16]!
+        ldp     x25,x26, [sp,#16]!
+        ldp     x23,x24, [sp,#16]!
+        ldp     x21,x22, [sp,#16]!
+        ldp     x19,x20, [sp,#16]!
+
+        ldp     d14, d15, [sp,#16]!
+        ldp     d12, d13, [sp,#16]!
+        ldp     d10, d11, [sp,#16]!
+        ldp     d8, d9, [sp,#16]!
+	ret	reg_LR
 	.size	call_into_lisp, .-call_into_lisp
 .frame_pointer_address:	.word	current_control_frame_pointer
 .stack_pointer_address: .word	current_control_stack_pointer
@@ -185,22 +218,20 @@ call_into_c:
         // debugger knows about this layout (see COMPUTE-CALLING-FRAME
         // in SYS:SRC;CODE;DEBUG-INT.LISP).  The stack is aligned, so
         // we can use X0 (a boxed register) as our temporary.
-        ldr     reg_X0, STATIC_SYMBOL_VALUE(CONTROL_STACK_POINTER)
-        add     reg_X0, reg_X0, #12
-        str     reg_X0, STATIC_SYMBOL_VALUE(CONTROL_STACK_POINTER)
-        str     reg_CFP, [reg_X0, #-12]
-        str     reg_NFP, [reg_X0, #-8]
-        str     reg_CODE, [reg_X0, #-4]
+        mov     reg_R0, reg_CSP
+        add     reg_CSP, reg_CSP, #8*4
+        str     reg_CFP, [reg_R0, #0]
+        str     reg_NFP, [reg_R0, #1*8]
+        str     reg_CODE, [reg_R0, #2*8]
 
-        // Enter PSEUDO-ATOMIC.
-	str     pc, STATIC_SYMBOL_VALUE(PSEUDO_ATOMIC_ATOMIC)
+	ENTER_PA
 
         // Save the lisp stack and frame pointers.
 	ldr	reg_NFP, .stack_pointer_address
-	str	reg_X0, [reg_NFP]
-        sub     reg_X0, reg_X0, #12
+	str	reg_CSP, [reg_NFP]
+        sub     reg_R0, reg_R0, #12
 	ldr	reg_NFP, .frame_pointer_address
-	str	reg_X0, [reg_NFP]
+	str	reg_R0, [reg_NFP]
 
         // We're done with X0, and we need to use OCFP when leaving
         // pseudo-atomic, so move the first of the C register
@@ -209,20 +240,16 @@ call_into_c:
 
 	// Set FFCA, so the runtime knows that we're not "in lisp".
 	ldr     reg_NFP, =foreign_function_call_active
-	str     pc, [reg_NFP]
+	str     reg_NFP, [reg_NFP]
 
 #ifndef LISP_FEATURE_GENCGC
         // Copy the current allocation pointer out from the symbol.
         ldr     reg_OCFP, =dynamic_space_free_pointer
-        ldr     reg_NFP, STATIC_SYMBOL_VALUE(ALLOCATION_POINTER)
+        LOAD_STATIC_SYMBOL_VALUE(reg_NFP, ALLOCATION_POINTER)
         str     reg_NFP, [reg_OCFP]
 #endif
 
-	// Leave PSEUDO-ATOMIC and check for interrupts.
-	str     reg_NULL, STATIC_SYMBOL_VALUE(PSEUDO_ATOMIC_ATOMIC)
-	ldr     reg_OCFP, STATIC_SYMBOL_VALUE(PSEUDO_ATOMIC_INTERRUPTED)
-        cmp     reg_OCFP, #0
-	blxne   reg_OCFP
+	LEAVE_PA
 
         // Now that we're in C mode, move the remaining register args
 	// into place.
@@ -236,7 +263,7 @@ call_into_c:
         // capable of doing a tail-call to a Thumb routine.
         //
         // X8 is important for undefined_alien_function.
-        blx      reg_X8
+        blr      reg_R8
 
         // We're back.  Our main tasks are to move the C return value
         // to where Lisp expects it, and to re-establish the Lisp
@@ -251,51 +278,47 @@ call_into_c:
         ldr     reg_NULL, .known_nil
 
         // Blank the boxed registers.
-        mov     reg_X0, #0
-        mov     reg_X1, #0
-        mov     reg_X2, #0
+        mov     reg_R0, #0
+        mov     reg_R1, #0
+        mov     reg_R2, #0
         mov     reg_LEXENV, #0
-        mov     reg_X8, #0
+        mov     reg_R8, #0
         mov     reg_CODE, #0
 
         // Enter PSEUDO-ATOMIC.
-	str     pc, STATIC_SYMBOL_VALUE(PSEUDO_ATOMIC_ATOMIC)
+	ENTER_PA
 
 	// Clear FFCA, so the runtime knows that we're "in lisp".
 	ldr     reg_OCFP, =foreign_function_call_active
-	str     reg_X2, [reg_OCFP]
+	str     XZR, [reg_OCFP]
 
 #ifndef LISP_FEATURE_GENCGC
         // Copy the current allocation pointer into the symbol.
         ldr     reg_OCFP, =dynamic_space_free_pointer
         ldr     reg_OCFP, [reg_OCFP]
-        str     reg_OCFP, STATIC_SYMBOL_VALUE(ALLOCATION_POINTER)
+        STORE_STATIC_SYMBOL_VALUE(reg_OCFP, ALLOCATION_POINTER)
 #endif
 
         // Restore the Lisp stack and frame pointers, but store the
         // control frame pointer in reg_NFP (saving a register move
         // later).
 	ldr	reg_NFP, .stack_pointer_address
-	ldr	reg_CFP, [reg_NFP]
-        str     reg_CFP, STATIC_SYMBOL_VALUE(CONTROL_STACK_POINTER)
+	ldr	reg_CSP, [reg_NFP]
 	ldr	reg_NFP, .frame_pointer_address
 	ldr	reg_NFP, [reg_NFP]
 
-	// Leave PSEUDO-ATOMIC and check for interrupts.
-	str     reg_NULL, STATIC_SYMBOL_VALUE(PSEUDO_ATOMIC_ATOMIC)
-	ldr     reg_OCFP, STATIC_SYMBOL_VALUE(PSEUDO_ATOMIC_INTERRUPTED)
-        cmp     reg_OCFP, #0
-	blxne   reg_OCFP
+	LEAVE_PA
 
         // Restore our caller state from our stack frame.
-        ldr     reg_CODE, [reg_NFP, #8]
-        ldr     reg_NL2, [reg_NFP, #4]
+        ldr     reg_CODE, [reg_NFP, #16]
+        ldr     reg_NL2, [reg_NFP, #8]
         ldr     reg_CFP, [reg_NFP]
-        str     reg_NFP, STATIC_SYMBOL_VALUE(CONTROL_STACK_POINTER)
+        mov     reg_CSP, reg_NFP
 
         // Restore our return address... into the program counter.
         sub     reg_NL2, reg_NL2, #OTHER_POINTER_LOWTAG
-        add     reg_PC, reg_NL2, reg_CODE
+        add     reg_TMP, reg_NL2, reg_CODE
+        br      reg_TMP
 
 	.size	call_into_c, .-call_into_c
 
@@ -378,7 +401,8 @@ undefined_alien_function:
 
 	ldr	reg_LEXENV, [reg_LEXENV, #FDEFN_FUN_OFFSET]
 	ldr	reg_CODE, [reg_LEXENV, #CLOSURE_FUN_OFFSET]
-	add	reg_PC, reg_CODE, #SIMPLE_FUN_CODE_OFFSET
+	add	reg_TMP, reg_CODE, #SIMPLE_FUN_CODE_OFFSET
+        br      reg_TMP
 
 	.align	3
 	.global	funcallable_instance_tramp
@@ -394,7 +418,8 @@ undefined_alien_function:
 
 	ldr	reg_LEXENV, [reg_LEXENV, #FUNCALLABLE_INSTANCE_FUNCTION_OFFSET]
 	ldr	reg_CODE, [reg_LEXENV, #CLOSURE_FUN_OFFSET]
-	add	reg_PC, reg_CODE, #SIMPLE_FUN_CODE_OFFSET
+	add	reg_TMP, reg_CODE, #SIMPLE_FUN_CODE_OFFSET
+        br      reg_TMP
 
         // FIXME-ARM: The following is random garbage, to make
         // code/debug-int compile. To get the debugger working, this
@@ -406,7 +431,7 @@ fun_end_breakpoint_guts:
 	.global	fun_end_breakpoint_trap
 	.type	fun_end_breakpoint_trap, %function
 fun_end_breakpoint_trap:
-        b       fun_end_breakpoint_trap
+        b      fun_end_breakpoint_trap
         .global fun_end_breakpoint_end
 fun_end_breakpoint_end:
 
@@ -415,57 +440,54 @@ fun_end_breakpoint_end:
 	.global	alloc_tramp
 	.type	alloc_tramp, %function
 alloc_tramp:
-        stmfd	sp!, {x4, x6, x12, lr}
+        // stp     x4,x6,[sp,#-16]!
+        // stp     x12,lr,[sp,#-16]!
 
-        ldr     x4, =foreign_function_call_active
-        str     pc, [x4]
+        // ldr     x4, =foreign_function_call_active
+        // str     x4, [x4]
 
-        ldr     x4, STATIC_SYMBOL_VALUE(CONTROL_STACK_POINTER)
-        add     x6, x4, #8*4
-        str     x6, STATIC_SYMBOL_VALUE(CONTROL_STACK_POINTER)
+        // add     x6, reg_CSP, #8*8
 
-        // Create a new frame and save descriptor regs on the stack
-	// for the GC to see.
-        str     reg_CFP, [x4, #0]
-        str     reg_NULL, [x4, #4]
-        str     reg_CODE, [x4, #8]
-        add     x4, x4, #3*4
-        stmea   x4, {x0-reg_LEXENV, x8}
+        // // Create a new frame and save descriptor regs on the stack
+	// // for the GC to see.
+        // str     reg_CFP, [x4, #0]
+        // str     reg_NULL, [x4, #8]
+        // str     reg_CODE, [x4, #16]
+        // add     x4, x4, #3*8
+        // stmea   x4, {x0-reg_LEXENV, x8}
 
-        ldr     x0,  [sp, #4*4]
-        fstmfdd sp!, {d0-d7}
+        // ldr     x0,  [sp, #4*4]
+        // fstmfdd sp!, {d0-d7}
 
-        mov     lr, pc
-        ldr     pc,=alloc
+        // ldr     x0,=alloc
+        // bl      x0
 
-        fldmfdd sp!, {d0-d7}
-        str     x0,  [sp, #4*4]
-        ldr     x4, STATIC_SYMBOL_VALUE(CONTROL_STACK_POINTER)
-        ldmea   x4, {x0-reg_LEXENV, x8}
-        sub     x4, x4, #8*4
-        str     x4, STATIC_SYMBOL_VALUE(CONTROL_STACK_POINTER)
+        // fldmfdd sp!, {d0-d7}
+        // str     x0,  [sp, #4*4]
+        // ldmea   reg_CSP, {x0-reg_LEXENV, x8}
+        // sub     reg_CSP, reg_CSP, #8**
 
-        ldr     x4, =foreign_function_call_active
-        mov     x6, #0
-	str     x6, [x4]
+        // ldr     x4, =foreign_function_call_active
+        // mov     x6, #0
+	// str     x6, [x4]
 
-	ldmfd	sp!, {x4, x6, x12, lr}
-	bx	lr
+	// ldmfd	sp!, {x4, x6, x12, lr}
+	// ret     reg_LR
 
         .align
 	.global	fpu_save
 	.type	fpu_save, %function
 fpu_save:
-        fstmiad x0, {d0-d7}
-	bx	lr
+        //fstmiad x0, {d0-d7}
+	ret	reg_LR
 
         .align
 	.global	fpu_restore
 	.type	fpu_restore, %function
 fpu_restore:
         add     x0, x0, #16
-        fldmiad x0, {d0-d7}
-	bx	lr
+        //fldmiad x0, {d0-d7}
+	ret	reg_LR
 
         .align
 	.global	do_pending_interrupt
@@ -476,5 +498,6 @@ do_pending_interrupt:
         .byte 0
         .byte 0
         .byte 0
-	bx	lr
-#endif
+	ret	reg_LR
+        #endif
+
