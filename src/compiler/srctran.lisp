@@ -2882,13 +2882,13 @@
     (two-arg-derive-type n shift #'%ash/right-derive-type-aux #'%ash/right))
   )
 
-(deftransform expt ((base power) ((constant-arg unsigned-byte) unsigned-byte))
-  (let ((base (lvar-value base)))
-    (unless (= (logcount base) 1)
-      (give-up-ir1-transform))
-    `(ash 1 ,(if (= base 2)
-                 `power
-                 `(* power ,(1- (integer-length base)))))))
+;;; Not declaring it as actually being RATIO becuase it is used as one
+;;; of the legs in the EXPT transform below and that may result in
+;;; some unwanted type conflicts, e.g. (random (expt 2 (the integer y)))
+(declaim (type (sfunction (integer) rational) reciprocate))
+(defun reciprocate (x)
+  (declare (optimize (safety 0)))
+  (%make-ratio 1 x))
 
 (deftransform expt ((base power) ((constant-arg unsigned-byte) integer))
   (let ((base (lvar-value base)))
@@ -2898,11 +2898,19 @@
            1)
           (t
            `(let ((%denominator (ash 1 ,(if (= base 2)
-                                           `(abs power)
-                                           `(* (abs power) ,(1- (integer-length base)))))))
+                                            `(abs power)
+                                            `(* (abs power) ,(1- (integer-length base)))))))
               (if (minusp power)
-                  (%make-ratio 1 %denominator)
+                  (reciprocate %denominator)
                   %denominator))))))
+
+(deftransform expt ((base power) ((constant-arg unsigned-byte) unsigned-byte))
+  (let ((base (lvar-value base)))
+    (unless (= (logcount base) 1)
+      (give-up-ir1-transform))
+    `(ash 1 ,(if (= base 2)
+                 `power
+                 `(* power ,(1- (integer-length base)))))))
 
 ;;; Modular functions
 
