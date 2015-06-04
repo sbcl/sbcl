@@ -295,7 +295,7 @@ bootstrapping.
         (parse-lambda-list lambda-list
                            :disallow '(&aux &environment &more)
                            :context "a generic function lambda list")
-      (declare (ignore llks rest))
+      (declare (ignore llks required rest))
       ;; no defaults allowed for &OPTIONAL arguments
       (dolist (arg optional)
         (or (symbol-or-singleton-p arg) (complain arg)))

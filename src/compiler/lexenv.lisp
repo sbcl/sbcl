@@ -123,9 +123,12 @@
                                          nil nil nil
                                          ,@(cdr lambda)))
         ((dolist (x vars nil)
-           ;; FIXME: it is a bug that you need to ignore X
+           ;; FIXME: it is a bug in SBCL that you need to ignore X
            ;; because iteration variables are, by definition, always "used".
-           #+sb-xc-host (declare (ignore x))
+           ;; But CLL says that it's an error to ignore X. Great.
+           ;; And you can't write "#+(and sb-xc-host sbcl)" because
+           ;; that's a "probable XC bug in host read-time conditional" error.
+           ;; #+sb-xc-host (declare (ignore x))
            #+sb-xc-host
            ;; KLUDGE: too complicated for cross-compilation
            (return t)
@@ -148,7 +151,7 @@
                   (return t))))))
          nil)
         ((dolist (x funs nil)
-           #+sb-xc-host (declare (ignore x))
+           ;; #+sb-xc-host (declare (ignore x)) ; FIXME (like above)
            #+sb-xc-host
            ;; KLUDGE: too complicated for cross-compilation (and
            ;; failure of OAOO in comments, *sigh*)

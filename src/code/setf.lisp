@@ -450,6 +450,7 @@
                        name setf-fn-name)))))
     (assign-it))
   (defun !quietly-defsetf (name expander expander-lambda-list inverse doc)
+    #+sb-xc-host (declare (ignore expander-lambda-list))
     (assign-it))))
 
 (def!macro sb!xc:defsetf (access-fn &rest rest)
