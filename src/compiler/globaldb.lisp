@@ -34,6 +34,12 @@
 
 (in-package "SB!C")
 
+#-no-ansi-print-object
+(defmethod print-object ((x meta-info) stream)
+  (print-unreadable-object (x stream)
+    (format stream "~S ~S, ~D" (meta-info-category x) (meta-info-kind x)
+            (meta-info-number x))))
+
 (!begin-collecting-cold-init-forms)
 #!+sb-show (!cold-init-forms (/show0 "early in globaldb.lisp cold init"))
 
@@ -96,76 +102,6 @@
 ;;; version with our version would be unlikely to help, because that
 ;;; would make the cross-compiler very confused.)
 (eval-when (#-sb-xc :compile-toplevel :load-toplevel :execute)
-
-(def!struct (meta-info
-            #-no-ansi-print-object
-            (:print-object (lambda (x s)
-                             (print-unreadable-object (x s)
-                               (format s
-                                       "~S ~S, Number = ~W"
-                                       (meta-info-category x)
-                                       (meta-info-kind x)
-                                       (meta-info-number x)))))
-            (:constructor
-             !make-meta-info (number category kind type-spec
-                              type-checker validate-function default))
-            (:copier nil))
-  ;; a number that uniquely identifies this object
-  (number nil :type info-number :read-only t)
-  ;; 2-part key to this piece of metainfo
-  (category nil :type keyword :read-only t)
-  (kind nil :type keyword :read-only t)
-  ;; a type specifier which info of this type must satisfy
-  (type-spec nil :type t :read-only t)
-  ;; Two functions called by (SETF INFO) before calling SET-INFO-VALUE.
-  ;; 1. A function that type-checks its argument and returns it,
-  ;;    or signals an error.
-  ;;    Some Lisps trip over their shoelaces trying to assert that
-  ;;    a function is (function (t) t). Our code is fine though.
-  (type-checker nil :type #+sb-xc-host function #-sb-xc-host (sfunction (t) t)
-                :read-only t)
-  ;; 2. a function of two arguments, a name and new-value, which performs
-  ;;    any other checks and/or side-effects including signaling an error.
-  (validate-function nil :type (or function null) :read-only t)
-  ;; If FUNCTIONP, then a function called when there is no information of
-  ;; this type. If not FUNCTIONP, then any object serving as a default.
-  (default nil)) ; shoud be :read-only t.  I have a fix for that.
-
-(declaim (freeze-type meta-info))
-
-(defconstant +info-metainfo-type-num+ 0)
-
-;; Perform the equivalent of (GET-INFO-VALUE sym +INFO-METAINFO-TYPE-NUM+)
-;; but without the AVER that meta-info for +info-metainfo-type-num+ exists,
-;; and bypassing the defaulting logic, returning zero or more META-INFOs that
-;; match KIND based on half of their key, which is often a unique
-;; identifier by itself.
-(defmacro !get-meta-infos (kind)
-  `(let* ((info-vector (symbol-info-vector ,kind))
-          (index (if info-vector
-                     (packed-info-value-index info-vector +no-auxilliary-key+
-                                              +info-metainfo-type-num+))))
-     (if index (svref info-vector index))))
-
-(defun meta-info (category kind &optional (errorp t))
-  ;; Really this takes (KEYWORD KEYWORD) but SYMBOL is easier to test.
-  ;; Nearly all callers have ERRORP defaulting to T,
-  ;; so there is an explicit check anyway if not found.
-  (declare (symbol category kind))
-  ;; Usually KIND designates a unique object, so we store only that object.
-  ;; Otherwise we store a list which has a small (<= 4) handful of items.
-  (or (let ((metadata (!get-meta-infos kind)))
-        (cond ((listp metadata)
-               (dolist (info metadata nil) ; FIND is slower :-(
-                 (when (eq (meta-info-category (truly-the meta-info info))
-                           category)
-                   (return info))))
-              ((eq (meta-info-category (truly-the meta-info metadata)) category)
-               metadata)))
-      (if errorp
-          (error "(~S ~S) is not a defined info type." category kind)
-          nil)))
-
 (defun !register-meta-info (metainfo)
   (let* ((name (meta-info-kind metainfo))
          (list (!get-meta-infos name)))
@@ -202,7 +138,7 @@
            id
            (sb!fasl::write-slots
             (sb!fasl::allocate-struct sb!fasl::*dynamic* layout)
-            (find-layout 'meta-info)
+            'meta-info ; give the type name in lieu of layout
             :category category :kind kind :type-spec type-spec
             :type-checker checker :validate-function validator
             :default default :number id)))))

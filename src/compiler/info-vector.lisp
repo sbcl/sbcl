@@ -490,10 +490,6 @@
 ;; Descriptors are target fixnums
 (deftype info-descriptor () `(signed-byte ,sb!vm:n-fixnum-bits))
 
-;; Every Name amenable to storage in info-vectors has an auxilliary key
-;; as explained above, except that the root name itself has none.
-(defconstant +no-auxilliary-key+ 0)
-
 ;; An empty info-vector. Its 0th field describes that there are no more fields.
 (defconstant-eqx +nil-packed-infos+ #(0) #'equalp)
 

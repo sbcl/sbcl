@@ -963,25 +963,53 @@ core and return a descriptor to it."
                    (error "~S is not the descriptor of a cold-layout" des)))
        (vector-from-core x)))
 
-(macrolet ((dsd-index-from-keyword (initarg slots)
-             `(let ((dsd (find ,initarg ,slots
-                               :test (lambda (x y)
-                                       (eq x (keywordicate (dsd-name y)))))))
-                (aver (eq (dsd-raw-type dsd) t)) ; raw slots not implemented
-                (+ (dsd-index dsd) sb!vm:instance-slots-offset))))
-
-  (defun write-slots (cold-object host-layout &rest assignments)
+(flet ((get-slots (host-layout-or-type)
+         (etypecase host-layout-or-type
+           (layout (dd-slots (layout-info host-layout-or-type)))
+           (symbol (dd-slots-from-core host-layout-or-type))))
+       (get-slot-index (slots initarg)
+         (+ sb!vm:instance-slots-offset
+            (if (descriptor-p slots)
+                (do ((dsd-layout (find-layout 'defstruct-slot-description))
+                     (slots slots (cold-cdr slots)))
+                    ((cold-null slots) (error "No slot for ~S" initarg))
+                  (let* ((dsd (cold-car slots))
+                         (slot-name (read-slot dsd dsd-layout :name)))
+                    (when (eq (keywordicate (warm-symbol slot-name)) initarg)
+                      (let ((raw-type (read-slot dsd dsd-layout :raw-type)))
+                        ;; Untagged slots are not accessible during cold-load.
+                        (aver (eq (warm-symbol raw-type) t)))
+                      (return (descriptor-fixnum
+                               (read-slot dsd dsd-layout :index))))))
+                (let ((dsd (find initarg slots
+                                 :test (lambda (x y)
+                                         (eq x (keywordicate (dsd-name y)))))))
+                  (aver (eq (dsd-raw-type dsd) t)) ; Same as above: no can do.
+                  (dsd-index dsd))))))
+  (defun write-slots (cold-object host-layout-or-type &rest assignments)
     (aver (evenp (length assignments)))
-    (let ((slots (dd-slots (layout-info host-layout))))
+    (let ((slots (get-slots host-layout-or-type)))
       (loop for (initarg value) on assignments by #'cddr
             do (write-wordindexed
-                cold-object (dsd-index-from-keyword initarg slots) value)))
+                cold-object (get-slot-index slots initarg) value)))
     cold-object)
 
-  (defun read-slot (cold-object host-layout slot-initarg) ; not "name"
-    (read-wordindexed cold-object
-                      (dsd-index-from-keyword
-                       slot-initarg (dd-slots (layout-info host-layout))))))
+  ;; For symmetry, the reader takes an initarg, not a slot name.
+  (defun read-slot (cold-object host-layout-or-type slot-initarg)
+    (let ((slots (get-slots host-layout-or-type)))
+      (read-wordindexed cold-object (get-slot-index slots slot-initarg)))))
+
+;; Given a TYPE-NAME of a structure-class, find its defstruct-description
+;; as a target descriptor, and return the slot list as a target descriptor.
+(defun dd-slots-from-core (type-name)
+  (let* ((host-dd-layout (find-layout 'defstruct-description))
+         (target-dd
+          ;; This is inefficient, but not enough so to worry about.
+          (or (car (assoc (cold-intern type-name) *known-structure-classoids*
+                          :key (lambda (x) (read-slot x host-dd-layout :name))
+                          :test #'descriptor=))
+              (error "No known layout for ~S" type-name))))
+    (read-slot target-dd host-dd-layout :slots)))
 
 (defvar *simple-vector-0-descriptor*)
 (defvar *vacuous-slot-table*)
