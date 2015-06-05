@@ -301,8 +301,7 @@
          (multiple-value-bind (new-policy specified-qualities)
              (process-optimize-decl form *policy*)
            (setq *policy* new-policy)
-           (advise-if-repeated-optimize-qualities
-            new-policy specified-qualities)))
+           (warn-repeated-optimize-qualities new-policy specified-qualities)))
         (muffle-conditions
          (setq *handled-conditions*
                (process-muffle-conditions-decl form *handled-conditions*)))
@@ -329,15 +328,17 @@
 
 ;; Issue a style warning if there are any repeated OPTIMIZE declarations
 ;; given the SPECIFIED-QUALITIES, unless there is no ambiguity.
-(defun advise-if-repeated-optimize-qualities (new-policy specified-qualities)
+(defun warn-repeated-optimize-qualities (new-policy specified-qualities)
   (let (dups)
     (dolist (quality-and-value specified-qualities)
       (let* ((quality (car quality-and-value))
-             (current (policy-quality new-policy quality)))
+             (current ; Read the raw quality value, not the adjusted value.
+              (%%policy-quality new-policy (policy-quality-name-p quality))))
         (when (and (not (eql (cdr quality-and-value) current))
                    (not (assq quality dups)))
           (push `(,quality ,current) dups))))
     (when dups
-      (compiler-style-warn
-       "Repeated OPTIMIZE qualit~@P. Using ~{~S~^ and ~}"
-       (length dups) dups))))
+      ;; If a restriction is in force, this message can be misleading,
+      ;; as the "effective" value isn't always what the message claims.
+      (compiler-style-warn "Repeated OPTIMIZE qualit~@P. Using ~{~S~^ and ~}"
+                           (length dups) dups))))

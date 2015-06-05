@@ -1468,6 +1468,8 @@
                                     (mask-field (byte 10 0) (cut-test a))))))
              469)))
 
+;; META: there's a test in compiler.pure.lisp that also tests
+;; interaction of PROGV with (debug 3). These tests should be together.
 (with-test (:name :progv-debug-3)
   (unwind-protect
        (sb-ext:restrict-compiler-policy 'debug 3)
@@ -1479,6 +1481,10 @@
     (sb-ext:restrict-compiler-policy 'debug 0)))
 
 (with-test (:name :restrict-compiler-policy-result)
+  (let ((sb-c::*policy-restrictions* sb-c::*policy-restrictions*))
+    (sb-ext:restrict-compiler-policy 'safety 2)
+    (assertoid:assert-no-signal
+     (compile nil '(lambda () (declare (optimize (safety 0)))))))
   (let ((sb-c::*policy-restrictions* sb-c::*policy-restrictions*))
     ;; Passing no arguments returns the current quality/value pairs.
     (assert (null (sb-ext:restrict-compiler-policy)))

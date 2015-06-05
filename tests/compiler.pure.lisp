@@ -2734,6 +2734,8 @@
   (assert (equal "#<FUNCTION READ-LINE>" (princ-to-string #'read-line))))
 
 ;;; PROGV + RESTRICT-COMPILER-POLICY
+;; META: there's a test in compiler.impure.lisp that also tests
+;; interaction of PROGV with (debug 3). These tests should be together.
 (with-test (:name :progv-and-restrict-compiler-policy)
   (let ((sb-c::*policy-restrictions* sb-c::*policy-restrictions*))
     (restrict-compiler-policy 'debug 3)
