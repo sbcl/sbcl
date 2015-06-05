@@ -4572,6 +4572,12 @@
       (when (stringp x)
         (check-format-args x args 'format)))))
 
+(defoptimizer (format derive-type) ((dest control &rest args))
+  (declare (ignore control args))
+  (when (and (constant-lvar-p dest)
+             (null (lvar-value dest)))
+    (specifier-type '(simple-array character (*)))))
+
 ;;; We disable this transform in the cross-compiler to save memory in
 ;;; the target image; most of the uses of FORMAT in the compiler are for
 ;;; error messages, and those don't need to be particularly fast.

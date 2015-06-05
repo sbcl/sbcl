@@ -1707,4 +1707,5 @@ lines and columns."
         `(let ((,var (make-string-output-stream)))
            ,@decls
            ,@forms
-           (get-output-stream-string ,var)))))
+           (truly-the (simple-array character (*))
+                      (get-output-stream-string ,var))))))
