@@ -17,6 +17,7 @@ changes relative to sbcl-1.2.12:
     due to faulty introspection of the lambda list of a closure.
   * bug fix: out of line MAP/MAP-INTO check that the results produced by the
     function are of the matching sequence type. (lp#1459581)
+  * bug fix: pretty-printing of '(LET `((,X ,Y)) :B) is handled correctly.
 
 changes in sbcl-1.2.12 relative to sbcl-1.2.11:
   * minor incompatible change: the SB-C::*POLICY* variable is no longer

@@ -1531,7 +1531,8 @@ line break."
   ;; Also, START-LOGICAL-BLOCK could become an FLET inside here.
   (declare (function proc))
   (with-pretty-stream (stream (out-synonym-of stream))
-    (if (not (listp object)) ; implies obj-supplied-p
+    (if (or (not (listp object)) ; implies obj-supplied-p
+            (eq (car object) 'quasiquote))
         ;; the spec says "If object is not a list, it is printed using WRITE"
         ;; but I guess this is close enough.
         (output-object object stream)
