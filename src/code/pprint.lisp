@@ -1532,7 +1532,11 @@ line break."
   (declare (function proc))
   (with-pretty-stream (stream (out-synonym-of stream))
     (if (or (not (listp object)) ; implies obj-supplied-p
-            (eq (car object) 'quasiquote))
+            (and (eq (car object) 'quasiquote)
+                 ;; We can only bail out from printing this logical block
+                 ;; if the quasiquote printer would *NOT* punt.
+                 ;; If it would punt, then we have to forge ahead.
+                 (singleton-p (cdr object))))
         ;; the spec says "If object is not a list, it is printed using WRITE"
         ;; but I guess this is close enough.
         (output-object object stream)
