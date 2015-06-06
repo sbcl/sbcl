@@ -467,7 +467,9 @@
     ((cons list (cons list))
      (destructuring-bind (lambda-list (&rest stores) &body body) rest
        (binding* (((llks req opt rest key aux more env)
-                   (parse-lambda-list lambda-list :disallow '(&aux &more)
+                   (parse-lambda-list lambda-list
+                                      :reject #.(lambda-list-keyword-mask
+                                                 '(&aux &body &more))
                                       :context 'defsetf))
                   ((forms decls doc) (parse-body body))
                   ((outer-decls inner-decls)
@@ -528,7 +530,7 @@
     (declare (type function expander))
     (multiple-value-bind (temp-vars temp-vals call-arguments)
         ;; FORMALS affect aesthetics only, not behavior.
-        (let ((formals #-sb-xc-host (%simple-fun-arglist expander)))
+        (let ((formals #-sb-xc-host (%fun-lambda-list expander)))
           (collect-setf-temps (cdr access-form) environment formals))
       (let ((stores (let ((sb!xc:*gensym-counter* 1))
                       (make-gensym-list num-store-vars "NEW"))))

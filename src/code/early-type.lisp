@@ -109,9 +109,13 @@
   (multiple-value-bind (llks required optional rest keys)
       (parse-lambda-list lambda-listy-thing
                          :context context
-                         :disallow (ecase context
-                                     (:values-type '(&key &aux &environment))
-                                     (:function-type '(&aux &environment)))
+                         :reject (ecase context
+                                   (:values-type
+                                    #.(lambda-list-keyword-mask
+                                       '(&key &aux &environment &body &whole)))
+                                   (:function-type
+                                    #.(lambda-list-keyword-mask
+                                       '(&aux &environment &body &whole))))
                          :silent t)
     (let ((required (mapcar #'single-value-specifier-type required))
           (optional (mapcar #'single-value-specifier-type optional))

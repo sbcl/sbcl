@@ -264,6 +264,9 @@
            (dummies (make-gensym-list 2))
            (all-dummies (cons tail dummies))
            (keyp (ll-kwds-keyp llks))
+           ;; FIXME: the logic for keywordicating a keyword arg specifier
+           ;; is repeated in a as many places as there are calls to
+           ;; parse-lambda-just, and more.
            (keys (mapcar (lambda (spec)
                            (multiple-value-bind (key var)
                                (if (atom spec)

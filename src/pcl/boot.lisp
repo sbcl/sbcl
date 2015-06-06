@@ -293,7 +293,8 @@ bootstrapping.
                     :format-arguments (list arg lambda-list))))
     (multiple-value-bind (llks required optional rest keys)
         (parse-lambda-list lambda-list
-                           :disallow '(&aux &environment &more)
+                           :reject #.(lambda-list-keyword-mask
+                                      '(&aux &environment &body &more))
                            :context "a generic function lambda list")
       (declare (ignore llks required rest))
       ;; no defaults allowed for &OPTIONAL arguments

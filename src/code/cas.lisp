@@ -178,7 +178,10 @@ user of DEFCAS to ensure that the function specified is atomic.
 EXPERIMENTAL: Interface subject to change."
   (multiple-value-bind (llks reqs opts rest)
       (parse-lambda-list lambda-list
-                         :disallow '(&key &allow-other-keys &aux &environment)
+                         :reject
+                         #.(lambda-list-keyword-mask
+                            '(&key &allow-other-keys &aux &environment
+                              &body &more &whole))
                          :context "a DEFCAS lambda-list")
     (declare (ignore llks))
     `(define-cas-expander ,accessor ,lambda-list
