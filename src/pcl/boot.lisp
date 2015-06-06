@@ -292,10 +292,12 @@ bootstrapping.
                     "~@<invalid ~S ~_in the generic function lambda list ~S~:>"
                     :format-arguments (list arg lambda-list))))
     (multiple-value-bind (llks required optional rest keys)
-        (parse-lambda-list lambda-list
-                           :reject #.(lambda-list-keyword-mask
-                                      '(&aux &environment &body &more))
-                           :context "a generic function lambda list")
+        (parse-lambda-list
+         lambda-list
+         :accept #.(lambda-list-keyword-mask
+                    '(&optional &rest &key &allow-other-keys))
+         :condition-class 'generic-function-lambda-list-error
+         :context "a generic function lambda list")
       (declare (ignore llks required rest))
       ;; no defaults allowed for &OPTIONAL arguments
       (dolist (arg optional)

@@ -107,16 +107,16 @@
 
 (defun parse-args-types (lambda-listy-thing context)
   (multiple-value-bind (llks required optional rest keys)
-      (parse-lambda-list lambda-listy-thing
-                         :context context
-                         :reject (ecase context
-                                   (:values-type
-                                    #.(lambda-list-keyword-mask
-                                       '(&key &aux &environment &body &whole)))
-                                   (:function-type
-                                    #.(lambda-list-keyword-mask
-                                       '(&aux &environment &body &whole))))
-                         :silent t)
+      (parse-lambda-list
+       lambda-listy-thing
+       :context context
+       :accept (ecase context
+                 (:values-type
+                  #.(lambda-list-keyword-mask '(&optional &rest)))
+                 (:function-type
+                  #.(lambda-list-keyword-mask
+                     '(&optional &rest &key &allow-other-keys))))
+       :silent t)
     (let ((required (mapcar #'single-value-specifier-type required))
           (optional (mapcar #'single-value-specifier-type optional))
           (rest (when rest (single-value-specifier-type (car rest))))

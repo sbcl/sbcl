@@ -152,3 +152,52 @@
                        (a-body-form) (another-body-form))))))))))
 
 ) ; end BINDING*-EXPANDER test
+
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (import '(sb-int:&more sb-int:parse-lambda-list)))
+
+(with-test (:name :parse-lambda-list)
+  ;; 3.4.1 - ordinary lambda list
+  (assert-error (parse-lambda-list '(foo &body bar)))
+  (assert-error (parse-lambda-list '(foo &whole bar)))
+  (assert-error (parse-lambda-list '(foo &environment bar)))
+  ;; &more expects exactly two following symbols
+  (assert-error (parse-lambda-list '(foo &more)))
+  (assert-error (parse-lambda-list '(foo &more c)))
+  (assert-error (parse-lambda-list '(foo &more ctxt ct junk)))
+  ;; &more and &rest are mutually exclusive
+  (assert-error (parse-lambda-list '(foo &rest foo &more ctxt n)))
+  (assert-error (parse-lambda-list '(foo &more ctxt n &rest foo)))
+
+  ;; 3.4.2 - generic function lambda lists
+  (macroexpand-1 '(defgeneric foo (a b &key size &allow-other-keys)))
+  (assert-error (macroexpand-1 '(defgeneric foo (a b &aux x)))
+                sb-pcl::generic-function-lambda-list-error)
+  ;; 3.4.3 - FIXME: add tests
+
+  ;; 3.4.4 - doesn't use PARSE-LAMBDA-LIST yet
+  ;; 3.4.5 - same
+
+  ;; 3.4.6 - BOA lambda list is a function lambda list,
+  ;; but the expander silently disregarded the internal &MORE keyword,
+  ;; which has no place in DEFSTRUCT.
+  (assert-error
+   (macroexpand-1 '(defstruct (s (:constructor
+                                  make-s (a b &more ctxt n)))
+                    a b ctxt n)))
+
+  ;; 3.4.7 - DEFSETF disallows &AUX
+  (assert-error (macroexpand-1
+                 '(defsetf foof (a b &optional k &aux) (v1 v2) (forms))))
+
+  ;; 3.4.8 - DEFTYPE currently uses parse-defmacro
+
+  ;; 3.4.9 - DEFINE-MODIFY-MACRO allows only &OPTIONAL and &REST
+  (assert-error (macroexpand-1
+                 '(define-modify-macro foof (a b &optional k &key) foo)))
+  (assert-error (macroexpand-1
+                 '(define-modify-macro foof (a b &optional k &body) foo)))
+
+  ;; 3.4.10 - DEFINE-METHOD-COMBINATION. Not even sure what this does.
+
+  )

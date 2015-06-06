@@ -31,7 +31,8 @@
 ;;; wrong, we use COMPILER-ERROR, aborting compilation to the last
 ;;; recovery point.
 (declaim (ftype (sfunction
-                 (list &key (:context t) (:reject integer) (:silent boolean))
+                 (list &key (:context t) (:accept integer) (:silent boolean)
+                            (:condition-class symbol))
                  (values symbol list list list list list list list list))
                 parse-lambda-list))
 
@@ -51,21 +52,22 @@
 ;;;
 (defun parse-lambda-list
     (list &key (context "an ordinary lambda list")
-               (reject #.(lambda-list-keyword-mask
-                          '(&whole &body &environment)))
+               (accept #.(lambda-list-keyword-mask
+                          '(&optional &rest &more &key &allow-other-keys &aux)))
+               (condition-class 'simple-program-error)
                silent
           &aux (seen 0) required optional rest more keys aux env whole tail)
   (declare (optimize speed))
-  (declare (type (unsigned-byte 13) reject seen))
+  (declare (type (unsigned-byte 13) accept seen))
   (labels ((need-arg (state)
-             (croak "expcting variable after ~A in: ~S" state list))
+             (croak "expecting variable after ~A in: ~S" state list))
            (need-symbol (x why)
              (unless (symbolp x)
                (croak "~A is not a symbol: ~S" why x)))
            (croak (string &optional (a1 0 a1p) (a2 0 a2p) (a3 0 a3p))
              (let ((l (if a1p (list a1 a2 a3))))
                (if (and l (not a3p)) (rplacd (if a2p (cdr l) l) nil))
-               (compiler-error 'simple-program-error
+               (compiler-error condition-class
                                :format-control string :format-arguments l))))
     (macrolet ((state (state) (lambda-list-state-number state))
                (state= (x y) `(= ,x ,(lambda-list-state-number y)))
@@ -120,15 +122,15 @@
                ;; but if it should be rejected, then it gets its own bit.
                ;; Error message production is thereby confined to one spot.
                (&body (values (bits :required &optional)
-                              (if (logbitp (state &body) reject)
-                                  (state &body) (state &rest))))
+                              (if (logbitp (state &body) accept)
+                                  (state &rest) (state &body))))
                (&whole
                 (values (if (and (state= state :required) (not required)
                                  (not (logbitp (state &environment) seen)))
                             (bits :required) 0)
                         (state &whole))))
              (when from-states
-               (when (logbitp to-state reject)
+               (unless (logbitp to-state accept)
                  (let ((where ; Keyword never legal in this flavor lambda list.
                         (case context
                           (:function-type "a FUNCTION type specifier")

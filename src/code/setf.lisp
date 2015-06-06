@@ -368,39 +368,23 @@
 (def!macro sb!xc:define-modify-macro (name lambda-list function &optional doc-string)
   #!+sb-doc
   "Creates a new read-modify-write macro like PUSH or INCF."
-  (let ((other-args nil)
-        (rest-arg nil)
-        (env (make-symbol "ENV"))          ; To beautify resulting arglist.
-        (reference (make-symbol "PLACE"))) ; Note that these will be nonexistent
-                                           ;  in the final expansion anyway.
-    ;; Parse out the variable names and &REST arg from the lambda list.
-    (do ((ll lambda-list (cdr ll))
-         (arg nil))
-        ((null ll))
-      (setq arg (car ll))
-      (cond ((eq arg '&optional))
-            ((eq arg '&rest)
-             (if (symbolp (cadr ll))
-               (setq rest-arg (cadr ll))
-               (error "Non-symbol &REST argument in definition of ~S." name))
-             (if (null (cddr ll))
-               (return nil)
-               (error "Illegal stuff after &REST argument.")))
-            ((memq arg '(&key &allow-other-keys &aux))
-             (error "~S not allowed in DEFINE-MODIFY-MACRO lambda list." arg))
-            ((symbolp arg)
-             (push arg other-args))
-            ((and (listp arg) (symbolp (car arg)))
-             (push (car arg) other-args))
-            (t (error "Illegal stuff in lambda list."))))
-    (setq other-args (nreverse other-args))
+  (binding* (((llks required optional rest)
+              (parse-lambda-list
+               lambda-list
+               :accept #.(lambda-list-keyword-mask '(&optional &rest))
+               :context "a DEFINE-MODIFY-MACRO lambda list"))
+             (args (append required
+                           (mapcar (lambda (x) (if (listp x) (car x) x))
+                                   optional)))
+             (place (make-symbol "PLACE"))
+             (env (make-symbol "ENV")))
+    (declare (ignore llks))
     `(#-sb-xc-host sb!xc:defmacro
       #+sb-xc-host defmacro-mundanely
-         ,name (,reference ,@lambda-list &environment ,env)
+         ,name (,place ,@lambda-list &environment ,env)
        ,@(when doc-string (list (the string doc-string)))
-       (expand-rmw-macro ',function
-                         '() ,reference (list* ,@other-args ,rest-arg) t
-                         ,env ',other-args))))
+       (expand-rmw-macro ',function '() ,place
+                         (list* ,@args ,(car rest)) t ,env ',args))))
 
 ;;;; DEFSETF
 
@@ -467,10 +451,12 @@
     ((cons list (cons list))
      (destructuring-bind (lambda-list (&rest stores) &body body) rest
        (binding* (((llks req opt rest key aux more env)
-                   (parse-lambda-list lambda-list
-                                      :reject #.(lambda-list-keyword-mask
-                                                 '(&aux &body &more))
-                                      :context 'defsetf))
+                   (parse-lambda-list
+                    lambda-list
+                    :accept #.(lambda-list-keyword-mask
+                               '(&optional &rest &key &allow-other-keys
+                                 &environment))
+                    :context "a DEFSETF lambda list"))
                   ((forms decls doc) (parse-body body))
                   ((outer-decls inner-decls)
                    (extract-var-decls decls (append env stores)))

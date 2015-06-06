@@ -23,6 +23,10 @@
 
 (in-package "SB-PCL")
 
+;;; FIXME: according to ANSI 3.4.10 this is supposed to allow &WHOLE
+;;; in the long syntax. But it clearly does not, because if you write
+;;; (&WHOLE v) then you get (LAMBDA (&WHOLE V ...) ...) which is illegal
+;;;
 (defmacro define-method-combination (&whole form &rest args)
   (declare (ignore args))
   `(progn

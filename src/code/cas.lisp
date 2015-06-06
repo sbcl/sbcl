@@ -165,6 +165,13 @@ EXPERIMENTAL: Interface subject to change."
                  ,@decls
                  ,body))))))
 
+;; FIXME: this interface is bogus - short-form DEFSETF/CAS does not
+;; want a lambda-list. You just blindly substitute
+;;  (CAS (PLACE arg1 ... argN) old new) -> (F arg1 ... argN old new).
+;; What role can this lambda-list have when there is no user-provided
+;; code to read the variables?
+;; And as mentioned no sbcl-devel, &REST is beyond bogus, it's broken.
+;;
 (def!macro defcas (accessor lambda-list function &optional docstring)
   #!+sb-doc
   "Analogous to short-form DEFSETF. Defines FUNCTION as responsible
@@ -178,10 +185,7 @@ user of DEFCAS to ensure that the function specified is atomic.
 EXPERIMENTAL: Interface subject to change."
   (multiple-value-bind (llks reqs opts rest)
       (parse-lambda-list lambda-list
-                         :reject
-                         #.(lambda-list-keyword-mask
-                            '(&key &allow-other-keys &aux &environment
-                              &body &more &whole))
+                         :accept #.(lambda-list-keyword-mask '(&optional &rest))
                          :context "a DEFCAS lambda-list")
     (declare (ignore llks))
     `(define-cas-expander ,accessor ,lambda-list

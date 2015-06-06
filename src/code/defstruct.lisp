@@ -1521,7 +1521,10 @@ or they must be declared locally notinline at each call site.~@:>")
 (defun create-boa-constructor (defstruct boa creator)
   (declare (type function creator))
   (multiple-value-bind (llks req opt rest keys aux)
-      (parse-lambda-list (second boa))
+      (parse-lambda-list (second boa)
+                         :accept
+                         #.(lambda-list-keyword-mask
+                            '(&optional &rest &key &allow-other-keys &aux)))
     (collect ((arglist)
               (vars)
               (skipped-vars)
