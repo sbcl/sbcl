@@ -13,10 +13,10 @@
 
 ; WHITE-BOX TESTS
 
-(in-package "SB-THREAD")
-(shadowing-import 'assertoid:assert-error)
-(use-package :test-util)
-(use-package "ASSERTOID")
+(cl:in-package #:sb-thread)
+(cl:shadowing-import 'assertoid:assert-error)
+(cl:use-package '#:test-util)
+(cl:use-package '#:assertoid)
 
 (setf sb-unix::*on-dangerous-wait* :error)
 
@@ -151,17 +151,17 @@
                                                              (svref x 1)))
 (format t "~&compare-and-swap tests done~%")
 
-(with-test (:name (:threads :more-trivia)))
-(let ((old-threads (list-all-threads))
-      (thread (make-thread (lambda ()
-                             (assert (find *current-thread* *all-threads*))
-                             (sleep 2))))
-      (new-threads (list-all-threads)))
-  (assert (thread-alive-p thread))
-  (assert (eq thread (first new-threads)))
-  (assert (= (1+ (length old-threads)) (length new-threads)))
-  (sleep 3)
-  (assert (not (thread-alive-p thread))))
+(with-test (:name (:threads :more-trivia))
+  (let ((old-threads (list-all-threads))
+        (thread (make-thread (lambda ()
+                               (assert (find *current-thread* *all-threads*))
+                               (sleep 2))))
+        (new-threads (list-all-threads)))
+    (assert (thread-alive-p thread))
+    (assert (eq thread (first new-threads)))
+    (assert (= (1+ (length old-threads)) (length new-threads)))
+    (sleep 3)
+    (assert (not (thread-alive-p thread)))))
 
 (with-test (:name (join-thread :abort :default))
   (let* ((sym (gensym))
@@ -206,6 +206,7 @@
       (funcall function)
       (prog1 (- (get-internal-run-time) start-time)
         (sb-thread:condition-broadcast queue)))))
+
 (defun fact (n)
   "A function that does work with the CPU."
   (if (zerop n) 1 (* n (fact (1- n)))))
