@@ -23,3 +23,21 @@
     (ignore-errors (frob-1-0-7-8 1))
   (declare (ignore whatever))
   (princ error)) ; shouldn't cause an error
+
+(with-test (:name :destruring-bind-atom-good-error)
+  (let ((c (make-condition 'sb-kernel::arg-count-error
+                           :args 'x
+                           :lambda-list '(a . b)
+                           :minimum 1
+                           :maximum nil
+                           :name 'foo
+                           :kind 'macro)))
+    (write-to-string c :escape nil))
+  (let ((c (make-condition 'sb-kernel::arg-count-error
+                           :args '(x . y)
+                           :lambda-list '(a b . c)
+                           :minimum 1
+                           :maximum nil
+                           :name 'foo
+                           :kind 'macro)))
+    (write-to-string c :escape nil)))

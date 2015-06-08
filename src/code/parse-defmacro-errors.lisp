@@ -62,27 +62,26 @@
    (maximum :reader arg-count-error-maximum :initarg :maximum))
   (:report
    (lambda (condition stream)
-     (!printing-defmacro-lambda-list-bind-error (condition stream)
+    (!printing-defmacro-lambda-list-bind-error (condition stream)
+      (let ((min (arg-count-error-minimum condition))
+            (max (arg-count-error-maximum condition))
+            (actual (arg-count-error-args condition)))
+            
        (format stream
                "invalid number of elements in ~2I~_~:S ~
                 ~I~_to satisfy lambda list ~2I~_~:S: ~I~_"
-               (arg-count-error-args condition)
-               (arg-count-error-lambda-list condition))
-       (cond ((null (arg-count-error-maximum condition))
-              (format stream "at least ~W expected"
-                      (arg-count-error-minimum condition)))
-             ((= (arg-count-error-minimum condition)
-                 (arg-count-error-maximum condition))
-              (format stream "exactly ~W expected"
-                      (arg-count-error-minimum condition)))
+               actual (arg-count-error-lambda-list condition))
+       (format stream
+               (cond ((null max) "at least ~W expected")
+                     ((= min max) "exactly ~W expected")
+                     (t "between ~W and ~W expected"))
+               min max)
+       (cond ((and (atom actual) actual)
+              (format stream ", but got a non-list"))
+             ((cdr (last actual))
+              (format stream ", but got an improper list"))
              (t
-              (format stream "between ~W and ~W expected"
-                      (arg-count-error-minimum condition)
-                      (arg-count-error-maximum condition))))
-       (format stream ", but ~a found"
-               (if (null (cdr (last (arg-count-error-args condition))))
-                   (length (arg-count-error-args condition))
-                   "not a proper list"))))))
+              (format stream ", but got ~d" (length actual)))))))))
 
 (define-condition defmacro-lambda-list-broken-key-list-error
                   (defmacro-lambda-list-bind-error)
@@ -107,6 +106,9 @@
                          (:odd-length
                           "odd number of elements in keyword/value list: ~S")
                          (:unknown-keyword
+                          ;; Todo: print the keyword portion of the actual args
+                          ;;  "unknown keyword foo in (:A 1 :B ...);
+                          ;;   expected one of ..."
                           "~{unknown keyword: ~S; expected one of ~
                            ~{~S~^, ~}~}"))
                        (defmacro-lambda-list-broken-key-list-error-info
