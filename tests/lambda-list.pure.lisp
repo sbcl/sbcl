@@ -72,3 +72,18 @@
                     (declare (ignore x xp))
                     nil)))
    warning))
+
+(with-test (:name :exact-unparse)
+  (labels ((round-trip (list)
+             (multiple-value-bind (llks req opt rest keys aux)
+                 (sb-c::parse-lambda-list
+                  list
+                  :accept (sb-c::lambda-list-keyword-mask 'destructuring-bind)
+                  :context 'destructuring-bind)
+               (sb-c::build-lambda-list llks req opt rest keys aux)))
+           (try (list)
+             (assert (equal list (round-trip list)))))
+    (try '(a b . c))
+    (try '(a b &rest r))
+    (try '(a b &body b))
+    (try '(a b &body b &key foo))))

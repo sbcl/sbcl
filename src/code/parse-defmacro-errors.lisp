@@ -66,7 +66,6 @@
       (let ((min (arg-count-error-minimum condition))
             (max (arg-count-error-maximum condition))
             (actual (arg-count-error-args condition)))
-            
        (format stream
                "invalid number of elements in ~2I~_~:S ~
                 ~I~_to satisfy lambda list ~2I~_~:S: ~I~_"

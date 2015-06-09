@@ -271,21 +271,3 @@ the stack without triggering overflow protection.")
           (bug "~S is a legal function name, and cannot be used as a ~
                 debug name." name))
         name))))
-
-;;; Some accessors to distinguish a parse of (values &optional) from (values)
-;;; and (lambda (x &key)) from (lambda (x)). If any lambda list keyword was seen
-;;; in the argument to PARSE-LAMBDA-LIST then it returns a non-nil flag
-;;; signifying whether &KEY and &ALLOW-OTHER-KEYS were present.
-;;; Otherwise it returns NIL for absence of all lambda list keywords.
-(declaim (inline ll-kwds-keyp ll-kwds-allowp))
-(defun ll-kwds-allowp (x) (eq x '&allow-other-keys))
-(defun ll-kwds-keyp (x) (or (eq x '&key) (ll-kwds-allowp x)))
-
-(defconstant-eqx lambda-list-parser-states
-    #(:required &optional &rest &more &key &aux &environment &whole
-      &allow-other-keys &body :post-env :post-rest :post-more)
-  #'equalp)
-(defun lambda-list-keyword-mask (list)
-  (loop for symbol in list
-        sum (ash 1 (position symbol lambda-list-parser-states))))
-

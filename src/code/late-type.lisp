@@ -394,7 +394,7 @@
       *wild-type*
       (multiple-value-bind (llks required optional rest)
           (parse-args-types values :values-type)
-        (if llks
+        (if (plusp llks)
             (make-values-type :required required :optional optional :rest rest)
             (make-short-values-type required)))))
 

@@ -450,7 +450,7 @@
         (%defsetf ',access-fn nil nil ',(car rest) ',(cadr rest))))
     ((cons list (cons list))
      (destructuring-bind (lambda-list (&rest stores) &body body) rest
-       (binding* (((llks req opt rest key aux more env)
+       (binding* (((llks req opt rest key aux env)
                    (parse-lambda-list
                     lambda-list
                     :accept #.(lambda-list-keyword-mask
@@ -463,7 +463,7 @@
                   (subforms (copy-symbol 'subforms))
                   (env-var (if env (car env) (copy-symbol 'env)))
                   (lambda-list (build-lambda-list llks req opt rest key)))
-         (declare (ignore aux more))
+         (declare (ignore aux))
          `(eval-when (:compile-toplevel :load-toplevel :execute)
             (%defsetf ',access-fn
                       (cons ,(length stores)

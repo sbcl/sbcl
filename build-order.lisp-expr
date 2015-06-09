@@ -129,6 +129,7 @@
  ("src/code/barrier" :not-host)
  ("src/code/parse-body")       ; on host for PARSE-BODY
  ("src/code/early-extensions") ; on host for COLLECT, SYMBOLICATE, etc.
+ ("src/compiler/parse-lambda-list") ; needed by PARSE-DEFMACRO
  ("src/code/parse-defmacro")   ; on host for PARSE-DEFMACRO
  ("src/compiler/deftype")      ; on host for SB!XC:DEFTYPE
  ("src/code/restart" :not-host) ; %DEFCONSTANT can bind a restart
@@ -377,11 +378,6 @@
  ("src/code/condition" :not-host)
 
  ("src/compiler/generic/primtype")
-
- ;; the implementation of the compiler-affecting part of forms like
- ;; DEFMACRO and DEFTYPE; must be loaded before we can start
- ;; defining types
- ("src/compiler/parse-lambda-list")
 
  ;; for DEFSTRUCT ALIEN-TYPE, needed by host-type.lisp
  ("src/code/host-alieneval")

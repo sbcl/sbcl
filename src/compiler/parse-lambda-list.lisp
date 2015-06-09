@@ -11,20 +11,46 @@
 
 (/show0 "parse-lambda-list.lisp 12")
 
+(defconstant-eqx lambda-list-parser-states
+    #(:required &optional &rest &more &key &aux &environment &whole
+      &allow-other-keys &body :post-env :post-rest :post-more)
+  #'equalp)
+(eval-when (#-sb-xc :compile-toplevel :load-toplevel :execute)
+  (defun lambda-list-keyword-mask (list)
+    (if (eq list 'destructuring-bind)
+        (lambda-list-keyword-mask
+         '(&optional &rest &body &key &allow-other-keys &aux &whole))
+        (loop for symbol in list
+              sum (ash 1 (position symbol lambda-list-parser-states))))))
+
+(defun ll-kwds-restp (bits)
+  (when (logtest (lambda-list-keyword-mask '(&rest &body &more)) bits)
+    ;; Test &BODY first because if present, &REST bit is also set.
+    (cond ((logtest #.(lambda-list-keyword-mask '(&body)) bits) '&body)
+          ((logtest #.(lambda-list-keyword-mask '(&more)) bits) '&more)
+          (t '&rest))))
+
+;;; Some accessors to distinguish a parse of (values &optional) from (values)
+;;; and (lambda (x &key)) from (lambda (x)).
+(declaim (inline ll-kwds-keyp ll-kwds-allowp))
+(defun ll-kwds-keyp (bits)
+  (logtest #.(lambda-list-keyword-mask '(&key)) bits))
+(defun ll-kwds-allowp (bits)
+  (logtest #.(lambda-list-keyword-mask '(&allow-other-keys)) bits))
+
 ;;; Break something like a lambda list (but not necessarily actually a
 ;;; lambda list, e.g. the representation of argument types which is
 ;;; used within an FTYPE specification) into its component parts. We
 ;;; return eight values:
-;;;  1. a symbol in {T,&KEY,&ALLOW-OTHER-KEYS,NIL} indicating presence
-;;      of any lambda-list-keyword except for &KEY, or specifically &KEY
-;;      without &ALLOW-OTHER-KEYS, or both &KEY + &ALLOW-, or nothing.
+;;;  1. a bitmask of lambda-list keywords which were present;
+;;;  2. a list of the required args;
 ;;;  3. a list of the &OPTIONAL arg specs;
 ;;;  4. a singleton list of the &REST arg if present;
+;;;     or a 2-list of the &MORE context and count if present
 ;;;  5. a list of the &KEY arg specs;
 ;;;  6. a list of the &AUX specifiers;
-;;;  7. the &MORE context and count vars if present;
-;;;  8. a singleton list of the &ENVIRONMENT arg if present
-;;;  9. a singleton list of the &WHOLE arg if present
+;;;  7. a singleton list of the &ENVIRONMENT arg if present
+;;;  8. a singleton list of the &WHOLE arg if present
 ;;;
 ;;; The top level lambda list syntax is checked for validity, but the
 ;;; arg specifiers are just passed through untouched. If something is
@@ -33,13 +59,8 @@
 (declaim (ftype (sfunction
                  (list &key (:context t) (:accept integer) (:silent boolean)
                             (:condition-class symbol))
-                 (values symbol list list list list list list list list))
+                 (values (unsigned-byte 13) list list list list list list list))
                 parse-lambda-list))
-
-#-sb-xc
-(eval-when (:compile-toplevel :load-toplevel :execute)
-  (defun lambda-list-state-number (ll-keyword)
-    (position ll-keyword lambda-list-parser-states)))
 
 ;;; Note: CLHS 3.4.4 [macro lambda list] allows &ENVIRONMENT anywhere,
 ;;; but 3.4.7 [defsetf lambda list] has it only at the end.
@@ -56,33 +77,46 @@
                           '(&optional &rest &more &key &allow-other-keys &aux)))
                (condition-class 'simple-program-error)
                silent
-          &aux (seen 0) required optional rest more keys aux env whole tail)
+          &aux (seen 0) required optional rest more keys aux env whole tail
+               (rest-bits 0))
   (declare (optimize speed))
   (declare (type (unsigned-byte 13) accept seen))
-  (labels ((need-arg (state)
-             (croak "expecting variable after ~A in: ~S" state list))
-           (need-symbol (x why)
-             (unless (symbolp x)
-               (croak "~A is not a symbol: ~S" why x)))
-           (croak (string &optional (a1 0 a1p) (a2 0 a2p) (a3 0 a3p))
-             (let ((l (if a1p (list a1 a2 a3))))
-               (if (and l (not a3p)) (rplacd (if a2p (cdr l) l) nil))
-               (compiler-error condition-class
-                               :format-control string :format-arguments l))))
-    (macrolet ((state (state) (lambda-list-state-number state))
-               (state= (x y) `(= ,x ,(lambda-list-state-number y)))
-               (bits (&rest list) (lambda-list-keyword-mask list))
-               (begin-list (val)
-                 `(case state
-                    ,@(loop for i from 0
-                            for s in '(required optional rest more
-                                       keys aux env whole)
-                            collect `(,i (setq ,s ,val))))))
-
+  (macrolet ((state (name) (position name lambda-list-parser-states))
+             (state= (x y) `(= ,x (state ,y)))
+             (bits (&rest list) (lambda-list-keyword-mask list))
+             (begin-list (val)
+               `(case state
+                  ,@(loop for i from 0
+                          for s in '(required optional rest more
+                                     keys aux env whole)
+                          collect `(,i (setq ,s ,val))))))
+    (labels ((destructuring-p ()
+               (logbitp (state &whole) accept))
+             (need-arg (state)
+               (croak "expecting variable after ~A in: ~S" state list))
+             (need-symbol (x why)
+               (unless (symbolp x)
+                 (croak "~A is not a symbol: ~S" why x)))
+             (need-bindable (x why)
+               ;; "Bindable" means symbol or cons, but only if destructuring.
+               (unless (or (symbolp x) (and (consp x) (destructuring-p)))
+                 (if (destructuring-p)
+                     (croak "~A is not a symbol or list: ~S" why x)
+                     (croak "~A is not a symbol: ~S" why x))))
+             (croak (string &optional (a1 0 a1p) (a2 0 a2p) (a3 0 a3p))
+               (let ((l (if a1p (list a1 a2 a3))))
+                 (if (and l (not a3p)) (rplacd (if a2p (cdr l) l) nil))
+                 ;; KLUDGE: When this function was limited to parsing
+                 ;; ordinary lambda lists, this error call was COMPILER-ERROR.
+                 ;; To make all tests pass, it has to decide what to be.
+                 ;; It's possible the tests are poorly designed and are
+                 ;; acting as "change detectors"
+                 (funcall (if (destructuring-p) 'error 'compiler-error)
+                          condition-class
+                          :format-control string :format-arguments l))))
       (prog ((input list)
              (saved-state 0)
              (state (state :required))
-             (rest-bits 0)
              (arg nil)
              (last-arg nil))
          (declare (type (mod 13) state saved-state))
@@ -170,7 +204,7 @@
                (go LOOP)))
            ;; Fell through, so warn if desired, and fall through some more.
            (unless silent
-             (compiler-style-warn
+             (style-warn
               "suspicious variable ~S in lambda list: ~S." arg list)))
 
          ;; Handle a lambda variable
@@ -195,26 +229,25 @@
 
       #-sb-xc-host ;; Supress &OPTIONAL + &KEY syle-warning on xc host
       (when (and (logbitp (state &key) seen) optional (not silent))
-        (compiler-style-warn
+        (style-warn
          "&OPTIONAL and &KEY found in the same lambda list: ~S" list))
 
       ;; For CONTEXT other than :VALUES-TYPE/:FUNCTION-TYPE we reject
       ;; illegal list elements. Type specifiers have arbitrary shapes,
       ;; such as (VALUES (ARRAY (MUMBLE) (1 2)) &OPTIONAL (MEMBER X Y Z)).
       ;; But why don't we reject constant symbols here?
-      (unless (member context '(:values-type :function-type :macro
-                                destructuring-bind))
+      (unless (member context '(:values-type :function-type))
         (dolist (i required)
-          (need-symbol i "Required argument"))
+          (need-bindable i "Required argument"))
         (dolist (i optional)
           (typecase i
             (symbol)
             (cons (destructuring-bind (var &optional init-form supplied-p) i
                     (declare (ignore init-form supplied-p))
-                    (need-symbol var "&OPTIONAL parameter name")))
+                    (need-bindable var "&OPTIONAL parameter name")))
             (t (croak "&OPTIONAL parameter is not a symbol or cons: ~S" i))))
         (when rest
-          (need-symbol (car rest) "&REST argument"))
+          (need-bindable (car rest) "&REST argument"))
         (dolist (i keys)
           (typecase i
             (symbol)
@@ -224,23 +257,26 @@
                (if (consp var-or-kv)
                    (destructuring-bind (keyword-name var) var-or-kv
                      (declare (ignore keyword-name))
-                     (need-symbol var "&KEY parameter name"))
+                     (need-bindable var "&KEY parameter name"))
                    (need-symbol var-or-kv "&KEY parameter name"))))
             (t (croak "&KEY parameter is not a symbol or cons: ~S" i)))))
 
     ;; Voila.
-      (values (cond ((logtest seen (bits &allow-other-keys)) '&allow-other-keys)
-                    ((logtest seen (bits &key)) '&key)
-                    ((logtest seen (bits &optional &rest &aux)) t))
-              required optional rest keys aux more env whole))))
+      (values (logior seen (if (oddp rest-bits) (bits &body) 0))
+              required optional (or rest more) keys aux env whole))))
 
 ;; Invert the parsing operation.
 (defun build-lambda-list (llks required &optional optional rest keys aux)
   (append required
           (if optional (cons '&optional optional))
-          (if rest (cons '&rest rest))
-          (if (ll-kwds-keyp llks) (cons '&key keys)) ; KEYS can be nil
-          (if (ll-kwds-allowp llks) '(&allow-other-keys))
-          (if aux (cons '&aux aux))))
+          (let ((restp (ll-kwds-restp llks)))
+            (if (and rest (not restp)) ; lambda list was "dotted"
+                (car rest)
+                (append
+                 (when rest (cons restp rest))
+                 (if (ll-kwds-keyp llks) (cons '&key keys)) ; KEYS can be nil
+                 (if (ll-kwds-allowp llks) '(&allow-other-keys))
+                 ;; Should &AUX be inserted even if empty? Probably not.
+                 (if aux (cons '&aux aux)))))))
 
 (/show0 "parse-lambda-list.lisp end of file")

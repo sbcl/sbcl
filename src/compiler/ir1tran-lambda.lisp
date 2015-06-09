@@ -87,7 +87,7 @@
 (declaim (ftype (sfunction (list) (values list boolean boolean list list))
                 make-lambda-vars))
 (defun make-lambda-vars (list)
-  (multiple-value-bind (llks required optional rest keys aux more-vars)
+  (multiple-value-bind (llks required optional rest/more keys aux)
       (parse-lambda-list list)
     (collect ((vars)
               (names-so-far)
@@ -129,19 +129,19 @@
                 (names-so-far name)
                 (parse-default spec info))))
 
-        (when rest
-          (let ((var (varify-lambda-arg (car rest) (names-so-far))))
+        (when (eq (ll-kwds-restp llks) '&rest)
+          (let ((var (varify-lambda-arg (car rest/more) (names-so-far))))
             (setf (lambda-var-arg-info var) (make-arg-info :kind :rest))
             (vars var)
             (names-so-far (lambda-var-%source-name var))))
 
-        (when more-vars
-          (let ((var (varify-lambda-arg (car more-vars) (names-so-far))))
+        (when (eq (ll-kwds-restp llks) '&more)
+          (let ((var (varify-lambda-arg (car rest/more) (names-so-far))))
             (setf (lambda-var-arg-info var)
                   (make-arg-info :kind :more-context))
             (vars var)
             (names-so-far (lambda-var-%source-name var)))
-          (let ((var (varify-lambda-arg (cadr more-vars) (names-so-far))))
+          (let ((var (varify-lambda-arg (cadr rest/more) (names-so-far))))
             (setf (lambda-var-arg-info var)
                   (make-arg-info :kind :more-count))
             (vars var)
@@ -1134,15 +1134,14 @@
 ;;; return type is *, and each individual arguments type is T -- but we get
 ;;; the argument counts and keywords.
 (defun ftype-from-lambda-list (lambda-list)
-  (multiple-value-bind (llks req opt rest key-list aux more)
+  (multiple-value-bind (llks req opt rest key-list)
       (parse-lambda-list lambda-list)
-    (declare (ignore aux))
     (flet ((list-of-t (list) (mapcar (constantly t) list)))
       (let ((reqs (list-of-t req))
             (opts (when opt (cons '&optional (list-of-t opt))))
             ;; When it comes to building a type, &REST means pretty much the
             ;; same thing as &MORE.
-            (rest (when (or more rest) '(&rest t)))
+            (rest (when rest '(&rest t)))
             (keys (when (ll-kwds-keyp llks)
                     (cons '&key (mapcar (lambda (spec)
                                           (let ((key/var (if (consp spec)

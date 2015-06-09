@@ -285,6 +285,7 @@
 ;;; Used only for implementing calls to interpreted functions.
 (defun parse-arguments (arguments lambda-list)
   (multiple-value-bind (llks required optional rest keyword aux)
+      ;; FIXME: shouldn't this just pass ":silent t" ?
       (handler-bind ((style-warning #'muffle-warning))
         (sb!int:parse-lambda-list lambda-list))
     (let* ((original-arguments arguments)
