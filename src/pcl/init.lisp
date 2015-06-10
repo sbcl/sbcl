@@ -292,12 +292,12 @@
     ;; any point we come across &allow-other-keys, we can
     ;; just quit.
     (dolist (method methods)
-      (multiple-value-bind (nreq nopt keysp restp allow-other-keys keys)
+      (multiple-value-bind (llks nreq nopt keys)
           (analyze-lambda-list (if (consp method)
                                    (early-method-lambda-list method)
                                    (method-lambda-list method)))
-        (declare (ignore nreq nopt keysp restp))
-        (when allow-other-keys
+        (declare (ignore nreq nopt))
+        (when (ll-kwds-allowp llks)
           (return-from check-initargs-values (values nil t)))
         (setq legal (append keys legal))))
     (values legal nil)))

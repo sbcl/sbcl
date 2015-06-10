@@ -1624,58 +1624,24 @@ bootstrapping.
                   (intern-pv-table :slot-name-lists snl))))))))
 
 (defun analyze-lambda-list (lambda-list)
-  (flet (;; FIXME: Is this redundant with SB-C::MAKE-KEYWORD-FOR-ARG?
-         (parse-key-arg (arg)
-           (if (listp arg)
-               (if (listp (car arg))
-                   (caar arg)
-                   (keywordicate (car arg)))
-               (keywordicate arg))))
-    (let ((nrequired 0)
-          (noptional 0)
-          (keysp nil)
-          (restp nil)
-          (nrest 0)
-          (allow-other-keys-p nil)
-          (keywords ())
-          (keyword-parameters ())
-          (state 'required))
-      (dolist (x lambda-list)
-        (if (memq x lambda-list-keywords)
-            (case x
-              (&optional         (setq state 'optional))
-              (&key              (setq keysp t
-                                       state 'key))
-              (&allow-other-keys (setq allow-other-keys-p t))
-              (&rest             (setq restp t
-                                       state 'rest))
-              (&aux           (return t))
-              (otherwise
-                (error "encountered the non-standard lambda list keyword ~S"
-                       x)))
-            (ecase state
-              (required  (incf nrequired))
-              (optional  (incf noptional))
-              (key       (push (parse-key-arg x) keywords)
-                         (push x keyword-parameters))
-              (rest      (incf nrest)))))
-      (when (and restp (zerop nrest))
-        (error "Error in lambda-list:~%~
-                After &REST, a DEFGENERIC lambda-list ~
-                must be followed by at least one variable."))
-      (values nrequired noptional keysp restp allow-other-keys-p
-              (reverse keywords)
-              (reverse keyword-parameters)))))
+  (multiple-value-bind (llks required optional rest keywords)
+      ;; We say "&MUMBLE is not allowed in a generic function lambda list"
+      ;; whether this is called by DEFMETHOD or DEFGENERIC.
+      ;; [It is used for either. Why else recognize and silently ignore &AUX?]
+      (parse-lambda-list lambda-list
+                         :accept #.(lambda-list-keyword-mask
+                                    '(&optional &rest &key &allow-other-keys &aux))
+                         :silent t
+                         :context "a generic function lambda list")
+    (declare (ignore rest))
+    (values llks (length required) (length optional)
+            (mapcar #'parse-key-arg-spec keywords) keywords)))
 
-(defun keyword-spec-name (x)
-  (let ((key (if (atom x) x (car x))))
-    (if (atom key)
-        (keywordicate key)
-        (car key))))
-
+;; FIXME: this does more than return an FTYPE from a lambda list -
+;; it unions the type with an existing ctype object. It needs a better name,
+;; and to be reimplemented as "union and call sb-c::ftype-from-lambda-list".
 (defun ftype-declaration-from-lambda-list (lambda-list name)
-  (multiple-value-bind (nrequired noptional keysp restp allow-other-keys-p
-                                  keywords keyword-parameters)
+  (multiple-value-bind (llks nrequired noptional keywords keyword-parameters)
       (analyze-lambda-list lambda-list)
     (declare (ignore keyword-parameters))
     (let* ((old (info :function :type name)) ;FIXME:FDOCUMENTATION instead?
@@ -1688,19 +1654,19 @@ bootstrapping.
            (old-keysp (and old-ftype (fun-type-keyp old-ftype)))
            (old-allowp (and old-ftype
                             (fun-type-allowp old-ftype)))
-           (keywords (union old-keys (mapcar #'keyword-spec-name keywords))))
+           (keywords (union old-keys (mapcar #'parse-key-arg-spec keywords))))
       `(function ,(append (make-list nrequired :initial-element t)
                           (when (plusp noptional)
                             (append '(&optional)
                                     (make-list noptional :initial-element t)))
-                          (when (or restp old-restp)
+                          (when (or (ll-kwds-restp llks) old-restp)
                             '(&rest t))
-                          (when (or keysp old-keysp)
+                          (when (or (ll-kwds-keyp llks) old-keysp)
                             (append '(&key)
                                     (mapcar (lambda (key)
                                               `(,key t))
                                             keywords)
-                                    (when (or allow-other-keys-p old-allowp)
+                                    (when (or (ll-kwds-allowp llks) old-allowp)
                                       '(&allow-other-keys)))))
                  *))))
 
@@ -1814,6 +1780,9 @@ bootstrapping.
         collect (if (consp x) (list (car x)) x)
         if (eq x '&key) do (loop-finish)))
 
+(defun ll-keyp-or-restp (bits)
+  (logtest #.(lambda-list-keyword-mask '(&key &rest)) bits))
+                            
 (defun set-arg-info (gf &key new-method (lambda-list nil lambda-list-p)
                         argument-precedence-order)
   (let* ((arg-info (if (eq **boot-state** 'complete)
@@ -1829,7 +1798,7 @@ bootstrapping.
     (when (or lambda-list-p
               (and first-p
                    (eq (arg-info-lambda-list arg-info) :no-lambda-list)))
-      (multiple-value-bind (nreq nopt keysp restp allow-other-keys-p keywords)
+      (multiple-value-bind (llks nreq nopt keywords)
           (analyze-lambda-list lambda-list)
         (when (and methods (not first-p))
           (let ((gf-nreq (arg-info-number-required arg-info))
@@ -1837,7 +1806,7 @@ bootstrapping.
                 (gf-key/rest-p (arg-info-key/rest-p arg-info)))
             (unless (and (= nreq gf-nreq)
                          (= nopt gf-nopt)
-                         (eq (or keysp restp) gf-key/rest-p))
+                         (eq (ll-keyp-or-restp llks) gf-key/rest-p))
               (error "The lambda-list ~S is incompatible with ~
                      existing methods of ~S."
                      lambda-list gf))))
@@ -1851,10 +1820,10 @@ bootstrapping.
                 (compute-precedence lambda-list nreq argument-precedence-order)))
         (setf (arg-info-metatypes arg-info) (make-list nreq))
         (setf (arg-info-number-optional arg-info) nopt)
-        (setf (arg-info-key/rest-p arg-info) (not (null (or keysp restp))))
+        (setf (arg-info-key/rest-p arg-info) (ll-keyp-or-restp llks))
         (setf (arg-info-keys arg-info)
               (if lambda-list-p
-                  (if allow-other-keys-p t keywords)
+                  (if (ll-kwds-allowp llks) t keywords)
                   (arg-info-key/rest-p arg-info)))))
     (when new-method
       (check-method-arg-info gf arg-info new-method))
@@ -1862,7 +1831,7 @@ bootstrapping.
     arg-info))
 
 (defun check-method-arg-info (gf arg-info method)
-  (multiple-value-bind (nreq nopt keysp restp allow-other-keys-p keywords)
+  (multiple-value-bind (llks nreq nopt keywords)
       (analyze-lambda-list (if (consp method)
                                (early-method-lambda-list method)
                                (method-lambda-list method)))
@@ -1886,13 +1855,13 @@ bootstrapping.
           (lose
            "the method has ~A optional arguments than the generic function."
            (comparison-description nopt gf-nopt)))
-        (unless (eq (or keysp restp) gf-key/rest-p)
+        (unless (eq (ll-keyp-or-restp llks) gf-key/rest-p)
           (lose
            "the method and generic function differ in whether they accept~_~
             &REST or &KEY arguments."))
         (when (consp gf-keywords)
-          (unless (or (and restp (not keysp))
-                      allow-other-keys-p
+          (unless (or (and (ll-kwds-restp llks) (not (ll-kwds-keyp llks)))
+                      (ll-kwds-allowp llks)
                       (every (lambda (k) (memq k keywords)) gf-keywords))
             (lose "the method does not accept each of the &KEY arguments~2I~_~
                    ~S."

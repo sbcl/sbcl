@@ -16,6 +16,12 @@
       &allow-other-keys &body :post-env :post-rest :post-more)
   #'equalp)
 (eval-when (#-sb-xc :compile-toplevel :load-toplevel :execute)
+  ;; Note: you usually want #. around LAMBDA-LIST-KEYWORD-MASK because for
+  ;; a variety of reasons it shouldn't be a macro; and I don't want to rely
+  ;; on a compiler-macro for other build hosts since processing is optional;
+  ;; and declaring it inline is the wrong way to go since semantic analysis
+  ;; is too weak to prove it constant; and FOLDABLE would only work on sbcl;
+  ;; and iterating over a const list for every PARSE-LAMBDA-LIST annoys me.
   (defun lambda-list-keyword-mask (list)
     (if (eq list 'destructuring-bind)
         (lambda-list-keyword-mask
@@ -264,6 +270,18 @@
     ;; Voila.
       (values (logior seen (if (oddp rest-bits) (bits &body) 0))
               required optional (or rest more) keys aux env whole))))
+
+;; Split a keyword argument specifier into the keyword, the bound variable
+;; or destructuring pattern, the default, and supplied-p var. If present the
+;; supplied-p var is in a singleton list.
+;; DEFAULT should be specified as '* when parsing a DEFTYPE lambda-list.
+(defun parse-key-arg-spec (spec &optional default)
+  (etypecase spec
+    (symbol (values (keywordicate spec) spec default nil))
+    (cons (destructuring-bind (var &optional (def default) . sup-p-var) spec
+              (if (symbolp var)
+                  (values (keywordicate var) var def sup-p-var)
+                  (values (car var) (cadr var) def sup-p-var))))))
 
 ;; Invert the parsing operation.
 (defun build-lambda-list (llks required &optional optional rest keys aux)

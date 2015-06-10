@@ -475,14 +475,14 @@
 
 (defun real-add-method (generic-function method &optional skip-dfun-update-p)
   (flet ((similar-lambda-lists-p (old-method new-lambda-list)
-           (multiple-value-bind (a-nreq a-nopt a-keyp a-restp)
-               (analyze-lambda-list (method-lambda-list old-method))
-             (multiple-value-bind (b-nreq b-nopt b-keyp b-restp)
-                 (analyze-lambda-list new-lambda-list)
+           (binding* (((a-llks a-nreq a-nopt)
+                       (analyze-lambda-list (method-lambda-list old-method)))
+                      ((b-llks b-nreq b-nopt)
+                       (analyze-lambda-list new-lambda-list)))
                (and (= a-nreq b-nreq)
                     (= a-nopt b-nopt)
-                    (eq (or a-keyp a-restp)
-                        (or b-keyp b-restp)))))))
+                    (eq (ll-keyp-or-restp a-llks)
+                        (ll-keyp-or-restp b-llks))))))
     (multiple-value-bind (lock qualifiers specializers new-lambda-list
                           method-gf name)
         (values-for-add-method generic-function method)
@@ -630,6 +630,8 @@
                                      :key #'method-lambda-list)))
                    (ftype
                     (specifier-type
+                     ;; SERIOUSLY? Do we not already have like at least
+                     ;; two other variations on this code?
                      `(function
                        (,@(mapcar tfun gf.required)
                           ,@(if gf.optional
@@ -644,7 +646,7 @@
                                       (remove-duplicates
                                        (nconc
                                         (mapcan #'function-keywords methods)
-                                        (mapcar #'keyword-spec-name gf.keys))))))
+                                        (mapcar #'parse-key-arg-spec gf.keys))))))
                                 (when all-keys
                                   (setq keysp t)
                                   `(&key ,@all-keys))))
@@ -1680,28 +1682,26 @@
   new-value)
 
 (defmethod function-keywords ((method standard-method))
-  (multiple-value-bind (nreq nopt keysp restp allow-other-keys-p
-                        keywords)
+  (multiple-value-bind (llks nreq nopt keywords)
       (analyze-lambda-list (if (consp method)
                                (early-method-lambda-list method)
                                (method-lambda-list method)))
-    (declare (ignore nreq nopt keysp restp))
-    (values keywords allow-other-keys-p)))
+    (declare (ignore nreq nopt))
+    (values keywords (ll-kwds-allowp llks))))
 
 (defmethod function-keyword-parameters ((method standard-method))
-  (multiple-value-bind (nreq nopt keysp restp allow-other-keys-p
-                        keywords keyword-parameters)
+  (multiple-value-bind (llks nreq nopt keywords keyword-parameters)
       (analyze-lambda-list (if (consp method)
                                (early-method-lambda-list method)
                                (method-lambda-list method)))
-    (declare (ignore nreq nopt keysp restp keywords))
-    (values keyword-parameters allow-other-keys-p)))
+    (declare (ignore nreq nopt keywords))
+    (values keyword-parameters (ll-kwds-allowp llks))))
 
+;; FIXME: this is just: "parse, set keys to nil, unparse" (I think).
 (defun method-ll->generic-function-ll (ll)
-  (multiple-value-bind
-      (nreq nopt keysp restp allow-other-keys-p keywords keyword-parameters)
+  (multiple-value-bind (llks nreq nopt keywords keyword-parameters)
       (analyze-lambda-list ll)
-    (declare (ignore nreq nopt keysp restp allow-other-keys-p keywords))
+    (declare (ignore llks nreq nopt keywords))
     (remove-if (lambda (s)
                  (or (memq s keyword-parameters)
                      (eq s '&allow-other-keys)))
