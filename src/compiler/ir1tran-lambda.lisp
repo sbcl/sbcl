@@ -28,7 +28,7 @@
 (declaim (ftype (sfunction (t list &optional t) lambda-var) varify-lambda-arg))
 (defun varify-lambda-arg (name names-so-far &optional (context "lambda list"))
   (declare (inline member))
-  (unless (symbolp name)
+  (unless (symbolp name) ;; FIXME: probably unreachable. Change to AVER?
     (compiler-error "~S is not a symbol, and cannot be used as a variable." name))
   (when (member name names-so-far :test #'eq)
     (compiler-error "The variable ~S occurs more than once in the ~A."
@@ -125,23 +125,14 @@
                 (names-so-far name)
                 (parse-default spec info))))
 
-        (when (eq (ll-kwds-restp llks) '&rest)
-          (let ((var (varify-lambda-arg (car rest/more) (names-so-far))))
-            (setf (lambda-var-arg-info var) (make-arg-info :kind :rest))
-            (vars var)
-            (names-so-far (lambda-var-%source-name var))))
-
-        (when (eq (ll-kwds-restp llks) '&more)
-          (let ((var (varify-lambda-arg (car rest/more) (names-so-far))))
-            (setf (lambda-var-arg-info var)
-                  (make-arg-info :kind :more-context))
-            (vars var)
-            (names-so-far (lambda-var-%source-name var)))
-          (let ((var (varify-lambda-arg (cadr rest/more) (names-so-far))))
-            (setf (lambda-var-arg-info var)
-                  (make-arg-info :kind :more-count))
-            (vars var)
-            (names-so-far (lambda-var-%source-name var))))
+        (when rest/more
+          (mapc (lambda (name kind)
+                  (let ((var (varify-lambda-arg name (names-so-far))))
+                    (setf (lambda-var-arg-info var) (make-arg-info :kind kind))
+                    (vars var)
+                    (names-so-far name)))
+                rest/more (let ((morep (eq (ll-kwds-restp llks) '&more)))
+                            (if morep '(:more-context :more-count) '(:rest)))))
 
         (dolist (spec keys)
           (cond
@@ -179,17 +170,12 @@
                 (parse-default spec info))))))
 
         (dolist (spec aux)
-          (cond ((atom spec)
-                 (let ((var (varify-lambda-arg spec nil)))
-                   (aux-vars var)
-                   (aux-vals nil)
-                   (names-so-far spec)))
-                (t
-                 (let* ((name (first spec))
-                        (var (varify-lambda-arg name nil)))
-                   (aux-vars var)
-                   (aux-vals (second spec))
-                   (names-so-far name)))))
+          (multiple-value-bind (name val)
+              (if (atom spec) spec (values (car spec) (cadr spec)))
+            (let ((var (varify-lambda-arg name nil)))
+              (aux-vars var)
+              (aux-vals val)
+              (names-so-far name))))
 
         (values (vars) (ll-kwds-keyp llks) (ll-kwds-allowp llks)
                 (aux-vars) (aux-vals))))))

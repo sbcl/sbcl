@@ -1630,17 +1630,14 @@ or they must be declared locally notinline at each call site.~@:>")
             (arglist '&aux)
             (dolist (arg aux)
               (typecase arg
-                ((cons symbol (cons t null))
+                ((cons symbol cons)
                  (let ((var (first arg)))
                    (arglist arg)
                    (vars var)
                    (decls `(type ,(get-slot var) ,var))))
-                ((cons symbol null)
-                 (skipped-vars (first arg)))
-                (symbol
-                 (skipped-vars arg))
                 (t
-                 (error "Malformed &AUX binding specifier: ~s." arg)))))))
+                 ;; (&AUX X) and (&AUX (X)) both skip the slot
+                 (skipped-vars (if (consp arg) (first arg) arg))))))))
 
       (funcall creator defstruct (first boa)
                (arglist) (ftype-args) (decls)

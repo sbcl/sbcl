@@ -1782,7 +1782,7 @@ bootstrapping.
 
 (defun ll-keyp-or-restp (bits)
   (logtest #.(lambda-list-keyword-mask '(&key &rest)) bits))
-                            
+
 (defun set-arg-info (gf &key new-method (lambda-list nil lambda-list-p)
                         argument-precedence-order)
   (let* ((arg-info (if (eq **boot-state** 'complete)

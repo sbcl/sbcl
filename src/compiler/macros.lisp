@@ -269,12 +269,7 @@
            ;; parse-lambda-just, and more.
            (keys (mapcar (lambda (spec)
                            (multiple-value-bind (key var)
-                               (if (atom spec)
-                                   (values (keywordicate spec) spec)
-                                   (let ((head (car spec)))
-                                     (if (atom head)
-                                         (values (keywordicate head) head)
-                                         (values (car head) (cadr head)))))
+                               (parse-key-arg-spec spec)
                              (cons var key)))
                          keys))
            final-mandatory-arg)
