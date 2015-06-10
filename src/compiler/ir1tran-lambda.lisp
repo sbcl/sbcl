@@ -103,11 +103,7 @@
                           (supplied-var (varify-lambda-arg supplied-p
                                                            (names-so-far))))
                      (setf (arg-info-supplied-p info) supplied-var)
-                     (names-so-far supplied-p)
-                     (when (> (length (the list spec)) 3)
-                       (compiler-error
-                        "The list ~S is too long to be an arg specifier."
-                        spec)))))))
+                     (names-so-far supplied-p))))))
 
         (dolist (name required)
           (let ((var (varify-lambda-arg name (names-so-far))))
@@ -170,8 +166,6 @@
               (parse-default spec info)))
            (t
             (let ((head (first spec)))
-              (unless (proper-list-of-length-p head 2)
-                (error "malformed &KEY argument specifier: ~S" spec))
               (let* ((name (second head))
                      (var (varify-lambda-arg name (names-so-far)))
                      (info (make-arg-info
@@ -191,9 +185,6 @@
                    (aux-vals nil)
                    (names-so-far spec)))
                 (t
-                 (unless (proper-list-of-length-p spec 1 2)
-                   (compiler-error "malformed &AUX binding specifier: ~S"
-                                   spec))
                  (let* ((name (first spec))
                         (var (varify-lambda-arg name nil)))
                    (aux-vars var)

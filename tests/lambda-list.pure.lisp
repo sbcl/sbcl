@@ -73,6 +73,12 @@
                     nil)))
    warning))
 
+(with-test (:name :aux-not-destructured)
+  (assert-error (sb-c::parse-lambda-list
+                 '(a &aux ((foo)))
+                 :context 'destructuring-bind
+                 :accept  (sb-int:lambda-list-keyword-mask 'destructuring-bind))))
+
 (with-test (:name :exact-unparse)
   (labels ((round-trip (list)
              (multiple-value-bind (llks req opt rest keys aux)

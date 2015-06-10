@@ -243,29 +243,36 @@
       ;; such as (VALUES (ARRAY (MUMBLE) (1 2)) &OPTIONAL (MEMBER X Y Z)).
       ;; But why don't we reject constant symbols here?
       (unless (member context '(:values-type :function-type))
-        (dolist (i required)
-          (need-bindable i "Required argument"))
-        (dolist (i optional)
-          (typecase i
-            (symbol)
-            (cons (destructuring-bind (var &optional init-form supplied-p) i
-                    (declare (ignore init-form supplied-p))
-                    (need-bindable var "&OPTIONAL parameter name")))
-            (t (croak "&OPTIONAL parameter is not a symbol or cons: ~S" i))))
-        (when rest
-          (need-bindable (car rest) "&REST argument"))
-        (dolist (i keys)
-          (typecase i
-            (symbol)
-            (cons
-             (destructuring-bind (var-or-kv &optional init-form supplied-p) i
-               (declare (ignore init-form supplied-p))
-               (if (consp var-or-kv)
-                   (destructuring-bind (keyword-name var) var-or-kv
-                     (declare (ignore keyword-name))
-                     (need-bindable var "&KEY parameter name"))
-                   (need-symbol var-or-kv "&KEY parameter name"))))
-            (t (croak "&KEY parameter is not a symbol or cons: ~S" i)))))
+        (dolist (arg required)
+          (need-bindable arg "Required argument"))
+        ;; FIXME: why not check symbol-ness of supplied-p variables now?
+        (flet ((defaultp (x what-kind)
+                 (cond ((symbolp x) nil)
+                       ((listp x) t)
+                       (t (croak "~A parameter is not a symbol or cons: ~S"
+                                 what-kind x)))))
+          (dolist (arg optional)
+            (when (defaultp arg '&optional)
+              (destructuring-bind (var &optional init-form supplied-p) arg
+                (declare (ignore init-form supplied-p))
+                (need-bindable var "&OPTIONAL parameter name"))))
+          (when rest
+            (need-bindable (car rest) "&REST argument"))
+          (dolist (arg keys)
+            (when (defaultp arg '&key)
+              (destructuring-bind (var-or-kv &optional init-form supplied-p) arg
+                (declare (ignore init-form supplied-p))
+                (if (atom var-or-kv)
+                    (need-symbol var-or-kv "&KEY parameter name")
+                    (destructuring-bind (keyword-name var) var-or-kv
+                      (declare (ignore keyword-name))
+                      (need-bindable var "&KEY parameter name"))))))
+          (dolist (arg aux)
+            (when (defaultp arg '&aux)
+              (destructuring-bind (var &optional init-form) arg
+                (declare (ignore init-form))
+                ;; &AUX is not destructured
+                (need-symbol var "&AUX parameter name"))))))
 
     ;; Voila.
       (values (logior seen (if (oddp rest-bits) (bits &body) 0))
