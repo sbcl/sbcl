@@ -93,3 +93,12 @@
     (try '(a b &rest r))
     (try '(a b &body b))
     (try '(a b &body b &key foo))))
+
+(with-test (:name :fun-type-from-lambda-list)
+  (assert (equal
+           (sb-c::type-specifier
+            (sb-c::ftype-from-lambda-list
+             '(&key (size 1) color ((secret foo) 3 ssp) ((:what baz) nil)
+               &allow-other-keys)))
+           '(function (&key (:size t) (:color t) (secret t) (:what t)
+                            &allow-other-keys) *))))
