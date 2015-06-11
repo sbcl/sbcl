@@ -243,6 +243,10 @@
       ;; such as (VALUES (ARRAY (MUMBLE) (1 2)) &OPTIONAL (MEMBER X Y Z)).
       ;; But why don't we reject constant symbols here?
       (unless (member context '(:values-type :function-type))
+        (when whole
+          (funcall (if (logbitp (state &environment) accept)
+                       #'need-symbol #'need-bindable)
+                   (car whole) "&WHOLE argument"))
         (dolist (arg required)
           (need-bindable arg "Required argument"))
         ;; FIXME: why not check symbol-ness of supplied-p variables now?

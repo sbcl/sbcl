@@ -102,3 +102,62 @@
                &allow-other-keys)))
            '(function (&key (:size t) (:color t) (secret t) (:what t)
                             &allow-other-keys) *))))
+
+;; CLHS 3.4.4 says
+;; "&whole is followed by a single variable that is bound to the entire
+;;  macro-call form; this is the value that the macro function receives
+;;  as its first argument."
+;;
+;; but 3.4.4.1.2 says
+;; "&whole - The next element is a destructuring pattern that matches
+;; the entire form in a macro, or the entire subexpression at inner levels."
+;;
+;; So one paragraph says "a single variable" and the other "a pattern".
+;;
+;; If it can be a pattern, then it constrains the expected shape of input
+;; in a way that can conflict with the remainder of the pattern.
+;; e.g. Given (FOO (&WHOLE (BAZ BAR) X &OPTIONAL Y) MUM), would the 
+;; outer list's second element need to be a list that matches both
+;; (BAZ BAR) and (X &OPTIONAL Y)?  Implementations disagree on this.
+;;
+;; Further 3.4.4 says "&whole can appear at any level of a macro
+;; lambda list. At inner levels, the &whole variable is bound to the
+;; corresponding part of the argument, as with &rest, but unlike &rest,
+;; other arguments are also allowed."
+;; This makes a strange implication that "&rest" does NOT allow
+;; "other arguments", when clearly &REST can be followed by &KEY and
+;; &AUX (if it means "formal" arguments), and followed by anything at
+;; all if it means "actual" arguments. So it's not obvious from this
+;; how &whole is supposed to be "unlike" &rest.
+;;
+;; And finally
+;;   "The use of &whole does not affect the pattern of arguments specified."
+;; which is is inconsistent in the case where you write
+;; (&WHOLE (A B) ...) which certainly seems to require that the whole
+;; form be exactly a 2-list. What it was trying to clarify - reasonably
+;; in the case where &whole binds one symbol - is that
+;;    (DEFMACRO MUMBLE (&WHOLE FOO) ...)
+;; in terms of the pattern accepted, is exactly the same as
+;;    (DEFMACRO MUMBLE () ...)
+;; which means that MUMBLE accepts zero arguments.
+;; This is a justified point because the equivalence of &WHOLE
+;; and &REST at inner levels suggests that (&WHOLE FOO) actually means that
+;; MUMBLE accepts anything when in fact it does not.
+;;
+;; To resolve these problems, we'll say that &WHOLE at the outermost level
+;; of a macro can only bind one symbol, which fits the mental model that it
+;; receives the input form and nothing but that.
+;; Whoever uses &WHOLE with a non-symbol after it deserves a kick in the head.
+
+(with-test (:name :destructuring-whole)
+  (let* ((accept-inner
+          (sb-int:lambda-list-keyword-mask 'destructuring-bind))
+         (accept-outer
+          (logior (sb-int:lambda-list-keyword-mask '(&environment))
+                  accept-inner)))
+    (sb-c::parse-lambda-list '(&whole w a b  x) :accept accept-outer)
+    (sb-c::parse-lambda-list '(&whole (w) a b  x) :accept accept-inner)
+    (assert-error
+     (sb-c::parse-lambda-list '(&whole 5 a b  x) :accept accept-outer))
+    (assert-error
+     (sb-c::parse-lambda-list '(&whole (w) a b  x) :accept accept-outer))))
