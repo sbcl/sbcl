@@ -11,10 +11,11 @@
 
 (/show0 "parse-lambda-list.lisp 12")
 
+(eval-when (:compile-toplevel :load-toplevel :execute)
 (defconstant-eqx lambda-list-parser-states
     #(:required &optional &rest &more &key &aux &environment &whole
       &allow-other-keys &body :post-env :post-rest :post-more)
-  #'equalp)
+  #'equalp))
 (eval-when (#-sb-xc :compile-toplevel :load-toplevel :execute)
   ;; Note: you usually want #. around LAMBDA-LIST-KEYWORD-MASK because for
   ;; a variety of reasons it shouldn't be a macro; and I don't want to rely

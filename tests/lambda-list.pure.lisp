@@ -116,7 +116,7 @@
 ;;
 ;; If it can be a pattern, then it constrains the expected shape of input
 ;; in a way that can conflict with the remainder of the pattern.
-;; e.g. Given (FOO (&WHOLE (BAZ BAR) X &OPTIONAL Y) MUM), would the 
+;; e.g. Given (FOO (&WHOLE (BAZ BAR) X &OPTIONAL Y) MUM), would the
 ;; outer list's second element need to be a list that matches both
 ;; (BAZ BAR) and (X &OPTIONAL Y)?  Implementations disagree on this.
 ;;
