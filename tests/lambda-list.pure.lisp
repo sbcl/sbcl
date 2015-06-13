@@ -86,7 +86,7 @@
                   list
                   :accept (sb-c::lambda-list-keyword-mask 'destructuring-bind)
                   :context 'destructuring-bind)
-               (sb-c::build-lambda-list llks req opt rest keys aux)))
+               (sb-c::make-lambda-list llks nil req opt rest keys aux)))
            (try (list)
              (assert (equal list (round-trip list)))))
     (try '(a b . c))
@@ -161,3 +161,53 @@
      (sb-c::parse-lambda-list '(&whole 5 a b  x) :accept accept-outer))
     (assert-error
      (sb-c::parse-lambda-list '(&whole (w) a b  x) :accept accept-outer))))
+
+;; Unparsing a destructuring lambda list does not retain default values,
+;; supplied-p variables, or &AUX.
+;; This has a practical benefit of not saving source code unwittingly
+;; in (X &OPTIONAL (A (MOAR-BIG-FN (DO-ALL-THE-THINGS (...)))))
+;; as well as showing just what the lambda list expects as an interface.
+(with-test (:name :destructuring-parse/unparse)
+  (flet ((try (input expect)
+           (let ((parse (sb-c::parse-ds-lambda-list input)))
+             (assert (equal (sb-c::unparse-ds-lambda-list parse) expect)))))
+
+    (try '((a (b c)) . d)
+         '((a (b c)) . d))
+
+    (try '(a (&rest foo) (&whole baz x y))
+         '(a (&rest foo) (x y)))
+
+    (try '((&body foo) (&whole (a . d) x y) &aux)
+         '((&body foo) (&whole (a . d) x y)))
+
+    (try '(&optional a ((bb1 bb2)) (c 'c) (d 'd dsp) &aux foo (baz))
+         '(&optional a ((bb1 bb2)) (c) (d)))
+
+    (try '(&key ((:bork (zook mook)) def bsp) (e 'e esp)
+                ((:name fred)) (color x csp))
+         '(&key ((:bork (zook mook))) (e) ((:name fred)) (color)))
+
+
+    (try '(x &optional (y) (((&whole (&whole w z . r) &body b) (c)) (def)))
+         ;;                           ^ this &WHOLE variable is irrelevant
+         ;;                   ^ but this one isn't
+         '(x &optional (y) (((&whole (z . r) &body b) (c)))))
+
+    ;; Expanding a ds-bind of (((X))) re-conses the innermost list
+    ;; list thrice, to generate code which produces three distinct
+    ;; messages: "problem in (((X)))", "... in ((X))", "... in (X)"
+    ;; This isn't great. Ideally the code should entail at most one
+    ;; error message, but in general it's not easy to have a single point
+    ;; at which the error is signaled, if you must already have pulled apart
+    ;; the input to find the error. Thus, ds-bind expands into a sequence
+    ;; of checks whether at each level, the structure is right.
+    ;; In this limited case, it seems a particularly stupid technique.
+    ;;
+    ;; At any rate, the unparser memoizes intermediate results,
+    ;; since the cost of doing that is virtually nothing.
+    ;; This asserts that sharing works during re-construction.
+    (let ((parse (sb-c::parse-ds-lambda-list '(((a)))))
+          (cache (list nil)))
+      (assert (eq (sb-c::unparse-ds-lambda-list parse cache)
+                  (sb-c::unparse-ds-lambda-list parse cache))))))

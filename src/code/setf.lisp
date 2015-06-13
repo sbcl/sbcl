@@ -462,7 +462,7 @@
                    (extract-var-decls decls (append env stores)))
                   (subforms (copy-symbol 'subforms))
                   (env-var (if env (car env) (copy-symbol 'env)))
-                  (lambda-list (build-lambda-list llks req opt rest key)))
+                  (lambda-list (make-lambda-list llks nil req opt rest key)))
          (declare (ignore aux))
          `(eval-when (:compile-toplevel :load-toplevel :execute)
             (%defsetf ',access-fn

@@ -283,6 +283,37 @@
       (values (logior seen (if (oddp rest-bits) (bits &body) 0))
               required optional (or rest more) keys aux env whole))))
 
+;; Construct an abstract representation of a destructuring lambda list
+;; from its source form, recursing as necessary.
+(defun parse-ds-lambda-list (lambda-list)
+  (multiple-value-bind (llks required optional rest keys aux env whole)
+      (parse-lambda-list lambda-list
+                         :accept #.(lambda-list-keyword-mask 'destructuring-bind)
+                         :context 'destructuring-bind)
+   (declare (ignore env) (notinline mapcar))
+   (flet ((parse (list) (if (atom list) list (parse-ds-lambda-list list))))
+     (vector llks
+             (mapcar #'parse whole) ; a singleton or NIL
+             (mapcar #'parse required)
+             (mapcar (lambda (x) (if (atom x) x (cons (parse (car x)) (cdr x))))
+                     optional)
+             (mapcar #'parse rest) ; a singleton or NIL
+             (mapcar (lambda (x)
+                       (if (typep x '(cons cons))
+                           (cons (list (caar x) (parse (cadar x))) (cdr x))
+                           x))
+                     keys)
+             aux))))
+
+;; Bind the parts of the abstract representation of a destructuring
+;; lambda list, a (SIMPLE-VECTOR 7), to individual symbols.
+(defmacro with-ds-lambda-list-parts ((&rest parts-names) parts &body body)
+  (aver (<= 1 (length parts-names) 7))
+  (once-only ((parts `(the (simple-vector 7) ,parts)))
+    `(let ,(loop for i from 0 for sym in parts-names
+                 when sym collect `(,sym (svref ,parts ,i)))
+       ,@body)))
+
 ;; Split a keyword argument specifier into the keyword, the bound variable
 ;; or destructuring pattern, the default, and supplied-p var. If present the
 ;; supplied-p var is in a singleton list.
@@ -295,9 +326,14 @@
                   (values (keywordicate var) var def sup-p-var)
                   (values (car var) (cadr var) def sup-p-var))))))
 
-;; Invert the parsing operation.
-(defun build-lambda-list (llks required &optional optional rest keys aux)
-  (append required
+;; Construct a lambda list from sublists.
+;; If &WHOLE and REST are present, they must be singleton lists.
+;; Any sublists that were obtained by parsing a destructuring
+;; lambda list must be supplied in their unparsed form.
+(defun make-lambda-list (llks whole required &optional optional rest keys aux)
+  (append (when whole (cons '&whole whole))
+          required
+          ;; NB: this discards &OPTIONAL with no optional bindings.
           (if optional (cons '&optional optional))
           (let ((restp (ll-kwds-restp llks)))
             (if (and rest (not restp)) ; lambda list was "dotted"
@@ -308,5 +344,35 @@
                  (if (ll-kwds-allowp llks) '(&allow-other-keys))
                  ;; Should &AUX be inserted even if empty? Probably not.
                  (if aux (cons '&aux aux)))))))
+
+;; Produce a destructuring lambda list from its internalized representation,
+;; excluding any parts that don't constrain the shape of the expected input.
+;; &AUX, supplied-p vars, and defaults do not impose shape constraints.
+(defun unparse-ds-lambda-list (parsed-lambda-list &optional cache)
+  (cond ((symbolp parsed-lambda-list) parsed-lambda-list)
+        ((cdr (assq parsed-lambda-list (cdr cache))))
+        (t
+         (with-ds-lambda-list-parts (llks whole req optional rest keys)
+             parsed-lambda-list
+           (labels ((remove-default (spec)
+                      (if (atom spec) spec (list (recurse (car spec)))))
+                    (recurse (x) (unparse-ds-lambda-list x cache))
+                    (memoize (input output)
+                      (when cache (push (cons input output) (cdr cache)))
+                      output))
+             (memoize
+              parsed-lambda-list
+              (make-lambda-list
+               llks
+               ;; &WHOLE is omitted unless it destructures something.
+               (when (vectorp (car whole)) (list (recurse (car whole))))
+               (mapcar #'recurse req)
+               (mapcar #'remove-default optional)
+               (when rest (list (recurse (car rest))))
+               (mapcar (lambda (x)
+                         (if (typep x '(cons cons))
+                             (list (list (caar x) (recurse (cadar x))))
+                             (remove-default x)))
+                       keys))))))))
 
 (/show0 "parse-lambda-list.lisp end of file")
