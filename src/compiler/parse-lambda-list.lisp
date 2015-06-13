@@ -16,34 +16,38 @@
     #(:required &optional &rest &more &key &aux &environment &whole
       &allow-other-keys &body :post-env :post-rest :post-more)
   #'equalp))
-(eval-when (#-sb-xc :compile-toplevel :load-toplevel :execute)
-  ;; Note: you usually want #. around LAMBDA-LIST-KEYWORD-MASK because for
-  ;; a variety of reasons it shouldn't be a macro; and I don't want to rely
-  ;; on a compiler-macro for other build hosts since processing is optional;
-  ;; and declaring it inline is the wrong way to go since semantic analysis
-  ;; is too weak to prove it constant; and FOLDABLE would only work on sbcl;
-  ;; and iterating over a const list for every PARSE-LAMBDA-LIST annoys me.
-  (defun lambda-list-keyword-mask (list)
-    (if (eq list 'destructuring-bind)
-        (lambda-list-keyword-mask
-         '(&optional &rest &body &key &allow-other-keys &aux &whole))
-        (loop for symbol in list
-              sum (ash 1 (position symbol lambda-list-parser-states))))))
+
+;; Return a bitmask representing the LIST of lambda list keywords.
+(defmacro lambda-list-keyword-mask (list)
+  (if (constantp list)
+      ;; When invoked with a quoted constant, some flexibility
+      ;; is allowed, in that the input may be a single symbol.
+      (let ((val (#+sb-xc constant-form-value #-sb-xc eval list)))
+        (loop for symbol in (cond ((eq val 'destructuring-bind)
+                                   '(&whole &optional &rest &body
+                                     &key &allow-other-keys &aux))
+                                  ((and val (symbolp val)) (list val))
+                                  (t val))
+              sum (ash 1 (position symbol lambda-list-parser-states))))
+      ;; Otherwise the input is required to be a list of symbols.
+      (with-unique-names (k)
+        `(loop for ,k in ,list
+               sum (ash 1 (position ,k lambda-list-parser-states))))))
 
 (defun ll-kwds-restp (bits)
   (when (logtest (lambda-list-keyword-mask '(&rest &body &more)) bits)
     ;; Test &BODY first because if present, &REST bit is also set.
-    (cond ((logtest #.(lambda-list-keyword-mask '(&body)) bits) '&body)
-          ((logtest #.(lambda-list-keyword-mask '(&more)) bits) '&more)
+    (cond ((logtest (lambda-list-keyword-mask '&body) bits) '&body)
+          ((logtest (lambda-list-keyword-mask '&more) bits) '&more)
           (t '&rest))))
 
 ;;; Some accessors to distinguish a parse of (values &optional) from (values)
 ;;; and (lambda (x &key)) from (lambda (x)).
 (declaim (inline ll-kwds-keyp ll-kwds-allowp))
 (defun ll-kwds-keyp (bits)
-  (logtest #.(lambda-list-keyword-mask '(&key)) bits))
+  (logtest (lambda-list-keyword-mask '&key) bits))
 (defun ll-kwds-allowp (bits)
-  (logtest #.(lambda-list-keyword-mask '(&allow-other-keys)) bits))
+  (logtest (lambda-list-keyword-mask '&allow-other-keys) bits))
 
 ;;; Break something like a lambda list (but not necessarily actually a
 ;;; lambda list, e.g. the representation of argument types which is
@@ -80,8 +84,8 @@
 ;;;
 (defun parse-lambda-list
     (list &key (context "an ordinary lambda list")
-               (accept #.(lambda-list-keyword-mask
-                          '(&optional &rest &more &key &allow-other-keys &aux)))
+               (accept (lambda-list-keyword-mask
+                        '(&optional &rest &more &key &allow-other-keys &aux)))
                (condition-class 'simple-program-error)
                silent
           &aux (seen 0) required optional rest more keys aux env whole tail
@@ -90,7 +94,7 @@
   (declare (type (unsigned-byte 13) accept seen))
   (macrolet ((state (name) (position name lambda-list-parser-states))
              (state= (x y) `(= ,x (state ,y)))
-             (bits (&rest list) (lambda-list-keyword-mask list))
+             (bits (&rest list) `(lambda-list-keyword-mask ',list))
              (begin-list (val)
                `(case state
                   ,@(loop for i from 0
@@ -98,7 +102,7 @@
                                      keys aux env whole)
                           collect `(,i (setq ,s ,val))))))
     (labels ((destructuring-p ()
-               (logbitp (state &whole) accept))
+               (logtest (bits &whole) accept))
              (need-arg (state)
                (croak "expecting variable after ~A in: ~S" state list))
              (need-symbol (x why)
@@ -132,9 +136,10 @@
            (cond ((not input)
                   (if (logbitp state (bits &whole &rest &more &environment))
                       (need-arg arg)))
-                 ((and (symbolp input)
+                 ;; Whenever &BODY is accepted, so is a dotted tail.
+                 ((and (logtest (bits &body) accept)
                        (not (logtest (bits &rest &key &aux) seen))
-                       (memq context '(destructuring-bind :macro)))
+                       (symbolp input))
                   (setf rest (list input)))
                  (t
                   (croak "illegal dotted lambda list: ~S" list)))
@@ -163,11 +168,11 @@
                ;; but if it should be rejected, then it gets its own bit.
                ;; Error message production is thereby confined to one spot.
                (&body (values (bits :required &optional)
-                              (if (logbitp (state &body) accept)
+                              (if (logtest (bits &body) accept)
                                   (state &rest) (state &body))))
                (&whole
                 (values (if (and (state= state :required) (not required)
-                                 (not (logbitp (state &environment) seen)))
+                                 (not (logtest (bits &environment) seen)))
                             (bits :required) 0)
                         (state &whole))))
              (when from-states
@@ -235,7 +240,7 @@
          (go LOOP))
 
       #-sb-xc-host ;; Supress &OPTIONAL + &KEY syle-warning on xc host
-      (when (and (logbitp (state &key) seen) optional (not silent))
+      (when (and (logtest (bits &key) seen) optional (not silent))
         (style-warn
          "&OPTIONAL and &KEY found in the same lambda list: ~S" list))
 
@@ -245,7 +250,9 @@
       ;; But why don't we reject constant symbols here?
       (unless (member context '(:values-type :function-type))
         (when whole
-          (funcall (if (logbitp (state &environment) accept)
+          ;; Refer to the comment above the :destructuring-whole test
+          ;; in lambda-list.pure as to why &WHOLE has two personalities.
+          (funcall (if (logtest (bits &environment) accept)
                        #'need-symbol #'need-bindable)
                    (car whole) "&WHOLE argument"))
         (dolist (arg required)
@@ -288,7 +295,7 @@
 (defun parse-ds-lambda-list (lambda-list)
   (multiple-value-bind (llks required optional rest keys aux env whole)
       (parse-lambda-list lambda-list
-                         :accept #.(lambda-list-keyword-mask 'destructuring-bind)
+                         :accept (lambda-list-keyword-mask 'destructuring-bind)
                          :context 'destructuring-bind)
    (declare (ignore env) (notinline mapcar))
    (flet ((parse (list) (if (atom list) list (parse-ds-lambda-list list))))

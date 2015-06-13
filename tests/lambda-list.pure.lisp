@@ -211,3 +211,28 @@
           (cache (list nil)))
       (assert (eq (sb-c::unparse-ds-lambda-list parse cache)
                   (sb-c::unparse-ds-lambda-list parse cache))))))
+
+(with-test (:name :macro-lambda-list)
+  ;; This only parses the surface level, which suffices to check for
+  ;; some edge cases at the toplevel of a macro lambda list.
+  (flet ((parse (list)
+           sb-c::
+           (multiple-value-list
+            (parse-lambda-list
+             list :accept (logior (lambda-list-keyword-mask 'destructuring-bind)
+                                  (lambda-list-keyword-mask '&environment))))))
+    ;; The bitmasks of lambda-list-keywords differ, so don't compare them.
+    (assert (equal (cdr (parse '(&environment e &rest rest)))
+                   (cdr (parse '(&environment e . rest)))))
+    (assert (equal (cdr (parse '(&whole w &rest r)))
+                   (cdr (parse '(&whole w . r)))))
+    (assert (equal (cdr (parse '(&whole w &environment e &rest r)))
+                   (cdr (parse '(&whole w &environment e . r)))))
+    (assert (equal (cdr (parse '(a b c &environment foo &rest rest)))
+                   (cdr (parse '(a b c &environment foo . rest)))))
+    (assert (equal (cdr (parse '(a b c &environment foo &body rest)))
+                   (cdr (parse '(a b c &environment foo . rest)))))
+    (assert-error (parse '(a b c &environment foo &rest r . rest)))
+
+    ;; lp# 707556 will be fixed once PARSE-DEFMACRO uses PARSE-LAMBDA-LIST
+    (assert-error (parse '(a &key b &allow-other-keys c)))))

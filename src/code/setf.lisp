@@ -371,7 +371,7 @@
   (binding* (((llks required optional rest)
               (parse-lambda-list
                lambda-list
-               :accept #.(lambda-list-keyword-mask '(&optional &rest))
+               :accept (lambda-list-keyword-mask '(&optional &rest))
                :context "a DEFINE-MODIFY-MACRO lambda list"))
              (args (append required
                            (mapcar (lambda (x) (if (listp x) (car x) x))
@@ -453,7 +453,7 @@
        (binding* (((llks req opt rest key aux env)
                    (parse-lambda-list
                     lambda-list
-                    :accept #.(lambda-list-keyword-mask
+                    :accept (lambda-list-keyword-mask
                                '(&optional &rest &key &allow-other-keys
                                  &environment))
                     :context "a DEFSETF lambda list"))

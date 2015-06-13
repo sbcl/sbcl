@@ -294,7 +294,7 @@ bootstrapping.
     (multiple-value-bind (llks required optional rest keys)
         (parse-lambda-list
          lambda-list
-         :accept #.(lambda-list-keyword-mask
+         :accept (lambda-list-keyword-mask
                     '(&optional &rest &key &allow-other-keys))
          :condition-class 'generic-function-lambda-list-error
          :context "a generic function lambda list")
@@ -1629,7 +1629,7 @@ bootstrapping.
       ;; whether this is called by DEFMETHOD or DEFGENERIC.
       ;; [It is used for either. Why else recognize and silently ignore &AUX?]
       (parse-lambda-list lambda-list
-                         :accept #.(lambda-list-keyword-mask
+                         :accept (lambda-list-keyword-mask
                                     '(&optional &rest &key &allow-other-keys &aux))
                          :silent t
                          :context "a generic function lambda list")
@@ -1781,7 +1781,7 @@ bootstrapping.
         if (eq x '&key) do (loop-finish)))
 
 (defun ll-keyp-or-restp (bits)
-  (logtest #.(lambda-list-keyword-mask '(&key &rest)) bits))
+  (logtest (lambda-list-keyword-mask '(&key &rest)) bits))
 
 (defun set-arg-info (gf &key new-method (lambda-list nil lambda-list-p)
                         argument-precedence-order)

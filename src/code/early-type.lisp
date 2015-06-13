@@ -111,11 +111,9 @@
        lambda-listy-thing
        :context context
        :accept (ecase context
-                 (:values-type
-                  #.(lambda-list-keyword-mask '(&optional &rest)))
-                 (:function-type
-                  #.(lambda-list-keyword-mask
-                     '(&optional &rest &key &allow-other-keys))))
+                 (:values-type (lambda-list-keyword-mask '(&optional &rest)))
+                 (:function-type (lambda-list-keyword-mask
+                                  '(&optional &rest &key &allow-other-keys))))
        :silent t)
     (let ((required (mapcar #'single-value-specifier-type required))
           (optional (mapcar #'single-value-specifier-type optional))

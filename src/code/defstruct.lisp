@@ -1523,7 +1523,7 @@ or they must be declared locally notinline at each call site.~@:>")
   (multiple-value-bind (llks req opt rest keys aux)
       (parse-lambda-list (second boa)
                          :accept
-                         #.(lambda-list-keyword-mask
+                         (lambda-list-keyword-mask
                             '(&optional &rest &key &allow-other-keys &aux)))
     (collect ((arglist)
               (vars)
