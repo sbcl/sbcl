@@ -73,12 +73,28 @@
 ;;; Source transforms may only be defined for functions. Source
 ;;; transformation is not attempted if the function is declared
 ;;; NOTINLINE. Source transforms should not examine their arguments.
+;;; A macro lambda list which destructures more than one level would
+;;; be legal but suspicious, as inner list parsing "examines" arguments.
 ;;; If it matters how the function is used, then DEFTRANSFORM should
 ;;; be used to define an IR1 transformation.
 ;;;
 ;;; If the desirability of the transformation depends on the current
 ;;; OPTIMIZE parameters, then the POLICY macro should be used to
 ;;; determine when to pass.
+;;;
+;;; Note that while a compiler-macro must deal with being invoked when its
+;;; whole form matches (FUNCALL <f> ...) so that it must skip over <f> to find
+;;; the arguments, a source-transform need not worry about that situation.
+;;; Any FUNCALL which is eligible for a source-transform calls the expander
+;;; with the form's head replaced by a compiler representation of the function.
+;;; Internalizing the name avoids semantic problems resulting from syntactic
+;;; substitution. One problem would be that a source-transform can exist for
+;;; a function named (SETF X), but ((SETF X) arg ...) would be bad syntax.
+;;; Even if we decided that it is ok within the compiler - just not in code
+;;; given to the compiler - the problem remains that changing (FUNCALL 'F x)
+;;; to (F x) is wrong when F also names a local functionoid.
+;;; Hence, either a #<GLOBAL-VAR> or #<DEFINED-FUN> appears in the form head.
+;;;
 (defmacro define-source-transform (fun-name lambda-list &body body)
   (with-unique-names (whole-var n-env name)
     (multiple-value-bind (body decls)
