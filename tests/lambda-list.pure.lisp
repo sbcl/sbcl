@@ -155,12 +155,12 @@
          (accept-outer
           (logior (sb-int:lambda-list-keyword-mask '(&environment))
                   accept-inner)))
-    (sb-c::parse-lambda-list '(&whole w a b  x) :accept accept-outer)
-    (sb-c::parse-lambda-list '(&whole (w) a b  x) :accept accept-inner)
+    (sb-c::parse-lambda-list '(&whole w a b x) :accept accept-outer)
+    (sb-c::parse-lambda-list '(&whole (w) a b x) :accept accept-inner)
     (assert-error
-     (sb-c::parse-lambda-list '(&whole 5 a b  x) :accept accept-outer))
+     (sb-c::parse-lambda-list '(&whole 5 a b x) :accept accept-outer))
     (assert-error
-     (sb-c::parse-lambda-list '(&whole (w) a b  x) :accept accept-outer))))
+     (sb-c::parse-lambda-list '(&whole (w) a b x) :accept accept-outer))))
 
 ;; Unparsing a destructuring lambda list does not retain default values,
 ;; supplied-p variables, or &AUX.
@@ -168,12 +168,15 @@
 ;; in (X &OPTIONAL (A (MOAR-BIG-FN (DO-ALL-THE-THINGS (...)))))
 ;; as well as showing just what the lambda list expects as an interface.
 (with-test (:name :destructuring-parse/unparse)
-  (flet ((try (input expect)
+  (flet ((try (input &optional (expect input))
            (let ((parse (sb-c::parse-ds-lambda-list input)))
              (assert (equal (sb-c::unparse-ds-lambda-list parse) expect)))))
 
-    (try '((a (b c)) . d)
-         '((a (b c)) . d))
+    (try '((a (b c)) . d)) ; parse/unparse undergoes no change
+
+    (try '(a &optional ((&optional)))) ; likewise
+
+    (try '(&optional . rest)) ; ... and even wackier
 
     (try '(a (&rest foo) (&whole baz x y))
          '(a (&rest foo) (x y)))
@@ -236,3 +239,16 @@
 
     ;; lp# 707556 will be fixed once PARSE-DEFMACRO uses PARSE-LAMBDA-LIST
     (assert-error (parse '(a &key b &allow-other-keys c)))))
+
+(with-test (:name :ds-lambda-list-symbols)
+  (flet ((try (list expect)
+           (assert (equal sb-c::(ds-lambda-list-symbols
+                                 (parse-ds-lambda-list list))
+                         expect))))
+    (try '(a ((b c))
+           &rest (r1 r2)
+           &key k1 (k2) (k3 'foo) (k4 'baz k4p) ((:boo (k5 k6)) '(1 2) k56p))
+         '(a b c r1 r2 k1 k2 k3 k4 k4p k5 k6 k56p))
+
+    (try '(a &optional x (y) (z 'foo zp) ((w1 w2)) &aux foo (bar) (baz 3))
+         '(a x y z zp w1 w2 foo bar baz))))

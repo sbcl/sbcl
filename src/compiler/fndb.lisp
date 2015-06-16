@@ -1582,6 +1582,8 @@
 (defknown %verify-arg-count (index index) (values))
 
 (defknown %arg-count-error (t t) nil)
+;; And of course DESTRUCTURING-BIND has its own variation on a theme.
+(defknown sb!kernel::arg-count-error (t t t t t t) nil)
 (defknown %unknown-values () *)
 (defknown %catch (t t) t)
 (defknown %unwind-protect (t t) t)

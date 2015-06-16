@@ -1408,7 +1408,11 @@
 ;; Given DECLS as returned by from parse-body, and SYMBOLS to be bound
 ;; (with LET, MULTIPLE-VALUE-BIND, etc) return two sets of declarations:
 ;; those which pertain to the variables and those which don't.
+;; The first returned value is NIL or a single expression headed by DECLARE.
+;; The second is a list of expressions resembling the input DECLS.
 (defun extract-var-decls (decls symbols)
+  (unless symbols ; Don't bother filtering DECLS, just return them.
+    (return-from extract-var-decls (values nil decls)))
   (labels ((applies-to-variables (decl)
              ;; If DECL is a variable-affecting declaration, then return
              ;; the subset of SYMBOLS to which DECL applies.

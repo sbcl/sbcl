@@ -91,11 +91,13 @@
           &aux (seen 0) required optional rest more keys aux env whole tail
                (rest-bits 0))
   (declare (optimize speed))
-  (declare (type (unsigned-byte 13) accept seen))
-  (macrolet ((state (name) (position name lambda-list-parser-states))
+  (declare (type (unsigned-byte 13) accept seen) (type (mod 4) rest-bits))
+  (macrolet ((state (name)
+               (position (the symbol name) lambda-list-parser-states))
              (state= (x y) `(= ,x (state ,y)))
              (bits (&rest list) `(lambda-list-keyword-mask ',list))
              (begin-list (val)
+               (declare (optimize (speed 0))) ; suppress generic math notes
                `(case state
                   ,@(loop for i from 0
                           for s in '(required optional rest more
@@ -115,6 +117,8 @@
                      (croak "~A is not a symbol or list: ~S" why x)
                      (croak "~A is not a symbol: ~S" why x))))
              (croak (string &optional (a1 0 a1p) (a2 0 a2p) (a3 0 a3p))
+               ;; Don't care that FUNCALL can't elide fdefinition here.
+               (declare (optimize (speed 1)))
                (let ((l (if a1p (list a1 a2 a3))))
                  (if (and l (not a3p)) (rplacd (if a2p (cdr l) l) nil))
                  ;; KLUDGE: When this function was limited to parsing
@@ -340,8 +344,8 @@
 (defun make-lambda-list (llks whole required &optional optional rest keys aux)
   (append (when whole (cons '&whole whole))
           required
-          ;; NB: this discards &OPTIONAL with no optional bindings.
-          (if optional (cons '&optional optional))
+          (when (logtest (lambda-list-keyword-mask '&optional) llks)
+            (cons '&optional optional))
           (let ((restp (ll-kwds-restp llks)))
             (if (and rest (not restp)) ; lambda list was "dotted"
                 (car rest)
@@ -381,5 +385,56 @@
                              (list (list (caar x) (recurse (cadar x))))
                              (remove-default x)))
                        keys))))))))
+
+;; Return the list of variables bound by a destructuring lambda list.
+;; One purpose for this is to help expand destructuring-bind using
+;; a strategy that delivers values to an MV-BIND. Consider e.g.
+#|
+   (DESTRUCTURING-BIND (A &OPTIONAL (B 0) (C 'DEF)) L (DOER))
+     -> (multiple-value-bind (a b c)
+            (handler-bind ((error (lambda (c) (return-from somewhere))))
+              (values (pop (the cons L))
+                      (if L (pop L) 0)
+                      (cond ((endp L) 'def)
+                            ((endp (cdr L)) (car L))
+                            (t (error "Excess args")))))
+          (doer))
+|#
+;; The above expansion places a condition handler around the forms which
+;; destructure the input, and only those forms. This corresponds to the
+;; logic that DEFINE-SOURCE-TRANSFORM wants, with a slight difference that
+;; type-errors in defaulting expressions are caught by the above
+;; but not caught by approximately similar code emitted by PARSE-DEFMACRO.
+;; We don't want the handler around the entire expression produced by
+;; DEFINE-SOURCE-TRANSFORM because that would skip a transform if any error
+;; occurred in the transform itself. In something complicated like SORT-VECTOR's
+;; source transform, a bug in the transform's body (not its output) might be
+;; undetected.  Contrariwise, the execution of a compiler-macro is typically
+;; in an error handler, but the compiler does warn about failure of macros.
+;;
+(defun ds-lambda-list-symbols (parsed-lambda-list)
+  (collect ((output))
+    (labels ((recurse (x) (if (vectorp x) (scan x) (output x)))
+             (copy (x) (dolist (elt x) (recurse elt)))
+             (suppliedp-var (spec) (if (cddr spec) (output (third spec))))
+             (scan (parts)
+               (with-ds-lambda-list-parts (nil whole req opt rest key aux) parts
+                 (copy whole)
+                 (copy req)
+                 (dolist (x opt)
+                   (cond ((symbolp x) (output x))
+                         (t (recurse (car x))
+                            (suppliedp-var x))))
+                 (copy rest)
+                 (dolist (x key)
+                   (cond ((symbolp x) (output x))
+                         (t (let ((k (car x)))
+                              (if (symbolp k) (output k) (recurse (cadr k)))
+                              (suppliedp-var x)))))
+                 (dolist (x aux)
+                   (output (if (symbolp x) x (car x)))))))
+      (recurse parsed-lambda-list)
+      (output))))
+
 
 (/show0 "parse-lambda-list.lisp end of file")
