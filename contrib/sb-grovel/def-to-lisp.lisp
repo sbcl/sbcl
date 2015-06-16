@@ -26,6 +26,10 @@
   "Pretty-print ARGS into the C source file, separated by #\Space"
   (format *default-c-stream* "~A~{ ~A~}~%" (first args) (rest args)))
 
+(defun long-long-cast (arg)
+  "Cast an argument to (signed) long long (int), so it can be formatted with %lld"
+  (format nil "((long long) (~A))" arg))
+
 (defun printf (formatter &rest args)
   "Emit C code to fprintf the quoted code, via FORMAT.
 The first argument is the C string that should be passed to
@@ -39,8 +43,8 @@ There is no error checking done, unless you pass too few FORMAT
 clause args. I recommend using this formatting convention in
 code:
 
- (printf \"string ~A ~S %d %d\" format-arg-1 format-arg-2
-         printf-arg-1 printf-arg-2)"
+ (printf \"string ~A ~S %lld %lld\" format-arg-1 format-arg-2
+         (long-long-cast printf-arg-1) (long-long-cast printf-arg-2))"
   (let ((*print-pretty* nil))
     (apply #'format *default-c-stream*
            "    fprintf (out, \"~@?\\n\"~@{, ~A~});~%"
@@ -51,7 +55,7 @@ code:
   (printf "(cl:eval-when (:compile-toplevel :load-toplevel :execute) (sb-alien:define-alien-type ~A (sb-alien:enum nil" lispname)
   (dolist (element elements)
     (destructuring-bind (lisp-element-name c-element-name) element
-      (printf " (~S %d)" lisp-element-name c-element-name)))
+      (printf " (~S %lld)" lisp-element-name (long-long-cast c-element-name))))
   (printf ")))")
   (when export
     (dolist (element elements)
@@ -62,23 +66,23 @@ code:
 
 (defun c-for-structure (lispname cstruct)
   (destructuring-bind (cname &rest elements) cstruct
-    (printf "(cl:eval-when (:compile-toplevel :load-toplevel :execute) (sb-grovel::define-c-struct ~A %d" lispname
-            (format nil "sizeof(~A)" cname))
+    (printf "(cl:eval-when (:compile-toplevel :load-toplevel :execute) (sb-grovel::define-c-struct ~A %lld" lispname
+            (long-long-cast (format nil "sizeof(~A)" cname)))
     (dolist (e elements)
       (destructuring-bind (lisp-type lisp-el-name c-type c-el-name &key distrust-length) e
         (printf " (~A ~A \"~A\"" lisp-el-name lisp-type c-type)
         ;; offset
         (as-c "{" cname "t;")
-        (printf "  %d"
-                (format nil "((unsigned long)&(t.~A)) - ((unsigned long)&(t))" c-el-name))
+        (printf "  %llu"
+                (format nil "((unsigned long long)&(t.~A)) - ((unsigned long long)&(t))" c-el-name))
         (as-c "}")
         ;; length
         (if distrust-length
             (printf "  0)")
             (progn
               (as-c "{" cname "t;")
-              (printf "  %d)"
-                      (format nil "sizeof(t.~A)" c-el-name))
+              (printf "  %lld)"
+                      (long-long-cast (format nil "sizeof(t.~A)" c-el-name)))
               (as-c "}")))))
     (printf "))")))
 
@@ -107,29 +111,29 @@ code:
     (dolist (type '("char" "short" "long" "int"
                     #+nil"long long" ; TODO: doesn't exist in sb-alien yet
                     ))
-      (printf "  (cl:setf (cl:gethash %d *integer-sizes*) 'sb-alien:~A)" (substitute #\- #\Space type)
-              (format nil "sizeof(~A)" type)))
+      (printf "  (cl:setf (cl:gethash %lld *integer-sizes*) 'sb-alien:~A)" (substitute #\- #\Space type)
+              (long-long-cast (format nil "sizeof(~A)" type))))
     (printf ")")
     (dolist (def definitions)
       (destructuring-bind (type lispname cname &optional doc export) def
         (case type
           ((:integer :errno)
            (as-c "#ifdef" cname)
-           (printf "(cl:defconstant ~A %d \"~A\")" lispname doc
-                   cname)
+           (printf "(cl:defconstant ~A %lld \"~A\")" lispname doc
+                   (long-long-cast cname))
            (when (eql type :errno)
              (printf "(cl:setf (get '~A 'errno) t)" lispname))
            (as-c "#else")
            (printf "(sb-int:style-warn \"Couldn't grovel for ~~A (unknown to the C compiler).\" \"~A\")" cname)
            (as-c "#endif"))
           ((:integer-no-check)
-           (printf "(cl:defconstant ~A %d \"~A\")" lispname doc cname))
+           (printf "(cl:defconstant ~A %lld \"~A\")" lispname doc (long-long-cast cname)))
           (:enum
            (c-for-enum lispname cname export))
           (:type
-           (printf "(cl:eval-when (:compile-toplevel :load-toplevel :execute) (sb-alien:define-alien-type ~A (sb-alien:%ssigned %d)))" lispname
+           (printf "(cl:eval-when (:compile-toplevel :load-toplevel :execute) (sb-alien:define-alien-type ~A (sb-alien:%ssigned %lld)))" lispname
                    (format nil "SIGNED_(~A)" cname)
-                   (format nil "(8*sizeof(~A))" cname)))
+                   (long-long-cast (format nil "(8*sizeof(~A))" cname))))
           (:string
            (printf "(cl:defparameter ~A %s \"~A\"" lispname doc
                    cname))
@@ -189,9 +193,6 @@ code:
                                          real-output-file))
          (tmp-constants (merge-pathnames #p"constants.lisp-temp"
                                          real-output-file)))
-    (princ (list filename output-file real-output-file
-                 tmp-c-source tmp-a-dot-out tmp-constants))
-    (terpri)
     (funcall (intern "C-CONSTANTS-EXTRACT" (find-package "SB-GROVEL"))
              filename tmp-c-source (constants-package component))
     (unless (do-not-grovel component)
