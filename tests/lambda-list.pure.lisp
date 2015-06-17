@@ -257,18 +257,51 @@
   (assert-signal (sb-c::parse-ds-lambda-list '(a &optional ((b c) 'foo)))
                  style-warning))
 
-;; Eventually the same lambda lists and test inputs should be run through
-;; all possible modes of expand-ds-bind, which is why these tests use
-;; more macros than are obviously necessary as of now.
+(with-test (:name :ds-bind-list-checkers)
+  (labels ((gen-check (lambda-list macro-context)
+             (sb-c::emit-ds-bind-check (sb-c::parse-ds-lambda-list lambda-list)
+                                       :ignore macro-context nil))
+           (try (winp lambda-list input)
+             (let ((check (gen-check lambda-list nil)))
+               (if winp
+                   (apply (car check) input (cddr check))
+                   (assert-error (apply (car check) input (cddr check)))))))
+    (try t '(a b . rest) '(1 2))
+    (try t '(a b . rest) '(1 2 3))
+    (try t '(a b . rest) '(1 2 . foo))
+    (try nil '(a b . rest) '(1))
+    (try t '(a &optional b . rest) '(1 2))
+    (try nil '(a &key b) '(1 :b)) ; odd
+    (try nil '(a &key b) '(1 :b . bar)) ; dotted
+    (try nil '(a &key b) '(1 :b bar . baz)) ; dotted
+    (try t '(a &key b) '(1 :b bar :allow-other-keys nil))
+
+    (let ((check (gen-check '(bar &key ((secret v)))
+                            '(:macro whatever . define-compiler-macro))))
+      (apply (car check) '(a secret 3) (cddr check))
+      (assert-signal (apply (car check) '(a secret 3) (cddr check))
+                     sb-c::compiler-macro-keyword-problem))))
+
+;; The same lambda lists and test inputs are each run two different ways.
 (macrolet ((with-test-ll ((name lambda-list) &body body)
              `(with-test (:name (:ds-bind-shape ,name))
-                (let ((ast (sb-c::meta-abstractify-ds-lambda-list
+                (let ((fun
+                       (lambda (args)
+                         (sb-int:binding*
+                             ,(sb-c::expand-ds-bind lambda-list 'args nil 'the)
+                           (list ,@(sb-c::ds-lambda-list-symbols
+                                    (sb-c::parse-ds-lambda-list lambda-list))))))
+                      (ast (sb-c::meta-abstractify-ds-lambda-list
                             (sb-c::parse-ds-lambda-list ',lambda-list))))
                   ,@body)))
-           (win (x)
-             `(assert (sb-c::ds-lambda-list-match-p ,x ast)))
+           (win (x &optional expect)
+             `(progn (assert (sb-c::ds-lambda-list-match-p ,x ast))
+                     ,(if expect
+                          `(assert (equal (funcall fun ,x) ,expect))
+                          `(funcall fun ,x)))) ; don't crash is all
            (lose (x)
-             `(assert (not (sb-c::ds-lambda-list-match-p ,x ast)))))
+             `(progn (assert (not (sb-c::ds-lambda-list-match-p ,x ast)))
+                     (assert-error (funcall fun ,x)))))
 
   (with-test-ll (:want-0-args ()) ; this only allows NIL as its input
     (win '())
@@ -336,13 +369,13 @@
     (win '((1) ((2 . whatever)) (3 4)))
     (lose '((1) ((2)) (3))))
 
-  (with-test-ll (:hairy-2 ((a) ((b . c)) &optional ((x &optional y) f)))
+  (with-test-ll (:hairy-2 ((a) ((b . c)) &optional ((x &optional y) '(f))))
     (win '((1) ((2 . whatever)) (3)))
     (win '((1) ((2 . whatever))))
     (lose '((1) ((2 . whatever)) 3)))
 
   ;; This destructuring &WHOLE pattern demands at least 2 args,
-  ;; despite that the containing pattern otherwise accepts 1 or more.
+  ;; despite that the containing pattern otherwise accepts 0 or more.
   (with-test-ll (:destructured-whole (&whole (a b . c) &optional x &rest y))
     (lose '())
     (lose '(a))
@@ -351,7 +384,8 @@
     (win '(a b c)))
 
   (with-test-ll (:destructured-key (a b &rest r
-                                      &key ((:point (x y &optional z)) f)))
+                                      &key ((:point (x y &optional z))
+                                            (list 'foo 'bar))))
     (lose '(a b . foo))
     (win '(a b :point (1 2)))
     (lose '(a b :point (1 2 . 3)))
@@ -375,4 +409,17 @@
     (lose '(:fruits (3)))
     (win '(:fruits nil)))
 
+  ;; Test an EXPAND-DS-BIND that is hairier than you should ever write.
+  (with-test-ll (:insane-hair
+                 ((a ((b) &key)) &optional (((c &rest r)) '((wat)) csp)
+                  &aux (bork 'end)))
+    (win '((1 ((2)))) '(1 2 wat nil nil end))
+    (win '((1 ((2) :size 3 :allow-other-keys t)))
+         '(1 2 wat nil nil end))
+    (win '((1 ((2))) ((3 . more))) '(1 2 3 more t end))
+    (lose '((1 ((2 3)))))
+    (lose '((1 ((2) 3))))
+    (lose '((1 ((2)) 3)))
+    (lose '((1 ((2))) wat))
+    (lose '((1 ((2))) (wat))))
   )

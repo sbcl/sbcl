@@ -571,4 +571,346 @@
                   (go loop))))
       (recurse template object))))
 
+;;; Emit a correctness check for one level of structure in PARSED-LAMBDA-LIST
+;;; which receives values from INPUT.
+;;; MACRO-CONTEXT provides context for the diagnostic message.
+;;; MEMO-TABLE is an alist of previously-unparsed parsed-lambda-lists.
+;;; The checker returns INPUT if it was well-formed, or signals an error.
+;;;
+;;; There is a better way (not implemented) to check &KEY arguments: assume
+;;; optimistically that unknown/duplicate keywords aren't frequent, and perform
+;;; all GETF operations for known keywords into temp vars; count the ones that
+;;; found something, and compare to the plist length/2.  If not equal, then do
+;;; a further check. Otherwise we've done most of the work of parsing;
+;;; just move the temps into their final places in turn.
+;;;
+(defun emit-ds-bind-check (parsed-lambda-list input macro-context memo-table)
+  (with-ds-lambda-list-parts (llks nil req opt rest keys) parsed-lambda-list
+    (let* ((display (unparse-ds-lambda-list parsed-lambda-list memo-table))
+           (pattern `',(if macro-context (cons macro-context display) display))
+           (min (length req))
+           (max (+ min (length opt)))
+           (bounds (list min max)))
+      (cond ((ll-kwds-keyp llks)
+             `(,(if (eq (cddr macro-context) 'define-compiler-macro)
+                    'cmacro-check-ds-list/&key
+                    'check-ds-list/&key)
+                ,input ,@bounds ,pattern
+                ,(unless (ll-kwds-allowp llks)
+                   (map 'vector #'parse-key-arg-spec keys))))
+            ;; The case that need not check anything at all:
+            ;; no keys, no required, no optional, and a &rest arg.
+            ((and rest (eql max 0)) input) ; nothing to check
+            (rest `(check-ds-list/&rest ,input ,@bounds ,pattern))
+            (t `(check-ds-list ,input ,@bounds ,pattern))))))
+
+;;; Produce the binding clauses for a BINDING* form that destructures
+;;; LAMBDA-LIST from input in DATA.
+;;; EMIT-PRE-TEST, if true, will diagnose most (but not all) structural
+;;; errors [*] before executing user-supplied code in defaulting forms.
+;;; EXPLICIT-CAST is one of {THE, TRULY-THE, NIL} to insert casts or not.
+;;; Optional MACRO-CONTEXT provides context for the error strings.
+;;; DEFAULT-DEFAULT, which defaults to NIL, supplies the value for optional
+;;; and key arguments which were absent and had no explicit defaulting form.
+;;;
+;;; Without explicit casts, the input must satisfy LISTP at each CAR/CDR step.
+;;; If pre-tests were done and user code did not smash the input, then it
+;;; will satisfy LISTP, and EXPLICIT-CAST may be specified as 'TRULY-THE
+;;; to omit compiler-generated ("checkgen") tests. If pre-tests were not done,
+;;; then EXPLICIT-CAST should be specified as 'THE to strengthen type tests
+;;; into (THE CONS x) at mandatory arguments.
+;;;
+;;; [*] "Structural errors" are those due to mismatch of the input against
+;;; the template; in the case of one list level, an error can be signaled
+;;; before defaults are evaluated, but with nested destructuring, this is not
+;;; always possible. Previously there was an attempt to check outer lists
+;;; before proceeding to inner lists, but this required departure from
+;;; customary left-to-right evaluation order of source forms as written.
+;;; The new scheme seems more in accordance with other Lisp implementations.
+;;; Portable code should probably not rely on the order in which structural
+;;; errors are tested for. If input is well-formed - it matches the template -
+;;; then there is no possibility of user code sensing the order in which
+;;; well-formedness tests ran.
+;;;
+(defun expand-ds-bind (lambda-list data emit-pre-test explicit-cast
+                       &optional macro-context default-default)
+  (collect ((cache (list nil)) ; This is a "scratchpad" for the unparser.
+            (bind))
+    (labels
+        (;; Bind VAR from VAL-FORM. VAR can be a symbol or ds-lambda-list.
+         (bind-pat (var val-form)
+           (if (symbolp var) (bind `(,var ,val-form)) (descend var val-form)))
+         ;; Conditionally bind VAR from VAL-FORM based on SUP-P-FORM.
+         (bind-if (sense sup-p-form val-form var sup-p-var def)
+           (let* ((suppliedp (car sup-p-var)) ; could be nil
+                  (vals (gen-test sense sup-p-form
+                                  (if sup-p-var `(values ,val-form t) val-form)
+                                  def)))
+             (cond ((not sup-p-var) (bind-pat var vals))
+                   ((symbolp var) (bind `((,var ,suppliedp) ,vals)))
+                   (t
+                    (let ((var-temp (sb!xc:gensym))
+                          (sup-p-temp (copy-symbol suppliedp)))
+                      (bind `((,var-temp ,sup-p-temp) ,vals))
+                      (descend var var-temp)
+                      (bind `(,suppliedp ,sup-p-temp)))))))
+         (gen-test (sense test then else)
+           (cond ((eq sense t) `(if ,test ,then ,@(if else (list else))))
+                 (else `(if ,test ,else ,then)) ; flip the branches
+                 (t `(if (not ,test) ,then)))) ; invert the test
+         (descend (parsed-lambda-list input)
+           (with-ds-lambda-list-parts (llks whole required opt rest keys aux)
+               parsed-lambda-list
+             ;; There could be nothing but &AUX vars in the lambda list.
+             ;; If nothing to bind from INPUT, then ignore "ds-check" result.
+             ;; But if keywords are accepted, always call the checker.
+             ;; A feature of BINDING* is that binding something to () means,
+             ;; in theory, (MULTIPLE-VALUE-BIND () (EXPR) ...)
+             ;; but in practice it becomes a binding of an ignored gensym.
+             (let* ((bindings-p (or whole required opt rest keys))
+                    (temp (and bindings-p (sb!xc:gensym))))
+               (bind `(,temp
+                       ,(cond ((or emit-pre-test (ll-kwds-keyp llks))
+                               (emit-ds-bind-check parsed-lambda-list input
+                                                   macro-context (cache)))
+                              ((or bindings-p (not explicit-cast)) input)
+                              ;; If nothing gets bound, then input must be NIL,
+                              ;; unless &KEY is accepted, which was done above.
+                              (t `(,explicit-cast null ,input)))))
+               (setq input temp))
+             ;; I would think it totally absurd to use something
+             ;; other than a symbol for &WHOLE, but the spec allows it.
+             (when whole (bind-pat (car whole) input))
+
+             (flet ((cast/pop (typed-list-expr more-to-go)
+                      `(prog1 (car ,typed-list-expr)
+                         ,(if (or more-to-go rest (ll-kwds-keyp llks))
+                              `(setq ,input (cdr ,input))
+                              `(,explicit-cast null (cdr ,input))))))
+               ;; Mandatory args. Only the rightmost need check that it sees
+               ;; a CONS. The predecessors will naturally assert that the
+               ;; input so far was of type LIST, which is enough.
+               ;; FIXME: explicit-cast of TRULY-THE should be inserted always.
+               ;; Lack thereof only affects performance, not semantics.
+               (do ((elts required (cdr elts)))
+                   ((endp elts))
+                 (bind-pat (car elts)
+                           (if (or (cdr elts) (not explicit-cast))
+                               `(pop ,input)
+                               (cast/pop `(,explicit-cast cons ,input) opt))))
+               ;; Optionals.
+               (do ((elts opt (cdr elts)))
+                   ((endp elts))
+                 (let ((elt (car elts)))
+                   (multiple-value-bind (var def sup-p-var)
+                       (if (atom elt)
+                           (values elt)
+                           (values (car elt)
+                                   (if (cdr elt) (cadr elt) default-default)
+                                   (cddr elt)))
+                     (bind-if t input
+                              (if (or (cdr elts) (not explicit-cast))
+                                  `(pop ,input)
+                                  ;; Don't assert CONS. CAR will assert LIST,
+                                  ;; and input is only popped when non-nil.
+                                  (cast/pop input nil))
+                              var sup-p-var def)))))
+
+             ;; The spec allows the inane use of (A B &REST (C D)) = (A B C D).
+             ;; The former is less efficient, since it is "nested", only not.
+             (when rest (bind-pat (car rest) input))
+
+             ;; Keywords.
+             (dolist (elt keys)
+               (multiple-value-bind (keyword var def sup-p-var)
+                   (parse-key-arg-spec elt default-default)
+                 (let ((temp (sb!xc:gensym)))
+                   (bind `(,temp (ds-getf ,input ',keyword)))
+                   (bind-if :not `(eql ,temp 0) `(car (truly-the cons ,temp))
+                            var sup-p-var def))))
+
+             ;; &AUX bindings aren't destructured. Finally something easy.
+             (dolist (elt aux)
+               (multiple-value-bind (var val)
+                   (if (listp elt) (values (car elt) (cadr elt)) elt)
+                 (bind `(,var ,val)))))))
+
+      (descend (parse-ds-lambda-list lambda-list) data)
+      (bind))))
+
+;;; Runtime support
+
+;; Extract the context from a destructuring-bind pattern as represented in
+;; a call to a checking function. A "context" is a non-bindable subpattern
+;; headed by :MACRO (as it came from a macro-like operator, e.g. DEFTYPE).
+;; Return three values: CONTEXT-NAME, CONTEXT-KIND, and the real pattern.
+(defun get-ds-bind-context (pattern)
+  (let ((marker (car pattern)))
+    (if (eq (if (listp marker) (car marker)) :macro)
+        (let ((context (cdr marker)))
+          (values (car context) (cdr context) (cdr pattern)))
+        (values nil 'destructuring-bind pattern))))
+
+;; Given FORM as the input to a compiler-macro, return the argument forms
+;; that the called function would receive, skipping over FUNCALL.
+(defun compiler-macro-args (form)
+  (cdr (if (eql (car form) 'funcall) (cdr form) form)))
+
+(macrolet ((scan-req-opt ((input min max pattern list-name actual-max)
+                          &key if-list-exhausted if-max-reached)
+             ;; Decide whether the input matches up to the end of
+             ;; the required and/or optional arguments.
+             ;; MAX is the limit on number of CDR operations performed
+             ;; in the loop. ACTUAL-MAX describes the upper bound
+             ;; in a condition reporting function.
+             ;; e.g. (A &OPTIONAL B &REST C) has MAX = 2, ACTUAL-MAX = NIL.
+             ;;      The input must be a proper list up to 2 arguments,
+             ;;      but beyond that may be dotted.
+             `(let ((,list-name ,input) (count ,max))
+                (declare (type index count))
+                (loop (when (zerop count) (return ,if-max-reached))
+                      (when (null ,list-name)
+                        (if (< (- max count) ,min)
+                            (min/max-err ,pattern ,actual-max)
+                            (return ,if-list-exhausted)))
+                      (unless (listp ,list-name) ; dotted list error
+                        (min/max-err ,pattern ,actual-max))
+                      (decf count)
+                      (setq ,list-name (cdr ,list-name)))))
+           (min/max-err (pattern effective-max)
+             `(multiple-value-bind (name kind lambda-list)
+                  (get-ds-bind-context ,pattern)
+               (sb!kernel::arg-count-error kind name input lambda-list
+                                           min ,effective-max))))
+
+  ;; Assert that INPUT has the requisite number of elements as
+  ;; specified by MIN/MAX. PATTERN does not contain &REST or &KEY.
+  (defun check-ds-list (input min max pattern)
+    (declare (type index min max) (optimize speed))
+    (scan-req-opt (input min max pattern list max)
+                  ;; If 'count' became zero, then since there was
+                  ;; no &REST, the LIST had better be NIL.
+                  :if-max-reached (if list (min/max-err pattern max) input)
+                  ;; The loop checks for dotted tail and at least MIN elements,
+                  ;; so end of list means a valid match to the pattern.
+                  :if-list-exhausted input))
+
+  ;; As above, but the pattern contains &REST.
+  ;; Elements beyond the final optional arg can form a dotted list.
+  (defun check-ds-list/&rest (input min max pattern)
+    (declare (type index min max) (optimize speed))
+    (scan-req-opt (input min max pattern list nil)
+                  :if-list-exhausted input :if-max-reached input))
+
+  ;; Check just the keyword portion of the input in PLIST
+  ;; against VALID-KEYS. If VALID-KEYS = NIL then we don't care what
+  ;; the keys are - &ALLOW-OTHER-KEYS was present in the lambda-list,
+  ;; and we don't care if non-symbols are found in keyword position.
+  ;; We always enforce that the list is not odd-length though.
+  (flet ((check-plist (input plist valid-keys pattern)
+           (let ((list plist) seen-allowp seen-other bad-key)
+             (flet ((validp (key)
+                      (find key (truly-the simple-vector valid-keys) :test 'eq))
+                    (croak (problem &optional (info plist))
+                      (multiple-value-bind (kind name)
+                          (get-ds-bind-context pattern)
+                       (error 'sb!kernel::defmacro-lambda-list-broken-key-list-error
+                              :kind kind :name name
+                              :problem problem :info info))))
+               (declare (inline validp))
+               (loop
+                (when (null list)
+                  (if seen-other
+                      (croak :unknown-keyword ; show any one unaccepted keyword
+                             (list bad-key
+                                   (coerce (truly-the simple-vector valid-keys)
+                                           'list)))
+                      (return input)))
+                (unless (listp list) (croak :dotted-list))
+                (let ((next (cdr list)))
+                  (when (null next) (croak :odd-length))
+                  (unless (listp next) (croak :dotted-list))
+                  (let ((key (car list)))
+                    (when valid-keys
+                      (if (eq key :allow-other-keys) ; always itself allowed
+                          (unless seen-allowp
+                            (when (car next) ; :allow-other-keys <non-nil>
+                              (setf valid-keys nil seen-other nil))
+                            (setf seen-allowp t))
+                          (when (and (not seen-other) (not (validp key)))
+                            (setq seen-other t bad-key key)))))
+                  (setq list (cdr next))))))))
+
+    ;; The pattern contains &KEY. Anything beyond the final optional arg
+    ;; must be a well-formed property list regardless of existence of &REST.
+    (defun check-ds-list/&key (input min max pattern valid-keys)
+      (declare (type index min max) (optimize speed))
+      (scan-req-opt (input min max pattern list nil)
+                    :if-list-exhausted input
+                    :if-max-reached (check-plist input list valid-keys
+                                                 pattern)))
+
+    ;; Compiler-macro lambda lists are macro lambda lists -- meaning that
+    ;; &key ((a a) t) should match a literal A, not a form evaluating to A
+    ;; as in an ordinary lambda list.
+    ;;
+    ;; That, however, breaks the evaluation model unless A is also a
+    ;; constant evaluating to itself. So, signal a condition telling the
+    ;; compiler to punt on the expansion.
+    ;; Moreover it has to be assumed that any non-constant might
+    ;; evaluate to :ALLOW-OTHER-KEYS.
+    ;;
+    ;; The reason this is its own function is for separation of concerns.
+    ;; Suppose that CHECK-DS-LIST/&KEY had a short-circuit exit wherein
+    ;; seeing ":ALLOW-OTHER-KEYS <non-nil>" stopped testing for keywords in
+    ;; the accepted list, but instead quickly scanned for a proper tail.
+    ;; (It doesn't, but suppose it did). A compiler-macro must nonetheless
+    ;; finish looking for all non-constant symbols in keyword positions.
+    ;; More realistically, if the optimization for &KEY mentioned above
+    ;; EMIT-DS-BIND-CHECK were implemented, where perhaps we elide a call
+    ;; to validate keywords, a compiler-macro is probably always best
+    ;; handled by a out-of-line call on account of the extra hair.
+    ;;
+    (defun cmacro-check-ds-list/&key (input min max pattern valid-keys)
+      (declare (type index min max) (optimize speed))
+      (flet ((require-constant-keys (plist)
+               ;; Signal a condition if the compiler should give up
+               ;; on expanding this macro. Well-formedness of the plist
+               ;; makes no difference, since CHECK-PLIST is rigorous.
+               ;; If the condition isn't handled, we just press onward.
+               (loop
+                  (when (atom plist) (return))
+                  (let ((key (pop plist)))
+                    (unless (or (keywordp key)
+                                (and (symbolp key)
+                                     (constantp key)
+                                     (eq key (symbol-value key))))
+                      (signal 'compiler-macro-keyword-problem :argument key)))
+                  (when (atom plist) (return))
+                  (pop plist))))
+        (scan-req-opt (input min max pattern list nil)
+                      :if-list-exhausted input
+                      :if-max-reached (progn (require-constant-keys list)
+                                             (check-plist input list valid-keys
+                                                          pattern)))))))
+
+;; Like GETF but return CDR of the cell whose CAR contained the found key,
+;; instead of CADR; and return 0 for not found.
+;; This helps destructuring-bind slightly by avoiding a secondary value as a
+;; found/not-found indicator, and using 0 is better for backends which don't
+;; wire a register to NIL. Also, NIL would accidentally allow taking its CAR
+;; if the caller were to try, whereas we'd want to see a explicit error.
+(defun ds-getf (place indicator)
+  (do ((plist place (cddr plist)))
+      ((null plist) 0)
+    (cond ((atom (cdr plist))
+           (error 'simple-type-error
+                  :format-control "malformed property list: ~S."
+                  :format-arguments (list place)
+                  :datum (cdr plist)
+                  :expected-type 'cons))
+          ((eq (car plist) indicator)
+           ;; Typecheck the next cell so that calling code doesn't get an atom.
+           (return (the cons (cdr plist)))))))
+
 (/show0 "parse-lambda-list.lisp end of file")
