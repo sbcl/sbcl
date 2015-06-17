@@ -294,24 +294,44 @@
       (values (logior seen (if (oddp rest-bits) (bits &body) 0))
               required optional (or rest more) keys aux env whole))))
 
-;; Construct an abstract representation of a destructuring lambda list
-;; from its source form, recursing as necessary.
-(defun parse-ds-lambda-list (lambda-list)
+;;; Construct an abstract representation of a destructuring lambda list
+;;; from its source form, recursing as necessary.
+;;; Warn if it looks like a default expression will cause pattern mismatch.
+;;; There are other things we could issue style warnings about:
+;;; - a &REST arg that destructures preceded by any optional args.
+;;;   It's suspicious because if &REST destructures, then in essence it
+;;;   must not be NIL, which means the optionals aren't really optional.
+(defun parse-ds-lambda-list (lambda-list &key silent)
   (multiple-value-bind (llks required optional rest keys aux env whole)
       (parse-lambda-list lambda-list
                          :accept (lambda-list-keyword-mask 'destructuring-bind)
                          :context 'destructuring-bind)
    (declare (ignore env) (notinline mapcar))
-   (flet ((parse (list) (if (atom list) list (parse-ds-lambda-list list))))
+   (labels ((parse (list) (if (atom list) list (parse-ds-lambda-list list)))
+            (parse* (list arg-specifier)
+              (let ((parse (parse list)))
+                (when (and (not silent) (vectorp parse)) ; is destructuring
+                  (let ((default (and (cdr arg-specifier) ; have an explicit default
+                                      (cadr arg-specifier))))
+                    (when (and (constantp default)
+                               (not (ds-lambda-list-match-p
+                                     (#+sb-xc constant-form-value #-sb-xc eval
+                                      default)
+                                     (meta-abstractify-ds-lambda-list parse))))
+                      (style-warn
+                       "Default expression ~S does not match ~S in ~S"
+                       default list lambda-list))))
+                parse)))
      (vector llks
              (mapcar #'parse whole) ; a singleton or NIL
              (mapcar #'parse required)
-             (mapcar (lambda (x) (if (atom x) x (cons (parse (car x)) (cdr x))))
+             (mapcar (lambda (x)
+                       (if (atom x) x (cons (parse* (car x) x) (cdr x))))
                      optional)
              (mapcar #'parse rest) ; a singleton or NIL
              (mapcar (lambda (x)
                        (if (typep x '(cons cons))
-                           (cons (list (caar x) (parse (cadar x))) (cdr x))
+                           (cons (list (caar x) (parse* (cadar x) x)) (cdr x))
                            x))
                      keys)
              aux))))
@@ -336,6 +356,47 @@
               (if (symbolp var)
                   (values (keywordicate var) var def sup-p-var)
                   (values (car var) (cadr var) def sup-p-var))))))
+
+;;; Return a "twice abstracted" representation of DS-LAMBDA-LIST that removes
+;;; all variable names, &AUX parameters, supplied-p variables, and defaults.
+;;; The result is a list with trailing suffixes of NIL dropped, and which can
+;;; be given to an AST matcher yielding a boolean answer as to whether some
+;;; input matches, with one caveat: Destructured &OPTIONAL or &KEY default
+;;; forms may cause failure of a destructuring-bind due to inner expressions
+;;; causing mismatch. In most cases this can not be anticipated.
+(defun meta-abstractify-ds-lambda-list (parsed-ds-lambda-list)
+  (labels ((process-opt/key (x) (recurse (if (listp x) (car x) x)))
+           (recurse (thing)
+             (when (symbolp thing)
+               (return-from recurse t))
+             (with-ds-lambda-list-parts (llks whole req opt rest keys) thing
+               (let ((keys
+                      (when (ll-kwds-keyp llks)
+                        (cons (ll-kwds-allowp llks)
+                              (mapcar (lambda (x)
+                                        (cons (parse-key-arg-spec x)
+                                              (if (typep x '(cons cons))
+                                                  (recurse (cadar x))
+                                                  (process-opt/key x))))
+                                      keys))))
+                     ;; Compute reversed representation of req, opt, rest.
+                     (repr (list (when rest (recurse (car rest)))
+                                 (mapcar #'process-opt/key opt)
+                                 (mapcar #'recurse req))))
+                 ;; If &KEYS are present, then req, opt, rest must be too.
+                 ;; But if not, then pop leading NILs (which become trailing
+                 ;; NILs). Missing parts aren't stored.
+                 ;; A degenerate ds-lambda-list accepting 0 args is just ().
+                 (unless keys
+                   (loop (if (or (null repr) (car repr)) (return) (pop repr))))
+                 (let ((result (nreconc repr keys))
+                       (whole (car whole)))
+                   (if (vectorp whole) ; Destructuring. Ugh.
+                       ;; The input must match two things - a tree implied by
+                       ;; the nested &WHOLE, and a tree that contains it.
+                       `(:both ,(recurse whole) ,@result)
+                       result))))))
+    (recurse parsed-ds-lambda-list)))
 
 ;; Construct a lambda list from sublists.
 ;; If &WHOLE and REST are present, they must be singleton lists.
@@ -436,5 +497,78 @@
       (recurse parsed-lambda-list)
       (output))))
 
+;;; Return T if EXPR matches TEMPLATE, where TEMPLATE is a meta-abstractified
+;;; destructuring lmbda list. Mnemonic: the arguments are like TYPEP.
+;;; [Indeed the AST could be a monstrous type specifier involving {CONS,AND,OR}
+;;; except for lambda lists that involve keywords.]
+;;;
+(defun ds-lambda-list-match-p (object template)
+  (macrolet ((pop-template () '(pop (truly-the list template)))
+             (accept ()
+               '(unless template (return-from recurse (null args))))
+             (fail ()
+               '(return-from recurse nil)))
+    ;; When a failure occurs, we could return all the way out, but that would
+    ;; mean establishing a dynamic exit. Instead let failure bubble up.
+    (labels ((recurse (template args)
+               (accept) ; Exit if no required, optional, rest, key args.
+               (when (eq (car (truly-the list template)) :both)
+                 (return-from recurse
+                   (and (recurse (cadr template) args)
+                        (recurse (cddr template) args))))
+               ;; Required args
+               (dolist (subpat (pop-template)) ; For each required argument
+                 (let ((arg (if (atom args) (fail) (pop args))))
+                   (when (and (listp subpat) (not (recurse subpat arg)))
+                     (fail))))
+               (accept) ; Exit if no optional, rest, key args.
+               ;; &OPTIONAL args
+               (dolist (subpat (pop-template))
+                 (let ((arg (cond ((not (listp args)) (fail))
+                                  ((null args)
+                                   ;; Why not just return T now?
+                                   ;; Because destructured &REST maybe.
+                                   (if template
+                                       (return)
+                                       (return-from recurse t)))
+                                  (t (pop args)))))
+                   (when (and (listp subpat) (not (recurse subpat arg)))
+                     (fail))))
+               (accept) ; Exit if no rest, key args.
+               ;; If REST is not a cons, that's fine - it's either T, meaning
+               ;; that it was present but not a pattern, or NIL, meaning
+               ;; absent, in which case &KEY must have been present,
+               ;; otherwise the preceding (ACCEPT) would have returned.
+               (let ((rest (pop-template)))
+                 (when (and (consp rest) (not (recurse rest args)))
+                   (fail)))
+               (when (null template) ; No keys.
+                 (return-from recurse t))
+               ;; Now test all keywords against the allowed ones, even if
+               ;; &ALLOW-OTHER-KEYS was present. Any key's value might bind
+               ;; to a subpattern, and the lambda list could be insane as well:
+               ;;   (&KEY ((:allow-other-keys (x)) '(foo)))
+               ;; where the value of :ALLOW-OTHER-KEYS must apparently
+               ;; be a cons. Yeesh.
+               (prog ((allowp (if (pop template) t 0)) seen-other)
+                LOOP
+                  (when (null args)
+                    (return (or (not seen-other) (eq allowp t))))
+                  (unless (listp args) (return nil))
+                  (let* ((next (cdr args))
+                         (key (car args))
+                         (cell (assq key template)))
+                    (unless (consp next) (return nil))
+                    (if (not cell)
+                        (setq seen-other t)
+                        (let ((pattern (cdr cell)))
+                          (when (and (listp pattern)
+                                     (not (recurse pattern (car next))))
+                            (fail))))
+                    (when (and (eq key :allow-other-keys) (eql allowp 0))
+                      (setq allowp (if (car next) t nil)))
+                    (setq args (cdr next)))
+                  (go loop))))
+      (recurse template object))))
 
 (/show0 "parse-lambda-list.lisp end of file")

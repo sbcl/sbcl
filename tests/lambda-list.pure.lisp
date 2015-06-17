@@ -184,7 +184,7 @@
     (try '((&body foo) (&whole (a . d) x y) &aux)
          '((&body foo) (&whole (a . d) x y)))
 
-    (try '(&optional a ((bb1 bb2)) (c 'c) (d 'd dsp) &aux foo (baz))
+    (try '(&optional a ((bb1 bb2) (f)) (c 'c) (d 'd dsp) &aux foo (baz))
          '(&optional a ((bb1 bb2)) (c) (d)))
 
     (try '(&key ((:bork (zook mook)) def bsp) (e 'e esp)
@@ -250,5 +250,129 @@
            &key k1 (k2) (k3 'foo) (k4 'baz k4p) ((:boo (k5 k6)) '(1 2) k56p))
          '(a b c r1 r2 k1 k2 k3 k4 k4p k5 k6 k56p))
 
-    (try '(a &optional x (y) (z 'foo zp) ((w1 w2)) &aux foo (bar) (baz 3))
+    (try '(a &optional x (y) (z 'foo zp) ((w1 w2) (f)) &aux foo (bar) (baz 3))
          '(a x y z zp w1 w2 foo bar baz))))
+
+(with-test (:name :ds-lambda-list-possible-mismatch-warning)
+  (assert-signal (sb-c::parse-ds-lambda-list '(a &optional ((b c) 'foo)))
+                 style-warning))
+
+;; Eventually the same lambda lists and test inputs should be run through
+;; all possible modes of expand-ds-bind, which is why these tests use
+;; more macros than are obviously necessary as of now.
+(macrolet ((with-test-ll ((name lambda-list) &body body)
+             `(with-test (:name (:ds-bind-shape ,name))
+                (let ((ast (sb-c::meta-abstractify-ds-lambda-list
+                            (sb-c::parse-ds-lambda-list ',lambda-list))))
+                  ,@body)))
+           (win (x)
+             `(assert (sb-c::ds-lambda-list-match-p ,x ast)))
+           (lose (x)
+             `(assert (not (sb-c::ds-lambda-list-match-p ,x ast)))))
+
+  (with-test-ll (:want-0-args ()) ; this only allows NIL as its input
+    (win '())
+    (lose 'foo)
+    (lose '(a)))
+
+  (with-test-ll (:want-1-arg (a))
+    (lose '())
+    (lose 'foo)
+    (win '(a))
+    (lose '(a . b))
+    (lose '(a b)))
+
+  (with-test-ll (:want-1-or-2-args (a &optional b))
+    (lose '())
+    (lose 'foo)
+    (win '(a))
+    (lose '(a . b))
+    (win '(a b))
+    (lose '(a b . c))
+    (lose '(a b c)))
+
+  (with-test-ll (:want-3-args (a b c))
+    (lose '())
+    (lose '(a))
+    (lose '(a b))
+    (lose '(a b . c))
+    (win '(a b c))
+    (lose '(a b c . d))
+    (lose '(a b c d)))
+
+  (with-test-ll (:want-3-or-4-args (a b c &optional d))
+    (lose '())
+    (lose '(a))
+    (lose '(a b))
+    (lose '(a b . c))
+    (win '(a b c))
+    (lose '(a b c . d))
+    (win '(a b c d))
+    (lose '(a b c d . e))
+    (lose '(a b c d ee)))
+
+  (with-test-ll (:want-3-or-more-args (a b c &optional d . r))
+    (lose '())
+    (lose '(a))
+    (lose '(a b))
+    (lose '(a b . c))
+    (win '(a b c))
+    (lose '(a b c . d))
+    (win '(a b c d))
+    (win '(a b c d . e))
+    (win '(a b c d ee)))
+
+  (with-test-ll (:destructured-rest (a b &rest (c d)))
+    (lose '())
+    (lose '(a b))
+    (lose '(a b . c))
+    (lose '(a b c . d))
+    (win '(a b c d))
+    (lose '(a b c d . e))
+    (lose '(a b c d ee)))
+
+  (with-test-ll (:hairy-1 ((a) ((b . c)) &optional ((x y) '(vx vy))))
+    (win '((1) ((2 . whatever)) (3 4)))
+    (win '((1) ((2 . whatever)) (3 4)))
+    (lose '((1) ((2)) (3))))
+
+  (with-test-ll (:hairy-2 ((a) ((b . c)) &optional ((x &optional y) f)))
+    (win '((1) ((2 . whatever)) (3)))
+    (win '((1) ((2 . whatever))))
+    (lose '((1) ((2 . whatever)) 3)))
+
+  ;; This destructuring &WHOLE pattern demands at least 2 args,
+  ;; despite that the containing pattern otherwise accepts 1 or more.
+  (with-test-ll (:destructured-whole (&whole (a b . c) &optional x &rest y))
+    (lose '())
+    (lose '(a))
+    (lose '(a . b))
+    (win '(a b))
+    (win '(a b c)))
+
+  (with-test-ll (:destructured-key (a b &rest r
+                                      &key ((:point (x y &optional z)) f)))
+    (lose '(a b . foo))
+    (win '(a b :point (1 2)))
+    (lose '(a b :point (1 2 . 3)))
+    (win '(a b :point (1 2 3)))
+    (lose '(a b :point (1 2 3 4)))
+    (lose '(a b :point (1 2 3) :baz 9))
+    (win '(a b :point (1 2 3) :baz 9 :allow-other-keys t))
+    (win '(a b :point (1 2 3) :baz 9 :allow-other-keys t
+           :allow-other-keys nil)))
+
+  ;; This bizarro lambda lists expects that if you give the :FRUITS keyword,
+  ;; then its value is NIL, because it has to match a lambda list that
+  ;; accepts exactly zero required arguments, zero optionals, and no &REST.
+  (with-test-ll (:fruity (&key ((:fruits (&optional)))))
+    (win '())
+    (lose 'a)
+    (lose '(a))
+    (lose '(a . b))
+    (lose '(:fruits))
+    (lose '(:fruits 3))
+    (lose '(:fruits (3)))
+    (win '(:fruits nil)))
+
+  )
