@@ -51,11 +51,10 @@
 ;; the nuance of TRULY-THE. Strictly speaking, byte-specifier is not a
 ;; type specifier that users are supposed to know about, so portable code
 ;; should not care, but this might affect internal code.
-(with-test (:name :dbp-inner-macro)
+(with-test (:name :dpb-inner-macro)
   (flet ((source-xform (sexpr)
-           (let ((sb-c:*lexenv* (sb-kernel:make-null-lexenv)))
-             (funcall (sb-int:info :function :source-transform (car sexpr))
-                      sexpr))))
+           (funcall (sb-int:info :function :source-transform (car sexpr))
+                    sexpr (sb-kernel:make-null-lexenv))))
     (assert (equal-mod-gensyms
              (source-xform
               '(dpb (new) (truly-the sb-kernel:byte-specifier bspec) (old)))

@@ -106,7 +106,7 @@
                                         (values nil t)))
                         :wrap-block nil)
       `(setf (info :function :source-transform ',fun-name)
-             (lambda (,whole-var &aux (,n-env *lexenv*))
+             (lambda (,whole-var ,n-env)
                ,@decls
                (block ,name
                  ,body))))))

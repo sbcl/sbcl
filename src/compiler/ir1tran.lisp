@@ -1093,7 +1093,7 @@
           (if transform
               (multiple-value-bind (transformed pass)
                   (if (functionp transform)
-                      (funcall transform form)
+                      (funcall transform form *lexenv*)
                       (let ((result
                              (if (eq (cdr transform) :predicate)
                                  (and (singleton-p (cdr form))

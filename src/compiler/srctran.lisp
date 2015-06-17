@@ -69,8 +69,9 @@
 ;;;; list hackery
 
 ;;; Translate CxR into CAR/CDR combos.
-(defun source-transform-cxr (form)
-  (if (/= (length form) 2)
+(defun source-transform-cxr (form env)
+  (declare (ignore env))
+  (if (not (singleton-p (cdr form)))
       (values nil t)
       (let* ((name (car form))
              (string (symbol-name
