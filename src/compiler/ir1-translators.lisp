@@ -619,23 +619,16 @@ be a lambda expression."
 (def-ir1-translator %funcall ((function &rest args) start next result)
   ;; MACROEXPAND so that (LAMBDA ...) forms arriving here don't get an
   ;; extra cast inserted for them.
-  (let* ((function (%macroexpand function *lexenv*))
-         (op (when (consp function) (car function))))
-    (cond ((eq op 'function)
-           (compiler-destructuring-bind (thing) (cdr function)
-               function
-             (with-fun-name-leaf (leaf thing start)
-               (ir1-convert start next result `(,leaf ,@args)))))
-          ((eq op 'global-function)
-           (compiler-destructuring-bind (thing) (cdr function)
-               global-function
-             (with-fun-name-leaf (leaf thing start :global-function t)
-               (ir1-convert start next result `(,leaf ,@args)))))
-          (t
-           (let ((ctran (make-ctran))
-                 (fun-lvar (make-lvar)))
-             (ir1-convert start ctran fun-lvar `(the function ,function))
-             (ir1-convert-combination-args fun-lvar ctran next result args))))))
+  (let ((function (%macroexpand function *lexenv*)))
+    (if (typep function '(cons (member function global-function) (cons t null)))
+        (with-fun-name-leaf (leaf (cadr function) start
+                                  :global-function (eq (car function)
+                                                       'global-function))
+          (ir1-convert start next result `(,leaf ,@args)))
+        (let ((ctran (make-ctran))
+              (fun-lvar (make-lvar)))
+          (ir1-convert start ctran fun-lvar `(the function ,function))
+          (ir1-convert-combination-args fun-lvar ctran next result args)))))
 
 ;;; This source transform exists to reduce the amount of work for the
 ;;; compiler. If the called function is a FUNCTION form, then convert
