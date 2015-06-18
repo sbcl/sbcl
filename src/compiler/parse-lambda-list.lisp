@@ -488,8 +488,8 @@
       (recurse parsed-lambda-list)
       (output))))
 
-;;; Return T if EXPR matches TEMPLATE, where TEMPLATE is a meta-abstractified
-;;; destructuring lmbda list. Mnemonic: the arguments are like TYPEP.
+;;; Return T if OBJECT matches TEMPLATE, where TEMPLATE is a meta-abstractified
+;;; destructuring lambda list. Mnemonic: the arguments are like TYPEP.
 ;;; [Indeed the AST could be a monstrous type specifier involving {CONS,AND,OR}
 ;;; except for lambda lists that involve keywords.]
 ;;;
