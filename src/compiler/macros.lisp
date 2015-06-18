@@ -96,20 +96,44 @@
 ;;; Hence, either a #<GLOBAL-VAR> or #<DEFINED-FUN> appears in the form head.
 ;;;
 (defmacro define-source-transform (fun-name lambda-list &body body)
-  (with-unique-names (whole-var n-env name)
-    (multiple-value-bind (body decls)
-        (parse-defmacro lambda-list whole-var body "source transform" "form"
-                        :environment n-env
-                        :error-fun `(lambda (&rest stuff)
-                                      (declare (ignore stuff))
-                                      (return-from ,name
-                                        (values nil t)))
-                        :wrap-block nil)
-      `(setf (info :function :source-transform ',fun-name)
-             (lambda (,whole-var ,n-env)
-               ,@decls
-               (block ,name
-                 ,body))))))
+  ;; FIXME: this is redundant with what will become MAKE-MACRO-LAMBDA
+  ;; except that it needs a "silently do nothing" mode, which may or may not
+  ;; be a generally exposed feature.
+  (binding*
+      (((forms decls) (parse-body body))
+       ((llks req opt rest keys aux env whole)
+        (parse-lambda-list
+         lambda-list
+         :accept
+         (logandc2 (logior (lambda-list-keyword-mask '&environment)
+                           (lambda-list-keyword-mask 'destructuring-bind))
+                   ;; Function lambda lists shouldn't take &BODY.
+                   (lambda-list-keyword-mask '&body))
+         :context "a source transform"))
+       ((outer-decl inner-decls) (extract-var-decls decls (append env whole)))
+       ;; With general macros, the user can declare (&WHOLE W &ENVIRONMENT E ..)
+       ;; and then (DECLARE (IGNORE W E)) which is a problem if system code
+       ;; touches user variables. But this is all system code, so it's fine.
+       (lambda-whole (if whole (car whole) (make-symbol "FORM")))
+       (lambda-env (if env (car env) (make-symbol "ENV")))
+       (new-ll (if (or whole env) ; strip them out if present
+                   (make-lambda-list llks whole req opt rest keys aux)
+                   lambda-list)) ; otherwise use the original list
+       (args (make-symbol "ARGS")))
+    `(setf (info :function :source-transform ',fun-name)
+           (named-lambda (:source-transform ,fun-name)
+               (,lambda-whole ,lambda-env &aux (,args (cdr ,lambda-whole)))
+             ,@(if (not env) `((declare (ignore ,lambda-env))))
+             ,@outer-decl ; SPECIALs or something? I hope not.
+             (if ,(emit-ds-lambda-list-match args new-ll)
+                 ;; The body can return 1 or 2 values, but consistently
+                 ;; returning 2 values from the XEP is stylistically
+                 ;; preferable, and produces shorter assembly code too.
+                 (multiple-value-bind (call pass)
+                     (binding* ,(expand-ds-bind new-ll args nil 'truly-the)
+                       ,@inner-decls ,@forms)
+                   (values call pass))
+                 (values nil t))))))
 
 ;;;; boolean attribute utilities
 ;;;;

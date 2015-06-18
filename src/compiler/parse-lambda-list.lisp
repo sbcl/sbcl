@@ -447,9 +447,12 @@
                              (remove-default x)))
                        keys))))))))
 
-;; Return the list of variables bound by a destructuring lambda list.
-;; One purpose for this is to help expand destructuring-bind using
-;; a strategy that delivers values to an MV-BIND. Consider e.g.
+;;; Return the list of variables bound by a destructuring lambda list.
+;;; One purpose for this is to help expand destructuring-bind using
+;;; a strategy that delivers values to an MV-BIND.
+;;; It would otherwise be difficult to wrap a condition handler
+;;; around only the binding creation forms and not the body
+;;; of the destructuring-bind. Consider e.g.
 #|
    (DESTRUCTURING-BIND (A &OPTIONAL (B 0) (C 'DEF)) L (DOER))
      -> (multiple-value-bind (a b c)
@@ -461,18 +464,6 @@
                             (t (error "Excess args")))))
           (doer))
 |#
-;; The above expansion places a condition handler around the forms which
-;; destructure the input, and only those forms. This corresponds to the
-;; logic that DEFINE-SOURCE-TRANSFORM wants, with a slight difference that
-;; type-errors in defaulting expressions are caught by the above
-;; but not caught by approximately similar code emitted by PARSE-DEFMACRO.
-;; We don't want the handler around the entire expression produced by
-;; DEFINE-SOURCE-TRANSFORM because that would skip a transform if any error
-;; occurred in the transform itself. In something complicated like SORT-VECTOR's
-;; source transform, a bug in the transform's body (not its output) might be
-;; undetected.  Contrariwise, the execution of a compiler-macro is typically
-;; in an error handler, but the compiler does warn about failure of macros.
-;;
 (defun ds-lambda-list-symbols (parsed-lambda-list)
   (collect ((output))
     (labels ((recurse (x) (if (vectorp x) (scan x) (output x)))
@@ -570,6 +561,23 @@
                     (setq args (cdr next)))
                   (go loop))))
       (recurse template object))))
+
+;;; Return the AST that recognizes inputs matching DS-LAMBDA-LIST.
+(defun ds-lambda-list-matcher (ds-lambda-list)
+  (meta-abstractify-ds-lambda-list (parse-ds-lambda-list ds-lambda-list)))
+
+;;; Emit a form to test whether INPUT matches DS-LAMBDA-LIST.
+;;; It's up to this function to decide (perhaps based on policy)
+;;; how to generate the code. There are a few simple cases that avoid
+;;; function calls. Others could easily be added. e.g. a 2-list could be:
+;;;   (TYPEP INPUT '(CONS T (CONS T NULL)))
+(defun emit-ds-lambda-list-match (input ds-lambda-list)
+  (let ((matcher (ds-lambda-list-matcher ds-lambda-list)))
+    ;; To match exactly 1 required arg, use SINGLETON-P.
+    (cond ((equal matcher '((t))) `(singleton-p ,input))
+          ;; Matching 0 required, 0 optional, and rest is trivially T.
+          ((equal matcher '(() () t)) t)
+          (t `(ds-lambda-list-match-p ,input ',matcher)))))
 
 ;;; Emit a correctness check for one level of structure in PARSED-LAMBDA-LIST
 ;;; which receives values from INPUT.
@@ -690,14 +698,14 @@
                ;; Mandatory args. Only the rightmost need check that it sees
                ;; a CONS. The predecessors will naturally assert that the
                ;; input so far was of type LIST, which is enough.
-               ;; FIXME: explicit-cast of TRULY-THE should be inserted always.
-               ;; Lack thereof only affects performance, not semantics.
                (do ((elts required (cdr elts)))
                    ((endp elts))
                  (bind-pat (car elts)
-                           (if (or (cdr elts) (not explicit-cast))
-                               `(pop ,input)
-                               (cast/pop `(,explicit-cast cons ,input) opt))))
+                           (if explicit-cast
+                               (cast/pop `(,explicit-cast
+                                           ,(if (cdr elts) 'list 'cons) ,input)
+                                         (or (cdr elts) opt))
+                               `(pop ,input))))
                ;; Optionals.
                (do ((elts opt (cdr elts)))
                    ((endp elts))
@@ -709,11 +717,10 @@
                                    (if (cdr elt) (cadr elt) default-default)
                                    (cddr elt)))
                      (bind-if t input
-                              (if (or (cdr elts) (not explicit-cast))
-                                  `(pop ,input)
-                                  ;; Don't assert CONS. CAR will assert LIST,
-                                  ;; and input is only popped when non-nil.
-                                  (cast/pop input nil))
+                              (if explicit-cast
+                                  (cast/pop `(,explicit-cast list ,input)
+                                            (cdr elts))
+                                  `(pop ,input))
                               var sup-p-var def)))))
 
              ;; The spec allows the inane use of (A B &REST (C D)) = (A B C D).
