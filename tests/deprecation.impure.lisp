@@ -48,6 +48,37 @@
     ;; Check the documentation.
     (search-string (documentation name kind))))
 
+;;;; DEPRECATED declaration syntax
+
+(with-test (:name (deprecated :declaration :syntax))
+  ;; Some syntax errors.
+  (mapc (lambda (declaration)
+          (assert-error (proclaim declaration)))
+        '((deprecated)
+          (deprecated :early)
+          (deprecated :early 1)
+          (deprecated :early ("1"))
+          (deprecated :early ("a" "b" "c"))
+          (deprecated :early 1 (function))
+          (deprecated :early 1 (unsupported-namespace name))))
+
+  ;; These should work.
+  (mapc (lambda (declaration)
+          (assert-no-signal (proclaim declaration)))
+        '((deprecated :early "1")
+          (deprecated :early ("my-software" "1"))
+          (deprecated :early "1" (variable deprecated.declaration.variable))
+          (deprecated :early "1" (function deprecated.declaration.function))
+          (deprecated :early "1" (function (setf deprecated.declaration.function)))
+          (deprecated :early "1" (type     deprecated.declaration.type))
+          (deprecated :early "1" (variable deprecated.declaration.thing1)
+                                 (variable deprecated.declaration.thing2))
+          (deprecated :early "1" (variable deprecated.declaration.replacement
+                                  :replacement deprecated.declaration.replacement))
+          (deprecated :early "1" (variable deprecated.declaration.replacement
+                                  :replacement (deprecated.declaration.replacement1
+                                                deprecated.declaration.replacement2))))))
+
 ;;;; Deprecated variables
 
 (sb-impl::define-deprecated-variable :early "1.2.10"

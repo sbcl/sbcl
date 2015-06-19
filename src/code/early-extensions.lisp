@@ -1457,8 +1457,8 @@
            (type function-name name)
            (type (or function-name list) replacements)
            (type list lambda-list))
-  (let* ((replacements (normalize-deprecation-replacements replacements))
-         (doc (print-deprecation-message name since replacements)))
+  (let ((doc (print-deprecation-message
+              name since (normalize-deprecation-replacements replacements))))
     (declare (ignorable doc))
     `(prog1
          ,(ecase state
@@ -1473,21 +1473,24 @@
                       (deprecated-function ,since ',name ',replacements
                                            #!+sb-doc ,doc))
                 ',name)))
-       (setf (info :function :deprecated ',name)
-             (make-deprecation-info ,state ,since ',replacements)))))
+       (proclaim '(deprecated
+                   ,state ,since
+                   (function ,name ,@(when replacements
+                                       `(:replacement ,replacements))))))))
 
 (defmacro define-deprecated-variable (state since name
                                       &key (value nil valuep) replacement)
   (declare (type deprecation-state state)
            (type string since)
            (type symbol name))
-  `(prog2
-       (setf (info :variable :deprecated ',name)
-             (make-deprecation-info
-              ,state ,since ,(when replacement (list ,replacement))))
+  `(prog1
        ,(if (member state '(:early :late))
             `(defvar ,name ,@(when valuep (list value)))
             `',name)
+     (proclaim '(deprecated
+                 ,state ,since
+                 (variable ,name ,@(when replacement
+                                     `(:replacement ,replacement)))))
      #!+sb-doc
      (setf (fdocumentation ',name 'variable)
            ,(print-deprecation-message name since (list replacement)))))

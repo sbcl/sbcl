@@ -731,6 +731,7 @@ like *STACK-TOP-HINT* and unsupported stuff like *TRACED-FUN-LIST*."
                "RESOLVE-CONFLICT"
 
                ;; Deprecation stuff
+               "DEPRECATED" ; declaration
                "DEPRECATION-CONDITION"
                "DEPRECATION-CONDITION-NAME"
                "DEPRECATION-CONDITION-SINCE"

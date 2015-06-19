@@ -196,6 +196,30 @@
     (warn-if-inline-failed/proclaim name newval)
     (setf (info :function :inlinep name) newval)))
 
+(defun check-deprecation-declaration (state since form)
+  (unless (typep state 'deprecation-state)
+    (error 'simple-type-error
+           :datum            state
+           :expected-type    'deprecation-state
+           :format-control   "~<In declaration ~S, ~S state is not a ~
+                              valid deprecation state. Expected one ~
+                              of ~{~A~^, ~}.~@:>"
+           :format-arguments (list form state
+                                   (rest (typexpand 'deprecation-state)))))
+  (values state since))
+
+(defun process-deprecation-declaration (thing state since)
+  (destructuring-bind (namespace name &key replacement) thing
+    (let ((info (make-deprecation-info state since replacement)))
+      (ecase namespace
+        (function
+         (setf (info :function :deprecated name) info))
+        (variable
+         ;; TODO (check-variable-name name "deprecated variable declaration")
+         (setf (info :variable :deprecated name) info))
+        (type
+         (setf (info :type :deprecated name) info))))))
+
 (defun process-declaration-declaration (name form)
   (unless (symbolp name)
     (error "In~%  ~S~%the declaration to be recognized is not a ~
@@ -280,6 +304,12 @@
                (process-package-lock-decl form *disabled-package-locks*)))
         ((inline notinline maybe-inline)
          (map-args #'process-inline-declaration kind))
+        (deprecated
+         (destructuring-bind (state since &rest things) args
+           (multiple-value-bind (state since)
+               (check-deprecation-declaration state since form)
+             (map-names things #'process-deprecation-declaration
+                        state since))))
         (declaration
          (map-args #'process-declaration-declaration form))
         (t
