@@ -337,15 +337,15 @@
 
 ;;; We save space in macro definitions by calling this function.
 (defun arg-count-error (context name args lambda-list minimum maximum)
-  (let (#-sb-xc-host
-        (sb!debug:*stack-top-hint* (or sb!debug:*stack-top-hint* 'arg-count-error)))
-    (error 'arg-count-error
+  ;; Tail-call ERROR, contrary to usual behavior.
+  #-sb-xc-host (declare (optimize sb!c::allow-non-returning-tail-call))
+  (error 'arg-count-error
            :kind context
            :name name
            :args args
            :lambda-list lambda-list
            :minimum minimum
-           :maximum maximum)))
+           :maximum maximum))
 
 (defun push-sublist-binding (variable path object name context error-fun)
   (check-defmacro-arg variable)

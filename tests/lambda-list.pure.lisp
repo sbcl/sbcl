@@ -423,3 +423,16 @@
     (lose '((1 ((2))) wat))
     (lose '((1 ((2))) (wat))))
   )
+
+(with-test (:name :arg-count-error-tail-calls-error)
+ (assert
+  (null
+   (block found
+     (handler-bind ((error
+                     (lambda (c)
+                       (declare (ignore c))
+                       (return-from found
+                         (assoc 'sb-kernel::arg-count-error
+                                (sb-debug::list-backtrace))))))
+       (sb-kernel::arg-count-error 'destructuring-bind 'nil
+                                   '(1 2) '(a b c) 3 3))))))

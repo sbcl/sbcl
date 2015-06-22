@@ -548,10 +548,33 @@
 
 ;;; Mark optimizable tail-recursive uses of function result
 ;;; continuations with the corresponding TAIL-SET.
+;;;
+;;; Regarding the suppression of TAIL-P for nil-returning calls,
+;;; a partial history of the changes affecting this is as follows:
+;;;
+;;; WHN said [in 85f9c92558538b85540ff420fa8970af91e241a2]
+;;;  ;; Nodes whose type is NIL (i.e. don't return) such as calls to
+;;;  ;; ERROR are never annotated as TAIL-P, in order to preserve
+;;;  ;; debugging information.
+;;;
+;;; NS added [in bea5b384106a6734a4b280a76e8ebdd4d51b5323]
+;;;  ;; Why is that bad? Because this non-elimination of
+;;;  ;; non-returning tail calls causes the XEP for FOO [to] appear in
+;;;  ;; backtrace for (defun foo (x) (error "foo ~S" x)) w[h]ich seems
+;;;  ;; less then optimal. --NS 2005-02-28
+;;; (not considering that the point of non-elimination was specifically
+;;; to allow FOO to appear in the backtrace?)
+;;;
 (defun tail-annotate (component)
   (declare (type component component))
   (dolist (fun (component-lambdas component))
     (let ((ret (lambda-return fun)))
+      ;; The code below assumes that a lambda whose final node is a call to
+      ;; a non-returning function gets a lambda-return. But it doesn't always,
+      ;; and it's not clear whether that means "always doesn't".
+      ;; If it never does, then (WHEN RET ..) will never execute, so we won't
+      ;; even see the call that might be be annotated as tail-p, regardless
+      ;; of whether we *want* to annotate it as such.
       (when ret
         (let ((result (return-result ret)))
           (do-uses (use result)
@@ -572,4 +595,18 @@
                            (not (or (eq *empty-type* (node-derived-type use))
                                     (eq *empty-type* (combination-defined-type use))))))
               (setf (node-tail-p use) t)))))))
+  ;; The above loop does not find all calls to ERROR.
+  (do-blocks (block component)
+    (do-nodes (node lvar block)
+      ;; CAUTION: This looks scary because it affects all known nil-returning
+      ;; calls even if not in tail position. Use of the policy quality which
+      ;; enables tail-p must be confined to a very restricted lexical scope.
+      ;; This might be better implemented as a local declaration about
+      ;; function names at the call site: (declare (uninhibit-tco error))
+      ;; but adding new kinds of declarations is fairly invasive surgery.
+      (when (and (combination-p node)
+                 (combination-fun-info node) ; must be a known fun
+                 (eq (combination-defined-type node) *empty-type*)
+                 (policy node (= allow-non-returning-tail-call 3)))
+        (setf (node-tail-p node) t))))
   (values))

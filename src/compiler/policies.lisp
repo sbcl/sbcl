@@ -157,5 +157,25 @@ compiled with this declaration in effect.")
     0
   ("no" "no" "yes" "yes"))
 
+;;; ALLOW-NON-RETURNING-TAIL-CALL unsupresses the supression of tail-call
+;;; optimization of nil-returning functions.
+;;;
+;;; At present this is used only by the ARG-COUNT-ERROR function, but would be
+;;; useful in similar functions whose sole purpose is to accept positional
+;;; arguments, shaping them into keyword arguments with which to call ERROR.
+;;; Generally any function tail-calling a nil-returning function remains on the
+;;; stack to allow a debugger to see variables in the signaling frame.
+;;; However ARG-COUNT-ERROR is not supposed to be visible.
+;;; Techniques that evolved to address its invisibility were brittle:
+;;; undocumented DEBUG versus SPEED policy-based decisions in TAIL-ANNOTATE,
+;;; or inefficient (performing FIND-CALLER-NAME-AND-FRAME before calling ERROR).
+;;; Frobbing *STACK-TOP-HINT* seems no better than a declaration saying
+;;; "do what I mean," as the latter at least produces a consistent backtrace
+;;; between Lisp and ldb or gdb.
+;;;
+(define-optimization-quality allow-non-returning-tail-call
+    0
+  ("no" "no" "no" "yes"))
+
 ;;; On the cross-compilation host, we initialize at load time
 #+sb-xc-host (!policy-cold-init-or-resanify)
