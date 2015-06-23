@@ -3114,7 +3114,7 @@ used for a COMPLEX component.~:@>"
                (setf accumulator
                      (type-intersection accumulator union))))))))
 
-(!def-type-translator and (&whole whole &rest type-specifiers)
+(!def-type-translator and (&rest type-specifiers)
   (apply #'type-intersection
          (mapcar #'specifier-type type-specifiers)))
 
