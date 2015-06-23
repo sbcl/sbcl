@@ -36,20 +36,18 @@
       (multiple-value-bind (new-body local-decs doc)
           (parse-defmacro lambda-list whole body name 'defmacro
                           :environment environment)
-        (let ((def `(#+sb-xc-host lambda
-                     ;; Use a named-lambda rather than a lambda so that
+        (let ((def   ;; Use a named-lambda rather than a lambda so that
                      ;; proper xref information can be stored. Use a
                      ;; list-based name, since otherwise the compiler
                      ;; will momentarily assume that it names a normal
                      ;; function, and report spurious warnings about
                      ;; redefinition a macro as a function, and then
                      ;; vice versa.
-                     #-sb-xc-host named-lambda #-sb-xc-host (defmacro ,name)
+                   `(named-lambda ,(sb!c::debug-name 'macro-function name)
                      (,whole ,environment)
                       ,@(sb!c:macro-policy-decls)
                       ,@local-decs
-                      ,new-body))
-              (debug-name (sb!c::debug-name 'macro-function name)))
+                      ,new-body)))
           `(progn
              #-sb-xc-host
              ;; Getting  this to cross-compile with the check enabled
@@ -59,20 +57,20 @@
              (eval-when (:compile-toplevel)
                (sb!c::%compiler-defmacro :macro-function ',name t))
              (eval-when (:compile-toplevel :load-toplevel :execute)
-               (sb!c::%defmacro ',name #',def ',lambda-list ,doc ',debug-name
+               (sb!c::%defmacro ',name ,def ',lambda-list ,doc
                                 (sb!c:source-location)))))))))
 
 (macrolet
     ((def (times set-p)
        `(eval-when (,@times)
-          (defun sb!c::%defmacro (name definition lambda-list doc debug-name
+          (defun sb!c::%defmacro (name definition lambda-list doc
                                   source-location)
             (declare (ignorable source-location)) ; xc-host doesn't use
             ;; old note (ca. 1985, maybe:-): "Eventually %%DEFMACRO
             ;; should deal with clearing old compiler information for
             ;; the functional value."
             ,@(unless set-p
-                '((declare (ignore lambda-list debug-name doc))))
+                '((declare (ignore lambda-list doc))))
             (let ((kind (info :function :kind name)))
               ;; Check for special form before package locks.
               (when (eq :special-form kind)
@@ -98,9 +96,8 @@
                         :new-location source-location))
                (setf (sb!xc:macro-function name) definition)
                ,(when set-p
-                      `(setf (%fun-doc definition) doc
-                             (%fun-lambda-list definition) lambda-list
-                             (%fun-name definition) debug-name))))
+                  `(setf (%fun-doc definition) doc
+                         (%fun-lambda-list definition) lambda-list))))
             name))))
   (progn
     (def (:load-toplevel :execute) #-sb-xc-host t #+sb-xc-host nil)
