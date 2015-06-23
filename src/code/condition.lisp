@@ -1674,32 +1674,21 @@ the usual naming convention (names like *FOO*) for special variables"
                             (deprecated-name condition)))))))
 
   (define-deprecation-warning early-deprecation-warning style-warning nil
-    #+sb-xc-host
-    "~%~@<~:@_In future SBCL versions ~
-     ~/sb!impl:print-symbol-with-prefix/ will signal a full warning ~
-     at compile-time.~:@>"
-    #-sb-xc-host
-    "~%~@<~:@_In future SBCL versions ~
-     ~/sb-impl:print-symbol-with-prefix/ will signal a full warning ~
-     at compile-time.~:@>")
+    (!uncross-format-control
+     "~%~@<~:@_In future SBCL versions ~
+      ~/sb!impl:print-symbol-with-prefix/ will signal a full warning ~
+      at compile-time.~:@>"))
 
   (define-deprecation-warning late-deprecation-warning warning t
-    #+sb-xc-host
-    "~%~@<~:@_In future SBCL versions ~
-     ~/sb!impl:print-symbol-with-prefix/ will signal a runtime ~
-     error.~:@>"
-    #-sb-xc-host
-    "~%~@<~:@_In future SBCL versions ~
-     ~/sb-impl:print-symbol-with-prefix/ will signal a runtime ~
-     error.~:@>")
+    (!uncross-format-control
+     "~%~@<~:@_In future SBCL versions ~
+      ~/sb!impl:print-symbol-with-prefix/ will signal a runtime ~
+      error.~:@>"))
 
   (define-deprecation-warning final-deprecation-warning warning t
-    #+sb-xc-host
-    "~%~@<~:@_An error will be signaled at runtime for ~
-     ~/sb!impl:print-symbol-with-prefix/.~:@>"
-    #-sb-xc-host
-    "~%~@<~:@_An error will be signaled at runtime for ~
-     ~/sb-impl:print-symbol-with-prefix/.~:@>"))
+    (!uncross-format-control
+     "~%~@<~:@_An error will be signaled at runtime for ~
+      ~/sb!impl:print-symbol-with-prefix/.~:@>")))
 
 (define-condition deprecation-error (error deprecation-condition)
   ())
