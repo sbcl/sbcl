@@ -24,7 +24,9 @@
            (error "Class is not yet defined or was undefined: ~S" name))
           ((not (typep (layout-info res) 'defstruct-description))
            (error "Class is not a structure class: ~S" name))
-          (t res))))
+          (t
+           (sb!int:check-deprecated-type name)
+           res))))
 
 (defun compiler-layout-ready-p (name)
   (let ((layout (info :type :compiler-layout name)))

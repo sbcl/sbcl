@@ -49,6 +49,10 @@
     ;; expansion of a defclass and signal them in a single go.
     (multiple-value-bind (metaclass canonical-options)
         (canonize-defclass-options name options)
+      ;; Check deprecation status of direct superclasses and
+      ;; metaclass.
+      (mapc #'sb-int:check-deprecated-type direct-superclasses)
+      (sb-int:check-deprecated-type metaclass)
     (let ((canonical-slots (canonize-defclass-slots name direct-slots env))
           ;; DEFSTRUCT-P should be true if the class is defined
           ;; with a metaclass STRUCTURE-CLASS, so that a DEFSTRUCT
@@ -311,7 +315,7 @@
            (mapc (lambda (name)
                    (let ((name (if key (funcall key name) name)))
                      (when (eq (info :function :where-from name) :assumed)
-                       (sb-c:proclaim-ftype name type :defined))))
+                       (sb-c:proclaim-ftype name type nil :defined))))
                  names)))
     (let ((rtype (specifier-type '(function (t) t)))
           (wtype (specifier-type '(function (t t) t))))

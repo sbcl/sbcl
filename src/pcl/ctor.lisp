@@ -407,6 +407,9 @@
             (let* ((class-or-name (constant-form-value class-arg))
                    (function-name (make-ctor-function-name class-or-name initargs
                                                            safe-code-p)))
+              (sb-int:check-deprecated-type (if (classp class-or-name)
+                                                (class-name class-or-name)
+                                                class-or-name))
               ;; Prevent compiler warnings for calling the ctor.
               (proclaim-as-fun-name function-name)
               (note-name-defined function-name :function)

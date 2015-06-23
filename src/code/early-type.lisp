@@ -850,48 +850,55 @@
 ;;; KLUDGE: why isn't this a MACROLET?  "lexical environment too
 ;;; hairy"
 (defmacro !values-specifier-type-body (arg)
-  `(let ((u (uncross ,arg)))
-     (or (info :type :builtin u)
-         (let ((spec (typexpand u)))
-           (cond
-             ((and (not (eq spec u))
-                   (info :type :builtin spec)))
-             ((and (consp spec) (symbolp (car spec))
-                   (info :type :builtin (car spec))
-                   (let ((expander (info :type :expander (car spec))))
-                     (and expander (values-specifier-type (funcall expander spec))))))
-             ((eq (info :type :kind spec) :instance)
-              (find-classoid spec))
-             ((typep spec 'classoid)
-              (if (typep spec 'built-in-classoid)
-                  (or (built-in-classoid-translation spec) spec)
-                  spec))
-             (t
-              (when (and (atom spec)
-                         (member spec '(and or not member eql satisfies values)))
-                (error "The symbol ~S is not valid as a type specifier." spec))
-              (let ((fun-or-ctype
-                     (info :type :translator (if (consp spec) (car spec) spec))))
-                (cond ((functionp fun-or-ctype)
-                       (funcall fun-or-ctype (if (atom spec) (list spec) spec)))
-                      (fun-or-ctype)
-                      ((or (and (consp spec) (symbolp (car spec))
-                                (not (info :type :builtin (car spec))))
-                           (and (symbolp spec) (not (info :type :builtin spec))))
-                       (when (and *type-system-initialized*
-                                  (not (eq (info :type :kind spec)
-                                           :forthcoming-defclass-type)))
-                         (signal 'parse-unknown-type :specifier spec))
-                       ;; (The RETURN-FROM here inhibits caching; this
-                       ;; does not only make sense from a compiler
-                       ;; diagnostics point of view but is also
-                       ;; indispensable for proper workingness of
-                       ;; VALID-TYPE-SPECIFIER-P.)
-                       (return-from values-specifier-type
-                         (make-unknown-type :specifier spec)))
-                      (t
-                       (error "bad thing to be a type specifier: ~S"
-                              spec))))))))))
+  `(let* ((u (uncross ,arg))
+          (cachep t)
+          (result (or (info :type :builtin u)
+                      (let ((spec (typexpand u)))
+                        (when (and (symbolp u) (deprecated-thing-p 'type u))
+                          (setf cachep nil)
+                          (signal 'parse-deprecated-type :specifier u))
+                        (cond
+                          ((and (not (eq spec u))
+                                (info :type :builtin spec)))
+                          ((and (consp spec) (symbolp (car spec))
+                                (info :type :builtin (car spec))
+                                (let ((expander (info :type :expander (car spec))))
+                                  (and expander (values-specifier-type (funcall expander spec))))))
+                          ((eq (info :type :kind spec) :instance)
+                           (find-classoid spec))
+                          ((typep spec 'classoid)
+                           (if (typep spec 'built-in-classoid)
+                               (or (built-in-classoid-translation spec) spec)
+                               spec))
+                          (t
+                           (when (and (atom spec)
+                                      (member spec '(and or not member eql satisfies values)))
+                             (error "The symbol ~S is not valid as a type specifier." spec))
+                           (let ((fun-or-ctype
+                                  (info :type :translator (if (consp spec) (car spec) spec))))
+                             (cond ((functionp fun-or-ctype)
+                                    (funcall fun-or-ctype (ensure-list spec)))
+                                   (fun-or-ctype)
+                                   ((or (and (consp spec) (symbolp (car spec))
+                                             (not (info :type :builtin (car spec))))
+                                        (and (symbolp spec) (not (info :type :builtin spec))))
+                                    (when (and *type-system-initialized*
+                                               (not (eq (info :type :kind spec)
+                                                        :forthcoming-defclass-type)))
+                                      (signal 'parse-unknown-type :specifier spec))
+                                    (setf cachep nil)
+                                    (make-unknown-type :specifier spec))
+                                   (t
+                                    (error "bad thing to be a type specifier: ~S"
+                                           spec))))))))))
+     (if cachep
+         result
+         ;; (The RETURN-FROM here inhibits caching; this does not only
+         ;; make sense from a compiler diagnostics point of view but
+         ;; is also indispensable for proper workingness of
+         ;; VALID-TYPE-SPECIFIER-P.)
+         (return-from values-specifier-type
+           result))))
 #+sb-xc-host
 (let ((table (make-hash-table :test 'equal)))
   (defun values-specifier-type (specifier)
@@ -910,14 +917,14 @@
 
 ;;; This is like VALUES-SPECIFIER-TYPE, except that we guarantee to
 ;;; never return a VALUES type.
-(defun specifier-type (x)
-  (let ((res (values-specifier-type x)))
-    (when (or (values-type-p res)
+(defun specifier-type (type-specifier)
+  (let ((ctype (values-specifier-type type-specifier)))
+    (when (or (values-type-p ctype)
               ;; bootstrap magic :-(
-              (and (named-type-p res)
-                   (eq (named-type-name res) '*)))
-      (error "VALUES type illegal in this context:~%  ~S" x))
-    res))
+              (and (named-type-p ctype)
+                   (eq (named-type-name ctype) '*)))
+      (error "VALUES type illegal in this context:~%  ~S" type-specifier))
+    ctype))
 
 (defun single-value-specifier-type (x)
   (if (eq x '*)

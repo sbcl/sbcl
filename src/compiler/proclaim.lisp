@@ -120,7 +120,7 @@
         (setf (info :variable :always-bound name) info-value)
         (setf (info :variable :kind name) info-value))))
 
-(defun proclaim-type (name type where-from)
+(defun proclaim-type (name type type-specifier where-from)
   (unless (symbolp name)
     (error "Cannot proclaim TYPE of a non-symbol: ~S" name))
 
@@ -130,11 +130,11 @@
       (let ((old-type (info :variable :type name)))
         (when (type/= type old-type)
           (type-proclamation-mismatch-warn
-           name (type-specifier old-type) (type-specifier type)))))
+           name (type-specifier old-type) type-specifier))))
     (setf (info :variable :type name) type
           (info :variable :where-from name) where-from)))
 
-(defun proclaim-ftype (name type where-from)
+(defun proclaim-ftype (name type type-specifier where-from)
   (unless (legal-fun-name-p name)
     (error "Cannot declare FTYPE of illegal function name ~S" name))
   (unless (csubtypep type (specifier-type 'function))
@@ -148,14 +148,14 @@
           ((not (type/= type old-type))) ; not changed
           ((not (info :function :info name)) ; not a known function
            (ftype-proclamation-mismatch-warn
-            name (type-specifier old-type) (type-specifier type)))
+            name (type-specifier old-type) type-specifier))
           ((csubtypep type old-type)) ; tighten known function type
           (t
            (cerror "Continue"
                    'ftype-proclamation-mismatch-error
                    :name name
                    :old (type-specifier old-type)
-                   :new (type-specifier type))))))
+                   :new type-specifier)))))
     ;; Now references to this function shouldn't be warned about as
     ;; undefined, since even if we haven't seen a definition yet, we
     ;; know one is planned.
@@ -255,11 +255,12 @@
         ((type ftype)
          (if *type-system-initialized*
              (destructuring-bind (type &rest names) args
+               (check-deprecated-type type)
                (let ((ctype (specifier-type type)))
                  (map-names names (ecase kind
                                     (type #'proclaim-type)
                                     (ftype #'proclaim-ftype))
-                            ctype :declared)))
+                            ctype type :declared)))
              (push raw-form *queued-proclaims*)))
         (freeze-type
          (map-args #'process-freeze-type-declaration))

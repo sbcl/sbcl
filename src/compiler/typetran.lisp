@@ -760,6 +760,8 @@
         `(%typep ,object ',type))))
 
 (defun source-transform-typep (object type)
+  (when (typep type 'type-specifier)
+    (check-deprecated-type type))
   (let ((name (gensym "OBJECT")))
     (multiple-value-bind (transform error)
         (%source-transform-typep name type)

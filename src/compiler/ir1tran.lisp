@@ -1219,8 +1219,12 @@
 ;;; type, otherwise we add a type restriction on the var. If a symbol
 ;;; macro, we just wrap a THE around the expansion.
 (defun process-type-decl (decl res vars context)
-  (declare (list decl vars) (type lexenv res))
-  (let ((type (compiler-specifier-type (first decl))))
+  (declare (type list decl vars) (type lexenv res))
+  (let* ((type-specifier (first decl))
+         (type (progn
+                 (when (typep type-specifier 'type-specifier)
+                   (check-deprecated-type type-specifier))
+                 (compiler-specifier-type type-specifier))))
     (collect ((restr nil cons)
              (new-vars nil cons))
       (dolist (var-name (rest decl))
@@ -1285,12 +1289,14 @@
 ;;; declarations for functions being bound, we must also deal with
 ;;; declarations that constrain the type of lexically apparent
 ;;; functions.
-(defun process-ftype-decl (spec res names fvars context)
+(defun process-ftype-decl (type-specifier res names fvars context)
   (declare (type list names fvars)
            (type lexenv res))
-  (let ((type (compiler-specifier-type spec)))
+  (let ((type (compiler-specifier-type type-specifier)))
+    (check-deprecated-type type-specifier)
     (unless (csubtypep type (specifier-type 'function))
-      (compiler-style-warn "ignoring declared FTYPE: ~S (not a function type)" spec)
+      (compiler-style-warn "ignoring declared FTYPE: ~S (not a function type)"
+                           type-specifier)
       (return-from process-ftype-decl res))
     (collect ((res nil cons))
       (dolist (name names)

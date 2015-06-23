@@ -637,6 +637,9 @@
 
 (define-info-type (:type :source-location) :type-spec t)
 
+;;; Indicates whether the function is deprecated.
+(define-info-type (:type :deprecated) :type-spec deprecation-info)
+
 ;;;; ":TYPED-STRUCTURE" subsection.
 ;;;; Data pertaining to structures that used DEFSTRUCT's :TYPE option.
 (define-info-type (:typed-structure :info) :type-spec t)

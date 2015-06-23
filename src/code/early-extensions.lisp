@@ -1269,7 +1269,8 @@
   (multiple-value-bind (info infop)
       (ecase namespace
         (variable (info :variable :deprecated name))
-        (function (info :function :deprecated name)))
+        (function (info :function :deprecated name))
+        (type     (info :type     :deprecated name)))
     (when infop
       (values (deprecation-info-state info)
               (deprecation-info-since info)
@@ -1298,6 +1299,53 @@
     (when state
       (deprecation-warn state since name replacements)
       (values state since replacements))))
+
+;;; For-effect-only variant of CHECK-DEPRECATED-THING for
+;;; type-specifiers that descends into compound type-specifiers.
+(declaim (ftype (function ((and type-specifier (not instance)))
+                          (values &optional))
+                %check-deprecated-type))
+(defun %check-deprecated-type (type-specifier)
+  (let ((seen '()))
+    ;; KLUDGE: we have to use SPECIFIER-TYPE to sanely traverse
+    ;; TYPE-SPECIFIER and detect references to deprecated types. But
+    ;; then we may have to drop its cache to get the
+    ;; PARSE-DEPRECATED-TYPE condition when TYPE-SPECIFIER is parsed
+    ;; again later.
+    ;;
+    ;; Proper fix would be a
+    ;;
+    ;;   walk-type function type-specifier
+    ;;
+    ;; mechanism that could drive VALUES-SPECIFIER-TYPE but also
+    ;; things like this function.
+    (block nil
+      (handler-bind
+          ((sb!kernel::parse-deprecated-type
+            (lambda (condition)
+              (let ((type-specifier (sb!kernel::parse-deprecated-type-specifier
+                                     condition)))
+                (aver (symbolp type-specifier))
+                (unless (memq type-specifier seen)
+                  (push type-specifier seen)
+                  (check-deprecated-thing 'type type-specifier)))))
+           (error (lambda (condition)
+                    (declare (ignore condition))
+                    (return))))
+        (specifier-type type-specifier))))
+  (values))
+
+(declaim (ftype (function (type-specifier) (values &optional))
+                check-deprecated-type))
+(defun check-deprecated-type (type-specifier)
+  (typecase type-specifier
+    ((and type-specifier (not instance))
+     (%check-deprecated-type type-specifier))
+    (class
+     (let ((name (class-name type-specifier)))
+       (when (and name (symbolp name))
+         (%check-deprecated-type name)))))
+  (values))
 
 (defun deprecated-function (since name replacements &optional doc)
   (declare (ignorable since name replacements doc))

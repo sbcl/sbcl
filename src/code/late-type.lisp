@@ -28,7 +28,16 @@
 ;;; This condition is signalled whenever we make a UNKNOWN-TYPE so that
 ;;; compiler warnings can be emitted as appropriate.
 (define-condition parse-unknown-type (condition)
-  ((specifier :reader parse-unknown-type-specifier :initarg :specifier)))
+  ((specifier :reader parse-unknown-type-specifier :initarg :specifier))
+  (:default-initargs
+   :specifier (missing-arg)))
+
+;;; This condition is signalled whenever we encounter a type (DEFTYPE,
+;;; structure, condition, class) that has been marked as deprecated.
+(define-condition parse-deprecated-type (condition)
+  ((specifier :reader parse-deprecated-type-specifier :initarg :specifier))
+  (:default-initargs
+   :specifier (missing-arg)))
 
 ;;; These functions are used as method for types which need a complex
 ;;; subtypep method to handle some superclasses, but cover a subtree
