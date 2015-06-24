@@ -7,7 +7,7 @@
 @include texinfo-macros.texinfo
 @include variables.texinfo
 @set EDITION 0.1
-@settitle SBCL @value{VERSION} User Manual 
+@settitle SBCL @value{VERSION} User Manual
 
 @c for install-info
 @dircategory Software development
@@ -78,25 +78,26 @@ provided with absolutely no warranty. See the @file{COPYING} and
 * Getting Support and Reporting Bugs::
 * Introduction::
 * Starting and Stopping::
-* Compiler::                    
-* Debugger::                    
-* Efficiency::                  
-* Beyond the ANSI Standard::    
-* Foreign Function Interface::  
+* Compiler::
+* Debugger::
+* Efficiency::
+* Beyond the ANSI Standard::
+* Foreign Function Interface::
 * Pathnames::
-* Streams::          
-* Package Locks::               
+* Streams::
+* Package Locks::
 * Threading::
 * Timers::
 * Networking::
-* Profiling::                   
-* Contributed Modules::         
-* Deprecated Interfaces::         
-* Concept Index::               
-* Function Index::              
-* Variable Index::              
-* Type Index::                  
-* Colophon::                    
+* Profiling::
+* Deprecation Declaration and Conditions::
+* Contributed Modules::
+* Deprecated Interfaces::
+* Concept Index::
+* Function Index::
+* Variable Index::
+* Type Index::
+* Colophon::
 @end menu
 
 @end ifnottex
@@ -116,6 +117,7 @@ provided with absolutely no warranty. See the @file{COPYING} and
 @include timers.texinfo
 @include sb-bsd-sockets/sb-bsd-sockets.texinfo
 @include profiling.texinfo
+@include deprecation.texinfo
 @include contrib-modules.texinfo
 @include deprecated.texinfo
 @include backmatter.texinfo

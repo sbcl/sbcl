@@ -1525,7 +1525,7 @@ the usual naming convention (names like *FOO*) for special variables"
 
 ;;;; deprecation conditions
 
-(define-condition deprecation-condition ()
+(define-condition deprecation-condition (reference-condition)
   ((namespace     :initarg :namespace
                   :reader deprecation-condition-namespace)
    (name          :initarg :name
@@ -1544,7 +1544,8 @@ the usual naming convention (names like *FOO*) for special variables"
    :name (missing-arg)
    :replacements (missing-arg)
    :software (missing-arg)
-   :version (missing-arg))
+   :version (missing-arg)
+   :references '((:sbcl :node "Deprecation Conditions")))
   #!+sb-doc
   (:documentation
    "Superclass for deprecation-related error and warning

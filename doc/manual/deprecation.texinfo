@@ -1,0 +1,176 @@
+@node Deprecation Declaration and Conditions
+@comment  node-name,  next,  previous,  up
+@chapter Deprecation Declaration and Conditions
+
+In order to support evolution of interfaces in SBCL as well as in user
+code, SBCL allows declaring functions, variables and types as
+deprecated. Users of deprecated things are notified by means of warnings
+while the deprecated thing in question is still available.
+
+SBCL uses a ``deprecation pipeline'' with multiple stages: as time goes
+by, deprecated things move from earlier stages of deprecation to later
+stages, leading to warnings of increasing severity. This intention is
+making users aware of necessary changes early but allowing a migration
+to new interfaces at a reasonable pace.
+
+Deprecation proceeds in the following three stages:
+
+@table @code
+
+@item :early
+When a thing in this deprecation stage is used, an
+@sbext{early-deprecation-warning}, which is a @cl{style-warning}, is
+signaled at compile-time. The deprecated thing works without
+restrictions at run-time.
+
+@item :late
+When a thing in this deprecation stage is used, a
+@sbext{late-deprecation-warning}, which is a full @cl{warning}, is
+signaled at compile-time. The deprecated thing works without
+restrictions at run-time.
+
+@item :final
+When a thing in this deprecation stage is used, a
+@sbext{final-deprecation-warning}, which is a full @cl{warning}, is
+signaled at compile-time and an @cl{error} is signaled at run-time.
+
+@end table
+
+The non-standard @sbext{deprecated} declaration is used to mark things
+as deprecated.
+
+@menu
+* Deprecation Conditions::
+* Introspecting Deprecation Information::
+* Deprecation Declaration::
+* Deprecation Examples::
+@end menu
+
+@node Deprecation Conditions
+@comment  node-name,  next,  previous,  up
+@section Deprecation Conditions
+@cindex Deprecation Conditions
+
+@sbext{deprecation-condition} is the superclass of all
+deprecation-related warning and error conditions. All common slots and
+readers are defined in this condition class.
+
+@include condition-sb-ext-deprecation-condition.texinfo
+
+@include condition-sb-ext-early-deprecation-warning.texinfo
+
+@include condition-sb-ext-late-deprecation-warning.texinfo
+
+@include condition-sb-ext-final-deprecation-warning.texinfo
+
+@include condition-sb-ext-deprecation-error.texinfo
+
+@node Introspecting Deprecation Information
+@comment node-name,  next,  previous,  up
+@section Introspecting Deprecation Information
+@cindex Introspecting Deprecation Information
+@comment TODO @findex @sbcltl{function-information}
+@comment TODO @findex @sbcltl{variable-information}
+
+The deprecation status of functions and variables can be inspected using
+the @code{sb-cltl2:function-information} and
+@code{sb-cltl2:variable-information} functions provided by the
+@code{sb-cltl2} contributed module.
+
+@node Deprecation Declaration
+@comment  node-name,  next,  previous,  up
+@section Deprecation Declaration
+@cindex Deprecation Declaration
+@findex @sbext{deprecated}
+
+The @code{sb-ext:deprecated} declaration can be used to declare objects
+in various namespaces@footnote{See ``namespace'' entry in the glossary
+of the Common Lisp Hyperspec.} as deprecated.
+
+@deffn {Declaration} @sbext{deprecated}
+
+Syntax:
+@example
+@code{sb-ext:deprecated} stage since @{object-clause@}*
+
+stage ::= @{:early | :late | :final@}
+
+since ::= @{@var{version} | (@var{software} @var{version})@}
+
+object-clause ::= (namespace @var{name} [:replacement @var{replacement}])
+
+namespace ::= @{cl:variable | cl:function | cl:type@}
+@end example
+
+@noindent were @var{name} is the name of the deprecated thing,
+@var{version} and @var{software} are strings describing the version in
+which the thing has been deprecated and @var{replacement} is a name or a
+list of names designating things that should be used instead of the
+deprecated thing.
+
+Currently the following namespaces are supported:
+
+@table @code
+
+@item cl:function
+Declare functions, compiler-macros or macros as deprecated.
+
+@quotation note
+When declaring a function to be in @code{:final} deprecation, there
+should be no actual definition of the function as the declaration emits
+a stub function that signals a @sbext{deprecation-error} at run-time
+when called.
+@end quotation
+
+@item cl:variable
+Declare special and global variables, constants and symbol-macros as
+deprecated.
+
+@quotation note
+When declaring a variable to be in @code{:final} deprecation, there
+should be no actual definition of the variable as the declaration emits
+a symbol-macro that signals a @code{sb-ext:deprecation-error} at
+run-time when accessed.
+@end quotation
+
+@item cl:type
+Declare named types (i.e. defined via @code{deftype}), standard classes,
+structure classes and condition classes as deprecated.
+
+@end table
+@end deffn
+
+@node Deprecation Examples
+@comment  node-name,  next,  previous,  up
+@section Deprecation Examples
+@cindex Deprecation Examples
+
+Marking functions as deprecated:
+@lisp
+(defun foo ())
+(defun bar ())
+(declaim (deprecated :early ("my-system" "1.2.3")
+                     (function foo :replacement bar)))
+
+;; Remember: do not define the actual function or variable in case of
+;; :final deprecation:
+(declaim (deprecated :final ("my-system" "1.2.3")
+                     (function fez :replacement whoop)))
+@end lisp
+
+@noindent Attempting to use the deprecated functions:
+@lisp
+(defun baz ()
+  (foo))
+| STYLE-WARNING: The function CL-USER::FOO has been deprecated...
+=> BAZ
+(baz)
+=> NIL ; no error
+
+(defun danger ()
+  (fez))
+| WARNING: The function CL-USER::FEZ has been deprecated...
+=> DANGER
+(danger)
+|- ERROR: The function CL-USER::FEZ has been deprecated...
+@end lisp
