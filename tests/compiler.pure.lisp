@@ -4919,7 +4919,8 @@
               (list (string 'list))
               (list "lisT")))))
 
-(with-test (:name (restart-case optimize speed compiler-note))
+(with-test (:name (restart-case optimize speed compiler-note)
+                 :skipped-on :sparc) ; crashes the test driver
   (handler-bind ((compiler-note #'error))
     (compile nil '(lambda ()
                    (declare (optimize speed))
