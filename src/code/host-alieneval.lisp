@@ -263,20 +263,19 @@
                                     :environment env)
         `(eval-when (:compile-toplevel :load-toplevel :execute)
            (defun ,defun-name (,whole ,env)
+             ,@(when docs (list docs))
              (declare (ignorable ,env))
              ,@decls
              (block ,name
                ,body))
-           (%define-alien-type-translator ',name #',defun-name ,docs))))))
+           (%define-alien-type-translator ',name #',defun-name))))))
 
 (eval-when (#-sb-xc :compile-toplevel :load-toplevel :execute)
-  (defun %define-alien-type-translator (name translator docs)
+  (defun %define-alien-type-translator (name translator)
     (declare (ignore docs))
     (setf (info :alien-type :kind name) :primitive)
     (setf (info :alien-type :translator name) translator)
     (clear-info :alien-type :definition name)
-    #+nil
-    (setf (fdocumentation name 'alien-type) docs)
     name))
 
 (def!macro define-alien-type (name type &environment env)

@@ -185,6 +185,7 @@ evaluated as a PROGN."
   (multiple-value-bind (forms decls doc) (parse-body body)
     (let* (;; stuff shared between LAMBDA and INLINE-LAMBDA and NAMED-LAMBDA
            (lambda-guts `(,args
+                          ,@(when doc (list doc))
                           ,@decls
                           (block ,(fun-name-block-name name)
                             ,@forms)))
@@ -206,13 +207,12 @@ evaluated as a PROGN."
          ,@(when (typep name '(cons (eql setf)))
              `((eval-when (:compile-toplevel :execute)
                  (sb!c::warn-if-setf-macro ',name))))
-         (%defun ',name ,named-lambda ,doc ',inline-lambda
+         (%defun ',name ,named-lambda ',inline-lambda
                  (sb!c:source-location))))))
 
 #-sb-xc-host
-(progn (defun %defun (name def doc inline-lambda source-location)
+(progn (defun %defun (name def inline-lambda source-location)
           (declare (type function def))
-          (declare (type (or null simple-string) doc))
           ;; should've been checked by DEFMACRO DEFUN
           (aver (legal-fun-name-p name))
           (sb!c:%compiler-defun name inline-lambda nil)
@@ -226,16 +226,13 @@ evaluated as a PROGN."
   ;; we frob any existing inline expansions.
           (sb!c::%set-inline-expansion name nil inline-lambda)
           (sb!c::note-name-defined name :function)
-          (when doc
-            (setf (%fun-doc def) doc))
           name)
        ;; During cold-init we don't touch the fdefinition.
-       (defun !%quietly-defun (name doc inline-lambda)
+       (defun !%quietly-defun (name inline-lambda)
          (sb!c:%compiler-defun name nil nil) ; makes :WHERE-FROM = :DEFINED
          (sb!c::%set-inline-expansion name nil inline-lambda)
          ;; and no need to call NOTE-NAME-DEFINED. It would do nothing.
-         (when doc
-           (setf (%fun-doc (fdefinition name)) doc))))
+         ))
 
 ;;;; DEFVAR and DEFPARAMETER
 

@@ -45,6 +45,7 @@
                      ;; vice versa.
                    `(named-lambda ,(sb!c::debug-name 'macro-function name)
                      (,whole ,environment)
+                      ,@(when doc (list doc))
                       ,@(sb!c:macro-policy-decls)
                       ,@local-decs
                       ,new-body)))
@@ -57,20 +58,19 @@
              (eval-when (:compile-toplevel)
                (sb!c::%compiler-defmacro :macro-function ',name t))
              (eval-when (:compile-toplevel :load-toplevel :execute)
-               (sb!c::%defmacro ',name ,def ',lambda-list ,doc
+               (sb!c::%defmacro ',name ,def ',lambda-list
                                 (sb!c:source-location)))))))))
 
 (macrolet
     ((def (times set-p)
        `(eval-when (,@times)
-          (defun sb!c::%defmacro (name definition lambda-list doc
-                                  source-location)
+          (defun sb!c::%defmacro (name definition lambda-list source-location)
             (declare (ignorable source-location)) ; xc-host doesn't use
             ;; old note (ca. 1985, maybe:-): "Eventually %%DEFMACRO
             ;; should deal with clearing old compiler information for
             ;; the functional value."
             ,@(unless set-p
-                '((declare (ignore lambda-list doc))))
+                '((declare (ignore lambda-list))))
             (let ((kind (info :function :kind name)))
               ;; Check for special form before package locks.
               (when (eq :special-form kind)
@@ -96,8 +96,7 @@
                         :new-location source-location))
                (setf (sb!xc:macro-function name) definition)
                ,(when set-p
-                  `(setf (%fun-doc definition) doc
-                         (%fun-lambda-list definition) lambda-list))))
+                  `(setf (%fun-lambda-list definition) lambda-list))))
             name))))
   (progn
     (def (:load-toplevel :execute) #-sb-xc-host t #+sb-xc-host nil)

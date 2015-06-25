@@ -1665,7 +1665,11 @@ core and return a descriptor to it."
 (defparameter *cold-fset-warm-names*
   (make-hash-table :test 'equal)) ; names can be conses, e.g. (SETF CAR)
 
-(defun cold-fset (name compiled-lambda docstring inline-expansion source-loc)
+(defun cold-fset (name compiled-lambda inline-expansion source-loc)
+  ;; SOURCE-LOC can be ignored, because functions intrinsically store
+  ;; their location as part of the code component.
+  ;; The argument is supplied here only to provide context for
+  ;; a redefinition warning, which can't happen in cold load.
   (declare (ignore source-loc))
   (multiple-value-bind (cold-name warm-name)
       ;; (SETF f) was descriptorized when dumped, symbols were not,
@@ -1676,10 +1680,7 @@ core and return a descriptor to it."
     (when (gethash warm-name *cold-fset-warm-names*)
       (error "duplicate COLD-FSET for ~S" warm-name))
     (setf (gethash warm-name *cold-fset-warm-names*) t)
-    (target-push (cold-cons cold-name
-                           (if (or docstring inline-expansion)
-                               (cold-cons docstring inline-expansion)
-                               *nil-descriptor*))
+    (target-push (cold-cons cold-name inline-expansion)
                  '*!reversed-cold-defuns*)
     (static-fset cold-name compiled-lambda)))
 

@@ -183,6 +183,7 @@ invoked. In that case it will store into PLACE and start over."
       (let ((def `(named-lambda
                       ,(sb!c::debug-name 'compiler-macro-function name)
                       (,whole ,environment)
+                    ,@(when doc (list doc))
                     ,@(sb!c:macro-policy-decls)
                     ,@local-decs
                     ,body)))
@@ -190,7 +191,7 @@ invoked. In that case it will store into PLACE and start over."
           (eval-when (:compile-toplevel)
            (sb!c::%compiler-defmacro :compiler-macro-function ',name t))
           (eval-when (:compile-toplevel :load-toplevel :execute)
-           (sb!c::%define-compiler-macro ',name ,def ',lambda-list ,doc)))))))
+           (sb!c::%define-compiler-macro ',name ,def ',lambda-list)))))))
 
 ;;; FIXME: This will look remarkably similar to those who have already
 ;;; seen the code for %DEFMACRO in src/code/defmacro.lisp.  Various
@@ -198,16 +199,15 @@ invoked. In that case it will store into PLACE and start over."
 (macrolet
     ((def (times set-p)
          `(eval-when (,@times)
-           (defun sb!c::%define-compiler-macro (name definition lambda-list doc)
+           (defun sb!c::%define-compiler-macro (name definition lambda-list)
              ,@(unless set-p
-                 '((declare (ignore lambda-list doc))))
+                 '((declare (ignore lambda-list))))
              (sb!c::warn-if-compiler-macro-dependency-problem name)
              ;; FIXME: warn about incompatible lambda list with
              ;; respect to parent function?
              (setf (sb!xc:compiler-macro-function name) definition)
              ,(when set-p
-                `(setf (%fun-doc definition) doc
-                       (%fun-lambda-list definition) lambda-list))
+                `(setf (%fun-lambda-list definition) lambda-list))
              name))))
   (progn
     (def (:load-toplevel :execute) #-sb-xc-host t #+sb-xc-host nil)

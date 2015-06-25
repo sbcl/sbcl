@@ -197,8 +197,8 @@
   (dolist (x (nreverse *!reversed-cold-setf-macros*))
     (apply #'!quietly-defsetf x))
   (dolist (x (nreverse *!reversed-cold-defuns*))
-    (destructuring-bind (name &optional docstring . inline-expansion) x
-      (!%quietly-defun name docstring inline-expansion)))
+    (destructuring-bind (name . inline-expansion) x
+      (!%quietly-defun name inline-expansion)))
 
   ;; KLUDGE: Why are fixups mixed up with toplevel forms? Couldn't
   ;; fixups be done separately? Wouldn't that be clearer and better?
