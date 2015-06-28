@@ -3417,8 +3417,8 @@ register."
                                   args)))
                     ;; Signal a step condition
                     (let* ((step-in
-                            (let ((*step-frame* (frame-down (top-frame))))
-                              (sb!impl::step-form step-info args))))
+                             (let ((*step-frame* (frame-down (top-frame))))
+                               (sb!impl::step-form step-info args))))
                       ;; And proceed based on its return value.
                       (if step-in
                           ;; STEP-INTO was selected. Use *STEP-OUT* to
@@ -3449,8 +3449,14 @@ register."
                             fdefn))
                          (function fun))))
       ;; And then store the wrapper in the same place.
-      (setf (context-register context callee-register-offset)
-            (get-lisp-obj-address new-callee)))))
+      (with-pinned-objects (new-callee)
+        ;; %SET-CONTEXT-REGISTER is a function, so the address of
+        ;; NEW-CALLEE gets converted to a fixnum before passing, which
+        ;; won't keep NEW-CALLEE pinned down. Once it's inside
+        ;; CONTEXT, which is registered in thread->interrupt_contexts,
+        ;; it will properly point to NEW-CALLEE.
+        (setf (context-register context callee-register-offset)
+              (get-lisp-obj-address new-callee))))))
 
 ;;; Given a signal context, fetch the step-info that's been stored in
 ;;; the debug info at the trap point.
