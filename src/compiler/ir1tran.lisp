@@ -721,29 +721,38 @@
 
 ;;; Find a compiler-macro for a form, taking FUNCALL into account.
 (defun find-compiler-macro (opname form)
-  (if (eq opname 'funcall)
-      (let ((fun-form (cadr form)))
-        (cond ((and (consp fun-form) (eq 'function (car fun-form))
-                    (not (cddr fun-form)))
-               (let ((real-fun (cadr fun-form)))
-                 (if (legal-fun-name-p real-fun)
-                     (values (sb!xc:compiler-macro-function real-fun *lexenv*)
-                             real-fun)
-                     (values nil nil))))
-              ((sb!xc:constantp fun-form *lexenv*)
-               (let ((fun (constant-form-value fun-form *lexenv*)))
-                 (if (legal-fun-name-p fun)
-                     ;; CLHS tells us that local functions must shadow
-                     ;; compiler-macro-functions, but since the call is
-                     ;; through a name, we are obviously interested
-                     ;; in the global function.
-                     (values (sb!xc:compiler-macro-function fun nil) fun)
-                     (values nil nil))))
-              (t
-               (values nil nil))))
-      (if (legal-fun-name-p opname)
-          (values (sb!xc:compiler-macro-function opname *lexenv*) opname)
-          (values nil nil))))
+  (flet ((legal-cm-name-p (name)
+           (and (legal-fun-name-p name)
+                (or (not (symbolp name))
+                    (not (sb!xc:macro-function name *lexenv*))))))
+    (if (eq opname 'funcall)
+        (let ((fun-form (cadr form)))
+          (cond ((and (consp fun-form) (eq 'function (car fun-form))
+                      (not (cddr fun-form)))
+                 (let ((real-fun (cadr fun-form)))
+                   (if (legal-cm-name-p real-fun)
+                       (values (sb!xc:compiler-macro-function real-fun *lexenv*)
+                               real-fun)
+                       (values nil nil))))
+                ((sb!xc:constantp fun-form *lexenv*)
+                 (let ((fun (constant-form-value fun-form *lexenv*)))
+                   (if (legal-cm-name-p fun)
+                       ;; CLHS tells us that local functions must shadow
+                       ;; compiler-macro-functions, but since the call is
+                       ;; through a name, we are obviously interested
+                       ;; in the global function.
+                       ;; KLUDGE: CLHS 3.2.2.1.1 also says that it can be
+                       ;; "a list whose car is funcall and whose cadr is
+                       ;; a list (function name)", that means that
+                       ;; (funcall 'name) that gets here doesn't fit the
+                       ;; definition.
+                       (values (sb!xc:compiler-macro-function fun nil) fun)
+                       (values nil nil))))
+                (t
+                 (values nil nil))))
+        (if (legal-fun-name-p opname)
+            (values (sb!xc:compiler-macro-function opname *lexenv*) opname)
+            (values nil nil)))))
 
 ;;; If FORM has a usable compiler macro, use it; otherwise return FORM itself.
 ;;; Return the name of the compiler-macro as a secondary value, if applicable.

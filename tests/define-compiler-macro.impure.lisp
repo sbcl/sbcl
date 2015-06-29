@@ -44,3 +44,10 @@
   ;; if its first argument names a special operator at expansion time.
   (assert-error (macroexpand-1
                  '(define-compiler-macro catch (foo &rest bar)))))
+
+(defmacro test-macro () 1)
+(define-compiler-macro test-macro () 2)
+
+(with-test (:name :funcall-macro-with-compiler-macro)
+  (assert-error (funcall (compile nil `(lambda () (funcall #'test-macro)))))
+  (assert-error (funcall (compile nil `(lambda () (funcall 'test-macro))))))
