@@ -108,13 +108,6 @@
   (unicode-property-init))
 
 ;;; Unicode property access
-(defun reverse-ucd-indices (strings)
-  (let ((hash (make-hash-table)))
-    (loop for string in strings
-          for index from 0
-          do (setf (gethash index hash) string))
-    hash))
-
 (defun ordered-ranges-member (item vector)
   (declare (type simple-vector vector)
            (type fixnum item)
@@ -166,42 +159,46 @@ with underscores replaced by dashes."
                          (gethash property **proplist-properties**)))
 
 ;; WARNING: These have to be manually kept in sync with the values in ucd.lisp
-(defparameter *general-categories*
-  (reverse-ucd-indices
-   '(:Lu :Ll :Lt :Lm :Lo :Cc :Cf :Co :Cs :Cn :Mc :Me :Mn :Nd
-     :Nl :No :Pc :Pd :Pe :Pf :Pi :Po :Ps :Sc :Sk :Sm :So :Zl
-     :Zp :Zs)))
+(declaim (type simple-vector *general-categories* *bidi-classes* *east-asian-widths*
+               *scripts* *line-break-classes* *blocks*))
+(sb!impl::defglobal *general-categories*
+  #(:Lu :Ll :Lt :Lm :Lo :Cc :Cf :Co :Cs :Cn :Mc :Me :Mn :Nd
+    :Nl :No :Pc :Pd :Pe :Pf :Pi :Po :Ps :Sc :Sk :Sm :So :Zl
+    :Zp :Zs))
 
-(defparameter *bidi-classes*
-  (reverse-ucd-indices
-   '(:BN :AL :AN :B :CS :EN :ES :ET :L :LRE :LRO :NSM :ON
-     :PDF :R :RLE :RLO :S :WS :LRI :RLI :FSI :PDI)))
+(sb!impl::defglobal *bidi-classes*
+  #(:BN :AL :AN :B :CS :EN :ES :ET :L :LRE :LRO :NSM :ON
+    :PDF :R :RLE :RLO :S :WS :LRI :RLI :FSI :PDI))
 
-(defparameter *east-asian-widths*
-  (reverse-ucd-indices '(:N :A :H :W :F :Na)))
+(sb!impl::defglobal *east-asian-widths*
+  #(:N :A :H :W :F :Na))
 
-(defparameter *scripts*
-  (reverse-ucd-indices
-   '(:Unknown :Common :Latin :Greek :Cyrillic :Armenian :Hebrew :Arabic :Syriac
-     :Thaana :Devanagari :Bengali :Gurmukhi :Gujarati :Oriya :Tamil :Telugu
-     :Kannada :Malayalam :Sinhala :Thai :Lao :Tibetan :Myanmar :Georgian :Hangul
-     :Ethiopic :Cherokee :Canadian-Aboriginal :Ogham :Runic :Khmer :Mongolian
-     :Hiragana :Katakana :Bopomofo :Han :Yi :Old-Italic :Gothic :Deseret
-     :Inherited :Tagalog :Hanunoo :Buhid :Tagbanwa :Limbu :Tai-Le :Linear-B
-     :Ugaritic :Shavian :Osmanya :Cypriot :Braille :Buginese :Coptic :New-Tai-Lue
-     :Glagolitic :Tifinagh :Syloti-Nagri :Old-Persian :Kharoshthi :Balinese
-     :Cuneiform :Phoenician :Phags-Pa :Nko :Sundanese :Lepcha :Ol-Chiki :Vai
-     :Saurashtra :Kayah-Li :Rejang :Lycian :Carian :Lydian :Cham :Tai-Tham
-     :Tai-Viet :Avestan :Egyptian-Hieroglyphs :Samaritan :Lisu :Bamum :Javanese
-     :Meetei-Mayek :Imperial-Aramaic :Old-South-Arabian :Inscriptional-Parthian
-     :Inscriptional-Pahlavi :Old-Turkic :Kaithi :Batak :Brahmi :Mandaic :Chakma
-     :Meroitic-Cursive :Meroitic-Hieroglyphs :Miao :Sharada :Sora-Sompeng
-     :Takri :Bassa-Vah :Mahajani :Pahawh-Hmong :Caucasian-Albanian :Manichaean
-     :Palmyrene :Duployan :Mende-Kikakui :Pau-Cin-Hau :Elbasan :Modi
-     :Psalter-Pahlavi :Grantha :Mro :Siddham :Khojki :Nabataean :Tirhuta
-     :Khudawadi :Old-North-Arabian :Warang-Citi :Linear-A :Old-Permic)))
+(sb!impl::defglobal *scripts*
+  #(:Unknown :Common :Latin :Greek :Cyrillic :Armenian :Hebrew :Arabic :Syriac
+    :Thaana :Devanagari :Bengali :Gurmukhi :Gujarati :Oriya :Tamil :Telugu
+    :Kannada :Malayalam :Sinhala :Thai :Lao :Tibetan :Myanmar :Georgian :Hangul
+    :Ethiopic :Cherokee :Canadian-Aboriginal :Ogham :Runic :Khmer :Mongolian
+    :Hiragana :Katakana :Bopomofo :Han :Yi :Old-Italic :Gothic :Deseret
+    :Inherited :Tagalog :Hanunoo :Buhid :Tagbanwa :Limbu :Tai-Le :Linear-B
+    :Ugaritic :Shavian :Osmanya :Cypriot :Braille :Buginese :Coptic :New-Tai-Lue
+    :Glagolitic :Tifinagh :Syloti-Nagri :Old-Persian :Kharoshthi :Balinese
+    :Cuneiform :Phoenician :Phags-Pa :Nko :Sundanese :Lepcha :Ol-Chiki :Vai
+    :Saurashtra :Kayah-Li :Rejang :Lycian :Carian :Lydian :Cham :Tai-Tham
+    :Tai-Viet :Avestan :Egyptian-Hieroglyphs :Samaritan :Lisu :Bamum :Javanese
+    :Meetei-Mayek :Imperial-Aramaic :Old-South-Arabian :Inscriptional-Parthian
+    :Inscriptional-Pahlavi :Old-Turkic :Kaithi :Batak :Brahmi :Mandaic :Chakma
+    :Meroitic-Cursive :Meroitic-Hieroglyphs :Miao :Sharada :Sora-Sompeng
+    :Takri :Bassa-Vah :Mahajani :Pahawh-Hmong :Caucasian-Albanian :Manichaean
+    :Palmyrene :Duployan :Mende-Kikakui :Pau-Cin-Hau :Elbasan :Modi
+    :Psalter-Pahlavi :Grantha :Mro :Siddham :Khojki :Nabataean :Tirhuta
+    :Khudawadi :Old-North-Arabian :Warang-Citi :Linear-A :Old-Permic))
 
-(defparameter *blocks*
+(sb!impl::defglobal *line-break-classes*
+    #(:XX :AI :AL :B2 :BA :BB :BK :CB :CJ :CL :CM :CP :CR :EX :GL
+      :HL :HY :ID :IN :IS :LF :NL :NS :NU :OP :PO :PR :QU :RI :SA
+      :SG :SP :SY :WJ :ZW))
+
+(sb!impl::defglobal *blocks*
   #(:Basic-Latin :Latin-1-Supplement :Latin-Extended-A :Latin-Extended-B
     :IPA-Extensions :Spacing-Modifier-Letters :Combining-Diacritical-Marks
     :Greek-and-Coptic :Cyrillic :Cyrillic-Supplement :Armenian :Hebrew :Arabic
@@ -269,16 +266,15 @@ with underscores replaced by dashes."
     :Tags :Variation-Selectors-Supplement :Supplementary-Private-Use-Area-A
     :Supplementary-Private-Use-Area-B))
 
-(defparameter *line-break-classes*
-  (reverse-ucd-indices
-   '(:XX :AI :AL :B2 :BA :BB :BK :CB :CJ :CL :CM :CP :CR :EX :GL
-     :HL :HY :ID :IN :IS :LF :NL :NS :NU :OP :PO :PR :QU :RI :SA
-     :SG :SP :SY :WJ :ZW)))
+(declaim (inline svref-or-null))
+(defun svref-or-null (vector index)
+  (and (< index (length vector))
+       (svref vector index)))
 
 (defun general-category (character)
   #!+sb-doc
   "Returns the general category of CHARACTER as it appears in UnicodeData.txt"
-  (gethash (sb!impl::ucd-general-category character) *general-categories*))
+  (svref-or-null *general-categories* (sb!impl::ucd-general-category character)))
 
 (defun bidi-class (character)
   #!+sb-doc
@@ -286,9 +282,9 @@ with underscores replaced by dashes."
   (if (and (eql (general-category character) :Cn)
            (default-ignorable-p character))
       :Bn
-      (gethash
-       (aref **character-misc-database** (+ 1 (misc-index character)))
-       *bidi-classes*)))
+      (svref-or-null
+       *bidi-classes*
+       (aref **character-misc-database** (1+ (misc-index character))))))
 
 (defun combining-class (character)
   #!+sb-doc
@@ -348,17 +344,17 @@ Otherwise, returns NIL."
   "Returns the East Asian Width property of CHARACTER as
 one of the keywords :N (Narrow), :A (Ambiguous), :H (Halfwidth),
 :W (Wide), :F (Fullwidth), or :NA (Not applicable)"
-  (gethash (ldb (byte 3 0)
-                (aref **character-misc-database**
-                      (+ 5 (misc-index character))))
-           *east-asian-widths*))
+  (svref-or-null *east-asian-widths*
+                 (ldb (byte 3 0)
+                      (aref **character-misc-database**
+                            (+ 5 (misc-index character))))))
 
 (defun script (character)
   #!+sb-doc
   "Returns the Script property of CHARACTER as a keyword.
 If CHARACTER does not have a known script, returns :UNKNOWN"
-  (gethash (aref **character-misc-database** (+ 6 (misc-index character)))
-           *scripts*))
+  (svref-or-null *scripts*
+                 (aref **character-misc-database** (+ 6 (misc-index character)))))
 
 (defun char-block (character)
   #!+sb-doc
@@ -421,8 +417,8 @@ Ideographic (:ID) class instead of Alphabetic (:AL)."
   (when (and resolve (listp character)) (setf character (car character)))
   (when (and resolve (not character)) (return-from line-break-class :nil))
   (let ((raw-class
-         (gethash (aref **character-misc-database** (+ 7 (misc-index character)))
-           *line-break-classes*))
+         (svref-or-null *line-break-classes*
+                        (aref **character-misc-database** (+ 7 (misc-index character)))))
         (syllable-type (hangul-syllable-type character)))
     (when syllable-type
       (setf raw-class
