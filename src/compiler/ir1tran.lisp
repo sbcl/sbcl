@@ -1423,7 +1423,12 @@
         ((not var)
          ;; ANSI's definition for "Declaration IGNORE, IGNORABLE"
          ;; requires that this be a STYLE-WARNING, not a full WARNING.
-         (multiple-value-call #'compiler-style-warn
+         ;; But, other Lisp hosts signal a full warning, so when building
+         ;; the cross-compiler, compile it as #'WARN so that in a self-hosted
+         ;; build we can at least crash in the same way,
+         ;; until we resolve this question about how severe the warning is.
+         (multiple-value-call #+sb-xc-host #'warn
+                              #-sb-xc-host #'compiler-style-warn
            "~A declaration for ~A: ~A"
            (first spec)
            (if (symbolp name)

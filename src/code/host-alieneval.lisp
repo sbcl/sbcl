@@ -272,7 +272,6 @@
 
 (eval-when (#-sb-xc :compile-toplevel :load-toplevel :execute)
   (defun %define-alien-type-translator (name translator)
-    (declare (ignore docs))
     (setf (info :alien-type :kind name) :primitive)
     (setf (info :alien-type :translator name) translator)
     (clear-info :alien-type :definition name)
