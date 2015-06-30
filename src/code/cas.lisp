@@ -152,18 +152,10 @@ can it verify that they are atomic: it is up to the implementor of a CAS
 expansion to ensure its atomicity.
 
 EXPERIMENTAL: Interface subject to change."
-  (with-unique-names (whole environment)
-    (multiple-value-bind (body decls doc)
-        (parse-defmacro lambda-list whole body accessor
-                        'define-cas-expander
-                        :environment environment
-                        :wrap-block nil)
-      `(eval-when (:compile-toplevel :load-toplevel :execute)
-         (setf (info :cas :expander ',accessor)
-               (lambda (,whole ,environment)
-                 ,@(when doc (list doc))
-                 ,@decls
-                 ,body))))))
+  `(eval-when (:compile-toplevel :load-toplevel :execute)
+     (setf (info :cas :expander ',accessor)
+           ,(make-macro-lambda `(cas-expand ,accessor) lambda-list body
+                               'define-cas-expander accessor))))
 
 ;; FIXME: this interface is bogus - short-form DEFSETF/CAS does not
 ;; want a lambda-list. You just blindly substitute

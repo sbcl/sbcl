@@ -776,14 +776,19 @@
 
 ;; Extract the context from a destructuring-bind pattern as represented in
 ;; a call to a checking function. A "context" is a non-bindable subpattern
-;; headed by :MACRO (as it came from a macro-like operator, e.g. DEFTYPE).
+;; headed by :MACRO (if it came from any macro-like thing, e.g. DEFTYPE),
+;; or :SPECIAL-FORM.
 ;; Return three values: CONTEXT-NAME, CONTEXT-KIND, and the real pattern.
 (defun get-ds-bind-context (pattern)
   (let ((marker (car pattern)))
-    (if (eq (if (listp marker) (car marker)) :macro)
-        (let ((context (cdr marker)))
-          (values (car context) (cdr context) (cdr pattern)))
-        (values nil 'destructuring-bind pattern))))
+    (case (and (listp marker) (car marker))
+      (:macro
+       (let ((context (cdr marker)))
+         (values (car context) (cdr context) (cdr pattern))))
+      (:special-form
+       (values (cdr marker) :special-form (cdr pattern)))
+      (t
+       (values nil 'destructuring-bind pattern)))))
 
 ;; Given FORM as the input to a compiler-macro, return the argument forms
 ;; that the called function would receive, skipping over FUNCALL.
@@ -812,10 +817,22 @@
                       (decf count)
                       (setq ,list-name (cdr ,list-name)))))
            (min/max-err (pattern effective-max)
+             ;; IR1 translators should call COMPILER-ERROR instead of
+             ;; ERROR. To ingrain that knowledge into the CHECK-DS-foo
+             ;; functions is a bit of a hack, but to do otherwise
+             ;; changes how DS-BIND has to expand.
              `(multiple-value-bind (name kind lambda-list)
                   (get-ds-bind-context ,pattern)
-               (sb!kernel::arg-count-error kind name input lambda-list
-                                           min ,effective-max))))
+                (if (eq kind :special-form)
+                    (compiler-error 'sb!kernel::arg-count-error
+                                    :kind "special form"
+                                    :name name
+                                    :args input
+                                    :lambda-list lambda-list
+                                    :minimum min
+                                    :maximum ,effective-max)
+                    (sb!kernel::arg-count-error
+                     kind name input lambda-list min ,effective-max)))))
 
   ;; Assert that INPUT has the requisite number of elements as
   ;; specified by MIN/MAX. PATTERN does not contain &REST or &KEY.
@@ -946,5 +963,82 @@
           ((eq (car plist) indicator)
            ;; Typecheck the next cell so that calling code doesn't get an atom.
            (return (the cons (cdr plist)))))))
+
+;;; This is a variant of destructuring-bind that provides the name
+;;; of the containing construct in generated error messages.
+(def!macro named-ds-bind (context lambda-list data &body body &environment env)
+  (declare (ignorable env))
+  `(binding* ,(expand-ds-bind lambda-list data t nil context
+                              (and (eq (car context) :macro)
+                                   (eq (cddr context) 'deftype)
+                                   ''*))
+     ,@body))
+
+;;; Make a lambda expression that receives an s-expression, destructures it
+;;; according to LAMBDA-LIST, and executes BODY.
+;;; NAME and KIND provide error-reporting context.
+;;; DOC-STRING-ALLOWED can be :INTERNAL to allow a docstring which is kept
+;;; inside the lambda, or :EXTERNAL to pull it out and return it, or NIL.
+;;; ENVIRONMENT can be NIL to disallow an &ENVIRONMENT variable,
+;;; or :IGNORE to allow it, but bind the corresponding symbol to NIL.
+;;; WRAP-BLOCK, if true, will place a block named NAME around body.
+;;;
+;;; The second returned value is a new lambda list that should be
+;;; attached to the resulting function, discarding &ENVIRONMENT, &WHOLE,
+;;; and/or anything else that does not document the list shape.
+;;; The third returned value is a docstring, if requested as :EXTERNAL.
+;;;
+;;; The CLtl2 name for this operation is PARSE-MACRO.
+(defun make-macro-lambda
+    (lambda-name lambda-list body kind name
+     &key ((:environment envp) t) (doc-string-allowed :internal)
+           (wrap-block name))
+  (declare (type (member t nil :ignore) envp))
+  (declare (type (member nil :external :internal) doc-string-allowed))
+  (binding* (((forms decls docstring)
+              (parse-body body :doc-string-allowed doc-string-allowed))
+             ;; Parse the lambda list, but not recursively.
+             ((llks req opt rest keys aux env whole)
+              (parse-lambda-list
+               lambda-list
+               :accept (logior
+                        (if envp (lambda-list-keyword-mask '&environment) 0)
+                        (lambda-list-keyword-mask 'destructuring-bind))
+               :context :macro))
+             ((outer-decls decls) (extract-var-decls decls (append env whole)))
+             (ll-env (when (eq envp t) (or env (list (make-symbol "ENV")))))
+             ;; We want a hidden WHOLE arg for the lambda - not the user's -
+             ;; in case one was present and declared IGNORE.
+             ;; Conversely, if the user asks for &WHOLE, doesn't use it,
+             ;; and doesn't declare it ignored, that deserves a warning.
+             (ll-whole (make-symbol "EXPR"))
+             ;; Then bind the user's WHOLE from the lambda's.
+             (ll-aux
+              (append (when (and (eq envp :ignore) env) `((,(car env) nil)))
+                      (when whole `((,(car whole) ,ll-whole)))))
+             ;; Drop &WHOLE and &ENVIRONMENT
+             (new-ll (make-lambda-list llks nil req opt rest keys aux))
+             (arg-accessor
+              (if (eq kind 'define-compiler-macro) 'compiler-macro-args 'cdr)))
+    (values `(,@(if lambda-name `(named-lambda ,lambda-name) '(lambda))
+                  (,ll-whole ,@ll-env ,@(and ll-aux (cons '&aux ll-aux)))
+               ,@(when (and docstring (eq doc-string-allowed :internal))
+                   (prog1 (list docstring) (setq docstring nil)))
+               ,@(if outer-decls (list outer-decls))
+               ,@(and (not env) (eq envp t) `((declare (ignore ,@ll-env))))
+               ,@(sb!c:macro-policy-decls)
+               (,@(if kind
+                      `(named-ds-bind ,(if (eq kind :special-form)
+                                           `(:special-form . ,name)
+                                           `(:macro ,name . ,kind)))
+                      '(destructuring-bind))
+                   ,new-ll (,arg-accessor ,ll-whole)
+                 ,@decls
+                 ,@(if wrap-block
+                       `((block ,(fun-name-block-name name) ,@forms))
+                       forms)))
+            ;; Normalize the lambda list by parsing and unparsing.
+            (unparse-ds-lambda-list (parse-ds-lambda-list new-ll))
+            docstring)))
 
 (/show0 "parse-lambda-list.lisp end of file")

@@ -274,7 +274,7 @@
 
 (deftest deftype-lambda-list.1
     (deftype-lambda-list 'foobar-type)
-  (&whole w &environment e r1 r2 &optional o &rest rest &key k1 k2 k3)
+  (r1 r2 &optional o &rest rest &key k1 k2 k3)
   t)
 
 (deftest deftype-lambda-list.2

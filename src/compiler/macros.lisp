@@ -29,22 +29,18 @@
 ;;; and we have no implementation-specific workaround to disallow it.
 (defmacro def-ir1-translator (name (lambda-list start-var next-var result-var)
                               &body body)
-  (let ((fn-name (symbolicate "IR1-CONVERT-" name)))
-    (with-unique-names (whole-var n-env)
-      (multiple-value-bind (body decls doc)
-          (parse-defmacro lambda-list whole-var body name "special form"
-                          :environment n-env
-                          :error-fun 'compiler-error
-                          :wrap-block nil)
-        (declare (ignorable doc))
-        `(progn
+  (let ((fn-name (symbolicate "IR1-CONVERT-" name))
+        (whole-var (make-symbol "FORM")))
+    (multiple-value-bind (lambda-expr arglist doc)
+        (make-macro-lambda nil lambda-list body :special-form name
+                           :doc-string-allowed :external :wrap-block nil)
+      (declare (ignorable doc))
+      `(progn
            (declaim (ftype (function (ctran ctran (or lvar null) t) (values))
                            ,fn-name))
-           (defun ,fn-name (,start-var ,next-var ,result-var ,whole-var
-                            &aux (,n-env *lexenv*))
+           (defun ,fn-name (,start-var ,next-var ,result-var ,whole-var)
              (declare (ignorable ,start-var ,next-var ,result-var))
-             ,@decls
-             ,body
+             (,lambda-expr ,whole-var *lexenv*)
              (values))
            (install-guard-function ',name '(:special ,name) ,(or #!+sb-doc doc))
            ;; The guard function is a closure, which can't have its lambda-list
@@ -53,16 +49,14 @@
            ;; lambda-list is not terribly useful.
            #-sb-xc-host
            (setf (%fun-lambda-list #',fn-name) ; This is for DESCRIBE et. al.
-                 ',(if (eq (first lambda-list) '&whole)
-                       (cddr lambda-list)
-                       lambda-list))
+                 ',arglist)
            ;; FIXME: Evidently "there can only be one!" -- we overwrite any
            ;; other :IR1-CONVERT value. This deserves a warning, I think.
            (setf (info :function :ir1-convert ',name) #',fn-name)
            ;; FIXME: rename this to SPECIAL-OPERATOR, to update it to
            ;; the 1990s?
            (setf (info :function :kind ',name) :special-form)
-           ',name)))))
+           ',name))))
 
 ;;; (This is similar to DEF-IR1-TRANSLATOR, except that we pass if the
 ;;; syntax is invalid.)

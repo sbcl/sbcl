@@ -577,15 +577,15 @@
   (unless (symbolp access-fn)
     (error "~S access-function name ~S is not a symbol."
            'sb!xc:define-setf-expander access-fn))
-  (with-unique-names (whole environment)
-    (multiple-value-bind (body local-decs doc)
-        (parse-defmacro lambda-list whole body access-fn
-                        'sb!xc:define-setf-expander
-                        :environment environment)
-      `(eval-when (:compile-toplevel :load-toplevel :execute)
-         (%defsetf ',access-fn
-                   (lambda (,whole ,environment) ,@local-decs ,body)
-                   ',lambda-list nil ',doc)))))
+  (multiple-value-bind (def arglist doc)
+      ;; Perhaps it would be more elegant to keep the docstring attached
+      ;; to the expander function, as for CAS?
+      (make-macro-lambda `(setf-expander ,access-fn) lambda-list body
+                         'sb!xc:define-setf-expander access-fn
+                         :doc-string-allowed :external)
+    (declare (ignore arglist))
+    `(eval-when (:compile-toplevel :load-toplevel :execute)
+       (%defsetf ',access-fn ,def ',lambda-list nil ',doc))))
 
 (sb!xc:define-setf-expander values (&rest places &environment env)
   (declare (type sb!c::lexenv env))

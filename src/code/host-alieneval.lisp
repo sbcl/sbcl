@@ -255,20 +255,12 @@
 ;;;; alien type defining stuff
 
 (def!macro define-alien-type-translator (name lambda-list &body body)
-  (with-unique-names (whole env)
-    (let ((defun-name (symbolicate "ALIEN-" name "-TYPE-TRANSLATOR")))
-      (multiple-value-bind (body decls docs)
-          (sb!kernel:parse-defmacro lambda-list whole body name
-                                    'define-alien-type-translator
-                                    :environment env)
-        `(eval-when (:compile-toplevel :load-toplevel :execute)
-           (defun ,defun-name (,whole ,env)
-             ,@(when docs (list docs))
-             (declare (ignorable ,env))
-             ,@decls
-             (block ,name
-               ,body))
-           (%define-alien-type-translator ',name #',defun-name))))))
+  (let ((defun-name (symbolicate "ALIEN-" name "-TYPE-TRANSLATOR")))
+    `(eval-when (:compile-toplevel :load-toplevel :execute)
+       (setf (symbol-function ',defun-name)
+             ,(make-macro-lambda defun-name lambda-list body
+                                 'define-alien-type-translator name))
+       (%define-alien-type-translator ',name #',defun-name))))
 
 (eval-when (#-sb-xc :compile-toplevel :load-toplevel :execute)
   (defun %define-alien-type-translator (name translator)

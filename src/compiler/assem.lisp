@@ -1678,17 +1678,11 @@
                 (append ,@(extract-nths 0 'list pdefs)))))))))
 
 (defmacro define-instruction-macro (name lambda-list &body body)
-  (with-unique-names (whole env)
-    (multiple-value-bind (body local-defs)
-        (sb!kernel:parse-defmacro lambda-list whole body name
-                                  'instruction-macro
-                                  :environment env)
-      `(eval-when (:compile-toplevel :load-toplevel :execute)
-         (%define-instruction ,(symbol-name name)
-                              (lambda (,whole ,env)
-                                ,@local-defs
-                                (block ,name
-                                  ,body)))))))
+  (let ((namestring (symbol-name name)))
+    `(eval-when (:compile-toplevel :load-toplevel :execute)
+       (%define-instruction ,namestring
+                            ,(make-macro-lambda
+                              namestring lambda-list body 'inst name)))))
 
 (defun %define-instruction (name defun)
   (setf (gethash name *assem-instructions*) defun)

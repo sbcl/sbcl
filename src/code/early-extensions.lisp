@@ -499,7 +499,7 @@
 ;;; Of course, since some other host Lisps don't seem to think that's
 ;;; acceptable syntax anyway, you're pretty much prevented from writing it.
 ;;;
-(defmacro binding* ((&rest clauses) &body body)
+(def!macro binding* ((&rest clauses) &body body)
   (unless clauses ; wrap in LET to preserve non-toplevelness
     (return-from binding* `(let () ,@body)))
   (multiple-value-bind (body decls) (parse-body body :doc-string-allowed nil)

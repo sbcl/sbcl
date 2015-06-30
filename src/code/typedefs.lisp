@@ -31,36 +31,14 @@
 ;;; an explicit default of '*, or else it assumes a default of NIL.
 (defmacro !def-type-translator (name arglist &body body)
   (declare (type symbol name))
-  ;; FIXME: Now that the T%CL hack is ancient history and we just use CL
-  ;; instead, we can probably return to using PARSE-DEFMACRO here.
-  ;;
-  ;; was:
-  ;;   This song and dance more or less emulates PARSE-DEFMACRO. The reason for
-  ;;   doing this emulation instead of just calling PARSE-DEFMACRO is just that
-  ;;   at cross-compile time PARSE-DEFMACRO expects lambda-list keywords in the
-  ;;   T%CL package, which is not what we have here. Maybe there's a tidier
-  ;;   solution.. (Other than wishing that ANSI had used symbols in the KEYWORD
-  ;;   package as lambda list keywords, rather than using symbols in the LISP
-  ;;   package!)
-  (multiple-value-bind (whole wholeless-arglist)
-      (if (eq '&whole (car arglist))
-          (values (cadr arglist) (cddr arglist))
-          (values (sb!xc:gensym) arglist))
-    (multiple-value-bind (forms decls)
-        (parse-body body :doc-string-allowed nil)
-      `(progn
-         (!cold-init-forms
-          (let ((fun (named-lambda ,(format nil "~A-TYPE-PARSE" name) (,whole)
-                       (block ,name
-                         (destructuring-bind ,wholeless-arglist
-                             (rest ,whole)  ; discarding NAME
-                           ,@decls
-                       ,@forms)))))
-            #-sb-xc-host
-            (setf (%simple-fun-arglist (the simple-fun fun)) ',wholeless-arglist)
-            (setf (info :type :translator ',name) fun)))
-         ',name))))
-
+  (multiple-value-bind (fun arglist)
+      (make-macro-lambda (format nil "~A-TYPE-PARSE" name)
+                         arglist body nil nil :environment nil)
+    `(!cold-init-forms
+      (let ((fun ,fun))
+        #-sb-xc-host
+        (setf (%simple-fun-arglist (the simple-fun fun)) ',arglist)
+        (setf (info :type :translator ',name) fun)))))
 
 #+sb-xc-host
 (defun ctype-random (mask)
