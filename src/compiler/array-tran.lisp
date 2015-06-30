@@ -165,7 +165,8 @@
              (cond ((= (length subscripts) 1)
                     (let ((arg (sb!xc:gensym)))
                       `(lambda (array ,arg)
-                         (< ,arg (array-dimension array 0)))))
+                         (and (fixnump ,arg)
+                              (< ,arg (array-dimension array 0))))))
                    (t
                     (give-up-ir1-transform
                      (or reason
