@@ -153,7 +153,7 @@
   (let* ((accept-inner
           (sb-int:lambda-list-keyword-mask 'destructuring-bind))
          (accept-outer
-          (logior (sb-int:lambda-list-keyword-mask '(&environment))
+          (logior (sb-int:lambda-list-keyword-mask '&environment)
                   accept-inner)))
     (sb-c::parse-lambda-list '(&whole w a b x) :accept accept-outer)
     (sb-c::parse-lambda-list '(&whole (w) a b x) :accept accept-inner)
@@ -185,12 +185,11 @@
          '((&body foo) (&whole (a . d) x y)))
 
     (try '(&optional a ((bb1 bb2) (f)) (c 'c) (d 'd dsp) &aux foo (baz))
-         '(&optional a ((bb1 bb2)) (c) (d)))
+         '(&optional a ((bb1 bb2)) (c 'c) (d 'd)))
 
     (try '(&key ((:bork (zook mook)) def bsp) (e 'e esp)
                 ((:name fred)) (color x csp))
-         '(&key ((:bork (zook mook))) (e) ((:name fred)) (color)))
-
+         '(&key ((:bork (zook mook))) (e 'e) ((:name fred)) (color)))
 
     (try '(x &optional (y) (((&whole (&whole w z . r) &body b) (c)) (def)))
          ;;                           ^ this &WHOLE variable is irrelevant

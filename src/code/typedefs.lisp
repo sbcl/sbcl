@@ -26,6 +26,9 @@
 
 ;;; Define the translation from a type-specifier to a type structure for
 ;;; some particular type. Syntax is identical to DEFTYPE.
+;;; Semantics are slightly different though: DEFTYPE causes the default
+;;; for missing &OPTIONAL arguments to be '* but a translator requires
+;;; an explicit default of '*, or else it assumes a default of NIL.
 (defmacro !def-type-translator (name arglist &body body)
   (declare (type symbol name))
   ;; FIXME: Now that the T%CL hack is ancient history and we just use CL

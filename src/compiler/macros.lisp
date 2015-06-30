@@ -23,6 +23,10 @@
 ;;; list. START-VAR, NEXT-VAR and RESULT-VAR are bound to the start and
 ;;; result continuations for the resulting IR1. KIND is the function
 ;;; kind to associate with NAME.
+;;; FIXME - Translators which accept implicit PROGNs fail on improper
+;;; input, e.g. (LAMBDA (X) (CATCH X (BAZ) . 3))
+;;; This is because &REST is defined to allow a dotted tail in macros,
+;;; and we have no implementation-specific workaround to disallow it.
 (defmacro def-ir1-translator (name (lambda-list start-var next-var result-var)
                               &body body)
   (let ((fn-name (symbolicate "IR1-CONVERT-" name)))

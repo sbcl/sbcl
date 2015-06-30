@@ -428,17 +428,37 @@
                  ;; Should &AUX be inserted even if empty? Probably not.
                  (if aux (cons '&aux aux)))))))
 
-;; Produce a destructuring lambda list from its internalized representation,
-;; excluding any parts that don't constrain the shape of the expected input.
-;; &AUX, supplied-p vars, and defaults do not impose shape constraints.
+;;; Produce a destructuring lambda list from its internalized representation,
+;;; excluding any parts that don't constrain the shape of the expected input.
+;;; &AUX, supplied-p vars, and defaults do not impose shape constraints.
+;;;
+;;; However as a special case, some constant defaults are retained mainly for
+;;; backward-compatibility.
+;;; The reason for it is that a test in SB-INTROSPECT checks the lambda list
+;;; of type ARRAY, which has explicit '* defaults. They're explicit
+;;; because of a bug or deficiency in !DEF-TYPE-TRANSLATOR which does not
+;;; adhere to the convention that DEFTYPE-like lambda lists use '* as implicit
+;;; defaults for everything unless stated otherwise.
+;;; So really the '* should have been superfluous in the lambda list,
+;;; but I'm also not convinced that changing the test case is the right thing.
+;;;
 (defun unparse-ds-lambda-list (parsed-lambda-list &optional cache)
   (cond ((symbolp parsed-lambda-list) parsed-lambda-list)
         ((cdr (assq parsed-lambda-list (cdr cache))))
         (t
          (with-ds-lambda-list-parts (llks whole req optional rest keys)
              parsed-lambda-list
-           (labels ((remove-default (spec)
-                      (if (atom spec) spec (list (recurse (car spec)))))
+           (labels ((process-opt (spec)
+                      (if (atom spec)
+                          spec
+                          (cons (recurse (car spec)) (maybe-default spec))))
+                    (maybe-default (spec)
+                      (let ((def (cdr spec)))
+                        (when (and def (typep (car def)
+                                              '(or (cons (eql quote))
+                                                   (member t)
+                                                   keyword number)))
+                          (list (car def))))) ; Remove any supplied-p var.
                     (recurse (x) (unparse-ds-lambda-list x cache))
                     (memoize (input output)
                       (when cache (push (cons input output) (cdr cache)))
@@ -450,12 +470,13 @@
                ;; &WHOLE is omitted unless it destructures something.
                (when (vectorp (car whole)) (list (recurse (car whole))))
                (mapcar #'recurse req)
-               (mapcar #'remove-default optional)
+               (mapcar #'process-opt optional)
                (when rest (list (recurse (car rest))))
                (mapcar (lambda (x)
                          (if (typep x '(cons cons))
-                             (list (list (caar x) (recurse (cadar x))))
-                             (remove-default x)))
+                             (cons (list (caar x) (recurse (cadar x)))
+                                   (maybe-default x))
+                             (process-opt x)))
                        keys))))))))
 
 ;;; Return the list of variables bound by a destructuring lambda list.
