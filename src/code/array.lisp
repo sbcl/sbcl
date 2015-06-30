@@ -805,8 +805,9 @@ of specialized arrays is supported."
 (defun array-in-bounds-p (array &rest subscripts)
   #!+sb-doc
   "Return T if the SUBSCRIPTS are in bounds for the ARRAY, NIL otherwise."
-  (if (%array-row-major-index array subscripts nil)
-      t))
+  (declare (truly-dynamic-extent subscripts))
+  (and (%array-row-major-index array subscripts nil)
+       t))
 
 (defun array-row-major-index (array &rest subscripts)
   (declare (truly-dynamic-extent subscripts))
