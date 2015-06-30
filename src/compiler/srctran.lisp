@@ -4258,13 +4258,14 @@
 ;;;; versions, and degenerate cases are flushed.
 
 ;;; Left-associate FIRST-ARG and MORE-ARGS using FUNCTION.
-(declaim (ftype (sfunction (symbol t list t) list) associate-args))
-(defun associate-args (fun first-arg more-args identity)
+(declaim (ftype (sfunction (symbol t list) list) associate-args))
+(defun associate-args (fun first-arg more-args)
+  (aver more-args)
   (let ((next (rest more-args))
         (arg (first more-args)))
     (if (null next)
-        `(,fun ,first-arg ,(if arg arg identity))
-        (associate-args fun `(,fun ,first-arg ,arg) next identity))))
+        `(,fun ,first-arg ,arg)
+        (associate-args fun `(,fun ,first-arg ,arg) next))))
 
 ;;; Reduce constants in ARGS list.
 (declaim (ftype (sfunction (symbol list symbol) list) reduce-constants))
@@ -4309,8 +4310,12 @@
     (1 `(,@one-arg-prefixes (the ,one-arg-result-type ,(first args))))
     (2 (values nil t))
     (t
-     (let ((reduced-args (reduce-constants fun args one-arg-result-type)))
-       (associate-args fun (first reduced-args) (rest reduced-args) identity)))))
+     (let* ((reduced-args (reduce-constants fun args one-arg-result-type))
+            (first (first reduced-args))
+            (rest (rest reduced-args)))
+       (if rest
+           (associate-args fun first rest)
+           first)))))
 
 (define-source-transform + (&rest args)
   (source-transform-transitive '+ args 0))
@@ -4332,10 +4337,10 @@
 ;;; Do source transformations for intransitive n-arg functions such as
 ;;; /. With one arg, we form the inverse. With two args we pass.
 ;;; Otherwise we associate into two-arg calls.
-(declaim (ftype (function (symbol symbol list t list &optional symbol)
+(declaim (ftype (function (symbol symbol list list &optional symbol)
                           (values list &optional (member nil t)))
                 source-transform-intransitive))
-(defun source-transform-intransitive (fun fun* args identity one-arg-prefixes
+(defun source-transform-intransitive (fun fun* args one-arg-prefixes
                                       &optional (one-arg-result-type 'number))
   (case (length args)
     ((0 2) (values nil t))
@@ -4343,12 +4348,12 @@
     (t
      (let ((reduced-args
              (reduce-constants fun* (rest args) one-arg-result-type)))
-       (associate-args fun (first args) reduced-args identity)))))
+       (associate-args fun (first args) reduced-args)))))
 
 (define-source-transform - (&rest args)
-  (source-transform-intransitive '- '+ args 0 '(%negate)))
+  (source-transform-intransitive '- '+ args '(%negate)))
 (define-source-transform / (&rest args)
-  (source-transform-intransitive '/ '* args 1 '(/ 1)))
+  (source-transform-intransitive '/ '* args '(/ 1)))
 
 ;;;; transforming APPLY
 

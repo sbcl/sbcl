@@ -5541,3 +5541,10 @@
            (coerce a (array-element-type (the (array (unsigned-byte 32)) x)))
            10
            (make-array 10 :element-type '(unsigned-byte 32)))))
+
+(with-test (:name :associate-args)
+  (assert-error
+   (funcall (compile nil `(lambda (x) (+ 1 x nil)))
+            2))
+  (assert-error
+   (funcall (compile nil `(lambda (x) (/ 1 x nil))) 4)))
