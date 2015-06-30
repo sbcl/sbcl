@@ -770,54 +770,71 @@ of specialized arrays is supported."
              :expected-type `(integer 0 (,bound)))))
 
 ;;; SUBSCRIPTS has a dynamic-extent list structure and is destroyed
-(defun %array-row-major-index (array subscripts
-                                     &optional (invalid-index-error-p t))
-  (declare (array array)
-           (list subscripts))
-  (let ((rank (array-rank array)))
-    (unless (= rank (length subscripts))
-      (error "wrong number of subscripts, ~W, for array of rank ~W"
-             (length subscripts) rank))
-    (if (array-header-p array)
-        (do ((subs (nreverse subscripts) (cdr subs))
-             (axis (1- (array-rank array)) (1- axis))
-             (chunk-size 1)
-             (result 0))
-            ((null subs) result)
-          (declare (list subs) (fixnum axis chunk-size result))
-          (let ((index (car subs))
-                (dim (%array-dimension array axis)))
-            (declare (fixnum dim))
-            (unless (and (fixnump index) (< -1 index dim))
-              (if invalid-index-error-p
-                  (invalid-array-index-error array index dim axis)
-                  (return-from %array-row-major-index nil)))
-            (incf result (* chunk-size (the fixnum index)))
-            (setf chunk-size (* chunk-size dim))))
-        (let ((index (first subscripts))
-              (length (length (the (simple-array * (*)) array))))
-          (unless (and (fixnump index) (< -1 index length))
-            (if invalid-index-error-p
-                (invalid-array-index-error array index length)
-                (return-from %array-row-major-index nil)))
-          index))))
+(defun %array-row-major-index (array &rest subscripts)
+  (declare (truly-dynamic-extent subscripts)
+           (array array))
+  (let ((length (length subscripts)))
+    (cond ((array-header-p array)
+           (let ((rank (%array-rank array)))
+             (unless (= rank length)
+               (error "wrong number of subscripts, ~W, for array of rank ~W."
+                      length rank))
+             (do ((axis (1- rank) (1- axis))
+                  (chunk-size 1)
+                  (result 0))
+                 ((minusp axis) result)
+               (declare (fixnum axis chunk-size result))
+               (let ((index (fast-&rest-nth axis subscripts))
+                     (dim (%array-dimension array axis)))
+                 (unless (and (fixnump index) (< -1 index dim))
+                   (invalid-array-index-error array index dim axis))
+                 (setf result
+                       (truly-the fixnum
+                                  (+ result
+                                     (truly-the fixnum (* chunk-size index))))
+                       chunk-size (truly-the fixnum (* chunk-size dim)))))))
+          ((/= length 1)
+           (error "Wrong number of subscripts, ~W, for array of rank 1."
+                  length))
+          (t
+           (let ((index (fast-&rest-nth 0 subscripts))
+                 (length (length (the (simple-array * (*)) array))))
+             (unless (and (fixnump index) (< -1 index length))
+               (invalid-array-index-error array index length))
+             index)))))
 
 (defun array-in-bounds-p (array &rest subscripts)
   #!+sb-doc
   "Return T if the SUBSCRIPTS are in bounds for the ARRAY, NIL otherwise."
   (declare (truly-dynamic-extent subscripts))
-  (and (%array-row-major-index array subscripts nil)
-       t))
+  (let ((length (length subscripts)))
+    (cond ((array-header-p array)
+           (let ((rank (%array-rank array)))
+             (unless (= rank length)
+               (error "Wrong number of subscripts, ~W, for array of rank ~W."
+                      length rank))
+             (loop for i below length
+                   for s = (fast-&rest-nth i subscripts)
+                   always (and (fixnump s)
+                               (< s (%array-dimension array i))))))
+          ((/= length 1)
+           (error "Wrong number of subscripts, ~W, for array of rank 1."
+                  length))
+          (t
+           (let ((subscript (fast-&rest-nth 0 subscripts)))
+             (and (fixnump subscript)
+                  (< subscript
+                     (length (truly-the (simple-array * (*)) array)))))))))
 
 (defun array-row-major-index (array &rest subscripts)
   (declare (truly-dynamic-extent subscripts))
-  (%array-row-major-index array subscripts))
+  (apply #'%array-row-major-index array subscripts))
 
 (defun aref (array &rest subscripts)
   #!+sb-doc
   "Return the element of the ARRAY specified by the SUBSCRIPTS."
   (declare (truly-dynamic-extent subscripts))
-  (row-major-aref array (%array-row-major-index array subscripts)))
+  (row-major-aref array (apply #'%array-row-major-index array subscripts)))
 
 ;;; (setf aref/bit/sbit) are implemented using setf-functions,
 ;;; because they have to work with (setf (apply #'aref array subscripts))
@@ -827,7 +844,7 @@ of specialized arrays is supported."
 (defun (setf aref) (new-value array &rest subscripts)
   (declare (truly-dynamic-extent subscripts)
            (type array array))
-  (setf (row-major-aref array (%array-row-major-index array subscripts))
+  (setf (row-major-aref array (apply #'%array-row-major-index array subscripts))
         new-value))
 
 (defun row-major-aref (array index)
@@ -857,7 +874,7 @@ of specialized arrays is supported."
   (declare (type (array bit) bit-array)
            (truly-dynamic-extent subscripts)
            (optimize (safety 1)))
-  (row-major-aref bit-array (%array-row-major-index bit-array subscripts)))
+  (row-major-aref bit-array (apply #'%array-row-major-index bit-array subscripts)))
 
 (defun (setf bit) (new-value bit-array &rest subscripts)
   (declare (type (array bit) bit-array)
@@ -865,7 +882,7 @@ of specialized arrays is supported."
            (truly-dynamic-extent subscripts)
            (optimize (safety 1)))
   (setf (row-major-aref bit-array
-                        (%array-row-major-index bit-array subscripts))
+                        (apply #'%array-row-major-index bit-array subscripts))
         new-value))
 
 (defun sbit (simple-bit-array &rest subscripts)
@@ -875,7 +892,7 @@ of specialized arrays is supported."
            (truly-dynamic-extent subscripts)
            (optimize (safety 1)))
   (row-major-aref simple-bit-array
-                  (%array-row-major-index simple-bit-array subscripts)))
+                  (apply #'%array-row-major-index simple-bit-array subscripts)))
 
 (defun (setf sbit) (new-value bit-array &rest subscripts)
   (declare (type (simple-array bit) bit-array)
@@ -883,7 +900,7 @@ of specialized arrays is supported."
            (truly-dynamic-extent subscripts)
            (optimize (safety 1)))
   (setf (row-major-aref bit-array
-                        (%array-row-major-index bit-array subscripts))
+                        (apply #'%array-row-major-index bit-array subscripts))
         new-value))
 
 ;;;; miscellaneous array properties

@@ -295,20 +295,20 @@
                      (list (values `(push funcall-result acc)
                                    `(nreverse acc))))
                  (catch-give-up-ir1-transform
-                     `(lambda (result-type fun ,@seq-args)
-                        (declare (ignore result-type))
-                        (let ((fun (%coerce-callable-to-fun fun))
-                              (acc nil))
-                          (declare (type list acc))
-                          (declare (ignorable acc))
-                          ,(build-sequence-iterator
-                            all-seqs seq-args
-                            :result result
-                            :body push-dacc
-                            :fast (policy node (> speed space)))))
+                     (`(lambda (result-type fun ,@seq-args)
+                         (declare (ignore result-type))
+                         (let ((fun (%coerce-callable-to-fun fun))
+                               (acc nil))
+                           (declare (type list acc))
+                           (declare (ignorable acc))
+                           ,(build-sequence-iterator
+                             all-seqs seq-args
+                             :result result
+                             :body push-dacc
+                             :fast (policy node (> speed space))))))
                    (if (and (null result-type-value) (null seqs))
                        '(%map-for-effect-arity-1 fun seq)
-                       (give-up))))))))))
+                       (%give-up))))))))))
 
 ;;; MAP-INTO
 (deftransform map-into ((result fun &rest seqs)
@@ -320,33 +320,33 @@
          (non-complex-vector-type-p (csubtypep result-type
                                                (specifier-type '(simple-array * 1)))))
     (catch-give-up-ir1-transform
-        `(lambda (result fun ,@seqs-names)
-           ,(if (and (policy node (> speed space))
-                     (not non-complex-vector-type-p))
-                (let ((data  (gensym "DATA"))
-                      (start (gensym "START"))
-                      (end   (gensym "END")))
-                  `(with-array-data ((,data result)
-                                     (,start)
-                                     (,end))
-                     (declare (ignore ,end))
-                     ,(build-sequence-iterator
-                       seqs seqs-names
-                       :result '(when (array-has-fill-pointer-p result)
-                                 (setf (fill-pointer result) index))
-                       :into 'result
-                       :body `(locally (declare (optimize (insert-array-bounds-checks 0)))
-                                (setf (aref ,data (truly-the index (+ index ,start)))
-                                      funcall-result))
-                       :fast t)))
-                (build-sequence-iterator
-                 seqs seqs-names
-                 :result '(when (array-has-fill-pointer-p result)
-                           (setf (fill-pointer result) index))
-                 :into 'result
-                 :body '(locally (declare (optimize (insert-array-bounds-checks 0)))
-                         (setf (aref result index) funcall-result))))
-           result)
+        (`(lambda (result fun ,@seqs-names)
+            ,(if (and (policy node (> speed space))
+                      (not non-complex-vector-type-p))
+                 (let ((data  (gensym "DATA"))
+                       (start (gensym "START"))
+                       (end   (gensym "END")))
+                   `(with-array-data ((,data result)
+                                      (,start)
+                                      (,end))
+                      (declare (ignore ,end))
+                      ,(build-sequence-iterator
+                        seqs seqs-names
+                        :result '(when (array-has-fill-pointer-p result)
+                                  (setf (fill-pointer result) index))
+                        :into 'result
+                        :body `(locally (declare (optimize (insert-array-bounds-checks 0)))
+                                 (setf (aref ,data (truly-the index (+ index ,start)))
+                                       funcall-result))
+                        :fast t)))
+                 (build-sequence-iterator
+                  seqs seqs-names
+                  :result '(when (array-has-fill-pointer-p result)
+                            (setf (fill-pointer result) index))
+                  :into 'result
+                  :body '(locally (declare (optimize (insert-array-bounds-checks 0)))
+                          (setf (aref result index) funcall-result))))
+            result))
       (cond #-sb-xc-host
             ;; %%vector-map-into-funs%% is not defined in xc
             ;; if something needs to be faster in the compiler, it
@@ -363,7 +363,7 @@
                  `(progn (,mapper result 0 (length result) (%coerce-callable-to-fun fun) seqs)
                          result))))
             (t
-             (give-up))))))
+             (%give-up))))))
 
 
 ;;; FIXME: once the confusion over doing transforms with known-complex

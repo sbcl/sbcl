@@ -3114,18 +3114,9 @@
           (array-in-bounds-p s 9)))
       (must-not-optimize
        ;; don't trust non-simple array length in safety=1
-       (let ((a (the (array * (10)) (make-array 10 :adjustable t))))
-         (eval `(adjust-array ,a 0))
-         (array-in-bounds-p a 9))
-       ;; same for a union type
-       (let ((s (the (string 10) (make-array 10
-                                             :element-type 'character
-                                             :adjustable t))))
-         (eval `(adjust-array ,s 0))
-         (array-in-bounds-p s 9))
-       ;; single unknown dimension
-       (let ((a (make-array (random 20))))
-         (array-in-bounds-p a 10))
+       (let ((a (the (array * (10 20)) (make-array '(10 20) :adjustable t))))
+         (eval `(adjust-array ,a '(0 0)))
+         (array-in-bounds-p a 9 0))
        ;; multiple unknown dimensions
        (let ((a (make-array (list (random 20) (random 5)))))
          (array-in-bounds-p a 5 2))
@@ -3133,17 +3124,17 @@
        (let ((a (make-array (list 1 (random 5)))))
          (array-in-bounds-p a 0 2))
        ;; subscript might be negative
-       (let ((a (make-array 5)))
-         (array-in-bounds-p a (- (random 3) 2)))
+       (let ((a (make-array '(5 10))))
+         (array-in-bounds-p a 1 (- (random 3) 2)))
        ;; subscript might be too large
-       (let ((a (make-array 5)))
-         (array-in-bounds-p a (random 6)))
+       (let ((a (make-array '(5 10))))
+         (array-in-bounds-p a (random 6) 1))
        ;; unknown upper bound
-       (let ((a (make-array 5)))
-         (array-in-bounds-p a (get-universal-time)))
+       (let ((a (make-array '(5 10))))
+         (array-in-bounds-p a (get-universal-time) 1))
        ;; unknown lower bound
-       (let ((a (make-array 5)))
-         (array-in-bounds-p a (- (get-universal-time))))
+       (let ((a (make-array '(5 30))))
+         (array-in-bounds-p a 0 (- (get-universal-time))))
        ;; in theory we should be able to optimize
        ;; the following but the current implementation
        ;; doesn't cut it because the array type's
