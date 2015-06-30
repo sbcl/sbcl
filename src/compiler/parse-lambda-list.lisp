@@ -345,10 +345,21 @@
                  when sym collect `(,sym (svref ,parts ,i)))
        ,@body)))
 
-;; Split a keyword argument specifier into the keyword, the bound variable
-;; or destructuring pattern, the default, and supplied-p var. If present the
-;; supplied-p var is in a singleton list.
-;; DEFAULT should be specified as '* when parsing a DEFTYPE lambda-list.
+;;; Split an optional argument specifier into the bound variable
+;;; or destructuring pattern, the default, and supplied-p var.
+;;; If present the supplied-p var is in a singleton list.
+;;; DEFAULT should be specified as '* when parsing a DEFTYPE lambda-list.
+(defun parse-optional-arg-spec (spec &optional default)
+  (etypecase spec
+    (symbol (values spec default nil))
+    (cons (values (car spec)
+                  (if (cdr spec) (cadr spec) default)
+                  (cddr spec)))))
+
+;;; Split a keyword argument specifier into the keyword, the bound variable
+;;; or destructuring pattern, the default, and supplied-p var.
+;;; If present the supplied-p var is in a singleton list.
+;;; DEFAULT should be specified as '* when parsing a DEFTYPE lambda-list.
 (defun parse-key-arg-spec (spec &optional default)
   (etypecase spec
     (symbol (values (keywordicate spec) spec default nil))
@@ -709,19 +720,14 @@
                ;; Optionals.
                (do ((elts opt (cdr elts)))
                    ((endp elts))
-                 (let ((elt (car elts)))
-                   (multiple-value-bind (var def sup-p-var)
-                       (if (atom elt)
-                           (values elt)
-                           (values (car elt)
-                                   (if (cdr elt) (cadr elt) default-default)
-                                   (cddr elt)))
-                     (bind-if t input
-                              (if explicit-cast
-                                  (cast/pop `(,explicit-cast list ,input)
-                                            (cdr elts))
-                                  `(pop ,input))
-                              var sup-p-var def)))))
+                 (multiple-value-bind (var def sup-p-var)
+                     (parse-optional-arg-spec (car elts) default-default)
+                   (bind-if t input
+                            (if explicit-cast
+                                (cast/pop `(,explicit-cast list ,input)
+                                          (cdr elts))
+                                `(pop ,input))
+                            var sup-p-var def))))
 
              ;; The spec allows the inane use of (A B &REST (C D)) = (A B C D).
              ;; The former is less efficient, since it is "nested", only not.
