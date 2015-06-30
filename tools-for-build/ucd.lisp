@@ -1016,9 +1016,13 @@ Used to look up block data.")
                    :if-exists :supersede
                    :if-does-not-exist :create)
     (with-standard-io-syntax
-      (let ((*print-pretty* t))
-        (prin1 (mapcar #'(lambda (x) (cons (car x) (read-from-string (cdr x))))
-                       *different-numerics*)))))
+      (let ((*print-pretty* t)
+            (result (make-array (* (length *different-numerics*) 2))))
+        (loop for (code . value) in (sort *different-numerics* #'< :key #'car)
+              for i by 2
+              do (setf (aref result i) code
+                       (aref result (1+ i)) (read-from-string value)))
+        (prin1 result))))
   (with-open-file (*standard-output*
                    (make-pathname :name "titlecases"
                                   :type "lisp-expr"

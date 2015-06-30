@@ -11,8 +11,9 @@
 
 (in-package "SB!UNICODE")
 
-(defparameter **special-numerics**
-  '#.(with-open-file (stream
+(declaim (type simple-vector **special-numerics**))
+(sb!impl::defglobal **special-numerics**
+  #.(with-open-file (stream
                      (merge-pathnames
                       (make-pathname
                        :directory
@@ -21,19 +22,23 @@
                       sb!xc:*compile-file-truename*)
                      :direction :input
                      :element-type 'character)
-        (read stream)))
+      (read stream)))
 
-(defparameter **block-ranges**
-  '#.(with-open-file (stream
-                     (merge-pathnames
-                      (make-pathname
-                       :directory
-                       '(:relative :up :up "output")
-                       :name "blocks" :type "lisp-expr")
-                      sb!xc:*compile-file-truename*)
-                     :direction :input
-                     :element-type 'character)
-        (read stream)))
+
+(declaim (type (simple-array (unsigned-byte 32) (*)) **block-ranges**))
+(sb!impl::defglobal **block-ranges**
+  #.(sb!int:!coerce-to-specialized
+     (with-open-file (stream
+                      (merge-pathnames
+                       (make-pathname
+                        :directory
+                        '(:relative :up :up "output")
+                        :name "blocks" :type "lisp-expr")
+                       sb!xc:*compile-file-truename*)
+                      :direction :input
+                      :element-type 'character)
+       (read stream))
+     '(unsigned-byte 32)))
 
 (macrolet ((unicode-property-init ()
              (let ((proplist-dump
@@ -111,36 +116,46 @@
     hash))
 
 (defun ordered-ranges-member (item vector)
+  (declare (type simple-vector vector)
+           (type fixnum item)
+           (optimize speed))
   (labels ((recurse (start end)
+             (declare (type index start end))
              (when (< start end)
                (let* ((i (+ start (truncate (- end start) 2)))
                       (index (* 2 i))
                       (elt1 (svref vector index))
                       (elt2 (svref vector (1+ index))))
+                 (declare (type index i)
+                          (fixnum elt1 elt2))
                  (cond ((< item elt1)
                         (recurse start i))
                        ((> item elt2)
                         (recurse (+ 1 i) end))
                        (t
                         item))))))
-    (recurse 0 (/ (length vector) 2))))
+    (recurse 0 (truncate (length vector) 2))))
 
 ;; Returns which range `item` was found in or NIL
 ;; First range = 0, second range = 1 ...
 (defun ordered-ranges-position (item vector)
+  (declare (type (simple-array (unsigned-byte 32) (*)) vector)
+           (type fixnum item))
   (labels ((recurse (start end)
+             (declare (type index start end))
              (when (< start end)
                (let* ((i (+ start (truncate (- end start) 2)))
                       (index (* 2 i))
-                      (elt1 (svref vector index))
-                      (elt2 (svref vector (1+ index))))
+                      (elt1 (aref vector index))
+                      (elt2 (aref vector (1+ index))))
+                 (declare (type index i))
                  (cond ((< item elt1)
                         (recurse start i))
                        ((> item elt2)
                         (recurse (+ 1 i) end))
                        (t
                         i))))))
-    (recurse 0 (/ (length vector) 2))))
+    (recurse 0 (truncate (length vector) 2))))
 
 (defun proplist-p (character property)
   #!+sb-doc
@@ -307,11 +322,11 @@ that have a digit value but no decimal digit value"
 (defun numeric-value (character)
   #!+sb-doc
   "Returns the numeric value of CHARACTER or NIL if there is no such value.
-
 Numeric value is the most general of the Unicode numeric properties.
 The only constraint on the numeric value is that it be a rational number."
-  (cdr (or (assoc (char-code character) **special-numerics**)
-           (cons nil (digit-value character)))))
+  (or (double-vector-binary-search (char-code character)
+                                   **special-numerics**)
+      (digit-value character)))
 
 (defun mirrored-p (character)
   #!+sb-doc
@@ -1486,7 +1501,7 @@ it defaults to 80 characters"
 
 
 ;;; Collation
-(defparameter **maximum-variable-primary-element**
+(defconstant +maximum-variable-primary-element+
   #.(with-open-file (stream
                      (merge-pathnames
                       (make-pathname
@@ -1506,8 +1521,9 @@ it defaults to 80 characters"
               (ldb (byte 11 5) value)
               (ldb (byte 5 0) value))))
 
+(declaim (inline variable-p))
 (defun variable-p (x)
-  (<= 1 x **maximum-variable-primary-element**))
+  (<= 1 x +maximum-variable-primary-element+))
 
 (defun collation-key (string start end)
   (let (char1
