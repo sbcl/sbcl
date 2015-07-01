@@ -254,6 +254,14 @@
 
 (with-test (:name :ds-lambda-list-possible-mismatch-warning)
   (assert-signal (sb-c::parse-ds-lambda-list '(a &optional ((b c) 'foo)))
+                 style-warning)
+  ;; Suppose this meant: one required arg followed by one optional arg
+  ;; which is a list of one required and one optional arg.
+  ;; But it's accidentally missing a pair of disambiguating parentheses.
+  (assert-signal (sb-c::parse-ds-lambda-list '(a &optional (b &optional c)))
+                 style-warning)
+  ;; Similarly...
+  (assert-signal (sb-c::parse-ds-lambda-list '(a &optional (b c &key)))
                  style-warning))
 
 (with-test (:name :ds-bind-list-checkers)

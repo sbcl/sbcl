@@ -105,6 +105,15 @@
                           collect `(,i (setq ,s ,val))))))
     (labels ((destructuring-p ()
                (logtest (bits &whole) accept))
+             (probably-ll-keyword-p (arg)
+               ;; Compiler doesn't see that the check is manually done. :-(
+               #-sb-xc-host
+               (declare (optimize (sb!c::insert-array-bounds-checks 0)))
+               (and (symbolp arg)
+                    (let ((name (symbol-name arg)))
+                      (and (typep name 'simple-base-string)
+                           (plusp (length name))
+                           (char= (char name 0) #\&)))))
              (need-arg (state)
                (croak "expecting variable after ~A in: ~S" state list))
              (need-symbol (x why)
@@ -150,9 +159,7 @@
            (return))
          (shiftf last-arg arg (pop input))
 
-         (when (and (symbolp arg)
-                    (let ((name (symbol-name arg)))
-                      (and (plusp (length name)) (char= (char name 0) #\&))))
+         (when (probably-ll-keyword-p arg)
            ;; Handle a probable lambda list keyword
            (multiple-value-bind (from-states to-state)
               (case arg
@@ -266,23 +273,40 @@
                  (cond ((symbolp x) nil)
                        ((listp x) t)
                        (t (croak "~A parameter is not a symbol or cons: ~S"
-                                 what-kind x)))))
+                                 what-kind x))))
+               ;; Inform the user about a possibly malformed destructuring
+               ;; lambda list (&OPTIONAL (A &OPTIONAL B)).
+               ;; It's technically legal but unlikely to be right, as it makes
+               ;; A's default form the expression &OPTIONAL, which is an
+               ;; unlikely name for a local variable or macro, and an illegal
+               ;; name for a DEFVAR or such, being in the CL package.
+               (check-suspicious (default suppliedp-var)
+                (unless silent
+                  (when (and (probably-ll-keyword-p default)
+                             (member default sb!xc:lambda-list-keywords))
+                    (style-warn "suspicious default ~S in lambda list: ~S."
+                                default list))
+                  (when (and (probably-ll-keyword-p suppliedp-var)
+                             (member suppliedp-var sb!xc:lambda-list-keywords))
+                    (style-warn
+                     "suspicious supplied-p variable ~S in lambda list: ~S."
+                     suppliedp-var list)))))
           (dolist (arg optional)
             (when (defaultp arg '&optional)
               (destructuring-bind (var &optional init-form supplied-p) arg
-                (declare (ignore init-form supplied-p))
-                (need-bindable var "&OPTIONAL parameter name"))))
+                (need-bindable var "&OPTIONAL parameter name")
+                (check-suspicious init-form supplied-p))))
           (when rest
             (need-bindable (car rest) "&REST argument"))
           (dolist (arg keys)
             (when (defaultp arg '&key)
               (destructuring-bind (var-or-kv &optional init-form supplied-p) arg
-                (declare (ignore init-form supplied-p))
                 (if (atom var-or-kv)
                     (need-symbol var-or-kv "&KEY parameter name")
                     (destructuring-bind (keyword-name var) var-or-kv
                       (declare (ignore keyword-name))
-                      (need-bindable var "&KEY parameter name"))))))
+                      (need-bindable var "&KEY parameter name")))
+                (check-suspicious init-form supplied-p))))
           (dolist (arg aux)
             (when (defaultp arg '&aux)
               (destructuring-bind (var &optional init-form) arg
@@ -305,9 +329,10 @@
   (multiple-value-bind (llks required optional rest keys aux env whole)
       (parse-lambda-list lambda-list
                          :accept (lambda-list-keyword-mask 'destructuring-bind)
-                         :context 'destructuring-bind)
+                         :silent silent :context 'destructuring-bind)
    (declare (ignore env) (notinline mapcar))
-   (labels ((parse (list) (if (atom list) list (parse-ds-lambda-list list)))
+   (labels ((parse (list)
+              (if (atom list) list (parse-ds-lambda-list list :silent silent)))
             (parse* (list arg-specifier)
               (let ((parse (parse list)))
                 (when (and (not silent) (vectorp parse)) ; is destructuring
