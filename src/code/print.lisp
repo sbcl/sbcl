@@ -489,6 +489,7 @@ variable: an unreadable object representing the error is printed instead.")
   (write-char #\| stream))
 
 (defun output-symbol (object stream)
+  (declare (symbol object))
   (if (or *print-escape* *print-readably*)
       (let ((package (symbol-package object))
             (name (symbol-name object))
