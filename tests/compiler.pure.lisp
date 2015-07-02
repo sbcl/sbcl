@@ -464,6 +464,9 @@
               (x &key (y nil x))
               (&key (y nil z) (z nil w))
               (&whole x &optional x)
+              ;; Uh, this test is semi-bogus - it's trying to test that
+              ;; you can't repeat, but it's now actually testing that
+              ;; &WHOLE has to appear first, per the formal spec.
               (&environment x &whole x)))
   (assert (nth-value 2
                      (handler-case
@@ -473,7 +476,8 @@
                                                 (bar (&environment env)
                                                   `',(macro-function 'foo env)))
                                        (bar))))
-                       (error (c)
+                       ((or warning error) (c)
+                         (declare (ignore c))
                          (values nil t t))))))
 
 (assert (typep (eval `(the arithmetic-error

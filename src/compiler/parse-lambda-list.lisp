@@ -325,11 +325,14 @@
 ;;; - a &REST arg that destructures preceded by any optional args.
 ;;;   It's suspicious because if &REST destructures, then in essence it
 ;;;   must not be NIL, which means the optionals aren't really optional.
-(defun parse-ds-lambda-list (lambda-list &key silent)
+(defun parse-ds-lambda-list (lambda-list
+                             &key silent
+                             (condition-class 'simple-program-error))
   (multiple-value-bind (llks required optional rest keys aux env whole)
       (parse-lambda-list lambda-list
                          :accept (lambda-list-keyword-mask 'destructuring-bind)
-                         :silent silent :context 'destructuring-bind)
+                         :context 'destructuring-bind
+                         :silent silent :condition-class condition-class)
    (declare (ignore env) (notinline mapcar))
    (labels ((parse (list)
               (if (atom list) list (parse-ds-lambda-list list :silent silent)))
@@ -521,7 +524,7 @@
                             (t (error "Excess args")))))
           (doer))
 |#
-(defun ds-lambda-list-symbols (parsed-lambda-list)
+(defun ds-lambda-list-variables (parsed-lambda-list &optional (include-aux t))
   (collect ((output))
     (labels ((recurse (x) (if (vectorp x) (scan x) (output x)))
              (copy (x) (dolist (elt x) (recurse elt)))
@@ -540,8 +543,9 @@
                          (t (let ((k (car x)))
                               (if (symbolp k) (output k) (recurse (cadr k)))
                               (suppliedp-var x)))))
-                 (dolist (x aux)
-                   (output (if (symbolp x) x (car x)))))))
+                 (when include-aux
+                   (dolist (x aux)
+                     (output (if (symbolp x) x (car x))))))))
       (recurse parsed-lambda-list)
       (output))))
 
@@ -1043,8 +1047,19 @@
                       (when whole `((,(car whole) ,ll-whole)))))
              ;; Drop &WHOLE and &ENVIRONMENT
              (new-ll (make-lambda-list llks nil req opt rest keys aux))
+             (parse (parse-ds-lambda-list new-ll))
              (arg-accessor
               (if (eq kind 'define-compiler-macro) 'compiler-macro-args 'cdr)))
+    ;; Signal a style warning for duplicate names, but disregard &AUX variables
+    ;; because most folks agree that (LET* ((X (F)) (X (G X))) ..) makes sense
+    ;; - some would even say that it is idiomatic - and &AUX bindings are just
+    ;; LET* bindings. PARSE-DEFMACRO signals an error, but that seems harsh.
+    ;; Other implementations permit (X &OPTIONAL X), and the fact that
+    ;; nesting is allowed makes this issue even less clear.
+    (mapl (lambda (tail)
+            (when (memq (car tail) (cdr tail))
+              (style-warn "variable ~S occurs more than once" (car tail))))
+          (append whole env (ds-lambda-list-variables parse nil)))
     (values `(,@(if lambda-name `(named-lambda ,lambda-name) '(lambda))
                   (,ll-whole ,@ll-env ,@(and ll-aux (cons '&aux ll-aux)))
                ,@(when (and docstring (eq doc-string-allowed :internal))
@@ -1062,8 +1077,8 @@
                  ,@(if wrap-block
                        `((block ,(fun-name-block-name name) ,@forms))
                        forms)))
-            ;; Normalize the lambda list by parsing and unparsing.
-            (unparse-ds-lambda-list (parse-ds-lambda-list new-ll))
+            ;; Normalize the lambda list by unparsing.
+            (unparse-ds-lambda-list parse)
             docstring)))
 
 (/show0 "parse-lambda-list.lisp end of file")

@@ -330,18 +330,11 @@ Evaluate the FORMS in the specified SITUATIONS (any of :COMPILE-TOPLEVEL,
         (unless (listp arglist)
           (fail "The local macro argument list ~S is not a list."
                 arglist))
-        (with-unique-names (whole environment)
-          (multiple-value-bind (body local-decls)
-              (parse-defmacro arglist whole body name 'macrolet
-                              :environment environment)
-            `(,name macro .
-                    ,(compile-in-lexenv
-                      nil
-                      `(lambda (,whole ,environment)
-                         ,@(macro-policy-decls)
-                         ,@local-decls
-                         ,body)
-                      lexenv))))))))
+        `(,name macro .
+                ,(compile-in-lexenv
+                  nil
+                  (make-macro-lambda nil arglist body 'macrolet name)
+                  lexenv))))))
 
 (defun funcall-in-macrolet-lexenv (definitions fun context)
   (%funcall-in-foomacrolet-lexenv
