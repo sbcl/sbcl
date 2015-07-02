@@ -41,6 +41,8 @@
     (pprint-logical-block (stream nil)
       (funcall fun stream))))
 
+;;; FIXME: This is not an exported symbol, so it can probably be removed,
+;;; since nothing signals the condition afaict.
 (define-condition defmacro-bogus-sublist-error
                   (defmacro-lambda-list-bind-error)
   ((object :reader defmacro-bogus-sublist-error-object :initarg :object)

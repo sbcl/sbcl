@@ -36,23 +36,36 @@
                                            program-error)
   ())
 
-(defun arg-count-program-error (datum &rest arguments)
-  (declare (ignore datum))
-  (apply #'error 'arg-count-program-error arguments))
+;;; FIXME: This macro is not clearly better than plain destructuring-bind.
+;;;
+;;; First of all, it's ridiculous that the error message says
+;;;   "error while parsing arguments to PROGRAM-DESTRUCTURING-BIND".
+;;; The user doesn't care what the macro was that parsed the arguments
+;;; to the special operator. It should instead say
+;;;   "... while parsing arguments to special operator <foo>"
+;;;
+;;; Second, it is naive to think that existence of this macro suffices
+;;; to always signal an INTEPRETED-PROGRAM-ERROR and not just ERROR.
+;;; e.g. (LET ((X 1)) . JUNK) binds the &BODY variable to the non-list JUNK.
+;;; To fix the general problem, every use of DOLIST and other things
+;;; would have to be replaced by something like SB-PCL::DOLIST-CAREFULLY.
+;;; Similarly for ((&REST BINDINGS) &BODY BODY) wherein it's not even
+;;; obvious that BINDINGS is enforced by the macro to be a list. [lp#1469275]
 
 ;; OAOOM? (see destructuring-bind.lisp)
 (defmacro program-destructuring-bind (lambda-list arg-list &body body)
-  (let ((arg-list-name (gensym "ARG-LIST-")))
-    (multiple-value-bind (body local-decls)
-        (parse-defmacro lambda-list arg-list-name body nil
-                        'program-destructuring-bind
-                        :anonymousp t
-                        :doc-string-allowed nil
-                        :wrap-block nil
-                        :error-fun 'arg-count-program-error)
-      `(let ((,arg-list-name ,arg-list))
-         ,@local-decls
-         ,body))))
+  ;; Not wrapping ARG-LIST in (THE LIST) is better than what DESTRUCTURING-BIND
+  ;; does, because this gives a more descriptive message if you pass a non-list
+  ;; to the form handler, like (IF . 3) will say that 3 does not match the
+  ;; list (TEST IF-TRUE &OPTIONAL IF-FALSE) rather than just "3 is not a list".
+  ;; For the sake of compatibility, DESTRUCTURING-BIND signals TYPE-ERROR
+  ;; in that situation, which is less than ideal.
+  ;;
+  ;; (:EVAL) is a dummy context. We don't have enough information to
+  ;; show the operator name without using debugger internals to get the stack frame.
+  ;; It would be easier to make the name an argument to this macro.
+  `(sb!int:binding* ,(sb!c::expand-ds-bind lambda-list arg-list t nil '(:eval))
+     ,@body))
 
 (defun ip-error (format-control &rest format-arguments)
   (error 'interpreted-program-error
@@ -725,53 +738,10 @@
 ;; definition form FUNCTION-DEF.
 (defun eval-local-macro-def (function-def env)
   (program-destructuring-bind (name lambda-list &body local-body) function-def
-    (multiple-value-bind (local-body documentation declarations)
-        (parse-lambda-headers local-body :doc-string-allowed t)
-      ;; HAS-ENVIRONMENT and HAS-WHOLE will be either NIL or the name
-      ;; of the variable. (Better names?)
-      (let (has-environment has-whole)
-        ;; Filter out &WHOLE and &ENVIRONMENT from the lambda-list, and
-        ;; do some syntax checking.
-        (when (eq (car lambda-list) '&whole)
-          (setf has-whole (second lambda-list))
-          (setf lambda-list (cddr lambda-list)))
-        (setf lambda-list
-              (loop with skip = 0
-                    for element in lambda-list
-                    if (cond
-                         ((/= skip 0)
-                          (decf skip)
-                          (setf has-environment element)
-                          nil)
-                         ((eq element '&environment)
-                          (if has-environment
-                              (ip-error "Repeated &ENVIRONMENT.")
-                              (setf skip 1))
-                          nil)
-                         ((eq element '&whole)
-                          (ip-error "&WHOLE may only appear first ~
-                                     in MACROLET lambda-list."))
-                         (t t))
-                    collect element))
-        (let ((outer-whole (gensym "WHOLE"))
-              (environment (or has-environment (gensym "ENVIRONMENT")))
-              (macro-name (gensym "NAME")))
-          (%eval `#'(lambda (,outer-whole ,environment)
-                      ,@(if documentation
-                            (list documentation)
-                            nil)
-                      (declare ,@(unless has-environment
-                                         `((ignore ,environment))))
-                      (program-destructuring-bind
-                          (,@(if has-whole
-                                 (list '&whole has-whole)
-                                 nil)
-                             ,macro-name ,@lambda-list)
-                          ,outer-whole
-                        (declare (ignore ,macro-name)
-                                 ,@declarations)
-                        (block ,name ,@local-body)))
-                 env))))))
+    (%eval (sb!int:make-macro-lambda nil ; the lambda is anonymous.
+                                     lambda-list local-body
+                                     'macrolet name)
+           env)))
 
 (defun eval-macrolet (body env)
   (program-destructuring-bind ((&rest local-functions) &body body) body

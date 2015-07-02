@@ -2,6 +2,9 @@
 changes relative to sbcl-1.2.13:
   * DESTRUCTURING-BIND has been totally reimplemented from scratch
     to address a handful of performance and correctness issues.
+    Some minor behavioral differences exist regarding order of evaluation
+    of default forms for unsupplied &OPTIONAL and &KEY arguments
+    when nested destructuring patterns are involved.
     (lp#707556, lp#707573, lp#707578, lp#708051)
 
 changes in sbcl-1.2.13 relative to sbcl-1.2.12:

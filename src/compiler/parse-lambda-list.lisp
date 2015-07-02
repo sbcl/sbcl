@@ -816,6 +816,8 @@
          (values (car context) (cdr context) (cdr pattern))))
       (:special-form
        (values (cdr marker) :special-form (cdr pattern)))
+      (:eval
+       (values nil :eval (cdr pattern)))
       (t
        (values nil 'destructuring-bind pattern)))))
 
@@ -852,16 +854,27 @@
              ;; changes how DS-BIND has to expand.
              `(multiple-value-bind (name kind lambda-list)
                   (get-ds-bind-context ,pattern)
-                (if (eq kind :special-form)
-                    (compiler-error 'sb!kernel::arg-count-error
-                                    :kind "special form"
-                                    :name name
-                                    :args input
-                                    :lambda-list lambda-list
-                                    :minimum min
-                                    :maximum ,effective-max)
-                    (sb!kernel::arg-count-error
-                     kind name input lambda-list min ,effective-max)))))
+                (case kind
+                 (:special-form
+                  (compiler-error 'sb!kernel::arg-count-error
+                                  :kind "special operator"
+                                  :name name
+                                  :args input
+                                  :lambda-list lambda-list
+                                  :minimum min
+                                  :maximum ,effective-max))
+                 (:eval
+                  (error 'sb!eval::arg-count-program-error
+                         ;; This is stupid. Maybe we should just say
+                         ;;  "error parsing special form"?
+                         ;; It would be more sensible than mentioning
+                         ;; a random nonstandard macro.
+                         :kind 'sb!eval::program-destructuring-bind
+                         :args input :lambda-list lambda-list
+                         :minimum min :maximum ,effective-max))
+                 (t
+                  (sb!kernel::arg-count-error
+                   kind name input lambda-list min ,effective-max))))))
 
   ;; Assert that INPUT has the requisite number of elements as
   ;; specified by MIN/MAX. PATTERN does not contain &REST or &KEY.
