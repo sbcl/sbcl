@@ -83,7 +83,9 @@
                                          sb!impl::%defsetf
                                          sb!kernel::%defstruct))
                       (and (symbolp function) ; no ((lambda ...) ...)
-                           (not (null (get function :sb-cold-funcall-handler))))
+                           (get-properties (symbol-plist function)
+                                           '(:sb-cold-funcall-handler/for-effect
+                                             :sb-cold-funcall-handler/for-value)))
                       (and (eq function 'setf)
                            (fopcompilable-p (%macroexpand form *lexenv*)))
                       (and (eq function 'sb!kernel:%svset)

@@ -1102,6 +1102,11 @@ core and return a descriptor to it."
 (defvar *cold-package-symbols*)
 (declaim (type hash-table *cold-package-symbols*))
 
+(setf (get 'find-package :sb-cold-funcall-handler/for-value)
+      (lambda (descriptor &aux (name (base-string-from-core descriptor)))
+        (or (car (gethash name *cold-package-symbols*))
+            (error "Genesis could not find a target package named ~S" name))))
+
 ;;; a map from descriptors to symbols, so that we can back up. The key
 ;;; is the address in the target core.
 (defvar *cold-symbols*)
@@ -1153,12 +1158,6 @@ core and return a descriptor to it."
       (dolist (pd package-data-list)
         (init-cold-package (sb-cold:package-data-name pd)
                            #!+sb-doc(sb-cold::package-data-doc pd)))
-      ;; MISMATCH needs !HAIRY-DATA-VECTOR-REFFER-INIT to have been done,
-      ;; and FIND-PACKAGE calls MISMATCH - which it shouldn't - but until
-      ;; that is fixed, doing this in genesis allows packages to be
-      ;; completely sane, modulo the naming, extremely early in cold-init.
-      (cold-set '*keyword-package* (find-cold-package "KEYWORD"))
-      (cold-set '*cl-package* (find-cold-package "COMMON-LISP"))
       ;; pass 2: set the 'use' lists and collect the 'used-by' lists
       (dolist (pd package-data-list)
         (let ((this (find-cold-package (sb-cold:package-data-name pd)))
@@ -2497,7 +2496,10 @@ core and return a descriptor to it."
                (stack (%fasl-input-stack fasl-input)))
            (dotimes (i (read-byte-arg (%fasl-input-stream fasl-input))
                        (values (pop-fop-stack stack) args))
-             (push (pop-fop-stack stack) args)))))
+             (push (pop-fop-stack stack) args))))
+       (call (fun-name handler-name args)
+         (acond ((get fun-name handler-name) (apply it args))
+                (t (error "Can't ~S ~S in cold load" handler-name fun-name)))))
 
   (define-cold-fop (fop-funcall)
     (multiple-value-bind (fun args) (pop-args (fasl-input))
@@ -2509,8 +2511,7 @@ core and return a descriptor to it."
             (target-symbol-function (car args)))
            (cons (cold-cons (first args) (second args)))
            (symbol-global-value (cold-symbol-value (first args)))
-           (t
-            (error "Can't FUNCALL ~S in cold load" fun)))
+           (t (call fun :sb-cold-funcall-handler/for-value args)))
           (let ((counter *load-time-value-counter*))
             (cold-push (cold-list (cold-intern :load-time-value) fun
                                   (number-to-core counter))
@@ -2537,9 +2538,7 @@ core and return a descriptor to it."
                        (let ((val (second args)))
                          (if (symbolp val) (cold-intern val) val))))
             (%svset (apply 'cold-svset args))
-            (t (acond ((get fun :sb-cold-funcall-handler) (apply it args))
-                      (t (error "Can't FUNCALL-FOR-EFFECT ~S in cold load"
-                                fun)))))))))
+            (t (call fun :sb-cold-funcall-handler/for-effect args)))))))
 
 (defun finalize-load-time-value-noise ()
   (cold-set '*!load-time-values*

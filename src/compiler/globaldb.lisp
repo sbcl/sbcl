@@ -126,7 +126,7 @@
 ) ; EVAL-WHEN
 
 #-sb-xc
-(setf (get '!%define-info-type :sb-cold-funcall-handler)
+(setf (get '!%define-info-type :sb-cold-funcall-handler/for-effect)
       (lambda (category kind type-spec checker validator default id)
         ;; The SB!FASL: symbols are poor style, but the lesser evil.
         ;; If exported, then they'll stick around in the target image.

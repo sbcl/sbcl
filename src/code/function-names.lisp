@@ -11,7 +11,7 @@
               (acons symbol checker *valid-fun-names-alist*)))))
 
 #+sb-xc-host
-(setf (get '%define-fun-name-syntax :sb-cold-funcall-handler)
+(setf (get '%define-fun-name-syntax :sb-cold-funcall-handler/for-effect)
       (lambda (symbol checker)
         (sb!fasl::target-push
          (sb!fasl::cold-cons (sb!fasl::cold-intern symbol) checker)

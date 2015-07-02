@@ -28,21 +28,10 @@
 
 (/show "starting early-low.lisp")
 
-;;; FIXME: The PCL package is internal and is used by code in potential
-;;; bottlenecks. Access to it might be faster through #.(find-package "SB-PCL")
-;;; than through *PCL-PACKAGE*. And since it's internal, no one should be
+;;; The PCL package is internal and is used by code in potential
+;;; bottlenecks. And since it's internal, no one should be
 ;;; doing things like deleting and recreating it in a running target Lisp.
-;;; So perhaps we should replace it uses of *PCL-PACKAGE* with uses of
-;;; (PCL-PACKAGE), and make PCL-PACKAGE a macro which expands into
-;;; the SB-PCL package itself. Maybe we should even use this trick for
-;;; COMMON-LISP and KEYWORD, too. (And the definition of PCL-PACKAGE etc.
-;;; could be made less viciously brittle when SB-FLUID.)
-;;; (Or perhaps just define a macro
-;;;   (DEFMACRO PKG (NAME)
-;;;     #-SB-FLUID (FIND-PACKAGE NAME)
-;;;     #+SB-FLUID `(FIND-PACKAGE ,NAME))
-;;; and use that to replace all three variables.)
-(defvar *pcl-package*                (find-package "SB-PCL"))
+(define-symbol-macro *pcl-package* (load-time-value (find-package "SB-PCL") t))
 
 (declaim (inline defstruct-classoid-p))
 (defun defstruct-classoid-p (classoid)

@@ -1497,18 +1497,27 @@ necessary, since type inference may take arbitrarily long to converge.")
 ;;; Compile FORM and arrange for it to be called at load-time. Return
 ;;; the dumper handle and our best guess at the type of the object.
 (defun compile-load-time-value (form)
-  ;; Special case for the cross-compiler. While the normal ltv stuff is fine
-  ;; for the most part, it is inadequate for SETUP-PRINTER-STATE.
-  ;; In cold-init we want the printer to work before regular ltv forms are run,
-  ;; so this is fop-based magic, slightly dangerous in that it can produce a
-  ;; use of #'F before the referenced function has been defined.
-  ;; Just be careful not to do that.
-  #+sb-xc-host
-  (when (typep form '(cons (eql function) (cons symbol null)))
-    (fopcompile form nil t)
-    (return-from compile-load-time-value
-      (values (sb!fasl::dump-pop *compile-object*)
-              (specifier-type 'function))))
+  (let ((ctype
+         (cond
+          ;; Ideally any ltv would test FOPCOMPILABLE-P on its form,
+          ;; but be that as it may, this case is picked off because of
+          ;; its importance during cross-compilation to ensure that
+          ;; compiled lambdas don't cause a chicken-and-egg problem.
+          ((typep form '(cons (eql find-package) (cons string null)))
+           (specifier-type 'package))
+          ;; Special case for the cross-compiler, necessary for at least
+          ;; SETUP-PRINTER-STATE, but also anything that would be dumped
+          ;; using FOP-KNOWN-FUN in the target compiler, to avoid going
+          ;; through an fdefn.
+          ;; I'm pretty sure that as of change 00298ec6, it works to
+          ;; compile #'F before the defun would have been seen by Genesis.
+          #+sb-xc-host
+          ((typep form '(cons (eql function) (cons symbol null)))
+           (specifier-type 'function)))))
+    (when ctype
+      (fopcompile form nil t)
+      (return-from compile-load-time-value
+        (values (sb!fasl::dump-pop *compile-object*) ctype))))
   (let ((lambda (compile-load-time-stuff form t)))
     (values
      (fasl-dump-load-time-value-lambda lambda *compile-object*)
