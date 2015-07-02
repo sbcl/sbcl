@@ -1,4 +1,9 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
+changes relative to sbcl-1.2.13:
+  * DESTRUCTURING-BIND has been totally reimplemented from scratch
+    to address a handful of performance and correctness issues.
+    (lp#707556, lp#707573, lp#707578, lp#708051)
+
 changes in sbcl-1.2.13 relative to sbcl-1.2.12:
   * incompatible change: on success, TRY-SEMAPHORE and WAIT-ON-SEMAPHORE
     return the new count

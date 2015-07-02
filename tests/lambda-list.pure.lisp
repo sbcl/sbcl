@@ -241,7 +241,7 @@
 
 (with-test (:name :ds-lambda-list-symbols)
   (flet ((try (list expect)
-           (assert (equal sb-c::(ds-lambda-list-symbols
+           (assert (equal sb-c::(ds-lambda-list-variables
                                  (parse-ds-lambda-list list))
                          expect))))
     (try '(a ((b c))
@@ -296,7 +296,7 @@
                        (lambda (args)
                          (sb-int:binding*
                              ,(sb-c::expand-ds-bind lambda-list 'args nil 'the)
-                           (list ,@(sb-c::ds-lambda-list-symbols
+                           (list ,@(sb-c::ds-lambda-list-variables
                                     (sb-c::parse-ds-lambda-list lambda-list))))))
                       (ast (sb-c::meta-abstractify-ds-lambda-list
                             (sb-c::parse-ds-lambda-list ',lambda-list))))

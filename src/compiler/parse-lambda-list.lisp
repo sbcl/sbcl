@@ -887,7 +887,7 @@
   ;; the keys are - &ALLOW-OTHER-KEYS was present in the lambda-list,
   ;; and we don't care if non-symbols are found in keyword position.
   ;; We always enforce that the list is not odd-length though.
-  (flet ((check-plist (input plist valid-keys pattern)
+  (defun check-plist (input plist valid-keys pattern)
            (let ((list plist) seen-allowp seen-other bad-key)
              (flet ((validp (key)
                       (find key (truly-the simple-vector valid-keys) :test 'eq))
@@ -919,7 +919,7 @@
                             (setf seen-allowp t))
                           (when (and (not seen-other) (not (validp key)))
                             (setq seen-other t bad-key key)))))
-                  (setq list (cdr next))))))))
+                  (setq list (cdr next)))))))
 
     ;; The pattern contains &KEY. Anything beyond the final optional arg
     ;; must be a well-formed property list regardless of existence of &REST.
@@ -972,7 +972,7 @@
                       :if-list-exhausted input
                       :if-max-reached (progn (require-constant-keys list)
                                              (check-plist input list valid-keys
-                                                          pattern)))))))
+                                                          pattern))))))
 
 ;; Like GETF but return CDR of the cell whose CAR contained the found key,
 ;; instead of CADR; and return 0 for not found.

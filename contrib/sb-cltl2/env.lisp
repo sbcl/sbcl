@@ -407,14 +407,8 @@ lambda expression will parse its form argument, binding the variables in
 LAMBDA-LIST appropriately, and then execute BODY with those bindings in
 effect."
   (declare (ignore env))
-  (with-unique-names (whole environment)
-    (multiple-value-bind (body decls)
-        (parse-defmacro lambda-list whole body name
-                        'parse-macro
-                        :environment environment)
-      `(lambda (,whole ,environment)
-         ,@decls
-         ,body))))
+  (make-macro-lambda (if (and name (symbolp name)) (string name) "PARSE-MACRO")
+                     lambda-list body 'parse-macro name))
 
 (defun enclose (lambda-expression &optional environment)
   "Return a function consistent with LAMBDA-EXPRESSION in ENVIRONMENT: the
