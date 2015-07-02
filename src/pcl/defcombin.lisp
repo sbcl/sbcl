@@ -436,7 +436,7 @@
 ;;; option are bound to the symbols in the intercept lambda list.
 ;;;
 ;;; FIXME: in here we have not one but two mini-copies of a weird
-;;; hybrid of PARSE-LAMBDA-LIST and PARSE-DEFMACRO-LAMBDA-LIST.
+;;; hybrid of PARSE-LAMBDA-LIST and (obsolete) PARSE-DEFMACRO-LAMBDA-LIST.
 (defun deal-with-args-option (wrapped-body args-lambda-list)
   (let ((intercept-rebindings
          (let (rebindings)

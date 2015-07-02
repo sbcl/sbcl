@@ -129,8 +129,7 @@
  ("src/code/barrier" :not-host)
  ("src/code/parse-body")       ; on host for PARSE-BODY
  ("src/code/early-extensions") ; on host for COLLECT, SYMBOLICATE, etc.
- ("src/compiler/parse-lambda-list") ; needed by PARSE-DEFMACRO
- ("src/code/parse-defmacro")   ; on host for PARSE-DEFMACRO
+ ("src/compiler/parse-lambda-list")
  ("src/compiler/deftype")      ; on host for SB!XC:DEFTYPE
  ("src/code/restart" :not-host) ; %DEFCONSTANT can bind a restart
  ("src/compiler/defconstant")

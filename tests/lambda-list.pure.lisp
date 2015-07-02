@@ -236,7 +236,7 @@
                    (cdr (parse '(a b c &environment foo . rest)))))
     (assert-error (parse '(a b c &environment foo &rest r . rest)))
 
-    ;; lp# 707556 will be fixed once PARSE-DEFMACRO uses PARSE-LAMBDA-LIST
+    ;; lp# 707556
     (assert-error (parse '(a &key b &allow-other-keys c)))))
 
 (with-test (:name :ds-lambda-list-symbols)

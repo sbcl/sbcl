@@ -190,7 +190,8 @@
   (assert-error (macroexpand-1
                  '(defsetf foof (a b &optional k &aux) (v1 v2) (forms))))
 
-  ;; 3.4.8 - DEFTYPE currently uses parse-defmacro
+  ;; 3.4.8 - DEFTYPE is exactly like DEFMACRO
+  ;;         except for the implied default-default of '*
 
   ;; 3.4.9 - DEFINE-MODIFY-MACRO allows only &OPTIONAL and &REST
   (assert-error (macroexpand-1

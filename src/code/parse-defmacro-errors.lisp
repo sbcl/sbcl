@@ -1,5 +1,5 @@
-;;;; error-handling machinery for PARSE-DEFMACRO, separated from
-;;;; PARSE-DEFMACRO code itself because the happy path can be handled
+;;;; error-handling machinery for MAKE-MACRO-LAMBDA separated from
+;;;; that code because the happy path can be handled
 ;;;; earlier in the bootstrap sequence than DEFINE-CONDITION can be
 
 ;;;; This software is part of the SBCL system. See the README file for
@@ -40,21 +40,6 @@
             (defmacro-lambda-list-bind-error-name condition))
     (pprint-logical-block (stream nil)
       (funcall fun stream))))
-
-;;; FIXME: This is not an exported symbol, so it can probably be removed,
-;;; since nothing signals the condition afaict.
-(define-condition defmacro-bogus-sublist-error
-                  (defmacro-lambda-list-bind-error)
-  ((object :reader defmacro-bogus-sublist-error-object :initarg :object)
-   (lambda-list :reader defmacro-bogus-sublist-error-lambda-list
-                :initarg :lambda-list))
-  (:report
-   (lambda (condition stream)
-     (!printing-defmacro-lambda-list-bind-error (condition stream)
-       (format stream
-               "bogus sublist ~2I~_~S ~I~_to satisfy lambda-list ~2I~_~:S"
-               (defmacro-bogus-sublist-error-object condition)
-               (defmacro-bogus-sublist-error-lambda-list condition))))))
 
 (define-condition arg-count-error (defmacro-lambda-list-bind-error)
   ((args :reader arg-count-error-args :initarg :args)

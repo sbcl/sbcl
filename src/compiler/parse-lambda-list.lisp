@@ -78,9 +78,6 @@
 ;;; This is possibly surprising to people since there seems to be some
 ;;; expectation that a DEFSETF lambda list is a macro lambda list,
 ;;; which it isn't. We'll relax and accept &ENVIRONMENT in the middle.
-;;; But we won't accept the ugly syntax that parse-defmacro accidentally
-;;; allows of (A B &ENVIRONMENT E X Y) which has 4 positional parameters.
-;;; Nor can it appear between &KEY and &ALLOW-OTHER-KEYS.
 ;;;
 (defun parse-lambda-list
     (list &key (context "an ordinary lambda list")
@@ -1066,7 +1063,8 @@
     ;; Signal a style warning for duplicate names, but disregard &AUX variables
     ;; because most folks agree that (LET* ((X (F)) (X (G X))) ..) makes sense
     ;; - some would even say that it is idiomatic - and &AUX bindings are just
-    ;; LET* bindings. PARSE-DEFMACRO signals an error, but that seems harsh.
+    ;; LET* bindings.
+    ;; The obsolete PARSE-DEFMACRO signaled an error, but that seems harsh.
     ;; Other implementations permit (X &OPTIONAL X), and the fact that
     ;; nesting is allowed makes this issue even less clear.
     (mapl (lambda (tail)
@@ -1093,5 +1091,25 @@
             ;; Normalize the lambda list by unparsing.
             (unparse-ds-lambda-list parse)
             docstring)))
+
+;;; We save space in macro definitions by calling this function.
+;;; FIXME: that consideration no longer seems relevant
+;;; given how macros expand now - they don't call this at all.
+;;; And the SB!KERNEL versus SB!C issue is pretty dang confusing
+;;; (the SB!C thing is a vop) so if nothing else, this deserves
+;;; to be renamed.
+(defun sb!kernel::arg-count-error
+    (context name args lambda-list minimum maximum)
+  ;; Tail-call ERROR, contrary to usual behavior.
+  #-sb-xc-host (declare (optimize sb!c::allow-non-returning-tail-call))
+  ;; And why isn't the condition class name an exported symbol?
+  ;; Perhaps to avoid conflict with the one exported from SB-C.
+  (error 'sb!kernel::arg-count-error
+         :kind context
+         :name name
+         :args args
+         :lambda-list lambda-list
+         :minimum minimum
+         :maximum maximum))
 
 (/show0 "parse-lambda-list.lisp end of file")
