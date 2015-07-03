@@ -41,6 +41,7 @@
 ;;; classes has been defined, the real definition of LOAD-DEFCLASS is
 ;;; installed by the file std-class.lisp
 (defmacro defclass (&environment env name direct-superclasses direct-slots &rest options)
+  (check-class-name name nil)
   (let (*initfunctions-for-this-defclass*
         *readers-for-this-defclass* ;Truly a crock, but we got
         *writers-for-this-defclass* ;to have it to live nicely.

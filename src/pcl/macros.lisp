@@ -55,9 +55,31 @@
 ;;;;
 ;;;; This is documented in the CLOS specification.
 
-(declaim (inline legal-class-name-p))
-(defun legal-class-name-p (x)
-  (symbolp x))
+(define-condition illegal-class-name-error (error)
+  ((name :initarg :name :reader illegal-class-name-error-name))
+  (:default-initargs :name (missing-arg))
+  (:report (lambda (condition stream)
+             (format stream "~@<~S is not a legal class name.~@:>"
+                     (illegal-class-name-error-name condition)))))
+
+(declaim (inline legal-class-name-p check-class-name))
+(defun legal-class-name-p (thing)
+  (symbolp thing))
+
+(defun check-class-name (thing &optional (allow-nil t))
+  ;; Apparently, FIND-CLASS and (SETF FIND-CLASS) accept any symbol,
+  ;; but DEFCLASS only accepts non-NIL symbols.
+  (if (or (not (legal-class-name-p thing))
+          (and (null thing) (not allow-nil)))
+      (error 'illegal-class-name-error :name thing)
+      thing))
+
+(define-condition class-not-found-error (sb-kernel::cell-error)
+  ((sb-kernel::name :type (satisfies legal-class-name-p)))
+  (:report (lambda (condition stream)
+             (format stream "~@<There is no class named ~
+                             ~/sb-impl:print-symbol-with-prefix/.~@:>"
+                     (sb-kernel::cell-error-name condition)))))
 
 (defvar *create-classes-from-internal-structure-definitions-p* t)
 
@@ -71,12 +93,9 @@
                            (or (condition-classoid-p classoid)
                                (defstruct-classoid-p classoid)))
                   (ensure-non-standard-class symbol classoid))))))
-      (cond ((null errorp) nil)
-            ((legal-class-name-p symbol)
-             (error "There is no class named ~
-                     ~/sb-impl::print-symbol-with-prefix/." symbol))
-            (t
-             (error "~S is not a legal class name." symbol)))))
+      (when errorp
+        (check-class-name symbol)
+        (error 'class-not-found-error :name symbol))))
 
 (defun find-class (symbol &optional (errorp t) environment)
   (declare (ignore environment) (explicit-check))
@@ -105,25 +124,23 @@
 (declaim (ftype function update-ctors))
 (defun (setf find-class) (new-value name &optional errorp environment)
   (declare (ignore errorp environment))
-  (cond ((legal-class-name-p name)
-         (with-single-package-locked-error
-             (:symbol name "Using ~A as the class-name argument in ~
-                           (SETF FIND-CLASS)"))
-         (with-world-lock ()
-           (let ((cell (find-classoid-cell name :create new-value)))
-             (cond (new-value
-                    (setf (classoid-cell-pcl-class cell) new-value)
-                    (when (eq **boot-state** 'complete)
-                      (let ((classoid (class-classoid new-value)))
-                        (setf (find-classoid name) classoid))))
-                   (cell
-                    (%clear-classoid name cell)))
-             (when (or (eq **boot-state** 'complete)
-                       (eq **boot-state** 'braid))
-               (update-ctors 'setf-find-class :class new-value :name name))
-             new-value)))
-        (t
-         (error "~S is not a legal class name." name))))
+  (check-class-name name)
+  (with-single-package-locked-error
+      (:symbol name "Using ~A as the class-name argument in ~
+                     (SETF FIND-CLASS)"))
+  (with-world-lock ()
+    (let ((cell (find-classoid-cell name :create new-value)))
+      (cond (new-value
+             (setf (classoid-cell-pcl-class cell) new-value)
+             (when (eq **boot-state** 'complete)
+               (let ((classoid (class-classoid new-value)))
+                 (setf (find-classoid name) classoid))))
+            (cell
+             (%clear-classoid name cell)))
+      (when (or (eq **boot-state** 'complete)
+                (eq **boot-state** 'braid))
+        (update-ctors 'setf-find-class :class new-value :name name))
+      new-value)))
 
 (flet ((call-gf (gf-nameize action object slot-name env &optional newval)
          (aver (constantp slot-name env))

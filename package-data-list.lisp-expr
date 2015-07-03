@@ -2445,7 +2445,10 @@ package is deprecated in favour of SB-MOP."
                "UNPARSE-SPECIALIZER-USING-CLASS"
                "+SLOT-UNBOUND+"
 
-               "ENSURE-CLASS-FINALIZED")
+               "ENSURE-CLASS-FINALIZED"
+
+               "ILLEGAL-CLASS-NAME-ERROR"
+               "CLASS-NOT-FOUND-ERROR")
       ;; FIXME: After a little while, these reexports can probably go
       ;; away, as they're superseded by the use of SB-MOP as the
       ;; publically-accessible package.
