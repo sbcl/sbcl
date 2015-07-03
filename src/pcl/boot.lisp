@@ -80,14 +80,13 @@ bootstrapping.
 ;;; early definition. Do this in a way that makes sure that if we
 ;;; redefine one of the early definitions the redefinition will take
 ;;; effect. This makes development easier.
-(dolist (fns *!early-functions*)
-  (let ((name (car fns))
-        (early-name (cadr fns)))
-    (setf (gdefinition name)
-            (set-fun-name
-             (lambda (&rest args)
-               (apply (fdefinition early-name) args))
-             name))))
+(loop for (name early-name) in *!early-functions*
+   do (let ((early-name early-name))
+        (setf (gdefinition name)
+              (set-fun-name
+               (lambda (&rest args)
+                 (apply (fdefinition early-name) args))
+               name))))
 
 ;;; *!GENERIC-FUNCTION-FIXUPS* is used by !FIX-EARLY-GENERIC-FUNCTIONS
 ;;; to convert the few functions in the bootstrap which are supposed
@@ -542,16 +541,12 @@ generic function lambda list ~S~:>"
     (sb-c:source-location)))
 
 (defmacro make-method-function (method-lambda &environment env)
-  (multiple-value-bind (proto-gf proto-method)
-      (prototypes-for-make-method-lambda nil)
-    (multiple-value-bind (method-function-lambda initargs)
-        (make-method-lambda proto-gf proto-method method-lambda env)
-      (make-method-initargs-form proto-gf
-                                 proto-method
-                                 method-function-lambda
-                                 initargs
-                                 ;; FIXME: coerce-to-lexenv?
-                                 env))))
+  (binding* (((proto-gf proto-method)
+              (prototypes-for-make-method-lambda nil))
+             ((method-function-lambda initargs)
+              (make-method-lambda proto-gf proto-method method-lambda env))) ; FIXME: coerce-to-lexenv?
+    (make-method-initargs-form
+     proto-gf proto-method method-function-lambda initargs env)))
 
 (defun real-make-method-initargs-form (proto-gf proto-method
                                        method-lambda initargs env)
@@ -2300,48 +2295,46 @@ generic function lambda list ~S~:>"
 (defun !early-make-a-method (class qualifiers arglist specializers initargs doc
                             &key slot-name object-class method-class-function
                             definition-source)
-  (let ((parsed ())
-        (unparsed ()))
-    ;; Figure out whether we got class objects or class names as the
-    ;; specializers and set parsed and unparsed appropriately. If we
-    ;; got class objects, then we can compute unparsed, but if we got
-    ;; class names we don't try to compute parsed.
-    ;;
-    (aver (notany #'sb-pcl::eql-specializer-p specializers))
-    (if (every #'classp specializers)
-        (setq parsed specializers
-              unparsed (mapcar (lambda (s)
-                                 (if (eq s t) t (class-name s)))
-                               specializers))
-        (setq unparsed specializers
-              parsed ()))
-    (let ((result
-           (list :early-method
+  (aver (notany #'sb-pcl::eql-specializer-p specializers))
+  (binding*
+      ;; Figure out whether we got class objects or class names as the
+      ;; specializers and set parsed and unparsed appropriately. If we
+      ;; got class objects, then we can compute unparsed, but if we
+      ;; got class names we don't try to compute parsed.
+      (((parsed unparsed)
+        (if (every #'classp specializers)
+            (values specializers
+                    (mapcar (lambda (s)
+                              (if (eq s t) t (class-name s)))
+                            specializers))
+            (values () specializers)))
+       (result
+        (list :early-method
 
-                 (getf initargs :function)
-                 (let ((mf (getf initargs :function)))
-                   (aver mf)
-                   (and (typep mf '%method-function)
-                        (%method-function-fast-function mf)))
+              (getf initargs :function)
+              (let ((mf (getf initargs :function)))
+                (aver mf)
+                (and (typep mf '%method-function)
+                     (%method-function-fast-function mf)))
 
-                 ;; the parsed specializers. This is used by
-                 ;; EARLY-METHOD-SPECIALIZERS to cache the parse.
-                 ;; Note that this only comes into play when there is
-                 ;; more than one early method on an early gf.
-                 parsed
+              ;; the parsed specializers. This is used by
+              ;; EARLY-METHOD-SPECIALIZERS to cache the parse.
+              ;; Note that this only comes into play when there is
+              ;; more than one early method on an early gf.
+              parsed
 
-                 ;; A list to which REAL-MAKE-A-METHOD can be applied
-                 ;; to make a real method corresponding to this early
-                 ;; one.
-                 (append
-                  (list class qualifiers arglist unparsed
-                        initargs doc)
-                  (when slot-name
-                    (list :slot-name slot-name :object-class object-class
-                          :method-class-function method-class-function))
-                  (list :definition-source definition-source)))))
-      (initialize-method-function initargs result)
-      result)))
+              ;; A list to which REAL-MAKE-A-METHOD can be applied
+              ;; to make a real method corresponding to this early
+              ;; one.
+              (append
+               (list class qualifiers arglist unparsed
+                     initargs doc)
+               (when slot-name
+                 (list :slot-name slot-name :object-class object-class
+                       :method-class-function method-class-function))
+               (list :definition-source definition-source)))))
+    (initialize-method-function initargs result)
+    result))
 
 (defun real-make-a-method
        (class qualifiers lambda-list specializers initargs doc
