@@ -2456,6 +2456,7 @@ package is deprecated in favour of SB-MOP."
 
                "PARSE-SPECIALIZER-USING-CLASS"
                "UNPARSE-SPECIALIZER-USING-CLASS"
+               "MAKE-SPECIALIZER-FORM-USING-CLASS"
 
                "+SLOT-UNBOUND+"
 

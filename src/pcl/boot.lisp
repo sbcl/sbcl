@@ -160,6 +160,25 @@ bootstrapping.
       ()
       real-make-method-specializers-form))
 
+    (make-specializer-form-using-class
+     or
+     ((proto-generic-function proto-method specializer-name environment)
+      (standard-generic-function standard-method t t)
+      (or)
+      real-make-specializer-form-using-class/t)
+     ((proto-generic-function proto-method specializer-name environment)
+      (standard-generic-function standard-method specializer t)
+      (or)
+      real-make-specializer-form-using-class/specializer)
+     ((proto-generic-function proto-method specializer-name environment)
+      (standard-generic-function standard-method symbol t)
+      (or)
+      real-make-specializer-form-using-class/symbol)
+     ((proto-generic-function proto-method specializer-name environment)
+      (standard-generic-function standard-method cons t)
+      (or)
+      real-make-specializer-form-using-class/cons))
+
     (parse-specializer-using-class
      standard
      ((generic-function specializer)
@@ -800,30 +819,70 @@ generic function lambda list ~S~:>"
                           ,@(when documentation `(:documentation ,documentation)))))))))))
 
 (defun real-make-method-specializers-form
-    (proto-gf proto-method specializer-names env)
-  (declare (ignore env proto-gf proto-method))
-  (flet ((parse (name)
-           (cond
-             ((and (eq **boot-state** 'complete)
-                   (specializerp name))
-              name)
-             ((symbolp name) `(find-class ',name))
-             ((consp name) (ecase (car name)
-                             ((eql) `(intern-eql-specializer ,(cadr name)))
-                             ((class-eq) `(class-eq-specializer (find-class ',(cadr name))))))
-             (t
-              ;; FIXME: Document CLASS-EQ specializers.
-              (error 'simple-reference-error
-                     :format-control
-                     "~@<~S is not a valid parameter specializer name.~@:>"
-                     :format-arguments (list name)
-                     :references (list '(:ansi-cl :macro defmethod)
-                                       '(:ansi-cl :glossary "parameter specializer name")))))))
-    `(list ,@(mapcar #'parse specializer-names))))
+    (proto-generic-function proto-method specializer-names environment)
+  (flet ((make-parse-form (name)
+           (make-specializer-form-using-class
+            proto-generic-function proto-method name environment)))
+    `(list ,@(mapcar #'make-parse-form specializer-names))))
 
 (unless (fboundp 'make-method-specializers-form)
   (setf (gdefinition 'make-method-specializers-form)
         (symbol-function 'real-make-method-specializers-form)))
+
+(defun real-make-specializer-form-using-class/t
+    (proto-generic-function proto-method specializer-name environment)
+  (declare (ignore proto-generic-function proto-method environment))
+  (error 'simple-reference-error
+         :format-control
+         "~@<~S is not a valid parameter specializer name.~@:>"
+         :format-arguments (list specializer-name)
+         :references (list '(:ansi-cl :macro defmethod)
+                           '(:ansi-cl :glossary "parameter specializer name"))))
+
+(defun real-make-specializer-form-using-class/specializer
+    (proto-generic-function proto-method specializer-name environment)
+  (declare (ignore proto-generic-function proto-method environment))
+  (when (eq **boot-state** 'complete)
+    specializer-name))
+
+(defun real-make-specializer-form-using-class/symbol
+    (proto-generic-function proto-method specializer-name environment)
+  (declare (ignore proto-generic-function proto-method environment))
+  `(find-class ',specializer-name))
+
+(defun real-make-specializer-form-using-class/cons
+    (proto-generic-function proto-method specializer-name environment)
+  (declare (ignore proto-generic-function proto-method environment))
+  ;; In case of unknown specializer or known specializer with syntax
+  ;; error, TYPECASE may fall through to default method with error
+  ;; signaling.
+  (typecase specializer-name
+    ((cons (eql eql) (cons t null))
+     `(intern-eql-specializer ,(second specializer-name)))
+    ((cons (eql class-eq) (cons t null))
+     `(class-eq-specializer (find-class ',(second specializer-name))))))
+
+(defun real-make-specializer-form-using-class
+    (proto-generic-function proto-method specializer-name environment)
+  (macrolet
+      ((delegations ()
+         `(typecase specializer-name
+            ,@(mapcar
+               (lambda (type)
+                 (let ((function-name
+                         (symbolicate
+                          'real-make-specializer-form-using-class '#:/ type)))
+                   `(,type
+                     (,function-name
+                      proto-generic-function proto-method specializer-name environment))))
+               '(; specializer
+                 ; ^ apparently not needed during bootstrapping
+                 symbol cons t)))))
+    (delegations)))
+
+(unless (fboundp 'make-specializer-form-using-class)
+  (setf (gdefinition 'make-specializer-form-using-class)
+        (symbol-function 'real-make-specializer-form-using-class)))
 
 (defun real-parse-specializer-using-class (generic-function specializer)
   (let ((result (specializer-from-type specializer)))

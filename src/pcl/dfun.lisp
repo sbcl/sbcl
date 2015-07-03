@@ -1660,20 +1660,30 @@ Except see also BREAK-VICIOUS-METACIRCLE.  -- CSR, 2003-05-28
                     value)))))))
 
 (defun get-secondary-dispatch-function2 (gf methods types method-alist-p
-                                            wrappers-p all-applicable-p
-                                            all-sorted-p function-p)
-  (if (and all-applicable-p all-sorted-p (not function-p))
-      (if (eq **boot-state** 'complete)
-          (let* ((combin (generic-function-method-combination gf))
-                 (effective (compute-effective-method gf combin methods)))
-            (make-effective-method-function1 gf effective method-alist-p
-                                             wrappers-p))
-          (let ((effective (standard-compute-effective-method gf nil methods)))
-            (make-effective-method-function1 gf effective method-alist-p
-                                             wrappers-p)))
-      (let ((net (generate-discrimination-net
-                  gf methods types all-sorted-p)))
-        (compute-secondary-dispatch-function1 gf net function-p))))
+                                         wrappers-p all-applicable-p
+                                         all-sorted-p function-p)
+  (cond
+    ((not (and all-applicable-p all-sorted-p (not function-p)))
+     (let ((net (generate-discrimination-net
+                 gf methods types all-sorted-p)))
+       (compute-secondary-dispatch-function1 gf net function-p)))
+    ((eq **boot-state** 'complete)
+     (let* ((combin (generic-function-method-combination gf))
+            (effective (compute-effective-method gf combin methods)))
+       (make-effective-method-function1
+        gf effective method-alist-p wrappers-p)))
+    ((eq (generic-function-name gf) 'make-specializer-form-using-class)
+     ;; FIXME: instead of the above form, this should be
+     ;; (eq (generic-function-method-combination gf) *or-method-combination*)
+     ;; but that does not work for reasons I (JM) do not understand.
+     (let* ((combin (generic-function-method-combination gf))
+            (effective (short-compute-effective-method gf combin methods)))
+       (make-effective-method-function1
+        gf effective method-alist-p wrappers-p)))
+    (t
+     (let ((effective (standard-compute-effective-method gf nil methods)))
+       (make-effective-method-function1
+        gf effective method-alist-p wrappers-p)))))
 
 (defun get-effective-method-function (gf methods
                                          &optional method-alist wrappers)

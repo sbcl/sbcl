@@ -365,6 +365,51 @@
 (defgeneric make-method-specializers-form
     (proto-generic-function proto-method specializer-names environment))
 
+;;; MAKE-SPECIALIZER-FORM-USING-CLASS
+;;;
+;;; To free every new custom generic function class from having to
+;;; implement iteration over specializers in
+;;; MAKE-METHOD-SPECIALIZERS-FORM, we provide a default method
+;;;
+;;;   make-method-specializers-form standard-g-f standard-method
+;;;
+;;; which performs this iteration and calls the generic function
+;;;
+;;;   make-specializer-form-using-class proto-g-f proto-m specializer-name env
+;;;
+;;; on which custom generic function classes can install methods to
+;;; handle their custom specializers. The generic function uses OR
+;;; method combination to allow the following idiom:
+;;;
+;;;   (defmethod make-specializer-form-using-class or
+;;;       (proto-generic-function MY-GENERIC-FUNCTION)
+;;;       (proto-method standard-method)
+;;;       (specializer-name cons)
+;;;       (environment t))
+;;;     (when (typep specializer-name '(cons (eql MY-SPECIALIZER)))
+;;;       MY-SPECIALIZER-FORM))
+;;;
+;;; The OR method combination lets everything but (my-specializer ...)
+;;; fall through to the next methods which will, at some point, handle
+;;; class and eql specializers and eventually reach an error signaling
+;;; method for invalid specializers.
+
+(defgeneric make-specializer-form-using-class
+    (proto-generic-function proto-method specializer-name environment)
+  (:method-combination or)
+  #+sb-doc
+  (:documentation
+   "Return a form which, when evaluated in the lexical environment
+described by ENVIRONMENT, parses the specializer SPECIALIZER-NAME and
+yields the appropriate specializer object.
+
+Both PROTO-GENERIC-FUNCTION and PROTO-METHOD may be
+uninitialized. However their classes and prototypes can be
+inspected.
+
+NOTE: This generic function is part of an SBCL-specific experimental
+protocol. Interface subject to change."))
+
 (defgeneric (setf slot-value-using-class) (new-value class object slotd))
 
 ;;;; 5 arguments
