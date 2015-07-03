@@ -2450,9 +2450,13 @@ package is deprecated in favour of SB-MOP."
       :use ("CL" "SB!MOP" "SB!INT" "SB!EXT" "SB!WALKER" "SB!KERNEL")
       ;; experimental SBCL-only (for now) symbols
       :export ("SYSTEM-CLASS"
+
+               "MAKE-METHOD-LAMBDA-USING-SPECIALIZERS"
                "MAKE-METHOD-SPECIALIZERS-FORM"
+
                "PARSE-SPECIALIZER-USING-CLASS"
                "UNPARSE-SPECIALIZER-USING-CLASS"
+
                "+SLOT-UNBOUND+"
 
                "ENSURE-CLASS-FINALIZED"
