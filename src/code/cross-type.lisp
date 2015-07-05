@@ -11,11 +11,6 @@
 
 (in-package "SB!KERNEL")
 
-;;; Is X a fixnum in the target Lisp?
-(defun fixnump (x)
-  (and (integerp x)
-       (<= sb!xc:most-negative-fixnum x sb!xc:most-positive-fixnum)))
-
 ;;; (This was a useful warning when trying to get bootstrapping
 ;;; to work, but it's mostly irrelevant noise now that the system
 ;;; works.)

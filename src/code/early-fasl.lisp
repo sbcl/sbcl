@@ -159,6 +159,12 @@
   "the current number of recursive LOADs")
 (declaim (type index *load-depth*))
 
+(defun make-fop-vector (size)
+  (declare (type index size))
+  (let ((vector (make-array size)))
+    (setf (aref vector 0) 0)
+    vector))
+
 ;;; a holder for the FASL file we're reading from
 (defstruct (fasl-input (:conc-name %fasl-input-)
                        (:constructor make-fasl-input (stream))

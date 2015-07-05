@@ -131,7 +131,7 @@
            ;; #+sb-xc-host (declare (ignore x))
            #+sb-xc-host
            ;; KLUDGE: too complicated for cross-compilation
-           (return t)
+           (progn x (return t)) ; lp#719585
            #-sb-xc-host
            (let ((name (car x))
                  (what (cdr x)))
@@ -155,7 +155,7 @@
            #+sb-xc-host
            ;; KLUDGE: too complicated for cross-compilation (and
            ;; failure of OAOO in comments, *sigh*)
-           (return t)
+           (progn x (return t)) ; lp#719585
            #-sb-xc-host
            (let ((name (car x))
                  (what (cdr x)))

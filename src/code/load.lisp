@@ -147,13 +147,7 @@
     (setf (aref table 0) index
           (aref table index) thing)))
 
-;;; These three routines are used for both the stack and the table.
-(defun make-fop-vector (size)
-  (declare (type index size))
-  (let ((vector (make-array size)))
-    (setf (aref vector 0) 0)
-    vector))
-
+;;; These two routines are used for both the stack and the table.
 (defun grow-fop-vector (old-vector old-size)
   (declare (simple-vector old-vector)
            (type index old-size))

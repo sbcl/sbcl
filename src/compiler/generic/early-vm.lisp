@@ -93,3 +93,9 @@
 ;; a slot of data that is not the instance-layout.
 ;; To get a layout, you must call %INSTANCE-LAYOUT - don't assume index 0.
 (def!constant instance-data-start 1)
+
+;;; Is X a fixnum in the target Lisp?
+#+sb-xc-host
+(defun fixnump (x)
+  (and (integerp x)
+       (<= sb!xc:most-negative-fixnum x sb!xc:most-positive-fixnum)))

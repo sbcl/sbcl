@@ -34,7 +34,7 @@
     (multiple-value-bind (lambda-expr arglist doc)
         (make-macro-lambda nil lambda-list body :special-form name
                            :doc-string-allowed :external :wrap-block nil)
-      (declare (ignorable doc))
+      (declare (ignorable arglist doc))
       `(progn
            (declaim (ftype (function (ctran ctran (or lvar null) t) (values))
                            ,fn-name))

@@ -132,6 +132,11 @@
 (defglobal *raw-slot-data-list* nil)
 (setq *raw-slot-data-list*
   (macrolet ((make-comparer (accessor-name)
+               #+sb-xc-host
+               `(lambda (x y)
+                  (declare (ignore x y))
+                  (error "~S comparator called" ',accessor-name))
+               #-sb-xc-host
                ;; Not a symbol, because there aren't any so-named functions.
                `(named-lambda ,(string (symbolicate accessor-name "="))
                     (index x y)

@@ -31,7 +31,7 @@
 ;;; an explicit default of '*, or else it assumes a default of NIL.
 (defmacro !def-type-translator (name arglist &body body)
   (declare (type symbol name))
-  (multiple-value-bind (fun arglist)
+  (multiple-value-bind (fun #-sb-xc-host arglist)
       (make-macro-lambda (format nil "~A-TYPE-PARSE" name)
                          arglist body nil nil :environment nil)
     `(!cold-init-forms
