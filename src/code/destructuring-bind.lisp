@@ -13,10 +13,5 @@
   #!+sb-doc
   "Bind the variables in LAMBDA-LIST to the corresponding values in the
 tree structure resulting from the evaluation of EXPRESSION."
-  ;; (THE LIST ...) is not really right, because it means that
-  ;; the descriptive message about the lambda list won't be shown.
-  ;; It'll just be type-error.
-  `(binding* ,(sb!c::expand-ds-bind lambda-list
-                                    `(the list ,expression)
-                                    t nil)
+  `(binding* ,(sb!c::expand-ds-bind lambda-list expression t nil)
              ,@body))

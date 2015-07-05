@@ -54,13 +54,6 @@
 
 ;; OAOOM? (see destructuring-bind.lisp)
 (defmacro program-destructuring-bind (lambda-list arg-list &body body)
-  ;; Not wrapping ARG-LIST in (THE LIST) is better than what DESTRUCTURING-BIND
-  ;; does, because this gives a more descriptive message if you pass a non-list
-  ;; to the form handler, like (IF . 3) will say that 3 does not match the
-  ;; list (TEST IF-TRUE &OPTIONAL IF-FALSE) rather than just "3 is not a list".
-  ;; For the sake of compatibility, DESTRUCTURING-BIND signals TYPE-ERROR
-  ;; in that situation, which is less than ideal.
-  ;;
   ;; (:EVAL) is a dummy context. We don't have enough information to
   ;; show the operator name without using debugger internals to get the stack frame.
   ;; It would be easier to make the name an argument to this macro.

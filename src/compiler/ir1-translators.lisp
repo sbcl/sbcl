@@ -287,6 +287,7 @@ Evaluate the FORMS in the specified SITUATIONS (any of :COMPILE-TOPLEVEL,
 ;;; Call DEFINITIONIZE-FUN on each element of DEFINITIONS to find its
 ;;; in-lexenv representation, stuff the results into *LEXENV*, and
 ;;; call FUN (with no arguments).
+;;; lp#1395952 suggests that this needs to be more careful.
 (defun %funcall-in-foomacrolet-lexenv (definitionize-fun
                                        definitionize-keyword
                                        definitions

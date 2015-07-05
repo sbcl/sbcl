@@ -515,7 +515,7 @@
 (with-test (:name :parse-safely)
   (dolist (x '(array integer cons))
     (assert (handler-case (sb-kernel:specifier-type `(,x . 0))
-              (type-error () t)
+              (sb-kernel::arg-count-error () t)
               (error (c) (print c) nil)))))
 
 (with-test (:name :unparse-safely)
