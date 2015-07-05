@@ -344,7 +344,7 @@
         (make-member-type :members (list (specializer-object specl)))))
 
 (defun real-load-defclass (name metaclass-name supers slots other
-                           readers writers slot-names source-location safe-p)
+                           readers writers slot-names source-location &optional safe-p)
   (with-single-package-locked-error (:symbol name "defining ~S as a class")
     (%compiler-defclass name readers writers slot-names)
     (let ((res (apply #'ensure-class name :metaclass metaclass-name

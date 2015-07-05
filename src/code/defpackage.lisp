@@ -153,8 +153,9 @@
        (%defpackage ,(stringify-string-designator package) ',nicknames ',size
                     ',shadows ',shadowing-imports ',(if use-p use :default)
                     ',imports ',interns ',exports ',implement ',local-nicknames
-                    ',lock ',doc
-                    (sb!c:source-location)))))
+                    ',lock (sb!c:source-location)
+                    ,@(and doc
+                           `(,doc))))))
 
 (defun check-disjoint (&rest args)
   ;; An arg is (:key . set)
@@ -383,13 +384,12 @@ specifies to signal a warning if SWANK package is in variance, and an error othe
 
 (defun %defpackage (name nicknames size shadows shadowing-imports
                     use imports interns exports implement local-nicknames
-                    lock doc-string
-                    source-location)
+                    lock source-location &optional doc)
   (declare (type simple-string name)
            (type list nicknames shadows shadowing-imports
                  imports interns exports)
            (type (or list (member :default)) use)
-           (type (or simple-string null) doc-string))
+           (type (or simple-string null) doc))
   (with-package-graph ()
     (let* ((existing-package (find-package name))
            (use (use-list-packages existing-package use))
@@ -401,7 +401,7 @@ specifies to signal a warning if SWANK package is in variance, and an error othe
                                         shadows shadowing-imports
                                         use imports interns exports
                                         implement local-nicknames
-                                        lock doc-string)
+                                        lock doc)
           (let ((package (make-package name
                                        :use nil
                                        :internal-symbols (or size 10)
@@ -412,7 +412,7 @@ specifies to signal a warning if SWANK package is in variance, and an error othe
                             shadows shadowing-imports
                             use imports interns exports
                             implement local-nicknames
-                            lock doc-string))))))
+                            lock doc))))))
 
 (defun find-or-make-symbol (name package)
   (multiple-value-bind (symbol how) (find-symbol name package)

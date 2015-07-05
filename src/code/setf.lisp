@@ -405,7 +405,7 @@
                   (when doc
                     (setf (fdocumentation name 'setf) doc))
                   name)))
-  (defun %defsetf (name expander expander-lambda-list inverse doc)
+  (defun %defsetf (name expander expander-lambda-list inverse &optional doc)
     #+sb-xc-host (declare (ignore expander-lambda-list))
     (with-single-package-locked-error
         (:symbol name "defining a setf-expander for ~A"))
@@ -433,7 +433,7 @@
            (style-warn "defining setf macro for ~S when ~S is also defined"
                        name setf-fn-name)))))
     (assign-it))
-  (defun !quietly-defsetf (name expander expander-lambda-list inverse doc)
+    (defun !quietly-defsetf (name expander expander-lambda-list inverse &optional doc)
     #+sb-xc-host (declare (ignore expander-lambda-list))
     (assign-it))))
 
@@ -447,7 +447,7 @@
   (typecase rest
     ((cons (and symbol (not null)) (or null (cons string null)))
      `(eval-when (:load-toplevel :compile-toplevel :execute)
-        (%defsetf ',access-fn nil nil ',(car rest) ',(cadr rest))))
+        (%defsetf ',access-fn nil nil ',(car rest) ,@(cdr rest))))
     ((cons list (cons list))
      (destructuring-bind (lambda-list (&rest stores) &body body) rest
        (binding* (((llks req opt rest key aux env)
@@ -473,7 +473,8 @@
                               (apply (lambda ,lambda-list
                                        ,@inner-decls (block ,access-fn ,@forms))
                                      ,subforms)))
-                      ',lambda-list nil ',doc)))))
+                      ',lambda-list nil ,@(and doc
+                                               `(,doc)))))))
     (t
      (error "Ill-formed DEFSETF for ~S" access-fn))))
 
@@ -585,7 +586,8 @@
                          :doc-string-allowed :external)
     (declare (ignore arglist))
     `(eval-when (:compile-toplevel :load-toplevel :execute)
-       (%defsetf ',access-fn ,def ',lambda-list nil ',doc))))
+       (%defsetf ',access-fn ,def ',lambda-list nil ,@(and doc
+                                                           `(,doc))))))
 
 (sb!xc:define-setf-expander values (&rest places &environment env)
   (declare (type sb!c::lexenv env))

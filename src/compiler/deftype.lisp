@@ -16,9 +16,6 @@
         (sb!kernel::arg-count-error 'deftype (car whole) (cdr whole) nil 0 0)
         expansion)))
 
-(defun %deftype (name)
-  (setf (classoid-cell-pcl-class (find-classoid-cell name :create t)) nil))
-
 (defvar !*xc-processed-deftypes* nil)
 (def!macro sb!xc:deftype (&whole form name lambda-list &body body)
   #!+sb-doc
@@ -54,7 +51,6 @@
          (%compiler-deftype ',name
                             ',lambda-list
                             ,expander-form
-                            ,doc
-                            ,source-location-form))
-       (%deftype ',name)
-       ',name)))
+                            ,source-location-form
+                            ,@(and doc
+                                   `(,doc)))))))

@@ -207,11 +207,12 @@ evaluated as a PROGN."
          ,@(when (typep name '(cons (eql setf)))
              `((eval-when (:compile-toplevel :execute)
                  (sb!c::warn-if-setf-macro ',name))))
-         (%defun ',name ,named-lambda ',inline-lambda
-                 (sb!c:source-location))))))
+         (%defun ',name ,named-lambda (sb!c:source-location)
+                 ,@(and inline-lambda
+                        `(',inline-lambda)))))))
 
 #-sb-xc-host
-(progn (defun %defun (name def inline-lambda source-location)
+(progn (defun %defun (name def source-location &optional inline-lambda)
           (declare (type function def))
           ;; should've been checked by DEFMACRO DEFUN
           (aver (legal-fun-name-p name))
@@ -245,9 +246,12 @@ evaluated as a PROGN."
   `(progn
      (eval-when (:compile-toplevel)
        (%compiler-defvar ',var))
-     (%defvar ',var (unless (boundp ',var) ,val)
-              ',valp ,doc ',docp
-              (sb!c:source-location))))
+     (%defvar ',var
+              (sb!c:source-location)
+              ,@(and valp
+                     `((unless (boundp ',var) ,val)))
+              ,@(and docp
+                     `(,doc)))))
 
 (defmacro-mundanely defparameter (var val &optional (doc nil docp))
   #!+sb-doc
@@ -259,17 +263,19 @@ evaluated as a PROGN."
   `(progn
      (eval-when (:compile-toplevel)
        (%compiler-defvar ',var))
-     (%defparameter ',var ,val ,doc ',docp (sb!c:source-location))))
+     (%defparameter ',var ,val (sb!c:source-location)
+                    ,@(and docp
+                           `(,doc)))))
 
 (defun %compiler-defvar (var)
   (sb!xc:proclaim `(special ,var)))
 
 #-sb-xc-host
-(defun %defvar (var val valp doc docp source-location)
+(defun %defvar (var source-location &optional (val nil valp) (doc nil docp))
   (%compiler-defvar var)
-  (when valp
-    (unless (boundp var)
-      (set var val)))
+  (when (and valp
+             (not (boundp var)))
+    (set var val))
   (when docp
     (setf (fdocumentation var 'variable) doc))
   (sb!c:with-source-location (source-location)
@@ -277,7 +283,7 @@ evaluated as a PROGN."
   var)
 
 #-sb-xc-host
-(defun %defparameter (var val doc docp source-location)
+(defun %defparameter (var val source-location &optional (doc nil docp))
   (%compiler-defvar var)
   (set var val)
   (when docp

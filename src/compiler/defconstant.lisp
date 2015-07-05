@@ -29,18 +29,19 @@
       (declare (ignore indicator))
       (values value (not (null foundp))))))
 
-(def!macro sb!xc:defconstant (name value &optional documentation)
+(def!macro sb!xc:defconstant (name value &optional (doc nil docp))
   #!+sb-doc
   "Define a global constant, saying that the value is constant and may be
   compiled into code. If the variable already has a value, and this is not
   EQL to the new value, the code is not portable (undefined behavior). The
   third argument is an optional documentation string for the variable."
   `(eval-when (:compile-toplevel :load-toplevel :execute)
-     (sb!c::%defconstant ',name ,value ',documentation
-      (sb!c:source-location))))
+     (sb!c::%defconstant ',name ,value (sb!c:source-location)
+                         ,@(and docp
+                                `(,doc)))))
 
 ;;; the guts of DEFCONSTANT
-(defun sb!c::%defconstant (name value doc source-location)
+(defun sb!c::%defconstant (name value source-location &optional (doc nil docp))
   (unless (symbolp name)
     (error "The constant name is not a symbol: ~S" name))
   (when (looks-like-name-of-special-var-p name)
@@ -89,7 +90,7 @@
   ;; :macro-expansion of something that is getting defined as constant.
   (clear-info :variable :macro-expansion name)
   (clear-info :source-location :symbol-macro name)
-  (when doc
+  (when docp
     (setf (fdocumentation name 'variable) doc))
   #-sb-xc-host
   (%set-symbol-value name value)

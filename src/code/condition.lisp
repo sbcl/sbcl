@@ -407,9 +407,9 @@
   (setf (condition-classoid-report (find-classoid name))
         report))
 
-(defun %define-condition (name parent-types layout slots documentation
+(defun %define-condition (name parent-types layout slots
                           direct-default-initargs all-readers all-writers
-                          source-location)
+                          source-location &optional documentation)
   (with-single-package-locked-error
       (:symbol name "defining ~A as a condition")
     (%compiler-define-condition name parent-types layout all-readers all-writers)
@@ -576,11 +576,12 @@
                             ',parent-types
                             ',layout
                             (list ,@(slots))
-                            ,documentation
                             (list ,@direct-default-initargs)
                             ',(all-readers)
                             ',(all-writers)
-                            (sb!c:source-location))
+                            (sb!c:source-location)
+                            ,@(and documentation
+                                   `(,documentation)))
          ;; This needs to be after %DEFINE-CONDITION in case :REPORT
          ;; is a lambda referring to condition slot accessors:
          ;; they're not proclaimed as functions before it has run if

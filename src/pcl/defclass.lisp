@@ -73,7 +73,8 @@
                                 ',*writers-for-this-defclass*
                                 ',*slot-names-for-this-defclass*
                                 (sb-c:source-location)
-                                ',(safe-code-p env)))))
+                                ,@(and (safe-code-p env)
+                                       '(t))))))
         (if defstruct-p
             (progn
               ;; FIXME: (YUK!) Why do we do this? Because in order
@@ -470,7 +471,7 @@
 
 (declaim (notinline load-defclass))
 (defun load-defclass (name metaclass supers canonical-slots canonical-options
-                      readers writers slot-names source-location safe-p)
+                      readers writers slot-names source-location &optional safe-p)
   ;; SAFE-P is used by REAL-LOAD-DEFCLASS, but can be ignored here, since
   ;; during the bootstrap we won't have (SAFETY 3).
   (declare (ignore safe-p))

@@ -1664,7 +1664,7 @@ core and return a descriptor to it."
 (defparameter *cold-fset-warm-names*
   (make-hash-table :test 'equal)) ; names can be conses, e.g. (SETF CAR)
 
-(defun cold-fset (name compiled-lambda inline-expansion source-loc)
+(defun cold-fset (name compiled-lambda source-loc &optional inline-expansion)
   ;; SOURCE-LOC can be ignored, because functions intrinsically store
   ;; their location as part of the code component.
   ;; The argument is supplied here only to provide context for

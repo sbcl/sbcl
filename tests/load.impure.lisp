@@ -447,7 +447,6 @@
 ";; SOME-FANCY-MACRO
 ;; *SOME-VAR*
 ;; MY-FAVORITE-TYPE
-;; NIL
 ;; FRED
 ;; (A)"))
      (delete-file *tmp-filename*)))
