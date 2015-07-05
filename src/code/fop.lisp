@@ -142,6 +142,9 @@
 (!define-fop 3 (fop-truth) t)
 (!define-fop 4 (fop-push ((:operands index)))
   (ref-fop-table (fasl-input) index))
+(!define-fop 9 (fop-move-to-table (x))
+  (push-fop-table x (fasl-input))
+  x)
 
 ;;; CMU CL had FOP-POP-FOR-EFFECT as fop 65, but it was never used and seemed
 ;;; to have no possible use.

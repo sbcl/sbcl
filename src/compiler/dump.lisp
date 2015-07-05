@@ -207,6 +207,12 @@
     (dump-fop 'fop-pop fasl-output)
     (incf (fasl-output-table-free fasl-output))))
 
+(defun dump-to-table (fasl-output)
+  (prog1
+      (fasl-output-table-free fasl-output)
+    (dump-fop 'fop-move-to-table fasl-output)
+    (incf (fasl-output-table-free fasl-output))))
+
 ;;; If X is in File's EQUAL-TABLE, then push the object and return T,
 ;;; otherwise NIL.
 (defun equal-check-table (x fasl-output)
@@ -231,27 +237,24 @@
 ;;; be on the top of the FOP stack.
 (defun eq-save-object (x fasl-output)
   (declare (type fasl-output fasl-output))
-  (let ((handle (dump-pop fasl-output)))
-    (setf (gethash x (fasl-output-eq-table fasl-output)) handle)
-    (dump-push handle fasl-output))
+  (setf (gethash x (fasl-output-eq-table fasl-output))
+        (dump-to-table fasl-output))
   (values))
 (defun equal-save-object (x fasl-output)
   (declare (type fasl-output fasl-output))
-  (let ((handle (dump-pop fasl-output)))
+  (let ((handle (dump-to-table fasl-output)))
     (setf (gethash x (fasl-output-equal-table fasl-output)) handle)
-    (setf (gethash x (fasl-output-eq-table fasl-output)) handle)
-    (dump-push handle fasl-output))
+    (setf (gethash x (fasl-output-eq-table fasl-output)) handle))
   (values))
 (defun string-save-object (x fasl-output)
   (declare (type fasl-output fasl-output)
            (type string x))
-  (let ((handle (dump-pop fasl-output)))
+  (let ((handle (dump-to-table fasl-output)))
     (push (cons #+sb-xc-host 'base-char ; repeatable xc fasls
                 #-sb-xc-host (array-element-type x)
                 handle)
           (gethash x (fasl-output-equal-table fasl-output)))
-    (setf (gethash x (fasl-output-eq-table fasl-output)) handle)
-    (dump-push handle fasl-output))
+    (setf (gethash x (fasl-output-eq-table fasl-output)) handle))
   (values))
 ;;; Record X in File's CIRCULARITY-TABLE. This is called on objects
 ;;; that we are about to dump might have a circular path through them.
@@ -1119,9 +1122,8 @@
       (let ((info (sb!c::debug-info-for-component component))
             (*dump-only-valid-structures* nil))
         (dump-object info fasl-output)
-        (let ((info-handle (dump-pop fasl-output)))
-          (dump-push info-handle fasl-output)
-          (push info-handle (fasl-output-debug-info fasl-output))))
+        (push (dump-to-table fasl-output)
+              (fasl-output-debug-info fasl-output)))
 
       (let ((num-consts (- header-length sb!vm:code-constants-offset)))
         (dump-fop 'fop-code fasl-output num-consts code-length))
