@@ -41,6 +41,9 @@
   (make-wired-tn (primitive-type-or-lose 'system-area-pointer)
                  sap-stack-sc-number return-pc-save-offset))
 
+(defconstant return-pc-passing-offset
+  (make-sc-offset sap-stack-sc-number return-pc-save-offset))
+
 ;;; This is similar to MAKE-RETURN-PC-PASSING-LOCATION, but makes a
 ;;; location to pass OLD-FP in.
 ;;;
@@ -52,6 +55,9 @@
   (declare (ignore standard))
   (make-wired-tn *fixnum-primitive-type* control-stack-sc-number
                  ocfp-save-offset))
+
+(defconstant old-fp-passing-offset
+  (make-sc-offset control-stack-sc-number ocfp-save-offset))
 
 ;;; Make the TNs used to hold OLD-FP and RETURN-PC within the current
 ;;; function. We treat these specially so that the debugger can find

@@ -163,7 +163,9 @@
   ;;    in order to save space, we elected not to store a vector.
   (returns :fixed :type (or (simple-array * (*)) (member :standard :fixed)))
   ;; SC-OFFSETs describing where the return PC and return FP are kept.
+  #!-fp-and-pc-standard-save
   (return-pc (missing-arg) :type sc-offset)
+  #!-fp-and-pc-standard-save
   (old-fp (missing-arg) :type sc-offset)
   ;; SC-OFFSET for the number stack FP in this function, or NIL if no
   ;; NFP allocated.

@@ -647,16 +647,23 @@
           (setf (frame-%down frame)
                 (etypecase debug-fun
                   (compiled-debug-fun
-                   (let ((c-d-f (compiled-debug-fun-compiler-debug-fun
+                   (let (#!-fp-and-pc-standard-save
+                         (c-d-f (compiled-debug-fun-compiler-debug-fun
                                  debug-fun)))
                      (compute-calling-frame
                       (descriptor-sap
                        (get-context-value
                         frame ocfp-save-offset
-                        (sb!c::compiled-debug-fun-old-fp c-d-f)))
+                        #!-fp-and-pc-standard-save
+                        (sb!c::compiled-debug-fun-old-fp c-d-f)
+                        #!+fp-and-pc-standard-save
+                        sb!c:old-fp-passing-offset))
                       (get-context-value
                        frame lra-save-offset
-                       (sb!c::compiled-debug-fun-return-pc c-d-f))
+                       #!-fp-and-pc-standard-save
+                       (sb!c::compiled-debug-fun-return-pc c-d-f)
+                       #!+fp-and-pc-standard-save
+                       sb!c:return-pc-passing-offset)
                       frame)))
                   (bogus-debug-fun
                    (let ((fp (frame-pointer frame)))
@@ -2855,8 +2862,11 @@ register."
     (declare (ignore breakpoint)
              (type frame frame))
     (let ((lra-sc-offset
-           (sb!c::compiled-debug-fun-return-pc
-            (compiled-debug-fun-compiler-debug-fun debug-fun))))
+            #!-fp-and-pc-standard-save
+            (sb!c::compiled-debug-fun-return-pc
+             (compiled-debug-fun-compiler-debug-fun debug-fun))
+            #!+fp-and-pc-standard-save
+            sb!c:return-pc-passing-offset))
       (multiple-value-bind (lra component offset)
           (make-bogus-lra
            (get-context-value frame
@@ -2889,9 +2899,13 @@ register."
 ;;; series of cookies is valid.
 (defun fun-end-cookie-valid-p (frame cookie)
   (let ((lra (fun-end-cookie-bogus-lra cookie))
-        (lra-sc-offset (sb!c::compiled-debug-fun-return-pc
-                        (compiled-debug-fun-compiler-debug-fun
-                         (fun-end-cookie-debug-fun cookie)))))
+        (lra-sc-offset
+          #!-fp-and-pc-standard-save
+          (sb!c::compiled-debug-fun-return-pc
+           (compiled-debug-fun-compiler-debug-fun
+            (fun-end-cookie-debug-fun cookie)))
+          #!+fp-and-pc-standard-save
+          sb!c:return-pc-passing-offset))
     (do ((frame frame (frame-down frame)))
         ((not frame) nil)
       (when (and (compiled-frame-p frame)

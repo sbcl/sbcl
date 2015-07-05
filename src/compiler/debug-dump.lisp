@@ -505,8 +505,10 @@
     (make-compiled-debug-fun
      :name (leaf-debug-name fun)
      :kind (if main-p nil (functional-kind fun))
-     :return-pc (tn-sc-offset (ir2-physenv-return-pc 2env))
-     :old-fp (tn-sc-offset (ir2-physenv-old-fp 2env))
+     #!-fp-and-pc-standard-save :return-pc
+     #!-fp-and-pc-standard-save (tn-sc-offset (ir2-physenv-return-pc 2env))
+     #!-fp-and-pc-standard-save :old-fp
+     #!-fp-and-pc-standard-save (tn-sc-offset (ir2-physenv-old-fp 2env))
      :start-pc (label-position (ir2-physenv-environment-start 2env))
      :elsewhere-pc (label-position (ir2-physenv-elsewhere-start 2env))
      :closure-save (when (ir2-physenv-closure-save-tn 2env)
