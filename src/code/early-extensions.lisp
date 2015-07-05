@@ -1442,20 +1442,27 @@
 ;;; - SB-THREAD:JOIN-THREAD-ERROR-THREAD, since 1.0.29.17 (06/2009)     -> Final: 09/2012
 ;;; - SB-THREAD:INTERRUPT-THREAD-ERROR-THREAD since 1.0.29.17 (06/2009) -> Final: 06/2012
 
-(defun print-deprecation-message (namespace name software version
-                                  &optional replacements stream)
+(defun print-deprecation-replacements (stream replacements &optional colonp atp)
+  (declare (ignore colonp atp))
   (apply #'format stream
          (!uncross-format-control
-         "The ~(~A~) ~/sb!impl:print-symbol-with-prefix/ has been ~
-          deprecated as of ~A ~A.~
-          ~#[~;~
-            ~2%Use ~/sb!impl:print-symbol-with-prefix/ instead.~;~
-            ~2%Use ~/sb!impl:print-symbol-with-prefix/ or ~
-            ~/sb!impl:print-symbol-with-prefix/ instead.~:;~
-            ~2%Use~@{~#[~; or~] ~
-            ~/sb!impl:print-symbol-with-prefix/~^,~} instead.~
-          ~]")
-         namespace name software version replacements))
+          "~#[~;~
+             Use ~/sb!impl:print-symbol-with-prefix/ instead.~;~
+             Use ~/sb!impl:print-symbol-with-prefix/ or ~
+             ~/sb!impl:print-symbol-with-prefix/ instead.~:;~
+             Use~@{~#[~; or~] ~
+             ~/sb!impl:print-symbol-with-prefix/~^,~} instead.~
+           ~]")
+         replacements))
+
+(defun print-deprecation-message (namespace name software version
+                                  &optional replacements stream)
+  (format stream
+          (!uncross-format-control
+           "The ~(~A~) ~/sb!impl:print-symbol-with-prefix/ has been ~
+            deprecated as of ~A ~A.~
+            ~@[~2%~/sb!impl::print-deprecation-replacements/~]")
+          namespace name software version replacements))
 
 (defconstant-eqx +function-in-final-deprecation-type+
     '(function * nil) #'equal)

@@ -286,42 +286,9 @@
 
 (defmethod describe-object ((symbol symbol) stream)
   (print-standard-describe-header symbol stream)
+
   ;; Describe the value cell.
-  (let* ((kind (info :variable :kind symbol))
-         (wot (ecase kind
-                (:special "a special variable")
-                (:macro "a symbol macro")
-                (:constant "a constant variable")
-                (:global "a global variable")
-                (:unknown "an undefined variable")
-                (:alien "an alien variable"))))
-    (when (or (not (eq :unknown kind)) (boundp symbol))
-      (pprint-logical-block (stream nil)
-        (format stream "~@:_~A names ~A:" symbol wot)
-        (pprint-indent :block 2 stream)
-        (when (eq (info :variable :where-from symbol) :declared)
-          (format stream "~@:_Declared type: ~S"
-                  (type-specifier (info :variable :type symbol))))
-        (when (info :variable :always-bound symbol)
-          (format stream "~@:_Declared always-bound."))
-        (cond
-          ((eq kind :alien)
-           (let ((info (info :variable :alien-info symbol)))
-             (format stream "~@:_Value: ~S" (eval symbol))
-             (format stream "~@:_Type: ~S"
-                     (sb-alien-internals:unparse-alien-type
-                      (sb-alien::heap-alien-info-type info)))
-             (format stream "~@:_Address: #x~8,'0X"
-                     (sap-int (sb-alien::heap-alien-info-sap info)))))
-          ((eq kind :macro)
-           (let ((expansion (info :variable :macro-expansion symbol)))
-             (format stream "~@:_Expansion: ~S" expansion)))
-          ((boundp symbol)
-           (format stream "~:@_Value: ~S" (symbol-value symbol)))
-          ((not (eq kind :unknown))
-           (format stream "~:@_Currently unbound.")))
-        (describe-documentation symbol 'variable stream)
-        (terpri stream))))
+  (describe-variable symbol stream)
 
   ;; TODO: We could grovel over all packages looking for and
   ;; reporting other phenomena, e.g. IMPORT and SHADOW, or
@@ -335,30 +302,7 @@
   (describe-class symbol nil stream)
 
   ;; Type specifier
-  (let* ((kind (info :type :kind symbol))
-         (fun (case kind
-                (:defined
-                 (or (info :type :expander symbol) t))
-                (:primitive
-                 (or (info :type :translator symbol) t)))))
-    (when fun
-      (pprint-newline :mandatory stream)
-      (pprint-logical-block (stream nil)
-        (format stream "~@:_~A names a ~@[primitive~* ~]type-specifier:"
-                symbol
-                (eq kind :primitive))
-        (pprint-indent :block 2 stream)
-        (describe-documentation symbol 'type stream (eq t fun))
-        (unless (eq t fun)
-          ;; even though :translator can store a CTYPE, this is safe
-          ;; because a symbol can't have a non-FUNCTIONP translator.
-          (describe-lambda-list (%fun-lambda-list fun) stream)
-          (multiple-value-bind (expansion ok)
-              (handler-case (typexpand-1 symbol)
-                (error () (values nil nil)))
-            (when ok
-              (format stream "~@:_Expansion: ~S" expansion)))))
-      (terpri stream)))
+  (describe-type symbol stream)
 
   (awhen (sb-c::policy-quality-name-p symbol)
     (pprint-logical-block (stream nil)
@@ -418,19 +362,28 @@
 
 ;;;; Helpers to deal with shared functionality
 
+(defun describe-deprecation (namespace name stream)
+  (multiple-value-bind (state since replacements)
+      (deprecated-thing-p namespace name)
+    (when state
+      (destructuring-bind (software version) since
+        (format stream "~@:_In ~A deprecation since ~A version ~A.~
+                        ~@[ ~/sb-impl::print-deprecation-replacements/~]"
+                state software version replacements)))))
+
 (defun describe-class (name class stream)
-  (let* ((by-name (not class))
-         (name (if class (class-name class) name))
-         (class (if class class (find-class name nil))))
+  (binding* ((by-name (not class))
+             ((name class) (if class
+                               (values (class-name class) name)
+                               (values name (find-class name nil)))))
     (when class
       (let ((metaclass-name (class-name (class-of class))))
         (pprint-logical-block (stream nil)
           (when by-name
             (format stream "~@:_~A names the ~(~A~) ~S:"
-                    name
-                    metaclass-name
-                    class)
+                    name metaclass-name class)
             (pprint-indent :block 2 stream))
+          (describe-deprecation 'type name stream)
           (describe-documentation class t stream)
           (when (sb-mop:class-finalized-p class)
             (describe-stuff "Class precedence-list"
@@ -538,6 +491,45 @@
         (format stream "~@:_~A:~@<~;~{ ~S~^,~:_~}~;~:>" label list)
         (format stream "~@:_~A:~@<~;~{ ~A~^,~:_~}~;~:>" label list))))
 
+(defun describe-variable (name stream)
+  (let* ((kind (info :variable :kind name))
+         (wot (ecase kind
+                (:special "a special variable")
+                (:macro "a symbol macro")
+                (:constant "a constant variable")
+                (:global "a global variable")
+                (:unknown "an undefined variable")
+                (:alien "an alien variable"))))
+    (when (and (eq kind :unknown) (not (boundp name)))
+      (return-from describe-variable))
+    (pprint-logical-block (stream nil)
+      (format stream "~@:_~A names ~A:" name wot)
+      (pprint-indent :block 2 stream)
+      (describe-deprecation 'variable name stream)
+      (when (eq (info :variable :where-from name) :declared)
+        (format stream "~@:_Declared type: ~S"
+                (type-specifier (info :variable :type name))))
+      (when (info :variable :always-bound name)
+        (format stream "~@:_Declared always-bound."))
+      (cond
+        ((eq kind :alien)
+         (let ((info (info :variable :alien-info name)))
+           (format stream "~@:_Value: ~S" (eval name))
+           (format stream "~@:_Type: ~S"
+                   (sb-alien-internals:unparse-alien-type
+                    (sb-alien::heap-alien-info-type info)))
+           (format stream "~@:_Address: #x~8,'0X"
+                   (sap-int (sb-alien::heap-alien-info-sap info)))))
+        ((eq kind :macro)
+         (let ((expansion (info :variable :macro-expansion name)))
+           (format stream "~@:_Expansion: ~S" expansion)))
+        ((boundp name)
+         (format stream "~:@_Value: ~S" (symbol-value name)))
+        ((not (eq kind :unknown))
+         (format stream "~:@_Currently unbound.")))
+      (describe-documentation name 'variable stream)
+      (terpri stream))))
+
 (defun describe-lambda-list (lambda-list stream)
   (let ((*print-circle* nil)
         (*print-level* 24)
@@ -640,6 +632,7 @@
             (unless function
               (format stream "~%~A names ~A:" name what)
               (pprint-indent :block 2 stream))
+            (describe-deprecation 'function name stream)
             (describe-lambda-list lambda-list stream)
             (when declared-type
               (format stream "~@:_Declared type: ~S" declared-type))
@@ -708,3 +701,29 @@
                (terpri stream)))))
     (when (symbolp name)
       (describe-function `(setf ,name) nil stream))))
+
+(defun describe-type (name stream)
+  (let* ((kind (info :type :kind name))
+         (fun (case kind
+                (:defined
+                 (or (info :type :expander name) t))
+                (:primitive
+                 (or (info :type :translator name) t)))))
+    (when fun
+      (pprint-newline :mandatory stream)
+      (pprint-logical-block (stream nil)
+        (format stream "~@:_~A names a ~@[primitive~* ~]type-specifier:"
+                name (eq kind :primitive))
+        (pprint-indent :block 2 stream)
+        (describe-deprecation 'type name stream)
+        (describe-documentation name 'type stream (eq t fun))
+        (unless (eq t fun)
+          ;; even though :translator can store a CTYPE, this is safe
+          ;; because a symbol can't have a non-FUNCTIONP translator.
+          (describe-lambda-list (%fun-lambda-list fun) stream)
+          (multiple-value-bind (expansion ok)
+              (handler-case (typexpand-1 name)
+                (error () (values nil nil)))
+            (when ok
+              (format stream "~@:_Expansion: ~S" expansion)))))
+      (terpri stream))))
