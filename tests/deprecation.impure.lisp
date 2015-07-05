@@ -155,11 +155,11 @@
   you-cant-use-this replacement-fn (x) (identity x))
 
 (with-test (:name :introspect-deprecation-stage)
-  (assert (eq (sb-int:deprecated-thing-p :function 'please-dont-use-this)
+  (assert (eq (sb-int:deprecated-thing-p 'function 'please-dont-use-this)
               :early))
-  (assert (eq (sb-int:deprecated-thing-p :function 'really-dont-do-it)
+  (assert (eq (sb-int:deprecated-thing-p 'function 'really-dont-do-it)
               :late))
-  (assert (eq (sb-int:deprecated-thing-p :function 'you-cant-use-this)
+  (assert (eq (sb-int:deprecated-thing-p 'function 'you-cant-use-this)
               :final)))
 
 ;; lp#1439151

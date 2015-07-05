@@ -33,11 +33,10 @@
 
 #-sb-xc-host
 (define-compiler-macro symbol-value (&whole form symbol &environment env)
-  (when (sb!xc:constantp symbol env)
-    (let ((name (constant-form-value symbol env)))
-      (awhen (and (symbolp name) (handle-deprecated-global-variable name))
-        (return-from symbol-value it))))
-  form)
+  (or (when (sb!xc:constantp symbol env)
+        (let ((name (constant-form-value symbol env)))
+          (and (symbolp name) (handle-deprecated-global-variable name))))
+      form))
 
 (defun boundp (symbol)
   #!+sb-doc

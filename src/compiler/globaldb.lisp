@@ -474,7 +474,7 @@
 (define-info-type (:variable :always-bound)
   :type-spec (member nil :eventually :always-bound))
 
-(define-info-type (:variable :deprecated) :type-spec t)
+(define-info-type (:variable :deprecated) :type-spec deprecation-info)
 
 ;;; the declared type for this variable
 (define-info-type (:variable :type)

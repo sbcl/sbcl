@@ -1244,11 +1244,47 @@
 
 ;;;; Deprecating stuff
 
+(deftype deprecation-state ()
+  '(member :early :late :final))
+
 (defun normalize-deprecation-replacements (replacements)
   (if (or (not (listp replacements))
           (eq 'setf (car replacements)))
       (list replacements)
       replacements))
+
+(defstruct (deprecation-info
+             (:constructor make-deprecation-info
+                           (state since &optional replacement-spec
+                            &aux (replacements (normalize-deprecation-replacements
+                                                replacement-spec))))
+             (:copier nil))
+  (state        (missing-arg) :type deprecation-state :read-only t)
+  (since        (missing-arg) :type string            :read-only t)
+  (replacements '()           :type list              :read-only t))
+
+;; Return the state of deprecation of the thing identified by
+;; NAMESPACE and NAME, or NIL.
+(defun deprecated-thing-p (namespace name)
+  (ecase namespace
+    (function
+     ;; This can't work on the host due to CLOSUREP,%FUN-NAME, etc.
+     #-sb-xc-host
+     (let ((macro-fun (info :function :compiler-macro-function name)))
+       (and (closurep macro-fun)
+            (eq (%fun-name macro-fun) '.deprecation-warning.)
+            ;; If you name a function literally :EARLY and it happens to
+            ;; be in :LATE deprecation, then this could be wrong; etc.
+            ;; But come on now ... who would name a function like that?
+            (find-if-in-closure (lambda (x) (member x '(:early :late :final)))
+                                macro-fun))))
+    (variable
+     (multiple-value-bind (info infop)
+         (info :variable :deprecated name)
+       (when infop
+         (values (deprecation-info-state info)
+                 (deprecation-info-since info)
+                 (deprecation-info-replacements info)))))))
 
 (defun deprecation-error (since name replacements)
   (error 'deprecation-error
@@ -1292,22 +1328,6 @@
     (declare (ignore env))
     (deprecation-warn state since name replacements)
     form))
-
-;; Return the stage of deprecation of thing identified by KIND and NAME, or NIL.
-(defun deprecated-thing-p (kind name)
-  (declare (ignorable kind name))
-  (ecase kind
-    (:function
-     ;; This can't work on the host due to CLOSUREP,%FUN-NAME, etc.
-     #-sb-xc-host
-     (let ((macro-fun (info :function :compiler-macro-function name)))
-       (and (closurep macro-fun)
-            (eq (%fun-name macro-fun) '.deprecation-warning.)
-            ;; If you name a function literally :EARLY and it happens to
-            ;; be in :LATE deprecation, then this could be wrong; etc.
-            ;; But come on now ... who would name a function like that?
-            (find-if-in-closure (lambda (x) (member x '(:early :late :final)))
-                                macro-fun))))))
 
 ;; This is the moral equivalent of a warning from /usr/bin/ld that
 ;; "gets() is dangerous." You're informed by both the compiler and linker.
@@ -1381,9 +1401,6 @@
 ;;; - SB-THREAD:JOIN-THREAD-ERROR-THREAD, since 1.0.29.17 (06/2009)     -> Final: 09/2012
 ;;; - SB-THREAD:INTERRUPT-THREAD-ERROR-THREAD since 1.0.29.17 (06/2009) -> Final: 06/2012
 
-(deftype deprecation-state ()
-  '(member :early :late :final))
-
 (defun print-deprecation-message (name since &optional replacements stream)
   (apply #'format stream
          (!uncross-format-control
@@ -1425,20 +1442,21 @@
              (deprecation-compiler-macro ,state ,since ',name ',replacements)))))
 
 (defun check-deprecated-variable (name)
-  (let ((info (info :variable :deprecated name)))
-    (when info
-      (deprecation-warn (first info) (second info) name (third info))
-      (values-list info))))
+  (multiple-value-bind (state since replacements)
+      (deprecated-thing-p 'variable name)
+    (when state
+      (deprecation-warn state since name replacements)
+      (values state since replacements))))
 
 (defmacro define-deprecated-variable (state since name
                                       &key (value nil valuep) replacement)
-  (declare (ignorable replacement)
-           (type deprecation-state state)
+  (declare (type deprecation-state state)
            (type string since)
            (type symbol name))
   `(prog2
        (setf (info :variable :deprecated ',name)
-             '(,state ,since ,(when replacement `(,replacement))))
+             (make-deprecation-info
+              ,state ,since ,(when replacement (list ,replacement))))
        ,(if (member state '(:early :late))
             `(defvar ,name ,@(when valuep (list value)))
             `',name)
