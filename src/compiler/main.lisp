@@ -1496,6 +1496,8 @@ necessary, since type inference may take arbitrarily long to converge.")
 
 ;;; Compile FORM and arrange for it to be called at load-time. Return
 ;;; the dumper handle and our best guess at the type of the object.
+;;; It would be nice if L-T-V forms were generally eligible
+;;; for fopcompilation, as it could eliminate special cases below.
 (defun compile-load-time-value (form)
   (let ((ctype
          (cond
@@ -1505,6 +1507,11 @@ necessary, since type inference may take arbitrarily long to converge.")
           ;; compiled lambdas don't cause a chicken-and-egg problem.
           ((typep form '(cons (eql find-package) (cons string null)))
            (specifier-type 'package))
+          #+sb-xc-host
+          ((typep form '(cons (eql find-classoid-cell)
+                              (cons (cons (eql quote)))))
+           (aver (eq (getf (cddr form) :create) t))
+           (specifier-type 'sb!kernel::classoid-cell))
           ;; Special case for the cross-compiler, necessary for at least
           ;; SETUP-PRINTER-STATE, but also anything that would be dumped
           ;; using FOP-KNOWN-FUN in the target compiler, to avoid going

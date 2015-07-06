@@ -23,7 +23,13 @@
 ;;; away as with the merger of SB-PCL:CLASS and CL:CLASS it's no
 ;;; longer necessary)
 (def!struct (classoid
-             (:make-load-form-fun classoid-make-load-form-fun)
+             (:make-load-form-fun
+              (lambda (self)
+                (let ((name (classoid-name self)))
+                  (if (and name (eq (find-classoid name nil) self))
+                      `(find-classoid ',name)
+                      (error "can't use anonymous or undefined class as constant:~%  ~S"
+                             self)))))
              (:include ctype
                        (class-info (type-class-or-lose 'classoid)))
              (:constructor nil)
@@ -63,21 +69,6 @@
   ;; we don't just call it the CLASS slot) object for this class, or
   ;; NIL if none assigned yet
   (pcl-class nil))
-
-(defun classoid-make-load-form-fun (class)
-  (/show "entering CLASSOID-MAKE-LOAD-FORM-FUN" class)
-  (let ((name (classoid-name class)))
-    (unless (and name (eq (find-classoid name nil) class))
-      (/show "anonymous/undefined class case")
-      (error "can't use anonymous or undefined class as constant:~%  ~S"
-             class))
-    `(locally
-       ;; KLUDGE: There's a FIND-CLASSOID DEFTRANSFORM for constant
-       ;; class names which creates fast but non-cold-loadable,
-       ;; non-compact code. In this context, we'd rather have compact,
-       ;; cold-loadable code. -- WHN 19990928
-       (declare (notinline find-classoid))
-       (find-classoid ',name))))
 
 ;;;; basic LAYOUT stuff
 
@@ -1585,15 +1576,7 @@ between the ~A definition and the ~A definition"
 (!cold-init-forms
   #-sb-xc-host (/show0 "about to set *BUILT-IN-CLASS-CODES*")
   (setq **built-in-class-codes**
-        (let* ((initial-element
-                (locally
-                  ;; KLUDGE: There's a FIND-CLASSOID DEFTRANSFORM for
-                  ;; constant class names which creates fast but
-                  ;; non-cold-loadable, non-compact code. In this
-                  ;; context, we'd rather have compact, cold-loadable
-                  ;; code. -- WHN 19990928
-                  (declare (notinline find-classoid))
-                  (classoid-layout (find-classoid 'random-class))))
+        (let* ((initial-element (classoid-layout (find-classoid 'random-class)))
                (res (make-array 256 :initial-element initial-element)))
           (dolist (x *!built-in-classes* res)
             (destructuring-bind (name &key codes &allow-other-keys)

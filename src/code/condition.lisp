@@ -86,30 +86,12 @@
 ;;; figured out whether it's right. -- WHN 19990612
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (/show0 "condition.lisp 103")
-  (let ((condition-class (locally
-                           ;; KLUDGE: There's a DEFTRANSFORM
-                           ;; FIND-CLASSOID for constant class names
-                           ;; which creates fast but
-                           ;; non-cold-loadable, non-compact code. In
-                           ;; this context, we'd rather have compact,
-                           ;; cold-loadable code. -- WHN 19990928
-                           (declare (notinline find-classoid))
-                           (find-classoid 'condition))))
+  (let ((condition-class (find-classoid 'condition)))
     (setf (condition-classoid-cpl condition-class)
           (list condition-class)))
   (/show0 "condition.lisp 103"))
 
-(setf (condition-classoid-report (locally
-                                   ;; KLUDGE: There's a DEFTRANSFORM
-                                   ;; FIND-CLASSOID for constant class
-                                   ;; names which creates fast but
-                                   ;; non-cold-loadable, non-compact
-                                   ;; code. In this context, we'd
-                                   ;; rather have compact,
-                                   ;; cold-loadable code. -- WHN
-                                   ;; 19990928
-                                   (declare (notinline find-classoid))
-                                   (find-classoid 'condition)))
+(setf (condition-classoid-report (find-classoid 'condition))
       (lambda (cond stream)
         (format stream "Condition ~S was signalled." (type-of cond))))
 
@@ -333,13 +315,7 @@
       ;; => (#<DEFSTRUCT-SLOT-DESCRIPTION ACTUAL-INITARGS>
       ;;     #<DEFSTRUCT-SLOT-DESCRIPTION ASSIGNED-SLOTS>)
       (setf (layout-info layout)
-            (locally
-                ;; KLUDGE: There's a FIND-CLASS DEFTRANSFORM for constant class
-                ;; names which creates fast but non-cold-loadable, non-compact
-                ;; code. In this context, we'd rather have compact, cold-loadable
-                ;; code. -- WHN 19990928
-                (declare (notinline find-classoid))
-              (layout-info (classoid-layout (find-classoid 'condition)))))
+            (layout-info (classoid-layout (find-classoid 'condition))))
 
       (setf (find-classoid name) class)
 

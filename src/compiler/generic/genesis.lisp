@@ -1107,6 +1107,19 @@ core and return a descriptor to it."
         (or (car (gethash name *cold-package-symbols*))
             (error "Genesis could not find a target package named ~S" name))))
 
+(defvar *classoid-cells*)
+(setf (get 'find-classoid-cell :sb-cold-funcall-handler/for-value)
+      (lambda (name &key create)
+        (aver (eq create t))
+        (or (gethash name *classoid-cells*)
+            (let ((layout (gethash 'sb!kernel::classoid-cell *cold-layouts*)))
+              (setf (gethash name *classoid-cells*)
+                    (write-slots (allocate-struct *dynamic* layout)
+                                 (find-layout 'sb!kernel::classoid-cell)
+                                 :name name
+                                 :pcl-class *nil-descriptor*
+                                 :classoid *nil-descriptor*))))))
+
 ;;; a map from descriptors to symbols, so that we can back up. The key
 ;;; is the address in the target core.
 (defvar *cold-symbols*)
@@ -1535,7 +1548,9 @@ core and return a descriptor to it."
                    cold-pkg-inits)))
     (cold-set 'sb!impl::*!initial-symbols* cold-pkg-inits))
 
-  (attach-fdefinitions-to-symbols)
+  (dump-symbol-info-vectors
+   (attach-fdefinitions-to-symbols
+    (attach-classoid-cells-to-symbols (make-hash-table :test #'eq))))
 
   (cold-set '*!reversed-cold-toplevels* *current-reversed-cold-toplevels*)
   (cold-set '*!initial-debug-sources* *current-debug-sources*)
@@ -1697,10 +1712,20 @@ core and return a descriptor to it."
           (error "Offset from FDEFN ~S to ~S is ~W, not ~W."
                  sym nil offset desired))))))
 
+(defun attach-classoid-cells-to-symbols (hashtable)
+  (let ((num (sb!c::meta-info-number (sb!c::meta-info :type :classoid-cell))))
+    ;; Iteration order is immaterial. The symbols will get sorted later.
+    (maphash (lambda (symbol cold-classoid-cell)
+               (setf (gethash symbol hashtable)
+                     (packed-info-insert
+                      (gethash symbol hashtable +nil-packed-infos+)
+                      sb!c::+no-auxilliary-key+ num cold-classoid-cell)))
+             *classoid-cells*))
+  hashtable)
+
 ;; Create pointer from SYMBOL and/or (SETF SYMBOL) to respective fdefinition
 ;;
-(defun attach-fdefinitions-to-symbols ()
-  (let ((hashtable (make-hash-table :test #'eq)))
+(defun attach-fdefinitions-to-symbols (hashtable)
     ;; Collect fdefinitions that go with one symbol, e.g. CAR and (SETF CAR),
     ;; using the host's code for manipulating a packed info-vector.
     (maphash (lambda (warm-name cold-fdefn)
@@ -1712,6 +1737,9 @@ core and return a descriptor to it."
                         (gethash key1 hashtable +nil-packed-infos+)
                         key2 +fdefn-info-num+ cold-fdefn))))
               *cold-fdefn-objects*)
+    hashtable)
+
+(defun dump-symbol-info-vectors (hashtable)
     ;; Emit in the same order symbols reside in core to avoid
     ;; sensitivity to the iteration order of host's maphash.
     (loop for (warm-sym . info)
@@ -1720,14 +1748,14 @@ core and return a descriptor to it."
           do (write-wordindexed
               (cold-intern warm-sym) sb!vm:symbol-info-slot
               ;; Each vector will have one fixnum, possibly the symbol SETF,
-              ;; and one or two #<fdefn> objects in it.
+              ;; and one or two #<fdefn> objects in it, and/or a classoid-cell.
               (vector-in-core
                      (map 'list (lambda (elt)
                                   (etypecase elt
                                     (symbol (cold-intern elt))
                                     (fixnum (make-fixnum-descriptor elt))
                                     (descriptor elt)))
-                          info))))))
+                          info)))))
 
 
 ;;;; fixups and related stuff
@@ -3580,6 +3608,7 @@ initially undefined function references:~2%")
                           (cons nil nil))))) ; (externals . internals)
            (*nil-descriptor* (make-nil-descriptor target-cl-pkg-info))
            (*known-structure-classoids* nil)
+           (*classoid-cells* (make-hash-table :test 'eq))
            (*current-reversed-cold-toplevels* *nil-descriptor*)
            (*current-debug-sources* *nil-descriptor*)
            (*unbound-marker* (make-other-immediate-descriptor
