@@ -311,12 +311,6 @@
                              ,@(accessor-definitions dd)))
                 ;; This must be in the same lexical environment
                      ,@(constructor-definitions dd)
-                     ,@(when (eq (dd-pure dd) t)
-                         ;; Seems like %TARGET-DEFSTRUCT should do this
-                         `((locally
-                            (declare (notinline find-classoid))
-                            (setf (layout-pure (classoid-layout
-                                                (find-classoid ',name))) t))))
                      ,@print-method
                 ;; Various other operations only make sense on the target SBCL.
                      (%target-defstruct ',dd))))

@@ -140,7 +140,8 @@
 
   (let* ((classoid (find-classoid (dd-name dd)))
          (layout (classoid-layout classoid)))
-    (declare (ignorable layout))
+    (when (eq (dd-pure dd) t)
+      (setf (layout-pure layout) t))
     #!+interleaved-raw-slots
     ;; Make a vector of EQUALP slots comparators, indexed by (- word-index data-start).
     ;; This has to be assigned to something regardless of whether there are
