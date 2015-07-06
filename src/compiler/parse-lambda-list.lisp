@@ -122,16 +122,27 @@
                  (if (destructuring-p)
                      (croak "~A is not a symbol or list: ~S" why x)
                      (croak "~A is not a symbol: ~S" why x))))
+             (defaultp (x what-kind)
+               (cond ((symbolp x) nil)
+                     ((listp x) t)
+                     (t (croak "~A parameter is not a symbol or cons: ~S"
+                               what-kind x))))
              (croak (string &optional (a1 0 a1p) (a2 0 a2p) (a3 0 a3p))
                ;; Don't care that FUNCALL can't elide fdefinition here.
                (declare (optimize (speed 1)))
                (let ((l (if a1p (list a1 a2 a3))))
                  (if (and l (not a3p)) (rplacd (if a2p (cdr l) l) nil))
                  ;; KLUDGE: When this function was limited to parsing
-                 ;; ordinary lambda lists, this error call was COMPILER-ERROR.
-                 ;; To make all tests pass, it has to decide what to be.
-                 ;; It's possible the tests are poorly designed and are
-                 ;; acting as "change detectors"
+                 ;; ordinary lambda lists, this error call was always
+                 ;; COMPILER-ERROR, which must be used, not plain old ERROR,
+                 ;; to avoid the compiler itself crashing. But outside of
+                 ;; the compiler, it must be ERROR. This discrepancy is sad
+                 ;; since DESTRUCTURING-BIND herein can cause a compiler crash.
+                 ;; It seems that the right thing is for the compiler to wrap
+                 ;; a condition handler around PARSE-LAMBDA-LIST.
+                 ;; Expecting a callee to understand how to signal conditions
+                 ;; tailored to a particular caller is not how things are
+                 ;; supposed to work.
                  (funcall (if (destructuring-p) 'error 'compiler-error)
                           condition-class
                           :format-control string :format-arguments l))))
@@ -266,46 +277,42 @@
         (dolist (arg required)
           (need-bindable arg "Required argument"))
         ;; FIXME: why not check symbol-ness of supplied-p variables now?
-        (flet ((defaultp (x what-kind)
-                 (cond ((symbolp x) nil)
-                       ((listp x) t)
-                       (t (croak "~A parameter is not a symbol or cons: ~S"
-                                 what-kind x))))
-               ;; Inform the user about a possibly malformed destructuring
-               ;; lambda list (&OPTIONAL (A &OPTIONAL B)).
-               ;; It's technically legal but unlikely to be right, as it makes
-               ;; A's default form the expression &OPTIONAL, which is an
-               ;; unlikely name for a local variable or macro, and an illegal
-               ;; name for a DEFVAR or such, being in the CL package.
-               (check-suspicious (default suppliedp-var)
-                (unless silent
-                  (when (and (probably-ll-keyword-p default)
-                             (member default sb!xc:lambda-list-keywords))
-                    (style-warn "suspicious default ~S in lambda list: ~S."
-                                default list))
-                  (when (and (probably-ll-keyword-p suppliedp-var)
-                             (member suppliedp-var sb!xc:lambda-list-keywords))
-                    (style-warn
-                     "suspicious supplied-p variable ~S in lambda list: ~S."
-                     suppliedp-var list)))))
-          (dolist (arg optional)
-            (when (defaultp arg '&optional)
-              (destructuring-bind (var &optional init-form supplied-p) arg
-                (need-bindable var "&OPTIONAL parameter name")
-                (check-suspicious init-form supplied-p))))
+        (flet ((scan-opt/key (list what-kind description)
+                 (dolist (arg list)
+                   (when (defaultp arg what-kind)
+                     ;; FIXME:  (DEFUN F (&OPTIONAL (A B C D)) 42) crashes the
+                     ;; compiler, but not as consequence of the new parser.
+                     ;; (This is not a regression)
+                     (destructuring-bind (var &optional default sup-p) arg
+                       (if (and (consp var) (eq what-kind '&key))
+                           (destructuring-bind (keyword-name var) var
+                             (declare (ignore keyword-name))
+                             (need-bindable var description))
+                           (need-bindable var description))
+                       ;; Inform the user about a possibly malformed
+                       ;; destructuring list (&OPTIONAL (A &OPTIONAL B)).
+                       ;; It's technically legal but unlikely to be right,
+                       ;; as A's default form is the symbol &OPTIONAL,
+                       ;; which is an unlikely name for a local variable,
+                       ;; and an illegal name for a DEFVAR or such,
+                       ;; being in the CL package.
+                       (unless silent
+                         (when (and (probably-ll-keyword-p default)
+                                    (member default sb!xc:lambda-list-keywords))
+                           (style-warn "suspicious default ~S in lambda list: ~S."
+                                       default list))
+                         (when (and (probably-ll-keyword-p sup-p)
+                                    (member sup-p sb!xc:lambda-list-keywords))
+                           (style-warn
+                            "suspicious supplied-p variable ~S in lambda list: ~S."
+                            sup-p list))))))))
+          (scan-opt/key optional '&optional "&OPTIONAL parameter name")
           (when rest
             (need-bindable (car rest) "&REST argument"))
-          (dolist (arg keys)
-            (when (defaultp arg '&key)
-              (destructuring-bind (var-or-kv &optional init-form supplied-p) arg
-                (if (atom var-or-kv)
-                    (need-symbol var-or-kv "&KEY parameter name")
-                    (destructuring-bind (keyword-name var) var-or-kv
-                      (declare (ignore keyword-name))
-                      (need-bindable var "&KEY parameter name")))
-                (check-suspicious init-form supplied-p))))
+          (scan-opt/key keys '&key "&KEY parameter name")
           (dolist (arg aux)
             (when (defaultp arg '&aux)
+              ;; FIXME: also potentially compiler-crash-inducing
               (destructuring-bind (var &optional init-form) arg
                 (declare (ignore init-form))
                 ;; &AUX is not destructured
@@ -1012,6 +1019,18 @@
                                    (eq (cddr context) 'deftype)
                                    ''*))
      ,@body))
+
+(defvar *macro-policy* nil)
+;; Turn the macro policy into an OPTIMIZE declaration for insertion
+;; into a macro body for DEFMACRO, MACROLET, or DEFINE-COMPILER-MACRO.
+;; Note that despite it being a style-warning to insert a duplicate,
+;; we need no precaution against that even though users may write
+;;  (DEFMACRO FOO (X) (DECLARE (OPTIMIZE (SAFETY 1))) ...)
+;; The expansion of macro-defining forms is such that the macro-policy
+;; appears in a different lexical scope from the user's declarations.
+(defun macro-policy-decls ()
+  (and *macro-policy*
+       `((declare (optimize ,@(policy-to-decl-spec *macro-policy*))))))
 
 ;;; Make a lambda expression that receives an s-expression, destructures it
 ;;; according to LAMBDA-LIST, and executes BODY.
