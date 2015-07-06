@@ -52,7 +52,8 @@ temporarily.")
   (signal-number nil :type integer))
 
 (declaim (inline make-mutex)) ;; for possible DX-allocating
-(def!struct mutex
+(def!struct (mutex
+             (:constructor make-mutex (&key name)))
   #!+sb-doc
   "Mutex type."
   (name   nil :type (or null thread-name))
