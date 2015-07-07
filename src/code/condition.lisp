@@ -1530,15 +1530,18 @@ the usual naming convention (names like *FOO*) for special variables"
                   :reader deprecation-condition-name)
    (replacements  :initarg :replacements
                   :reader deprecation-condition-replacements)
-   (since         :initarg :since
-                  :reader deprecation-condition-since)
+   (software      :initarg :software
+                  :reader deprecation-condition-software)
+   (version       :initarg :version
+                  :reader deprecation-condition-version)
    (runtime-error :initarg :runtime-error
                   :reader deprecation-condition-runtime-error
                   :initform nil))
   (:default-initargs
    :name (missing-arg)
    :replacements (missing-arg)
-   :since (missing-arg))
+   :software (missing-arg)
+   :version (missing-arg))
   #!+sb-doc
   (:documentation
    "Superclass for deprecation-related error and warning
@@ -1548,7 +1551,8 @@ conditions."))
   (flet ((print-it (stream)
            (print-deprecation-message
             (deprecation-condition-name condition)
-            (deprecation-condition-since condition)
+            (deprecation-condition-software condition)
+            (deprecation-condition-version condition)
             (deprecation-condition-replacements condition)
             stream)))
     (if *print-escape*
@@ -1570,11 +1574,12 @@ conditions."))
                              ,@(when check-runtime-error
                                 `((deprecation-condition-runtime-error condition))))
                     (format stream ,format-string
+                            (deprecation-condition-software condition)
                             (deprecation-condition-name condition)))))))
 
   (define-deprecation-warning early-deprecation-warning style-warning nil
     (!uncross-format-control
-     "~%~@<~:@_In future SBCL versions ~
+     "~%~@<~:@_In future ~A versions ~
       ~/sb!impl:print-symbol-with-prefix/ will signal a full warning ~
       at compile-time.~:@>")
     #!+sb-doc
@@ -1585,7 +1590,7 @@ error.")
 
   (define-deprecation-warning late-deprecation-warning warning t
     (!uncross-format-control
-     "~%~@<~:@_In future SBCL versions ~
+     "~%~@<~:@_In future ~A versions ~
       ~/sb!impl:print-symbol-with-prefix/ will signal a runtime ~
       error.~:@>")
     #!+sb-doc
@@ -1596,7 +1601,7 @@ error.")
 
   (define-deprecation-warning final-deprecation-warning warning t
     (!uncross-format-control
-     "~%~@<~:@_An error will be signaled at runtime for ~
+     "~%~@<~:@_~*An error will be signaled at runtime for ~
       ~/sb!impl:print-symbol-with-prefix/.~:@>")
     #!+sb-doc
     "This warning is signaled when the use of a variable,

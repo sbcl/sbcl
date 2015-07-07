@@ -1247,6 +1247,21 @@
 (deftype deprecation-state ()
   '(member :early :late :final))
 
+(deftype deprecation-software-and-version ()
+  '(or string (cons string (cons string null))))
+
+(defun normalize-deprecation-since (since)
+  (unless (typep since 'deprecation-software-and-version)
+    (error 'simple-type-error
+           :datum since
+           :expected-type 'deprecation-software-and-version
+           :format-control "~@<The value ~S does not designate a ~
+                            version or a software name and a version.~@:>"
+           :format-arguments (list since)))
+  (if (typep since 'string)
+      (values "SBCL" since)
+      (values-list since)))
+
 (defun normalize-deprecation-replacements (replacements)
   (if (or (not (listp replacements))
           (eq 'setf (car replacements)))
@@ -1255,12 +1270,14 @@
 
 (defstruct (deprecation-info
              (:constructor make-deprecation-info
-                           (state since &optional replacement-spec
-                            &aux (replacements (normalize-deprecation-replacements
-                                                replacement-spec))))
+                           (state software version &optional replacement-spec
+                            &aux
+                            (replacements (normalize-deprecation-replacements
+                                           replacement-spec))))
              (:copier nil))
   (state        (missing-arg) :type deprecation-state :read-only t)
-  (since        (missing-arg) :type string            :read-only t)
+  (software     (missing-arg) :type string            :read-only t)
+  (version      (missing-arg) :type string            :read-only t)
   (replacements '()           :type list              :read-only t))
 
 ;; Return the state of deprecation of the thing identified by
@@ -1273,31 +1290,35 @@
         (type     (info :type     :deprecated name)))
     (when infop
       (values (deprecation-info-state info)
-              (deprecation-info-since info)
+              (list (deprecation-info-software info)
+                    (deprecation-info-version info))
               (deprecation-info-replacements info)))))
 
-(defun deprecation-error (since name replacements)
+(defun deprecation-error (software version name replacements)
   (error 'deprecation-error
          :name name
-         :replacements (normalize-deprecation-replacements replacements)
-         :since since))
+         :software software
+         :version version
+         :replacements (normalize-deprecation-replacements replacements)))
 
-(defun deprecation-warn (state since name replacements
+(defun deprecation-warn (state software version name replacements
                          &key (runtime-error (neq :early state)))
   (warn (ecase state
           (:early 'early-deprecation-warning)
           (:late 'late-deprecation-warning)
           (:final 'final-deprecation-warning))
         :name name
+        :software software
+        :version version
         :replacements (normalize-deprecation-replacements replacements)
-        :since since
         :runtime-error runtime-error))
 
 (defun check-deprecated-thing (namespace name)
   (multiple-value-bind (state since replacements)
       (deprecated-thing-p namespace name)
     (when state
-      (deprecation-warn state since name replacements)
+      (deprecation-warn
+       state (first since) (second since) name replacements)
       (values state since replacements))))
 
 ;;; For-effect-only variant of CHECK-DEPRECATED-THING for
@@ -1347,8 +1368,8 @@
          (%check-deprecated-type name)))))
   (values))
 
-(defun deprecated-function (since name replacements &optional doc)
-  (declare (ignorable since name replacements doc))
+(defun deprecated-function (software version name replacements &optional doc)
+  (declare (ignorable software version name replacements doc))
   #+sb-xc-host
   (error "Can't define deprecated functions on the host")
   #-sb-xc-host
@@ -1358,7 +1379,7 @@
          (set-closure-name
           (lambda (&rest deprecated-function-args)
             (declare (ignore deprecated-function-args))
-            (deprecation-error since name replacements))
+            (deprecation-error software version name replacements))
           name)))
     (when doc
       (setf (%fun-doc closure) doc))
@@ -1436,11 +1457,12 @@
 ;;; - SB-THREAD:JOIN-THREAD-ERROR-THREAD, since 1.0.29.17 (06/2009)     -> Final: 09/2012
 ;;; - SB-THREAD:INTERRUPT-THREAD-ERROR-THREAD since 1.0.29.17 (06/2009) -> Final: 06/2012
 
-(defun print-deprecation-message (name since &optional replacements stream)
+(defun print-deprecation-message (name software version
+                                  &optional replacements stream)
   (apply #'format stream
          (!uncross-format-control
          "~/sb!impl:print-symbol-with-prefix/ has been ~
-          deprecated as of SBCL ~A.~
+          deprecated as of ~A ~A.~
           ~#[~;~
             ~2%Use ~/sb!impl:print-symbol-with-prefix/ instead.~;~
             ~2%Use ~/sb!impl:print-symbol-with-prefix/ or ~
@@ -1448,7 +1470,7 @@
             ~2%Use~@{~#[~; or~] ~
             ~/sb!impl:print-symbol-with-prefix/~^,~} instead.~
           ~]")
-         name since replacements))
+         name software version replacements))
 
 (defmacro define-deprecated-function (state since name replacements lambda-list
                                       &body body)
@@ -1458,7 +1480,8 @@
            (type (or function-name list) replacements)
            (type list lambda-list))
   (let ((doc (print-deprecation-message
-              name since (normalize-deprecation-replacements replacements))))
+              name "SBCL" since
+              (normalize-deprecation-replacements replacements))))
     (declare (ignorable doc))
     `(prog1
          ,(ecase state
@@ -1470,8 +1493,8 @@
              `(progn
                 (declaim (ftype (function * nil) ,name))
                 (setf (fdefinition ',name)
-                      (deprecated-function ,since ',name ',replacements
-                                           #!+sb-doc ,doc))
+                      (deprecated-function
+                       "SBCL" ,since ',name ',replacements #!+sb-doc ,doc))
                 ',name)))
        (proclaim '(deprecated
                    ,state ,since
@@ -1493,7 +1516,7 @@
                                      `(:replacement ,replacement)))))
      #!+sb-doc
      (setf (fdocumentation ',name 'variable)
-           ,(print-deprecation-message name since (list replacement)))))
+           ,(print-deprecation-message name "SBCL" since (list replacement)))))
 
 ;; Given DECLS as returned by from parse-body, and SYMBOLS to be bound
 ;; (with LET, MULTIPLE-VALUE-BIND, etc) return two sets of declarations:

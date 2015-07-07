@@ -206,11 +206,12 @@
                               of ~{~A~^, ~}.~@:>"
            :format-arguments (list form state
                                    (rest (typexpand 'deprecation-state)))))
-  (values state since))
+  (multiple-value-call #'values
+    state (sb!impl::normalize-deprecation-since since)))
 
-(defun process-deprecation-declaration (thing state since)
+(defun process-deprecation-declaration (thing state software version)
   (destructuring-bind (namespace name &key replacement) thing
-    (let ((info (make-deprecation-info state since replacement)))
+    (let ((info (make-deprecation-info state software version replacement)))
       (ecase namespace
         (function
          (setf (info :function :deprecated name) info))
@@ -306,10 +307,10 @@
          (map-args #'process-inline-declaration kind))
         (deprecated
          (destructuring-bind (state since &rest things) args
-           (multiple-value-bind (state since)
+           (multiple-value-bind (state software version)
                (check-deprecation-declaration state since form)
              (map-names things #'process-deprecation-declaration
-                        state since))))
+                        state software version))))
         (declaration
          (map-args #'process-declaration-declaration form))
         (t
